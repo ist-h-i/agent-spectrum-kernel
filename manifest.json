@@ -1,0 +1,26 @@
+{
+  "name": "ai-coding-kernel-skills",
+  "version": "1.0.0",
+  "created": "2026-06-15",
+  "kernel": "AGENTS.md",
+  "skills": [
+    "adr-review",
+    "code-review-quality",
+    "doubt-driven-development",
+    "evidence-ledger",
+    "grill-design",
+    "grill-with-docs",
+    "handoff-generation",
+    "planning-with-files",
+    "repository-orientation",
+    "scope-control",
+    "skill-router",
+    "spec-driven-development",
+    "test-first-verification"
+  ],
+  "design": {
+    "kernel": "single physical file, internally modular",
+    "skills": "one directory per workflow, each with SKILL.md",
+    "language": "English instructions for agent portability; Japanese README guidance in chat response"
+  }
+}
