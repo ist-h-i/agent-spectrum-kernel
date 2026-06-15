@@ -1,6 +1,6 @@
 ---
 name: evidence-ledger
-description: Separate claims from evidence and downgrade unsupported assertions. Use for performance, security, reliability, correctness, readiness, refactor value, or research claims.
+description: Separate claims from evidence and downgrade unsupported assertions. Use for performance, security, reliability, correctness, readiness, refactor value, UX, cost, or research claims.
 ---
 
 # Evidence Ledger
@@ -9,22 +9,26 @@ description: Separate claims from evidence and downgrade unsupported assertions.
 
 Prevent the agent from overstating what has been proven.
 
-## When to use
+## Use when
 
-Use when the output contains claims such as:
-- faster
-- safer
-- more reliable
-- production-ready
-- scalable
-- simpler
-- correct
-- fixed
-- improved
-- secure
-- no regression
-- reduces cost
-- better UX
+The output contains or may imply claims such as:
+- faster,
+- safer,
+- more reliable,
+- production-ready,
+- scalable,
+- simpler,
+- correct,
+- fixed,
+- improved,
+- secure,
+- no regression,
+- reduces cost,
+- better UX.
+
+## Do not use when
+
+- The task is purely mechanical and no claim beyond “changed X” is needed.
 
 ## Process
 
@@ -42,15 +46,26 @@ Missing evidence:
 Next check:
 ```
 
-3. Downgrade language:
-   - `verified` → can state directly with evidence.
-   - `supported` → state with caveat.
-   - `weak` → tentative.
-   - `hypothesis` → do not present as fact.
-   - `unknown` → explicitly unknown.
-   - `falsified` → remove or correct.
+3. Grade evidence.
 
-4. Add evidence requirements before merge/ship.
+| Evidence type | Strength |
+|---|---|
+| Passing focused test reproducing changed behavior | Strong for that behavior. |
+| Broader suite/build/typecheck | Strong for integration/static guarantees. |
+| Runtime/manual check | Useful but scoped. |
+| Benchmark with method | Strong only for measured scenario. |
+| Code inspection | Weak unless no executable check exists. |
+| Assumption or intent | Not evidence. |
+
+4. Downgrade language.
+   - `verified`: state directly with evidence.
+   - `supported`: state with caveat.
+   - `weak`: tentative only.
+   - `hypothesis`: do not present as fact.
+   - `unknown`: explicitly unknown.
+   - `falsified`: remove or correct.
+
+5. Define evidence required before merge/ship when needed.
 
 ## Output
 
@@ -61,11 +76,18 @@ Evidence ledger:
 | ... | ... | ... | ... | ... |
 ```
 
-## Anti-rationalization
+## Exit criteria
 
-| Excuse | Rebuttal |
+- Unsupported claims are downgraded.
+- Evidence strength is visible.
+- Missing evidence has a next check.
+- Final language matches evidence status.
+
+## Failure modes
+
+| Failure | Correction |
 |---|---|
-| “The code is cleaner.” | Cleaner must be tied to a reviewable property. |
-| “It should be faster.” | Performance needs measurement. |
-| “The bug is fixed.” | A fix needs reproduction and passing verification. |
-| “No known issue.” | Unknown is not evidence of absence. |
+| “Cleaner” claimed without property | Tie to reviewable property. |
+| “Faster” claimed without measurement | Require benchmark/measurement. |
+| “Fixed” claimed without reproduction | Require failing-then-passing evidence when feasible. |
+| “No known issue” used as proof | Unknown is not evidence of absence. |

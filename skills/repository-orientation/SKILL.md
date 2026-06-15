@@ -1,56 +1,59 @@
 ---
 name: repository-orientation
-description: Build a concise map of an unfamiliar repository before making changes. Use at the start of work in a repo whose structure, commands, conventions, or test setup are not yet known.
+description: Build a concise map of an unfamiliar repository before making changes. Use when structure, commands, conventions, tests, or module boundaries are unknown.
 ---
 
 # Repository Orientation
 
 ## Goal
 
-Understand enough of the repository to avoid random edits and false assumptions.
+Understand enough of the repository to avoid random edits, invented conventions, and false assumptions.
 
-## When to use
+## Use when
 
-Use when:
 - This is the first task in a repository.
-- The requested change spans unfamiliar modules.
+- The change spans unfamiliar modules.
 - Build/test commands are unknown.
-- The repo has unclear architecture, generated code, or multiple packages.
+- The repo has monorepo structure, generated code, multiple packages, or unclear boundaries.
+- Nearby conventions are likely to matter.
 
-Do not use for a tiny, already-localized edit where the relevant files are obvious.
+## Do not use when
+
+- The change is a tiny localized edit and the relevant files/tests are already known.
 
 ## Process
 
-1. Inspect project entry points:
+1. Inspect entry points.
    - README or equivalent.
-   - package/build/dependency files.
-   - test, lint, typecheck, and CI configuration.
-   - workspace/monorepo configuration.
+   - Package/build/dependency files.
+   - Workspace/monorepo configuration.
+   - Test/lint/typecheck/build scripts.
+   - CI config if available.
 
-2. Inspect domain and architecture material:
+2. Inspect design context.
    - docs/
-   - adr/
-   - CONTEXT.md or context maps
-   - contributing guide
-   - code ownership or module boundaries
+   - ADRs
+   - CONTRIBUTING or coding standards
+   - context maps, schema docs, API docs
+   - ownership/module-boundary hints
 
-3. Identify commands:
-   - install
+3. Identify commands.
+   - install/bootstrap
    - build
-   - test
+   - test all
+   - focused test
    - typecheck
    - lint
    - run/dev server
-   - focused test command for the target area
 
-4. Map relevant code:
-   - target files
-   - neighboring tests
-   - existing patterns
+4. Map target area.
+   - target files/modules
+   - nearby tests
    - public interfaces
-   - generated or vendored files to avoid
+   - existing patterns to reuse
+   - generated/vendored files to avoid
 
-5. Record only useful findings. Do not create a large repo encyclopedia.
+5. Record only decision-relevant findings. Do not create a repository encyclopedia.
 
 ## Output
 
@@ -63,14 +66,22 @@ Repository orientation:
 - Target area:
 - Tests near target:
 - Docs/ADRs found:
+- Generated/vendored areas to avoid:
 - Known risks:
 - Unknowns:
 ```
 
-## Anti-rationalization
+## Exit criteria
 
-| Excuse | Rebuttal |
+- The agent knows where to change code.
+- The agent knows the strongest affordable verification command.
+- Existing conventions near the target are identified.
+- Unknowns are explicit.
+
+## Failure modes
+
+| Failure | Correction |
 |---|---|
-| “I can infer the structure from filenames.” | Inspect the actual repo. Filenames lie. |
-| “I only need one file.” | Nearby tests and conventions determine whether the change is valid. |
-| “No docs means no architecture.” | Existing code is still architecture. |
+| Inferring structure from filenames | Inspect files and scripts. |
+| Reading too broadly | Stop after the task-relevant map is sufficient. |
+| Ignoring tests | Find nearby tests or mark test gap explicitly. |

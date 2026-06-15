@@ -1,6 +1,6 @@
 ---
 name: handoff-generation
-description: Create a precise handoff for another agent, reviewer, or future session. Use after implementation, investigation, review, or partial completion.
+description: Create a precise handoff for another agent, reviewer, or future session. Use after implementation, investigation, review, partial completion, or when generating a Codex/Cursor/Claude task prompt.
 ---
 
 # Handoff Generation
@@ -9,29 +9,39 @@ description: Create a precise handoff for another agent, reviewer, or future ses
 
 Make the next agent or human effective without rereading the entire conversation.
 
-## When to use
+## Use when
 
-Use when:
-- work is complete and needs review,
-- work is partial and must continue later,
-- another agent will implement the next task,
-- the user needs a Codex/Cursor/Claude task prompt,
-- risk or unverified behavior remains.
+- Work is complete and needs review.
+- Work is partial and must continue later.
+- Another agent will implement the next task.
+- The user needs a precise coding-agent prompt.
+- Risk, assumptions, or unverified behavior remains.
+
+## Do not use when
+
+- The task is trivial and the final response fully captures state.
 
 ## Process
 
 1. Summarize the actual goal, not the chat history.
-2. State current status:
-   - complete
-   - partial
-   - blocked
-   - needs review
-   - needs verification
-3. List changed files and why.
+
+2. State current status.
+
+```text
+Status: complete | partial | blocked | needs review | needs verification
+```
+
+3. List changed or relevant files and why.
+
 4. List verified evidence.
+
 5. List unverified items and why.
+
 6. List assumptions and risks.
-7. Create the next task as a narrow instruction.
+
+7. Create the next task as a narrow instruction with allowed/forbidden scope.
+
+8. Include a stop condition so the next agent knows when to pause.
 
 ## Output
 
@@ -39,7 +49,7 @@ Use when:
 Handoff:
 - Goal:
 - Current state:
-- Changed files:
+- Changed/relevant files:
 - Verified:
 - Not verified:
 - Assumptions:
@@ -59,12 +69,21 @@ Forbidden scope:
 Expected output:
 Verification:
 Do not:
+Stop condition:
 ```
 
-## Anti-rationalization
+## Exit criteria
 
-| Excuse | Rebuttal |
+- The next agent can start without rereading the full conversation.
+- The next task is narrow and executable.
+- Residual risks and verification gaps are explicit.
+- Stop condition prevents uncontrolled continuation.
+
+## Failure modes
+
+| Failure | Correction |
 |---|---|
-| “The diff is self-explanatory.” | Diffs do not explain intent, risk, or unverified behavior. |
-| “The next agent can inspect it.” | Make inspection targeted. |
-| “I should include everything.” | Handoff should preserve decision-relevant state, not transcript noise. |
+| Handoff repeats chat history | Preserve decision-relevant state only. |
+| “Continue from here” task | Write a concrete next task. |
+| Unverified items omitted | List them explicitly. |
+| No stop condition | Add a clear pause/escalation point. |

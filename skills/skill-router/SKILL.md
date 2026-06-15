@@ -1,72 +1,104 @@
 ---
 name: skill-router
-description: Select the minimal relevant engineering skill workflow for a coding-agent task. Use for non-trivial, ambiguous, multi-step, design, review, investigation, or handoff requests.
+description: Select the smallest relevant workflow for a coding-agent task. Use for non-trivial, ambiguous, multi-step, design, investigation, review, risk-gated, or handoff requests.
 ---
 
 # Skill Router
 
 ## Goal
 
-Route the task to the smallest sufficient workflow. Do not load or perform every skill.
+Route the task to the smallest workflow that controls the risk. Do not run every skill.
+
+## Use when
+
+- The task is non-trivial and the correct workflow is unclear.
+- The task has multiple possible modes: design, implementation, review, investigation, risk, or handoff.
+- The user asks broadly and the agent must decide how to proceed without over-processing.
+
+## Do not use when
+
+- The task is a trivial local edit.
+- The user explicitly names a relevant skill and no routing decision is needed.
+
+## Inputs
+
+- User request.
+- Available repository context.
+- Known risk: behavior, data, API, security, deployment, performance, or external side effects.
 
 ## Process
 
-1. Classify the task:
-   - trivial edit
-   - implementation
-   - design
-   - investigation
-   - review
-   - handoff
-   - architecture decision
-   - long-running/multi-step task
+1. Classify the task.
 
-2. Check risk:
-   - user-visible behavior
-   - public API or data model
-   - security, privacy, performance, reliability
-   - cross-module change
-   - irreversible migration
-   - unclear requirements
-   - weak or missing tests
-
-3. Select skills:
-   - Trivial edit: no skill unless verification is needed.
-   - Unfamiliar repo: `repository-orientation`.
-   - Plan/design: `grill-design`.
-   - Plan/design constrained by docs/domain/ADR: `grill-with-docs`.
-   - New feature: `spec-driven-development`, then `test-first-verification`.
-   - Multi-session work: `planning-with-files`.
-   - Scope creep risk: `scope-control`.
-   - Bug/investigation: `doubt-driven-development`, then `test-first-verification`.
-   - Architecture decision: `adr-review`.
-   - Review: `code-review-quality`, optionally `evidence-ledger`.
-   - Claim validation: `evidence-ledger`.
-   - End of work: `handoff-generation`.
-
-4. State the selected workflow briefly:
-   - selected skill(s)
-   - why they apply
-   - what is intentionally skipped
-
-5. Continue into the first selected skill.
-
-## Anti-rationalization
-
-| Excuse | Rebuttal |
+| Class | Meaning |
 |---|---|
-| “I should run every skill to be safe.” | Overloading context reduces quality. Use the smallest sufficient workflow. |
-| “This is probably simple.” | Check risk, not vibes. A small change can affect public behavior. |
-| “The user did not ask for a process.” | The process is only used when it reduces risk. Do not expose unnecessary ceremony. |
-| “I can decide later.” | Routing is cheap; late process correction is expensive. |
+| `trivial` | Small local edit with obvious scope. |
+| `implementation` | Code change with observable behavior. |
+| `design` | Plan, architecture, API, schema, workflow, or ambiguous requirement. |
+| `investigation` | Bug, regression, unknown root cause, performance, reliability, or research-like question. |
+| `review` | Diff, PR, generated code, design, readiness, or claim evaluation. |
+| `handoff` | State transfer or next task creation. |
+| `risk-gated` | Destructive, irreversible, secret-sensitive, production-facing, or externally visible work. |
+
+2. Estimate risk.
+
+| Risk | Signals |
+|---|---|
+| Low | Local change, known files, no behavior/API/data impact. |
+| Medium | User-visible behavior, multiple files, tests needed, ambiguous edge cases. |
+| High | Public API/schema, auth/security, persistence, migration, performance claim, broad refactor. |
+| Critical | Production deploy, destructive command, credentials, payments, email sending, data deletion. |
+
+3. Select the workflow.
+
+| Situation | Primary | Secondary |
+|---|---|---|
+| Unfamiliar repo | `repository-orientation` | — |
+| Ambiguous design | `grill-design` | `spec-driven-development` |
+| Existing docs/domain/ADR constraints | `grill-with-docs` | `adr-review` |
+| New behavior | `spec-driven-development` | `test-first-verification` |
+| Implementation after plan exists | `controlled-implementation` | `scope-control` |
+| Long-running/multi-agent work | `planning-with-files` | `handoff-generation` |
+| Scope/refactor risk | `scope-control` | `code-review-quality` |
+| Bug/unknown cause | `doubt-driven-development` | `test-first-verification` |
+| Risk-gated action | `risk-gate` | `evidence-ledger` |
+| Architecture decision | `adr-review` | `grill-with-docs` |
+| PR/diff/generated code review | `code-review-quality` | `evidence-ledger` |
+| Claim validation | `evidence-ledger` | `doubt-driven-development` |
+| End of work | `handoff-generation` | — |
+
+4. State what is intentionally skipped.
+
+5. Continue into the selected primary workflow unless the task requires user approval.
 
 ## Output
 
 ```text
 Selected workflow:
-- Primary: ...
-- Secondary: ...
-- Skipped: ...
+- Primary:
+- Secondary:
+- Skipped:
+
 Reason:
+- Task class:
+- Risk level:
+- Decisive signal:
+
+Next action:
 - ...
 ```
+
+## Exit criteria
+
+- One primary workflow is selected.
+- Any secondary workflow has a clear reason.
+- Trivial work is not over-processed.
+- Critical risk is routed to `risk-gate` before action.
+
+## Failure modes
+
+| Failure | Correction |
+|---|---|
+| Running all skills | Use smallest sufficient workflow. |
+| Skipping process for high-risk work | Reclassify by impact, not diff size. |
+| Asking broad questions before routing | Route first; ask only blocking questions. |

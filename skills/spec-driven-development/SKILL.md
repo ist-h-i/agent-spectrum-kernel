@@ -1,6 +1,6 @@
 ---
 name: spec-driven-development
-description: Convert a feature or behavior request into a spec, plan, and task breakdown before implementation. Use for new features, behavior changes, cross-file work, or vague requirements.
+description: Convert a feature or behavior request into a spec, plan, task breakdown, and verification plan before implementation. Use for new behavior, cross-file work, or vague requirements.
 ---
 
 # Spec-Driven Development
@@ -9,25 +9,27 @@ description: Convert a feature or behavior request into a spec, plan, and task b
 
 Move from vague intent to executable constraints before writing code.
 
-## When to use
+## Use when
 
-Use when:
-- The request changes user-visible behavior.
-- The implementation touches multiple files or modules.
-- Requirements are ambiguous.
+- The request changes user-visible or caller-visible behavior.
+- The implementation touches multiple files/modules.
 - Acceptance criteria are missing.
-- The task may need tests, migration, or rollout.
+- Edge cases are unclear.
+- Migration, compatibility, or rollout may matter.
 
-Do not use for trivial edits.
+## Do not use when
+
+- The task is a trivial localized edit.
+- A current spec and verification plan already exist.
 
 ## Process
 
-1. Draft the spec.
+1. Draft the spec at the smallest useful fidelity.
 
 ```text
 Spec:
 - Problem:
-- Users / callers affected:
+- Users/callers affected:
 - Desired behavior:
 - Non-goals:
 - Inputs:
@@ -42,11 +44,12 @@ Spec:
 ```
 
 2. Validate the spec.
-   - Are the criteria observable?
+   - Are acceptance criteria observable?
    - Are non-goals explicit?
    - Are edge cases represented?
    - Is there a smallest deliverable slice?
    - What would falsify success?
+   - Which assumptions are still unresolved?
 
 3. Create the implementation plan.
 
@@ -65,27 +68,42 @@ Plan:
 Each task must:
 - be independently reviewable,
 - have a clear verification method,
-- avoid mixing refactor and behavior change unless necessary.
+- avoid mixing refactor and behavior change unless necessary,
+- preserve a working state after completion.
 
-5. Implement only after the spec and first task are clear.
+5. Stop before implementation if the next task cannot be scoped or verified.
 
 ## Output
 
 ```text
 Spec summary:
 - ...
+
 Plan:
 - ...
+
 Tasks:
 1. ...
+
 Verification:
+- ...
+
+Open assumptions:
 - ...
 ```
 
-## Anti-rationalization
+## Exit criteria
 
-| Excuse | Rebuttal |
+- The next implementation task is narrow.
+- Acceptance criteria are testable.
+- Non-goals and edge cases are explicit.
+- Verification is defined before code changes.
+
+## Failure modes
+
+| Failure | Correction |
 |---|---|
-| “The prompt is the spec.” | Prompts are usually incomplete. Acceptance criteria are the spec. |
-| “I can infer edge cases.” | Inferred edge cases must be named. |
-| “We can test after implementation.” | Testability must shape the plan before implementation. |
+| Treating the prompt as the spec | Extract acceptance criteria. |
+| Listing tasks without verification | Attach verification to each task. |
+| Over-specifying trivial work | Use kernel only. |
+| Hiding assumptions in the plan | List them explicitly. |

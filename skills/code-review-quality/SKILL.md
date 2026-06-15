@@ -7,7 +7,18 @@ description: Review a diff, PR, commit, or generated code for correctness, scope
 
 ## Goal
 
-Decide whether the change is safe to merge and identify concrete fixes.
+Decide whether the change is safe to merge and identify concrete required fixes.
+
+## Use when
+
+- Reviewing a PR, diff, commit, patch, or generated code.
+- Deciding whether a change is safe to merge.
+- Evaluating implementation quality, test coverage, scope, or risk.
+
+## Do not use when
+
+- The user only asks for a non-evaluative summary.
+- No code, diff, or concrete design artifact is available to review.
 
 ## Review stance
 
@@ -15,50 +26,55 @@ Be specific. Do not produce generic style advice. Every finding needs evidence.
 
 ## Severity
 
-- `blocker`: must fix before merge; correctness/security/data loss/build break.
-- `major`: likely bug, regression, missing critical test, bad API boundary.
-- `minor`: maintainability or edge case issue worth fixing.
-- `nit`: optional, low-risk clarity issue.
+| Severity | Meaning |
+|---|---|
+| `blocker` | Must fix before merge; correctness/security/data loss/build break. |
+| `major` | Likely bug, regression, missing critical test, bad API/data boundary. |
+| `minor` | Maintainability, edge case, or local correctness issue worth fixing. |
+| `nit` | Optional clarity/style issue; must not block. |
 
 ## Process
 
-1. Read the change in context:
-   - diff
-   - touched files
-   - nearby code
-   - tests
-   - docs/ADRs if relevant
+1. Read the change in context.
+   - diff,
+   - touched files,
+   - nearby code,
+   - tests,
+   - docs/ADRs if relevant.
 
-2. Check:
-   - correctness
-   - edge cases
-   - backward compatibility
-   - API/data model impact
-   - security/privacy
-   - performance
-   - test coverage
-   - observability/error handling
-   - scope creep
-   - readability and maintainability
+2. Check review dimensions.
+   - correctness,
+   - edge cases,
+   - backward compatibility,
+   - API/data model impact,
+   - security/privacy,
+   - performance,
+   - test coverage,
+   - observability/error handling,
+   - scope creep,
+   - readability/maintainability.
 
-3. Separate findings from suggestions.
-   - Findings require evidence and a fix.
-   - Suggestions are optional and must not block.
+3. For AI-generated work, additionally check:
+   - invented APIs,
+   - stale assumptions,
+   - unsupported claims,
+   - missing negative cases,
+   - overly broad refactors,
+   - unverified behavior.
 
-4. Make a merge decision:
-   - approve
-   - approve with minor comments
-   - request changes
-   - block
-   - insufficient evidence
+4. Separate findings from suggestions.
+   - Finding: evidence + required fix.
+   - Suggestion: optional improvement.
 
-5. If reviewing AI-generated work, check for:
-   - unsupported claims
-   - invented APIs
-   - stale assumptions
-   - unverified behavior
-   - overly broad refactors
-   - missing negative cases
+5. Make a merge decision.
+
+| Decision | Use when |
+|---|---|
+| approve | No blocking/major issues and evidence is sufficient. |
+| approve with comments | Only minor/nit issues remain. |
+| request changes | Fixes required but direction is sound. |
+| block | Critical correctness/security/data/build risk. |
+| insufficient evidence | Cannot decide without more context or verification. |
 
 ## Output
 
@@ -81,10 +97,17 @@ Residual risk:
 - ...
 ```
 
-## Anti-rationalization
+## Exit criteria
 
-| Excuse | Rebuttal |
+- Decision is explicit.
+- Each blocking finding has evidence and required fix.
+- Suggestions are not mixed with required fixes.
+- Residual risk is named.
+
+## Failure modes
+
+| Failure | Correction |
 |---|---|
-| “The diff looks clean.” | Clean diffs can still be wrong. |
-| “Tests pass.” | Passing tests are evidence, not proof of coverage. |
-| “This is generated code.” | Generated code still needs ownership and review. |
+| Generic advice | Tie each finding to code/evidence. |
+| Treating passing tests as complete proof | Assess coverage and changed behavior. |
+| Reviewing style instead of merge risk | Prioritize correctness, scope, safety, evidence. |

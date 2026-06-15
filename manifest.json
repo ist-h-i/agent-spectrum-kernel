@@ -1,11 +1,14 @@
 {
   "name": "ai-coding-kernel-skills",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "created": "2026-06-15",
+  "target_use": "personal development and internal team introduction",
   "kernel": "AGENTS.md",
+  "copy_paste_kernel": "CUSTOM_INSTRUCTIONS.md",
   "skills": [
     "adr-review",
     "code-review-quality",
+    "controlled-implementation",
     "doubt-driven-development",
     "evidence-ledger",
     "grill-design",
@@ -13,14 +16,39 @@
     "handoff-generation",
     "planning-with-files",
     "repository-orientation",
+    "risk-gate",
     "scope-control",
     "skill-router",
     "spec-driven-development",
     "test-first-verification"
   ],
+  "docs": [
+    "README.md",
+    "README.ja.md",
+    "CUSTOM_INSTRUCTIONS.md",
+    "docs/skill-matrix.md",
+    "docs/usage-ja.md",
+    "docs/workflow-examples.md",
+    "docs/project-overlay-template.md",
+    "docs/customization-guide.md",
+    "docs/quality-rubric.md",
+    "docs/references.md",
+    "docs/validation-report.md",
+    "CHANGELOG.md"
+  ],
+  "examples": [
+    "examples/01-small-change.md",
+    "examples/02-new-feature.md",
+    "examples/03-bug-fix.md",
+    "examples/04-design-grill.md",
+    "examples/05-pr-review.md",
+    "examples/06-handoff-to-agent.md"
+  ],
   "design": {
-    "kernel": "single physical file, internally modular",
+    "kernel": "single physical file with always-on principles and minimal routing",
     "skills": "one directory per workflow, each with SKILL.md",
-    "language": "English instructions for agent portability; Japanese README guidance in chat response"
+    "language": "English agent instructions for portability; Japanese guidance for personal/internal adoption",
+    "principle": "kernel for judgment, skills for procedures, project rules for local conventions",
+    "quality_target": "95+ across reviewed personal/internal-use categories"
   }
 }

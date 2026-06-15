@@ -7,48 +7,56 @@ description: Stress-test a plan or design before implementation. Use when the us
 
 ## Goal
 
-Force shared understanding before implementation by walking the decision tree deliberately.
+Force shared understanding before implementation by walking the design decision tree deliberately.
 
-## Non-goal
+## Use when
 
-Do not turn a trivial edit into a design ceremony.
+- The user asks to be grilled.
+- Requirements are ambiguous.
+- A design decision will shape APIs, data, state, workflows, or tests.
+- The failure modes are not yet explicit.
+- The implementation path depends on unresolved tradeoffs.
+
+## Do not use when
+
+- The task is a trivial edit.
+- The plan is already specified with acceptance criteria and verification.
 
 ## Process
 
-1. Restate the target as a falsifiable outcome:
-   - What must become true?
-   - What must remain true?
-   - What would make this plan fail?
+1. Convert intent into a falsifiable outcome.
 
-2. Identify the decision tree:
-   - product behavior
-   - data model
-   - API or interface
-   - state management
-   - error handling
-   - migration/backward compatibility
-   - security/privacy
-   - performance
-   - observability
-   - testability
-   - rollout/rollback
+```text
+Outcome:
+Must remain true:
+Failure condition:
+```
 
-3. Ask one question at a time.
+2. Walk the decision tree.
 
-For each question:
-- Explain why this decision matters.
-- Provide your recommended answer.
-- State the tradeoff.
-- Wait for the user when the answer materially changes the plan.
+Check only branches relevant to the task:
+- user/product behavior,
+- data model,
+- API/interface,
+- state management,
+- error handling,
+- migration/backward compatibility,
+- security/privacy,
+- performance,
+- observability,
+- testability,
+- rollout/rollback.
 
-4. If the question can be answered from the codebase, inspect the codebase instead of asking.
+3. For each material question:
+- ask one question at a time,
+- explain why it matters,
+- provide the recommended answer,
+- state the tradeoff,
+- wait only if the answer materially changes the plan.
 
-5. Stop only when:
-   - key decisions are resolved,
-   - open questions are explicit,
-   - constraints are clear,
-   - acceptance criteria are testable,
-   - implementation boundary is narrow.
+4. If the repository can answer the question, inspect the repository instead of asking.
+
+5. Stop when the implementation boundary and acceptance criteria are clear.
 
 ## Output
 
@@ -57,6 +65,7 @@ Design decision summary:
 - Goal:
 - Non-goals:
 - Decisions:
+- Recommended unresolved decisions:
 - Constraints:
 - Open questions:
 - Acceptance criteria:
@@ -64,11 +73,18 @@ Design decision summary:
 - Verification plan:
 ```
 
-## Anti-rationalization
+## Exit criteria
 
-| Excuse | Rebuttal |
+- Key design branches have been considered.
+- User decisions are separated from repository facts.
+- Open questions are explicit and minimal.
+- Implementation can start without encoding hidden assumptions.
+
+## Failure modes
+
+| Failure | Correction |
 |---|---|
-| “The plan sounds reasonable.” | Reasonable is not enough. Resolve failure modes. |
-| “We can decide during implementation.” | Late decisions leak into code structure. |
-| “The user can answer everything.” | If the repo can answer it, inspect the repo. |
-| “Ask all questions at once.” | One question at a time prevents shallow agreement. |
+| Asking all questions at once | Ask the next material question only. |
+| Treating “reasonable” as sufficient | Name failure modes and acceptance criteria. |
+| Asking the user what the repo can answer | Inspect the repo. |
+| Designing past the need | Stop at the smallest implementation boundary. |
