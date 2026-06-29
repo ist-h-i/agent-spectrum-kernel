@@ -14,6 +14,7 @@
 | Destructive/external/production/security-sensitive action | `risk-gate` | `handoff-generation` | Risk classification, approval requirement, safe alternative |
 | Architecture or hard-to-reverse decision | `adr-review` | `grill-with-docs` | ADR action and decision record |
 | PR/diff/commit review | `review-router` | `review-final-merge-gate` | Required gates, gate evidence, and merge decision |
+| MR README / specification understanding record | `mr-readme-generation` | `adr-review` | Durable MR context for human review and future AI reuse |
 | Performance/security/reliability/readiness claim | `evidence-ledger` | `doubt-driven-development` | Claim/evidence/status table |
 | End of work or passing to another agent | `handoff-generation` | `evidence-ledger` | Executable next task and residual risk |
 
@@ -35,6 +36,9 @@ grill-design -> grill-with-docs -> adr-review when needed
 
 Review:
 review-router -> required gates -> review-final-merge-gate
+
+MR README:
+mr-readme-generation -> adr-review when hard-to-reverse decisions appear
 
 Risky operation:
 risk-gate -> handoff-generation

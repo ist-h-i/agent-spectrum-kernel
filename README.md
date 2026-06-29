@@ -50,6 +50,7 @@ examples/
   04-design-grill.md
   05-pr-review.md
   06-handoff-to-agent.md
+  07-mr-readme.md
 skills/
   skill-router/SKILL.md
   repository-orientation/SKILL.md
@@ -71,6 +72,7 @@ skills/
   doubt-driven-development/SKILL.md
   evidence-ledger/SKILL.md
   handoff-generation/SKILL.md
+  mr-readme-generation/SKILL.md
 ```
 
 ## Minimum setup
@@ -96,6 +98,7 @@ For tools that only support a single custom instruction field, use `CUSTOM_INSTR
 | スコープが広がりそう | `scope-control` |
 | 危険操作・外部影響 | `risk-gate` |
 | PR/diffレビュー | `review-router` → required gates → `review-final-merge-gate` |
+| MR README / 仕様理解固定 | `mr-readme-generation` |
 | 次のAgentへ渡す | `handoff-generation` |
 
 ## What changed from v1

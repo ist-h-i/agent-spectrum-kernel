@@ -129,6 +129,22 @@ review-final-merge-gate
 review-router を使ってこのdiffの必要ゲートを選び、必要なレビュー後に review-final-merge-gate で approve/request changes/block の判断を出してください。
 ```
 
+### MR README / 仕様理解固定
+
+使うSkill:
+
+```text
+mr-readme-generation
+adr-review if needed
+review-router if merge decision is requested
+```
+
+例:
+
+```text
+mr-readme-generation を使って、このMRの説明を docs/mr 配下のMR専用READMEとして作成してください。MR概要、影響範囲、リスク、切り戻し方針、ドメイン領域、アーキテクチャー判断ログ、設計思想、検証結果、後続AI向け再利用メモを含めてください。
+```
+
 ### 危険操作
 
 使うSkill:

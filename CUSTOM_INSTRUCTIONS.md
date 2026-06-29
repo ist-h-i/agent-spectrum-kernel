@@ -30,6 +30,7 @@ Core rules:
 - Scope creep/refactor risk: `scope-control` -> `review-ai-quality`.
 - Architecture decision: `adr-review`.
 - Diff/PR/generated code review: `review-router` -> required gates -> `review-final-merge-gate`.
+- MR README / reusable specification understanding: `mr-readme-generation`.
 - Risky operation: `risk-gate`.
 - Handoff: `handoff-generation`.
 

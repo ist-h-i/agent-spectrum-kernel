@@ -64,6 +64,7 @@ Route the task to the smallest workflow that controls the risk. Do not run every
 | Risk-gated action | `risk-gate` | `evidence-ledger` |
 | Architecture decision | `adr-review` | `grill-with-docs` |
 | PR/diff/generated code review | `review-router` | `review-final-merge-gate` |
+| MR README or reusable specification understanding | `mr-readme-generation` | `adr-review` |
 | Claim validation | `evidence-ledger` | `doubt-driven-development` |
 | End of work | `handoff-generation` | — |
 

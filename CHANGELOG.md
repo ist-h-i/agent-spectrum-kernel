@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.2.0
+
+Purpose: add a non-evaluative MR documentation workflow that turns merge requests into reusable specification context.
+
+Changes:
+
+- Added `mr-readme-generation` for creating MR-specific README documents.
+- Routed MR README / specification understanding tasks separately from PR review and merge decisions.
+- Added usage guidance and an example for MR README generation.
+- Updated manifest and validation report for the new skill.
+
 ## v2.1.0
 
 Purpose: split PR/code review responsibility so automated checks, AI quality review, domain impact, and final merge decisions are explicit.

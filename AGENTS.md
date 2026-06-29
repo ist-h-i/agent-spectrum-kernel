@@ -156,6 +156,7 @@ Use this routing table for non-trivial tasks.
 | Destructive/external/security-sensitive action | `risk-gate` | `evidence-ledger` |
 | Architectural decision | `adr-review` | `grill-with-docs` |
 | Diff/PR/generated code review | `review-router` | `review-final-merge-gate` |
+| MR README or reusable specification understanding | `mr-readme-generation` | `adr-review` |
 | Claim validation | `evidence-ledger` | `doubt-driven-development` |
 | End of work or next-agent prompt | `handoff-generation` | `evidence-ledger` |
 

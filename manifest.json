@@ -1,6 +1,6 @@
 {
   "name": "ai-coding-kernel-skills",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "created": "2026-06-15",
   "target_use": "personal development and internal team introduction",
   "kernel": "AGENTS.md",
@@ -14,6 +14,7 @@
     "grill-design",
     "grill-with-docs",
     "handoff-generation",
+    "mr-readme-generation",
     "planning-with-files",
     "repository-orientation",
     "review-ai-quality",
@@ -47,7 +48,8 @@
     "examples/03-bug-fix.md",
     "examples/04-design-grill.md",
     "examples/05-pr-review.md",
-    "examples/06-handoff-to-agent.md"
+    "examples/06-handoff-to-agent.md",
+    "examples/07-mr-readme.md"
   ],
   "design": {
     "kernel": "single physical file with always-on principles and minimal routing",

@@ -54,6 +54,7 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | バグ原因が不明 | `doubt-driven-development` |
 | 実装フェーズに入る | `controlled-implementation` |
 | PRレビュー | `review-router` → required gates → `review-final-merge-gate` |
+| MR README / 仕様理解固定 | `mr-readme-generation` |
 | 破壊的操作・deploy・migration・secret絡み | `risk-gate` |
 | 次のCodex/Cursor/Claudeに渡す | `handoff-generation` |
 
