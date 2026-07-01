@@ -56,7 +56,7 @@ This skill is the canonical runtime routing source. `AGENTS.md` only contains th
 | Situation | Primary | Secondary |
 |---|---|---|
 | Unfamiliar repo | `repository-orientation` | `scope-control` if target boundary is unclear; `planning-with-files` only if the task spans sessions/agents or durable state is needed |
-| Ambiguous design | `grill-design` | `spec-driven-development` |
+| Ambiguous design / “grill me” | `grill-design` | `grill-with-docs` if docs/domain/ADR terms matter; then `spec-driven-development` only after design boundary and acceptance criteria are stable |
 | Existing docs/domain/ADR constraints | `grill-with-docs` | `adr-review` |
 | New behavior | `spec-driven-development` | `controlled-implementation` -> `test-first-verification` |
 | Implementation after plan exists | `controlled-implementation` | `scope-control` |

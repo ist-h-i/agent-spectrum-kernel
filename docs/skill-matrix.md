@@ -6,7 +6,7 @@ This matrix is a reference view of the canonical runtime routes in `skills/skill
 |---|---|---|---|
 | Unsure which workflow applies | `skill-router` | — | Selected workflow and skipped workflows |
 | First task in unfamiliar repo | `repository-orientation` | `scope-control` if target boundary is unclear; `planning-with-files` only if the task spans sessions/agents or durable state is needed | Repo map, commands, conventions, risks |
-| User says “grill me” or plan is under-specified | `grill-design` | `grill-with-docs` | Design decision summary and acceptance criteria |
+| Ambiguous design / “grill me” or under-specified plan | `grill-design` | `grill-with-docs` if docs/domain/ADR terms matter; then `spec-driven-development` only after design boundary and acceptance criteria are stable | Design decision summary, stable boundary, and acceptance criteria before spec |
 | Plan must fit docs/domain/ADRs | `grill-with-docs` | `adr-review` | Term/doc conflict review and documentation decision |
 | New feature or user-visible behavior | `spec-driven-development` | `controlled-implementation` -> `test-first-verification` | Spec, scoped implementation, verification evidence |
 | Clear non-trivial implementation | `controlled-implementation` | `test-first-verification` | Minimal scoped implementation summary |
