@@ -1,13 +1,13 @@
 ---
 name: application-boundary-architecture
-description: Framework-agnostic and TypeScript-oriented application architecture and boundary decisions. Use when Codex must decide ownership, dependency direction, external I/O boundaries, DTO/error trust boundaries, async lifetime, feature public API, usecase/repository/port/adapter/mapper necessity, ID boundaries, or architecture guard rollout. Do not use for framework-local mechanics, template-only changes, style-only edits, copy changes, simple tests, or implementation details after the boundary is already clear. For Angular-specific APIs, provider scope, Signals/RxJS, templates, forms, SSR/hydration, rendering, performance, or upgrades, use the project overlay's Angular-specific skill if available; otherwise treat the concern as outside this generic skill and report the missing overlay.
+description: Framework-agnostic and TypeScript-oriented application architecture and boundary decisions. Use when the agent must decide ownership, dependency direction, external I/O boundaries, DTO/error trust boundaries, async lifetime, feature public API, usecase/repository/port/adapter/mapper necessity, ID boundaries, or architecture guard rollout. Do not use for framework-local mechanics, template-only changes, style-only edits, copy changes, simple tests, or implementation details after the boundary is already clear. For Angular-specific APIs, provider scope, Signals/RxJS, templates, forms, SSR/hydration, rendering, performance, or upgrades, use the project overlay's Angular-specific skill if available; otherwise treat the concern as outside this generic skill and report the missing overlay.
 ---
 
 # Application Boundary Architecture
 
 ## Purpose
 
-Use this skill when Codex must decide application boundaries independent of a specific framework.
+Use this skill when the agent must decide application boundaries independent of a specific framework.
 
 Do not use this skill for framework-local mechanics, UI rendering details, or implementation steps after the boundary decision is already clear.
 
