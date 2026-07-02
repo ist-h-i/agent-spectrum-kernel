@@ -1,6 +1,6 @@
 ---
 name: review-ai-quality
-description: Review a code change for AI-assessable implementation quality: correctness, edge cases, test adequacy, API/design boundaries, maintainability, error handling, performance risk, security signals, and scope creep. Use for PR/diff/code reviews after routing, but do not make the final merge decision.
+description: Review a code change for AI-assessable implementation quality: correctness, edge cases, test adequacy, local API/design choices, maintainability, error handling, performance risk, security signals, and scope creep. Use for PR/diff/code reviews after routing, but do not make architecture, domain, risk, ADR, evidence, or final merge decisions.
 ---
 
 # AI Quality Review
@@ -9,24 +9,25 @@ description: Review a code change for AI-assessable implementation quality: corr
 
 Find evidence-backed implementation issues that a code reviewer can identify from the diff and repository context.
 
-This gate may flag performance, security, scope, ADR, or domain signals, but it must route final judgment to the specialized gate when the issue affects:
+This gate may flag performance, security, scope, architecture, ADR, or domain signals, but it must route final judgment to the specialized gate when the issue affects:
 
 - external risk -> `risk-gate`,
 - unsupported claim -> `evidence-ledger`,
+- structural or boundary impact -> `review-architecture-impact`,
 - domain meaning -> `review-domain-impact`,
-- hard-to-reverse architecture -> `adr-review`,
+- durable architecture memory -> `adr-review`,
 - scope authorization -> `scope-control`.
 
 ## Use when
 
 - Reviewing implementation quality in a PR, diff, commit, patch, or generated code.
-- The change may affect correctness, edge cases, APIs, tests, maintainability, local design, performance, security, or scope.
+- The change may affect correctness, edge cases, local APIs, tests, maintainability, local design, performance, security, or scope.
 - `review-router` selects an AI quality review gate.
 
 ## Do not use when
 
 - The only question is whether commands passed.
-- The issue is primarily domain authorization, owner approval, ADR need, or a risky action.
+- The issue is primarily architecture impact, boundary mechanics, domain authorization, owner approval, ADR need, or a risky action.
 - No concrete code or design artifact is available.
 
 ## Review stance
@@ -55,7 +56,7 @@ Be specific. A finding needs file/line evidence, impact, and a required fix. Do 
 2. Review focus areas.
    - correctness and edge cases,
    - backward compatibility,
-   - API/data-shape impact,
+   - local API/data-shape impact that is not a public contract or architecture boundary,
    - error handling and observability,
    - security/privacy signals,
    - performance risk,
@@ -76,8 +77,9 @@ Be specific. A finding needs file/line evidence, impact, and a required fix. Do 
 5. Route specialized signals before judging them.
    - external risk -> `risk-gate`,
    - unsupported claim -> `evidence-ledger`,
+   - structural or boundary impact -> `review-architecture-impact`,
    - domain meaning -> `review-domain-impact`,
-   - hard-to-reverse architecture -> `adr-review`,
+   - durable architecture memory -> `adr-review`,
    - scope authorization -> `scope-control`.
 
 6. Return quality gate status, not final merge approval.
@@ -117,6 +119,7 @@ Residual quality risk:
 |---|---|
 | Generic advice | Tie each finding to code/evidence. |
 | Treating passing tests as complete proof | Assess coverage and changed behavior. |
+| Making architecture approval decisions | Route structural and boundary impact to `review-architecture-impact`. |
 | Making domain approval decisions | Route domain meaning to `review-domain-impact`. |
-| Making specialized risk, claim, architecture, or scope decisions | Flag the signal and route final judgment to the specialized gate. |
+| Making specialized risk, claim, ADR, or scope decisions | Flag the signal and route final judgment to the specialized gate. |
 | Approving the PR directly | Report gate status only. |

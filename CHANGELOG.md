@@ -4,6 +4,8 @@
 
 Changes:
 
+- Added `review-architecture-impact` as the dedicated structural and boundary review gate.
+- Routed review architecture impact through the new gate while keeping detailed boundary mechanics in `application-boundary-architecture` and durable architecture records in `adr-review`.
 - Removed the legacy code review compatibility adapter and standardized review entry points on `review-router`.
 - Added layer-aware final merge decisions to `review-final-merge-gate`, including layer summaries and upper-layer precedence over mechanical passes.
 

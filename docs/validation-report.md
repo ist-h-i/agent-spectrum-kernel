@@ -4,29 +4,30 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 
 ## Manifest / directory consistency
 
-- Skills in manifest: 21
-- Skill directories: 21
+- Skills in manifest: 22
+- Skill directories: 22
 - Missing directories: none
 - Extra directories: none
 
 ## Skill section checks
 
 - `skills/adr-review/SKILL.md`: words=317, name_ok=True, missing=none
-- `skills/application-boundary-architecture/SKILL.md`: words=3643, name_ok=True, missing=none
+- `skills/application-boundary-architecture/SKILL.md`: words=3645, name_ok=True, missing=none
 - `skills/controlled-implementation/SKILL.md`: words=405, name_ok=True, missing=none
 - `skills/doubt-driven-development/SKILL.md`: words=351, name_ok=True, missing=none
 - `skills/evidence-ledger/SKILL.md`: words=394, name_ok=True, missing=none
 - `skills/grill-design/SKILL.md`: words=356, name_ok=True, missing=none
 - `skills/grill-with-docs/SKILL.md`: words=381, name_ok=True, missing=none
 - `skills/handoff-generation/SKILL.md`: words=320, name_ok=True, missing=none
-- `skills/mr-readme-generation/SKILL.md`: words=1009, name_ok=True, missing=none
+- `skills/mr-readme-generation/SKILL.md`: words=1010, name_ok=True, missing=none
 - `skills/planning-with-files/SKILL.md`: words=342, name_ok=True, missing=none
 - `skills/repository-orientation/SKILL.md`: words=325, name_ok=True, missing=none
-- `skills/review-ai-quality/SKILL.md`: words=560, name_ok=True, missing=none
+- `skills/review-ai-quality/SKILL.md`: words=612, name_ok=True, missing=none
+- `skills/review-architecture-impact/SKILL.md`: words=854, name_ok=True, missing=none
 - `skills/review-automated-gate/SKILL.md`: words=340, name_ok=True, missing=none
 - `skills/review-domain-impact/SKILL.md`: words=483, name_ok=True, missing=none
-- `skills/review-final-merge-gate/SKILL.md`: words=768, name_ok=True, missing=none
-- `skills/review-router/SKILL.md`: words=426, name_ok=True, missing=none
+- `skills/review-final-merge-gate/SKILL.md`: words=787, name_ok=True, missing=none
+- `skills/review-router/SKILL.md`: words=993, name_ok=True, missing=none
 - `skills/risk-gate/SKILL.md`: words=416, name_ok=True, missing=none
 - `skills/scope-control/SKILL.md`: words=338, name_ok=True, missing=none
 - `skills/skill-router/SKILL.md`: words=808, name_ok=True, missing=none

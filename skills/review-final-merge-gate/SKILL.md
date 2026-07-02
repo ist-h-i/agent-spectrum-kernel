@@ -26,6 +26,7 @@ Make the final merge decision from gate evidence without hiding missing checks, 
    - layer applicability from `review-router`,
    - `review-automated-gate`,
    - `review-ai-quality`,
+   - `review-architecture-impact` when applicable,
    - `review-domain-impact` when applicable,
    - `adr-review` when applicable,
    - `risk-gate` when applicable,
@@ -33,6 +34,7 @@ Make the final merge decision from gate evidence without hiding missing checks, 
 
 2. Build a layer summary.
    - Every layer routed by `review-router` must appear in the final decision.
+   - Architecture layer evidence comes from `review-architecture-impact` when that gate was required.
    - Use `pass`, `fail`, `skipped`, or `insufficient evidence` for each layer.
    - Required layers without gate evidence remain `insufficient evidence`; do not silently downgrade them to skipped.
    - Skipped layers must retain the router's evidence-based reason.
@@ -49,7 +51,7 @@ Make the final merge decision from gate evidence without hiding missing checks, 
    - blocker or major unresolved quality findings,
    - unauthorized or implicit domain change,
    - missing required owner approval,
-   - required ADR/domain decision missing,
+   - required architecture, ADR, or domain decision missing,
    - risky action not approved,
    - insufficient evidence for changed behavior.
 

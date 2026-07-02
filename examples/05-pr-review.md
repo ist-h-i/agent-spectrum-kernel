@@ -66,7 +66,7 @@ Layer applicability:
 Review route:
 - Required gates: review-automated-gate, review-ai-quality, review-final-merge-gate
 - Optional gates: evidence-ledger
-- Skipped gates: review-domain-impact, adr-review, risk-gate
+- Skipped gates: review-architecture-impact, review-domain-impact, adr-review, risk-gate
 
 Decision:
 - request changes

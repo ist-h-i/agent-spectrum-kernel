@@ -1,6 +1,6 @@
 ---
 name: review-router
-description: Route a diff, PR, commit, patch, or generated code review to the smallest required review gates. Use before merge reviews to decide which automated, AI quality, domain, ADR, risk, evidence, and final merge gates are required, optional, or skipped.
+description: Route a diff, PR, commit, patch, or generated code review to the smallest required review gates. Use before merge reviews to decide which automated, AI quality, architecture, domain, ADR, risk, evidence, and final merge gates are required, optional, or skipped.
 ---
 
 # Review Router
@@ -33,7 +33,7 @@ Select the smallest set of review gates needed to make the merge decision defens
    - Technical behavior: correctness, edge cases, API use, error handling, tests.
    - Maintainability: naming, readability, local design, scope creep.
    - Domain behavior: business rules, state semantics, responsibility, workflow, reporting, generated business text.
-   - Architecture/risk: hard-to-reverse boundaries, dependencies, persistence, auth, infra, external effects.
+   - Architecture/risk: hard-to-reverse boundaries, dependencies, public contracts, persistence, auth, infra, external effects.
 
 3. Produce a layer applicability contract before executing gates.
    - Every layer must have `status: required | skipped | insufficient evidence`.
@@ -57,10 +57,11 @@ Select the smallest set of review gates needed to make the merge decision defens
 
 5. Route gates from the layer contract.
    - `review-domain-impact` first if domain behavior may change.
-   - `adr-review` if architectural memory or hard-to-reverse boundary decisions may change.
+   - `review-architecture-impact` if structural, dependency, boundary, public contract, persistence, infrastructure, ownership, lifecycle, or coupling impact may exist.
+   - `adr-review` if architectural memory or hard-to-reverse boundary decisions may need to be recorded, updated, or superseded.
    - `risk-gate` before any destructive, external, auth, secret, production, dependency, or infra action.
    - `review-automated-gate` for mechanical verification evidence.
-   - `review-ai-quality` for code-quality review.
+   - `review-ai-quality` for local implementation-quality review.
    - `evidence-ledger` when claims need evidence classification.
    - `review-final-merge-gate` to make the merge decision.
 
@@ -144,6 +145,7 @@ Review route:
 - Required, optional, and skipped gates are explicit.
 - Layer applicability is explicit before gates run.
 - Required layers map to selected gates.
+- Architecture impact maps to `review-architecture-impact` instead of being hidden inside `review-ai-quality` or conflated with `adr-review`.
 - Skipped layers have evidence-based reasons.
 - Insufficient-evidence layers name the missing inputs.
 - Domain impact is checked before technical review when applicable.

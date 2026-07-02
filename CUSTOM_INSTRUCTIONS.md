@@ -32,7 +32,7 @@ Core rules:
 - Bug/unknown root cause: `doubt-driven-development` -> `test-first-verification` for reproduction -> `controlled-implementation` -> `test-first-verification` for regression proof.
 - Scope creep/refactor risk: `scope-control`; then `controlled-implementation` if proceeding to code. In review, route scope drift through `review-router` -> `review-ai-quality`.
 - Hard-to-reverse architecture decision or ADR need: `adr-review`.
-- Diff/PR/generated code review: `review-router` -> required gates -> `review-final-merge-gate`.
+- Diff/PR/generated code review: `review-router` -> layer applicability -> required gates, including `review-architecture-impact` when structural or boundary impact may exist -> `review-final-merge-gate`.
 - MR/PR README, PR explanation, or durable change-context documentation: `mr-readme-generation`.
 - Handoff: `handoff-generation`.
 

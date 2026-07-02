@@ -65,6 +65,7 @@ skills/
   review-router/SKILL.md
   review-automated-gate/SKILL.md
   review-ai-quality/SKILL.md
+  review-architecture-impact/SKILL.md
   review-domain-impact/SKILL.md
   review-final-merge-gate/SKILL.md
   risk-gate/SKILL.md
@@ -100,7 +101,7 @@ For tools that only support a single custom instruction field, use `CUSTOM_INSTR
 | バグ・原因不明 | `doubt-driven-development` → `test-first-verification` for reproduction → `controlled-implementation` → `test-first-verification` for regression proof |
 | スコープが広がりそう | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → `review-ai-quality`） |
 | 危険操作・外部影響 | `risk-gate` before the selected workflow proceeds to action |
-| PR/diffレビュー | `review-router` → required gates → `review-final-merge-gate` |
+| PR/diffレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`）→ `review-final-merge-gate` |
 | MR/PR README・PR説明・変更文脈固定 | `mr-readme-generation` |
 | 次のAgentへ渡す | `handoff-generation` |
 
