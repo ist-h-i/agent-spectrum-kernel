@@ -13,7 +13,6 @@ Select the smallest set of review gates needed to make the merge decision defens
 
 - Reviewing a PR, diff, commit, patch, or generated code.
 - The review may involve multiple concerns such as tests, logic, maintainability, domain behavior, architecture, risk, or evidence.
-- An existing `code-review-quality` request needs routing into the newer gate model.
 
 ## Do not use when
 

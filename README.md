@@ -62,7 +62,6 @@ skills/
   scope-control/SKILL.md
   controlled-implementation/SKILL.md
   test-first-verification/SKILL.md
-  code-review-quality/SKILL.md
   review-router/SKILL.md
   review-automated-gate/SKILL.md
   review-ai-quality/SKILL.md

@@ -4,8 +4,8 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 
 ## Manifest / directory consistency
 
-- Skills in manifest: 22
-- Skill directories: 22
+- Skills in manifest: 21
+- Skill directories: 21
 - Missing directories: none
 - Extra directories: none
 
@@ -13,7 +13,6 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 
 - `skills/adr-review/SKILL.md`: words=317, name_ok=True, missing=none
 - `skills/application-boundary-architecture/SKILL.md`: words=3643, name_ok=True, missing=none
-- `skills/code-review-quality/SKILL.md`: words=442, name_ok=True, missing=none
 - `skills/controlled-implementation/SKILL.md`: words=405, name_ok=True, missing=none
 - `skills/doubt-driven-development/SKILL.md`: words=351, name_ok=True, missing=none
 - `skills/evidence-ledger/SKILL.md`: words=394, name_ok=True, missing=none
@@ -26,8 +25,8 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 - `skills/review-ai-quality/SKILL.md`: words=560, name_ok=True, missing=none
 - `skills/review-automated-gate/SKILL.md`: words=340, name_ok=True, missing=none
 - `skills/review-domain-impact/SKILL.md`: words=483, name_ok=True, missing=none
-- `skills/review-final-merge-gate/SKILL.md`: words=446, name_ok=True, missing=none
-- `skills/review-router/SKILL.md`: words=438, name_ok=True, missing=none
+- `skills/review-final-merge-gate/SKILL.md`: words=438, name_ok=True, missing=none
+- `skills/review-router/SKILL.md`: words=426, name_ok=True, missing=none
 - `skills/risk-gate/SKILL.md`: words=416, name_ok=True, missing=none
 - `skills/scope-control/SKILL.md`: words=338, name_ok=True, missing=none
 - `skills/skill-router/SKILL.md`: words=808, name_ok=True, missing=none

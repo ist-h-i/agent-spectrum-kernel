@@ -13,7 +13,6 @@ Make the final merge decision from gate evidence without hiding missing checks, 
 
 - A review needs a final merge decision.
 - Required review gates have produced results or their absence must be judged.
-- Existing `code-review-quality` behavior needs a compatibility decision.
 
 ## Do not use when
 

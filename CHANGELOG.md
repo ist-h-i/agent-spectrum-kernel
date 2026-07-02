@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+Changes:
+
+- Removed the legacy code review compatibility adapter and standardized review entry points on `review-router`.
+
 ## v2.3.0
 
 Purpose: add a framework-agnostic application boundary workflow for architecture decisions that are too concrete for ADR-only routing.
@@ -32,7 +38,6 @@ Changes:
 - Added `review-ai-quality` for AI-assessable implementation review without final approval.
 - Added `review-domain-impact` for business rules, state semantics, workflow, responsibility, and operational meaning.
 - Added `review-final-merge-gate` as the only gate that emits final merge decisions.
-- Converted `code-review-quality` into a compatibility adapter for legacy review prompts.
 - Updated README, usage docs, workflow examples, and routing tables to use the new review model.
 
 ## v2.0.0
