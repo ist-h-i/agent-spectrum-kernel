@@ -58,7 +58,7 @@ This skill is the canonical runtime routing source. `AGENTS.md` only contains th
 | Unfamiliar repo | `repository-orientation` | `scope-control` if target boundary is unclear; `planning-with-files` only if the task spans sessions/agents or durable state is needed |
 | Ambiguous design / “grill me” | `grill-design` | `grill-with-docs` if docs/domain/ADR terms matter; then `spec-driven-development` only after design boundary and acceptance criteria are stable |
 | Existing docs/domain/ADR constraints | `grill-with-docs` | `adr-review` |
-| Application boundary, dependency direction, state ownership, external I/O, DTO/error trust boundary, async lifetime, feature public API, usecase/repository/port/adapter/mapper, ID boundary, or architecture guard decision | `application-boundary-architecture` | `adr-review` if hard-to-reverse or record-worthy; `grill-with-docs` if docs/domain/ADR terms matter |
+| Application boundary decision needed before implementation, including dependency direction, state ownership, external I/O boundary, DTO/error trust boundary, async lifetime, feature public API, usecase/repository/port/adapter/mapper necessity, ID boundary, or architecture guard rollout | `application-boundary-architecture` | Return to `spec-driven-development` or `controlled-implementation` after the boundary decision; use `adr-review` if hard-to-reverse or record-worthy |
 | New behavior | `spec-driven-development` | `controlled-implementation` -> `test-first-verification` |
 | Implementation after plan exists | `controlled-implementation` | `scope-control` |
 | Long-running/multi-agent work | `planning-with-files` | `handoff-generation` |

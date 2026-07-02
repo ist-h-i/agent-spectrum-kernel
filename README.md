@@ -96,7 +96,7 @@ For tools that only support a single custom instruction field, use `CUSTOM_INSTR
 | 初見repo | `repository-orientation`（対象境界が曖昧なら `scope-control`、セッション/Agentを跨ぐかdurable stateが必要なら `planning-with-files`） |
 | 実装方針の壁打ち | `grill-design` |
 | docs/ADR/用語体系に関わる設計 | `grill-with-docs` |
-| アプリケーション境界・依存方向・DTO/Error/async lifetime判断 | `application-boundary-architecture` |
+| 実装前に未解決のアプリケーション境界・依存方向・DTO/Error/async lifetime判断 | `application-boundary-architecture` → 通常の実装ルートへ戻る |
 | 新機能・挙動変更 | `spec-driven-development` → `controlled-implementation` → `test-first-verification` |
 | バグ・原因不明 | `doubt-driven-development` → `test-first-verification` for reproduction → `controlled-implementation` → `test-first-verification` for regression proof |
 | スコープが広がりそう | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → `review-ai-quality`） |
@@ -109,7 +109,7 @@ Use `evidence-ledger` whenever final text makes or evaluates a claim about corre
 
 ## What changed from v1
 
-- Added `application-boundary-architecture` for framework-agnostic boundary, dependency direction, DTO/error trust boundary, async lifetime, feature public API, and architecture guard decisions.
+- Added `application-boundary-architecture` for unresolved framework-agnostic boundary, dependency direction, DTO/error trust boundary, async lifetime, feature public API, and architecture guard decisions before returning to the normal implementation route.
 - Added `Safety and External Effects` to the kernel.
 - Added a minimal routing gate inside `AGENTS.md` that sends non-trivial workflow selection to `skill-router`.
 - Added `risk-gate` for destructive, irreversible, external, production, auth, secret, billing, dependency, and infra risks.
