@@ -144,6 +144,17 @@ review-final-merge-gate
 Expected output:
 
 ```text
+Layer applicability:
+- Domain:
+  status: required | skipped | insufficient evidence
+  reason:
+  gate:
+- Architecture:
+  status: required | skipped | insufficient evidence
+  reason:
+  gate:
+- ...
+
 Review route:
 - required gates
 - skipped gates

@@ -15,7 +15,7 @@ This matrix is a reference view of the canonical runtime routes in `skills/skill
 | Risk of scope creep/refactor sprawl | `scope-control` | `controlled-implementation` if proceeding to code; review phase uses `review-router` -> `review-ai-quality` | Scope contract, scoped implementation path, or review route |
 | Bug, regression, or unknown root cause | `doubt-driven-development` | `test-first-verification` for reproduction -> `controlled-implementation` -> `test-first-verification` for regression proof | Hypothesis, reproduction evidence, scoped fix, regression proof |
 | Hard-to-reverse architecture decision or ADR need | `adr-review` | `grill-with-docs`; `application-boundary-architecture` if boundary mechanics are unresolved | ADR action and decision record |
-| PR/diff/commit review | `review-router` | `review-final-merge-gate` | Required gates, gate evidence, and merge decision |
+| PR/diff/commit review | `review-router` | `review-final-merge-gate` | Layer applicability, required gates, gate evidence, and merge decision |
 | MR/PR README, PR explanation, or durable change-context documentation | `mr-readme-generation` | `adr-review` | Durable change context for human review and future AI reuse |
 | Performance/security/reliability/readiness claim | `evidence-ledger` | `doubt-driven-development` | Claim/evidence/status table |
 | End of work or passing to another agent | `handoff-generation` | `evidence-ledger` | Executable next task and residual risk |
@@ -51,7 +51,7 @@ Application boundary:
 application-boundary-architecture -> adr-review when the decision is hard to reverse or should be recorded
 
 Review:
-review-router -> required gates -> review-final-merge-gate
+review-router -> layer applicability -> required gates -> review-final-merge-gate
 
 MR/PR change-context README:
 mr-readme-generation -> adr-review when hard-to-reverse decisions appear
