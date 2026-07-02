@@ -7,7 +7,7 @@ description: Combine review gate results into the only final merge decision for 
 
 ## Goal
 
-Make the final merge decision from gate evidence without hiding missing checks, unresolved findings, or required approvals.
+Make the final merge decision from gate evidence without hiding missing checks, unresolved layer findings, or required approvals.
 
 ## Use when
 
@@ -22,8 +22,8 @@ Make the final merge decision from gate evidence without hiding missing checks, 
 
 ## Process
 
-1. Collect gate results.
-   - `review-router`,
+1. Collect gate and layer results.
+   - layer applicability from `review-router`,
    - `review-automated-gate`,
    - `review-ai-quality`,
    - `review-domain-impact` when applicable,
@@ -31,7 +31,20 @@ Make the final merge decision from gate evidence without hiding missing checks, 
    - `risk-gate` when applicable,
    - `evidence-ledger` when claims need evidence status.
 
-2. Check hard blockers.
+2. Build a layer summary.
+   - Every layer routed by `review-router` must appear in the final decision.
+   - Use `pass`, `fail`, `skipped`, or `insufficient evidence` for each layer.
+   - Required layers without gate evidence remain `insufficient evidence`; do not silently downgrade them to skipped.
+   - Skipped layers must retain the router's evidence-based reason.
+   - Failed upper-layer or cross-cutting layers cannot be overridden by lower-layer passes.
+
+3. Apply precedence.
+   - Domain, architecture, design, output quality, adversarial risk, risk, and evidence issues take precedence over mechanical success.
+   - A mechanical pass from lint, typecheck, build, tests, or CI proves only that mechanical layer.
+   - Missing evidence for a required layer leads to `insufficient evidence` or `request changes`, not `approve`.
+   - Suggestions remain separate from required fixes and must not change the decision unless they identify required missing evidence or a failing layer.
+
+4. Check hard blockers.
    - failed required automated checks,
    - blocker or major unresolved quality findings,
    - unauthorized or implicit domain change,
@@ -40,17 +53,17 @@ Make the final merge decision from gate evidence without hiding missing checks, 
    - risky action not approved,
    - insufficient evidence for changed behavior.
 
-3. Decide.
+5. Decide.
 
 | Decision | Use when |
 |---|---|
-| `approve` | Required gates pass and evidence is sufficient. |
-| `approve with comments` | Only minor/nit or documented low residual risk remains. |
-| `request changes` | Fixes are required but direction is sound. |
+| `approve` | Required layers pass or are evidence-backed skipped, and evidence is sufficient. |
+| `approve with comments` | Required layers pass or are evidence-backed skipped, and only minor/nit or documented low residual risk remains. |
+| `request changes` | Fixes are required, including missing required layer evidence that the author can reasonably provide, but direction is sound. |
 | `block` | Critical correctness, security, data, domain, build, or risk issue exists. |
 | `insufficient evidence` | The review target cannot be judged without more context, checks, or approvals. |
 
-4. Keep suggestions separate from required fixes.
+6. Keep suggestions separate from required fixes.
 
 ## Output
 
@@ -58,13 +71,18 @@ Make the final merge decision from gate evidence without hiding missing checks, 
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
-Gate summary:
-- Automated:
-- AI quality:
-- Domain:
-- ADR:
-- Risk:
-- Evidence:
+Layer summary:
+- Domain: pass | fail | skipped | insufficient evidence - evidence/reason
+- Architecture: pass | fail | skipped | insufficient evidence - evidence/reason
+- Design: pass | fail | skipped | insufficient evidence - evidence/reason
+- Logic: pass | fail | skipped | insufficient evidence - evidence/reason
+- Output quality: pass | fail | skipped | insufficient evidence - evidence/reason
+- Test / verification: pass | fail | skipped | insufficient evidence - evidence/reason
+- Style / maintainability: pass | fail | skipped | insufficient evidence - evidence/reason
+- Mechanical: pass | fail | skipped | insufficient evidence - evidence/reason
+- Adversarial risk: pass | fail | skipped | insufficient evidence - evidence/reason
+- Risk: pass | fail | skipped | insufficient evidence - evidence/reason
+- Evidence: pass | fail | skipped | insufficient evidence - evidence/reason
 
 Required fixes:
 - ...
@@ -82,8 +100,11 @@ Residual risk:
 ## Exit criteria
 
 - Final decision is explicit.
-- The decision cites gate evidence or missing gate evidence.
+- The decision cites layer evidence or missing layer evidence.
+- Every routed layer is summarized as passed, failed, skipped, or insufficient evidence.
 - Domain impact and required approvals are accounted for when applicable.
+- Upper-layer and cross-cutting failures are not overridden by lower-layer passes.
+- Required but missing layer evidence prevents approval.
 - Suggestions are not treated as merge blockers.
 
 ## Failure modes
@@ -91,6 +112,6 @@ Residual risk:
 | Failure | Correction |
 |---|---|
 | Approving without required gate evidence | Return `insufficient evidence` or request the missing gate. |
-| Letting logic review override domain risk | Domain failures block regardless of code correctness. |
+| Letting logic or mechanical review override domain/risk failure | Upper-layer and cross-cutting failures block regardless of lower-layer success. |
 | Mixing suggestions with required fixes | Separate optional improvements from merge blockers. |
 | Treating unknown as pass | Unknown remains insufficient evidence. |

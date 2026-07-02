@@ -25,7 +25,7 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 - `skills/review-ai-quality/SKILL.md`: words=560, name_ok=True, missing=none
 - `skills/review-automated-gate/SKILL.md`: words=340, name_ok=True, missing=none
 - `skills/review-domain-impact/SKILL.md`: words=483, name_ok=True, missing=none
-- `skills/review-final-merge-gate/SKILL.md`: words=438, name_ok=True, missing=none
+- `skills/review-final-merge-gate/SKILL.md`: words=768, name_ok=True, missing=none
 - `skills/review-router/SKILL.md`: words=426, name_ok=True, missing=none
 - `skills/risk-gate/SKILL.md`: words=416, name_ok=True, missing=none
 - `skills/scope-control/SKILL.md`: words=338, name_ok=True, missing=none
