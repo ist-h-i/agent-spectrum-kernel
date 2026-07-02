@@ -16,8 +16,8 @@ This gate may flag performance, security, scope, architecture, ADR, output quali
 - architecture quality -> `review-architecture-impact`,
 - unresolved boundary mechanics -> `application-boundary-architecture`,
 - domain meaning -> `review-domain-impact`,
-- output quality -> `review-output-quality`,
-- adversarial risk -> `review-adversarial-risk`,
+- output quality -> `review-output-quality` when available; otherwise report the signal as pending specialized review and do not finalize it inside this gate,
+- adversarial risk -> `review-adversarial-risk` when available; otherwise report the signal as pending specialized review and do not finalize it inside this gate,
 - durable architecture memory -> `adr-review`,
 - scope authorization -> `scope-control`.
 
@@ -85,8 +85,8 @@ Be specific. A finding needs file/line evidence, impact, and a required fix. Do 
    - architecture quality -> `review-architecture-impact`,
    - unresolved boundary mechanics -> `application-boundary-architecture`,
    - durable architecture memory -> `adr-review`,
-   - output quality -> `review-output-quality`,
-   - adversarial risk -> `review-adversarial-risk`,
+   - output quality -> `review-output-quality` when available; otherwise report the signal as pending specialized review and do not finalize it inside this gate,
+   - adversarial risk -> `review-adversarial-risk` when available; otherwise report the signal as pending specialized review and do not finalize it inside this gate,
    - external risk -> `risk-gate`,
    - unsupported claim -> `evidence-ledger`,
    - scope authorization -> `scope-control`.
@@ -134,8 +134,8 @@ Specialized signals routed:
 - Architecture quality:
 - Boundary mechanics:
 - ADR:
-- Output quality:
-- Adversarial risk:
+- Output quality: routed | pending specialized review | none
+- Adversarial risk: routed | pending specialized review | none
 - Risk:
 - Evidence:
 
@@ -166,6 +166,6 @@ Residual quality risk:
 | Treating passing tests as complete proof | Assess coverage and changed behavior. |
 | Making architecture approval decisions | Route architecture quality to `review-architecture-impact`, unresolved boundary mechanics to `application-boundary-architecture`, and ADR memory to `adr-review`. |
 | Making domain approval decisions | Route domain meaning to `review-domain-impact`. |
-| Making output quality or adversarial risk decisions | Route output quality to `review-output-quality` and adversarial risk to `review-adversarial-risk`. |
+| Making output quality or adversarial risk decisions | Route output quality to `review-output-quality` and adversarial risk to `review-adversarial-risk` when available; otherwise mark the signal pending specialized review without finalizing it here. |
 | Making specialized risk, claim, ADR, or scope decisions | Flag the signal and route final judgment to the specialized gate. |
 | Approving the PR directly | Report gate status only. |
