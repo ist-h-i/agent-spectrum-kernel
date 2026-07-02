@@ -5,6 +5,7 @@
 Changes:
 
 - Removed the legacy code review compatibility adapter and standardized review entry points on `review-router`.
+- Added layer-aware final merge decisions to `review-final-merge-gate`, including layer summaries and upper-layer precedence over mechanical passes.
 
 ## v2.3.0
 

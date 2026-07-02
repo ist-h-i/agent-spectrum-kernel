@@ -199,8 +199,24 @@ For review tasks, end with:
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
-Findings:
+Layer summary:
+- Domain: pass | fail | skipped | insufficient evidence - evidence/reason
+- Architecture: pass | fail | skipped | insufficient evidence - evidence/reason
+- Design: pass | fail | skipped | insufficient evidence - evidence/reason
+- Logic: pass | fail | skipped | insufficient evidence - evidence/reason
+- Output quality: pass | fail | skipped | insufficient evidence - evidence/reason
+- Test / verification: pass | fail | skipped | insufficient evidence - evidence/reason
+- Style / maintainability: pass | fail | skipped | insufficient evidence - evidence/reason
+- Mechanical: pass | fail | skipped | insufficient evidence - evidence/reason
+- Adversarial risk: pass | fail | skipped | insufficient evidence - evidence/reason
+- Risk: pass | fail | skipped | insufficient evidence - evidence/reason
+- Evidence: pass | fail | skipped | insufficient evidence - evidence/reason
+
+Required fixes:
 - [severity] file:line — issue, evidence, required fix
+
+Suggestions:
+- ...
 
 Evidence reviewed:
 - ...
