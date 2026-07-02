@@ -146,8 +146,10 @@ review-final-merge-gate
 例:
 
 ```text
-review-router を使ってこのdiffの必要ゲートを選び、必要なレビュー後に review-final-merge-gate で approve/request changes/block の判断を出してください。
+review-router を使ってこのdiffの Layer applicability を出し、必要ゲートを選んでください。必要なレビュー後に review-final-merge-gate で approve/request changes/block の判断を出してください。
 ```
+
+`review-router` は、各レビュー層を `required | skipped | insufficient evidence` で明示してからゲートを選びます。スキップする層には、diff・docs・tests・CIなど確認済み入力に基づく理由が必要です。
 
 ### MR/PR README / 仕様理解固定
 
