@@ -1,4 +1,4 @@
-# AI Coding Kernel + Skills v2
+# AI Coding Kernel + Skills
 
 個人開発と社内紹介向けの、AIコーディングエージェント用ルールセットです。
 
