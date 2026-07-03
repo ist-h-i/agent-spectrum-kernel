@@ -149,6 +149,9 @@ If verification cannot be run, state:
 | Non-trivial, ambiguous, multi-step, design, investigation, review, risk-gated, or handoff work | `skill-router` |
 | Project overlay contains framework/domain-specific skills | First use `skill-router` for generic workflow selection, then select relevant project overlay skill before action |
 
+Stack implementation overlays:
+After generic workflow selection, use a matching stack overlay only when stack-specific implementation signals apply. Stack overlays supplement `controlled-implementation` with implementation constraints and `test-first-verification` with verification supplements; they do not replace the generic workflow.
+
 Do not load every skill “to be safe.” Context overload reduces quality.
 
 Risk overlay:
