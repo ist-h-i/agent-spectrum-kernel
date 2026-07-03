@@ -13,7 +13,7 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 
 - `skills/adr-review/SKILL.md`: words=317, name_ok=True, missing=none
 - `skills/application-boundary-architecture/SKILL.md`: words=3645, name_ok=True, missing=none
-- `skills/controlled-implementation/SKILL.md`: words=405, name_ok=True, missing=none
+- `skills/controlled-implementation/SKILL.md`: words=695, name_ok=True, missing=none
 - `skills/doubt-driven-development/SKILL.md`: words=351, name_ok=True, missing=none
 - `skills/evidence-ledger/SKILL.md`: words=394, name_ok=True, missing=none
 - `skills/grill-design/SKILL.md`: words=356, name_ok=True, missing=none
@@ -34,9 +34,9 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 - `skills/review-router/SKILL.md`: words=1110, name_ok=True, missing=none
 - `skills/risk-gate/SKILL.md`: words=416, name_ok=True, missing=none
 - `skills/scope-control/SKILL.md`: words=342, name_ok=True, missing=none
-- `skills/skill-router/SKILL.md`: words=861, name_ok=True, missing=none
+- `skills/skill-router/SKILL.md`: words=886, name_ok=True, missing=none
 - `skills/spec-driven-development/SKILL.md`: words=365, name_ok=True, missing=none
-- `skills/test-first-verification/SKILL.md`: words=364, name_ok=True, missing=none
+- `skills/test-first-verification/SKILL.md`: words=547, name_ok=True, missing=none
 
 ## Document path checks
 

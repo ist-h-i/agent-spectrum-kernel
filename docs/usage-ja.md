@@ -56,8 +56,9 @@ Kernelだけで十分です。
 
 ```text
 spec-driven-development
+test-first-verification for Verification Contract
 controlled-implementation
-test-first-verification
+test-first-verification for evidence
 ```
 
 例:
@@ -117,7 +118,7 @@ application-boundary-architecture を使って、この変更で facade / usecas
 
 ```text
 doubt-driven-development
-test-first-verification for reproduction
+test-first-verification for reproduction and Verification Contract
 controlled-implementation
 test-first-verification for regression proof
 ```

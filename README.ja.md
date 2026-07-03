@@ -53,8 +53,8 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | 設計を詰めたい | `grill-design` |
 | 既存docs/ADRと整合させたい | `grill-with-docs` |
 | 実装前に未解決のアプリケーション境界・依存方向・DTO/Error/async lifetime判断 | `application-boundary-architecture` → 通常の実装ルートへ戻る |
-| 新機能を作る | `spec-driven-development` → `controlled-implementation` → `test-first-verification` |
-| バグ原因が不明 | `doubt-driven-development` → `test-first-verification` for reproduction → `controlled-implementation` → `test-first-verification` for regression proof |
+| 新機能を作る | `spec-driven-development` → `test-first-verification` for Verification Contract → `controlled-implementation` → `test-first-verification` for evidence |
+| バグ原因が不明 | `doubt-driven-development` → `test-first-verification` for reproduction and Verification Contract → `controlled-implementation` → `test-first-verification` for regression proof |
 | 実装フェーズに入る | `controlled-implementation` |
 | スコープ逸脱が怖い | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → required gates） |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |

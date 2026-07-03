@@ -33,8 +33,9 @@ Workflow:
 
 ```text
 spec-driven-development
+test-first-verification for Verification Contract
 controlled-implementation
-test-first-verification
+test-first-verification for evidence
 ```
 
 Expected output before implementation:
@@ -50,6 +51,21 @@ Plan:
 - files/modules
 - tests
 - verification
+
+Implementation Contract:
+- allowed/forbidden scope
+- public/data impact
+- implementation context
+- stack overlay used
+- verification contract
+- stop conditions
+
+Verification Contract:
+- behavior to prove
+- existing coverage
+- focused test or runtime check
+- commands and required evidence
+- remaining unverified items
 ```
 
 Implementation must stay inside the agreed first slice.
@@ -66,7 +82,7 @@ Workflow:
 
 ```text
 doubt-driven-development
-test-first-verification for reproduction
+test-first-verification for reproduction and Verification Contract
 controlled-implementation
 test-first-verification for regression proof
 ```

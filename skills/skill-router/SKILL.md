@@ -60,11 +60,11 @@ This skill is the canonical runtime routing source. `AGENTS.md` only contains th
 | Existing docs/domain/ADR constraints | `grill-with-docs` | `adr-review` |
 | Application boundary decision needed before implementation, including dependency direction, state ownership, external I/O boundary, DTO/error trust boundary, async lifetime, feature public API, usecase/repository/port/adapter/mapper necessity, ID boundary, or architecture guard rollout | `application-boundary-architecture` | Return to `spec-driven-development` or `controlled-implementation` after the boundary decision; use `adr-review` if hard-to-reverse or record-worthy |
 | Repeated implementation context setup | `implementation-context-generation` | `repository-orientation` for repo facts before drafting context |
-| New behavior | `spec-driven-development` | `controlled-implementation` -> `test-first-verification` |
-| Implementation after plan exists | `controlled-implementation` | `scope-control` |
+| New behavior | `spec-driven-development` | `test-first-verification` for Verification Contract -> `controlled-implementation` -> `test-first-verification` for evidence |
+| Implementation after plan exists | `controlled-implementation` | `test-first-verification` for Verification Contract before behavior changes when proof is needed; `scope-control` if scope is unclear |
 | Long-running/multi-agent work | `planning-with-files` | `handoff-generation` |
 | Scope/refactor risk | `scope-control` | `controlled-implementation` if proceeding to code; review phase uses `review-router` -> required gates, with scope findings generally routed to `review-ai-quality` |
-| Bug/unknown cause | `doubt-driven-development` | `test-first-verification` for reproduction -> `controlled-implementation` -> `test-first-verification` for regression proof |
+| Bug/unknown cause | `doubt-driven-development` | `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof |
 | Hard-to-reverse architecture decision or ADR need | `adr-review` | `grill-with-docs`; `application-boundary-architecture` if boundary mechanics are unresolved |
 | PR/diff/generated code review | `review-router` | Required gates from layer applicability, including `review-architecture-impact`, `review-output-quality`, and `review-adversarial-risk` when applicable; then `review-final-merge-gate` |
 | MR/PR README, PR explanation, or durable change-context documentation | `mr-readme-generation` | `adr-review` |

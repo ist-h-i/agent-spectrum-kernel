@@ -11,7 +11,7 @@ Add CSV export for the task list.
 Use:
 
 ```text
-spec-driven-development → controlled-implementation → test-first-verification
+spec-driven-development → test-first-verification for Verification Contract → controlled-implementation → test-first-verification for evidence
 ```
 
 ## Expected first response
@@ -31,6 +31,25 @@ Plan:
 - Existing patterns to reuse:
 - New tests:
 - Verification commands:
+
+Implementation Contract:
+- Goal:
+- Change class:
+- Allowed files/modules:
+- Forbidden files/modules:
+- Boundary decision:
+- Implementation context:
+- Stack overlay used:
+- Verification contract:
+- Stop conditions:
+
+Verification Contract:
+- Behavior to prove:
+- Existing coverage:
+- New or focused test needed:
+- Commands:
+- Evidence required:
+- What remains unverified:
 
 Tasks:
 1. Add export behavior behind existing UI/action boundary.
