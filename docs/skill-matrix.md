@@ -9,6 +9,7 @@ This matrix is a reference view of the canonical runtime routes in `skills/skill
 | Ambiguous design / “grill me” or under-specified plan | `grill-design` | `grill-with-docs` if docs/domain/ADR terms matter; then `spec-driven-development` only after design boundary and acceptance criteria are stable | Design decision summary, stable boundary, and acceptance criteria before spec |
 | Plan must fit docs/domain/ADRs | `grill-with-docs` | `adr-review` | Term/doc conflict review and documentation decision |
 | Application boundary decision needed before implementation, including dependency direction, state ownership, external I/O boundary, DTO/error trust boundary, async lifetime, feature public API, usecase/repository/port/adapter/mapper necessity, ID boundary, or architecture guard rollout | `application-boundary-architecture` | Return to `spec-driven-development` or `controlled-implementation` after the boundary decision; use `adr-review` if hard-to-reverse or record-worthy | Boundary decision, violations, smallest compatible change, and verification path |
+| Repeated implementation context setup | `implementation-context-generation` | `repository-orientation` for repo facts before drafting context | Durable implementation context with evidence-status-labeled stack, commands, patterns, boundaries, overlays, stop conditions, and update triggers |
 | New feature or user-visible behavior | `spec-driven-development` | `controlled-implementation` -> `test-first-verification` | Spec, scoped implementation, verification evidence |
 | Clear non-trivial implementation | `controlled-implementation` | `test-first-verification` | Minimal scoped implementation summary |
 | Multi-step task likely to span sessions | `planning-with-files` | `handoff-generation` | Durable planning state and next task |
@@ -56,6 +57,9 @@ review-router -> layer applicability -> required gates, including review-archite
 
 Review context:
 review-context-generation -> docs/ai/review-context.md
+
+Implementation context:
+implementation-context-generation -> docs/ai/implementation-context.md
 
 MR/PR change-context README:
 mr-readme-generation -> adr-review when hard-to-reverse decisions appear

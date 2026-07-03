@@ -36,6 +36,7 @@ README.ja.md
 CHANGELOG.md
 docs/
   ai/review-context.md
+  ai/implementation-context.md
   skill-matrix.md
   usage-ja.md
   workflow-examples.md
@@ -77,6 +78,7 @@ skills/
   doubt-driven-development/SKILL.md
   evidence-ledger/SKILL.md
   handoff-generation/SKILL.md
+  implementation-context-generation/SKILL.md
   mr-readme-generation/SKILL.md
 ```
 
@@ -105,6 +107,7 @@ For tools that only support a single custom instruction field, use `CUSTOM_INSTR
 | バグ・原因不明 | `doubt-driven-development` → `test-first-verification` for reproduction → `controlled-implementation` → `test-first-verification` for regression proof |
 | スコープが広がりそう | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → required gates） |
 | 危険操作・外部影響 | `risk-gate` before the selected workflow proceeds to action |
+| 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
 | PR/diffレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
 | 繰り返しレビュー文脈の固定 | `review-context-generation`（既定: `docs/ai/review-context.md`） |
 | MR/PR README・PR説明・変更文脈固定 | `mr-readme-generation` |
@@ -116,6 +119,7 @@ Use `evidence-ledger` whenever final text makes or evaluates a claim about corre
 
 - Added `application-boundary-architecture` for unresolved framework-agnostic boundary, dependency direction, DTO/error trust boundary, async lifetime, feature public API, and architecture guard decisions before returning to the normal implementation route.
 - Added `review-context-generation`, `review-output-quality`, and `review-adversarial-risk` so context-heavy review layers have dedicated gates instead of being collapsed into AI quality review.
+- Added `implementation-context-generation` so repeated implementation tasks can reuse evidence-labeled stack, command, pattern, boundary, and stop-condition context without embedding framework-specific rules.
 - Added `Safety and External Effects` to the kernel.
 - Added a minimal routing gate inside `AGENTS.md` that sends non-trivial workflow selection to `skill-router`.
 - Added `risk-gate` for destructive, irreversible, external, production, auth, secret, billing, dependency, and infra risks.

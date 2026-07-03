@@ -57,6 +57,7 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | バグ原因が不明 | `doubt-driven-development` → `test-first-verification` for reproduction → `controlled-implementation` → `test-first-verification` for regression proof |
 | 実装フェーズに入る | `controlled-implementation` |
 | スコープ逸脱が怖い | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → required gates） |
+| 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
 | PRレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
 | 繰り返しレビュー文脈の固定 | `review-context-generation`（既定: `docs/ai/review-context.md`） |
 | MR/PR README・PR説明・変更文脈固定 | `mr-readme-generation` |
