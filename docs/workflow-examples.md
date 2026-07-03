@@ -50,6 +50,21 @@ Plan:
 - files/modules
 - tests
 - verification
+
+Implementation Contract:
+- allowed/forbidden scope
+- public/data impact
+- implementation context
+- stack overlay used
+- verification contract
+- stop conditions
+
+Verification Contract:
+- behavior to prove
+- existing coverage
+- focused test or runtime check
+- commands and required evidence
+- remaining unverified items
 ```
 
 Implementation must stay inside the agreed first slice.

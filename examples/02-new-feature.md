@@ -32,6 +32,25 @@ Plan:
 - New tests:
 - Verification commands:
 
+Implementation Contract:
+- Goal:
+- Change class:
+- Allowed files/modules:
+- Forbidden files/modules:
+- Boundary decision:
+- Implementation context:
+- Stack overlay used:
+- Verification contract:
+- Stop conditions:
+
+Verification Contract:
+- Behavior to prove:
+- Existing coverage:
+- New or focused test needed:
+- Commands:
+- Evidence required:
+- What remains unverified:
+
 Tasks:
 1. Add export behavior behind existing UI/action boundary.
 2. Add tests for escaping, empty list, and visible columns.

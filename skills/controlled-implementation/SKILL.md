@@ -24,15 +24,43 @@ Implement the required behavior without scope drift, speculative architecture, o
 
 ## Process
 
-1. Restate the implementation contract.
+1. Produce the Implementation Contract before editing.
+
+Read `docs/ai/implementation-context.md` when it exists. Use it for known commands, implementation patterns, boundaries, generated-file policy, and stop conditions. If it is missing but the task is small and local, proceed from nearby repository evidence instead of forcing context generation. If it is missing or stale for repeated or non-trivial work, recommend `implementation-context-generation`.
 
 ```text
-Goal:
-Allowed scope:
-Forbidden scope:
-Expected behavior:
-Verification:
+Implementation Contract:
+- Goal:
+- Change class:
+  - feature | bug fix | refactor | cleanup | test | docs
+- Expected behavior:
+- Non-goals:
+- Allowed files/modules:
+- Forbidden files/modules:
+- Public contract impact:
+- Data/state impact:
+- Error handling expectation:
+- Existing patterns to reuse:
+- Boundary decision:
+  - resolved | unresolved | not needed
+- Implementation context:
+  - read | missing | stale | not needed
+- Stack overlay used:
+  - none | project-specific | stack-specific
+- Verification contract:
+- Stop conditions:
 ```
+
+Stop before implementation when:
+
+- boundary mechanics are unresolved; route to `application-boundary-architecture`,
+- a verification path is missing or cannot produce sufficient evidence,
+- stack-specific implementation uncertainty exists and a relevant overlay is available,
+- public API, schema, migration, dependency, auth, permission, billing, email, telemetry, production config, or infrastructure changes are needed,
+- generated/manual-edit boundaries are unclear,
+- a human decision is required.
+
+Do not treat passing tests as permission to expand scope beyond the contract.
 
 2. Inspect nearby patterns.
 
@@ -43,7 +71,8 @@ Before editing, inspect:
 - error handling style,
 - naming conventions,
 - public interfaces,
-- dependency patterns.
+- dependency patterns,
+- stack or project overlay constraints when the contract selected an overlay.
 
 3. Make the smallest valid change.
 
@@ -57,7 +86,7 @@ Rules:
 
 4. Add or update verification.
 
-Use `test-first-verification` when behavior needs proof or a bug/regression is involved.
+Use `test-first-verification` when behavior needs proof or a bug/regression is involved. Reference its Verification Contract before changing behavior.
 
 5. Run focused checks.
 
@@ -78,6 +107,7 @@ Check for:
 
 Implementation is complete only when:
 
+- the Implementation Contract was created and followed or a stop condition was reported,
 - the requested behavior is implemented,
 - the diff stays inside scope,
 - verification evidence is recorded or limitation is explicit,
@@ -87,6 +117,23 @@ Implementation is complete only when:
 ## Output
 
 ```text
+Implementation Contract:
+- Goal:
+- Change class:
+- Expected behavior:
+- Non-goals:
+- Allowed files/modules:
+- Forbidden files/modules:
+- Public contract impact:
+- Data/state impact:
+- Error handling expectation:
+- Existing patterns to reuse:
+- Boundary decision:
+- Implementation context:
+- Stack overlay used:
+- Verification contract:
+- Stop conditions:
+
 Implementation summary:
 - Goal:
 - Changed files:

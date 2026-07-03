@@ -23,25 +23,37 @@ Make success observable before declaring the work complete.
 
 ## Process
 
-1. Identify the behavior under test.
+1. Produce the Verification Contract before or alongside implementation planning.
+
+Use available repository context for commands, existing coverage, and test patterns. If a stack or project overlay supplies verification supplements, apply it without hard-coding stack-specific rules into this skill.
 
 ```text
-Behavior:
-Input/action:
-Expected output/state:
-Failure mode:
-Edge case:
-Regression condition:
+Verification Contract:
+- Behavior to prove:
+- Regression to prevent:
+- Existing coverage:
+- New or focused test needed:
+- Negative cases:
+- Manual/runtime check:
+- Commands:
+- Evidence required:
+- Stack overlay verification supplement:
+  - none | project-specific | stack-specific
+- What remains unverified:
+- Stop if:
 ```
 
-2. Prefer a failing check first when feasible.
-   - Bug fix: reproduce the bug.
-   - Feature: encode acceptance criteria.
-   - Refactor: protect unchanged behavior.
-   - UI: run or add interaction-level check if available.
-   - Performance: define measurement method before claiming improvement.
+2. Tie the contract to the change type.
 
-3. Choose verification depth.
+- Bug fix: require reproduction evidence before the fix when feasible.
+- New behavior: tie checks to acceptance criteria.
+- Refactor: require evidence that existing behavior is preserved.
+- Output change: require an output artifact, sample response, rendered text, schema, or contract when relevant.
+- Performance: define measurement method before claiming improvement.
+
+3. Prefer a failing check first when feasible.
+
+4. Choose verification depth.
 
 | Depth | Use when |
 |---|---|
@@ -51,15 +63,28 @@ Regression condition:
 | Manual/runtime check | User-visible or integration behavior lacks automated coverage. |
 | Benchmark/security check | Performance/security claim is being made. |
 
-4. Run verification and record exact evidence.
+5. Run verification and record exact evidence.
 
-5. If verification fails, report failure. Do not bury it under partial success.
+6. If verification fails, report failure. Do not bury it under partial success.
 
-6. If verification cannot run, provide the exact next verification path.
+7. If a required verification path is unavailable, report `insufficient evidence` instead of claiming completion. Provide the exact next verification path.
 
 ## Output
 
 ```text
+Verification Contract:
+- Behavior to prove:
+- Regression to prevent:
+- Existing coverage:
+- New or focused test needed:
+- Negative cases:
+- Manual/runtime check:
+- Commands:
+- Evidence required:
+- Stack overlay verification supplement:
+- What remains unverified:
+- Stop if:
+
 Verification plan:
 - ...
 
@@ -78,9 +103,10 @@ Next verification:
 
 ## Exit criteria
 
+- The Verification Contract exists or the change is explicitly exempt.
 - The changed behavior has an observable check.
 - Commands/results are exact.
-- Unverified items are explicit.
+- Unverified items are explicit and not presented as fixed or proven.
 - Success is not claimed from code inspection alone unless no executable check exists.
 
 ## Failure modes
@@ -90,4 +116,5 @@ Next verification:
 | “I know this works.” | Treat as hypothesis until verified. |
 | Existing tests assumed sufficient | Identify which tests cover the changed behavior. |
 | Manual check used as proof of all behavior | Scope manual evidence narrowly. |
+| Missing required verification path ignored | Report `insufficient evidence` and the next check. |
 | Invented command output | Never invent results; say not run. |
