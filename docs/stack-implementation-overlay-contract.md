@@ -59,11 +59,11 @@ must_not:
 
 - `outputs`: The bounded output the generic workflow may consume:
 
-- stack surface: which files, APIs, templates, build/test tools, or runtime behavior are stack-specific in this task,
-- existing pattern: local conventions observed in nearby code/tests,
-- constraints for `controlled-implementation`: stack-specific boundaries, public APIs, lifecycle rules, generated-file limits, and forbidden changes,
-- verification supplement for `test-first-verification`: focused stack commands, fixtures, runtime/manual checks, or negative cases,
-- stop conditions: stack-specific uncertainty, missing context, unsafe generated-file edits, broad architecture impact, or verification gaps.
+  - stack surface: which files, APIs, templates, build/test tools, or runtime behavior are stack-specific in this task,
+  - existing pattern: local conventions observed in nearby code/tests,
+  - constraints for `controlled-implementation`: stack-specific boundaries, public APIs, lifecycle rules, generated-file limits, and forbidden changes,
+  - verification supplement for `test-first-verification`: focused stack commands, fixtures, runtime/manual checks, or negative cases,
+  - stop conditions: stack-specific uncertainty, missing context, unsafe generated-file edits, broad architecture impact, or verification gaps.
 
 - `must_not`: Hard limits that keep the overlay from becoming a replacement workflow or a global architecture mandate.
 
