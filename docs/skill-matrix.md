@@ -31,6 +31,9 @@ Use the smallest workflow that reduces real risk. Do not invoke a skill because 
 Project overlay:
 After generic workflow selection, consider framework/domain-specific project overlay skills when the overlay signal applies. Do not add project-specific skills to the generic routing table.
 
+Stack implementation overlay:
+Follow `docs/stack-implementation-overlay-contract.md`. Stack overlays are optional, stack-signal driven supplements that feed constraints into `controlled-implementation` and verification supplements into `test-first-verification`; they do not replace the generic workflow.
+
 Risk overlay:
 If any task involves destructive, external, production, auth, secret, dependency, migration, billing, email, or infra impact, run `risk-gate` before the selected workflow proceeds to action.
 
