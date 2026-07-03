@@ -26,7 +26,13 @@ Implement the required behavior without scope drift, speculative architecture, o
 
 1. Produce the Implementation Contract before editing.
 
-Read `docs/ai/implementation-context.md` when it exists. Use it for known commands, implementation patterns, boundaries, generated-file policy, and stop conditions. If it is missing but the task is small and local, proceed from nearby repository evidence instead of forcing context generation. If it is missing or stale for repeated or non-trivial work, recommend `implementation-context-generation`.
+Read `docs/ai/implementation-context.md` when it exists. Check `context_status` before using it:
+
+- `template`: treat as missing durable context; placeholder rows and `Unknown` values are not implementation evidence.
+- `initialized`: use recorded commands, implementation patterns, boundaries, generated-file policy, and stop conditions according to their evidence status.
+- `stale`: refresh affected context or downgrade affected claims to `insufficient evidence` before relying on them.
+
+If implementation context is missing or `template` but the task is small and local, proceed from nearby repository evidence instead of forcing context generation. If it is missing, `template`, or `stale` for repeated or non-trivial work, recommend `implementation-context-generation`.
 
 ```text
 Implementation Contract:
@@ -44,7 +50,7 @@ Implementation Contract:
 - Boundary decision:
   - resolved | unresolved | not needed
 - Implementation context:
-  - read | missing | stale | not needed
+  - initialized | template | missing | stale | not needed
 - Stack overlay used:
   - none | project-specific | stack-specific
 - Verification contract:

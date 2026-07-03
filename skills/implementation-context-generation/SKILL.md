@@ -46,6 +46,23 @@ If the context belongs in permanent project rules, reference or update:
 AGENTS.project.md
 ```
 
+## Context status metadata
+
+The context file must include explicit metadata:
+
+```yaml
+context_status: template | initialized | stale
+last_updated:
+evidence_owner:
+source_scope:
+```
+
+Interpretation:
+
+- `template`: default uninitialized context. Treat placeholder rows, blank rows, and `Unknown` values as missing or insufficient evidence, not reusable project facts.
+- `initialized`: real project facts have been recorded with evidence status and source. Consumers may use the recorded claims according to their evidence status.
+- `stale`: previously initialized context may be outdated because source files, commands, package/workspace shape, tests, boundaries, generated-file policy, overlays, or stop conditions changed. Refresh before relying on it, or downgrade affected claims to `Unknown` / `insufficient evidence`.
+
 ## Evidence statuses
 
 Use these statuses for important claims:
@@ -60,7 +77,12 @@ Use these statuses for important claims:
 
 ## Process
 
-1. Inspect repository evidence first.
+1. Read existing context status first.
+   - If `context_status` is `template`, treat the file as missing durable context and populate only from repository evidence or targeted human input.
+   - If `context_status` is `initialized`, preserve evidence-backed content unless contradicted by newer evidence.
+   - If `context_status` is `stale`, refresh affected sections before use, or mark the affected implementation assumptions as `insufficient evidence`.
+
+2. Inspect repository evidence first.
    - README and setup docs.
    - Package, workspace, build, dependency, and CI files.
    - Test, lint, typecheck, build, focused-test, and local run commands.
@@ -69,7 +91,7 @@ Use these statuses for important claims:
    - Project overlay rules, docs, ADRs, schemas, generated artifacts, and examples.
    - `docs/ai/review-context.md` only for implementation-relevant constraints; do not duplicate review-only content.
 
-2. Draft candidate context.
+3. Draft candidate context.
    - evidence status key,
    - stack inventory,
    - package/workspace shape,
@@ -85,28 +107,34 @@ Use these statuses for important claims:
    - stop conditions requiring re-planning or human decision,
    - update triggers.
 
-3. Label each important claim with evidence status and source.
+4. Label each important claim with evidence status and source.
    - Do not treat inferred framework conventions as fact.
    - Mark unsupported conventions as `Hypothesis` or `Unknown`.
    - Prefer exact command sources such as package scripts, Make targets, CI jobs, or docs.
 
-4. Ask the user only for missing or high-impact human judgment when needed.
+5. Ask the user only for missing or high-impact human judgment when needed.
    - preferred verification depth,
    - generated/manual-edit boundary,
    - project-specific overlays,
    - hard stop conditions,
    - commands that are intentionally not safe to run.
 
-5. Save or update the context file.
+6. Save or update the context file.
+   - Change `context_status` from `template` to `initialized` only after at least one real project fact is recorded with a non-empty source.
+   - Set `last_updated` to the evidence update date or timestamp.
+   - Set `evidence_owner` to the human, agent, team, or source responsible for the update.
+   - Set `source_scope` to the repository paths, docs, package/build files, tests, or human input scope inspected.
+   - Use `stale` when existing context is known or strongly suspected to lag behind changed source evidence; do not silently rely on stale claims.
    - Preserve existing `Human-confirmed` content unless contradicted by newer evidence.
    - Keep task progress out of this file.
    - Keep stack-specific rules in overlay hooks or linked project overlay files.
    - Add update triggers so future agents know when context may be stale.
 
-6. Wire consumers by instruction, not by changing unrelated workflows.
+7. Wire consumers by instruction, not by changing unrelated workflows.
    - `repository-orientation` may recommend this skill when implementation context is missing or stale.
    - `controlled-implementation` should read this context when available.
    - `test-first-verification` should use this context for commands and test patterns when available.
+   - Consumers must treat `context_status: template` as missing context and `context_status: stale` as insufficient evidence for affected claims until refreshed.
    - Stack overlays may extend this context, but must not replace it.
 
 ## Output
@@ -130,6 +158,7 @@ Implementation context generation:
 ## Exit criteria
 
 - A reusable implementation context file is created or updated.
+- `context_status` is `initialized` only after real project facts are recorded with sources; otherwise `template` or `stale` is explicit.
 - Important claims have evidence status and source.
 - The context is framework-agnostic and only points to stack overlays.
 - Task progress is not stored in implementation context.
@@ -146,3 +175,4 @@ Implementation context generation:
 | Storing task progress here | Move progress to `planning-with-files`. |
 | Duplicating review-only context | Link `review-context-generation` output instead and copy only implementation-relevant constraints. |
 | Letting context go stale silently | Add update triggers and evidence sources. |
+| Treating a checked-in template as context | Keep `context_status: template` and report missing or insufficient evidence until real project facts are recorded. |

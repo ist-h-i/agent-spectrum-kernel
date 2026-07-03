@@ -33,6 +33,8 @@ Read available project review context before judging adversarial risk:
 - project overlay rules such as `AGENTS.project.md`,
 - relevant docs, ADRs, threat models, security notes, accepted risks, known issues, incidents, or critical workflow docs.
 
+If `docs/ai/review-context.md` has `context_status: template`, treat it as missing context. If it has `context_status: stale`, refresh affected claims or mark those judgments as `insufficient evidence`.
+
 If assets, actors, safety boundaries, accepted risks, or threat/misuse model are missing, mark the affected judgment as `insufficient evidence` instead of inventing threats.
 
 ## Process

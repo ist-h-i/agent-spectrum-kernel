@@ -29,7 +29,7 @@ Make the final merge decision from gate evidence without hiding missing checks, 
    - `review-architecture-impact` when applicable,
    - `review-output-quality` when applicable,
    - `review-adversarial-risk` when applicable,
-   - `docs/ai/review-context.md` or project overlay review context when available,
+   - `docs/ai/review-context.md` or project overlay review context when available; `context_status: template` counts as missing context, and `context_status: stale` counts as insufficient evidence for affected claims until refreshed,
    - `review-domain-impact` when applicable,
    - `adr-review` when applicable,
    - `risk-gate` when applicable,
@@ -41,6 +41,8 @@ Make the final merge decision from gate evidence without hiding missing checks, 
    - Output quality layer evidence comes from `review-output-quality` when that gate was required.
    - Adversarial risk overlay evidence comes from `review-adversarial-risk` when that gate was required.
    - Durable review context may explain skipped, insufficient-evidence, known-issue, or accepted-risk judgments, but cannot replace required gate evidence.
+   - Durable review context with `context_status: template` must not explain skipped or passed judgments; it is uninitialized context.
+   - Durable review context with `context_status: stale` can only support unaffected claims; affected stale claims remain `insufficient evidence`.
    - Use `pass`, `fail`, `skipped`, or `insufficient evidence` for each layer.
    - Required layers without gate evidence remain `insufficient evidence`; do not silently downgrade them to skipped.
    - Skipped layers must retain the router's evidence-based reason.

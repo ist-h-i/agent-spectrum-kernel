@@ -1,8 +1,26 @@
+---
+context_status: template
+last_updated: null
+evidence_owner: null
+source_scope: "default template; no project-specific review evidence recorded"
+---
+
 # Review Context Template
 
 Use this file as durable project review context for repeated PR, diff, generated-output, output-quality, and adversarial-risk reviews.
 
+Context status: this checked-in file is a `template`, not initialized project evidence. Treat blank rows and `Unknown` placeholder rows as missing or insufficient context until `review-context-generation` records real project facts and changes `context_status` to `initialized`.
+
 This file is not task progress. Use `planning-with-files` for task state.
+
+## Context Status Metadata
+
+| Field | Meaning |
+|---|---|
+| `context_status` | `template` means uninitialized placeholder context; `initialized` means real project facts have been recorded; `stale` means evidence may be outdated and must be refreshed or downgraded before use. |
+| `last_updated` | Date or timestamp of the last evidence-backed context update, or `null` for a default template. |
+| `evidence_owner` | Human, agent, team, or source responsible for the recorded evidence, or `null` for a default template. |
+| `source_scope` | Scope of evidence used to populate the context, or a note that no project-specific evidence has been recorded. |
 
 ## Evidence Status Key
 
