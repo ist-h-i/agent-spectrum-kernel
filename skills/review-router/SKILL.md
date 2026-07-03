@@ -1,6 +1,6 @@
 ---
 name: review-router
-description: Route a diff, PR, commit, patch, or generated code review to the smallest required review gates. Use before merge reviews to decide which automated, AI quality, architecture, output quality, adversarial risk, domain, ADR, risk, evidence, and final merge gates are required, optional, or skipped.
+description: Route a diff, PR, commit, patch, or generated code review to the smallest required review gates. Use before merge reviews to decide which automated, AI quality, code health, architecture, output quality, adversarial risk, domain, ADR, risk, evidence, and final merge gates are required, optional, or skipped.
 ---
 
 # Review Router
@@ -12,7 +12,7 @@ Select the smallest set of review gates needed to make the merge decision defens
 ## Use when
 
 - Reviewing a PR, diff, commit, patch, or generated code.
-- The review may involve multiple concerns such as tests, logic, maintainability, domain behavior, architecture, risk, or evidence.
+- The review may involve multiple concerns such as tests, logic, maintainability, code health, domain behavior, architecture, risk, or evidence.
 
 ## Do not use when
 
@@ -32,7 +32,7 @@ Select the smallest set of review gates needed to make the merge decision defens
 2. Classify changed meaning.
    - Mechanical: formatting, generated output, lockfile-only, or lint-only.
    - Technical behavior: correctness, edge cases, API use, error handling, tests.
-   - Maintainability: naming, readability, local design, scope creep.
+   - Maintainability and code health: naming, readability, local design, scope creep, technical debt, duplicated logic, dead code, refactor candidates, testability risk, dependency/tooling risk, and repeated review findings.
    - Domain behavior: business rules, state semantics, responsibility, workflow, reporting, generated business text.
    - Architecture/risk: hard-to-reverse boundaries, dependencies, public contracts, persistence, auth, infra, external effects.
 
@@ -50,7 +50,7 @@ Select the smallest set of review gates needed to make the merge decision defens
    - Logic: correctness, edge cases, API use, error handling, concurrency, compatibility.
    - Output quality: user-visible, operator-visible, reviewer-visible, system-consumed, or AI-consumed output such as UI screens, reports, notifications, CLI output, API responses, docs, generated text, or AI output; review form, structure, completeness, clarity, persona/consumer fit, and output contract fit.
    - Test / verification: changed behavior coverage, regression proof, missing negative cases, executable evidence.
-   - Style / maintainability: naming, readability, duplication, scope creep, local complexity.
+   - Style / maintainability: naming, readability, duplication, scope creep, local complexity, code smells, debt, testability, and refactor candidates.
    - Mechanical: format, lint, typecheck, build, tests, static analysis, CI.
    - Adversarial risk overlay: abuse cases, prompt/generated-output failure modes, security/privacy signals, reviewer challenge pass.
    - Risk overlay: destructive, external, auth, secret, production, dependency, migration, billing, email, infra impact.
@@ -65,6 +65,7 @@ Select the smallest set of review gates needed to make the merge decision defens
    - `adr-review` if architectural memory or hard-to-reverse boundary decisions may need to be recorded, updated, or superseded.
    - `risk-gate` before any destructive, external, auth, secret, production, dependency, or infra action.
    - `review-automated-gate` for mechanical verification evidence.
+   - `review-code-health` when the user asks for debt, vulnerability/security weakness, refactor candidate, coding smell, maintainability, testability, performance, dependency/tooling, dead code, duplication, boundary weakness, or repeated finding analysis; map non-specialized findings into the Style / maintainability layer.
    - `review-ai-quality` for local implementation-quality review.
    - `evidence-ledger` when claims need evidence classification.
    - `review-final-merge-gate` to make the merge decision.
@@ -153,6 +154,7 @@ Review route:
 - Architecture impact maps to `review-architecture-impact` instead of being hidden inside `review-ai-quality` or conflated with `adr-review`.
 - Output quality maps to `review-output-quality` instead of being hidden inside `review-ai-quality`.
 - Adversarial risk maps to `review-adversarial-risk` instead of being hidden inside `review-ai-quality` or `risk-gate`.
+- Code-health review maps to `review-code-health` when applicable, but debt or smell discovery is not forced on every review.
 - Durable project review context is read when available, or `review-context-generation` is selected when missing context would otherwise recur.
 - Skipped layers have evidence-based reasons.
 - Insufficient-evidence layers name the missing inputs.

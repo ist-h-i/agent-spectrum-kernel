@@ -329,6 +329,36 @@ review-router -> layer applicability -> required gates -> review-final-merge-gat
 
 - Mechanical pass だけで merge 可とは判断しません。
 
+## Code health review
+
+### そのまま貼る依頼文
+
+```text
+review-code-health を使って、このdiffまたは指定範囲の技術負債、脆弱性/security weakness、リファクタ候補、コードスメル、保守性・テスト容易性・性能・依存関係リスク、dead code、重複、境界問題、repeated review finding を確認してください。
+各findingは evidence、impact、severity、urgency、recommended action、scope guidance、AI-rule feedback を含め、current PRで直すものと separate PR / project-level improvement / no action に分けてください。
+review-ai-quality、review-architecture-impact、review-adversarial-risk の責務は置き換えず、該当する場合だけroutingしてください。
+```
+
+### 使われる主なSkill
+
+- `review-router`
+- `review-code-health`
+- `review-ai-quality` when ordinary implementation quality review is also required
+- `review-architecture-impact` / `review-adversarial-risk` when specialized signals appear
+- `evidence-ledger` when claims need evidence status
+
+### 期待する出力
+
+- category / evidence / impact
+- severity / urgency / recommended action
+- current PR blocker と backlog candidate の分離
+- AI-rule feedback
+
+### 注意
+
+- すべてのPRで強制実行しません。
+- 任意のリファクタ実装は行いません。
+
 ## Output quality review
 
 ### そのまま貼る依頼文
