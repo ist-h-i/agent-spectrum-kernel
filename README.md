@@ -104,6 +104,8 @@ First-time users should start with `docs/quickstart-ja.md`.
 - `docs/quickstart-ja.md`: minimum install path, skill-aware / non-skill-aware setup, first prompts.
 - `docs/prompt-recipes-ja.md`: copy-paste requests organized by what the user wants to do.
 - `docs/glossary-ja.md`: operational definitions for Kernel, Skill, Gate, overlay, context, and contract terms.
+- `docs/usage-ja.md`: representative usage guide for common operating patterns.
+- `docs/skill-matrix.md`: reference matrix for workflow selection.
 
 ## Recommended workflows
 
