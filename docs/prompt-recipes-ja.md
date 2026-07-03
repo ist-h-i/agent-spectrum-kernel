@@ -1,0 +1,452 @@
+# Prompt Recipes 日本語版
+
+この文書は、Skill名を深く知らなくても使える copy-paste 用の依頼文集です。各recipeは「やりたいこと」から選びます。Skillの正本は各 `SKILL.md` と `skills/skill-router/SKILL.md` です。
+
+## Small local edit
+
+### そのまま貼る依頼文
+
+```text
+この小さな修正だけを行ってください。
+対象外のrefactor、format churn、public API変更はしないでください。
+作業前に軽く対象ファイルと近傍patternを確認し、最後に変更点、検証、未検証事項を報告してください。
+```
+
+### 使われる主なSkill
+
+- `AGENTS.md` only
+
+### 期待する出力
+
+- 変更ファイル
+- 実行した確認
+- 未確認事項
+
+### 注意
+
+- trivial なら `skill-router` を無理に使いません。
+
+## New feature / behavior change
+
+### そのまま貼る依頼文
+
+```text
+新しい挙動を追加してください。
+まず skill-router で必要workflowを選び、spec-driven-development で仕様、非目標、受け入れ条件、検証方法を出してください。
+その後、test-first-verification で Verification Contract を作り、controlled-implementation で最小実装してください。
+最後に実行した検証と未検証リスクを分けて報告してください。
+```
+
+### 使われる主なSkill
+
+- `skill-router`
+- `spec-driven-development`
+- `test-first-verification`
+- `controlled-implementation`
+- `evidence-ledger`
+
+### 期待する出力
+
+- Spec
+- Verification Contract
+- Implementation Contract
+- 実装結果と検証結果
+
+### 注意
+
+- 仕様が曖昧なら実装前に止めます。
+- stack overlay は generic workflow 選択後、該当する場合だけ使います。
+
+## Bug fix with unknown cause
+
+### そのまま貼る依頼文
+
+```text
+この不具合を修正してください。
+doubt-driven-development を使い、最初の仮説に飛びつかず、反証可能な仮説と観測方法を出してください。
+可能なら修正前に再現し、test-first-verification で回帰を防ぐ Verification Contract を作ってください。
+修正は controlled-implementation で最小範囲に限定してください。
+```
+
+### 使われる主なSkill
+
+- `doubt-driven-development`
+- `test-first-verification`
+- `controlled-implementation`
+
+### 期待する出力
+
+- 仮説と反証結果
+- 再現または再現不能理由
+- 回帰確認
+
+### 注意
+
+- 再現できない場合、fixed と断言せず evidence status を下げます。
+
+## Investigation / root-cause analysis
+
+### そのまま貼る依頼文
+
+```text
+doubt-driven-development を使って原因調査してください。
+観測事実、仮説、反証チェック、次に見るファイルやログを分けてください。
+原因が確定するまで実装修正に進まず、確定後に最小修正案と検証方法を出してください。
+```
+
+### 使われる主なSkill
+
+- `doubt-driven-development`
+- `evidence-ledger`
+
+### 期待する出力
+
+- Verified / Supported / Hypothesis / Unknown の区別
+- 最小の次アクション
+
+### 注意
+
+- 調査だけなら実装しません。修正依頼が含まれる場合だけ実装へ進みます。
+
+## Design grill
+
+### そのまま貼る依頼文
+
+```text
+grill-design を使って、この設計案を実装前に厳しく確認してください。
+repoから確認できることは先に調べ、未確定の前提、失敗モード、非目標、受け入れ条件を整理してください。
+質問が必要な場合は一度に一問だけにしてください。
+```
+
+### 使われる主なSkill
+
+- `grill-design`
+- `evidence-ledger`
+
+### 期待する出力
+
+- 設計判断
+- 未解決リスク
+- 実装前に決めること
+
+### 注意
+
+- deploy、migration、secret、authなどが出たら `risk-gate` が先です。
+
+## Docs / ADR / terminology fit review
+
+### そのまま貼る依頼文
+
+```text
+grill-with-docs を使って、この案が既存docs、ADR、用語体系と衝突しないか確認してください。
+必要なら adr-review で、ADR作成、更新、不要の判断を出してください。
+```
+
+### 使われる主なSkill
+
+- `grill-with-docs`
+- `adr-review`
+
+### 期待する出力
+
+- 用語やdocsとの整合
+- ADR要否
+- 変更すべき文書
+
+### 注意
+
+- docsにない推測を事実として扱いません。
+
+## Application boundary decision
+
+### そのまま貼る依頼文
+
+```text
+application-boundary-architecture を使って、この変更の境界を判断してください。
+dependency direction、state ownership、external I/O、DTO/error trust boundary、async lifetime、feature public API、usecase/repository/port/adapter/mapper の必要性を、既存repo構成に合わせて見てください。
+最小変更、境界違反、検証方法、ADR要否も出してください。
+```
+
+### 使われる主なSkill
+
+- `application-boundary-architecture`
+- `adr-review` when needed
+- `grill-with-docs` when docs/domain/ADR terms matter
+
+### 期待する出力
+
+- 境界判断
+- 許可される実装範囲
+- stop condition
+
+### 注意
+
+- pass-through layer を将来のためだけに追加しません。
+
+## Implementation context generation
+
+### そのまま貼る依頼文
+
+```text
+implementation-context-generation を使って、このrepoの実装contextを作成してください。stack、commands、test patterns、implementation patterns、architecture boundaries、generated files、stop conditions を evidence status 付きで docs/ai/implementation-context.md に整理してください。
+```
+
+### 使われる主なSkill
+
+- `implementation-context-generation`
+- `repository-orientation`
+
+### 期待する出力
+
+- `docs/ai/implementation-context.md`
+- evidence status 付きの実装判断材料
+
+### 注意
+
+- task progress はここに書かず、長期進捗は `planning-with-files` に分けます。
+
+## Implementation with an Implementation Contract
+
+### そのまま貼る依頼文
+
+```text
+controlled-implementation を使う前に Implementation Contract を出してください。goal、non-goals、allowed/forbidden scope、existing patterns、boundary decision、implementation context、stack overlay used、verification contract、stop conditions を明示してください。
+```
+
+### 使われる主なSkill
+
+- `controlled-implementation`
+- `test-first-verification` when behavior needs proof
+
+### 期待する出力
+
+- Implementation Contract
+- scoped implementation
+- verification evidence
+
+### 注意
+
+- contract 外の refactor はしません。
+
+## Verification Contract before implementation
+
+### そのまま貼る依頼文
+
+```text
+test-first-verification を使って、実装前に Verification Contract を出してください。証明する挙動、回帰防止、既存coverage、追加すべきfocused test、negative cases、commands、未検証事項を明示してください。
+```
+
+### 使われる主なSkill
+
+- `test-first-verification`
+
+### 期待する出力
+
+- Behavior to prove
+- Regression to prevent
+- Commands
+- Evidence required
+
+### 注意
+
+- 実行していない検証を実行済みとして報告しません。
+
+## Stack overlay use when available
+
+### そのまま貼る依頼文
+
+```text
+このrepoに stack-specific overlay がある場合だけ、generic workflow選択後に該当overlayを使って controlled-implementation への制約と test-first-verification への検証補足を出してください。Angular固有Skillを全repoに強制しないでください。
+```
+
+### 使われる主なSkill
+
+- `skill-router`
+- relevant stack overlay only when present and applicable
+
+### 期待する出力
+
+- generic workflow
+- overlay applicability
+- stack-specific constraints and verification supplement
+
+### 注意
+
+- stack overlay は任意補助です。generic workflow を置き換えません。
+
+## Angular implementation overlay
+
+### そのまま貼る依頼文
+
+```text
+Angular固有のcomponent、route、provider、template、forms、Signals/RxJS、DOM/security、SSR/hydration、Angular test、CLI、migrationに触る実装です。
+まず skill-router でgeneric workflowを選び、その後に angular-implementation-architecture を stack overlay として使ってください。
+Angular固有の制約は controlled-implementation に、検証補足は test-first-verification に接続してください。
+```
+
+### 使われる主なSkill
+
+- `skill-router`
+- `angular-implementation-architecture`
+- `controlled-implementation`
+- `test-first-verification`
+
+### 期待する出力
+
+- Angular overlay applicability
+- 実装制約
+- Angular向け検証補足
+
+### 注意
+
+- Angular は任意例です。他stackに強制しません。
+- React / Python / Java overlay は、repoやproject overlayに追加されている場合だけ使います。
+
+## PR / diff review
+
+### そのまま貼る依頼文
+
+```text
+review-router を使ってこのdiffをレビューしてください。
+review-router -> layer applicability -> required gates -> review-final-merge-gate の順に進めてください。
+各層を required / skipped / insufficient evidence で分け、最後に approve / approve with comments / request changes / block / insufficient evidence を判断してください。
+```
+
+### 使われる主なSkill
+
+- `review-router`
+- required gates
+- `review-final-merge-gate`
+- `evidence-ledger`
+
+### 期待する出力
+
+- Layer applicability
+- Required fixes
+- Decision
+
+### 注意
+
+- Mechanical pass だけで merge 可とは判断しません。
+
+## Output quality review
+
+### そのまま貼る依頼文
+
+```text
+review-output-quality を使って、UI、docs、通知、CLI、API response、generated text、AI/system-consumed output としての品質をレビューしてください。
+利用できる場合は docs/ai/review-context.md を読み、persona、medium、output contract に対する適合を確認してください。
+```
+
+### 使われる主なSkill
+
+- `review-output-quality`
+- `review-context-generation` if reusable context is missing and requested
+
+### 期待する出力
+
+- consumer fit
+- structure / completeness
+- contract fit
+
+### 注意
+
+- persona や output contract が不明なら insufficient evidence とします。
+
+## Adversarial risk review
+
+### そのまま貼る依頼文
+
+```text
+review-adversarial-risk を使って、通常レビュー後に残る高impactの失敗経路、misuse、blast radiusを確認してください。
+利用できる場合は docs/ai/review-context.md を読み、known issueやaccepted riskの再報告は避けてください。
+最大3件程度の重要リスクに絞ってください。
+```
+
+### 使われる主なSkill
+
+- `review-adversarial-risk`
+- `risk-gate` when external or destructive impact exists
+
+### 期待する出力
+
+- high-impact failure paths
+- blast radius
+- mitigation or stop condition
+
+### 注意
+
+- 通常レビューの全項目を繰り返しません。
+
+## Review context generation
+
+### そのまま貼る依頼文
+
+```text
+review-context-generation を使って、このrepoのレビュー判断contextを docs/ai/review-context.md に整理してください。
+project identity、persona、output contract、critical workflow、accepted risk、known issue、noise-control rule を evidence status 付きで残してください。
+task progress は書かないでください。
+```
+
+### 使われる主なSkill
+
+- `review-context-generation`
+- `repository-orientation`
+
+### 期待する出力
+
+- `docs/ai/review-context.md`
+- review gate が再利用できる判断材料
+
+### 注意
+
+- 実装判断用の情報は `docs/ai/implementation-context.md` に分けます。
+
+## MR/PR README generation
+
+### そのまま貼る依頼文
+
+```text
+mr-readme-generation を使って、このPRの説明を docs/pr 配下のPR専用READMEとして作成してください。
+PR概要、影響範囲、リスク、切り戻し方針、ドメイン領域、アーキテクチャー判断ログ、設計思想、検証結果、後続AI向け再利用メモを含めてください。
+hard-to-reverse な判断がある場合は adr-review も使ってください。
+```
+
+### 使われる主なSkill
+
+- `mr-readme-generation`
+- `adr-review` when needed
+
+### 期待する出力
+
+- durable change context
+- reviewer向け説明
+- future AI reuse notes
+
+### 注意
+
+- merge decision が必要な場合だけ `review-router` を使います。
+
+## Handoff to another agent
+
+### そのまま貼る依頼文
+
+```text
+handoff-generation を使って、次のAgentに渡せるタスク指示を作ってください。
+Task、Context、Allowed scope、Forbidden scope、Expected output、Verification、Stop condition を必ず含めてください。
+事実、推論、未確認を分けてください。
+```
+
+### 使われる主なSkill
+
+- `handoff-generation`
+- `evidence-ledger`
+
+### 期待する出力
+
+- 次のAgentがそのまま実行できる依頼
+- 残リスクと未確認事項
+
+### 注意
+
+- 汎用的な助言ではなく、具体的な次タスクにします。

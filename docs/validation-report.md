@@ -49,6 +49,9 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 - `docs/skill-matrix.md`: ok
 - `docs/ai/review-context.md`: ok
 - `docs/ai/implementation-context.md`: ok
+- `docs/quickstart-ja.md`: ok
+- `docs/prompt-recipes-ja.md`: ok
+- `docs/glossary-ja.md`: ok
 - `docs/usage-ja.md`: ok
 - `docs/workflow-examples.md`: ok
 - `docs/project-overlay-template.md`: ok

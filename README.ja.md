@@ -20,6 +20,14 @@ examples/      使い方の短い例
 docs/          運用・カスタマイズ・採点基準
 ```
 
+## 3分で使う
+
+初回利用者は `docs/quickstart-ja.md` から始めてください。
+
+- `docs/quickstart-ja.md`: 最小導入、Skill対応/非対応ツール、最初にAIへ言うこと。
+- `docs/prompt-recipes-ja.md`: やりたいこと別のcopy-paste依頼文。
+- `docs/glossary-ja.md`: Kernel、Skill、Gate、overlay、context、contractの用語集。
+
 ## 使い分け
 
 判断基準は単純です。
