@@ -56,6 +56,7 @@ examples/
   07-mr-readme.md
 skills/
   skill-router/SKILL.md
+  angular-implementation-architecture/SKILL.md
   application-boundary-architecture/SKILL.md
   repository-orientation/SKILL.md
   grill-design/SKILL.md
@@ -132,9 +133,9 @@ Use `evidence-ledger` whenever final text makes or evaluates a claim about corre
 
 ## Boundary
 
-This set is intentionally generic. It does not encode Angular, React, Python, finance, infra, internal naming, branch strategy, or CI-specific conventions.
+The kernel and generic workflows are intentionally stack-agnostic. They do not encode Angular, React, Python, finance, infra, internal naming, branch strategy, or CI-specific conventions as always-on rules.
 
-Add those as project overlays. Do not put them into the global kernel unless they must apply to every repository.
+Add those as project overlays or stack implementation overlays. The included `angular-implementation-architecture` skill is the first concrete stack overlay and is selected only after the generic workflow when Angular signals apply. Do not put stack-specific rules into the global kernel unless they must apply to every repository.
 
 When a project overlay contains framework/domain-specific skills, route in two steps:
 

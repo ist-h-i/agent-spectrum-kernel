@@ -67,6 +67,25 @@ test-first-verification for evidence
 spec-driven-development を使って、先に仕様・非目標・受け入れ条件・検証方法を出してください。実装はその後。
 ```
 
+### Angular stack overlay
+
+Angular固有のcomponent、route、provider、template、forms、Signals/RxJS、DOM/security、SSR/hydration、Angular test、CLI、migrationに触る実装では、generic workflowを選んだ後にstack overlayとして使います。
+
+使うSkill:
+
+```text
+skill-routerでgeneric workflow選択
+angular-implementation-architecture as stack overlay
+controlled-implementation
+test-first-verification
+```
+
+例:
+
+```text
+Angularのrouted formを実装してください。generic workflowは維持し、Angular固有の制約と検証補助だけ angular-implementation-architecture から出してください。
+```
+
 ### 設計壁打ち
 
 使うSkill:

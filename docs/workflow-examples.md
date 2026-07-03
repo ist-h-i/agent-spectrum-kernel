@@ -263,7 +263,41 @@ MR/PR README:
 - Follow-up skills: ...
 ```
 
-## 9. Implementation context generation
+## 9. Angular stack implementation overlay
+
+User request:
+
+```text
+Implement this Angular routed form. Use the Angular overlay only for Angular-specific constraints.
+```
+
+Workflow:
+
+```text
+spec-driven-development or controlled-implementation as selected by skill-router
+angular-implementation-architecture as stack overlay
+test-first-verification for Angular verification supplement
+```
+
+Expected overlay output:
+
+```text
+Angular implementation overlay:
+- Angular surface: routed page, form, provider, template
+- Existing Angular pattern: ...
+- State owner: ...
+- Provider / DI scope: ...
+- Async lifecycle: ...
+- Template / form impact: ...
+- DOM / security impact: ...
+- SSR / hydration impact: ...
+- Constraints for controlled-implementation: ...
+- Verification supplement for test-first-verification: ...
+- Stop conditions: ...
+- Evidence: ...
+```
+
+## 10. Implementation context generation
 
 User request:
 

@@ -15,6 +15,12 @@ For stack-specific implementation skills, follow `docs/stack-implementation-over
 
 Use `docs/ai/review-context.md` for reusable review context such as personas, output contracts, critical workflows, accepted risks, known issues, and review noise-control rules. Keep permanent agent behavior rules in the project overlay; keep task progress in `planning-with-files`.
 
+Example stack overlay entry:
+
+| Overlay signal | Skill | Use after generic workflow |
+|---|---|---|
+| Angular components, routes, providers, templates, forms, Signals/RxJS, SSR/hydration, Angular tests, CLI, or migrations | `angular-implementation-architecture` | `controlled-implementation` and `test-first-verification` |
+
 Recommended filename:
 
 ```text

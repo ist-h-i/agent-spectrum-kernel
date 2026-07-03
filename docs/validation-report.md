@@ -4,14 +4,15 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 
 ## Manifest / directory consistency
 
-- Skills in manifest: 26
-- Skill directories: 26
+- Skills in manifest: 27
+- Skill directories: 27
 - Missing directories: none
 - Extra directories: none
 
 ## Skill section checks
 
 - `skills/adr-review/SKILL.md`: words=317, name_ok=True, missing=none
+- `skills/angular-implementation-architecture/SKILL.md`: words=1431, name_ok=True, missing=none
 - `skills/application-boundary-architecture/SKILL.md`: words=3645, name_ok=True, missing=none
 - `skills/controlled-implementation/SKILL.md`: words=695, name_ok=True, missing=none
 - `skills/doubt-driven-development/SKILL.md`: words=351, name_ok=True, missing=none

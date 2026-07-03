@@ -110,7 +110,7 @@ This file is framework-agnostic. Put Angular, React, Python, Java, or other stac
 
 | Overlay | Applies when | What it may define | Status | Source |
 |---|---|---|---|---|
-| Angular overlay: | Angular-specific implementation is required | Angular-specific boundaries, testing, and CLI conventions | Unknown |  |
+| Angular overlay: | Angular-specific implementation is required | Angular-specific implementation constraints, testing supplements, provider/DI scope, template/form, Signals/RxJS, router, DOM/security, SSR/hydration, CLI, and migration checks | Supported | `skills/angular-implementation-architecture/SKILL.md` |
 | React overlay: | React-specific implementation is required | React-specific component, state, and rendering conventions | Unknown |  |
 | Python overlay: | Python-specific implementation is required | Python-specific packaging, testing, and runtime conventions | Unknown |  |
 | Java overlay: | Java-specific implementation is required | Java-specific package, build, and testing conventions | Unknown |  |

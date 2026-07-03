@@ -34,6 +34,9 @@ After generic workflow selection, consider framework/domain-specific project ove
 Stack implementation overlay:
 Follow `docs/stack-implementation-overlay-contract.md`. Stack overlays are optional, stack-signal driven supplements that feed constraints into `controlled-implementation` and verification supplements into `test-first-verification`; they do not replace the generic workflow.
 
+Available concrete stack overlay:
+`angular-implementation-architecture` for Angular components, routes, providers, templates, forms, Signals/RxJS, DOM/security, SSR/hydration, Angular tests, CLI, migrations, and Angular tooling.
+
 Risk overlay:
 If any task involves destructive, external, production, auth, secret, dependency, migration, billing, email, or infra impact, run `risk-gate` before the selected workflow proceeds to action.
 
