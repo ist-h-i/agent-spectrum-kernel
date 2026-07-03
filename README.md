@@ -156,18 +156,3 @@ When a project overlay contains framework/domain-specific skills, route in two s
 generic workflow selection via skill-router
 -> project overlay skill selection when the overlay signal applies
 ```
-
-## Quality target
-
-This v2 is optimized for personal development and internal introduction, not for public marketing. The quality target is:
-
-```text
-Kernel design:            95+
-Skill separation:         95+
-Agent operational safety: 95+
-Verification discipline:  95+
-Review/handoff utility:   95+
-Personal/internal use:    95+
-```
-
-See `docs/quality-rubric.md` for the scoring rubric.
