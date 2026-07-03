@@ -16,6 +16,12 @@ AIに期待する動作は次です。
 7. 次のAgent/人間が引き継げる状態にする
 ```
 
+## 最初に読むもの
+
+- `docs/quickstart-ja.md`: 初回導入と最初の依頼文。
+- `docs/prompt-recipes-ja.md`: common workflow のcopy-paste依頼文。
+- `docs/glossary-ja.md`: Kernel、Skill、Gate、overlay、context、contractの用語。
+
 ## まず入れるもの
 
 最低限は `AGENTS.md` だけでよいです。

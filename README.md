@@ -37,6 +37,9 @@ CHANGELOG.md
 docs/
   ai/review-context.md
   ai/implementation-context.md
+  quickstart-ja.md
+  prompt-recipes-ja.md
+  glossary-ja.md
   skill-matrix.md
   usage-ja.md
   workflow-examples.md
@@ -93,6 +96,14 @@ skills/
 5. Add project-specific rules and skills as a separate overlay, not by bloating the kernel.
 
 For tools that only support a single custom instruction field, use `CUSTOM_INSTRUCTIONS.md`.
+
+## 3分で使う / Quick start
+
+First-time users should start with `docs/quickstart-ja.md`.
+
+- `docs/quickstart-ja.md`: minimum install path, skill-aware / non-skill-aware setup, first prompts.
+- `docs/prompt-recipes-ja.md`: copy-paste requests organized by what the user wants to do.
+- `docs/glossary-ja.md`: operational definitions for Kernel, Skill, Gate, overlay, context, and contract terms.
 
 ## Recommended workflows
 
