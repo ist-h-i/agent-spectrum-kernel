@@ -37,6 +37,7 @@ CHANGELOG.md
 docs/
   ai/review-context.md
   ai/implementation-context.md
+  ai/improvement-ledger.md
   quickstart-ja.md
   prompt-recipes-ja.md
   glossary-ja.md

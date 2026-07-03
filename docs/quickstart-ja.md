@@ -224,6 +224,7 @@ test-first-verification を使って、実装前に Verification Contract を出
 ```text
 docs/ai/review-context.md          レビュー判断用。persona, output contract, accepted risk, known issue など。
 docs/ai/implementation-context.md  実装判断用。stack, commands, patterns, test style, boundaries など。
+docs/ai/improvement-ledger.md      改善台帳用。reviewで見つけた負債、rule gap、check化候補、accepted risk など。
 planning-with-files                長期タスクの進捗保存用。context fileの代替ではない。
 ```
 
