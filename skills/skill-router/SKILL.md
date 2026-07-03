@@ -76,6 +76,7 @@ This skill is the canonical runtime routing source. `AGENTS.md` only contains th
    - If a project overlay contains framework, domain, UI/UX, architecture, CI, data, security, or other repository-specific skills, consider them after generic workflow selection.
    - Select overlay skills only when the overlay signal applies to the selected work type.
    - Do not add project-specific skills to the generic routing table.
+   - For stack-specific implementation overlays, follow `docs/stack-implementation-overlay-contract.md`. They may supplement `controlled-implementation` and `test-first-verification`, but must not replace the generic workflow.
 
 5. State what is intentionally skipped.
 

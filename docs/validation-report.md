@@ -34,7 +34,7 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 - `skills/review-router/SKILL.md`: words=1110, name_ok=True, missing=none
 - `skills/risk-gate/SKILL.md`: words=416, name_ok=True, missing=none
 - `skills/scope-control/SKILL.md`: words=342, name_ok=True, missing=none
-- `skills/skill-router/SKILL.md`: words=886, name_ok=True, missing=none
+- `skills/skill-router/SKILL.md`: words=906, name_ok=True, missing=none
 - `skills/spec-driven-development/SKILL.md`: words=365, name_ok=True, missing=none
 - `skills/test-first-verification/SKILL.md`: words=547, name_ok=True, missing=none
 
@@ -51,6 +51,7 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 - `docs/usage-ja.md`: ok
 - `docs/workflow-examples.md`: ok
 - `docs/project-overlay-template.md`: ok
+- `docs/stack-implementation-overlay-contract.md`: ok
 - `docs/customization-guide.md`: ok
 - `docs/quality-rubric.md`: ok
 - `docs/references.md`: ok

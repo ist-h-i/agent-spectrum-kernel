@@ -11,6 +11,8 @@ generic workflow selection via skill-router
 
 Do not replace the generic `skill-router` table with framework-specific routes. Add overlay skills only for repository-specific framework, domain, architecture, UI/UX, data, CI, or safety rules.
 
+For stack-specific implementation skills, follow `docs/stack-implementation-overlay-contract.md`. Stack overlays are selected after the generic workflow and only add constraints for `controlled-implementation` plus verification supplements for `test-first-verification`.
+
 Use `docs/ai/review-context.md` for reusable review context such as personas, output contracts, critical workflows, accepted risks, known issues, and review noise-control rules. Keep permanent agent behavior rules in the project overlay; keep task progress in `planning-with-files`.
 
 Recommended filename:

@@ -41,6 +41,7 @@ docs/
   usage-ja.md
   workflow-examples.md
   project-overlay-template.md
+  stack-implementation-overlay-contract.md
   customization-guide.md
   quality-rubric.md
   validation-report.md
