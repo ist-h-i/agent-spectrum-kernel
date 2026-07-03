@@ -172,6 +172,16 @@ review-context-generation
 
 `review-context-generation` は、`docs/ai/review-context.md` を作成・更新し、project identity、persona、output contract、critical workflow、accepted risk、known issue、noise-control rule を evidence status 付きで残します。task progressはここに保存せず、長期タスク状態は `planning-with-files` を使います。
 
+### 繰り返し実装文脈
+
+使うSkill:
+
+```text
+implementation-context-generation
+```
+
+`implementation-context-generation` は、`docs/ai/implementation-context.md` を作成・更新し、stack inventory、workspace shape、build/typecheck/lint/test/focused-test commands、implementation/test patterns、architecture boundaries、generated/manual-edit boundaries、stack overlay hooks、stop conditions、update triggers を evidence status 付きで残します。task progressはここに保存せず、Angular/React/Python/Javaなどの固有規約はProject Overlayや専門Skillへ分離します。
+
 ### MR/PR README / 仕様理解固定
 
 使うSkill:

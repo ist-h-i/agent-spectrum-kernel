@@ -34,6 +34,7 @@ Understand enough of the repository to avoid random edits, invented conventions,
    - docs/
    - ADRs
    - CONTRIBUTING or coding standards
+   - `docs/ai/implementation-context.md` when repeated implementation work, unknown stack conventions, or stack overlays are expected
    - `docs/ai/review-context.md` when repeated reviews or review gates are expected
    - context maps, schema docs, API docs
    - ownership/module-boundary hints
@@ -56,7 +57,9 @@ Understand enough of the repository to avoid random edits, invented conventions,
 
 5. Record only decision-relevant findings. Do not create a repository encyclopedia.
 
-6. Recommend `review-context-generation` when repeated MR/PR reviews, output-quality review, adversarial review, accepted-risk suppression, or known-issue suppression are expected.
+6. Recommend `implementation-context-generation` when repeated implementation work, unknown stack conventions, missing command/test context, or stack overlays are expected.
+
+7. Recommend `review-context-generation` when repeated MR/PR reviews, output-quality review, adversarial review, accepted-risk suppression, or known-issue suppression are expected.
 
 ## Output
 
@@ -66,6 +69,7 @@ Repository orientation:
 - Package/workspace shape:
 - Relevant commands:
 - Relevant conventions:
+- Implementation context:
 - Target area:
 - Tests near target:
 - Docs/ADRs found:

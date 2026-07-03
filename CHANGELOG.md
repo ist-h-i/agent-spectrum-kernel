@@ -9,6 +9,7 @@ Changes:
 - Removed the legacy code review compatibility adapter and standardized review entry points on `review-router`.
 - Added layer-aware final merge decisions to `review-final-merge-gate`, including layer summaries and upper-layer precedence over mechanical passes.
 - Added `review-context-generation` and `docs/ai/review-context.md` for durable review context with evidence-status-labeled claims.
+- Added `implementation-context-generation` and `docs/ai/implementation-context.md` for durable implementation context with evidence-status-labeled stack, command, pattern, boundary, overlay, stop-condition, and update-trigger claims.
 - Added `review-output-quality` for human, system, AI, and generated output review.
 - Added `review-adversarial-risk` for noise-controlled severe failure-path review.
 - Routed output-quality and adversarial-risk signals out of `review-ai-quality` and into dedicated review gates.

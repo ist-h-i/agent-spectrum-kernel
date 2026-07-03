@@ -4,8 +4,8 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 
 ## Manifest / directory consistency
 
-- Skills in manifest: 25
-- Skill directories: 25
+- Skills in manifest: 26
+- Skill directories: 26
 - Missing directories: none
 - Extra directories: none
 
@@ -19,9 +19,10 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 - `skills/grill-design/SKILL.md`: words=356, name_ok=True, missing=none
 - `skills/grill-with-docs/SKILL.md`: words=381, name_ok=True, missing=none
 - `skills/handoff-generation/SKILL.md`: words=320, name_ok=True, missing=none
+- `skills/implementation-context-generation/SKILL.md`: words=885, name_ok=True, missing=none
 - `skills/mr-readme-generation/SKILL.md`: words=1010, name_ok=True, missing=none
 - `skills/planning-with-files/SKILL.md`: words=342, name_ok=True, missing=none
-- `skills/repository-orientation/SKILL.md`: words=353, name_ok=True, missing=none
+- `skills/repository-orientation/SKILL.md`: words=388, name_ok=True, missing=none
 - `skills/review-adversarial-risk/SKILL.md`: words=667, name_ok=True, missing=none
 - `skills/review-ai-quality/SKILL.md`: words=867, name_ok=True, missing=none
 - `skills/review-architecture-impact/SKILL.md`: words=854, name_ok=True, missing=none
@@ -33,7 +34,7 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 - `skills/review-router/SKILL.md`: words=1110, name_ok=True, missing=none
 - `skills/risk-gate/SKILL.md`: words=416, name_ok=True, missing=none
 - `skills/scope-control/SKILL.md`: words=342, name_ok=True, missing=none
-- `skills/skill-router/SKILL.md`: words=845, name_ok=True, missing=none
+- `skills/skill-router/SKILL.md`: words=861, name_ok=True, missing=none
 - `skills/spec-driven-development/SKILL.md`: words=365, name_ok=True, missing=none
 - `skills/test-first-verification/SKILL.md`: words=364, name_ok=True, missing=none
 
@@ -46,6 +47,7 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 - `CHANGELOG.md`: ok
 - `docs/skill-matrix.md`: ok
 - `docs/ai/review-context.md`: ok
+- `docs/ai/implementation-context.md`: ok
 - `docs/usage-ja.md`: ok
 - `docs/workflow-examples.md`: ok
 - `docs/project-overlay-template.md`: ok

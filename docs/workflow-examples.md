@@ -246,3 +246,36 @@ MR/PR README:
 - Review decision emitted: no
 - Follow-up skills: ...
 ```
+
+## 9. Implementation context generation
+
+User request:
+
+```text
+Create reusable implementation context for this repository so future feature work does not rediscover stack commands and conventions.
+```
+
+Workflow:
+
+```text
+implementation-context-generation
+repository-orientation for repo facts before drafting context
+```
+
+Expected output:
+
+```text
+Implementation context generation:
+- Path: docs/ai/implementation-context.md
+- Created or updated: created | updated
+- Stack inventory: ...
+- Commands found: ...
+- Implementation patterns found: ...
+- Test patterns found: ...
+- Boundary rules found: ...
+- Hypotheses needing confirmation: ...
+- Unknowns: ...
+- Stack overlays detected: ...
+- Stop conditions: ...
+- Update triggers: ...
+```
