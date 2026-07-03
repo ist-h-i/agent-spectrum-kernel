@@ -27,6 +27,8 @@ docs/          運用・カスタマイズ・採点基準
 - `docs/quickstart-ja.md`: 最小導入、Skill対応/非対応ツール、最初にAIへ言うこと。
 - `docs/prompt-recipes-ja.md`: やりたいこと別のcopy-paste依頼文。
 - `docs/glossary-ja.md`: Kernel、Skill、Gate、overlay、context、contractの用語集。
+- `docs/usage-ja.md`: 代表的な使い分けと運用ガイド。
+- `docs/skill-matrix.md`: workflow選択の一覧。
 
 ## 使い分け
 
