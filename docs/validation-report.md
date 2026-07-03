@@ -72,6 +72,14 @@ Static packaging checks. This does not prove runtime behavior; it catches drift 
 
 none
 
+## Auxiliary documentation audit
+
+- No stale pre-27 skill-count references found.
+- No deleted legacy code-review adapter references found.
+- Review route references use the current layer-aware route through `review-router`, layer applicability, required gates, and `review-final-merge-gate`.
+- Implementation route references use Verification Contract, Implementation Contract, `controlled-implementation`, and evidence-oriented verification wording.
+- Project overlay, stack overlay, review context, implementation context, and task progress terminology is explicitly separated in maintained auxiliary docs.
+
 ## Quality target
 
 - Target: 95+ across personal/internal-use categories.

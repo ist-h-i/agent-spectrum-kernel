@@ -11,10 +11,15 @@ Otherwise, put it in a skill or a project-specific file.
 ```text
 Generic kernel        AGENTS.md
 Generic workflows     skills/*/SKILL.md
-Project rules         project AGENTS.md or docs/ai/*.md
-Framework rules       skills/angular-enterprise/SKILL.md, etc.
+Project rules         project AGENTS.md or equivalent project overlay
+Durable context       docs/ai/review-context.md and docs/ai/implementation-context.md
+Stack overlays        skills/angular-implementation-architecture/SKILL.md, etc.
 Company workflows     skills/internal-release/SKILL.md, etc.
 ```
+
+Project overlays hold repository-specific rules. Durable context files hold reusable evidence for review or implementation decisions; they are not task progress and do not replace project overlays.
+
+Stack overlays are optional supplements selected after the generic workflow when matching stack signals exist. The included Angular overlay is the first concrete stack implementation overlay; React, Python, Java, and other overlays should be project-specific or future additions unless implemented.
 
 ## How to add project-specific rules
 
@@ -38,7 +43,7 @@ Add a short project appendix:
 - ...
 ```
 
-Do not copy large internal docs into the kernel. Link to them or create a project-specific skill.
+Do not copy large internal docs into the kernel. Link to them or create a project-specific skill or overlay.
 
 ## When to create a new skill
 
