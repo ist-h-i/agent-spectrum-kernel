@@ -11,7 +11,7 @@ The date filter returns one extra day in Tokyo time.
 Use:
 
 ```text
-doubt-driven-development → test-first-verification for reproduction → controlled-implementation → test-first-verification for regression proof
+doubt-driven-development → test-first-verification for reproduction and Verification Contract → controlled-implementation → test-first-verification for regression proof
 ```
 
 ## Expected investigation shape

@@ -10,11 +10,11 @@ This matrix is a reference view of the canonical runtime routes in `skills/skill
 | Plan must fit docs/domain/ADRs | `grill-with-docs` | `adr-review` | Term/doc conflict review and documentation decision |
 | Application boundary decision needed before implementation, including dependency direction, state ownership, external I/O boundary, DTO/error trust boundary, async lifetime, feature public API, usecase/repository/port/adapter/mapper necessity, ID boundary, or architecture guard rollout | `application-boundary-architecture` | Return to `spec-driven-development` or `controlled-implementation` after the boundary decision; use `adr-review` if hard-to-reverse or record-worthy | Boundary decision, violations, smallest compatible change, and verification path |
 | Repeated implementation context setup | `implementation-context-generation` | `repository-orientation` for repo facts before drafting context | Durable implementation context with evidence-status-labeled stack, commands, patterns, boundaries, overlays, stop conditions, and update triggers |
-| New feature or user-visible behavior | `spec-driven-development` | `controlled-implementation` -> `test-first-verification` | Spec, scoped implementation, verification evidence |
-| Clear non-trivial implementation | `controlled-implementation` | `test-first-verification` | Minimal scoped implementation summary |
+| New feature or user-visible behavior | `spec-driven-development` | `test-first-verification` for Verification Contract -> `controlled-implementation` -> `test-first-verification` for evidence | Spec, Verification Contract, scoped implementation, verification evidence |
+| Clear non-trivial implementation | `controlled-implementation` | `test-first-verification` for Verification Contract before behavior changes when proof is needed | Implementation Contract, scoped implementation summary, and verification evidence when applicable |
 | Multi-step task likely to span sessions | `planning-with-files` | `handoff-generation` | Durable planning state and next task |
 | Risk of scope creep/refactor sprawl | `scope-control` | `controlled-implementation` if proceeding to code; review phase uses `review-router` -> required gates, with scope findings generally routed to `review-ai-quality` | Scope contract, scoped implementation path, or review route |
-| Bug, regression, or unknown root cause | `doubt-driven-development` | `test-first-verification` for reproduction -> `controlled-implementation` -> `test-first-verification` for regression proof | Hypothesis, reproduction evidence, scoped fix, regression proof |
+| Bug, regression, or unknown root cause | `doubt-driven-development` | `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof | Hypothesis, reproduction evidence, Verification Contract, scoped fix, regression proof |
 | Hard-to-reverse architecture decision or ADR need | `adr-review` | `grill-with-docs`; `application-boundary-architecture` if boundary mechanics are unresolved | ADR action and decision record |
 | PR/diff/commit review | `review-router` | `review-architecture-impact` when structural or boundary impact may exist; `review-output-quality` when consumer-facing or machine-consumed output may change; `review-adversarial-risk` when severe failure paths or blast radius may exist; `review-final-merge-gate` for the final decision | Layer applicability, required gates, gate evidence, and merge decision |
 | Repeated review context setup | `review-context-generation` | `repository-orientation` for repo facts before drafting context | Durable review context with evidence-status-labeled claims |
@@ -41,10 +41,10 @@ Use `evidence-ledger` whenever the response makes or evaluates a claim about cor
 
 ```text
 New feature:
-spec-driven-development -> controlled-implementation -> test-first-verification
+spec-driven-development -> test-first-verification for Verification Contract -> controlled-implementation -> test-first-verification for evidence
 
 Bug:
-doubt-driven-development -> test-first-verification for reproduction -> controlled-implementation -> test-first-verification for regression proof
+doubt-driven-development -> test-first-verification for reproduction and Verification Contract -> controlled-implementation -> test-first-verification for regression proof
 
 Design:
 grill-design -> grill-with-docs -> adr-review when needed

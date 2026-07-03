@@ -28,8 +28,8 @@ Core rules:
 - Design / “grill me”: `grill-design`.
 - Docs/domain/ADR fit: `grill-with-docs`.
 - Application boundary decision needed before implementation, including dependency direction, state ownership, external I/O boundary, DTO/error trust boundary, async lifetime, feature public API, usecase/repository/port/adapter/mapper necessity, ID boundary, or architecture guard rollout: `application-boundary-architecture`, then return to `spec-driven-development` or `controlled-implementation`.
-- New feature: `spec-driven-development` -> `controlled-implementation` -> `test-first-verification`.
-- Bug/unknown root cause: `doubt-driven-development` -> `test-first-verification` for reproduction -> `controlled-implementation` -> `test-first-verification` for regression proof.
+- New feature: `spec-driven-development` -> `test-first-verification` for Verification Contract -> `controlled-implementation` -> `test-first-verification` for evidence.
+- Bug/unknown root cause: `doubt-driven-development` -> `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof.
 - Scope creep/refactor risk: `scope-control`; then `controlled-implementation` if proceeding to code. In review, use `review-router` -> required gates; scope findings generally route to `review-ai-quality`.
 - Hard-to-reverse architecture decision or ADR need: `adr-review`.
 - Diff/PR/generated code review: `review-router` -> layer applicability -> required gates, including `review-architecture-impact` for structural or boundary impact, `review-output-quality` for consumer-facing or machine-consumed output, and `review-adversarial-risk` for severe failure paths -> `review-final-merge-gate`.

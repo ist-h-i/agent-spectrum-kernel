@@ -33,8 +33,9 @@ Workflow:
 
 ```text
 spec-driven-development
+test-first-verification for Verification Contract
 controlled-implementation
-test-first-verification
+test-first-verification for evidence
 ```
 
 Expected output before implementation:
@@ -81,7 +82,7 @@ Workflow:
 
 ```text
 doubt-driven-development
-test-first-verification for reproduction
+test-first-verification for reproduction and Verification Contract
 controlled-implementation
 test-first-verification for regression proof
 ```
