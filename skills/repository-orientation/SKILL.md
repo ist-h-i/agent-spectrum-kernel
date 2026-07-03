@@ -34,8 +34,8 @@ Understand enough of the repository to avoid random edits, invented conventions,
    - docs/
    - ADRs
    - CONTRIBUTING or coding standards
-   - `docs/ai/implementation-context.md` when repeated implementation work, unknown stack conventions, or stack overlays are expected
-   - `docs/ai/review-context.md` when repeated reviews or review gates are expected
+   - `docs/ai/implementation-context.md` when repeated implementation work, unknown stack conventions, or stack overlays are expected; treat `context_status: template` as missing context and `context_status: stale` as needing refresh before reliance
+   - `docs/ai/review-context.md` when repeated reviews or review gates are expected; treat `context_status: template` as missing context and `context_status: stale` as needing refresh before reliance
    - context maps, schema docs, API docs
    - ownership/module-boundary hints
 

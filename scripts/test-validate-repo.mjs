@@ -99,6 +99,16 @@ try {
   const validRoot = cloneFixture("valid");
   assertPass("valid fixture", validRoot);
 
+  const invalidContextMetadataRoot = cloneFixture("invalid-context-metadata");
+  mkdirSync(resolve(invalidContextMetadataRoot, "docs/ai"), { recursive: true });
+  writeFileSync(resolve(invalidContextMetadataRoot, "docs/ai/review-context.md"), "# Review Context\n");
+  assertFail("invalid context metadata", invalidContextMetadataRoot, "missing context metadata fields");
+
+  const invalidContextStatusRoot = cloneFixture("invalid-context-status");
+  mkdirSync(resolve(invalidContextStatusRoot, "docs/ai"), { recursive: true });
+  writeFileSync(resolve(invalidContextStatusRoot, "docs/ai/review-context.md"), "---\ncontext_status: ready\nlast_updated: null\nevidence_owner: null\nsource_scope: fixture\n---\n\n# Review Context\n");
+  assertFail("invalid context status", invalidContextStatusRoot, "invalid context_status");
+
   const missingPathRoot = cloneFixture("missing-path");
   writeFileSync(
     resolve(missingPathRoot, "manifest.json"),

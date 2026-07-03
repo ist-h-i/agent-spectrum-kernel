@@ -32,6 +32,12 @@ const ALLOWED_ROUTE_PHRASE_CONTEXTS = [
   "spec-driven-development -> test-first-verification for Verification Contract -> controlled-implementation -> test-first-verification for evidence",
   "doubt-driven-development -> test-first-verification for reproduction and Verification Contract -> controlled-implementation -> test-first-verification for regression proof",
 ];
+const CONTEXT_METADATA_FILES = [
+  "docs/ai/review-context.md",
+  "docs/ai/implementation-context.md",
+];
+const REQUIRED_CONTEXT_METADATA_FIELDS = ["context_status", "last_updated", "evidence_owner", "source_scope"];
+const ALLOWED_CONTEXT_STATUSES = new Set(["template", "initialized", "stale"]);
 
 function parseArgs(argv) {
   const args = {
@@ -217,6 +223,37 @@ function validateSkills(root, skillDirectories, errors) {
   return checks;
 }
 
+function validateContextMetadata(root, errors) {
+  const checks = [];
+
+  for (const path of CONTEXT_METADATA_FILES) {
+    const absolutePath = resolve(root, path);
+    if (!existsSync(absolutePath)) {
+      continue;
+    }
+
+    const frontmatter = parseFrontmatter(readFileSync(absolutePath, "utf8"));
+    const missing = REQUIRED_CONTEXT_METADATA_FIELDS.filter((field) => !frontmatter.has(field));
+    const status = frontmatter.get("context_status") ?? "missing";
+    const statusOk = ALLOWED_CONTEXT_STATUSES.has(status);
+
+    if (missing.length > 0) {
+      fail(errors, "context metadata", `${path} is missing context metadata fields: ${missing.join(", ")}`);
+    }
+    if (!statusOk) {
+      fail(errors, "context metadata", `${path} has invalid context_status '${status}'`);
+    }
+
+    checks.push({
+      path,
+      status,
+      metadataOk: missing.length === 0 && statusOk,
+    });
+  }
+
+  return checks;
+}
+
 function collectMarkdownFiles(root) {
   const files = [];
 
@@ -295,7 +332,7 @@ function buildPathChecks(root, manifest) {
   }));
 }
 
-function buildReport({ manifest, skillDirectories, skillChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -322,6 +359,10 @@ function buildReport({ manifest, skillDirectories, skillChecks, pathChecks, stal
       (check) => `- \`${check.path}\`: words=${check.words}, name_ok=${check.nameOk ? "True" : "False"}, missing=${check.missing.length > 0 ? check.missing.join(", ") : "none"}`,
     ),
     "",
+    "## Context template status checks",
+    "",
+    ...contextMetadataChecks.map((check) => `- \`${check.path}\`: context_status=${check.status}, metadata=${check.metadataOk ? "ok" : "invalid"}`),
+    "",
     "## Document path checks",
     "",
     ...pathChecks.map((check) => `- \`${check.path}\`: ${check.ok ? "ok" : "missing"}`),
@@ -337,6 +378,7 @@ function buildReport({ manifest, skillDirectories, skillChecks, pathChecks, stal
     "- Review route references use the current layer-aware route through `review-router`, layer applicability, required gates, and `review-final-merge-gate`.",
     "- Implementation route references use Verification Contract, Implementation Contract, `controlled-implementation`, and evidence-oriented verification wording.",
     "- Project overlay, stack overlay, review context, implementation context, and task progress terminology is explicitly separated in maintained auxiliary docs.",
+    "- Review and implementation context metadata distinguishes uninitialized templates from initialized or stale durable context.",
     "",
     "## Quality target",
     "",
@@ -392,9 +434,10 @@ export function validateRepository(options) {
   validateManifest(root, manifest, skillDirectories, errors);
   validateManifestPaths(root, manifest, errors);
   const skillChecks = validateSkills(root, skillDirectories, errors);
+  const contextMetadataChecks = validateContextMetadata(root, errors);
   const staleFindings = findStalePhrases(root, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

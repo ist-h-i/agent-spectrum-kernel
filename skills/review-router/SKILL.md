@@ -26,7 +26,7 @@ Select the smallest set of review gates needed to make the merge decision defens
    - diff or changed files,
    - touched public interfaces,
    - tests and commands,
-   - `docs/ai/review-context.md` or project overlay review context when available,
+   - `docs/ai/review-context.md` or project overlay review context when available; treat `context_status: template` as missing durable context and `context_status: stale` as insufficient evidence for affected claims until refreshed,
    - docs/ADRs when terms, state, or architecture may change.
 
 2. Classify changed meaning.

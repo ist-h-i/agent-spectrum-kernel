@@ -31,6 +31,8 @@ Read available project review context before judging consumer fit:
 - project overlay rules such as `AGENTS.project.md`,
 - relevant docs, examples, screenshots, schemas, output contracts, style guides, or product requirements.
 
+If `docs/ai/review-context.md` has `context_status: template`, treat it as missing context. If it has `context_status: stale`, refresh affected claims or mark those judgments as `insufficient evidence`.
+
 If target audience, purpose, medium, or output contract is missing, mark the affected judgment as `insufficient evidence` instead of giving generic UX, copy, or formatting advice.
 
 ## Process

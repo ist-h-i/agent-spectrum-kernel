@@ -43,6 +43,23 @@ If the context belongs in permanent project rules, reference or update:
 AGENTS.project.md
 ```
 
+## Context status metadata
+
+The context file must include explicit metadata:
+
+```yaml
+context_status: template | initialized | stale
+last_updated:
+evidence_owner:
+source_scope:
+```
+
+Interpretation:
+
+- `template`: default uninitialized context. Treat placeholder rows, blank rows, and `Unknown` values as missing or insufficient evidence, not reusable project facts.
+- `initialized`: real project facts have been recorded with evidence status and source. Consumers may use the recorded claims according to their evidence status.
+- `stale`: previously initialized context may be outdated because source files, docs, workflows, product claims, accepted risks, known issues, or review gates changed. Refresh before relying on it, or downgrade affected claims to `Unknown` / `insufficient evidence`.
+
 ## Evidence statuses
 
 Use these statuses for important claims:
@@ -57,13 +74,18 @@ Use these statuses for important claims:
 
 ## Process
 
-1. Inspect repository evidence first.
+1. Read existing context status first.
+   - If `context_status` is `template`, treat the file as missing durable context and populate only from repository evidence or targeted human input.
+   - If `context_status` is `initialized`, preserve evidence-backed content unless contradicted by newer evidence.
+   - If `context_status` is `stale`, refresh affected sections before use, or mark the affected judgments as `insufficient evidence`.
+
+2. Inspect repository evidence first.
    - README and product docs,
    - project overlay rules,
    - docs, ADRs, schemas, examples, tests, generated artifacts, screenshots, or workflows,
    - review history when available.
 
-2. Draft candidate context.
+3. Draft candidate context.
    - product / project identity,
    - project hero or product promise,
    - primary users / personas,
@@ -81,11 +103,11 @@ Use these statuses for important claims:
    - verification policy,
    - update triggers.
 
-3. Label each important claim with evidence status and source.
+4. Label each important claim with evidence status and source.
    - Do not treat AI-inferred persona, project promise, accepted risk, or threat model as fact.
    - Mark unsupported items as `Hypothesis` or `Unknown`.
 
-4. Ask the user only for missing or high-impact human judgment when needed.
+5. Ask the user only for missing or high-impact human judgment when needed.
    - persona or audience,
    - accepted risks,
    - assets to protect,
@@ -93,13 +115,19 @@ Use these statuses for important claims:
    - known issues not to re-report,
    - safety boundaries.
 
-5. Save or update the context file.
+6. Save or update the context file.
+   - Change `context_status` from `template` to `initialized` only after at least one real project fact is recorded with a non-empty source.
+   - Set `last_updated` to the evidence update date or timestamp.
+   - Set `evidence_owner` to the human, agent, team, or source responsible for the update.
+   - Set `source_scope` to the repository paths, docs, PR/review history, or human input scope inspected.
+   - Use `stale` when existing context is known or strongly suspected to lag behind changed source evidence; do not silently rely on stale claims.
    - Preserve existing human-confirmed content unless contradicted by newer evidence.
    - Keep task progress out of this file.
    - Add update triggers so future agents know when context may be stale.
 
-6. Wire consumers.
+7. Wire consumers.
    - `review-router`, `review-output-quality`, `review-adversarial-risk`, and `review-final-merge-gate` should read this context when available.
+   - Consumers must treat `context_status: template` as missing context and `context_status: stale` as insufficient evidence for affected claims until refreshed.
    - `planning-with-files` remains responsible for task progress.
 
 ## Output
@@ -120,6 +148,7 @@ Review context generation:
 ## Exit criteria
 
 - A reusable review context file is created or updated.
+- `context_status` is `initialized` only after real project facts are recorded with sources; otherwise `template` or `stale` is explicit.
 - Important claims have evidence status and source.
 - Human-provided context is requested only for high-impact gaps.
 - Output quality and adversarial review can rely on the context instead of repeating repo-wide discovery.
@@ -135,3 +164,4 @@ Review context generation:
 | Replacing project overlay rules | Reference the overlay; update it only when the content is a durable project rule. |
 | Storing task progress here | Move progress to `planning-with-files`. |
 | Letting context go stale silently | Add update triggers and evidence sources. |
+| Treating a checked-in template as context | Keep `context_status: template` and report missing or insufficient evidence until real project facts are recorded. |
