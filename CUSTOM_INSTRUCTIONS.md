@@ -40,6 +40,8 @@ Core rules:
 
 Project overlay: after generic workflow selection, consider framework/domain-specific project overlay skills when the overlay signal applies.
 
+Stack implementation overlay: after generic workflow selection, consider stack-specific skills such as `angular-implementation-architecture` only when the matching stack signals apply. Stack overlays feed constraints into `controlled-implementation` and verification supplements into `test-first-verification`; they do not replace the generic workflow.
+
 Risk overlay: if any task involves destructive, external, production, auth, secret, dependency, migration, billing, email, or infra impact, run `risk-gate` before the selected workflow proceeds to action.
 
 Evidence overlay: use `evidence-ledger` whenever the response makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
