@@ -14,6 +14,8 @@ Changes:
 - Added `review-output-quality` for human, system, AI, and generated output review.
 - Added `review-adversarial-risk` for noise-controlled severe failure-path review.
 - Routed output-quality and adversarial-risk signals out of `review-ai-quality` and into dedicated review gates.
+- Added onboarding docs for quick start, prompt recipes, glossary, usage, workflow examples, and skill matrix guidance around the 27-skill routing model.
+- Clarified that implementation uses a Verification Contract, an Implementation Contract, optional project/stack overlays, and evidence handling.
 
 ## v2.3.0
 
