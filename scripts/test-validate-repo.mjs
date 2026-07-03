@@ -43,6 +43,7 @@ function writeFixture(root) {
   mkdirSync(resolve(root, "examples"), { recursive: true });
 
   writeFileSync(resolve(root, "AGENTS.md"), "# Kernel\n");
+  writeFileSync(resolve(root, "CUSTOM_INSTRUCTIONS.md"), "# Custom instructions\n");
   writeFileSync(resolve(root, "docs/ok.md"), "# OK\n");
   writeFileSync(resolve(root, "examples/ok.md"), "# OK\n");
   writeFileSync(resolve(root, "skills/alpha/SKILL.md"), validSkill);
@@ -51,6 +52,7 @@ function writeFixture(root) {
     JSON.stringify(
       {
         kernel: "AGENTS.md",
+        copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
         skills: ["alpha"],
         docs: ["docs/ok.md"],
         examples: ["examples/ok.md"],
@@ -103,6 +105,7 @@ try {
     JSON.stringify(
       {
         kernel: "AGENTS.md",
+        copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
         skills: ["alpha"],
         docs: ["docs/missing.md"],
         examples: ["examples/ok.md"],
@@ -113,6 +116,24 @@ try {
     ),
   );
   assertFail("missing manifest path", missingPathRoot, "manifest.json.docs path does not exist");
+
+  const missingCopyPasteKernelRoot = cloneFixture("missing-copy-paste-kernel");
+  writeFileSync(
+    resolve(missingCopyPasteKernelRoot, "manifest.json"),
+    JSON.stringify(
+      {
+        kernel: "AGENTS.md",
+        copy_paste_kernel: "missing-custom.md",
+        skills: ["alpha"],
+        docs: ["docs/ok.md"],
+        examples: ["examples/ok.md"],
+        design: { quality_target: "95+" },
+      },
+      null,
+      2,
+    ),
+  );
+  assertFail("missing copy_paste_kernel path", missingCopyPasteKernelRoot, "manifest.json.copy_paste_kernel path does not exist");
 
   const extraSkillRoot = cloneFixture("extra-skill");
   mkdirSync(resolve(extraSkillRoot, "skills/beta"), { recursive: true });
@@ -125,6 +146,7 @@ try {
     JSON.stringify(
       {
         kernel: "AGENTS.md",
+        copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
         skills: ["alpha", "beta"],
         docs: ["docs/ok.md"],
         examples: ["examples/ok.md"],
@@ -141,8 +163,11 @@ try {
   assertFail("stale phrase", stalePhraseRoot, "25 skills");
 
   const staleRouteRoot = cloneFixture("stale-route");
-  writeFileSync(resolve(staleRouteRoot, "docs/ok.md"), "# OK\n\ncontrolled-implementation -> test-first-verification\n");
-  assertFail("stale route phrase", staleRouteRoot, "standalone line");
+  writeFileSync(
+    resolve(staleRouteRoot, "docs/ok.md"),
+    "# OK\n\nFor reviews, use review-router -> required gates -> review-final-merge-gate before final review.\n",
+  );
+  assertFail("inline stale route phrase", staleRouteRoot, "review-router -> required gates -> review-final-merge-gate");
 
   console.log("validate-repo fixture tests passed");
 } finally {

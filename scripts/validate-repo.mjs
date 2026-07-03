@@ -22,12 +22,16 @@ const STALE_PHRASES = [
   { phrase: "pending specialized review", mode: "contains" },
   { phrase: "review-output-quality when available", mode: "contains" },
   { phrase: "review-adversarial-risk when available", mode: "contains" },
-  { phrase: "review-router -> required gates -> review-final-merge-gate", mode: "line" },
-  { phrase: "controlled-implementation -> test-first-verification", mode: "line" },
+  { phrase: "review-router -> required gates -> review-final-merge-gate", mode: "contains" },
+  { phrase: "controlled-implementation -> test-first-verification", mode: "contains" },
   { phrase: "angular-enterprise", mode: "contains" },
 ];
 
 const MAINTAINED_SCAN_ROOTS = ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "README.md", "README.ja.md", "docs", "examples", "skills"];
+const ALLOWED_ROUTE_PHRASE_CONTEXTS = [
+  "spec-driven-development -> test-first-verification for Verification Contract -> controlled-implementation -> test-first-verification for evidence",
+  "doubt-driven-development -> test-first-verification for reproduction and Verification Contract -> controlled-implementation -> test-first-verification for regression proof",
+];
 
 function parseArgs(argv) {
   const args = {
@@ -154,6 +158,16 @@ function validateManifestPaths(root, manifest, errors) {
     return;
   }
 
+  for (const key of ["kernel", "copy_paste_kernel"]) {
+    if (typeof manifest[key] !== "string") {
+      fail(errors, "paths", `manifest.json.${key} must be a path string`);
+      continue;
+    }
+    if (!existsSync(resolve(root, manifest[key]))) {
+      fail(errors, "paths", `manifest.json.${key} path does not exist: ${manifest[key]}`);
+    }
+  }
+
   for (const key of ["docs", "examples"]) {
     if (!Array.isArray(manifest[key])) {
       continue;
@@ -235,20 +249,11 @@ function findStalePhrases(root, errors) {
 
   for (const path of collectMarkdownFiles(root)) {
     const text = readFileSync(resolve(root, path), "utf8");
-    const lines = text.split(/\r?\n/);
 
     for (const stale of STALE_PHRASES) {
-      if (stale.mode === "contains" && text.includes(stale.phrase)) {
+      if (stale.mode === "contains" && containsDisallowedStalePhrase(text, stale.phrase)) {
         findings.push({ path, phrase: stale.phrase });
         fail(errors, "stale phrases", `${path} contains stale phrase: ${stale.phrase}`);
-      }
-
-      if (stale.mode === "line") {
-        const found = lines.some((line) => normalizeLine(line) === stale.phrase);
-        if (found) {
-          findings.push({ path, phrase: stale.phrase });
-          fail(errors, "stale phrases", `${path} contains stale route phrase as a standalone line: ${stale.phrase}`);
-        }
       }
     }
   }
@@ -256,18 +261,27 @@ function findStalePhrases(root, errors) {
   return findings;
 }
 
-function normalizeLine(line) {
-  return line
-    .replace(/^[-*]\s+/, "")
-    .replace(/^>\s+/, "")
-    .replace(/`/g, "")
-    .trim();
+function containsDisallowedStalePhrase(text, phrase) {
+  if (!text.includes(phrase)) {
+    return false;
+  }
+
+  if (!phrase.includes(" -> ")) {
+    return true;
+  }
+
+  // These are the current full route examples; the shorter substring is stale only when it appears outside them.
+  const remainingText = ALLOWED_ROUTE_PHRASE_CONTEXTS.reduce((current, allowed) => current.replaceAll(allowed, ""), text);
+  return remainingText.includes(phrase);
 }
 
 function buildPathChecks(root, manifest) {
   const paths = [];
   if (manifest?.kernel) {
     paths.push(manifest.kernel);
+  }
+  if (manifest?.copy_paste_kernel) {
+    paths.push(manifest.copy_paste_kernel);
   }
   for (const key of ["docs", "examples"]) {
     if (Array.isArray(manifest?.[key])) {
