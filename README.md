@@ -85,6 +85,7 @@ skills/
   doubt-driven-development/SKILL.md
   evidence-ledger/SKILL.md
   handoff-generation/SKILL.md
+  improvement-ledger/SKILL.md
   implementation-context-generation/SKILL.md
   mr-readme-generation/SKILL.md
 ```
@@ -127,6 +128,7 @@ First-time users should start with `docs/quickstart-ja.md`.
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
 | PR/diffレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
 | 負債・スメル・リファクタ候補レビュー | `review-router` → `review-code-health` when applicable |
+| non-blockingな改善候補の台帳化 | `improvement-ledger` |
 | 繰り返しレビュー文脈の固定 | `review-context-generation`（既定: `docs/ai/review-context.md`） |
 | MR/PR README・PR説明・変更文脈固定 | `mr-readme-generation` |
 | 次のAgentへ渡す | `handoff-generation` |
