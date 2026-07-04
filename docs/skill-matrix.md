@@ -41,6 +41,7 @@ This matrix is a reference view of the layered runtime routes in `skills/operati
 | Track adoption maturity and impact over multiple tasks | `skill-adoption-metrics` | `skill-effectiveness-evaluation` only for one-task examples inside the period | Instruction maturity, skill usage maturity, task outcomes, maturity movement, privacy note |
 | Repeated review context setup | `review-context-generation` | `repository-orientation` for repo facts before drafting context | Durable review context with evidence-status-labeled claims |
 | MR/PR README, PR explanation, or durable change-context documentation | `mr-readme-generation` | `adr-review` | Durable change context for human review and future AI reuse |
+| Release candidate or bundled change-set readiness | `release-readiness-gate` | `risk-gate` before deploy, publish, migration, external notification, or release execution; `review-final-merge-gate` remains the PR-level decision gate | Release readiness decision, required release conditions, residual risks, and evidence reviewed |
 | Performance/security/reliability/readiness claim | `evidence-ledger` | `doubt-driven-development` | Claim/evidence/status table |
 | Opt-in metrics event recording | normal delivery/review skill output | `skill-adoption-metrics` consumes the event later | Metrics event candidate with counts, related IDs, evidence references, and privacy note |
 | Weekly/monthly adoption report | operation layer | `skill-adoption-metrics` plus `docs/ai/adoption-report-template.md` | Period summary without creating a reporting skill |
@@ -119,6 +120,9 @@ implementation-context-generation -> docs/ai/implementation-context.md
 
 MR/PR change-context README:
 mr-readme-generation -> adr-review when hard-to-reverse decisions appear
+
+Release readiness:
+release candidate scope + validation + rollback + monitoring + post-release verification + approvals -> release-readiness-gate -> risk-gate before any deploy, publish, migration, external notification, or release execution
 
 Risky operation:
 risk-gate -> selected workflow when approved, or handoff-generation when action needs approval

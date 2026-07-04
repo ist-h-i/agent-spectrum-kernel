@@ -36,6 +36,7 @@ Target: every category should be 95+ for personal development and internal intro
 | Improvement ledger quality | 95+ | Ledger rows require source, evidence, impact, severity, urgency, decision, owner/status, refresh date, and close condition |
 | Prevention-rule / check feedback | 95+ | Repeated or high-leverage findings are routed to the narrowest durable rule, context, validation script, lint, test, or CI check only when evidence supports conversion |
 | Refactor safety | 95+ | `refactor-implementation` requires an approved objective, behavior-preservation contract, allowed/forbidden scope, boundary decision, and regression proof |
+| Release readiness | 95+ | Release candidates are evaluated as packages across scope, validation, migration/data, rollback, rollout controls, monitoring, post-release verification, customer impact, communication, approvals, and residual risks without performing release actions |
 | Review-to-improvement feedback loop | 95+ | Review output can hand non-blocking items into the loop `review-code-health -> review-final-merge-gate -> improvement-ledger -> prevention-rule feedback -> refactor-implementation` |
 | Project adoption / rollout | 95+ | First-time adoption produces project overlay, implementation/review context drafts, local commands, risks, recipes, and missing human decisions without inventing policy |
 | Observability / effectiveness | 95+ | One-task workflow retrospectives distinguish routing quality, outcome value, evidence quality, overhead, missed coverage, and reuse value |
@@ -47,13 +48,13 @@ Target: every category should be 95+ for personal development and internal intro
 
 ## Current self-assessment
 
-Baseline: current 34-skill system in `manifest.json`.
+Baseline: current 35-skill system in `manifest.json`.
 
 | Category | Score | Notes |
 |---|---:|---|
 | Kernel design | 96 | Added safety, routing, truth model, completion contracts without turning kernel into a workflow dump |
 | Operating mode routing | 95 | `operating-mode-router` separates delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation before lower-level routing |
-| Skill separation | 96 | 34 focused skills; each skill keeps process, output, exit criteria, or failure modes close to one workflow responsibility |
+| Skill separation | 96 | 35 focused skills; each skill keeps process, output, exit criteria, or failure modes close to one workflow responsibility |
 | Skill group metadata | 95 | `manifest.json.skill_groups` and validation cover unclassified, unknown, duplicate, invalid, and unsupported multi-group skill entries |
 | Repository awareness | 95 | Dedicated orientation skill plus kernel repository-first rules |
 | Scope control | 96 | Kernel scope rules plus dedicated scope-control skill and diff audit |
@@ -70,6 +71,7 @@ Baseline: current 34-skill system in `manifest.json`.
 | Improvement ledger quality | 95 | The ledger template defines required fields, lifecycle states, evidence key, conversion tables, stale review rules, and executable validation coverage |
 | Prevention-rule / check feedback | 95 | Repeated findings can be routed to `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, project overlay, `SKILL.md`, review checklist, validation script, lint/test/check, implementation context, or review context without dumping every observation into always-on rules |
 | Refactor safety | 95 | `refactor-implementation` keeps approved structural cleanup separate from behavior change and requires behavior-preservation plus regression evidence |
+| Release readiness | 95 | `release-readiness-gate` separates release package readiness from PR merge review and risky release execution while requiring rollback, monitoring, post-release verification, customer impact, communication, approval, and residual-risk evidence |
 | Review-to-improvement feedback loop | 95 | The loop `review-code-health -> review-final-merge-gate -> improvement-ledger -> prevention-rule feedback -> refactor-implementation` is represented in routing, prompt recipes, examples, and validation expectations |
 | Project adoption / rollout | 95 | `project-adoption-pack-generation` produces adoption packs with overlay/context drafts and missing human decisions while avoiding unapproved mutation |
 | Observability / effectiveness | 95 | `skill-effectiveness-evaluation` evaluates one completed task without rerunning every workflow or replacing review/evidence gates |
@@ -94,6 +96,7 @@ The following still require project-specific human judgment:
 - confirmation that improvement-ledger entries reflect real project ownership and current evidence,
 - judgment on whether a repeated finding should become a durable rule, executable check, accepted risk, or separate refactor,
 - deployment, release, and production-change approval rules,
+- confirmation that release-readiness inputs and approvals match the target environment,
 - branch/PR policy,
 - code ownership,
 - domain-specific terminology and business invariants,

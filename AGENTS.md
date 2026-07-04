@@ -18,6 +18,8 @@ The agent must:
 
 Before acting, classify the request. Use the lightest workflow that controls the risk.
 
+If the request may be project adoption, skill effectiveness evaluation, adoption metrics, or weekly/monthly operation reporting, use `operating-mode-router` first. The task classes below are delivery/quality-oriented classes used after the operating mode is delivery work.
+
 - `trivial`: localized edit, rename, copy, text change, small config change.
 - `implementation`: code change with observable behavior.
 - `design`: architecture, API, data model, workflow, or ambiguous requirement.
