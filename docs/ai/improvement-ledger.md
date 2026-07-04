@@ -71,12 +71,57 @@ Every active entry must include source, evidence, impact, decision, status, and 
 | Urgency | yes | `now`, `soon`, `backlog`, or `observe`. |
 | Decision | yes | `fix_now`, `separate_pr`, `backlog`, `convert_to_rule`, `convert_to_check`, `accept`, or `wont_fix`. |
 | Recommended action | yes | Concrete next action. |
-| Prevention target | yes | `AGENTS.md`, project overlay, `SKILL.md`, review checklist, validation script, lint/test/check, refactor task, or no prevention needed. |
+| Prevention target | yes | `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, project overlay, `SKILL.md`, review checklist, validation script, lint/test/check, implementation context, review context, refactor task, or no prevention needed. |
+| Repeat pattern | required for rule/check conversion | `one-off`, `repeated`, `likely_repeated`, or `high_impact_single_case`. |
+| Proposed rule or check | required for rule/check conversion | Concrete rule, checklist item, context update, validation script, lint, test, CI check, or other prevention proposal. |
+| Scope | required for rule/check conversion | `generic`, `project_specific`, `stack_specific`, `review_only`, or `validation_only`. |
 | Owner | yes | Person, team, agent, or `unassigned`. |
 | Status | yes | Current lifecycle status. |
 | Created date | yes | Date the entry was created. |
 | Refresh date | yes | Date by which evidence, urgency, or owner should be reviewed again. |
 | Close condition | yes | Observable condition required to close, convert, or accept the entry. |
+
+## Prevention Rule / Check Feedback
+
+Use this section when a repeated or high-leverage finding should become a prevention rule, checklist item, context entry, or executable guard. Do not update durable rules from weak evidence.
+
+```text
+Finding:
+- ...
+
+Repeat pattern:
+- one-off | repeated | likely_repeated | high_impact_single_case
+
+Prevention target:
+- AGENTS.md | CUSTOM_INSTRUCTIONS.md | project overlay | SKILL.md | review checklist | validation script | lint/test/check | implementation context | review context
+
+Proposed rule or check:
+- ...
+
+Why this target:
+- ...
+
+Evidence:
+- ...
+
+Scope:
+- generic | project_specific | stack_specific | review_only | validation_only
+
+Decision:
+- convert | defer | reject | needs_more_evidence
+```
+
+Target selection rules:
+
+- Use `AGENTS.md` only for always-on rules that should apply even to one-line typo fixes.
+- Use `CUSTOM_INSTRUCTIONS.md` only when the condensed fallback instructions must mirror an always-on rule.
+- Use a project overlay for repository-specific, team-specific, or low-frequency rules.
+- Use `SKILL.md` or a review checklist for reusable workflow behavior.
+- Use a validation script, lint, test, or CI check when the pattern is mechanically detectable.
+- Use implementation context or review context for evidence-backed local guidance that should inform future work but is not a rule.
+- Use `converted_to_rule` when the accepted prevention target is an AI rule, project overlay, Skill update, checklist item, implementation context, or review context.
+- Use `converted_to_check` when the accepted prevention target is a validation script, lint rule, test, CI check, or similar executable guard.
+- Use `needs_more_evidence` when the repeat pattern is only a hypothesis or the prevention target is unclear.
 
 ## Status Lifecycle
 
@@ -88,7 +133,7 @@ Every active entry must include source, evidence, impact, decision, status, and 
 | `planned` | Follow-up work is planned but not started. |
 | `in_progress` | Follow-up work is actively being done. |
 | `resolved` | Close condition is satisfied and evidence is linked. |
-| `converted_to_rule` | Finding became an AI rule, review checklist item, Skill update, or project overlay update. |
+| `converted_to_rule` | Finding became an AI rule, condensed instruction update, review checklist item, Skill update, project overlay update, implementation context update, or review context update. |
 | `converted_to_check` | Finding became a validation script, lint rule, test, CI check, or similar executable guard. |
 | `wont_fix` | Finding is intentionally closed without action, with rationale and owner. |
 | `stale` | Entry missed refresh or its evidence no longer supports the current decision. |
@@ -100,7 +145,7 @@ Allowed transitions:
 | `open` | `triaged` | Required fields have enough evidence for prioritization. |
 | `triaged` | `accepted` | Finding is valid and should remain tracked. |
 | `triaged` | `planned` | Follow-up work is selected. |
-| `triaged` | `converted_to_rule` | Best prevention target is a rule/checklist/Skill/overlay update. |
+| `triaged` | `converted_to_rule` | Best prevention target is a rule, condensed instruction, checklist, Skill, overlay, implementation context, or review context update. |
 | `triaged` | `converted_to_check` | Best prevention target is executable validation, lint, test, or CI. |
 | `triaged` | `wont_fix` | Rationale and owner approve no action. |
 | `accepted` | `planned` | Work is scheduled. |
@@ -112,36 +157,36 @@ Allowed transitions:
 
 ## Open Improvement Items
 
-| ID | Source | Finding | Category | Evidence | Impact | Severity | Urgency | Decision | Recommended action | Prevention target | Owner | Status | Created date | Refresh date | Close condition |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Source | Finding | Category | Evidence | Impact | Severity | Urgency | Decision | Recommended action | Prevention target | Repeat pattern | Proposed rule or check | Scope | Owner | Status | Created date | Refresh date | Close condition |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Converted-to-Rule Items
 
-Use this table when an entry becomes an AI implementation rule, review checklist item, Skill update, or project overlay update.
+Use this table when an entry becomes an AI implementation rule, condensed instruction update, review checklist item, Skill update, project overlay update, implementation context update, or review context update.
 
-| ID | Source | Finding | Category | Evidence | Impact | Severity | Urgency | Decision | Recommended action | Prevention target | Owner | Status | Created date | Refresh date | Close condition |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Source | Finding | Category | Evidence | Impact | Severity | Urgency | Decision | Recommended action | Prevention target | Repeat pattern | Proposed rule or check | Scope | Owner | Status | Created date | Refresh date | Close condition |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Converted-to-Check Items
 
 Use this table when an entry becomes a validation script, lint rule, test, CI check, or other executable guard.
 
-| ID | Source | Finding | Category | Evidence | Impact | Severity | Urgency | Decision | Recommended action | Prevention target | Owner | Status | Created date | Refresh date | Close condition |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Source | Finding | Category | Evidence | Impact | Severity | Urgency | Decision | Recommended action | Prevention target | Repeat pattern | Proposed rule or check | Scope | Owner | Status | Created date | Refresh date | Close condition |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Resolved Items
 
 Use this table only after the close condition has been met and linked evidence exists.
 
-| ID | Source | Finding | Category | Evidence | Impact | Severity | Urgency | Decision | Recommended action | Prevention target | Owner | Status | Created date | Refresh date | Close condition |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Source | Finding | Category | Evidence | Impact | Severity | Urgency | Decision | Recommended action | Prevention target | Repeat pattern | Proposed rule or check | Scope | Owner | Status | Created date | Refresh date | Close condition |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Accepted / Wont-Fix Items
 
 Use this table for explicitly accepted risks or no-action decisions. Every row needs rationale, owner, and refresh date.
 
-| ID | Source | Finding | Category | Evidence | Impact | Severity | Urgency | Decision | Recommended action | Prevention target | Owner | Status | Created date | Refresh date | Close condition |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Source | Finding | Category | Evidence | Impact | Severity | Urgency | Decision | Recommended action | Prevention target | Repeat pattern | Proposed rule or check | Scope | Owner | Status | Created date | Refresh date | Close condition |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Stale Item Review Rules
 

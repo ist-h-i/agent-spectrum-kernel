@@ -19,6 +19,7 @@ This matrix is a reference view of the canonical runtime routes in `skills/skill
 | PR/diff/commit review | `review-router` | `review-code-health` when debt, smell, refactor, dependency/tooling, or repeated-finding analysis is applicable; `review-architecture-impact` when structural or boundary impact may exist; `review-output-quality` when consumer-facing or machine-consumed output may change; `review-adversarial-risk` when severe failure paths or blast radius may exist; `review-final-merge-gate` for the final decision | Layer applicability, required gates, gate evidence, and merge decision |
 | Technical debt / code smell / refactor candidate review | `review-router` | `review-code-health`; specialized gates only when findings cross into architecture, adversarial, risk, or evidence concerns | Evidence-backed code-health findings with category, severity, urgency, recommended action, scope guidance, and AI-rule feedback |
 | Persist non-blocking review findings / debt / rule feedback | `improvement-ledger` | `review-code-health` only if findings still need detection; `evidence-ledger` if readiness or resolution claims need evidence classification | Ledger entries with ID, source, evidence, impact, decision, prevention target, owner/status, refresh rule, and close condition |
+| Convert repeated findings into prevention rules or checks | `improvement-ledger` | `evidence-ledger` if repeat pattern, readiness, or conversion claims need evidence classification | Prevention-rule feedback with repeat pattern, target, proposed rule/check, evidence, scope, and convert/defer/reject/needs-more-evidence decision |
 | Repeated review context setup | `review-context-generation` | `repository-orientation` for repo facts before drafting context | Durable review context with evidence-status-labeled claims |
 | MR/PR README, PR explanation, or durable change-context documentation | `mr-readme-generation` | `adr-review` | Durable change context for human review and future AI reuse |
 | Performance/security/reliability/readiness claim | `evidence-ledger` | `doubt-driven-development` | Claim/evidence/status table |
@@ -65,6 +66,9 @@ review-router -> layer applicability -> required gates, including review-code-he
 
 Improvement ledger:
 review-code-health findings or review follow-up -> improvement-ledger -> separate PR, backlog, rule/check feedback, accepted risk, or stale review
+
+Prevention rule feedback:
+repeated or high-leverage improvement-ledger findings -> improvement-ledger prevention-rule feedback -> AGENTS.md, CUSTOM_INSTRUCTIONS.md, project overlay, SKILL.md, review checklist, validation script, lint/test/check, implementation context, or review context proposal
 
 Review context:
 review-context-generation -> docs/ai/review-context.md
