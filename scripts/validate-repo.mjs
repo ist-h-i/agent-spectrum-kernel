@@ -24,7 +24,14 @@ const STALE_PHRASES = [
   { phrase: "angular-enterprise", mode: "contains" },
 ];
 
-const SKILL_COUNT_REFERENCE_PATTERN = /\b(\d+)\s+skills\b/gi;
+const SKILL_COUNT_REFERENCE_PATTERNS = [
+  /\b(\d+)\s+skills\b/gi,
+  /\bcurrent\s+(\d+)-skill(?:\s+system|\s+baseline)?\b/gi,
+  /\b(\d+)\s+focused\s+skills\b/gi,
+  /\bBaseline:\s*current\s+(\d+)-skill\b/gi,
+  /\bSkills in manifest:\s*(\d+)\b/gi,
+  /\bSkill directories:\s*(\d+)\b/gi,
+];
 const MAINTAINED_SCAN_ROOTS = ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "README.md", "README.ja.md", "docs", "examples", "skills"];
 const ALLOWED_ROUTE_PHRASE_CONTEXTS = [
   "spec-driven-development -> test-first-verification for Verification Contract -> controlled-implementation -> test-first-verification for evidence",
@@ -36,9 +43,65 @@ const CONTEXT_METADATA_FILES = [
 ];
 const REQUIRED_CONTEXT_METADATA_FIELDS = ["context_status", "last_updated", "evidence_owner", "source_scope"];
 const ALLOWED_CONTEXT_STATUSES = new Set(["template", "initialized", "stale"]);
-const LEDGER_METADATA_FILE = "docs/ai/improvement-ledger.md";
+const IMPROVEMENT_LEDGER_PATH = "docs/ai/improvement-ledger.md";
 const REQUIRED_LEDGER_METADATA_FIELDS = ["ledger_status", "last_updated", "evidence_owner", "source_scope"];
 const ALLOWED_LEDGER_STATUSES = new Set(["template", "active", "archived"]);
+const LEDGER_ENTRY_SECTIONS = new Set([
+  "Open Improvement Items",
+  "Converted-to-Rule Items",
+  "Converted-to-Check Items",
+  "Resolved Items",
+  "Accepted / Wont-Fix Items",
+]);
+const REQUIRED_LEDGER_FIELDS = [
+  "ID",
+  "Source",
+  "Finding",
+  "Category",
+  "Evidence",
+  "Impact",
+  "Severity",
+  "Urgency",
+  "Decision",
+  "Recommended action",
+  "Prevention target",
+  "Owner",
+  "Status",
+  "Created date",
+  "Refresh date",
+  "Close condition",
+];
+const LEDGER_TABLE_FIELDS = [
+  ...REQUIRED_LEDGER_FIELDS,
+  "Repeat pattern",
+  "Proposed rule or check",
+  "Scope",
+];
+const ALLOWED_LEDGER_ROW_STATUSES = new Set([
+  "open",
+  "triaged",
+  "accepted",
+  "planned",
+  "in_progress",
+  "resolved",
+  "converted_to_rule",
+  "converted_to_check",
+  "wont_fix",
+  "stale",
+]);
+const ALLOWED_LEDGER_DECISIONS = new Set([
+  "fix_now",
+  "separate_pr",
+  "backlog",
+  "convert_to_rule",
+  "convert_to_check",
+  "accept",
+  "wont_fix",
+  "needs_more_evidence",
+]);
+const LEDGER_REFRESH_EXEMPT_STATUSES = new Set(["stale", "resolved", "wont_fix"]);
+const EXECUTABLE_CHECK_TARGET_PATTERN = /\b(validation script|lint|test|check|ci)\b/i;
+const WEAK_EVIDENCE_PATTERN = /\b(Hypothesis|Unknown)\b/i;
 
 function parseArgs(argv) {
   const args = {
@@ -255,31 +318,222 @@ function validateContextMetadata(root, errors) {
   return checks;
 }
 
-function validateLedgerMetadata(root, errors) {
-  const absolutePath = resolve(root, LEDGER_METADATA_FILE);
+function validateImprovementLedger(root, errors) {
+  const checks = [];
+  const absolutePath = resolve(root, IMPROVEMENT_LEDGER_PATH);
   if (!existsSync(absolutePath)) {
-    return [];
+    return checks;
   }
 
-  const frontmatter = parseFrontmatter(readFileSync(absolutePath, "utf8"));
+  const errorCountBefore = errors.length;
+  const text = readFileSync(absolutePath, "utf8");
+  const frontmatter = parseFrontmatter(text);
   const missing = REQUIRED_LEDGER_METADATA_FIELDS.filter((field) => !frontmatter.has(field));
   const status = frontmatter.get("ledger_status") ?? "missing";
   const statusOk = ALLOWED_LEDGER_STATUSES.has(status);
+  const rows = parseImprovementLedgerRows(text);
 
   if (missing.length > 0) {
-    fail(errors, "ledger metadata", `${LEDGER_METADATA_FILE} is missing ledger metadata fields: ${missing.join(", ")}`);
+    fail(errors, "improvement ledger", `${IMPROVEMENT_LEDGER_PATH} is missing ledger metadata fields: ${missing.join(", ")}`);
   }
   if (!statusOk) {
-    fail(errors, "ledger metadata", `${LEDGER_METADATA_FILE} has invalid ledger_status '${status}'`);
+    fail(errors, "improvement ledger", `${IMPROVEMENT_LEDGER_PATH} has invalid ledger_status '${status}'`);
   }
 
-  return [
-    {
-      path: LEDGER_METADATA_FILE,
-      status,
-      metadataOk: missing.length === 0 && statusOk,
-    },
-  ];
+  if (status === "template") {
+    if (rows.length > 0) {
+      fail(errors, "improvement ledger", `${IMPROVEMENT_LEDGER_PATH} has ledger_status 'template' but contains project ledger rows`);
+    }
+  } else if (status === "active" || status === "archived") {
+    validateImprovementLedgerRows(rows, status, errors);
+  }
+
+  checks.push({
+    path: IMPROVEMENT_LEDGER_PATH,
+    status,
+    rowCount: rows.length,
+    metadataOk: missing.length === 0 && statusOk,
+    validationOk: errors.length === errorCountBefore,
+  });
+
+  return checks;
+}
+
+function parseImprovementLedgerRows(text) {
+  const rows = [];
+  const lines = text.split(/\r?\n/);
+  let currentSection = null;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const heading = lines[index].match(/^##\s+(.+?)\s*$/);
+    if (heading) {
+      currentSection = heading[1];
+      continue;
+    }
+
+    if (!LEDGER_ENTRY_SECTIONS.has(currentSection) || !lines[index].trim().startsWith("|")) {
+      continue;
+    }
+
+    const headers = splitMarkdownTableRow(lines[index]);
+    if (!isLedgerEntryHeader(headers)) {
+      continue;
+    }
+
+    let rowIndex = index + 1;
+    if (rowIndex < lines.length && isMarkdownSeparatorRow(splitMarkdownTableRow(lines[rowIndex]))) {
+      rowIndex += 1;
+    }
+
+    while (rowIndex < lines.length && lines[rowIndex].trim().startsWith("|")) {
+      const cells = splitMarkdownTableRow(lines[rowIndex]);
+      if (!isMarkdownSeparatorRow(cells)) {
+        const values = new Map();
+        headers.forEach((header, headerIndex) => {
+          values.set(normalizeLedgerField(header), cells[headerIndex]?.trim() ?? "");
+        });
+        if ([...values.values()].some(Boolean)) {
+          rows.push({
+            line: rowIndex + 1,
+            section: currentSection,
+            values,
+          });
+        }
+      }
+      rowIndex += 1;
+    }
+
+    index = rowIndex - 1;
+  }
+
+  return rows;
+}
+
+function splitMarkdownTableRow(line) {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("|")) {
+    return [];
+  }
+
+  const withoutOuterPipes = trimmed.replace(/^\|/, "").replace(/\|$/, "");
+  return withoutOuterPipes.split("|").map((cell) => cell.trim());
+}
+
+function isMarkdownSeparatorRow(cells) {
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function isLedgerEntryHeader(headers) {
+  const normalizedHeaders = new Set(headers.map(normalizeLedgerField));
+  return LEDGER_TABLE_FIELDS.every((field) => normalizedHeaders.has(normalizeLedgerField(field)));
+}
+
+function normalizeLedgerField(field) {
+  return field.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function ledgerValue(row, field) {
+  return row.values.get(normalizeLedgerField(field)) ?? "";
+}
+
+function validateImprovementLedgerRows(rows, ledgerStatus, errors) {
+  const ids = new Map();
+  const today = currentIsoDate();
+
+  for (const row of rows) {
+    const rowLabel = `${IMPROVEMENT_LEDGER_PATH}:${row.line}`;
+    const missingRequiredFields = REQUIRED_LEDGER_FIELDS.filter((field) => ledgerValue(row, field) === "");
+    if (missingRequiredFields.length > 0) {
+      fail(errors, "improvement ledger", `${rowLabel} is missing required fields: ${missingRequiredFields.join(", ")}`);
+    }
+
+    const id = ledgerValue(row, "ID");
+    if (id && !/^IMP-\d{4}$/.test(id)) {
+      fail(errors, "improvement ledger", `${rowLabel} has invalid ID '${id}'; expected IMP-0001 style`);
+    }
+    if (id) {
+      if (ids.has(id)) {
+        fail(errors, "improvement ledger", `${rowLabel} duplicates ledger ID '${id}' first used at ${IMPROVEMENT_LEDGER_PATH}:${ids.get(id)}`);
+      } else {
+        ids.set(id, row.line);
+      }
+    }
+
+    const status = ledgerValue(row, "Status");
+    if (status && !ALLOWED_LEDGER_ROW_STATUSES.has(status)) {
+      fail(errors, "improvement ledger", `${rowLabel} has invalid Status '${status}'`);
+    }
+
+    const decision = ledgerValue(row, "Decision");
+    if (decision && !ALLOWED_LEDGER_DECISIONS.has(decision)) {
+      fail(errors, "improvement ledger", `${rowLabel} has invalid Decision '${decision}'`);
+    }
+
+    validateLedgerDates(row, rowLabel, ledgerStatus, today, errors);
+    validateLedgerConversion(row, rowLabel, errors);
+  }
+}
+
+function validateLedgerDates(row, rowLabel, ledgerStatus, today, errors) {
+  const status = ledgerValue(row, "Status");
+  const createdDate = ledgerValue(row, "Created date");
+  const refreshDate = ledgerValue(row, "Refresh date");
+
+  if (createdDate && !isIsoDate(createdDate)) {
+    fail(errors, "improvement ledger", `${rowLabel} has invalid Created date '${createdDate}'; expected YYYY-MM-DD`);
+  }
+  if (refreshDate && !isIsoDate(refreshDate)) {
+    fail(errors, "improvement ledger", `${rowLabel} has invalid Refresh date '${refreshDate}'; expected YYYY-MM-DD`);
+  }
+  if (
+    ledgerStatus === "active"
+    && refreshDate
+    && isIsoDate(refreshDate)
+    && refreshDate < today
+    && !LEDGER_REFRESH_EXEMPT_STATUSES.has(status)
+  ) {
+    fail(errors, "improvement ledger", `${rowLabel} is past its Refresh date '${refreshDate}' and must be marked stale or reviewed`);
+  }
+}
+
+function validateLedgerConversion(row, rowLabel, errors) {
+  const status = ledgerValue(row, "Status");
+  const decision = ledgerValue(row, "Decision");
+  const evidence = ledgerValue(row, "Evidence");
+  const preventionTarget = ledgerValue(row, "Prevention target");
+  const proposedRuleOrCheck = ledgerValue(row, "Proposed rule or check");
+  const closeCondition = ledgerValue(row, "Close condition");
+  const isRuleConversion = status === "converted_to_rule" || decision === "convert_to_rule";
+  const isCheckConversion = status === "converted_to_check" || decision === "convert_to_check";
+
+  if (!isRuleConversion && !isCheckConversion) {
+    return;
+  }
+
+  if (!preventionTarget) {
+    fail(errors, "improvement ledger", `${rowLabel} conversion row is missing Prevention target`);
+  }
+  if (!proposedRuleOrCheck) {
+    fail(errors, "improvement ledger", `${rowLabel} conversion row is missing Proposed rule or check evidence`);
+  }
+  if (WEAK_EVIDENCE_PATTERN.test(evidence)) {
+    fail(errors, "improvement ledger", `${rowLabel} converts weak evidence; use needs_more_evidence until evidence is stronger`);
+  }
+  if (isCheckConversion && !EXECUTABLE_CHECK_TARGET_PATTERN.test(`${preventionTarget} ${proposedRuleOrCheck} ${closeCondition}`)) {
+    fail(errors, "improvement ledger", `${rowLabel} converted_to_check row must name an executable check target such as validation script, lint, test, check, or CI`);
+  }
+}
+
+function isIsoDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function currentIsoDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function collectMarkdownFiles(root) {
@@ -317,7 +571,7 @@ function findStalePhrases(root, currentSkillCount, errors) {
 
     for (const stale of STALE_PHRASES) {
       if (stale.mode === "contains" && containsDisallowedStalePhrase(text, stale.phrase)) {
-        findings.push({ path, phrase: stale.phrase });
+        findings.push({ path, phrase: stale.phrase, kind: "phrase" });
         fail(errors, "stale phrases", `${path} contains stale phrase: ${stale.phrase}`);
       }
     }
@@ -339,11 +593,19 @@ function findStalePhrases(root, currentSkillCount, errors) {
 
 function findStaleSkillCountReferences(path, text, currentSkillCount) {
   const findings = [];
+  const seen = new Set();
 
-  for (const match of text.matchAll(SKILL_COUNT_REFERENCE_PATTERN)) {
-    const count = Number(match[1]);
-    if (count !== currentSkillCount) {
-      findings.push({ path, phrase: match[0], currentSkillCount });
+  for (const pattern of SKILL_COUNT_REFERENCE_PATTERNS) {
+    for (const match of text.matchAll(pattern)) {
+      const count = Number(match[1]);
+      const key = `${match.index}:${match[0]}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      if (count !== currentSkillCount) {
+        findings.push({ path, phrase: match[0], currentSkillCount, kind: "skill-count" });
+      }
     }
   }
 
@@ -365,31 +627,45 @@ function containsDisallowedStalePhrase(text, phrase) {
 }
 
 function buildPathChecks(root, manifest) {
-  const paths = [];
+  const paths = new Map();
+  function addPath(path, role) {
+    if (!path) {
+      return;
+    }
+    if (!paths.has(path)) {
+      paths.set(path, new Set());
+    }
+    paths.get(path).add(role);
+  }
+
   if (manifest?.kernel) {
-    paths.push(manifest.kernel);
+    addPath(manifest.kernel, "kernel");
   }
   if (manifest?.copy_paste_kernel) {
-    paths.push(manifest.copy_paste_kernel);
+    addPath(manifest.copy_paste_kernel, "copy_paste_kernel");
   }
   for (const key of ["docs", "examples"]) {
     if (Array.isArray(manifest?.[key])) {
-      paths.push(...manifest[key]);
+      for (const path of manifest[key]) {
+        addPath(path, key);
+      }
     }
   }
 
-  return paths.map((path) => ({
+  return [...paths.entries()].map(([path, roles]) => ({
     path,
+    roles: [...roles],
     ok: existsSync(resolve(root, path)),
   }));
 }
 
-function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, ledgerMetadataChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, improvementLedgerChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
   const skillCount = manifestSkills.length;
   const target = manifest?.design?.quality_target ?? "unknown";
+  const staleSkillCountFindings = staleFindings.filter((finding) => finding.kind === "skill-count");
 
   const lines = [
     "# Validation Report",
@@ -415,14 +691,17 @@ function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataC
     "",
     ...contextMetadataChecks.map((check) => `- \`${check.path}\`: context_status=${check.status}, metadata=${check.metadataOk ? "ok" : "invalid"}`),
     "",
-    "## Ledger template status checks",
+    "## Improvement ledger checks",
     "",
-    "- `ledger_status=template` marks the checked-in file as a generic empty template, not project-specific evidence.",
-    ...ledgerMetadataChecks.map((check) => `- \`${check.path}\`: ledger_status=${check.status}, metadata=${check.metadataOk ? "ok" : "invalid"}`),
+    ...(improvementLedgerChecks.length > 0
+      ? improvementLedgerChecks.map(
+          (check) => `- \`${check.path}\`: ledger_status=${check.status}, metadata=${check.metadataOk ? "ok" : "invalid"}, rows=${check.rowCount}, validation=${check.validationOk ? "ok" : "invalid"}`,
+        )
+      : ["- `docs/ai/improvement-ledger.md`: not present"]),
     "",
     "## Document path checks",
     "",
-    ...pathChecks.map((check) => `- \`${check.path}\`: ${check.ok ? "ok" : "missing"}`),
+    ...pathChecks.map((check) => `- \`${check.path}\`: ${check.ok ? "ok" : "missing"} (${check.roles.join(", ")})`),
     "",
     "## Stale name scan",
     "",
@@ -430,7 +709,9 @@ function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataC
     "",
     "## Auxiliary documentation audit",
     "",
-    "- No stale skill-count references found.",
+    staleSkillCountFindings.length > 0
+      ? `- Stale skill-count references found above: ${staleSkillCountFindings.length}.`
+      : "- No stale skill-count references found.",
     "- No deleted legacy code-review adapter references found.",
     "- Review route references use the current layer-aware route through `review-router`, layer applicability, required gates, and `review-final-merge-gate`.",
     "- Implementation route references use Verification Contract, Implementation Contract, `controlled-implementation`, and evidence-oriented verification wording.",
@@ -492,11 +773,11 @@ export function validateRepository(options) {
   validateManifestPaths(root, manifest, errors);
   const skillChecks = validateSkills(root, skillDirectories, errors);
   const contextMetadataChecks = validateContextMetadata(root, errors);
-  const ledgerMetadataChecks = validateLedgerMetadata(root, errors);
+  const improvementLedgerChecks = validateImprovementLedger(root, errors);
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, ledgerMetadataChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, improvementLedgerChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

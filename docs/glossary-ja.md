@@ -189,6 +189,17 @@ Use when:
 Do not confuse with:
 - `docs/ai/review-context.md` や `docs/ai/implementation-context.md`。これらは判断材料で、改善itemの状態管理ではありません。
 
+## Security review boundary
+
+Meaning:
+- `review-code-health` は通常のコードレビュー中に evidence-backed な vulnerability / security weakness signals を見つけるための観点です。
+
+Use when:
+- diffや対象範囲の中で、入力検証、権限境界、機密情報、依存関係利用、危険なI/Oなどの弱点シグナルを分類したい場合。
+
+Do not confuse with:
+- SAST、依存脆弱性スキャン、脅威モデリング、ペンテスト、コンプライアンスレビュー、または正式なセキュリティ監査。abuse path、privacy risk、severe failure path は `review-adversarial-risk` のrouting対象です。
+
 ## Behavior preservation contract
 
 Meaning:

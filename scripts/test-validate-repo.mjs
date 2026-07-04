@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -88,6 +88,13 @@ function runValidation(root) {
   });
 }
 
+function runValidationAndWriteReport(root) {
+  return spawnSync(process.execPath, [validateScript, "--root", root, "--write-report"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+}
+
 function assertPass(name, root) {
   const result = runValidation(root);
   if (result.status !== 0) {
@@ -106,10 +113,112 @@ function assertFail(name, root, expected) {
   }
 }
 
+function assertPassWithReport(name, root) {
+  const result = runValidationAndWriteReport(root);
+  if (result.status !== 0) {
+    throw new Error(`${name} should pass\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  }
+}
+
 function cloneFixture(name, skills) {
   const root = resolve(fixtureRoot, name);
   writeFixture(root, skills);
   return root;
+}
+
+const ledgerHeader = "| ID | Source | Finding | Category | Evidence | Impact | Severity | Urgency | Decision | Recommended action | Prevention target | Repeat pattern | Proposed rule or check | Scope | Owner | Status | Created date | Refresh date | Close condition |";
+const ledgerSeparator = "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|";
+
+function ledgerRow(overrides = {}) {
+  const row = {
+    ID: "IMP-0001",
+    Source: "PR #1",
+    Finding: "Repeated stale count docs",
+    Category: "rule_gap",
+    Evidence: "Verified: docs/ok.md contained a stale count",
+    Impact: "Validation could miss adoption-doc drift",
+    Severity: "medium",
+    Urgency: "soon",
+    Decision: "backlog",
+    "Recommended action": "Add a validation fixture",
+    "Prevention target": "validation script",
+    "Repeat pattern": "",
+    "Proposed rule or check": "",
+    Scope: "",
+    Owner: "unassigned",
+    Status: "triaged",
+    "Created date": "2999-01-01",
+    "Refresh date": "2999-02-01",
+    "Close condition": "Fixture fails before the validation change and passes after it",
+    ...overrides,
+  };
+
+  return `| ${[
+    row.ID,
+    row.Source,
+    row.Finding,
+    row.Category,
+    row.Evidence,
+    row.Impact,
+    row.Severity,
+    row.Urgency,
+    row.Decision,
+    row["Recommended action"],
+    row["Prevention target"],
+    row["Repeat pattern"],
+    row["Proposed rule or check"],
+    row.Scope,
+    row.Owner,
+    row.Status,
+    row["Created date"],
+    row["Refresh date"],
+    row["Close condition"],
+  ].join(" | ")} |`;
+}
+
+function improvementLedgerFixture({ status = "active", openRows = [], ruleRows = [], checkRows = [] } = {}) {
+  return `---
+ledger_status: ${status}
+last_updated: 2026-01-01
+evidence_owner: fixture
+source_scope: validation fixture
+---
+
+# Improvement Ledger
+
+## Open Improvement Items
+
+${ledgerHeader}
+${ledgerSeparator}
+${openRows.join("\n")}
+
+## Converted-to-Rule Items
+
+${ledgerHeader}
+${ledgerSeparator}
+${ruleRows.join("\n")}
+
+## Converted-to-Check Items
+
+${ledgerHeader}
+${ledgerSeparator}
+${checkRows.join("\n")}
+
+## Resolved Items
+
+${ledgerHeader}
+${ledgerSeparator}
+
+## Accepted / Wont-Fix Items
+
+${ledgerHeader}
+${ledgerSeparator}
+`;
+}
+
+function writeImprovementLedger(root, content) {
+  mkdirSync(resolve(root, "docs/ai"), { recursive: true });
+  writeFileSync(resolve(root, "docs/ai/improvement-ledger.md"), content);
 }
 
 try {
@@ -205,9 +314,25 @@ try {
   writeFileSync(resolve(staleSkillCountRoot, "docs/ok.md"), "# OK\n\nThis repository has 2 skills.\n");
   assertFail("stale skill count", staleSkillCountRoot, "2 skills");
 
+  const staleCurrentSkillSystemRoot = cloneFixture("stale-current-skill-system", ["alpha", "beta", "gamma"]);
+  writeFileSync(resolve(staleCurrentSkillSystemRoot, "docs/ok.md"), "# OK\n\nBaseline: current 2-skill system.\n");
+  assertFail("stale current skill system", staleCurrentSkillSystemRoot, "current 2-skill system");
+
+  const staleFocusedSkillsRoot = cloneFixture("stale-focused-skills", ["alpha", "beta", "gamma"]);
+  writeFileSync(resolve(staleFocusedSkillsRoot, "docs/ok.md"), "# OK\n\nThis package includes 2 focused skills.\n");
+  assertFail("stale focused skills", staleFocusedSkillsRoot, "2 focused skills");
+
+  const staleReportSkillCountRoot = cloneFixture("stale-report-skill-count", ["alpha", "beta", "gamma"]);
+  writeFileSync(resolve(staleReportSkillCountRoot, "docs/ok.md"), "# OK\n\n- Skills in manifest: 2\n- Skill directories: 2\n");
+  assertFail("stale report skill count", staleReportSkillCountRoot, "Skills in manifest: 2");
+
   const currentSkillCountRoot = cloneFixture("current-skill-count", ["alpha", "beta", "gamma"]);
   writeFileSync(resolve(currentSkillCountRoot, "docs/ok.md"), "# OK\n\nThis repository has 3 skills.\n");
   assertPass("current skill count", currentSkillCountRoot);
+
+  const currentReportSkillCountRoot = cloneFixture("current-report-skill-count", ["alpha", "beta", "gamma"]);
+  writeFileSync(resolve(currentReportSkillCountRoot, "docs/ok.md"), "# OK\n\n- Skills in manifest: 3\n- Skill directories: 3\n");
+  assertPass("current report skill count", currentReportSkillCountRoot);
 
   const noSkillCountRoot = cloneFixture("no-skill-count", ["alpha", "beta", "gamma"]);
   writeFileSync(resolve(noSkillCountRoot, "docs/ok.md"), "# OK\n\nThis repository lists workflows without a numeric skill count.\n");
@@ -223,6 +348,98 @@ try {
     "# OK\n\nFor reviews, use review-router -> required gates -> review-final-merge-gate before final review.\n",
   );
   assertFail("inline stale route phrase", staleRouteRoot, "review-router -> required gates -> review-final-merge-gate");
+
+  const activeLedgerRoot = cloneFixture("active-ledger");
+  writeImprovementLedger(activeLedgerRoot, improvementLedgerFixture({ openRows: [ledgerRow()] }));
+  assertPass("active ledger", activeLedgerRoot);
+
+  const templateLedgerRoot = cloneFixture("template-ledger");
+  writeImprovementLedger(templateLedgerRoot, improvementLedgerFixture({ status: "template" }));
+  assertPass("template ledger", templateLedgerRoot);
+
+  const missingLedgerFieldRoot = cloneFixture("missing-ledger-field");
+  writeImprovementLedger(missingLedgerFieldRoot, improvementLedgerFixture({ openRows: [ledgerRow({ Impact: "" })] }));
+  assertFail("missing ledger field", missingLedgerFieldRoot, "missing required fields: Impact");
+
+  const staleLedgerRowRoot = cloneFixture("stale-ledger-row");
+  writeImprovementLedger(staleLedgerRowRoot, improvementLedgerFixture({ openRows: [ledgerRow({ "Refresh date": "2000-01-01" })] }));
+  assertFail("stale ledger row", staleLedgerRowRoot, "past its Refresh date");
+
+  const weakRuleConversionRoot = cloneFixture("weak-rule-conversion");
+  writeImprovementLedger(
+    weakRuleConversionRoot,
+    improvementLedgerFixture({
+      ruleRows: [
+        ledgerRow({
+          Decision: "convert_to_rule",
+          Status: "converted_to_rule",
+          Evidence: "Hypothesis: this may recur",
+          "Repeat pattern": "likely_repeated",
+          "Proposed rule or check": "Add a reusable rule after evidence is confirmed",
+          Scope: "generic",
+        }),
+      ],
+    }),
+  );
+  assertFail("weak rule conversion", weakRuleConversionRoot, "converts weak evidence");
+
+  const weakEvidenceNeedsMoreRoot = cloneFixture("weak-evidence-needs-more");
+  writeImprovementLedger(
+    weakEvidenceNeedsMoreRoot,
+    improvementLedgerFixture({
+      openRows: [
+        ledgerRow({
+          Decision: "needs_more_evidence",
+          Evidence: "Unknown: review comments were unavailable",
+          "Repeat pattern": "likely_repeated",
+          "Proposed rule or check": "Confirm whether this pattern recurs before converting it",
+          Scope: "generic",
+        }),
+      ],
+    }),
+  );
+  assertPass("weak evidence needs more", weakEvidenceNeedsMoreRoot);
+
+  const invalidCheckConversionRoot = cloneFixture("invalid-check-conversion");
+  writeImprovementLedger(
+    invalidCheckConversionRoot,
+    improvementLedgerFixture({
+      checkRows: [
+        ledgerRow({
+          Decision: "convert_to_check",
+          Status: "converted_to_check",
+          "Prevention target": "SKILL.md",
+          "Repeat pattern": "repeated",
+          "Proposed rule or check": "Document the review behavior",
+          Scope: "generic",
+        }),
+      ],
+    }),
+  );
+  assertFail("invalid check conversion", invalidCheckConversionRoot, "executable check target");
+
+  const dedupedPathReportRoot = cloneFixture("deduped-path-report");
+  writeFileSync(
+    resolve(dedupedPathReportRoot, "manifest.json"),
+    JSON.stringify(
+      {
+        kernel: "AGENTS.md",
+        copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
+        skills: ["alpha"],
+        docs: ["CUSTOM_INSTRUCTIONS.md", "docs/ok.md"],
+        examples: ["examples/ok.md"],
+        design: { quality_target: "95+" },
+      },
+      null,
+      2,
+    ),
+  );
+  assertPassWithReport("deduped path report", dedupedPathReportRoot);
+  const dedupedReport = readFileSync(resolve(dedupedPathReportRoot, "docs/validation-report.md"), "utf8");
+  const customInstructionsEntries = dedupedReport.match(/`CUSTOM_INSTRUCTIONS\.md`/g) ?? [];
+  if (customInstructionsEntries.length !== 1 || !dedupedReport.includes("`CUSTOM_INSTRUCTIONS.md`: ok (copy_paste_kernel, docs)")) {
+    throw new Error(`deduped path report should list CUSTOM_INSTRUCTIONS.md once with both roles\n${dedupedReport}`);
+  }
 
   console.log("validate-repo fixture tests passed");
 } finally {
