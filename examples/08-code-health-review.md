@@ -27,7 +27,7 @@ Code health review:
 - Gate status: pass with findings
 - Scope reviewed: changed validation helper, nearby tests, and manifest/report generation code
 - Current-PR blockers:
-  - [medium] scripts/validate-repo.mjs:120 - stale count detection misses hyphenated "30-skill" references.
+  - [medium] scripts/validate-repo.mjs:120 - stale count detection misses hyphenated "34-skill" references.
 - Backlog / separate-PR candidates:
   - [low] docs/usage-ja.md - adoption examples could be clearer, but this does not block the current fix.
 - Rule or check feedback:
@@ -42,7 +42,7 @@ Category:
 - rule_gap
 
 Evidence:
-- scripts/validate-repo.mjs uses a count pattern that misses "current 30-skill system" style phrases.
+- scripts/validate-repo.mjs uses a count pattern that misses "current 34-skill system" style phrases.
 
 Impact:
 - Quality/adoption docs can drift while validation still reports no stale count references.

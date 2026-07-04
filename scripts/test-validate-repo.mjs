@@ -50,6 +50,17 @@ source_scope: "generic empty template; no project-specific improvement items rec
 # Improvement Ledger Template
 `;
 
+function skillGroupsFor(skills, overrides = {}) {
+  return {
+    mode_routing: [],
+    delivery_quality: skills,
+    adoption_bootstrap: [],
+    observability_metrics: [],
+    operation_automation: [],
+    ...overrides,
+  };
+}
+
 function writeFixture(root, skills = ["alpha"]) {
   for (const skill of skills) {
     mkdirSync(resolve(root, `skills/${skill}`), { recursive: true });
@@ -71,6 +82,8 @@ function writeFixture(root, skills = ["alpha"]) {
         kernel: "AGENTS.md",
         copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
         skills,
+        skill_groups: skillGroupsFor(skills),
+        allowed_multi_group_skills: [],
         docs: ["docs/ok.md", "docs/ai/improvement-ledger.md"],
         examples: ["examples/ok.md"],
         design: { quality_target: "95+" },
@@ -255,6 +268,8 @@ try {
         kernel: "AGENTS.md",
         copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
         skills: ["alpha"],
+        skill_groups: skillGroupsFor(["alpha"]),
+        allowed_multi_group_skills: [],
         docs: ["docs/missing.md"],
         examples: ["examples/ok.md"],
         design: { quality_target: "95+" },
@@ -273,6 +288,8 @@ try {
         kernel: "AGENTS.md",
         copy_paste_kernel: "missing-custom.md",
         skills: ["alpha"],
+        skill_groups: skillGroupsFor(["alpha"]),
+        allowed_multi_group_skills: [],
         docs: ["docs/ok.md"],
         examples: ["examples/ok.md"],
         design: { quality_target: "95+" },
@@ -296,6 +313,8 @@ try {
         kernel: "AGENTS.md",
         copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
         skills: ["alpha", "beta"],
+        skill_groups: skillGroupsFor(["alpha", "beta"]),
+        allowed_multi_group_skills: [],
         docs: ["docs/ok.md"],
         examples: ["examples/ok.md"],
         design: { quality_target: "95+" },
@@ -305,6 +324,147 @@ try {
     ),
   );
   assertFail("manifest skill without directory", missingSkillRoot, "but skills/beta/SKILL.md is missing");
+
+  const missingSkillGroupsRoot = cloneFixture("missing-skill-groups");
+  writeFileSync(
+    resolve(missingSkillGroupsRoot, "manifest.json"),
+    JSON.stringify(
+      {
+        kernel: "AGENTS.md",
+        copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
+        skills: ["alpha"],
+        docs: ["docs/ok.md"],
+        examples: ["examples/ok.md"],
+        design: { quality_target: "95+" },
+      },
+      null,
+      2,
+    ),
+  );
+  assertFail("missing skill groups", missingSkillGroupsRoot, "manifest.json.skill_groups must exist");
+
+  const ungroupedSkillRoot = cloneFixture("ungrouped-skill", ["alpha", "beta"]);
+  writeFileSync(
+    resolve(ungroupedSkillRoot, "manifest.json"),
+    JSON.stringify(
+      {
+        kernel: "AGENTS.md",
+        copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
+        skills: ["alpha", "beta"],
+        skill_groups: skillGroupsFor(["alpha"]),
+        allowed_multi_group_skills: [],
+        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md"],
+        examples: ["examples/ok.md"],
+        design: { quality_target: "95+" },
+      },
+      null,
+      2,
+    ),
+  );
+  assertFail("ungrouped skill", ungroupedSkillRoot, "is not assigned to a skill group");
+
+  const invalidGroupRoot = cloneFixture("invalid-group");
+  writeFileSync(
+    resolve(invalidGroupRoot, "manifest.json"),
+    JSON.stringify(
+      {
+        kernel: "AGENTS.md",
+        copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
+        skills: ["alpha"],
+        skill_groups: {
+          ...skillGroupsFor(["alpha"]),
+          delivery: [],
+        },
+        allowed_multi_group_skills: [],
+        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md"],
+        examples: ["examples/ok.md"],
+        design: { quality_target: "95+" },
+      },
+      null,
+      2,
+    ),
+  );
+  assertFail("invalid group", invalidGroupRoot, "invalid group 'delivery'");
+
+  const unknownGroupedSkillRoot = cloneFixture("unknown-grouped-skill");
+  writeFileSync(
+    resolve(unknownGroupedSkillRoot, "manifest.json"),
+    JSON.stringify(
+      {
+        kernel: "AGENTS.md",
+        copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
+        skills: ["alpha"],
+        skill_groups: skillGroupsFor(["alpha", "beta"]),
+        allowed_multi_group_skills: [],
+        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md"],
+        examples: ["examples/ok.md"],
+        design: { quality_target: "95+" },
+      },
+      null,
+      2,
+    ),
+  );
+  assertFail("unknown grouped skill", unknownGroupedSkillRoot, "contains 'beta', but manifest.json.skills does not list it");
+
+  const duplicateGroupedSkillRoot = cloneFixture("duplicate-grouped-skill");
+  writeFileSync(
+    resolve(duplicateGroupedSkillRoot, "manifest.json"),
+    JSON.stringify(
+      {
+        kernel: "AGENTS.md",
+        copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
+        skills: ["alpha"],
+        skill_groups: skillGroupsFor(["alpha", "alpha"]),
+        allowed_multi_group_skills: [],
+        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md"],
+        examples: ["examples/ok.md"],
+        design: { quality_target: "95+" },
+      },
+      null,
+      2,
+    ),
+  );
+  assertFail("duplicate grouped skill", duplicateGroupedSkillRoot, "contains duplicate entries");
+
+  const unallowedMultiGroupRoot = cloneFixture("unallowed-multi-group");
+  writeFileSync(
+    resolve(unallowedMultiGroupRoot, "manifest.json"),
+    JSON.stringify(
+      {
+        kernel: "AGENTS.md",
+        copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
+        skills: ["alpha"],
+        skill_groups: skillGroupsFor(["alpha"], { adoption_bootstrap: ["alpha"] }),
+        allowed_multi_group_skills: [],
+        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md"],
+        examples: ["examples/ok.md"],
+        design: { quality_target: "95+" },
+      },
+      null,
+      2,
+    ),
+  );
+  assertFail("unallowed multi-group skill", unallowedMultiGroupRoot, "appears in multiple skill_groups");
+
+  const allowedMultiGroupRoot = cloneFixture("allowed-multi-group");
+  writeFileSync(
+    resolve(allowedMultiGroupRoot, "manifest.json"),
+    JSON.stringify(
+      {
+        kernel: "AGENTS.md",
+        copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
+        skills: ["alpha"],
+        skill_groups: skillGroupsFor(["alpha"], { adoption_bootstrap: ["alpha"] }),
+        allowed_multi_group_skills: ["alpha"],
+        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md"],
+        examples: ["examples/ok.md"],
+        design: { quality_target: "95+" },
+      },
+      null,
+      2,
+    ),
+  );
+  assertPass("allowed multi-group skill", allowedMultiGroupRoot);
 
   const stalePhraseRoot = cloneFixture("stale-phrase");
   writeFileSync(resolve(stalePhraseRoot, "docs/ok.md"), "# OK\n\nThis repository has 25 skills.\n");
@@ -426,6 +586,8 @@ try {
         kernel: "AGENTS.md",
         copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
         skills: ["alpha"],
+        skill_groups: skillGroupsFor(["alpha"]),
+        allowed_multi_group_skills: [],
         docs: ["CUSTOM_INSTRUCTIONS.md", "docs/ok.md"],
         examples: ["examples/ok.md"],
         design: { quality_target: "95+" },

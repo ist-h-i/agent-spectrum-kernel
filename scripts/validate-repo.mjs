@@ -33,10 +33,19 @@ const SKILL_COUNT_REFERENCE_PATTERNS = [
   /\bSkill directories:\s*(\d+)\b/gi,
 ];
 const MAINTAINED_SCAN_ROOTS = ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "README.md", "README.ja.md", "docs", "examples", "skills"];
+const GENERATED_REPORT_PATH = "docs/validation-report.md";
 const ALLOWED_ROUTE_PHRASE_CONTEXTS = [
   "spec-driven-development -> test-first-verification for Verification Contract -> controlled-implementation -> test-first-verification for evidence",
   "doubt-driven-development -> test-first-verification for reproduction and Verification Contract -> controlled-implementation -> test-first-verification for regression proof",
 ];
+const REQUIRED_SKILL_GROUPS = [
+  "mode_routing",
+  "delivery_quality",
+  "adoption_bootstrap",
+  "observability_metrics",
+  "operation_automation",
+];
+const REQUIRED_SKILL_GROUP_SET = new Set(REQUIRED_SKILL_GROUPS);
 const CONTEXT_METADATA_FILES = [
   "docs/ai/review-context.md",
   "docs/ai/implementation-context.md",
@@ -221,6 +230,97 @@ function validateManifest(root, manifest, skillDirectories, errors) {
   for (const skill of extraDirectories) {
     fail(errors, "manifest", `skills/${skill}/SKILL.md exists, but '${skill}' is missing from manifest.json.skills`);
   }
+}
+
+function validateSkillGroups(manifest, errors) {
+  const checks = [];
+  if (!manifest) {
+    return checks;
+  }
+
+  const manifestSkills = Array.isArray(manifest.skills) ? manifest.skills : [];
+  const manifestSkillSet = new Set(manifestSkills);
+  const skillGroups = manifest.skill_groups;
+  const allowedMultiGroupSkills = Array.isArray(manifest.allowed_multi_group_skills)
+    ? manifest.allowed_multi_group_skills
+    : [];
+  const allowedMultiGroupSet = new Set(allowedMultiGroupSkills);
+
+  if (!skillGroups || Array.isArray(skillGroups) || typeof skillGroups !== "object") {
+    fail(errors, "skill groups", "manifest.json.skill_groups must exist and be an object");
+    return checks;
+  }
+
+  if (
+    manifest.allowed_multi_group_skills !== undefined
+    && !Array.isArray(manifest.allowed_multi_group_skills)
+  ) {
+    fail(errors, "skill groups", "manifest.json.allowed_multi_group_skills must be an array when present");
+  }
+
+  const allowedDuplicates = allowedMultiGroupSkills.filter((skill, index) => allowedMultiGroupSkills.indexOf(skill) !== index);
+  if (allowedDuplicates.length > 0) {
+    fail(errors, "skill groups", `manifest.json.allowed_multi_group_skills contains duplicate entries: ${[...new Set(allowedDuplicates)].join(", ")}`);
+  }
+  for (const skill of allowedMultiGroupSkills) {
+    if (!manifestSkillSet.has(skill)) {
+      fail(errors, "skill groups", `manifest.json.allowed_multi_group_skills lists '${skill}', but manifest.json.skills does not list it`);
+    }
+  }
+
+  const groupNames = Object.keys(skillGroups).sort();
+  for (const group of groupNames) {
+    if (!REQUIRED_SKILL_GROUP_SET.has(group)) {
+      fail(errors, "skill groups", `manifest.json.skill_groups contains invalid group '${group}'`);
+    }
+  }
+  for (const group of REQUIRED_SKILL_GROUPS) {
+    if (!Object.hasOwn(skillGroups, group)) {
+      fail(errors, "skill groups", `manifest.json.skill_groups is missing required group '${group}'`);
+    }
+  }
+
+  const memberships = new Map();
+  for (const group of REQUIRED_SKILL_GROUPS) {
+    const skills = skillGroups[group];
+    if (!Array.isArray(skills)) {
+      fail(errors, "skill groups", `manifest.json.skill_groups.${group} must be an array`);
+      checks.push({ group, count: 0, skills: [] });
+      continue;
+    }
+
+    const duplicates = skills.filter((skill, index) => skills.indexOf(skill) !== index);
+    if (duplicates.length > 0) {
+      fail(errors, "skill groups", `manifest.json.skill_groups.${group} contains duplicate entries: ${[...new Set(duplicates)].join(", ")}`);
+    }
+
+    for (const skill of skills) {
+      if (typeof skill !== "string") {
+        fail(errors, "skill groups", `manifest.json.skill_groups.${group} contains a non-string skill entry`);
+        continue;
+      }
+      if (!manifestSkillSet.has(skill)) {
+        fail(errors, "skill groups", `manifest.json.skill_groups.${group} contains '${skill}', but manifest.json.skills does not list it`);
+      }
+      if (!memberships.has(skill)) {
+        memberships.set(skill, new Set());
+      }
+      memberships.get(skill).add(group);
+    }
+
+    checks.push({ group, count: skills.length, skills: [...skills] });
+  }
+
+  for (const skill of manifestSkills) {
+    const groups = memberships.get(skill) ?? new Set();
+    if (groups.size === 0) {
+      fail(errors, "skill groups", `manifest.json.skills entry '${skill}' is not assigned to a skill group`);
+    } else if (groups.size > 1 && !allowedMultiGroupSet.has(skill)) {
+      fail(errors, "skill groups", `manifest.json.skills entry '${skill}' appears in multiple skill_groups (${[...groups].join(", ")}) but is not listed in allowed_multi_group_skills`);
+    }
+  }
+
+  return checks;
 }
 
 function validateManifestPaths(root, manifest, errors) {
@@ -552,6 +652,9 @@ function collectMarkdownFiles(root) {
       return;
     }
     if (path.endsWith(".md")) {
+      if (path === GENERATED_REPORT_PATH) {
+        return;
+      }
       files.push(path);
     }
   }
@@ -659,7 +762,7 @@ function buildPathChecks(root, manifest) {
   }));
 }
 
-function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, improvementLedgerChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -680,6 +783,15 @@ function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataC
     `- Skill directories: ${skillDirectories.length}`,
     `- Missing directories: ${missingDirectories.length > 0 ? missingDirectories.join(", ") : "none"}`,
     `- Extra directories: ${extraDirectories.length > 0 ? extraDirectories.join(", ") : "none"}`,
+    "",
+    "## Skill group checks",
+    "",
+    ...(skillGroupChecks.length > 0
+      ? [
+          ...skillGroupChecks.map((check) => `- \`${check.group}\`: skills=${check.count}${check.count === 0 ? " (empty)" : ""}`),
+          `- Allowed multi-group skills: ${Array.isArray(manifest?.allowed_multi_group_skills) && manifest.allowed_multi_group_skills.length > 0 ? manifest.allowed_multi_group_skills.join(", ") : "none"}`,
+        ]
+      : ["- `manifest.json.skill_groups`: missing or invalid"]),
     "",
     "## Skill section checks",
     "",
@@ -715,6 +827,7 @@ function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataC
     "- No deleted legacy code-review adapter references found.",
     "- Review route references use the current layer-aware route through `review-router`, layer applicability, required gates, and `review-final-merge-gate`.",
     "- Implementation route references use Verification Contract, Implementation Contract, `controlled-implementation`, and evidence-oriented verification wording.",
+    "- Operating mode routing, skill group metadata, adoption workflows, observability metrics, and operation reporting are represented as separate layers.",
     "- Project overlay, stack overlay, review context, implementation context, and task progress terminology is explicitly separated in maintained auxiliary docs.",
     "- Review and implementation context metadata distinguishes uninitialized templates from initialized or stale durable context.",
     "",
@@ -770,6 +883,7 @@ export function validateRepository(options) {
   const skillDirectories = listSkillDirectories(root);
 
   validateManifest(root, manifest, skillDirectories, errors);
+  const skillGroupChecks = validateSkillGroups(manifest, errors);
   validateManifestPaths(root, manifest, errors);
   const skillChecks = validateSkills(root, skillDirectories, errors);
   const contextMetadataChecks = validateContextMetadata(root, errors);
@@ -777,7 +891,7 @@ export function validateRepository(options) {
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, improvementLedgerChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

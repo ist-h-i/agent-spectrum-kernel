@@ -18,7 +18,9 @@ Target: every category should be 95+ for personal development and internal intro
 | Category | Target | Required properties |
 |---|---:|---|
 | Kernel design | 95+ | Small, always-on, non-procedural, includes truth/scope/safety/verification/completion contracts |
+| Operating mode routing | 95+ | Delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation are separated before workflow selection |
 | Skill separation | 95+ | Heavy workflows are modular; each has use cases, exit criteria, output, failure modes |
+| Skill group metadata | 95+ | Every skill is classified into validated manifest groups without moving directories; allowed multi-group membership is explicit |
 | Repository awareness | 95+ | Agents inspect actual repo conventions and commands before non-trivial edits |
 | Scope control | 95+ | Allowed/forbidden scope, diff budget, and escalation are explicit |
 | Implementation control | 95+ | Implementation Contract fixes goal, non-goals, allowed/forbidden scope, context, verification, and stop conditions before edits |
@@ -35,18 +37,24 @@ Target: every category should be 95+ for personal development and internal intro
 | Prevention-rule / check feedback | 95+ | Repeated or high-leverage findings are routed to the narrowest durable rule, context, validation script, lint, test, or CI check only when evidence supports conversion |
 | Refactor safety | 95+ | `refactor-implementation` requires an approved objective, behavior-preservation contract, allowed/forbidden scope, boundary decision, and regression proof |
 | Review-to-improvement feedback loop | 95+ | Review output can hand non-blocking items into the loop `review-code-health -> review-final-merge-gate -> improvement-ledger -> prevention-rule feedback -> refactor-implementation` |
+| Project adoption / rollout | 95+ | First-time adoption produces project overlay, implementation/review context drafts, local commands, risks, recipes, and missing human decisions without inventing policy |
+| Observability / effectiveness | 95+ | One-task workflow retrospectives distinguish routing quality, outcome value, evidence quality, overhead, missed coverage, and reuse value |
+| Adoption metrics privacy | 95+ | Longitudinal metrics are opt-in, avoid raw prompt storage, avoid HR/personnel framing, and separate correlation from unsupported causality |
+| Operation reporting separation | 95+ | Weekly/monthly reporting is handled as templates or external cadence, not as normal delivery skills or mandatory telemetry |
 | Evidence handling | 95+ | Claims are extracted, classified, downgraded, and linked to next checks |
 | Handoff utility | 95+ | Next task includes scope, forbidden scope, expected output, verification, and stop condition |
 | Personal/internal usability | 95+ | Japanese quickstart, prompt recipes, glossary, usage guide, examples, and simple adoption path exist |
 
 ## Current self-assessment
 
-Baseline: current 30-skill system in `manifest.json`.
+Baseline: current 34-skill system in `manifest.json`.
 
 | Category | Score | Notes |
 |---|---:|---|
 | Kernel design | 96 | Added safety, routing, truth model, completion contracts without turning kernel into a workflow dump |
-| Skill separation | 96 | 30 focused skills; each skill keeps process, output, exit criteria, or failure modes close to one workflow responsibility |
+| Operating mode routing | 95 | `operating-mode-router` separates delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation before lower-level routing |
+| Skill separation | 96 | 34 focused skills; each skill keeps process, output, exit criteria, or failure modes close to one workflow responsibility |
+| Skill group metadata | 95 | `manifest.json.skill_groups` and validation cover unclassified, unknown, duplicate, invalid, and unsupported multi-group skill entries |
 | Repository awareness | 95 | Dedicated orientation skill plus kernel repository-first rules |
 | Scope control | 96 | Kernel scope rules plus dedicated scope-control skill and diff audit |
 | Implementation control | 96 | `controlled-implementation` requires an Implementation Contract before edits, including goal, non-goals, boundaries, context, verification, and stop conditions |
@@ -63,6 +71,10 @@ Baseline: current 30-skill system in `manifest.json`.
 | Prevention-rule / check feedback | 95 | Repeated findings can be routed to `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, project overlay, `SKILL.md`, review checklist, validation script, lint/test/check, implementation context, or review context without dumping every observation into always-on rules |
 | Refactor safety | 95 | `refactor-implementation` keeps approved structural cleanup separate from behavior change and requires behavior-preservation plus regression evidence |
 | Review-to-improvement feedback loop | 95 | The loop `review-code-health -> review-final-merge-gate -> improvement-ledger -> prevention-rule feedback -> refactor-implementation` is represented in routing, prompt recipes, examples, and validation expectations |
+| Project adoption / rollout | 95 | `project-adoption-pack-generation` produces adoption packs with overlay/context drafts and missing human decisions while avoiding unapproved mutation |
+| Observability / effectiveness | 95 | `skill-effectiveness-evaluation` evaluates one completed task without rerunning every workflow or replacing review/evidence gates |
+| Adoption metrics privacy | 95 | `skill-adoption-metrics` and the metrics event contract avoid hidden telemetry, raw prompt storage by default, and HR/personnel scoring |
+| Operation reporting separation | 95 | Adoption report templates clarify weekly/monthly summaries as operation cadence and keep scheduling outside delivery skills |
 | Evidence handling | 97 | Evidence ledger is explicit and reusable across review/handoff/completion |
 | Handoff utility | 96 | Handoff has executable next-task format and stop conditions |
 | Personal/internal usability | 96 | `docs/quickstart-ja.md`, `docs/prompt-recipes-ja.md`, `docs/glossary-ja.md`, Japanese usage guide, workflow examples, and project overlay template are included |

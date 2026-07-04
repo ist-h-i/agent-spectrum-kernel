@@ -146,6 +146,12 @@ Review route:
 - Inputs still needed:
 ```
 
+## Optional Metrics Event Candidate
+
+Only when adoption metrics are explicitly enabled or requested, and the review reaches a meaningful durable state through the selected gates or final merge gate, include a `Metrics event candidate` following `docs/metrics-event-contract.md`.
+
+Do not emit metrics for a bare router invocation. Route selection alone is not a durable task outcome.
+
 ## Exit criteria
 
 - Required, optional, and skipped gates are explicit.

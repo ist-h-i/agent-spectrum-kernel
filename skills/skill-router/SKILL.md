@@ -1,19 +1,19 @@
 ---
 name: skill-router
-description: Select the smallest relevant workflow for a coding-agent task. Use for non-trivial, ambiguous, multi-step, design, investigation, review, risk-gated, or handoff requests.
+description: Select the smallest relevant delivery or quality workflow for a coding-agent task after the operating mode has been classified.
 ---
 
 # Skill Router
 
 ## Goal
 
-Route the task to the smallest workflow that controls the risk. Do not run every skill.
+Route a delivery/quality task to the smallest workflow that controls the risk. Do not run every skill.
 
-This skill is the canonical runtime routing source. `AGENTS.md` only contains the minimal kernel-level routing gate, and documentation tables or workflow examples must mirror this skill instead of defining competing routes.
+This skill is the canonical delivery/quality router. `operating-mode-router` selects the top-level mode first when adoption, observability, or operation signals may be present. Documentation tables or workflow examples must mirror this skill for delivery/quality routes instead of defining competing routes.
 
 ## Use when
 
-- The task is non-trivial and the correct workflow is unclear.
+- The operating mode is `delivery_quality` and the correct workflow is unclear.
 - The task has multiple possible modes: design, implementation, review, investigation, risk, or handoff.
 - The user asks broadly and the agent must decide how to proceed without over-processing.
 
@@ -21,6 +21,7 @@ This skill is the canonical runtime routing source. `AGENTS.md` only contains th
 
 - The task is a trivial local edit.
 - The user explicitly names a relevant skill and no routing decision is needed.
+- The request is about first-time project rollout, skill effectiveness, adoption metrics, or weekly/monthly reporting. Use `operating-mode-router` first.
 
 ## Inputs
 
@@ -55,6 +56,10 @@ This skill is the canonical runtime routing source. `AGENTS.md` only contains th
 
 | Situation | Primary | Secondary |
 |---|---|---|
+| First-time project rollout or adoption pack request | `operating-mode-router` | Route to `adoption_bootstrap` -> `project-adoption-pack-generation` |
+| Skill effectiveness, routing quality, or one-task workflow retrospective | `operating-mode-router` | Route to `observability_metrics` -> `skill-effectiveness-evaluation` |
+| Adoption maturity, instruction quality, usage metrics, or multi-task adoption impact | `operating-mode-router` | Route to `observability_metrics` -> `skill-adoption-metrics` |
+| Weekly/monthly reporting, recurring summary, scheduler, or automation cadence | `operating-mode-router` | Route to `operation_automation`; use report templates or external operation, not a delivery skill |
 | Unfamiliar repo | `repository-orientation` | `scope-control` if target boundary is unclear; `planning-with-files` only if the task spans sessions/agents or durable state is needed |
 | Ambiguous design / “grill me” | `grill-design` | `grill-with-docs` if docs/domain/ADR terms matter; then `spec-driven-development` only after design boundary and acceptance criteria are stable |
 | Existing docs/domain/ADR constraints | `grill-with-docs` | `adr-review` |
@@ -113,6 +118,12 @@ Next action:
 - Any secondary workflow has a clear reason.
 - Trivial work is not over-processed.
 - Critical risk is routed to `risk-gate` before action.
+
+## Optional Metrics Event Candidate
+
+Only when adoption metrics are explicitly enabled or requested, and the routed delivery task reaches a meaningful durable state, include a `Metrics event candidate` following `docs/metrics-event-contract.md`.
+
+Do not emit metrics for a bare router invocation, a partial conversation, a trivial edit with no adoption measurement need, or hidden telemetry.
 
 ## Failure modes
 

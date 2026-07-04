@@ -140,13 +140,14 @@ If verification cannot be run, state:
 
 ## 8. Skill routing
 
-`skills/skill-router/SKILL.md` is the canonical runtime routing source for non-trivial workflows. `AGENTS.md` only decides whether to stay in the kernel, invoke `skill-router`, or honor an explicitly requested relevant skill.
+`skills/operating-mode-router/SKILL.md` is the top-level routing source when a request may be delivery, adoption, observability, or operation work. `skills/skill-router/SKILL.md` is the canonical delivery/quality router. `AGENTS.md` only decides whether to stay in the kernel, invoke the mode router, invoke the delivery router, or honor an explicitly requested relevant skill.
 
 | Situation | Route |
 |---|---|
 | Trivial localized edit | `AGENTS.md` only |
 | User explicitly names a relevant skill | Use that skill; use `skill-router` only if the requested route conflicts with observed risk |
-| Non-trivial, ambiguous, multi-step, design, investigation, review, risk-gated, or handoff work | `skill-router` |
+| Non-trivial request with possible delivery/adoption/observability/operation ambiguity | `operating-mode-router` |
+| Non-trivial delivery/quality, design, investigation, review, risk-gated, or handoff work | `skill-router` |
 | Project overlay contains framework/domain-specific skills | First use `skill-router` for generic workflow selection, then select relevant project overlay skill before action |
 
 Stack implementation overlays:

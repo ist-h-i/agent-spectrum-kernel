@@ -129,6 +129,12 @@ Residual risk:
 - ...
 ```
 
+## Optional Metrics Event Candidate
+
+Only when adoption metrics are explicitly enabled or requested, and the review decision is complete, include a `Metrics event candidate` following `docs/metrics-event-contract.md`.
+
+Summarize review outcome, validation status, required changes, improvement-ledger candidates, rule/check conversions if already completed, related IDs, evidence references, and privacy note. Do not duplicate detailed findings from the review or ledger.
+
 ## Exit criteria
 
 - Final decision is explicit.

@@ -129,6 +129,12 @@ Residual risk:
 - ...
 ```
 
+## Optional Metrics Event Candidate
+
+Only when adoption metrics are explicitly enabled or requested, and code-health review produces a durable result, include a `Metrics event candidate` following `docs/metrics-event-contract.md`.
+
+Use counts for debt detected, ledger candidates, converted rules/checks, and refactor candidates. Keep detailed findings in the review output or improvement ledger, not duplicated in the metrics event.
+
 ## Exit criteria
 
 - Each finding has category, evidence, impact, severity, urgency, recommended action, scope guidance, and AI-rule feedback.

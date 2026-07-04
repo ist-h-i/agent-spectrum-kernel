@@ -1,6 +1,6 @@
 # Prompt Recipes 日本語版
 
-この文書は、Skill名を深く知らなくても使える copy-paste 用の依頼文集です。各recipeは「やりたいこと」から選びます。Skillの正本は各 `SKILL.md` と `skills/skill-router/SKILL.md` です。
+この文書は、Skill名を深く知らなくても使える copy-paste 用の依頼文集です。各recipeは「やりたいこと」から選びます。上位routingの正本は `skills/operating-mode-router/SKILL.md`、delivery/quality内の正本は `skills/skill-router/SKILL.md`、各手順の正本は各 `SKILL.md` です。
 
 ## Small local edit
 
@@ -56,6 +56,177 @@
 
 - 仕様が曖昧なら実装前に止めます。
 - stack overlay は generic workflow 選択後、該当する場合だけ使います。
+
+## Operating mode routing
+
+### そのまま貼る依頼文
+
+```text
+この依頼が delivery/quality、adoption/bootstrap、observability/metrics、operation/automation のどれかを operating-mode-router で先に分類してください。
+通常の実装・レビューなら skill-router に渡し、導入・メトリクス・週次/月次運用なら該当する上位layerに送ってください。
+不要なworkflowは明示的にskipしてください。
+```
+
+### 使われる主なSkill
+
+- `operating-mode-router`
+- `skill-router` when delivery/quality
+
+### 期待する出力
+
+- Operating mode
+- Selected route
+- Skipped workflows
+- Risk overlay要否
+
+### 注意
+
+- 週次/月次運用はdelivery skillではなくoperation layerです。
+- adoptionやmetricsは明示依頼または明確な信号がある場合だけ使います。
+
+## Project adoption pack
+
+### そのまま貼る依頼文
+
+```text
+このrepoにAI coding kernel + skillsを導入するための project adoption pack を作ってください。
+operating-mode-router で adoption_bootstrap に分類し、project-adoption-pack-generation を使ってください。
+README、commands、CI、docs、ADR、local rules、risk、generated file boundaries を確認し、project overlay draft、implementation context draft、review context draft、improvement-ledger initialization guidance、最初の3つのworkflow recipe、missing human decisions を出してください。
+ファイル変更はまだ行わず、根拠がないpolicyは Unknown としてください。
+```
+
+### 使われる主なSkill
+
+- `operating-mode-router`
+- `project-adoption-pack-generation`
+- `repository-orientation` when needed
+
+### 期待する出力
+
+- Project adoption pack
+- Project overlay draft
+- Implementation / review context draft
+- Missing information
+
+### 注意
+
+- project-specificな生成物は対象project側に置きます。
+- branch/release/security/ownership policyを推測で埋めません。
+
+## Skill effectiveness evaluation
+
+### そのまま貼る依頼文
+
+```text
+この完了済みタスクで選んだSkillが有効だったかを評価してください。
+operating-mode-router で observability_metrics に分類し、skill-effectiveness-evaluation を使ってください。
+使ったSkill、skipしたSkill、成果物、検証結果、残リスクを根拠に、routing quality、output usefulness、evidence quality、risk reduction、overhead control、reuse valueを0-100で評価してください。
+一つの実例だけでSkillを書き換えず、必要なら prompt recipe、validation、project overlay、context、example、improvement-ledger への狭いfollow-upを提案してください。
+```
+
+### 使われる主なSkill
+
+- `operating-mode-router`
+- `skill-effectiveness-evaluation`
+- `evidence-ledger` when claims need evidence status
+
+### 期待する出力
+
+- Scores
+- What worked / excessive / missing
+- Defects or risks caught / missed
+- Recommended follow-up
+- Confidence
+
+### 注意
+
+- 1タスクの評価です。期間集計は `skill-adoption-metrics` です。
+- 人やチームの評価ではなくworkflow効果の評価です。
+
+## Adoption metrics measurement
+
+### そのまま貼る依頼文
+
+```text
+複数タスクの evidence から skill adoption metrics をまとめてください。
+operating-mode-router で observability_metrics に分類し、skill-adoption-metrics を使ってください。
+raw promptは保存せず、instruction quality、skill usage maturity、task outcomes、quality improvement、maturity movement、privacy/safety noteを集計してください。
+改善効果は、因果が証明できない場合は correlation / signal として表現してください。
+```
+
+### 使われる主なSkill
+
+- `operating-mode-router`
+- `skill-adoption-metrics`
+
+### 期待する出力
+
+- Instruction maturity
+- Skill usage maturity
+- Task outcomes
+- Maturity movement
+- Adoption effect
+- Privacy / safety note
+
+### 注意
+
+- HR/personnel evaluationに使いません。
+- project-specific metrics は対象projectの `docs/ai/skill-adoption-metrics.md` に保存します。
+
+## Opt-in metrics event candidate
+
+### そのまま貼る依頼文
+
+```text
+このタスクでは adoption metrics を明示的に有効にします。
+通常の作業は該当Skillで進め、意味のあるタスクイベントが完了またはdurable stateに達した場合だけ、docs/metrics-event-contract.md に沿って Metrics event candidate を出してください。
+raw prompt、secret、customer data、個人情報、機密情報は保存しないでください。
+```
+
+### 使われる主なSkill
+
+- normal delivery/review skills
+- `skill-adoption-metrics` later consumes event candidates
+
+### 期待する出力
+
+- Optional Metrics event candidate
+- Evidence references
+- Privacy note
+
+### 注意
+
+- hidden telemetryではありません。
+- bare router invocationやtrivial editでは出しません。
+
+## Weekly / monthly adoption report
+
+### そのまま貼る依頼文
+
+```text
+今週または今月の adoption report を作ってください。
+operating-mode-router で operation_automation と observability_metrics の境界を明示し、集計は skill-adoption-metrics、出力形は docs/ai/adoption-report-template.md を使ってください。
+スケジューラ設定や外部通知は実行しないでください。必要ならrisk-gateで承認要否を出してください。
+```
+
+### 使われる主なSkill
+
+- `operating-mode-router`
+- `skill-adoption-metrics`
+- `docs/ai/adoption-report-template.md`
+- `risk-gate` if external scheduling or notifications are requested
+
+### 期待する出力
+
+- Weekly or monthly report
+- Evidence sources
+- Adoption effect with unsupported causality avoided
+- Next intervention
+
+### 注意
+
+- weekly/monthly reportは別Skillではなくoperation layerのreporting modeです。
+- project-specific generated reportsは導入先projectに置きます。
 
 ## Bug fix with unknown cause
 

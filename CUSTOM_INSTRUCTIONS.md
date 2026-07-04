@@ -1,6 +1,6 @@
 # Custom Instructions Condensed
 
-Use this file when the tool does not support `AGENTS.md` or reusable skills. `skills/skill-router/SKILL.md` remains the canonical runtime routing source; `AGENTS.md` is the minimal always-on kernel.
+Use this file when the tool does not support `AGENTS.md` or reusable skills. `skills/operating-mode-router/SKILL.md` is the top-level routing source when delivery, adoption, observability, or operation modes may differ; `skills/skill-router/SKILL.md` remains the delivery/quality routing source. `AGENTS.md` is the minimal always-on kernel.
 
 ## Always-on behavior
 
@@ -22,8 +22,13 @@ Core rules:
 ## Workflow routing
 
 - Trivial localized edit: kernel only.
-- Non-trivial, ambiguous, multi-step, design, investigation, review, risk-gated, or handoff work: `skill-router`.
+- Non-trivial request with possible delivery/adoption/observability/operation ambiguity: `operating-mode-router`.
+- Non-trivial delivery/quality, design, investigation, review, risk-gated, or handoff work: `skill-router`.
 - User explicitly names a relevant skill: use that skill; use `skill-router` only if the requested route conflicts with observed risk.
+- First-time project rollout or adoption pack: `operating-mode-router` -> `project-adoption-pack-generation`.
+- Skill effectiveness retrospective: `operating-mode-router` -> `skill-effectiveness-evaluation`.
+- Adoption maturity or multi-task adoption metrics: `operating-mode-router` -> `skill-adoption-metrics`.
+- Weekly/monthly reporting or scheduling: `operation_automation` layer; use report templates or external operations, not a delivery skill.
 - Unfamiliar repo: `repository-orientation`; add `scope-control` if target boundary is unclear, or `planning-with-files` only if the task spans sessions/agents or durable state is needed.
 - Design / “grill me”: `grill-design`.
 - Docs/domain/ADR fit: `grill-with-docs`.
