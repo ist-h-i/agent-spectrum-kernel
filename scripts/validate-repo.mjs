@@ -15,9 +15,6 @@ const REQUIRED_SKILL_SIGNALS = [
 
 const STALE_PHRASES = [
   { phrase: "15 focused workflows", mode: "contains" },
-  { phrase: "21 skills", mode: "contains" },
-  { phrase: "22 skills", mode: "contains" },
-  { phrase: "25 skills", mode: "contains" },
   { phrase: "code-review-quality", mode: "contains" },
   { phrase: "pending specialized review", mode: "contains" },
   { phrase: "review-output-quality when available", mode: "contains" },
@@ -27,6 +24,7 @@ const STALE_PHRASES = [
   { phrase: "angular-enterprise", mode: "contains" },
 ];
 
+const SKILL_COUNT_REFERENCE_PATTERN = /\b(\d+)\s+skills\b/gi;
 const MAINTAINED_SCAN_ROOTS = ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "README.md", "README.ja.md", "docs", "examples", "skills"];
 const ALLOWED_ROUTE_PHRASE_CONTEXTS = [
   "spec-driven-development -> test-first-verification for Verification Contract -> controlled-implementation -> test-first-verification for evidence",
@@ -38,6 +36,9 @@ const CONTEXT_METADATA_FILES = [
 ];
 const REQUIRED_CONTEXT_METADATA_FIELDS = ["context_status", "last_updated", "evidence_owner", "source_scope"];
 const ALLOWED_CONTEXT_STATUSES = new Set(["template", "initialized", "stale"]);
+const LEDGER_METADATA_FILE = "docs/ai/improvement-ledger.md";
+const REQUIRED_LEDGER_METADATA_FIELDS = ["ledger_status", "last_updated", "evidence_owner", "source_scope"];
+const ALLOWED_LEDGER_STATUSES = new Set(["template", "active", "archived"]);
 
 function parseArgs(argv) {
   const args = {
@@ -254,6 +255,33 @@ function validateContextMetadata(root, errors) {
   return checks;
 }
 
+function validateLedgerMetadata(root, errors) {
+  const absolutePath = resolve(root, LEDGER_METADATA_FILE);
+  if (!existsSync(absolutePath)) {
+    return [];
+  }
+
+  const frontmatter = parseFrontmatter(readFileSync(absolutePath, "utf8"));
+  const missing = REQUIRED_LEDGER_METADATA_FIELDS.filter((field) => !frontmatter.has(field));
+  const status = frontmatter.get("ledger_status") ?? "missing";
+  const statusOk = ALLOWED_LEDGER_STATUSES.has(status);
+
+  if (missing.length > 0) {
+    fail(errors, "ledger metadata", `${LEDGER_METADATA_FILE} is missing ledger metadata fields: ${missing.join(", ")}`);
+  }
+  if (!statusOk) {
+    fail(errors, "ledger metadata", `${LEDGER_METADATA_FILE} has invalid ledger_status '${status}'`);
+  }
+
+  return [
+    {
+      path: LEDGER_METADATA_FILE,
+      status,
+      metadataOk: missing.length === 0 && statusOk,
+    },
+  ];
+}
+
 function collectMarkdownFiles(root) {
   const files = [];
 
@@ -281,7 +309,7 @@ function collectMarkdownFiles(root) {
   return files;
 }
 
-function findStalePhrases(root, errors) {
+function findStalePhrases(root, currentSkillCount, errors) {
   const findings = [];
 
   for (const path of collectMarkdownFiles(root)) {
@@ -292,6 +320,30 @@ function findStalePhrases(root, errors) {
         findings.push({ path, phrase: stale.phrase });
         fail(errors, "stale phrases", `${path} contains stale phrase: ${stale.phrase}`);
       }
+    }
+
+    if (Number.isInteger(currentSkillCount)) {
+      for (const finding of findStaleSkillCountReferences(path, text, currentSkillCount)) {
+        findings.push(finding);
+        fail(
+          errors,
+          "stale phrases",
+          `${path} contains stale skill-count reference: ${finding.phrase} (current: ${currentSkillCount} skills)`,
+        );
+      }
+    }
+  }
+
+  return findings;
+}
+
+function findStaleSkillCountReferences(path, text, currentSkillCount) {
+  const findings = [];
+
+  for (const match of text.matchAll(SKILL_COUNT_REFERENCE_PATTERN)) {
+    const count = Number(match[1]);
+    if (count !== currentSkillCount) {
+      findings.push({ path, phrase: match[0], currentSkillCount });
     }
   }
 
@@ -332,7 +384,7 @@ function buildPathChecks(root, manifest) {
   }));
 }
 
-function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, ledgerMetadataChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -363,6 +415,11 @@ function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataC
     "",
     ...contextMetadataChecks.map((check) => `- \`${check.path}\`: context_status=${check.status}, metadata=${check.metadataOk ? "ok" : "invalid"}`),
     "",
+    "## Ledger template status checks",
+    "",
+    "- `ledger_status=template` marks the checked-in file as a generic empty template, not project-specific evidence.",
+    ...ledgerMetadataChecks.map((check) => `- \`${check.path}\`: ledger_status=${check.status}, metadata=${check.metadataOk ? "ok" : "invalid"}`),
+    "",
     "## Document path checks",
     "",
     ...pathChecks.map((check) => `- \`${check.path}\`: ${check.ok ? "ok" : "missing"}`),
@@ -373,7 +430,7 @@ function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataC
     "",
     "## Auxiliary documentation audit",
     "",
-    "- No stale pre-27 skill-count references found.",
+    "- No stale skill-count references found.",
     "- No deleted legacy code-review adapter references found.",
     "- Review route references use the current layer-aware route through `review-router`, layer applicability, required gates, and `review-final-merge-gate`.",
     "- Implementation route references use Verification Contract, Implementation Contract, `controlled-implementation`, and evidence-oriented verification wording.",
@@ -435,9 +492,11 @@ export function validateRepository(options) {
   validateManifestPaths(root, manifest, errors);
   const skillChecks = validateSkills(root, skillDirectories, errors);
   const contextMetadataChecks = validateContextMetadata(root, errors);
-  const staleFindings = findStalePhrases(root, errors);
+  const ledgerMetadataChecks = validateLedgerMetadata(root, errors);
+  const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
+  const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, ledgerMetadataChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 
