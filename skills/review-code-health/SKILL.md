@@ -24,7 +24,7 @@ This skill focuses on debt discovery and classification. It does not replace ord
 - The primary issue is a hard-to-reverse dependency, public API, persistence, or ownership boundary. Use `review-architecture-impact` or `application-boundary-architecture`.
 - The primary issue is misuse, blast radius, security/privacy abuse path, or prompt/generated-output adversarial risk. Use `review-adversarial-risk`.
 - The task is to implement an approved refactor. Use `refactor-implementation` when available, or `controlled-implementation` with a behavior-preservation verification contract.
-- The task is to store, prioritize, or update an improvement ledger. Use `improvement-ledger` when available.
+- The task is to store, prioritize, or update an improvement ledger. Use `docs/ai/improvement-ledger.md` or an improvement-ledger process when available.
 - There is no concrete code, diff, repository pattern, review comment, or CI evidence to inspect.
 
 ## Process
