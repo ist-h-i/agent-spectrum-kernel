@@ -69,6 +69,7 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | スコープ逸脱が怖い | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → required gates） |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
 | PRレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
+| 負債・スメル・リファクタ候補レビュー | `review-router` → `review-code-health` when applicable |
 | 繰り返しレビュー文脈の固定 | `review-context-generation`（既定: `docs/ai/review-context.md`） |
 | MR/PR README・PR説明・変更文脈固定 | `mr-readme-generation` |
 | 破壊的操作・deploy・migration・secret絡み | `risk-gate` before the selected workflow proceeds to action |
