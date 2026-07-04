@@ -23,7 +23,7 @@ This skill starts after detection. It classifies, prioritizes, records, and refr
 
 - The finding is a current PR blocker that must be fixed before merge. Keep it in the review gate's required fixes.
 - The task is to detect debt, smells, or refactor candidates. Use `review-code-health`.
-- The task is to implement an approved refactor. Use `controlled-implementation` with a behavior-preservation Verification Contract, or a project-specific refactor workflow when available.
+- The task is to implement an approved refactor. Use `refactor-implementation`.
 - The task is to change final review output semantics. Use the dedicated final review output integration workflow when applicable.
 - The item is a vague opinion without source, evidence, impact, and decision.
 - The user only wants a one-off review summary with no durable follow-up.

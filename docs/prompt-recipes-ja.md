@@ -251,6 +251,40 @@ test-first-verification を使って、実装前に Verification Contract を出
 
 - 実行していない検証を実行済みとして報告しません。
 
+## Safe refactor implementation
+
+### そのまま貼る依頼文
+
+```text
+refactor-implementation を使って、承認済みのリファクタ候補だけを安全に実装してください。
+まず Refactor objective、Behavior preservation contract、Allowed scope、Forbidden scope、Boundary decision、Verification contract を出してください。
+public API、UI、schema、snapshot、runtime behavior、errors、logs、data shape は明示承認なしに変えないでください。
+境界移動や責務移動が必要なら application-boundary-architecture を先に使って止めてください。
+実装後は before / after、実行した検証、未検証事項、improvement-ledger へのfollow-up有無を報告してください。
+```
+
+### 使われる主なSkill
+
+- `refactor-implementation`
+- `test-first-verification`
+- `application-boundary-architecture` when boundary movement may be needed
+- `improvement-ledger` when follow-up debt or prevention candidates remain
+
+### 期待する出力
+
+- Refactor objective
+- Behavior preservation contract
+- Allowed / forbidden scope
+- Boundary decision
+- Regression proof
+- Before / after
+
+### 注意
+
+- リファクタ候補の検出は `review-code-health` の責務です。
+- backlog保存やrule/check候補化は `improvement-ledger` の責務です。
+- リファクタ名目で挙動変更しません。
+
 ## Stack overlay use when available
 
 ### そのまま貼る依頼文

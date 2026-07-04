@@ -23,7 +23,7 @@ This skill focuses on debt discovery and classification. It does not replace ord
 - The only question is whether the PR is correct. Use `review-ai-quality` after `review-router`.
 - The primary issue is a hard-to-reverse dependency, public API, persistence, or ownership boundary. Use `review-architecture-impact` or `application-boundary-architecture`.
 - The primary issue is misuse, blast radius, security/privacy abuse path, or prompt/generated-output adversarial risk. Use `review-adversarial-risk`.
-- The task is to implement an approved refactor. Use `refactor-implementation` when available, or `controlled-implementation` with a behavior-preservation verification contract.
+- The task is to implement an approved refactor. Use `refactor-implementation`.
 - The task is to store, prioritize, or update improvement items after findings already exist. Use `improvement-ledger`.
 - There is no concrete code, diff, repository pattern, review comment, or CI evidence to inspect.
 

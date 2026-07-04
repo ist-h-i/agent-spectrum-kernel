@@ -88,6 +88,7 @@ skills/
   improvement-ledger/SKILL.md
   implementation-context-generation/SKILL.md
   mr-readme-generation/SKILL.md
+  refactor-implementation/SKILL.md
 ```
 
 ## Minimum setup
@@ -123,6 +124,7 @@ First-time users should start with `docs/quickstart-ja.md`.
 | 実装前に未解決のアプリケーション境界・依存方向・DTO/Error/async lifetime判断 | `application-boundary-architecture` → 通常の実装ルートへ戻る |
 | 新機能・挙動変更 | `spec-driven-development` → `test-first-verification` for Verification Contract → `controlled-implementation` → `test-first-verification` for evidence |
 | バグ・原因不明 | `doubt-driven-development` → `test-first-verification` for reproduction and Verification Contract → `controlled-implementation` → `test-first-verification` for regression proof |
+| 承認済みリファクタ実装 | `refactor-implementation` → `test-first-verification` for regression proof |
 | スコープが広がりそう | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → required gates） |
 | 危険操作・外部影響 | `risk-gate` before the selected workflow proceeds to action |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
