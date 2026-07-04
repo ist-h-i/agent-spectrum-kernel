@@ -4,6 +4,21 @@
 
 Changes:
 
+- None.
+
+## v3.0.0
+
+Purpose: reflect the layered routing, adoption, observability, reporting, and release-readiness architecture now represented in the package.
+
+Changes:
+
+- Bumped `manifest.json` from `2.3.0` to `3.0.0`.
+- Added `operating-mode-router` and `docs/routing-model.md` so the system first separates delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation.
+- Added `project-adoption-pack-generation` for first-time repository or team rollout.
+- Added `skill-effectiveness-evaluation` for one-task workflow retrospective evaluation.
+- Added `skill-adoption-metrics`, `docs/metrics-event-contract.md`, `docs/ai/skill-adoption-metrics.md`, and adoption report templates for opt-in adoption measurement.
+- Added skill group metadata to `manifest.json` and validation coverage for unclassified, unknown, duplicate, invalid, and unsupported multi-group skill entries.
+- Added `release-readiness-gate` for release package readiness checks across scope, validation, migration/data, rollback, rollout controls, monitoring, post-release verification, customer impact, communication, approvals, and residual risks.
 - Added `angular-implementation-architecture` as the first concrete stack implementation overlay for Angular-specific implementation constraints and verification supplements.
 - Added `review-architecture-impact` as the dedicated structural and boundary review gate.
 - Routed review architecture impact through the new gate while keeping detailed boundary mechanics in `application-boundary-architecture` and durable architecture records in `adr-review`.

@@ -37,7 +37,7 @@ This skill prevents ordinary delivery work from being polluted by adoption, metr
 
 | Mode | Use when | Delegate to |
 |---|---|---|
-| `delivery_quality` | Implement, review, verify, refactor, investigate, document, decide, or hand off a concrete development task | `skill-router`; `review-router` when review |
+| `delivery_quality` | Implement, review, verify, refactor, investigate, document, decide, release-readiness check, or hand off a concrete development task | `skill-router`; `review-router` when review |
 | `adoption_bootstrap` | Introduce the skill set into a new repository, project, team, or client context | `project-adoption-pack-generation`; `repository-orientation`; `implementation-context-generation`; `review-context-generation` |
 | `observability_metrics` | Evaluate skill effectiveness, routing quality, instruction maturity, adoption impact, or skill usage over time | `skill-effectiveness-evaluation`; `skill-adoption-metrics` |
 | `operation_automation` | Run or plan a periodic cadence such as weekly/monthly summaries, scheduler setup, or team routine | External operation layer; manual routine; ChatGPT automation; GitHub Actions; cron |
@@ -47,6 +47,7 @@ This skill prevents ordinary delivery work from being polluted by adoption, metr
    - Multiple tasks or a period-over-period adoption question: route to `skill-adoption-metrics`.
    - First-time repository rollout: route to `project-adoption-pack-generation`.
    - Weekly/monthly cadence: classify as `operation_automation`, then use report templates or external scheduling outside the skill set.
+   - Release candidate readiness: classify as `delivery_quality`, then route through `skill-router` to `release-readiness-gate`; release execution still requires `risk-gate`.
    - Ordinary coding/review/investigation/refactor work: route to `skill-router`.
 
 3. Apply risk overlay before action.

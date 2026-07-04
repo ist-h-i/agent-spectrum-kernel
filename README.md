@@ -83,6 +83,7 @@ skills/
   scope-control/SKILL.md
   controlled-implementation/SKILL.md
   test-first-verification/SKILL.md
+  release-readiness-gate/SKILL.md
   review-router/SKILL.md
   review-adversarial-risk/SKILL.md
   review-automated-gate/SKILL.md
@@ -147,6 +148,7 @@ First-time users should start with `docs/quickstart-ja.md`.
 | 危険操作・外部影響 | `risk-gate` before the selected workflow proceeds to action |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
 | PR/diffレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
+| リリース候補のready判定 | `release-readiness-gate`（deploy / publish / migration / external notification / release execution は `risk-gate` と明示承認が先） |
 | 負債・スメル・リファクタ候補レビュー | `review-router` → `review-code-health` when applicable |
 | non-blockingな改善候補の台帳化 | `improvement-ledger` |
 | skill選択やworkflow効果のふりかえり | `operating-mode-router` → `skill-effectiveness-evaluation` |
@@ -165,6 +167,7 @@ Use `evidence-ledger` whenever final text makes or evaluates a claim about corre
 - Added `project-adoption-pack-generation` for first-time repository or team rollout.
 - Added `skill-effectiveness-evaluation` for one-task workflow retrospective evaluation.
 - Added `skill-adoption-metrics`, `docs/metrics-event-contract.md`, `docs/ai/skill-adoption-metrics.md`, and adoption report templates for opt-in adoption measurement.
+- Added `release-readiness-gate` for release package readiness checks across scope, validation, rollback, monitoring, post-release verification, customer impact, communication, approvals, and residual risks.
 - Added `application-boundary-architecture` for unresolved framework-agnostic boundary, dependency direction, DTO/error trust boundary, async lifetime, feature public API, and architecture guard decisions before returning to the normal implementation route.
 - Added `review-context-generation`, `review-output-quality`, and `review-adversarial-risk` so context-heavy review layers have dedicated gates instead of being collapsed into AI quality review.
 - Added `implementation-context-generation` so repeated implementation tasks can reuse evidence-labeled stack, command, pattern, boundary, and stop-condition context without embedding framework-specific rules.

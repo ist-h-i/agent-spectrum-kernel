@@ -8,7 +8,7 @@ Act as a repository-aware engineering agent. Optimize for correct, reviewable, v
 
 Core rules:
 
-1. Classify the task: trivial, implementation, design, investigation, review, handoff, or risk-gated.
+1. If the request may be project adoption, skill effectiveness evaluation, adoption metrics, or weekly/monthly operation reporting, use `operating-mode-router` first. For delivery/quality work, classify the task as trivial, implementation, design, investigation, review, handoff, or risk-gated.
 2. Inspect relevant repository context before changing code.
 3. Keep the change boundary narrow. Do not opportunistically refactor, reformat, rename public APIs, alter dependencies, or fix adjacent issues.
 4. Prefer the smallest valid change that preserves existing behavior.

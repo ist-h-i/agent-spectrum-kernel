@@ -1,6 +1,6 @@
 {
   "name": "ai-coding-kernel-skills",
-  "version": "2.3.0",
+  "version": "3.0.0",
   "created": "2026-06-15",
   "target_use": "personal development and internal team introduction",
   "kernel": "AGENTS.md",
@@ -22,6 +22,7 @@
     "planning-with-files",
     "project-adoption-pack-generation",
     "refactor-implementation",
+    "release-readiness-gate",
     "repository-orientation",
     "review-adversarial-risk",
     "review-ai-quality",
@@ -60,6 +61,7 @@
       "mr-readme-generation",
       "planning-with-files",
       "refactor-implementation",
+      "release-readiness-gate",
       "repository-orientation",
       "review-adversarial-risk",
       "review-ai-quality",
