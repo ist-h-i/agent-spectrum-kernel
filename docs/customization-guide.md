@@ -6,6 +6,24 @@ Add a rule to `AGENTS.md` only if it should apply to a one-line typo fix.
 
 Otherwise, put it in a skill or a project-specific file.
 
+Use `docs/ai/improvement-ledger.md` to record evidence before converting repeated findings into durable rules or checks. A prevention proposal should name the finding, repeat pattern, prevention target, proposed rule or check, evidence, scope, and decision.
+
+Default placement:
+
+| Prevention target | Use when |
+|---|---|
+| `AGENTS.md` | The rule is generic, always-on, and should apply even to one-line typo fixes. |
+| `CUSTOM_INSTRUCTIONS.md` | The condensed fallback instructions must mirror an accepted always-on rule. |
+| Project overlay | The rule is repository-specific, team-specific, domain-specific, or lower frequency. |
+| `SKILL.md` | The rule changes a reusable workflow, gate, review, implementation, or handoff procedure. |
+| Review checklist | The finding is review-only and should guide human or AI review without changing implementation behavior. |
+| Validation script | The pattern is mechanically detectable inside this repository. |
+| Lint/test/check | The prevention belongs in executable tooling, regression tests, or CI. |
+| Implementation context | The guidance is evidence-backed local implementation knowledge, not a permanent rule. |
+| Review context | The guidance is evidence-backed local review knowledge, accepted risk, or noise-control context. |
+
+Do not convert hypotheses into durable rules. Use `needs_more_evidence` until the repeated or high-impact pattern and target are clear.
+
 ## Recommended layering
 
 ```text

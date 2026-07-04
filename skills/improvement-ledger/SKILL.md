@@ -17,6 +17,7 @@ This skill starts after detection. It classifies, prioritizes, records, and refr
 - A review produces improvement items that should become separate PRs, backlog entries, validation checks, project overlay updates, review checklist items, or accepted risks.
 - The user asks to update, triage, refresh, or close entries in `docs/ai/improvement-ledger.md`.
 - A finding should be classified as current PR blocker, separate PR, backlog, rule feedback, validation check, or accepted risk.
+- Repeated or high-leverage findings should be converted into prevention rule or executable check proposals.
 - Stale ledger entries need owner, evidence, urgency, status, or close-condition review.
 
 ## Do not use when
@@ -25,6 +26,7 @@ This skill starts after detection. It classifies, prioritizes, records, and refr
 - The task is to detect debt, smells, or refactor candidates. Use `review-code-health`.
 - The task is to implement an approved refactor. Use `refactor-implementation`.
 - The task is to change final review output semantics. Use the dedicated final review output integration workflow when applicable.
+- The task is to directly edit durable rules, project overlays, Skills, validation scripts, lint, tests, CI, implementation context, or review context without an evidence-backed ledger decision and review.
 - The item is a vague opinion without source, evidence, impact, and decision.
 - The user only wants a one-off review summary with no durable follow-up.
 
@@ -54,23 +56,35 @@ This skill starts after detection. It classifies, prioritizes, records, and refr
 5. Classify each entry.
    - Category: `vulnerability`, `technical_debt`, `refactor_candidate`, `code_smell`, `maintainability`, `testability`, `performance`, `dependency`, `duplication`, `boundary`, `repeated_finding`, or `rule_gap`.
    - Decision: `fix_now`, `separate_pr`, `backlog`, `convert_to_rule`, `convert_to_check`, `accept`, or `wont_fix`.
-   - Prevention target: `AGENTS.md`, project overlay, `SKILL.md`, review checklist, validation script, lint/test/check, refactor task, or no prevention needed.
+   - Prevention target: `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, project overlay, `SKILL.md`, review checklist, validation script, lint/test/check, implementation context, review context, refactor task, or no prevention needed.
    - Status: `open`, `triaged`, `accepted`, `planned`, `in_progress`, `resolved`, `converted_to_rule`, `converted_to_check`, `wont_fix`, or `stale`.
 
-6. Place entries in the right table.
+6. Evaluate prevention-rule feedback when applicable.
+   - Repeat pattern: `one-off`, `repeated`, `likely_repeated`, or `high_impact_single_case`.
+   - Scope: `generic`, `project_specific`, `stack_specific`, `review_only`, or `validation_only`.
+   - Prevention decision: `convert`, `defer`, `reject`, or `needs_more_evidence`.
+   - Require evidence before proposing durable rules or checks. `Hypothesis` or `Unknown` evidence cannot be converted without more investigation.
+   - Prefer validation scripts, lint, tests, or CI checks for mechanically detectable patterns.
+   - Prefer project overlays or review/implementation context for project-specific or local operating knowledge.
+   - Prefer Skill or review checklist updates for reusable workflow behavior.
+   - Use `AGENTS.md` only for always-on rules that should apply even to one-line typo fixes. Use `CUSTOM_INSTRUCTIONS.md` only when the condensed fallback instructions must mirror an always-on rule.
+   - Do not edit the selected prevention target from this skill unless the user explicitly asks for that follow-up change.
+
+7. Place entries in the right table.
    - Open, triaged, accepted, planned, and in-progress work belongs in Open Improvement Items.
    - `converted_to_rule` belongs in Converted-to-Rule Items.
    - `converted_to_check` belongs in Converted-to-Check Items.
    - `resolved` belongs in Resolved Items.
    - `accept` / `wont_fix` decisions belong in Accepted / Wont-Fix Items.
 
-7. Define refresh and close rules.
+8. Define refresh and close rules.
    - Every active entry needs a refresh date or review trigger.
    - Every entry needs an observable close condition.
    - Move entries to `stale` when evidence, owner, urgency, prevention target, or status no longer matches current reality.
+   - Conversion entries need a close condition that names the accepted rule, overlay, Skill, checklist, context, validation script, lint, test, or CI change.
 
-8. Route follow-up without mixing responsibilities.
-   - Rule/check conversion details can be handled later by prevention-rule feedback.
+9. Route follow-up without mixing responsibilities.
+   - Rule/check implementation details can be handled later by the selected prevention target follow-up.
    - Refactor implementation belongs to refactor implementation workflow.
    - Final review output integration belongs to the final merge gate workflow.
 
@@ -118,7 +132,33 @@ Recommended action:
 - Concrete next action
 
 Prevention target:
-- AGENTS.md | project overlay | SKILL.md | review checklist | validation script | lint/test/check | refactor task | no prevention needed
+- AGENTS.md | CUSTOM_INSTRUCTIONS.md | project overlay | SKILL.md | review checklist | validation script | lint/test/check | implementation context | review context | refactor task | no prevention needed
+
+Prevention-rule feedback:
+
+Finding:
+- What should be prevented
+
+Repeat pattern:
+- one-off | repeated | likely_repeated | high_impact_single_case
+
+Prevention target:
+- AGENTS.md | CUSTOM_INSTRUCTIONS.md | project overlay | SKILL.md | review checklist | validation script | lint/test/check | implementation context | review context
+
+Proposed rule or check:
+- Concrete rule, checklist item, context note, validation, lint, test, or CI check
+
+Why this target:
+- Why this belongs there instead of the always-on kernel or another layer
+
+Evidence:
+- Source evidence and evidence status
+
+Scope:
+- generic | project_specific | stack_specific | review_only | validation_only
+
+Decision:
+- convert | defer | reject | needs_more_evidence
 
 Owner / status:
 - owner if known
@@ -137,6 +177,9 @@ Not recorded:
 - Current PR blockers are not hidden in the ledger.
 - Non-blocking findings have a durable status, owner, refresh rule, and close condition.
 - Rule/check/refactor follow-up is routed without implementing it inside this skill.
+- Repeated or high-leverage findings can produce evidence-backed prevention rule or check proposals.
+- Converted entries use `converted_to_rule` or `converted_to_check` consistently with their prevention target.
+- Project-specific or low-frequency observations are not dumped into `AGENTS.md`.
 - Vague findings without evidence are rejected or marked insufficient evidence.
 
 ## Failure modes
@@ -147,4 +190,6 @@ Not recorded:
 | Hiding blockers in backlog | Keep merge blockers in current PR required fixes. |
 | Creating vague debt notes | Require source, evidence, impact, decision, status, and close condition. |
 | Forcing ledger entries for every review | Use only when non-blocking follow-up needs durable tracking. |
+| Dumping every prevention idea into `AGENTS.md` | Route by scope, frequency, detectability, and audience; prefer project overlays, Skills, context, or executable checks when narrower. |
+| Converting hypotheses into durable rules | Mark `needs_more_evidence` until the repeated or high-impact pattern is supported. |
 | Mixing prevention or refactor work into ledger triage | Route conversion or implementation to the relevant later workflow. |
