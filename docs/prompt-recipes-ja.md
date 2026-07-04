@@ -310,6 +310,7 @@ Angular固有の制約は controlled-implementation に、検証補足は test-f
 review-router を使ってこのdiffをレビューしてください。
 review-router -> layer applicability -> required gates -> review-final-merge-gate の順に進めてください。
 各層を required / skipped / insufficient evidence で分け、最後に approve / approve with comments / request changes / block / insufficient evidence を判断してください。
+review-code-health が applicable な場合は、current PR blocker と non-blocking な improvement ledger candidate / rule feedback / deferred or accepted code-health risk を分け、final review output に必要時だけ optional section として残してください。
 ```
 
 ### 使われる主なSkill
@@ -323,11 +324,14 @@ review-router -> layer applicability -> required gates -> review-final-merge-gat
 
 - Layer applicability
 - Required fixes
+- Improvement ledger candidates / Rule feedback / Deferred or accepted code-health risks when applicable
 - Decision
 
 ### 注意
 
 - Mechanical pass だけで merge 可とは判断しません。
+- Required fixes と backlog / rule feedback / accepted risk を混ぜません。
+- final gate は `docs/ai/improvement-ledger.md` を直接更新せず、必要な場合に `improvement-ledger` へ渡せる候補を明示します。
 
 ## Code health review
 
