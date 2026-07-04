@@ -178,6 +178,17 @@ Use when:
 Do not confuse with:
 - `docs/ai/review-context.md` や `docs/ai/implementation-context.md`。これらはdurableな判断材料で、タスク進捗ではありません。
 
+## Improvement ledger
+
+Meaning:
+- reviewで見つかった技術負債、リファクタ候補、rule gap、validation check候補、accepted riskを、source、evidence、impact、decision、status付きで残す改善台帳です。既定テンプレートは `docs/ai/improvement-ledger.md` です。
+
+Use when:
+- 指摘をreviewコメントで流さず、backlog、rule/check化、resolved、wont_fix、stale reviewへ接続したい場合。
+
+Do not confuse with:
+- `docs/ai/review-context.md` や `docs/ai/implementation-context.md`。これらは判断材料で、改善itemの状態管理ではありません。
+
 ## Implementation Contract
 
 Meaning:
