@@ -15,9 +15,6 @@ const REQUIRED_SKILL_SIGNALS = [
 
 const STALE_PHRASES = [
   { phrase: "15 focused workflows", mode: "contains" },
-  { phrase: "21 skills", mode: "contains" },
-  { phrase: "22 skills", mode: "contains" },
-  { phrase: "25 skills", mode: "contains" },
   { phrase: "code-review-quality", mode: "contains" },
   { phrase: "pending specialized review", mode: "contains" },
   { phrase: "review-output-quality when available", mode: "contains" },
@@ -27,6 +24,7 @@ const STALE_PHRASES = [
   { phrase: "angular-enterprise", mode: "contains" },
 ];
 
+const SKILL_COUNT_REFERENCE_PATTERN = /\b(\d+)\s+skills\b/gi;
 const MAINTAINED_SCAN_ROOTS = ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "README.md", "README.ja.md", "docs", "examples", "skills"];
 const ALLOWED_ROUTE_PHRASE_CONTEXTS = [
   "spec-driven-development -> test-first-verification for Verification Contract -> controlled-implementation -> test-first-verification for evidence",
@@ -281,7 +279,7 @@ function collectMarkdownFiles(root) {
   return files;
 }
 
-function findStalePhrases(root, errors) {
+function findStalePhrases(root, currentSkillCount, errors) {
   const findings = [];
 
   for (const path of collectMarkdownFiles(root)) {
@@ -292,6 +290,30 @@ function findStalePhrases(root, errors) {
         findings.push({ path, phrase: stale.phrase });
         fail(errors, "stale phrases", `${path} contains stale phrase: ${stale.phrase}`);
       }
+    }
+
+    if (Number.isInteger(currentSkillCount)) {
+      for (const finding of findStaleSkillCountReferences(path, text, currentSkillCount)) {
+        findings.push(finding);
+        fail(
+          errors,
+          "stale phrases",
+          `${path} contains stale skill-count reference: ${finding.phrase} (current: ${currentSkillCount} skills)`,
+        );
+      }
+    }
+  }
+
+  return findings;
+}
+
+function findStaleSkillCountReferences(path, text, currentSkillCount) {
+  const findings = [];
+
+  for (const match of text.matchAll(SKILL_COUNT_REFERENCE_PATTERN)) {
+    const count = Number(match[1]);
+    if (count !== currentSkillCount) {
+      findings.push({ path, phrase: match[0], currentSkillCount });
     }
   }
 
@@ -373,7 +395,7 @@ function buildReport({ manifest, skillDirectories, skillChecks, contextMetadataC
     "",
     "## Auxiliary documentation audit",
     "",
-    "- No stale pre-27 skill-count references found.",
+    "- No stale skill-count references found.",
     "- No deleted legacy code-review adapter references found.",
     "- Review route references use the current layer-aware route through `review-router`, layer applicability, required gates, and `review-final-merge-gate`.",
     "- Implementation route references use Verification Contract, Implementation Contract, `controlled-implementation`, and evidence-oriented verification wording.",
@@ -435,7 +457,8 @@ export function validateRepository(options) {
   validateManifestPaths(root, manifest, errors);
   const skillChecks = validateSkills(root, skillDirectories, errors);
   const contextMetadataChecks = validateContextMetadata(root, errors);
-  const staleFindings = findStalePhrases(root, errors);
+  const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
+  const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
   const report = buildReport({ manifest, skillDirectories, skillChecks, contextMetadataChecks, pathChecks, staleFindings });
 

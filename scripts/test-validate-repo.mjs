@@ -37,8 +37,19 @@ Run the validation script.
 A validation result.
 `;
 
-function writeFixture(root) {
-  mkdirSync(resolve(root, "skills/alpha"), { recursive: true });
+function skillFixture(name) {
+  const title = `${name.slice(0, 1).toUpperCase()}${name.slice(1)}`;
+  return validSkill
+    .replace("name: alpha", `name: ${name}`)
+    .replace("description: Alpha skill fixture.", `description: ${title} skill fixture.`)
+    .replace("# Alpha", `# ${title}`);
+}
+
+function writeFixture(root, skills = ["alpha"]) {
+  for (const skill of skills) {
+    mkdirSync(resolve(root, `skills/${skill}`), { recursive: true });
+  }
+
   mkdirSync(resolve(root, "docs"), { recursive: true });
   mkdirSync(resolve(root, "examples"), { recursive: true });
 
@@ -46,14 +57,16 @@ function writeFixture(root) {
   writeFileSync(resolve(root, "CUSTOM_INSTRUCTIONS.md"), "# Custom instructions\n");
   writeFileSync(resolve(root, "docs/ok.md"), "# OK\n");
   writeFileSync(resolve(root, "examples/ok.md"), "# OK\n");
-  writeFileSync(resolve(root, "skills/alpha/SKILL.md"), validSkill);
+  for (const skill of skills) {
+    writeFileSync(resolve(root, `skills/${skill}/SKILL.md`), skillFixture(skill));
+  }
   writeFileSync(
     resolve(root, "manifest.json"),
     JSON.stringify(
       {
         kernel: "AGENTS.md",
         copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
-        skills: ["alpha"],
+        skills,
         docs: ["docs/ok.md"],
         examples: ["examples/ok.md"],
         design: { quality_target: "95+" },
@@ -89,9 +102,9 @@ function assertFail(name, root, expected) {
   }
 }
 
-function cloneFixture(name) {
+function cloneFixture(name, skills) {
   const root = resolve(fixtureRoot, name);
-  writeFixture(root);
+  writeFixture(root, skills);
   return root;
 }
 
@@ -147,7 +160,7 @@ try {
 
   const extraSkillRoot = cloneFixture("extra-skill");
   mkdirSync(resolve(extraSkillRoot, "skills/beta"), { recursive: true });
-  writeFileSync(resolve(extraSkillRoot, "skills/beta/SKILL.md"), validSkill.replace("name: alpha", "name: beta").replace("# Alpha", "# Beta"));
+  writeFileSync(resolve(extraSkillRoot, "skills/beta/SKILL.md"), skillFixture("beta"));
   assertFail("extra skill directory", extraSkillRoot, "missing from manifest.json.skills");
 
   const missingSkillRoot = cloneFixture("missing-skill");
@@ -171,6 +184,22 @@ try {
   const stalePhraseRoot = cloneFixture("stale-phrase");
   writeFileSync(resolve(stalePhraseRoot, "docs/ok.md"), "# OK\n\nThis repository has 25 skills.\n");
   assertFail("stale phrase", stalePhraseRoot, "25 skills");
+
+  const staleSkillCountRoot = cloneFixture("stale-skill-count", ["alpha", "beta", "gamma"]);
+  writeFileSync(resolve(staleSkillCountRoot, "docs/ok.md"), "# OK\n\nThis repository has 2 skills.\n");
+  assertFail("stale skill count", staleSkillCountRoot, "2 skills");
+
+  const currentSkillCountRoot = cloneFixture("current-skill-count", ["alpha", "beta", "gamma"]);
+  writeFileSync(resolve(currentSkillCountRoot, "docs/ok.md"), "# OK\n\nThis repository has 3 skills.\n");
+  assertPass("current skill count", currentSkillCountRoot);
+
+  const noSkillCountRoot = cloneFixture("no-skill-count", ["alpha", "beta", "gamma"]);
+  writeFileSync(resolve(noSkillCountRoot, "docs/ok.md"), "# OK\n\nThis repository lists workflows without a numeric skill count.\n");
+  assertPass("no skill count", noSkillCountRoot);
+
+  const unrelatedNumericTextRoot = cloneFixture("unrelated-numeric-text", ["alpha", "beta", "gamma"]);
+  writeFileSync(resolve(unrelatedNumericTextRoot, "docs/ok.md"), "# OK\n\nThe quality target is 95+ and example 07 remains documented.\n");
+  assertPass("unrelated numeric text", unrelatedNumericTextRoot);
 
   const staleRouteRoot = cloneFixture("stale-route");
   writeFileSync(

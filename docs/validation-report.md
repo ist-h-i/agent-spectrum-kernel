@@ -86,7 +86,7 @@ none
 
 ## Auxiliary documentation audit
 
-- No stale pre-27 skill-count references found.
+- No stale skill-count references found.
 - No deleted legacy code-review adapter references found.
 - Review route references use the current layer-aware route through `review-router`, layer applicability, required gates, and `review-final-merge-gate`.
 - Implementation route references use Verification Contract, Implementation Contract, `controlled-implementation`, and evidence-oriented verification wording.
