@@ -169,7 +169,7 @@ Use `evidence-ledger` whenever final text makes or evaluates a claim about corre
 - Added `review-context-generation`, `review-output-quality`, and `review-adversarial-risk` so context-heavy review layers have dedicated gates instead of being collapsed into AI quality review.
 - Added `implementation-context-generation` so repeated implementation tasks can reuse evidence-labeled stack, command, pattern, boundary, and stop-condition context without embedding framework-specific rules.
 - Added `Safety and External Effects` to the kernel.
-- Added a minimal routing gate inside `AGENTS.md` that sends non-trivial workflow selection to `skill-router`.
+- Added a minimal routing gate inside `AGENTS.md` that sends operating-mode ambiguity to `operating-mode-router` and delivery/quality workflow selection to `skill-router`.
 - Added `risk-gate` for destructive, irreversible, external, production, auth, secret, billing, dependency, and infra risks.
 - Added `controlled-implementation` to cover the actual implementation loop between planning and verification.
 - Split PR review from one all-purpose skill into router, automated evidence, AI quality, domain impact, and final merge gates.

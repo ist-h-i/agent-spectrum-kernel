@@ -18,8 +18,8 @@ This matrix is a reference view of the layered runtime routes in `skills/operati
 
 | Situation | Primary skill | Secondary skill | Expected output |
 |---|---|---|---|
-| Unsure which workflow applies | `skill-router` | — | Selected workflow and skipped workflows |
-| Request may be project adoption, metrics, or operation instead of delivery | `operating-mode-router` | selected mode-specific route | Mode selection before lower-level workflow |
+| Unsure which operating mode applies | `operating-mode-router` | selected mode-specific route | Selected operating mode and delegated workflow |
+| Delivery/quality workflow is unclear after mode selection | `skill-router` | — | Selected delivery/quality workflow and skipped workflows |
 | First-time project rollout or adoption pack | `project-adoption-pack-generation` | `repository-orientation`; `implementation-context-generation`; `review-context-generation` | Adoption pack with project overlay draft, context drafts, first recipes, and missing decisions |
 | First task in unfamiliar repo | `repository-orientation` | `scope-control` if target boundary is unclear; `planning-with-files` only if the task spans sessions/agents or durable state is needed | Repo map, commands, conventions, risks |
 | Ambiguous design / “grill me” or under-specified plan | `grill-design` | `grill-with-docs` if docs/domain/ADR terms matter; then `spec-driven-development` only after design boundary and acceptance criteria are stable | Design decision summary, stable boundary, and acceptance criteria before spec |
