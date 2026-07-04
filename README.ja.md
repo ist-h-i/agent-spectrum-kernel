@@ -66,6 +66,7 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | 新機能を作る | `spec-driven-development` → `test-first-verification` for Verification Contract → `controlled-implementation` → `test-first-verification` for evidence |
 | バグ原因が不明 | `doubt-driven-development` → `test-first-verification` for reproduction and Verification Contract → `controlled-implementation` → `test-first-verification` for regression proof |
 | 実装フェーズに入る | `controlled-implementation` |
+| 承認済みリファクタを安全に実装する | `refactor-implementation` → `test-first-verification` for regression proof |
 | スコープ逸脱が怖い | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → required gates） |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
 | PRレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |

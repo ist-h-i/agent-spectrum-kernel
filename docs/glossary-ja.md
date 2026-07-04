@@ -189,6 +189,17 @@ Use when:
 Do not confuse with:
 - `docs/ai/review-context.md` や `docs/ai/implementation-context.md`。これらは判断材料で、改善itemの状態管理ではありません。
 
+## Behavior preservation contract
+
+Meaning:
+- リファクタ実装前に、public API、UI、schema、snapshot、runtime behavior、errors、logs、data shapeなど、変えてはいけない観測可能な挙動を明示する契約です。
+
+Use when:
+- `refactor-implementation` で、構造改善をしても既存挙動を維持する必要がある場合。
+
+Do not confuse with:
+- 新機能の受け入れ条件。挙動を変える場合はリファクタではなく、仕様化された実装として扱います。
+
 ## Implementation Contract
 
 Meaning:

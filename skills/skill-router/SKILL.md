@@ -62,6 +62,7 @@ This skill is the canonical runtime routing source. `AGENTS.md` only contains th
 | Repeated implementation context setup | `implementation-context-generation` | `repository-orientation` for repo facts before drafting context |
 | New behavior | `spec-driven-development` | `test-first-verification` for Verification Contract -> `controlled-implementation` -> `test-first-verification` for evidence |
 | Implementation after plan exists | `controlled-implementation` | `test-first-verification` for Verification Contract before behavior changes when proof is needed; `scope-control` if scope is unclear |
+| Approved behavior-preserving refactor implementation | `refactor-implementation` | `test-first-verification` for regression proof; `application-boundary-architecture` first if responsibility, dependency direction, public contract, schema, UI behavior, or ownership boundaries may move; `improvement-ledger` for follow-up debt or prevention candidates |
 | Long-running/multi-agent work | `planning-with-files` | `handoff-generation` |
 | Scope/refactor risk | `scope-control` | `controlled-implementation` if proceeding to code; review phase uses `review-router` -> required gates, with scope findings generally routed to `review-ai-quality` |
 | Bug/unknown cause | `doubt-driven-development` | `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof |
