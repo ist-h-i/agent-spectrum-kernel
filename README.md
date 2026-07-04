@@ -58,6 +58,10 @@ examples/
   05-pr-review.md
   06-handoff-to-agent.md
   07-mr-readme.md
+  08-code-health-review.md
+  09-improvement-ledger-update.md
+  10-safe-refactor.md
+  11-prevention-rule-feedback.md
 skills/
   skill-router/SKILL.md
   angular-implementation-architecture/SKILL.md

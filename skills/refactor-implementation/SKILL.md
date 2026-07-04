@@ -32,7 +32,11 @@ This skill is for safe refactor execution after a candidate exists. It does not 
 1. Identify the refactor objective.
    - Name the approved candidate, source, files, and reason.
    - Separate the structural improvement from any requested behavior change.
-   - If the objective is vague, stop and ask for the smallest concrete refactor target.
+   - Apply this decision tree before editing:
+     - Approved candidate exists with concrete files/objective: proceed after behavior-preservation and verification contracts are defined.
+     - Candidate exists but scope is ambiguous: propose the smallest safe target, including files/objective/non-goals, and stop before editing if authorization is missing.
+     - No candidate exists: route to `review-code-health` or ask for the concrete objective.
+     - Boundary movement is implied: route to `application-boundary-architecture` first.
 
 2. Define the behavior-preservation contract.
    - Must not change public API, UI behavior, schema, snapshots, runtime behavior, errors, logs, data shape, permissions, notifications, or external I/O unless explicitly authorized.
@@ -120,6 +124,8 @@ Follow-up:
 | Failure | Correction |
 |---|---|
 | Refactoring without an approved candidate | Route to `review-code-health` or ask for the concrete objective. |
+| Stopping despite a concrete approved candidate | Proceed after behavior-preservation, scope, boundary, and verification contracts are defined. |
+| Ambiguous candidate scope | Propose the smallest safe target and stop before editing unless authorized. |
 | Hiding behavior change inside cleanup | Stop and treat the behavior change as a new feature or bug fix. |
 | Broad architecture rewrite | Route boundary movement to `application-boundary-architecture` and split the work. |
 | Scope creep through adjacent cleanup | Keep unrelated cleanup out of the refactor PR. |

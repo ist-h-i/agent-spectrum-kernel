@@ -55,7 +55,7 @@ This skill starts after detection. It classifies, prioritizes, records, and refr
 
 5. Classify each entry.
    - Category: `vulnerability`, `technical_debt`, `refactor_candidate`, `code_smell`, `maintainability`, `testability`, `performance`, `dependency`, `duplication`, `boundary`, `repeated_finding`, or `rule_gap`.
-   - Decision: `fix_now`, `separate_pr`, `backlog`, `convert_to_rule`, `convert_to_check`, `accept`, or `wont_fix`.
+   - Decision: `fix_now`, `separate_pr`, `backlog`, `convert_to_rule`, `convert_to_check`, `accept`, `wont_fix`, or `needs_more_evidence`.
    - Prevention target: `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, project overlay, `SKILL.md`, review checklist, validation script, lint/test/check, implementation context, review context, refactor task, or no prevention needed.
    - Status: `open`, `triaged`, `accepted`, `planned`, `in_progress`, `resolved`, `converted_to_rule`, `converted_to_check`, `wont_fix`, or `stale`.
 
@@ -126,7 +126,7 @@ Urgency:
 - now | soon | backlog | observe
 
 Decision:
-- fix_now | separate_pr | backlog | convert_to_rule | convert_to_check | accept | wont_fix
+- fix_now | separate_pr | backlog | convert_to_rule | convert_to_check | accept | wont_fix | needs_more_evidence
 
 Recommended action:
 - Concrete next action

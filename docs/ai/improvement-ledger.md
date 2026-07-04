@@ -69,7 +69,7 @@ Every active entry must include source, evidence, impact, decision, status, and 
 | Impact | yes | Why this matters if ignored. |
 | Severity | yes | `critical`, `high`, `medium`, or `low`. |
 | Urgency | yes | `now`, `soon`, `backlog`, or `observe`. |
-| Decision | yes | `fix_now`, `separate_pr`, `backlog`, `convert_to_rule`, `convert_to_check`, `accept`, or `wont_fix`. |
+| Decision | yes | `fix_now`, `separate_pr`, `backlog`, `convert_to_rule`, `convert_to_check`, `accept`, `wont_fix`, or `needs_more_evidence`. |
 | Recommended action | yes | Concrete next action. |
 | Prevention target | yes | `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, project overlay, `SKILL.md`, review checklist, validation script, lint/test/check, implementation context, review context, refactor task, or no prevention needed. |
 | Repeat pattern | required for rule/check conversion | `one-off`, `repeated`, `likely_repeated`, or `high_impact_single_case`. |

@@ -11,6 +11,8 @@ Find evidence-backed code-health issues and classify them into actionable curren
 
 This skill focuses on debt discovery and classification. It does not replace ordinary correctness review, architecture review, adversarial review, or refactor implementation.
 
+Security boundary: this skill can identify evidence-backed vulnerability and security-weakness signals during code review, but it is not a full security audit, SAST replacement, dependency vulnerability scan, threat modeling process, penetration test, or compliance review.
+
 ## Use when
 
 - The user asks for technical debt review, code smell inspection, vulnerability-oriented code review, maintainability audit, or refactor candidate discovery.
@@ -40,7 +42,7 @@ This skill focuses on debt discovery and classification. It does not replace ord
    - Skipped when inspected evidence shows only mechanical, correctness, domain, architecture, output-quality, or adversarial concerns covered by other gates.
 
 3. Inspect required categories.
-   - vulnerability / security weakness
+   - vulnerability / security weakness signals within the reviewed code
    - technical debt
    - refactor candidate
    - coding smell

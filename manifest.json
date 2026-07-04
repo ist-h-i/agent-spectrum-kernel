@@ -65,7 +65,11 @@
     "examples/04-design-grill.md",
     "examples/05-pr-review.md",
     "examples/06-handoff-to-agent.md",
-    "examples/07-mr-readme.md"
+    "examples/07-mr-readme.md",
+    "examples/08-code-health-review.md",
+    "examples/09-improvement-ledger-update.md",
+    "examples/10-safe-refactor.md",
+    "examples/11-prevention-rule-feedback.md"
   ],
   "design": {
     "kernel": "single physical file with always-on principles and minimal routing",
