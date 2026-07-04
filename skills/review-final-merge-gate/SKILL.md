@@ -29,6 +29,8 @@ Make the final merge decision from gate evidence without hiding missing checks, 
    - `review-architecture-impact` when applicable,
    - `review-output-quality` when applicable,
    - `review-adversarial-risk` when applicable,
+   - `review-code-health` when applicable, including current-PR blockers, backlog or separate-PR candidates, rule/check feedback, and improvement-ledger handoff,
+   - `improvement-ledger` output when it has already been run for non-blocking findings,
    - `docs/ai/review-context.md` or project overlay review context when available; `context_status: template` counts as missing context, and `context_status: stale` counts as insufficient evidence for affected claims until refreshed,
    - `review-domain-impact` when applicable,
    - `adr-review` when applicable,
@@ -47,6 +49,7 @@ Make the final merge decision from gate evidence without hiding missing checks, 
    - Required layers without gate evidence remain `insufficient evidence`; do not silently downgrade them to skipped.
    - Skipped layers must retain the router's evidence-based reason.
    - Failed upper-layer or cross-cutting layers cannot be overridden by lower-layer passes.
+   - Style / maintainability layer evidence may include `review-code-health`; current-PR blockers and non-blocking follow-up candidates must remain separate.
 
 3. Apply precedence.
    - Domain, architecture, design, output quality, adversarial risk, risk, and evidence issues take precedence over mechanical success.
@@ -75,7 +78,17 @@ Make the final merge decision from gate evidence without hiding missing checks, 
 
 6. Keep suggestions separate from required fixes.
 
+7. Preserve non-blocking follow-up candidates when applicable.
+   - Keep current PR blockers in Required fixes.
+   - Put non-blocking debt, refactor candidates, repeated findings, validation-check candidates, and backlog work under Improvement ledger candidates when durable tracking may be needed.
+   - Put reusable prevention proposals under Rule feedback. Treat them as rule/check/project-overlay candidates, not code fixes.
+   - Put explicitly deferred or accepted code-health risks under Deferred / accepted code-health risks with the known reason or follow-up condition.
+   - Do not force every review to run `review-code-health` or `improvement-ledger`.
+   - Do not update `docs/ai/improvement-ledger.md` from this final gate; make candidates explicit enough for a later `improvement-ledger` invocation or follow-up task.
+
 ## Output
+
+Include the improvement-ledger, rule-feedback, and deferred-risk sections only when applicable.
 
 ```text
 Decision:
@@ -97,6 +110,15 @@ Layer summary:
 Required fixes:
 - ...
 
+Improvement ledger candidates:
+- ...
+
+Rule feedback:
+- ...
+
+Deferred / accepted code-health risks:
+- ...
+
 Suggestions:
 - ...
 
@@ -116,6 +138,8 @@ Residual risk:
 - Upper-layer and cross-cutting failures are not overridden by lower-layer passes.
 - Required but missing layer evidence prevents approval.
 - Suggestions are not treated as merge blockers.
+- Current PR blockers, improvement-ledger candidates, rule feedback, and deferred or accepted code-health risks are separated when those categories appear.
+- Non-blocking findings are visible without forcing ledger updates inside this gate.
 
 ## Failure modes
 
@@ -124,4 +148,6 @@ Residual risk:
 | Approving without required gate evidence | Return `insufficient evidence` or request the missing gate. |
 | Letting logic or mechanical review override domain/risk failure | Upper-layer and cross-cutting failures block regardless of lower-layer success. |
 | Mixing suggestions with required fixes | Separate optional improvements from merge blockers. |
+| Hiding non-blocking code-health findings | Put durable follow-up candidates under Improvement ledger candidates, Rule feedback, or Deferred / accepted code-health risks. |
+| Updating the improvement ledger from the final gate | Stop at explicit candidates and hand off to `improvement-ledger` when durable tracking is needed. |
 | Treating unknown as pass | Unknown remains insufficient evidence. |
