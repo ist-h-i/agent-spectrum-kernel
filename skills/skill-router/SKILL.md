@@ -66,7 +66,8 @@ This skill is the canonical runtime routing source. `AGENTS.md` only contains th
 | Scope/refactor risk | `scope-control` | `controlled-implementation` if proceeding to code; review phase uses `review-router` -> required gates, with scope findings generally routed to `review-ai-quality` |
 | Bug/unknown cause | `doubt-driven-development` | `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof |
 | Hard-to-reverse architecture decision or ADR need | `adr-review` | `grill-with-docs`; `application-boundary-architecture` if boundary mechanics are unresolved |
-| PR/diff/generated code review | `review-router` | Required gates from layer applicability, including `review-architecture-impact`, `review-output-quality`, and `review-adversarial-risk` when applicable; then `review-final-merge-gate` |
+| PR/diff/generated code review | `review-router` | Required gates from layer applicability, including `review-code-health`, `review-architecture-impact`, `review-output-quality`, and `review-adversarial-risk` when applicable; then `review-final-merge-gate` |
+| Technical debt, code smell, or refactor candidate review | `review-router` | `review-code-health`; specialized gates only when findings cross into architecture, adversarial, risk, or evidence concerns |
 | MR/PR README, PR explanation, or durable change-context documentation | `mr-readme-generation` | `adr-review` |
 | Repeated review context setup | `review-context-generation` | `repository-orientation` for repo facts before drafting context |
 | Claim validation | `evidence-ledger` | `doubt-driven-development` |

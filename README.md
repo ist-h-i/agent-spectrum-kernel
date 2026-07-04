@@ -76,6 +76,7 @@ skills/
   review-ai-quality/SKILL.md
   review-architecture-impact/SKILL.md
   review-context-generation/SKILL.md
+  review-code-health/SKILL.md
   review-domain-impact/SKILL.md
   review-output-quality/SKILL.md
   review-final-merge-gate/SKILL.md
@@ -125,6 +126,7 @@ First-time users should start with `docs/quickstart-ja.md`.
 | 危険操作・外部影響 | `risk-gate` before the selected workflow proceeds to action |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
 | PR/diffレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
+| 負債・スメル・リファクタ候補レビュー | `review-router` → `review-code-health` when applicable |
 | 繰り返しレビュー文脈の固定 | `review-context-generation`（既定: `docs/ai/review-context.md`） |
 | MR/PR README・PR説明・変更文脈固定 | `mr-readme-generation` |
 | 次のAgentへ渡す | `handoff-generation` |

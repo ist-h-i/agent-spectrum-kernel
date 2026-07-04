@@ -23,6 +23,7 @@
     "review-ai-quality",
     "review-architecture-impact",
     "review-automated-gate",
+    "review-code-health",
     "review-context-generation",
     "review-domain-impact",
     "review-final-merge-gate",
