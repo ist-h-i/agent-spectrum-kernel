@@ -1,10 +1,26 @@
 # Skill Matrix
 
-This matrix is a reference view of the canonical runtime routes in `skills/skill-router/SKILL.md`. If they differ, update this file to mirror the skill router instead of treating this table as a separate source of truth.
+This matrix is a reference view of the layered runtime routes in `skills/operating-mode-router/SKILL.md` and the delivery/quality routes in `skills/skill-router/SKILL.md`. If they differ, update this file to mirror the routers instead of treating this table as a separate source of truth.
+
+## Operating Mode Routes
+
+| Operating mode | Use when | Primary route | Expected output |
+|---|---|---|---|
+| `mode_routing` | The request may be delivery, adoption, observability, or operation work | `operating-mode-router` | Selected operating mode and delegated route |
+| `delivery_quality` | Concrete implementation, review, verification, refactor, investigation, docs, decision, or handoff task | `skill-router` | Smallest delivery/quality workflow |
+| `adoption_bootstrap` | First-time project, repo, team, or client rollout | `project-adoption-pack-generation` | Adoption pack, overlay/context drafts, missing decisions |
+| `observability_metrics` | One-task workflow retrospective or multi-task adoption measurement | `skill-effectiveness-evaluation` or `skill-adoption-metrics` | Evidence-backed effectiveness evaluation or adoption metrics |
+| `operation_automation` | Weekly/monthly summaries, scheduling, or recurring reporting cadence | External operation layer plus templates | Manual routine, automation plan, or report output |
+
+`operation_automation` is an external cadence layer. It can be manual, ChatGPT automation, GitHub Actions, cron, or a team routine. It is not represented as a separate delivery skill in this repository.
+
+## Detailed Workflow Routes
 
 | Situation | Primary skill | Secondary skill | Expected output |
 |---|---|---|---|
-| Unsure which workflow applies | `skill-router` | — | Selected workflow and skipped workflows |
+| Unsure which operating mode applies | `operating-mode-router` | selected mode-specific route | Selected operating mode and delegated workflow |
+| Delivery/quality workflow is unclear after mode selection | `skill-router` | — | Selected delivery/quality workflow and skipped workflows |
+| First-time project rollout or adoption pack | `project-adoption-pack-generation` | `repository-orientation`; `implementation-context-generation`; `review-context-generation` | Adoption pack with project overlay draft, context drafts, first recipes, and missing decisions |
 | First task in unfamiliar repo | `repository-orientation` | `scope-control` if target boundary is unclear; `planning-with-files` only if the task spans sessions/agents or durable state is needed | Repo map, commands, conventions, risks |
 | Ambiguous design / “grill me” or under-specified plan | `grill-design` | `grill-with-docs` if docs/domain/ADR terms matter; then `spec-driven-development` only after design boundary and acceptance criteria are stable | Design decision summary, stable boundary, and acceptance criteria before spec |
 | Plan must fit docs/domain/ADRs | `grill-with-docs` | `adr-review` | Term/doc conflict review and documentation decision |
@@ -21,14 +37,20 @@ This matrix is a reference view of the canonical runtime routes in `skills/skill
 | Technical debt / code smell / refactor candidate review | `review-router` | `review-code-health`; specialized gates only when findings cross into architecture, adversarial, risk, or evidence concerns | Evidence-backed code-health findings with category, severity, urgency, recommended action, scope guidance, and AI-rule feedback |
 | Persist non-blocking review findings / debt / rule feedback | `improvement-ledger` | `review-code-health` only if findings still need detection; `evidence-ledger` if readiness or resolution claims need evidence classification | Ledger entries with ID, source, evidence, impact, decision, prevention target, owner/status, refresh rule, and close condition |
 | Convert repeated findings into prevention rules or checks | `improvement-ledger` | `evidence-ledger` if repeat pattern, readiness, or conversion claims need evidence classification | Prevention-rule feedback with repeat pattern, target, proposed rule/check, evidence, scope, and convert/defer/reject/needs-more-evidence decision |
+| Evaluate whether selected skills helped one completed task | `skill-effectiveness-evaluation` | `evidence-ledger` if claims need evidence status | Routing quality, outcome value, evidence quality, overhead, missed coverage, and follow-up recommendation |
+| Track adoption maturity and impact over multiple tasks | `skill-adoption-metrics` | `skill-effectiveness-evaluation` only for one-task examples inside the period | Instruction maturity, skill usage maturity, task outcomes, maturity movement, privacy note |
 | Repeated review context setup | `review-context-generation` | `repository-orientation` for repo facts before drafting context | Durable review context with evidence-status-labeled claims |
 | MR/PR README, PR explanation, or durable change-context documentation | `mr-readme-generation` | `adr-review` | Durable change context for human review and future AI reuse |
 | Performance/security/reliability/readiness claim | `evidence-ledger` | `doubt-driven-development` | Claim/evidence/status table |
+| Opt-in metrics event recording | normal delivery/review skill output | `skill-adoption-metrics` consumes the event later | Metrics event candidate with counts, related IDs, evidence references, and privacy note |
+| Weekly/monthly adoption report | operation layer | `skill-adoption-metrics` plus `docs/ai/adoption-report-template.md` | Period summary without creating a reporting skill |
 | End of work or passing to another agent | `handoff-generation` | `evidence-ledger` | Executable next task and residual risk |
 
 ## Routing rule
 
 Use the smallest workflow that reduces real risk. Do not invoke a skill because its name matches a keyword. Invoke it because the task has the corresponding uncertainty, evidence gap, or failure mode.
+
+Start with `operating-mode-router` when the request could be adoption, observability, or operation work. Start directly with `skill-router` when the request is already clearly delivery/quality work.
 
 ## Routing overlays
 
@@ -50,6 +72,9 @@ Use `evidence-ledger` whenever the response makes or evaluates a claim about cor
 ## Common chains
 
 ```text
+Operating mode:
+operating-mode-router -> delivery_quality | adoption_bootstrap | observability_metrics | operation_automation
+
 New feature:
 spec-driven-development -> test-first-verification for Verification Contract -> controlled-implementation -> test-first-verification for evidence
 
@@ -70,6 +95,18 @@ review-router -> layer applicability -> required gates, including review-code-he
 
 Improvement ledger:
 review-code-health findings or final-gate improvement candidates -> improvement-ledger -> separate PR, backlog, rule/check feedback, accepted risk, or stale review
+
+Project adoption:
+operating-mode-router -> project-adoption-pack-generation -> repository-orientation / implementation-context-generation / review-context-generation as needed
+
+Skill effectiveness:
+operating-mode-router -> skill-effectiveness-evaluation -> prompt recipe / validation / overlay / context / skill follow-up when evidence supports it
+
+Adoption metrics:
+opt-in Metrics event candidates -> skill-adoption-metrics -> project-local docs/ai/skill-adoption-metrics.md
+
+Adoption reports:
+operation_automation layer -> skill-adoption-metrics period summary -> docs/ai/adoption-report-template.md
 
 Prevention rule feedback:
 repeated or high-leverage improvement-ledger findings -> improvement-ledger prevention-rule feedback -> AGENTS.md, CUSTOM_INSTRUCTIONS.md, project overlay, SKILL.md, review checklist, validation script, lint/test/check, implementation context, or review context proposal

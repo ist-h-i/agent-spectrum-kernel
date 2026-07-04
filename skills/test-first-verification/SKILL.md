@@ -101,6 +101,12 @@ Next verification:
 - ...
 ```
 
+## Optional Metrics Event Candidate
+
+Only when adoption metrics are explicitly enabled or requested, and verification completes or insufficient evidence is explicitly reported, include a `Metrics event candidate` following `docs/metrics-event-contract.md`.
+
+Record whether a Verification Contract was defined, whether tests were added or updated, whether validation passed, and whether insufficient evidence remained. Do not emit metrics for hidden telemetry or a partial conversation with no durable outcome.
+
 ## Exit criteria
 
 - The Verification Contract exists or the change is explicitly exempt.

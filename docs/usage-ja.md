@@ -44,7 +44,26 @@ Skill非対応ツールでは、必要な `SKILL.md` だけをプロンプトに
 
 ## 使い分け
 
-実行時のルーティング正本は `skills/skill-router/SKILL.md` です。このガイドの例は、その導線を説明するためのものです。
+実行時の上位ルーティング正本は `skills/operating-mode-router/SKILL.md` です。通常のdelivery/quality作業では `skills/skill-router/SKILL.md` が正本です。このガイドの例は、その導線を説明するためのものです。
+
+### Operating mode routing
+
+使うSkill:
+
+```text
+operating-mode-router
+```
+
+使う場面:
+
+- delivery/quality、adoption/bootstrap、observability/metrics、operation/automation の分類が曖昧
+- project rollout、Skill効果評価、adoption metrics、週次/月次運用が混じる
+
+例:
+
+```text
+operating-mode-router を使って、この依頼のmodeを選んでください。通常の実装・レビューなら skill-router に渡してください。
+```
 
 ### 軽微な修正
 
@@ -207,6 +226,49 @@ implementation-context-generation
 ```
 
 `implementation-context-generation` は、`docs/ai/implementation-context.md` を作成・更新し、stack inventory、workspace shape、build/typecheck/lint/test/focused-test commands、implementation/test patterns、architecture boundaries、generated/manual-edit boundaries、stack overlay hooks、stop conditions、update triggers を evidence status 付きで残します。task progressはここに保存せず、Angular/React/Python/Javaなどの固有規約はProject Overlayや専門Skillへ分離します。
+
+### Project adoption / first-time rollout
+
+使うSkill:
+
+```text
+operating-mode-router
+project-adoption-pack-generation
+repository-orientation when needed
+implementation-context-generation / review-context-generation as follow-up
+```
+
+`project-adoption-pack-generation` は、新しいrepoやteamにこのSkillセットを導入するため、project overlay draft、implementation context draft、review context draft、improvement-ledger initialization guidance、最初のworkflow recipe、missing human decisionsを作ります。
+
+通常の一回限りの実装やレビューでは使いません。ファイル変更は明示依頼があるまで行わず、branch、release、security、ownership policyは根拠なしに推測しません。
+
+### Skill effectiveness / adoption metrics
+
+使うSkill:
+
+```text
+operating-mode-router
+skill-effectiveness-evaluation for one completed task
+skill-adoption-metrics for multiple tasks or period measurement
+```
+
+`skill-effectiveness-evaluation` は、1つの完了済みタスクでSkill選択が役に立ったか、過剰だったか、足りなかったかを根拠付きで評価します。
+
+`skill-adoption-metrics` は、複数タスクや期間を対象に、instruction quality、skill usage maturity、task outcomes、quality improvement、maturity movementを見ます。raw promptは既定で保存せず、HR/personnel evaluationには使いません。
+
+### Metrics event / adoption reports
+
+使う文書:
+
+```text
+docs/metrics-event-contract.md
+docs/ai/skill-adoption-metrics.md
+docs/ai/adoption-report-template.md
+```
+
+通常Skillは作業を行い、adoption metrics が明示的に有効な場合だけ `Metrics event candidate` を出せます。bare router invocation、partial conversation、trivial edit、hidden telemetryでは出しません。
+
+週次/月次reportは別Skillではなくoperation layerのreporting modeです。集計は `skill-adoption-metrics`、出力形は `docs/ai/adoption-report-template.md` を使います。スケジューラや外部通知は `risk-gate` の対象です。
 
 ### MR/PR README / 仕様理解固定
 

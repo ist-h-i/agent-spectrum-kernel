@@ -109,6 +109,12 @@ Follow-up:
 - improvement-ledger entry | rule update | no follow-up
 ```
 
+## Optional Metrics Event Candidate
+
+Only when adoption metrics are explicitly enabled or requested, and the refactor reaches a verified durable state, include a `Metrics event candidate` following `docs/metrics-event-contract.md`.
+
+Record refactor candidate implemented, behavior-preservation verification, validation status, related IDs, evidence references, and privacy note. Do not claim behavior preservation without executed evidence.
+
 ## Exit criteria
 
 - A concrete approved refactor objective is named.

@@ -27,6 +27,7 @@ docs/          運用・カスタマイズ・採点基準
 - `docs/quickstart-ja.md`: 最小導入、Skill対応/非対応ツール、最初にAIへ言うこと。
 - `docs/prompt-recipes-ja.md`: やりたいこと別のcopy-paste依頼文。
 - `docs/glossary-ja.md`: Kernel、Skill、Gate、overlay、context、contractの用語集。
+- `docs/routing-model.md`: operating mode と skill group metadata の説明。
 - `docs/usage-ja.md`: 代表的な使い分けと運用ガイド。
 - `docs/skill-matrix.md`: workflow選択の一覧。
 
@@ -44,7 +45,7 @@ docs/          運用・カスタマイズ・採点基準
 
 1. `AGENTS.md` を対象repoのルートに置く。
 2. AIコーディングツールのプロジェクト指示として読ませる。
-3. 普段はKernelだけで使う。ルーティングの正本は `skills/skill-router/SKILL.md`。
+3. 普段はKernelだけで使う。上位routingは `skills/operating-mode-router/SKILL.md`、delivery/quality内の正本は `skills/skill-router/SKILL.md`。
 4. 重い作業ではSkill名を明示して呼ぶ。
 
 例:
@@ -56,10 +57,12 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 
 ## 代表的な呼び出し
 
-正本は `skills/skill-router/SKILL.md` です。以下は代表例です。
+上位正本は `skills/operating-mode-router/SKILL.md`、delivery/quality内の正本は `skills/skill-router/SKILL.md` です。以下は代表例です。
 
 | 状況 | 呼ぶSkill |
 |---|---|
+| delivery / adoption / metrics / operation の分類が曖昧 | `operating-mode-router` |
+| 新しいrepoやteamへ導入したい | `operating-mode-router` → `project-adoption-pack-generation` |
 | 設計を詰めたい | `grill-design` |
 | 既存docs/ADRと整合させたい | `grill-with-docs` |
 | 実装前に未解決のアプリケーション境界・依存方向・DTO/Error/async lifetime判断 | `application-boundary-architecture` → 通常の実装ルートへ戻る |
@@ -72,6 +75,9 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | PRレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
 | 負債・スメル・リファクタ候補レビュー | `review-router` → `review-code-health` when applicable |
 | non-blockingな改善候補の台帳化 | `improvement-ledger` |
+| Skill選択やworkflow効果をふりかえりたい | `operating-mode-router` → `skill-effectiveness-evaluation` |
+| adoption maturityやinstruction qualityを期間で測りたい | `operating-mode-router` → `skill-adoption-metrics` |
+| weekly/monthly adoption reportを作りたい | operation layer + `docs/ai/adoption-report-template.md` |
 | 繰り返しレビュー文脈の固定 | `review-context-generation`（既定: `docs/ai/review-context.md`） |
 | MR/PR README・PR説明・変更文脈固定 | `mr-readme-generation` |
 | 破壊的操作・deploy・migration・secret絡み | `risk-gate` before the selected workflow proceeds to action |
@@ -86,10 +92,11 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 強調点:
 
 - 常時ルールは短く保つ。
+- まず operating mode を分け、通常開発は `skill-router` に渡す。
 - Grill-MeやSpec作成のような重い手順はSkillに分ける。
 - 完了条件は「コードを書いた」ではなく「検証した」。
 - 根拠なしの成果主張をEvidence Ledgerで潰す。
 - 危険操作はRisk Gateで止める。
 - Risk Gateは単独工程ではなく、危険影響がある全ワークフローの前に割り込む。
-- Project Overlayの専門Skillは、`skill-router` でgeneric workflowを選んだ後に必要な場合だけ選ぶ。
+- Project Overlayの専門Skillは、`operating-mode-router` と `skill-router` でgeneric workflowを選んだ後に必要な場合だけ選ぶ。
 - Handoffまで含めてAgent運用に対応する。

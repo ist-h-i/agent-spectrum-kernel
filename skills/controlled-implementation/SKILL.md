@@ -151,6 +151,12 @@ Implementation summary:
 - Next:
 ```
 
+## Optional Metrics Event Candidate
+
+Only when adoption metrics are explicitly enabled or requested, and the implementation reaches a meaningful durable state, include a `Metrics event candidate` following `docs/metrics-event-contract.md`.
+
+Use counts, related IDs, verification references, and a privacy note. Do not store raw prompts, secrets, customer data, or detailed improvement-ledger findings.
+
 ## Failure modes
 
 | Failure | Correction |

@@ -27,13 +27,68 @@ Do not confuse with:
 ## Skill router
 
 Meaning:
-- 依頼に必要な最小workflowを選ぶSkillです。正本は `skills/skill-router/SKILL.md` です。
+- delivery/quality作業に必要な最小workflowを選ぶSkillです。正本は `skills/skill-router/SKILL.md` です。
 
 Use when:
-- 非自明、曖昧、multi-step、review、investigation、handoff、risk-gated の作業です。
+- operating mode が delivery/quality で、非自明、曖昧、multi-step、review、investigation、handoff、risk-gated の作業です。
 
 Do not confuse with:
-- すべてのSkillを実行する仕組み。
+- adoption、metrics、operationまで含む上位router。上位分類は `operating-mode-router` が行います。
+
+## Operating mode router
+
+Meaning:
+- delivery/quality、adoption/bootstrap、observability/metrics、operation/automation の上位modeを選ぶSkillです。正本は `skills/operating-mode-router/SKILL.md` です。
+
+Use when:
+- 通常の実装・レビューなのか、project導入、metrics評価、週次/月次運用なのかが曖昧な場合。
+
+Do not confuse with:
+- delivery/quality内の詳細workflowを選ぶ `skill-router`。
+
+## Project adoption pack
+
+Meaning:
+- 新しいrepo、project、team、client siteにSkillセットを導入するための最小packageです。project overlay draft、implementation context draft、review context draft、local commands、risks、first workflow recipes、missing decisionsを含みます。
+
+Use when:
+- 初回導入やrolloutで、generic Skillとproject-specific ruleを分けたい場合。
+
+Do not confuse with:
+- 通常の一回限りの実装やレビュー。
+
+## Skill effectiveness evaluation
+
+Meaning:
+- 1つの完了済みタスクについて、選んだSkillが効果的だったか、過剰だったか、足りなかったかを根拠付きで評価するworkflowです。
+
+Use when:
+- routing quality、output usefulness、evidence quality、risk reduction、overhead control、reuse valueをふりかえりたい場合。
+
+Do not confuse with:
+- 複数タスクや期間でadoption maturityを見る `skill-adoption-metrics`。
+
+## Skill adoption metrics
+
+Meaning:
+- 複数タスクや期間を対象に、instruction quality、skill usage maturity、task outcomes、quality improvement、maturity movementを測るworkflowです。
+
+Use when:
+- Skill導入が運用にどう定着しているかを見たい場合。
+
+Do not confuse with:
+- 人事評価、個人成績、compensation/promotion判断。metricsはadoption support、coaching、workflow improvement用です。
+
+## Metrics event candidate
+
+Meaning:
+- adoption metrics が明示的に有効な場合だけ、意味のあるタスク境界で出すopt-inの要約eventです。
+
+Use when:
+- `docs/metrics-event-contract.md` に沿って、counts、related IDs、evidence references、privacy noteを残したい場合。
+
+Do not confuse with:
+- hidden telemetry、raw prompt storage、skill invocationごとの自動ログ。
 
 ## Project overlay
 

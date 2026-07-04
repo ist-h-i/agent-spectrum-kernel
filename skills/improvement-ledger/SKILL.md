@@ -171,6 +171,12 @@ Not recorded:
 - Findings rejected for insufficient evidence or current-PR blocker status
 ```
 
+## Optional Metrics Event Candidate
+
+Only when adoption metrics are explicitly enabled or requested, and the ledger is updated or a durable ledger decision is produced, include a `Metrics event candidate` following `docs/metrics-event-contract.md`.
+
+Record counts and IDs for debt items created, resolved, marked stale, converted to rule, or converted to check. Do not duplicate full ledger rows or raw review comments inside the metrics event.
+
 ## Exit criteria
 
 - Entries match the fields and lifecycle in `docs/ai/improvement-ledger.md`.
