@@ -68,6 +68,7 @@ This skill is the canonical runtime routing source. `AGENTS.md` only contains th
 | Hard-to-reverse architecture decision or ADR need | `adr-review` | `grill-with-docs`; `application-boundary-architecture` if boundary mechanics are unresolved |
 | PR/diff/generated code review | `review-router` | Required gates from layer applicability, including `review-code-health`, `review-architecture-impact`, `review-output-quality`, and `review-adversarial-risk` when applicable; then `review-final-merge-gate` |
 | Technical debt, code smell, or refactor candidate review | `review-router` | `review-code-health`; specialized gates only when findings cross into architecture, adversarial, risk, or evidence concerns |
+| Persisting non-blocking review findings, debt, rule feedback, validation check candidates, accepted risks, or stale improvement items | `improvement-ledger` | `review-code-health` only if findings still need detection; `evidence-ledger` if readiness or resolution claims need evidence classification |
 | MR/PR README, PR explanation, or durable change-context documentation | `mr-readme-generation` | `adr-review` |
 | Repeated review context setup | `review-context-generation` | `repository-orientation` for repo facts before drafting context |
 | Claim validation | `evidence-ledger` | `doubt-driven-development` |

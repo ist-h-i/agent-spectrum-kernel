@@ -18,6 +18,7 @@ This matrix is a reference view of the canonical runtime routes in `skills/skill
 | Hard-to-reverse architecture decision or ADR need | `adr-review` | `grill-with-docs`; `application-boundary-architecture` if boundary mechanics are unresolved | ADR action and decision record |
 | PR/diff/commit review | `review-router` | `review-code-health` when debt, smell, refactor, dependency/tooling, or repeated-finding analysis is applicable; `review-architecture-impact` when structural or boundary impact may exist; `review-output-quality` when consumer-facing or machine-consumed output may change; `review-adversarial-risk` when severe failure paths or blast radius may exist; `review-final-merge-gate` for the final decision | Layer applicability, required gates, gate evidence, and merge decision |
 | Technical debt / code smell / refactor candidate review | `review-router` | `review-code-health`; specialized gates only when findings cross into architecture, adversarial, risk, or evidence concerns | Evidence-backed code-health findings with category, severity, urgency, recommended action, scope guidance, and AI-rule feedback |
+| Persist non-blocking review findings / debt / rule feedback | `improvement-ledger` | `review-code-health` only if findings still need detection; `evidence-ledger` if readiness or resolution claims need evidence classification | Ledger entries with ID, source, evidence, impact, decision, prevention target, owner/status, refresh rule, and close condition |
 | Repeated review context setup | `review-context-generation` | `repository-orientation` for repo facts before drafting context | Durable review context with evidence-status-labeled claims |
 | MR/PR README, PR explanation, or durable change-context documentation | `mr-readme-generation` | `adr-review` | Durable change context for human review and future AI reuse |
 | Performance/security/reliability/readiness claim | `evidence-ledger` | `doubt-driven-development` | Claim/evidence/status table |
@@ -61,6 +62,9 @@ application-boundary-architecture -> adr-review when the decision is hard to rev
 
 Review:
 review-router -> layer applicability -> required gates, including review-code-health, review-architecture-impact, review-output-quality, and review-adversarial-risk when needed -> review-final-merge-gate
+
+Improvement ledger:
+review-code-health findings or review follow-up -> improvement-ledger -> separate PR, backlog, rule/check feedback, accepted risk, or stale review
 
 Review context:
 review-context-generation -> docs/ai/review-context.md
