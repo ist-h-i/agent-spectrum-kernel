@@ -169,6 +169,7 @@ function summarize(events, invalidLines, args) {
       correct_routing_rate: correctRoutingRate(tasks),
       required_gate_coverage: requiredGateCoverage(tasks),
       over_processing_count: sumCounts(gateDecisionSummary.over_processing_warnings),
+      under_processing_count: sumCounts(gateDecisionSummary.under_processing_warnings),
       missing_evidence_count: insufficientEvidence,
     },
     gate_decision_summary: gateDecisionSummary,
@@ -509,6 +510,7 @@ function summarizeGateDecisions(tasks) {
   const insufficientEvidence = new Map();
   const underProcessing = new Map();
   const overProcessing = new Map();
+  const missingSkipReasons = new Map();
   let totalDecisions = 0;
   let missingSkipReasonCount = 0;
 
@@ -536,6 +538,7 @@ function summarizeGateDecisions(tasks) {
       if (decision.status === "skipped") {
         if (!hasSkipReason(decision)) {
           missingSkipReasonCount += 1;
+          increment(missingSkipReasons, decision.gate);
         }
         increment(skippedByCategory, skipReasonCategory(decision));
       } else if (decision.status === "insufficient_evidence") {
@@ -555,6 +558,12 @@ function summarizeGateDecisions(tasks) {
     insufficient_evidence: [...insufficientEvidence.values()].sort(compareCountEntries),
     under_processing_warnings: countMapEntries(underProcessing, "gate"),
     over_processing_warnings: countMapEntries(overProcessing, "gate"),
+    top_gate_deviation_patterns: topGateDeviationPatterns({
+      underProcessing,
+      overProcessing,
+      missingSkipReasons,
+      insufficientEvidence,
+    }),
   };
 }
 
@@ -567,11 +576,11 @@ function hasSkipReason(decision) {
 }
 
 function skipReasonCategory(decision) {
-  if (!hasSkipReason(decision)) {
-    return "missing_reason";
-  }
   if (decision.reason_category) {
     return decision.reason_category;
+  }
+  if (!hasSkipReason(decision)) {
+    return "missing_reason";
   }
   const text = `${decision.judgment} ${decision.missing_inputs.join(" ")} ${decision.triggering_signals.join(" ")}`.toLowerCase();
   if (/\b(no trigger|no .*signal|not triggered)\b/.test(text)) return "no_trigger_signal";
@@ -597,6 +606,31 @@ function compareCountEntries(a, b) {
 
 function sumCounts(entries) {
   return entries.reduce((total, entry) => total + entry.count, 0);
+}
+
+function topGateDeviationPatterns({ underProcessing, overProcessing, missingSkipReasons, insufficientEvidence }) {
+  const patterns = [
+    ...countMapEntries(underProcessing, "gate").map((entry) => ({ deviation_type: "under_processing", ...entry })),
+    ...countMapEntries(overProcessing, "gate").map((entry) => ({ deviation_type: "over_processing", ...entry })),
+    ...countMapEntries(missingSkipReasons, "gate").map((entry) => ({ deviation_type: "missing_skip_reason", ...entry })),
+    ...[...insufficientEvidence.values()].sort(compareCountEntries).map((entry) => ({ deviation_type: "insufficient_evidence", ...entry })),
+  ];
+  return patterns.sort(compareDeviationPatterns).slice(0, 10);
+}
+
+function compareDeviationPatterns(a, b) {
+  const typeOrder = {
+    under_processing: 0,
+    over_processing: 1,
+    missing_skip_reason: 2,
+    insufficient_evidence: 3,
+  };
+  return (
+    b.count - a.count ||
+    (typeOrder[a.deviation_type] ?? 99) - (typeOrder[b.deviation_type] ?? 99) ||
+    String(a.gate).localeCompare(String(b.gate)) ||
+    String(a.layer ?? "").localeCompare(String(b.layer ?? ""))
+  );
 }
 
 function summarizeReviewQuality(tasks) {
@@ -652,11 +686,13 @@ Period: ${report.period.start} to ${report.period.end}
 - Correct routing rate: ${formatUnknownNumber(report.skill_usage.correct_routing_rate)}
 - Required gate coverage: ${formatUnknownNumber(report.skill_usage.required_gate_coverage)}
 - Over-processing warnings: ${report.skill_usage.over_processing_count}
+- Under-processing warnings: ${report.skill_usage.under_processing_count}
 - Missing evidence count: ${report.skill_usage.missing_evidence_count}
 - Missing skip reason count: ${report.gate_decision_summary.missing_skip_reason_count}
 - Skipped gate categories: ${formatCountList(report.gate_decision_summary.skipped_by_reason_category, "category")}
 - Insufficient evidence gates: ${formatGateLayerList(report.gate_decision_summary.insufficient_evidence)}
-- Under-processing warnings: ${formatCountList(report.gate_decision_summary.under_processing_warnings, "gate")}
+- Top gate deviations: ${formatDeviationList(report.gate_decision_summary.top_gate_deviation_patterns)}
+- Under-processing gates: ${formatCountList(report.gate_decision_summary.under_processing_warnings, "gate")}
 
 ## Review Quality
 
@@ -718,6 +754,12 @@ function formatCountList(entries, key) {
 function formatGateLayerList(entries) {
   return entries.length > 0
     ? entries.map((entry) => `${entry.gate}${entry.layer ? `/${entry.layer}` : ""}=${entry.count}`).join(", ")
+    : "none";
+}
+
+function formatDeviationList(entries) {
+  return entries.length > 0
+    ? entries.slice(0, 5).map((entry) => `${entry.deviation_type}:${entry.gate}${entry.layer ? `/${entry.layer}` : ""}=${entry.count}`).join(", ")
     : "none";
 }
 

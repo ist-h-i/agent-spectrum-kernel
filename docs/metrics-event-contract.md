@@ -166,7 +166,8 @@ Normal adoption reports should summarize gate decisions instead of listing every
 - insufficient evidence by gate or layer,
 - under-processing warnings,
 - over-processing warnings,
-- missing skip reason count.
+- missing skip reason count,
+- top repeated gate-deviation patterns.
 
 ```text
 detected -> recorded -> planned -> in_progress -> resolved

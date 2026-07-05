@@ -32,10 +32,12 @@ Skill usage:
 - correct routing rate:
 - required gate coverage:
 - over-processing cases:
+- under-processing cases:
 - missing evidence cases:
 - skipped gate categories:
 - insufficient evidence gates:
-- under-processing warnings:
+- top gate deviations:
+- under-processing gates:
 - missing skip reason count:
 - improvement-ledger handoff count:
 
@@ -142,7 +144,7 @@ Privacy / safety note:
 - Debt movement is a delta for the period. Debt inventory snapshot is a separate latest-status view.
 - Sparse early-adoption reports use `null` for unavailable averages and rates. `null` means unknown, not zero.
 - Review and routing summaries store counts, gates, and decisions only; raw review text and prompts remain out of scope.
-- Normal reports summarize `gate_decisions` by coverage, skipped reason category, insufficient evidence, under-processing, over-processing, and missing skip reasons. Full gate decision details remain drill-down data in JSON/event artifacts.
+- Normal reports summarize `gate_decisions` by coverage, skipped reason category, insufficient evidence, under-processing, over-processing, missing skip reasons, and top repeated deviation patterns. Full gate decision details remain drill-down data in JSON/event artifacts.
 - Weekly/monthly report templates shape the output, but do not create new skills.
 - External scheduling belongs to the operation layer.
 - Local reports are project-local by default and must not publish externally without opt-in approval.

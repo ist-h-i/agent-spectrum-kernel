@@ -163,8 +163,9 @@ Skill usage maturity:
 - Required gate coverage:
 - Skipped gates by reason category:
 - Insufficient evidence by gate/layer:
-- Under-processing warnings:
-- Over-processing rate:
+- Under-processing count:
+- Over-processing count:
+- Top repeated gate-deviation patterns:
 - Missing skip reason count:
 - Missing evidence rate:
 - Improvement-ledger handoff rate:

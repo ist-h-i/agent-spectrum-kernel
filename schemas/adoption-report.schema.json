@@ -55,6 +55,7 @@
         "correct_routing_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "Null means routing correctness was not recorded." },
         "required_gate_coverage": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "Null means required/executed gate data was not recorded." },
         "over_processing_count": { "type": "integer", "minimum": 0 },
+        "under_processing_count": { "type": "integer", "minimum": 0 },
         "missing_evidence_count": { "type": "integer", "minimum": 0 }
       }
     },
@@ -112,6 +113,24 @@
               "count": { "type": "integer", "minimum": 0 }
             }
           }
+        },
+        "top_gate_deviation_patterns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["deviation_type", "gate", "count"],
+            "properties": {
+              "deviation_type": {
+                "type": "string",
+                "enum": ["under_processing", "over_processing", "missing_skip_reason", "insufficient_evidence"]
+              },
+              "gate": { "type": "string", "minLength": 1 },
+              "layer": { "type": "string" },
+              "count": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "maxItems": 10
         }
       }
     },
