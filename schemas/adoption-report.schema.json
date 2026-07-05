@@ -141,6 +141,13 @@
         "personnel_evaluation_boundary": { "type": "string", "minLength": 1 },
         "sensitive_data_handling": { "type": "string" }
       }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "invalid_jsonl_lines": { "type": "integer", "minimum": 0 }
+      }
     }
   }
 }

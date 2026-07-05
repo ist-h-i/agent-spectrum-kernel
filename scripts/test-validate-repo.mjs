@@ -407,6 +407,80 @@ function assertRuntimePass(name, result) {
   }
 }
 
+function assertSchemaPass(name, schema, value) {
+  const errors = validateJsonSchemaSubset(schema, value);
+  if (errors.length > 0) {
+    throw new Error(`${name} should match schema\n${errors.join("\n")}\n${JSON.stringify(value, null, 2)}`);
+  }
+}
+
+function validateJsonSchemaSubset(schema, value, path = "$") {
+  const errors = [];
+  const types = Array.isArray(schema.type) ? schema.type : schema.type ? [schema.type] : [];
+
+  if (types.length > 0 && !types.some((type) => valueMatchesJsonType(value, type))) {
+    errors.push(`${path} expected type ${types.join("|")}, got ${value === null ? "null" : Array.isArray(value) ? "array" : typeof value}`);
+    return errors;
+  }
+  if (Object.hasOwn(schema, "const") && value !== schema.const) {
+    errors.push(`${path} expected const ${JSON.stringify(schema.const)}`);
+  }
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
+    errors.push(`${path} expected one of ${schema.enum.join(", ")}`);
+  }
+  if (typeof value === "number") {
+    if (typeof schema.minimum === "number" && value < schema.minimum) {
+      errors.push(`${path} expected minimum ${schema.minimum}`);
+    }
+    if (typeof schema.maximum === "number" && value > schema.maximum) {
+      errors.push(`${path} expected maximum ${schema.maximum}`);
+    }
+  }
+  if (typeof value === "string" && typeof schema.minLength === "number" && value.length < schema.minLength) {
+    errors.push(`${path} expected minLength ${schema.minLength}`);
+  }
+  if (Array.isArray(value)) {
+    if (schema.uniqueItems && new Set(value.map((item) => JSON.stringify(item))).size !== value.length) {
+      errors.push(`${path} expected uniqueItems`);
+    }
+    if (schema.items) {
+      value.forEach((item, index) => {
+        errors.push(...validateJsonSchemaSubset(schema.items, item, `${path}[${index}]`));
+      });
+    }
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const properties = schema.properties ?? {};
+    for (const required of schema.required ?? []) {
+      if (!Object.hasOwn(value, required)) {
+        errors.push(`${path} missing required property ${required}`);
+      }
+    }
+    if (schema.additionalProperties === false) {
+      for (const key of Object.keys(value)) {
+        if (!Object.hasOwn(properties, key)) {
+          errors.push(`${path} has additional property ${key}`);
+        }
+      }
+    }
+    for (const [key, propertySchema] of Object.entries(properties)) {
+      if (Object.hasOwn(value, key)) {
+        errors.push(...validateJsonSchemaSubset(propertySchema, value[key], `${path}.${key}`));
+      }
+    }
+  }
+  return errors;
+}
+
+function valueMatchesJsonType(value, type) {
+  if (type === "null") return value === null;
+  if (type === "array") return Array.isArray(value);
+  if (type === "object") return value !== null && typeof value === "object" && !Array.isArray(value);
+  if (type === "integer") return Number.isInteger(value);
+  if (type === "number") return typeof value === "number" && Number.isFinite(value);
+  return typeof value === type;
+}
+
 function assertRuntimeScripts() {
   const root = resolve(fixtureRoot, "runtime");
   mkdirSync(root, { recursive: true });
@@ -608,6 +682,8 @@ function assertRuntimeScripts() {
     throw new Error(`sparse metrics should remain unknown/null, not zero\n${JSON.stringify(sparseReport, null, 2)}`);
   }
   const adoptionSchema = JSON.parse(readFileSync(resolve(repoRoot, "schemas/adoption-report.schema.json"), "utf8"));
+  assertSchemaPass("generated review adoption report", adoptionSchema, reviewReport);
+  assertSchemaPass("generated sparse adoption report", adoptionSchema, sparseReport);
   const goalType = adoptionSchema.properties.instruction_maturity.properties.average_goal_clarity.type;
   const routingType = adoptionSchema.properties.skill_usage.properties.correct_routing_rate.type;
   if (!Array.isArray(goalType) || !goalType.includes("null") || !Array.isArray(routingType) || !routingType.includes("null")) {
