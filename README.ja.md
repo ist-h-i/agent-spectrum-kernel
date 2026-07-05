@@ -19,7 +19,7 @@ skills/        必要時だけ使うワークフロー
 examples/      使い方の短い例
 docs/          運用・カスタマイズ・採点基準
 schemas/       metrics / report / improvement ledger のmachine-readable schema
-adapters/      Claude Code project adapter、Pattern B GitHub Actions adapter、optional plugin
+adapters/      Claude Code adapter と Codex adapter
 scripts/       validation、Claude adapter install、local observability runtime
 ```
 
@@ -70,6 +70,16 @@ node scripts/install-claude-adapter.mjs --target /path/to/project
 ```
 
 Local hooks がdefaultです。GitHub Actionsは任意のPR共有adapterであり、常時PR reviewやlocal observabilityの代替ではありません。metricsは既定でproject-local、raw prompt / secret / customer data / personal data / full file contents / full command output / external publication は既定offです。
+
+Codex の推奨入口:
+
+```text
+adapters/codex/README.md
+adapters/codex/prompts/
+adapters/codex/commands/codex-exec.md
+```
+
+Codex adapter は prompt-driven な最小adapterです。`AGENTS.md` と必要なSkillを Codex のrepo surfaceへ投影する使い方を示しますが、installer、hooks、local metrics sidecar、共有PR workflow、外部公開は提供しません。capabilityは `docs/adapter-capability-matrix.md` で supported / partial / unsupported / unknown に分けます。
 
 例:
 
