@@ -72,7 +72,7 @@ Skill route:
 - skipped_gates:
   - gate:
   - reason:
-- gate_applicability:
+- routing_result.gate_applicability:
   - layer:
     status: required | skipped | insufficient_evidence
     gate:
@@ -176,12 +176,10 @@ Skill usage maturity:
 - Correct routing rate:
 - Required gate coverage:
 - Under-processing count:
-- Over-processing rate:
-- Skipped gates by reason category:
-- Insufficient evidence by gate/layer:
-- Under-processing count:
 - Over-processing count:
 - Top repeated gate-deviation patterns:
+- Skipped gates by reason category:
+- Insufficient evidence by gate/layer:
 - Missing skip reason count:
 - Missing evidence rate:
 - Improvement-ledger handoff rate:

@@ -33,14 +33,14 @@ Metrics event candidate:
   - skipped_gates:
     - gate:
     - reason:
-- gate_applicability:
-  - layer:
-    status: required | skipped | insufficient_evidence
-    gate:
-    reason:
-    evidence:
-    trigger_signals:
-    inputs_still_needed:
+  - gate_applicability:
+    - layer:
+      status: required | skipped | insufficient_evidence
+      gate:
+      reason:
+      evidence:
+      trigger_signals:
+      inputs_still_needed:
 - gate_decisions:
   - gate:
     layer:

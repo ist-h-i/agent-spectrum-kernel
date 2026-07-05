@@ -37,6 +37,8 @@ Select the smallest set of review gates needed to make the merge decision defens
    - Architecture/risk: hard-to-reverse boundaries, dependencies, public contracts, persistence, auth, infra, external effects.
 
 3. Produce a layer applicability contract before executing gates.
+   - Layer applicability is a routing contract, not the gate execution result.
+   - Gate execution and final review judgments are recorded separately as gate_decisions when metrics are emitted.
    - Every layer must have `status: required | skipped | insufficient evidence`.
    - Every layer must include an evidence-based reason.
    - Every layer must include `trigger_signals` and `evidence`.
