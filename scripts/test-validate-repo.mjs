@@ -171,7 +171,7 @@ safety:
   }
 
   mkdirSync(resolve(root, "adapters/claude-code/project/.claude/hooks"), { recursive: true });
-  writeFileSync(resolve(root, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind task_stop --sidecar .claude/metrics/current-task.json --non-blocking" }] }] } }\n');
+  writeFileSync(resolve(root, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind task_stop --sidecar .claude/metrics/current-task.json --non-blocking >/dev/null 2>&1 || true" }] }] } }\n');
   mkdirSync(resolve(root, "adapters/claude-code/plugin/hooks"), { recursive: true });
   writeFileSync(resolve(root, "adapters/claude-code/plugin/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "ai-skills-metrics-record" }] }] } }\n');
 
@@ -1296,6 +1296,10 @@ function assertStakeholderReadinessSamples() {
   }
 }
 
+function isFailOpenHookCommand(command) {
+  return />\/dev\/null\s+2>&1\s+\|\|\s+true\s*$/.test(command);
+}
+
 function assertSidecarAdapterInstructions() {
   const commandNames = ["skill-review.md", "skill-implement.md", "skill-investigate.md", "skill-verify.md", "skill-handoff.md"];
   for (const commandName of commandNames) {
@@ -1319,9 +1323,38 @@ function assertSidecarAdapterInstructions() {
   }
 
   const hooks = JSON.parse(readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/hooks/hooks.json"), "utf8"));
+  const projectHookCommands = Object.values(hooks.hooks ?? {}).flatMap((groups) =>
+    (Array.isArray(groups) ? groups : []).flatMap((group) =>
+      (Array.isArray(group.hooks) ? group.hooks : []).map((hook) => hook.command ?? ""),
+    ),
+  );
+  const metricsHookCommands = projectHookCommands.filter((command) => command.includes("ai-metrics-record.mjs"));
+  if (metricsHookCommands.length === 0) {
+    throw new Error("project hooks should include metrics recorder commands");
+  }
+  for (const command of metricsHookCommands) {
+    if (!command.includes("--non-blocking") || !isFailOpenHookCommand(command)) {
+      throw new Error(`project metrics hook should be shell-level fail-open and silent\n${command}`);
+    }
+  }
+
   const stopCommands = (hooks.hooks?.Stop ?? []).flatMap((group) => (group.hooks ?? []).map((hook) => hook.command ?? ""));
-  if (!stopCommands.some((command) => command.includes("--event-kind task_stop") && command.includes("--sidecar") && command.includes(".claude/metrics/current-task.json") && command.includes("--non-blocking"))) {
+  const sidecarStopCommand = stopCommands.find((command) => command.includes("--event-kind task_stop") && command.includes("--sidecar") && command.includes(".claude/metrics/current-task.json") && command.includes("--non-blocking"));
+  if (!sidecarStopCommand) {
     throw new Error("project Stop hook should ingest the sidecar through the non-blocking metrics recorder");
+  }
+
+  const missingRuntimeRoot = resolve(fixtureRoot, "hook-missing-runtime");
+  mkdirSync(resolve(missingRuntimeRoot, ".claude/metrics"), { recursive: true });
+  const missingRuntimeResult = spawnSync("/bin/sh", ["-c", sidecarStopCommand], {
+    cwd: missingRuntimeRoot,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: missingRuntimeRoot },
+    input: JSON.stringify({ session_id: "S-MISSING-RUNTIME" }),
+    encoding: "utf8",
+  });
+  assertRuntimePass("project Stop hook missing runtime script", missingRuntimeResult);
+  if (missingRuntimeResult.stdout || missingRuntimeResult.stderr) {
+    throw new Error(`project Stop hook missing runtime should stay silent\nstdout:\n${missingRuntimeResult.stdout}\nstderr:\n${missingRuntimeResult.stderr}`);
   }
 }
 
