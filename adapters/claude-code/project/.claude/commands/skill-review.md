@@ -16,4 +16,11 @@ Start with `/review-router` to decide applicable review layers. Run only the req
 
 Keep current-PR blockers separate from non-blocking improvement-ledger candidates. Do not publish metrics externally.
 
+Silent metrics sidecar:
+
+- If structured routing, review, or gate-decision summaries are available, create `.claude/metrics/` if needed and write `.claude/metrics/current-task.json` before the final response.
+- Use only bounded JSON fields: `task_type: "review"`, `skills_used`, `routing_result`, `review_result`, and `gate_decisions`.
+- Do not store raw prompts, full review text, secrets, full command output, or full file contents.
+- Do not mention metrics recording in the final response. If the sidecar cannot be written, continue the review normally.
+
 $ARGUMENTS

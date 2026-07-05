@@ -171,7 +171,7 @@ safety:
   }
 
   mkdirSync(resolve(root, "adapters/claude-code/project/.claude/hooks"), { recursive: true });
-  writeFileSync(resolve(root, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs" }] }] } }\n');
+  writeFileSync(resolve(root, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind task_stop --sidecar .claude/metrics/current-task.json --non-blocking" }] }] } }\n');
   mkdirSync(resolve(root, "adapters/claude-code/plugin/hooks"), { recursive: true });
   writeFileSync(resolve(root, "adapters/claude-code/plugin/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "ai-skills-metrics-record" }] }] } }\n');
 
@@ -554,6 +554,165 @@ function assertRuntimeScripts() {
     JSON.stringify(gateDecisionRecordedEvent.gate_decisions).includes("must not be stored")
   ) {
     throw new Error(`metrics recorder should store sanitized structured gate decisions\n${JSON.stringify(gateDecisionRecordedEvent, null, 2)}`);
+  }
+
+  const sidecarDir = resolve(root, ".claude/metrics");
+  mkdirSync(sidecarDir, { recursive: true });
+  const sidecarPath = resolve(sidecarDir, "current-task.json");
+  const sidecarStore = resolve(root, "docs/ai/metrics/sidecar-review-events.jsonl");
+  writeFileSync(
+    sidecarPath,
+    JSON.stringify({
+      task_type: "review",
+      skills_used: ["review-router", "review-final-merge-gate"],
+      routing_result: {
+        operating_mode: "delivery_quality",
+        primary_skill: "review-router",
+        required_gates: ["review-router", "review-final-merge-gate"],
+        executed_gates: ["review-router", "review-final-merge-gate"],
+        raw_prompt: "raw prompt text must not be stored",
+      },
+      review_result: {
+        decision: "request_changes",
+        required_fixes_count: 2,
+        insufficient_evidence_layers: ["Architecture"],
+        full_review_text: "full review text must not be stored",
+      },
+      gate_decisions: [
+        {
+          gate: "review-architecture-impact",
+          layer: "Architecture",
+          status: "executed",
+          judgment: "Architecture gate checked public API surface.",
+          evidence_checked: ["changed files", "public API surface"],
+          triggering_signals: ["public_api_change"],
+          missing_inputs: [],
+          confidence: "high",
+          reason_category: "other",
+          raw_prompt: "must not be stored",
+        },
+      ],
+      full_command_output: "secret command output must not be stored",
+      full_file_contents: "file contents must not be stored",
+      secret: "sk-test-secret",
+    }),
+  );
+  const sidecarResult = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--hook-event",
+      "Stop",
+      "--event-kind",
+      "task_stop",
+      "--event-store",
+      sidecarStore,
+      "--sidecar",
+      sidecarPath,
+      "--non-blocking",
+    ],
+    {
+      cwd: root,
+      input: JSON.stringify({ session_id: "S2" }),
+    },
+  );
+  assertRuntimePass("metrics recorder review sidecar ingestion", sidecarResult);
+  if (sidecarResult.stdout || sidecarResult.stderr) {
+    throw new Error(`sidecar ingestion should not print routine output\nstdout:\n${sidecarResult.stdout}\nstderr:\n${sidecarResult.stderr}`);
+  }
+  if (existsSync(sidecarPath)) {
+    throw new Error("sidecar ingestion should consume current-task.json to avoid stale reuse");
+  }
+  const sidecarEvent = JSON.parse(readFileSync(sidecarStore, "utf8"));
+  assertSchemaPass("recorded sidecar review event", metricsSchema, sidecarEvent);
+  if (
+    sidecarEvent.task_id !== "session:S2" ||
+    sidecarEvent.task_type !== "review" ||
+    sidecarEvent.review_result?.decision !== "request_changes" ||
+    sidecarEvent.gate_decisions?.[0]?.gate !== "review-architecture-impact" ||
+    sidecarEvent.outcome_metrics.task_completed !== true ||
+    JSON.stringify(sidecarEvent).includes("sk-test-secret") ||
+    JSON.stringify(sidecarEvent).includes("raw prompt text must not be stored") ||
+    JSON.stringify(sidecarEvent).includes("full review text must not be stored") ||
+    JSON.stringify(sidecarEvent).includes("secret command output must not be stored") ||
+    JSON.stringify(sidecarEvent).includes("file contents must not be stored")
+  ) {
+    throw new Error(`skill-review sidecar should produce a sanitized review_result event\n${JSON.stringify(sidecarEvent, null, 2)}`);
+  }
+
+  const missingSidecarStore = resolve(root, "docs/ai/metrics/missing-sidecar-events.jsonl");
+  const missingSidecarResult = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--hook-event",
+      "Stop",
+      "--event-kind",
+      "task_stop",
+      "--event-store",
+      missingSidecarStore,
+      "--sidecar",
+      resolve(sidecarDir, "missing-current-task.json"),
+      "--non-blocking",
+    ],
+    {
+      cwd: root,
+      input: JSON.stringify({ session_id: "S3" }),
+    },
+  );
+  assertRuntimePass("metrics recorder missing sidecar fallback", missingSidecarResult);
+  if (missingSidecarResult.stdout || missingSidecarResult.stderr) {
+    throw new Error(`missing sidecar fallback should stay silent\nstdout:\n${missingSidecarResult.stdout}\nstderr:\n${missingSidecarResult.stderr}`);
+  }
+  const missingSidecarEvent = JSON.parse(readFileSync(missingSidecarStore, "utf8"));
+  if (missingSidecarEvent.outcome_metrics.task_completed !== true || missingSidecarEvent.review_result || missingSidecarEvent.gate_decisions) {
+    throw new Error(`missing sidecar should still record a normal task_stop event\n${JSON.stringify(missingSidecarEvent, null, 2)}`);
+  }
+
+  const invalidSidecarStore = resolve(root, "docs/ai/metrics/invalid-sidecar-events.jsonl");
+  writeFileSync(sidecarPath, '{ "review_result": "invalid", "secret": "sk-invalid-secret"');
+  const invalidSidecarResult = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--hook-event",
+      "Stop",
+      "--event-kind",
+      "task_stop",
+      "--event-store",
+      invalidSidecarStore,
+      "--sidecar",
+      sidecarPath,
+      "--non-blocking",
+    ],
+    {
+      cwd: root,
+      input: JSON.stringify({ session_id: "S4" }),
+    },
+  );
+  assertRuntimePass("metrics recorder invalid sidecar fallback", invalidSidecarResult);
+  if (invalidSidecarResult.stdout || invalidSidecarResult.stderr) {
+    throw new Error(`invalid sidecar fallback should stay silent\nstdout:\n${invalidSidecarResult.stdout}\nstderr:\n${invalidSidecarResult.stderr}`);
+  }
+  const invalidSidecarEvent = JSON.parse(readFileSync(invalidSidecarStore, "utf8"));
+  if (invalidSidecarEvent.outcome_metrics.task_completed !== true || JSON.stringify(invalidSidecarEvent).includes("sk-invalid-secret")) {
+    throw new Error(`invalid sidecar should be skipped without leaking content\n${JSON.stringify(invalidSidecarEvent, null, 2)}`);
+  }
+
+  const nonBlockingFailure = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--event-kind",
+      "task_stop",
+      "--event-store",
+      resolve(root, "docs/ai/metrics"),
+      "--non-blocking",
+    ],
+    {
+      cwd: root,
+      input: JSON.stringify({ session_id: "S5" }),
+    },
+  );
+  assertRuntimePass("metrics recorder non-blocking failure", nonBlockingFailure);
+  if (nonBlockingFailure.stdout || nonBlockingFailure.stderr) {
+    throw new Error(`non-blocking metrics failures should stay silent\nstdout:\n${nonBlockingFailure.stdout}\nstderr:\n${nonBlockingFailure.stderr}`);
   }
 
   const taskEvents = [];
@@ -1137,9 +1296,39 @@ function assertStakeholderReadinessSamples() {
   }
 }
 
+function assertSidecarAdapterInstructions() {
+  const commandNames = ["skill-review.md", "skill-implement.md", "skill-investigate.md", "skill-verify.md", "skill-handoff.md"];
+  for (const commandName of commandNames) {
+    const commandPath = resolve(repoRoot, "adapters/claude-code/project/.claude/commands", commandName);
+    const content = readFileSync(commandPath, "utf8");
+    if (
+      !content.includes("Silent metrics sidecar") ||
+      !content.includes(".claude/metrics/current-task.json") ||
+      !content.includes("Do not mention metrics recording") ||
+      !content.includes("raw prompts") ||
+      !content.includes("full command output") ||
+      !content.includes("full file contents")
+    ) {
+      throw new Error(`${commandName} should include silent sidecar privacy instructions`);
+    }
+  }
+
+  const reviewCommand = readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/commands/skill-review.md"), "utf8");
+  if (!reviewCommand.includes("review_result") || !reviewCommand.includes("gate_decisions")) {
+    throw new Error("skill-review command should instruct review_result and gate_decisions sidecar summaries");
+  }
+
+  const hooks = JSON.parse(readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/hooks/hooks.json"), "utf8"));
+  const stopCommands = (hooks.hooks?.Stop ?? []).flatMap((group) => (group.hooks ?? []).map((hook) => hook.command ?? ""));
+  if (!stopCommands.some((command) => command.includes("--event-kind task_stop") && command.includes("--sidecar") && command.includes(".claude/metrics/current-task.json") && command.includes("--non-blocking"))) {
+    throw new Error("project Stop hook should ingest the sidecar through the non-blocking metrics recorder");
+  }
+}
+
 try {
   const validRoot = cloneFixture("valid");
   assertPass("valid fixture", validRoot);
+  assertSidecarAdapterInstructions();
   assertRuntimeScripts();
   assertInstallerScripts();
   assertStakeholderReadinessSamples();
