@@ -2,6 +2,20 @@
 
 These templates translate internal workflow evidence into stakeholder-specific readiness views. They do not prove client value by themselves.
 
+Fixture-backed sample reports are available under:
+
+```text
+docs/ai/reports/examples/
+```
+
+The sample source events are under:
+
+```text
+docs/ai/metrics/fixtures/stakeholder-readiness-events.jsonl
+```
+
+The samples are illustrative only. They must not be treated as adopting-project evidence or client-value proof.
+
 Use three separate readiness concepts:
 
 | Concept | Meaning | Evidence needed |

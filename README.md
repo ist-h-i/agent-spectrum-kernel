@@ -174,6 +174,7 @@ First-time users should start with `docs/quickstart-ja.md`.
 - `docs/skill-matrix.md`: reference matrix for workflow selection.
 - `docs/adapter-conformance-contract.md` and `docs/adapter-capability-matrix.md`: adapter portability and capability evidence.
 - `docs/ai/stakeholder-readiness-report-template.md`: stakeholder-specific readiness reports that separate internal quality, release readiness, and client-value readiness.
+- `docs/ai/reports/examples/`: fixture-backed stakeholder-readiness samples for senior engineering, development management, business unit, and AI promotion views.
 
 ## Recommended workflows
 
