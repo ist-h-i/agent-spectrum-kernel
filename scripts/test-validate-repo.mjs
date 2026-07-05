@@ -1293,6 +1293,52 @@ function assertRuntimeScripts() {
     throw new Error(`boundary/API change should require and execute architecture gate without deviation warnings\n${JSON.stringify(boundaryReport.skill_usage, null, 2)}`);
   }
 
+  const missingHeavyApplicabilityReport = summarizeEvents("missing-heavy-applicability-routing-report", [
+    routingEvent({
+      event_id: "evt-missing-heavy-applicability",
+      task_id: "MISSING-HEAVY-APP-1",
+      changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
+      routing_result: {
+        required_gates: ["review-router", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-architecture-impact"],
+      },
+    }),
+  ]);
+  if (
+    missingHeavyApplicabilityReport.skill_usage.over_processing_count !== 0 ||
+    !missingHeavyApplicabilityReport.adoption_effect.weak_signal.some((signal) => signal.includes("Over-processing") && signal.includes("review-architecture-impact"))
+  ) {
+    throw new Error(`heavy gate required/executed without applicability evidence should be flagged\n${JSON.stringify(missingHeavyApplicabilityReport, null, 2)}`);
+  }
+
+  const missingHeavyTriggerReport = summarizeEvents("missing-heavy-trigger-routing-report", [
+    routingEvent({
+      event_id: "evt-missing-heavy-trigger",
+      task_id: "MISSING-HEAVY-TRIGGER-1",
+      changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
+      routing_result: {
+        required_gates: ["review-router", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-architecture-impact"],
+        gate_applicability: [
+          {
+            layer: "Architecture",
+            status: "required",
+            gate: "review-architecture-impact",
+            reason: "Architecture gate was selected but no trigger signal was recorded.",
+            evidence: "changed_file_summary includes schemas/public-api.schema.json",
+            trigger_signals: [],
+          },
+        ],
+      },
+    }),
+  ]);
+  if (
+    missingHeavyTriggerReport.skill_usage.over_processing_count !== 0 ||
+    !missingHeavyTriggerReport.adoption_effect.weak_signal.some((signal) => signal.includes("Over-processing") && signal.includes("review-architecture-impact"))
+  ) {
+    throw new Error(`heavy gate required/executed without trigger signals should be flagged\n${JSON.stringify(missingHeavyTriggerReport, null, 2)}`);
+  }
+
   const missingEvidenceReport = summarizeEvents("missing-evidence-routing-report", [
     routingEvent({
       event_id: "evt-missing-routing-evidence",
