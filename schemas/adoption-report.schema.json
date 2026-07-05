@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/ai-coding-rules-and-skills/schemas/adoption-report.schema.json",
+  "title": "AI Skills Adoption Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "report_type", "period", "summary", "privacy_note", "evidence_references"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "report_type": { "type": "string", "enum": ["weekly", "monthly", "custom"] },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "string", "format": "date" },
+        "end": { "type": "string", "format": "date" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tasks_reviewed": { "type": "integer", "minimum": 0 },
+        "completed_tasks": { "type": "integer", "minimum": 0 },
+        "validation_passed": { "type": "integer", "minimum": 0 },
+        "validation_failed": { "type": "integer", "minimum": 0 },
+        "insufficient_evidence": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "instruction_maturity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "average_goal_clarity": { "type": "number", "minimum": 1, "maximum": 5 },
+        "average_scope_clarity": { "type": "number", "minimum": 1, "maximum": 5 },
+        "average_context_sufficiency": { "type": "number", "minimum": 1, "maximum": 5 },
+        "verification_instruction_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "risk_awareness_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "stop_condition_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "skill_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "skills_used": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "correct_routing_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "required_gate_coverage": { "type": "number", "minimum": 0, "maximum": 1 },
+        "over_processing_count": { "type": "integer", "minimum": 0 },
+        "missing_evidence_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "debt_movement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "detected": { "type": "integer", "minimum": 0 },
+        "recorded": { "type": "integer", "minimum": 0 },
+        "planned": { "type": "integer", "minimum": 0 },
+        "in_progress": { "type": "integer", "minimum": 0 },
+        "resolved": { "type": "integer", "minimum": 0 },
+        "converted_to_rule": { "type": "integer", "minimum": 0 },
+        "converted_to_check": { "type": "integer", "minimum": 0 },
+        "accepted": { "type": "integer", "minimum": 0 },
+        "wont_fix": { "type": "integer", "minimum": 0 },
+        "stale": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "adoption_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strong_signal": { "type": "array", "items": { "type": "string" } },
+        "weak_signal": { "type": "array", "items": { "type": "string" } },
+        "unknown": { "type": "array", "items": { "type": "string" } },
+        "recommended_next_intervention": { "type": "string" }
+      }
+    },
+    "evidence_references": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "privacy_note": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_prompts_stored", "external_publication", "personnel_evaluation_boundary"],
+      "properties": {
+        "raw_prompts_stored": { "type": "boolean", "const": false },
+        "external_publication": { "type": "boolean", "const": false },
+        "personnel_evaluation_boundary": { "type": "string", "minLength": 1 },
+        "sensitive_data_handling": { "type": "string" }
+      }
+    }
+  }
+}

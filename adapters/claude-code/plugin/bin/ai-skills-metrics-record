@@ -1,0 +1,18 @@
+#!/usr/bin/env node
+import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
+
+const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+const runtime = resolve(projectDir, "scripts/ai-metrics-record.mjs");
+
+if (!existsSync(runtime)) {
+  process.exit(0);
+}
+
+const result = spawnSync(process.execPath, [runtime, ...process.argv.slice(2)], {
+  cwd: projectDir,
+  stdio: "inherit",
+});
+
+process.exit(result.status ?? 1);

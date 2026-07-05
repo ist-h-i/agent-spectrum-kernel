@@ -1,0 +1,34 @@
+# Local AI observability config template.
+# Copy into an adopting project and keep project-specific data local by default.
+
+enabled: true
+
+storage:
+  event_store: docs/ai/metrics/events.jsonl
+  report_dir: docs/ai/reports
+  improvement_ledger: docs/ai/improvement-ledger.md
+
+capture:
+  task_boundary_required: true
+  allow_session_id_task_boundary: false
+  record_file_change_events: true
+  record_verification_attempts: true
+  record_task_stop_candidates: true
+  max_paths_per_event: 50
+
+privacy:
+  raw_prompt_storage: false
+  secrets_storage: false
+  customer_data_storage: false
+  personal_data_storage: false
+  full_file_contents: false
+  full_command_output: false
+
+external_publication:
+  enabled: false
+  destination: null
+
+safety:
+  http_hooks_enabled: false
+  webhook_hooks_enabled: false
+  block_on_record_failure: false

@@ -34,6 +34,42 @@ const SKILL_COUNT_REFERENCE_PATTERNS = [
 ];
 const MAINTAINED_SCAN_ROOTS = ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "README.md", "README.ja.md", "docs", "examples", "skills"];
 const GENERATED_REPORT_PATH = "docs/validation-report.md";
+const REQUIRED_SCHEMA_PATHS = [
+  "schemas/metrics-event.schema.json",
+  "schemas/adoption-report.schema.json",
+  "schemas/improvement-ledger-entry.schema.json",
+];
+const REQUIRED_CLAUDE_ADAPTER_PATHS = [
+  "adapters/claude-code/README.md",
+  "adapters/claude-code/project/.claude/skills/README.md",
+  "adapters/claude-code/project/.claude/commands/skill-review.md",
+  "adapters/claude-code/project/.claude/commands/skill-report.md",
+  "adapters/claude-code/project/.claude/commands/skill-ledger-refresh.md",
+  "adapters/claude-code/project/.claude/hooks/hooks.json",
+  "adapters/claude-code/github-actions/claude-review-on-mention.yml",
+  "adapters/claude-code/github-actions/README.md",
+  "adapters/claude-code/plugin/.claude-plugin/plugin.json",
+  "adapters/claude-code/plugin/README.md",
+  "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+  "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
+  "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
+  "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md",
+  "adapters/claude-code/plugin/hooks/hooks.json",
+  "adapters/claude-code/plugin/bin/ai-skills-metrics-record",
+];
+const REQUIRED_OBSERVABILITY_DOCS = [
+  "docs/observability-runtime-contract.md",
+  "docs/operation-automation-contract.md",
+  "docs/debt-lifecycle-contract.md",
+  "docs/metrics-event-contract.md",
+  "docs/ai/skill-adoption-metrics.md",
+  "docs/ai/adoption-report-template.md",
+  "docs/ai/observability-config.yml",
+];
+const OBSERVABILITY_CONFIG_PATH = "docs/ai/observability-config.yml";
+const PATTERN_B_WORKFLOW_PATH = "adapters/claude-code/github-actions/claude-review-on-mention.yml";
+const FORBIDDEN_OPERATION_AUTOMATION_SKILL = "skills/operation-automation/SKILL.md";
+const FORBIDDEN_OPERATION_AUTOMATION_SKILL_UNDERSCORE = "skills/operation_automation/SKILL.md";
 const ALLOWED_ROUTE_PHRASE_CONTEXTS = [
   "spec-driven-development -> test-first-verification for Verification Contract -> controlled-implementation -> test-first-verification for evidence",
   "doubt-driven-development -> test-first-verification for reproduction and Verification Contract -> controlled-implementation -> test-first-verification for regression proof",
@@ -338,7 +374,7 @@ function validateManifestPaths(root, manifest, errors) {
     }
   }
 
-  for (const key of ["docs", "examples"]) {
+  for (const key of ["docs", "examples", "schemas", "adapters"]) {
     if (!Array.isArray(manifest[key])) {
       continue;
     }
@@ -666,6 +702,31 @@ function collectMarkdownFiles(root) {
   return files;
 }
 
+function collectFiles(root, paths) {
+  const files = [];
+
+  function walk(path) {
+    const absolutePath = resolve(root, path);
+    if (!existsSync(absolutePath)) {
+      return;
+    }
+    const stat = statSync(absolutePath);
+    if (stat.isDirectory()) {
+      for (const entry of readdirSync(absolutePath).sort()) {
+        walk(`${path}/${entry}`);
+      }
+      return;
+    }
+    files.push(path);
+  }
+
+  for (const path of paths) {
+    walk(path);
+  }
+
+  return files;
+}
+
 function findStalePhrases(root, currentSkillCount, errors) {
   const findings = [];
 
@@ -747,7 +808,7 @@ function buildPathChecks(root, manifest) {
   if (manifest?.copy_paste_kernel) {
     addPath(manifest.copy_paste_kernel, "copy_paste_kernel");
   }
-  for (const key of ["docs", "examples"]) {
+  for (const key of ["docs", "examples", "schemas", "adapters"]) {
     if (Array.isArray(manifest?.[key])) {
       for (const path of manifest[key]) {
         addPath(path, key);
@@ -762,7 +823,278 @@ function buildPathChecks(root, manifest) {
   }));
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, pathChecks, staleFindings }) {
+function validateClaudeAdapterArchitecture(root, manifest, errors) {
+  const checks = {
+    requiredAdapterPaths: [],
+    schemaPaths: [],
+    observabilityDocs: [],
+    operationAutomationSkillAbsent: true,
+    operationAutomationGroupEmpty: false,
+    localObservability: {
+      configPresent: false,
+      eventStoreLocal: false,
+      reportDirLocal: false,
+      externalPublicationDisabled: false,
+      rawPromptStorageDisabled: false,
+      sensitiveStorageDisabled: false,
+      httpHooksDisabled: false,
+      webhookHooksDisabled: false,
+    },
+    externalPublicationSafety: {
+      noHttpHookHandlers: true,
+      noWebhookHookHandlers: true,
+      noExternalDestinationEnabled: true,
+    },
+    patternBGitHubAction: {
+      present: false,
+      hasIssueCommentTrigger: false,
+      hasReviewCommentTrigger: false,
+      hasMentionGuard: false,
+      noAlwaysOnPullRequestTrigger: true,
+      noSecretLiteral: true,
+      noAutoMergeDeployRelease: true,
+    },
+    documentationConsistency: {
+      mentionsLocalHooksDefault: false,
+      mentionsPatternBOptional: false,
+      mentionsNoRawPromptDefault: false,
+      mentionsNoExternalPublicationDefault: false,
+    },
+  };
+
+  for (const path of REQUIRED_CLAUDE_ADAPTER_PATHS) {
+    const ok = existsSync(resolve(root, path));
+    checks.requiredAdapterPaths.push({ path, ok });
+    if (!ok) {
+      fail(errors, "claude adapter", `required adapter path is missing: ${path}`);
+    }
+  }
+
+  for (const path of REQUIRED_SCHEMA_PATHS) {
+    const absolutePath = resolve(root, path);
+    const ok = existsSync(absolutePath);
+    let validJson = false;
+    let hasSchema = false;
+    if (ok) {
+      try {
+        const json = JSON.parse(readFileSync(absolutePath, "utf8"));
+        validJson = true;
+        hasSchema = typeof json.$schema === "string";
+      } catch (error) {
+        fail(errors, "schema paths", `${path} is not valid JSON: ${error.message}`);
+      }
+    }
+    checks.schemaPaths.push({ path, ok, validJson, hasSchema });
+    if (!ok) {
+      fail(errors, "schema paths", `required schema is missing: ${path}`);
+    } else if (!hasSchema) {
+      fail(errors, "schema paths", `${path} is missing $schema`);
+    }
+  }
+
+  for (const path of REQUIRED_OBSERVABILITY_DOCS) {
+    const ok = existsSync(resolve(root, path));
+    checks.observabilityDocs.push({ path, ok });
+    if (!ok) {
+      fail(errors, "local observability", `required observability doc/config is missing: ${path}`);
+    }
+  }
+
+  checks.operationAutomationSkillAbsent =
+    !existsSync(resolve(root, FORBIDDEN_OPERATION_AUTOMATION_SKILL)) &&
+    !existsSync(resolve(root, FORBIDDEN_OPERATION_AUTOMATION_SKILL_UNDERSCORE));
+  if (!checks.operationAutomationSkillAbsent) {
+    fail(errors, "operation automation", "operation automation must remain an external layer; do not add skills/operation-automation/SKILL.md");
+  }
+  checks.operationAutomationGroupEmpty = Array.isArray(manifest?.skill_groups?.operation_automation) && manifest.skill_groups.operation_automation.length === 0;
+  if (!checks.operationAutomationGroupEmpty) {
+    fail(errors, "operation automation", "manifest.json.skill_groups.operation_automation must remain an empty external layer");
+  }
+
+  validateObservabilityConfig(root, checks, errors);
+  validateHookSafety(root, checks, errors);
+  validatePatternBWorkflow(root, checks, errors);
+  validateAdapterDocumentation(root, checks, errors);
+
+  return checks;
+}
+
+function validateObservabilityConfig(root, checks, errors) {
+  const absolutePath = resolve(root, OBSERVABILITY_CONFIG_PATH);
+  if (!existsSync(absolutePath)) {
+    return;
+  }
+  checks.localObservability.configPresent = true;
+  const text = readFileSync(absolutePath, "utf8");
+  const config = parseSimpleYaml(text);
+  const eventStore = readObjectPath(config, "storage.event_store");
+  const reportDir = readObjectPath(config, "storage.report_dir");
+  checks.localObservability.eventStoreLocal = typeof eventStore === "string" && eventStore.startsWith("docs/ai/") && !/^https?:\/\//i.test(eventStore);
+  checks.localObservability.reportDirLocal = typeof reportDir === "string" && reportDir.startsWith("docs/ai/") && !/^https?:\/\//i.test(reportDir);
+  checks.localObservability.externalPublicationDisabled = readObjectPath(config, "external_publication.enabled") === false;
+  checks.localObservability.rawPromptStorageDisabled = readObjectPath(config, "privacy.raw_prompt_storage") === false;
+  checks.localObservability.sensitiveStorageDisabled =
+    readObjectPath(config, "privacy.secrets_storage") === false &&
+    readObjectPath(config, "privacy.customer_data_storage") === false &&
+    readObjectPath(config, "privacy.personal_data_storage") === false;
+  checks.localObservability.httpHooksDisabled = readObjectPath(config, "safety.http_hooks_enabled") === false;
+  checks.localObservability.webhookHooksDisabled = readObjectPath(config, "safety.webhook_hooks_enabled") === false;
+
+  for (const [field, ok] of Object.entries(checks.localObservability)) {
+    if (field === "configPresent") {
+      continue;
+    }
+    if (!ok) {
+      fail(errors, "local observability", `${OBSERVABILITY_CONFIG_PATH} failed local-first safety check: ${field}`);
+    }
+  }
+}
+
+function parseSimpleYaml(text) {
+  const result = {};
+  const stack = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.replace(/\s+#.*$/, "");
+    if (!line.trim()) {
+      continue;
+    }
+    const match = line.match(/^(\s*)([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!match) {
+      continue;
+    }
+    const level = Math.floor(match[1].length / 2);
+    const key = match[2];
+    const value = match[3];
+    stack.length = level;
+    if (value === "") {
+      stack[level] = key;
+      assignObjectPath(result, [...stack.slice(0, level), key], {});
+      continue;
+    }
+    assignObjectPath(result, [...stack.slice(0, level), key], parseYamlScalar(value));
+  }
+  return result;
+}
+
+function parseYamlScalar(value) {
+  const trimmed = value.trim();
+  if (trimmed === "true") return true;
+  if (trimmed === "false") return false;
+  if (trimmed === "null") return null;
+  return trimmed.replace(/^["']|["']$/g, "");
+}
+
+function assignObjectPath(object, pathParts, value) {
+  let cursor = object;
+  for (const part of pathParts.slice(0, -1)) {
+    if (!cursor[part] || typeof cursor[part] !== "object") {
+      cursor[part] = {};
+    }
+    cursor = cursor[part];
+  }
+  cursor[pathParts.at(-1)] = value;
+}
+
+function readObjectPath(object, dottedPath) {
+  return dottedPath.split(".").reduce((cursor, part) => (cursor && Object.hasOwn(cursor, part) ? cursor[part] : undefined), object);
+}
+
+function validateHookSafety(root, checks, errors) {
+  const hookPaths = [
+    "adapters/claude-code/project/.claude/hooks/hooks.json",
+    "adapters/claude-code/plugin/hooks/hooks.json",
+  ];
+  for (const path of hookPaths) {
+    const absolutePath = resolve(root, path);
+    if (!existsSync(absolutePath)) {
+      continue;
+    }
+    let hookConfig;
+    try {
+      hookConfig = JSON.parse(readFileSync(absolutePath, "utf8"));
+    } catch (error) {
+      fail(errors, "external publication safety", `${path} is not valid JSON: ${error.message}`);
+      continue;
+    }
+    const serialized = JSON.stringify(hookConfig);
+    if (/"type"\s*:\s*"http"/i.test(serialized)) {
+      checks.externalPublicationSafety.noHttpHookHandlers = false;
+      fail(errors, "external publication safety", `${path} enables an HTTP hook by default`);
+    }
+    if (/webhook/i.test(serialized)) {
+      checks.externalPublicationSafety.noWebhookHookHandlers = false;
+      fail(errors, "external publication safety", `${path} contains a webhook hook by default`);
+    }
+    if (/https?:\/\//i.test(serialized)) {
+      checks.externalPublicationSafety.noExternalDestinationEnabled = false;
+      fail(errors, "external publication safety", `${path} contains an enabled external destination`);
+    }
+  }
+}
+
+function validatePatternBWorkflow(root, checks, errors) {
+  const absolutePath = resolve(root, PATTERN_B_WORKFLOW_PATH);
+  if (!existsSync(absolutePath)) {
+    return;
+  }
+  checks.patternBGitHubAction.present = true;
+  const text = readFileSync(absolutePath, "utf8");
+  checks.patternBGitHubAction.hasIssueCommentTrigger = /^\s+issue_comment:/m.test(text);
+  checks.patternBGitHubAction.hasReviewCommentTrigger = /^\s+pull_request_review_comment:/m.test(text);
+  checks.patternBGitHubAction.hasMentionGuard = text.includes("@claude review") && /contains\([^)]*github\.event\.comment\.body[^)]*'@claude review'[^)]*\)/.test(text);
+  checks.patternBGitHubAction.noAlwaysOnPullRequestTrigger = !/^\s+pull_request:\s*$/m.test(text);
+  checks.patternBGitHubAction.noSecretLiteral = !/(sk-ant-|ANTHROPIC_API_KEY\s*:\s*["'][^$])/i.test(text);
+  checks.patternBGitHubAction.noAutoMergeDeployRelease = !/\b(auto-?merge|deploy|release|publish)\b/i.test(text.replace(/Do not deploy, merge, release, publish/gi, ""));
+
+  for (const [field, ok] of Object.entries(checks.patternBGitHubAction)) {
+    if (field === "present") continue;
+    if (!ok) {
+      fail(errors, "pattern b github action", `${PATTERN_B_WORKFLOW_PATH} failed Pattern B check: ${field}`);
+    }
+  }
+
+  const claudeActionReferences = collectFiles(root, [".github", "adapters", "docs", "examples"])
+    .filter((path) => existsSync(resolve(root, path)) && statSync(resolve(root, path)).isFile())
+    .filter((path) => readFileSync(resolve(root, path), "utf8").includes("anthropics/claude-code-action"));
+  for (const path of claudeActionReferences) {
+    if (!path.startsWith("adapters/claude-code/github-actions/") && path !== "docs/claude-github-review-setup.md") {
+      fail(errors, "pattern b github action", `Claude Code Action workflow reference must live under adapter docs/templates, found: ${path}`);
+    }
+  }
+}
+
+function validateAdapterDocumentation(root, checks, errors) {
+  const docsText = REQUIRED_OBSERVABILITY_DOCS
+    .filter((path) => existsSync(resolve(root, path)))
+    .map((path) => readFileSync(resolve(root, path), "utf8"))
+    .join("\n");
+  const adoptionText = [
+    "README.md",
+    "README.ja.md",
+    "docs/quickstart-ja.md",
+    "docs/usage-ja.md",
+    "docs/prompt-recipes-ja.md",
+    "docs/skill-matrix.md",
+    "docs/routing-model.md",
+  ]
+    .filter((path) => existsSync(resolve(root, path)))
+    .map((path) => readFileSync(resolve(root, path), "utf8"))
+    .join("\n");
+
+  const combinedDocsText = `${docsText}\n${adoptionText}`;
+  checks.documentationConsistency.mentionsLocalHooksDefault = /local hooks?.*(default|primary|推奨|既定)|default.*local hooks?/is.test(combinedDocsText);
+  checks.documentationConsistency.mentionsPatternBOptional = /Pattern B[\s\S]{0,120}(optional|任意)|optional[\s\S]{0,120}Pattern B/is.test(combinedDocsText);
+  checks.documentationConsistency.mentionsNoRawPromptDefault = /raw prompt[\s\S]{0,120}(default|off|既定|保存しません|omitted)/is.test(`${docsText}\n${adoptionText}`);
+  checks.documentationConsistency.mentionsNoExternalPublicationDefault = /external publication[\s\S]{0,120}(default|off|disabled|既定|外部公開)|外部公開[\s\S]{0,120}(既定off|既定で.*しません)/is.test(`${docsText}\n${adoptionText}`);
+
+  for (const [field, ok] of Object.entries(checks.documentationConsistency)) {
+    if (!ok) {
+      fail(errors, "documentation consistency", `Claude adapter docs failed consistency check: ${field}`);
+    }
+  }
+}
+
+function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -810,6 +1142,50 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks
           (check) => `- \`${check.path}\`: ledger_status=${check.status}, metadata=${check.metadataOk ? "ok" : "invalid"}, rows=${check.rowCount}, validation=${check.validationOk ? "ok" : "invalid"}`,
         )
       : ["- `docs/ai/improvement-ledger.md`: not present"]),
+    "",
+    "## Claude adapter checks",
+    "",
+    ...claudeAdapterChecks.requiredAdapterPaths.map((check) => `- \`${check.path}\`: ${check.ok ? "ok" : "missing"}`),
+    "",
+    "## Local observability checks",
+    "",
+    `- config present: ${claudeAdapterChecks.localObservability.configPresent ? "ok" : "missing"}`,
+    `- event store local: ${claudeAdapterChecks.localObservability.eventStoreLocal ? "ok" : "invalid"}`,
+    `- report dir local: ${claudeAdapterChecks.localObservability.reportDirLocal ? "ok" : "invalid"}`,
+    `- external publication disabled: ${claudeAdapterChecks.localObservability.externalPublicationDisabled ? "ok" : "invalid"}`,
+    `- raw prompt storage disabled: ${claudeAdapterChecks.localObservability.rawPromptStorageDisabled ? "ok" : "invalid"}`,
+    `- sensitive storage disabled: ${claudeAdapterChecks.localObservability.sensitiveStorageDisabled ? "ok" : "invalid"}`,
+    `- HTTP hooks disabled: ${claudeAdapterChecks.localObservability.httpHooksDisabled ? "ok" : "invalid"}`,
+    `- webhook hooks disabled: ${claudeAdapterChecks.localObservability.webhookHooksDisabled ? "ok" : "invalid"}`,
+    "",
+    "## External publication safety checks",
+    "",
+    `- operation automation skill absent: ${claudeAdapterChecks.operationAutomationSkillAbsent ? "ok" : "invalid"}`,
+    `- operation automation manifest group empty: ${claudeAdapterChecks.operationAutomationGroupEmpty ? "ok" : "invalid"}`,
+    `- no HTTP hook handlers enabled: ${claudeAdapterChecks.externalPublicationSafety.noHttpHookHandlers ? "ok" : "invalid"}`,
+    `- no webhook hook handlers enabled: ${claudeAdapterChecks.externalPublicationSafety.noWebhookHookHandlers ? "ok" : "invalid"}`,
+    `- no external destination enabled: ${claudeAdapterChecks.externalPublicationSafety.noExternalDestinationEnabled ? "ok" : "invalid"}`,
+    "",
+    "## Schema path checks",
+    "",
+    ...claudeAdapterChecks.schemaPaths.map((check) => `- \`${check.path}\`: exists=${check.ok ? "yes" : "no"}, json=${check.validJson ? "ok" : "invalid"}, schema=${check.hasSchema ? "ok" : "missing"}`),
+    "",
+    "## Pattern B GitHub Actions adapter checks",
+    "",
+    `- template present: ${claudeAdapterChecks.patternBGitHubAction.present ? "ok" : "missing"}`,
+    `- issue_comment trigger: ${claudeAdapterChecks.patternBGitHubAction.hasIssueCommentTrigger ? "ok" : "invalid"}`,
+    `- pull_request_review_comment trigger: ${claudeAdapterChecks.patternBGitHubAction.hasReviewCommentTrigger ? "ok" : "invalid"}`,
+    `- @claude review guard: ${claudeAdapterChecks.patternBGitHubAction.hasMentionGuard ? "ok" : "invalid"}`,
+    `- no always-on pull_request trigger: ${claudeAdapterChecks.patternBGitHubAction.noAlwaysOnPullRequestTrigger ? "ok" : "invalid"}`,
+    `- no literal secret: ${claudeAdapterChecks.patternBGitHubAction.noSecretLiteral ? "ok" : "invalid"}`,
+    `- no auto-merge/deploy/release action: ${claudeAdapterChecks.patternBGitHubAction.noAutoMergeDeployRelease ? "ok" : "invalid"}`,
+    "",
+    "## Documentation consistency checks",
+    "",
+    `- local hooks documented as default: ${claudeAdapterChecks.documentationConsistency.mentionsLocalHooksDefault ? "ok" : "missing"}`,
+    `- Pattern B documented as optional: ${claudeAdapterChecks.documentationConsistency.mentionsPatternBOptional ? "ok" : "missing"}`,
+    `- no raw prompt storage by default documented: ${claudeAdapterChecks.documentationConsistency.mentionsNoRawPromptDefault ? "ok" : "missing"}`,
+    `- no external publication by default documented: ${claudeAdapterChecks.documentationConsistency.mentionsNoExternalPublicationDefault ? "ok" : "missing"}`,
     "",
     "## Document path checks",
     "",
@@ -888,10 +1264,11 @@ export function validateRepository(options) {
   const skillChecks = validateSkills(root, skillDirectories, errors);
   const contextMetadataChecks = validateContextMetadata(root, errors);
   const improvementLedgerChecks = validateImprovementLedger(root, errors);
+  const claudeAdapterChecks = validateClaudeAdapterArchitecture(root, manifest, errors);
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

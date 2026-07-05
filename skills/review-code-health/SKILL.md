@@ -65,6 +65,7 @@ Security boundary: this skill can identify evidence-backed vulnerability and sec
    - Use urgency to describe timing: `now`, `soon`, `backlog`, or `observe`.
    - Use recommended action to separate fixing, backlog creation, rule/check feedback, later refactor, or acceptance.
    - Use scope guidance to keep current-PR blockers separate from separate-PR or project-level improvements.
+   - Use `docs/debt-lifecycle-contract.md` vocabulary when handing off non-blocking debt: detected, recorded, planned, in_progress, resolved, converted_to_rule, converted_to_check, accepted, wont_fix, or stale.
 
 6. Route specialized signals.
    - Security weakness with abuse path or privacy risk may require `review-adversarial-risk`.

@@ -9,7 +9,7 @@ description: Persist review findings, technical debt, refactor candidates, and r
 
 Turn evidence-backed review findings into durable improvement ledger entries so non-blocking debt, refactor candidates, rule gaps, validation checks, and accepted risks are not lost after a PR review.
 
-This skill starts after detection. It classifies, prioritizes, records, and refreshes improvement items. It does not discover code-health findings and does not implement fixes or refactors.
+This skill starts after detection. It classifies, prioritizes, records, and refreshes improvement items. It does not discover code-health findings and does not implement fixes or refactors. The lifecycle contract is `docs/debt-lifecycle-contract.md`; machine-readable entry examples should conform to `schemas/improvement-ledger-entry.schema.json`.
 
 ## Use when
 
@@ -57,7 +57,7 @@ This skill starts after detection. It classifies, prioritizes, records, and refr
    - Category: `vulnerability`, `technical_debt`, `refactor_candidate`, `code_smell`, `maintainability`, `testability`, `performance`, `dependency`, `duplication`, `boundary`, `repeated_finding`, or `rule_gap`.
    - Decision: `fix_now`, `separate_pr`, `backlog`, `convert_to_rule`, `convert_to_check`, `accept`, `wont_fix`, or `needs_more_evidence`.
    - Prevention target: `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, project overlay, `SKILL.md`, review checklist, validation script, lint/test/check, implementation context, review context, refactor task, or no prevention needed.
-   - Status: `open`, `triaged`, `accepted`, `planned`, `in_progress`, `resolved`, `converted_to_rule`, `converted_to_check`, `wont_fix`, or `stale`.
+   - Status: `detected`, `recorded`, `open`, `triaged`, `accepted`, `planned`, `in_progress`, `resolved`, `converted_to_rule`, `converted_to_check`, `wont_fix`, or `stale`.
 
 6. Evaluate prevention-rule feedback when applicable.
    - Repeat pattern: `one-off`, `repeated`, `likely_repeated`, or `high_impact_single_case`.
@@ -82,6 +82,11 @@ This skill starts after detection. It classifies, prioritizes, records, and refr
    - Every entry needs an observable close condition.
    - Move entries to `stale` when evidence, owner, urgency, prevention target, or status no longer matches current reality.
    - Conversion entries need a close condition that names the accepted rule, overlay, Skill, checklist, context, validation script, lint, test, or CI change.
+
+10. Use local automation when appropriate.
+   - `scripts/ai-ledger-refresh.mjs` can dry-run ledger status counts, stale candidates, and debt movement metrics.
+   - With explicit `--write`, it can append non-blocking candidates or mark overdue rows stale.
+   - Keep current-PR blockers out of candidate files or mark them as blockers so the script skips them.
 
 9. Route follow-up without mixing responsibilities.
    - Rule/check implementation details can be handled later by the selected prevention target follow-up.
@@ -162,7 +167,7 @@ Decision:
 
 Owner / status:
 - owner if known
-- open | triaged | accepted | planned | in_progress | resolved | converted_to_rule | converted_to_check | wont_fix | stale
+- detected | recorded | open | triaged | accepted | planned | in_progress | resolved | converted_to_rule | converted_to_check | wont_fix | stale
 
 Refresh rule:
 - When to revisit or close

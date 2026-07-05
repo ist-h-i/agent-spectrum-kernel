@@ -18,6 +18,9 @@ AGENTS.md      常時発火する軽量Kernel
 skills/        必要時だけ使うワークフロー
 examples/      使い方の短い例
 docs/          運用・カスタマイズ・採点基準
+schemas/       metrics / report / improvement ledger のmachine-readable schema
+adapters/      Claude Code project adapter、Pattern B GitHub Actions adapter、optional plugin
+scripts/       validation、Claude adapter install、local observability runtime
 ```
 
 ## 3分で使う
@@ -47,6 +50,24 @@ docs/          運用・カスタマイズ・採点基準
 2. AIコーディングツールのプロジェクト指示として読ませる。
 3. 普段はKernelだけで使う。上位routingは `skills/operating-mode-router/SKILL.md`、delivery/quality内の正本は `skills/skill-router/SKILL.md`。
 4. 重い作業ではSkill名を明示して呼ぶ。
+
+Claude Code の推奨導入:
+
+```bash
+node scripts/install-claude-adapter.mjs --target /path/to/project
+```
+
+推奨順:
+
+```text
+1. core kernel / skills を入れる
+2. Claude project adapter または optional plugin を入れる
+3. local hooks で project-local observability を有効にする
+4. PR共有が必要なときだけ Pattern B @claude review GitHub Actions を使う
+5. local events / improvement ledger から週次・月次reportを生成する
+```
+
+Local hooks がdefaultです。GitHub Actionsは任意のPR共有adapterであり、常時PR reviewやlocal observabilityの代替ではありません。metricsは既定でproject-local、raw prompt / secret / customer data / personal data / full file contents / full command output / external publication は既定offです。
 
 例:
 
@@ -79,6 +100,8 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | Skill選択やworkflow効果をふりかえりたい | `operating-mode-router` → `skill-effectiveness-evaluation` |
 | adoption maturityやinstruction qualityを期間で測りたい | `operating-mode-router` → `skill-adoption-metrics` |
 | weekly/monthly adoption reportを作りたい | operation layer + `docs/ai/adoption-report-template.md` |
+| Claude Codeでlocal-firstに導入したい | `scripts/install-claude-adapter.mjs` + local hooks |
+| `@claude review` をPRで任意実行したい | Pattern B GitHub Actions adapter（有効化前に `risk-gate`） |
 | 繰り返しレビュー文脈の固定 | `review-context-generation`（既定: `docs/ai/review-context.md`） |
 | MR/PR README・PR説明・変更文脈固定 | `mr-readme-generation` |
 | 破壊的操作・deploy・migration・secret絡み | `risk-gate` before the selected workflow proceeds to action |

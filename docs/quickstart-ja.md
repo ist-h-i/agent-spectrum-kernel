@@ -22,6 +22,19 @@ repo-root/
     */SKILL.md
 ```
 
+Claude Code を使う場合の推奨構成:
+
+```text
+repo-root/
+  AGENTS.md
+  skills/
+  .claude/
+    skills/
+    commands/
+    hooks/
+  docs/ai/observability-config.yml
+```
+
 Skill非対応ツール:
 
 ```text
@@ -84,6 +97,28 @@ AGENTS.md のルールを前提にしてください。
 2. `skills/operating-mode-router/SKILL.md` when mode is unclear
 3. `skills/skill-router/SKILL.md` when the task is delivery/quality
 4. ルーティングで選ばれた必要最小の `SKILL.md`
+
+### Claude Code local-first setup
+
+Claude Code では、core skills を project-local adapter として投影するのが推奨です。
+
+```bash
+node scripts/install-claude-adapter.mjs --target /path/to/project
+```
+
+導入順:
+
+```text
+1. core kernel / skills を入れる。
+2. Claude project adapter または optional plugin を入れる。
+3. local hooks で observability を有効化する。
+4. PR共有が必要なときだけ Pattern B `@claude review` GitHub Actions を使う。
+5. project-local events と ledger から週次/月次reportを生成する。
+```
+
+Local hooks はローカル作業のdefaultです。`docs/ai/metrics/events.jsonl` に要約イベントだけを保存し、raw prompt、secret、customer data、personal data、full file contents、full command output は既定で保存しません。
+
+GitHub Actions は任意です。`@claude review` コメントでだけ動かすPR共有adapterであり、常時PR reviewやlocal observabilityの代替ではありません。
 
 ### Project overlay rules
 
@@ -227,6 +262,9 @@ docs/ai/review-context.md          レビュー判断用。persona, output contr
 docs/ai/implementation-context.md  実装判断用。stack, commands, patterns, test style, boundaries など。
 docs/ai/improvement-ledger.md      改善台帳用。reviewで見つけた負債、rule gap、check化候補、accepted risk など。
 docs/ai/skill-adoption-metrics.md  adoption metrics用。project-specific metricsは導入先projectにだけ保存。
+docs/ai/observability-config.yml   Claude hook-first runtimeのlocal設定。外部公開は既定off。
+docs/ai/metrics/events.jsonl       導入先projectのlocal JSONL event store。
+docs/ai/reports/                   導入先projectのlocal weekly/monthly report出力先。
 planning-with-files                長期タスクの進捗保存用。context fileの代替ではない。
 ```
 

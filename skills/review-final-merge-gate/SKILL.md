@@ -81,6 +81,7 @@ Make the final merge decision from gate evidence without hiding missing checks, 
 7. Preserve non-blocking follow-up candidates when applicable.
    - Keep current PR blockers in Required fixes.
    - Put non-blocking debt, refactor candidates, repeated findings, validation-check candidates, and backlog work under Improvement ledger candidates when durable tracking may be needed.
+   - Use `docs/debt-lifecycle-contract.md` vocabulary for candidate lifecycle state, but do not move blockers into the ledger.
    - Put reusable prevention proposals under Rule feedback. Treat them as rule/check/project-overlay candidates, not code fixes.
    - Put explicitly deferred or accepted code-health risks under Deferred / accepted code-health risks with the known reason or follow-up condition.
    - Do not force every review to run `review-code-health` or `improvement-ledger`.

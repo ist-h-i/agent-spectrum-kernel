@@ -12,6 +12,8 @@ No raw prompt storage by default.
 No file per skill invocation.
 ```
 
+This contract is the human-readable companion to `schemas/metrics-event.schema.json`. Runtime adapters should produce machine-readable JSONL events that satisfy the schema when event capture is enabled.
+
 ## Contract
 
 ```text
@@ -19,7 +21,7 @@ Metrics event candidate:
 - event_id:
 - task_id:
 - task_type:
-- date:
+- occurred_at:
 - skills_used:
 - routing_result:
 - instruction_quality_metrics:
@@ -41,10 +43,11 @@ Metrics event candidate:
   - insufficient_evidence_reported:
 - debt_movement_metrics:
   - debt_items_detected:
-  - debt_items_created:
+  - debt_items_recorded:
   - debt_items_resolved:
   - debt_items_converted_to_rule:
   - debt_items_converted_to_check:
+  - debt_items_accepted:
   - stale_debt_items:
   - refactor_candidates_created:
   - refactor_candidates_implemented:
@@ -56,6 +59,18 @@ Metrics event candidate:
 - evidence_references:
 - privacy_note:
 ```
+
+## Runtime Storage
+
+Default runtime storage is project-local:
+
+```text
+docs/ai/metrics/events.jsonl
+```
+
+Each line is one JSON object. The generic repository includes schemas and templates only; adopting projects own their project-specific event store.
+
+Adapters must treat a missing task boundary as `skip`. They should not create noisy per-tool events when no meaningful task is in progress.
 
 ## When To Emit
 
@@ -75,6 +90,7 @@ Meaningful events include:
 - Improvement ledger updated.
 - Finding converted to a rule or executable check.
 - Verification completed or insufficient evidence explicitly reported.
+- Weekly or monthly report generated from project-local events.
 
 Do not emit for:
 
@@ -95,6 +111,17 @@ The event should store counts, statuses, related IDs, and evidence references. I
 `skill-adoption-metrics` consumes Metrics event candidates, normalizes them into adoption metrics, and may update a project-local `docs/ai/skill-adoption-metrics.md` ledger.
 
 The generic repository contains only the template. Project-specific metrics belong in the adopting project.
+
+Debt movement fields are counts, not full findings. Full finding detail belongs in the review output or improvement ledger. The shared lifecycle vocabulary is:
+
+```text
+detected -> recorded -> planned -> in_progress -> resolved
+                  -> converted_to_rule
+                  -> converted_to_check
+                  -> accepted
+                  -> wont_fix
+                  -> stale
+```
 
 ## Privacy And Safety
 

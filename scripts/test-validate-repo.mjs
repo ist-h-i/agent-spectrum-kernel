@@ -69,6 +69,7 @@ function writeFixture(root, skills = ["alpha"]) {
 
   mkdirSync(resolve(root, "docs/ai"), { recursive: true });
   mkdirSync(resolve(root, "examples"), { recursive: true });
+  writeAdapterFixture(root);
 
   writeFileSync(resolve(root, "AGENTS.md"), "# Kernel\n");
   writeFileSync(resolve(root, "CUSTOM_INSTRUCTIONS.md"), "# Custom instructions\n");
@@ -91,6 +92,100 @@ function writeFixture(root, skills = ["alpha"]) {
       null,
       2,
     ),
+  );
+}
+
+function writeAdapterFixture(root) {
+  const schemaPaths = [
+    "schemas/metrics-event.schema.json",
+    "schemas/adoption-report.schema.json",
+    "schemas/improvement-ledger-entry.schema.json",
+  ];
+  for (const path of schemaPaths) {
+    mkdirSync(dirname(resolve(root, path)), { recursive: true });
+    writeFileSync(resolve(root, path), '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object" }\n');
+  }
+
+  const docs = [
+    "docs/observability-runtime-contract.md",
+    "docs/operation-automation-contract.md",
+    "docs/debt-lifecycle-contract.md",
+    "docs/metrics-event-contract.md",
+    "docs/ai/skill-adoption-metrics.md",
+    "docs/ai/adoption-report-template.md",
+  ];
+  for (const path of docs) {
+    mkdirSync(dirname(resolve(root, path)), { recursive: true });
+    writeFileSync(
+      resolve(root, path),
+      "# Fixture\n\nLocal hooks are the default local observability path. Pattern B is optional. No raw prompt storage by default. No external publication by default.\n",
+    );
+  }
+
+  mkdirSync(resolve(root, "docs/ai"), { recursive: true });
+  writeFileSync(
+    resolve(root, "docs/ai/observability-config.yml"),
+    `enabled: true
+storage:
+  event_store: docs/ai/metrics/events.jsonl
+  report_dir: docs/ai/reports
+privacy:
+  raw_prompt_storage: false
+  secrets_storage: false
+  customer_data_storage: false
+  personal_data_storage: false
+external_publication:
+  enabled: false
+safety:
+  http_hooks_enabled: false
+  webhook_hooks_enabled: false
+`,
+  );
+
+  const adapterFiles = [
+    "adapters/claude-code/README.md",
+    "adapters/claude-code/project/.claude/skills/README.md",
+    "adapters/claude-code/project/.claude/commands/skill-review.md",
+    "adapters/claude-code/project/.claude/commands/skill-report.md",
+    "adapters/claude-code/project/.claude/commands/skill-ledger-refresh.md",
+    "adapters/claude-code/github-actions/README.md",
+    "adapters/claude-code/plugin/README.md",
+    "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+    "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
+    "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
+    "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md",
+    "adapters/claude-code/plugin/bin/ai-skills-metrics-record",
+  ];
+  for (const path of adapterFiles) {
+    mkdirSync(dirname(resolve(root, path)), { recursive: true });
+    writeFileSync(resolve(root, path), "# Fixture\n");
+  }
+
+  mkdirSync(resolve(root, "adapters/claude-code/project/.claude/hooks"), { recursive: true });
+  writeFileSync(resolve(root, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs" }] }] } }\n');
+  mkdirSync(resolve(root, "adapters/claude-code/plugin/hooks"), { recursive: true });
+  writeFileSync(resolve(root, "adapters/claude-code/plugin/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "ai-skills-metrics-record" }] }] } }\n');
+
+  mkdirSync(resolve(root, "adapters/claude-code/plugin/.claude-plugin"), { recursive: true });
+  writeFileSync(resolve(root, "adapters/claude-code/plugin/.claude-plugin/plugin.json"), '{ "name": "ai-skills" }\n');
+
+  mkdirSync(resolve(root, "adapters/claude-code/github-actions"), { recursive: true });
+  writeFileSync(
+    resolve(root, "adapters/claude-code/github-actions/claude-review-on-mention.yml"),
+    `name: Claude Skill Review On Mention
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+jobs:
+  review:
+    if: contains(github.event.comment.body, '@claude review')
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+`,
   );
 }
 
@@ -237,6 +332,57 @@ function writeImprovementLedger(root, content) {
 try {
   const validRoot = cloneFixture("valid");
   assertPass("valid fixture", validRoot);
+
+  const missingSchemaRoot = cloneFixture("missing-schema");
+  rmSync(resolve(missingSchemaRoot, "schemas/metrics-event.schema.json"));
+  assertFail("missing required schema", missingSchemaRoot, "required schema is missing");
+
+  const operationSkillRoot = cloneFixture("operation-skill");
+  mkdirSync(resolve(operationSkillRoot, "skills/operation-automation"), { recursive: true });
+  writeFileSync(resolve(operationSkillRoot, "skills/operation-automation/SKILL.md"), validSkill("operation-automation"));
+  assertFail("operation automation skill forbidden", operationSkillRoot, "operation automation must remain an external layer");
+
+  const unsafeObservabilityRoot = cloneFixture("unsafe-observability");
+  writeFileSync(
+    resolve(unsafeObservabilityRoot, "docs/ai/observability-config.yml"),
+    `enabled: true
+storage:
+  event_store: https://metrics.example.invalid/events
+  report_dir: docs/ai/reports
+privacy:
+  raw_prompt_storage: true
+  secrets_storage: false
+  customer_data_storage: false
+  personal_data_storage: false
+external_publication:
+  enabled: true
+safety:
+  http_hooks_enabled: false
+  webhook_hooks_enabled: false
+`,
+  );
+  assertFail("unsafe observability config", unsafeObservabilityRoot, "externalPublicationDisabled");
+
+  const httpHookRoot = cloneFixture("http-hook");
+  writeFileSync(resolve(httpHookRoot, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "http", "url": "https://example.invalid" }] }] } }\n');
+  assertFail("http hook forbidden", httpHookRoot, "enables an HTTP hook");
+
+  const alwaysOnWorkflowRoot = cloneFixture("always-on-workflow");
+  writeFileSync(
+    resolve(alwaysOnWorkflowRoot, "adapters/claude-code/github-actions/claude-review-on-mention.yml"),
+    `name: Always On
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  review:
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+`,
+  );
+  assertFail("always-on workflow forbidden", alwaysOnWorkflowRoot, "noAlwaysOnPullRequestTrigger");
 
   const validLedgerMetadataRoot = cloneFixture("valid-ledger-metadata");
   assertPass("valid ledger metadata", validLedgerMetadataRoot);

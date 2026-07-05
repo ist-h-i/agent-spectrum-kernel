@@ -1,0 +1,15 @@
+{
+  "name": "ai-skills",
+  "displayName": "AI Coding Kernel Skills",
+  "version": "0.1.0",
+  "description": "Claude Code adapter for AI Coding Kernel review, reporting, ledger refresh, and context checks.",
+  "author": {
+    "name": "ist-h-i"
+  },
+  "homepage": "https://github.com/ist-h-i/ai-coding-rules-and-skills",
+  "repository": "https://github.com/ist-h-i/ai-coding-rules-and-skills",
+  "license": "MIT",
+  "keywords": ["claude-code", "skills", "review", "observability", "debt-ledger"],
+  "skills": "./skills",
+  "hooks": "./hooks/hooks.json"
+}

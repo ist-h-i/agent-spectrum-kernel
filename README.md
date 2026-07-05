@@ -40,11 +40,18 @@ CHANGELOG.md
 docs/
   routing-model.md
   metrics-event-contract.md
+  observability-runtime-contract.md
+  operation-automation-contract.md
+  debt-lifecycle-contract.md
+  claude-github-review-setup.md
   ai/review-context.md
   ai/implementation-context.md
   ai/improvement-ledger.md
   ai/skill-adoption-metrics.md
   ai/adoption-report-template.md
+  ai/observability-config.yml
+  ai/metrics/README.md
+  ai/reports/README.md
   quickstart-ja.md
   prompt-recipes-ja.md
   glossary-ja.md
@@ -69,6 +76,21 @@ examples/
   09-improvement-ledger-update.md
   10-safe-refactor.md
   11-prevention-rule-feedback.md
+  12-claude-adapter-adoption.md
+schemas/
+  metrics-event.schema.json
+  adoption-report.schema.json
+  improvement-ledger-entry.schema.json
+adapters/
+  claude-code/
+    project/.claude/
+    github-actions/
+    plugin/
+scripts/
+  install-claude-adapter.mjs
+  ai-metrics-record.mjs
+  ai-metrics-summarize.mjs
+  ai-ledger-refresh.mjs
 skills/
   operating-mode-router/SKILL.md
   skill-router/SKILL.md
@@ -116,6 +138,26 @@ skills/
 5. Add project-specific rules and skills as a separate overlay, not by bloating the kernel.
 
 For tools that only support a single custom instruction field, use `CUSTOM_INSTRUCTIONS.md`.
+
+## Claude Code adapter
+
+For Claude Code, use the local-first adapter instead of changing core skills.
+
+```bash
+node scripts/install-claude-adapter.mjs --target /path/to/project
+```
+
+Recommended adoption path:
+
+```text
+1. Install core kernel/skills.
+2. Install the Claude project adapter or optional plugin.
+3. Enable local hooks for project-local observability.
+4. Use Pattern B @claude review GitHub Actions only when PR-level shared review is needed.
+5. Generate local weekly/monthly adoption and debt reports.
+```
+
+Defaults are project-local: no external publication, no raw prompt storage, no secrets/customer/personal data storage, and no full file contents or full command output in metrics events.
 
 ## 3分で使う / Quick start
 
