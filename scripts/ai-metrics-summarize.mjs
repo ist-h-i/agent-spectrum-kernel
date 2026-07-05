@@ -572,18 +572,15 @@ function gateDecisionDrilldown(tasks) {
 }
 
 function hasSkipReason(decision) {
-  if (typeof decision.judgment === "string" && decision.judgment.trim().length > 0) {
-    return true;
-  }
-  return typeof decision.reason_category === "string" && decision.reason_category.length > 0 && decision.reason_category !== "other";
+  return typeof decision.judgment === "string" && decision.judgment.trim().length > 0;
 }
 
 function skipReasonCategory(decision) {
-  if (!hasSkipReason(decision)) {
-    return "missing_reason";
-  }
   if (decision.reason_category) {
     return decision.reason_category;
+  }
+  if (!hasSkipReason(decision)) {
+    return "missing_reason";
   }
   const text = `${decision.judgment} ${decision.missing_inputs.join(" ")} ${decision.triggering_signals.join(" ")}`.toLowerCase();
   if (/\b(no trigger|no .*signal|not triggered)\b/.test(text)) return "no_trigger_signal";
