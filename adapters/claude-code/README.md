@@ -14,7 +14,7 @@ The installer can copy:
 - local metrics and ledger runtime scripts into `scripts/`,
 - the local observability config template into `docs/ai/observability-config.yml`.
 
-The copied skills remain a projection of the canonical core skills in this repository. Update by rerunning the installer from a newer checkout of this repository.
+The copied skills remain a projection of the canonical core skills in this repository. Update by rerunning the installer from a newer checkout of this repository. The default mode is upgrade-safe: projected files are overwritten from the current checkout, unrelated existing settings are preserved, and adapter hook commands are merged without duplication.
 
 ## Install
 
@@ -36,19 +36,45 @@ The installer does not enable external publication. It does not create secrets, 
 
 ## Installed Skills
 
-First version:
+Default workflow projection:
 
+- `operating-mode-router`
+- `skill-router`
+- `spec-driven-development`
+- `controlled-implementation`
+- `test-first-verification`
+- `doubt-driven-development`
+- `handoff-generation`
 - `review-router`
-- `review-final-merge-gate`
+- `review-automated-gate`
+- `review-ai-quality`
 - `review-code-health`
+- `review-domain-impact`
 - `review-architecture-impact`
 - `review-output-quality`
 - `review-adversarial-risk`
-- `skill-adoption-metrics`
-- `improvement-ledger`
+- `review-final-merge-gate`
+- `evidence-ledger`
 - `risk-gate`
+- `adr-review`
+- `improvement-ledger`
+- `skill-adoption-metrics`
 
 Claude Code project skills load from `.claude/skills/<skill-name>/SKILL.md` and can be invoked as `/skill-name`.
+
+## Project Commands
+
+The project adapter installs local command templates for common daily workflows:
+
+- `/skill-review`: layered PR or diff review through `review-router` and `review-final-merge-gate`.
+- `/skill-implement`: scoped implementation through `skill-router`, `test-first-verification`, and `controlled-implementation`.
+- `/skill-investigate`: bug, regression, performance, or unknown-root-cause work through `doubt-driven-development` and verification.
+- `/skill-verify`: focused verification and evidence classification before readiness or correctness claims.
+- `/skill-handoff`: executable next-task handoff through `handoff-generation`.
+- `/skill-report`: local adoption/debt report generation from project-local evidence.
+- `/skill-ledger-refresh`: improvement-ledger lifecycle refresh.
+
+Commands route through the existing skill model. They do not bypass `risk-gate`, verification, or evidence requirements.
 
 ## Local Observability
 

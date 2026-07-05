@@ -57,6 +57,7 @@
       "properties": {
         "operating_mode": { "type": "string" },
         "primary_skill": { "type": "string" },
+        "correct_routing": { "type": "boolean" },
         "secondary_skills": {
           "type": "array",
           "items": { "type": "string" },
@@ -66,6 +67,41 @@
           "type": "array",
           "items": { "type": "string" },
           "uniqueItems": true
+        },
+        "executed_gates": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "skipped_gates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["gate", "reason"],
+            "properties": {
+              "gate": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+            }
+          },
+          "maxItems": 50
+        }
+      }
+    },
+    "review_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": ["approve", "approve_with_comments", "request_changes", "block", "insufficient_evidence"]
+        },
+        "required_fixes_count": { "type": "integer", "minimum": 0 },
+        "insufficient_evidence_layers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "maxItems": 20
         }
       }
     },

@@ -24,6 +24,19 @@ Metrics event candidate:
 - occurred_at:
 - skills_used:
 - routing_result:
+  - operating_mode:
+  - primary_skill:
+  - correct_routing: optional boolean when reviewed
+  - secondary_skills:
+  - required_gates:
+  - executed_gates:
+  - skipped_gates:
+    - gate:
+    - reason:
+- review_result:
+  - decision: approve | approve_with_comments | request_changes | block | insufficient_evidence
+  - required_fixes_count:
+  - insufficient_evidence_layers:
 - instruction_quality_metrics:
   - goal_clarity:
   - scope_clarity:
@@ -129,6 +142,10 @@ The event should store counts, statuses, related IDs, and evidence references. I
 The generic repository contains only the template. Project-specific metrics belong in the adopting project.
 
 Debt movement fields are delta counts for the current event, not full ledger inventory. Full finding detail belongs in the review output or improvement ledger. Snapshot counts may be included separately under `debt_inventory_snapshot`.
+
+Routing and review fields are summaries only. They should capture which gates were required, executed, or skipped and the final review decision, but must not store raw review text, prompts, secrets, full file contents, or full command output.
+
+Sparse early-adoption reports may emit `null` for averages and rates such as correct routing rate or required gate coverage. `null` means unknown or unavailable evidence; it must not be interpreted as `0`.
 
 ```text
 detected -> recorded -> planned -> in_progress -> resolved

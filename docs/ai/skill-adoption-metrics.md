@@ -64,8 +64,18 @@ Skill route:
 - primary_skill:
 - secondary_skills:
 - required_gates:
+- executed_gates:
+- skipped_gates:
+  - gate:
+  - reason:
+- correct_routing:
 - unnecessary_skills_avoided:
 - skipped_skills_reasoned:
+
+Review result:
+- decision:
+- required_fixes_count:
+- insufficient_evidence_layers:
 
 Outcome metrics:
 - task_completed:
@@ -175,3 +185,5 @@ Privacy / safety note:
 - Sensitive data handling:
 - Personnel-evaluation boundary:
 ```
+
+Use `null` for unavailable numeric averages and rates in generated JSON reports. Unknown routing or gate coverage is not the same as zero coverage.

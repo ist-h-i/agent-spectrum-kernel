@@ -124,8 +124,9 @@ function summarize(events, invalidLines, args) {
   const completed = tasks.filter((task) => task.outcome_metrics.task_completed === true).length;
   const validationPassed = tasks.filter((task) => task.outcome_metrics.validation_passed === true).length;
   const validationFailed = tasks.filter((task) => task.outcome_metrics.validation_passed === false).length;
-  const insufficientEvidence = tasks.filter((task) => task.verification_metrics.insufficient_evidence_reported === true).length;
+  const insufficientEvidence = tasks.filter((task) => taskHasInsufficientEvidence(task)).length;
   const latestInventorySnapshot = latestSnapshot(filtered, "debt_inventory_snapshot");
+  const reviewQuality = summarizeReviewQuality(tasks);
 
   return {
     schema_version: "1.0.0",
@@ -153,11 +154,12 @@ function summarize(events, invalidLines, args) {
     },
     skill_usage: {
       skills_used: skills,
-      correct_routing_rate: null,
-      required_gate_coverage: null,
+      correct_routing_rate: correctRoutingRate(tasks),
+      required_gate_coverage: requiredGateCoverage(tasks),
       over_processing_count: 0,
       missing_evidence_count: insufficientEvidence,
     },
+    review_quality: reviewQuality,
     debt_movement: {
       detected: sum(tasks, "debt_movement_metrics.debt_items_detected"),
       recorded: sum(tasks, "debt_movement_metrics.debt_items_recorded"),
@@ -210,6 +212,15 @@ function aggregateTasks(events) {
         outcome_metrics: {},
         verification_metrics: {},
         debt_movement_metrics: {},
+        routing_result: {
+          secondary_skills: new Set(),
+          required_gates: new Set(),
+          executed_gates: new Set(),
+          skipped_gates: [],
+        },
+        review_result: {
+          insufficient_evidence_layers: new Set(),
+        },
         latest_debt_inventory_snapshot: null,
       });
     }
@@ -226,6 +237,8 @@ function aggregateTasks(events) {
     collectInstructionMetric(task, event, "stop_condition_clarity");
     mergeOutcome(task.outcome_metrics, event.outcome_metrics ?? {});
     mergeVerification(task.verification_metrics, event.verification_metrics ?? {});
+    mergeRouting(task.routing_result, event.routing_result ?? {});
+    mergeReview(task.review_result, event.review_result ?? {});
     addMetricObject(task.debt_movement_metrics, event.debt_movement_metrics ?? {});
     if (event.debt_inventory_snapshot) {
       task.latest_debt_inventory_snapshot = event.debt_inventory_snapshot;
@@ -239,6 +252,20 @@ function aggregateTasks(events) {
     instruction_quality_metrics: summarizeInstructionMetrics(task.instruction_quality_values),
     outcome_metrics: task.outcome_metrics,
     verification_metrics: task.verification_metrics,
+    routing_result: {
+      operating_mode: task.routing_result.operating_mode,
+      primary_skill: task.routing_result.primary_skill,
+      correct_routing: task.routing_result.correct_routing,
+      secondary_skills: [...task.routing_result.secondary_skills].sort(),
+      required_gates: [...task.routing_result.required_gates].sort(),
+      executed_gates: [...task.routing_result.executed_gates].sort(),
+      skipped_gates: task.routing_result.skipped_gates,
+    },
+    review_result: {
+      decision: task.review_result.decision,
+      required_fixes_count: task.review_result.required_fixes_count ?? 0,
+      insufficient_evidence_layers: [...task.review_result.insufficient_evidence_layers].sort(),
+    },
     debt_movement_metrics: task.debt_movement_metrics,
     debt_inventory_snapshot: task.latest_debt_inventory_snapshot,
   }));
@@ -303,6 +330,52 @@ function mergeVerification(target, source) {
   }
 }
 
+function mergeRouting(target, source) {
+  if (typeof source.operating_mode === "string" && source.operating_mode) {
+    target.operating_mode = source.operating_mode;
+  }
+  if (typeof source.primary_skill === "string" && source.primary_skill) {
+    target.primary_skill = source.primary_skill;
+  }
+  if (typeof source.correct_routing === "boolean") {
+    target.correct_routing = source.correct_routing === false ? false : target.correct_routing ?? true;
+  }
+  for (const field of ["secondary_skills", "required_gates", "executed_gates"]) {
+    if (!Array.isArray(source[field])) {
+      continue;
+    }
+    for (const value of source[field]) {
+      if (typeof value === "string" && value) {
+        target[field].add(value);
+      }
+    }
+  }
+  if (Array.isArray(source.skipped_gates)) {
+    for (const item of source.skipped_gates) {
+      if (item && typeof item.gate === "string" && typeof item.reason === "string") {
+        target.skipped_gates.push({ gate: item.gate, reason: item.reason });
+      }
+    }
+  }
+}
+
+function mergeReview(target, source) {
+  const allowedDecisions = new Set(["approve", "approve_with_comments", "request_changes", "block", "insufficient_evidence"]);
+  if (allowedDecisions.has(source.decision)) {
+    target.decision = source.decision;
+  }
+  if (Number.isFinite(Number(source.required_fixes_count))) {
+    target.required_fixes_count = Math.max(target.required_fixes_count ?? 0, Number(source.required_fixes_count));
+  }
+  if (Array.isArray(source.insufficient_evidence_layers)) {
+    for (const value of source.insufficient_evidence_layers) {
+      if (typeof value === "string" && value) {
+        target.insufficient_evidence_layers.add(value);
+      }
+    }
+  }
+}
+
 function addMetricObject(target, source) {
   for (const [key, value] of Object.entries(source)) {
     if (Number.isFinite(Number(value))) {
@@ -316,6 +389,64 @@ function latestSnapshot(events, field) {
     .filter((event) => event[field])
     .sort((a, b) => String(a.occurred_at || "").localeCompare(String(b.occurred_at || "")));
   return withSnapshots.length > 0 ? withSnapshots.at(-1)[field] : null;
+}
+
+function taskHasInsufficientEvidence(task) {
+  return (
+    task.verification_metrics.insufficient_evidence_reported === true ||
+    task.review_result.decision === "insufficient_evidence" ||
+    task.review_result.insufficient_evidence_layers.length > 0
+  );
+}
+
+function correctRoutingRate(tasks) {
+  const values = tasks
+    .map((task) => task.routing_result.correct_routing)
+    .filter((value) => typeof value === "boolean");
+  if (values.length === 0) return null;
+  return values.filter(Boolean).length / values.length;
+}
+
+function requiredGateCoverage(tasks) {
+  const coverages = tasks
+    .map((task) => {
+      const required = Array.isArray(task.routing_result.required_gates) ? task.routing_result.required_gates : [];
+      if (required.length === 0) {
+        return null;
+      }
+      const executed = new Set(task.routing_result.executed_gates ?? []);
+      return required.filter((gate) => executed.has(gate)).length / required.length;
+    })
+    .filter((value) => value !== null);
+  if (coverages.length === 0) return null;
+  return coverages.reduce((total, value) => total + value, 0) / coverages.length;
+}
+
+function summarizeReviewQuality(tasks) {
+  const decisions = {
+    approve: 0,
+    approve_with_comments: 0,
+    request_changes: 0,
+    block: 0,
+    insufficient_evidence: 0,
+  };
+  const reviewTasks = tasks.filter((task) => task.review_result.decision);
+  let requiredFixes = 0;
+  const insufficientLayers = new Set();
+  for (const task of reviewTasks) {
+    decisions[task.review_result.decision] += 1;
+    requiredFixes += Number(task.review_result.required_fixes_count || 0);
+    for (const layer of task.review_result.insufficient_evidence_layers) {
+      insufficientLayers.add(layer);
+    }
+  }
+  return {
+    review_tasks: reviewTasks.length,
+    decisions,
+    required_fixes_count: requiredFixes,
+    insufficient_evidence_tasks: reviewTasks.filter((task) => taskHasInsufficientEvidence(task)).length,
+    insufficient_evidence_layers: [...insufficientLayers].sort(),
+  };
 }
 
 function presenceRate(events, path) {
@@ -341,7 +472,17 @@ Period: ${report.period.start} to ${report.period.end}
 ## Skill Usage
 
 - Skills used: ${report.skill_usage.skills_used.length > 0 ? report.skill_usage.skills_used.join(", ") : "none"}
+- Correct routing rate: ${formatUnknownNumber(report.skill_usage.correct_routing_rate)}
+- Required gate coverage: ${formatUnknownNumber(report.skill_usage.required_gate_coverage)}
 - Missing evidence count: ${report.skill_usage.missing_evidence_count}
+
+## Review Quality
+
+- Review tasks: ${report.review_quality.review_tasks}
+- Decisions: ${Object.entries(report.review_quality.decisions).map(([decision, count]) => `${decision}=${count}`).join(", ")}
+- Required fixes count: ${report.review_quality.required_fixes_count}
+- Insufficient evidence tasks: ${report.review_quality.insufficient_evidence_tasks}
+- Insufficient evidence layers: ${report.review_quality.insufficient_evidence_layers.length > 0 ? report.review_quality.insufficient_evidence_layers.join(", ") : "none"}
 
 ## Debt Movement
 
@@ -382,6 +523,10 @@ ${report.evidence_references.map((reference) => `- ${reference}`).join("\n")}
 
 function titleCase(value) {
   return `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`;
+}
+
+function formatUnknownNumber(value) {
+  return value === null || value === undefined ? "unknown" : String(value);
 }
 
 function writeOutput(args, content) {
