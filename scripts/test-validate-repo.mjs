@@ -860,6 +860,47 @@ function assertRuntimeScripts() {
         external_publication: false,
       },
     },
+    {
+      schema_version: "1.0.0",
+      event_id: "evt-gate-decision-repeat-over-and-justified-skip",
+      task_id: "GATE-4",
+      task_type: "review",
+      occurred_at: "2999-01-01T00:00:00.000Z",
+      skills_used: ["review-router", "review-adversarial-risk"],
+      gate_decisions: [
+        {
+          gate: "review-adversarial-risk",
+          layer: "Adversarial risk overlay",
+          status: "executed",
+          judgment: "No triggering signal was recorded for this heavy gate.",
+          evidence_checked: ["changed files"],
+          triggering_signals: [],
+          missing_inputs: [],
+          confidence: "low",
+        },
+        {
+          gate: "review-domain-impact",
+          layer: "Domain",
+          status: "skipped",
+          evidence_checked: ["changed files"],
+          triggering_signals: [],
+          missing_inputs: [],
+          confidence: "high",
+          reason_category: "no_trigger_signal",
+        },
+      ],
+      outcome_metrics: {},
+      verification_metrics: {},
+      debt_movement_metrics: {},
+      evidence_references: ["fixture"],
+      privacy_note: {
+        raw_prompts_stored: false,
+        secrets_stored: false,
+        customer_data_stored: false,
+        personal_data_stored: false,
+        external_publication: false,
+      },
+    },
   ];
   for (const event of gateDecisionEvents) {
     assertSchemaPass(`gate decision event ${event.event_id}`, metricsSchema, event);
@@ -883,12 +924,16 @@ function assertRuntimeScripts() {
   const gateDecisionReport = JSON.parse(readFileSync(resolve(root, "docs/ai/reports/gate-decision-report.json"), "utf8"));
   assertSchemaPass("generated gate decision adoption report", adoptionSchema, gateDecisionReport);
   if (
-    gateDecisionReport.gate_decision_summary.total_decisions !== 6 ||
+    gateDecisionReport.gate_decision_summary.total_decisions !== 8 ||
+    gateDecisionReport.skill_usage.over_processing_count !== 2 ||
+    gateDecisionReport.skill_usage.under_processing_count !== 1 ||
     gateDecisionReport.gate_decision_summary.missing_skip_reason_count !== 1 ||
-    !gateDecisionReport.gate_decision_summary.skipped_by_reason_category.some((entry) => entry.category === "no_trigger_signal" && entry.count === 1) ||
+    !gateDecisionReport.gate_decision_summary.skipped_by_reason_category.some((entry) => entry.category === "no_trigger_signal" && entry.count === 2) ||
     !gateDecisionReport.gate_decision_summary.insufficient_evidence.some((entry) => entry.gate === "review-output-quality" && entry.layer === "Output quality") ||
     !gateDecisionReport.gate_decision_summary.under_processing_warnings.some((entry) => entry.gate === "review-architecture-impact" && entry.count === 1) ||
-    !gateDecisionReport.gate_decision_summary.over_processing_warnings.some((entry) => entry.gate === "review-adversarial-risk" && entry.count === 1) ||
+    !gateDecisionReport.gate_decision_summary.over_processing_warnings.some((entry) => entry.gate === "review-adversarial-risk" && entry.count === 2) ||
+    !gateDecisionReport.gate_decision_summary.top_gate_deviation_patterns.some((entry) => entry.deviation_type === "over_processing" && entry.gate === "review-adversarial-risk" && entry.count === 2) ||
+    !gateDecisionReport.gate_decision_summary.top_gate_deviation_patterns.some((entry) => entry.deviation_type === "missing_skip_reason" && entry.gate === "review-code-health" && entry.count === 1) ||
     !gateDecisionReport.gate_decision_drilldown.some((entry) => entry.judgment === "Detailed architecture judgment should stay in JSON only.")
   ) {
     throw new Error(`gate decision report should summarize deviations and preserve JSON drill-down\n${JSON.stringify(gateDecisionReport, null, 2)}`);
@@ -909,6 +954,8 @@ function assertRuntimeScripts() {
   if (
     !gateDecisionMarkdown.includes("Skipped gate categories") ||
     !gateDecisionMarkdown.includes("Under-processing warnings") ||
+    !gateDecisionMarkdown.includes("Top gate deviations") ||
+    !gateDecisionMarkdown.includes("over_processing:review-adversarial-risk=2") ||
     gateDecisionMarkdown.includes("Detailed architecture judgment should stay in JSON only.")
   ) {
     throw new Error(`markdown adoption report should show concise gate summaries only\n${gateDecisionMarkdown}`);
