@@ -1017,11 +1017,132 @@ function hookIdentities(hooks) {
   return identities;
 }
 
+function assertKnownStakeholderGateReference(event, field, value, knownSkillOrGateNames) {
+  if (typeof value === "string" && value.length > 0 && !knownSkillOrGateNames.has(value)) {
+    throw new Error(`stakeholder fixture ${event.event_id} references unknown ${field}: ${value}`);
+  }
+}
+
+function assertStakeholderGateConsistency(event, knownSkillOrGateNames) {
+  for (const skill of event.skills_used ?? []) {
+    assertKnownStakeholderGateReference(event, "skills_used", skill, knownSkillOrGateNames);
+  }
+
+  const routing = event.routing_result ?? {};
+  assertKnownStakeholderGateReference(event, "primary_skill", routing.primary_skill, knownSkillOrGateNames);
+
+  const required = new Set(routing.required_gates ?? []);
+  const executed = new Set(routing.executed_gates ?? []);
+  for (const gate of required) {
+    assertKnownStakeholderGateReference(event, "required_gates", gate, knownSkillOrGateNames);
+  }
+  for (const gate of executed) {
+    assertKnownStakeholderGateReference(event, "executed_gates", gate, knownSkillOrGateNames);
+  }
+  for (const skipped of routing.skipped_gates ?? []) {
+    const gate = skipped.gate;
+    assertKnownStakeholderGateReference(event, "skipped_gates", gate, knownSkillOrGateNames);
+    if (required.has(gate) && !executed.has(gate)) {
+      throw new Error(`stakeholder fixture ${event.event_id} has gate ${gate} in required_gates and skipped_gates without executed_gates`);
+    }
+  }
+}
+
+function assertStakeholderReadinessSamples() {
+  const samplePaths = [
+    "docs/ai/reports/examples/senior-engineer-readiness-sample.md",
+    "docs/ai/reports/examples/development-manager-readiness-sample.md",
+    "docs/ai/reports/examples/business-unit-client-value-readiness-sample.md",
+    "docs/ai/reports/examples/ai-promotion-readiness-sample.md",
+  ];
+  const fixturePath = "docs/ai/metrics/fixtures/stakeholder-readiness-events.jsonl";
+  const allPaths = [fixturePath, ...samplePaths];
+  const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
+  const allowedFixtureGateVocabulary = new Set();
+  const knownSkillOrGateNames = new Set([...(manifest.skills ?? []), ...allowedFixtureGateVocabulary]);
+  for (const skill of manifest.skills ?? []) {
+    if (!existsSync(resolve(repoRoot, "skills", skill, "SKILL.md"))) {
+      throw new Error(`stakeholder fixture gate vocabulary references missing skill: ${skill}`);
+    }
+  }
+  for (const path of allPaths) {
+    if (!existsSync(resolve(repoRoot, path))) {
+      throw new Error(`stakeholder readiness sample path should exist: ${path}`);
+    }
+    if (!manifest.docs.includes(path)) {
+      throw new Error(`stakeholder readiness sample path should be referenced from manifest.json.docs: ${path}`);
+    }
+  }
+
+  const template = readFileSync(resolve(repoRoot, "docs/ai/stakeholder-readiness-report-template.md"), "utf8");
+  if (!template.includes("docs/ai/reports/examples/") || !template.includes(fixturePath)) {
+    throw new Error("stakeholder readiness template should reference sample reports and fixture events");
+  }
+  const readme = readFileSync(resolve(repoRoot, "README.md"), "utf8");
+  if (!readme.includes("docs/ai/reports/examples/")) {
+    throw new Error("README should reference stakeholder readiness sample reports");
+  }
+
+  const metricsSchema = JSON.parse(readFileSync(resolve(repoRoot, "schemas/metrics-event.schema.json"), "utf8"));
+  const fixtureLines = readFileSync(resolve(repoRoot, fixturePath), "utf8").trim().split(/\r?\n/);
+  if (fixtureLines.length < 3) {
+    throw new Error("stakeholder readiness fixture should include multiple sample events");
+  }
+  for (const [index, line] of fixtureLines.entries()) {
+    const event = JSON.parse(line);
+    assertSchemaPass(`stakeholder fixture event ${index + 1}`, metricsSchema, event);
+    assertStakeholderGateConsistency(event, knownSkillOrGateNames);
+    if (
+      event.privacy_note.raw_prompts_stored !== false ||
+      event.privacy_note.secrets_stored !== false ||
+      event.privacy_note.customer_data_stored !== false ||
+      event.privacy_note.personal_data_stored !== false ||
+      event.privacy_note.external_publication !== false
+    ) {
+      throw new Error(`stakeholder fixture should keep privacy flags false\n${JSON.stringify(event, null, 2)}`);
+    }
+  }
+
+  for (const path of samplePaths) {
+    const content = readFileSync(resolve(repoRoot, path), "utf8");
+    for (const required of ["Sample status: fixture data only", "Evidence reviewed:", "Evidence status:", "Decision / readiness status:", "Internal workflow quality:", "Release readiness:", "Client-value readiness:", "Residual risk:"]) {
+      if (!content.includes(required)) {
+        throw new Error(`${path} is missing required stakeholder sample section: ${required}`);
+      }
+    }
+    for (const forbidden of [/\bsk-[A-Za-z0-9_-]{20,}/, /BEGIN PROMPT/i, /customer data:/i, /person-level ranking:/i, /HR scoring:/i]) {
+      if (forbidden.test(content)) {
+        throw new Error(`${path} appears to include forbidden raw or personnel data pattern: ${forbidden}`);
+      }
+    }
+  }
+
+  const businessUnitSample = readFileSync(resolve(repoRoot, "docs/ai/reports/examples/business-unit-client-value-readiness-sample.md"), "utf8");
+  if (
+    !businessUnitSample.includes("Client-facing value claim: insufficient evidence") ||
+    !businessUnitSample.includes("Unknown. Internal workflow quality is not the same as client value.") ||
+    !businessUnitSample.includes("Required before a client-value claim")
+  ) {
+    throw new Error("business unit sample should avoid client-value overclaiming without outcome evidence");
+  }
+
+  const aiPromotionSample = readFileSync(resolve(repoRoot, "docs/ai/reports/examples/ai-promotion-readiness-sample.md"), "utf8");
+  for (const state of ["Supported:", "Partial:", "Unknown:"]) {
+    if (!aiPromotionSample.includes(state)) {
+      throw new Error(`AI promotion sample should list capability state: ${state}`);
+    }
+  }
+  if (!aiPromotionSample.includes("not a personnel evaluation") || !aiPromotionSample.includes("Personnel evaluation readiness: not applicable")) {
+    throw new Error("AI promotion sample should preserve the personnel-evaluation boundary");
+  }
+}
+
 try {
   const validRoot = cloneFixture("valid");
   assertPass("valid fixture", validRoot);
   assertRuntimeScripts();
   assertInstallerScripts();
+  assertStakeholderReadinessSamples();
 
   const missingSchemaRoot = cloneFixture("missing-schema");
   rmSync(resolve(missingSchemaRoot, "schemas/metrics-event.schema.json"));
