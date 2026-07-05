@@ -39,11 +39,23 @@ Select the smallest set of review gates needed to make the merge decision defens
 3. Produce a layer applicability contract before executing gates.
    - Every layer must have `status: required | skipped | insufficient evidence`.
    - Every layer must include an evidence-based reason.
+   - Every layer must include `trigger_signals` and `evidence`.
    - Required layers must name the selected gate.
    - Layers with insufficient evidence must name the inputs still needed.
    - Skipped layers must cite observed evidence, not assumption or convenience.
+   - Missing changed-file, diff, context, or output evidence must become `insufficient evidence`, not `skipped`.
 
-4. Evaluate each layer.
+4. Apply explicit gate trigger criteria.
+   - `review-domain-impact` is required when trigger signals include business rule, workflow responsibility, permission, notification, reporting meaning, state semantics, or generated business text changes.
+   - `review-architecture-impact` is required when trigger signals include public API or contract change, dependency direction change, persistence boundary change, state ownership change, cross-module responsibility change, infrastructure, deployment, lifecycle, coupling, or hard-to-reverse boundary change.
+   - `review-output-quality` is required when trigger signals include changed UI, docs, reports, notifications, CLI output, API responses, generated text, AI-facing output, structured output, or consumer-facing wording.
+   - `review-adversarial-risk` is required when trigger signals include untrusted input, security/privacy impact, prompt or generated-output failure modes, critical workflow blast radius, misuse path, release-readiness risk, or safety-boundary uncertainty.
+   - `risk-gate` is required before destructive actions, external effects, auth, secret, production, dependency, migration, billing, email, or infrastructure-impacting actions.
+   - `review-automated-gate` is required when merge confidence depends on lint, format, typecheck, build, test, static analysis, or CI evidence.
+   - `review-code-health` is required when the user asks for, or the diff exposes, debt, smell, duplication, dead code, maintainability, testability, performance, dependency/tooling, boundary weakness, or repeated finding analysis.
+   - If no trigger signal is observed for a heavy gate, skip that gate with evidence or mark it `insufficient evidence` if the needed inputs were unavailable.
+
+5. Evaluate each layer.
    - Domain: business rules, workflow responsibility, state semantics, reporting meaning, permissions, notifications, generated business text.
    - Architecture: hard-to-reverse boundaries, public APIs, dependencies, persistence, deployment, cross-module contracts.
    - Design: local design, responsibility split, API shape, data flow, state ownership, error boundaries.
@@ -56,7 +68,7 @@ Select the smallest set of review gates needed to make the merge decision defens
    - Risk overlay: destructive, external, auth, secret, production, dependency, migration, billing, email, infra impact.
    - Evidence overlay: correctness, readiness, reliability, performance, security, UX, cost, or maintainability claims that need evidence status.
 
-5. Route gates from the layer contract.
+6. Route gates from the layer contract.
    - `review-domain-impact` first if domain behavior may change.
    - `review-architecture-impact` if structural, dependency, boundary, public contract, persistence, infrastructure, ownership, lifecycle, or coupling impact may exist.
    - `review-output-quality` if user-visible, operator-visible, reviewer-visible, system-consumed, AI-consumed, generated, or structured output may change.
@@ -70,7 +82,15 @@ Select the smallest set of review gates needed to make the merge decision defens
    - `evidence-ledger` when claims need evidence classification.
    - `review-final-merge-gate` to make the merge decision.
 
-6. Keep the route minimal.
+7. Detect routing deviations before running or reporting gates.
+   - Under-processing: any gate marked `required` but absent from executed gate evidence.
+   - Over-processing warning: any heavy gate selected or executed without a required applicability row or without recorded trigger signals.
+   - Missing-evidence deviation: any layer treated as skipped when changed-file, diff, context, output, or verification evidence was not available.
+   - Heavy gates for over-processing checks are `review-domain-impact`, `review-architecture-impact`, `review-output-quality`, `review-adversarial-risk`, `review-code-health`, `risk-gate`, `adr-review`, and `release-readiness-gate`.
+   - Under-processing blocks final merge confidence until the missing gate is run or the layer is reclassified with evidence.
+   - Over-processing does not by itself prove incorrect review output, but it must be reported so the route can be simplified or justified.
+
+8. Keep the route minimal.
    - Do not run a gate only because the layer exists.
    - Combine layers into one selected gate when that gate covers the observed risk.
    - Do not treat a required layer as permission to run every gate.
@@ -83,56 +103,78 @@ Layer applicability:
 - Domain:
   status: required | skipped | insufficient evidence
   reason:
+  trigger_signals:
+  evidence:
   gate:
   inputs still needed:
 - Architecture:
   status: required | skipped | insufficient evidence
   reason:
+  trigger_signals:
+  evidence:
   gate:
   inputs still needed:
 - Design:
   status: required | skipped | insufficient evidence
   reason:
+  trigger_signals:
+  evidence:
   gate:
   inputs still needed:
 - Logic:
   status: required | skipped | insufficient evidence
   reason:
+  trigger_signals:
+  evidence:
   gate:
   inputs still needed:
 - Output quality:
   status: required | skipped | insufficient evidence
   reason:
+  trigger_signals:
+  evidence:
   gate:
   inputs still needed:
 - Test / verification:
   status: required | skipped | insufficient evidence
   reason:
+  trigger_signals:
+  evidence:
   gate:
   inputs still needed:
 - Style / maintainability:
   status: required | skipped | insufficient evidence
   reason:
+  trigger_signals:
+  evidence:
   gate:
   inputs still needed:
 - Mechanical:
   status: required | skipped | insufficient evidence
   reason:
+  trigger_signals:
+  evidence:
   gate:
   inputs still needed:
 - Adversarial risk overlay:
   status: required | skipped | insufficient evidence
   reason:
+  trigger_signals:
+  evidence:
   gate:
   inputs still needed:
 - Risk overlay:
   status: required | skipped | insufficient evidence
   reason:
+  trigger_signals:
+  evidence:
   gate:
   inputs still needed:
 - Evidence overlay:
   status: required | skipped | insufficient evidence
   reason:
+  trigger_signals:
+  evidence:
   gate:
   inputs still needed:
 
@@ -144,6 +186,17 @@ Review route:
 - Review context:
 - Reason:
 - Inputs still needed:
+
+Deviation check:
+- Under-processing:
+  - gate:
+    reason:
+- Over-processing warnings:
+  - gate:
+    reason:
+- Missing evidence warnings:
+  - layer:
+    reason:
 ```
 
 ## Optional Metrics Event Candidate
@@ -164,6 +217,8 @@ Do not emit metrics for a bare router invocation. Route selection alone is not a
 - Durable project review context is read when available, or `review-context-generation` is selected when missing context would otherwise recur.
 - Skipped layers have evidence-based reasons.
 - Insufficient-evidence layers name the missing inputs.
+- Required-but-not-executed gates are reported as under-processing.
+- Heavy gates selected without trigger evidence are reported as over-processing warnings.
 - Domain impact is checked before technical review when applicable.
 - The route does not run every gate by default.
 - Final merge decision is delegated to `review-final-merge-gate`.

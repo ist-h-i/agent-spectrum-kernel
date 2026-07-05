@@ -1121,6 +1121,210 @@ function assertRuntimeScripts() {
     throw new Error(`markdown adoption report should show concise gate summaries only\n${gateDecisionMarkdown}`);
   }
 
+  const routingEvent = ({ event_id, task_id, routing_result, review_result = {}, changed_file_summary }) => ({
+    schema_version: "1.0.0",
+    event_id,
+    task_id,
+    task_type: "review",
+    occurred_at: "2999-01-01T00:00:00.000Z",
+    skills_used: ["review-router"],
+    routing_result,
+    review_result,
+    changed_file_summary,
+    outcome_metrics: {},
+    verification_metrics: {},
+    debt_movement_metrics: {},
+    evidence_references: ["fixture"],
+    privacy_note: {
+      raw_prompts_stored: false,
+      secrets_stored: false,
+      customer_data_stored: false,
+      personal_data_stored: false,
+      external_publication: false,
+    },
+  });
+
+  const summarizeEvents = (name, events) => {
+    const store = resolve(root, `docs/ai/metrics/${name}.jsonl`);
+    const out = resolve(root, `docs/ai/reports/${name}.json`);
+    writeFileSync(store, `${events.map((event) => JSON.stringify(event)).join("\n")}\n`);
+    const result = runRepoScript([
+      resolve(repoRoot, "scripts/ai-metrics-summarize.mjs"),
+      "--event-store",
+      store,
+      "--out",
+      out,
+      "--period-start",
+      "2999-01-01",
+      "--period-end",
+      "2999-01-02",
+      "--format",
+      "json",
+    ]);
+    assertRuntimePass(`metrics summarizer ${name}`, result);
+    const report = JSON.parse(readFileSync(out, "utf8"));
+    assertSchemaPass(`generated ${name} adoption report`, adoptionSchema, report);
+    return report;
+  };
+
+  const lightReport = summarizeEvents("light-routing-report", [
+    routingEvent({
+      event_id: "evt-light-routing",
+      task_id: "LIGHT-ROUTE-1",
+      changed_file_summary: { count: 1, paths: ["docs/ok.md"] },
+      routing_result: {
+        required_gates: ["review-router", "review-final-merge-gate"],
+        executed_gates: ["review-router", "review-final-merge-gate"],
+        gate_applicability: [
+          {
+            layer: "Domain",
+            status: "skipped",
+            gate: "review-domain-impact",
+            reason: "Docs typo change has no business-rule, workflow, reporting, permission, or state-semantics signal.",
+            evidence: "changed_file_summary paths only docs/ok.md",
+            trigger_signals: [],
+          },
+          {
+            layer: "Architecture",
+            status: "skipped",
+            gate: "review-architecture-impact",
+            reason: "Docs typo change has no public API, dependency direction, persistence, ownership, or lifecycle signal.",
+            evidence: "changed_file_summary paths only docs/ok.md",
+            trigger_signals: [],
+          },
+          {
+            layer: "Adversarial risk overlay",
+            status: "skipped",
+            gate: "review-adversarial-risk",
+            reason: "Docs typo change has no untrusted input, security/privacy, prompt, misuse, or critical workflow signal.",
+            evidence: "changed_file_summary paths only docs/ok.md",
+            trigger_signals: [],
+          },
+        ],
+      },
+    }),
+  ]);
+  if (
+    lightReport.skill_usage.required_gate_coverage !== 1 ||
+    lightReport.skill_usage.over_processing_count !== 0 ||
+    lightReport.skill_usage.missing_evidence_count !== 0 ||
+    lightReport.adoption_effect.weak_signal.some((signal) => /Under-processing|Over-processing|Missing evidence/.test(signal))
+  ) {
+    throw new Error(`light routing should not require heavy gates without triggers\n${JSON.stringify(lightReport.skill_usage, null, 2)}`);
+  }
+
+  const boundaryReport = summarizeEvents("boundary-routing-report", [
+    routingEvent({
+      event_id: "evt-boundary-routing",
+      task_id: "BOUNDARY-ROUTE-1",
+      changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
+      routing_result: {
+        required_gates: ["review-router", "review-architecture-impact", "review-final-merge-gate"],
+        executed_gates: ["review-router", "review-architecture-impact", "review-final-merge-gate"],
+        gate_applicability: [
+          {
+            layer: "Architecture",
+            status: "required",
+            gate: "review-architecture-impact",
+            reason: "Public schema contract changed.",
+            evidence: "changed_file_summary includes schemas/public-api.schema.json",
+            trigger_signals: ["public_api_change"],
+          },
+        ],
+      },
+    }),
+  ]);
+  if (
+    boundaryReport.skill_usage.required_gate_coverage !== 1 ||
+    boundaryReport.adoption_effect.weak_signal.some((signal) => /Under-processing|Over-processing|Missing evidence/.test(signal))
+  ) {
+    throw new Error(`boundary/API change should require and execute architecture gate without deviation warnings\n${JSON.stringify(boundaryReport.skill_usage, null, 2)}`);
+  }
+
+  const missingEvidenceReport = summarizeEvents("missing-evidence-routing-report", [
+    routingEvent({
+      event_id: "evt-missing-routing-evidence",
+      task_id: "MISSING-ROUTE-1",
+      routing_result: {
+        required_gates: ["review-router"],
+        executed_gates: ["review-router"],
+        gate_applicability: [
+          {
+            layer: "Architecture",
+            status: "insufficient_evidence",
+            gate: "review-architecture-impact",
+            reason: "Changed files and diff were unavailable, so architecture impact cannot be skipped.",
+            evidence: "routing input omitted changed_file_summary and diff reference",
+            trigger_signals: [],
+            inputs_still_needed: ["changed files", "diff"],
+          },
+        ],
+      },
+    }),
+  ]);
+  if (
+    missingEvidenceReport.summary.insufficient_evidence !== 1 ||
+    !missingEvidenceReport.adoption_effect.weak_signal.some((signal) => signal.includes("Missing evidence") && signal.includes("review-architecture-impact"))
+  ) {
+    throw new Error(`missing changed-file/context evidence should become insufficient evidence\n${JSON.stringify(missingEvidenceReport, null, 2)}`);
+  }
+
+  const underProcessingReport = summarizeEvents("under-processing-routing-report", [
+    routingEvent({
+      event_id: "evt-under-processing",
+      task_id: "UNDER-ROUTE-1",
+      changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
+      routing_result: {
+        required_gates: ["review-router", "review-architecture-impact"],
+        executed_gates: ["review-router"],
+        gate_applicability: [
+          {
+            layer: "Architecture",
+            status: "required",
+            gate: "review-architecture-impact",
+            reason: "Public schema contract changed.",
+            evidence: "changed_file_summary includes schemas/public-api.schema.json",
+            trigger_signals: ["public_api_change"],
+          },
+        ],
+      },
+    }),
+  ]);
+  if (
+    underProcessingReport.skill_usage.required_gate_coverage !== 0.5 ||
+    !underProcessingReport.adoption_effect.weak_signal.some((signal) => signal.includes("Under-processing") && signal.includes("review-architecture-impact"))
+  ) {
+    throw new Error(`required gate not executed should be flagged\n${JSON.stringify(underProcessingReport.skill_usage, null, 2)}`);
+  }
+
+  const overProcessingReport = summarizeEvents("over-processing-routing-report", [
+    routingEvent({
+      event_id: "evt-over-processing",
+      task_id: "OVER-ROUTE-1",
+      changed_file_summary: { count: 1, paths: ["docs/ok.md"] },
+      routing_result: {
+        required_gates: ["review-router"],
+        executed_gates: ["review-router", "review-adversarial-risk"],
+        gate_applicability: [
+          {
+            layer: "Adversarial risk overlay",
+            status: "skipped",
+            gate: "review-adversarial-risk",
+            reason: "Docs typo change has no untrusted input, security/privacy, prompt, misuse, or critical workflow signal.",
+            evidence: "changed_file_summary paths only docs/ok.md",
+            trigger_signals: [],
+          },
+        ],
+      },
+    }),
+  ]);
+  if (
+    overProcessingReport.skill_usage.over_processing_count !== 1 ||
+    !overProcessingReport.adoption_effect.weak_signal.some((signal) => signal.includes("Over-processing") && signal.includes("review-adversarial-risk"))
+  ) {
+    throw new Error(`heavy gate selected without triggering signals should be flagged\n${JSON.stringify(overProcessingReport.skill_usage, null, 2)}`);
+  }
+
   const ledgerRoot = resolve(root, "ledger");
   writeImprovementLedger(
     ledgerRoot,
