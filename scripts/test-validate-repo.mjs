@@ -715,6 +715,58 @@ function assertRuntimeScripts() {
     throw new Error(`non-blocking metrics failures should stay silent\nstdout:\n${nonBlockingFailure.stdout}\nstderr:\n${nonBlockingFailure.stderr}`);
   }
 
+  const routingRecordStore = resolve(root, "docs/ai/metrics/routing-record-events.jsonl");
+  const routingRecordResult = runRepoScript([
+    resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+    "--event-kind",
+    "task_stop",
+    "--task-id",
+    "ROUTING-RECORDER-1",
+    "--task-type",
+    "review",
+    "--skills",
+    "review-router",
+    "--event-store",
+    routingRecordStore,
+    "--routing-result-json",
+    JSON.stringify({
+      required_gates: ["review-router"],
+      executed_gates: ["review-router"],
+      gate_applicability: [
+        {
+          layer: "Architecture",
+          status: "required",
+          gate: "review-architecture-impact",
+          reason: "Public API changed.",
+          evidence: "schema file changed",
+          trigger_signals: ["public_api_change", "public_api_change", 42],
+          inputs_still_needed: ["diff"],
+          raw_prompt: "must not be stored",
+        },
+        {
+          layer: "Output quality",
+          status: "required",
+          reason: "Rendered output changed but the gate id was omitted.",
+          evidence: "docs output path changed",
+        },
+      ],
+    }),
+  ]);
+  assertRuntimePass("metrics recorder routing applicability smoke", routingRecordResult);
+  const routingRecordedEvent = JSON.parse(readFileSync(routingRecordStore, "utf8"));
+  assertSchemaPass("recorded routing applicability event", metricsSchema, routingRecordedEvent);
+  const recordedApplicability = routingRecordedEvent.routing_result.gate_applicability;
+  if (
+    recordedApplicability.length !== 2 ||
+    recordedApplicability[0].gate !== "review-architecture-impact" ||
+    recordedApplicability[0].trigger_signals.length !== 1 ||
+    recordedApplicability[1].layer !== "Output quality" ||
+    Object.hasOwn(recordedApplicability[1], "gate") ||
+    JSON.stringify(routingRecordedEvent).includes("must not be stored")
+  ) {
+    throw new Error(`metrics recorder should preserve sanitized gate_applicability from routing_result\n${JSON.stringify(routingRecordedEvent, null, 2)}`);
+  }
+
   const taskEvents = [];
   for (let index = 0; index < 5; index += 1) {
     taskEvents.push({
@@ -1267,6 +1319,34 @@ function assertRuntimeScripts() {
     !missingEvidenceReport.adoption_effect.weak_signal.some((signal) => signal.includes("Missing evidence") && signal.includes("review-architecture-impact"))
   ) {
     throw new Error(`missing changed-file/context evidence should become insufficient evidence\n${JSON.stringify(missingEvidenceReport, null, 2)}`);
+  }
+
+  const missingRequiredGateReport = summarizeEvents("missing-required-gate-routing-report", [
+    routingEvent({
+      event_id: "evt-missing-required-gate",
+      task_id: "MISSING-GATE-ROUTE-1",
+      changed_file_summary: { count: 1, paths: ["docs/output.md"] },
+      routing_result: {
+        required_gates: ["review-router"],
+        executed_gates: ["review-router"],
+        gate_applicability: [
+          {
+            layer: "Output quality",
+            status: "required",
+            reason: "Rendered output changed but the gate id was omitted.",
+            evidence: "changed_file_summary includes docs/output.md",
+            trigger_signals: ["docs_output_change"],
+          },
+        ],
+      },
+    }),
+  ]);
+  if (
+    missingRequiredGateReport.summary.insufficient_evidence !== 1 ||
+    missingRequiredGateReport.skill_usage.missing_evidence_count !== 1 ||
+    !missingRequiredGateReport.adoption_effect.weak_signal.some((signal) => signal.includes("Missing evidence") && signal.includes("Output quality") && signal.includes("missing a gate id"))
+  ) {
+    throw new Error(`required gate applicability without gate id should be flagged as missing evidence\n${JSON.stringify(missingRequiredGateReport, null, 2)}`);
   }
 
   const underProcessingReport = summarizeEvents("under-processing-routing-report", [
