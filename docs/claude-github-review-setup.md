@@ -34,6 +34,8 @@ The review comment should include:
 - evidence reviewed,
 - residual risk.
 
+The workflow captures PR metadata into `.claude/pr-context.json` and patch diff into `.claude/pr.diff` before invoking Claude. The prompt requires Claude to read those files before deciding layer applicability.
+
 ## What This Does Not Do
 
 - It does not run on every PR update by default.

@@ -23,6 +23,7 @@
       "additionalProperties": false,
       "properties": {
         "tasks_reviewed": { "type": "integer", "minimum": 0 },
+        "event_count": { "type": "integer", "minimum": 0 },
         "completed_tasks": { "type": "integer", "minimum": 0 },
         "validation_passed": { "type": "integer", "minimum": 0 },
         "validation_failed": { "type": "integer", "minimum": 0 },
@@ -68,6 +69,24 @@
         "converted_to_rule": { "type": "integer", "minimum": 0 },
         "converted_to_check": { "type": "integer", "minimum": 0 },
         "accepted": { "type": "integer", "minimum": 0 },
+        "wont_fix": { "type": "integer", "minimum": 0 },
+        "stale": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "debt_inventory_snapshot": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "detected": { "type": "integer", "minimum": 0 },
+        "recorded": { "type": "integer", "minimum": 0 },
+        "open": { "type": "integer", "minimum": 0 },
+        "triaged": { "type": "integer", "minimum": 0 },
+        "accepted": { "type": "integer", "minimum": 0 },
+        "planned": { "type": "integer", "minimum": 0 },
+        "in_progress": { "type": "integer", "minimum": 0 },
+        "resolved": { "type": "integer", "minimum": 0 },
+        "converted_to_rule": { "type": "integer", "minimum": 0 },
+        "converted_to_check": { "type": "integer", "minimum": 0 },
         "wont_fix": { "type": "integer", "minimum": 0 },
         "stale": { "type": "integer", "minimum": 0 }
       }

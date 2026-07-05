@@ -40,6 +40,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Capture pull request context and diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || inputs.pr_number }}
+        run: |
+          mkdir -p .claude
+          gh pr view "$PR_NUMBER" \
+            --json number,url,title,baseRefName,headRefName,headRepositoryOwner,headRepository,baseRefOid,headRefOid \
+            > .claude/pr-context.json
+          gh pr diff "$PR_NUMBER" --patch > .claude/pr.diff
+
       - name: Run Claude review workflow
         uses: anthropics/claude-code-action@v1
         with:
@@ -52,8 +63,11 @@ jobs:
             Target PR:
             - Repository: ${{ github.repository }}
             - PR number: ${{ github.event.issue.number || github.event.pull_request.number || inputs.pr_number }}
+            - PR context file: .claude/pr-context.json
+            - PR diff file: .claude/pr.diff
 
             Requirements:
+            - Read .claude/pr-context.json and .claude/pr.diff before deciding layer applicability.
             - Use review-router first.
             - Run only required gates.
             - Include review-code-health only when code-health risk or non-blocking debt is applicable.

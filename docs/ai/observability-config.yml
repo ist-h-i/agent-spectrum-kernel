@@ -10,10 +10,13 @@ storage:
 
 capture:
   task_boundary_required: true
-  allow_session_id_task_boundary: false
+  allow_session_id_task_boundary: true
+  task_boundary_source: session_id
   record_file_change_events: true
   record_verification_attempts: true
   record_task_stop_candidates: true
+  record_command_hash: false
+  record_command_preview: false
   max_paths_per_event: 50
 
 privacy:

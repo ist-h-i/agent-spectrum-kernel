@@ -100,7 +100,9 @@ function readPath(object, path) {
 }
 
 function average(events, path) {
-  const values = events.map((event) => readPath(event, path)).filter((value) => Number.isFinite(Number(value)));
+  const values = events
+    .map((event) => readPath(event, path))
+    .filter((value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value)));
   if (values.length === 0) return null;
   return values.reduce((total, value) => total + Number(value), 0) / values.length;
 }
@@ -117,10 +119,13 @@ function unique(values) {
 
 function summarize(events, invalidLines, args) {
   const filtered = events.filter((event) => inPeriod(event, args.periodStart, args.periodEnd));
-  const skills = unique(filtered.flatMap((event) => Array.isArray(event.skills_used) ? event.skills_used : []));
-  const completed = filtered.filter((event) => event.outcome_metrics?.task_completed === true).length;
-  const validationPassed = filtered.filter((event) => event.outcome_metrics?.validation_passed === true).length;
-  const insufficientEvidence = filtered.filter((event) => event.verification_metrics?.insufficient_evidence_reported === true).length;
+  const tasks = aggregateTasks(filtered);
+  const skills = unique(tasks.flatMap((task) => task.skills_used));
+  const completed = tasks.filter((task) => task.outcome_metrics.task_completed === true).length;
+  const validationPassed = tasks.filter((task) => task.outcome_metrics.validation_passed === true).length;
+  const validationFailed = tasks.filter((task) => task.outcome_metrics.validation_passed === false).length;
+  const insufficientEvidence = tasks.filter((task) => task.verification_metrics.insufficient_evidence_reported === true).length;
+  const latestInventorySnapshot = latestSnapshot(filtered, "debt_inventory_snapshot");
 
   return {
     schema_version: "1.0.0",
@@ -131,19 +136,20 @@ function summarize(events, invalidLines, args) {
       end: args.periodEnd,
     },
     summary: {
-      tasks_reviewed: filtered.length,
+      event_count: filtered.length,
+      tasks_reviewed: tasks.length,
       completed_tasks: completed,
       validation_passed: validationPassed,
-      validation_failed: filtered.filter((event) => event.outcome_metrics?.validation_passed === false).length,
+      validation_failed: validationFailed,
       insufficient_evidence: insufficientEvidence,
     },
     instruction_maturity: {
-      average_goal_clarity: average(filtered, "instruction_quality_metrics.goal_clarity"),
-      average_scope_clarity: average(filtered, "instruction_quality_metrics.scope_clarity"),
-      average_context_sufficiency: average(filtered, "instruction_quality_metrics.context_sufficiency"),
-      verification_instruction_rate: presenceRate(filtered, "instruction_quality_metrics.verification_instruction"),
-      risk_awareness_rate: presenceRate(filtered, "instruction_quality_metrics.risk_awareness"),
-      stop_condition_rate: presenceRate(filtered, "instruction_quality_metrics.stop_condition_clarity"),
+      average_goal_clarity: average(tasks, "instruction_quality_metrics.goal_clarity"),
+      average_scope_clarity: average(tasks, "instruction_quality_metrics.scope_clarity"),
+      average_context_sufficiency: average(tasks, "instruction_quality_metrics.context_sufficiency"),
+      verification_instruction_rate: presenceRate(tasks, "instruction_quality_metrics.verification_instruction"),
+      risk_awareness_rate: presenceRate(tasks, "instruction_quality_metrics.risk_awareness"),
+      stop_condition_rate: presenceRate(tasks, "instruction_quality_metrics.stop_condition_clarity"),
     },
     skill_usage: {
       skills_used: skills,
@@ -153,22 +159,23 @@ function summarize(events, invalidLines, args) {
       missing_evidence_count: insufficientEvidence,
     },
     debt_movement: {
-      detected: sum(filtered, "debt_movement_metrics.debt_items_detected"),
-      recorded: sum(filtered, "debt_movement_metrics.debt_items_recorded"),
-      planned: sum(filtered, "debt_movement_metrics.debt_items_planned"),
-      in_progress: sum(filtered, "debt_movement_metrics.debt_items_in_progress"),
-      resolved: sum(filtered, "debt_movement_metrics.debt_items_resolved"),
-      converted_to_rule: sum(filtered, "debt_movement_metrics.debt_items_converted_to_rule"),
-      converted_to_check: sum(filtered, "debt_movement_metrics.debt_items_converted_to_check"),
-      accepted: sum(filtered, "debt_movement_metrics.debt_items_accepted"),
-      wont_fix: sum(filtered, "debt_movement_metrics.debt_items_wont_fix"),
-      stale: sum(filtered, "debt_movement_metrics.stale_debt_items"),
+      detected: sum(tasks, "debt_movement_metrics.debt_items_detected"),
+      recorded: sum(tasks, "debt_movement_metrics.debt_items_recorded"),
+      planned: sum(tasks, "debt_movement_metrics.debt_items_planned"),
+      in_progress: sum(tasks, "debt_movement_metrics.debt_items_in_progress"),
+      resolved: sum(tasks, "debt_movement_metrics.debt_items_resolved"),
+      converted_to_rule: sum(tasks, "debt_movement_metrics.debt_items_converted_to_rule"),
+      converted_to_check: sum(tasks, "debt_movement_metrics.debt_items_converted_to_check"),
+      accepted: sum(tasks, "debt_movement_metrics.debt_items_accepted"),
+      wont_fix: sum(tasks, "debt_movement_metrics.debt_items_wont_fix"),
+      stale: sum(tasks, "debt_movement_metrics.stale_debt_items"),
     },
+    debt_inventory_snapshot: latestInventorySnapshot,
     adoption_effect: {
       strong_signal: [],
-      weak_signal: filtered.length > 0 ? ["Local task-boundary events were available for this period."] : [],
+      weak_signal: tasks.length > 0 ? ["Local task-boundary events were available for this period."] : [],
       unknown: ["Causal impact is not proven by local metrics alone."],
-      recommended_next_intervention: filtered.length === 0 ? "Enable local hooks or pass explicit task IDs when recording events." : "Review missing evidence and debt movement before the next reporting period.",
+      recommended_next_intervention: tasks.length === 0 ? "Enable local hooks or pass explicit task IDs when recording events." : "Review missing evidence and debt movement before the next reporting period.",
     },
     evidence_references: [args.eventStore],
     privacy_note: {
@@ -181,6 +188,134 @@ function summarize(events, invalidLines, args) {
       invalid_jsonl_lines: invalidLines,
     },
   };
+}
+
+function aggregateTasks(events) {
+  const grouped = new Map();
+  for (const event of events) {
+    const taskId = event.task_id || `event:${event.event_id || grouped.size}`;
+    if (!grouped.has(taskId)) {
+      grouped.set(taskId, {
+        task_id: taskId,
+        events: [],
+        skills_used: new Set(),
+        instruction_quality_values: {
+          goal_clarity: [],
+          scope_clarity: [],
+          context_sufficiency: [],
+          verification_instruction: [],
+          risk_awareness: [],
+          stop_condition_clarity: [],
+        },
+        outcome_metrics: {},
+        verification_metrics: {},
+        debt_movement_metrics: {},
+        latest_debt_inventory_snapshot: null,
+      });
+    }
+    const task = grouped.get(taskId);
+    task.events.push(event);
+    for (const skill of Array.isArray(event.skills_used) ? event.skills_used : []) {
+      task.skills_used.add(skill);
+    }
+    collectInstructionMetric(task, event, "goal_clarity");
+    collectInstructionMetric(task, event, "scope_clarity");
+    collectInstructionMetric(task, event, "context_sufficiency");
+    collectInstructionMetric(task, event, "verification_instruction");
+    collectInstructionMetric(task, event, "risk_awareness");
+    collectInstructionMetric(task, event, "stop_condition_clarity");
+    mergeOutcome(task.outcome_metrics, event.outcome_metrics ?? {});
+    mergeVerification(task.verification_metrics, event.verification_metrics ?? {});
+    addMetricObject(task.debt_movement_metrics, event.debt_movement_metrics ?? {});
+    if (event.debt_inventory_snapshot) {
+      task.latest_debt_inventory_snapshot = event.debt_inventory_snapshot;
+    }
+  }
+
+  return [...grouped.values()].map((task) => ({
+    task_id: task.task_id,
+    event_count: task.events.length,
+    skills_used: [...task.skills_used].sort(),
+    instruction_quality_metrics: summarizeInstructionMetrics(task.instruction_quality_values),
+    outcome_metrics: task.outcome_metrics,
+    verification_metrics: task.verification_metrics,
+    debt_movement_metrics: task.debt_movement_metrics,
+    debt_inventory_snapshot: task.latest_debt_inventory_snapshot,
+  }));
+}
+
+function collectInstructionMetric(task, event, field) {
+  const value = event.instruction_quality_metrics?.[field];
+  if (value !== undefined && value !== null && value !== "") {
+    task.instruction_quality_values[field].push(value);
+  }
+}
+
+function summarizeInstructionMetrics(values) {
+  return {
+    goal_clarity: averageRaw(values.goal_clarity),
+    scope_clarity: averageRaw(values.scope_clarity),
+    context_sufficiency: averageRaw(values.context_sufficiency),
+    verification_instruction: mostPositivePresence(values.verification_instruction),
+    risk_awareness: mostPositivePresence(values.risk_awareness),
+    stop_condition_clarity: mostPositivePresence(values.stop_condition_clarity),
+  };
+}
+
+function averageRaw(values) {
+  const numbers = values.filter((value) => Number.isFinite(Number(value))).map(Number);
+  if (numbers.length === 0) return null;
+  return numbers.reduce((total, value) => total + value, 0) / numbers.length;
+}
+
+function mostPositivePresence(values) {
+  if (values.includes("present")) return "present";
+  if (values.includes("partial")) return "partial";
+  if (values.includes("missing")) return "missing";
+  if (values.includes("unknown")) return "unknown";
+  if (values.includes("not_applicable")) return "not_applicable";
+  return null;
+}
+
+function mergeOutcome(target, source) {
+  for (const [key, value] of Object.entries(source)) {
+    if (typeof value === "boolean") {
+      if (value === true || target[key] === undefined) {
+        target[key] = value;
+      }
+    } else if (Number.isFinite(Number(value))) {
+      target[key] = (target[key] || 0) + Number(value);
+    }
+  }
+}
+
+function mergeVerification(target, source) {
+  for (const [key, value] of Object.entries(source)) {
+    if (key === "commands_run" && Array.isArray(value)) {
+      target.commands_run = [...(target.commands_run ?? []), ...value];
+    } else if (typeof value === "boolean") {
+      if (value === true || target[key] === undefined) {
+        target[key] = value;
+      }
+    } else if (Number.isFinite(Number(value))) {
+      target[key] = (target[key] || 0) + Number(value);
+    }
+  }
+}
+
+function addMetricObject(target, source) {
+  for (const [key, value] of Object.entries(source)) {
+    if (Number.isFinite(Number(value))) {
+      target[key] = (target[key] || 0) + Number(value);
+    }
+  }
+}
+
+function latestSnapshot(events, field) {
+  const withSnapshots = events
+    .filter((event) => event[field])
+    .sort((a, b) => String(a.occurred_at || "").localeCompare(String(b.occurred_at || "")));
+  return withSnapshots.length > 0 ? withSnapshots.at(-1)[field] : null;
 }
 
 function presenceRate(events, path) {
@@ -197,6 +332,7 @@ Period: ${report.period.start} to ${report.period.end}
 ## Summary
 
 - Tasks reviewed: ${report.summary.tasks_reviewed}
+- Events reviewed: ${report.summary.event_count}
 - Completed tasks: ${report.summary.completed_tasks}
 - Validation passed: ${report.summary.validation_passed}
 - Validation failed: ${report.summary.validation_failed}
@@ -219,6 +355,10 @@ Period: ${report.period.start} to ${report.period.end}
 - accepted: ${report.debt_movement.accepted}
 - wont_fix: ${report.debt_movement.wont_fix}
 - stale: ${report.debt_movement.stale}
+
+## Debt Inventory Snapshot
+
+${report.debt_inventory_snapshot ? Object.entries(report.debt_inventory_snapshot).map(([status, count]) => `- ${status}: ${count}`).join("\n") : "- none"}
 
 ## Adoption Effect
 

@@ -112,6 +112,9 @@
       "type": "string",
       "maxLength": 2000
     },
+    "debt_inventory_snapshot": {
+      "$ref": "#/$defs/debt_inventory_snapshot"
+    },
     "privacy_note": {
       "type": "object",
       "additionalProperties": false,
@@ -166,7 +169,20 @@
         "verification_contract_defined": { "type": "boolean" },
         "tests_added_or_updated": { "type": "boolean" },
         "insufficient_evidence_reported": { "type": "boolean" },
-        "commands_run": { "type": "array", "items": { "type": "string" }, "maxItems": 20 }
+        "commands_run": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["command_kind"],
+            "properties": {
+              "command_kind": { "type": "string", "enum": ["test", "lint", "typecheck", "build", "validate", "unknown"] },
+              "command_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "redacted_command_preview": { "type": "string", "maxLength": 120 }
+            }
+          }
+        }
       }
     },
     "debt_movement_metrics": {
@@ -185,6 +201,24 @@
         "stale_debt_items": { "type": "integer", "minimum": 0 },
         "refactor_candidates_created": { "type": "integer", "minimum": 0 },
         "refactor_candidates_implemented": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "debt_inventory_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "detected": { "type": "integer", "minimum": 0 },
+        "recorded": { "type": "integer", "minimum": 0 },
+        "open": { "type": "integer", "minimum": 0 },
+        "triaged": { "type": "integer", "minimum": 0 },
+        "accepted": { "type": "integer", "minimum": 0 },
+        "planned": { "type": "integer", "minimum": 0 },
+        "in_progress": { "type": "integer", "minimum": 0 },
+        "resolved": { "type": "integer", "minimum": 0 },
+        "converted_to_rule": { "type": "integer", "minimum": 0 },
+        "converted_to_check": { "type": "integer", "minimum": 0 },
+        "wont_fix": { "type": "integer", "minimum": 0 },
+        "stale": { "type": "integer", "minimum": 0 }
       }
     }
   }

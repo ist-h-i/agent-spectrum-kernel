@@ -29,6 +29,7 @@ The workflow template references `${{ secrets.ANTHROPIC_API_KEY }}` but does not
 The template:
 
 - uses comment and manual triggers only,
+- captures PR metadata with `gh pr view` and PR patch with `gh pr diff` before invoking Claude,
 - does not trigger on `pull_request.opened` or `pull_request.synchronize`,
 - does not auto-merge,
 - does not deploy,

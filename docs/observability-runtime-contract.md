@@ -71,7 +71,15 @@ Events are recorded at meaningful boundaries:
 - improvement ledger candidate created or ledger refreshed,
 - weekly or monthly report generated.
 
-Missing task boundary is handled as `skip`. Adapters should avoid noisy per-edit records unless the edit event is explicitly tied to an active task boundary.
+Explicit task IDs are preferred. Claude hook adapters may use `session_id` as the default local task boundary when configured:
+
+```text
+capture.task_boundary_required: true
+capture.allow_session_id_task_boundary: true
+capture.task_boundary_source: session_id
+```
+
+File-change and verification events are then recorded under the session-scoped task ID, and the Stop event marks the task boundary complete. If neither an explicit task ID nor an allowed session boundary is available, missing task boundary is handled as `skip`.
 
 ## Event Shape
 
@@ -89,6 +97,8 @@ Metrics events should conform to `schemas/metrics-event.schema.json`. Each event
 - related IDs,
 - evidence references,
 - privacy note.
+
+Verification events record command kind by default, not raw command text. Command hashes or strictly allowlisted redacted previews are opt-in fields.
 
 The JSONL store uses one JSON object per line. Invalid lines should be reported in summaries but should not block reading valid events unless strict validation is requested.
 
@@ -120,7 +130,7 @@ Meaning:
 | `wont_fix` | The finding is closed without action with rationale. |
 | `stale` | Evidence, owner, urgency, or status no longer matches reality. |
 
-Current-PR blockers remain in review required fixes. Non-blocking findings may become improvement-ledger candidates. Metrics should count movement between states but should not duplicate full findings.
+Current-PR blockers remain in review required fixes. Non-blocking findings may become improvement-ledger candidates. Metrics must count movement deltas separately from inventory snapshots and must not duplicate full findings.
 
 ## Report Contract
 

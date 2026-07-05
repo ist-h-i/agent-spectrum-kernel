@@ -834,6 +834,8 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
       configPresent: false,
       eventStoreLocal: false,
       reportDirLocal: false,
+      sessionBoundaryFallbackEnabled: false,
+      sessionBoundarySource: false,
       externalPublicationDisabled: false,
       rawPromptStorageDisabled: false,
       sensitiveStorageDisabled: false,
@@ -850,6 +852,7 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
       hasIssueCommentTrigger: false,
       hasReviewCommentTrigger: false,
       hasMentionGuard: false,
+      capturesPrDiff: false,
       noAlwaysOnPullRequestTrigger: true,
       noSecretLiteral: true,
       noAutoMergeDeployRelease: true,
@@ -931,6 +934,8 @@ function validateObservabilityConfig(root, checks, errors) {
   const reportDir = readObjectPath(config, "storage.report_dir");
   checks.localObservability.eventStoreLocal = typeof eventStore === "string" && eventStore.startsWith("docs/ai/") && !/^https?:\/\//i.test(eventStore);
   checks.localObservability.reportDirLocal = typeof reportDir === "string" && reportDir.startsWith("docs/ai/") && !/^https?:\/\//i.test(reportDir);
+  checks.localObservability.sessionBoundaryFallbackEnabled = readObjectPath(config, "capture.allow_session_id_task_boundary") === true;
+  checks.localObservability.sessionBoundarySource = readObjectPath(config, "capture.task_boundary_source") === "session_id";
   checks.localObservability.externalPublicationDisabled = readObjectPath(config, "external_publication.enabled") === false;
   checks.localObservability.rawPromptStorageDisabled = readObjectPath(config, "privacy.raw_prompt_storage") === false;
   checks.localObservability.sensitiveStorageDisabled =
@@ -1042,6 +1047,7 @@ function validatePatternBWorkflow(root, checks, errors) {
   checks.patternBGitHubAction.hasIssueCommentTrigger = /^\s+issue_comment:/m.test(text);
   checks.patternBGitHubAction.hasReviewCommentTrigger = /^\s+pull_request_review_comment:/m.test(text);
   checks.patternBGitHubAction.hasMentionGuard = text.includes("@claude review") && /contains\([^)]*github\.event\.comment\.body[^)]*'@claude review'[^)]*\)/.test(text);
+  checks.patternBGitHubAction.capturesPrDiff = /\bgh pr view\b/.test(text) && /\bgh pr diff\b/.test(text) && text.includes(".claude/pr.diff");
   checks.patternBGitHubAction.noAlwaysOnPullRequestTrigger = !/^\s+pull_request:\s*$/m.test(text);
   checks.patternBGitHubAction.noSecretLiteral = !/(sk-ant-|ANTHROPIC_API_KEY\s*:\s*["'][^$])/i.test(text);
   checks.patternBGitHubAction.noAutoMergeDeployRelease = !/\b(auto-?merge|deploy|release|publish)\b/i.test(text.replace(/Do not deploy, merge, release, publish/gi, ""));
@@ -1152,6 +1158,8 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks
     `- config present: ${claudeAdapterChecks.localObservability.configPresent ? "ok" : "missing"}`,
     `- event store local: ${claudeAdapterChecks.localObservability.eventStoreLocal ? "ok" : "invalid"}`,
     `- report dir local: ${claudeAdapterChecks.localObservability.reportDirLocal ? "ok" : "invalid"}`,
+    `- session boundary fallback enabled: ${claudeAdapterChecks.localObservability.sessionBoundaryFallbackEnabled ? "ok" : "invalid"}`,
+    `- session boundary source is session_id: ${claudeAdapterChecks.localObservability.sessionBoundarySource ? "ok" : "invalid"}`,
     `- external publication disabled: ${claudeAdapterChecks.localObservability.externalPublicationDisabled ? "ok" : "invalid"}`,
     `- raw prompt storage disabled: ${claudeAdapterChecks.localObservability.rawPromptStorageDisabled ? "ok" : "invalid"}`,
     `- sensitive storage disabled: ${claudeAdapterChecks.localObservability.sensitiveStorageDisabled ? "ok" : "invalid"}`,
@@ -1176,6 +1184,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks
     `- issue_comment trigger: ${claudeAdapterChecks.patternBGitHubAction.hasIssueCommentTrigger ? "ok" : "invalid"}`,
     `- pull_request_review_comment trigger: ${claudeAdapterChecks.patternBGitHubAction.hasReviewCommentTrigger ? "ok" : "invalid"}`,
     `- @claude review guard: ${claudeAdapterChecks.patternBGitHubAction.hasMentionGuard ? "ok" : "invalid"}`,
+    `- PR diff captured before Claude: ${claudeAdapterChecks.patternBGitHubAction.capturesPrDiff ? "ok" : "invalid"}`,
     `- no always-on pull_request trigger: ${claudeAdapterChecks.patternBGitHubAction.noAlwaysOnPullRequestTrigger ? "ok" : "invalid"}`,
     `- no literal secret: ${claudeAdapterChecks.patternBGitHubAction.noSecretLiteral ? "ok" : "invalid"}`,
     `- no auto-merge/deploy/release action: ${claudeAdapterChecks.patternBGitHubAction.noAutoMergeDeployRelease ? "ok" : "invalid"}`,

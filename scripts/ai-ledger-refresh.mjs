@@ -218,9 +218,13 @@ function appendCandidates(text, rows, candidates) {
   if (headingIndex === -1) {
     throw new Error(`Ledger is missing section: ${OPEN_SECTION}`);
   }
-  let insertIndex = headingIndex + 1;
-  while (insertIndex < parsed.lines.length && !parsed.lines[insertIndex].startsWith("## ")) {
-    insertIndex += 1;
+  let sectionEnd = headingIndex + 1;
+  while (sectionEnd < parsed.lines.length && !parsed.lines[sectionEnd].startsWith("## ")) {
+    sectionEnd += 1;
+  }
+  let insertIndex = sectionEnd;
+  while (insertIndex > headingIndex && parsed.lines[insertIndex - 1].trim() === "") {
+    insertIndex -= 1;
   }
   const newRows = [];
   let next = nextId(rows);
@@ -248,18 +252,35 @@ function markRowsStale(text, staleRows) {
   return parsed.lines.join("\n");
 }
 
-function debtMovementFromCounts(counts, detected = 0) {
-  const movement = { debt_items_detected: detected };
-  for (const [status, count] of Object.entries(counts)) {
+function debtMovementDelta({ candidates, staleRowsMarked }) {
+  const movement = {
+    debt_items_detected: candidates.length,
+    debt_items_recorded: candidates.length,
+  };
+  for (const candidate of candidates) {
+    const status = candidate.status || "triaged";
     const metric = STATUS_METRIC_MAP[status];
-    if (metric) {
-      movement[metric] = (movement[metric] || 0) + count;
+    if (metric && metric !== "debt_items_recorded") {
+      movement[metric] = (movement[metric] || 0) + 1;
     }
   }
-  return movement;
+  if (staleRowsMarked > 0) {
+    movement.stale_debt_items = (movement.stale_debt_items || 0) + staleRowsMarked;
+  }
+  return Object.fromEntries(Object.entries(movement).filter(([, value]) => value > 0));
 }
 
-function writeMetricsEvent(eventStore, taskId, movement, ledgerPath) {
+function inventorySnapshotFromCounts(counts) {
+  const snapshot = {};
+  for (const status of ["detected", "recorded", "open", "triaged", "accepted", "planned", "in_progress", "resolved", "converted_to_rule", "converted_to_check", "wont_fix", "stale"]) {
+    if (counts[status] > 0) {
+      snapshot[status] = counts[status];
+    }
+  }
+  return snapshot;
+}
+
+function writeMetricsEvent(eventStore, taskId, movement, inventorySnapshot, ledgerPath) {
   if (!eventStore || !taskId) return;
   const now = new Date().toISOString();
   const event = {
@@ -272,6 +293,7 @@ function writeMetricsEvent(eventStore, taskId, movement, ledgerPath) {
     outcome_metrics: { task_completed: true },
     verification_metrics: {},
     debt_movement_metrics: movement,
+    debt_inventory_snapshot: inventorySnapshot,
     evidence_references: [ledgerPath],
     privacy_note: {
       raw_prompts_stored: false,
@@ -279,7 +301,7 @@ function writeMetricsEvent(eventStore, taskId, movement, ledgerPath) {
       customer_data_stored: false,
       personal_data_stored: false,
       external_publication: false,
-      note: "Ledger movement counts only; full findings remain in the project-local ledger.",
+      note: "Ledger movement delta and inventory snapshot only; full findings remain in the project-local ledger.",
     },
   };
   mkdirSync(dirname(resolve(eventStore)), { recursive: true });
@@ -294,7 +316,9 @@ function renderText(summary) {
 - Candidates added: ${summary.candidates_added}
 - Current-PR blockers skipped: ${summary.current_pr_blockers_skipped}
 - Stale candidates: ${summary.stale_candidates.length}
+- Stale rows marked: ${summary.stale_rows_marked}
 - Status counts: ${Object.entries(summary.status_counts).map(([status, count]) => `${status}=${count}`).join(", ") || "none"}
+- Debt movement delta: ${Object.entries(summary.debt_movement_metrics).map(([metric, count]) => `${metric}=${count}`).join(", ") || "none"}
 - Metrics event: ${summary.metrics_event_written ? "written" : "not written"}
 `;
 }
@@ -326,10 +350,15 @@ function main() {
 
   const refreshedRows = parseLedger(nextText).rows;
   const statusCounts = countsByStatus(refreshedRows);
-  const movement = debtMovementFromCounts(statusCounts, candidates.length + blockersSkipped);
+  const staleRowsMarked = args.write && args.markStale ? stale.length : 0;
+  const movement = debtMovementDelta({
+    candidates: args.write ? candidates : [],
+    staleRowsMarked,
+  });
+  const inventorySnapshot = inventorySnapshotFromCounts(statusCounts);
   const metricsEventWritten = Boolean(args.eventStore && args.taskId);
   if (metricsEventWritten) {
-    writeMetricsEvent(args.eventStore, args.taskId, movement, args.ledger);
+    writeMetricsEvent(args.eventStore, args.taskId, movement, inventorySnapshot, args.ledger);
   }
 
   const summary = {
@@ -340,8 +369,10 @@ function main() {
     candidates_pending: args.write ? 0 : candidates.length,
     current_pr_blockers_skipped: blockersSkipped,
     stale_candidates: stale.map((row) => ({ id: row.values.ID, line: row.line + 1, refresh_date: row.values["Refresh date"] })),
+    stale_rows_marked: staleRowsMarked,
     status_counts: statusCounts,
     debt_movement_metrics: movement,
+    debt_inventory_snapshot: inventorySnapshot,
     metrics_event_written: metricsEventWritten,
   };
 

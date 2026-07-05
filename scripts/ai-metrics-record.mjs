@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -10,10 +10,13 @@ const DEFAULT_CONFIG = {
   },
   capture: {
     task_boundary_required: true,
-    allow_session_id_task_boundary: false,
+    allow_session_id_task_boundary: true,
+    task_boundary_source: "session_id",
     record_file_change_events: true,
     record_verification_attempts: true,
     record_task_stop_candidates: true,
+    record_command_hash: false,
+    record_command_preview: false,
     max_paths_per_event: 50,
   },
   privacy: {
@@ -30,7 +33,7 @@ const DEFAULT_CONFIG = {
 };
 
 const VERIFICATION_COMMAND_PATTERN = /\b(test|lint|typecheck|tsc|build|validate|check|pytest|vitest|jest|mocha|cargo test|go test|mvn test|gradle test)\b/i;
-const SECRET_PATTERN = /(api[_-]?key|token|secret|password|passwd|authorization|bearer)\s*[:=]\s*["']?[^"'\s]+/gi;
+const UNSAFE_COMMAND_PREVIEW_PATTERN = /\b(api[_-]?key|token|secret|password|passwd|authorization|bearer|_authToken|npm publish|curl\s+-H)\b|sk-[A-Za-z0-9_-]+/i;
 
 function parseArgs(argv) {
   const args = {
@@ -83,7 +86,7 @@ function printHelp() {
 Options:
   --event-kind <kind>       file_change | verification_attempt | task_stop | ledger_refresh | report
   --hook-event <name>       Claude hook event name.
-  --task-id <id>            Required when task_boundary_required is true.
+  --task-id <id>            Optional explicit task boundary. Defaults to configured hook boundary source.
   --task-type <type>        implementation | review | validation | report | other.
   --skills <csv>            Skills used by this task.
   --event-store <path>      JSONL event store path.
@@ -158,8 +161,11 @@ function assignConfig(config, pathParts, value) {
 function resolveTaskId(args, hookInput, config) {
   if (args.taskId) return args.taskId;
   if (typeof hookInput.task_id === "string" && hookInput.task_id) return hookInput.task_id;
+  const boundarySource = config.capture.task_boundary_source || "session_id";
+  if (boundarySource === "session_id" && config.capture.allow_session_id_task_boundary && hookInput.session_id) {
+    return `session:${hookInput.session_id}`;
+  }
   if (!config.capture.task_boundary_required) return `session:${hookInput.session_id || "unknown"}`;
-  if (config.capture.allow_session_id_task_boundary && hookInput.session_id) return `session:${hookInput.session_id}`;
   return "";
 }
 
@@ -208,8 +214,29 @@ function changedPaths(hookInput, maxPaths) {
   ]).slice(0, maxPaths);
 }
 
-function sanitizeCommand(command) {
-  return String(command).replace(SECRET_PATTERN, "$1=<redacted>").slice(0, 300);
+function commandKind(command) {
+  const normalized = String(command).toLowerCase();
+  if (/\b(lint|eslint|ruff|rubocop)\b/.test(normalized)) return "lint";
+  if (/\b(typecheck|tsc)\b/.test(normalized)) return "typecheck";
+  if (/\b(build|webpack|vite build|next build)\b/.test(normalized)) return "build";
+  if (/\b(validate|check)\b/.test(normalized)) return "validate";
+  if (/\b(test|pytest|vitest|jest|mocha|cargo test|go test|mvn test|gradle test)\b/.test(normalized)) return "test";
+  return "unknown";
+}
+
+function commandHash(command) {
+  return createHash("sha256").update(String(command)).digest("hex");
+}
+
+function safeCommandPreview(command) {
+  const value = String(command).trim().replace(/\s+/g, " ");
+  if (!value || value.length > 120 || UNSAFE_COMMAND_PREVIEW_PATTERN.test(value)) {
+    return "";
+  }
+  if (!/^(npm|pnpm|yarn|bun|node|npx|pytest|vitest|jest|go|cargo|mvn|gradle|make)\b/.test(value)) {
+    return "";
+  }
+  return value;
 }
 
 function buildEvent(args, hookInput, config, taskId) {
@@ -252,8 +279,20 @@ function buildEvent(args, hookInput, config, taskId) {
   }
 
   if (args.eventKind === "verification_attempt") {
-    event.verification_metrics.commands_run = [sanitizeCommand(command)];
-    event.verification_result_summary = "Verification command attempted; full command output omitted by default.";
+    const commandRecord = {
+      command_kind: commandKind(command),
+    };
+    if (config.capture.record_command_hash) {
+      commandRecord.command_hash = commandHash(command);
+    }
+    if (config.capture.record_command_preview) {
+      const preview = safeCommandPreview(command);
+      if (preview) {
+        commandRecord.redacted_command_preview = preview;
+      }
+    }
+    event.verification_metrics.commands_run = [commandRecord];
+    event.verification_result_summary = "Verification command attempted; command text and full command output omitted by default.";
   }
 
   if (args.eventKind === "task_stop") {

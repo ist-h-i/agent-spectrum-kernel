@@ -112,7 +112,7 @@ Refreshing stale items requires updated evidence, impact, owner or explicit `una
 
 ## Metrics Relationship
 
-Metrics events count lifecycle movement. They do not store full findings.
+Metrics events count lifecycle movement deltas. They do not store full findings and they do not repeatedly count the full ledger inventory as movement.
 
 Reports should include:
 
@@ -126,5 +126,7 @@ Reports should include:
 - accepted,
 - wont_fix,
 - stale.
+
+Inventory counts are separate from movement counts. A ledger refresh may include the latest inventory under `debt_inventory_snapshot`, while `debt_movement_metrics` includes only rows added, changed, resolved, converted, accepted, or marked stale during that refresh.
 
 Detailed finding text stays in review output or `docs/ai/improvement-ledger.md`.

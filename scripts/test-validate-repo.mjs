@@ -126,6 +126,11 @@ function writeAdapterFixture(root) {
   writeFileSync(
     resolve(root, "docs/ai/observability-config.yml"),
     `enabled: true
+capture:
+  allow_session_id_task_boundary: true
+  task_boundary_source: session_id
+  record_command_hash: false
+  record_command_preview: false
 storage:
   event_store: docs/ai/metrics/events.jsonl
   report_dir: docs/ai/reports
@@ -182,6 +187,9 @@ jobs:
   review:
     if: contains(github.event.comment.body, '@claude review')
     steps:
+      - run: |
+          gh pr view "$PR_NUMBER" --json number > .claude/pr-context.json
+          gh pr diff "$PR_NUMBER" --patch > .claude/pr.diff
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
@@ -329,9 +337,161 @@ function writeImprovementLedger(root, content) {
   writeFileSync(resolve(root, "docs/ai/improvement-ledger.md"), content);
 }
 
+function runRepoScript(args, options = {}) {
+  return spawnSync(process.execPath, args, {
+    cwd: options.cwd ?? repoRoot,
+    input: options.input,
+    encoding: "utf8",
+  });
+}
+
+function assertRuntimePass(name, result) {
+  if (result.status !== 0) {
+    throw new Error(`${name} should pass\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  }
+}
+
+function assertRuntimeScripts() {
+  const root = resolve(fixtureRoot, "runtime");
+  mkdirSync(root, { recursive: true });
+
+  const recordResult = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--event-kind",
+      "verification_attempt",
+      "--event-store",
+      resolve(root, "docs/ai/metrics/events.jsonl"),
+    ],
+    {
+      cwd: root,
+      input: JSON.stringify({
+        session_id: "S1",
+        tool_name: "Bash",
+        tool_input: {
+          command: 'curl -H "Authorization: Bearer sk-test-secret" https://example.invalid && npm test',
+        },
+      }),
+    },
+  );
+  assertRuntimePass("metrics recorder session-boundary smoke", recordResult);
+  const recordedEvent = JSON.parse(readFileSync(resolve(root, "docs/ai/metrics/events.jsonl"), "utf8"));
+  if (recordedEvent.task_id !== "session:S1") {
+    throw new Error(`metrics recorder should fall back to session boundary\n${JSON.stringify(recordedEvent, null, 2)}`);
+  }
+  const commandRecord = recordedEvent.verification_metrics.commands_run[0];
+  if (commandRecord.command_kind !== "test" || JSON.stringify(commandRecord).includes("sk-test-secret") || commandRecord.redacted_command_preview) {
+    throw new Error(`metrics recorder should store command kind only by default\n${JSON.stringify(commandRecord, null, 2)}`);
+  }
+
+  const taskEvents = [];
+  for (let index = 0; index < 5; index += 1) {
+    taskEvents.push({
+      schema_version: "1.0.0",
+      event_id: `evt-file-${index}`,
+      task_id: "TASK-1",
+      task_type: "implementation",
+      occurred_at: "2999-01-01T00:00:00.000Z",
+      skills_used: ["controlled-implementation"],
+      outcome_metrics: {},
+      verification_metrics: {},
+      debt_movement_metrics: {},
+      evidence_references: ["fixture"],
+      privacy_note: {
+        raw_prompts_stored: false,
+        secrets_stored: false,
+        customer_data_stored: false,
+        personal_data_stored: false,
+        external_publication: false,
+      },
+    });
+  }
+  taskEvents.push({
+    ...taskEvents[0],
+    event_id: "evt-verification-1",
+    verification_metrics: { commands_run: [{ command_kind: "test" }] },
+  });
+  taskEvents.push({
+    ...taskEvents[0],
+    event_id: "evt-verification-2",
+    verification_metrics: { commands_run: [{ command_kind: "lint" }] },
+  });
+  taskEvents.push({
+    ...taskEvents[0],
+    event_id: "evt-stop",
+    outcome_metrics: { task_completed: true },
+  });
+  const aggregateStore = resolve(root, "docs/ai/metrics/aggregate-events.jsonl");
+  writeFileSync(aggregateStore, `${taskEvents.map((event) => JSON.stringify(event)).join("\n")}\n`);
+  const summarizeResult = runRepoScript([
+    resolve(repoRoot, "scripts/ai-metrics-summarize.mjs"),
+    "--event-store",
+    aggregateStore,
+    "--out",
+    resolve(root, "docs/ai/reports/report.json"),
+    "--period-start",
+    "2999-01-01",
+    "--period-end",
+    "2999-01-02",
+    "--format",
+    "json",
+  ]);
+  assertRuntimePass("metrics summarizer task aggregation smoke", summarizeResult);
+  const report = JSON.parse(readFileSync(resolve(root, "docs/ai/reports/report.json"), "utf8"));
+  if (report.summary.event_count !== 8 || report.summary.tasks_reviewed !== 1 || report.summary.completed_tasks !== 1) {
+    throw new Error(`summarizer should separate event count from task count\n${JSON.stringify(report.summary, null, 2)}`);
+  }
+
+  const ledgerRoot = resolve(root, "ledger");
+  writeImprovementLedger(
+    ledgerRoot,
+    improvementLedgerFixture({
+      openRows: [ledgerRow({ ID: "IMP-0001", Status: "planned", "Refresh date": "2999-12-31" })],
+    }),
+  );
+  const candidatesPath = resolve(ledgerRoot, "candidates.json");
+  writeFileSync(
+    candidatesPath,
+    JSON.stringify([
+      {
+        source: "PR #1",
+        finding: "Non-blocking debt",
+        evidence: "Verified: review output",
+        impact: "Can recur",
+        recommended_action: "Track separately",
+        close_condition: "Follow-up issue is created",
+        refresh_date: "2999-12-31",
+      },
+    ]),
+  );
+  const ledgerEvents = resolve(ledgerRoot, "docs/ai/metrics/events.jsonl");
+  const ledgerResult = runRepoScript([
+    resolve(repoRoot, "scripts/ai-ledger-refresh.mjs"),
+    "--ledger",
+    resolve(ledgerRoot, "docs/ai/improvement-ledger.md"),
+    "--candidates",
+    candidatesPath,
+    "--write",
+    "--task-id",
+    "LEDGER-1",
+    "--event-store",
+    ledgerEvents,
+    "--json",
+  ]);
+  assertRuntimePass("ledger refresh delta smoke", ledgerResult);
+  const ledgerEvent = JSON.parse(readFileSync(ledgerEvents, "utf8"));
+  if (ledgerEvent.debt_movement_metrics.debt_items_recorded !== 1 || ledgerEvent.debt_movement_metrics.debt_items_planned) {
+    throw new Error(`ledger refresh should write movement delta, not full inventory\n${JSON.stringify(ledgerEvent, null, 2)}`);
+  }
+  if (ledgerEvent.debt_inventory_snapshot.planned !== 1 || ledgerEvent.debt_inventory_snapshot.triaged !== 1) {
+    throw new Error(`ledger refresh should include full inventory as snapshot\n${JSON.stringify(ledgerEvent.debt_inventory_snapshot, null, 2)}`);
+  }
+}
+
 try {
   const validRoot = cloneFixture("valid");
   assertPass("valid fixture", validRoot);
+  assertRuntimeScripts();
 
   const missingSchemaRoot = cloneFixture("missing-schema");
   rmSync(resolve(missingSchemaRoot, "schemas/metrics-event.schema.json"));

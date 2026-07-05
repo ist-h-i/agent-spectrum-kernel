@@ -41,6 +41,10 @@ Metrics event candidate:
   - verification_contract_defined:
   - tests_added_or_updated:
   - insufficient_evidence_reported:
+  - commands_run:
+    - command_kind:
+    - command_hash: optional
+    - redacted_command_preview: optional explicit opt-in
 - debt_movement_metrics:
   - debt_items_detected:
   - debt_items_recorded:
@@ -51,6 +55,8 @@ Metrics event candidate:
   - stale_debt_items:
   - refactor_candidates_created:
   - refactor_candidates_implemented:
+- debt_inventory_snapshot:
+  - optional inventory counts by ledger status
 - related_ids:
   - PR:
   - issues:
@@ -70,7 +76,17 @@ docs/ai/metrics/events.jsonl
 
 Each line is one JSON object. The generic repository includes schemas and templates only; adopting projects own their project-specific event store.
 
-Adapters must treat a missing task boundary as `skip`. They should not create noisy per-tool events when no meaningful task is in progress.
+Adapters must prefer explicit task IDs when available. For Claude hooks, the default fallback boundary is `session_id`:
+
+```text
+capture.task_boundary_required: true
+capture.allow_session_id_task_boundary: true
+capture.task_boundary_source: session_id
+```
+
+This means file-change and verification events are recorded under a session-scoped task ID such as `session:<id>`, then the Stop event marks that task boundary complete. If neither an explicit task ID nor an allowed session boundary is available, adapters must `skip` rather than create noisy unbounded events.
+
+Command text is not recorded by default. Verification events record `command_kind` only. `command_hash` and `redacted_command_preview` require explicit opt-in and must not include secrets.
 
 ## When To Emit
 
@@ -112,7 +128,7 @@ The event should store counts, statuses, related IDs, and evidence references. I
 
 The generic repository contains only the template. Project-specific metrics belong in the adopting project.
 
-Debt movement fields are counts, not full findings. Full finding detail belongs in the review output or improvement ledger. The shared lifecycle vocabulary is:
+Debt movement fields are delta counts for the current event, not full ledger inventory. Full finding detail belongs in the review output or improvement ledger. Snapshot counts may be included separately under `debt_inventory_snapshot`.
 
 ```text
 detected -> recorded -> planned -> in_progress -> resolved
