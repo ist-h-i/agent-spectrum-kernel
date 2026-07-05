@@ -793,6 +793,37 @@ function hookIdentities(hooks) {
   return identities;
 }
 
+function assertKnownStakeholderGateReference(event, field, value, knownSkillOrGateNames) {
+  if (typeof value === "string" && value.length > 0 && !knownSkillOrGateNames.has(value)) {
+    throw new Error(`stakeholder fixture ${event.event_id} references unknown ${field}: ${value}`);
+  }
+}
+
+function assertStakeholderGateConsistency(event, knownSkillOrGateNames) {
+  for (const skill of event.skills_used ?? []) {
+    assertKnownStakeholderGateReference(event, "skills_used", skill, knownSkillOrGateNames);
+  }
+
+  const routing = event.routing_result ?? {};
+  assertKnownStakeholderGateReference(event, "primary_skill", routing.primary_skill, knownSkillOrGateNames);
+
+  const required = new Set(routing.required_gates ?? []);
+  const executed = new Set(routing.executed_gates ?? []);
+  for (const gate of required) {
+    assertKnownStakeholderGateReference(event, "required_gates", gate, knownSkillOrGateNames);
+  }
+  for (const gate of executed) {
+    assertKnownStakeholderGateReference(event, "executed_gates", gate, knownSkillOrGateNames);
+  }
+  for (const skipped of routing.skipped_gates ?? []) {
+    const gate = skipped.gate;
+    assertKnownStakeholderGateReference(event, "skipped_gates", gate, knownSkillOrGateNames);
+    if (required.has(gate) && !executed.has(gate)) {
+      throw new Error(`stakeholder fixture ${event.event_id} has gate ${gate} in required_gates and skipped_gates without executed_gates`);
+    }
+  }
+}
+
 function assertStakeholderReadinessSamples() {
   const samplePaths = [
     "docs/ai/reports/examples/senior-engineer-readiness-sample.md",
@@ -803,6 +834,13 @@ function assertStakeholderReadinessSamples() {
   const fixturePath = "docs/ai/metrics/fixtures/stakeholder-readiness-events.jsonl";
   const allPaths = [fixturePath, ...samplePaths];
   const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
+  const allowedFixtureGateVocabulary = new Set();
+  const knownSkillOrGateNames = new Set([...(manifest.skills ?? []), ...allowedFixtureGateVocabulary]);
+  for (const skill of manifest.skills ?? []) {
+    if (!existsSync(resolve(repoRoot, "skills", skill, "SKILL.md"))) {
+      throw new Error(`stakeholder fixture gate vocabulary references missing skill: ${skill}`);
+    }
+  }
   for (const path of allPaths) {
     if (!existsSync(resolve(repoRoot, path))) {
       throw new Error(`stakeholder readiness sample path should exist: ${path}`);
@@ -829,6 +867,7 @@ function assertStakeholderReadinessSamples() {
   for (const [index, line] of fixtureLines.entries()) {
     const event = JSON.parse(line);
     assertSchemaPass(`stakeholder fixture event ${index + 1}`, metricsSchema, event);
+    assertStakeholderGateConsistency(event, knownSkillOrGateNames);
     if (
       event.privacy_note.raw_prompts_stored !== false ||
       event.privacy_note.secrets_stored !== false ||
