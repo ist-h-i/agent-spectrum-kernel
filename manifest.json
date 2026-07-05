@@ -175,7 +175,15 @@
     "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
     "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md",
     "adapters/claude-code/plugin/hooks/hooks.json",
-    "adapters/claude-code/plugin/bin/ai-skills-metrics-record"
+    "adapters/claude-code/plugin/bin/ai-skills-metrics-record",
+    "adapters/codex/README.md",
+    "adapters/codex/commands/codex-exec.md",
+    "adapters/codex/project/.agents/skills/README.md",
+    "adapters/codex/prompts/skill-implement.md",
+    "adapters/codex/prompts/skill-investigate.md",
+    "adapters/codex/prompts/skill-review.md",
+    "adapters/codex/prompts/skill-verify.md",
+    "adapters/codex/prompts/skill-handoff.md"
   ],
   "design": {
     "kernel": "single physical file with always-on principles and minimal routing",

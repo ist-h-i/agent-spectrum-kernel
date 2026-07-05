@@ -164,6 +164,14 @@ safety:
     "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
     "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md",
     "adapters/claude-code/plugin/bin/ai-skills-metrics-record",
+    "adapters/codex/README.md",
+    "adapters/codex/commands/codex-exec.md",
+    "adapters/codex/project/.agents/skills/README.md",
+    "adapters/codex/prompts/skill-implement.md",
+    "adapters/codex/prompts/skill-investigate.md",
+    "adapters/codex/prompts/skill-review.md",
+    "adapters/codex/prompts/skill-verify.md",
+    "adapters/codex/prompts/skill-handoff.md",
   ];
   for (const path of adapterFiles) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
@@ -1828,6 +1836,10 @@ jobs:
     readFileSync(resolve(missingCommandTemplateRoot, "scripts/install-claude-adapter.mjs"), "utf8").replace('  "skill-handoff.md",\n', ""),
   );
   assertFail("adapter installer command templates", missingCommandTemplateRoot, "COMMAND_TEMPLATES is missing required command template: skill-handoff.md");
+
+  const missingCodexAdapterPathRoot = cloneFixture("missing-codex-adapter-path");
+  rmSync(resolve(missingCodexAdapterPathRoot, "adapters/codex/prompts/skill-handoff.md"));
+  assertFail("missing Codex adapter path", missingCodexAdapterPathRoot, "required Codex adapter path is missing");
 
   const validLedgerMetadataRoot = cloneFixture("valid-ledger-metadata");
   assertPass("valid ledger metadata", validLedgerMetadataRoot);

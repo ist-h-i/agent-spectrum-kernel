@@ -89,6 +89,10 @@ adapters/
     project/.claude/
     github-actions/
     plugin/
+  codex/
+    project/.agents/skills/
+    prompts/
+    commands/
 scripts/
   install-claude-adapter.mjs
   ai-metrics-record.mjs
@@ -161,6 +165,14 @@ Recommended adoption path:
 ```
 
 Defaults are project-local: no external publication, no raw prompt storage, no secrets/customer/personal data storage, and no full file contents or full command output in metrics events.
+
+## Codex adapter
+
+For Codex, use the prompt-driven adapter in `adapters/codex/`.
+
+The Codex adapter documents how to project the core `AGENTS.md` and selected canonical skills into Codex-compatible repository surfaces, including `.agents/skills`, prompt templates, and `codex exec` command patterns.
+
+It is intentionally smaller than the Claude Code adapter: no installer, no hooks, no local metrics sidecar, no shared PR workflow, and no external publication path are provided. Capability claims are downgraded in `docs/adapter-capability-matrix.md`.
 
 ## 3分で使う / Quick start
 

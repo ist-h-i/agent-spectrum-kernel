@@ -48,9 +48,12 @@ Future adapters should add validation or fixture coverage for:
 Verified in this repository:
 
 - The Claude Code project adapter has installer, command, hook, runtime, and Pattern B GitHub Actions templates.
+- The Codex adapter has README guidance, repo skill projection guidance for `.agents/skills`, prompt templates, a `codex exec` command template, and explicit unsupported/partial capability downgrades.
 - Static validation checks the presence of required Claude adapter paths, default review skill projection, command template projection, local observability defaults, and Pattern B guardrails.
+- Static validation checks the presence of required Codex adapter paths.
 
 Unknown:
 
 - Runtime behavior inside each external tool after users copy or modify adapter assets.
+- Whether an adopting Codex repository copied the expected skills or ran the prompt templates against the intended workspace, diff, PR head, and verification commands.
 - Capabilities of tools without adapters in this repository.

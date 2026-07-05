@@ -61,6 +61,16 @@ const REQUIRED_CLAUDE_ADAPTER_PATHS = [
   "adapters/claude-code/plugin/hooks/hooks.json",
   "adapters/claude-code/plugin/bin/ai-skills-metrics-record",
 ];
+const REQUIRED_CODEX_ADAPTER_PATHS = [
+  "adapters/codex/README.md",
+  "adapters/codex/commands/codex-exec.md",
+  "adapters/codex/project/.agents/skills/README.md",
+  "adapters/codex/prompts/skill-implement.md",
+  "adapters/codex/prompts/skill-investigate.md",
+  "adapters/codex/prompts/skill-review.md",
+  "adapters/codex/prompts/skill-verify.md",
+  "adapters/codex/prompts/skill-handoff.md",
+];
 const REQUIRED_OBSERVABILITY_DOCS = [
   "docs/observability-runtime-contract.md",
   "docs/operation-automation-contract.md",
@@ -863,6 +873,7 @@ function buildPathChecks(root, manifest) {
 function validateClaudeAdapterArchitecture(root, manifest, errors) {
   const checks = {
     requiredAdapterPaths: [],
+    requiredCodexAdapterPaths: [],
     schemaPaths: [],
     observabilityDocs: [],
     operationAutomationSkillAbsent: true,
@@ -919,6 +930,14 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
     checks.requiredAdapterPaths.push({ path, ok });
     if (!ok) {
       fail(errors, "claude adapter", `required adapter path is missing: ${path}`);
+    }
+  }
+
+  for (const path of REQUIRED_CODEX_ADAPTER_PATHS) {
+    const ok = existsSync(resolve(root, path));
+    checks.requiredCodexAdapterPaths.push({ path, ok });
+    if (!ok) {
+      fail(errors, "codex adapter", `required Codex adapter path is missing: ${path}`);
     }
   }
 
@@ -1246,6 +1265,10 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks
     "## Claude adapter checks",
     "",
     ...claudeAdapterChecks.requiredAdapterPaths.map((check) => `- \`${check.path}\`: ${check.ok ? "ok" : "missing"}`),
+    "",
+    "## Codex adapter checks",
+    "",
+    ...claudeAdapterChecks.requiredCodexAdapterPaths.map((check) => `- \`${check.path}\`: ${check.ok ? "ok" : "missing"}`),
     "",
     "## Local observability checks",
     "",
