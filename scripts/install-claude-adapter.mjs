@@ -5,18 +5,34 @@ import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_SKILLS = [
+  "operating-mode-router",
+  "skill-router",
+  "spec-driven-development",
+  "controlled-implementation",
+  "test-first-verification",
+  "doubt-driven-development",
+  "handoff-generation",
   "review-router",
-  "review-final-merge-gate",
+  "review-automated-gate",
+  "review-ai-quality",
   "review-code-health",
+  "review-domain-impact",
   "review-architecture-impact",
   "review-output-quality",
   "review-adversarial-risk",
-  "skill-adoption-metrics",
-  "improvement-ledger",
+  "review-final-merge-gate",
+  "evidence-ledger",
   "risk-gate",
+  "adr-review",
+  "improvement-ledger",
+  "skill-adoption-metrics",
 ];
 const COMMAND_TEMPLATES = [
   "skill-review.md",
+  "skill-implement.md",
+  "skill-investigate.md",
+  "skill-verify.md",
+  "skill-handoff.md",
   "skill-report.md",
   "skill-ledger-refresh.md",
 ];
@@ -68,6 +84,10 @@ Options:
   --skip-runtime       Do not copy local runtime scripts or config.
   --dry-run            Print planned writes without changing files.
   -h, --help           Show this help.
+
+Default mode is upgrade-safe: projected files are overwritten from this checkout,
+existing unrelated settings are preserved, and adapter hooks are merged without
+duplicating hook commands.
 `);
 }
 
@@ -149,11 +169,48 @@ function installHooks(args, writes) {
 
 function mergeHooks(existingHooks, adapterHooks) {
   const merged = { ...existingHooks };
+  const seen = new Set();
+
+  for (const [eventName, groups] of Object.entries(merged)) {
+    if (!Array.isArray(groups)) {
+      continue;
+    }
+    for (const group of groups) {
+      for (const hook of Array.isArray(group.hooks) ? group.hooks : []) {
+        seen.add(hookIdentity(eventName, group, hook));
+      }
+    }
+  }
+
   for (const [eventName, groups] of Object.entries(adapterHooks)) {
     const currentGroups = Array.isArray(merged[eventName]) ? merged[eventName] : [];
-    merged[eventName] = [...currentGroups, ...groups];
+    const newGroups = [];
+    for (const group of groups) {
+      const hooks = [];
+      for (const hook of Array.isArray(group.hooks) ? group.hooks : []) {
+        const identity = hookIdentity(eventName, group, hook);
+        if (seen.has(identity)) {
+          continue;
+        }
+        seen.add(identity);
+        hooks.push(hook);
+      }
+      if (hooks.length > 0) {
+        newGroups.push({ ...group, hooks });
+      }
+    }
+    merged[eventName] = [...currentGroups, ...newGroups];
   }
   return merged;
+}
+
+function hookIdentity(eventName, group, hook) {
+  return JSON.stringify([
+    eventName,
+    group.matcher ?? "",
+    hook.type ?? "",
+    hook.command ?? "",
+  ]);
 }
 
 function installRuntime(args, writes) {

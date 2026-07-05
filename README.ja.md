@@ -33,6 +33,8 @@ scripts/       validation、Claude adapter install、local observability runtime
 - `docs/routing-model.md`: operating mode と skill group metadata の説明。
 - `docs/usage-ja.md`: 代表的な使い分けと運用ガイド。
 - `docs/skill-matrix.md`: workflow選択の一覧。
+- `docs/adapter-conformance-contract.md` / `docs/adapter-capability-matrix.md`: adapterの移植性とcapability evidence。
+- `docs/ai/stakeholder-readiness-report-template.md`: internal quality、release readiness、client-value readinessを分けるstakeholder別report template。
 
 ## 使い分け
 
@@ -100,6 +102,7 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | Skill選択やworkflow効果をふりかえりたい | `operating-mode-router` → `skill-effectiveness-evaluation` |
 | adoption maturityやinstruction qualityを期間で測りたい | `operating-mode-router` → `skill-adoption-metrics` |
 | weekly/monthly adoption reportを作りたい | operation layer + `docs/ai/adoption-report-template.md` |
+| stakeholder向けにreadinessを説明したい | `docs/ai/stakeholder-readiness-report-template.md` |
 | Claude Codeでlocal-firstに導入したい | `scripts/install-claude-adapter.mjs` + local hooks |
 | `@claude review` をPRで任意実行したい | Pattern B GitHub Actions adapter（有効化前に `risk-gate`） |
 | 繰り返しレビュー文脈の固定 | `review-context-generation`（既定: `docs/ai/review-context.md`） |

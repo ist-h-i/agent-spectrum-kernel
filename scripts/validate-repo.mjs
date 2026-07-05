@@ -43,6 +43,10 @@ const REQUIRED_CLAUDE_ADAPTER_PATHS = [
   "adapters/claude-code/README.md",
   "adapters/claude-code/project/.claude/skills/README.md",
   "adapters/claude-code/project/.claude/commands/skill-review.md",
+  "adapters/claude-code/project/.claude/commands/skill-implement.md",
+  "adapters/claude-code/project/.claude/commands/skill-investigate.md",
+  "adapters/claude-code/project/.claude/commands/skill-verify.md",
+  "adapters/claude-code/project/.claude/commands/skill-handoff.md",
   "adapters/claude-code/project/.claude/commands/skill-report.md",
   "adapters/claude-code/project/.claude/commands/skill-ledger-refresh.md",
   "adapters/claude-code/project/.claude/hooks/hooks.json",
@@ -68,6 +72,39 @@ const REQUIRED_OBSERVABILITY_DOCS = [
 ];
 const OBSERVABILITY_CONFIG_PATH = "docs/ai/observability-config.yml";
 const PATTERN_B_WORKFLOW_PATH = "adapters/claude-code/github-actions/claude-review-on-mention.yml";
+const CLAUDE_ADAPTER_INSTALLER_PATH = "scripts/install-claude-adapter.mjs";
+const REQUIRED_DEFAULT_REVIEW_SKILLS = [
+  "operating-mode-router",
+  "skill-router",
+  "spec-driven-development",
+  "controlled-implementation",
+  "test-first-verification",
+  "doubt-driven-development",
+  "handoff-generation",
+  "review-router",
+  "review-automated-gate",
+  "review-ai-quality",
+  "review-code-health",
+  "review-domain-impact",
+  "review-architecture-impact",
+  "review-output-quality",
+  "review-adversarial-risk",
+  "review-final-merge-gate",
+  "evidence-ledger",
+  "risk-gate",
+  "adr-review",
+  "improvement-ledger",
+  "skill-adoption-metrics",
+];
+const REQUIRED_COMMAND_TEMPLATES = [
+  "skill-review.md",
+  "skill-implement.md",
+  "skill-investigate.md",
+  "skill-verify.md",
+  "skill-handoff.md",
+  "skill-report.md",
+  "skill-ledger-refresh.md",
+];
 const FORBIDDEN_OPERATION_AUTOMATION_SKILL = "skills/operation-automation/SKILL.md";
 const FORBIDDEN_OPERATION_AUTOMATION_SKILL_UNDERSCORE = "skills/operation_automation/SKILL.md";
 const ALLOWED_ROUTE_PHRASE_CONTEXTS = [
@@ -852,10 +889,22 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
       hasIssueCommentTrigger: false,
       hasReviewCommentTrigger: false,
       hasMentionGuard: false,
+      hasTrustedActorGuard: false,
+      hasForkGuard: false,
       capturesPrDiff: false,
+      checksOutPrHead: false,
+      verifiesPrHeadSha: false,
+      promptStatesPrHeadWorkspace: false,
       noAlwaysOnPullRequestTrigger: true,
       noSecretLiteral: true,
       noAutoMergeDeployRelease: true,
+    },
+    installerProjection: {
+      installerPresent: false,
+      defaultSkills: [],
+      missingDefaultReviewSkills: [],
+      commandTemplates: [],
+      missingCommandTemplates: [],
     },
     documentationConsistency: {
       mentionsLocalHooksDefault: false,
@@ -916,6 +965,7 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
 
   validateObservabilityConfig(root, checks, errors);
   validateHookSafety(root, checks, errors);
+  validateInstallerProjection(root, checks, errors);
   validatePatternBWorkflow(root, checks, errors);
   validateAdapterDocumentation(root, checks, errors);
 
@@ -1037,6 +1087,38 @@ function validateHookSafety(root, checks, errors) {
   }
 }
 
+function validateInstallerProjection(root, checks, errors) {
+  const absolutePath = resolve(root, CLAUDE_ADAPTER_INSTALLER_PATH);
+  checks.installerProjection.installerPresent = existsSync(absolutePath);
+  if (!checks.installerProjection.installerPresent) {
+    fail(errors, "claude adapter installer", `required installer is missing: ${CLAUDE_ADAPTER_INSTALLER_PATH}`);
+    return;
+  }
+
+  const text = readFileSync(absolutePath, "utf8");
+  const defaultSkills = extractStringArrayConstant(text, "DEFAULT_SKILLS");
+  const commandTemplates = extractStringArrayConstant(text, "COMMAND_TEMPLATES");
+  checks.installerProjection.defaultSkills = defaultSkills;
+  checks.installerProjection.commandTemplates = commandTemplates;
+  checks.installerProjection.missingDefaultReviewSkills = REQUIRED_DEFAULT_REVIEW_SKILLS.filter((skill) => !defaultSkills.includes(skill));
+  checks.installerProjection.missingCommandTemplates = REQUIRED_COMMAND_TEMPLATES.filter((command) => !commandTemplates.includes(command));
+
+  for (const skill of checks.installerProjection.missingDefaultReviewSkills) {
+    fail(errors, "claude adapter installer", `${CLAUDE_ADAPTER_INSTALLER_PATH} DEFAULT_SKILLS is missing required review skill: ${skill}`);
+  }
+  for (const command of checks.installerProjection.missingCommandTemplates) {
+    fail(errors, "claude adapter installer", `${CLAUDE_ADAPTER_INSTALLER_PATH} COMMAND_TEMPLATES is missing required command template: ${command}`);
+  }
+}
+
+function extractStringArrayConstant(text, constantName) {
+  const match = text.match(new RegExp(`const\\s+${constantName}\\s*=\\s*\\[([\\s\\S]*?)\\];`));
+  if (!match) {
+    return [];
+  }
+  return [...match[1].matchAll(/"([^"]+)"/g)].map((entry) => entry[1]);
+}
+
 function validatePatternBWorkflow(root, checks, errors) {
   const absolutePath = resolve(root, PATTERN_B_WORKFLOW_PATH);
   if (!existsSync(absolutePath)) {
@@ -1047,7 +1129,19 @@ function validatePatternBWorkflow(root, checks, errors) {
   checks.patternBGitHubAction.hasIssueCommentTrigger = /^\s+issue_comment:/m.test(text);
   checks.patternBGitHubAction.hasReviewCommentTrigger = /^\s+pull_request_review_comment:/m.test(text);
   checks.patternBGitHubAction.hasMentionGuard = text.includes("@claude review") && /contains\([^)]*github\.event\.comment\.body[^)]*'@claude review'[^)]*\)/.test(text);
+  checks.patternBGitHubAction.hasTrustedActorGuard =
+    /author_association/.test(text) &&
+    /\bOWNER\b/.test(text) &&
+    /\bMEMBER\b/.test(text) &&
+    /\bCOLLABORATOR\b/.test(text);
+  checks.patternBGitHubAction.hasForkGuard =
+    /allow_fork/i.test(text) &&
+    /Fork PR review is blocked by default/.test(text) &&
+    /workflow_dispatch/.test(text);
   checks.patternBGitHubAction.capturesPrDiff = /\bgh pr view\b/.test(text) && /\bgh pr diff\b/.test(text) && text.includes(".claude/pr.diff");
+  checks.patternBGitHubAction.checksOutPrHead = /\bgh pr checkout\b[\s\S]{0,120}--detach/.test(text);
+  checks.patternBGitHubAction.verifiesPrHeadSha = text.includes(".claude/pr-head-sha.txt") && /headRefOid/.test(text) && /git rev-parse HEAD/.test(text);
+  checks.patternBGitHubAction.promptStatesPrHeadWorkspace = /PR head workspace/.test(text) && /insufficient evidence/.test(text);
   checks.patternBGitHubAction.noAlwaysOnPullRequestTrigger = !/^\s+pull_request:\s*$/m.test(text);
   checks.patternBGitHubAction.noSecretLiteral = !/(sk-ant-|ANTHROPIC_API_KEY\s*:\s*["'][^$])/i.test(text);
   checks.patternBGitHubAction.noAutoMergeDeployRelease = !/\b(auto-?merge|deploy|release|publish)\b/i.test(text.replace(/Do not deploy, merge, release, publish/gi, ""));
@@ -1184,10 +1278,21 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks
     `- issue_comment trigger: ${claudeAdapterChecks.patternBGitHubAction.hasIssueCommentTrigger ? "ok" : "invalid"}`,
     `- pull_request_review_comment trigger: ${claudeAdapterChecks.patternBGitHubAction.hasReviewCommentTrigger ? "ok" : "invalid"}`,
     `- @claude review guard: ${claudeAdapterChecks.patternBGitHubAction.hasMentionGuard ? "ok" : "invalid"}`,
+    `- trusted actor guard: ${claudeAdapterChecks.patternBGitHubAction.hasTrustedActorGuard ? "ok" : "invalid"}`,
+    `- fork PR guard: ${claudeAdapterChecks.patternBGitHubAction.hasForkGuard ? "ok" : "invalid"}`,
     `- PR diff captured before Claude: ${claudeAdapterChecks.patternBGitHubAction.capturesPrDiff ? "ok" : "invalid"}`,
+    `- PR head checkout before Claude: ${claudeAdapterChecks.patternBGitHubAction.checksOutPrHead ? "ok" : "invalid"}`,
+    `- PR head SHA verified: ${claudeAdapterChecks.patternBGitHubAction.verifiesPrHeadSha ? "ok" : "invalid"}`,
+    `- prompt states PR head evidence boundary: ${claudeAdapterChecks.patternBGitHubAction.promptStatesPrHeadWorkspace ? "ok" : "invalid"}`,
     `- no always-on pull_request trigger: ${claudeAdapterChecks.patternBGitHubAction.noAlwaysOnPullRequestTrigger ? "ok" : "invalid"}`,
     `- no literal secret: ${claudeAdapterChecks.patternBGitHubAction.noSecretLiteral ? "ok" : "invalid"}`,
     `- no auto-merge/deploy/release action: ${claudeAdapterChecks.patternBGitHubAction.noAutoMergeDeployRelease ? "ok" : "invalid"}`,
+    "",
+    "## Claude adapter installer projection checks",
+    "",
+    `- installer present: ${claudeAdapterChecks.installerProjection.installerPresent ? "ok" : "missing"}`,
+    `- default review skills projected: ${claudeAdapterChecks.installerProjection.missingDefaultReviewSkills.length === 0 ? "ok" : `missing ${claudeAdapterChecks.installerProjection.missingDefaultReviewSkills.join(", ")}`}`,
+    `- command templates projected: ${claudeAdapterChecks.installerProjection.missingCommandTemplates.length === 0 ? "ok" : `missing ${claudeAdapterChecks.installerProjection.missingCommandTemplates.join(", ")}`}`,
     "",
     "## Documentation consistency checks",
     "",

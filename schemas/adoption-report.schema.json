@@ -33,13 +33,14 @@
     "instruction_maturity": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Numeric values are null when the metric is unknown or unavailable; null is not zero.",
       "properties": {
-        "average_goal_clarity": { "type": "number", "minimum": 1, "maximum": 5 },
-        "average_scope_clarity": { "type": "number", "minimum": 1, "maximum": 5 },
-        "average_context_sufficiency": { "type": "number", "minimum": 1, "maximum": 5 },
-        "verification_instruction_rate": { "type": "number", "minimum": 0, "maximum": 1 },
-        "risk_awareness_rate": { "type": "number", "minimum": 0, "maximum": 1 },
-        "stop_condition_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+        "average_goal_clarity": { "type": ["number", "null"], "minimum": 1, "maximum": 5 },
+        "average_scope_clarity": { "type": ["number", "null"], "minimum": 1, "maximum": 5 },
+        "average_context_sufficiency": { "type": ["number", "null"], "minimum": 1, "maximum": 5 },
+        "verification_instruction_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "risk_awareness_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "stop_condition_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
       }
     },
     "skill_usage": {
@@ -51,10 +52,35 @@
           "items": { "type": "string" },
           "uniqueItems": true
         },
-        "correct_routing_rate": { "type": "number", "minimum": 0, "maximum": 1 },
-        "required_gate_coverage": { "type": "number", "minimum": 0, "maximum": 1 },
+        "correct_routing_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "Null means routing correctness was not recorded." },
+        "required_gate_coverage": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "Null means required/executed gate data was not recorded." },
         "over_processing_count": { "type": "integer", "minimum": 0 },
         "missing_evidence_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "review_quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "review_tasks": { "type": "integer", "minimum": 0 },
+        "decisions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "approve": { "type": "integer", "minimum": 0 },
+            "approve_with_comments": { "type": "integer", "minimum": 0 },
+            "request_changes": { "type": "integer", "minimum": 0 },
+            "block": { "type": "integer", "minimum": 0 },
+            "insufficient_evidence": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "required_fixes_count": { "type": "integer", "minimum": 0 },
+        "insufficient_evidence_tasks": { "type": "integer", "minimum": 0 },
+        "insufficient_evidence_layers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
       }
     },
     "debt_movement": {

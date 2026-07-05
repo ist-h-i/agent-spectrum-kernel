@@ -43,12 +43,15 @@ docs/
   observability-runtime-contract.md
   operation-automation-contract.md
   debt-lifecycle-contract.md
+  adapter-conformance-contract.md
+  adapter-capability-matrix.md
   claude-github-review-setup.md
   ai/review-context.md
   ai/implementation-context.md
   ai/improvement-ledger.md
   ai/skill-adoption-metrics.md
   ai/adoption-report-template.md
+  ai/stakeholder-readiness-report-template.md
   ai/observability-config.yml
   ai/metrics/README.md
   ai/reports/README.md
@@ -169,6 +172,8 @@ First-time users should start with `docs/quickstart-ja.md`.
 - `docs/routing-model.md`: operating-mode routing and skill group model.
 - `docs/usage-ja.md`: representative usage guide for common operating patterns.
 - `docs/skill-matrix.md`: reference matrix for workflow selection.
+- `docs/adapter-conformance-contract.md` and `docs/adapter-capability-matrix.md`: adapter portability and capability evidence.
+- `docs/ai/stakeholder-readiness-report-template.md`: stakeholder-specific readiness reports that separate internal quality, release readiness, and client-value readiness.
 
 ## Recommended workflows
 

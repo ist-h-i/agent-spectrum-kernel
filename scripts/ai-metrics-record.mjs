@@ -44,6 +44,8 @@ function parseArgs(argv) {
     taskId: process.env.AI_TASK_ID || "",
     taskType: process.env.AI_TASK_TYPE || "other",
     skills: process.env.AI_SKILLS_USED ? process.env.AI_SKILLS_USED.split(",").map((value) => value.trim()).filter(Boolean) : [],
+    routingResultJson: process.env.AI_ROUTING_RESULT_JSON || "",
+    reviewResultJson: process.env.AI_REVIEW_RESULT_JSON || "",
     dryRun: false,
     printResult: false,
   };
@@ -64,6 +66,10 @@ function parseArgs(argv) {
       args.taskType = argv[++i];
     } else if (arg === "--skills") {
       args.skills = argv[++i].split(",").map((value) => value.trim()).filter(Boolean);
+    } else if (arg === "--routing-result-json") {
+      args.routingResultJson = argv[++i];
+    } else if (arg === "--review-result-json") {
+      args.reviewResultJson = argv[++i];
     } else if (arg === "--dry-run") {
       args.dryRun = true;
       args.printResult = true;
@@ -89,6 +95,10 @@ Options:
   --task-id <id>            Optional explicit task boundary. Defaults to configured hook boundary source.
   --task-type <type>        implementation | review | validation | report | other.
   --skills <csv>            Skills used by this task.
+  --routing-result-json <json>
+                            Optional routing summary without raw prompt text.
+  --review-result-json <json>
+                            Optional review decision summary without raw review text.
   --event-store <path>      JSONL event store path.
   --config <path>           Observability config. Defaults to docs/ai/observability-config.yml.
   --dry-run                 Print event without writing.
@@ -205,6 +215,17 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function parseJsonOption(value, fallback = {}) {
+  if (!value) {
+    return fallback;
+  }
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
 function changedPaths(hookInput, maxPaths) {
   const input = hookInput.tool_input ?? {};
   return unique([
@@ -244,6 +265,14 @@ function buildEvent(args, hookInput, config, taskId) {
   const paths = changedPaths(hookInput, config.capture.max_paths_per_event ?? 50);
   const command = hookInput.tool_input?.command ?? "";
   const skills = unique(args.skills);
+  const routingResult = sanitizeRoutingResult({
+    ...(hookInput.routing_result ?? {}),
+    ...parseJsonOption(args.routingResultJson),
+  });
+  const reviewResult = sanitizeReviewResult({
+    ...(hookInput.review_result ?? {}),
+    ...parseJsonOption(args.reviewResultJson),
+  });
 
   const event = {
     schema_version: "1.0.0",
@@ -252,7 +281,7 @@ function buildEvent(args, hookInput, config, taskId) {
     task_type: args.taskType,
     occurred_at: now,
     skills_used: skills,
-    routing_result: {},
+    routing_result: routingResult,
     outcome_metrics: {},
     verification_metrics: {},
     debt_movement_metrics: {},
@@ -266,6 +295,10 @@ function buildEvent(args, hookInput, config, taskId) {
       note: "Summarized local event. Raw prompts, secrets, full file contents, and full command output omitted by default.",
     },
   };
+
+  if (Object.keys(reviewResult).length > 0) {
+    event.review_result = reviewResult;
+  }
 
   if (args.hookEvent) {
     event.evidence_references.push(`claude_hook:${args.hookEvent}`);
@@ -308,6 +341,46 @@ function buildEvent(args, hookInput, config, taskId) {
   }
 
   return event;
+}
+
+function sanitizeRoutingResult(source) {
+  const result = {};
+  if (typeof source.operating_mode === "string" && source.operating_mode) {
+    result.operating_mode = source.operating_mode;
+  }
+  if (typeof source.primary_skill === "string" && source.primary_skill) {
+    result.primary_skill = source.primary_skill;
+  }
+  if (typeof source.correct_routing === "boolean") {
+    result.correct_routing = source.correct_routing;
+  }
+  for (const field of ["secondary_skills", "required_gates", "executed_gates"]) {
+    if (Array.isArray(source[field])) {
+      result[field] = unique(source[field].filter((value) => typeof value === "string"));
+    }
+  }
+  if (Array.isArray(source.skipped_gates)) {
+    result.skipped_gates = source.skipped_gates
+      .filter((item) => item && typeof item.gate === "string" && typeof item.reason === "string")
+      .map((item) => ({ gate: item.gate, reason: item.reason.slice(0, 500) }))
+      .slice(0, 50);
+  }
+  return result;
+}
+
+function sanitizeReviewResult(source) {
+  const result = {};
+  const allowedDecisions = new Set(["approve", "approve_with_comments", "request_changes", "block", "insufficient_evidence"]);
+  if (allowedDecisions.has(source.decision)) {
+    result.decision = source.decision;
+  }
+  if (Number.isInteger(source.required_fixes_count) && source.required_fixes_count >= 0) {
+    result.required_fixes_count = source.required_fixes_count;
+  }
+  if (Array.isArray(source.insufficient_evidence_layers)) {
+    result.insufficient_evidence_layers = unique(source.insufficient_evidence_layers.filter((value) => typeof value === "string")).slice(0, 20);
+  }
+  return result;
 }
 
 function appendEvent(eventStore, event) {

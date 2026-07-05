@@ -105,12 +105,15 @@
     "docs/observability-runtime-contract.md",
     "docs/operation-automation-contract.md",
     "docs/debt-lifecycle-contract.md",
+    "docs/adapter-conformance-contract.md",
+    "docs/adapter-capability-matrix.md",
     "docs/claude-github-review-setup.md",
     "docs/ai/review-context.md",
     "docs/ai/implementation-context.md",
     "docs/ai/improvement-ledger.md",
     "docs/ai/skill-adoption-metrics.md",
     "docs/ai/adoption-report-template.md",
+    "docs/ai/stakeholder-readiness-report-template.md",
     "docs/ai/observability-config.yml",
     "docs/ai/metrics/README.md",
     "docs/ai/reports/README.md",
@@ -151,6 +154,10 @@
     "adapters/claude-code/README.md",
     "adapters/claude-code/project/.claude/skills/README.md",
     "adapters/claude-code/project/.claude/commands/skill-review.md",
+    "adapters/claude-code/project/.claude/commands/skill-implement.md",
+    "adapters/claude-code/project/.claude/commands/skill-investigate.md",
+    "adapters/claude-code/project/.claude/commands/skill-verify.md",
+    "adapters/claude-code/project/.claude/commands/skill-handoff.md",
     "adapters/claude-code/project/.claude/commands/skill-report.md",
     "adapters/claude-code/project/.claude/commands/skill-ledger-refresh.md",
     "adapters/claude-code/project/.claude/hooks/hooks.json",
@@ -170,6 +177,6 @@
     "skills": "one directory per workflow, each with SKILL.md",
     "language": "English agent instructions for portability; Japanese guidance for personal/internal adoption",
     "principle": "kernel for judgment, skills for procedures, project rules for local conventions",
-    "quality_target": "95+ across reviewed personal/internal-use categories"
+    "quality_target": "95+ static package/design readiness for reviewed personal/internal-use categories; runtime and client-value outcomes require adopting-project evidence"
   }
 }

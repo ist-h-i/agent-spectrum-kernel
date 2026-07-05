@@ -9,7 +9,10 @@ It is not the default local observability path. Local hooks remain the primary w
 Pattern B means:
 
 - run only when a user comments `@claude review` on a PR,
+- accept comment-triggered runs only from trusted actor associations by default,
 - do not run on every PR update,
+- block fork PR comment triggers by default,
+- check out the PR head workspace before invoking Claude,
 - use the installed project skills or plugin skills,
 - start with `review-router`,
 - run only required gates,
@@ -20,7 +23,7 @@ Pattern B means:
 1. Install the Claude project adapter or plugin in the adopting repository.
 2. Copy `claude-review-on-mention.yml` into the adopting repository's `.github/workflows/`.
 3. Add required Claude authentication through GitHub Secrets or approved OIDC setup.
-4. Comment `@claude review` on a pull request.
+4. Comment `@claude review` on a pull request as a repository `OWNER`, `MEMBER`, or `COLLABORATOR`.
 
 The workflow template references `${{ secrets.ANTHROPIC_API_KEY }}` but does not contain any secret value.
 
@@ -29,7 +32,8 @@ The workflow template references `${{ secrets.ANTHROPIC_API_KEY }}` but does not
 The template:
 
 - uses comment and manual triggers only,
-- captures PR metadata with `gh pr view` and PR patch with `gh pr diff` before invoking Claude,
+- captures PR metadata with `gh pr view`, PR patch with `gh pr diff`, and the checked-out PR head SHA before invoking Claude,
+- requires `workflow_dispatch` with `allow_fork=true` for fork PRs,
 - does not trigger on `pull_request.opened` or `pull_request.synchronize`,
 - does not auto-merge,
 - does not deploy,

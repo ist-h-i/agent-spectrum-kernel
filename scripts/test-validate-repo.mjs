@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -151,6 +151,10 @@ safety:
     "adapters/claude-code/README.md",
     "adapters/claude-code/project/.claude/skills/README.md",
     "adapters/claude-code/project/.claude/commands/skill-review.md",
+    "adapters/claude-code/project/.claude/commands/skill-implement.md",
+    "adapters/claude-code/project/.claude/commands/skill-investigate.md",
+    "adapters/claude-code/project/.claude/commands/skill-verify.md",
+    "adapters/claude-code/project/.claude/commands/skill-handoff.md",
     "adapters/claude-code/project/.claude/commands/skill-report.md",
     "adapters/claude-code/project/.claude/commands/skill-ledger-refresh.md",
     "adapters/claude-code/github-actions/README.md",
@@ -183,16 +187,68 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      allow_fork:
+        type: boolean
+        default: false
 jobs:
   review:
-    if: contains(github.event.comment.body, '@claude review')
+    if: contains(github.event.comment.body, '@claude review') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
     steps:
       - run: |
+          if [ "$ALLOW_FORK" != "true" ]; then
+            echo "Fork PR review is blocked by default."
+          fi
+          gh pr checkout "$PR_NUMBER" --detach
           gh pr view "$PR_NUMBER" --json number > .claude/pr-context.json
           gh pr diff "$PR_NUMBER" --patch > .claude/pr.diff
+          git rev-parse HEAD > .claude/pr-head-sha.txt
+          echo headRefOid
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Treat the checked-out workspace as the PR head workspace.
+            Return insufficient evidence if the PR head workspace is unavailable.
+`,
+  );
+
+  mkdirSync(resolve(root, "scripts"), { recursive: true });
+  writeFileSync(
+    resolve(root, "scripts/install-claude-adapter.mjs"),
+    `const DEFAULT_SKILLS = [
+  "operating-mode-router",
+  "skill-router",
+  "spec-driven-development",
+  "controlled-implementation",
+  "test-first-verification",
+  "doubt-driven-development",
+  "handoff-generation",
+  "review-router",
+  "review-automated-gate",
+  "review-ai-quality",
+  "review-code-health",
+  "review-domain-impact",
+  "review-architecture-impact",
+  "review-output-quality",
+  "review-adversarial-risk",
+  "review-final-merge-gate",
+  "evidence-ledger",
+  "risk-gate",
+  "adr-review",
+  "improvement-ledger",
+  "skill-adoption-metrics",
+];
+const COMMAND_TEMPLATES = [
+  "skill-review.md",
+  "skill-implement.md",
+  "skill-investigate.md",
+  "skill-verify.md",
+  "skill-handoff.md",
+  "skill-report.md",
+  "skill-ledger-refresh.md",
+];
 `,
   );
 }
@@ -442,6 +498,122 @@ function assertRuntimeScripts() {
     throw new Error(`summarizer should separate event count from task count\n${JSON.stringify(report.summary, null, 2)}`);
   }
 
+  const reviewEvents = [
+    {
+      schema_version: "1.0.0",
+      event_id: "evt-review-1",
+      task_id: "REVIEW-1",
+      task_type: "review",
+      occurred_at: "2999-01-01T00:00:00.000Z",
+      skills_used: ["review-router", "review-final-merge-gate"],
+      routing_result: {
+        operating_mode: "delivery_quality",
+        primary_skill: "review-router",
+        correct_routing: true,
+        required_gates: ["review-router", "review-final-merge-gate"],
+        executed_gates: ["review-router", "review-final-merge-gate"],
+      },
+      review_result: {
+        decision: "request_changes",
+        required_fixes_count: 2,
+        insufficient_evidence_layers: [],
+      },
+      outcome_metrics: {},
+      verification_metrics: {},
+      debt_movement_metrics: {},
+      evidence_references: ["fixture"],
+      privacy_note: {
+        raw_prompts_stored: false,
+        secrets_stored: false,
+        customer_data_stored: false,
+        personal_data_stored: false,
+        external_publication: false,
+      },
+    },
+    {
+      schema_version: "1.0.0",
+      event_id: "evt-review-2",
+      task_id: "REVIEW-2",
+      task_type: "review",
+      occurred_at: "2999-01-01T00:00:00.000Z",
+      skills_used: ["review-router"],
+      routing_result: {
+        operating_mode: "delivery_quality",
+        primary_skill: "review-router",
+        correct_routing: false,
+        required_gates: ["review-router", "review-final-merge-gate"],
+        executed_gates: ["review-router"],
+        skipped_gates: [{ gate: "review-final-merge-gate", reason: "fixture missing evidence" }],
+      },
+      review_result: {
+        decision: "insufficient_evidence",
+        required_fixes_count: 0,
+        insufficient_evidence_layers: ["Architecture"],
+      },
+      outcome_metrics: {},
+      verification_metrics: {},
+      debt_movement_metrics: {},
+      evidence_references: ["fixture"],
+      privacy_note: {
+        raw_prompts_stored: false,
+        secrets_stored: false,
+        customer_data_stored: false,
+        personal_data_stored: false,
+        external_publication: false,
+      },
+    },
+  ];
+  const reviewStore = resolve(root, "docs/ai/metrics/review-events.jsonl");
+  writeFileSync(reviewStore, `${reviewEvents.map((event) => JSON.stringify(event)).join("\n")}\n`);
+  const reviewSummarizeResult = runRepoScript([
+    resolve(repoRoot, "scripts/ai-metrics-summarize.mjs"),
+    "--event-store",
+    reviewStore,
+    "--out",
+    resolve(root, "docs/ai/reports/review-report.json"),
+    "--period-start",
+    "2999-01-01",
+    "--period-end",
+    "2999-01-02",
+    "--format",
+    "json",
+  ]);
+  assertRuntimePass("metrics summarizer review coverage smoke", reviewSummarizeResult);
+  const reviewReport = JSON.parse(readFileSync(resolve(root, "docs/ai/reports/review-report.json"), "utf8"));
+  if (reviewReport.skill_usage.correct_routing_rate !== 0.5 || reviewReport.skill_usage.required_gate_coverage !== 0.75) {
+    throw new Error(`summarizer should compute routing and gate coverage when evidence exists\n${JSON.stringify(reviewReport.skill_usage, null, 2)}`);
+  }
+  if (reviewReport.review_quality.review_tasks !== 2 || reviewReport.review_quality.insufficient_evidence_tasks !== 1 || reviewReport.review_quality.required_fixes_count !== 2) {
+    throw new Error(`summarizer should aggregate review decisions without raw review text\n${JSON.stringify(reviewReport.review_quality, null, 2)}`);
+  }
+
+  const sparseStore = resolve(root, "docs/ai/metrics/sparse-events.jsonl");
+  writeFileSync(sparseStore, `${JSON.stringify({ ...taskEvents[0], event_id: "evt-sparse", task_id: "SPARSE-1" })}\n`);
+  const sparseResult = runRepoScript([
+    resolve(repoRoot, "scripts/ai-metrics-summarize.mjs"),
+    "--event-store",
+    sparseStore,
+    "--out",
+    resolve(root, "docs/ai/reports/sparse-report.json"),
+    "--period-start",
+    "2999-01-01",
+    "--period-end",
+    "2999-01-02",
+    "--format",
+    "json",
+  ]);
+  assertRuntimePass("metrics summarizer sparse null smoke", sparseResult);
+  const sparseReport = JSON.parse(readFileSync(resolve(root, "docs/ai/reports/sparse-report.json"), "utf8"));
+  if (sparseReport.instruction_maturity.average_goal_clarity !== null || sparseReport.skill_usage.correct_routing_rate !== null) {
+    throw new Error(`sparse metrics should remain unknown/null, not zero\n${JSON.stringify(sparseReport, null, 2)}`);
+  }
+  const adoptionSchema = JSON.parse(readFileSync(resolve(repoRoot, "schemas/adoption-report.schema.json"), "utf8"));
+  const goalType = adoptionSchema.properties.instruction_maturity.properties.average_goal_clarity.type;
+  const routingType = adoptionSchema.properties.skill_usage.properties.correct_routing_rate.type;
+  if (!Array.isArray(goalType) || !goalType.includes("null") || !Array.isArray(routingType) || !routingType.includes("null")) {
+    throw new Error("adoption report schema should allow null for unavailable numeric metrics");
+  }
+
   const ledgerRoot = resolve(root, "ledger");
   writeImprovementLedger(
     ledgerRoot,
@@ -488,10 +660,68 @@ function assertRuntimeScripts() {
   }
 }
 
+function assertInstallerScripts() {
+  const target = resolve(fixtureRoot, "install-target");
+  mkdirSync(resolve(target, ".claude"), { recursive: true });
+  writeFileSync(
+    resolve(target, ".claude/settings.json"),
+    JSON.stringify(
+      {
+        hooks: {
+          Stop: [
+            {
+              matcher: "Custom",
+              hooks: [{ type: "command", command: "echo unrelated" }],
+            },
+          ],
+        },
+      },
+      null,
+      2,
+    ),
+  );
+
+  const installer = resolve(repoRoot, "scripts/install-claude-adapter.mjs");
+  assertRuntimePass("installer first run", runRepoScript([installer, "--target", target]));
+  assertRuntimePass("installer second run", runRepoScript([installer, "--target", target]));
+
+  const settings = JSON.parse(readFileSync(resolve(target, ".claude/settings.json"), "utf8"));
+  const identities = hookIdentities(settings.hooks);
+  if (identities.length !== new Set(identities).size) {
+    throw new Error(`installer should not duplicate hook commands\n${JSON.stringify(settings.hooks, null, 2)}`);
+  }
+  if (!identities.some((identity) => identity.includes("echo unrelated"))) {
+    throw new Error(`installer should preserve unrelated hooks\n${JSON.stringify(settings.hooks, null, 2)}`);
+  }
+
+  const dryRunTarget = resolve(fixtureRoot, "install-dry-run-target");
+  const dryRun = runRepoScript([installer, "--target", dryRunTarget, "--dry-run"]);
+  assertRuntimePass("installer dry run", dryRun);
+  if (!dryRun.stdout.includes(".claude/settings.json") || !dryRun.stdout.includes("skill-handoff.md")) {
+    throw new Error(`installer dry run should list planned writes\n${dryRun.stdout}`);
+  }
+  if (existsSync(resolve(dryRunTarget, ".claude/settings.json"))) {
+    throw new Error("installer dry run should not write settings");
+  }
+}
+
+function hookIdentities(hooks) {
+  const identities = [];
+  for (const [eventName, groups] of Object.entries(hooks ?? {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const hook of Array.isArray(group.hooks) ? group.hooks : []) {
+        identities.push(JSON.stringify([eventName, group.matcher ?? "", hook.type ?? "", hook.command ?? ""]));
+      }
+    }
+  }
+  return identities;
+}
+
 try {
   const validRoot = cloneFixture("valid");
   assertPass("valid fixture", validRoot);
   assertRuntimeScripts();
+  assertInstallerScripts();
 
   const missingSchemaRoot = cloneFixture("missing-schema");
   rmSync(resolve(missingSchemaRoot, "schemas/metrics-event.schema.json"));
@@ -543,6 +773,40 @@ jobs:
 `,
   );
   assertFail("always-on workflow forbidden", alwaysOnWorkflowRoot, "noAlwaysOnPullRequestTrigger");
+
+  const untrustedActorWorkflowRoot = cloneFixture("untrusted-actor-workflow");
+  writeFileSync(
+    resolve(untrustedActorWorkflowRoot, "adapters/claude-code/github-actions/claude-review-on-mention.yml"),
+    readFileSync(resolve(untrustedActorWorkflowRoot, "adapters/claude-code/github-actions/claude-review-on-mention.yml"), "utf8").replace(
+      " && contains(fromJSON('[\"OWNER\",\"MEMBER\",\"COLLABORATOR\"]'), github.event.comment.author_association)",
+      "",
+    ),
+  );
+  assertFail("pattern b actor guard required", untrustedActorWorkflowRoot, "hasTrustedActorGuard");
+
+  const missingHeadCheckoutRoot = cloneFixture("missing-head-checkout");
+  writeFileSync(
+    resolve(missingHeadCheckoutRoot, "adapters/claude-code/github-actions/claude-review-on-mention.yml"),
+    readFileSync(resolve(missingHeadCheckoutRoot, "adapters/claude-code/github-actions/claude-review-on-mention.yml"), "utf8").replace(
+      '          gh pr checkout "$PR_NUMBER" --detach\n',
+      "",
+    ),
+  );
+  assertFail("pattern b head checkout required", missingHeadCheckoutRoot, "checksOutPrHead");
+
+  const missingDefaultReviewSkillRoot = cloneFixture("missing-default-review-skill");
+  writeFileSync(
+    resolve(missingDefaultReviewSkillRoot, "scripts/install-claude-adapter.mjs"),
+    readFileSync(resolve(missingDefaultReviewSkillRoot, "scripts/install-claude-adapter.mjs"), "utf8").replace('  "review-domain-impact",\n', ""),
+  );
+  assertFail("adapter installer default review skills", missingDefaultReviewSkillRoot, "DEFAULT_SKILLS is missing required review skill: review-domain-impact");
+
+  const missingCommandTemplateRoot = cloneFixture("missing-command-template");
+  writeFileSync(
+    resolve(missingCommandTemplateRoot, "scripts/install-claude-adapter.mjs"),
+    readFileSync(resolve(missingCommandTemplateRoot, "scripts/install-claude-adapter.mjs"), "utf8").replace('  "skill-handoff.md",\n', ""),
+  );
+  assertFail("adapter installer command templates", missingCommandTemplateRoot, "COMMAND_TEMPLATES is missing required command template: skill-handoff.md");
 
   const validLedgerMetadataRoot = cloneFixture("valid-ledger-metadata");
   assertPass("valid ledger metadata", validLedgerMetadataRoot);

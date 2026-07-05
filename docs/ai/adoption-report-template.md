@@ -30,9 +30,17 @@ Instruction maturity:
 
 Skill usage:
 - correct routing rate:
+- required gate coverage:
 - over-processing cases:
 - missing evidence cases:
 - improvement-ledger handoff count:
+
+Review quality:
+- review tasks:
+- decisions:
+- required fixes count:
+- insufficient evidence tasks:
+- insufficient evidence layers:
 
 Debt movement:
 - detected:
@@ -128,6 +136,8 @@ Privacy / safety note:
 - Period summary generation consumes metrics events or reviewed evidence over a defined period.
 - Period summaries aggregate by `task_id`; event count and task count are reported separately.
 - Debt movement is a delta for the period. Debt inventory snapshot is a separate latest-status view.
+- Sparse early-adoption reports use `null` for unavailable averages and rates. `null` means unknown, not zero.
+- Review and routing summaries store counts, gates, and decisions only; raw review text and prompts remain out of scope.
 - Weekly/monthly report templates shape the output, but do not create new skills.
 - External scheduling belongs to the operation layer.
 - Local reports are project-local by default and must not publish externally without opt-in approval.

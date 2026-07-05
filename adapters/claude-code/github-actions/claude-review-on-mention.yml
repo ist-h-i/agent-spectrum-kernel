@@ -10,6 +10,11 @@ on:
       pr_number:
         description: Pull request number to review.
         required: true
+      allow_fork:
+        description: Allow reviewing a fork PR. Requires manual owner approval.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,6 +33,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (
         contains(github.event.comment.body, '@claude review') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
         (
           github.event_name == 'pull_request_review_comment' ||
           github.event.issue.pull_request
@@ -40,7 +46,35 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Capture pull request context and diff
+      - name: Resolve pull request safety boundary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || inputs.pr_number }}
+          EVENT_NAME: ${{ github.event_name }}
+          ALLOW_FORK: ${{ inputs.allow_fork || 'false' }}
+        run: |
+          pr_context="$RUNNER_TEMP/pr-context.json"
+          gh pr view "$PR_NUMBER" \
+            --json number,url,title,baseRefName,headRefName,headRepositoryOwner,headRepository,baseRefOid,headRefOid \
+            > "$pr_context"
+
+          head_owner="$(PR_CONTEXT="$pr_context" node -e "const fs=require('node:fs'); const p=JSON.parse(fs.readFileSync(process.env.PR_CONTEXT,'utf8')); console.log(p.headRepositoryOwner?.login ?? p.headRepositoryOwner?.name ?? p.headRepositoryOwner ?? '')")"
+          head_repo="$(PR_CONTEXT="$pr_context" node -e "const fs=require('node:fs'); const p=JSON.parse(fs.readFileSync(process.env.PR_CONTEXT,'utf8')); console.log(p.headRepository?.name ?? p.headRepository ?? '')")"
+          base_repo="${GITHUB_REPOSITORY#*/}"
+
+          if [ "$head_owner/$head_repo" != "$GITHUB_REPOSITORY_OWNER/$base_repo" ] && { [ "$EVENT_NAME" != "workflow_dispatch" ] || [ "$ALLOW_FORK" != "true" ]; }; then
+            echo "Fork PR review is blocked by default. Use workflow_dispatch with allow_fork=true only after owner approval."
+            exit 1
+          fi
+
+      - name: Check out pull request head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || inputs.pr_number }}
+        run: |
+          gh pr checkout "$PR_NUMBER" --detach
+
+      - name: Capture pull request head context and diff
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || inputs.pr_number }}
@@ -50,6 +84,14 @@ jobs:
             --json number,url,title,baseRefName,headRefName,headRepositoryOwner,headRepository,baseRefOid,headRefOid \
             > .claude/pr-context.json
           gh pr diff "$PR_NUMBER" --patch > .claude/pr.diff
+          git rev-parse HEAD > .claude/pr-head-sha.txt
+
+          expected_head="$(node -e "const fs=require('node:fs'); const p=JSON.parse(fs.readFileSync('.claude/pr-context.json','utf8')); console.log(p.headRefOid ?? '')")"
+          actual_head="$(cat .claude/pr-head-sha.txt)"
+          if [ "$expected_head" != "$actual_head" ]; then
+            echo "Checked-out workspace is not the PR head."
+            exit 1
+          fi
 
       - name: Run Claude review workflow
         uses: anthropics/claude-code-action@v1
@@ -65,9 +107,12 @@ jobs:
             - PR number: ${{ github.event.issue.number || github.event.pull_request.number || inputs.pr_number }}
             - PR context file: .claude/pr-context.json
             - PR diff file: .claude/pr.diff
+            - PR head SHA file: .claude/pr-head-sha.txt
 
             Requirements:
-            - Read .claude/pr-context.json and .claude/pr.diff before deciding layer applicability.
+            - Treat the checked-out workspace as the PR head workspace.
+            - Read .claude/pr-context.json, .claude/pr.diff, and .claude/pr-head-sha.txt before deciding layer applicability.
+            - If the PR head workspace or diff evidence is unavailable, return insufficient evidence instead of a confident decision.
             - Use review-router first.
             - Run only required gates.
             - Include review-code-health only when code-health risk or non-blocking debt is applicable.

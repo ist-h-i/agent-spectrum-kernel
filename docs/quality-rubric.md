@@ -1,6 +1,8 @@
 # Quality Rubric
 
-Target: every category should be 95+ for personal development and internal introduction.
+Target: every static package/design category should be 95+ for personal development and internal introduction.
+
+Scope note: these scores assess repository packaging, workflow design, validation coverage, and documentation readiness. They do not prove runtime adoption effectiveness, release readiness for a specific project, or client-value readiness.
 
 ## Scoring scale
 
@@ -42,6 +44,8 @@ Target: every category should be 95+ for personal development and internal intro
 | Observability / effectiveness | 95+ | One-task workflow retrospectives distinguish routing quality, outcome value, evidence quality, overhead, missed coverage, and reuse value |
 | Adoption metrics privacy | 95+ | Longitudinal metrics are opt-in, avoid raw prompt storage, avoid HR/personnel framing, and separate correlation from unsupported causality |
 | Operation reporting separation | 95+ | Weekly/monthly reporting is handled as templates or external cadence, not as normal delivery skills or mandatory telemetry |
+| Adapter conformance | 95+ | Adapter requirements, capability levels, validation checks, and unsupported-capability downgrade rules are documented |
+| Stakeholder readiness reporting | 95+ | Stakeholder templates separate internal workflow quality, release readiness, and client-value readiness with evidence and residual-risk sections |
 | Evidence handling | 95+ | Claims are extracted, classified, downgraded, and linked to next checks |
 | Handoff utility | 95+ | Next task includes scope, forbidden scope, expected output, verification, and stop condition |
 | Personal/internal usability | 95+ | Japanese quickstart, prompt recipes, glossary, usage guide, examples, and simple adoption path exist |
@@ -49,6 +53,8 @@ Target: every category should be 95+ for personal development and internal intro
 ## Current self-assessment
 
 Baseline: current 35-skill system in `manifest.json`.
+
+The scores below are static package/design readiness scores. Runtime effectiveness and client-value outcomes remain insufficient evidence until measured in an adopting project.
 
 | Category | Score | Notes |
 |---|---:|---|
@@ -77,6 +83,8 @@ Baseline: current 35-skill system in `manifest.json`.
 | Observability / effectiveness | 95 | `skill-effectiveness-evaluation` evaluates one completed task without rerunning every workflow or replacing review/evidence gates |
 | Adoption metrics privacy | 95 | `skill-adoption-metrics` and the metrics event contract avoid hidden telemetry, raw prompt storage by default, and HR/personnel scoring |
 | Operation reporting separation | 95 | Adoption report templates clarify weekly/monthly summaries as operation cadence and keep scheduling outside delivery skills |
+| Adapter conformance | 95 | `docs/adapter-conformance-contract.md`, `docs/adapter-capability-matrix.md`, and validation checks define adapter requirements and downgrade rules for unsupported capabilities |
+| Stakeholder readiness reporting | 95 | `docs/ai/stakeholder-readiness-report-template.md` separates senior engineer, development manager, business unit leader, and AI promotion leader evidence needs |
 | Evidence handling | 97 | Evidence ledger is explicit and reusable across review/handoff/completion |
 | Handoff utility | 96 | Handoff has executable next-task format and stop conditions |
 | Personal/internal usability | 96 | `docs/quickstart-ja.md`, `docs/prompt-recipes-ja.md`, `docs/glossary-ja.md`, Japanese usage guide, workflow examples, and project overlay template are included |
@@ -91,6 +99,7 @@ The current system splits local knowledge across three extension points:
 
 The following still require project-specific human judgment:
 
+- proof of client-value outcomes, rework reduction, release-confidence improvement, or business impact,
 - final choice of exact framework conventions when no stack overlay exists,
 - confirmation that recorded commands and implementation context remain current,
 - confirmation that improvement-ledger entries reflect real project ownership and current evidence,
