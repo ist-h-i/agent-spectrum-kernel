@@ -59,6 +59,7 @@ This skill separates generic workflow rules from project-specific overlay rules.
 5. Recommend first workflows.
    - Name the first three project-specific recipes that will reduce risk without over-processing.
    - Choose from adoption setup, implementation context generation, review context generation, first review route, first implementation route, or improvement-ledger initialization.
+   - When Claude Code is the target runtime, recommend the local-first adapter path: install core kernel/skills, install the Claude project adapter or optional plugin, enable local hooks for project-local observability, use Pattern B `@claude review` only for PR-level shared review, and generate local weekly/monthly reports from project-local events and ledgers.
 
 6. Stop before mutation unless authorized.
    - If the user asked only for a pack, output drafts and exact next file changes.

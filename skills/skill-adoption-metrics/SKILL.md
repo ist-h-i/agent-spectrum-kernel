@@ -11,6 +11,8 @@ Track skill usage maturity, instruction quality, task outcomes, and adoption imp
 
 This skill measures adoption over time. It is separate from `skill-effectiveness-evaluation`, which evaluates whether selected skills helped one task.
 
+Machine-readable events and reports are defined by `schemas/metrics-event.schema.json` and `schemas/adoption-report.schema.json`. The runtime boundary is `docs/observability-runtime-contract.md`; scheduling remains outside this skill.
+
 ## Use when
 
 - A team wants to measure whether skill adoption is improving development operations.
@@ -64,8 +66,15 @@ Task outcomes:
 - tests_added_or_updated
 - defects_found_before_merge
 - debt_items_created
+- debt_items_recorded
+- debt_items_planned
+- debt_items_in_progress
 - debt_items_resolved
-- rule_or_check_converted
+- debt_items_converted_to_rule
+- debt_items_converted_to_check
+- debt_items_accepted
+- debt_items_wont_fix
+- stale_debt_items
 
 Quality improvement:
 - evidence_quality
@@ -102,6 +111,7 @@ Quality improvement:
 3. Normalize metrics.
    - Score instruction metrics on a consistent 1-5 scale or present/partial/missing status.
    - Count outcomes, verification evidence, debt movement, and prevention conversions.
+   - Use the debt lifecycle vocabulary from `docs/debt-lifecycle-contract.md`: detected, recorded, planned, in_progress, resolved, converted_to_rule, converted_to_check, accepted, wont_fix, and stale.
    - Keep evidence references compact and non-sensitive.
 
 4. Evaluate maturity movement.
@@ -151,7 +161,13 @@ Task outcomes:
 - Validation pass rate:
 - Defects caught before merge:
 - Debt items tracked:
+- Debt items planned:
+- Debt items in progress:
 - Debt items resolved:
+- Debt items converted_to_rule:
+- Debt items converted_to_check:
+- Accepted or wont-fix items:
+- Stale debt items:
 
 Maturity movement:
 - Initial level:

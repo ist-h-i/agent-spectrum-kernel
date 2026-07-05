@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/ai-coding-rules-and-skills/schemas/improvement-ledger-entry.schema.json",
+  "title": "Improvement Ledger Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "finding",
+    "category",
+    "evidence",
+    "impact",
+    "severity",
+    "urgency",
+    "decision",
+    "recommended_action",
+    "prevention_target",
+    "owner",
+    "status",
+    "created_date",
+    "refresh_date",
+    "close_condition"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "id": { "type": "string", "pattern": "^IMP-[0-9]{4}$" },
+    "source": { "type": "string", "minLength": 1 },
+    "finding": { "type": "string", "minLength": 1 },
+    "category": {
+      "type": "string",
+      "enum": ["vulnerability", "technical_debt", "refactor_candidate", "code_smell", "maintainability", "testability", "performance", "dependency", "duplication", "boundary", "repeated_finding", "rule_gap"]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reference", "summary"],
+      "properties": {
+        "status": { "type": "string", "enum": ["Verified", "Supported", "Hypothesis", "Unknown", "Falsified"] },
+        "reference": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "impact": { "type": "string", "minLength": 1 },
+    "severity": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+    "urgency": { "type": "string", "enum": ["now", "soon", "backlog", "observe"] },
+    "decision": { "type": "string", "enum": ["fix_now", "separate_pr", "backlog", "convert_to_rule", "convert_to_check", "accept", "wont_fix", "needs_more_evidence"] },
+    "recommended_action": { "type": "string", "minLength": 1 },
+    "prevention_target": {
+      "type": "string",
+      "enum": ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "project overlay", "SKILL.md", "review checklist", "validation script", "lint/test/check", "implementation context", "review context", "refactor task", "no prevention needed"]
+    },
+    "repeat_pattern": { "type": "string", "enum": ["one-off", "repeated", "likely_repeated", "high_impact_single_case"] },
+    "proposed_rule_or_check": { "type": "string" },
+    "scope": { "type": "string", "enum": ["generic", "project_specific", "stack_specific", "review_only", "validation_only"] },
+    "owner": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["detected", "recorded", "open", "triaged", "accepted", "planned", "in_progress", "resolved", "converted_to_rule", "converted_to_check", "wont_fix", "stale"]
+    },
+    "created_date": { "type": "string", "format": "date" },
+    "refresh_date": { "type": "string", "format": "date" },
+    "close_condition": { "type": "string", "minLength": 1 },
+    "related_ids": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prs": { "type": "array", "items": { "type": "string" } },
+        "issues": { "type": "array", "items": { "type": "string" } },
+        "checks": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision": { "enum": ["convert_to_rule", "convert_to_check"] }
+        },
+        "required": ["decision"]
+      },
+      "then": {
+        "required": ["repeat_pattern", "proposed_rule_or_check", "scope"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "enum": ["converted_to_rule", "converted_to_check"] }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["repeat_pattern", "proposed_rule_or_check", "scope"]
+      }
+    }
+  ]
+}

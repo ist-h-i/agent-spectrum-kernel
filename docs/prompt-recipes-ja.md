@@ -173,6 +173,50 @@ raw promptは保存せず、instruction quality、skill usage maturity、task ou
 - HR/personnel evaluationに使いません。
 - project-specific metrics は対象projectの `docs/ai/skill-adoption-metrics.md` に保存します。
 
+## Claude Code local adapter setup
+
+### そのまま貼る依頼文
+
+```text
+Claude Code 用にこのskill setを導入してください。
+core skillsは変更せず、scripts/install-claude-adapter.mjs で .claude/skills と commands/hooks をproject-localに投影してください。
+local hooksは docs/ai/observability-config.yml を使い、raw prompt、secret、customer data、personal data、full file contents、full command output、external publication は既定offにしてください。
+GitHub Actionsは有効化せず、Pattern B @claude review は必要時のoptional adapterとしてdocsだけ確認してください。
+```
+
+### 使われる主なSkill / artifact
+
+- `project-adoption-pack-generation` when first-time rollout
+- `adapters/claude-code/README.md`
+- `scripts/install-claude-adapter.mjs`
+- `docs/observability-runtime-contract.md`
+
+### 注意
+
+- local hooks がdefaultです。
+- GitHub ActionsはPR共有が必要な場合だけ使います。
+- 外部公開、secret、repository settings変更は `risk-gate` 対象です。
+
+## Claude Pattern B PR review
+
+### そのまま貼る依頼文
+
+```text
+このPRで @claude review Pattern B を使うための設定を確認してください。
+GitHub Actions workflowを有効化する前に、adapters/claude-code/github-actions/README.md と docs/claude-github-review-setup.md に沿って、trigger guard、permissions、secrets、cost、fork PR扱い、risk-gate要否を確認してください。
+```
+
+### 使われる主なSkill / artifact
+
+- `risk-gate` when enabling workflow/secrets
+- `review-router`
+- `review-final-merge-gate`
+
+### 注意
+
+- `@claude review` コメント時だけ動かします。
+- `pull_request.opened` や `synchronize` で常時起動するdefaultにはしません。
+
 ## Opt-in metrics event candidate
 
 ### そのまま貼る依頼文

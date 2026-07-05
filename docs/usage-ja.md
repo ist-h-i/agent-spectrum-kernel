@@ -42,6 +42,22 @@ repo-root/
 
 Skill非対応ツールでは、必要な `SKILL.md` だけをプロンプトに貼ります。
 
+Claude Code では project-local adapter を使うと、core skills を `.claude/skills/` に投影できます。
+
+```bash
+node scripts/install-claude-adapter.mjs --target /path/to/project
+```
+
+推奨導入順:
+
+```text
+1. core kernel / skills
+2. Claude project adapter または optional plugin
+3. local hooks for observability
+4. Pattern B `@claude review` GitHub Actions only when PR-level shared review is needed
+5. local weekly/monthly adoption and debt reports
+```
+
 ## 使い分け
 
 実行時の上位ルーティング正本は `skills/operating-mode-router/SKILL.md` です。通常のdelivery/quality作業では `skills/skill-router/SKILL.md` が正本です。このガイドの例は、その導線を説明するためのものです。
@@ -242,6 +258,13 @@ implementation-context-generation / review-context-generation as follow-up
 
 通常の一回限りの実装やレビューでは使いません。ファイル変更は明示依頼があるまで行わず、branch、release、security、ownership policyは根拠なしに推測しません。
 
+Claude Code が対象runtimeの場合は、project adoption packで次を推奨します。
+
+- `scripts/install-claude-adapter.mjs` によるproject-local `.claude/skills` 投影。
+- `docs/ai/observability-config.yml` と local hooks による project-local event capture。
+- `adapters/claude-code/plugin/` は team distribution が必要な場合だけ使う optional package。
+- `adapters/claude-code/github-actions/` は `@claude review` が必要なPR共有時だけ使う Pattern B adapter。
+
 ### Skill effectiveness / adoption metrics
 
 使うSkill:
@@ -262,13 +285,18 @@ skill-adoption-metrics for multiple tasks or period measurement
 
 ```text
 docs/metrics-event-contract.md
+docs/observability-runtime-contract.md
+docs/debt-lifecycle-contract.md
 docs/ai/skill-adoption-metrics.md
 docs/ai/adoption-report-template.md
+docs/ai/observability-config.yml
 ```
 
 通常Skillは作業を行い、adoption metrics が明示的に有効な場合だけ `Metrics event candidate` を出せます。bare router invocation、partial conversation、trivial edit、hidden telemetryでは出しません。
 
-週次/月次reportは別Skillではなくoperation layerのreporting modeです。集計は `skill-adoption-metrics`、出力形は `docs/ai/adoption-report-template.md` を使います。スケジューラや外部通知は `risk-gate` の対象です。
+Claude hook-first runtimeでは、task boundary があるときだけ `docs/ai/metrics/events.jsonl` に要約イベントを追記します。task boundary がない場合は `skip` とし、file editごとのノイズを出しません。
+
+週次/月次reportは別Skillではなくoperation layerのreporting modeです。集計は `skill-adoption-metrics`、出力形は `docs/ai/adoption-report-template.md` を使います。local report は `docs/ai/reports/` に保存します。スケジューラ、外部通知、外部公開は `risk-gate` の対象です。
 
 ### MR/PR README / 仕様理解固定
 

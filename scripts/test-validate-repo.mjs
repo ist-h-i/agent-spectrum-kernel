@@ -69,6 +69,7 @@ function writeFixture(root, skills = ["alpha"]) {
 
   mkdirSync(resolve(root, "docs/ai"), { recursive: true });
   mkdirSync(resolve(root, "examples"), { recursive: true });
+  writeAdapterFixture(root);
 
   writeFileSync(resolve(root, "AGENTS.md"), "# Kernel\n");
   writeFileSync(resolve(root, "CUSTOM_INSTRUCTIONS.md"), "# Custom instructions\n");
@@ -91,6 +92,108 @@ function writeFixture(root, skills = ["alpha"]) {
       null,
       2,
     ),
+  );
+}
+
+function writeAdapterFixture(root) {
+  const schemaPaths = [
+    "schemas/metrics-event.schema.json",
+    "schemas/adoption-report.schema.json",
+    "schemas/improvement-ledger-entry.schema.json",
+  ];
+  for (const path of schemaPaths) {
+    mkdirSync(dirname(resolve(root, path)), { recursive: true });
+    writeFileSync(resolve(root, path), '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object" }\n');
+  }
+
+  const docs = [
+    "docs/observability-runtime-contract.md",
+    "docs/operation-automation-contract.md",
+    "docs/debt-lifecycle-contract.md",
+    "docs/metrics-event-contract.md",
+    "docs/ai/skill-adoption-metrics.md",
+    "docs/ai/adoption-report-template.md",
+  ];
+  for (const path of docs) {
+    mkdirSync(dirname(resolve(root, path)), { recursive: true });
+    writeFileSync(
+      resolve(root, path),
+      "# Fixture\n\nLocal hooks are the default local observability path. Pattern B is optional. No raw prompt storage by default. No external publication by default.\n",
+    );
+  }
+
+  mkdirSync(resolve(root, "docs/ai"), { recursive: true });
+  writeFileSync(
+    resolve(root, "docs/ai/observability-config.yml"),
+    `enabled: true
+capture:
+  allow_session_id_task_boundary: true
+  task_boundary_source: session_id
+  record_command_hash: false
+  record_command_preview: false
+storage:
+  event_store: docs/ai/metrics/events.jsonl
+  report_dir: docs/ai/reports
+privacy:
+  raw_prompt_storage: false
+  secrets_storage: false
+  customer_data_storage: false
+  personal_data_storage: false
+external_publication:
+  enabled: false
+safety:
+  http_hooks_enabled: false
+  webhook_hooks_enabled: false
+`,
+  );
+
+  const adapterFiles = [
+    "adapters/claude-code/README.md",
+    "adapters/claude-code/project/.claude/skills/README.md",
+    "adapters/claude-code/project/.claude/commands/skill-review.md",
+    "adapters/claude-code/project/.claude/commands/skill-report.md",
+    "adapters/claude-code/project/.claude/commands/skill-ledger-refresh.md",
+    "adapters/claude-code/github-actions/README.md",
+    "adapters/claude-code/plugin/README.md",
+    "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+    "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
+    "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
+    "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md",
+    "adapters/claude-code/plugin/bin/ai-skills-metrics-record",
+  ];
+  for (const path of adapterFiles) {
+    mkdirSync(dirname(resolve(root, path)), { recursive: true });
+    writeFileSync(resolve(root, path), "# Fixture\n");
+  }
+
+  mkdirSync(resolve(root, "adapters/claude-code/project/.claude/hooks"), { recursive: true });
+  writeFileSync(resolve(root, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs" }] }] } }\n');
+  mkdirSync(resolve(root, "adapters/claude-code/plugin/hooks"), { recursive: true });
+  writeFileSync(resolve(root, "adapters/claude-code/plugin/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "ai-skills-metrics-record" }] }] } }\n');
+
+  mkdirSync(resolve(root, "adapters/claude-code/plugin/.claude-plugin"), { recursive: true });
+  writeFileSync(resolve(root, "adapters/claude-code/plugin/.claude-plugin/plugin.json"), '{ "name": "ai-skills" }\n');
+
+  mkdirSync(resolve(root, "adapters/claude-code/github-actions"), { recursive: true });
+  writeFileSync(
+    resolve(root, "adapters/claude-code/github-actions/claude-review-on-mention.yml"),
+    `name: Claude Skill Review On Mention
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+jobs:
+  review:
+    if: contains(github.event.comment.body, '@claude review')
+    steps:
+      - run: |
+          gh pr view "$PR_NUMBER" --json number > .claude/pr-context.json
+          gh pr diff "$PR_NUMBER" --patch > .claude/pr.diff
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+`,
   );
 }
 
@@ -234,9 +337,212 @@ function writeImprovementLedger(root, content) {
   writeFileSync(resolve(root, "docs/ai/improvement-ledger.md"), content);
 }
 
+function runRepoScript(args, options = {}) {
+  return spawnSync(process.execPath, args, {
+    cwd: options.cwd ?? repoRoot,
+    input: options.input,
+    encoding: "utf8",
+  });
+}
+
+function assertRuntimePass(name, result) {
+  if (result.status !== 0) {
+    throw new Error(`${name} should pass\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  }
+}
+
+function assertRuntimeScripts() {
+  const root = resolve(fixtureRoot, "runtime");
+  mkdirSync(root, { recursive: true });
+
+  const recordResult = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--event-kind",
+      "verification_attempt",
+      "--event-store",
+      resolve(root, "docs/ai/metrics/events.jsonl"),
+    ],
+    {
+      cwd: root,
+      input: JSON.stringify({
+        session_id: "S1",
+        tool_name: "Bash",
+        tool_input: {
+          command: 'curl -H "Authorization: Bearer sk-test-secret" https://example.invalid && npm test',
+        },
+      }),
+    },
+  );
+  assertRuntimePass("metrics recorder session-boundary smoke", recordResult);
+  const recordedEvent = JSON.parse(readFileSync(resolve(root, "docs/ai/metrics/events.jsonl"), "utf8"));
+  if (recordedEvent.task_id !== "session:S1") {
+    throw new Error(`metrics recorder should fall back to session boundary\n${JSON.stringify(recordedEvent, null, 2)}`);
+  }
+  const commandRecord = recordedEvent.verification_metrics.commands_run[0];
+  if (commandRecord.command_kind !== "test" || JSON.stringify(commandRecord).includes("sk-test-secret") || commandRecord.redacted_command_preview) {
+    throw new Error(`metrics recorder should store command kind only by default\n${JSON.stringify(commandRecord, null, 2)}`);
+  }
+
+  const taskEvents = [];
+  for (let index = 0; index < 5; index += 1) {
+    taskEvents.push({
+      schema_version: "1.0.0",
+      event_id: `evt-file-${index}`,
+      task_id: "TASK-1",
+      task_type: "implementation",
+      occurred_at: "2999-01-01T00:00:00.000Z",
+      skills_used: ["controlled-implementation"],
+      outcome_metrics: {},
+      verification_metrics: {},
+      debt_movement_metrics: {},
+      evidence_references: ["fixture"],
+      privacy_note: {
+        raw_prompts_stored: false,
+        secrets_stored: false,
+        customer_data_stored: false,
+        personal_data_stored: false,
+        external_publication: false,
+      },
+    });
+  }
+  taskEvents.push({
+    ...taskEvents[0],
+    event_id: "evt-verification-1",
+    verification_metrics: { commands_run: [{ command_kind: "test" }] },
+  });
+  taskEvents.push({
+    ...taskEvents[0],
+    event_id: "evt-verification-2",
+    verification_metrics: { commands_run: [{ command_kind: "lint" }] },
+  });
+  taskEvents.push({
+    ...taskEvents[0],
+    event_id: "evt-stop",
+    outcome_metrics: { task_completed: true },
+  });
+  const aggregateStore = resolve(root, "docs/ai/metrics/aggregate-events.jsonl");
+  writeFileSync(aggregateStore, `${taskEvents.map((event) => JSON.stringify(event)).join("\n")}\n`);
+  const summarizeResult = runRepoScript([
+    resolve(repoRoot, "scripts/ai-metrics-summarize.mjs"),
+    "--event-store",
+    aggregateStore,
+    "--out",
+    resolve(root, "docs/ai/reports/report.json"),
+    "--period-start",
+    "2999-01-01",
+    "--period-end",
+    "2999-01-02",
+    "--format",
+    "json",
+  ]);
+  assertRuntimePass("metrics summarizer task aggregation smoke", summarizeResult);
+  const report = JSON.parse(readFileSync(resolve(root, "docs/ai/reports/report.json"), "utf8"));
+  if (report.summary.event_count !== 8 || report.summary.tasks_reviewed !== 1 || report.summary.completed_tasks !== 1) {
+    throw new Error(`summarizer should separate event count from task count\n${JSON.stringify(report.summary, null, 2)}`);
+  }
+
+  const ledgerRoot = resolve(root, "ledger");
+  writeImprovementLedger(
+    ledgerRoot,
+    improvementLedgerFixture({
+      openRows: [ledgerRow({ ID: "IMP-0001", Status: "planned", "Refresh date": "2999-12-31" })],
+    }),
+  );
+  const candidatesPath = resolve(ledgerRoot, "candidates.json");
+  writeFileSync(
+    candidatesPath,
+    JSON.stringify([
+      {
+        source: "PR #1",
+        finding: "Non-blocking debt",
+        evidence: "Verified: review output",
+        impact: "Can recur",
+        recommended_action: "Track separately",
+        close_condition: "Follow-up issue is created",
+        refresh_date: "2999-12-31",
+      },
+    ]),
+  );
+  const ledgerEvents = resolve(ledgerRoot, "docs/ai/metrics/events.jsonl");
+  const ledgerResult = runRepoScript([
+    resolve(repoRoot, "scripts/ai-ledger-refresh.mjs"),
+    "--ledger",
+    resolve(ledgerRoot, "docs/ai/improvement-ledger.md"),
+    "--candidates",
+    candidatesPath,
+    "--write",
+    "--task-id",
+    "LEDGER-1",
+    "--event-store",
+    ledgerEvents,
+    "--json",
+  ]);
+  assertRuntimePass("ledger refresh delta smoke", ledgerResult);
+  const ledgerEvent = JSON.parse(readFileSync(ledgerEvents, "utf8"));
+  if (ledgerEvent.debt_movement_metrics.debt_items_recorded !== 1 || ledgerEvent.debt_movement_metrics.debt_items_planned) {
+    throw new Error(`ledger refresh should write movement delta, not full inventory\n${JSON.stringify(ledgerEvent, null, 2)}`);
+  }
+  if (ledgerEvent.debt_inventory_snapshot.planned !== 1 || ledgerEvent.debt_inventory_snapshot.triaged !== 1) {
+    throw new Error(`ledger refresh should include full inventory as snapshot\n${JSON.stringify(ledgerEvent.debt_inventory_snapshot, null, 2)}`);
+  }
+}
+
 try {
   const validRoot = cloneFixture("valid");
   assertPass("valid fixture", validRoot);
+  assertRuntimeScripts();
+
+  const missingSchemaRoot = cloneFixture("missing-schema");
+  rmSync(resolve(missingSchemaRoot, "schemas/metrics-event.schema.json"));
+  assertFail("missing required schema", missingSchemaRoot, "required schema is missing");
+
+  const operationSkillRoot = cloneFixture("operation-skill");
+  mkdirSync(resolve(operationSkillRoot, "skills/operation-automation"), { recursive: true });
+  writeFileSync(resolve(operationSkillRoot, "skills/operation-automation/SKILL.md"), validSkill("operation-automation"));
+  assertFail("operation automation skill forbidden", operationSkillRoot, "operation automation must remain an external layer");
+
+  const unsafeObservabilityRoot = cloneFixture("unsafe-observability");
+  writeFileSync(
+    resolve(unsafeObservabilityRoot, "docs/ai/observability-config.yml"),
+    `enabled: true
+storage:
+  event_store: https://metrics.example.invalid/events
+  report_dir: docs/ai/reports
+privacy:
+  raw_prompt_storage: true
+  secrets_storage: false
+  customer_data_storage: false
+  personal_data_storage: false
+external_publication:
+  enabled: true
+safety:
+  http_hooks_enabled: false
+  webhook_hooks_enabled: false
+`,
+  );
+  assertFail("unsafe observability config", unsafeObservabilityRoot, "externalPublicationDisabled");
+
+  const httpHookRoot = cloneFixture("http-hook");
+  writeFileSync(resolve(httpHookRoot, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "http", "url": "https://example.invalid" }] }] } }\n');
+  assertFail("http hook forbidden", httpHookRoot, "enables an HTTP hook");
+
+  const alwaysOnWorkflowRoot = cloneFixture("always-on-workflow");
+  writeFileSync(
+    resolve(alwaysOnWorkflowRoot, "adapters/claude-code/github-actions/claude-review-on-mention.yml"),
+    `name: Always On
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  review:
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+`,
+  );
+  assertFail("always-on workflow forbidden", alwaysOnWorkflowRoot, "noAlwaysOnPullRequestTrigger");
 
   const validLedgerMetadataRoot = cloneFixture("valid-ledger-metadata");
   assertPass("valid ledger metadata", validLedgerMetadataRoot);

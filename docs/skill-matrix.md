@@ -45,6 +45,8 @@ This matrix is a reference view of the layered runtime routes in `skills/operati
 | Performance/security/reliability/readiness claim | `evidence-ledger` | `doubt-driven-development` | Claim/evidence/status table |
 | Opt-in metrics event recording | normal delivery/review skill output | `skill-adoption-metrics` consumes the event later | Metrics event candidate with counts, related IDs, evidence references, and privacy note |
 | Weekly/monthly adoption report | operation layer | `skill-adoption-metrics` plus `docs/ai/adoption-report-template.md` | Period summary without creating a reporting skill |
+| Claude Code project-local adoption | `project-adoption-pack-generation` when first-time rollout; otherwise adapter install script | `docs/observability-runtime-contract.md`; `docs/operation-automation-contract.md`; local hooks | Core skills projected to `.claude/skills/`, local hooks enabled, no external publication by default |
+| Pattern B `@claude review` PR adapter | external operation layer template | `risk-gate` before enabling secrets/workflow; `review-router`; `review-final-merge-gate` | Optional user-triggered PR review, not always-on PR review |
 | End of work or passing to another agent | `handoff-generation` | `evidence-ledger` | Executable next task and residual risk |
 
 ## Routing rule
@@ -105,6 +107,12 @@ operating-mode-router -> skill-effectiveness-evaluation -> prompt recipe / valid
 
 Adoption metrics:
 opt-in Metrics event candidates -> skill-adoption-metrics -> project-local docs/ai/skill-adoption-metrics.md
+
+Claude local observability:
+Claude project adapter or plugin -> local hooks -> docs/ai/metrics/events.jsonl -> ai-metrics-summarize -> docs/ai/reports/
+
+Pattern B PR review:
+@claude review comment -> optional GitHub Actions adapter -> review-router -> layer applicability -> required gates -> review-final-merge-gate
 
 Adoption reports:
 operation_automation layer -> skill-adoption-metrics period summary -> docs/ai/adoption-report-template.md

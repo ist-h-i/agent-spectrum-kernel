@@ -24,6 +24,13 @@ operating-mode-router
 
 `skills/operating-mode-router/SKILL.md` is the top-level mode router. `skills/skill-router/SKILL.md` remains the delivery/quality router for concrete development work.
 
+Claude Code adapters follow the same model:
+
+- project-local `.claude/skills` and local hooks are adapter/runtime projection, not new core workflow logic,
+- local observability is project-local by default,
+- Pattern B `@claude review` GitHub Actions is an optional operation-layer PR-sharing adapter,
+- external publication and workflow/secrets enablement remain risk-gated.
+
 ## Mode Definitions
 
 | Mode | Purpose | Typical request | Route |
@@ -59,6 +66,7 @@ Some skills can belong to more than one group when their role is shared across d
 - One-task retrospective questions route to `observability_metrics` and then to `skill-effectiveness-evaluation`.
 - Multi-task adoption measurement routes to `observability_metrics` and then to `skill-adoption-metrics`.
 - Weekly/monthly report generation is an operation cadence, not a separate delivery skill.
+- Claude hook-first local observability records project-local summaries at task boundaries and remains separate from external publication.
 - Scheduler setup, external notifications, publishing, deploys, and other external effects require `risk-gate` before action.
 
 ## Examples
@@ -95,3 +103,5 @@ Some skills can belong to more than one group when their role is shared across d
 - Do not automatically run adoption or metrics workflows for ordinary development tasks.
 - Do not create weekly/monthly reporting skills without a future explicit design.
 - Do not add hidden telemetry or background metrics collection.
+- Do not treat GitHub Actions as the default path for local work.
+- Do not store raw prompts or publish metrics externally by default.

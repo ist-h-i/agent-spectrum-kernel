@@ -11,6 +11,8 @@ This is a generic template. Project-specific metrics should be stored only in th
 
 Do not store raw prompts by default. Do not store secrets, customer data, personal data, or sensitive project details. Metrics are for adoption support, coaching, and workflow improvement, not HR or personnel evaluation.
 
+Machine-readable metrics events should conform to `schemas/metrics-event.schema.json`. Period summaries and generated reports should conform to `schemas/adoption-report.schema.json` when emitted as JSON.
+
 ## Measurement Scope
 
 ```text
@@ -22,6 +24,7 @@ Period:
 
 Evidence sources:
 - Metrics event candidates
+- Project-local `docs/ai/metrics/events.jsonl`
 - PRs / reviews / validation reports
 - Improvement ledger entries
 - Handoffs or adoption pack outputs
@@ -70,9 +73,16 @@ Outcome metrics:
 - PR_merged:
 - validation_passed:
 - rework_count:
-- debt_items_created:
+- debt_items_detected:
+- debt_items_recorded:
+- debt_items_planned:
+- debt_items_in_progress:
 - debt_items_resolved:
-- rule_or_check_converted:
+- debt_items_converted_to_rule:
+- debt_items_converted_to_check:
+- debt_items_accepted:
+- debt_items_wont_fix:
+- stale_debt_items:
 
 Quality improvement metrics:
 - evidence_quality:
@@ -144,6 +154,9 @@ Task outcomes:
 - Defects caught before merge:
 - Debt items tracked:
 - Debt items resolved:
+- Debt items converted_to_rule:
+- Debt items converted_to_check:
+- Stale debt items:
 
 Maturity movement:
 - Initial level:
