@@ -2,6 +2,17 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
+const HEAVY_REVIEW_GATES = new Set([
+  "review-domain-impact",
+  "review-architecture-impact",
+  "review-output-quality",
+  "review-adversarial-risk",
+  "review-code-health",
+  "risk-gate",
+  "adr-review",
+  "release-readiness-gate",
+]);
+
 function parseArgs(argv) {
   const args = {
     eventStore: "docs/ai/metrics/events.jsonl",
@@ -127,6 +138,7 @@ function summarize(events, invalidLines, args) {
   const insufficientEvidence = tasks.filter((task) => taskHasInsufficientEvidence(task)).length;
   const latestInventorySnapshot = latestSnapshot(filtered, "debt_inventory_snapshot");
   const reviewQuality = summarizeReviewQuality(tasks);
+  const gateDecisionSummary = summarizeGateDecisions(tasks);
 
   return {
     schema_version: "1.0.0",
@@ -156,9 +168,11 @@ function summarize(events, invalidLines, args) {
       skills_used: skills,
       correct_routing_rate: correctRoutingRate(tasks),
       required_gate_coverage: requiredGateCoverage(tasks),
-      over_processing_count: 0,
+      over_processing_count: sumCounts(gateDecisionSummary.over_processing_warnings),
       missing_evidence_count: insufficientEvidence,
     },
+    gate_decision_summary: gateDecisionSummary,
+    gate_decision_drilldown: gateDecisionDrilldown(tasks),
     review_quality: reviewQuality,
     debt_movement: {
       detected: sum(tasks, "debt_movement_metrics.debt_items_detected"),
@@ -218,6 +232,7 @@ function aggregateTasks(events) {
           executed_gates: new Set(),
           skipped_gates: [],
         },
+        gate_decisions: [],
         review_result: {
           insufficient_evidence_layers: new Set(),
         },
@@ -238,6 +253,7 @@ function aggregateTasks(events) {
     mergeOutcome(task.outcome_metrics, event.outcome_metrics ?? {});
     mergeVerification(task.verification_metrics, event.verification_metrics ?? {});
     mergeRouting(task.routing_result, event.routing_result ?? {});
+    mergeGateDecisions(task.gate_decisions, event.gate_decisions ?? [], task.task_id);
     mergeReview(task.review_result, event.review_result ?? {});
     addMetricObject(task.debt_movement_metrics, event.debt_movement_metrics ?? {});
     if (event.debt_inventory_snapshot) {
@@ -261,6 +277,7 @@ function aggregateTasks(events) {
       executed_gates: [...task.routing_result.executed_gates].sort(),
       skipped_gates: task.routing_result.skipped_gates,
     },
+    gate_decisions: task.gate_decisions,
     review_result: {
       decision: task.review_result.decision,
       required_fixes_count: task.review_result.required_fixes_count ?? 0,
@@ -395,7 +412,8 @@ function taskHasInsufficientEvidence(task) {
   return (
     task.verification_metrics.insufficient_evidence_reported === true ||
     task.review_result.decision === "insufficient_evidence" ||
-    task.review_result.insufficient_evidence_layers.length > 0
+    task.review_result.insufficient_evidence_layers.length > 0 ||
+    task.gate_decisions.some((decision) => decision.status === "insufficient_evidence")
   );
 }
 
@@ -410,16 +428,175 @@ function correctRoutingRate(tasks) {
 function requiredGateCoverage(tasks) {
   const coverages = tasks
     .map((task) => {
-      const required = Array.isArray(task.routing_result.required_gates) ? task.routing_result.required_gates : [];
+      const required = effectiveRequiredGates(task);
       if (required.length === 0) {
         return null;
       }
-      const executed = new Set(task.routing_result.executed_gates ?? []);
+      const executed = new Set(effectiveExecutedGates(task));
       return required.filter((gate) => executed.has(gate)).length / required.length;
     })
     .filter((value) => value !== null);
   if (coverages.length === 0) return null;
   return coverages.reduce((total, value) => total + value, 0) / coverages.length;
+}
+
+function mergeGateDecisions(target, source, taskId) {
+  if (!Array.isArray(source)) {
+    return;
+  }
+  for (const item of source) {
+    const decision = normalizeGateDecision(item, taskId);
+    if (decision) {
+      target.push(decision);
+    }
+  }
+}
+
+function normalizeGateDecision(item, taskId) {
+  const allowedStatuses = new Set(["required", "executed", "skipped", "insufficient_evidence"]);
+  if (!item || typeof item.gate !== "string" || !allowedStatuses.has(item.status)) {
+    return null;
+  }
+  const gate = item.gate.trim();
+  if (!gate) {
+    return null;
+  }
+  const decision = {
+    task_id: taskId,
+    gate,
+    status: item.status,
+    evidence_checked: Array.isArray(item.evidence_checked) ? unique(item.evidence_checked.filter((value) => typeof value === "string")) : [],
+    triggering_signals: Array.isArray(item.triggering_signals) ? unique(item.triggering_signals.filter((value) => typeof value === "string")) : [],
+    missing_inputs: Array.isArray(item.missing_inputs) ? unique(item.missing_inputs.filter((value) => typeof value === "string")) : [],
+  };
+  if (typeof item.layer === "string" && item.layer) {
+    decision.layer = item.layer;
+  }
+  if (typeof item.judgment === "string") {
+    decision.judgment = item.judgment;
+  }
+  if (["high", "medium", "low"].includes(item.confidence)) {
+    decision.confidence = item.confidence;
+  }
+  if (typeof item.reason_category === "string" && item.reason_category) {
+    decision.reason_category = item.reason_category;
+  }
+  return decision;
+}
+
+function effectiveRequiredGates(task) {
+  const required = new Set(Array.isArray(task.routing_result.required_gates) ? task.routing_result.required_gates : []);
+  for (const decision of task.gate_decisions) {
+    if (decision.status === "required") {
+      required.add(decision.gate);
+    }
+  }
+  return [...required].sort();
+}
+
+function effectiveExecutedGates(task) {
+  const executed = new Set(Array.isArray(task.routing_result.executed_gates) ? task.routing_result.executed_gates : []);
+  for (const decision of task.gate_decisions) {
+    if (decision.status === "executed") {
+      executed.add(decision.gate);
+    }
+  }
+  return [...executed].sort();
+}
+
+function summarizeGateDecisions(tasks) {
+  const skippedByCategory = new Map();
+  const insufficientEvidence = new Map();
+  const underProcessing = new Map();
+  const overProcessing = new Map();
+  let totalDecisions = 0;
+  let missingSkipReasonCount = 0;
+
+  for (const task of tasks) {
+    totalDecisions += task.gate_decisions.length;
+    const required = new Set(effectiveRequiredGates(task));
+    const executed = new Set(effectiveExecutedGates(task));
+
+    for (const gate of required) {
+      if (!executed.has(gate)) {
+        increment(underProcessing, gate);
+      }
+    }
+
+    for (const gate of executed) {
+      if (!required.has(gate) && HEAVY_REVIEW_GATES.has(gate)) {
+        const decision = task.gate_decisions.find((item) => item.gate === gate && item.status === "executed");
+        if (!decision || decision.triggering_signals.length === 0) {
+          increment(overProcessing, gate);
+        }
+      }
+    }
+
+    for (const decision of task.gate_decisions) {
+      if (decision.status === "skipped") {
+        if (!hasSkipReason(decision)) {
+          missingSkipReasonCount += 1;
+        }
+        increment(skippedByCategory, skipReasonCategory(decision));
+      } else if (decision.status === "insufficient_evidence") {
+        const key = JSON.stringify([decision.gate, decision.layer ?? ""]);
+        if (!insufficientEvidence.has(key)) {
+          insufficientEvidence.set(key, { gate: decision.gate, layer: decision.layer, count: 0 });
+        }
+        insufficientEvidence.get(key).count += 1;
+      }
+    }
+  }
+
+  return {
+    total_decisions: totalDecisions,
+    missing_skip_reason_count: missingSkipReasonCount,
+    skipped_by_reason_category: countMapEntries(skippedByCategory, "category"),
+    insufficient_evidence: [...insufficientEvidence.values()].sort(compareCountEntries),
+    under_processing_warnings: countMapEntries(underProcessing, "gate"),
+    over_processing_warnings: countMapEntries(overProcessing, "gate"),
+  };
+}
+
+function gateDecisionDrilldown(tasks) {
+  return tasks.flatMap((task) => task.gate_decisions).slice(0, 200);
+}
+
+function hasSkipReason(decision) {
+  return typeof decision.judgment === "string" && decision.judgment.trim().length > 0;
+}
+
+function skipReasonCategory(decision) {
+  if (!hasSkipReason(decision)) {
+    return "missing_reason";
+  }
+  if (decision.reason_category) {
+    return decision.reason_category;
+  }
+  const text = `${decision.judgment} ${decision.missing_inputs.join(" ")} ${decision.triggering_signals.join(" ")}`.toLowerCase();
+  if (/\b(no trigger|no .*signal|not triggered)\b/.test(text)) return "no_trigger_signal";
+  if (/\b(missing|unavailable|insufficient).*(context|diff|evidence|input)\b/.test(text)) return "missing_context";
+  if (/\bcovered by|redundant|duplicate\b/.test(text)) return "covered_by_other_gate";
+  if (/\bnot applicable|n\/a|out of scope\b/.test(text)) return "not_applicable";
+  return "other";
+}
+
+function increment(map, key) {
+  map.set(key, (map.get(key) ?? 0) + 1);
+}
+
+function countMapEntries(map, keyName) {
+  return [...map.entries()]
+    .map(([key, count]) => ({ [keyName]: key, count }))
+    .sort(compareCountEntries);
+}
+
+function compareCountEntries(a, b) {
+  return b.count - a.count || String(a.gate ?? a.category ?? "").localeCompare(String(b.gate ?? b.category ?? ""));
+}
+
+function sumCounts(entries) {
+  return entries.reduce((total, entry) => total + entry.count, 0);
 }
 
 function summarizeReviewQuality(tasks) {
@@ -474,7 +651,12 @@ Period: ${report.period.start} to ${report.period.end}
 - Skills used: ${report.skill_usage.skills_used.length > 0 ? report.skill_usage.skills_used.join(", ") : "none"}
 - Correct routing rate: ${formatUnknownNumber(report.skill_usage.correct_routing_rate)}
 - Required gate coverage: ${formatUnknownNumber(report.skill_usage.required_gate_coverage)}
+- Over-processing warnings: ${report.skill_usage.over_processing_count}
 - Missing evidence count: ${report.skill_usage.missing_evidence_count}
+- Missing skip reason count: ${report.gate_decision_summary.missing_skip_reason_count}
+- Skipped gate categories: ${formatCountList(report.gate_decision_summary.skipped_by_reason_category, "category")}
+- Insufficient evidence gates: ${formatGateLayerList(report.gate_decision_summary.insufficient_evidence)}
+- Under-processing warnings: ${formatCountList(report.gate_decision_summary.under_processing_warnings, "gate")}
 
 ## Review Quality
 
@@ -527,6 +709,16 @@ function titleCase(value) {
 
 function formatUnknownNumber(value) {
   return value === null || value === undefined ? "unknown" : String(value);
+}
+
+function formatCountList(entries, key) {
+  return entries.length > 0 ? entries.map((entry) => `${entry[key]}=${entry.count}`).join(", ") : "none";
+}
+
+function formatGateLayerList(entries) {
+  return entries.length > 0
+    ? entries.map((entry) => `${entry.gate}${entry.layer ? `/${entry.layer}` : ""}=${entry.count}`).join(", ")
+    : "none";
 }
 
 function writeOutput(args, content) {

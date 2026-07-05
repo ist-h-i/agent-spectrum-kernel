@@ -33,6 +33,16 @@ Metrics event candidate:
   - skipped_gates:
     - gate:
     - reason:
+- gate_decisions:
+  - gate:
+    layer:
+    status: required | executed | skipped | insufficient_evidence
+    judgment:
+    evidence_checked:
+    triggering_signals:
+    missing_inputs:
+    confidence: high | medium | low
+    reason_category:
 - review_result:
   - decision: approve | approve_with_comments | request_changes | block | insufficient_evidence
   - required_fixes_count:
@@ -146,6 +156,17 @@ Debt movement fields are delta counts for the current event, not full ledger inv
 Routing and review fields are summaries only. They should capture which gates were required, executed, or skipped and the final review decision, but must not store raw review text, prompts, secrets, full file contents, or full command output.
 
 Sparse early-adoption reports may emit `null` for averages and rates such as correct routing rate or required gate coverage. `null` means unknown or unavailable evidence; it must not be interpreted as `0`.
+
+`gate_decisions` is the bounded drill-down form for gate-level judgment data. It stores short structured judgments only. It must not contain raw prompts, full review text, full command output, or full file contents.
+
+Normal adoption reports should summarize gate decisions instead of listing every decision:
+
+- required gate coverage,
+- skipped gates by reason category,
+- insufficient evidence by gate or layer,
+- under-processing warnings,
+- over-processing warnings,
+- missing skip reason count.
 
 ```text
 detected -> recorded -> planned -> in_progress -> resolved

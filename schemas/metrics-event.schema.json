@@ -88,6 +88,44 @@
         }
       }
     },
+    "gate_decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["gate", "status"],
+        "properties": {
+          "gate": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "layer": { "type": "string", "maxLength": 120 },
+          "status": { "type": "string", "enum": ["required", "executed", "skipped", "insufficient_evidence"] },
+          "judgment": { "type": "string", "maxLength": 500 },
+          "evidence_checked": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "uniqueItems": true,
+            "maxItems": 20
+          },
+          "triggering_signals": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "uniqueItems": true,
+            "maxItems": 20
+          },
+          "missing_inputs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "uniqueItems": true,
+            "maxItems": 20
+          },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "reason_category": {
+            "type": "string",
+            "enum": ["no_trigger_signal", "not_applicable", "covered_by_other_gate", "missing_context", "missing_evidence", "other"]
+          }
+        }
+      },
+      "maxItems": 100
+    },
     "review_result": {
       "type": "object",
       "additionalProperties": false,
