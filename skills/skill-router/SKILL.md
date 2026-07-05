@@ -93,7 +93,14 @@ This skill is the canonical delivery/quality router. `operating-mode-router` sel
    - Risk overlay: if any task involves destructive, external, production, auth, secret, dependency, migration, billing, email, or infra impact, run `risk-gate` before the selected workflow proceeds to action.
    - Evidence overlay: use `evidence-ledger` whenever the response makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
 
-7. Continue into the selected primary workflow unless the task requires user approval.
+7. Preserve review gate minimality.
+   - When routing to `review-router`, require the layer applicability contract to include evidence-backed `required`, `skipped`, or `insufficient evidence` status for each layer.
+   - Missing changed-file, diff, context, output, or verification evidence must be reported as `insufficient evidence`, not as a skipped gate.
+   - Required gates not present in executed gate evidence must be reported as under-processing.
+   - Heavy gates selected without trigger signals must be reported as over-processing warnings.
+   - Do not select every review gate by default.
+
+8. Continue into the selected primary workflow unless the task requires user approval.
 
 ## Output
 

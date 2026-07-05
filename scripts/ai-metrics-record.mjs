@@ -443,7 +443,45 @@ function sanitizeRoutingResult(source) {
       .map((item) => ({ gate: item.gate, reason: item.reason.slice(0, 500) }))
       .slice(0, 50);
   }
+  if (Array.isArray(source.gate_applicability)) {
+    result.gate_applicability = source.gate_applicability
+      .map((item) => sanitizeGateApplicability(item))
+      .filter(Boolean)
+      .slice(0, 50);
+  }
   return result;
+}
+
+function sanitizeGateApplicability(item) {
+  const allowedStatuses = new Set(["required", "skipped", "insufficient_evidence"]);
+  if (!item || typeof item.layer !== "string" || !allowedStatuses.has(item.status) || typeof item.reason !== "string" || typeof item.evidence !== "string") {
+    return null;
+  }
+  const layer = sanitizeText(item.layer, 120);
+  const reason = sanitizeText(item.reason, 1000);
+  const evidence = sanitizeText(item.evidence, 1000);
+  if (!layer || !reason || !evidence) {
+    return null;
+  }
+  const row = {
+    layer,
+    status: item.status,
+    reason,
+    evidence,
+  };
+  if (typeof item.gate === "string") {
+    const gate = sanitizeText(item.gate, 120);
+    if (gate) {
+      row.gate = gate;
+    }
+  }
+  if (Array.isArray(item.trigger_signals)) {
+    row.trigger_signals = unique(item.trigger_signals.filter((value) => typeof value === "string").map((value) => sanitizeText(value, 120))).slice(0, 20);
+  }
+  if (Array.isArray(item.inputs_still_needed)) {
+    row.inputs_still_needed = unique(item.inputs_still_needed.filter((value) => typeof value === "string").map((value) => sanitizeText(value, 120))).slice(0, 20);
+  }
+  return row;
 }
 
 function sanitizeReviewResult(source) {
