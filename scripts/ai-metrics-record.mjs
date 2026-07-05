@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 
@@ -34,6 +34,7 @@ const DEFAULT_CONFIG = {
 
 const VERIFICATION_COMMAND_PATTERN = /\b(test|lint|typecheck|tsc|build|validate|check|pytest|vitest|jest|mocha|cargo test|go test|mvn test|gradle test)\b/i;
 const UNSAFE_COMMAND_PREVIEW_PATTERN = /\b(api[_-]?key|token|secret|password|passwd|authorization|bearer|_authToken|npm publish|curl\s+-H)\b|sk-[A-Za-z0-9_-]+/i;
+const ALLOWED_TASK_TYPES = new Set(["implementation", "review", "refactor", "investigation", "adoption", "documentation", "handoff", "validation", "report", "ledger_refresh", "other"]);
 
 function parseArgs(argv) {
   const args = {
@@ -47,6 +48,8 @@ function parseArgs(argv) {
     routingResultJson: process.env.AI_ROUTING_RESULT_JSON || "",
     reviewResultJson: process.env.AI_REVIEW_RESULT_JSON || "",
     gateDecisionsJson: process.env.AI_GATE_DECISIONS_JSON || "",
+    sidecar: process.env.AI_METRICS_SIDECAR || ".claude/metrics/current-task.json",
+    nonBlocking: false,
     dryRun: false,
     printResult: false,
   };
@@ -73,6 +76,10 @@ function parseArgs(argv) {
       args.reviewResultJson = argv[++i];
     } else if (arg === "--gate-decisions-json") {
       args.gateDecisionsJson = argv[++i];
+    } else if (arg === "--sidecar") {
+      args.sidecar = argv[++i];
+    } else if (arg === "--non-blocking") {
+      args.nonBlocking = true;
     } else if (arg === "--dry-run") {
       args.dryRun = true;
       args.printResult = true;
@@ -104,8 +111,10 @@ Options:
                             Optional review decision summary without raw review text.
   --gate-decisions-json <json>
                             Optional structured gate decisions without raw review text.
+  --sidecar <path>          Optional project-local task sidecar. Defaults to .claude/metrics/current-task.json.
   --event-store <path>      JSONL event store path.
   --config <path>           Observability config. Defaults to docs/ai/observability-config.yml.
+  --non-blocking            Exit successfully and stay silent if metrics recording fails.
   --dry-run                 Print event without writing.
   --print-result            Print result JSON.
 `);
@@ -228,6 +237,62 @@ function parseJsonOption(value, fallback = {}) {
     return JSON.parse(value);
   } catch {
     return fallback;
+  }
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function readSidecar(args) {
+  if (args.eventKind !== "task_stop" || !args.sidecar) {
+    return {};
+  }
+  const sidecarPath = resolve(args.sidecar);
+  if (!existsSync(sidecarPath)) {
+    return {};
+  }
+
+  try {
+    const input = readFileSync(sidecarPath, "utf8").trim();
+    if (!input) {
+      return {};
+    }
+    const parsed = JSON.parse(input);
+    return isPlainObject(parsed) ? parsed : {};
+  } catch {
+    return {};
+  } finally {
+    try {
+      rmSync(sidecarPath, { force: true });
+    } catch {
+      // Metrics sidecars are best-effort and must not affect the developer task.
+    }
+  }
+}
+
+function applySidecar(args, sidecar) {
+  if (!isPlainObject(sidecar)) {
+    return;
+  }
+  if (!args.taskId && typeof sidecar.task_id === "string" && sidecar.task_id) {
+    args.taskId = sidecar.task_id;
+  }
+  if (args.taskType === "other" && ALLOWED_TASK_TYPES.has(sidecar.task_type)) {
+    args.taskType = sidecar.task_type;
+  }
+  const sidecarSkills = Array.isArray(sidecar.skills_used) ? sidecar.skills_used : Array.isArray(sidecar.skills) ? sidecar.skills : [];
+  if (args.skills.length === 0 && sidecarSkills.length > 0) {
+    args.skills = sidecarSkills.filter((value) => typeof value === "string" && value);
+  }
+  if (!args.routingResultJson && isPlainObject(sidecar.routing_result)) {
+    args.routingResultJson = JSON.stringify(sidecar.routing_result);
+  }
+  if (!args.reviewResultJson && isPlainObject(sidecar.review_result)) {
+    args.reviewResultJson = JSON.stringify(sidecar.review_result);
+  }
+  if (!args.gateDecisionsJson && Array.isArray(sidecar.gate_decisions)) {
+    args.gateDecisionsJson = JSON.stringify(sidecar.gate_decisions);
   }
 }
 
@@ -452,6 +517,7 @@ function appendEvent(eventStore, event) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const hookInput = readStdinJson();
+  applySidecar(args, readSidecar(args));
   const config = readConfig(args.config);
   const decision = shouldRecord(args, hookInput, config);
   if (!decision.ok) {
@@ -473,6 +539,9 @@ function main() {
 try {
   main();
 } catch (error) {
+  if (process.argv.includes("--non-blocking")) {
+    process.exit(0);
+  }
   console.error(`ai-metrics-record failed: ${error.message}`);
   process.exit(1);
 }

@@ -13,6 +13,8 @@ Do not store raw prompts by default. Do not store secrets, customer data, person
 
 Machine-readable metrics events should conform to `schemas/metrics-event.schema.json`. Period summaries and generated reports should conform to `schemas/adoption-report.schema.json` when emitted as JSON.
 
+Skill command sidecars are transient input to the event store, not durable metrics records. They should be written silently only when structured summaries such as `routing_result`, `review_result`, or `gate_decisions` are already available, and sidecar failures should not change the task output.
+
 ## Measurement Scope
 
 ```text
@@ -24,6 +26,7 @@ Period:
 
 Evidence sources:
 - Metrics event candidates
+- Project-local `.claude/metrics/current-task.json` sidecar summaries, after Stop hook ingestion
 - Project-local `docs/ai/metrics/events.jsonl`
 - PRs / reviews / validation reports
 - Improvement ledger entries
@@ -31,6 +34,7 @@ Evidence sources:
 
 Excluded data:
 - Raw prompts
+- Full review text, full command output, and full file contents
 - Secrets
 - Customer data
 - Sensitive personal data

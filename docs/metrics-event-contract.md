@@ -111,6 +111,31 @@ This means file-change and verification events are recorded under a session-scop
 
 Command text is not recorded by default. Verification events record `command_kind` only. `command_hash` and `redacted_command_preview` require explicit opt-in and must not include secrets.
 
+## Skill Command Sidecar
+
+Project-level Claude skill commands may write one transient project-local sidecar:
+
+```text
+.claude/metrics/current-task.json
+```
+
+The Stop hook reads this sidecar silently and folds the available structured summaries into the normal `task_stop` event. If the sidecar is missing, empty, invalid JSON, or contains unsupported fields, the Stop event still records normally from hook data. Sidecar ingestion is best-effort: metrics failures must not fail or interrupt the developer task, and adapters must not print routine "metrics recorded" status.
+
+Allowed sidecar fields:
+
+```json
+{
+  "task_id": "optional explicit task boundary",
+  "task_type": "implementation | review | investigation | validation | handoff | other",
+  "skills_used": ["skill-router"],
+  "routing_result": {},
+  "review_result": {},
+  "gate_decisions": []
+}
+```
+
+The sidecar must contain summarized structured data only. It must not include raw prompts, full review text, full command output, full file contents, secrets, customer data, sensitive personal data, or personnel-scoring data. Adapters may consume and remove the current-task sidecar after reading it to avoid stale data reuse.
+
 ## When To Emit
 
 Emit a Metrics event candidate only when all are true:

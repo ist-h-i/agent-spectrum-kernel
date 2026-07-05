@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event PostToolUse --event-kind file_change"
+            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event PostToolUse --event-kind file_change --non-blocking >/dev/null 2>&1 || true"
           }
         ]
       },
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event PostToolUse --event-kind file_change"
+            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event PostToolUse --event-kind file_change --non-blocking >/dev/null 2>&1 || true"
           }
         ]
       },
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event PostToolUse --event-kind file_change"
+            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event PostToolUse --event-kind file_change --non-blocking >/dev/null 2>&1 || true"
           }
         ]
       },
@@ -33,7 +33,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event PostToolUse --event-kind verification_attempt"
+            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event PostToolUse --event-kind verification_attempt --non-blocking >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event Stop --event-kind task_stop"
+            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event Stop --event-kind task_stop --sidecar ${CLAUDE_PROJECT_DIR}/.claude/metrics/current-task.json --non-blocking >/dev/null 2>&1 || true"
           }
         ]
       }
