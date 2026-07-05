@@ -68,6 +68,16 @@ Skill route:
 - skipped_gates:
   - gate:
   - reason:
+- gate_decisions:
+  - gate:
+    layer:
+    status: required | executed | skipped | insufficient_evidence
+    judgment:
+    evidence_checked:
+    triggering_signals:
+    missing_inputs:
+    confidence:
+    reason_category:
 - correct_routing:
 - unnecessary_skills_avoided:
 - skipped_skills_reasoned:
@@ -151,7 +161,11 @@ Instruction maturity:
 Skill usage maturity:
 - Correct routing rate:
 - Required gate coverage:
+- Skipped gates by reason category:
+- Insufficient evidence by gate/layer:
+- Under-processing warnings:
 - Over-processing rate:
+- Missing skip reason count:
 - Missing evidence rate:
 - Improvement-ledger handoff rate:
 - Prevention-rule conversion rate:

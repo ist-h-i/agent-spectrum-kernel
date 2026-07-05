@@ -514,6 +514,48 @@ function assertRuntimeScripts() {
     throw new Error(`metrics recorder should store command kind only by default\n${JSON.stringify(commandRecord, null, 2)}`);
   }
 
+  const metricsSchema = JSON.parse(readFileSync(resolve(repoRoot, "schemas/metrics-event.schema.json"), "utf8"));
+  const gateDecisionStore = resolve(root, "docs/ai/metrics/gate-decision-record-events.jsonl");
+  const gateDecisionRecordResult = runRepoScript([
+    resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+    "--event-kind",
+    "task_stop",
+    "--task-id",
+    "GATE-RECORDER-1",
+    "--task-type",
+    "review",
+    "--skills",
+    "review-router",
+    "--event-store",
+    gateDecisionStore,
+    "--gate-decisions-json",
+    JSON.stringify([
+      {
+        gate: "review-architecture-impact",
+        layer: "Architecture",
+        status: "executed",
+        judgment: "Architecture gate checked public API surface.",
+        evidence_checked: ["changed files", "public API surface"],
+        triggering_signals: ["public_api_change"],
+        missing_inputs: [],
+        confidence: "high",
+        reason_category: "other",
+        raw_prompt: "must not be stored",
+      },
+    ]),
+  ]);
+  assertRuntimePass("metrics recorder gate decisions smoke", gateDecisionRecordResult);
+  const gateDecisionRecordedEvent = JSON.parse(readFileSync(gateDecisionStore, "utf8"));
+  assertSchemaPass("recorded gate decision event", metricsSchema, gateDecisionRecordedEvent);
+  if (
+    gateDecisionRecordedEvent.gate_decisions.length !== 1 ||
+    gateDecisionRecordedEvent.gate_decisions[0].gate !== "review-architecture-impact" ||
+    Object.hasOwn(gateDecisionRecordedEvent.gate_decisions[0], "raw_prompt") ||
+    JSON.stringify(gateDecisionRecordedEvent.gate_decisions).includes("must not be stored")
+  ) {
+    throw new Error(`metrics recorder should store sanitized structured gate decisions\n${JSON.stringify(gateDecisionRecordedEvent, null, 2)}`);
+  }
+
   const taskEvents = [];
   for (let index = 0; index < 5; index += 1) {
     taskEvents.push({
@@ -688,6 +730,188 @@ function assertRuntimeScripts() {
   const routingType = adoptionSchema.properties.skill_usage.properties.correct_routing_rate.type;
   if (!Array.isArray(goalType) || !goalType.includes("null") || !Array.isArray(routingType) || !routingType.includes("null")) {
     throw new Error("adoption report schema should allow null for unavailable numeric metrics");
+  }
+
+  const gateDecisionEvents = [
+    {
+      schema_version: "1.0.0",
+      event_id: "evt-gate-decision-valid",
+      task_id: "GATE-1",
+      task_type: "review",
+      occurred_at: "2999-01-01T00:00:00.000Z",
+      skills_used: ["review-router", "review-architecture-impact"],
+      routing_result: {
+        required_gates: ["review-router", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-architecture-impact"],
+      },
+      gate_decisions: [
+        {
+          gate: "review-architecture-impact",
+          layer: "Architecture",
+          status: "executed",
+          judgment: "Detailed architecture judgment should stay in JSON only.",
+          evidence_checked: ["changed files", "public API surface"],
+          triggering_signals: ["public_api_change"],
+          missing_inputs: [],
+          confidence: "high",
+        },
+        {
+          gate: "review-domain-impact",
+          layer: "Domain",
+          status: "skipped",
+          judgment: "No domain behavior signal detected.",
+          evidence_checked: ["changed files"],
+          triggering_signals: [],
+          missing_inputs: [],
+          confidence: "high",
+          reason_category: "no_trigger_signal",
+        },
+        {
+          gate: "review-output-quality",
+          layer: "Output quality",
+          status: "insufficient_evidence",
+          judgment: "Output sample was unavailable.",
+          evidence_checked: ["changed files"],
+          triggering_signals: ["docs_output_change"],
+          missing_inputs: ["rendered output sample"],
+          confidence: "low",
+        },
+        {
+          gate: "review-code-health",
+          layer: "Style / maintainability",
+          status: "skipped",
+          evidence_checked: ["changed files"],
+          triggering_signals: [],
+          missing_inputs: [],
+          confidence: "medium",
+        },
+      ],
+      outcome_metrics: {},
+      verification_metrics: {},
+      debt_movement_metrics: {},
+      evidence_references: ["fixture"],
+      privacy_note: {
+        raw_prompts_stored: false,
+        secrets_stored: false,
+        customer_data_stored: false,
+        personal_data_stored: false,
+        external_publication: false,
+      },
+    },
+    {
+      schema_version: "1.0.0",
+      event_id: "evt-gate-decision-under",
+      task_id: "GATE-2",
+      task_type: "review",
+      occurred_at: "2999-01-01T00:00:00.000Z",
+      skills_used: ["review-router"],
+      gate_decisions: [
+        {
+          gate: "review-architecture-impact",
+          layer: "Architecture",
+          status: "required",
+          judgment: "Public API trigger requires architecture review.",
+          evidence_checked: ["changed files"],
+          triggering_signals: ["public_api_change"],
+          missing_inputs: [],
+          confidence: "high",
+        },
+      ],
+      outcome_metrics: {},
+      verification_metrics: {},
+      debt_movement_metrics: {},
+      evidence_references: ["fixture"],
+      privacy_note: {
+        raw_prompts_stored: false,
+        secrets_stored: false,
+        customer_data_stored: false,
+        personal_data_stored: false,
+        external_publication: false,
+      },
+    },
+    {
+      schema_version: "1.0.0",
+      event_id: "evt-gate-decision-over",
+      task_id: "GATE-3",
+      task_type: "review",
+      occurred_at: "2999-01-01T00:00:00.000Z",
+      skills_used: ["review-router", "review-adversarial-risk"],
+      gate_decisions: [
+        {
+          gate: "review-adversarial-risk",
+          layer: "Adversarial risk overlay",
+          status: "executed",
+          judgment: "No triggering signal was recorded for this heavy gate.",
+          evidence_checked: ["changed files"],
+          triggering_signals: [],
+          missing_inputs: [],
+          confidence: "low",
+        },
+      ],
+      outcome_metrics: {},
+      verification_metrics: {},
+      debt_movement_metrics: {},
+      evidence_references: ["fixture"],
+      privacy_note: {
+        raw_prompts_stored: false,
+        secrets_stored: false,
+        customer_data_stored: false,
+        personal_data_stored: false,
+        external_publication: false,
+      },
+    },
+  ];
+  for (const event of gateDecisionEvents) {
+    assertSchemaPass(`gate decision event ${event.event_id}`, metricsSchema, event);
+  }
+  const gateDecisionStoreForSummary = resolve(root, "docs/ai/metrics/gate-decision-events.jsonl");
+  writeFileSync(gateDecisionStoreForSummary, `${gateDecisionEvents.map((event) => JSON.stringify(event)).join("\n")}\n`);
+  const gateDecisionSummaryResult = runRepoScript([
+    resolve(repoRoot, "scripts/ai-metrics-summarize.mjs"),
+    "--event-store",
+    gateDecisionStoreForSummary,
+    "--out",
+    resolve(root, "docs/ai/reports/gate-decision-report.json"),
+    "--period-start",
+    "2999-01-01",
+    "--period-end",
+    "2999-01-02",
+    "--format",
+    "json",
+  ]);
+  assertRuntimePass("metrics summarizer gate decision summary", gateDecisionSummaryResult);
+  const gateDecisionReport = JSON.parse(readFileSync(resolve(root, "docs/ai/reports/gate-decision-report.json"), "utf8"));
+  assertSchemaPass("generated gate decision adoption report", adoptionSchema, gateDecisionReport);
+  if (
+    gateDecisionReport.gate_decision_summary.total_decisions !== 6 ||
+    gateDecisionReport.gate_decision_summary.missing_skip_reason_count !== 1 ||
+    !gateDecisionReport.gate_decision_summary.skipped_by_reason_category.some((entry) => entry.category === "no_trigger_signal" && entry.count === 1) ||
+    !gateDecisionReport.gate_decision_summary.insufficient_evidence.some((entry) => entry.gate === "review-output-quality" && entry.layer === "Output quality") ||
+    !gateDecisionReport.gate_decision_summary.under_processing_warnings.some((entry) => entry.gate === "review-architecture-impact" && entry.count === 1) ||
+    !gateDecisionReport.gate_decision_summary.over_processing_warnings.some((entry) => entry.gate === "review-adversarial-risk" && entry.count === 1) ||
+    !gateDecisionReport.gate_decision_drilldown.some((entry) => entry.judgment === "Detailed architecture judgment should stay in JSON only.")
+  ) {
+    throw new Error(`gate decision report should summarize deviations and preserve JSON drill-down\n${JSON.stringify(gateDecisionReport, null, 2)}`);
+  }
+  const gateDecisionMarkdownResult = runRepoScript([
+    resolve(repoRoot, "scripts/ai-metrics-summarize.mjs"),
+    "--event-store",
+    gateDecisionStoreForSummary,
+    "--out",
+    resolve(root, "docs/ai/reports/gate-decision-report.md"),
+    "--period-start",
+    "2999-01-01",
+    "--period-end",
+    "2999-01-02",
+  ]);
+  assertRuntimePass("metrics summarizer concise gate decision markdown", gateDecisionMarkdownResult);
+  const gateDecisionMarkdown = readFileSync(resolve(root, "docs/ai/reports/gate-decision-report.md"), "utf8");
+  if (
+    !gateDecisionMarkdown.includes("Skipped gate categories") ||
+    !gateDecisionMarkdown.includes("Under-processing warnings") ||
+    gateDecisionMarkdown.includes("Detailed architecture judgment should stay in JSON only.")
+  ) {
+    throw new Error(`markdown adoption report should show concise gate summaries only\n${gateDecisionMarkdown}`);
   }
 
   const ledgerRoot = resolve(root, "ledger");

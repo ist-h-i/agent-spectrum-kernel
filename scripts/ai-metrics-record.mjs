@@ -46,6 +46,7 @@ function parseArgs(argv) {
     skills: process.env.AI_SKILLS_USED ? process.env.AI_SKILLS_USED.split(",").map((value) => value.trim()).filter(Boolean) : [],
     routingResultJson: process.env.AI_ROUTING_RESULT_JSON || "",
     reviewResultJson: process.env.AI_REVIEW_RESULT_JSON || "",
+    gateDecisionsJson: process.env.AI_GATE_DECISIONS_JSON || "",
     dryRun: false,
     printResult: false,
   };
@@ -70,6 +71,8 @@ function parseArgs(argv) {
       args.routingResultJson = argv[++i];
     } else if (arg === "--review-result-json") {
       args.reviewResultJson = argv[++i];
+    } else if (arg === "--gate-decisions-json") {
+      args.gateDecisionsJson = argv[++i];
     } else if (arg === "--dry-run") {
       args.dryRun = true;
       args.printResult = true;
@@ -99,6 +102,8 @@ Options:
                             Optional routing summary without raw prompt text.
   --review-result-json <json>
                             Optional review decision summary without raw review text.
+  --gate-decisions-json <json>
+                            Optional structured gate decisions without raw review text.
   --event-store <path>      JSONL event store path.
   --config <path>           Observability config. Defaults to docs/ai/observability-config.yml.
   --dry-run                 Print event without writing.
@@ -273,6 +278,11 @@ function buildEvent(args, hookInput, config, taskId) {
     ...(hookInput.review_result ?? {}),
     ...parseJsonOption(args.reviewResultJson),
   });
+  const gateDecisionOption = parseJsonOption(args.gateDecisionsJson, []);
+  const gateDecisions = sanitizeGateDecisions([
+    ...(Array.isArray(hookInput.gate_decisions) ? hookInput.gate_decisions : []),
+    ...(Array.isArray(gateDecisionOption) ? gateDecisionOption : []),
+  ]);
 
   const event = {
     schema_version: "1.0.0",
@@ -298,6 +308,9 @@ function buildEvent(args, hookInput, config, taskId) {
 
   if (Object.keys(reviewResult).length > 0) {
     event.review_result = reviewResult;
+  }
+  if (gateDecisions.length > 0) {
+    event.gate_decisions = gateDecisions;
   }
 
   if (args.hookEvent) {
@@ -381,6 +394,54 @@ function sanitizeReviewResult(source) {
     result.insufficient_evidence_layers = unique(source.insufficient_evidence_layers.filter((value) => typeof value === "string")).slice(0, 20);
   }
   return result;
+}
+
+function sanitizeGateDecisions(source) {
+  const allowedStatuses = new Set(["required", "executed", "skipped", "insufficient_evidence"]);
+  const allowedConfidence = new Set(["high", "medium", "low"]);
+  const allowedCategories = new Set(["no_trigger_signal", "not_applicable", "covered_by_other_gate", "missing_context", "missing_evidence", "other"]);
+  if (!Array.isArray(source)) {
+    return [];
+  }
+
+  return source
+    .map((item) => {
+      if (!item || typeof item.gate !== "string" || !allowedStatuses.has(item.status)) {
+        return null;
+      }
+      const gate = sanitizeText(item.gate, 120);
+      if (!gate) {
+        return null;
+      }
+      const decision = {
+        gate,
+        status: item.status,
+      };
+      if (typeof item.layer === "string" && item.layer) {
+        decision.layer = sanitizeText(item.layer, 120);
+      }
+      if (typeof item.judgment === "string") {
+        decision.judgment = sanitizeText(item.judgment, 500);
+      }
+      for (const field of ["evidence_checked", "triggering_signals", "missing_inputs"]) {
+        if (Array.isArray(item[field])) {
+          decision[field] = unique(item[field].filter((value) => typeof value === "string").map((value) => sanitizeText(value, 120))).slice(0, 20);
+        }
+      }
+      if (allowedConfidence.has(item.confidence)) {
+        decision.confidence = item.confidence;
+      }
+      if (allowedCategories.has(item.reason_category)) {
+        decision.reason_category = item.reason_category;
+      }
+      return decision;
+    })
+    .filter(Boolean)
+    .slice(0, 100);
+}
+
+function sanitizeText(value, maxLength) {
+  return String(value).replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
 function appendEvent(eventStore, event) {
