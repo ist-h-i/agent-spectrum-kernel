@@ -43,7 +43,21 @@ This skill is the canonical delivery/quality router. `operating-mode-router` sel
 | `handoff` | State transfer or next task creation. |
 | `risk-gated` | Destructive, irreversible, secret-sensitive, production-facing, or externally visible work. |
 
-2. Estimate risk.
+2. Select the user-facing work mode.
+
+| Work mode | Natural request examples | Route family |
+|---|---|---|
+| `要件確認` | このチケットを進めて / この設計を詰めて | requirement, decision, domain-rule route |
+| `実装準備` | Codexに渡せる形にして / 実装できる作業にして | work package, spec, verification contract route |
+| `実装` | 実装して / 修正して | scoped implementation or refactor route |
+| `レビュー` | このPRをレビューして / このdiffを見て | review-router and required gates |
+| `調査` | このバグを調べて / 原因を特定して | doubt-driven-development and verification route |
+| `ドキュメント整理` | この状態を整理して / handoffを作って | documentation, PR explanation, handoff route |
+| `知識蓄積` | この指摘を次に活かして | finding, ledger, reusable guidance route |
+
+The user-facing route should describe work steps and stop points without requiring skill-name knowledge. The internal route should keep skill names explicit for review and debugging.
+
+3. Estimate risk.
 
 | Risk | Signals |
 |---|---|
@@ -52,7 +66,7 @@ This skill is the canonical delivery/quality router. `operating-mode-router` sel
 | High | Public API/schema, auth/security, persistence, migration, performance claim, broad refactor. |
 | Critical | Production deploy, destructive command, credentials, payments, email sending, data deletion. |
 
-3. Select the workflow.
+4. Select the workflow.
 
 | Situation | Primary | Secondary |
 |---|---|---|
@@ -92,35 +106,59 @@ This skill is the canonical delivery/quality router. `operating-mode-router` sel
 | Claim validation | `evidence-ledger` | `doubt-driven-development` |
 | End of work | `handoff-generation` | — |
 
-4. Apply project overlay skill selection.
+5. Apply project overlay skill selection.
    - If a project overlay contains framework, domain, UI/UX, architecture, CI, data, security, or other repository-specific skills, consider them after generic workflow selection.
    - Select overlay skills only when the overlay signal applies to the selected work type.
    - Do not add project-specific skills to the generic routing table.
    - For stack-specific implementation overlays, follow `docs/stack-implementation-overlay-contract.md`. They may supplement `controlled-implementation` and `test-first-verification`, but must not replace the generic workflow.
 
-5. State what is intentionally skipped.
+6. State what is intentionally skipped.
 
-6. Apply overlays before action.
+7. Apply overlays before action.
    - Risk overlay: if any task involves destructive, external, production, auth, secret, dependency, migration, billing, email, or infra impact, run `risk-gate` before the selected workflow proceeds to action.
    - Evidence overlay: use `evidence-ledger` whenever the response makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
 
-7. Preserve review gate minimality.
+8. Preserve review gate minimality.
    - When routing to `review-router`, require the layer applicability contract to include evidence-backed `required`, `skipped`, or `insufficient evidence` status for each layer.
    - Missing changed-file, diff, context, output, or verification evidence must be reported as `insufficient evidence`, not as a skipped gate.
    - Required gates not present in executed gate evidence must be reported as under-processing.
    - Heavy gates selected without trigger signals must be reported as over-processing warnings.
    - Do not select every review gate by default.
 
-8. Continue into the selected primary workflow unless the task requires user approval.
+9. Continue into the selected primary workflow unless the task requires user approval.
 
 ## Output
 
 ```text
+Selected work mode:
+- 要件確認 | 実装準備 | 実装 | レビュー | 調査 | ドキュメント整理 | 知識蓄積
+
+User-facing route:
+- Work-term explanation of the selected path, expected checks, stop points, and what happens next.
+
+Internal route:
+- Primary:
+- Secondary:
+- Next if resolved:
+- Stop if:
+
 Selected workflow:
 - Primary:
 - Secondary:
 - Project overlay skills:
 - Skipped:
+
+Route confidence:
+- high | medium | low
+
+Evidence checked:
+- ...
+
+Missing evidence:
+- ...
+
+Human decision required:
+- ...
 
 Reason:
 - Task class:
@@ -128,7 +166,7 @@ Reason:
 - Decisive signal:
 
 Next action:
-- ...
+- proceed to implementation packaging | stop for human decision | refine requirement | refine technical design | create verification contract | implement scoped change | run review gates | prepare PR explanation | capture durable knowledge candidate | create handoff | no further action needed
 ```
 
 ## Exit criteria

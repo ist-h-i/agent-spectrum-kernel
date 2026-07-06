@@ -62,6 +62,35 @@ node scripts/install-claude-adapter.mjs --target /path/to/project
 
 実行時の上位ルーティング正本は `skills/operating-mode-router/SKILL.md` です。通常のdelivery/quality作業では `skills/skill-router/SKILL.md` が正本です。このガイドの例は、その導線を説明するためのものです。
 
+### Skill名を知らない通常依頼
+
+普段はSkill名ではなく、作業意図で依頼します。
+
+```text
+この作業を適切なルートで進めてください。
+```
+
+または:
+
+```text
+この依頼を、必要なルートを選んで進めてください。
+既存のdocs、repo、domain rules、context、ledgerで判断できるものは吸収し、
+人間判断が必要なものだけ明示してください。
+作業が進められる場合は、次に必要な実装・検証・レビュー・ドキュメント作成まで案内してください。
+```
+
+| やりたいこと | こう言う | User-facing work mode |
+|---|---|---|
+| チケットを進める | このチケットを進めて | 要件確認 / 実装準備 / 実装 |
+| PRをレビューする | このPRをレビューして | レビュー |
+| バグを調べる | このバグを調べて | 調査 |
+| 設計を詰める | この設計を詰めて | 要件確認 / 設計 |
+| Agent-readyにする | Codexに渡せる形にして | 実装準備 |
+| 状態を整理する | この状態を整理して | ドキュメント整理 |
+| 指摘を次回に活かす | この指摘を次に活かして | 知識蓄積 |
+
+期待する出力は、`Selected work mode`、`User-facing route`、`Internal route`、`Route confidence`、`Evidence checked`、`Missing evidence`、`Human decision required`、`Next action` です。`Internal route` はSkill名を出してよいですが、`User-facing route` と `Next action` は作業用語で書きます。
+
 ### Operating mode routing
 
 使うSkill:

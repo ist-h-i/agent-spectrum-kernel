@@ -214,6 +214,34 @@ First-time users should start with `docs/quickstart-ja.md`.
 - `docs/ai/stakeholder-readiness-report-template.md`: stakeholder-specific readiness reports that separate internal quality, release readiness, and client-value readiness.
 - `docs/ai/reports/examples/`: fixture-backed stakeholder-readiness samples for senior engineering, development management, business unit, and AI promotion views.
 
+## Skill名を知らない入口
+
+通常の利用者はSkill名を覚える必要はありません。やりたい作業を自然文で依頼し、内部では `operating-mode-router` と `skill-router` が必要なrouteを選びます。
+
+```text
+この作業を適切なルートで進めてください。
+```
+
+より明示したい場合:
+
+```text
+この依頼を、必要なルートを選んで進めてください。
+既存のdocs、repo、domain rules、context、ledgerで判断できるものは吸収し、
+人間判断が必要なものだけ明示してください。
+作業が進められる場合は、次に必要な実装・検証・レビュー・ドキュメント作成まで案内してください。
+```
+
+| User wants to... | Say this | System should route to... |
+|---|---|---|
+| Move a ticket forward | このチケットを進めて | requirement / work package / implementation route |
+| Review a PR | このPRをレビューして | review-router and required gates |
+| Investigate a bug | このバグを調べて | doubt-driven-development and verification route |
+| Refine a design | この設計を詰めて | design / architecture route |
+| Prepare agent work | Codexに渡せる形にして | work-package route |
+| Preserve lessons | この指摘を次に活かして | finding / ledger / documentation route |
+
+Default outputs should describe the selected work mode, user-facing route, missing evidence, human-decision points, internal route, and next action. Skill names may appear in the internal route for debugging, but the user-facing route should stay in work terms.
+
 ## Recommended workflows
 
 `skills/operating-mode-router/SKILL.md` first separates delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation. `skills/skill-router/SKILL.md` is the delivery/quality routing source. The table below is a reference summary.

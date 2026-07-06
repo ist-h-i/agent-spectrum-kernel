@@ -99,10 +99,17 @@ Select the smallest set of review gates needed to make the merge decision defens
    - Combine layers into one selected gate when that gate covers the observed risk.
    - Do not treat a required layer as permission to run every gate.
    - If a layer is skipped, explain which inspected input made it non-applicable.
+   - Use work terms in the user-facing route; keep gate names in the review route for traceability.
 
 ## Output
 
 ```text
+Selected work mode:
+- レビュー
+
+User-facing route:
+- What review layers matter, what evidence is missing, which checks must run before a merge decision, and where human approval is required.
+
 Layer applicability:
 - Domain:
   status: required | skipped | insufficient evidence
@@ -191,6 +198,24 @@ Review route:
 - Reason:
 - Inputs still needed:
 
+Internal route:
+- Primary: review-router
+- Secondary:
+- Next if routed:
+- Stop if:
+
+Route confidence:
+- high | medium | low
+
+Evidence checked:
+- ...
+
+Missing evidence:
+- ...
+
+Human decision required:
+- ...
+
 Deviation check:
 - Under-processing:
   - gate:
@@ -201,6 +226,9 @@ Deviation check:
 - Missing evidence warnings:
   - layer:
     reason:
+
+Next action:
+- run required review gates | request missing review evidence | stop for human approval | prepare final merge decision | capture durable knowledge candidate | no further action needed
 ```
 
 ## Optional Metrics Event Candidate

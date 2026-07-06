@@ -120,6 +120,7 @@ Check for:
 - stale comments/docs,
 - missing tests,
 - unsupported claims.
+- next action summarized in work terms such as running missing checks, preparing review, or stopping for approval.
 
 ## Exit criteria
 
@@ -135,6 +136,12 @@ Implementation is complete only when:
 ## Output
 
 ```text
+Selected work mode:
+- 実装
+
+User-facing route:
+- How the scoped change will be made, what boundaries are preserved, and what checks determine whether it is ready for review.
+
 Implementation Contract:
 - Goal:
 - Change class:
@@ -154,6 +161,12 @@ Implementation Contract:
 - Verification contract:
 - Stop conditions:
 
+Internal route:
+- Primary: controlled-implementation
+- Secondary:
+- Next if implemented:
+- Stop if:
+
 Implementation summary:
 - Goal:
 - Changed files:
@@ -163,6 +176,9 @@ Implementation summary:
 - Not verified:
 - Risks/assumptions:
 - Next:
+
+Next action:
+- run missing verification | run review gates | prepare PR explanation | create handoff | stop for human decision | no further action needed
 ```
 
 ## Optional Metrics Event Candidate

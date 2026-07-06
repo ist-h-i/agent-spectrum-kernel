@@ -79,10 +79,17 @@ Requirement Contract:
    - Use `grill-design` when technical decision trees or tradeoffs remain.
    - Use `spec-driven-development` when behavior is clear enough for implementation planning.
    - Use `reject / needs human decision` when the value, owner, policy, or rule choice is still unresolved.
+   - Express the next action in work terms for the user; keep skill names in the route/debug fields.
 
 ## Output
 
 ```text
+Selected work mode:
+- 要件確認
+
+User-facing route:
+- What can be decided from evidence, what remains a human decision, and whether the work can proceed to packaging or design refinement.
+
 Requirement Contract:
 - User intent:
 - Business object:
@@ -99,10 +106,28 @@ Requirement Contract:
 - Evidence status:
 - Route next:
 
+Internal route:
+- Primary: requirement-grill
+- Secondary:
+- Next if resolved:
+- Stop if:
+
 Decision boundary:
 - AI-supported:
 - Human decision required:
 - Do not compile yet:
+
+Route confidence:
+- high | medium | low
+
+Evidence checked:
+- ...
+
+Missing evidence:
+- ...
+
+Next action:
+- proceed to implementation packaging | refine requirement | refine technical design | stop for human decision | no further action needed
 ```
 
 ## Exit criteria

@@ -25,6 +25,63 @@ operating-mode-router
 
 `skills/operating-mode-router/SKILL.md` is the top-level mode router. `skills/skill-router/SKILL.md` remains the delivery/quality router for concrete development work.
 
+## User-Facing Work Modes
+
+Users do not need to know skill names to start work. The default surface is a small set of work intents; routers translate those intents into internal routes.
+
+| User-facing intent | Example request | Selected work mode | Internal route family |
+|---|---|---|---|
+| 進める / proceed with this ticket or task | このチケットを進めて | 要件確認 / 実装準備 / 実装 | requirement, work package, implementation |
+| レビューする / review a PR, diff, design, or output | このPRをレビューして | レビュー | review-router and required gates |
+| 調べる / investigate a bug, regression, or uncertainty | このバグを調べて | 調査 | doubt-driven-development and verification |
+| 詰める / refine requirement, design, architecture, or decision | この設計を詰めて | 要件確認 / 設計 | requirement, design, architecture |
+| 作業化する / convert to agent-ready work | Codexに渡せる形にして | 実装準備 | work-package |
+| 整理する / document, summarize, or hand off | この状態を整理して | ドキュメント整理 | documentation, handoff |
+| 活かす / preserve review findings or corrections | この指摘を次に活かして | 知識蓄積 | finding, ledger, documentation |
+
+Default route output separates user-facing work terms from internal routing:
+
+```text
+Selected work mode:
+- 要件確認 | 実装準備 | 実装 | レビュー | 調査 | ドキュメント整理 | 知識蓄積
+
+User-facing route:
+- What will be checked, what can proceed, and what must stop for human decision.
+
+Internal route:
+- Primary:
+- Secondary:
+- Next if resolved:
+- Stop if:
+
+Route confidence:
+- high | medium | low
+
+Evidence checked:
+- ...
+
+Missing evidence:
+- ...
+
+Human decision required:
+- ...
+
+Next action:
+- proceed to implementation packaging
+- stop for human decision
+- refine requirement
+- refine technical design
+- create verification contract
+- implement scoped change
+- run review gates
+- prepare PR explanation
+- capture durable knowledge candidate
+- create handoff
+- no further action needed
+```
+
+The user-facing route should not require skill-name knowledge. Skill names remain visible in `Internal route` for review, debugging, and advanced usage.
+
 ## Full-layer Engineering Intelligence
 
 Full-layer intelligence is modeled as narrow lanes. Durable ledgers and memory files are evidence sources for selected workflows, not autonomous decision makers and not mandatory inputs for every task.

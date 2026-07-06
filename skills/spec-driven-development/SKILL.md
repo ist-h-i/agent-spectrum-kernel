@@ -72,10 +72,17 @@ Each task must:
 - preserve a working state after completion.
 
 5. Stop before implementation if the next task cannot be scoped or verified.
+   - Present the next action in work terms. Use skill names only in the internal route or advanced/debug notes.
 
 ## Output
 
 ```text
+Selected work mode:
+- 実装準備
+
+User-facing route:
+- How the request becomes a scoped, testable implementation slice and what would stop implementation.
+
 Spec summary:
 - ...
 
@@ -90,6 +97,15 @@ Verification:
 
 Open assumptions:
 - ...
+
+Internal route:
+- Primary: spec-driven-development
+- Secondary:
+- Next if resolved:
+- Stop if:
+
+Next action:
+- create verification contract | implement scoped change | refine requirement | refine technical design | stop for human decision | no further action needed
 ```
 
 ## Exit criteria
