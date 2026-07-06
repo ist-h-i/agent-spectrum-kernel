@@ -37,7 +37,6 @@ AGENTS.md
 CUSTOM_INSTRUCTIONS.md
 manifest.json
 README.md
-README.ja.md
 CHANGELOG.md
 docs/
   routing-model.md

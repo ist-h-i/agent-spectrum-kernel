@@ -32,7 +32,7 @@ const SKILL_COUNT_REFERENCE_PATTERNS = [
   /\bSkills in manifest:\s*(\d+)\b/gi,
   /\bSkill directories:\s*(\d+)\b/gi,
 ];
-const MAINTAINED_SCAN_ROOTS = ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "README.md", "README.ja.md", "docs", "examples", "skills"];
+const MAINTAINED_SCAN_ROOTS = ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "README.md", "docs", "examples", "skills"];
 const GENERATED_REPORT_PATH = "docs/validation-report.md";
 const REQUIRED_SCHEMA_PATHS = [
   "schemas/metrics-event.schema.json",
@@ -1403,7 +1403,6 @@ function validateAdapterDocumentation(root, checks, errors) {
     .join("\n");
   const adoptionText = [
     "README.md",
-    "README.ja.md",
     "docs/quickstart-ja.md",
     "docs/usage-ja.md",
     "docs/prompt-recipes-ja.md",

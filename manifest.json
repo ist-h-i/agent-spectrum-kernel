@@ -121,7 +121,6 @@
   ],
   "docs": [
     "README.md",
-    "README.ja.md",
     "CUSTOM_INSTRUCTIONS.md",
     "docs/routing-model.md",
     "docs/skill-matrix.md",
