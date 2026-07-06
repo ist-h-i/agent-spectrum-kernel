@@ -1,5 +1,5 @@
 ---
-description: Route and execute a scoped implementation through the AI Coding Kernel.
+description: Route and execute a scoped implementation through the Agent Spectrum Kernel.
 ---
 
 Use the installed project skills from this repository projection.
