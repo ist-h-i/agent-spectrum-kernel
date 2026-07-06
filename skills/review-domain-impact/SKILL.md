@@ -131,10 +131,17 @@ Domain rule checks:
    - require product/domain owner approval,
    - require ADR/domain decision record,
    - block.
+   - State the next action in work terms, not only as another skill name.
 
 ## Output
 
 ```text
+Selected work mode:
+- レビュー
+
+User-facing route:
+- What business meaning changed, whether that change is authorized, and what must be clarified or approved before technical merge confidence.
+
 Domain impact decision:
 - Classification:
 - Gate status: pass | pass with note | fail | insufficient evidence
@@ -150,6 +157,15 @@ Domain impact decision:
 - Required fix:
 - Required approval:
 - Residual domain risk:
+
+Internal route:
+- Primary: review-domain-impact
+- Secondary:
+- Next if passed:
+- Stop if:
+
+Next action:
+- continue technical review | request domain clarification | require owner approval | record domain decision | block merge | no further action needed
 ```
 
 ## Exit criteria

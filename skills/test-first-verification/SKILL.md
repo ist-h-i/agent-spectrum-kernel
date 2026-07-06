@@ -78,10 +78,17 @@ Verification Contract:
 6. If verification fails, report failure. Do not bury it under partial success.
 
 7. If a required verification path is unavailable, report `insufficient evidence` instead of claiming completion. Provide the exact next verification path.
+   - Express the next action as the work to do next, such as adding a focused test, running checks, or stopping for missing evidence.
 
 ## Output
 
 ```text
+Selected work mode:
+- 実装準備 | 実装
+
+User-facing route:
+- What behavior must be proven, which checks provide evidence, and what remains insufficient before completion or review.
+
 Verification Contract:
 - Behavior to prove:
 - Regression to prevent:
@@ -94,6 +101,12 @@ Verification Contract:
 - Stack overlay verification supplement:
 - Verification pattern ledger:
 - What remains unverified:
+- Stop if:
+
+Internal route:
+- Primary: test-first-verification
+- Secondary:
+- Next if evidence passes:
 - Stop if:
 
 Verification plan:
@@ -110,6 +123,9 @@ Not verified:
 
 Next verification:
 - ...
+
+Next action:
+- add focused test | run verification command | implement scoped change | run review gates | report insufficient evidence | no further action needed
 ```
 
 ## Optional Metrics Event Candidate

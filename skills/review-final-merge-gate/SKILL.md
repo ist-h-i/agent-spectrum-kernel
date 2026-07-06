@@ -86,12 +86,19 @@ Make the final merge decision from gate evidence without hiding missing checks, 
    - Put explicitly deferred or accepted code-health risks under Deferred / accepted code-health risks with the known reason or follow-up condition.
    - Do not force every review to run `review-code-health` or `improvement-ledger`.
    - Do not update `docs/ai/improvement-ledger.md` from this final gate; make candidates explicit enough for a later `improvement-ledger` invocation or follow-up task.
+   - End with a work-term next action such as merge readiness, required fixes, missing evidence, or durable follow-up capture.
 
 ## Output
 
 Include the improvement-ledger, rule-feedback, and deferred-risk sections only when applicable.
 
 ```text
+Selected work mode:
+- レビュー
+
+User-facing route:
+- Whether the target can merge, what must change first, what evidence is missing, and what optional follow-up should be preserved.
+
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
@@ -128,6 +135,15 @@ Evidence reviewed:
 
 Residual risk:
 - ...
+
+Internal route:
+- Primary: review-final-merge-gate
+- Secondary:
+- Next if approved:
+- Stop if:
+
+Next action:
+- prepare PR explanation | fix required changes | request missing evidence | capture durable knowledge candidate | create handoff | no further action needed
 ```
 
 ## Optional Metrics Event Candidate

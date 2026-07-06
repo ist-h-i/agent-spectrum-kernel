@@ -38,6 +38,36 @@ scripts/       validation、Claude adapter install、local observability runtime
 - `docs/ai/domain-rule-ledger.md`: 業務ルールを証拠状態付きで残す台帳template。
 - `docs/ai/engineering-pattern-ledger.md` / `docs/ai/verification-pattern-ledger.md` / `docs/ai/review-rule-ledger.md` / `docs/ai/documentation-knowledge-ledger.md` / `docs/ai/architecture-decision-memory.md` / `docs/ai/engineering-capability-ledger.md`: full-layer engineering intelligence の台帳template。
 
+## Skill名を知らない入口
+
+通常の依頼では、Skill名を覚えずに「やりたい作業」を言えばよいです。内部ではrouteを選び、外向きには作業モード、根拠不足、人間判断、次アクションを説明します。
+
+短い依頼:
+
+```text
+この作業を適切なルートで進めてください。
+```
+
+丁寧な依頼:
+
+```text
+この依頼を、必要なルートを選んで進めてください。
+既存のdocs、repo、domain rules、context、ledgerで判断できるものは吸収し、
+人間判断が必要なものだけ明示してください。
+作業が進められる場合は、次に必要な実装・検証・レビュー・ドキュメント作成まで案内してください。
+```
+
+| やりたいこと | こう言う | 内部で選ぶroute |
+|---|---|---|
+| チケットを前に進める | このチケットを進めて | 要件確認 / 実装準備 / 実装route |
+| PRをレビューする | このPRをレビューして | review-router and required gates |
+| バグ原因を調べる | このバグを調べて | doubt-driven-development and verification route |
+| 設計を詰める | この設計を詰めて | design / architecture route |
+| Agent-readyにする | Codexに渡せる形にして | work-package route |
+| 指摘を次に活かす | この指摘を次に活かして | finding / ledger / documentation route |
+
+Skill名は内部routeやdebug説明では出してよいですが、通常のUser-facing routeと `Next action` は作業用語で書きます。
+
 ## 使い分け
 
 判断基準は単純です。

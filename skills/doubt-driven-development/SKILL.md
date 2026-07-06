@@ -64,10 +64,17 @@ Ask:
 | unknown | Evidence is insufficient. |
 
 6. Only then implement or recommend.
+   - State the next action in work terms such as collecting evidence, creating a reproduction, implementing a scoped fix, or stopping because the cause remains unknown.
 
 ## Output
 
 ```text
+Selected work mode:
+- 調査
+
+User-facing route:
+- Which hypothesis is being tested, what evidence can falsify it, and what must be proven before implementation or closure.
+
 Hypothesis:
 - ...
 
@@ -81,8 +88,17 @@ Results:
 Conclusion:
 - verified | weakened | falsified | unknown
 
+Internal route:
+- Primary: doubt-driven-development
+- Secondary:
+- Next if verified:
+- Stop if:
+
 Next:
 - ...
+
+Next action:
+- collect missing evidence | create reproduction | create verification contract | implement scoped fix | report unknown cause | no further action needed
 ```
 
 ## Exit criteria

@@ -1,5 +1,63 @@
 # Workflow Examples
 
+## 0. Natural work request routing
+
+User request:
+
+```text
+このチケットを進めて
+```
+
+Workflow:
+
+```text
+operating-mode-router when the operating layer is unclear
+skill-router for delivery/quality work
+then the smallest selected workflow
+```
+
+Expected output shape:
+
+```text
+Selected work mode:
+- 要件確認 / 実装準備
+
+User-facing route:
+- まず既存要件、関連docs、repo根拠から判断できる点を確認します。
+- 不足している判断だけを人間判断として分離します。
+- 実行可能なら、実装可能な作業単位、検証条件、レビュー観点に変換します。
+
+Internal route:
+- Primary: requirement-grill
+- Secondary: domain-rule-ledger when matching confirmed or verified rules exist
+- Next if resolved: work-package-compiler
+- Stop if: unresolved human-owned business decision remains
+
+Route confidence:
+- medium
+
+Evidence checked:
+- issue body
+- README / docs relevant to the request
+- matching active ledgers when they materially affect the task
+
+Missing evidence:
+- ...
+
+Human decision required:
+- ...
+
+Next action:
+- stop for human decision
+- proceed to implementation packaging
+```
+
+Expected behavior:
+
+- Do not require the user to name `requirement-grill`, `work-package-compiler`, or any other skill.
+- Keep the internal route explicit for review and debugging.
+- Do not auto-run the whole chain when a human-owned decision remains.
+
 ## 1. Trivial edit
 
 User request:

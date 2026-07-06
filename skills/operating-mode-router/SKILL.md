@@ -42,7 +42,22 @@ This skill prevents ordinary delivery work from being polluted by adoption, metr
 | `observability_metrics` | Evaluate skill effectiveness, routing quality, instruction maturity, adoption impact, full-layer capability growth, or skill usage over time | `skill-effectiveness-evaluation`; `skill-adoption-metrics`; `engineering-capability-evaluation` |
 | `operation_automation` | Run or plan a periodic cadence such as weekly/monthly summaries, scheduler setup, or team routine | External operation layer; manual routine; ChatGPT automation; GitHub Actions; cron |
 
-2. Distinguish close signals.
+2. Select the user-facing work mode.
+
+| Work mode | Use when |
+|---|---|
+| `要件確認` | User intent, business meaning, success condition, or decision boundary must be clarified. |
+| `実装準備` | A confirmed request needs packaging, verification planning, or scoped implementation preparation. |
+| `実装` | The request asks to make a scoped change. |
+| `レビュー` | The request asks to evaluate a PR, diff, design, generated output, or readiness. |
+| `調査` | The request involves a bug, regression, uncertainty, or unknown root cause. |
+| `ドキュメント整理` | The request asks to summarize, document, prepare a PR explanation, or hand off state. |
+| `知識蓄積` | The request asks to preserve review findings, corrections, patterns, or rules for future work. |
+| `運用整理` | The request asks for periodic reporting, scheduler setup, or external operation planning. |
+
+User-facing route text should explain the work path in these terms. Skill names belong in `Internal route` for review and debugging.
+
+3. Distinguish close signals.
    - One completed task effectiveness question: route to `skill-effectiveness-evaluation`.
    - Multiple tasks or a period-over-period adoption question: route to `skill-adoption-metrics`.
    - Evidence-backed full-layer engineering capability or reusable intelligence maturity question: route to `engineering-capability-evaluation`.
@@ -52,16 +67,16 @@ This skill prevents ordinary delivery work from being polluted by adoption, metr
    - Requirement-to-Rule Loop work for a concrete repository task: classify as `delivery_quality`, then route through `skill-router` to `next-best-change-finder`, `requirement-grill`, `work-package-compiler`, `review-domain-impact`, `review-to-rule-compiler`, or `domain-rule-ledger` as appropriate.
    - Ordinary coding/review/investigation/refactor work: route to `skill-router`.
 
-3. Apply risk overlay before action.
+4. Apply risk overlay before action.
    - If the request includes destructive, irreversible, external, production, auth, secret, dependency, migration, billing, email, infra, or scheduler changes, run `risk-gate` before action.
    - Creating local templates or docs is not the same as enabling automation.
 
-4. Keep mode boundaries explicit.
+5. Keep mode boundaries explicit.
    - Do not invoke adoption or metrics workflows for normal development tasks unless the user asks for adoption or metrics.
    - Do not create weekly/monthly skills for reporting cadence.
    - Do not store raw prompts, secrets, customer data, or project-specific metrics in the generic repository.
 
-5. Delegate to the selected layer.
+6. Delegate to the selected layer.
    - For `delivery_quality`, continue with `skill-router`.
    - For `adoption_bootstrap`, produce or delegate to an adoption pack workflow.
    - For `observability_metrics`, choose one metrics/evaluation skill.
@@ -70,13 +85,32 @@ This skill prevents ordinary delivery work from being polluted by adoption, metr
 ## Output
 
 ```text
+Selected work mode:
+- 要件確認 | 実装準備 | 実装 | レビュー | 調査 | ドキュメント整理 | 知識蓄積 | 運用整理
+
+User-facing route:
+- Work-term explanation of what will be checked, what can proceed, and where the work must stop.
+
 Operating mode:
 - delivery_quality | adoption_bootstrap | observability_metrics | operation_automation
 
-Selected route:
+Internal route:
 - Primary:
 - Secondary:
-- External operation layer:
+- Next if resolved:
+- Stop if:
+
+Route confidence:
+- high | medium | low
+
+Evidence checked:
+- ...
+
+Missing evidence:
+- ...
+
+Human decision required:
+- ...
 
 Reason:
 - Decisive signal:
@@ -84,7 +118,7 @@ Reason:
 - Risk overlay:
 
 Next action:
-- ...
+- proceed to implementation packaging | stop for human decision | refine requirement | refine technical design | create verification contract | implement scoped change | run review gates | prepare PR explanation | capture durable knowledge candidate | create handoff | no further action needed
 ```
 
 ## Exit criteria

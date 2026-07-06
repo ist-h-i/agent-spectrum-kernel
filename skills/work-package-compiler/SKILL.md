@@ -77,10 +77,17 @@ Work Package:
 5. Confirm execution readiness.
    - The package is executable only when `Open blockers` has no unresolved business decisions.
    - Required review gates must include `review-domain-impact` when domain rules or business behavior are involved.
+   - The user-facing next action must be a work action, not only the name of the next skill.
 
 ## Output
 
 ```text
+Selected work mode:
+- 実装準備
+
+User-facing route:
+- How the confirmed requirement becomes scoped work, what evidence and checks are required, and what still blocks execution.
+
 Work Package:
 - Title:
 - Goal:
@@ -104,6 +111,27 @@ Work Package:
 
 Route:
 - executable | requirement-grill | grill-design | needs human decision
+
+Internal route:
+- Primary: work-package-compiler
+- Secondary:
+- Next if executable:
+- Stop if:
+
+Route confidence:
+- high | medium | low
+
+Evidence checked:
+- ...
+
+Missing evidence:
+- ...
+
+Human decision required:
+- ...
+
+Next action:
+- implement scoped change | create verification contract | run review gates | refine requirement | refine technical design | stop for human decision | create handoff
 ```
 
 ## Exit criteria

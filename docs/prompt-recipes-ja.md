@@ -2,6 +2,73 @@
 
 この文書は、Skill名を深く知らなくても使える copy-paste 用の依頼文集です。各recipeは「やりたいこと」から選びます。上位routingの正本は `skills/operating-mode-router/SKILL.md`、delivery/quality内の正本は `skills/skill-router/SKILL.md`、各手順の正本は各 `SKILL.md` です。
 
+## Skill名を知らない通常入口
+
+### そのまま貼る短い依頼文
+
+```text
+この作業を適切なルートで進めてください。
+```
+
+### そのまま貼る丁寧な依頼文
+
+```text
+この依頼を、必要なルートを選んで進めてください。
+既存のdocs、repo、domain rules、context、ledgerで判断できるものは吸収し、
+人間判断が必要なものだけ明示してください。
+作業が進められる場合は、次に必要な実装・検証・レビュー・ドキュメント作成まで案内してください。
+```
+
+### やりたいこと別の言い方
+
+| やりたいこと | こう言う | 期待される内部route |
+|---|---|---|
+| チケットを前に進める | このチケットを進めて | requirement / work package / implementation route |
+| PR、diff、生成物をレビューする | このPRをレビューして | review-router and required gates |
+| バグ、regression、原因不明を調べる | このバグを調べて | doubt-driven-development and verification route |
+| 要件、設計、アーキテクチャを詰める | この設計を詰めて | requirement / design / architecture route |
+| Codexや別Agentへ渡せる作業にする | Codexに渡せる形にして | work-package route |
+| レビュー指摘や訂正を次回に活かす | この指摘を次に活かして | finding / ledger / documentation route |
+
+### 期待する出力
+
+```text
+Selected work mode:
+- 要件確認 | 実装準備 | 実装 | レビュー | 調査 | ドキュメント整理 | 知識蓄積
+
+User-facing route:
+- 作業用語で、次に何を確認し、何を止め、何を進めるか。
+
+Internal route:
+- Primary:
+- Secondary:
+- Next if resolved:
+- Stop if:
+
+Route confidence:
+- high | medium | low
+
+Evidence checked:
+- ...
+
+Missing evidence:
+- ...
+
+Human decision required:
+- ...
+
+Next action:
+- implement scoped change | run review gates | create verification contract | stop for human decision | create handoff | no further action needed
+```
+
+### 注意
+
+- `User-facing route` と `Next action` はSkill名だけで終わらせません。
+- `Internal route` はdebugやreviewのためにSkill名を出して構いません。
+- 次のrouteは推薦です。ユーザーが継続を求めていない場合、全Skill chainを自動実行しません。
+- `template`、`stale`、`archived`、`contradicted`、`Hypothesis` のledger entryをenforcement evidenceとして扱いません。
+- deploy、migration、release、外部通知、secret、auth、permission、production config は `risk-gate` と明示承認が先です。
+
 ## Small local edit
 
 ### そのまま貼る依頼文

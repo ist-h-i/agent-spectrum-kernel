@@ -2,6 +2,22 @@
 
 This matrix is a reference view of the layered runtime routes in `skills/operating-mode-router/SKILL.md` and the delivery/quality routes in `skills/skill-router/SKILL.md`. If they differ, update this file to mirror the routers instead of treating this table as a separate source of truth.
 
+## User-Facing Entry Routes
+
+Start from what the user wants to do. The internal route can name skills, but the normal user-facing explanation should name the work mode and next action.
+
+| User wants to... | Say this | Selected work mode | System should route to... |
+|---|---|---|---|
+| Move a ticket forward | このチケットを進めて | 要件確認 / 実装準備 / 実装 | requirement / work package / implementation route |
+| Review a PR, diff, design, or output | このPRをレビューして | レビュー | review-router and required gates |
+| Investigate a bug or uncertainty | このバグを調べて | 調査 | doubt-driven-development and verification route |
+| Refine a requirement, design, architecture, or decision | この設計を詰めて | 要件確認 / 設計 | requirement / design / architecture route |
+| Prepare work for an agent | Codexに渡せる形にして | 実装準備 | work-package route |
+| Document or hand off state | この状態を整理して | ドキュメント整理 | documentation / handoff route |
+| Preserve a review lesson | この指摘を次に活かして | 知識蓄積 | finding / ledger / documentation route |
+
+Route outputs should include `Selected work mode`, `User-facing route`, `Internal route`, `Route confidence`, `Evidence checked`, `Missing evidence`, `Human decision required`, and a work-term `Next action`.
+
 ## Operating Mode Routes
 
 | Operating mode | Use when | Primary route | Expected output |
