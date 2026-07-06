@@ -1,6 +1,6 @@
-# Adapter Capability Matrix
+# Agent Spectrum Kernel Adapter Capability Matrix
 
-Evidence status is based on this repository's files and validation scripts, not on external product claims. Tools without repository adapters are marked `unknown` unless a capability is directly represented here.
+Evidence status is based on this repository's Agent Spectrum Kernel files and validation scripts, not on external product claims. Tools without repository adapters are marked `unknown` unless a capability is directly represented here.
 
 | Capability | Claude Code | Codex | Cursor | Cline | Devin | Kiro |
 |---|---|---|---|---|---|---|

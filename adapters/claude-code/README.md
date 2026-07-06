@@ -1,6 +1,6 @@
 # Claude Code Adapter
 
-This adapter projects the core AI Coding Kernel skills into Claude Code without changing the core `skills/` directory design.
+This adapter projects the core Agent Spectrum Kernel skills into Claude Code without changing the core `skills/` directory design.
 
 Use the project-local adapter when you want short project commands such as `/review-router` and local hook-based observability in one repository. Use the optional plugin package when the same entry points should be distributed across several projects or a team.
 

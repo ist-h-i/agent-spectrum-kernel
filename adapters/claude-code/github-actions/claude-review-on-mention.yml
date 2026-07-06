@@ -100,7 +100,7 @@ jobs:
           prompt: |
             /review-router
 
-            Review this pull request using the AI Coding Kernel skill set.
+            Review this pull request using the Agent Spectrum Kernel skill set.
 
             Target PR:
             - Repository: ${{ github.repository }}

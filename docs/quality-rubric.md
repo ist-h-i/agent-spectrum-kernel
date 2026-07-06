@@ -1,6 +1,6 @@
-# Quality Rubric
+# Agent Spectrum Kernel Quality Rubric
 
-Target: every static package/design category should be 95+ for personal development and internal introduction.
+Target: every Agent Spectrum Kernel static package/design category should be 95+ for personal development and internal introduction.
 
 Scope note: these scores assess repository packaging, workflow design, validation coverage, and documentation readiness. They do not prove runtime adoption effectiveness, release readiness for a specific project, or client-value readiness.
 

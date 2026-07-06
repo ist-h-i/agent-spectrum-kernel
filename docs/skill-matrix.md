@@ -1,6 +1,6 @@
-# Skill Matrix
+# Agent Spectrum Kernel Skill Matrix
 
-This matrix is a reference view of the layered runtime routes in `skills/operating-mode-router/SKILL.md` and the delivery/quality routes in `skills/skill-router/SKILL.md`. If they differ, update this file to mirror the routers instead of treating this table as a separate source of truth.
+This matrix is a reference view of the Agent Spectrum Kernel layered runtime routes in `skills/operating-mode-router/SKILL.md` and the delivery/quality routes in `skills/skill-router/SKILL.md`. If they differ, update this file to mirror the routers instead of treating this table as a separate source of truth.
 
 ## User-Facing Entry Routes
 

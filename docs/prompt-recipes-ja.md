@@ -1,6 +1,6 @@
-# Prompt Recipes 日本語版
+# Agent Spectrum Kernel Prompt Recipes 日本語版
 
-この文書は、Skill名を深く知らなくても使える copy-paste 用の依頼文集です。各recipeは「やりたいこと」から選びます。上位routingの正本は `skills/operating-mode-router/SKILL.md`、delivery/quality内の正本は `skills/skill-router/SKILL.md`、各手順の正本は各 `SKILL.md` です。
+この文書は、Agent Spectrum Kernel を Skill名を深く知らなくても使えるようにする copy-paste 用の依頼文集です。各recipeは「やりたいこと」から選びます。上位routingの正本は `skills/operating-mode-router/SKILL.md`、delivery/quality内の正本は `skills/skill-router/SKILL.md`、各手順の正本は各 `SKILL.md` です。
 
 ## Skill名を知らない通常入口
 
@@ -191,7 +191,7 @@ Next action:
 ### そのまま貼る依頼文
 
 ```text
-このrepoにAI coding kernel + skillsを導入するための project adoption pack を作ってください。
+このrepoに Agent Spectrum Kernel を導入するための project adoption pack を作ってください。
 operating-mode-router で adoption_bootstrap に分類し、project-adoption-pack-generation を使ってください。
 README、commands、CI、docs、ADR、local rules、risk、generated file boundaries を確認し、project overlay draft、implementation context draft、review context draft、improvement-ledger initialization guidance、最初の3つのworkflow recipe、missing human decisions を出してください。
 ファイル変更はまだ行わず、根拠がないpolicyは Unknown としてください。

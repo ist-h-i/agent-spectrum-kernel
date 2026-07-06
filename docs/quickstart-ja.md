@@ -1,6 +1,6 @@
-# Quick Start 日本語版
+# Agent Spectrum Kernel Quick Start 日本語版
 
-このガイドは、設計議論を追っていない人が最初の3分で使い始めるための入口です。詳しいSkill一覧は `docs/skill-matrix.md`、実例は `docs/workflow-examples.md`、そのまま貼れる依頼文は `docs/prompt-recipes-ja.md` を見てください。
+このガイドは、Agent Spectrum Kernel を設計議論を追っていない人が最初の3分で使い始めるための入口です。詳しいSkill一覧は `docs/skill-matrix.md`、実例は `docs/workflow-examples.md`、そのまま貼れる依頼文は `docs/prompt-recipes-ja.md` を見てください。
 
 ## 3分で使う
 

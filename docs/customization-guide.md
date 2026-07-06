@@ -1,4 +1,4 @@
-# Customization Guide
+# Agent Spectrum Kernel Customization Guide
 
 ## Rule of placement
 

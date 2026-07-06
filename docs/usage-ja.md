@@ -1,8 +1,8 @@
-# Usage Guide 日本語版
+# Agent Spectrum Kernel Usage Guide 日本語版
 
 ## 目的
 
-このセットは、個人開発や社内でAIコーディングツールを紹介するときのベースです。
+Agent Spectrum Kernel は、個人開発や社内でAIコーディングツールを紹介するときのベースです。
 
 AIに期待する動作は次です。
 

@@ -1,5 +1,5 @@
 ---
-description: Route and execute a scoped implementation through the AI Coding Kernel in Codex.
+description: Route and execute a scoped implementation through the Agent Spectrum Kernel in Codex.
 ---
 
 Use the repository `AGENTS.md` and projected skills from `.agents/skills`.

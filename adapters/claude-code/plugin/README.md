@@ -1,6 +1,6 @@
 # AI Skills Claude Plugin
 
-This optional plugin packages stable Claude Code entry points for the AI Coding Kernel.
+This optional plugin packages stable Claude Code entry points for Agent Spectrum Kernel.
 
 Use the project-local adapter when one repository needs short commands such as `/review-router`. Use this plugin when a team wants namespaced commands such as `/ai-skills:review-pr` across multiple repositories.
 

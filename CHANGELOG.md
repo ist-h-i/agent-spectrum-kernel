@@ -4,6 +4,7 @@
 
 Changes:
 
+- Renamed project-facing branding to Agent Spectrum Kernel across repository metadata, README files, docs, and adapter descriptions.
 - Added the Requirement-to-Rule Loop skills: `next-best-change-finder`, `requirement-grill`, `work-package-compiler`, `review-to-rule-compiler`, and `domain-rule-ledger`.
 - Added `docs/ai/domain-rule-ledger.md` and `schemas/domain-rule-ledger-entry.schema.json` for evidence-status-labeled domain rules.
 - Enhanced `review-domain-impact` to consume Requirement Contracts, Work Packages, domain rule ledgers, review context, and repository orientation evidence.
