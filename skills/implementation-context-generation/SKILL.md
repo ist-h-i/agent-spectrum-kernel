@@ -16,6 +16,7 @@ This skill is framework-agnostic. Stack-specific rules belong in optional projec
 - Repeated implementation work is expected in the same repository.
 - The stack, workspace shape, commands, test style, or generated/manual-edit boundaries are not yet durable.
 - A project overlay exists or may be needed, and generic implementation context should point to it without replacing it.
+- Engineering pattern, verification pattern, or architecture decision memory exists and should be referenced without duplicating entries.
 - `controlled-implementation` or `test-first-verification` would benefit from known commands, local patterns, or stop conditions.
 
 ## Do not use when
@@ -89,6 +90,7 @@ Use these statuses for important claims:
    - Existing implementations near common change areas.
    - Existing tests near common change areas.
    - Project overlay rules, docs, ADRs, schemas, generated artifacts, and examples.
+   - Engineering pattern, verification pattern, and architecture decision memory ledgers when present.
    - `docs/ai/review-context.md` only for implementation-relevant constraints; do not duplicate review-only content.
 
 3. Draft candidate context.
@@ -99,6 +101,7 @@ Use these statuses for important claims:
    - implementation patterns by area,
    - test patterns by change type,
    - architecture boundaries and public contracts,
+   - links to engineering patterns, verification patterns, and architecture decision memory,
    - error handling, logging, and observability conventions,
    - state and data-flow conventions,
    - generated, vendored, and manual-edit boundaries,
@@ -134,6 +137,7 @@ Use these statuses for important claims:
    - `repository-orientation` may recommend this skill when implementation context is missing or stale.
    - `controlled-implementation` should read this context when available.
    - `test-first-verification` should use this context for commands and test patterns when available.
+   - `engineering-pattern-ledger`, `verification-pattern-ledger`, and `architecture-decision-memory` remain the durable sources for reusable entries; implementation context may point to them but should not duplicate their tables.
    - Consumers must treat `context_status: template` as missing context and `context_status: stale` as insufficient evidence for affected claims until refreshed.
    - Stack overlays may extend this context, but must not replace it.
 
@@ -148,6 +152,7 @@ Implementation context generation:
 - Implementation patterns found:
 - Test patterns found:
 - Boundary rules found:
+- Ledger links found:
 - Hypotheses needing confirmation:
 - Unknowns:
 - Stack overlays detected:

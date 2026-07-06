@@ -34,6 +34,14 @@ Read `docs/ai/implementation-context.md` when it exists. Check `context_status` 
 
 If implementation context is missing or `template` but the task is small and local, proceed from nearby repository evidence instead of forcing context generation. If it is missing, `template`, or `stale` for repeated or non-trivial work, recommend `implementation-context-generation`.
 
+When `docs/ai/engineering-pattern-ledger.md` exists, consult it only when the task has a repeated implementation shape, project-specific pattern, or review finding that materially affects the implementation choice:
+
+- `template`: treat as no project-specific pattern evidence.
+- `active`: use matching `Verified` or `Human-confirmed` entries as constraints, `Supported` entries as cautions requiring current repo checks, and `Hypothesis` entries as questions only.
+- `archived`: cite for history only; do not use as current implementation guidance.
+
+If the implementation decision depends on a prior architecture or boundary decision, consult `docs/ai/architecture-decision-memory.md` with the same evidence-status discipline and route to `application-boundary-architecture` or `adr-review` when mechanics or durable ADR action are unresolved.
+
 ```text
 Implementation Contract:
 - Goal:
@@ -51,6 +59,10 @@ Implementation Contract:
   - resolved | unresolved | not needed
 - Implementation context:
   - initialized | template | missing | stale | not needed
+- Engineering pattern ledger:
+  - active | template | missing | archived | not needed
+- Architecture decision memory:
+  - active | template | missing | archived | not needed
 - Stack overlay used:
   - none | project-specific | stack-specific
 - Verification contract:
@@ -136,6 +148,8 @@ Implementation Contract:
 - Existing patterns to reuse:
 - Boundary decision:
 - Implementation context:
+- Engineering pattern ledger:
+- Architecture decision memory:
 - Stack overlay used:
 - Verification contract:
 - Stop conditions:

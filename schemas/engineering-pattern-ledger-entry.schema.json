@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/ai-coding-rules-and-skills/schemas/engineering-pattern-ledger-entry.schema.json",
+  "title": "Engineering Pattern Ledger Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "pattern_name",
+    "layer_boundary",
+    "applies_when",
+    "do_not_use_when",
+    "accepted_implementation_shape",
+    "rejected_alternatives",
+    "evidence_source",
+    "evidence_status",
+    "related_files_modules",
+    "related_skills",
+    "review_impact",
+    "verification_expectation",
+    "staleness_trigger",
+    "owner"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "id": { "type": "string", "pattern": "^EP-[0-9]{4}$" },
+    "pattern_name": { "type": "string", "minLength": 1 },
+    "layer_boundary": { "type": "string", "minLength": 1 },
+    "applies_when": { "type": "string", "minLength": 1 },
+    "do_not_use_when": { "type": "string", "minLength": 1 },
+    "accepted_implementation_shape": { "type": "string", "minLength": 1 },
+    "rejected_alternatives": { "type": "string", "minLength": 1 },
+    "evidence_source": { "type": "string", "minLength": 1 },
+    "evidence_status": {
+      "type": "string",
+      "enum": ["Verified", "Human-confirmed", "Supported", "Hypothesis", "Deprecated", "Contradicted"]
+    },
+    "related_files_modules": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+    "related_skills": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+    "review_impact": { "type": "string", "minLength": 1 },
+    "verification_expectation": { "type": "string", "minLength": 1 },
+    "staleness_trigger": { "type": "string", "minLength": 1 },
+    "owner": { "type": "string", "minLength": 1 }
+  }
+}

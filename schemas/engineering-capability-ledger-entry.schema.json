@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/ai-coding-rules-and-skills/schemas/engineering-capability-ledger-entry.schema.json",
+  "title": "Engineering Capability Ledger Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "capability_area",
+    "current_level",
+    "evidence_source",
+    "evidence_status",
+    "observed_strengths",
+    "observed_failures",
+    "human_dependency",
+    "reusable_assets_involved",
+    "reliability_signals",
+    "staleness_trigger",
+    "next_improvement_candidate",
+    "owner"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "id": { "type": "string", "pattern": "^EC-[0-9]{4}$" },
+    "capability_area": {
+      "type": "string",
+      "enum": ["Requirement definition", "Domain rule application", "Work package compilation", "Architecture decision support", "Implementation pattern reuse", "Verification/test design", "Review judgment", "Documentation knowledge management", "Release/readiness judgment", "Next-change candidate discovery", "Handoff/restart quality", "Rule/check promotion quality"]
+    },
+    "current_level": {
+      "type": "string",
+      "enum": ["0 Unknown", "1 One-off assisted", "2 Repeatable with human supervision", "3 Evidence-backed reusable pattern", "4 Mostly autonomous verification/review support", "5 Mature reusable project intelligence"]
+    },
+    "evidence_source": { "type": "string", "minLength": 1 },
+    "evidence_status": {
+      "type": "string",
+      "enum": ["Verified", "Human-confirmed", "Supported", "Hypothesis", "Deprecated", "Contradicted", "Unknown"]
+    },
+    "observed_strengths": { "type": "string", "minLength": 1 },
+    "observed_failures": { "type": "string", "minLength": 1 },
+    "human_dependency": { "type": "string", "minLength": 1 },
+    "reusable_assets_involved": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "reliability_signals": { "type": "string", "minLength": 1 },
+    "staleness_trigger": { "type": "string", "minLength": 1 },
+    "next_improvement_candidate": { "type": "string", "minLength": 1 },
+    "owner": { "type": "string", "minLength": 1 }
+  }
+}

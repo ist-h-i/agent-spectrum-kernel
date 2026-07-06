@@ -48,9 +48,15 @@ docs/
   claude-github-review-setup.md
   ai/review-context.md
   ai/implementation-context.md
+  ai/architecture-decision-memory.md
+  ai/documentation-knowledge-ledger.md
+  ai/engineering-capability-ledger.md
+  ai/engineering-pattern-ledger.md
   ai/improvement-ledger.md
   ai/domain-rule-ledger.md
+  ai/review-rule-ledger.md
   ai/skill-adoption-metrics.md
+  ai/verification-pattern-ledger.md
   ai/adoption-report-template.md
   ai/stakeholder-readiness-report-template.md
   ai/observability-config.yml
@@ -86,6 +92,12 @@ schemas/
   adoption-report.schema.json
   improvement-ledger-entry.schema.json
   domain-rule-ledger-entry.schema.json
+  architecture-decision-memory-entry.schema.json
+  documentation-knowledge-ledger-entry.schema.json
+  engineering-capability-ledger-entry.schema.json
+  engineering-pattern-ledger-entry.schema.json
+  review-rule-ledger-entry.schema.json
+  verification-pattern-ledger-entry.schema.json
 adapters/
   claude-code/
     project/.claude/
@@ -105,6 +117,7 @@ skills/
   skill-router/SKILL.md
   angular-implementation-architecture/SKILL.md
   application-boundary-architecture/SKILL.md
+  architecture-decision-memory/SKILL.md
   repository-orientation/SKILL.md
   grill-design/SKILL.md
   grill-with-docs/SKILL.md
@@ -113,8 +126,12 @@ skills/
   project-adoption-pack-generation/SKILL.md
   scope-control/SKILL.md
   controlled-implementation/SKILL.md
+  documentation-knowledge-compiler/SKILL.md
   domain-rule-ledger/SKILL.md
+  engineering-capability-evaluation/SKILL.md
+  engineering-pattern-ledger/SKILL.md
   test-first-verification/SKILL.md
+  verification-pattern-ledger/SKILL.md
   release-readiness-gate/SKILL.md
   review-router/SKILL.md
   review-adversarial-risk/SKILL.md
@@ -124,6 +141,7 @@ skills/
   review-context-generation/SKILL.md
   review-code-health/SKILL.md
   review-domain-impact/SKILL.md
+  review-finding-compiler/SKILL.md
   review-output-quality/SKILL.md
   review-final-merge-gate/SKILL.md
   risk-gate/SKILL.md
@@ -192,6 +210,7 @@ First-time users should start with `docs/quickstart-ja.md`.
 - `docs/usage-ja.md`: representative usage guide for common operating patterns.
 - `docs/skill-matrix.md`: reference matrix for workflow selection.
 - `docs/adapter-conformance-contract.md` and `docs/adapter-capability-matrix.md`: adapter portability and capability evidence.
+- Full-layer intelligence ledger templates: `docs/ai/engineering-pattern-ledger.md`, `docs/ai/verification-pattern-ledger.md`, `docs/ai/review-rule-ledger.md`, `docs/ai/documentation-knowledge-ledger.md`, `docs/ai/architecture-decision-memory.md`, and `docs/ai/engineering-capability-ledger.md`.
 - `docs/ai/stakeholder-readiness-report-template.md`: stakeholder-specific readiness reports that separate internal quality, release readiness, and client-value readiness.
 - `docs/ai/reports/examples/`: fixture-backed stakeholder-readiness samples for senior engineering, development management, business unit, and AI promotion views.
 
@@ -211,6 +230,9 @@ First-time users should start with `docs/quickstart-ja.md`.
 | 実装方針の壁打ち | `grill-design` |
 | docs/ADR/用語体系に関わる設計 | `grill-with-docs` |
 | 実装前に未解決のアプリケーション境界・依存方向・DTO/Error/async lifetime判断 | `application-boundary-architecture` → 通常の実装ルートへ戻る |
+| 再利用可能な実装patternを台帳化 | `engineering-pattern-ledger` |
+| 再利用可能な検証patternを台帳化 | `verification-pattern-ledger` |
+| ADR未満のarchitecture decision memory | `architecture-decision-memory`（ADRが必要なら `adr-review`） |
 | 新機能・挙動変更 | `spec-driven-development` → `test-first-verification` for Verification Contract → `controlled-implementation` → `test-first-verification` for evidence |
 | バグ・原因不明 | `doubt-driven-development` → `test-first-verification` for reproduction and Verification Contract → `controlled-implementation` → `test-first-verification` for regression proof |
 | 承認済みリファクタ実装 | `refactor-implementation` → `test-first-verification` for regression proof |
@@ -218,6 +240,7 @@ First-time users should start with `docs/quickstart-ja.md`.
 | 危険操作・外部影響 | `risk-gate` before the selected workflow proceeds to action |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
 | PR/diffレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
+| 繰り返し/高impact review findingsを予防知識へ変換 | `review-finding-compiler` |
 | 既存要件・業務ルールとの照合 | `review-domain-impact`（Requirement Contract / Work Package / Domain Rule Ledger を入力にできる） |
 | リリース候補のready判定 | `release-readiness-gate`（deploy / publish / migration / external notification / release execution は `risk-gate` と明示承認が先） |
 | 負債・スメル・リファクタ候補レビュー | `review-router` → `review-code-health` when applicable |
@@ -226,9 +249,11 @@ First-time users should start with `docs/quickstart-ja.md`.
 | レビューや人間の訂正から業務ルール候補を抽出 | `review-to-rule-compiler` |
 | skill選択やworkflow効果のふりかえり | `operating-mode-router` → `skill-effectiveness-evaluation` |
 | adoption maturity / instruction quality / adoption impact measurement | `operating-mode-router` → `skill-adoption-metrics` |
+| full-layer engineering capabilityを証拠付きで評価 | `operating-mode-router` → `engineering-capability-evaluation` |
 | weekly/monthly adoption report | `operation_automation` layer + report templates; scheduling is external |
 | 繰り返しレビュー文脈の固定 | `review-context-generation`（既定: `docs/ai/review-context.md`） |
 | MR/PR README・PR説明・変更文脈固定 | `mr-readme-generation` |
+| docs/ADR/PR/handoffからdurable knowledgeを抽出 | `documentation-knowledge-compiler` |
 | 次のAgentへ渡す | `handoff-generation` |
 
 Use `evidence-ledger` whenever final text makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.

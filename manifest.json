@@ -9,10 +9,14 @@
     "adr-review",
     "angular-implementation-architecture",
     "application-boundary-architecture",
+    "architecture-decision-memory",
     "controlled-implementation",
+    "documentation-knowledge-compiler",
     "domain-rule-ledger",
     "doubt-driven-development",
     "evidence-ledger",
+    "engineering-capability-evaluation",
+    "engineering-pattern-ledger",
     "grill-design",
     "grill-with-docs",
     "handoff-generation",
@@ -34,6 +38,7 @@
     "review-code-health",
     "review-context-generation",
     "review-domain-impact",
+    "review-finding-compiler",
     "review-final-merge-gate",
     "review-output-quality",
     "review-router",
@@ -45,6 +50,7 @@
     "skill-router",
     "spec-driven-development",
     "test-first-verification",
+    "verification-pattern-ledger",
     "work-package-compiler"
   ],
   "skill_groups": {
@@ -55,10 +61,13 @@
       "adr-review",
       "angular-implementation-architecture",
       "application-boundary-architecture",
+      "architecture-decision-memory",
       "controlled-implementation",
+      "documentation-knowledge-compiler",
       "domain-rule-ledger",
       "doubt-driven-development",
       "evidence-ledger",
+      "engineering-pattern-ledger",
       "grill-design",
       "grill-with-docs",
       "handoff-generation",
@@ -78,6 +87,7 @@
       "review-code-health",
       "review-context-generation",
       "review-domain-impact",
+      "review-finding-compiler",
       "review-final-merge-gate",
       "review-output-quality",
       "review-router",
@@ -87,6 +97,7 @@
       "skill-router",
       "spec-driven-development",
       "test-first-verification",
+      "verification-pattern-ledger",
       "work-package-compiler"
     ],
     "adoption_bootstrap": [
@@ -96,6 +107,7 @@
       "review-context-generation"
     ],
     "observability_metrics": [
+      "engineering-capability-evaluation",
       "skill-adoption-metrics",
       "skill-effectiveness-evaluation"
     ],
@@ -120,8 +132,14 @@
     "docs/claude-github-review-setup.md",
     "docs/ai/review-context.md",
     "docs/ai/implementation-context.md",
+    "docs/ai/architecture-decision-memory.md",
+    "docs/ai/documentation-knowledge-ledger.md",
+    "docs/ai/engineering-capability-ledger.md",
+    "docs/ai/engineering-pattern-ledger.md",
     "docs/ai/improvement-ledger.md",
     "docs/ai/domain-rule-ledger.md",
+    "docs/ai/review-rule-ledger.md",
+    "docs/ai/verification-pattern-ledger.md",
     "docs/ai/skill-adoption-metrics.md",
     "docs/ai/adoption-report-template.md",
     "docs/ai/stakeholder-readiness-report-template.md",
@@ -165,7 +183,13 @@
     "schemas/metrics-event.schema.json",
     "schemas/adoption-report.schema.json",
     "schemas/improvement-ledger-entry.schema.json",
-    "schemas/domain-rule-ledger-entry.schema.json"
+    "schemas/domain-rule-ledger-entry.schema.json",
+    "schemas/architecture-decision-memory-entry.schema.json",
+    "schemas/documentation-knowledge-ledger-entry.schema.json",
+    "schemas/engineering-capability-ledger-entry.schema.json",
+    "schemas/engineering-pattern-ledger-entry.schema.json",
+    "schemas/review-rule-ledger-entry.schema.json",
+    "schemas/verification-pattern-ledger-entry.schema.json"
   ],
   "adapters": [
     "adapters/claude-code/README.md",

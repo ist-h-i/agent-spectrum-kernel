@@ -58,6 +58,7 @@ Review architecture impact from repository evidence, not preference. A finding n
    - nearby boundary patterns,
    - persistence and infrastructure access patterns,
    - relevant docs or ADRs when structural intent is documented.
+   - `docs/ai/architecture-decision-memory.md` when active architecture memory exists for the affected boundary; treat template or stale memory as insufficient evidence, and route contradictions to `adr-review` or `application-boundary-architecture`.
 
 2. Classify architecture impact.
    - no architecture impact,
@@ -107,6 +108,7 @@ Findings:
 Routed signals:
 - Application boundary:
 - ADR:
+- Architecture decision memory:
 - Domain:
 - Risk:
 - Evidence:
@@ -120,6 +122,7 @@ Residual architecture risk:
 - Architecture impact classification is explicit.
 - Boundary mechanics are delegated to or checked against `application-boundary-architecture` when applicable.
 - ADR need is detected without treating ADR recording as the architecture review itself.
+- Active architecture decision memory is used only by evidence status and never replaces ADRs.
 - Domain, risk, evidence, and local quality signals are routed instead of folded into this gate.
 - Each blocking or major architecture issue has evidence, impact, and a required fix.
 - Final merge decision is left to `review-final-merge-gate`.

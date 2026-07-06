@@ -44,6 +44,8 @@ Default workflow projection:
 - `requirement-grill`
 - `work-package-compiler`
 - `domain-rule-ledger`
+- `engineering-pattern-ledger`
+- `verification-pattern-ledger`
 - `spec-driven-development`
 - `controlled-implementation`
 - `test-first-verification`
@@ -55,19 +57,23 @@ Default workflow projection:
 - `review-code-health`
 - `review-domain-impact`
 - `review-to-rule-compiler`
+- `review-finding-compiler`
 - `review-architecture-impact`
+- `architecture-decision-memory`
 - `review-output-quality`
 - `review-adversarial-risk`
 - `review-final-merge-gate`
+- `documentation-knowledge-compiler`
 - `evidence-ledger`
 - `risk-gate`
 - `adr-review`
 - `improvement-ledger`
 - `skill-adoption-metrics`
+- `engineering-capability-evaluation`
 
 Claude Code project skills load from `.claude/skills/<skill-name>/SKILL.md` and can be invoked as `/skill-name`.
 
-The Requirement-to-Rule Loop skills are projected by default so teams can move from candidate discovery to Requirement Contract, Work Package, domain review, and durable rule updates without copying extra skill files manually.
+The Requirement-to-Rule Loop and full-layer intelligence skills are projected by default so teams can move from candidate discovery to Requirement Contract, Work Package, domain review, reusable implementation/verification/review/documentation/architecture memory, and capability evaluation without copying extra skill files manually. Projection only makes skills available; routing still loads them only when relevant.
 
 ## Project Commands
 

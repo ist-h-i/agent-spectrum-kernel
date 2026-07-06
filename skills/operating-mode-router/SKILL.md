@@ -39,12 +39,13 @@ This skill prevents ordinary delivery work from being polluted by adoption, metr
 |---|---|---|
 | `delivery_quality` | Implement, review, verify, refactor, investigate, document, decide, define requirements, compile work packages, govern domain rules, run release-readiness checks, or hand off a concrete development task | `skill-router`; `review-router` when review |
 | `adoption_bootstrap` | Introduce the skill set into a new repository, project, team, or client context | `project-adoption-pack-generation`; `repository-orientation`; `implementation-context-generation`; `review-context-generation` |
-| `observability_metrics` | Evaluate skill effectiveness, routing quality, instruction maturity, adoption impact, or skill usage over time | `skill-effectiveness-evaluation`; `skill-adoption-metrics` |
+| `observability_metrics` | Evaluate skill effectiveness, routing quality, instruction maturity, adoption impact, full-layer capability growth, or skill usage over time | `skill-effectiveness-evaluation`; `skill-adoption-metrics`; `engineering-capability-evaluation` |
 | `operation_automation` | Run or plan a periodic cadence such as weekly/monthly summaries, scheduler setup, or team routine | External operation layer; manual routine; ChatGPT automation; GitHub Actions; cron |
 
 2. Distinguish close signals.
    - One completed task effectiveness question: route to `skill-effectiveness-evaluation`.
    - Multiple tasks or a period-over-period adoption question: route to `skill-adoption-metrics`.
+   - Evidence-backed full-layer engineering capability or reusable intelligence maturity question: route to `engineering-capability-evaluation`.
    - First-time repository rollout: route to `project-adoption-pack-generation`.
    - Weekly/monthly cadence: classify as `operation_automation`, then use report templates or external scheduling outside the skill set.
    - Release candidate readiness: classify as `delivery_quality`, then route through `skill-router` to `release-readiness-gate`; release execution still requires `risk-gate`.

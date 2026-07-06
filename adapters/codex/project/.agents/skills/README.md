@@ -21,3 +21,14 @@ Minimum common projections:
 - `handoff-generation`
 
 Review projections should also include the review router and required gates listed in `adapters/codex/README.md`.
+
+Full-layer intelligence projections are optional and should be selected by need:
+
+- `engineering-pattern-ledger`
+- `verification-pattern-ledger`
+- `review-finding-compiler`
+- `documentation-knowledge-compiler`
+- `architecture-decision-memory`
+- `engineering-capability-evaluation`
+
+Do not project every ledger just to handle trivial tasks. Project them when the adopting repository wants reusable evidence-backed implementation, verification, review, documentation, architecture, or capability memory.

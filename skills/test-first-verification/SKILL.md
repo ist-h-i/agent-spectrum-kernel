@@ -27,6 +27,14 @@ Make success observable before declaring the work complete.
 
 Use available repository context for commands, existing coverage, and test patterns. If a stack or project overlay supplies verification supplements, apply it without hard-coding stack-specific rules into this skill.
 
+When `docs/ai/verification-pattern-ledger.md` exists, consult it only for matching change types, risk classes, regressions, or historically flaky areas:
+
+- `template`: treat as no project-specific reusable verification evidence.
+- `active`: use matching `Verified` or `Human-confirmed` entries as expected evidence, `Supported` entries as candidate evidence requiring current confirmation, and `Hypothesis` entries as test ideas only.
+- `archived`: cite for history only; do not use as current verification requirements.
+
+Stored verification patterns do not prove current task behavior. Current commands, focused tests, runtime checks, or explicit insufficient evidence remain required.
+
 ```text
 Verification Contract:
 - Behavior to prove:
@@ -39,6 +47,8 @@ Verification Contract:
 - Evidence required:
 - Stack overlay verification supplement:
   - none | project-specific | stack-specific
+- Verification pattern ledger:
+  - active | template | missing | archived | not needed
 - What remains unverified:
 - Stop if:
 ```
@@ -82,6 +92,7 @@ Verification Contract:
 - Commands:
 - Evidence required:
 - Stack overlay verification supplement:
+- Verification pattern ledger:
 - What remains unverified:
 - Stop if:
 

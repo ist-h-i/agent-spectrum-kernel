@@ -17,12 +17,49 @@ operating-mode-router
   -> observability_metrics
       -> skill-effectiveness-evaluation
       -> skill-adoption-metrics
+      -> engineering-capability-evaluation
 
   -> operation_automation
       -> manual routine / ChatGPT automation / GitHub Actions / cron / team routine
 ```
 
 `skills/operating-mode-router/SKILL.md` is the top-level mode router. `skills/skill-router/SKILL.md` remains the delivery/quality router for concrete development work.
+
+## Full-layer Engineering Intelligence
+
+Full-layer intelligence is modeled as narrow lanes. Durable ledgers and memory files are evidence sources for selected workflows, not autonomous decision makers and not mandatory inputs for every task.
+
+```text
+Domain Intelligence:
+  requirement-grill / domain-rule-ledger / review-domain-impact
+
+Engineering Intelligence:
+  engineering-pattern-ledger / controlled-implementation / implementation-context-generation
+
+Verification Intelligence:
+  verification-pattern-ledger / test-first-verification / review-automated-gate
+
+Review Intelligence:
+  review-finding-compiler / review-router / review gates / improvement-ledger
+
+Documentation Intelligence:
+  documentation-knowledge-compiler / review-context-generation / implementation-context-generation / adr-review / handoff-generation
+
+Architecture Intelligence:
+  architecture-decision-memory / application-boundary-architecture / adr-review / review-architecture-impact
+
+Capability Intelligence:
+  engineering-capability-evaluation / skill-effectiveness-evaluation / skill-adoption-metrics
+```
+
+Routing rules:
+
+- Do not load every ledger for every task.
+- Use ledgers only when they materially affect the selected workflow.
+- Treat template, archived, stale, missing, or contradicted ledgers as missing or insufficient evidence for current constraints.
+- Hypothesis entries can guide questions, not enforcement.
+- Current task verification and review gates remain required even when ledger guidance exists.
+- Project overlays and ADRs remain canonical for their own responsibilities; ledgers may reference or propose updates, not overwrite them.
 
 ## Requirement-to-Rule Loop
 
@@ -75,7 +112,7 @@ Claude Code adapters follow the same model:
 | `mode_routing` | Select the top-level operating layer | "Which workflow should this use?" | `operating-mode-router` |
 | `delivery_quality` | Implement, review, verify, refactor, investigate, document, decide, or hand off a concrete development task | "Implement this", "Review this PR", "Investigate this bug" | `skill-router`; `review-router` for review |
 | `adoption_bootstrap` | Introduce the skill set into a new repository, project, team, or client site | "Create an adoption pack", "Apply this skill set to this repo" | `project-adoption-pack-generation` and context-generation skills |
-| `observability_metrics` | Evaluate workflow effectiveness or skill adoption over time | "Was this skill selection effective?", "Measure adoption maturity" | `skill-effectiveness-evaluation`; `skill-adoption-metrics` |
+| `observability_metrics` | Evaluate workflow effectiveness, skill adoption, or reusable capability growth over time | "Was this skill selection effective?", "Measure adoption maturity", "Evaluate full-layer capability" | `skill-effectiveness-evaluation`; `skill-adoption-metrics`; `engineering-capability-evaluation` |
 | `operation_automation` | Run or schedule recurring summaries and routines | "Summarize weekly", "Run monthly adoption report" | External operation layer and report templates |
 
 ## Manifest Groups
@@ -102,6 +139,7 @@ Some skills can belong to more than one group when their role is shared across d
 - First-time rollout tasks route to `adoption_bootstrap` and then to `project-adoption-pack-generation`.
 - One-task retrospective questions route to `observability_metrics` and then to `skill-effectiveness-evaluation`.
 - Multi-task adoption measurement routes to `observability_metrics` and then to `skill-adoption-metrics`.
+- Evidence-backed full-layer capability evaluation routes to `observability_metrics` and then to `engineering-capability-evaluation`.
 - Weekly/monthly report generation is an operation cadence, not a separate delivery skill.
 - Claude hook-first local observability records project-local summaries at task boundaries and remains separate from external publication.
 - Scheduler setup, external notifications, publishing, deploys, and other external effects require `risk-gate` before action.

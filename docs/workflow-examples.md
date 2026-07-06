@@ -261,7 +261,55 @@ Do not:
 Stop and ask if:
 ```
 
-## 9. MR/PR README generation
+## 9. Full-layer reusable intelligence extraction
+
+User request:
+
+```text
+This review found the same missing permission-denial test again. Turn the reusable lesson into the right durable place without hiding the current PR blocker.
+```
+
+Workflow:
+
+```text
+review-router keeps the blocker in the current PR review
+review-finding-compiler
+verification-pattern-ledger when the reusable lesson is evidence expectation
+improvement-ledger only when follow-up work needs tracking
+```
+
+Expected behavior:
+
+- Keep current PR blockers in the review output.
+- Classify evidence status and repeat pattern.
+- Route domain/business rules to `review-to-rule-compiler`.
+- Route implementation shape to `engineering-pattern-ledger`.
+- Route verification expectation to `verification-pattern-ledger`.
+- Record false-positive risk and suppression rules.
+- Do not enforce hypothesis entries.
+
+## 10. Engineering capability evaluation
+
+User request:
+
+```text
+Evaluate whether this project has reusable engineering intelligence for verification and review.
+```
+
+Workflow:
+
+```text
+operating-mode-router -> observability_metrics -> engineering-capability-evaluation
+```
+
+Expected behavior:
+
+- Score capability only from evidence-backed assets and outcomes.
+- Separate breadth, reliability, autonomy, evidence quality, and human dependency.
+- Keep `Unknown`, stale, contradicted, and insufficient-evidence areas visible.
+- Do not claim human-equivalent capability or replace task-level verification/review gates.
+
+## 11. MR/PR README generation
 
 User request:
 
@@ -290,7 +338,7 @@ MR/PR README:
 - Follow-up skills: ...
 ```
 
-## 10. Angular stack implementation overlay
+## 12. Angular stack implementation overlay
 
 User request:
 
@@ -324,7 +372,7 @@ Angular implementation overlay:
 - Evidence: ...
 ```
 
-## 10. Implementation context generation
+## 13. Implementation context generation
 
 User request:
 

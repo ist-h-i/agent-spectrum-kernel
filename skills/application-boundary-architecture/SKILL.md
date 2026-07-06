@@ -30,7 +30,7 @@ Use these invariants as the compact first-pass decision model:
 
 ## Workflow
 
-1. Inspect only the repository evidence needed for the decision surface first: touched files, direct imports, nearby tests, relevant package scripts, public APIs, data access patterns, and error handling. Broaden inspection only when shared behavior, public boundaries, migration rollout, or guard failures require it.
+1. Inspect only the repository evidence needed for the decision surface first: touched files, direct imports, nearby tests, relevant package scripts, public APIs, data access patterns, error handling, and `docs/ai/architecture-decision-memory.md` when active matching memory exists. Treat template, stale, or hypothesis memory as questions or insufficient evidence, not as a boundary rule. Broaden inspection only when shared behavior, public boundaries, migration rollout, or guard failures require it.
 2. Classify the decision surface: feature boundary, dependency direction, state ownership, external I/O, async lifetime, usecase, repository/port/adapter, mapper, DTO/domain/view model, typed error, ID boundary, test boundary, or guardrail.
 3. Classify the code maturity: new code, mature feature code, critical/security/boundary code, or legacy code.
 4. Choose the smallest boundary that names a real policy or isolates a real source of change.

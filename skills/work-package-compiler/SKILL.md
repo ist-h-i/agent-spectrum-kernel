@@ -32,6 +32,7 @@ This is a transformation skill. It does not make business decisions and must rou
    - Relevant repo facts and project overlay.
    - Domain rules from `docs/ai/domain-rule-ledger.md` when present.
    - Review/implementation context when present.
+   - Engineering pattern, verification pattern, and architecture decision memory ledgers when present and relevant.
    - Verification policy and commands when available.
 
 2. Check blockers before compiling.
@@ -45,6 +46,8 @@ This is a transformation skill. It does not make business decisions and must rou
    - Use `Human-confirmed` and `Verified` domain rules as constraints.
    - Use `Supported` domain rules as cautions.
    - Use `Hypothesis` domain rules only as questions or warnings.
+   - Use `Verified` and `Human-confirmed` engineering, verification, and architecture memory entries only when their scope matches the Work Package.
+   - Treat `template`, stale, archived, missing, or hypothesis ledger entries as insufficient evidence for constraints.
 
 4. Produce a Work Package.
 
@@ -62,6 +65,9 @@ Work Package:
 - Verification contract:
 - Required review gates:
 - Domain rules applied:
+- Engineering patterns applied:
+- Verification patterns applied:
+- Architecture memory applied:
 - Risk gates:
 - Agent prompt:
 - Reviewer checklist:
@@ -88,6 +94,9 @@ Work Package:
 - Verification contract:
 - Required review gates:
 - Domain rules applied:
+- Engineering patterns applied:
+- Verification patterns applied:
+- Architecture memory applied:
 - Risk gates:
 - Agent prompt:
 - Reviewer checklist:
