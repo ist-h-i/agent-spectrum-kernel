@@ -1,5 +1,5 @@
 ---
-description: Run the AI Coding Kernel review flow for the current PR or diff.
+description: Run the Agent Spectrum Kernel review flow for the current PR or diff.
 ---
 
 Use the installed project skills from this repository projection.
