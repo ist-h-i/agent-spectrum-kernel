@@ -1,10 +1,10 @@
 ---
-description: Run the AI Coding Kernel PR review flow through review-router and final merge gate.
+description: Run the Agent Spectrum Kernel PR review flow through review-router and final merge gate.
 ---
 
 # Review PR
 
-Use the core AI Coding Kernel review model.
+Use the core Agent Spectrum Kernel review model.
 
 Process:
 

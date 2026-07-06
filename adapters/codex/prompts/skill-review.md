@@ -1,5 +1,5 @@
 ---
-description: Run the AI Coding Kernel review flow for the current PR, branch diff, or generated output in Codex.
+description: Run the Agent Spectrum Kernel review flow for the current PR, branch diff, or generated output in Codex.
 ---
 
 Use the repository `AGENTS.md` and projected skills from `.agents/skills`.

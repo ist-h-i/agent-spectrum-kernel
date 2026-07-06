@@ -1,6 +1,6 @@
-# Operating Mode Routing Model
+# Agent Spectrum Kernel Routing Model
 
-The repository now routes in two layers:
+Agent Spectrum Kernel routes in two layers:
 
 ```text
 operating-mode-router

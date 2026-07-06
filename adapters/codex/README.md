@@ -1,6 +1,6 @@
 # Codex Adapter
 
-This adapter projects the AI Coding Kernel into Codex-compatible usage without creating a separate quality model.
+This adapter projects Agent Spectrum Kernel into Codex-compatible usage without creating a separate quality model.
 
 Use this adapter when a repository wants Codex to follow the core kernel, route through the existing skills, and produce evidence-backed outputs from either an interactive Codex session or `codex exec`.
 

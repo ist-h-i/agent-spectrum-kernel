@@ -1,6 +1,6 @@
-# Custom Instructions Condensed
+# Agent Spectrum Kernel Custom Instructions
 
-Use this file when the tool does not support `AGENTS.md` or reusable skills. `skills/operating-mode-router/SKILL.md` is the top-level routing source when delivery, adoption, observability, or operation modes may differ; `skills/skill-router/SKILL.md` remains the delivery/quality routing source. `AGENTS.md` is the minimal always-on kernel.
+Use this condensed Agent Spectrum Kernel instruction layer when the tool does not support `AGENTS.md` or reusable skills. `skills/operating-mode-router/SKILL.md` is the top-level routing source when delivery, adoption, observability, or operation modes may differ; `skills/skill-router/SKILL.md` remains the delivery/quality routing source. `AGENTS.md` is the minimal always-on kernel.
 
 ## Always-on behavior
 

@@ -1,4 +1,4 @@
-# Workflow Examples
+# Agent Spectrum Kernel Workflow Examples
 
 ## 0. Natural work request routing
 

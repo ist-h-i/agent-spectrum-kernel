@@ -1,6 +1,8 @@
-# AI Coding Kernel + Skills
+# Agent Spectrum Kernel
 
-個人開発と社内紹介向けの、AIコーディングエージェント用ルールセットです。
+A layered intelligence kernel for evidence-based routing, verification, review, and reusable memory in AI coding agents.
+
+AIエージェントが扱う要件・設計・実装・検証・レビュー・知識蓄積の複数スペクトラムを、証拠ベースで接続するKernel。
 
 狙いは「AIにたくさん書かせる」ことではなく、AIの開発行動を次の方向へ固定することです。
 

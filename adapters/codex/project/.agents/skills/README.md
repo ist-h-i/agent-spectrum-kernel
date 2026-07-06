@@ -1,6 +1,6 @@
-# Codex Repo Skill Projection
+# Agent Spectrum Kernel Codex Repo Skill Projection
 
-Codex reads repo-scoped skills from `.agents/skills`. Project only the skills needed for the adopting repository.
+Codex reads Agent Spectrum Kernel repo-scoped skills from `.agents/skills`. Project only the skills needed for the adopting repository.
 
 Each projected skill must remain traceable to the canonical source in this repository:
 

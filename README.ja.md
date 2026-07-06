@@ -1,6 +1,6 @@
-# AI Coding Rules and Skills 日本語ガイド
+# Agent Spectrum Kernel 日本語ガイド
 
-これは、AIコーディングツールに入れるための汎用ルールとスキルのセットです。
+Agent Spectrum Kernel は、AIコーディングエージェント向けに、要件・設計・実装・検証・レビュー・知識蓄積の複数スペクトラムを証拠ベースで接続するKernelです。
 
 目的は「AIにたくさん書かせること」ではなく、次の失敗を減らすことです。
 

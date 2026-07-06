@@ -1,6 +1,6 @@
-# Adapter Conformance Contract
+# Agent Spectrum Kernel Adapter Conformance Contract
 
-Adapters project the AI Coding Kernel into a specific coding tool without changing the core quality model. An adapter may be a local project projection, plugin, command set, or hosted workflow template.
+Adapters project Agent Spectrum Kernel into a specific coding tool without changing the core quality model. An adapter may be a local project projection, plugin, command set, or hosted workflow template.
 
 ## Core Requirement
 

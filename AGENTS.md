@@ -1,4 +1,4 @@
-# AI Coding Engineering Kernel
+# Agent Spectrum Kernel
 
 This file is the always-on instruction layer for AI coding agents. It is intentionally small. Use skills for procedural workflows and specialized reviews.
 
