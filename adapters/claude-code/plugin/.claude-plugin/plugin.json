@@ -1,15 +1,15 @@
 {
   "name": "ai-skills",
-  "displayName": "AI Coding Kernel Skills",
+  "displayName": "Agent Spectrum Kernel Claude Plugin",
   "version": "0.1.0",
-  "description": "Claude Code adapter for AI Coding Kernel review, reporting, ledger refresh, and context checks.",
+  "description": "Claude Code adapter for Agent Spectrum Kernel review, reporting, ledger refresh, and context checks.",
   "author": {
     "name": "ist-h-i"
   },
-  "homepage": "https://github.com/ist-h-i/ai-coding-rules-and-skills",
-  "repository": "https://github.com/ist-h-i/ai-coding-rules-and-skills",
+  "homepage": "https://github.com/ist-h-i/agent-spectrum-kernel",
+  "repository": "https://github.com/ist-h-i/agent-spectrum-kernel",
   "license": "MIT",
-  "keywords": ["claude-code", "skills", "review", "observability", "debt-ledger"],
+  "keywords": ["claude-code", "agent-spectrum-kernel", "skills", "review", "observability", "debt-ledger"],
   "skills": "./skills",
   "hooks": "./hooks/hooks.json"
 }
