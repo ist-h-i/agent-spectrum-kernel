@@ -24,6 +24,7 @@ Core rules:
 - Trivial localized edit: kernel only.
 - Non-trivial request with possible delivery/adoption/observability/operation ambiguity: `operating-mode-router`.
 - Non-trivial delivery/quality, design, investigation, review, risk-gated, or handoff work: `skill-router`.
+- Vague business intent, success condition, responsibility boundary, or durable domain rule impact: `skill-router` -> `requirement-grill`, `work-package-compiler`, or `domain-rule-ledger` as appropriate.
 - User explicitly names a relevant skill: use that skill; use `skill-router` only if the requested route conflicts with observed risk.
 - First-time project rollout or adoption pack: `operating-mode-router` -> `project-adoption-pack-generation`.
 - Skill effectiveness retrospective: `operating-mode-router` -> `skill-effectiveness-evaluation`.

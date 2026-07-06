@@ -7,6 +7,10 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_SKILLS = [
   "operating-mode-router",
   "skill-router",
+  "next-best-change-finder",
+  "requirement-grill",
+  "work-package-compiler",
+  "domain-rule-ledger",
   "spec-driven-development",
   "controlled-implementation",
   "test-first-verification",
@@ -17,6 +21,7 @@ const DEFAULT_SKILLS = [
   "review-ai-quality",
   "review-code-health",
   "review-domain-impact",
+  "review-to-rule-compiler",
   "review-architecture-impact",
   "review-output-quality",
   "review-adversarial-risk",

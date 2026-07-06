@@ -24,6 +24,43 @@ operating-mode-router
 
 `skills/operating-mode-router/SKILL.md` is the top-level mode router. `skills/skill-router/SKILL.md` remains the delivery/quality router for concrete development work.
 
+## Requirement-to-Rule Loop
+
+For business decision support and durable domain-rule learning, use explicit lanes instead of merging every step into implementation or review:
+
+```text
+Decision lane:
+  next-best-change-finder
+  -> requirement-grill
+  -> human decision
+  -> Requirement Contract
+
+Compilation lane:
+  Requirement Contract
+  -> work-package-compiler
+  -> agent task
+
+Verification lane:
+  Work Package + PR
+  -> review-domain-impact
+  -> required review gates
+
+Learning lane:
+  review findings / human corrections
+  -> review-to-rule-compiler
+  -> domain-rule-ledger
+  -> future requirement-grill / domain review
+```
+
+Routing rules:
+
+- `next-best-change-finder` generates candidate changes, not implementation authorization.
+- `requirement-grill` is decision support and must not convert unresolved business assumptions into tasks.
+- `work-package-compiler` transforms a confirmed Requirement Contract into agent-ready task scope.
+- `review-domain-impact` verifies changes against existing requirements, Work Packages, and confirmed or verified domain rules.
+- `review-to-rule-compiler` extracts and promotes domain rule candidates without auto-confirming them.
+- `domain-rule-ledger` stores evidence-status-labeled rules with stale triggers and contradiction handling.
+
 Claude Code adapters follow the same model:
 
 - project-local `.claude/skills` and local hooks are adapter/runtime projection, not new core workflow logic,

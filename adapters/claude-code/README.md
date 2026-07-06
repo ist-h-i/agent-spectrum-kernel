@@ -40,6 +40,10 @@ Default workflow projection:
 
 - `operating-mode-router`
 - `skill-router`
+- `next-best-change-finder`
+- `requirement-grill`
+- `work-package-compiler`
+- `domain-rule-ledger`
 - `spec-driven-development`
 - `controlled-implementation`
 - `test-first-verification`
@@ -50,6 +54,7 @@ Default workflow projection:
 - `review-ai-quality`
 - `review-code-health`
 - `review-domain-impact`
+- `review-to-rule-compiler`
 - `review-architecture-impact`
 - `review-output-quality`
 - `review-adversarial-risk`
@@ -61,6 +66,8 @@ Default workflow projection:
 - `skill-adoption-metrics`
 
 Claude Code project skills load from `.claude/skills/<skill-name>/SKILL.md` and can be invoked as `/skill-name`.
+
+The Requirement-to-Rule Loop skills are projected by default so teams can move from candidate discovery to Requirement Contract, Work Package, domain review, and durable rule updates without copying extra skill files manually.
 
 ## Project Commands
 

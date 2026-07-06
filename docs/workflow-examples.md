@@ -95,7 +95,34 @@ Expected behavior:
 - Add regression verification where feasible.
 - Downgrade claim if reproduction is unavailable.
 
-## 4. Design review / “grill me”
+## 4. Requirement-to-Rule Loop
+
+User request:
+
+```text
+Find the next change that would reduce manual business decision work without collapsing responsibility boundaries.
+```
+
+Workflow:
+
+```text
+next-best-change-finder
+requirement-grill
+work-package-compiler only after required business decisions are resolved
+review-domain-impact during review
+review-to-rule-compiler after review when rule candidates appear
+domain-rule-ledger only for explicitly accepted durable rule updates
+```
+
+Expected behavior:
+
+- Rank candidates by evidence, value, risk reduction, tractability, and verification feasibility.
+- Treat candidates as hypotheses until selected or clarified.
+- Produce a Requirement Contract before compiling an agent task.
+- Refuse to convert unresolved business decisions into implementation scope.
+- Use confirmed or verified domain rules as constraints; use hypothesis rules only for questions.
+
+## 5. Design review / “grill me”
 
 User request:
 
@@ -118,7 +145,7 @@ Expected behavior:
 - Answer from repo/docs where possible.
 - Produce decision summary, non-goals, acceptance criteria, and failure modes.
 
-## 5. Application boundary decision
+## 6. Application boundary decision
 
 User request:
 
@@ -141,7 +168,7 @@ Expected behavior:
 - Avoid adding pass-through layers that name no real policy.
 - Report boundary decision, violations, smallest compatible change, and verification.
 
-## 6. PR review
+## 7. PR review
 
 User request:
 
@@ -205,7 +232,7 @@ Residual risk:
 - ...
 ```
 
-## 7. Handoff to another agent
+## 8. Handoff to another agent
 
 User request:
 
@@ -234,7 +261,7 @@ Do not:
 Stop and ask if:
 ```
 
-## 8. MR/PR README generation
+## 9. MR/PR README generation
 
 User request:
 
@@ -263,7 +290,7 @@ MR/PR README:
 - Follow-up skills: ...
 ```
 
-## 9. Angular stack implementation overlay
+## 10. Angular stack implementation overlay
 
 User request:
 

@@ -49,6 +49,7 @@ docs/
   ai/review-context.md
   ai/implementation-context.md
   ai/improvement-ledger.md
+  ai/domain-rule-ledger.md
   ai/skill-adoption-metrics.md
   ai/adoption-report-template.md
   ai/stakeholder-readiness-report-template.md
@@ -84,6 +85,7 @@ schemas/
   metrics-event.schema.json
   adoption-report.schema.json
   improvement-ledger-entry.schema.json
+  domain-rule-ledger-entry.schema.json
 adapters/
   claude-code/
     project/.claude/
@@ -111,6 +113,7 @@ skills/
   project-adoption-pack-generation/SKILL.md
   scope-control/SKILL.md
   controlled-implementation/SKILL.md
+  domain-rule-ledger/SKILL.md
   test-first-verification/SKILL.md
   release-readiness-gate/SKILL.md
   review-router/SKILL.md
@@ -133,7 +136,11 @@ skills/
   improvement-ledger/SKILL.md
   implementation-context-generation/SKILL.md
   mr-readme-generation/SKILL.md
+  next-best-change-finder/SKILL.md
   refactor-implementation/SKILL.md
+  requirement-grill/SKILL.md
+  review-to-rule-compiler/SKILL.md
+  work-package-compiler/SKILL.md
 ```
 
 ## Minimum setup
@@ -198,6 +205,9 @@ First-time users should start with `docs/quickstart-ja.md`.
 | operating mode が曖昧 | `operating-mode-router` |
 | project adoption / first-time rollout | `operating-mode-router` → `project-adoption-pack-generation` |
 | 初見repo | `repository-orientation`（対象境界が曖昧なら `scope-control`、セッション/Agentを跨ぐかdurable stateが必要なら `planning-with-files`） |
+| 次にやるべき変更候補探索 | `next-best-change-finder` → 原則 `requirement-grill` |
+| 業務意図・成功条件・責任境界が曖昧 | `requirement-grill` |
+| 確定済み要件をAgent-ready taskへ変換 | `work-package-compiler` |
 | 実装方針の壁打ち | `grill-design` |
 | docs/ADR/用語体系に関わる設計 | `grill-with-docs` |
 | 実装前に未解決のアプリケーション境界・依存方向・DTO/Error/async lifetime判断 | `application-boundary-architecture` → 通常の実装ルートへ戻る |
@@ -208,9 +218,12 @@ First-time users should start with `docs/quickstart-ja.md`.
 | 危険操作・外部影響 | `risk-gate` before the selected workflow proceeds to action |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
 | PR/diffレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
+| 既存要件・業務ルールとの照合 | `review-domain-impact`（Requirement Contract / Work Package / Domain Rule Ledger を入力にできる） |
 | リリース候補のready判定 | `release-readiness-gate`（deploy / publish / migration / external notification / release execution は `risk-gate` と明示承認が先） |
 | 負債・スメル・リファクタ候補レビュー | `review-router` → `review-code-health` when applicable |
 | non-blockingな改善候補の台帳化 | `improvement-ledger` |
+| 業務ルール台帳の作成・更新 | `domain-rule-ledger` |
+| レビューや人間の訂正から業務ルール候補を抽出 | `review-to-rule-compiler` |
 | skill選択やworkflow効果のふりかえり | `operating-mode-router` → `skill-effectiveness-evaluation` |
 | adoption maturity / instruction quality / adoption impact measurement | `operating-mode-router` → `skill-adoption-metrics` |
 | weekly/monthly adoption report | `operation_automation` layer + report templates; scheduling is external |
@@ -231,6 +244,7 @@ Use `evidence-ledger` whenever final text makes or evaluates a claim about corre
 - Added `application-boundary-architecture` for unresolved framework-agnostic boundary, dependency direction, DTO/error trust boundary, async lifetime, feature public API, and architecture guard decisions before returning to the normal implementation route.
 - Added `review-context-generation`, `review-output-quality`, and `review-adversarial-risk` so context-heavy review layers have dedicated gates instead of being collapsed into AI quality review.
 - Added `implementation-context-generation` so repeated implementation tasks can reuse evidence-labeled stack, command, pattern, boundary, and stop-condition context without embedding framework-specific rules.
+- Added the Requirement-to-Rule Loop: `next-best-change-finder`, `requirement-grill`, `work-package-compiler`, `review-to-rule-compiler`, `domain-rule-ledger`, and enhanced `review-domain-impact` input handling.
 - Added `Safety and External Effects` to the kernel.
 - Added a minimal routing gate inside `AGENTS.md` that sends operating-mode ambiguity to `operating-mode-router` and delivery/quality workflow selection to `skill-router`.
 - Added `risk-gate` for destructive, irreversible, external, production, auth, secret, billing, dependency, and infra risks.

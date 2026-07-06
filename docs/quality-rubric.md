@@ -52,7 +52,7 @@ Scope note: these scores assess repository packaging, workflow design, validatio
 
 ## Current self-assessment
 
-Baseline: current 35-skill system in `manifest.json`.
+Baseline: current 40-skill system in `manifest.json`.
 
 The scores below are static package/design readiness scores. Runtime effectiveness and client-value outcomes remain insufficient evidence until measured in an adopting project.
 
@@ -60,7 +60,7 @@ The scores below are static package/design readiness scores. Runtime effectivene
 |---|---:|---|
 | Kernel design | 96 | Added safety, routing, truth model, completion contracts without turning kernel into a workflow dump |
 | Operating mode routing | 95 | `operating-mode-router` separates delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation before lower-level routing |
-| Skill separation | 96 | 35 focused skills; each skill keeps process, output, exit criteria, or failure modes close to one workflow responsibility |
+| Skill separation | 96 | 40 focused skills; each skill keeps process, output, exit criteria, or failure modes close to one workflow responsibility |
 | Skill group metadata | 95 | `manifest.json.skill_groups` and validation cover unclassified, unknown, duplicate, invalid, and unsupported multi-group skill entries |
 | Repository awareness | 95 | Dedicated orientation skill plus kernel repository-first rules |
 | Scope control | 96 | Kernel scope rules plus dedicated scope-control skill and diff audit |

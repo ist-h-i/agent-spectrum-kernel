@@ -38,6 +38,7 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/metrics-event.schema.json",
   "schemas/adoption-report.schema.json",
   "schemas/improvement-ledger-entry.schema.json",
+  "schemas/domain-rule-ledger-entry.schema.json",
 ];
 const REQUIRED_CLAUDE_ADAPTER_PATHS = [
   "adapters/claude-code/README.md",
@@ -86,6 +87,10 @@ const CLAUDE_ADAPTER_INSTALLER_PATH = "scripts/install-claude-adapter.mjs";
 const REQUIRED_DEFAULT_REVIEW_SKILLS = [
   "operating-mode-router",
   "skill-router",
+  "next-best-change-finder",
+  "requirement-grill",
+  "work-package-compiler",
+  "domain-rule-ledger",
   "spec-driven-development",
   "controlled-implementation",
   "test-first-verification",
@@ -96,6 +101,7 @@ const REQUIRED_DEFAULT_REVIEW_SKILLS = [
   "review-ai-quality",
   "review-code-health",
   "review-domain-impact",
+  "review-to-rule-compiler",
   "review-architecture-impact",
   "review-output-quality",
   "review-adversarial-risk",
@@ -194,6 +200,33 @@ const ALLOWED_LEDGER_DECISIONS = new Set([
 const LEDGER_REFRESH_EXEMPT_STATUSES = new Set(["stale", "resolved", "wont_fix"]);
 const EXECUTABLE_CHECK_TARGET_PATTERN = /\b(validation script|lint|test|check|ci)\b/i;
 const WEAK_EVIDENCE_PATTERN = /\b(Hypothesis|Unknown)\b/i;
+const DOMAIN_RULE_LEDGER_PATH = "docs/ai/domain-rule-ledger.md";
+const REQUIRED_DOMAIN_RULE_METADATA_FIELDS = ["ledger_status", "last_updated", "evidence_owner", "source_scope"];
+const ALLOWED_DOMAIN_RULE_LEDGER_STATUSES = new Set(["template", "active", "archived"]);
+const DOMAIN_RULE_ENTRY_SECTIONS = new Set(["Domain Rule Entries"]);
+const REQUIRED_DOMAIN_RULE_FIELDS = [
+  "ID",
+  "Rule",
+  "Business object",
+  "Business actor",
+  "Workflow",
+  "State / condition",
+  "Source",
+  "Evidence status",
+  "Applies to",
+  "Used by",
+  "Last checked",
+  "Staleness trigger",
+  "Owner",
+];
+const ALLOWED_DOMAIN_RULE_EVIDENCE_STATUSES = new Set([
+  "Verified",
+  "Human-confirmed",
+  "Supported",
+  "Hypothesis",
+  "Deprecated",
+  "Contradicted",
+]);
 
 function parseArgs(argv) {
   const args = {
@@ -540,6 +573,175 @@ function validateImprovementLedger(root, errors) {
   });
 
   return checks;
+}
+
+function validateDomainRuleLedger(root, errors) {
+  const checks = [];
+  const absolutePath = resolve(root, DOMAIN_RULE_LEDGER_PATH);
+  if (!existsSync(absolutePath)) {
+    return checks;
+  }
+
+  const errorCountBefore = errors.length;
+  const text = readFileSync(absolutePath, "utf8");
+  const frontmatter = parseFrontmatter(text);
+  const missing = REQUIRED_DOMAIN_RULE_METADATA_FIELDS.filter((field) => !frontmatter.has(field));
+  const status = frontmatter.get("ledger_status") ?? "missing";
+  const statusOk = ALLOWED_DOMAIN_RULE_LEDGER_STATUSES.has(status);
+  const rows = parseDomainRuleLedgerRows(text, errors);
+
+  if (missing.length > 0) {
+    fail(errors, "domain rule ledger", `${DOMAIN_RULE_LEDGER_PATH} is missing ledger metadata fields: ${missing.join(", ")}`);
+  }
+  if (!statusOk) {
+    fail(errors, "domain rule ledger", `${DOMAIN_RULE_LEDGER_PATH} has invalid ledger_status '${status}'`);
+  }
+
+  if (status === "template") {
+    if (rows.length > 0) {
+      fail(errors, "domain rule ledger", `${DOMAIN_RULE_LEDGER_PATH} has ledger_status 'template' but contains project domain rule rows`);
+    }
+  } else if (status === "active" || status === "archived") {
+    validateDomainRuleLedgerRows(rows, status, errors);
+  }
+
+  checks.push({
+    path: DOMAIN_RULE_LEDGER_PATH,
+    status,
+    rowCount: rows.length,
+    metadataOk: missing.length === 0 && statusOk,
+    validationOk: errors.length === errorCountBefore,
+  });
+
+  return checks;
+}
+
+function parseDomainRuleLedgerRows(text, errors) {
+  const rows = [];
+  const lines = text.split(/\r?\n/);
+  let currentSection = null;
+  let inHtmlComment = false;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const trimmedLine = lines[index].trim();
+    if (trimmedLine.startsWith("<!--")) {
+      inHtmlComment = !trimmedLine.includes("-->");
+      continue;
+    }
+    if (inHtmlComment) {
+      if (trimmedLine.includes("-->")) {
+        inHtmlComment = false;
+      }
+      continue;
+    }
+
+    const heading = lines[index].match(/^##\s+(.+?)\s*$/);
+    if (heading) {
+      currentSection = heading[1];
+      continue;
+    }
+
+    if (!DOMAIN_RULE_ENTRY_SECTIONS.has(currentSection) || !lines[index].trim().startsWith("|")) {
+      continue;
+    }
+
+    const headers = splitMarkdownTableRow(lines[index]);
+    if (!isDomainRuleEntryHeader(headers)) {
+      if (!isMarkdownSeparatorRow(headers)) {
+        const missingFields = missingDomainRuleHeaderFields(headers);
+        fail(
+          errors,
+          "domain rule ledger",
+          `${DOMAIN_RULE_LEDGER_PATH}:${index + 1} has malformed domain rule table header; missing required fields: ${missingFields.join(", ")}`,
+        );
+        let rowIndex = index + 1;
+        while (rowIndex < lines.length && lines[rowIndex].trim().startsWith("|")) {
+          rowIndex += 1;
+        }
+        index = rowIndex - 1;
+      }
+      continue;
+    }
+
+    let rowIndex = index + 1;
+    if (rowIndex < lines.length && isMarkdownSeparatorRow(splitMarkdownTableRow(lines[rowIndex]))) {
+      rowIndex += 1;
+    }
+
+    while (rowIndex < lines.length && lines[rowIndex].trim().startsWith("|")) {
+      const cells = splitMarkdownTableRow(lines[rowIndex]);
+      if (!isMarkdownSeparatorRow(cells)) {
+        const values = new Map();
+        headers.forEach((header, headerIndex) => {
+          values.set(normalizeLedgerField(header), cells[headerIndex]?.trim() ?? "");
+        });
+        if ([...values.values()].some(Boolean)) {
+          rows.push({
+            line: rowIndex + 1,
+            section: currentSection,
+            values,
+          });
+        }
+      }
+      rowIndex += 1;
+    }
+
+    index = rowIndex - 1;
+  }
+
+  return rows;
+}
+
+function isDomainRuleEntryHeader(headers) {
+  const normalizedHeaders = new Set(headers.map(normalizeLedgerField));
+  return REQUIRED_DOMAIN_RULE_FIELDS.every((field) => normalizedHeaders.has(normalizeLedgerField(field)));
+}
+
+function missingDomainRuleHeaderFields(headers) {
+  const normalizedHeaders = new Set(headers.map(normalizeLedgerField));
+  return REQUIRED_DOMAIN_RULE_FIELDS.filter((field) => !normalizedHeaders.has(normalizeLedgerField(field)));
+}
+
+function domainRuleValue(row, field) {
+  return row.values.get(normalizeLedgerField(field)) ?? "";
+}
+
+function validateDomainRuleLedgerRows(rows, ledgerStatus, errors) {
+  const ids = new Map();
+
+  for (const row of rows) {
+    const rowLabel = `${DOMAIN_RULE_LEDGER_PATH}:${row.line}`;
+    const missingRequiredFields = REQUIRED_DOMAIN_RULE_FIELDS.filter((field) => domainRuleValue(row, field) === "");
+    if (missingRequiredFields.length > 0) {
+      fail(errors, "domain rule ledger", `${rowLabel} is missing required fields: ${missingRequiredFields.join(", ")}`);
+    }
+
+    const id = domainRuleValue(row, "ID");
+    if (id && !/^DR-\d{4}$/.test(id)) {
+      fail(errors, "domain rule ledger", `${rowLabel} has invalid ID '${id}'; expected DR-0001 style`);
+    }
+    if (id) {
+      if (ids.has(id)) {
+        fail(errors, "domain rule ledger", `${rowLabel} duplicates domain rule ID '${id}' first used at ${DOMAIN_RULE_LEDGER_PATH}:${ids.get(id)}`);
+      } else {
+        ids.set(id, row.line);
+      }
+    }
+
+    const evidenceStatus = domainRuleValue(row, "Evidence status");
+    if (evidenceStatus && !ALLOWED_DOMAIN_RULE_EVIDENCE_STATUSES.has(evidenceStatus)) {
+      fail(errors, "domain rule ledger", `${rowLabel} has invalid Evidence status '${evidenceStatus}'`);
+    }
+
+    const lastChecked = domainRuleValue(row, "Last checked");
+    if (lastChecked && !isIsoDate(lastChecked)) {
+      fail(errors, "domain rule ledger", `${rowLabel} has invalid Last checked '${lastChecked}'; expected YYYY-MM-DD`);
+    }
+
+    if (ledgerStatus === "active" && evidenceStatus === "Hypothesis" && /\bconstraint\b/i.test(domainRuleValue(row, "Used by"))) {
+      fail(errors, "domain rule ledger", `${rowLabel} uses a Hypothesis rule as a constraint; hypotheses may only generate questions or warnings`);
+    }
+  }
 }
 
 function parseImprovementLedgerRows(text) {
@@ -1213,7 +1415,7 @@ function validateAdapterDocumentation(root, checks, errors) {
   }
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -1261,6 +1463,14 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks
           (check) => `- \`${check.path}\`: ledger_status=${check.status}, metadata=${check.metadataOk ? "ok" : "invalid"}, rows=${check.rowCount}, validation=${check.validationOk ? "ok" : "invalid"}`,
         )
       : ["- `docs/ai/improvement-ledger.md`: not present"]),
+    "",
+    "## Domain rule ledger checks",
+    "",
+    ...(domainRuleLedgerChecks.length > 0
+      ? domainRuleLedgerChecks.map(
+          (check) => `- \`${check.path}\`: ledger_status=${check.status}, metadata=${check.metadataOk ? "ok" : "invalid"}, rows=${check.rowCount}, validation=${check.validationOk ? "ok" : "invalid"}`,
+        )
+      : ["- `docs/ai/domain-rule-ledger.md`: not present"]),
     "",
     "## Claude adapter checks",
     "",
@@ -1401,11 +1611,12 @@ export function validateRepository(options) {
   const skillChecks = validateSkills(root, skillDirectories, errors);
   const contextMetadataChecks = validateContextMetadata(root, errors);
   const improvementLedgerChecks = validateImprovementLedger(root, errors);
+  const domainRuleLedgerChecks = validateDomainRuleLedger(root, errors);
   const claudeAdapterChecks = validateClaudeAdapterArchitecture(root, manifest, errors);
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

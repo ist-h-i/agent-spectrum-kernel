@@ -84,6 +84,41 @@
 - 週次/月次運用はdelivery skillではなくoperation layerです。
 - adoptionやmetricsは明示依頼または明確な信号がある場合だけ使います。
 
+## Requirement-to-Rule Loop
+
+### そのまま貼る依頼文
+
+```text
+業務判断を楽にする変更候補をrepo evidenceから探し、実装前に責任境界を崩さない形で要件化してください。
+まず next-best-change-finder で候補、根拠、期待価値、リスク、反証条件を出してください。
+業務意図や成功条件が曖昧な候補は requirement-grill に回し、Requirement Contract を作ってください。
+未解決の業務判断が残る場合は work-package-compiler に進まず、needs human decision としてください。
+確定済みRequirement Contractだけを work-package-compiler でWork Packageに変換してください。
+```
+
+### 使われる主なSkill
+
+- `next-best-change-finder`
+- `requirement-grill`
+- `work-package-compiler`
+- `review-domain-impact`
+- `review-to-rule-compiler`
+- `domain-rule-ledger`
+
+### 期待する出力
+
+- Change Candidate
+- Requirement Contract
+- Work Package when executable
+- Domain rule candidates when evidence exists
+- Human decision required / not required
+
+### 注意
+
+- 候補探索は実装承認ではありません。
+- `Hypothesis` domain rule は質問や警告にだけ使い、review blockの単独根拠にしません。
+- AI推測を `Human-confirmed` に昇格しません。
+
 ## Project adoption pack
 
 ### そのまま貼る依頼文

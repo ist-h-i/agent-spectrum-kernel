@@ -91,6 +91,48 @@ Kernelだけで十分です。
 このラベル文言を “Save” から “保存” に変更してください。関連しないファイルは触らないでください。
 ```
 
+### Requirement-to-Rule Loop
+
+使うSkill:
+
+```text
+next-best-change-finder
+requirement-grill
+work-package-compiler
+review-domain-impact
+review-to-rule-compiler
+domain-rule-ledger
+```
+
+使う場面:
+
+- 次にやるべき変更候補をrepo evidenceから探したい
+- 業務意図、成功条件、責任境界、確認負担、訂正負担が曖昧
+- 確定済み要件を別Agentに渡せる作業単位へ変換したい
+- PRやdiffが既存要件・業務ルールに反していないか確認したい
+- レビューや人間の訂正から再利用可能な業務ルール候補を抽出したい
+
+基本route:
+
+```text
+next-best-change-finder
+  -> requirement-grill
+  -> human decision
+  -> work-package-compiler
+  -> review-domain-impact
+  -> review-to-rule-compiler
+  -> domain-rule-ledger
+```
+
+注意:
+
+- `next-best-change-finder` は候補生成であり、実装承認ではありません。
+- `requirement-grill` は判断支援であり、未解決の業務判断を実装タスクに変換しません。
+- `work-package-compiler` は確定済みRequirement Contractの変換だけを行います。
+- `review-domain-impact` は検証Skillであり、新しい業務判断を作りません。
+- `review-to-rule-compiler` は候補抽出であり、AI推測をconfirmed ruleに昇格しません。
+- `domain-rule-ledger` は証拠状態、stale trigger、contradictionを残す台帳です。
+
 ### 新機能
 
 使うSkill:
