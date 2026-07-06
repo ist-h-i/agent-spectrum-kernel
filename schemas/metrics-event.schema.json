@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/ist-h-i/ai-coding-rules-and-skills/schemas/metrics-event.schema.json",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/metrics-event.schema.json",
   "title": "AI Skills Metrics Event",
   "type": "object",
   "additionalProperties": false,

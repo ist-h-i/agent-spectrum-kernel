@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/ist-h-i/ai-coding-rules-and-skills/schemas/architecture-decision-memory-entry.schema.json",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/architecture-decision-memory-entry.schema.json",
   "title": "Architecture Decision Memory Entry",
   "type": "object",
   "additionalProperties": false,
