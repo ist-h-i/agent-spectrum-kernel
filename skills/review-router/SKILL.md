@@ -28,6 +28,7 @@ Select the smallest set of review gates needed to make the merge decision defens
    - tests and commands,
    - `docs/ai/review-context.md` or project overlay review context when available; treat `context_status: template` as missing durable context and `context_status: stale` as insufficient evidence for affected claims until refreshed,
    - docs/ADRs when terms, state, or architecture may change.
+   - `docs/ai/review-rule-ledger.md`, `docs/ai/engineering-pattern-ledger.md`, `docs/ai/verification-pattern-ledger.md`, and `docs/ai/architecture-decision-memory.md` only when their active entries materially affect the review target. Treat template or stale memory as missing evidence.
 
 2. Classify changed meaning.
    - Mechanical: formatting, generated output, lockfile-only, or lint-only.
@@ -80,6 +81,7 @@ Select the smallest set of review gates needed to make the merge decision defens
    - `risk-gate` before any destructive, external, auth, secret, production, dependency, or infra action.
    - `review-automated-gate` for mechanical verification evidence.
    - `review-code-health` when the user asks for debt, vulnerability/security weakness, refactor candidate, coding smell, maintainability, testability, performance, dependency/tooling, dead code, duplication, boundary weakness, or repeated finding analysis; map non-specialized findings into the Style / maintainability layer.
+   - `review-finding-compiler` after gate findings only when repeated or high-impact findings should become reusable prevention knowledge.
    - `review-ai-quality` for local implementation-quality review.
    - `evidence-ledger` when claims need evidence classification.
    - `review-final-merge-gate` to make the merge decision.
@@ -224,6 +226,7 @@ Do not emit metrics for a bare router invocation. Route selection alone is not a
 - Domain impact is checked before technical review when applicable.
 - The route does not run every gate by default.
 - Final merge decision is delegated to `review-final-merge-gate`.
+- Repeated or high-impact findings are routed to `review-finding-compiler` after the current PR blockers remain in the review output.
 
 ## Failure modes
 

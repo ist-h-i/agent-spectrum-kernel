@@ -18,7 +18,7 @@ AGENTS.md      常時発火する軽量Kernel
 skills/        必要時だけ使うワークフロー
 examples/      使い方の短い例
 docs/          運用・カスタマイズ・採点基準
-schemas/       metrics / report / improvement ledger のmachine-readable schema
+schemas/       metrics / report / ledger entry のmachine-readable schema
 adapters/      Claude Code adapter と Codex adapter
 scripts/       validation、Claude adapter install、local observability runtime
 ```
@@ -36,6 +36,7 @@ scripts/       validation、Claude adapter install、local observability runtime
 - `docs/adapter-conformance-contract.md` / `docs/adapter-capability-matrix.md`: adapterの移植性とcapability evidence。
 - `docs/ai/stakeholder-readiness-report-template.md`: internal quality、release readiness、client-value readinessを分けるstakeholder別report template。
 - `docs/ai/domain-rule-ledger.md`: 業務ルールを証拠状態付きで残す台帳template。
+- `docs/ai/engineering-pattern-ledger.md` / `docs/ai/verification-pattern-ledger.md` / `docs/ai/review-rule-ledger.md` / `docs/ai/documentation-knowledge-ledger.md` / `docs/ai/architecture-decision-memory.md` / `docs/ai/engineering-capability-ledger.md`: full-layer engineering intelligence の台帳template。
 
 ## 使い分け
 
@@ -103,6 +104,9 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | 設計を詰めたい | `grill-design` |
 | 既存docs/ADRと整合させたい | `grill-with-docs` |
 | 実装前に未解決のアプリケーション境界・依存方向・DTO/Error/async lifetime判断 | `application-boundary-architecture` → 通常の実装ルートへ戻る |
+| 再利用可能な実装patternを台帳化したい | `engineering-pattern-ledger` |
+| 再利用可能な検証patternを台帳化したい | `verification-pattern-ledger` |
+| ADR未満のarchitecture decision memoryを残したい | `architecture-decision-memory`（ADRが必要なら `adr-review`） |
 | 新機能を作る | `spec-driven-development` → `test-first-verification` for Verification Contract → `controlled-implementation` → `test-first-verification` for evidence |
 | バグ原因が不明 | `doubt-driven-development` → `test-first-verification` for reproduction and Verification Contract → `controlled-implementation` → `test-first-verification` for regression proof |
 | 実装フェーズに入る | `controlled-implementation` |
@@ -110,6 +114,7 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | スコープ逸脱が怖い | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → required gates） |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
 | PRレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
+| 繰り返し/高impact review findingsを予防知識へ変換 | `review-finding-compiler` |
 | 既存要件・業務ルールとの照合 | `review-domain-impact` |
 | リリース候補のready判定 | `release-readiness-gate`（deploy / publish / migration / external notification / release execution は `risk-gate` と明示承認が先） |
 | 負債・スメル・リファクタ候補レビュー | `review-router` → `review-code-health` when applicable |
@@ -118,12 +123,14 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | レビューや人間の訂正から業務ルール候補を抽出 | `review-to-rule-compiler` |
 | Skill選択やworkflow効果をふりかえりたい | `operating-mode-router` → `skill-effectiveness-evaluation` |
 | adoption maturityやinstruction qualityを期間で測りたい | `operating-mode-router` → `skill-adoption-metrics` |
+| full-layer engineering capabilityを証拠付きで評価したい | `operating-mode-router` → `engineering-capability-evaluation` |
 | weekly/monthly adoption reportを作りたい | operation layer + `docs/ai/adoption-report-template.md` |
 | stakeholder向けにreadinessを説明したい | `docs/ai/stakeholder-readiness-report-template.md` |
 | Claude Codeでlocal-firstに導入したい | `scripts/install-claude-adapter.mjs` + local hooks |
 | `@claude review` をPRで任意実行したい | Pattern B GitHub Actions adapter（有効化前に `risk-gate`） |
 | 繰り返しレビュー文脈の固定 | `review-context-generation`（既定: `docs/ai/review-context.md`） |
 | MR/PR README・PR説明・変更文脈固定 | `mr-readme-generation` |
+| docs/ADR/PR/handoffからdurable knowledgeを抽出 | `documentation-knowledge-compiler` |
 | 破壊的操作・deploy・migration・secret絡み | `risk-gate` before the selected workflow proceeds to action |
 | 次のCodex/Cursor/Claudeに渡す | `handoff-generation` |
 

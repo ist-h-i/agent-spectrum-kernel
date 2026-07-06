@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/ai-coding-rules-and-skills/schemas/architecture-decision-memory-entry.schema.json",
+  "title": "Architecture Decision Memory Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "decision_summary",
+    "architecture_boundary",
+    "context",
+    "options_considered",
+    "accepted_option",
+    "rejected_alternatives",
+    "reason",
+    "tradeoffs",
+    "consequences",
+    "evidence_source",
+    "evidence_status",
+    "related_adr",
+    "related_project_overlay_rule",
+    "related_engineering_pattern",
+    "review_impact",
+    "revisit_condition",
+    "staleness_trigger",
+    "owner"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "id": { "type": "string", "pattern": "^ADM-[0-9]{4}$" },
+    "decision_summary": { "type": "string", "minLength": 1 },
+    "architecture_boundary": { "type": "string", "minLength": 1 },
+    "context": { "type": "string", "minLength": 1 },
+    "options_considered": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+    "accepted_option": { "type": "string", "minLength": 1 },
+    "rejected_alternatives": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1 },
+    "tradeoffs": { "type": "string", "minLength": 1 },
+    "consequences": { "type": "string", "minLength": 1 },
+    "evidence_source": { "type": "string", "minLength": 1 },
+    "evidence_status": {
+      "type": "string",
+      "enum": ["Verified", "Human-confirmed", "Supported", "Hypothesis", "Deprecated", "Contradicted"]
+    },
+    "related_adr": { "type": "string", "minLength": 1 },
+    "related_project_overlay_rule": { "type": "string", "minLength": 1 },
+    "related_engineering_pattern": { "type": "string", "minLength": 1 },
+    "review_impact": { "type": "string", "minLength": 1 },
+    "revisit_condition": { "type": "string", "minLength": 1 },
+    "staleness_trigger": { "type": "string", "minLength": 1 },
+    "owner": { "type": "string", "minLength": 1 }
+  }
+}

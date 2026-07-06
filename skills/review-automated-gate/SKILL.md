@@ -22,7 +22,7 @@ Record whether mechanical checks passed, failed, were skipped, or are insufficie
 
 ## Process
 
-1. Identify expected checks from repository docs, package scripts, CI, project overlay, or changed-file conventions.
+1. Identify expected checks from repository docs, package scripts, CI, project overlay, verification pattern ledger entries, or changed-file conventions. Treat `docs/ai/verification-pattern-ledger.md` with `ledger_status: template` as missing reusable verification evidence.
 
 2. Compare expected checks with available evidence.
 

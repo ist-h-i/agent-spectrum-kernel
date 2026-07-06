@@ -117,6 +117,12 @@ function writeAdapterFixture(root) {
     "schemas/adoption-report.schema.json",
     "schemas/improvement-ledger-entry.schema.json",
     "schemas/domain-rule-ledger-entry.schema.json",
+    "schemas/architecture-decision-memory-entry.schema.json",
+    "schemas/documentation-knowledge-ledger-entry.schema.json",
+    "schemas/engineering-capability-ledger-entry.schema.json",
+    "schemas/engineering-pattern-ledger-entry.schema.json",
+    "schemas/review-rule-ledger-entry.schema.json",
+    "schemas/verification-pattern-ledger-entry.schema.json",
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
@@ -249,6 +255,8 @@ jobs:
   "requirement-grill",
   "work-package-compiler",
   "domain-rule-ledger",
+  "engineering-pattern-ledger",
+  "verification-pattern-ledger",
   "spec-driven-development",
   "controlled-implementation",
   "test-first-verification",
@@ -260,15 +268,19 @@ jobs:
   "review-code-health",
   "review-domain-impact",
   "review-to-rule-compiler",
+  "review-finding-compiler",
   "review-architecture-impact",
+  "architecture-decision-memory",
   "review-output-quality",
   "review-adversarial-risk",
   "review-final-merge-gate",
+  "documentation-knowledge-compiler",
   "evidence-ledger",
   "risk-gate",
   "adr-review",
   "improvement-ledger",
   "skill-adoption-metrics",
+  "engineering-capability-evaluation",
 ];
 const COMMAND_TEMPLATES = [
   "skill-review.md",

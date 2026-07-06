@@ -87,6 +87,17 @@ Decision-support and learning work:
 - `review-to-rule-compiler`
 - `domain-rule-ledger`
 
+Full-layer reusable intelligence work:
+
+- `engineering-pattern-ledger`
+- `verification-pattern-ledger`
+- `review-finding-compiler`
+- `documentation-knowledge-compiler`
+- `architecture-decision-memory`
+- `engineering-capability-evaluation`
+
+Project only the full-layer skills that match the adopting repository's need. Their ledgers are evidence sources for selected workflows, not mandatory inputs for every Codex task.
+
 ## Prompt Templates
 
 Use these files as copy-paste prompts or as `codex exec` prompt files:

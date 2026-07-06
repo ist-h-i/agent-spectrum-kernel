@@ -14,6 +14,7 @@ Create or update reusable review context so repeated PR reviews do not rediscove
 - Initial repository orientation or review setup is expected to support repeated MR/PR reviews.
 - `review-output-quality` or `review-adversarial-risk` needs project context.
 - Review noise is recurring because known issues, accepted risks, output contracts, or critical workflows are not documented.
+- Review rule ledger or documentation knowledge entries should inform repeated reviews without duplicating current PR blockers.
 - A project overlay exists and should be referenced from review workflows without replacing it.
 
 ## Do not use when
@@ -83,6 +84,7 @@ Use these statuses for important claims:
    - README and product docs,
    - project overlay rules,
    - docs, ADRs, schemas, examples, tests, generated artifacts, screenshots, or workflows,
+   - review rule ledger, documentation knowledge ledger, architecture decision memory, and other active evidence-backed ledgers when present,
    - review history when available.
 
 3. Draft candidate context.
@@ -100,6 +102,7 @@ Use these statuses for important claims:
    - accepted risks,
    - known issues not to re-report,
    - review noise-control rules,
+   - links to review rule and documentation knowledge entries,
    - verification policy,
    - update triggers.
 
@@ -127,6 +130,8 @@ Use these statuses for important claims:
 
 7. Wire consumers.
    - `review-router`, `review-output-quality`, `review-adversarial-risk`, and `review-final-merge-gate` should read this context when available.
+   - `review-finding-compiler` should update reusable review-rule entries after current PR blockers remain in the review output.
+   - `documentation-knowledge-compiler` should route durable docs knowledge into this context only when it is review-relevant.
    - Consumers must treat `context_status: template` as missing context and `context_status: stale` as insufficient evidence for affected claims until refreshed.
    - `planning-with-files` remains responsible for task progress.
 
@@ -141,6 +146,7 @@ Review context generation:
 - Hypotheses needing confirmation:
 - Unknowns:
 - Review consumers:
+- Ledger links found:
 - Update triggers:
 - Next review skills that should read this file:
 ```

@@ -133,6 +133,35 @@ next-best-change-finder
 - `review-to-rule-compiler` は候補抽出であり、AI推測をconfirmed ruleに昇格しません。
 - `domain-rule-ledger` は証拠状態、stale trigger、contradictionを残す台帳です。
 
+### Full-layer Engineering Intelligence
+
+使うSkill:
+
+```text
+engineering-pattern-ledger
+verification-pattern-ledger
+review-finding-compiler
+documentation-knowledge-compiler
+architecture-decision-memory
+engineering-capability-evaluation
+```
+
+使う場面:
+
+- 繰り返し使える実装patternを証拠付きで残したい
+- 変更種別ごとの検証patternや回帰防止観点を残したい
+- review findingを次回以降の予防知識、check、台帳候補へ変換したい
+- docs/ADR/PR/handoffからdurable knowledgeを抽出し、正しい保存先へ送る
+- ADR未満のarchitecture decision memoryを残し、必要ならADRへ昇格判断する
+- capability growthを自己申告ではなく証拠付きで評価する
+
+基本ルール:
+
+- すべての台帳を毎回読む必要はありません。
+- `template`、`stale`、`archived`、`missing`、`Hypothesis` は enforcement の根拠にしません。
+- 台帳はmemory sourceであり、現在タスクの検証・review gate・human decisionを置き換えません。
+- Project overlayとADRがそれぞれの責務では正本です。台帳は参照や更新提案に留めます。
+
 ### 新機能
 
 使うSkill:

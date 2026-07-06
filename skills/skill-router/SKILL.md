@@ -59,6 +59,7 @@ This skill is the canonical delivery/quality router. `operating-mode-router` sel
 | First-time project rollout or adoption pack request | `operating-mode-router` | Route to `adoption_bootstrap` -> `project-adoption-pack-generation` |
 | Skill effectiveness, routing quality, or one-task workflow retrospective | `operating-mode-router` | Route to `observability_metrics` -> `skill-effectiveness-evaluation` |
 | Adoption maturity, instruction quality, usage metrics, or multi-task adoption impact | `operating-mode-router` | Route to `observability_metrics` -> `skill-adoption-metrics` |
+| Evidence-backed full-layer engineering capability evaluation | `operating-mode-router` | Route to `observability_metrics` -> `engineering-capability-evaluation` |
 | Weekly/monthly reporting, recurring summary, scheduler, or automation cadence | `operating-mode-router` | Route to `operation_automation`; use report templates or external operation, not a delivery skill |
 | Unfamiliar repo | `repository-orientation` | `scope-control` if target boundary is unclear; `planning-with-files` only if the task spans sessions/agents or durable state is needed |
 | Vague business intent, success condition, responsibility boundary, or domain rule impact before implementation | `requirement-grill` | `domain-rule-ledger` only to consume existing confirmed/verified rules or record explicitly requested durable rules; then route to `work-package-compiler`, `grill-design`, or `spec-driven-development` |
@@ -67,6 +68,9 @@ This skill is the canonical delivery/quality router. `operating-mode-router` sel
 | Ambiguous design / “grill me” | `grill-design` | `grill-with-docs` if docs/domain/ADR terms matter; then `spec-driven-development` only after design boundary and acceptance criteria are stable |
 | Existing docs/domain/ADR constraints | `grill-with-docs` | `adr-review` |
 | Application boundary decision needed before implementation, including dependency direction, state ownership, external I/O boundary, DTO/error trust boundary, async lifetime, feature public API, usecase/repository/port/adapter/mapper necessity, ID boundary, or architecture guard rollout | `application-boundary-architecture` | Return to `spec-driven-development` or `controlled-implementation` after the boundary decision; use `adr-review` if hard-to-reverse or record-worthy |
+| Reusable implementation pattern creation, refresh, deprecation, or contradiction | `engineering-pattern-ledger` | `controlled-implementation`, `application-boundary-architecture`, stack overlays, and review gates consume only matching entries by evidence status |
+| Reusable verification expectation creation, refresh, deprecation, or contradiction | `verification-pattern-ledger` | `test-first-verification`, `work-package-compiler`, `review-automated-gate`, `review-final-merge-gate`, and `release-readiness-gate` consume only current matching entries |
+| Reusable architecture or boundary decision memory below ADR level | `architecture-decision-memory` | `adr-review` when formal ADR action is needed; `application-boundary-architecture` when mechanics are unresolved; `review-architecture-impact` when reviewing diffs |
 | Repeated implementation context setup | `implementation-context-generation` | `repository-orientation` for repo facts before drafting context |
 | New behavior | `spec-driven-development` | `test-first-verification` for Verification Contract -> `controlled-implementation` -> `test-first-verification` for evidence |
 | Implementation after plan exists | `controlled-implementation` | `test-first-verification` for Verification Contract before behavior changes when proof is needed; `scope-control` if scope is unclear |
@@ -76,6 +80,7 @@ This skill is the canonical delivery/quality router. `operating-mode-router` sel
 | Bug/unknown cause | `doubt-driven-development` | `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof |
 | Hard-to-reverse architecture decision or ADR need | `adr-review` | `grill-with-docs`; `application-boundary-architecture` if boundary mechanics are unresolved |
 | PR/diff/generated code review | `review-router` | Required gates from layer applicability, including `review-code-health`, `review-architecture-impact`, `review-output-quality`, and `review-adversarial-risk` when applicable; then `review-final-merge-gate` |
+| Repeated or high-impact review findings should become prevention knowledge | `review-finding-compiler` | Route domain/business rules to `review-to-rule-compiler`; route non-blocking work to `improvement-ledger`; route implementation and verification lessons to their ledgers |
 | Release candidate or bundled change-set readiness | `release-readiness-gate` | `risk-gate` before deploy, publish, migration, external notification, or release execution; `review-final-merge-gate` remains the PR-level decision gate |
 | Technical debt, code smell, or refactor candidate review | `review-router` | `review-code-health`; specialized gates only when findings cross into architecture, adversarial, risk, or evidence concerns |
 | Persisting non-blocking review findings, debt, rule feedback, validation check candidates, accepted risks, or stale improvement items | `improvement-ledger` | `review-code-health` only if findings still need detection; `evidence-ledger` if readiness or resolution claims need evidence classification |
@@ -83,6 +88,7 @@ This skill is the canonical delivery/quality router. `operating-mode-router` sel
 | Extract domain rule candidates from review findings, human corrections, incidents, or rejected AI outputs | `review-to-rule-compiler` | `domain-rule-ledger` only when explicitly updating durable rules |
 | MR/PR README, PR explanation, or durable change-context documentation | `mr-readme-generation` | `adr-review` |
 | Repeated review context setup | `review-context-generation` | `repository-orientation` for repo facts before drafting context |
+| Durable documentation knowledge extraction, freshness review, conflict routing, or target selection | `documentation-knowledge-compiler` | Route reusable review or implementation knowledge to context generation, domain rules to `domain-rule-ledger`, architecture decisions to `architecture-decision-memory` or `adr-review`, and task progress to handoff/planning |
 | Claim validation | `evidence-ledger` | `doubt-driven-development` |
 | End of work | `handoff-generation` | — |
 

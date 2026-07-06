@@ -21,6 +21,12 @@ Default placement:
 | Lint/test/check | The prevention belongs in executable tooling, regression tests, or CI. |
 | Implementation context | The guidance is evidence-backed local implementation knowledge, not a permanent rule. |
 | Review context | The guidance is evidence-backed local review knowledge, accepted risk, or noise-control context. |
+| Engineering pattern ledger | The guidance is reusable implementation judgment with source evidence, accepted shape, rejected alternatives, and stale trigger. |
+| Verification pattern ledger | The guidance is reusable evidence expectation for recurring change types; it does not prove current task behavior. |
+| Review rule ledger | The guidance comes from repeated or high-impact review findings and needs blocker policy, false-positive risk, and suppression rule. |
+| Documentation knowledge ledger | The source is docs/ADR/PR/handoff knowledge that needs freshness, conflicts, consumers, and target routing. |
+| Architecture decision memory | The decision is reusable boundary or architecture memory below ADR level; promote to ADR when hard to reverse. |
+| Engineering capability ledger | The topic is evidence-backed reusable capability growth across layers, not task-level correctness. |
 
 Do not convert hypotheses into durable rules. Use `needs_more_evidence` until the repeated or high-impact pattern and target are clear.
 
@@ -31,11 +37,12 @@ Generic kernel        AGENTS.md
 Generic workflows     skills/*/SKILL.md
 Project rules         project AGENTS.md or equivalent project overlay
 Durable context       docs/ai/review-context.md and docs/ai/implementation-context.md
+Durable ledgers       docs/ai/*-ledger.md and docs/ai/architecture-decision-memory.md
 Stack overlays        skills/angular-implementation-architecture/SKILL.md, etc.
 Company workflows     skills/internal-release/SKILL.md, etc.
 ```
 
-Project overlays hold repository-specific rules. Durable context files hold reusable evidence for review or implementation decisions; they are not task progress and do not replace project overlays.
+Project overlays hold repository-specific rules. Durable context files hold reusable evidence for review or implementation decisions. Durable ledgers hold evidence-backed reusable memory by layer. They are not task progress and do not replace project overlays, ADRs, current verification, or current review gates.
 
 Stack overlays are optional supplements selected after the generic workflow when matching stack signals exist. The included Angular overlay is the first concrete stack implementation overlay; React, Python, Java, and other overlays should be project-specific or future additions unless implemented.
 
@@ -92,5 +99,6 @@ Every few weeks of real use, audit:
 - Which tasks still expand scope unexpectedly?
 - Which verification steps are missing or too costly?
 - Which handoffs are insufficient for the next agent?
+- Which reusable patterns, verification expectations, review findings, documentation knowledge, architecture decisions, or capability claims have evidence and stale triggers?
 
 Improve the system based on observed failures, not theoretical completeness.

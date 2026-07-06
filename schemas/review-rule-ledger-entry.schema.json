@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/ai-coding-rules-and-skills/schemas/review-rule-ledger-entry.schema.json",
+  "title": "Review Rule Ledger Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "finding_pattern",
+    "review_layer",
+    "trigger_signal",
+    "why_it_matters",
+    "current_pr_blocker_policy",
+    "suggested_prevention_target",
+    "evidence_source",
+    "evidence_status",
+    "repeat_pattern",
+    "false_positive_risk",
+    "suppression_rule",
+    "staleness_trigger",
+    "owner"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "id": { "type": "string", "pattern": "^RR-[0-9]{4}$" },
+    "finding_pattern": { "type": "string", "minLength": 1 },
+    "review_layer": { "type": "string", "minLength": 1 },
+    "trigger_signal": { "type": "string", "minLength": 1 },
+    "why_it_matters": { "type": "string", "minLength": 1 },
+    "current_pr_blocker_policy": { "type": "string", "minLength": 1 },
+    "suggested_prevention_target": {
+      "type": "string",
+      "enum": ["review checklist", "project overlay", "SKILL.md", "engineering pattern ledger", "verification pattern ledger", "validation script", "lint/test/check", "improvement-ledger", "review context", "none"]
+    },
+    "evidence_source": { "type": "string", "minLength": 1 },
+    "evidence_status": {
+      "type": "string",
+      "enum": ["Verified", "Human-confirmed", "Supported", "Hypothesis", "Deprecated", "Contradicted"]
+    },
+    "repeat_pattern": {
+      "type": "string",
+      "enum": ["one-off", "repeated", "likely_repeated", "high_impact_single_case"]
+    },
+    "false_positive_risk": { "type": "string", "minLength": 1 },
+    "suppression_rule": { "type": "string", "minLength": 1 },
+    "staleness_trigger": { "type": "string", "minLength": 1 },
+    "owner": { "type": "string", "minLength": 1 }
+  }
+}

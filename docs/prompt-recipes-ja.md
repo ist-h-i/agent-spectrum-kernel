@@ -148,6 +148,41 @@ README、commands、CI、docs、ADR、local rules、risk、generated file bounda
 - project-specificな生成物は対象project側に置きます。
 - branch/release/security/ownership policyを推測で埋めません。
 
+## Full-layer engineering memory
+
+### そのまま貼る依頼文
+
+```text
+このタスク/PR/レビューから、再利用可能なengineering intelligenceだけを抽出してください。
+まず skill-router で対象を分類し、実装patternなら engineering-pattern-ledger、検証patternなら verification-pattern-ledger、review findingなら review-finding-compiler、docs/ADR/PR/handoff由来のdurable knowledgeなら documentation-knowledge-compiler、architecture decisionなら architecture-decision-memory に送ってください。
+Hypothesisは質問にだけ使い、enforcementやblockerにしないでください。
+現在PRのblocker、task progress、project overlay rule、ADRはそれぞれの場所に残し、台帳へ隠さないでください。
+```
+
+### 使われる主なSkill
+
+- `skill-router`
+- `engineering-pattern-ledger`
+- `verification-pattern-ledger`
+- `review-finding-compiler`
+- `documentation-knowledge-compiler`
+- `architecture-decision-memory`
+- `evidence-ledger`
+
+### 期待する出力
+
+- どの台帳/Skillに送るか
+- Evidence source / Evidence status
+- Staleness trigger
+- Current taskでの扱い
+- 追加しないものと理由
+
+### 注意
+
+- full-layer memoryは通常タスクの必須工程ではありません。
+- 台帳は現在タスクの検証・レビューを置き換えません。
+- Project overlayやADRの内容を自動で上書きしません。
+
 ## Skill effectiveness evaluation
 
 ### そのまま貼る依頼文

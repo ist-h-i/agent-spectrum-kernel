@@ -27,7 +27,7 @@ A decision:
 
 ## Process
 
-1. Read existing ADRs and architecture docs.
+1. Read existing ADRs, architecture docs, and `docs/ai/architecture-decision-memory.md` when it exists. Treat architecture memory as pre-ADR or supporting context; ADRs remain canonical when present.
 
 2. Identify the decision.
 
@@ -41,13 +41,15 @@ Reversibility:
 
 3. Check consistency with previous decisions.
 
-4. Decide:
+4. Check whether architecture memory should be added, refreshed, contradicted, or promoted into ADR work.
+
+5. Decide:
 - no ADR needed,
 - new ADR,
 - update existing ADR,
 - supersede existing ADR.
 
-5. Draft the smallest adequate ADR.
+6. Draft the smallest adequate ADR.
 
 ## ADR template
 
@@ -85,6 +87,7 @@ ADR decision:
 - Needed: yes | no | update | supersede
 - Reason:
 - Existing ADRs affected:
+- Architecture memory affected:
 - Proposed title:
 - Key consequences:
 - Review trigger:

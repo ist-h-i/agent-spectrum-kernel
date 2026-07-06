@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/ai-coding-rules-and-skills/schemas/documentation-knowledge-ledger-entry.schema.json",
+  "title": "Documentation Knowledge Ledger Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "knowledge_type",
+    "statement",
+    "source_document",
+    "source_location",
+    "evidence_status",
+    "freshness_status",
+    "consumers",
+    "conflicts",
+    "recommended_target",
+    "staleness_trigger",
+    "owner"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "id": { "type": "string", "pattern": "^DK-[0-9]{4}$" },
+    "knowledge_type": {
+      "type": "string",
+      "enum": ["requirement", "design decision", "implementation convention", "verification expectation", "review policy", "operation note", "release note", "known issue", "deprecated information"]
+    },
+    "statement": { "type": "string", "minLength": 1 },
+    "source_document": { "type": "string", "minLength": 1 },
+    "source_location": { "type": "string", "minLength": 1 },
+    "evidence_status": {
+      "type": "string",
+      "enum": ["Verified", "Human-confirmed", "Supported", "Hypothesis", "Deprecated", "Contradicted"]
+    },
+    "freshness_status": {
+      "type": "string",
+      "enum": ["current", "stale", "conflicting", "unknown", "deprecated"]
+    },
+    "consumers": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+    "conflicts": { "type": "string", "minLength": 1 },
+    "recommended_target": {
+      "type": "string",
+      "enum": ["review context", "implementation context", "domain rule ledger", "engineering pattern ledger", "verification pattern ledger", "ADR", "architecture memory", "project overlay", "docs update", "none"]
+    },
+    "staleness_trigger": { "type": "string", "minLength": 1 },
+    "owner": { "type": "string", "minLength": 1 }
+  }
+}
