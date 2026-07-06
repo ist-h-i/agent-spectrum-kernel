@@ -44,6 +44,8 @@ Implementation work:
 
 - `operating-mode-router`
 - `skill-router`
+- `requirement-grill` when business intent or responsibility boundary is unclear
+- `work-package-compiler` when a confirmed Requirement Contract should become an agent-ready task
 - `spec-driven-development`
 - `test-first-verification`
 - `controlled-implementation`
@@ -67,6 +69,7 @@ Review work:
 - `review-ai-quality`
 - `review-code-health`
 - `review-domain-impact`
+- `review-to-rule-compiler` when review evidence should become domain rule candidates
 - `review-architecture-impact`
 - `review-output-quality`
 - `review-adversarial-risk`
@@ -75,6 +78,14 @@ Review work:
 - `risk-gate`
 - `adr-review`
 - `improvement-ledger`
+
+Decision-support and learning work:
+
+- `next-best-change-finder`
+- `requirement-grill`
+- `work-package-compiler`
+- `review-to-rule-compiler`
+- `domain-rule-ledger`
 
 ## Prompt Templates
 

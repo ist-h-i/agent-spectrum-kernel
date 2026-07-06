@@ -50,6 +50,21 @@ source_scope: "generic empty template; no project-specific improvement items rec
 # Improvement Ledger Template
 `;
 
+const validDomainRuleLedger = `---
+ledger_status: template
+last_updated: null
+evidence_owner: null
+source_scope: "generic empty template; no project-specific domain rules recorded"
+---
+
+# Domain Rule Ledger Template
+
+## Domain Rule Entries
+
+| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Applies to | Used by | Last checked | Staleness trigger | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+`;
+
 function skillGroupsFor(skills, overrides = {}) {
   return {
     mode_routing: [],
@@ -75,6 +90,7 @@ function writeFixture(root, skills = ["alpha"]) {
   writeFileSync(resolve(root, "CUSTOM_INSTRUCTIONS.md"), "# Custom instructions\n");
   writeFileSync(resolve(root, "docs/ok.md"), "# OK\n");
   writeFileSync(resolve(root, "docs/ai/improvement-ledger.md"), validLedger);
+  writeFileSync(resolve(root, "docs/ai/domain-rule-ledger.md"), validDomainRuleLedger);
   writeFileSync(resolve(root, "examples/ok.md"), "# OK\n");
   writeFileSync(
     resolve(root, "manifest.json"),
@@ -85,7 +101,7 @@ function writeFixture(root, skills = ["alpha"]) {
         skills,
         skill_groups: skillGroupsFor(skills),
         allowed_multi_group_skills: [],
-        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md"],
+        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md", "docs/ai/domain-rule-ledger.md"],
         examples: ["examples/ok.md"],
         design: { quality_target: "95+" },
       },
@@ -100,6 +116,7 @@ function writeAdapterFixture(root) {
     "schemas/metrics-event.schema.json",
     "schemas/adoption-report.schema.json",
     "schemas/improvement-ledger-entry.schema.json",
+    "schemas/domain-rule-ledger-entry.schema.json",
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
@@ -228,6 +245,10 @@ jobs:
     `const DEFAULT_SKILLS = [
   "operating-mode-router",
   "skill-router",
+  "next-best-change-finder",
+  "requirement-grill",
+  "work-package-compiler",
+  "domain-rule-ledger",
   "spec-driven-development",
   "controlled-implementation",
   "test-first-verification",
@@ -238,6 +259,7 @@ jobs:
   "review-ai-quality",
   "review-code-health",
   "review-domain-impact",
+  "review-to-rule-compiler",
   "review-architecture-impact",
   "review-output-quality",
   "review-adversarial-risk",
@@ -399,6 +421,67 @@ ${ledgerSeparator}
 function writeImprovementLedger(root, content) {
   mkdirSync(resolve(root, "docs/ai"), { recursive: true });
   writeFileSync(resolve(root, "docs/ai/improvement-ledger.md"), content);
+}
+
+const domainRuleHeader = "| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Applies to | Used by | Last checked | Staleness trigger | Owner |";
+const domainRuleSeparator = "|---|---|---|---|---|---|---|---|---|---|---|---|---|";
+
+function domainRuleRow(overrides = {}) {
+  const row = {
+    ID: "DR-0001",
+    Rule: "Refunds over the configured threshold require manager approval before payout",
+    "Business object": "Refund",
+    "Business actor": "Support agent; manager",
+    Workflow: "Refund approval",
+    "State / condition": "Refund amount exceeds configured threshold",
+    Source: "Human-confirmed: fixture domain owner note",
+    "Evidence status": "Human-confirmed",
+    "Applies to": "Refund workflow",
+    "Used by": "requirement-grill; review-domain-impact",
+    "Last checked": "2999-01-01",
+    "Staleness trigger": "Approval policy, threshold, or payout workflow changes",
+    Owner: "support-ops",
+    ...overrides,
+  };
+
+  return `| ${[
+    row.ID,
+    row.Rule,
+    row["Business object"],
+    row["Business actor"],
+    row.Workflow,
+    row["State / condition"],
+    row.Source,
+    row["Evidence status"],
+    row["Applies to"],
+    row["Used by"],
+    row["Last checked"],
+    row["Staleness trigger"],
+    row.Owner,
+  ].join(" | ")} |`;
+}
+
+function domainRuleLedgerFixture({ status = "active", rows = [], header = domainRuleHeader } = {}) {
+  return `---
+ledger_status: ${status}
+last_updated: 2026-01-01
+evidence_owner: fixture
+source_scope: validation fixture
+---
+
+# Domain Rule Ledger
+
+## Domain Rule Entries
+
+${header}
+${domainRuleSeparator}
+${rows.join("\n")}
+`;
+}
+
+function writeDomainRuleLedger(root, content) {
+  mkdirSync(resolve(root, "docs/ai"), { recursive: true });
+  writeFileSync(resolve(root, "docs/ai/domain-rule-ledger.md"), content);
 }
 
 function runRepoScript(args, options = {}) {
@@ -2180,6 +2263,40 @@ jobs:
     }),
   );
   assertFail("invalid check conversion", invalidCheckConversionRoot, "executable check target");
+
+  const activeDomainRuleLedgerRoot = cloneFixture("active-domain-rule-ledger");
+  writeDomainRuleLedger(activeDomainRuleLedgerRoot, domainRuleLedgerFixture({ rows: [domainRuleRow()] }));
+  assertPass("active domain rule ledger", activeDomainRuleLedgerRoot);
+
+  const templateDomainRuleLedgerRoot = cloneFixture("template-domain-rule-ledger");
+  writeDomainRuleLedger(templateDomainRuleLedgerRoot, domainRuleLedgerFixture({ status: "template" }));
+  assertPass("template domain rule ledger", templateDomainRuleLedgerRoot);
+
+  const templateWithDomainRuleRowsRoot = cloneFixture("template-with-domain-rule-rows");
+  writeDomainRuleLedger(templateWithDomainRuleRowsRoot, domainRuleLedgerFixture({ status: "template", rows: [domainRuleRow()] }));
+  assertFail("template with domain rule rows", templateWithDomainRuleRowsRoot, "contains project domain rule rows");
+
+  const invalidDomainRuleStatusRoot = cloneFixture("invalid-domain-rule-status");
+  writeDomainRuleLedger(invalidDomainRuleStatusRoot, domainRuleLedgerFixture({ rows: [domainRuleRow({ "Evidence status": "Confirmed" })] }));
+  assertFail("invalid domain rule status", invalidDomainRuleStatusRoot, "invalid Evidence status");
+
+  const duplicateDomainRuleRoot = cloneFixture("duplicate-domain-rule");
+  writeDomainRuleLedger(duplicateDomainRuleRoot, domainRuleLedgerFixture({ rows: [domainRuleRow(), domainRuleRow()] }));
+  assertFail("duplicate domain rule", duplicateDomainRuleRoot, "duplicates domain rule ID");
+
+  const invalidDomainRuleDateRoot = cloneFixture("invalid-domain-rule-date");
+  writeDomainRuleLedger(invalidDomainRuleDateRoot, domainRuleLedgerFixture({ rows: [domainRuleRow({ "Last checked": "next week" })] }));
+  assertFail("invalid domain rule date", invalidDomainRuleDateRoot, "invalid Last checked");
+
+  const malformedDomainRuleHeaderRoot = cloneFixture("malformed-domain-rule-header");
+  writeDomainRuleLedger(
+    malformedDomainRuleHeaderRoot,
+    domainRuleLedgerFixture({
+      header: "| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Applies to | Used by | Last checked | Staleness trigger |",
+      rows: [domainRuleRow()],
+    }),
+  );
+  assertFail("malformed domain rule header", malformedDomainRuleHeaderRoot, "malformed domain rule table header");
 
   const dedupedPathReportRoot = cloneFixture("deduped-path-report");
   writeFileSync(

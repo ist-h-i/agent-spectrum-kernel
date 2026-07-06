@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/domain-rule-ledger-entry.schema.json",
+  "title": "Domain Rule Ledger Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "rule",
+    "business_object",
+    "business_actor",
+    "workflow",
+    "state_condition",
+    "source",
+    "evidence_status",
+    "applies_to",
+    "used_by",
+    "last_checked",
+    "staleness_trigger",
+    "owner"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^DR-[0-9]{4}$"
+    },
+    "rule": {
+      "type": "string",
+      "minLength": 1
+    },
+    "business_object": {
+      "type": "string",
+      "minLength": 1
+    },
+    "business_actor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflow": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state_condition": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_status": {
+      "type": "string",
+      "enum": [
+        "Verified",
+        "Human-confirmed",
+        "Supported",
+        "Hypothesis",
+        "Deprecated",
+        "Contradicted"
+      ]
+    },
+    "applies_to": {
+      "type": "string",
+      "minLength": 1
+    },
+    "used_by": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "last_checked": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "staleness_trigger": {
+      "type": "string",
+      "minLength": 1
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -150,6 +150,7 @@ If verification cannot be run, state:
 | User explicitly names a relevant skill | Use that skill; use `skill-router` only if the requested route conflicts with observed risk |
 | Non-trivial request with possible delivery/adoption/observability/operation ambiguity | `operating-mode-router` |
 | Non-trivial delivery/quality, design, investigation, review, risk-gated, or handoff work | `skill-router` |
+| Vague business intent, success condition, responsibility boundary, or durable domain rule impact | `skill-router` -> `requirement-grill` / `work-package-compiler` / `domain-rule-ledger` as appropriate |
 | Project overlay contains framework/domain-specific skills | First use `skill-router` for generic workflow selection, then select relevant project overlay skill before action |
 
 Stack implementation overlays:

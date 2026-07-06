@@ -10,6 +10,7 @@
     "angular-implementation-architecture",
     "application-boundary-architecture",
     "controlled-implementation",
+    "domain-rule-ledger",
     "doubt-driven-development",
     "evidence-ledger",
     "grill-design",
@@ -18,12 +19,14 @@
     "improvement-ledger",
     "implementation-context-generation",
     "mr-readme-generation",
+    "next-best-change-finder",
     "operating-mode-router",
     "planning-with-files",
     "project-adoption-pack-generation",
     "refactor-implementation",
     "release-readiness-gate",
     "repository-orientation",
+    "requirement-grill",
     "review-adversarial-risk",
     "review-ai-quality",
     "review-architecture-impact",
@@ -34,13 +37,15 @@
     "review-final-merge-gate",
     "review-output-quality",
     "review-router",
+    "review-to-rule-compiler",
     "risk-gate",
     "scope-control",
     "skill-adoption-metrics",
     "skill-effectiveness-evaluation",
     "skill-router",
     "spec-driven-development",
-    "test-first-verification"
+    "test-first-verification",
+    "work-package-compiler"
   ],
   "skill_groups": {
     "mode_routing": [
@@ -51,6 +56,7 @@
       "angular-implementation-architecture",
       "application-boundary-architecture",
       "controlled-implementation",
+      "domain-rule-ledger",
       "doubt-driven-development",
       "evidence-ledger",
       "grill-design",
@@ -59,10 +65,12 @@
       "improvement-ledger",
       "implementation-context-generation",
       "mr-readme-generation",
+      "next-best-change-finder",
       "planning-with-files",
       "refactor-implementation",
       "release-readiness-gate",
       "repository-orientation",
+      "requirement-grill",
       "review-adversarial-risk",
       "review-ai-quality",
       "review-architecture-impact",
@@ -73,11 +81,13 @@
       "review-final-merge-gate",
       "review-output-quality",
       "review-router",
+      "review-to-rule-compiler",
       "risk-gate",
       "scope-control",
       "skill-router",
       "spec-driven-development",
-      "test-first-verification"
+      "test-first-verification",
+      "work-package-compiler"
     ],
     "adoption_bootstrap": [
       "project-adoption-pack-generation",
@@ -111,6 +121,7 @@
     "docs/ai/review-context.md",
     "docs/ai/implementation-context.md",
     "docs/ai/improvement-ledger.md",
+    "docs/ai/domain-rule-ledger.md",
     "docs/ai/skill-adoption-metrics.md",
     "docs/ai/adoption-report-template.md",
     "docs/ai/stakeholder-readiness-report-template.md",
@@ -153,7 +164,8 @@
   "schemas": [
     "schemas/metrics-event.schema.json",
     "schemas/adoption-report.schema.json",
-    "schemas/improvement-ledger-entry.schema.json"
+    "schemas/improvement-ledger-entry.schema.json",
+    "schemas/domain-rule-ledger-entry.schema.json"
   ],
   "adapters": [
     "adapters/claude-code/README.md",

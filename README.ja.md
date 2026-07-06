@@ -35,6 +35,7 @@ scripts/       validation、Claude adapter install、local observability runtime
 - `docs/skill-matrix.md`: workflow選択の一覧。
 - `docs/adapter-conformance-contract.md` / `docs/adapter-capability-matrix.md`: adapterの移植性とcapability evidence。
 - `docs/ai/stakeholder-readiness-report-template.md`: internal quality、release readiness、client-value readinessを分けるstakeholder別report template。
+- `docs/ai/domain-rule-ledger.md`: 業務ルールを証拠状態付きで残す台帳template。
 
 ## 使い分け
 
@@ -95,6 +96,9 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | 状況 | 呼ぶSkill |
 |---|---|
 | delivery / adoption / metrics / operation の分類が曖昧 | `operating-mode-router` |
+| 次にやるべき変更候補を探す | `next-best-change-finder` → 原則 `requirement-grill` |
+| 業務意図・成功条件・責任境界が曖昧 | `requirement-grill` |
+| 確定済み要件をAgent-ready taskへ変換 | `work-package-compiler` |
 | 新しいrepoやteamへ導入したい | `operating-mode-router` → `project-adoption-pack-generation` |
 | 設計を詰めたい | `grill-design` |
 | 既存docs/ADRと整合させたい | `grill-with-docs` |
@@ -106,9 +110,12 @@ AGENTS.mdを前提に、spec-driven-development skillを使ってください。
 | スコープ逸脱が怖い | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → required gates） |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
 | PRレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
+| 既存要件・業務ルールとの照合 | `review-domain-impact` |
 | リリース候補のready判定 | `release-readiness-gate`（deploy / publish / migration / external notification / release execution は `risk-gate` と明示承認が先） |
 | 負債・スメル・リファクタ候補レビュー | `review-router` → `review-code-health` when applicable |
 | non-blockingな改善候補の台帳化 | `improvement-ledger` |
+| 業務ルール台帳の作成・更新 | `domain-rule-ledger` |
+| レビューや人間の訂正から業務ルール候補を抽出 | `review-to-rule-compiler` |
 | Skill選択やworkflow効果をふりかえりたい | `operating-mode-router` → `skill-effectiveness-evaluation` |
 | adoption maturityやinstruction qualityを期間で測りたい | `operating-mode-router` → `skill-adoption-metrics` |
 | weekly/monthly adoption reportを作りたい | operation layer + `docs/ai/adoption-report-template.md` |
