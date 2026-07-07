@@ -443,23 +443,3 @@ handoff-generation
 ```text
 handoff-generation を使って、次のCodexに渡せるタスク指示を作ってください。Allowed scope / Forbidden scope / Verification / Stop condition を必ず含めてください。
 ```
-
-## 社内紹介時の説明
-
-短く説明するならこうです。
-
-```text
-これはAIコーディング用の常時ルールと、状況別Skillのセットです。
-Kernelは「いつも守る判断基準」、Skillは「必要なときだけ呼ぶ工程」です。
-狙いは、AIの過剰実装・スコープ逸脱・根拠なし完了報告・引き継ぎ不能を減らすことです。
-```
-
-## 導入時の注意
-
-- 全Skillを毎回使わない。
-- Kernelにプロジェクト固有ルールを詰め込みすぎない。
-- フレームワーク固有規約はProject Overlayに分離する。
-- Project Overlayの専門Skillは、`skill-router` でgeneric workflowを選んだ後に必要な場合だけ選ぶ。
-- 検証できていないものを「完了」「改善」「安全」と言わせない。
-- 「修正済み」「no regression」「production-ready」「安全」「改善」などの主張を出すときは `evidence-ledger` を通す。
-- 危険影響がある作業は、選択済みワークフローの前に `risk-gate` を通す。
