@@ -247,6 +247,42 @@ jobs:
 
   mkdirSync(resolve(root, "scripts"), { recursive: true });
   writeFileSync(
+    resolve(root, "scripts/install-kernel.mjs"),
+    `const STATE_PATH = ".agent-spectrum-kernel/install-state.json";
+const MANAGED_START = "<!-- agent-spectrum-kernel:start -->";
+const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
+function install(manifest, options) {
+  const skills = manifest.skills;
+  const managed_files = {};
+  const dryRun = options["--dry-run"];
+  if (dryRun) return { skills, managed_files };
+  if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
+  if (options["--prune"]) return "stale managed projection";
+  return STATE_PATH;
+}
+`,
+  );
+  writeFileSync(
+    resolve(root, "scripts/install-codex-adapter.mjs"),
+    `const STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
+const MANAGED_START = "<!-- agent-spectrum-kernel:start -->";
+const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
+const PROMPT_TEMPLATES = ["skill-implement.md"];
+const COMMAND_TEMPLATES = ["codex-exec.md"];
+function install(manifest, options) {
+  const skills = manifest.skills;
+  const managed_files = {};
+  const dryRun = options["--dry-run"];
+  const skipAgents = options["--skip-agents"];
+  if (dryRun) return { skills, managed_files };
+  if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
+  if (skipAgents) return ".agents/skills";
+  if (options["--prune"]) return "stale Codex managed projection";
+  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill";
+}
+`,
+  );
+  writeFileSync(
     resolve(root, "scripts/install-claude-adapter.mjs"),
     `const DEFAULT_SKILLS = [
   "operating-mode-router",
@@ -507,6 +543,16 @@ function runRepoScript(args, options = {}) {
 function assertRuntimePass(name, result) {
   if (result.status !== 0) {
     throw new Error(`${name} should pass\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  }
+}
+
+function assertRuntimeFail(name, result, expected) {
+  const output = `${result.stdout}\n${result.stderr}`;
+  if (result.status === 0) {
+    throw new Error(`${name} should fail`);
+  }
+  if (expected && !output.includes(expected)) {
+    throw new Error(`${name} should mention '${expected}'\n${output}`);
   }
 }
 
@@ -1645,6 +1691,251 @@ function assertInstallerScripts() {
   }
 }
 
+function assertCoreInstallerScripts() {
+  const installer = resolve(repoRoot, "scripts/install-kernel.mjs");
+  const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
+  const markerPattern = /<!-- agent-spectrum-kernel:start -->/g;
+
+  const freshTarget = resolve(fixtureRoot, "kernel-install-fresh");
+  const freshRun = runRepoScript([installer, "--target", freshTarget]);
+  assertRuntimePass("kernel installer fresh run", freshRun);
+  const freshState = JSON.parse(readFileSync(resolve(freshTarget, ".agent-spectrum-kernel/install-state.json"), "utf8"));
+  if (freshState.installed_skills.length !== manifest.skills.length) {
+    throw new Error(`kernel installer should install manifest skills by default\n${JSON.stringify(freshState, null, 2)}`);
+  }
+  if (!existsSync(resolve(freshTarget, "AGENTS.md")) || !existsSync(resolve(freshTarget, "CUSTOM_INSTRUCTIONS.md"))) {
+    throw new Error("kernel installer should write core instruction files");
+  }
+  if (!existsSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"))) {
+    throw new Error("kernel installer should project manifest skills");
+  }
+
+  const beforeRerunAgents = readFileSync(resolve(freshTarget, "AGENTS.md"), "utf8");
+  const beforeRerunState = readFileSync(resolve(freshTarget, ".agent-spectrum-kernel/install-state.json"), "utf8");
+  assertRuntimePass("kernel installer rerun", runRepoScript([installer, "--target", freshTarget]));
+  const afterRerunAgents = readFileSync(resolve(freshTarget, "AGENTS.md"), "utf8");
+  const afterRerunState = readFileSync(resolve(freshTarget, ".agent-spectrum-kernel/install-state.json"), "utf8");
+  if (afterRerunAgents !== beforeRerunAgents || afterRerunState !== beforeRerunState) {
+    throw new Error("kernel installer rerun should be idempotent when source did not change");
+  }
+  if ((afterRerunAgents.match(markerPattern) ?? []).length !== 1) {
+    throw new Error(`kernel installer should not duplicate managed AGENTS blocks\n${afterRerunAgents}`);
+  }
+
+  writeFileSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"), "# local stale copy\n");
+  assertRuntimePass("kernel installer updates managed skills", runRepoScript([installer, "--target", freshTarget]));
+  if (readFileSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"), "utf8") !== readFileSync(resolve(repoRoot, "skills/operating-mode-router/SKILL.md"), "utf8")) {
+    throw new Error("kernel installer should refresh managed skills from the current checkout");
+  }
+
+  const mergeTarget = resolve(fixtureRoot, "kernel-install-merge");
+  mkdirSync(mergeTarget, { recursive: true });
+  writeFileSync(resolve(mergeTarget, "AGENTS.md"), "# Project Rules\n\nKeep this project overlay.\n");
+  assertRuntimePass("kernel installer merge agents", runRepoScript([installer, "--target", mergeTarget, "--skills", "operating-mode-router", "--merge-agents"]));
+  assertRuntimePass("kernel installer merge agents rerun", runRepoScript([installer, "--target", mergeTarget, "--skills", "operating-mode-router", "--merge-agents"]));
+  const mergedAgents = readFileSync(resolve(mergeTarget, "AGENTS.md"), "utf8");
+  if (!mergedAgents.includes("Keep this project overlay.") || (mergedAgents.match(markerPattern) ?? []).length !== 1) {
+    throw new Error(`kernel installer should preserve existing AGENTS.md content and keep one managed block\n${mergedAgents}`);
+  }
+
+  const conflictTarget = resolve(fixtureRoot, "kernel-install-conflict");
+  mkdirSync(conflictTarget, { recursive: true });
+  writeFileSync(resolve(conflictTarget, "AGENTS.md"), "# Existing AGENTS\n");
+  assertRuntimeFail(
+    "kernel installer existing AGENTS without merge",
+    runRepoScript([installer, "--target", conflictTarget, "--skills", "operating-mode-router"]),
+    "--merge-agents",
+  );
+  if (existsSync(resolve(conflictTarget, ".agent-spectrum-kernel/install-state.json")) || existsSync(resolve(conflictTarget, "skills/operating-mode-router/SKILL.md"))) {
+    throw new Error("kernel installer preflight failure should not partially write files");
+  }
+
+  const dryRunTarget = resolve(fixtureRoot, "kernel-install-dry-run");
+  const dryRun = runRepoScript([installer, "--target", dryRunTarget, "--skills", "operating-mode-router", "--dry-run"]);
+  assertRuntimePass("kernel installer dry run", dryRun);
+  if (!dryRun.stdout.includes(".agent-spectrum-kernel/install-state.json") || !dryRun.stdout.includes("skills/operating-mode-router/SKILL.md")) {
+    throw new Error(`kernel installer dry run should list planned writes\n${dryRun.stdout}`);
+  }
+  if (existsSync(resolve(dryRunTarget, ".agent-spectrum-kernel/install-state.json"))) {
+    throw new Error("kernel installer dry run should not write state");
+  }
+
+  const staleTarget = resolve(fixtureRoot, "kernel-install-stale");
+  assertRuntimePass(
+    "kernel installer stale setup",
+    runRepoScript([installer, "--target", staleTarget, "--skills", "operating-mode-router,test-first-verification"]),
+  );
+  const staleRun = runRepoScript([installer, "--target", staleTarget, "--skills", "operating-mode-router"]);
+  assertRuntimePass("kernel installer stale report", staleRun);
+  if (!staleRun.stdout.includes("stale managed projection: skills/test-first-verification")) {
+    throw new Error(`kernel installer should report stale managed projections\n${staleRun.stdout}`);
+  }
+  if (!existsSync(resolve(staleTarget, "skills/test-first-verification/SKILL.md"))) {
+    throw new Error("kernel installer should not delete stale skills without --prune");
+  }
+  const staleState = JSON.parse(readFileSync(resolve(staleTarget, ".agent-spectrum-kernel/install-state.json"), "utf8"));
+  if (!staleState.installed_skills.includes("test-first-verification")) {
+    throw new Error(`kernel installer should keep stale skills in state until pruned\n${JSON.stringify(staleState, null, 2)}`);
+  }
+  const pruneRun = runRepoScript([installer, "--target", staleTarget, "--skills", "operating-mode-router", "--prune"]);
+  assertRuntimePass("kernel installer prune", pruneRun);
+  if (existsSync(resolve(staleTarget, "skills/test-first-verification/SKILL.md"))) {
+    throw new Error("kernel installer --prune should delete stale managed skill directories");
+  }
+  const prunedState = JSON.parse(readFileSync(resolve(staleTarget, ".agent-spectrum-kernel/install-state.json"), "utf8"));
+  if (prunedState.installed_skills.includes("test-first-verification")) {
+    throw new Error(`kernel installer should remove pruned skills from state\n${JSON.stringify(prunedState, null, 2)}`);
+  }
+
+  assertRuntimeFail(
+    "kernel installer unknown skill",
+    runRepoScript([installer, "--target", resolve(fixtureRoot, "kernel-install-unknown"), "--skills", "missing-skill"]),
+    "Unknown skill",
+  );
+
+  const overwriteTarget = resolve(fixtureRoot, "kernel-install-no-overwrite");
+  mkdirSync(resolve(overwriteTarget, "skills/operating-mode-router"), { recursive: true });
+  writeFileSync(resolve(overwriteTarget, "skills/operating-mode-router/SKILL.md"), "# local skill\n");
+  assertRuntimeFail(
+    "kernel installer no-overwrite skill conflict",
+    runRepoScript([installer, "--target", overwriteTarget, "--skills", "operating-mode-router", "--no-overwrite-skills"]),
+    "would be overwritten",
+  );
+  if (existsSync(resolve(overwriteTarget, ".agent-spectrum-kernel/install-state.json"))) {
+    throw new Error("kernel installer no-overwrite failure should not write state");
+  }
+}
+
+function assertCodexInstallerScripts() {
+  const installer = resolve(repoRoot, "scripts/install-codex-adapter.mjs");
+  const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
+  const markerPattern = /<!-- agent-spectrum-kernel:start -->/g;
+
+  const freshTarget = resolve(fixtureRoot, "codex-install-fresh");
+  const freshRun = runRepoScript([installer, "--target", freshTarget]);
+  assertRuntimePass("codex installer fresh run", freshRun);
+  const freshState = JSON.parse(readFileSync(resolve(freshTarget, ".agent-spectrum-kernel/codex-install-state.json"), "utf8"));
+  if (freshState.installed_skills.length !== manifest.skills.length || freshState.target.skills_root !== ".agents/skills") {
+    throw new Error(`codex installer should install manifest skills into .agents/skills by default\n${JSON.stringify(freshState, null, 2)}`);
+  }
+  if (
+    !existsSync(resolve(freshTarget, "AGENTS.md")) ||
+    !existsSync(resolve(freshTarget, ".agents/skills/operating-mode-router/SKILL.md")) ||
+    !existsSync(resolve(freshTarget, ".agents/prompts/skill-implement.md")) ||
+    !existsSync(resolve(freshTarget, ".agents/commands/codex-exec.md"))
+  ) {
+    throw new Error("codex installer should write Codex AGENTS, skills, prompts, and command templates");
+  }
+
+  const beforeRerunAgents = readFileSync(resolve(freshTarget, "AGENTS.md"), "utf8");
+  const beforeRerunState = readFileSync(resolve(freshTarget, ".agent-spectrum-kernel/codex-install-state.json"), "utf8");
+  assertRuntimePass("codex installer rerun", runRepoScript([installer, "--target", freshTarget]));
+  const afterRerunAgents = readFileSync(resolve(freshTarget, "AGENTS.md"), "utf8");
+  const afterRerunState = readFileSync(resolve(freshTarget, ".agent-spectrum-kernel/codex-install-state.json"), "utf8");
+  if (afterRerunAgents !== beforeRerunAgents || afterRerunState !== beforeRerunState) {
+    throw new Error("codex installer rerun should be idempotent when source did not change");
+  }
+  if ((afterRerunAgents.match(markerPattern) ?? []).length !== 1) {
+    throw new Error(`codex installer should not duplicate managed AGENTS blocks\n${afterRerunAgents}`);
+  }
+
+  writeFileSync(resolve(freshTarget, ".agents/skills/operating-mode-router/SKILL.md"), "# local stale copy\n");
+  assertRuntimePass("codex installer updates managed skills", runRepoScript([installer, "--target", freshTarget]));
+  if (readFileSync(resolve(freshTarget, ".agents/skills/operating-mode-router/SKILL.md"), "utf8") !== readFileSync(resolve(repoRoot, "skills/operating-mode-router/SKILL.md"), "utf8")) {
+    throw new Error("codex installer should refresh managed Codex skills from the current checkout");
+  }
+
+  const mergeTarget = resolve(fixtureRoot, "codex-install-merge");
+  mkdirSync(mergeTarget, { recursive: true });
+  writeFileSync(resolve(mergeTarget, "AGENTS.md"), "# Project Rules\n\nKeep this Codex project overlay.\n");
+  assertRuntimePass("codex installer merge agents", runRepoScript([installer, "--target", mergeTarget, "--skills", "operating-mode-router", "--merge-agents"]));
+  assertRuntimePass("codex installer merge agents rerun", runRepoScript([installer, "--target", mergeTarget, "--skills", "operating-mode-router", "--merge-agents"]));
+  const mergedAgents = readFileSync(resolve(mergeTarget, "AGENTS.md"), "utf8");
+  if (!mergedAgents.includes("Keep this Codex project overlay.") || (mergedAgents.match(markerPattern) ?? []).length !== 1) {
+    throw new Error(`codex installer should preserve existing AGENTS.md content and keep one managed block\n${mergedAgents}`);
+  }
+
+  const skipAgentsTarget = resolve(fixtureRoot, "codex-install-skip-agents");
+  mkdirSync(skipAgentsTarget, { recursive: true });
+  writeFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "# Existing AGENTS\n");
+  assertRuntimePass("codex installer skip agents", runRepoScript([installer, "--target", skipAgentsTarget, "--skills", "operating-mode-router", "--skip-agents"]));
+  if (readFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "utf8") !== "# Existing AGENTS\n") {
+    throw new Error("codex installer --skip-agents should leave AGENTS.md untouched");
+  }
+
+  const conflictTarget = resolve(fixtureRoot, "codex-install-conflict");
+  mkdirSync(conflictTarget, { recursive: true });
+  writeFileSync(resolve(conflictTarget, "AGENTS.md"), "# Existing AGENTS\n");
+  assertRuntimeFail(
+    "codex installer existing AGENTS without merge",
+    runRepoScript([installer, "--target", conflictTarget, "--skills", "operating-mode-router"]),
+    "--merge-agents",
+  );
+  if (existsSync(resolve(conflictTarget, ".agent-spectrum-kernel/codex-install-state.json")) || existsSync(resolve(conflictTarget, ".agents/skills/operating-mode-router/SKILL.md"))) {
+    throw new Error("codex installer preflight failure should not partially write files");
+  }
+
+  const dryRunTarget = resolve(fixtureRoot, "codex-install-dry-run");
+  const dryRun = runRepoScript([installer, "--target", dryRunTarget, "--skills", "operating-mode-router", "--dry-run"]);
+  assertRuntimePass("codex installer dry run", dryRun);
+  if (
+    !dryRun.stdout.includes(".agent-spectrum-kernel/codex-install-state.json") ||
+    !dryRun.stdout.includes(".agents/skills/operating-mode-router/SKILL.md") ||
+    !dryRun.stdout.includes(".agents/prompts/skill-implement.md") ||
+    !dryRun.stdout.includes(".agents/commands/codex-exec.md")
+  ) {
+    throw new Error(`codex installer dry run should list planned writes\n${dryRun.stdout}`);
+  }
+  if (existsSync(resolve(dryRunTarget, ".agent-spectrum-kernel/codex-install-state.json"))) {
+    throw new Error("codex installer dry run should not write state");
+  }
+
+  const staleTarget = resolve(fixtureRoot, "codex-install-stale");
+  assertRuntimePass(
+    "codex installer stale setup",
+    runRepoScript([installer, "--target", staleTarget, "--skills", "operating-mode-router,test-first-verification"]),
+  );
+  const staleRun = runRepoScript([installer, "--target", staleTarget, "--skills", "operating-mode-router"]);
+  assertRuntimePass("codex installer stale report", staleRun);
+  if (!staleRun.stdout.includes("stale Codex managed projection: .agents/skills/test-first-verification")) {
+    throw new Error(`codex installer should report stale managed Codex projections\n${staleRun.stdout}`);
+  }
+  if (!existsSync(resolve(staleTarget, ".agents/skills/test-first-verification/SKILL.md"))) {
+    throw new Error("codex installer should not delete stale skills without --prune");
+  }
+  const staleState = JSON.parse(readFileSync(resolve(staleTarget, ".agent-spectrum-kernel/codex-install-state.json"), "utf8"));
+  if (!staleState.installed_skills.includes("test-first-verification")) {
+    throw new Error(`codex installer should keep stale skills in state until pruned\n${JSON.stringify(staleState, null, 2)}`);
+  }
+  const pruneRun = runRepoScript([installer, "--target", staleTarget, "--skills", "operating-mode-router", "--prune"]);
+  assertRuntimePass("codex installer prune", pruneRun);
+  if (existsSync(resolve(staleTarget, ".agents/skills/test-first-verification/SKILL.md"))) {
+    throw new Error("codex installer --prune should delete stale managed Codex skill directories");
+  }
+  const prunedState = JSON.parse(readFileSync(resolve(staleTarget, ".agent-spectrum-kernel/codex-install-state.json"), "utf8"));
+  if (prunedState.installed_skills.includes("test-first-verification")) {
+    throw new Error(`codex installer should remove pruned skills from state\n${JSON.stringify(prunedState, null, 2)}`);
+  }
+
+  assertRuntimeFail(
+    "codex installer unknown skill",
+    runRepoScript([installer, "--target", resolve(fixtureRoot, "codex-install-unknown"), "--skills", "missing-skill"]),
+    "Unknown skill",
+  );
+
+  const overwriteTarget = resolve(fixtureRoot, "codex-install-no-overwrite");
+  mkdirSync(resolve(overwriteTarget, ".agents/skills/operating-mode-router"), { recursive: true });
+  writeFileSync(resolve(overwriteTarget, ".agents/skills/operating-mode-router/SKILL.md"), "# local codex skill\n");
+  assertRuntimeFail(
+    "codex installer no-overwrite skill conflict",
+    runRepoScript([installer, "--target", overwriteTarget, "--skills", "operating-mode-router", "--no-overwrite-skills", "--skip-agents"]),
+    "would be overwritten",
+  );
+  if (existsSync(resolve(overwriteTarget, ".agent-spectrum-kernel/codex-install-state.json"))) {
+    throw new Error("codex installer no-overwrite failure should not write state");
+  }
+}
+
 function hookIdentities(hooks) {
   const identities = [];
   for (const [eventName, groups] of Object.entries(hooks ?? {})) {
@@ -1845,6 +2136,8 @@ try {
   assertSidecarAdapterInstructions();
   assertRuntimeScripts();
   assertInstallerScripts();
+  assertCoreInstallerScripts();
+  assertCodexInstallerScripts();
   assertStakeholderReadinessSamples();
 
   const missingSchemaRoot = cloneFixture("missing-schema");
@@ -1931,6 +2224,14 @@ jobs:
     readFileSync(resolve(missingCommandTemplateRoot, "scripts/install-claude-adapter.mjs"), "utf8").replace('  "skill-handoff.md",\n', ""),
   );
   assertFail("adapter installer command templates", missingCommandTemplateRoot, "COMMAND_TEMPLATES is missing required command template: skill-handoff.md");
+
+  const missingCoreInstallerRoot = cloneFixture("missing-core-installer");
+  rmSync(resolve(missingCoreInstallerRoot, "scripts/install-kernel.mjs"));
+  assertFail("missing core kernel installer", missingCoreInstallerRoot, "required installer is missing: scripts/install-kernel.mjs");
+
+  const missingCodexInstallerRoot = cloneFixture("missing-codex-installer");
+  rmSync(resolve(missingCodexInstallerRoot, "scripts/install-codex-adapter.mjs"));
+  assertFail("missing codex adapter installer", missingCodexInstallerRoot, "required installer is missing: scripts/install-codex-adapter.mjs");
 
   const missingCodexAdapterPathRoot = cloneFixture("missing-codex-adapter-path");
   rmSync(resolve(missingCodexAdapterPathRoot, "adapters/codex/prompts/skill-handoff.md"));

@@ -47,8 +47,11 @@ Future adapters should add validation or fixture coverage for:
 
 Verified in this repository:
 
+- The generic core installer can project and update `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, and canonical `skills/<name>/SKILL.md` files while preserving existing `AGENTS.md` content through a managed block.
 - The Claude Code project adapter has installer, command, hook, runtime, and Pattern B GitHub Actions templates.
-- The Codex adapter has README guidance, repo skill projection guidance for `.agents/skills`, prompt templates, a `codex exec` command template, and explicit unsupported/partial capability downgrades.
+- The Codex adapter has a local installer for `.agents/skills`, `.agents/prompts`, `.agents/commands`, README guidance, repo skill projection guidance, prompt templates, a `codex exec` command template, and explicit unsupported/partial capability downgrades.
+- Static and fixture validation checks the generic core installer, install state output, dry-run behavior, managed `AGENTS.md` merge behavior, stale skill reporting, and explicit prune behavior.
+- Static and fixture validation checks the Codex adapter installer, Codex install state output, dry-run behavior, managed `AGENTS.md` merge/skip behavior, `.agents/skills` projection, prompt/command projection, stale skill reporting, and explicit prune behavior.
 - Static validation checks the presence of required Claude adapter paths, default review skill projection, command template projection, local observability defaults, and Pattern B guardrails.
 - Static validation checks the presence of required Codex adapter paths.
 

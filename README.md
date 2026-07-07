@@ -109,6 +109,8 @@ adapters/
     prompts/
     commands/
 scripts/
+  install-kernel.mjs
+  install-codex-adapter.mjs
   install-claude-adapter.mjs
   ai-metrics-record.mjs
   ai-metrics-summarize.mjs
@@ -170,6 +172,21 @@ skills/
 4. For non-trivial tasks, use `operating-mode-router` when the operating layer is unclear, then use `skill-router` for delivery/quality work or invoke an explicitly requested specific skill directly.
 5. Add project-specific rules and skills as a separate overlay, not by bloating the kernel.
 
+From this repository, the generic core installer can project and later update the kernel and canonical skills in an adopting repository:
+
+```bash
+node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
+```
+
+When this repository is updated, pull the new revision and rerun the installer:
+
+```bash
+git pull
+node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
+```
+
+The installer writes only local files, records `.agent-spectrum-kernel/install-state.json`, reports stale managed skill projections, and prunes stale skills only with `--prune`.
+
 For tools that only support a single custom instruction field, use `CUSTOM_INSTRUCTIONS.md`.
 
 ## Claude Code adapter
@@ -183,7 +200,7 @@ node scripts/install-claude-adapter.mjs --target /path/to/project
 Recommended adoption path:
 
 ```text
-1. Install core kernel/skills.
+1. Install core kernel/skills with `scripts/install-kernel.mjs`.
 2. Install the Claude project adapter or optional plugin.
 3. Enable local hooks for project-local observability.
 4. Use Pattern B @claude review GitHub Actions only when PR-level shared review is needed.
@@ -198,7 +215,11 @@ For Codex, use the prompt-driven adapter in `adapters/codex/`.
 
 The Codex adapter documents how to project the core `AGENTS.md` and selected canonical skills into Codex-compatible repository surfaces, including `.agents/skills`, prompt templates, and `codex exec` command patterns.
 
-It is intentionally smaller than the Claude Code adapter: no installer, no hooks, no local metrics sidecar, no shared PR workflow, and no external publication path are provided. Capability claims are downgraded in `docs/adapter-capability-matrix.md`.
+```bash
+node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents
+```
+
+The Codex installer updates `AGENTS.md`, `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. It is intentionally smaller than the Claude Code adapter: no hooks, no local metrics sidecar, no shared PR workflow, and no external publication path are provided. Capability claims are downgraded in `docs/adapter-capability-matrix.md`.
 
 ## 3分で使う / Quick start
 

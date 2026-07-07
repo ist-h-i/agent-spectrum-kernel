@@ -22,6 +22,29 @@ repo-root/
     */SKILL.md
 ```
 
+このrepoのcheckoutから導入先repoへ投影する場合:
+
+```bash
+node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
+```
+
+このrepoに更新が入った後は、checkoutを更新して同じコマンドを再実行します。
+
+```bash
+git pull
+node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
+```
+
+installer は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、`.agent-spectrum-kernel/install-state.json` を更新します。前回投影したが今回対象外になったSkillは既定では削除せず、`--prune` 指定時だけ削除します。
+
+Codex の `.agents/skills`、prompt template、`codex exec` command template も投影する場合:
+
+```bash
+node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents
+```
+
+Codex installer は `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、`.agent-spectrum-kernel/codex-install-state.json` を更新します。hook、telemetry、外部公開、GitHub Actions は作りません。
+
 Claude Code を使う場合の推奨構成:
 
 ```text

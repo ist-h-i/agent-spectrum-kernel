@@ -89,6 +89,8 @@ const REQUIRED_OBSERVABILITY_DOCS = [
 ];
 const OBSERVABILITY_CONFIG_PATH = "docs/ai/observability-config.yml";
 const PATTERN_B_WORKFLOW_PATH = "adapters/claude-code/github-actions/claude-review-on-mention.yml";
+const CORE_KERNEL_INSTALLER_PATH = "scripts/install-kernel.mjs";
+const CODEX_ADAPTER_INSTALLER_PATH = "scripts/install-codex-adapter.mjs";
 const CLAUDE_ADAPTER_INSTALLER_PATH = "scripts/install-claude-adapter.mjs";
 const REQUIRED_DEFAULT_REVIEW_SKILLS = [
   "operating-mode-router",
@@ -1131,6 +1133,30 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
       commandTemplates: [],
       missingCommandTemplates: [],
     },
+    coreInstaller: {
+      installerPresent: false,
+      readsManifestSkills: false,
+      writesInstallState: false,
+      hasDryRun: false,
+      hasMergeAgents: false,
+      hasStaleReporting: false,
+      hasPrune: false,
+      avoidsCodexProjectionDefault: true,
+    },
+    codexInstaller: {
+      installerPresent: false,
+      readsManifestSkills: false,
+      writesCodexInstallState: false,
+      projectsAgentsSkills: false,
+      installsPrompts: false,
+      installsCommand: false,
+      hasDryRun: false,
+      hasMergeAgents: false,
+      hasSkipAgents: false,
+      hasStaleReporting: false,
+      hasPrune: false,
+      avoidsHooksTelemetryExternal: true,
+    },
     documentationConsistency: {
       mentionsLocalHooksDefault: false,
       mentionsPatternBOptional: false,
@@ -1198,6 +1224,8 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
 
   validateObservabilityConfig(root, checks, errors);
   validateHookSafety(root, checks, errors);
+  validateCoreInstaller(root, checks, errors);
+  validateCodexInstaller(root, checks, errors);
   validateInstallerProjection(root, checks, errors);
   validatePatternBWorkflow(root, checks, errors);
   validateAdapterDocumentation(root, checks, errors);
@@ -1316,6 +1344,59 @@ function validateHookSafety(root, checks, errors) {
     if (/https?:\/\//i.test(serialized)) {
       checks.externalPublicationSafety.noExternalDestinationEnabled = false;
       fail(errors, "external publication safety", `${path} contains an enabled external destination`);
+    }
+  }
+}
+
+function validateCoreInstaller(root, checks, errors) {
+  const absolutePath = resolve(root, CORE_KERNEL_INSTALLER_PATH);
+  checks.coreInstaller.installerPresent = existsSync(absolutePath);
+  if (!checks.coreInstaller.installerPresent) {
+    fail(errors, "core kernel installer", `required installer is missing: ${CORE_KERNEL_INSTALLER_PATH}`);
+    return;
+  }
+
+  const text = readFileSync(absolutePath, "utf8");
+  checks.coreInstaller.readsManifestSkills = /manifest\.skills/.test(text);
+  checks.coreInstaller.writesInstallState = text.includes(".agent-spectrum-kernel/install-state.json") && text.includes("managed_files");
+  checks.coreInstaller.hasDryRun = text.includes("--dry-run") && /dryRun/.test(text);
+  checks.coreInstaller.hasMergeAgents = text.includes("--merge-agents") && text.includes("agent-spectrum-kernel:start") && text.includes("agent-spectrum-kernel:end");
+  checks.coreInstaller.hasStaleReporting = text.includes("stale managed projection");
+  checks.coreInstaller.hasPrune = text.includes("--prune") && /prune/.test(text);
+  checks.coreInstaller.avoidsCodexProjectionDefault = !/\.agents\/skills/.test(text);
+
+  for (const [field, ok] of Object.entries(checks.coreInstaller)) {
+    if (!ok) {
+      fail(errors, "core kernel installer", `${CORE_KERNEL_INSTALLER_PATH} failed core installer check: ${field}`);
+    }
+  }
+}
+
+function validateCodexInstaller(root, checks, errors) {
+  const absolutePath = resolve(root, CODEX_ADAPTER_INSTALLER_PATH);
+  checks.codexInstaller.installerPresent = existsSync(absolutePath);
+  if (!checks.codexInstaller.installerPresent) {
+    fail(errors, "codex adapter installer", `required installer is missing: ${CODEX_ADAPTER_INSTALLER_PATH}`);
+    return;
+  }
+
+  const text = readFileSync(absolutePath, "utf8");
+  checks.codexInstaller.readsManifestSkills = /manifest\.skills/.test(text);
+  checks.codexInstaller.writesCodexInstallState = text.includes(".agent-spectrum-kernel/codex-install-state.json") && text.includes("managed_files");
+  checks.codexInstaller.projectsAgentsSkills = text.includes(".agents/skills") && text.includes("codex_skill");
+  checks.codexInstaller.installsPrompts = text.includes(".agents/prompts") && text.includes("PROMPT_TEMPLATES");
+  checks.codexInstaller.installsCommand = text.includes(".agents/commands") && text.includes("COMMAND_TEMPLATES");
+  checks.codexInstaller.hasDryRun = text.includes("--dry-run") && /dryRun/.test(text);
+  checks.codexInstaller.hasMergeAgents = text.includes("--merge-agents") && text.includes("agent-spectrum-kernel:start") && text.includes("agent-spectrum-kernel:end");
+  checks.codexInstaller.hasSkipAgents = text.includes("--skip-agents") && /skipAgents/.test(text);
+  checks.codexInstaller.hasStaleReporting = text.includes("stale Codex managed projection");
+  checks.codexInstaller.hasPrune = text.includes("--prune") && /prune/.test(text);
+  checks.codexInstaller.avoidsHooksTelemetryExternal =
+    !/\.claude|hooks\.json|webhook|https?:\/\/|telemetry|deploy|publish|release/i.test(text.replace(/no hooks, telemetry, secrets, deploys, external publication/gi, ""));
+
+  for (const [field, ok] of Object.entries(checks.codexInstaller)) {
+    if (!ok) {
+      fail(errors, "codex adapter installer", `${CODEX_ADAPTER_INSTALLER_PATH} failed Codex installer check: ${field}`);
     }
   }
 }
@@ -1490,6 +1571,32 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks
     "## Codex adapter checks",
     "",
     ...claudeAdapterChecks.requiredCodexAdapterPaths.map((check) => `- \`${check.path}\`: ${check.ok ? "ok" : "missing"}`),
+    "",
+    "## Core kernel installer checks",
+    "",
+    `- installer present: ${claudeAdapterChecks.coreInstaller.installerPresent ? "ok" : "missing"}`,
+    `- reads manifest skills: ${claudeAdapterChecks.coreInstaller.readsManifestSkills ? "ok" : "invalid"}`,
+    `- writes install state: ${claudeAdapterChecks.coreInstaller.writesInstallState ? "ok" : "invalid"}`,
+    `- dry-run supported: ${claudeAdapterChecks.coreInstaller.hasDryRun ? "ok" : "invalid"}`,
+    `- managed AGENTS.md merge supported: ${claudeAdapterChecks.coreInstaller.hasMergeAgents ? "ok" : "invalid"}`,
+    `- stale managed projection reporting: ${claudeAdapterChecks.coreInstaller.hasStaleReporting ? "ok" : "invalid"}`,
+    `- prune supported: ${claudeAdapterChecks.coreInstaller.hasPrune ? "ok" : "invalid"}`,
+    `- no Codex-specific projection by default: ${claudeAdapterChecks.coreInstaller.avoidsCodexProjectionDefault ? "ok" : "invalid"}`,
+    "",
+    "## Codex adapter installer checks",
+    "",
+    `- installer present: ${claudeAdapterChecks.codexInstaller.installerPresent ? "ok" : "missing"}`,
+    `- reads manifest skills: ${claudeAdapterChecks.codexInstaller.readsManifestSkills ? "ok" : "invalid"}`,
+    `- writes Codex install state: ${claudeAdapterChecks.codexInstaller.writesCodexInstallState ? "ok" : "invalid"}`,
+    `- projects .agents/skills: ${claudeAdapterChecks.codexInstaller.projectsAgentsSkills ? "ok" : "invalid"}`,
+    `- installs prompt templates: ${claudeAdapterChecks.codexInstaller.installsPrompts ? "ok" : "invalid"}`,
+    `- installs command templates: ${claudeAdapterChecks.codexInstaller.installsCommand ? "ok" : "invalid"}`,
+    `- dry-run supported: ${claudeAdapterChecks.codexInstaller.hasDryRun ? "ok" : "invalid"}`,
+    `- managed AGENTS.md merge supported: ${claudeAdapterChecks.codexInstaller.hasMergeAgents ? "ok" : "invalid"}`,
+    `- skip AGENTS.md supported: ${claudeAdapterChecks.codexInstaller.hasSkipAgents ? "ok" : "invalid"}`,
+    `- stale Codex projection reporting: ${claudeAdapterChecks.codexInstaller.hasStaleReporting ? "ok" : "invalid"}`,
+    `- prune supported: ${claudeAdapterChecks.codexInstaller.hasPrune ? "ok" : "invalid"}`,
+    `- no hooks/telemetry/external effects: ${claudeAdapterChecks.codexInstaller.avoidsHooksTelemetryExternal ? "ok" : "invalid"}`,
     "",
     "## Local observability checks",
     "",

@@ -40,6 +40,29 @@ repo-root/
     */SKILL.md
 ```
 
+このrepoから導入先repoへcore kernel / skillsを投影する場合は、汎用installerを使います。
+
+```bash
+node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
+```
+
+このrepoに更新が入った後は、更新済みcheckoutから同じinstallerを再実行します。
+
+```bash
+git pull
+node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
+```
+
+`scripts/install-kernel.mjs` は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、`.agent-spectrum-kernel/install-state.json` を更新します。導入先の独自 `AGENTS.md` 本文は保持し、stale skill は `--prune` なしでは削除しません。
+
+Codex のrepo-scoped skill surfaceも使う場合は、Codex adapter installerを使います。
+
+```bash
+node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents
+```
+
+このinstallerは `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、`.agent-spectrum-kernel/codex-install-state.json` を更新します。Codex用のローカル投影だけを行い、hook、telemetry、外部公開、GitHub Actions は作りません。
+
 Skill非対応ツールでは、必要な `SKILL.md` だけをプロンプトに貼ります。
 
 Claude Code では project-local adapter を使うと、core skills を `.claude/skills/` に投影できます。
