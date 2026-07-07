@@ -53,7 +53,7 @@ git pull
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 ```
 
-`scripts/install-kernel.mjs` は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、`.agent-spectrum-kernel/install-state.json` を更新します。導入先の独自 `AGENTS.md` 本文は保持し、stale skill は `--prune` なしでは削除しません。
+`scripts/install-kernel.mjs` は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、`.agent-spectrum-kernel/install-state.json` を更新します。導入先の独自 `AGENTS.md` 本文は保持し、stale skill は `--prune` なしでは削除しません。`--prune` 指定時も、前回stateとhash一致する管理済み `SKILL.md` だけを削除します。
 
 Codex のrepo-scoped skill surfaceも使う場合は、Codex adapter installerを使います。
 

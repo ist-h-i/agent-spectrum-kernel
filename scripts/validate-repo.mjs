@@ -1141,6 +1141,8 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
       hasMergeAgents: false,
       hasStaleReporting: false,
       hasPrune: false,
+      verifiesPruneHash: false,
+      prunesManagedFileOnly: false,
       avoidsCodexProjectionDefault: true,
     },
     codexInstaller: {
@@ -1155,6 +1157,8 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
       hasSkipAgents: false,
       hasStaleReporting: false,
       hasPrune: false,
+      verifiesPruneHash: false,
+      prunesManagedFileOnly: false,
       avoidsHooksTelemetryExternal: true,
     },
     documentationConsistency: {
@@ -1363,6 +1367,8 @@ function validateCoreInstaller(root, checks, errors) {
   checks.coreInstaller.hasMergeAgents = text.includes("--merge-agents") && text.includes("agent-spectrum-kernel:start") && text.includes("agent-spectrum-kernel:end");
   checks.coreInstaller.hasStaleReporting = text.includes("stale managed projection");
   checks.coreInstaller.hasPrune = text.includes("--prune") && /prune/.test(text);
+  checks.coreInstaller.verifiesPruneHash = text.includes("modified managed file; refusing to prune") && /currentHash\s*!==\s*record\.sha256/.test(text);
+  checks.coreInstaller.prunesManagedFileOnly = text.includes("unlinkSync") && !text.includes("rmSync(");
   checks.coreInstaller.avoidsCodexProjectionDefault = !/\.agents\/skills/.test(text);
 
   for (const [field, ok] of Object.entries(checks.coreInstaller)) {
@@ -1391,6 +1397,8 @@ function validateCodexInstaller(root, checks, errors) {
   checks.codexInstaller.hasSkipAgents = text.includes("--skip-agents") && /skipAgents/.test(text);
   checks.codexInstaller.hasStaleReporting = text.includes("stale Codex managed projection");
   checks.codexInstaller.hasPrune = text.includes("--prune") && /prune/.test(text);
+  checks.codexInstaller.verifiesPruneHash = text.includes("modified managed file; refusing to prune") && /currentHash\s*!==\s*record\.sha256/.test(text);
+  checks.codexInstaller.prunesManagedFileOnly = text.includes("unlinkSync") && !text.includes("rmSync(");
   checks.codexInstaller.avoidsHooksTelemetryExternal =
     !/\.claude|hooks\.json|webhook|https?:\/\/|telemetry|deploy|publish|release/i.test(text.replace(/no hooks, telemetry, secrets, deploys, external publication/gi, ""));
 
@@ -1581,6 +1589,8 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks
     `- managed AGENTS.md merge supported: ${claudeAdapterChecks.coreInstaller.hasMergeAgents ? "ok" : "invalid"}`,
     `- stale managed projection reporting: ${claudeAdapterChecks.coreInstaller.hasStaleReporting ? "ok" : "invalid"}`,
     `- prune supported: ${claudeAdapterChecks.coreInstaller.hasPrune ? "ok" : "invalid"}`,
+    `- prune hash verification: ${claudeAdapterChecks.coreInstaller.verifiesPruneHash ? "ok" : "invalid"}`,
+    `- prune limited to managed files: ${claudeAdapterChecks.coreInstaller.prunesManagedFileOnly ? "ok" : "invalid"}`,
     `- no Codex-specific projection by default: ${claudeAdapterChecks.coreInstaller.avoidsCodexProjectionDefault ? "ok" : "invalid"}`,
     "",
     "## Codex adapter installer checks",
@@ -1596,6 +1606,8 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks
     `- skip AGENTS.md supported: ${claudeAdapterChecks.codexInstaller.hasSkipAgents ? "ok" : "invalid"}`,
     `- stale Codex projection reporting: ${claudeAdapterChecks.codexInstaller.hasStaleReporting ? "ok" : "invalid"}`,
     `- prune supported: ${claudeAdapterChecks.codexInstaller.hasPrune ? "ok" : "invalid"}`,
+    `- prune hash verification: ${claudeAdapterChecks.codexInstaller.verifiesPruneHash ? "ok" : "invalid"}`,
+    `- prune limited to managed files: ${claudeAdapterChecks.codexInstaller.prunesManagedFileOnly ? "ok" : "invalid"}`,
     `- no hooks/telemetry/external effects: ${claudeAdapterChecks.codexInstaller.avoidsHooksTelemetryExternal ? "ok" : "invalid"}`,
     "",
     "## Local observability checks",

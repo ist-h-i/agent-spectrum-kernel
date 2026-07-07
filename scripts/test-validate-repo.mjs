@@ -255,6 +255,10 @@ function install(manifest, options) {
   const skills = manifest.skills;
   const managed_files = {};
   const dryRun = options["--dry-run"];
+  const currentHash = "current";
+  const record = { sha256: "expected" };
+  if (currentHash !== record.sha256) throw new Error("modified managed file; refusing to prune");
+  unlinkSync("skills/example/SKILL.md");
   if (dryRun) return { skills, managed_files };
   if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
   if (options["--prune"]) return "stale managed projection";
@@ -274,6 +278,10 @@ function install(manifest, options) {
   const managed_files = {};
   const dryRun = options["--dry-run"];
   const skipAgents = options["--skip-agents"];
+  const currentHash = "current";
+  const record = { sha256: "expected" };
+  if (currentHash !== record.sha256) throw new Error("modified managed file; refusing to prune");
+  unlinkSync(".agents/skills/example/SKILL.md");
   if (dryRun) return { skills, managed_files };
   if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
   if (skipAgents) return ".agents/skills";
@@ -1777,14 +1785,33 @@ function assertCoreInstallerScripts() {
   if (!staleState.installed_skills.includes("test-first-verification")) {
     throw new Error(`kernel installer should keep stale skills in state until pruned\n${JSON.stringify(staleState, null, 2)}`);
   }
+  writeFileSync(resolve(staleTarget, "skills/test-first-verification/local-notes.md"), "# keep local notes\n");
   const pruneRun = runRepoScript([installer, "--target", staleTarget, "--skills", "operating-mode-router", "--prune"]);
   assertRuntimePass("kernel installer prune", pruneRun);
   if (existsSync(resolve(staleTarget, "skills/test-first-verification/SKILL.md"))) {
-    throw new Error("kernel installer --prune should delete stale managed skill directories");
+    throw new Error("kernel installer --prune should delete stale managed SKILL.md");
+  }
+  if (!existsSync(resolve(staleTarget, "skills/test-first-verification/local-notes.md"))) {
+    throw new Error("kernel installer --prune should preserve local files in stale skill directories");
   }
   const prunedState = JSON.parse(readFileSync(resolve(staleTarget, ".agent-spectrum-kernel/install-state.json"), "utf8"));
   if (prunedState.installed_skills.includes("test-first-verification")) {
     throw new Error(`kernel installer should remove pruned skills from state\n${JSON.stringify(prunedState, null, 2)}`);
+  }
+
+  const modifiedPruneTarget = resolve(fixtureRoot, "kernel-install-modified-prune");
+  assertRuntimePass(
+    "kernel installer modified prune setup",
+    runRepoScript([installer, "--target", modifiedPruneTarget, "--skills", "operating-mode-router,test-first-verification"]),
+  );
+  writeFileSync(resolve(modifiedPruneTarget, "skills/test-first-verification/SKILL.md"), "# locally modified managed file\n");
+  assertRuntimeFail(
+    "kernel installer modified managed file prune",
+    runRepoScript([installer, "--target", modifiedPruneTarget, "--skills", "operating-mode-router", "--prune"]),
+    "modified managed file; refusing to prune",
+  );
+  if (!existsSync(resolve(modifiedPruneTarget, "skills/test-first-verification/SKILL.md"))) {
+    throw new Error("kernel installer should preserve modified managed file when prune is refused");
   }
 
   assertRuntimeFail(
@@ -1907,14 +1934,33 @@ function assertCodexInstallerScripts() {
   if (!staleState.installed_skills.includes("test-first-verification")) {
     throw new Error(`codex installer should keep stale skills in state until pruned\n${JSON.stringify(staleState, null, 2)}`);
   }
+  writeFileSync(resolve(staleTarget, ".agents/skills/test-first-verification/local-notes.md"), "# keep local Codex notes\n");
   const pruneRun = runRepoScript([installer, "--target", staleTarget, "--skills", "operating-mode-router", "--prune"]);
   assertRuntimePass("codex installer prune", pruneRun);
   if (existsSync(resolve(staleTarget, ".agents/skills/test-first-verification/SKILL.md"))) {
-    throw new Error("codex installer --prune should delete stale managed Codex skill directories");
+    throw new Error("codex installer --prune should delete stale managed Codex SKILL.md");
+  }
+  if (!existsSync(resolve(staleTarget, ".agents/skills/test-first-verification/local-notes.md"))) {
+    throw new Error("codex installer --prune should preserve local files in stale Codex skill directories");
   }
   const prunedState = JSON.parse(readFileSync(resolve(staleTarget, ".agent-spectrum-kernel/codex-install-state.json"), "utf8"));
   if (prunedState.installed_skills.includes("test-first-verification")) {
     throw new Error(`codex installer should remove pruned skills from state\n${JSON.stringify(prunedState, null, 2)}`);
+  }
+
+  const modifiedPruneTarget = resolve(fixtureRoot, "codex-install-modified-prune");
+  assertRuntimePass(
+    "codex installer modified prune setup",
+    runRepoScript([installer, "--target", modifiedPruneTarget, "--skills", "operating-mode-router,test-first-verification"]),
+  );
+  writeFileSync(resolve(modifiedPruneTarget, ".agents/skills/test-first-verification/SKILL.md"), "# locally modified Codex managed file\n");
+  assertRuntimeFail(
+    "codex installer modified managed file prune",
+    runRepoScript([installer, "--target", modifiedPruneTarget, "--skills", "operating-mode-router", "--prune"]),
+    "modified managed file; refusing to prune",
+  );
+  if (!existsSync(resolve(modifiedPruneTarget, ".agents/skills/test-first-verification/SKILL.md"))) {
+    throw new Error("codex installer should preserve modified managed file when prune is refused");
   }
 
   assertRuntimeFail(

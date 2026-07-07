@@ -185,7 +185,7 @@ git pull
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 ```
 
-The installer writes only local files, records `.agent-spectrum-kernel/install-state.json`, reports stale managed skill projections, and prunes stale skills only with `--prune`.
+The installer writes only local files, records `.agent-spectrum-kernel/install-state.json`, reports stale managed skill projections, and prunes stale managed `SKILL.md` files only with `--prune` when their hashes still match the previous install state.
 
 For tools that only support a single custom instruction field, use `CUSTOM_INSTRUCTIONS.md`.
 

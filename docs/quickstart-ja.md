@@ -35,7 +35,7 @@ git pull
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 ```
 
-installer は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、`.agent-spectrum-kernel/install-state.json` を更新します。前回投影したが今回対象外になったSkillは既定では削除せず、`--prune` 指定時だけ削除します。
+installer は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、`.agent-spectrum-kernel/install-state.json` を更新します。前回投影したが今回対象外になったSkillは既定では削除せず、`--prune` 指定時も前回stateとhash一致する管理済み `SKILL.md` だけを削除します。
 
 Codex の `.agents/skills`、prompt template、`codex exec` command template も投影する場合:
 

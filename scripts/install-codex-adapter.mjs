@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -73,13 +73,15 @@ Options:
   --skip-prompts        Do not copy Codex prompt templates into .agents/prompts.
   --skip-command        Do not copy the codex exec command template into .agents/commands.
   --no-overwrite-skills Fail when an existing Codex skill projection would be overwritten.
-  --prune               Delete stale managed Codex skill projections from the previous install state.
+  --prune               Delete stale managed Codex SKILL.md files from the previous install state.
   --dry-run             Print planned changes without changing files.
   -h, --help            Show this help.
 
 Default mode is update-safe: .agents/skills, .agents/prompts, and .agents/commands
 are updated from this checkout, AGENTS.md is only written when missing or when a
 managed block exists, and existing project-local AGENTS.md content is preserved.
+Prune mode deletes only managed files whose hashes still match the previous
+install state, and removes skill directories only if they become empty.
 `);
 }
 
@@ -163,8 +165,12 @@ function planWrite(operations, destination, content, reason) {
   operations.push({ kind: "write", destination, content, reason, unchanged });
 }
 
-function planDelete(operations, destination, reason) {
-  operations.push({ kind: "delete", destination, reason, unchanged: !existsSync(destination) });
+function planDeleteFile(operations, destination, reason) {
+  operations.push({ kind: "delete_file", destination, reason, unchanged: !existsSync(destination) });
+}
+
+function planRemoveEmptyDirectory(operations, destination, reason) {
+  operations.push({ kind: "remove_empty_dir", destination, reason, unchanged: false });
 }
 
 function buildGitDir() {
@@ -224,7 +230,7 @@ function readGitRevision() {
   return null;
 }
 
-function buildState({ manifest, skills, promptTemplates, commandTemplates, managedFiles }) {
+function buildState({ manifest, skills, selectedSkills, retainedStaleSkills, promptTemplates, commandTemplates, managedFiles }) {
   return {
     schema_version: 1,
     installer: "agent-spectrum-codex-adapter",
@@ -240,10 +246,39 @@ function buildState({ manifest, skills, promptTemplates, commandTemplates, manag
       commands_root: ".agents/commands",
     },
     installed_skills: skills,
+    selected_skills: selectedSkills,
+    retained_stale_skills: retainedStaleSkills,
     prompt_templates: promptTemplates,
     command_templates: commandTemplates,
     managed_files: managedFiles,
   };
+}
+
+function previousManagedRecord(previousState, relativePath) {
+  const record = previousState?.managed_files?.[relativePath];
+  if (!record || typeof record.sha256 !== "string") {
+    return null;
+  }
+  return record;
+}
+
+function planPruneManagedFile({ operations, previousState, target, relativePath, skill }) {
+  const record = previousManagedRecord(previousState, relativePath);
+  if (!record) {
+    throw new Error(`missing managed file record; refusing to prune: ${relativePath}`);
+  }
+
+  const destination = resolve(target, relativePath);
+  if (!existsSync(destination)) {
+    return;
+  }
+  const currentHash = hashText(readText(destination));
+  if (currentHash !== record.sha256) {
+    throw new Error(`modified managed file; refusing to prune: ${relativePath}`);
+  }
+
+  planDeleteFile(operations, destination, `stale Codex managed projection:${skill}`);
+  planRemoveEmptyDirectory(operations, dirname(destination), `empty stale Codex managed projection directory:${skill}`);
 }
 
 function buildPlan(args) {
@@ -313,20 +348,20 @@ function buildPlan(args) {
   }
 
   for (const skill of staleSkills) {
-    const destination = resolve(args.target, ".agents", "skills", skill);
+    const relativePath = `.agents/skills/${skill}/SKILL.md`;
     if (args.prune) {
-      planDelete(operations, destination, `stale Codex managed projection:${skill}`);
+      planPruneManagedFile({ operations, previousState, target: args.target, relativePath, skill });
     } else {
-      const staleSkillPath = resolve(destination, "SKILL.md");
-      if (existsSync(staleSkillPath)) {
-        const relativePath = `.agents/skills/${skill}/SKILL.md`;
-        managedFiles[relativePath] = { kind: "stale_codex_skill", skill, sha256: hashText(readText(staleSkillPath)) };
+      const record = previousManagedRecord(previousState, relativePath);
+      if (record) {
+        managedFiles[relativePath] = { ...record, kind: "stale_codex_skill", skill };
       }
     }
   }
 
   const stateSkills = args.prune ? skills : [...new Set([...skills, ...staleSkills])].sort();
-  const state = buildState({ manifest, skills: stateSkills, promptTemplates, commandTemplates, managedFiles });
+  const retainedStaleSkills = args.prune ? [] : staleSkills;
+  const state = buildState({ manifest, skills: stateSkills, selectedSkills: skills, retainedStaleSkills, promptTemplates, commandTemplates, managedFiles });
   const stateContent = `${JSON.stringify(state, null, 2)}\n`;
   planWrite(operations, resolve(args.target, STATE_PATH), stateContent, "codex_install_state");
 
@@ -341,8 +376,14 @@ function applyOperations(operations, dryRun) {
     if (operation.kind === "write") {
       mkdirSync(dirname(operation.destination), { recursive: true });
       writeFileSync(operation.destination, operation.content);
-    } else if (operation.kind === "delete") {
-      rmSync(operation.destination, { recursive: true, force: true });
+    } else if (operation.kind === "delete_file") {
+      if (existsSync(operation.destination)) {
+        unlinkSync(operation.destination);
+      }
+    } else if (operation.kind === "remove_empty_dir") {
+      if (existsSync(operation.destination) && statSync(operation.destination).isDirectory() && readdirSync(operation.destination).length === 0) {
+        rmdirSync(operation.destination);
+      }
     }
   }
 }
@@ -351,7 +392,7 @@ function printPlan(args, plan) {
   const label = args.dryRun ? "Codex adapter installer dry run" : "Codex adapter installed";
   console.log(`${label}: ${args.target}`);
   for (const operation of plan.operations) {
-    const marker = operation.kind === "delete" ? "delete" : operation.unchanged ? "unchanged" : "write";
+    const marker = operation.kind === "delete_file" ? "delete" : operation.kind === "remove_empty_dir" ? "rmdir-if-empty" : operation.unchanged ? "unchanged" : "write";
     console.log(`- ${marker}: ${relative(args.target, operation.destination)} (${operation.reason})`);
   }
   for (const skill of plan.staleSkills) {
