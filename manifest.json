@@ -123,6 +123,7 @@
     "README.md",
     "CUSTOM_INSTRUCTIONS.md",
     "docs/routing-model.md",
+    "docs/agent-session-state-contract.md",
     "docs/skill-matrix.md",
     "docs/observability-runtime-contract.md",
     "docs/operation-automation-contract.md",
@@ -221,6 +222,172 @@
     "adapters/codex/prompts/skill-verify.md",
     "adapters/codex/prompts/skill-handoff.md"
   ],
+  "routing": {
+    "schema_version": 1,
+    "enforcement_model": "default_selection_and_validation",
+    "purpose": "Machine-readable defaults for route selection, route-override validation, risk-gate detection, and adapter capability downgrade checks. This does not replace SKILL.md procedures and does not restrict read-only repository inspection or local verification commands.",
+    "task_classes": {
+      "trivial": {
+        "default_route": "kernel",
+        "risk_gate_required": false,
+        "override_allowed": true
+      },
+      "implementation": {
+        "default_route": "controlled-implementation",
+        "risk_gate_required": false,
+        "override_allowed": true,
+        "override_requires_reason": true
+      },
+      "design": {
+        "default_route": "grill-design",
+        "risk_gate_required": false,
+        "override_allowed": true,
+        "override_requires_reason": true
+      },
+      "investigation": {
+        "default_route": "doubt-driven-development",
+        "risk_gate_required": false,
+        "override_allowed": true,
+        "override_requires_reason": true
+      },
+      "review": {
+        "default_route": "review-router",
+        "risk_gate_required": false,
+        "override_allowed": true,
+        "override_requires_reason": true
+      },
+      "handoff": {
+        "default_route": "handoff-generation",
+        "risk_gate_required": false,
+        "override_allowed": true,
+        "override_requires_reason": true
+      },
+      "risk-gated": {
+        "default_route": "risk-gate",
+        "required_gate": "risk-gate",
+        "risk_gate_required": true,
+        "override_allowed": false
+      }
+    },
+    "operating_modes": {
+      "delivery_quality": {
+        "skill_group": "delivery_quality",
+        "default_route": "skill-router"
+      },
+      "adoption_bootstrap": {
+        "skill_group": "adoption_bootstrap",
+        "default_route": "project-adoption-pack-generation"
+      },
+      "observability_metrics": {
+        "skill_group": "observability_metrics",
+        "default_route": "skill-effectiveness-evaluation",
+        "secondary_routes": ["skill-adoption-metrics", "engineering-capability-evaluation"]
+      },
+      "operation_automation": {
+        "skill_group": "operation_automation",
+        "default_route": "external_operation"
+      }
+    },
+    "default_routes": [
+      {
+        "id": "mode_unclear",
+        "signals": ["delivery/adoption/observability/operation ambiguity"],
+        "task_class": "design",
+        "primary": "operating-mode-router",
+        "secondary": []
+      },
+      {
+        "id": "delivery_unclear",
+        "signals": ["delivery/quality workflow unclear"],
+        "task_class": "design",
+        "primary": "skill-router",
+        "secondary": []
+      },
+      {
+        "id": "new_behavior",
+        "signals": ["new behavior", "feature", "observable behavior change"],
+        "task_class": "implementation",
+        "primary": "spec-driven-development",
+        "secondary": ["test-first-verification", "controlled-implementation"]
+      },
+      {
+        "id": "implementation_after_plan",
+        "signals": ["scope clear", "implementation requested"],
+        "task_class": "implementation",
+        "primary": "controlled-implementation",
+        "secondary": ["test-first-verification"]
+      },
+      {
+        "id": "bug_or_unknown_cause",
+        "signals": ["bug", "regression", "unknown root cause"],
+        "task_class": "investigation",
+        "primary": "doubt-driven-development",
+        "secondary": ["test-first-verification", "controlled-implementation"]
+      },
+      {
+        "id": "review",
+        "signals": ["PR", "diff", "commit", "generated output", "readiness review"],
+        "task_class": "review",
+        "primary": "review-router",
+        "secondary": ["review-final-merge-gate"]
+      },
+      {
+        "id": "handoff",
+        "signals": ["handoff", "partial work", "resume later", "next agent"],
+        "task_class": "handoff",
+        "primary": "handoff-generation",
+        "secondary": []
+      },
+      {
+        "id": "release_readiness",
+        "signals": ["release candidate", "release readiness"],
+        "task_class": "review",
+        "primary": "release-readiness-gate",
+        "secondary": ["risk-gate"]
+      }
+    ],
+    "risk_gate": {
+      "required_route": "risk-gate",
+      "hard_stop_surfaces": [
+        "data_or_file_deletion",
+        "migration_or_destructive_script",
+        "deploy_publish_release_or_external_notification",
+        "git_history_or_remote_ref_mutation",
+        "auth_permission_billing_payment_email_or_telemetry",
+        "secrets_credentials_tokens_keys_or_env",
+        "broad_dependency_install",
+        "global_machine_state",
+        "production_config_or_infrastructure"
+      ],
+      "read_only_investigation_allowed": true,
+      "local_verification_allowed": true,
+      "claim_restriction_for_missing_approval": "Do not claim approval, safety, readiness, mergeability, or permission to execute the risky action."
+    },
+    "allowed_direct_skill_invocation": {
+      "explicit_user_skill_name": true,
+      "must_still_apply_risk_gate": true,
+      "must_still_downgrade_unsupported_adapter_claims": true
+    },
+    "route_override": {
+      "allowed": true,
+      "requires_reason": true,
+      "record_fields": ["default", "selected", "reason"],
+      "not_allowed_for_required_gates": ["risk-gate"],
+      "does_not_limit_adjacent_context": true,
+      "does_not_limit_read_only_or_local_verification_commands": true
+    },
+    "ambiguous_task_fallback": {
+      "mode_unclear": "operating-mode-router",
+      "delivery_workflow_unclear": "skill-router",
+      "unknown_adapter_capability": "downgrade_claim"
+    },
+    "unsupported_adapter_capability": {
+      "source": "docs/adapter-capability-matrix.md",
+      "unknown_status": "downgrade_to_unknown",
+      "unsupported_status": "downgrade_to_unsupported",
+      "partial_status": "claim_only_partial_support"
+    }
+  },
   "design": {
     "kernel": "single physical file with always-on principles and minimal routing",
     "skills": "one directory per workflow, each with SKILL.md",

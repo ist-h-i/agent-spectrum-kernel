@@ -25,6 +25,28 @@ operating-mode-router
 
 `skills/operating-mode-router/SKILL.md` is the top-level mode router. `skills/skill-router/SKILL.md` remains the delivery/quality router for concrete development work.
 
+## Machine-Readable Routing Manifest
+
+`manifest.json.routing` mirrors the routing vocabulary in this document, `AGENTS.md`, `skills/operating-mode-router/SKILL.md`, and `skills/skill-router/SKILL.md`.
+
+It is for:
+
+- default route selection,
+- route-reference validation,
+- route-override reason checks,
+- risk-gate trigger visibility,
+- unsupported adapter capability downgrade checks.
+
+It is not for:
+
+- replacing human-readable `SKILL.md` procedures,
+- forcing one command path,
+- blocking adjacent repository inspection,
+- blocking read-only investigation or local verification,
+- turning route mismatch into an automatic work blocker.
+
+Route override remains allowed when the agent records the default route, selected route, and reason. The exception is a true required `risk-gate`; risky action approval cannot be bypassed by route override.
+
 ## User-Facing Work Modes
 
 Users do not need to know skill names to start work. The default surface is a small set of work intents; routers translate those intents into internal routes.

@@ -43,6 +43,8 @@ Status: complete | partial | blocked | needs review | needs verification
 
 8. Include a stop condition so the next agent knows when to pause.
 
+9. For handoff, non-trivial continuation, interrupted work, or risk-gated work, include a resume block compatible with `docs/agent-session-state-contract.md`. Do not create session state for trivial tasks where the final response already fully captures the state.
+
 ## Output
 
 ```text
@@ -57,6 +59,19 @@ Handoff:
 - Important context:
 - Next task:
 - Stop condition:
+- Resume state: optional; include only for handoff, non-trivial continuation, interrupted work, or risk-gated work. Omit for trivial or fully captured simple tasks.
+  - task_intent:
+  - selected_mode:
+  - selected_skill:
+  - current_phase:
+  - last_verified_evidence:
+  - open_assumptions:
+  - not_verified:
+  - blocked_reason:
+  - required_human_approval:
+  - resume_instruction:
+  - stop_conditions:
+  - updated_at:
 ```
 
 ## Next task format

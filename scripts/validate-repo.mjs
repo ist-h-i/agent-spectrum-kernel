@@ -2,6 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { APPROVAL_REQUIRED_SURFACE_IDS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REQUIRED_SKILL_SIGNALS = [
@@ -451,6 +452,229 @@ function validateSkillGroups(manifest, errors) {
   }
 
   return checks;
+}
+
+function validateRoutingManifest(root, manifest, errors) {
+  const checks = {
+    present: false,
+    taskClasses: [],
+    operatingModes: [],
+    defaultRoutes: [],
+    routeOverridePreserved: false,
+    riskGateHardStopLimited: false,
+    unsupportedCapabilityDowngrade: false,
+  };
+  if (!manifest) {
+    return checks;
+  }
+
+  const routing = manifest.routing;
+  if (!routing || Array.isArray(routing) || typeof routing !== "object") {
+    fail(errors, "routing manifest", "manifest.json.routing must exist and be an object");
+    return checks;
+  }
+  checks.present = true;
+
+  if (routing.schema_version !== 1) {
+    fail(errors, "routing manifest", "manifest.json.routing.schema_version must be 1");
+  }
+  if (routing.enforcement_model !== "default_selection_and_validation") {
+    fail(errors, "routing manifest", "manifest.json.routing.enforcement_model must be default_selection_and_validation");
+  }
+
+  validateRoutingTaskClasses(root, manifest, routing, checks, errors);
+  validateRoutingOperatingModes(root, manifest, routing, checks, errors);
+  validateRoutingDefaultRoutes(root, manifest, routing, checks, errors);
+  validateRoutingRiskGate(root, manifest, routing, checks, errors);
+  validateRoutingOverride(routing, checks, errors);
+  validateRoutingAdapterDowngrade(root, routing, checks, errors);
+
+  return checks;
+}
+
+function validateRoutingTaskClasses(root, manifest, routing, checks, errors) {
+  const taskClasses = routing.task_classes;
+  if (!taskClasses || Array.isArray(taskClasses) || typeof taskClasses !== "object") {
+    fail(errors, "routing manifest", "manifest.json.routing.task_classes must be an object");
+    return;
+  }
+
+  const keys = Object.keys(taskClasses).sort();
+  for (const taskClass of keys) {
+    if (!TASK_CLASSES.includes(taskClass)) {
+      fail(errors, "routing manifest", `manifest.json.routing.task_classes contains unknown task class '${taskClass}'`);
+      continue;
+    }
+    const entry = taskClasses[taskClass];
+    checks.taskClasses.push(taskClass);
+    validateRouteReference(root, manifest, entry?.default_route, `manifest.json.routing.task_classes.${taskClass}.default_route`, errors);
+    if (taskClass === "risk-gated") {
+      if (entry?.required_gate !== "risk-gate") {
+        fail(errors, "routing manifest", "manifest.json.routing.task_classes.risk-gated.required_gate must be risk-gate");
+      }
+      if (entry?.override_allowed !== false) {
+        fail(errors, "routing manifest", "manifest.json.routing.task_classes.risk-gated.override_allowed must be false");
+      }
+    }
+  }
+  for (const taskClass of TASK_CLASSES) {
+    if (!Object.hasOwn(taskClasses, taskClass)) {
+      fail(errors, "routing manifest", `manifest.json.routing.task_classes is missing '${taskClass}'`);
+    }
+  }
+}
+
+function validateRoutingOperatingModes(root, manifest, routing, checks, errors) {
+  const modes = routing.operating_modes;
+  if (!modes || Array.isArray(modes) || typeof modes !== "object") {
+    fail(errors, "routing manifest", "manifest.json.routing.operating_modes must be an object");
+    return;
+  }
+
+  for (const mode of Object.keys(modes).sort()) {
+    if (!OPERATING_MODES.includes(mode)) {
+      fail(errors, "routing manifest", `manifest.json.routing.operating_modes contains unknown mode '${mode}'`);
+      continue;
+    }
+    const entry = modes[mode];
+    checks.operatingModes.push(mode);
+    if (!Object.hasOwn(manifest.skill_groups ?? {}, entry?.skill_group ?? "")) {
+      fail(errors, "routing manifest", `manifest.json.routing.operating_modes.${mode}.skill_group references unknown skill group '${entry?.skill_group ?? "missing"}'`);
+    }
+    validateRouteReference(root, manifest, entry?.default_route, `manifest.json.routing.operating_modes.${mode}.default_route`, errors);
+    if (entry?.secondary_routes !== undefined) {
+      if (!Array.isArray(entry.secondary_routes)) {
+        fail(errors, "routing manifest", `manifest.json.routing.operating_modes.${mode}.secondary_routes must be an array when present`);
+      } else {
+        validateRouteReference(root, manifest, entry.secondary_routes, `manifest.json.routing.operating_modes.${mode}.secondary_routes`, errors);
+      }
+    }
+  }
+  for (const mode of OPERATING_MODES) {
+    if (!Object.hasOwn(modes, mode)) {
+      fail(errors, "routing manifest", `manifest.json.routing.operating_modes is missing '${mode}'`);
+    }
+  }
+}
+
+function validateRoutingDefaultRoutes(root, manifest, routing, checks, errors) {
+  if (!Array.isArray(routing.default_routes)) {
+    fail(errors, "routing manifest", "manifest.json.routing.default_routes must be an array");
+    return;
+  }
+
+  const ids = new Set();
+  for (const [index, route] of routing.default_routes.entries()) {
+    const label = `manifest.json.routing.default_routes[${index}]`;
+    if (!route || Array.isArray(route) || typeof route !== "object") {
+      fail(errors, "routing manifest", `${label} must be an object`);
+      continue;
+    }
+    if (typeof route.id !== "string" || route.id.length === 0) {
+      fail(errors, "routing manifest", `${label}.id must be a non-empty string`);
+    } else if (ids.has(route.id)) {
+      fail(errors, "routing manifest", `${label}.id duplicates '${route.id}'`);
+    } else {
+      ids.add(route.id);
+    }
+    if (route.task_class && !TASK_CLASSES.includes(route.task_class)) {
+      fail(errors, "routing manifest", `${label}.task_class references unknown task class '${route.task_class}'`);
+    }
+    validateRouteReference(root, manifest, route.primary, `${label}.primary`, errors);
+    validateRouteReference(root, manifest, route.secondary ?? [], `${label}.secondary`, errors);
+    checks.defaultRoutes.push(route.id ?? `index:${index}`);
+  }
+}
+
+function validateRoutingRiskGate(root, manifest, routing, checks, errors) {
+  const riskGate = routing.risk_gate;
+  if (!riskGate || Array.isArray(riskGate) || typeof riskGate !== "object") {
+    fail(errors, "routing manifest", "manifest.json.routing.risk_gate must be an object");
+    return;
+  }
+  validateRouteReference(root, manifest, riskGate.required_route, "manifest.json.routing.risk_gate.required_route", errors);
+  if (!Array.isArray(riskGate.hard_stop_surfaces)) {
+    fail(errors, "routing manifest", "manifest.json.routing.risk_gate.hard_stop_surfaces must be an array");
+    return;
+  }
+  const invalid = riskGate.hard_stop_surfaces.filter((surface) => !APPROVAL_REQUIRED_SURFACE_IDS.has(surface));
+  if (invalid.length > 0) {
+    fail(errors, "routing manifest", `manifest.json.routing.risk_gate.hard_stop_surfaces contains non-AGENTS approval-required surfaces: ${invalid.join(", ")}`);
+  } else {
+    checks.riskGateHardStopLimited = true;
+  }
+  if (riskGate.read_only_investigation_allowed !== true || riskGate.local_verification_allowed !== true) {
+    fail(errors, "routing manifest", "manifest.json.routing.risk_gate must allow read-only investigation and local verification");
+  }
+}
+
+function validateRoutingOverride(routing, checks, errors) {
+  const override = routing.route_override;
+  if (!override || Array.isArray(override) || typeof override !== "object") {
+    fail(errors, "routing manifest", "manifest.json.routing.route_override must be an object");
+    return;
+  }
+  checks.routeOverridePreserved = override.allowed === true && override.requires_reason === true;
+  if (!checks.routeOverridePreserved) {
+    fail(errors, "routing manifest", "manifest.json.routing.route_override must keep overrides allowed and require a reason");
+  }
+  if (!Array.isArray(override.not_allowed_for_required_gates) || !override.not_allowed_for_required_gates.includes("risk-gate")) {
+    fail(errors, "routing manifest", "manifest.json.routing.route_override.not_allowed_for_required_gates must include risk-gate");
+  }
+}
+
+function validateRoutingAdapterDowngrade(root, routing, checks, errors) {
+  const downgrade = routing.unsupported_adapter_capability;
+  if (!downgrade || Array.isArray(downgrade) || typeof downgrade !== "object") {
+    fail(errors, "routing manifest", "manifest.json.routing.unsupported_adapter_capability must be an object");
+    return;
+  }
+  if (downgrade.source !== "docs/adapter-capability-matrix.md" || !existsSync(resolve(root, downgrade.source))) {
+    fail(errors, "routing manifest", "manifest.json.routing.unsupported_adapter_capability.source must reference docs/adapter-capability-matrix.md");
+  }
+  checks.unsupportedCapabilityDowngrade =
+    downgrade.unknown_status === "downgrade_to_unknown" &&
+    downgrade.unsupported_status === "downgrade_to_unsupported" &&
+    downgrade.partial_status === "claim_only_partial_support";
+  if (!checks.unsupportedCapabilityDowngrade) {
+    fail(errors, "routing manifest", "manifest.json.routing.unsupported_adapter_capability must preserve adapter capability downgrades");
+  }
+}
+
+function validateRouteReference(root, manifest, reference, label, errors) {
+  if (Array.isArray(reference)) {
+    for (const [index, item] of reference.entries()) {
+      validateRouteReference(root, manifest, item, `${label}[${index}]`, errors);
+    }
+    return;
+  }
+  if (reference && typeof reference === "object") {
+    for (const key of ["skill", "gate", "route", "path"]) {
+      if (Object.hasOwn(reference, key)) {
+        validateRouteReference(root, manifest, reference[key], `${label}.${key}`, errors);
+      }
+    }
+    if (Array.isArray(reference.skills)) {
+      validateRouteReference(root, manifest, reference.skills, `${label}.skills`, errors);
+    }
+    return;
+  }
+  if (typeof reference !== "string" || reference.length === 0) {
+    fail(errors, "routing manifest", `${label} must be a non-empty route reference`);
+    return;
+  }
+  if (["kernel", "external_operation", "manual_routine"].includes(reference)) {
+    return;
+  }
+  const pathMatch = reference.match(/^skills\/([^/]+)\/SKILL\.md$/);
+  const skill = pathMatch ? pathMatch[1] : reference;
+  if (!Array.isArray(manifest.skills) || !manifest.skills.includes(skill)) {
+    fail(errors, "routing manifest", `${label} references unknown skill '${reference}'`);
+    return;
+  }
+  if (!existsSync(resolve(root, "skills", skill, "SKILL.md"))) {
+    fail(errors, "routing manifest", `${label} references missing skill path: skills/${skill}/SKILL.md`);
+  }
 }
 
 function validateManifestPaths(root, manifest, errors) {
@@ -1515,7 +1739,7 @@ function validateAdapterDocumentation(root, checks, errors) {
   }
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -1545,6 +1769,16 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks
           `- Allowed multi-group skills: ${Array.isArray(manifest?.allowed_multi_group_skills) && manifest.allowed_multi_group_skills.length > 0 ? manifest.allowed_multi_group_skills.join(", ") : "none"}`,
         ]
       : ["- `manifest.json.skill_groups`: missing or invalid"]),
+    "",
+    "## Routing manifest checks",
+    "",
+    `- routing section present: ${routingChecks.present ? "ok" : "missing"}`,
+    `- task classes: ${routingChecks.taskClasses.length > 0 ? routingChecks.taskClasses.join(", ") : "none"}`,
+    `- operating modes: ${routingChecks.operatingModes.length > 0 ? routingChecks.operatingModes.join(", ") : "none"}`,
+    `- default route entries: ${routingChecks.defaultRoutes.length}`,
+    `- route override preserved: ${routingChecks.routeOverridePreserved ? "ok" : "invalid"}`,
+    `- hard_stop limited to AGENTS approval-required surfaces: ${routingChecks.riskGateHardStopLimited ? "ok" : "invalid"}`,
+    `- unsupported adapter capability downgrade preserved: ${routingChecks.unsupportedCapabilityDowngrade ? "ok" : "invalid"}`,
     "",
     "## Skill section checks",
     "",
@@ -1737,6 +1971,7 @@ export function validateRepository(options) {
 
   validateManifest(root, manifest, skillDirectories, errors);
   const skillGroupChecks = validateSkillGroups(manifest, errors);
+  const routingChecks = validateRoutingManifest(root, manifest, errors);
   validateManifestPaths(root, manifest, errors);
   const skillChecks = validateSkills(root, skillDirectories, errors);
   const contextMetadataChecks = validateContextMetadata(root, errors);
@@ -1746,7 +1981,7 @@ export function validateRepository(options) {
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

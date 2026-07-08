@@ -89,6 +89,8 @@ The project adapter installs local command templates for common daily workflows:
 
 Commands route through the existing skill model. They do not bypass `risk-gate`, verification, or evidence requirements.
 
+For non-trivial continuation, handoff, interrupted work, or risk-gated work, `/skill-handoff` may include the bounded resume state from `docs/agent-session-state-contract.md`. The adapter does not require session state for trivial or fully captured simple local tasks.
+
 ## Local Observability
 
 Hooks are local-first. They record summarized facts only when a task boundary is available. Missing task boundary is treated as `skip` to avoid event spam.

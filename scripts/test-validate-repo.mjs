@@ -4,9 +4,12 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { APPROVAL_REQUIRED_SURFACES, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
+const doctorScript = resolve(repoRoot, "scripts/ask-doctor.mjs");
+const sensorsScript = resolve(repoRoot, "scripts/ask-sensors.mjs");
 const fixtureRoot = mkdtempSync(resolve(tmpdir(), "validate-repo-"));
 
 function validSkill(name) {
@@ -76,6 +79,51 @@ function skillGroupsFor(skills, overrides = {}) {
   };
 }
 
+function routingFixture() {
+  const task_classes = {};
+  for (const taskClass of TASK_CLASSES) {
+    task_classes[taskClass] = {
+      default_route: "kernel",
+      risk_gate_required: taskClass === "risk-gated",
+      override_allowed: taskClass !== "risk-gated",
+      ...(taskClass === "risk-gated" ? { required_gate: "risk-gate" } : { override_requires_reason: taskClass !== "trivial" }),
+    };
+  }
+
+  const operating_modes = {};
+  for (const mode of OPERATING_MODES) {
+    operating_modes[mode] = {
+      skill_group: mode,
+      default_route: mode === "operation_automation" ? "external_operation" : "kernel",
+    };
+  }
+
+  return {
+    schema_version: 1,
+    enforcement_model: "default_selection_and_validation",
+    task_classes,
+    operating_modes,
+    default_routes: [],
+    risk_gate: {
+      required_route: "kernel",
+      hard_stop_surfaces: APPROVAL_REQUIRED_SURFACES.map((surface) => surface.id),
+      read_only_investigation_allowed: true,
+      local_verification_allowed: true,
+    },
+    route_override: {
+      allowed: true,
+      requires_reason: true,
+      not_allowed_for_required_gates: ["risk-gate"],
+    },
+    unsupported_adapter_capability: {
+      source: "docs/adapter-capability-matrix.md",
+      unknown_status: "downgrade_to_unknown",
+      unsupported_status: "downgrade_to_unsupported",
+      partial_status: "claim_only_partial_support",
+    },
+  };
+}
+
 function writeFixture(root, skills = ["alpha"]) {
   for (const skill of skills) {
     mkdirSync(resolve(root, `skills/${skill}`), { recursive: true });
@@ -101,6 +149,7 @@ function writeFixture(root, skills = ["alpha"]) {
         skills,
         skill_groups: skillGroupsFor(skills),
         allowed_multi_group_skills: [],
+        routing: routingFixture(),
         docs: ["docs/ok.md", "docs/ai/improvement-ledger.md", "docs/ai/domain-rule-ledger.md"],
         examples: ["examples/ok.md"],
         design: { quality_target: "95+" },
@@ -144,6 +193,16 @@ function writeAdapterFixture(root) {
       "# Fixture\n\nLocal hooks are the default local observability path. Pattern B is optional. No raw prompt storage by default. No external publication by default.\n",
     );
   }
+  writeFileSync(
+    resolve(root, "docs/adapter-capability-matrix.md"),
+    `# Adapter Capability Matrix
+
+| Capability | Claude Code | Codex | Cursor |
+|---|---|---|---|
+| Local metrics event recording | partial | unsupported | unknown |
+| Project-local skill projection | supported | supported | unknown |
+`,
+  );
 
   mkdirSync(resolve(root, "docs/ai"), { recursive: true });
   writeFileSync(
@@ -1982,6 +2041,127 @@ function assertCodexInstallerScripts() {
   }
 }
 
+function assertDoctorScript() {
+  const installer = resolve(repoRoot, "scripts/install-kernel.mjs");
+
+  const healthyTarget = resolve(fixtureRoot, "doctor-healthy");
+  assertRuntimePass("doctor setup healthy install", runRepoScript([installer, "--target", healthyTarget, "--skills", "operating-mode-router"]));
+  const healthyResult = runRepoScript([doctorScript, "--target", healthyTarget]);
+  assertRuntimePass("doctor healthy install", healthyResult);
+  if (!healthyResult.stdout.includes("Exit code 1 means installation health failed")) {
+    throw new Error(`doctor should document exit code semantics\n${healthyResult.stdout}\n${healthyResult.stderr}`);
+  }
+
+  const missingSkillTarget = resolve(fixtureRoot, "doctor-missing-skill");
+  assertRuntimePass("doctor setup missing skill install", runRepoScript([installer, "--target", missingSkillTarget, "--skills", "operating-mode-router"]));
+  rmSync(resolve(missingSkillTarget, "skills/operating-mode-router/SKILL.md"));
+  assertRuntimeFail(
+    "doctor missing skill",
+    runRepoScript([doctorScript, "--target", missingSkillTarget]),
+    "managed file is missing: skills/operating-mode-router/SKILL.md",
+  );
+
+  const staleSkillTarget = resolve(fixtureRoot, "doctor-stale-skill");
+  assertRuntimePass(
+    "doctor setup stale skills",
+    runRepoScript([installer, "--target", staleSkillTarget, "--skills", "operating-mode-router,test-first-verification"]),
+  );
+  assertRuntimePass("doctor retain stale skill setup", runRepoScript([installer, "--target", staleSkillTarget, "--skills", "operating-mode-router"]));
+  const staleResult = runRepoScript([doctorScript, "--target", staleSkillTarget]);
+  assertRuntimePass("doctor stale skill warning", staleResult);
+  if (!staleResult.stdout.includes("ASK doctor: warn") || !staleResult.stdout.includes("retained stale managed skill projection: test-first-verification")) {
+    throw new Error(`doctor should warn on retained stale skills\n${staleResult.stdout}\n${staleResult.stderr}`);
+  }
+
+  const unsupportedClaimTarget = resolve(fixtureRoot, "doctor-unsupported-claim");
+  assertRuntimePass("doctor setup unsupported claim install", runRepoScript([installer, "--target", unsupportedClaimTarget, "--skills", "operating-mode-router"]));
+  writeFileSync(resolve(unsupportedClaimTarget, "README.md"), "# Claim\n\nCodex local metrics event recording is supported.\n");
+  const unsupportedClaimResult = runRepoScript([doctorScript, "--target", unsupportedClaimTarget]);
+  assertRuntimePass("doctor unsupported capability warning", unsupportedClaimResult);
+  if (!unsupportedClaimResult.stdout.includes("ASK doctor: warn") || !unsupportedClaimResult.stdout.includes("Local metrics event recording is unsupported")) {
+    throw new Error(`doctor should warn on unsupported adapter capability claims\n${unsupportedClaimResult.stdout}\n${unsupportedClaimResult.stderr}`);
+  }
+}
+
+function assertSensorsScript() {
+  const target = cloneFixture("sensors-target");
+  const implementationPass = resolve(target, "implementation-pass.txt");
+  writeFileSync(
+    implementationPass,
+    `Changed:
+- Added local validation wiring.
+
+Verified:
+- node scripts/test-validate-repo.mjs
+
+Not verified:
+- External integrations.
+
+Risks / assumptions:
+- None beyond local fixture scope.
+
+Next:
+- Prepare review.
+`,
+  );
+  const implementationPassResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", implementationPass]);
+  assertRuntimePass("sensors implementation pass", implementationPassResult);
+  if (!implementationPassResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`implementation contract fixture should pass sensors\n${implementationPassResult.stdout}`);
+  }
+
+  const implementationFail = resolve(target, "implementation-fail.txt");
+  writeFileSync(implementationFail, "Changed:\n- Updated code.\n\nVerified:\n- tests pass\n");
+  const implementationFailResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", implementationFail]);
+  assertRuntimePass("sensors implementation fail is report-only", implementationFailResult);
+  if (!implementationFailResult.stdout.includes("ASK sensors: fail") || !implementationFailResult.stdout.includes("missing required sections")) {
+    throw new Error(`implementation missing sections should be report-only fail\n${implementationFailResult.stdout}`);
+  }
+
+  const reviewPass = resolve(target, "review-pass.txt");
+  writeFileSync(
+    reviewPass,
+    `Decision:
+- approve with comments
+
+Layer summary:
+- Domain: skipped - no domain behavior signal.
+- Architecture: skipped - no boundary signal.
+`,
+  );
+  const reviewPassResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", reviewPass]);
+  assertRuntimePass("sensors review pass", reviewPassResult);
+  if (!reviewPassResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`review contract fixture should pass sensors\n${reviewPassResult.stdout}`);
+  }
+
+  const riskInput = resolve(target, "risk.txt");
+  writeFileSync(riskInput, "Next action: deploy production config.\n");
+  const riskResult = runRepoScript([
+    sensorsScript,
+    "--target",
+    target,
+    "--mode",
+    "implementation",
+    "--input",
+    riskInput,
+    "--changed-files",
+    ".github/workflows/deploy.yml",
+  ]);
+  assertRuntimePass("sensors hard stop is report-only", riskResult);
+  if (!riskResult.stdout.includes("ASK sensors: hard_stop") || !riskResult.stdout.includes("approval-required action")) {
+    throw new Error(`risk surface should be report-only hard_stop\n${riskResult.stdout}`);
+  }
+
+  const unsupportedTarget = cloneFixture("sensors-unsupported-target");
+  writeFileSync(resolve(unsupportedTarget, "README.md"), "# Claim\n\nCodex local metrics event recording is supported.\n");
+  const unsupportedResult = runRepoScript([sensorsScript, "--target", unsupportedTarget, "--mode", "implementation", "--input", implementationPass]);
+  assertRuntimePass("sensors unsupported capability is report-only", unsupportedResult);
+  if (!unsupportedResult.stdout.includes("ASK sensors: fail") || !unsupportedResult.stdout.includes("Unsupported or partial adapter capability overclaims")) {
+    throw new Error(`unsupported adapter claim should be report-only fail\n${unsupportedResult.stdout}`);
+  }
+}
+
 function hookIdentities(hooks) {
   const identities = [];
   for (const [eventName, groups] of Object.entries(hooks ?? {})) {
@@ -2184,6 +2364,8 @@ try {
   assertInstallerScripts();
   assertCoreInstallerScripts();
   assertCodexInstallerScripts();
+  assertDoctorScript();
+  assertSensorsScript();
   assertStakeholderReadinessSamples();
 
   const missingSchemaRoot = cloneFixture("missing-schema");
@@ -2501,6 +2683,7 @@ jobs:
         skills: ["alpha"],
         skill_groups: skillGroupsFor(["alpha"], { adoption_bootstrap: ["alpha"] }),
         allowed_multi_group_skills: ["alpha"],
+        routing: routingFixture(),
         docs: ["docs/ok.md", "docs/ai/improvement-ledger.md"],
         examples: ["examples/ok.md"],
         design: { quality_target: "95+" },
@@ -2510,6 +2693,59 @@ jobs:
     ),
   );
   assertPass("allowed multi-group skill", allowedMultiGroupRoot);
+
+  const missingRoutingRoot = cloneFixture("missing-routing");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(missingRoutingRoot, "manifest.json"), "utf8"));
+    delete manifest.routing;
+    writeFileSync(resolve(missingRoutingRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("missing routing manifest", missingRoutingRoot, "manifest.json.routing must exist");
+
+  const unknownRoutingTaskRoot = cloneFixture("unknown-routing-task");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(unknownRoutingTaskRoot, "manifest.json"), "utf8"));
+    manifest.routing.task_classes.documentation = { default_route: "kernel" };
+    writeFileSync(resolve(unknownRoutingTaskRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("unknown routing task class", unknownRoutingTaskRoot, "unknown task class 'documentation'");
+
+  const missingRoutingSkillRoot = cloneFixture("missing-routing-skill");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(missingRoutingSkillRoot, "manifest.json"), "utf8"));
+    manifest.routing.default_routes.push({
+      id: "bad-route",
+      task_class: "implementation",
+      primary: "missing-skill",
+      secondary: [],
+    });
+    writeFileSync(resolve(missingRoutingSkillRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("missing routing skill", missingRoutingSkillRoot, "references unknown skill 'missing-skill'");
+
+  const missingSecondaryRouteRoot = cloneFixture("missing-secondary-route");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(missingSecondaryRouteRoot, "manifest.json"), "utf8"));
+    manifest.routing.operating_modes.delivery_quality.secondary_routes = ["missing-skill"];
+    writeFileSync(resolve(missingSecondaryRouteRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("missing secondary route skill", missingSecondaryRouteRoot, "references unknown skill 'missing-skill'");
+
+  const routeOverrideRemovedRoot = cloneFixture("route-override-removed");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(routeOverrideRemovedRoot, "manifest.json"), "utf8"));
+    manifest.routing.route_override.allowed = false;
+    writeFileSync(resolve(routeOverrideRemovedRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("route override preserved", routeOverrideRemovedRoot, "must keep overrides allowed");
+
+  const invalidHardStopRoot = cloneFixture("invalid-hard-stop-surface");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(invalidHardStopRoot, "manifest.json"), "utf8"));
+    manifest.routing.risk_gate.hard_stop_surfaces.push("route_mismatch");
+    writeFileSync(resolve(invalidHardStopRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("hard stop limited to approval-required surfaces", invalidHardStopRoot, "non-AGENTS approval-required surfaces");
 
   const stalePhraseRoot = cloneFixture("stale-phrase");
   writeFileSync(resolve(stalePhraseRoot, "docs/ok.md"), "# OK\n\nThis repository has 25 skills.\n");
@@ -2667,6 +2903,7 @@ jobs:
         skills: ["alpha"],
         skill_groups: skillGroupsFor(["alpha"]),
         allowed_multi_group_skills: [],
+        routing: routingFixture(),
         docs: ["CUSTOM_INSTRUCTIONS.md", "docs/ok.md"],
         examples: ["examples/ok.md"],
         design: { quality_target: "95+" },

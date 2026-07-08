@@ -117,6 +117,8 @@ Use these files as copy-paste prompts or as `codex exec` prompt files:
 
 They route through the existing core skills and require evidence-backed outputs. They do not store raw prompts, secrets, customer data, personal data, full command output, or full file contents.
 
+For non-trivial continuation, handoff, interrupted work, or risk-gated work, handoff prompts may include the bounded resume state from `docs/agent-session-state-contract.md`. The adapter does not require session state for trivial or fully captured simple local tasks.
+
 ## Capability Downgrades
 
 This adapter is intentionally narrower than the Claude Code adapter.

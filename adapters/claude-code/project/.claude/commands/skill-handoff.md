@@ -20,6 +20,8 @@ Stop condition:
 
 Include verified evidence and unresolved risks. Do not hide current blockers as optional follow-up.
 
+For non-trivial continuation, handoff, interrupted work, or risk-gated work, also include the bounded resume state fields from `docs/agent-session-state-contract.md`. Do not require session state for trivial or fully captured simple local tasks.
+
 Silent metrics sidecar:
 
 - If structured routing or gate-decision summaries are available, create `.claude/metrics/` if needed and write `.claude/metrics/current-task.json` before the final response.
