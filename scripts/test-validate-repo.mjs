@@ -2043,6 +2043,7 @@ function assertCodexInstallerScripts() {
 
 function assertDoctorScript() {
   const installer = resolve(repoRoot, "scripts/install-kernel.mjs");
+  const claudeInstaller = resolve(repoRoot, "scripts/install-claude-adapter.mjs");
 
   const healthyTarget = resolve(fixtureRoot, "doctor-healthy");
   assertRuntimePass("doctor setup healthy install", runRepoScript([installer, "--target", healthyTarget, "--skills", "operating-mode-router"]));
@@ -2081,6 +2082,23 @@ function assertDoctorScript() {
   if (!unsupportedClaimResult.stdout.includes("ASK doctor: warn") || !unsupportedClaimResult.stdout.includes("Local metrics event recording is unsupported")) {
     throw new Error(`doctor should warn on unsupported adapter capability claims\n${unsupportedClaimResult.stdout}\n${unsupportedClaimResult.stderr}`);
   }
+
+  const runtimeProbeTarget = resolve(fixtureRoot, "doctor-runtime-probe");
+  assertRuntimePass("doctor runtime probe core setup", runRepoScript([installer, "--target", runtimeProbeTarget, "--skills", "operating-mode-router"]));
+  assertRuntimePass("doctor runtime probe Claude adapter setup", runRepoScript([claudeInstaller, "--target", runtimeProbeTarget, "--skills", "operating-mode-router", "--skip-runtime"]));
+  writeFileSync(resolve(runtimeProbeTarget, ".claude/hooks/hooks.json"), '{ "hooks": { "Stop": { "hooks": [] } } }\n');
+  writeFileSync(resolve(runtimeProbeTarget, "README.md"), "# Runtime probe\n\nUse `.claude/commands/missing-runtime.md` during local review.\n");
+  const runtimeProbeResult = runRepoScript([doctorScript, "--target", runtimeProbeTarget, "--runtime-probe"]);
+  assertRuntimePass("doctor runtime probe remains report-only", runtimeProbeResult);
+  if (
+    !runtimeProbeResult.stdout.includes("ASK doctor: warn") ||
+    !runtimeProbeResult.stdout.includes("Runtime conformance probe: enabled") ||
+    !runtimeProbeResult.stdout.includes("Claude adapter hooks shape is invalid") ||
+    !runtimeProbeResult.stdout.includes("runtime command/template reference is missing: .claude/commands/missing-runtime.md") ||
+    !runtimeProbeResult.stdout.includes("local/static/dry-run only")
+  ) {
+    throw new Error(`runtime probe should report local conformance issues without failing installation health\n${runtimeProbeResult.stdout}\n${runtimeProbeResult.stderr}`);
+  }
 }
 
 function assertSensorsScript() {
@@ -2118,6 +2136,85 @@ Next:
     throw new Error(`implementation missing sections should be report-only fail\n${implementationFailResult.stdout}`);
   }
 
+  const weakEvidence = resolve(target, "weak-evidence.txt");
+  writeFileSync(
+    weakEvidence,
+    `Changed:
+- Updated local validation wiring.
+
+Verified:
+- Looks good.
+
+Not verified:
+- none
+
+Risks / assumptions:
+- No additional risk identified.
+
+Next:
+- Ready for review.
+`,
+  );
+  const weakEvidenceResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", weakEvidence]);
+  assertRuntimePass("sensors weak evidence is report-only", weakEvidenceResult);
+  if (
+    !weakEvidenceResult.stdout.includes("ASK sensors: fail") ||
+    !weakEvidenceResult.stdout.includes("evidence_quality: fail") ||
+    !weakEvidenceResult.stdout.includes("Weak evidence downgrades readiness/safety/correctness/no-regression claims")
+  ) {
+    throw new Error(`weak verification evidence should downgrade readiness claims\n${weakEvidenceResult.stdout}`);
+  }
+
+  const testsPassWithoutCommand = resolve(target, "tests-pass-without-command.txt");
+  writeFileSync(
+    testsPassWithoutCommand,
+    `Changed:
+- Updated local validation wiring.
+
+Verified:
+- tests pass
+
+Not verified:
+- none
+
+Risks / assumptions:
+- None beyond local fixture scope.
+
+Next:
+- Prepare review.
+`,
+  );
+  const testsPassWithoutCommandResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", testsPassWithoutCommand]);
+  assertRuntimePass("sensors tests pass without command is report-only", testsPassWithoutCommandResult);
+  if (!testsPassWithoutCommandResult.stdout.includes("ASK sensors: fail") || !testsPassWithoutCommandResult.stdout.includes("tests pass without an explicit command or test target")) {
+    throw new Error(`tests pass without command should be weak evidence\n${testsPassWithoutCommandResult.stdout}`);
+  }
+
+  const concreteEvidence = resolve(target, "concrete-evidence.txt");
+  writeFileSync(
+    concreteEvidence,
+    `Changed:
+- Added local validation wiring.
+
+Verified:
+- node scripts/test-validate-repo.mjs
+
+Not verified:
+- none
+
+Risks / assumptions:
+- None beyond local fixture scope.
+
+Next:
+- Prepare review.
+`,
+  );
+  const concreteEvidenceResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", concreteEvidence]);
+  assertRuntimePass("sensors concrete evidence passes", concreteEvidenceResult);
+  if (!concreteEvidenceResult.stdout.includes("ASK sensors: pass") || !concreteEvidenceResult.stdout.includes("evidence_quality: pass")) {
+    throw new Error(`concrete command evidence should pass evidence quality sensor\n${concreteEvidenceResult.stdout}`);
+  }
+
   const reviewPass = resolve(target, "review-pass.txt");
   writeFileSync(
     reviewPass,
@@ -2151,6 +2248,65 @@ Layer summary:
   assertRuntimePass("sensors hard stop is report-only", riskResult);
   if (!riskResult.stdout.includes("ASK sensors: hard_stop") || !riskResult.stdout.includes("approval-required action")) {
     throw new Error(`risk surface should be report-only hard_stop\n${riskResult.stdout}`);
+  }
+
+  const negatedRisk = resolve(target, "negated-risk.txt");
+  writeFileSync(
+    negatedRisk,
+    `Changed:
+- Documentation only. No deployment or release action was performed.
+
+Verified:
+- node scripts/test-validate-repo.mjs
+
+Not verified:
+- Email notification behavior was not touched.
+
+Risks / assumptions:
+- Auth code was not modified.
+- Telemetry is out of scope.
+
+Next:
+- Reviewed auth docs only.
+`,
+  );
+  const negatedRiskResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", negatedRisk]);
+  assertRuntimePass("sensors negated risk references pass", negatedRiskResult);
+  if (!negatedRiskResult.stdout.includes("ASK sensors: pass") || negatedRiskResult.stdout.includes("risk_surface: hard_stop")) {
+    throw new Error(`negated or non-action risk references should not hard-stop\n${negatedRiskResult.stdout}`);
+  }
+
+  const scopedEvidencePhrases = resolve(target, "scoped-evidence-phrases.txt");
+  writeFileSync(
+    scopedEvidencePhrases,
+    `Changed:
+- Quoted issue title: "Fixed flaky sensor wording".
+
+Verified:
+- node scripts/test-validate-repo.mjs
+
+Not verified:
+- Correctness of unrelated adapters is not confirmed correct.
+
+Risks / assumptions:
+- Safe read-only investigation remains allowed; no safety claim is made.
+
+Next:
+- Prepare review.
+`,
+  );
+  const scopedEvidencePhraseResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", scopedEvidencePhrases]);
+  assertRuntimePass("sensors scoped evidence phrase references pass", scopedEvidencePhraseResult);
+  if (!scopedEvidencePhraseResult.stdout.includes("ASK sensors: pass") || scopedEvidencePhraseResult.stdout.includes("evidence_phrase: warn")) {
+    throw new Error(`quoted, negated, or risk-scoped evidence phrases should not warn as unsupported claims\n${scopedEvidencePhraseResult.stdout}`);
+  }
+
+  const trueRisk = resolve(target, "true-risk.txt");
+  writeFileSync(trueRisk, "Changed:\n- Changed auth behavior.\n");
+  const trueRiskResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", trueRisk]);
+  assertRuntimePass("sensors true auth risk is report-only", trueRiskResult);
+  if (!trueRiskResult.stdout.includes("ASK sensors: hard_stop") || !trueRiskResult.stdout.includes("auth_permission_billing_payment_email_or_telemetry")) {
+    throw new Error(`true auth behavior change should remain hard_stop\n${trueRiskResult.stdout}`);
   }
 
   const unsupportedTarget = cloneFixture("sensors-unsupported-target");

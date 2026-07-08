@@ -230,9 +230,12 @@ Use `ask-doctor` after first adoption, kernel updates, adapter installation, ski
 
 ```bash
 node scripts/ask-doctor.mjs --target /path/to/adopting-repo
+node scripts/ask-doctor.mjs --target /path/to/adopting-repo --runtime-probe
 ```
 
 Doctor reports installation health. It is not a per-task gate, and a failure downgrades setup/readiness claims rather than blocking read-only investigation or local verification. Exit code 1 means installation health failed; it does not prohibit normal read-only investigation or local verification.
+
+The optional runtime probe adds local/static/dry-run adapter conformance checks for projected command/template directories, skill readability, adapter config shape, and visible command/template references. Runtime probe findings are reported separately from installation health and downgrade runtime conformance/readiness claims only. Passing the probe is not proof that Claude, Codex, GitHub Actions, deployment, network, or product/client readiness works.
 
 Use `ask-sensors` to classify control risks in an implementation or review output:
 
