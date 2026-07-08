@@ -4,6 +4,8 @@ Target: every Agent Spectrum Kernel static package/design category should be 95+
 
 Scope note: these scores assess repository packaging, workflow design, validation coverage, and documentation readiness. They do not prove runtime adoption effectiveness, release readiness for a specific project, or client-value readiness.
 
+The current rubric already separates static package/design readiness from runtime effectiveness and client-value outcomes. This update adds finer-grained evaluation categories for doctor, sensors, runtime probe, report-only control semantics, and false-positive/false-negative monitoring.
+
 ## Scoring scale
 
 | Score | Meaning |
@@ -21,6 +23,7 @@ Scope note: these scores assess repository packaging, workflow design, validatio
 |---|---:|---|
 | Kernel design | 95+ | Small, always-on, non-procedural, includes truth/scope/safety/verification/completion contracts |
 | Operating mode routing | 95+ | Delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation are separated before workflow selection |
+| Routing source separation | 95+ | `operating-mode-router` and `skill-router` remain procedural routing sources; `manifest.json.routing` remains machine-readable defaults / validation mirror, not a workflow engine or procedural authority |
 | Skill separation | 95+ | Heavy workflows are modular; each has use cases, exit criteria, output, failure modes |
 | Skill group metadata | 95+ | Every skill is classified into validated manifest groups without moving directories; allowed multi-group membership is explicit |
 | Repository awareness | 95+ | Agents inspect actual repo conventions and commands before non-trivial edits |
@@ -51,6 +54,10 @@ Scope note: these scores assess repository packaging, workflow design, validatio
 | Adoption metrics privacy | 95+ | Longitudinal metrics are opt-in, avoid raw prompt storage, avoid HR/personnel framing, and separate correlation from unsupported causality |
 | Operation reporting separation | 95+ | Weekly/monthly reporting is handled as templates or external cadence, not as normal delivery skills or mandatory telemetry |
 | Adapter conformance | 95+ | Adapter requirements, capability levels, validation checks, and unsupported-capability downgrade rules are documented |
+| Doctor installation health | 95+ | `ask-doctor` checks installation state, managed projections, privacy defaults, and unsupported capability claims without becoming a per-task gate or product-readiness proof |
+| Runtime probe boundary | 95+ | `ask-doctor --runtime-probe` provides local/static/dry-run conformance confidence only; external runtime, deployment, network, and client-value outcomes remain unproven |
+| Sensor control checks | 95+ | `ask-sensors` stays report-only, preserves exit code 0 for findings, limits `hard_stop` to approval-required surfaces, and downgrades weak verification/readiness claims through evidence-quality checks |
+| Sensor/probe noise monitoring | 95+ | False positives and false negatives for sensors and runtime probe are tracked as operational measurement targets, with fixtures used before adding new detectors |
 | Stakeholder readiness reporting | 95+ | Stakeholder templates separate internal workflow quality, release readiness, and client-value readiness with evidence and residual-risk sections |
 | Evidence handling | 95+ | Claims are extracted, classified, downgraded, and linked to next checks |
 | Handoff utility | 95+ | Next task includes scope, forbidden scope, expected output, verification, and stop condition |
@@ -66,6 +73,7 @@ The scores below are static package/design readiness scores. Runtime effectivene
 |---|---:|---|
 | Kernel design | 96 | Added safety, routing, truth model, completion contracts without turning kernel into a workflow dump |
 | Operating mode routing | 95 | `operating-mode-router` separates delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation before lower-level routing |
+| Routing source separation | 95 | `docs/routing-model.md` and `manifest.json.routing.purpose` keep manifest routing as defaults / validation mirror while routers remain the procedural sources |
 | Skill separation | 96 | Focused skills; each skill keeps process, output, exit criteria, or failure modes close to one workflow responsibility |
 | Skill group metadata | 95 | `manifest.json.skill_groups` and validation cover unclassified, unknown, duplicate, invalid, and unsupported multi-group skill entries |
 | Repository awareness | 95 | Dedicated orientation skill plus kernel repository-first rules |
@@ -96,6 +104,10 @@ The scores below are static package/design readiness scores. Runtime effectivene
 | Adoption metrics privacy | 95 | `skill-adoption-metrics` and the metrics event contract avoid hidden telemetry, raw prompt storage by default, and HR/personnel scoring |
 | Operation reporting separation | 95 | Adoption report templates clarify weekly/monthly summaries as operation cadence and keep scheduling outside delivery skills |
 | Adapter conformance | 95 | `docs/adapter-conformance-contract.md`, `docs/adapter-capability-matrix.md`, and validation checks define adapter requirements and downgrade rules for unsupported capabilities |
+| Doctor installation health | 95 | `ask-doctor` separates installation failures, warnings, unsupported claims, and privacy defaults; README states it is not a per-task gate |
+| Runtime probe boundary | 95 | Runtime probe output is documented and printed as local/static/dry-run only; failures downgrade conformance/readiness claims rather than proving external runtime behavior |
+| Sensor control checks | 95 | `ask-sensors` is report-only and fixture-tested for completion sections, review layer summary, weak evidence, risk surfaces, unsupported capability claims, and scoped evidence phrases |
+| Sensor/probe noise monitoring | 90 | Fixture coverage includes several false-positive controls, but real adopting-project false-positive and false-negative rates for sensors and runtime probe remain unmeasured |
 | Stakeholder readiness reporting | 95 | `docs/ai/stakeholder-readiness-report-template.md` separates senior engineer, development manager, business unit leader, and AI promotion leader evidence needs |
 | Evidence handling | 97 | Evidence ledger is explicit and reusable across review/handoff/completion |
 | Handoff utility | 96 | Handoff has executable next-task format and stop conditions |
@@ -119,6 +131,7 @@ The following still require project-specific human judgment:
 - judgment on whether a repeated finding should become a durable rule, executable check, accepted risk, or separate refactor,
 - deployment, release, and production-change approval rules,
 - confirmation that release-readiness inputs and approvals match the target environment,
+- measured false-positive and false-negative rates for `ask-sensors` and `ask-doctor --runtime-probe` in real adopting projects,
 - branch/PR policy,
 - code ownership,
 - domain-specific terminology and business invariants,

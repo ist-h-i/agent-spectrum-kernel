@@ -28,6 +28,8 @@ Project overlay = リポジトリ固有の規約・コマンド・禁止範囲
 
 `skills/operating-mode-router/SKILL.md` は、通常のdelivery/quality作業と、project adoption、observability/metrics、operation/automationを先に分ける上位routerです。`skills/skill-router/SKILL.md` はdelivery/quality内のrouterとして使います。
 
+`manifest.json.routing` は routing の正本や workflow engine ではありません。machine-readable defaults / validation mirror として、route reference、override、risk-gate surface、adapter capability downgrade の静的検査を支えます。人間向けの手順は `SKILL.md` に残し、route mismatch は risk-gate 以外の自動blockにしません。
+
 `skills/*/SKILL.md` は分割します。Grill、Spec、ADR、検証、レビュー、Handoffのような重い手順を常時ルールに混ぜないためです。
 
 ## File layout
@@ -291,7 +293,7 @@ Default outputs should describe the selected work mode, user-facing route, missi
 
 ## Recommended workflows
 
-`skills/operating-mode-router/SKILL.md` first separates delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation. `skills/skill-router/SKILL.md` is the delivery/quality routing source. The table below is a reference summary.
+`skills/operating-mode-router/SKILL.md` first separates delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation. `skills/skill-router/SKILL.md` is the procedural delivery/quality routing source. The table below is a reference summary.
 
 | Task | Use |
 |---|---|
