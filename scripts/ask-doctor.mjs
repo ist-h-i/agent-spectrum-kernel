@@ -385,11 +385,23 @@ function checkProjectOverlayContradictions(target, probe) {
     const text = readFileSync(resolve(target, file), "utf8");
     const units = text.split(/\r?\n|(?<=[.!?])\s+/u).map((unit) => unit.trim()).filter(Boolean);
     for (const unit of units) {
-      if (/\b(?:skip|bypass|disable|ignore|not require|no need for)\b.{0,80}\b(?:risk-gate|verification|evidence-ledger|evidence)\b/i.test(unit)) {
+      if (hasProjectOverlayContradiction(unit) && !isProhibitiveOverlayStatement(unit)) {
         probe.warnings.push(`possible project-overlay contradiction: ${file}: ${unit}`);
       }
     }
   }
+}
+
+function hasProjectOverlayContradiction(unit) {
+  return /\b(?:skip|skipping|bypass|bypassing|disable|disabling|ignore|ignoring|not require|no need for)\b.{0,80}\b(?:risk-gate|verification|evidence-ledger|evidence)\b/i.test(unit);
+}
+
+function isProhibitiveOverlayStatement(unit) {
+  return (
+    /\b(?:do not|don't|never|must not|should not|cannot|can't)\s+(?:skip|bypass|disable|ignore)\b.{0,80}\b(?:risk-gate|verification|evidence-ledger|evidence)\b/i.test(unit) ||
+    /\b(?:skip|skipping|bypass|bypassing|disable|disabling|ignore|ignoring)\b.{0,80}\b(?:risk-gate|verification|evidence-ledger|evidence)\b.{0,80}\b(?:prohibited|forbidden|unacceptable|not allowed|blocked)\b/i.test(unit) ||
+    /\bno need for\b.{0,80}\b(?:risk-gate|verification|evidence-ledger|evidence)\b.{0,80}\b(?:prohibited|forbidden|unacceptable|not allowed|blocked)\b/i.test(unit)
+  );
 }
 
 function printReport(target, report) {

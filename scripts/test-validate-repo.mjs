@@ -2099,6 +2099,36 @@ function assertDoctorScript() {
   ) {
     throw new Error(`runtime probe should report local conformance issues without failing installation health\n${runtimeProbeResult.stdout}\n${runtimeProbeResult.stderr}`);
   }
+
+  const safeOverlayTarget = resolve(fixtureRoot, "doctor-runtime-probe-safe-overlay");
+  assertRuntimePass("doctor runtime safe overlay setup", runRepoScript([installer, "--target", safeOverlayTarget, "--skills", "operating-mode-router"]));
+  mkdirSync(resolve(safeOverlayTarget, "docs"), { recursive: true });
+  writeFileSync(
+    resolve(safeOverlayTarget, "docs/project-overlay.md"),
+    `# Project Overlay
+
+Do not skip risk-gate.
+Never bypass verification.
+No need for evidence is unacceptable.
+Do not ignore evidence requirements.
+Bypassing verification is prohibited.
+`,
+  );
+  const safeOverlayResult = runRepoScript([doctorScript, "--target", safeOverlayTarget, "--runtime-probe"]);
+  assertRuntimePass("doctor runtime probe prohibitive overlay statements", safeOverlayResult);
+  if (safeOverlayResult.stdout.includes("possible project-overlay contradiction")) {
+    throw new Error(`runtime probe should not warn on prohibitive statements that reinforce ASK rules\n${safeOverlayResult.stdout}\n${safeOverlayResult.stderr}`);
+  }
+
+  const unsafeOverlayTarget = resolve(fixtureRoot, "doctor-runtime-probe-unsafe-overlay");
+  assertRuntimePass("doctor runtime unsafe overlay setup", runRepoScript([installer, "--target", unsafeOverlayTarget, "--skills", "operating-mode-router"]));
+  mkdirSync(resolve(unsafeOverlayTarget, "docs"), { recursive: true });
+  writeFileSync(resolve(unsafeOverlayTarget, "docs/project-overlay.md"), "# Project Overlay\n\nDocs-only work may skip risk-gate and bypass verification.\n");
+  const unsafeOverlayResult = runRepoScript([doctorScript, "--target", unsafeOverlayTarget, "--runtime-probe"]);
+  assertRuntimePass("doctor runtime probe unsafe overlay warning", unsafeOverlayResult);
+  if (!unsafeOverlayResult.stdout.includes("ASK doctor: warn") || !unsafeOverlayResult.stdout.includes("possible project-overlay contradiction")) {
+    throw new Error(`runtime probe should still warn on overlay statements that permit bypassing ASK rules\n${unsafeOverlayResult.stdout}\n${unsafeOverlayResult.stderr}`);
+  }
 }
 
 function assertSensorsScript() {
