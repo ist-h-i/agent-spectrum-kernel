@@ -23,11 +23,20 @@ operating-mode-router
       -> manual routine / ChatGPT automation / GitHub Actions / cron / team routine
 ```
 
-`skills/operating-mode-router/SKILL.md` is the top-level mode router. `skills/skill-router/SKILL.md` remains the delivery/quality router for concrete development work.
+`skills/operating-mode-router/SKILL.md` is the procedural source for top-level operating-mode routing. `skills/skill-router/SKILL.md` remains the procedural source for delivery/quality routing for concrete development work.
 
 ## Machine-Readable Routing Manifest
 
-`manifest.json.routing` mirrors the routing vocabulary in this document, `AGENTS.md`, `skills/operating-mode-router/SKILL.md`, and `skills/skill-router/SKILL.md`.
+`manifest.json.routing` is a machine-readable defaults / validation mirror for routing vocabulary in this document, `AGENTS.md`, `skills/operating-mode-router/SKILL.md`, and `skills/skill-router/SKILL.md`. It is not the procedural routing source.
+
+Responsibility split:
+
+| Surface | Responsibility |
+|---|---|
+| `skills/operating-mode-router/SKILL.md` | Procedural source for top-level operating-mode routing. |
+| `skills/skill-router/SKILL.md` | Procedural source for delivery/quality routing. |
+| `manifest.json.routing` | Machine-readable defaults / validation mirror for route references, override checks, risk-gate surfaces, and adapter capability downgrade checks. |
+| `docs/routing-model.md` | Human-readable routing model and explanation. |
 
 It is for:
 
@@ -40,6 +49,7 @@ It is for:
 It is not for:
 
 - replacing human-readable `SKILL.md` procedures,
+- acting as a workflow engine,
 - forcing one command path,
 - blocking adjacent repository inspection,
 - blocking read-only investigation or local verification,

@@ -83,7 +83,7 @@ node scripts/install-claude-adapter.mjs --target /path/to/project
 
 ## 使い分け
 
-実行時の上位ルーティング正本は `skills/operating-mode-router/SKILL.md` です。通常のdelivery/quality作業では `skills/skill-router/SKILL.md` が正本です。このガイドの例は、その導線を説明するためのものです。
+実行時の上位ルーティング正本は `skills/operating-mode-router/SKILL.md` です。通常のdelivery/quality作業では `skills/skill-router/SKILL.md` が正本です。`manifest.json.routing` は正本ではなく、machine-readable defaults / validation mirror です。このガイドの例は、その導線を説明するためのものです。
 
 ### Skill名を知らない通常依頼
 

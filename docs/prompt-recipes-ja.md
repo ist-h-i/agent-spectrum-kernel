@@ -1,6 +1,6 @@
 # Agent Spectrum Kernel Prompt Recipes 日本語版
 
-この文書は、Agent Spectrum Kernel を Skill名を深く知らなくても使えるようにする copy-paste 用の依頼文集です。各recipeは「やりたいこと」から選びます。上位routingの正本は `skills/operating-mode-router/SKILL.md`、delivery/quality内の正本は `skills/skill-router/SKILL.md`、各手順の正本は各 `SKILL.md` です。
+この文書は、Agent Spectrum Kernel を Skill名を深く知らなくても使えるようにする copy-paste 用の依頼文集です。各recipeは「やりたいこと」から選びます。上位routingの正本は `skills/operating-mode-router/SKILL.md`、delivery/quality内の正本は `skills/skill-router/SKILL.md`、各手順の正本は各 `SKILL.md` です。`manifest.json.routing` は正本ではなく、machine-readable defaults / validation mirror です。
 
 ## Skill名を知らない通常入口
 

@@ -89,6 +89,69 @@ Delete or merge a skill when:
 - it causes the agent to over-process simple tasks,
 - users cannot tell when to invoke it.
 
+## Core script refactor boundaries
+
+Keep core helper refactors focused on reviewability and evidence quality, not on turning scripts into a workflow engine.
+
+### `ask-sensors`
+
+`scripts/ask-sensors.mjs` may remain a single runner for now. Do not split it only because it has multiple sensors. Prefer fixture coverage before adding detection logic, and preserve report-only semantics.
+
+Future fixture matrix:
+
+| Sensor | Fixture coverage to preserve before changing behavior |
+|---|---|
+| `completion_contract` | Missing and present implementation completion sections. |
+| `review_layer_summary` | Missing and present review decision / layer summary sections. |
+| `risk_surface` | True approval-required action, approved action, negated risk reference, and read-only mention. |
+| `unsupported_capability` | Unsupported, partial, downgraded, and supported adapter capability claims. |
+| `evidence_phrase` | Unsupported readiness/fixed/safe claims, quoted issue titles, and negated or scoped claims. |
+| `evidence_quality` | Empty verification, vague verification, tests-pass-without-command, concrete command/source evidence, and no-regression/readiness claims. |
+
+Split `ask-sensors` only when one or more of these becomes true:
+
+- file size or sensor count makes the runner difficult to review,
+- adding a new sensor requires understanding unrelated sensors,
+- report-only status aggregation is duplicated or scattered,
+- evidence, risk, or capability fixtures become hard to navigate,
+- CLI compatibility can be preserved with clear tests.
+
+Any future split must preserve:
+
+- CLI arguments and output contract,
+- exit code 0 for report-only findings,
+- `hard_stop` semantics as claim restriction, not command blocking,
+- existing fixture behavior,
+- strongest-status aggregation,
+- no external service calls.
+
+### `ask-shared`
+
+`scripts/ask-shared.mjs` has high responsibility density and is a future split candidate, but it does not need immediate module extraction.
+
+Current responsibilities:
+
+- routing constants,
+- operating modes / task classes,
+- approval-required surfaces,
+- file scanning,
+- adapter capability matrix parsing,
+- unsupported capability claim detection,
+- privacy storage concern detection.
+
+Before adding more shared logic, consider responsibility-specific modules such as:
+
+```text
+scripts/shared/
+  routing-constants.mjs
+  approval-surfaces.mjs
+  file-scan.mjs
+  adapter-capability.mjs
+  privacy-detection.mjs
+```
+
+Any future split must preserve CLI compatibility, doctor and sensors output contracts, validation behavior, fixture behavior, and local-only execution.
+
 ## Maintenance audit
 
 Every few weeks of real use, audit:
