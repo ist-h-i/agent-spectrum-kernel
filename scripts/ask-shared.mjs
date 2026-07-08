@@ -128,8 +128,11 @@ export function collectTextFiles(root, paths, extensions = [".md", ".txt", ".jso
 
 export function detectApprovalRequiredSurfaces({ text = "", paths = [] } = {}) {
   const findings = [];
+  const units = splitDetectionUnits(text);
   for (const surface of APPROVAL_REQUIRED_SURFACES) {
-    const textMatched = surface.patterns.some((pattern) => pattern.test(text));
+    const textMatched = units.some(
+      (unit) => surface.patterns.some((pattern) => pattern.test(unit)) && !isNonActionRiskReference(unit),
+    );
     const pathMatched = paths.some((path) => surface.pathPatterns.some((pattern) => pattern.test(path)));
     if (textMatched || pathMatched) {
       findings.push({
@@ -140,6 +143,40 @@ export function detectApprovalRequiredSurfaces({ text = "", paths = [] } = {}) {
     }
   }
   return findings;
+}
+
+function splitDetectionUnits(text) {
+  return text
+    .split(/\r?\n|(?<=[.!?])\s+/u)
+    .map((unit) => unit.trim())
+    .filter(Boolean);
+}
+
+function isNonActionRiskReference(unit) {
+  const normalized = unit.toLowerCase();
+  if (hasUnnegatedRiskAction(normalized)) {
+    return false;
+  }
+  if (/\b(out of scope|outside scope|not in scope|scope excludes)\b/.test(normalized)) {
+    return true;
+  }
+  if (/\b(was|were|is|are|has|have|had)?\s*not\s+(?:been\s+)?(?:touched|modified|changed|executed|performed|sent|deployed|released|published|enabled|configured|rotated|installed)\b/.test(normalized)) {
+    return true;
+  }
+  if (/\bno\b.{0,80}\b(?:deployment|release|publish|external notification|notification|auth|authorization|permission|billing|payment|email|telemetry)\b.{0,80}\b(?:performed|executed|sent|changed|modified|touched)\b/.test(normalized)) {
+    return true;
+  }
+  if (/\b(?:reviewed|read|inspected|mentioned|referenced)\b.{0,80}\b(?:auth|authorization|permission|billing|payment|email|telemetry|deploy|release|docs?|documentation)\b/.test(normalized)) {
+    return true;
+  }
+  return false;
+}
+
+function hasUnnegatedRiskAction(normalized) {
+  if (!/\b(?:changed|modified|updated|implemented|enabled|disabled|deployed|published|released|sent|rotated|installed|deleted|migrated)\b/.test(normalized)) {
+    return false;
+  }
+  return !/\b(?:not|no|never|without)\b.{0,80}\b(?:changed|modified|updated|implemented|enabled|disabled|deployed|published|released|sent|rotated|installed|deleted|migrated)\b/.test(normalized);
 }
 
 export function parseAdapterCapabilityMatrix(root = REPO_ROOT) {

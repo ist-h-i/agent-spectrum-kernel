@@ -43,6 +43,12 @@ Future adapters should add validation or fixture coverage for:
 - documentation of unsupported or unknown capabilities,
 - upgrade/idempotence behavior when the adapter modifies project-local settings.
 
+## Runtime Probe Boundary
+
+`ask-doctor --runtime-probe` is an optional local/static/dry-run confidence check for projected adapter surfaces. It may inspect command/template directories, projected `SKILL.md` files, adapter config shape, static project-overlay contradictions, and docs that reference command/template paths.
+
+Runtime probe output is not a per-task gate and is not proof of real Claude, Codex, GitHub Actions, network, deployment, or product/client-value execution. Failures downgrade runtime conformance/readiness claims only; installation health remains a separate doctor result.
+
 ## Evidence Status
 
 Verified in this repository:
