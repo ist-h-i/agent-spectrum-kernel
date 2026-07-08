@@ -43,7 +43,7 @@ installer は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills
 node scripts/ask-doctor.mjs --target /path/to/adopting-repo
 ```
 
-`ask-doctor` は初回導入、kernel更新、adapter導入、skill投影更新、drift調査のためのhealth checkです。per-task gateではありません。failure は setup/readiness claim を下げる根拠になりますが、read-only investigation や local verification をそれだけで禁止しません。
+`ask-doctor` は初回導入、kernel更新、adapter導入、skill投影更新、drift調査のためのhealth checkです。per-task gateではありません。exit code 1 は installation health failed を示すだけで、read-only investigation や local verification を禁止しません。failure は setup/readiness claim を下げる根拠として扱います。
 
 Codex の `.agents/skills`、prompt template、`codex exec` command template も投影する場合:
 

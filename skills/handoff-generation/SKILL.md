@@ -59,7 +59,7 @@ Handoff:
 - Important context:
 - Next task:
 - Stop condition:
-- Resume state:
+- Resume state: optional; include only for handoff, non-trivial continuation, interrupted work, or risk-gated work. Omit for trivial or fully captured simple tasks.
   - task_intent:
   - selected_mode:
   - selected_skill:

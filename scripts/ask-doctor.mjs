@@ -35,6 +35,8 @@ function printHelp() {
 
 Checks Agent Spectrum Kernel installation health without mutating files.
 Doctor is an adoption/update health check, not a per-task execution gate.
+Exit code 1 means installation health failed; it does not prohibit normal
+read-only investigation or local verification.
 `);
 }
 
@@ -220,6 +222,7 @@ function printReport(target, report) {
     console.log("- Installation health check passed for the inspected files.");
   }
   console.log("- Doctor is not a per-task gate; safe read-only investigation and local verification may continue.");
+  console.log("- Exit code 1 means installation health failed; it does not prohibit normal read-only investigation or local verification.");
   console.log(`- Target inspected: ${target}`);
 }
 

@@ -542,6 +542,13 @@ function validateRoutingOperatingModes(root, manifest, routing, checks, errors) 
       fail(errors, "routing manifest", `manifest.json.routing.operating_modes.${mode}.skill_group references unknown skill group '${entry?.skill_group ?? "missing"}'`);
     }
     validateRouteReference(root, manifest, entry?.default_route, `manifest.json.routing.operating_modes.${mode}.default_route`, errors);
+    if (entry?.secondary_routes !== undefined) {
+      if (!Array.isArray(entry.secondary_routes)) {
+        fail(errors, "routing manifest", `manifest.json.routing.operating_modes.${mode}.secondary_routes must be an array when present`);
+      } else {
+        validateRouteReference(root, manifest, entry.secondary_routes, `manifest.json.routing.operating_modes.${mode}.secondary_routes`, errors);
+      }
+    }
   }
   for (const mode of OPERATING_MODES) {
     if (!Object.hasOwn(modes, mode)) {

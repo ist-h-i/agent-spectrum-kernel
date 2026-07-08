@@ -2046,7 +2046,11 @@ function assertDoctorScript() {
 
   const healthyTarget = resolve(fixtureRoot, "doctor-healthy");
   assertRuntimePass("doctor setup healthy install", runRepoScript([installer, "--target", healthyTarget, "--skills", "operating-mode-router"]));
-  assertRuntimePass("doctor healthy install", runRepoScript([doctorScript, "--target", healthyTarget]));
+  const healthyResult = runRepoScript([doctorScript, "--target", healthyTarget]);
+  assertRuntimePass("doctor healthy install", healthyResult);
+  if (!healthyResult.stdout.includes("Exit code 1 means installation health failed")) {
+    throw new Error(`doctor should document exit code semantics\n${healthyResult.stdout}\n${healthyResult.stderr}`);
+  }
 
   const missingSkillTarget = resolve(fixtureRoot, "doctor-missing-skill");
   assertRuntimePass("doctor setup missing skill install", runRepoScript([installer, "--target", missingSkillTarget, "--skills", "operating-mode-router"]));
@@ -2718,6 +2722,14 @@ jobs:
     writeFileSync(resolve(missingRoutingSkillRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   }
   assertFail("missing routing skill", missingRoutingSkillRoot, "references unknown skill 'missing-skill'");
+
+  const missingSecondaryRouteRoot = cloneFixture("missing-secondary-route");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(missingSecondaryRouteRoot, "manifest.json"), "utf8"));
+    manifest.routing.operating_modes.delivery_quality.secondary_routes = ["missing-skill"];
+    writeFileSync(resolve(missingSecondaryRouteRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("missing secondary route skill", missingSecondaryRouteRoot, "references unknown skill 'missing-skill'");
 
   const routeOverrideRemovedRoot = cloneFixture("route-override-removed");
   {

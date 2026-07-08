@@ -280,7 +280,8 @@
       },
       "observability_metrics": {
         "skill_group": "observability_metrics",
-        "default_route": "skill-adoption-metrics"
+        "default_route": "skill-effectiveness-evaluation",
+        "secondary_routes": ["skill-adoption-metrics", "engineering-capability-evaluation"]
       },
       "operation_automation": {
         "skill_group": "operation_automation",

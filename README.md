@@ -232,7 +232,7 @@ Use `ask-doctor` after first adoption, kernel updates, adapter installation, ski
 node scripts/ask-doctor.mjs --target /path/to/adopting-repo
 ```
 
-Doctor reports installation health. It is not a per-task gate, and a failure downgrades setup/readiness claims rather than blocking read-only investigation or local verification.
+Doctor reports installation health. It is not a per-task gate, and a failure downgrades setup/readiness claims rather than blocking read-only investigation or local verification. Exit code 1 means installation health failed; it does not prohibit normal read-only investigation or local verification.
 
 Use `ask-sensors` to classify control risks in an implementation or review output:
 
