@@ -140,6 +140,18 @@ If verification cannot be run, state:
 - what remains unverified,
 - the exact next verification command or procedure.
 
+## 7.5 Session state
+
+Use `docs/agent-session-state-contract.md` only for state that materially helps safe continuation.
+
+Write or refresh session state only for:
+- non-trivial work that may need continuation,
+- handoff,
+- interrupted work,
+- risk-gated work or work waiting for approval.
+
+Do not require session state for trivial edits, one-shot answers, or simple local fixes where the final response fully captures state. Session state is not evidence of correctness, readiness, safety, or no regression; it only preserves resume context, verified evidence, assumptions, unverified items, approval needs, resume instruction, and stop conditions.
+
 ## 8. Skill routing
 
 `skills/operating-mode-router/SKILL.md` is the top-level routing source when a request may be delivery, adoption, observability, or operation work. `skills/skill-router/SKILL.md` is the canonical delivery/quality router. `AGENTS.md` only decides whether to stay in the kernel, invoke the mode router, invoke the delivery router, or honor an explicitly requested relevant skill.

@@ -40,6 +40,7 @@ README.md
 CHANGELOG.md
 docs/
   routing-model.md
+  agent-session-state-contract.md
   metrics-event-contract.md
   observability-runtime-contract.md
   operation-automation-contract.md
@@ -109,6 +110,8 @@ adapters/
     prompts/
     commands/
 scripts/
+  ask-doctor.mjs
+  ask-sensors.mjs
   install-kernel.mjs
   install-codex-adapter.mjs
   install-claude-adapter.mjs
@@ -220,6 +223,25 @@ node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-a
 ```
 
 The Codex installer updates `AGENTS.md`, `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. It is intentionally smaller than the Claude Code adapter: no hooks, no local metrics sidecar, no shared PR workflow, and no external publication path are provided. Capability claims are downgraded in `docs/adapter-capability-matrix.md`.
+
+## Doctor and sensors
+
+Use `ask-doctor` after first adoption, kernel updates, adapter installation, skill projection refresh, or suspected installation drift:
+
+```bash
+node scripts/ask-doctor.mjs --target /path/to/adopting-repo
+```
+
+Doctor reports installation health. It is not a per-task gate, and a failure downgrades setup/readiness claims rather than blocking read-only investigation or local verification.
+
+Use `ask-sensors` to classify control risks in an implementation or review output:
+
+```bash
+node scripts/ask-sensors.mjs --target /path/to/repo --mode implementation --input final-output.txt
+node scripts/ask-sensors.mjs --target /path/to/repo --mode review --input review-output.txt
+```
+
+Sensors are initial report-only checks. They detect control failures such as missing completion sections, missing review layer summary, risk surfaces, unsupported adapter capability claims, and evidence phrases without evidence. They do not prove business correctness. `fail` restricts unsupported completion/readiness/safety/merge claims; `hard_stop` is limited to AGENTS approval-required actions.
 
 ## 3分で使う / Quick start
 

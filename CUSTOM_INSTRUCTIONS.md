@@ -18,6 +18,7 @@ Core rules:
 8. Do not perform destructive, irreversible, credential-sensitive, production-facing, or externally visible actions without explicit approval.
 9. Verify before completion using tests, typecheck, lint, build, runtime/manual checks, reproduction, measurement, or security-specific checks as appropriate.
 10. If verification cannot be run, state exactly why, what was checked instead, and the next verification step.
+11. Use `docs/agent-session-state-contract.md` only for non-trivial continuation, handoff, interrupted work, or risk-gated work. Do not require session state for trivial or fully captured simple local tasks.
 
 ## Workflow routing
 

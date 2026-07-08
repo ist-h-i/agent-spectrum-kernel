@@ -37,6 +37,14 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 
 installer は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、`.agent-spectrum-kernel/install-state.json` を更新します。前回投影したが今回対象外になったSkillは既定では削除せず、`--prune` 指定時も前回stateとhash一致する管理済み `SKILL.md` だけを削除します。
 
+導入状態を確認する場合:
+
+```bash
+node scripts/ask-doctor.mjs --target /path/to/adopting-repo
+```
+
+`ask-doctor` は初回導入、kernel更新、adapter導入、skill投影更新、drift調査のためのhealth checkです。per-task gateではありません。failure は setup/readiness claim を下げる根拠になりますが、read-only investigation や local verification をそれだけで禁止しません。
+
 Codex の `.agents/skills`、prompt template、`codex exec` command template も投影する場合:
 
 ```bash
@@ -44,6 +52,15 @@ node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-a
 ```
 
 Codex installer は `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、`.agent-spectrum-kernel/codex-install-state.json` を更新します。hook、telemetry、外部公開、GitHub Actions は作りません。
+
+完了報告やレビュー出力の制御リスクを確認する場合:
+
+```bash
+node scripts/ask-sensors.mjs --target /path/to/repo --mode implementation --input final-output.txt
+node scripts/ask-sensors.mjs --target /path/to/repo --mode review --input review-output.txt
+```
+
+初期 sensors は report-only です。control failure を検出しますが、業務正しさは証明しません。`fail` は unsupported completion/readiness/safety/merge claim を制限し、`hard_stop` は既存 `AGENTS.md` の approval-required action に限定します。
 
 Claude Code を使う場合の推奨構成:
 
