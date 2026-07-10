@@ -2742,7 +2742,11 @@ function assertCodexRunnerScript() {
   writeFileSync(
     fakeCodex,
     `#!/bin/sh
-cat <<'EOF'
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
 Changed:
 - Ran fake Codex implementation.
 
@@ -2796,7 +2800,7 @@ EOF
     "codex-weak-output.md",
   ]);
   assertRuntimeFail("codex runner insufficient evidence is normalized", weakResult, "Codex runner: insufficient_evidence");
-  if (!weakResult.stdout.includes("Codex runner: insufficient_evidence") || !weakResult.stdout.includes("Sensor status: fail")) {
+  if (!weakResult.stdout.includes("Codex runner: insufficient_evidence") || !weakResult.stdout.includes("Sensor status: not run")) {
     throw new Error(`codex runner should normalize weak output as insufficient evidence\n${weakResult.stdout}\n${weakResult.stderr}`);
   }
 

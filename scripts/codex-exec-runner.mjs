@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -131,8 +131,15 @@ function preflight(args) {
   if (promptPath && promptRecord?.sha256 && existsSync(promptPath) && hashText(readFileSync(promptPath, "utf8")) !== promptRecord.sha256) failures.push(`prompt hash does not match Codex install state: ${args.prompt}`);
   try { args.outputPath = resolveWithinTarget(args.target, args.output, "output"); } catch (error) { failures.push(error.message); }
   const sensorsPath = resolve(args.target, "scripts/ask-sensors.mjs");
-  if (!existsSync(sensorsPath)) {
-    failures.push("ask-sensors runtime is missing: scripts/ask-sensors.mjs");
+  for (const runtime of ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs"]) {
+    const relativePath = `scripts/${runtime}`;
+    const record = state?.managed_files?.[relativePath];
+    const runtimePath = resolve(args.target, relativePath);
+    if (!state?.selected_runtime_scripts?.includes(runtime) || record?.kind !== "codex_runtime" || !existsSync(runtimePath)) {
+      failures.push(`managed Codex runtime is missing or unselected: ${relativePath}`);
+    } else if (hashText(readFileSync(runtimePath, "utf8")) !== record.sha256) {
+      failures.push(`managed Codex runtime hash mismatch: ${relativePath}`);
+    }
   }
   return { failures, warnings, state, promptPath };
 }
@@ -170,23 +177,26 @@ function runCodex(args, prompt) {
   const outputPath = args.outputPath;
   mkdirSync(dirname(outputPath), { recursive: true });
   if (existsSync(outputPath)) unlinkSync(outputPath);
-  const commandArgs = ["exec", "--sandbox", args.sandbox, "--output-last-message", args.output];
+  const temporaryOutput = `.agents/runs/codex-run-${process.pid}-${Date.now()}.md`;
+  const temporaryOutputPath = resolveWithinTarget(args.target, temporaryOutput, "temporary output");
+  mkdirSync(dirname(temporaryOutputPath), { recursive: true });
+  const commandArgs = ["exec", "--sandbox", args.sandbox, "--output-last-message", temporaryOutput];
   const result = spawnSync(args.codexBin, commandArgs, {
     cwd: args.target,
     encoding: "utf8",
     input: prompt,
     maxBuffer: 10 * 1024 * 1024,
   });
-  const outputExists = existsSync(outputPath);
-  const finalOutput = outputExists ? readFileSync(outputPath, "utf8") : result.stdout ?? "";
-  if (!outputExists && finalOutput.trim()) {
-    writeFileSync(outputPath, finalOutput);
-  }
+  const outputExists = existsSync(temporaryOutputPath);
+  const finalOutput = outputExists ? readFileSync(temporaryOutputPath, "utf8") : "";
+  if (outputExists && finalOutput.trim()) renameSync(temporaryOutputPath, outputPath);
+  else if (outputExists) unlinkSync(temporaryOutputPath);
   return {
     command: [args.codexBin, ...commandArgs, "<stdin-prompt>"].join(" "),
     exitCode: result.status,
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
+    error: result.error?.message ?? null,
     outputPath: args.output,
     finalOutput,
   };
@@ -214,13 +224,16 @@ function resultStatus({ preflightResult, codexResult, sensorResult, dryRun }) {
   if (dryRun) {
     return { status: "ready_to_execute", evidenceLevel: "projected" };
   }
-  if (!codexResult || codexResult.exitCode !== 0) {
+  if (!codexResult || codexResult.error) {
+    return { status: "execution_failed", evidenceLevel: "projected" };
+  }
+  if (codexResult.exitCode !== 0) {
     return { status: "execution_failed", evidenceLevel: "runtime_detected" };
   }
   if (!codexResult.finalOutput.trim()) {
     return { status: "insufficient_evidence", evidenceLevel: "executed" };
   }
-  if (sensorResult?.status === "pass") {
+  if (sensorResult?.exitCode === 0 && sensorResult?.status === "pass") {
     return { status: "executed", evidenceLevel: "executed" };
   }
   return { status: "insufficient_evidence", evidenceLevel: "executed" };
@@ -275,7 +288,7 @@ try {
     command,
     output_path: codexResult?.outputPath ?? args.output,
     sensor_status: sensorResult?.status ?? null,
-    failures: [...preflightResult.failures, ...(codexResult?.exitCode && codexResult.exitCode !== 0 ? [`codex exec exited ${codexResult.exitCode}`] : [])],
+    failures: [...preflightResult.failures, ...(codexResult?.error ? [`codex exec could not start: ${codexResult.error}`] : []), ...(codexResult?.exitCode !== null && codexResult?.exitCode !== 0 ? [`codex exec exited ${codexResult.exitCode}`] : []), ...(sensorResult && (sensorResult.exitCode !== 0 || sensorResult.status !== "pass") ? [`ask-sensors rejected output: status=${sensorResult.status}, exit=${sensorResult.exitCode}`] : [])],
     warnings: preflightResult.warnings,
     boundary: "File projection and ask-sensors output checks do not prove business correctness, product readiness, or no regression.",
   };
