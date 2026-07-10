@@ -35,7 +35,7 @@ git pull
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 ```
 
-installer は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、`.agent-spectrum-kernel/install-state.json` を更新します。前回投影したが今回対象外になったSkillは既定では削除せず、`--prune` 指定時も前回stateとhash一致する管理済み `SKILL.md` だけを削除します。
+installer は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、`.agent-spectrum-kernel/install-state.json` を更新します。managed file は前回stateのhashと導入先の現在hashが一致する場合だけ更新し、ローカル改変がある場合は `--force` なしでは失敗します。`--check`、`--dry-run`、`--prune`、`--rollback`、`--detach` を使えます。`--detach` は実行面を外し、project-owned contentを残します。
 
 導入状態を確認する場合:
 
@@ -48,10 +48,11 @@ node scripts/ask-doctor.mjs --target /path/to/adopting-repo
 Codex の `.agents/skills`、prompt template、`codex exec` command template も投影する場合:
 
 ```bash
-node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents
+node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
+node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-Codex installer は profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile minimal|implementation|investigation|review|adoption|observability|full` を使い、`--skills <csv>` は選択 prompt / command、router到達可能route、指定 skill 依存の閉包検証付き advanced override として扱います。hook、telemetry、外部公開、GitHub Actions は作りません。
+Codex installer は profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile minimal|implementation|investigation|review|adoption|observability|full` を使い、`--skills <csv>` は選択 prompt / command、router到達可能route、指定 skill 依存の閉包検証付き advanced override として扱います。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。hook、telemetry、外部公開、GitHub Actions は作りません。
 
 完了報告やレビュー出力の制御リスクを確認する場合:
 
@@ -186,6 +187,8 @@ node scripts/install-claude-adapter.mjs --target /path/to/project
 ```
 
 Claude adapter installer は core installer が作る `.agent-spectrum-kernel/install-state.json` を要求します。core state がない場合は `.claude/` を書き込む前に失敗します。
+
+Claude adapter は `.agent-spectrum-kernel/claude-install-state.json` を記録し、core/Codexと同じ lifecycle semantics を使います。`--check`、`--dry-run`、`--prune`、`--force`、`--rollback`、`--detach` が使えます。`--detach` は `.claude/skills`、`.claude/commands`、runtime script、adapter-owned hooksを外し、local metrics、reports、ledgersは既定で残します。
 
 対応profileは `implementation`、`investigation`、`review`、`observability`、`full` です。default は `full` です。narrow profile は、選択commandの必須Skill、Skill依存、通常routerが到達し得るSkillを含むよう閉じています。`--skills <csv>` はadvanced overrideで、閉包を満たさない場合は書き込み前に失敗します。
 

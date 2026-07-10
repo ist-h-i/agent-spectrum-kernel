@@ -16,7 +16,7 @@ The installer can copy:
 - initialize-once project ledger state into `docs/`,
 - the local observability config template into `docs/ai/observability-config.yml`.
 
-The copied skills remain a projection of the canonical core skills in this repository. Update by rerunning the installer from a newer checkout of this repository. The default mode is upgrade-safe: managed projections and refreshable references are updated from the current checkout, project-owned state and unrelated existing settings are preserved, and adapter-owned hook commands are replaced without duplication.
+The copied skills remain a projection of the canonical core skills in this repository. Update by rerunning the installer from a newer checkout of this repository. The default mode is three-way update safe: managed projections and refreshable references are updated only when the target still matches the previous managed hash, unless `--force` is used. Project-owned state and unrelated existing settings are preserved, and adapter-owned hook commands are replaced without duplication.
 
 Hook source of truth:
 
@@ -42,9 +42,14 @@ node scripts/install-claude-adapter.mjs --target /path/to/project --profile impl
 node scripts/install-claude-adapter.mjs --target /path/to/project --profile review
 node scripts/install-claude-adapter.mjs --target /path/to/project --skip-hooks
 node scripts/install-claude-adapter.mjs --target /path/to/project --skip-runtime
+node scripts/install-claude-adapter.mjs --target /path/to/project --check
+node scripts/install-claude-adapter.mjs --target /path/to/project --rollback
+node scripts/install-claude-adapter.mjs --target /path/to/project --detach
 ```
 
 The Claude adapter requires `.agent-spectrum-kernel/install-state.json` from the core installer. If the core state is missing, the adapter fails before writing `.claude/`.
+
+The adapter records `.agent-spectrum-kernel/claude-install-state.json` with managed file hashes, managed hook identifiers, partial-file hashes for `.claude/settings.json`, selected profile, previous successful state, and rollback snapshot. `--prune` removes stale unmodified managed assets. `--detach` removes projected Claude execution surfaces and adapter-owned hooks while preserving metrics, reports, and ledgers by default.
 
 The installer does not enable external publication. It does not create secrets, tokens, webhooks, or cloud telemetry destinations.
 

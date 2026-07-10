@@ -190,7 +190,7 @@ git pull
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 ```
 
-The installer writes only local files, records `.agent-spectrum-kernel/install-state.json`, reports stale managed skill projections, and prunes stale managed `SKILL.md` files only with `--prune` when their hashes still match the previous install state.
+The installer writes only local files, records `.agent-spectrum-kernel/install-state.json`, reports stale managed skill projections, and uses three-way update safety: managed files are updated only when the target still matches the previous managed hash, unless `--force` is used. `--check`, `--dry-run`, `--prune`, `--rollback`, and `--detach` are supported lifecycle commands. `--detach` removes ASK execution surfaces while preserving project-owned content.
 
 For tools that only support a single custom instruction field, use `CUSTOM_INSTRUCTIONS.md`.
 
@@ -215,6 +215,8 @@ Recommended adoption path:
 
 The Claude installer requires the core install state, then updates profile-selected `.claude/skills`, `.claude/commands`, command-required docs/assets, local runtime scripts, and managed hooks in `.claude/settings.json`. It does not use `.claude/hooks/hooks.json` as the project hook source of truth.
 
+The Claude adapter records `.agent-spectrum-kernel/claude-install-state.json` with the same lifecycle schema as the core and Codex installers, including managed hook identifiers and partial-file hashes for `.claude/settings.json`. It supports `--check`, `--dry-run`, `--prune`, `--force`, `--rollback`, and `--detach`; detach removes projected Claude execution surfaces and adapter-owned hooks while preserving local metrics, reports, and ledgers by default.
+
 Supported Claude profiles are `implementation`, `investigation`, `review`, `observability`, and `full`. The default is `full`; narrow profiles are closed over command requirements and router-reachable skills. Use `--skills <csv>` only as an advanced override; the installer fails before writing files when the override is not closed.
 
 `--skip-runtime` also skips/removes adapter-owned metrics hooks. `--skip-hooks` skips/removes hooks but still installs runtime scripts. The optional plugin may be combined with the project adapter; plugin hooks resolve through `CLAUDE_PLUGIN_ROOT` and no-op when the project runtime is absent.
@@ -228,12 +230,15 @@ For Codex, use the prompt-driven adapter in `adapters/codex/`.
 The Codex adapter documents how to project the core `AGENTS.md` and selected canonical skills into Codex-compatible repository surfaces, including `.agents/skills`, prompt templates, and `codex exec` command patterns.
 
 ```bash
-node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents
+node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
+node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-The Codex installer updates `AGENTS.md`, profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. The default profile is `implementation`, not every manifest skill. Supported profiles are `minimal`, `implementation`, `investigation`, `review`, `adoption`, `observability`, and `full`.
+The core installer owns `AGENTS.md`; the Codex installer updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. The default profile is `implementation`, not every manifest skill. Supported profiles are `minimal`, `implementation`, `investigation`, `review`, `adoption`, `observability`, and `full`.
 
 Use `--profile <name>` for normal installs. Use `--skills <csv>` only as an advanced override; the installer fails before writing files when the override is not closed over required skills for the selected prompts, commands, router-reachable routes, and dependencies of the specified skills.
+
+The Codex installer uses the shared lifecycle semantics: `--check`, `--dry-run`, `--prune`, `--force`, `--rollback`, and `--detach` are available, and locally modified managed files are not overwritten without `--force`.
 
 The Codex adapter is intentionally smaller than the Claude Code adapter: no hooks, no local metrics sidecar, no shared PR workflow, and no external publication path are provided. Capability claims are downgraded in `docs/adapter-capability-matrix.md`.
 

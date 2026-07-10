@@ -1598,14 +1598,16 @@ function validateCoreInstaller(root, checks, errors) {
   }
 
   const text = readFileSync(absolutePath, "utf8");
+  const lifecycleText = readFileSync(resolve(root, "scripts/installer-lifecycle.mjs"), "utf8");
+  const combinedText = `${text}\n${lifecycleText}`;
   checks.coreInstaller.readsManifestSkills = /manifest\.skills/.test(text);
   checks.coreInstaller.writesInstallState = text.includes(".agent-spectrum-kernel/install-state.json") && text.includes("managed_files");
   checks.coreInstaller.hasDryRun = text.includes("--dry-run") && /dryRun/.test(text);
   checks.coreInstaller.hasMergeAgents = text.includes("--merge-agents") && text.includes("agent-spectrum-kernel:start") && text.includes("agent-spectrum-kernel:end");
   checks.coreInstaller.hasStaleReporting = text.includes("stale managed projection");
   checks.coreInstaller.hasPrune = text.includes("--prune") && /prune/.test(text);
-  checks.coreInstaller.verifiesPruneHash = text.includes("modified managed file; refusing to prune") && /currentHash\s*!==\s*record\.sha256/.test(text);
-  checks.coreInstaller.prunesManagedFileOnly = text.includes("unlinkSync") && !text.includes("rmSync(");
+  checks.coreInstaller.verifiesPruneHash = combinedText.includes("modified managed file; refusing to prune") && /currentHash\s*!==\s*record\.sha256/.test(combinedText);
+  checks.coreInstaller.prunesManagedFileOnly = combinedText.includes("unlinkSync") && !combinedText.includes("rmSync(");
   checks.coreInstaller.avoidsCodexProjectionDefault = !/\.agents\/skills/.test(text);
 
   for (const [field, ok] of Object.entries(checks.coreInstaller)) {
@@ -1624,6 +1626,8 @@ function validateCodexInstaller(root, checks, errors) {
   }
 
   const text = readFileSync(absolutePath, "utf8");
+  const lifecycleText = readFileSync(resolve(root, "scripts/installer-lifecycle.mjs"), "utf8");
+  const combinedText = `${text}\n${lifecycleText}`;
   checks.codexInstaller.readsManifestSkills = /manifest\.skills/.test(text);
   checks.codexInstaller.writesCodexInstallState = text.includes(".agent-spectrum-kernel/codex-install-state.json") && text.includes("managed_files");
   checks.codexInstaller.hasWorkflowProfiles = text.includes("CODEX_PROFILES") && text.includes("DEFAULT_PROFILE") && text.includes("--profile");
@@ -1647,8 +1651,8 @@ function validateCodexInstaller(root, checks, errors) {
   checks.codexInstaller.hasSkipAgents = text.includes("--skip-agents") && /skipAgents/.test(text);
   checks.codexInstaller.hasStaleReporting = text.includes("stale Codex managed projection");
   checks.codexInstaller.hasPrune = text.includes("--prune") && /prune/.test(text);
-  checks.codexInstaller.verifiesPruneHash = text.includes("modified managed file; refusing to prune") && /currentHash\s*!==\s*record\.sha256/.test(text);
-  checks.codexInstaller.prunesManagedFileOnly = text.includes("unlinkSync") && !text.includes("rmSync(");
+  checks.codexInstaller.verifiesPruneHash = combinedText.includes("modified managed file; refusing to prune") && /currentHash\s*!==\s*record\.sha256/.test(combinedText);
+  checks.codexInstaller.prunesManagedFileOnly = combinedText.includes("unlinkSync") && !combinedText.includes("rmSync(");
   const codexInstallerExecutableText = text
     .replace(/release-readiness-gate/g, "")
     .replace(/- Do not chain this template to publish, deploy, release, send notifications, or mutate production state without .+? and explicit approval\./g, "")

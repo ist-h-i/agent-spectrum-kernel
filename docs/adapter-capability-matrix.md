@@ -19,7 +19,7 @@ Evidence status is based on this repository's Agent Spectrum Kernel files and va
 
 ## Generic Core Installer
 
-The repository also ships `scripts/install-kernel.mjs`, which supports upgrade-safe projection of the generic core `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, and `skills/<name>/SKILL.md` files into an adopting repository. Codex-specific `.agents/skills`, prompt, and command projection is handled separately by `scripts/install-codex-adapter.mjs`.
+The repository also ships `scripts/install-kernel.mjs`, which supports three-way update-safe projection of the generic core `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, and `skills/<name>/SKILL.md` files into an adopting repository. Codex-specific `.agents/skills`, prompt, and command projection is handled separately by `scripts/install-codex-adapter.mjs`; Claude projection is handled by `scripts/install-claude-adapter.mjs`. The installers share lifecycle semantics for `--check`, `--dry-run`, `--prune`, `--force`, `--rollback`, and `--detach`.
 
 ## Tool Notes
 
