@@ -72,6 +72,10 @@ const RUNTIME_SCRIPTS = [
   "ai-metrics-summarize.mjs",
   "ai-ledger-refresh.mjs",
 ];
+const RUNTIME_DIRECTORIES = [
+  "docs/ai/metrics",
+  "docs/ai/reports",
+];
 const COMMAND_METADATA = {
   "skill-review.md": {
     requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
@@ -982,9 +986,7 @@ function main() {
   } else if (args.skipHooks) {
     console.log("- runtime hooks: skipped because --skip-hooks was used");
   }
-  for (const destination of writes) {
-    console.log(`- ${relative(args.target, destination)}`);
-  }
+  lifecycle.printOperations(args.target, args.operations);
   console.log(`- ${STATE_PATH}`);
   console.log("Privacy defaults: local project storage, no external publication, no raw prompt storage.");
 }
