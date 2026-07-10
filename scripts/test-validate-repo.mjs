@@ -2009,11 +2009,11 @@ function assertInstallerScripts() {
   const rollbackConflictSettings = JSON.parse(readFileSync(rollbackConflictSettingsPath, "utf8"));
   rollbackConflictSettings.localPreference = true;
   writeFileSync(rollbackConflictSettingsPath, `${JSON.stringify(rollbackConflictSettings, null, 2)}\n`);
-  assertRuntimeFail(
-    "installer rollback partial settings conflict",
-    runRepoScript([installer, "--target", rollbackConflictTarget, "--rollback"]),
-    "managed partial file conflict",
-  );
+  assertRuntimePass("installer rollback preserves unrelated settings", runRepoScript([installer, "--target", rollbackConflictTarget, "--rollback"]));
+  const restoredSettings = JSON.parse(readFileSync(rollbackConflictSettingsPath, "utf8"));
+  if (restoredSettings.localPreference !== true) {
+    throw new Error("installer rollback should preserve unrelated .claude/settings.json fields");
+  }
 
   const detachTarget = resolve(fixtureRoot, "install-claude-detach-target");
   assertRuntimePass("installer detach core setup", runRepoScript([coreInstaller, "--target", detachTarget]));
@@ -2064,7 +2064,7 @@ function assertInstallerScripts() {
   assertRuntimeFail(
     "installer missing core",
     runRepoScript([installer, "--target", missingCoreTarget]),
-    "ASK core install state is missing",
+    "--merge-agents",
   );
   if (existsSync(resolve(missingCoreTarget, ".claude"))) {
     throw new Error("installer missing core failure should not write adapter files");
@@ -2303,11 +2303,13 @@ function assertCoreInstallerScripts() {
 
 function assertCodexInstallerScripts() {
   const installer = resolve(repoRoot, "scripts/install-codex-adapter.mjs");
+  const coreInstaller = resolve(repoRoot, "scripts/install-kernel.mjs");
   const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
   const markerPattern = /<!-- agent-spectrum-kernel:start -->/g;
   const profiles = ["minimal", "implementation", "investigation", "review", "adoption", "observability", "full"];
 
   const freshTarget = resolve(fixtureRoot, "codex-install-fresh");
+  assertRuntimePass("codex installer core setup", runRepoScript([coreInstaller, "--target", freshTarget]));
   const freshRun = runRepoScript([installer, "--target", freshTarget]);
   assertRuntimePass("codex installer fresh run", freshRun);
   const freshState = readCodexInstallState(freshTarget);
@@ -2350,6 +2352,7 @@ function assertCodexInstallerScripts() {
 
   for (const profile of profiles) {
     const profileTarget = resolve(fixtureRoot, `codex-install-profile-${profile}`);
+    assertRuntimePass(`codex installer ${profile} core setup`, runRepoScript([coreInstaller, "--target", profileTarget]));
     assertRuntimePass(`codex installer ${profile} profile`, runRepoScript([installer, "--target", profileTarget, "--profile", profile]));
     const profileState = readCodexInstallState(profileTarget);
     if (profileState.selected_profile !== profile) {
@@ -2390,6 +2393,7 @@ function assertCodexInstallerScripts() {
   const mergeTarget = resolve(fixtureRoot, "codex-install-merge");
   mkdirSync(mergeTarget, { recursive: true });
   writeFileSync(resolve(mergeTarget, "AGENTS.md"), "# Project Rules\n\nKeep this Codex project overlay.\n");
+  assertRuntimePass("codex installer merge core setup", runRepoScript([coreInstaller, "--target", mergeTarget, "--merge-agents"]));
   assertRuntimePass("codex installer merge agents", runRepoScript([installer, "--target", mergeTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--merge-agents"]));
   assertRuntimePass("codex installer merge agents rerun", runRepoScript([installer, "--target", mergeTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--merge-agents"]));
   const mergedAgents = readFileSync(resolve(mergeTarget, "AGENTS.md"), "utf8");
@@ -2400,8 +2404,10 @@ function assertCodexInstallerScripts() {
   const skipAgentsTarget = resolve(fixtureRoot, "codex-install-skip-agents");
   mkdirSync(skipAgentsTarget, { recursive: true });
   writeFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "# Existing AGENTS\n");
+  assertRuntimePass("codex installer skip agents core setup", runRepoScript([coreInstaller, "--target", skipAgentsTarget, "--merge-agents"]));
+  const agentsBeforeCodex = readFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "utf8");
   assertRuntimePass("codex installer skip agents", runRepoScript([installer, "--target", skipAgentsTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--skip-agents"]));
-  if (readFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "utf8") !== "# Existing AGENTS\n") {
+  if (readFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "utf8") !== agentsBeforeCodex) {
     throw new Error("codex installer --skip-agents should leave AGENTS.md untouched");
   }
 
@@ -2411,13 +2417,14 @@ function assertCodexInstallerScripts() {
   assertRuntimeFail(
     "codex installer existing AGENTS without merge",
     runRepoScript([installer, "--target", conflictTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command"]),
-    "--merge-agents",
+    "ASK core install state is missing",
   );
   if (existsSync(resolve(conflictTarget, ".agent-spectrum-kernel/codex-install-state.json")) || existsSync(resolve(conflictTarget, ".agents/skills/test-first-verification/SKILL.md"))) {
     throw new Error("codex installer preflight failure should not partially write files");
   }
 
   const dryRunTarget = resolve(fixtureRoot, "codex-install-dry-run");
+  assertRuntimePass("codex installer dry-run core setup", runRepoScript([coreInstaller, "--target", dryRunTarget]));
   const dryRun = runRepoScript([installer, "--target", dryRunTarget, "--dry-run"]);
   assertRuntimePass("codex installer dry run", dryRun);
   if (
@@ -2433,6 +2440,7 @@ function assertCodexInstallerScripts() {
   }
 
   const staleTarget = resolve(fixtureRoot, "codex-install-stale");
+  assertRuntimePass("codex installer stale core setup", runRepoScript([coreInstaller, "--target", staleTarget]));
   assertRuntimePass("codex installer stale setup", runRepoScript([installer, "--target", staleTarget, "--profile", "full"]));
   const staleRun = runRepoScript([installer, "--target", staleTarget, "--profile", "review"]);
   assertRuntimePass("codex installer stale report", staleRun);
@@ -2465,6 +2473,7 @@ function assertCodexInstallerScripts() {
   assertCodexInstallClosed("codex installer pruned review profile", staleTarget);
 
   const modifiedPruneTarget = resolve(fixtureRoot, "codex-install-modified-prune");
+  assertRuntimePass("codex installer modified prune core setup", runRepoScript([coreInstaller, "--target", modifiedPruneTarget]));
   assertRuntimePass("codex installer modified prune setup", runRepoScript([installer, "--target", modifiedPruneTarget, "--profile", "full"]));
   assertRuntimePass("codex installer modified prune stale setup", runRepoScript([installer, "--target", modifiedPruneTarget, "--profile", "review"]));
   writeFileSync(resolve(modifiedPruneTarget, ".agents/prompts/skill-implement.md"), "# locally modified Codex managed file\n");
@@ -2524,6 +2533,7 @@ function assertCodexInstallerScripts() {
   }
 
   const overwriteTarget = resolve(fixtureRoot, "codex-install-no-overwrite");
+  assertRuntimePass("codex installer no-overwrite core setup", runRepoScript([coreInstaller, "--target", overwriteTarget]));
   mkdirSync(resolve(overwriteTarget, ".agents/skills/test-first-verification"), { recursive: true });
   writeFileSync(resolve(overwriteTarget, ".agents/skills/test-first-verification/SKILL.md"), "# local codex skill\n");
   assertRuntimeFail(

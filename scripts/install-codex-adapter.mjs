@@ -932,6 +932,10 @@ function buildPlan(args) {
 
   validateSkillNames(skills, manifestSkills);
   validateSkillClosure({ selectedSkills: skills, requiredSkills, profileName: args.profile });
+  const coreStatePath = resolve(args.target, ".agent-spectrum-kernel/install-state.json");
+  if (!existsSync(coreStatePath)) {
+    throw new Error("ASK core install state is missing: .agent-spectrum-kernel/install-state.json. Run scripts/install-kernel.mjs before installing the Codex adapter.");
+  }
 
   const previousState = readPreviousState(args.target);
   const previousSkillNames = previousItems(previousState, "installed_skills", ["codex_skill", "stale_codex_skill"], "skill").filter((skill) =>
@@ -952,31 +956,6 @@ function buildPlan(args) {
   const managedFiles = {};
   const managedBlocks = {};
   const rollback = lifecycle.createRollbackSnapshot();
-
-  if (!args.skipAgents) {
-    const agentsSource = resolve(REPO_ROOT, "AGENTS.md");
-    ensureSource(agentsSource, "AGENTS.md");
-    const agentsDestination = resolve(args.target, "AGENTS.md");
-    const agentsBlock = buildAgentsBlock(readText(agentsSource));
-    const agentsContent = existsSync(agentsDestination)
-      ? replaceOrAppendManagedBlock(readText(agentsDestination), agentsBlock, args.mergeAgents)
-      : agentsBlock;
-    managedBlocks["AGENTS.md#agent-spectrum-kernel"] = lifecycle.createManagedBlockRecord({
-      path: "AGENTS.md",
-      marker: "agent-spectrum-kernel",
-      content: agentsBlock.trimEnd(),
-    });
-    lifecycle.planWriteManagedBlock(operations, {
-      target: args.target,
-      relativePath: "AGENTS.md",
-      blockKey: "AGENTS.md#agent-spectrum-kernel",
-      content: agentsContent,
-      reason: "kernel",
-      previousState,
-      force: args.force,
-      rollback,
-    });
-  }
 
   for (const skill of skills) {
     const source = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
