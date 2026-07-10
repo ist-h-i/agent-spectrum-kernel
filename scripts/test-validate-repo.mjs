@@ -2015,6 +2015,38 @@ function assertInstallerScripts() {
     throw new Error("installer rollback should preserve unrelated .claude/settings.json fields");
   }
 
+  const interruptedHooksTarget = resolve(fixtureRoot, "install-claude-interrupted-hooks-target");
+  assertRuntimePass("installer interrupted hooks core setup", runRepoScript([coreInstaller, "--target", interruptedHooksTarget]));
+  assertRuntimePass("installer interrupted hooks first install", runRepoScript([installer, "--target", interruptedHooksTarget, "--profile", "implementation"]));
+  const interruptedSettingsPath = resolve(interruptedHooksTarget, ".claude/settings.json");
+  const hooksBeforeRemoval = readFileSync(interruptedSettingsPath, "utf8");
+  assertRuntimePass("installer interrupted hooks removal", runRepoScript([installer, "--target", interruptedHooksTarget, "--profile", "implementation", "--skip-hooks"]));
+  const pendingHookState = JSON.parse(readFileSync(resolve(interruptedHooksTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  writeFileSync(resolve(interruptedHooksTarget, ".agent-spectrum-kernel/claude-install-state.json.in-progress.json"), `${JSON.stringify({ pending_state: pendingHookState }, null, 2)}\n`);
+  writeFileSync(interruptedSettingsPath, hooksBeforeRemoval);
+  assertRuntimePass("installer interrupted hooks before-write rollback", runRepoScript([installer, "--target", interruptedHooksTarget, "--rollback"]));
+  if (readFileSync(interruptedSettingsPath, "utf8") !== hooksBeforeRemoval) {
+    throw new Error("rollback should accept an unapplied hook removal as already restored");
+  }
+
+  assertRuntimePass("installer interrupted hooks second removal", runRepoScript([installer, "--target", interruptedHooksTarget, "--profile", "implementation", "--skip-hooks"]));
+  const pendingHookWriteState = JSON.parse(readFileSync(resolve(interruptedHooksTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  writeFileSync(resolve(interruptedHooksTarget, ".agent-spectrum-kernel/claude-install-state.json.in-progress.json"), `${JSON.stringify({ pending_state: pendingHookWriteState }, null, 2)}\n`);
+  assertRuntimePass("installer interrupted hooks after-write rollback", runRepoScript([installer, "--target", interruptedHooksTarget, "--rollback"]));
+  if (!readFileSync(interruptedSettingsPath, "utf8").includes("ai-metrics-record")) {
+    throw new Error("rollback should restore hooks after an applied hook removal");
+  }
+
+  const missingSettingsRollbackTarget = resolve(fixtureRoot, "install-claude-missing-settings-rollback-target");
+  assertRuntimePass("installer missing settings rollback core setup", runRepoScript([coreInstaller, "--target", missingSettingsRollbackTarget]));
+  assertRuntimePass("installer missing settings rollback first install", runRepoScript([installer, "--target", missingSettingsRollbackTarget, "--profile", "implementation"]));
+  assertRuntimePass("installer missing settings rollback second install", runRepoScript([installer, "--target", missingSettingsRollbackTarget, "--profile", "review"]));
+  rmSync(resolve(missingSettingsRollbackTarget, ".claude/settings.json"));
+  assertRuntimePass("installer missing settings force rollback", runRepoScript([installer, "--target", missingSettingsRollbackTarget, "--rollback", "--force"]));
+  if (!existsSync(resolve(missingSettingsRollbackTarget, ".claude/settings.json"))) {
+    throw new Error("force rollback should create settings.json when restoring managed hooks");
+  }
+
   const detachTarget = resolve(fixtureRoot, "install-claude-detach-target");
   assertRuntimePass("installer detach core setup", runRepoScript([coreInstaller, "--target", detachTarget]));
   assertRuntimePass("installer detach setup", runRepoScript([installer, "--target", detachTarget, "--profile", "implementation"]));

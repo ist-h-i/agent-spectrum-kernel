@@ -925,18 +925,22 @@ function hooksFromManagedRecords(records) {
 
 function restoreManagedHookSubset(target, state, { force }) {
   const settingsPath = resolve(target, ".claude/settings.json");
-  if (!existsSync(settingsPath)) {
-    return [];
+  const settings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, "utf8")) : {};
+  const currentSubset = normalizeHooks(settings.hooks ?? {});
+  const currentHash = lifecycle.hashText(JSON.stringify(currentSubset));
+  const pendingHash = state.managed_partial_files?.[".claude/settings.json"]?.sha256;
+  const rollbackRecords = state.rollback?.hooks?.[".claude/settings.json"] ?? state.previous_successful_state?.managed_hooks ?? [];
+  const rollbackHash = lifecycle.hashText(JSON.stringify(rollbackRecords));
+  if (currentHash === rollbackHash) {
+    return null;
   }
-  const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
-  const expectedHash = state.managed_partial_files?.[".claude/settings.json"]?.sha256;
-  const currentHash = lifecycle.hashText(JSON.stringify(normalizeHooks(settings.hooks ?? {})));
-  if (!force && expectedHash && currentHash !== expectedHash) {
+  if (!force && currentHash !== pendingHash) {
     throw new Error("managed hook subset conflict: .claude/settings.json ASK hooks were modified locally. Use --force to overwrite.");
   }
-  const restoredHooks = mergeHooks(settings.hooks ?? {}, hooksFromManagedRecords(state.rollback?.hooks?.[".claude/settings.json"] ?? state.previous_successful_state?.managed_hooks ?? []));
+  const restoredHooks = mergeHooks(settings.hooks ?? {}, hooksFromManagedRecords(rollbackRecords));
   const content = `${JSON.stringify({ ...settings, hooks: restoredHooks }, null, 2)}\n`;
-  const operation = { kind: "write", destination: settingsPath, relativePath: ".claude/settings.json", content, reason: "rollback:restore-managed-hook-subset", unchanged: readFileSync(settingsPath, "utf8") === content };
+  const existing = existsSync(settingsPath) ? readFileSync(settingsPath, "utf8") : null;
+  const operation = { kind: "write", destination: settingsPath, relativePath: ".claude/settings.json", content, reason: "rollback:restore-managed-hook-subset", unchanged: existing === content };
   return operation;
 }
 
