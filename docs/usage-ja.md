@@ -58,7 +58,8 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 Codex のrepo-scoped skill surfaceも使う場合は、Codex adapter installerを使います。
 
 ```bash
-node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents
+node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
+node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
 このinstallerは profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile minimal|implementation|investigation|review|adoption|observability|full` を使います。`--skills <csv>` は advanced override で、選択 prompt / command、router到達可能route、指定 skill 依存の必須 skill 閉包を満たさない場合は書き込み前に失敗します。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。Codex用のローカル投影だけを行い、hook、telemetry、外部公開、GitHub Actions は作りません。

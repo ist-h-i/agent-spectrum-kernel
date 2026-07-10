@@ -631,14 +631,7 @@ function installHooks(args, writes) {
   if (existsSync(settingsPath)) {
     settings = JSON.parse(readFileSync(settingsPath, "utf8"));
   }
-  const currentSubset = JSON.stringify(normalizeHooks(settings.hooks ?? {}));
-  const previousSubset = args.previousState?.managed_partial_files?.[".claude/settings.json"]?.sha256;
-  if (previousSubset && lifecycle.hashText(currentSubset) !== previousSubset && !args.force) {
-    throw new Error("managed hook subset conflict: .claude/settings.json ASK hooks were modified locally. Use --force to overwrite.");
-  }
-  if (args.force && !Object.hasOwn(args.rollback.hooks, ".claude/settings.json")) {
-    args.rollback.hooks[".claude/settings.json"] = normalizeHooks(settings.hooks ?? {});
-  }
+  prepareManagedHookMutation(settings, args);
   settings.hooks = mergeHooks(settings.hooks ?? {}, hooksSettings.hooks ?? {});
   args.managedHooks = normalizeHooks(hooksSettings.hooks ?? {});
   writeFilePlanned(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, args, writes, null, { partialRecord: { kind: "claude_settings", content: JSON.stringify(args.managedHooks), skipRollback: true } });
@@ -686,6 +679,7 @@ function removeManagedHooks(args, writes) {
   const settingsPath = resolve(args.target, ".claude", "settings.json");
   if (existsSync(settingsPath)) {
     const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+    prepareManagedHookMutation(settings, args);
     const nextHooks = removeAdapterOwnedHooks(settings.hooks ?? {});
     const nextSettings = { ...settings, hooks: nextHooks };
     if (JSON.stringify(settings.hooks ?? {}) !== JSON.stringify(nextHooks)) {
@@ -693,6 +687,18 @@ function removeManagedHooks(args, writes) {
     }
   }
   removeLegacyHooksFile(args, writes);
+}
+
+function prepareManagedHookMutation(settings, args) {
+  const subset = normalizeHooks(settings.hooks ?? {});
+  const currentHash = lifecycle.hashText(JSON.stringify(subset));
+  const expectedHash = args.previousState?.managed_partial_files?.[".claude/settings.json"]?.sha256;
+  if (expectedHash && currentHash !== expectedHash && !args.force) {
+    throw new Error("managed hook subset conflict: .claude/settings.json ASK hooks were modified locally. Use --force to overwrite.");
+  }
+  if (args.force && !Object.hasOwn(args.rollback.hooks, ".claude/settings.json")) {
+    args.rollback.hooks[".claude/settings.json"] = subset;
+  }
 }
 
 function removeLegacyHooksFile(args, writes) {
@@ -917,7 +923,7 @@ function hooksFromManagedRecords(records) {
   return hooks;
 }
 
-function restoreManagedHookSubset(target, state, { dryRun, force }) {
+function restoreManagedHookSubset(target, state, { force }) {
   const settingsPath = resolve(target, ".claude/settings.json");
   if (!existsSync(settingsPath)) {
     return [];
@@ -931,8 +937,7 @@ function restoreManagedHookSubset(target, state, { dryRun, force }) {
   const restoredHooks = mergeHooks(settings.hooks ?? {}, hooksFromManagedRecords(state.rollback?.hooks?.[".claude/settings.json"] ?? state.previous_successful_state?.managed_hooks ?? []));
   const content = `${JSON.stringify({ ...settings, hooks: restoredHooks }, null, 2)}\n`;
   const operation = { kind: "write", destination: settingsPath, relativePath: ".claude/settings.json", content, reason: "rollback:restore-managed-hook-subset", unchanged: readFileSync(settingsPath, "utf8") === content };
-  if (!dryRun) lifecycle.applyOperations([operation], false);
-  return [operation];
+  return operation;
 }
 
 function manageStaleFiles(args, writes) {
@@ -1008,9 +1013,16 @@ function main() {
   const writes = [];
 
   if (args.rollback) {
-    const state = readJson(resolve(args.target, STATE_PATH));
-    const operations = lifecycle.rollbackLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force });
-    operations.push(...restoreManagedHookSubset(args.target, state, { dryRun: args.dryRun || args.check, force: args.force }));
+    const operations = lifecycle.rollbackLifecycleState({
+      target: args.target,
+      statePath: STATE_PATH,
+      dryRun: args.dryRun || args.check,
+      force: args.force,
+      extendOperations: ({ state, operations: plan }) => {
+        const hookOperation = restoreManagedHookSubset(args.target, state, { force: args.force });
+        if (hookOperation) plan.push(hookOperation);
+      },
+    });
     console.log(`${args.dryRun || args.check ? "Claude adapter rollback dry run" : "Claude adapter rolled back"}: ${args.target}`);
     lifecycle.printOperations(args.target, operations);
     return;

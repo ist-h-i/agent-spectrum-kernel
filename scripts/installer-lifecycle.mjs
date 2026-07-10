@@ -456,7 +456,7 @@ export function printOperations(target, operations) {
   }
 }
 
-export function rollbackLifecycleState({ target, statePath, dryRun = false, force = false }) {
+export function rollbackLifecycleState({ target, statePath, dryRun = false, force = false, extendOperations = null }) {
   const absoluteStatePath = resolve(target, statePath);
   const markerPath = stateInProgressPath(absoluteStatePath);
   const pending = readJsonIfExists(markerPath);
@@ -512,6 +512,9 @@ export function rollbackLifecycleState({ target, statePath, dryRun = false, forc
     const existing = readText(destination);
     const content = snapshot.content === null ? removeManagedBlock(existing) : replaceOrAppendManagedBlock(existing, `${snapshot.content}\n`, true);
     operations.push({ kind: "write", destination, relativePath: snapshot.path, content, reason: `rollback:restore-block:${blockKey}`, unchanged: existing === content });
+  }
+  if (extendOperations) {
+    extendOperations({ state, operations });
   }
   if (!dryRun) {
     applyOperations(operations, false);
