@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
@@ -80,6 +80,15 @@ function pathIsFile(path) {
 
 function pathIsDirectory(path) {
   return existsSync(path) && statSync(path).isDirectory();
+}
+
+function resolveWithinTarget(target, value, label) {
+  if (!value || value.includes("\0") || value.startsWith("/") || value.split(/[\\/]/).includes("..")) {
+    throw new Error(`${label} must be a relative path inside target`);
+  }
+  const path = resolve(target, value);
+  if (path !== target && !path.startsWith(`${target}/`)) throw new Error(`${label} escapes target`);
+  return path;
 }
 
 function readConfigValue(target, pathParts, fallback) {
@@ -166,11 +175,37 @@ function runClaudeSmoke(target, { dryRun }) {
     }
   }
 
+  const configuredEventStore = readConfigValue(target, ["storage", "event_store"], DEFAULT_EVENT_STORE);
+  let configuredEventStorePath = null;
+  try {
+    configuredEventStorePath = resolveWithinTarget(target, configuredEventStore, "configured event store");
+  } catch (error) {
+    checks.push(check("fail", "configured_event_store", error.message));
+  }
+  if (configuredEventStorePath) {
+    const configuredEventDir = dirname(configuredEventStorePath);
+    if (!pathIsDirectory(configuredEventDir)) {
+      checks.push(check("fail", "configured_event_store", `configured event-store directory is missing or invalid: ${configuredEventStore}`));
+    } else if (dryRun) {
+      checks.push(check("pass", "configured_event_store", `configured event-store location planned: ${configuredEventStore}`));
+    } else {
+      const probePath = resolve(configuredEventDir, `.ask-runtime-smoke-probe-${process.pid}-${Date.now()}`);
+      try {
+        writeFileSync(probePath, "probe\n", { flag: "wx" });
+        unlinkSync(probePath);
+        checks.push(check("pass", "configured_event_store", `configured event-store directory is writable: ${configuredEventStore}`));
+      } catch (error) {
+        if (existsSync(probePath)) unlinkSync(probePath);
+        checks.push(check("fail", "configured_event_store", `configured event-store directory is not writable: ${configuredEventStore}: ${error.message}`));
+      }
+    }
+  }
+
   const eventStore = ".agent-spectrum-kernel/runtime-smoke/events.jsonl";
   const eventStorePath = resolve(target, eventStore);
   const eventDir = dirname(eventStorePath);
   if (!pathIsDirectory(eventDir) && dryRun) {
-    checks.push(check("fail", "event_store_directory", `event-store directory is missing: ${eventStore}`));
+    checks.push(check("pass", "event_store_directory", `event-store location planned: ${eventStore}`));
   } else if (!dryRun) {
     try {
       const event = {

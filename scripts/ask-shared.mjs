@@ -90,6 +90,43 @@ export const ADAPTER_EVIDENCE_LEVELS = [
 ];
 export const ADAPTER_LEVELS_THAT_SUPPORT_CAPABILITY_CLAIMS = new Set(["behavior_verified"]);
 
+// This is the single execution contract for projected Codex prompts. The
+// installer, runner, and sensors must not derive mode or output requirements
+// independently.
+export const CODEX_PROMPT_CONTRACTS = {
+  "skill-implement.md": {
+    mode: "implementation",
+    sandbox: "workspace-write",
+    requiredSections: ["Changed:", "Verified:", "Not verified:", "Risks / assumptions:", "Next:"],
+  },
+  "skill-investigate.md": {
+    mode: "investigation",
+    sandbox: "workspace-write",
+    requiredSections: ["Findings:", "Cause:", "Changed:", "Verified:", "Unknown / not verified:", "Next:"],
+  },
+  "skill-review.md": {
+    mode: "review",
+    sandbox: "read-only",
+    requiredSections: ["Decision:", "Layer summary:"],
+  },
+  "skill-verify.md": {
+    mode: "verification",
+    sandbox: "workspace-write",
+    requiredSections: ["Verification Contract:", "Evidence:", "Not verified:", "Next verification:"],
+  },
+  "skill-handoff.md": {
+    mode: "handoff",
+    sandbox: "read-only",
+    requiredSections: ["Task:", "Context:", "Allowed scope:", "Forbidden scope:", "Expected output:", "Verification:", "Stop condition:"],
+  },
+};
+
+export const CODEX_PROMPT_MODES = new Set(Object.values(CODEX_PROMPT_CONTRACTS).map((contract) => contract.mode));
+
+export function codexPromptContractForMode(mode) {
+  return Object.values(CODEX_PROMPT_CONTRACTS).find((contract) => contract.mode === mode) ?? null;
+}
+
 export function hashText(text) {
   return createHash("sha256").update(text).digest("hex");
 }

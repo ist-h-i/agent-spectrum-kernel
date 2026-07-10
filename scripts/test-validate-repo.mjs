@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { APPROVAL_REQUIRED_SURFACES, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
+import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -2409,6 +2409,14 @@ function assertCodexInstallerScripts() {
     if (profile === "full" && profileState.selected_skills.length !== manifest.skills.length) {
       throw new Error(`codex full profile should install every manifest skill\n${JSON.stringify(profileState, null, 2)}`);
     }
+    const generatedCommand = readFileSync(resolve(profileTarget, ".agents/commands/codex-exec.md"), "utf8");
+    for (const prompt of profileState.selected_prompts) {
+      const contract = CODEX_PROMPT_CONTRACTS[prompt];
+      const expectedInvocation = `--prompt ${prompt} --mode ${contract.mode} --sandbox ${contract.sandbox}`;
+      if (!generatedCommand.includes(expectedInvocation)) {
+        throw new Error(`codex command template must use the managed contract for ${prompt}: ${expectedInvocation}`);
+      }
+    }
     assertCodexInstallClosed(`codex installer ${profile} profile`, profileTarget);
     if (profile === "implementation") {
       assertCodexRoutingFixtures(`codex installer ${profile} routing fixtures`, profileTarget, [
@@ -2728,7 +2736,7 @@ function assertAdapterRuntimeSmokeScript() {
   rmSync(resolve(missingEventStoreTarget, "docs/ai/metrics"), { recursive: true, force: true });
   writeFileSync(resolve(missingEventStoreTarget, "docs/ai/metrics"), "not a directory\n");
   const missingEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", missingEventStoreTarget, "--adapter", "claude"]);
-  assertRuntimePass("adapter runtime smoke isolates production event store", missingEventStoreResult);
+  assertRuntimeFail("adapter runtime smoke detects configured event store failure", missingEventStoreResult, "configured event-store directory is missing or invalid");
 }
 
 function assertCodexRunnerScript() {
@@ -2781,6 +2789,79 @@ EOF
   assertRuntimePass("codex runner captures and sensors output", passResult);
   if (!passResult.stdout.includes("Codex runner: executed") || !passResult.stdout.includes("Evidence level: executed") || !existsSync(resolve(target, "codex-output.md"))) {
     throw new Error(`codex runner should capture output and report executed evidence\n${passResult.stdout}\n${passResult.stderr}`);
+  }
+
+  const failedOutputPath = resolve(target, "codex-preserved-output.md");
+  writeFileSync(failedOutputPath, "previous successful output\n");
+  const fakeFailingCodex = resolve(target, "fake-failing-codex");
+  writeFileSync(
+    fakeFailingCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+echo 'partial failed output' > "$output"
+exit 9
+`,
+  );
+  chmodSync(fakeFailingCodex, 0o755);
+  const failedOutputResult = runRepoScript([
+    codexRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--codex-bin",
+    fakeFailingCodex,
+    "--output",
+    "codex-preserved-output.md",
+  ]);
+  assertRuntimeFail("codex runner preserves prior output on process failure", failedOutputResult, "codex exec exited 9");
+  if (readFileSync(failedOutputPath, "utf8") !== "previous successful output\n") {
+    throw new Error("codex runner must preserve the previous official output when Codex exits non-zero");
+  }
+
+  const mismatchResult = runRepoScript([codexRunnerScript, "--target", target, "--prompt", "skill-investigate.md", "--mode", "implementation", "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner rejects prompt mode mismatch", mismatchResult, "prompt/mode mismatch");
+  const escapeResult = runRepoScript([codexRunnerScript, "--target", target, "--output", "../escape.md", "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner rejects output escape", escapeResult, "output must be a relative path inside target");
+  const diffOptionResult = runRepoScript([codexRunnerScript, "--target", target, "--diff-base", "--output=/tmp/ask-injected.diff", "--dry-run"]);
+  assertRuntimeFail("codex runner rejects git option diff base", diffOptionResult, "invalid --diff-base");
+  if (existsSync("/tmp/ask-injected.diff")) {
+    throw new Error("codex runner must not permit --diff-base to create an external file");
+  }
+
+  const statePath = resolve(target, ".agent-spectrum-kernel/codex-install-state.json");
+  const originalState = readFileSync(statePath, "utf8");
+  const stateWithoutPromptRecord = JSON.parse(originalState);
+  delete stateWithoutPromptRecord.managed_files[".agents/prompts/skill-implement.md"];
+  writeFileSync(statePath, `${JSON.stringify(stateWithoutPromptRecord, null, 2)}\n`);
+  const missingPromptRecordResult = runRepoScript([codexRunnerScript, "--target", target, "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner requires selected prompt managed record", missingPromptRecordResult, "selected prompt has no managed Codex prompt record");
+  writeFileSync(statePath, originalState);
+
+  const detachedState = JSON.parse(originalState);
+  detachedState.install_status = "detached";
+  writeFileSync(statePath, `${JSON.stringify(detachedState, null, 2)}\n`);
+  const detachedDryRunResult = runRepoScript([codexRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects detached install state", detachedDryRunResult, "Codex install status must be installed");
+  if (detachedDryRunResult.stdout.includes("codex exec exited undefined")) {
+    throw new Error("preflight failures must not report an undefined Codex exit code");
+  }
+  writeFileSync(statePath, originalState);
+
+  const sensorRuntimePath = resolve(target, "scripts/ask-sensors.mjs");
+  const originalSensorRuntime = readFileSync(sensorRuntimePath, "utf8");
+  writeFileSync(sensorRuntimePath, `${originalSensorRuntime}\n// local modification\n`);
+  const runtimeHashResult = runRepoScript([codexRunnerScript, "--target", target, "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner rejects modified sensor runtime", runtimeHashResult, "managed Codex runtime hash mismatch: scripts/ask-sensors.mjs");
+  writeFileSync(sensorRuntimePath, originalSensorRuntime);
+
+  const missingBinaryResult = runRepoScript([codexRunnerScript, "--target", target, "--codex-bin", "missing-codex-binary-for-fixture"]);
+  assertRuntimeFail("codex runner reports unavailable executable as projected failure", missingBinaryResult, "codex exec could not start");
+  if (!missingBinaryResult.stdout.includes("Evidence level: projected")) {
+    throw new Error(`unavailable Codex executable must remain projected\n${missingBinaryResult.stdout}`);
   }
 
   const fakeWeakCodex = resolve(target, "fake-weak-codex");
@@ -2937,6 +3018,21 @@ Layer summary:
   assertRuntimePass("sensors review pass", reviewPassResult);
   if (!reviewPassResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`review contract fixture should pass sensors\n${reviewPassResult.stdout}`);
+  }
+
+  const promptContracts = [
+    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nUnknown / not verified:\n- External runtime.\n\nNext:\n- Continue investigation.\n"],
+    ["verification", "Verification Contract:\n- Behavior to prove: fixture.\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\nNot verified:\n- External runtime.\n\nNext verification:\n- Run integration coverage.\n"],
+    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nStop condition:\n- Missing evidence.\n"],
+  ];
+  for (const [mode, content] of promptContracts) {
+    const input = resolve(target, `${mode}-contract.txt`);
+    writeFileSync(input, content);
+    const contractResult = runRepoScript([sensorsScript, "--target", target, "--mode", mode, "--input", input]);
+    assertRuntimePass(`sensors ${mode} contract pass`, contractResult);
+    if (!contractResult.stdout.includes("ASK sensors: pass")) {
+      throw new Error(`${mode} prompt contract should pass sensors\n${contractResult.stdout}`);
+    }
   }
 
   const riskInput = resolve(target, "risk.txt");

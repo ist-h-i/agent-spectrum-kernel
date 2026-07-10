@@ -3,17 +3,11 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
 
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const DEFAULT_OUTPUT = ".agents/runs/codex-last-output.md";
 const SENSOR_STATUS_PATTERN = /^ASK sensors:\s+(\w+)/m;
-const PROMPT_PROFILES = {
-  "skill-implement.md": { mode: "implementation", sandbox: "workspace-write" },
-  "skill-investigate.md": { mode: "investigation", sandbox: "workspace-write" },
-  "skill-review.md": { mode: "review", sandbox: "read-only" },
-  "skill-verify.md": { mode: "implementation", sandbox: "workspace-write" },
-  "skill-handoff.md": { mode: "review", sandbox: "read-only" },
-};
 
 function hashText(value) { return createHash("sha256").update(value).digest("hex"); }
 
@@ -63,7 +57,7 @@ function parseArgs(argv) {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
-  const profile = PROMPT_PROFILES[args.prompt];
+  const profile = CODEX_PROMPT_CONTRACTS[args.prompt];
   if (!profile) throw new Error(`prompt has no validated execution profile: ${args.prompt}`);
   if (args.mode && args.mode !== profile.mode) throw new Error(`prompt/mode mismatch: ${args.prompt} requires ${profile.mode}`);
   if (args.sandbox && args.sandbox !== profile.sandbox) throw new Error(`prompt/sandbox mismatch: ${args.prompt} requires ${profile.sandbox}`);
@@ -78,7 +72,7 @@ function printHelp() {
 Options:
   --target <path>       Repository root containing .agent-spectrum-kernel/codex-install-state.json.
   --prompt <file>       Installed .agents/prompts file name. Defaults to skill-implement.md.
-  --mode <mode>         implementation | review. Defaults to implementation.
+  --mode <mode>         Must match the selected prompt's managed contract.
   --sandbox <mode>      read-only | workspace-write. Defaults to workspace-write.
   --output <path>       Output file inside target. Defaults to .agents/runs/codex-last-output.md.
   --codex-bin <path>    Codex executable. Defaults to codex.
@@ -115,8 +109,8 @@ function preflight(args) {
       failures.push(`Codex install state is invalid: ${error.message}`);
     }
   }
-  if (state?.install_status && state.install_status !== "installed") {
-    warnings.push(`Codex install status is ${state.install_status}`);
+  if (state?.install_status !== "installed") {
+    failures.push(`Codex install status must be installed, received ${state?.install_status ?? "missing"}`);
   }
   if (args.prompt !== args.prompt.split(/[\\/]/).at(-1)) failures.push("prompt must be an installed prompt basename");
   let promptPath = null;
@@ -128,7 +122,11 @@ function preflight(args) {
     failures.push(`prompt is not selected in Codex install state: ${args.prompt}`);
   }
   const promptRecord = state?.managed_files?.[`.agents/prompts/${args.prompt}`];
-  if (promptPath && promptRecord?.sha256 && existsSync(promptPath) && hashText(readFileSync(promptPath, "utf8")) !== promptRecord.sha256) failures.push(`prompt hash does not match Codex install state: ${args.prompt}`);
+  if (!promptRecord || promptRecord.kind !== "codex_prompt" || !promptRecord.sha256) {
+    failures.push(`selected prompt has no managed Codex prompt record: ${args.prompt}`);
+  } else if (promptPath && existsSync(promptPath) && hashText(readFileSync(promptPath, "utf8")) !== promptRecord.sha256) {
+    failures.push(`prompt hash does not match Codex install state: ${args.prompt}`);
+  }
   try { args.outputPath = resolveWithinTarget(args.target, args.output, "output"); } catch (error) { failures.push(error.message); }
   const sensorsPath = resolve(args.target, "scripts/ask-sensors.mjs");
   for (const runtime of ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs"]) {
@@ -141,14 +139,34 @@ function preflight(args) {
       failures.push(`managed Codex runtime hash mismatch: ${relativePath}`);
     }
   }
+  if (args.diffBase) {
+    try {
+      args.diffRange = resolveDiffRange(args.target, args.diffBase);
+    } catch (error) {
+      failures.push(`invalid --diff-base: ${error.message}`);
+    }
+  }
   return { failures, warnings, state, promptPath };
+}
+
+function resolveDiffRange(target, value) {
+  if (!value || value.startsWith("-") || /[\0\r\n\s]/.test(value)) throw new Error("must be a revision or A..B / A...B range without options or whitespace");
+  const separator = value.includes("...") ? "..." : value.includes("..") ? ".." : null;
+  const endpoints = separator ? value.split(separator) : [value];
+  if (endpoints.length > 2 || endpoints.some((endpoint) => !endpoint)) throw new Error("range endpoints must be non-empty");
+  const revisions = endpoints.map((endpoint) => {
+    const result = spawnSync("git", ["rev-parse", "--verify", `${endpoint}^{commit}`], { cwd: target, encoding: "utf8" });
+    if (result.error || result.status !== 0) throw new Error(`revision is not a commit: ${endpoint}`);
+    return result.stdout.trim();
+  });
+  return separator ? revisions.join(separator) : revisions[0];
 }
 
 function gitDiffContext(args) {
   if (!args.diffBase) {
     return "";
   }
-  const result = spawnSync("git", ["diff", "--patch", args.diffBase], {
+  const result = spawnSync("git", ["diff", "--patch", args.diffRange, "--"], {
     cwd: args.target,
     encoding: "utf8",
     maxBuffer: 5 * 1024 * 1024,
@@ -176,7 +194,6 @@ function buildPrompt(args, state, promptPath) {
 function runCodex(args, prompt) {
   const outputPath = args.outputPath;
   mkdirSync(dirname(outputPath), { recursive: true });
-  if (existsSync(outputPath)) unlinkSync(outputPath);
   const temporaryOutput = `.agents/runs/codex-run-${process.pid}-${Date.now()}.md`;
   const temporaryOutputPath = resolveWithinTarget(args.target, temporaryOutput, "temporary output");
   mkdirSync(dirname(temporaryOutputPath), { recursive: true });
@@ -189,7 +206,8 @@ function runCodex(args, prompt) {
   });
   const outputExists = existsSync(temporaryOutputPath);
   const finalOutput = outputExists ? readFileSync(temporaryOutputPath, "utf8") : "";
-  if (outputExists && finalOutput.trim()) renameSync(temporaryOutputPath, outputPath);
+  const acceptedOutput = !result.error && result.status === 0 && outputExists && finalOutput.trim().length > 0;
+  if (acceptedOutput) renameSync(temporaryOutputPath, outputPath);
   else if (outputExists) unlinkSync(temporaryOutputPath);
   return {
     command: [args.codexBin, ...commandArgs, "<stdin-prompt>"].join(" "),
@@ -198,7 +216,7 @@ function runCodex(args, prompt) {
     stderr: result.stderr ?? "",
     error: result.error?.message ?? null,
     outputPath: args.output,
-    finalOutput,
+    finalOutput: acceptedOutput ? finalOutput : "",
   };
 }
 
@@ -288,7 +306,7 @@ try {
     command,
     output_path: codexResult?.outputPath ?? args.output,
     sensor_status: sensorResult?.status ?? null,
-    failures: [...preflightResult.failures, ...(codexResult?.error ? [`codex exec could not start: ${codexResult.error}`] : []), ...(codexResult?.exitCode !== null && codexResult?.exitCode !== 0 ? [`codex exec exited ${codexResult.exitCode}`] : []), ...(sensorResult && (sensorResult.exitCode !== 0 || sensorResult.status !== "pass") ? [`ask-sensors rejected output: status=${sensorResult.status}, exit=${sensorResult.exitCode}`] : [])],
+    failures: [...preflightResult.failures, ...(codexResult?.error ? [`codex exec could not start: ${codexResult.error}`] : []), ...(codexResult && codexResult.exitCode !== null && codexResult.exitCode !== 0 ? [`codex exec exited ${codexResult.exitCode}`] : []), ...(sensorResult && (sensorResult.exitCode !== 0 || sensorResult.status !== "pass") ? [`ask-sensors rejected output: status=${sensorResult.status}, exit=${sensorResult.exitCode}`] : [])],
     warnings: preflightResult.warnings,
     boundary: "File projection and ask-sensors output checks do not prove business correctness, product readiness, or no regression.",
   };

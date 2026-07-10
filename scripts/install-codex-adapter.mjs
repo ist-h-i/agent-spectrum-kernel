@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, statSync, 
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
+import { CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
@@ -24,19 +25,19 @@ const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-
 const PROMPT_METADATA = {
   "skill-implement.md": {
     label: "Implementation",
-    sandbox: "workspace-write",
+    execution: CODEX_PROMPT_CONTRACTS["skill-implement.md"],
     requiredSkills: ["operating-mode-router", "skill-router", "controlled-implementation", "test-first-verification", "evidence-ledger", "risk-gate"],
     recommendedSkills: ["spec-driven-development", "requirement-grill", "work-package-compiler"],
   },
   "skill-investigate.md": {
     label: "Investigation",
-    sandbox: "workspace-write",
+    execution: CODEX_PROMPT_CONTRACTS["skill-investigate.md"],
     requiredSkills: ["operating-mode-router", "skill-router", "doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
     recommendedSkills: [],
   },
   "skill-review.md": {
     label: "Review",
-    sandbox: "read-only",
+    execution: CODEX_PROMPT_CONTRACTS["skill-review.md"],
     requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
     recommendedSkills: [
       "review-automated-gate",
@@ -52,13 +53,13 @@ const PROMPT_METADATA = {
   },
   "skill-verify.md": {
     label: "Verification",
-    sandbox: "workspace-write",
+    execution: CODEX_PROMPT_CONTRACTS["skill-verify.md"],
     requiredSkills: ["test-first-verification", "evidence-ledger"],
     recommendedSkills: [],
   },
   "skill-handoff.md": {
     label: "Handoff",
-    sandbox: "read-only",
+    execution: CODEX_PROMPT_CONTRACTS["skill-handoff.md"],
     requiredSkills: ["handoff-generation", "evidence-ledger"],
     recommendedSkills: [],
   },
@@ -889,7 +890,7 @@ function commandSectionForPrompt(prompt) {
     return `## ${metadata.label}
 
 \`\`\`bash
-node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode review --sandbox ${metadata.sandbox} --diff-base origin/main...HEAD --output codex-review.md
+node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox} --diff-base origin/main...HEAD --output codex-review.md
 \`\`\`
 
 Treat this as diff-only review unless the runner output also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.`;
@@ -898,13 +899,13 @@ Treat this as diff-only review unless the runner output also provides the checke
     return `## ${metadata.label}
 
 \`\`\`bash
-node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode implementation --sandbox ${metadata.sandbox} --output codex-implementation.md
+node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox} --output codex-implementation.md
 \`\`\``;
   }
   return `## ${metadata.label}
 
 \`\`\`bash
-node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode implementation --sandbox ${metadata.sandbox}
+node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox}
 \`\`\``;
 }
 
