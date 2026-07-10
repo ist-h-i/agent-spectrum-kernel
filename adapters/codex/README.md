@@ -61,7 +61,9 @@ Use profiles instead of arbitrary partial skill sets for normal installs:
 
 Each profile installs a closed command/prompt/skill set. Installed command examples only reference prompt files selected by that profile.
 
-Use `--skills <csv>` only as an advanced override. The override must include all required skills for installed prompt templates, command templates, and dependencies of the specified skills. Invalid combinations fail before any files are written.
+Profile closure includes representative router-reachable routes for the profile's declared task scope. For example, the implementation profile includes routes for unfamiliar repositories, unclear scope, boundary decisions, domain-rule impact, design grill, docs/ADR constraints, and long-running work; investigation includes bug investigation routes; review includes the review-router gate family.
+
+Use `--skills <csv>` only as an advanced override. The override must include all required skills for installed prompt templates, command templates, router-reachable routes, and dependencies of the specified skills. Invalid combinations fail before any files are written.
 
 ## Prompt Templates
 

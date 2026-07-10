@@ -57,7 +57,7 @@ Verified in this repository:
 - The Claude Code project adapter has installer, command, hook, runtime, and Pattern B GitHub Actions templates.
 - The Codex adapter has a local installer for `.agents/skills`, `.agents/prompts`, `.agents/commands`, README guidance, repo skill projection guidance, prompt templates, a `codex exec` command template, and explicit unsupported/partial capability downgrades.
 - Static and fixture validation checks the generic core installer, install state output, dry-run behavior, managed `AGENTS.md` merge behavior, stale skill reporting, hash-checked managed-file pruning, and local file preservation in stale skill directories.
-- Static and fixture validation checks the Codex adapter installer, Codex install state output, dry-run behavior, managed `AGENTS.md` merge/skip behavior, profile-selected `.agents/skills` projection, prompt/command projection, skill closure failures, installed-reference integrity, stale skill/prompt/command reporting, hash-checked managed-file pruning, and local file preservation in stale skill directories.
+- Static and fixture validation checks the Codex adapter installer, Codex install state output, dry-run behavior, managed `AGENTS.md` merge/skip behavior, profile-selected `.agents/skills` projection, prompt/command projection, skill and router-reachability closure failures, installed-reference integrity, stale skill/prompt/command reporting, hash-checked managed-file pruning, and local file preservation in stale skill directories.
 - Static validation checks the presence of required Claude adapter paths, default review skill projection, command template projection, local observability defaults, and Pattern B guardrails.
 - Static validation checks the presence of required Codex adapter paths.
 

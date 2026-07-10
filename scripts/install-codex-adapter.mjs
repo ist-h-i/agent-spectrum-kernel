@@ -213,6 +213,170 @@ const CODEX_PROFILES = {
   },
 };
 
+const PROFILE_ROUTING_FIXTURES = {
+  minimal: [],
+  implementation: [
+    {
+      id: "delivery_quality_mode",
+      signal: "Implementation request is classified as delivery_quality",
+      router: "operating-mode-router",
+      selected_route: "skill-router",
+      requiredSkills: ["skill-router"],
+    },
+    {
+      id: "unfamiliar_repository",
+      signal: "Unfamiliar repository before implementation",
+      router: "skill-router",
+      selected_route: "repository-orientation",
+      requiredSkills: ["repository-orientation"],
+    },
+    {
+      id: "unclear_scope",
+      signal: "Scope or refactor boundary is unclear",
+      router: "skill-router",
+      selected_route: "scope-control",
+      requiredSkills: ["scope-control"],
+    },
+    {
+      id: "boundary_decision",
+      signal: "Application boundary decision is needed before implementation",
+      router: "skill-router",
+      selected_route: "application-boundary-architecture",
+      requiredSkills: ["application-boundary-architecture"],
+    },
+    {
+      id: "domain_rule_impact",
+      signal: "Business rule or domain workflow impact appears during implementation",
+      router: "skill-router",
+      selected_route: "domain-rule-ledger",
+      requiredSkills: ["domain-rule-ledger"],
+    },
+    {
+      id: "design_grill",
+      signal: "Ambiguous implementation design needs stress testing",
+      router: "skill-router",
+      selected_route: "grill-design",
+      requiredSkills: ["grill-design"],
+    },
+    {
+      id: "docs_or_adr_constraints",
+      signal: "Existing docs, domain rules, or ADR terms constrain the implementation",
+      router: "skill-router",
+      selected_route: "grill-with-docs",
+      requiredSkills: ["grill-with-docs"],
+    },
+    {
+      id: "long_running_or_multi_agent",
+      signal: "Implementation spans sessions or agents",
+      router: "skill-router",
+      selected_route: "planning-with-files",
+      requiredSkills: ["planning-with-files"],
+    },
+  ],
+  investigation: [
+    {
+      id: "delivery_quality_mode",
+      signal: "Investigation request is classified as delivery_quality",
+      router: "operating-mode-router",
+      selected_route: "skill-router",
+      requiredSkills: ["skill-router"],
+    },
+    {
+      id: "bug_investigation",
+      signal: "Bug, regression, or unknown root cause",
+      router: "skill-router",
+      selected_route: "doubt-driven-development",
+      requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger"],
+    },
+    {
+      id: "unfamiliar_repository",
+      signal: "Unfamiliar repository before investigation",
+      router: "skill-router",
+      selected_route: "repository-orientation",
+      requiredSkills: ["repository-orientation"],
+    },
+    {
+      id: "unclear_scope",
+      signal: "Investigation scope or blast radius is unclear",
+      router: "skill-router",
+      selected_route: "scope-control",
+      requiredSkills: ["scope-control"],
+    },
+    {
+      id: "boundary_decision",
+      signal: "Root cause or fix path needs an application boundary decision",
+      router: "skill-router",
+      selected_route: "application-boundary-architecture",
+      requiredSkills: ["application-boundary-architecture"],
+    },
+  ],
+  review: [
+    {
+      id: "review",
+      signal: "PR, diff, commit, patch, or generated-output review",
+      router: "review-router",
+      selected_route: "review-router",
+      requiredSkills: [
+        "review-router",
+        "review-automated-gate",
+        "review-ai-quality",
+        "review-code-health",
+        "review-domain-impact",
+        "review-to-rule-compiler",
+        "review-finding-compiler",
+        "review-architecture-impact",
+        "review-output-quality",
+        "review-adversarial-risk",
+        "review-final-merge-gate",
+        "evidence-ledger",
+        "risk-gate",
+        "adr-review",
+        "improvement-ledger",
+      ],
+    },
+  ],
+  adoption: [
+    {
+      id: "unfamiliar_repository",
+      signal: "Repository adoption starts from unknown project context",
+      router: "operating-mode-router",
+      selected_route: "repository-orientation",
+      requiredSkills: ["repository-orientation"],
+    },
+    {
+      id: "adoption_bootstrap",
+      signal: "First-time project rollout or adoption pack request",
+      router: "operating-mode-router",
+      selected_route: "project-adoption-pack-generation",
+      requiredSkills: ["project-adoption-pack-generation", "implementation-context-generation", "review-context-generation"],
+    },
+  ],
+  observability: [
+    {
+      id: "skill_effectiveness",
+      signal: "One-task skill or routing effectiveness evaluation",
+      router: "operating-mode-router",
+      selected_route: "skill-effectiveness-evaluation",
+      requiredSkills: ["skill-effectiveness-evaluation", "evidence-ledger"],
+    },
+    {
+      id: "adoption_metrics",
+      signal: "Adoption maturity, usage metrics, or multi-task adoption impact",
+      router: "operating-mode-router",
+      selected_route: "skill-adoption-metrics",
+      requiredSkills: ["skill-adoption-metrics", "evidence-ledger"],
+    },
+    {
+      id: "capability_evaluation",
+      signal: "Evidence-backed full-layer engineering capability evaluation",
+      router: "operating-mode-router",
+      selected_route: "engineering-capability-evaluation",
+      requiredSkills: ["engineering-capability-evaluation", "evidence-ledger"],
+    },
+  ],
+  full: [],
+};
+
 function parseArgs(argv) {
   const args = {
     target: process.cwd(),
@@ -270,7 +434,7 @@ function printHelp() {
 Options:
   --target <path>       Adopting project root. Defaults to cwd.
   --profile <name>      Workflow profile. Defaults to ${DEFAULT_PROFILE}.
-  --skills <csv>        Advanced override for projected skills. Must satisfy selected prompt, command, and skill dependency closure.
+  --skills <csv>        Advanced override for projected skills. Must satisfy selected prompt, command, router reachability, and skill dependency closure.
   --merge-agents        Add or update the managed block in an existing AGENTS.md.
   --skip-agents         Do not install or merge AGENTS.md.
   --skip-prompts        Do not copy Codex prompt templates into .agents/prompts.
@@ -290,7 +454,8 @@ content is preserved.
 
 Use --profile for normal installs. Use --skills only for advanced overrides; the
 installer fails before writing files when the override is not closed over required
-skills for selected prompts, commands, and dependencies of the specified skills.
+skills for selected prompts, commands, router-reachable routes, and dependencies
+of the specified skills.
 
 Prune mode deletes only managed files whose hashes still match the previous
 install state, and removes directories only if they become empty.
@@ -465,6 +630,8 @@ function buildState({
   retainedStaleCommands,
   requiredSkills,
   recommendedSkills,
+  routerReachableSkills,
+  routingFixtures,
   managedFiles,
 }) {
   return {
@@ -497,6 +664,8 @@ function buildState({
     skill_closure: {
       required_skills: requiredSkills,
       recommended_skills: recommendedSkills,
+      router_reachable_skills: routerReachableSkills,
+      routing_fixtures: routingFixtures,
     },
     managed_files: managedFiles,
   };
@@ -570,8 +739,34 @@ function recommendedSkillsForPrompts(prompts) {
   return prompts.flatMap((prompt) => PROMPT_METADATA[prompt]?.recommendedSkills ?? []);
 }
 
-function computeRequiredClosure(seedSkills, promptTemplates) {
-  const required = new Set([...seedSkills, ...requiredSkillsForPrompts(promptTemplates)]);
+function routingFixturesForProfile(profileName, seedSkills, promptTemplates) {
+  const selectedRouters = new Set([...seedSkills, ...requiredSkillsForPrompts(promptTemplates)]);
+  return (PROFILE_ROUTING_FIXTURES[profileName] ?? [])
+    .filter((fixture) => selectedRouters.has(fixture.router))
+    .map((fixture) => ({
+      id: fixture.id,
+      signal: fixture.signal,
+      router: fixture.router,
+      selected_route: fixture.selected_route,
+      required_skills: [...fixture.requiredSkills].sort(),
+    }));
+}
+
+function skillsForRoutingFixtures(routingFixtures) {
+  const skills = new Set();
+  for (const fixture of routingFixtures) {
+    if (fixture.selected_route && SKILL_NAME_PATTERN.test(fixture.selected_route)) {
+      skills.add(fixture.selected_route);
+    }
+    for (const skill of fixture.required_skills ?? []) {
+      skills.add(skill);
+    }
+  }
+  return [...skills].sort();
+}
+
+function computeRequiredClosure(seedSkills, promptTemplates, routingFixtures) {
+  const required = new Set([...seedSkills, ...requiredSkillsForPrompts(promptTemplates), ...skillsForRoutingFixtures(routingFixtures)]);
   let changed = true;
   while (changed) {
     changed = false;
@@ -708,7 +903,9 @@ function buildPlan(args) {
   const selectedPromptTemplates = args.skipPrompts ? [] : resolvedProfile.prompts;
   const selectedCommandTemplates = args.skipCommand ? [] : resolvedProfile.commands;
   const skillSeed = args.skills ?? resolvedProfile.skills;
-  const requiredSkills = computeRequiredClosure(skillSeed, selectedPromptTemplates);
+  const routingFixtures = routingFixturesForProfile(args.profile, skillSeed, selectedPromptTemplates);
+  const routerReachableSkills = skillsForRoutingFixtures(routingFixtures);
+  const requiredSkills = computeRequiredClosure(skillSeed, selectedPromptTemplates, routingFixtures);
   const skills = [...(args.skills ?? requiredSkills)].sort();
 
   validateSkillNames(skills, manifestSkills);
@@ -842,6 +1039,8 @@ function buildPlan(args) {
     retainedStaleCommands,
     requiredSkills,
     recommendedSkills,
+    routerReachableSkills,
+    routingFixtures,
     managedFiles,
   });
   const stateContent = `${JSON.stringify(state, null, 2)}\n`;

@@ -1375,6 +1375,7 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
       writesCodexInstallState: false,
       hasWorkflowProfiles: false,
       validatesSkillClosure: false,
+      validatesRouterReachabilityClosure: false,
       validatesInstalledReferences: false,
       managesPromptCommandStale: false,
       projectsAgentsSkills: false,
@@ -1619,6 +1620,11 @@ function validateCodexInstaller(root, checks, errors) {
   checks.codexInstaller.writesCodexInstallState = text.includes(".agent-spectrum-kernel/codex-install-state.json") && text.includes("managed_files");
   checks.codexInstaller.hasWorkflowProfiles = text.includes("CODEX_PROFILES") && text.includes("DEFAULT_PROFILE") && text.includes("--profile");
   checks.codexInstaller.validatesSkillClosure = text.includes("SKILL_RELATIONSHIPS") && text.includes("validateSkillClosure") && text.includes("required_skills");
+  checks.codexInstaller.validatesRouterReachabilityClosure =
+    text.includes("PROFILE_ROUTING_FIXTURES") &&
+    text.includes("routingFixturesForProfile") &&
+    text.includes("router_reachable_skills") &&
+    text.includes("routing_fixtures");
   checks.codexInstaller.validatesInstalledReferences = text.includes("validateManagedReferences") && text.includes("source-repository-only Codex prompt path");
   checks.codexInstaller.managesPromptCommandStale =
     text.includes("retained_stale_prompts") &&
@@ -1851,6 +1857,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- writes Codex install state: ${claudeAdapterChecks.codexInstaller.writesCodexInstallState ? "ok" : "invalid"}`,
     `- workflow profiles: ${claudeAdapterChecks.codexInstaller.hasWorkflowProfiles ? "ok" : "invalid"}`,
     `- skill closure validation: ${claudeAdapterChecks.codexInstaller.validatesSkillClosure ? "ok" : "invalid"}`,
+    `- router reachability closure: ${claudeAdapterChecks.codexInstaller.validatesRouterReachabilityClosure ? "ok" : "invalid"}`,
     `- installed-reference validation: ${claudeAdapterChecks.codexInstaller.validatesInstalledReferences ? "ok" : "invalid"}`,
     `- prompt/command stale lifecycle: ${claudeAdapterChecks.codexInstaller.managesPromptCommandStale ? "ok" : "invalid"}`,
     `- projects .agents/skills: ${claudeAdapterChecks.codexInstaller.projectsAgentsSkills ? "ok" : "invalid"}`,

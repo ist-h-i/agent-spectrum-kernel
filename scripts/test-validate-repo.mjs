@@ -334,7 +334,11 @@ const DEFAULT_PROFILE = "implementation";
 const PROMPT_TEMPLATES = ["skill-implement.md"];
 const COMMAND_TEMPLATES = ["codex-exec.md"];
 const CODEX_PROFILES = { implementation: { skills: ["operating-mode-router"], prompts: PROMPT_TEMPLATES, commands: COMMAND_TEMPLATES } };
+const PROFILE_ROUTING_FIXTURES = { implementation: [{ id: "unfamiliar_repository", selected_route: "repository-orientation", required_skills: ["repository-orientation"] }] };
 const SKILL_RELATIONSHIPS = { "controlled-implementation": { requires: ["test-first-verification"], recommends: ["evidence-ledger"], incompatibleWith: [] } };
+function routingFixturesForProfile() {
+  return { router_reachable_skills: ["repository-orientation"], routing_fixtures: PROFILE_ROUTING_FIXTURES.implementation };
+}
 function validateSkillClosure() {
   return { required_skills: ["operating-mode-router"] };
 }
@@ -359,7 +363,7 @@ function install(manifest, options) {
   if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
   if (skipAgents) return ".agents/skills";
   if (options["--prune"]) return "stale Codex managed projection";
-  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill" + profile + retained_stale_prompts + retained_stale_commands + stale_codex_prompt + stale_codex_command + validateSkillClosure().required_skills + validateManagedReferences();
+  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill" + profile + retained_stale_prompts + retained_stale_commands + stale_codex_prompt + stale_codex_command + validateSkillClosure().required_skills + routingFixturesForProfile().router_reachable_skills + routingFixturesForProfile().routing_fixtures + validateManagedReferences();
 }
 `,
   );
@@ -665,7 +669,28 @@ function assertCodexInstallClosed(name, target) {
     }
   }
 
+  for (const fixture of state.skill_closure?.routing_fixtures ?? []) {
+    if (fixture.selected_route && !selectedSkills.has(fixture.selected_route)) {
+      throw new Error(`${name} routing fixture '${fixture.id}' selected missing route '${fixture.selected_route}'\n${JSON.stringify(state, null, 2)}`);
+    }
+    for (const skill of fixture.required_skills ?? []) {
+      if (!selectedSkills.has(skill)) {
+        throw new Error(`${name} routing fixture '${fixture.id}' requires missing skill '${skill}'\n${JSON.stringify(state, null, 2)}`);
+      }
+    }
+  }
+
   assertCodexReferenceIntegrity(name, target, state);
+}
+
+function assertCodexRoutingFixtures(name, target, expectedFixtureIds) {
+  const state = readCodexInstallState(target);
+  const fixtureIds = new Set((state.skill_closure?.routing_fixtures ?? []).map((fixture) => fixture.id));
+  const missing = expectedFixtureIds.filter((id) => !fixtureIds.has(id));
+  if (missing.length > 0) {
+    throw new Error(`${name} is missing routing fixture(s): ${missing.join(", ")}\n${JSON.stringify(state, null, 2)}`);
+  }
+  assertCodexInstallClosed(name, target);
 }
 
 function assertCodexReferenceIntegrity(name, target, state = readCodexInstallState(target)) {
@@ -1988,6 +2013,12 @@ function assertCodexInstallerScripts() {
     throw new Error("codex installer should write profile-selected Codex AGENTS, skills, prompts, and command templates");
   }
   assertCodexInstallClosed("codex installer fresh profile", freshTarget);
+  assertCodexRoutingFixtures("codex installer fresh implementation routing", freshTarget, [
+    "delivery_quality_mode",
+    "unfamiliar_repository",
+    "unclear_scope",
+    "boundary_decision",
+  ]);
 
   const beforeRerunAgents = readFileSync(resolve(freshTarget, "AGENTS.md"), "utf8");
   const beforeRerunState = readFileSync(resolve(freshTarget, ".agent-spectrum-kernel/codex-install-state.json"), "utf8");
@@ -2012,6 +2043,18 @@ function assertCodexInstallerScripts() {
       throw new Error(`codex full profile should install every manifest skill\n${JSON.stringify(profileState, null, 2)}`);
     }
     assertCodexInstallClosed(`codex installer ${profile} profile`, profileTarget);
+    if (profile === "implementation") {
+      assertCodexRoutingFixtures(`codex installer ${profile} routing fixtures`, profileTarget, [
+        "delivery_quality_mode",
+        "unfamiliar_repository",
+        "unclear_scope",
+        "boundary_decision",
+      ]);
+    } else if (profile === "investigation") {
+      assertCodexRoutingFixtures(`codex installer ${profile} routing fixtures`, profileTarget, ["bug_investigation"]);
+    } else if (profile === "review") {
+      assertCodexRoutingFixtures(`codex installer ${profile} routing fixtures`, profileTarget, ["review"]);
+    }
   }
 
   writeFileSync(resolve(freshTarget, ".agents/skills/controlled-implementation/SKILL.md"), "# local stale copy\n");
@@ -2023,8 +2066,8 @@ function assertCodexInstallerScripts() {
   const mergeTarget = resolve(fixtureRoot, "codex-install-merge");
   mkdirSync(mergeTarget, { recursive: true });
   writeFileSync(resolve(mergeTarget, "AGENTS.md"), "# Project Rules\n\nKeep this Codex project overlay.\n");
-  assertRuntimePass("codex installer merge agents", runRepoScript([installer, "--target", mergeTarget, "--skills", "operating-mode-router", "--skip-prompts", "--skip-command", "--merge-agents"]));
-  assertRuntimePass("codex installer merge agents rerun", runRepoScript([installer, "--target", mergeTarget, "--skills", "operating-mode-router", "--skip-prompts", "--skip-command", "--merge-agents"]));
+  assertRuntimePass("codex installer merge agents", runRepoScript([installer, "--target", mergeTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--merge-agents"]));
+  assertRuntimePass("codex installer merge agents rerun", runRepoScript([installer, "--target", mergeTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--merge-agents"]));
   const mergedAgents = readFileSync(resolve(mergeTarget, "AGENTS.md"), "utf8");
   if (!mergedAgents.includes("Keep this Codex project overlay.") || (mergedAgents.match(markerPattern) ?? []).length !== 1) {
     throw new Error(`codex installer should preserve existing AGENTS.md content and keep one managed block\n${mergedAgents}`);
@@ -2033,7 +2076,7 @@ function assertCodexInstallerScripts() {
   const skipAgentsTarget = resolve(fixtureRoot, "codex-install-skip-agents");
   mkdirSync(skipAgentsTarget, { recursive: true });
   writeFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "# Existing AGENTS\n");
-  assertRuntimePass("codex installer skip agents", runRepoScript([installer, "--target", skipAgentsTarget, "--skills", "operating-mode-router", "--skip-prompts", "--skip-command", "--skip-agents"]));
+  assertRuntimePass("codex installer skip agents", runRepoScript([installer, "--target", skipAgentsTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--skip-agents"]));
   if (readFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "utf8") !== "# Existing AGENTS\n") {
     throw new Error("codex installer --skip-agents should leave AGENTS.md untouched");
   }
@@ -2043,10 +2086,10 @@ function assertCodexInstallerScripts() {
   writeFileSync(resolve(conflictTarget, "AGENTS.md"), "# Existing AGENTS\n");
   assertRuntimeFail(
     "codex installer existing AGENTS without merge",
-    runRepoScript([installer, "--target", conflictTarget, "--skills", "operating-mode-router", "--skip-prompts", "--skip-command"]),
+    runRepoScript([installer, "--target", conflictTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command"]),
     "--merge-agents",
   );
-  if (existsSync(resolve(conflictTarget, ".agent-spectrum-kernel/codex-install-state.json")) || existsSync(resolve(conflictTarget, ".agents/skills/operating-mode-router/SKILL.md"))) {
+  if (existsSync(resolve(conflictTarget, ".agent-spectrum-kernel/codex-install-state.json")) || existsSync(resolve(conflictTarget, ".agents/skills/test-first-verification/SKILL.md"))) {
     throw new Error("codex installer preflight failure should not partially write files");
   }
 
@@ -2126,6 +2169,26 @@ function assertCodexInstallerScripts() {
     throw new Error("codex installer invalid skill closure should not write files");
   }
 
+  const invalidRouterClosureTarget = resolve(fixtureRoot, "codex-install-invalid-router-closure");
+  assertRuntimeFail(
+    "codex installer invalid router closure",
+    runRepoScript([installer, "--target", invalidRouterClosureTarget, "--skills", "skill-router", "--skip-prompts", "--skip-command"]),
+    "Missing required skill(s): application-boundary-architecture",
+  );
+  if (existsSync(resolve(invalidRouterClosureTarget, ".agent-spectrum-kernel/codex-install-state.json")) || existsSync(resolve(invalidRouterClosureTarget, ".agents"))) {
+    throw new Error("codex installer invalid router closure should not write files");
+  }
+
+  const invalidOperatingRouterClosureTarget = resolve(fixtureRoot, "codex-install-invalid-operating-router-closure");
+  assertRuntimeFail(
+    "codex installer invalid operating router closure",
+    runRepoScript([installer, "--target", invalidOperatingRouterClosureTarget, "--skills", "operating-mode-router", "--skip-prompts", "--skip-command"]),
+    "Missing required skill(s): skill-router",
+  );
+  if (existsSync(resolve(invalidOperatingRouterClosureTarget, ".agent-spectrum-kernel/codex-install-state.json")) || existsSync(resolve(invalidOperatingRouterClosureTarget, ".agents"))) {
+    throw new Error("codex installer invalid operating router closure should not write files");
+  }
+
   const invalidPromptClosureTarget = resolve(fixtureRoot, "codex-install-invalid-prompt-closure");
   assertRuntimeFail(
     "codex installer invalid prompt closure",
@@ -2137,11 +2200,11 @@ function assertCodexInstallerScripts() {
   }
 
   const overwriteTarget = resolve(fixtureRoot, "codex-install-no-overwrite");
-  mkdirSync(resolve(overwriteTarget, ".agents/skills/operating-mode-router"), { recursive: true });
-  writeFileSync(resolve(overwriteTarget, ".agents/skills/operating-mode-router/SKILL.md"), "# local codex skill\n");
+  mkdirSync(resolve(overwriteTarget, ".agents/skills/test-first-verification"), { recursive: true });
+  writeFileSync(resolve(overwriteTarget, ".agents/skills/test-first-verification/SKILL.md"), "# local codex skill\n");
   assertRuntimeFail(
     "codex installer no-overwrite skill conflict",
-    runRepoScript([installer, "--target", overwriteTarget, "--skills", "operating-mode-router", "--skip-prompts", "--skip-command", "--no-overwrite-skills", "--skip-agents"]),
+    runRepoScript([installer, "--target", overwriteTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--no-overwrite-skills", "--skip-agents"]),
     "would be overwritten",
   );
   if (existsSync(resolve(overwriteTarget, ".agent-spectrum-kernel/codex-install-state.json"))) {
