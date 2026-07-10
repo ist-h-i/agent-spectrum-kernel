@@ -404,10 +404,8 @@ function parseArgs(argv) {
       args.profile = argv[++i];
     } else if (arg === "--skills") {
       args.skills = argv[++i].split(",").map((skill) => skill.trim()).filter(Boolean);
-    } else if (arg === "--merge-agents") {
-      args.mergeAgents = true;
-    } else if (arg === "--skip-agents") {
-      args.skipAgents = true;
+    } else if (arg === "--merge-agents" || arg === "--skip-agents") {
+      throw new Error(`${arg} is no longer supported; install the core first with scripts/install-kernel.mjs --merge-agents.`);
     } else if (arg === "--skip-prompts") {
       args.skipPrompts = true;
     } else if (arg === "--skip-command") {
@@ -448,8 +446,6 @@ Options:
   --target <path>       Adopting project root. Defaults to cwd.
   --profile <name>      Workflow profile. Defaults to ${DEFAULT_PROFILE}.
   --skills <csv>        Advanced override for projected skills. Must satisfy selected prompt, command, router reachability, and skill dependency closure.
-  --merge-agents        Add or update the managed block in an existing AGENTS.md.
-  --skip-agents         Do not install or merge AGENTS.md.
   --skip-prompts        Do not copy Codex prompt templates into .agents/prompts.
   --skip-command        Do not copy the codex exec command template into .agents/commands.
   --no-overwrite-skills Fail when an existing Codex skill projection would be overwritten.
@@ -466,8 +462,7 @@ ${profileLines}
 
 Default mode is three-way update safe: managed files are updated only when the
 target still matches the previous managed hash, unless --force is used.
-AGENTS.md ownership is limited to the managed block, so existing project-local
-AGENTS.md content is preserved.
+AGENTS.md is owned by the core installer. Install or update core before this adapter.
 
 Use --profile for normal installs. Use --skills only for advanced overrides; the
 installer fails before writing files when the override is not closed over required
@@ -489,6 +484,18 @@ function readManifest() {
     throw new Error("manifest.json.skills must be an array");
   }
   return manifest;
+}
+
+function validateCoreInstalled(target, statePath) {
+  if (!existsSync(statePath)) throw new Error("ASK core install state is missing: .agent-spectrum-kernel/install-state.json. Run scripts/install-kernel.mjs before installing the Codex adapter.");
+  let state;
+  try { state = readJson(statePath); } catch { throw new Error("ASK core install state is invalid JSON."); }
+  const record = state?.managed_blocks?.["AGENTS.md#agent-spectrum-kernel"];
+  const agentsPath = resolve(target, "AGENTS.md");
+  const block = existsSync(agentsPath) ? lifecycle.extractManagedBlock(readText(agentsPath)) : null;
+  if (state?.install_status !== "installed" || !record?.sha256 || !block || lifecycle.hashText(block.content) !== record.sha256) {
+    throw new Error("ASK core installation is not active or its AGENTS.md managed block does not match install state.");
+  }
 }
 
 function readPreviousState(target) {
@@ -653,6 +660,7 @@ function buildState({
   managedBlocks,
   previousState,
   rollback,
+  hasMutations,
 }) {
   return lifecycle.buildLifecycleState({
     manifest,
@@ -672,6 +680,7 @@ function buildState({
     managedBlocks,
     previousState,
     rollback,
+    hasMutations,
     extra: {
       profile_description: profile.description,
       retained_stale_skills: retainedStaleSkills,
@@ -933,9 +942,7 @@ function buildPlan(args) {
   validateSkillNames(skills, manifestSkills);
   validateSkillClosure({ selectedSkills: skills, requiredSkills, profileName: args.profile });
   const coreStatePath = resolve(args.target, ".agent-spectrum-kernel/install-state.json");
-  if (!existsSync(coreStatePath)) {
-    throw new Error("ASK core install state is missing: .agent-spectrum-kernel/install-state.json. Run scripts/install-kernel.mjs before installing the Codex adapter.");
-  }
+  validateCoreInstalled(args.target, coreStatePath);
 
   const previousState = readPreviousState(args.target);
   const previousSkillNames = previousItems(previousState, "installed_skills", ["codex_skill", "stale_codex_skill"], "skill").filter((skill) =>
@@ -1110,6 +1117,7 @@ function buildPlan(args) {
     managedBlocks,
     previousState,
     rollback,
+    hasMutations: operations.some((operation) => !operation.unchanged),
   });
 
   return { operations, staleSkills, stalePrompts, staleCommands, state, recommendedSkills };

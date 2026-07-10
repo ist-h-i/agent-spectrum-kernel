@@ -2173,6 +2173,10 @@ function assertCoreInstallerScripts() {
   if (readFileSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"), "utf8") !== readFileSync(resolve(repoRoot, "skills/operating-mode-router/SKILL.md"), "utf8")) {
     throw new Error("kernel installer --force should refresh managed skills from the current checkout");
   }
+  assertRuntimePass("kernel installer force rollback", runRepoScript([installer, "--target", freshTarget, "--rollback"]));
+  if (readFileSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"), "utf8") !== "# local stale copy\n") {
+    throw new Error("kernel installer rollback should restore the immediate pre-force local content");
+  }
 
   const mergeTarget = resolve(fixtureRoot, "kernel-install-merge");
   mkdirSync(mergeTarget, { recursive: true });
@@ -2253,7 +2257,7 @@ function assertCoreInstallerScripts() {
   assertRuntimeFail(
     "kernel installer rollback managed block conflict",
     runRepoScript([installer, "--target", blockConflictTarget, "--rollback"]),
-    "managed block conflict",
+    "rollback block conflict",
   );
 
   const detachTarget = resolve(fixtureRoot, "kernel-install-detach");
@@ -2389,13 +2393,17 @@ function assertCodexInstallerScripts() {
   if (readFileSync(resolve(freshTarget, ".agents/skills/controlled-implementation/SKILL.md"), "utf8") !== readFileSync(resolve(repoRoot, "skills/controlled-implementation/SKILL.md"), "utf8")) {
     throw new Error("codex installer --force should refresh managed Codex skills from the current checkout");
   }
+  assertRuntimePass("codex installer force rollback", runRepoScript([installer, "--target", freshTarget, "--rollback"]));
+  if (readFileSync(resolve(freshTarget, ".agents/skills/controlled-implementation/SKILL.md"), "utf8") !== "# local stale copy\n") {
+    throw new Error("codex installer rollback should restore the immediate pre-force local content");
+  }
 
   const mergeTarget = resolve(fixtureRoot, "codex-install-merge");
   mkdirSync(mergeTarget, { recursive: true });
   writeFileSync(resolve(mergeTarget, "AGENTS.md"), "# Project Rules\n\nKeep this Codex project overlay.\n");
   assertRuntimePass("codex installer merge core setup", runRepoScript([coreInstaller, "--target", mergeTarget, "--merge-agents"]));
-  assertRuntimePass("codex installer merge agents", runRepoScript([installer, "--target", mergeTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--merge-agents"]));
-  assertRuntimePass("codex installer merge agents rerun", runRepoScript([installer, "--target", mergeTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--merge-agents"]));
+  assertRuntimePass("codex installer core-owned agents", runRepoScript([installer, "--target", mergeTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command"]));
+  assertRuntimePass("codex installer core-owned agents rerun", runRepoScript([installer, "--target", mergeTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command"]));
   const mergedAgents = readFileSync(resolve(mergeTarget, "AGENTS.md"), "utf8");
   if (!mergedAgents.includes("Keep this Codex project overlay.") || (mergedAgents.match(markerPattern) ?? []).length !== 1) {
     throw new Error(`codex installer should preserve existing AGENTS.md content and keep one managed block\n${mergedAgents}`);
@@ -2406,7 +2414,7 @@ function assertCodexInstallerScripts() {
   writeFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "# Existing AGENTS\n");
   assertRuntimePass("codex installer skip agents core setup", runRepoScript([coreInstaller, "--target", skipAgentsTarget, "--merge-agents"]));
   const agentsBeforeCodex = readFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "utf8");
-  assertRuntimePass("codex installer skip agents", runRepoScript([installer, "--target", skipAgentsTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--skip-agents"]));
+  assertRuntimePass("codex installer leaves core-owned agents", runRepoScript([installer, "--target", skipAgentsTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command"]));
   if (readFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "utf8") !== agentsBeforeCodex) {
     throw new Error("codex installer --skip-agents should leave AGENTS.md untouched");
   }
@@ -2538,7 +2546,7 @@ function assertCodexInstallerScripts() {
   writeFileSync(resolve(overwriteTarget, ".agents/skills/test-first-verification/SKILL.md"), "# local codex skill\n");
   assertRuntimeFail(
     "codex installer no-overwrite skill conflict",
-    runRepoScript([installer, "--target", overwriteTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--no-overwrite-skills", "--skip-agents"]),
+    runRepoScript([installer, "--target", overwriteTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--no-overwrite-skills"]),
     "would be overwritten",
   );
   if (existsSync(resolve(overwriteTarget, ".agent-spectrum-kernel/codex-install-state.json"))) {

@@ -230,10 +230,11 @@ For Codex, use the prompt-driven adapter in `adapters/codex/`.
 The Codex adapter documents how to project the core `AGENTS.md` and selected canonical skills into Codex-compatible repository surfaces, including `.agents/skills`, prompt templates, and `codex exec` command patterns.
 
 ```bash
-node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents
+node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
+node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-The Codex installer updates `AGENTS.md`, profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. The default profile is `implementation`, not every manifest skill. Supported profiles are `minimal`, `implementation`, `investigation`, `review`, `adoption`, `observability`, and `full`.
+The core installer owns `AGENTS.md`; the Codex installer updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. The default profile is `implementation`, not every manifest skill. Supported profiles are `minimal`, `implementation`, `investigation`, `review`, `adoption`, `observability`, and `full`.
 
 Use `--profile <name>` for normal installs. Use `--skills <csv>` only as an advanced override; the installer fails before writing files when the override is not closed over required skills for the selected prompts, commands, router-reachable routes, and dependencies of the specified skills.
 

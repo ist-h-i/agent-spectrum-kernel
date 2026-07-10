@@ -636,6 +636,9 @@ function installHooks(args, writes) {
   if (previousSubset && lifecycle.hashText(currentSubset) !== previousSubset && !args.force) {
     throw new Error("managed hook subset conflict: .claude/settings.json ASK hooks were modified locally. Use --force to overwrite.");
   }
+  if (args.force && !Object.hasOwn(args.rollback.hooks, ".claude/settings.json")) {
+    args.rollback.hooks[".claude/settings.json"] = normalizeHooks(settings.hooks ?? {});
+  }
   settings.hooks = mergeHooks(settings.hooks ?? {}, hooksSettings.hooks ?? {});
   args.managedHooks = normalizeHooks(hooksSettings.hooks ?? {});
   writeFilePlanned(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, args, writes, null, { partialRecord: { kind: "claude_settings", content: JSON.stringify(args.managedHooks), skipRollback: true } });
@@ -824,6 +827,14 @@ function validateCoreInstalled(args) {
   if (!existsSync(statePath)) {
     throw new Error(`ASK core install state is missing: ${CORE_STATE_PATH}. Run: node scripts/install-kernel.mjs --target ${args.target} --merge-agents`);
   }
+  let state;
+  try { state = readJson(statePath); } catch { throw new Error("ASK core install state is invalid JSON."); }
+  const record = state?.managed_blocks?.["AGENTS.md#agent-spectrum-kernel"];
+  const agentsPath = resolve(args.target, "AGENTS.md");
+  const block = existsSync(agentsPath) ? lifecycle.extractManagedBlock(readFileSync(agentsPath, "utf8")) : null;
+  if (state?.install_status !== "installed" || !record?.sha256 || !block || lifecycle.hashText(block.content) !== record.sha256) {
+    throw new Error("ASK core installation is not active or its AGENTS.md managed block does not match install state.");
+  }
 }
 
 function readPreviousState(target) {
@@ -917,7 +928,7 @@ function restoreManagedHookSubset(target, state, { dryRun, force }) {
   if (!force && expectedHash && currentHash !== expectedHash) {
     throw new Error("managed hook subset conflict: .claude/settings.json ASK hooks were modified locally. Use --force to overwrite.");
   }
-  const restoredHooks = mergeHooks(settings.hooks ?? {}, hooksFromManagedRecords(state.previous_successful_state?.managed_hooks ?? []));
+  const restoredHooks = mergeHooks(settings.hooks ?? {}, hooksFromManagedRecords(state.rollback?.hooks?.[".claude/settings.json"] ?? state.previous_successful_state?.managed_hooks ?? []));
   const content = `${JSON.stringify({ ...settings, hooks: restoredHooks }, null, 2)}\n`;
   const operation = { kind: "write", destination: settingsPath, relativePath: ".claude/settings.json", content, reason: "rollback:restore-managed-hook-subset", unchanged: readFileSync(settingsPath, "utf8") === content };
   if (!dryRun) lifecycle.applyOperations([operation], false);

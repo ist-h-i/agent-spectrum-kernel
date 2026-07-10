@@ -236,7 +236,7 @@ function previousManagedPartialRecord(previousState, relativePath) {
 }
 
 export function createRollbackSnapshot() {
-  return { files: {}, blocks: {} };
+  return { files: {}, blocks: {}, hooks: {} };
 }
 
 export function captureRollbackFile(rollback, target, relativePath) {
@@ -500,8 +500,14 @@ export function rollbackLifecycleState({ target, statePath, dryRun = false, forc
     if (!existsSync(destination)) {
       continue;
     }
-    if (!force) {
-      assertManagedBlockSafe({ target, relativePath: snapshot.path, blockKey, previousState: state, force });
+    const currentBlock = extractManagedBlock(readText(destination));
+    const currentHash = currentBlock ? hashText(currentBlock.content) : null;
+    const managedHash = state.managed_blocks?.[blockKey]?.sha256 ?? null;
+    if (currentHash === snapshot.sha256) {
+      continue;
+    }
+    if (!force && currentHash !== managedHash) {
+      throw new Error(`rollback block conflict: ${snapshot.path} does not match the pending managed or rollback snapshot. Use --force to overwrite.`);
     }
     const existing = readText(destination);
     const content = snapshot.content === null ? removeManagedBlock(existing) : replaceOrAppendManagedBlock(existing, `${snapshot.content}\n`, true);
