@@ -47,9 +47,9 @@ Options:
   --json                Print machine-readable result JSON.
 
 This smoke check is local-only. For Claude it verifies installed commands,
-selected skills, hook executable resolution, event-store writability, report
-input availability, and appends one non-sensitive smoke event unless --dry-run
-is used. It does not invoke Claude or prove product/business correctness.
+selected skills, hook executable resolution, and report input availability. A
+probe event is written only to an isolated runtime-smoke store. It does not
+invoke Claude or prove product/business correctness.
 `);
 }
 
@@ -155,8 +155,9 @@ function runClaudeSmoke(target, { dryRun }) {
     for (const command of hookCommands) {
       if (command.includes("${CLAUDE_PLUGIN_ROOT}")) {
         const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
-        const resolved = pluginRoot ? command.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, pluginRoot) : "";
-        checks.push(check(resolved && resolved.includes("ai-skills-metrics-record") ? "pass" : "fail", "plugin_hook_resolution", "Claude plugin hook command requires CLAUDE_PLUGIN_ROOT"));
+        const match = pluginRoot ? command.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, pluginRoot).match(/([^\s"']*ai-skills-metrics-record)/) : null;
+        const executable = match?.[1] && pathIsFile(match[1]) && (statSync(match[1]).mode & 0o111) !== 0;
+        checks.push(check(executable ? "pass" : "fail", "plugin_hook_resolution", "Claude plugin hook executable must resolve through CLAUDE_PLUGIN_ROOT"));
       }
       if (command.includes("scripts/ai-metrics-record.mjs")) {
         const scriptPath = resolve(target, "scripts/ai-metrics-record.mjs");
@@ -165,10 +166,10 @@ function runClaudeSmoke(target, { dryRun }) {
     }
   }
 
-  const eventStore = readConfigValue(target, ["storage", "event_store"], DEFAULT_EVENT_STORE);
+  const eventStore = ".agent-spectrum-kernel/runtime-smoke/events.jsonl";
   const eventStorePath = resolve(target, eventStore);
   const eventDir = dirname(eventStorePath);
-  if (!pathIsDirectory(eventDir)) {
+  if (!pathIsDirectory(eventDir) && dryRun) {
     checks.push(check("fail", "event_store_directory", `event-store directory is missing: ${eventStore}`));
   } else if (!dryRun) {
     try {
@@ -180,7 +181,7 @@ function runClaudeSmoke(target, { dryRun }) {
         occurred_at: new Date().toISOString(),
         skills_used: [],
         routing_result: {},
-        outcome_metrics: { task_completed: true },
+        outcome_metrics: { task_completed: false },
         verification_metrics: {},
         debt_movement_metrics: {},
         evidence_references: ["adapter-runtime-smoke"],
@@ -195,7 +196,7 @@ function runClaudeSmoke(target, { dryRun }) {
       };
       mkdirSync(eventDir, { recursive: true });
       appendFileSync(eventStorePath, `${JSON.stringify(event)}\n`);
-      checks.push(check("pass", "smoke_event", `non-sensitive smoke event appended: ${eventStore}`));
+      checks.push(check("pass", "smoke_event", `isolated non-sensitive smoke event appended: ${eventStore}`));
     } catch (error) {
       checks.push(check("fail", "smoke_event", `event-store is not writable: ${eventStore}: ${error.message}`));
     }

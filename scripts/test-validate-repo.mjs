@@ -2711,8 +2711,8 @@ function assertAdapterRuntimeSmokeScript() {
 
   const smokeResult = runRepoScript([runtimeSmokeScript, "--target", target, "--adapter", "claude"]);
   assertRuntimePass("adapter runtime smoke Claude pass", smokeResult);
-  if (!smokeResult.stdout.includes("ASK adapter runtime smoke: pass") || !readFileSync(resolve(target, "docs/ai/metrics/events.jsonl"), "utf8").includes("adapter-runtime-smoke")) {
-    throw new Error(`adapter runtime smoke should append a non-sensitive event\n${smokeResult.stdout}\n${smokeResult.stderr}`);
+  if (!smokeResult.stdout.includes("ASK adapter runtime smoke: pass") || !readFileSync(resolve(target, ".agent-spectrum-kernel/runtime-smoke/events.jsonl"), "utf8").includes("adapter-runtime-smoke")) {
+    throw new Error(`adapter runtime smoke should append an isolated non-sensitive event\n${smokeResult.stdout}\n${smokeResult.stderr}`);
   }
 
   const missingRuntimeTarget = resolve(fixtureRoot, "adapter-runtime-smoke-missing-runtime");
@@ -2728,7 +2728,7 @@ function assertAdapterRuntimeSmokeScript() {
   rmSync(resolve(missingEventStoreTarget, "docs/ai/metrics"), { recursive: true, force: true });
   writeFileSync(resolve(missingEventStoreTarget, "docs/ai/metrics"), "not a directory\n");
   const missingEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", missingEventStoreTarget, "--adapter", "claude"]);
-  assertRuntimeFail("adapter runtime smoke missing event store", missingEventStoreResult, "event-store directory is missing");
+  assertRuntimePass("adapter runtime smoke isolates production event store", missingEventStoreResult);
 }
 
 function assertCodexRunnerScript() {
