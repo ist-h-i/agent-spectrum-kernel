@@ -139,7 +139,7 @@ function ensureSource(path, label) {
   }
 }
 
-function buildState({ manifest, skills, selectedSkills, retainedStaleSkills, managedFiles, managedBlocks, previousState, rollback }) {
+function buildState({ manifest, skills, selectedSkills, retainedStaleSkills, managedFiles, managedBlocks, previousState, rollback, hasMutations }) {
   return buildLifecycleState({
     manifest,
     repoRoot: REPO_ROOT,
@@ -157,6 +157,7 @@ function buildState({ manifest, skills, selectedSkills, retainedStaleSkills, man
     managedBlocks,
     previousState,
     rollback,
+    hasMutations,
     extra: {
       retained_stale_skills: retainedStaleSkills,
     },
@@ -267,7 +268,7 @@ function buildPlan(args) {
 
   const stateSkills = args.prune ? skills : [...new Set([...skills, ...staleSkills])].sort();
   const retainedStaleSkills = args.prune ? [] : staleSkills;
-  const state = buildState({ manifest, skills: stateSkills, selectedSkills: skills, retainedStaleSkills, managedFiles, managedBlocks, previousState, rollback });
+  const state = buildState({ manifest, skills: stateSkills, selectedSkills: skills, retainedStaleSkills, managedFiles, managedBlocks, previousState, rollback, hasMutations: operations.some((operation) => !operation.unchanged) });
 
   return { operations, staleSkills, state };
 }

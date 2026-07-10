@@ -12,10 +12,11 @@ The installer can copy:
 - command templates into `.claude/commands/`,
 - managed project hook configuration into `.claude/settings.json`,
 - local metrics and ledger runtime scripts into `scripts/`,
-- command-required docs and ledger assets into `docs/`,
+- refreshable command references into `docs/`,
+- initialize-once project ledger state into `docs/`,
 - the local observability config template into `docs/ai/observability-config.yml`.
 
-The copied skills remain a projection of the canonical core skills in this repository. Update by rerunning the installer from a newer checkout of this repository. The default mode is three-way update safe: projected files are updated only when the target still matches the previous managed hash, unless `--force` is used. Unrelated existing settings are preserved, and adapter-owned hook commands are replaced without duplication.
+The copied skills remain a projection of the canonical core skills in this repository. Update by rerunning the installer from a newer checkout of this repository. The default mode is three-way update safe: managed projections and refreshable references are updated only when the target still matches the previous managed hash, unless `--force` is used. Project-owned state and unrelated existing settings are preserved, and adapter-owned hook commands are replaced without duplication.
 
 Hook source of truth:
 
@@ -51,6 +52,13 @@ The Claude adapter requires `.agent-spectrum-kernel/install-state.json` from the
 The adapter records `.agent-spectrum-kernel/claude-install-state.json` with managed file hashes, managed hook identifiers, partial-file hashes for `.claude/settings.json`, selected profile, previous successful state, and rollback snapshot. `--prune` removes stale unmodified managed assets. `--detach` removes projected Claude execution surfaces and adapter-owned hooks while preserving metrics, reports, and ledgers by default.
 
 The installer does not enable external publication. It does not create secrets, tokens, webhooks, or cloud telemetry destinations.
+
+## Asset Lifecycle
+
+- Managed references such as contracts, schemas, README files, and fixed templates are refreshed from the ASK checkout on each install.
+- Project-owned state such as `docs/ai/improvement-ledger.md` and `docs/ai/skill-adoption-metrics.md` is initialized only when absent. A later install, including `full` and `observability`, preserves existing content.
+- `docs/ai/metrics/` and `docs/ai/reports/` are runtime directories only. The installer creates the directories but does not seed or replace event or report data.
+- `--dry-run` labels each planned file operation as `refresh`, `initialize`, or `preserve`; runtime directories are reported separately.
 
 ## Profiles
 

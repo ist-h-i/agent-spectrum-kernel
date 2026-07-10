@@ -115,6 +115,7 @@ export function buildLifecycleState({
   managedHooks = [],
   rollback = { files: {}, blocks: {} },
   previousState = null,
+  hasMutations = false,
   extra = {},
 }) {
   const previousSuccessfulState =
@@ -147,7 +148,7 @@ export function buildLifecycleState({
     managed_hooks: managedHooks,
     rollback,
   };
-  if (previousState?.schema_version === LIFECYCLE_SCHEMA_VERSION && comparableState(previousState) === comparableState(state)) {
+  if (!hasMutations && previousState?.schema_version === LIFECYCLE_SCHEMA_VERSION && comparableState(previousState) === comparableState(state)) {
     return previousState;
   }
   return state;
@@ -235,7 +236,7 @@ function previousManagedPartialRecord(previousState, relativePath) {
 }
 
 export function createRollbackSnapshot() {
-  return { files: {}, blocks: {} };
+  return { files: {}, blocks: {}, hooks: {} };
 }
 
 export function captureRollbackFile(rollback, target, relativePath) {
@@ -413,7 +414,16 @@ export function applyLifecyclePlan({ target, statePath, operations, state, dryRu
   const absoluteStatePath = resolve(target, statePath);
   const markerPath = stateInProgressPath(absoluteStatePath);
   mkdirSync(dirname(absoluteStatePath), { recursive: true });
-  writeFileSync(markerPath, `${JSON.stringify({ install_status: "in_progress", state_path: statePath, started_at: new Date().toISOString() }, null, 2)}\n`);
+  writeFileSync(
+    markerPath,
+    `${JSON.stringify({
+      install_status: "in_progress",
+      state_path: statePath,
+      started_at: new Date().toISOString(),
+      pending_state: state,
+      operations: operations.map(({ kind, relativePath, reason }) => ({ kind, relative_path: relativePath, reason })),
+    }, null, 2)}\n`,
+  );
   try {
     applyOperations(operations, false);
     writeFileSync(absoluteStatePath, `${JSON.stringify(state, null, 2)}\n`);
@@ -427,14 +437,30 @@ export function applyLifecyclePlan({ target, statePath, operations, state, dryRu
 
 export function printOperations(target, operations) {
   for (const operation of operations) {
-    const marker = operation.kind === "delete_file" ? "delete" : operation.kind === "remove_empty_dir" ? "rmdir-if-empty" : operation.kind === "mkdir" ? "mkdir" : operation.unchanged ? "unchanged" : "write";
+    const marker = operation.reason === "initialize_project_state"
+      ? "initialize"
+      : operation.reason === "preserve_project_state"
+        ? "preserve"
+      : operation.reason?.startsWith("claude_")
+        ? "refresh"
+        : operation.kind === "delete_file"
+          ? "delete"
+          : operation.kind === "remove_empty_dir"
+            ? "rmdir-if-empty"
+            : operation.kind === "mkdir"
+              ? "mkdir"
+              : operation.unchanged
+                ? "unchanged"
+                : "write";
     console.log(`- ${marker}: ${relative(target, operation.destination)} (${operation.reason})`);
   }
 }
 
-export function rollbackLifecycleState({ target, statePath, dryRun = false, force = false }) {
+export function rollbackLifecycleState({ target, statePath, dryRun = false, force = false, extendOperations = null }) {
   const absoluteStatePath = resolve(target, statePath);
-  const state = readJsonIfExists(absoluteStatePath);
+  const markerPath = stateInProgressPath(absoluteStatePath);
+  const pending = readJsonIfExists(markerPath);
+  const state = pending?.pending_state ?? readJsonIfExists(absoluteStatePath);
   if (!state) {
     throw new Error(`install state is missing: ${statePath}`);
   }
@@ -444,12 +470,21 @@ export function rollbackLifecycleState({ target, statePath, dryRun = false, forc
   }
   const operations = [];
   for (const [relativePath, snapshot] of Object.entries(rollback.files ?? {})) {
-    if (!force && state.managed_files?.[relativePath]) {
-      assertManagedDeleteSafe({ target, relativePath, previousState: state, force });
+    if (state.managed_partial_files?.[relativePath]?.kind === "claude_settings") {
+      continue;
+    }
+    const destination = resolve(target, relativePath);
+    const currentHash = existsSync(destination) ? hashText(readText(destination)) : null;
+    const managedHash = state.managed_files?.[relativePath]?.sha256 ?? previousManagedPartialRecord(state, relativePath)?.sha256 ?? null;
+    const rollbackHash = snapshot.sha256 ?? null;
+    if (currentHash === rollbackHash) {
+      continue;
+    }
+    if (!force && currentHash !== managedHash) {
+      throw new Error(`rollback conflict: ${relativePath} does not match the pending managed or rollback snapshot. Use --force to overwrite.`);
     }
     const partialRecord = previousManagedPartialRecord(state, relativePath);
-    if (!force && partialRecord && existsSync(resolve(target, relativePath))) {
-      const currentHash = hashText(readText(resolve(target, relativePath)));
+    if (!force && partialRecord && existsSync(destination)) {
       if (currentHash !== partialRecord.sha256) {
         throw new Error(`managed partial file conflict: ${relativePath} was modified locally. Use --force to overwrite.`);
       }
@@ -465,12 +500,21 @@ export function rollbackLifecycleState({ target, statePath, dryRun = false, forc
     if (!existsSync(destination)) {
       continue;
     }
-    if (!force) {
-      assertManagedBlockSafe({ target, relativePath: snapshot.path, blockKey, previousState: state, force });
+    const currentBlock = extractManagedBlock(readText(destination));
+    const currentHash = currentBlock ? hashText(currentBlock.content) : null;
+    const managedHash = state.managed_blocks?.[blockKey]?.sha256 ?? null;
+    if (currentHash === snapshot.sha256) {
+      continue;
+    }
+    if (!force && currentHash !== managedHash) {
+      throw new Error(`rollback block conflict: ${snapshot.path} does not match the pending managed or rollback snapshot. Use --force to overwrite.`);
     }
     const existing = readText(destination);
     const content = snapshot.content === null ? removeManagedBlock(existing) : replaceOrAppendManagedBlock(existing, `${snapshot.content}\n`, true);
     operations.push({ kind: "write", destination, relativePath: snapshot.path, content, reason: `rollback:restore-block:${blockKey}`, unchanged: existing === content });
+  }
+  if (extendOperations) {
+    extendOperations({ state, operations });
   }
   if (!dryRun) {
     applyOperations(operations, false);
