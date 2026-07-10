@@ -4,21 +4,39 @@ description: Define and run focused verification for a change or readiness claim
 
 Use the repository `AGENTS.md` and projected skills from `.agents/skills`.
 
-Use `test-first-verification` to define the Verification Contract before claiming behavior is correct, fixed, ready, safe, reliable, faster, or regression-free.
+Entry intent: verification.
+Mutation level: local test or fixture edits are allowed when they are needed to make the target behavior observable.
+Routing source: use `test-first-verification` for the verification contract. Use `evidence-ledger` before any readiness, safety, reliability, correctness, performance, cost, maintainability, or no-regression claim.
 
-Verification output should include:
+Evidence requirements:
 
-- behavior to prove
-- regression to prevent
-- existing coverage
-- focused test or validation command
-- manual/runtime check when automated coverage is unavailable
-- evidence from exact commands run
-- what remains unverified
+- state the behavior to prove and regression to prevent
+- identify existing coverage before adding new checks
+- run the focused command, broader command, or manual/runtime check that matches the claim
+- quote exact command names and outcomes; never invent command output
+- state what remains unverified and the exact next check
 
-Use `evidence-ledger` when the result includes correctness, readiness, reliability, safety, performance, cost, maintainability, or no-regression claims.
+Output contract:
 
-Never invent command output. If a command was not run, say it was not run and provide the exact next command.
+```text
+Verification Contract:
+- Behavior to prove:
+- Regression to prevent:
+- Existing coverage:
+- Commands:
+- Evidence required:
+- What remains unverified:
+
+Evidence:
+- command:
+  result:
+
+Not verified:
+- ...
+
+Next verification:
+- ...
+```
 
 Do not include raw prompts, secrets, customer data, personal data, full command output, or full file contents.
 

@@ -1373,6 +1373,11 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
       installerPresent: false,
       readsManifestSkills: false,
       writesCodexInstallState: false,
+      hasWorkflowProfiles: false,
+      validatesSkillClosure: false,
+      validatesRouterReachabilityClosure: false,
+      validatesInstalledReferences: false,
+      managesPromptCommandStale: false,
       projectsAgentsSkills: false,
       installsPrompts: false,
       installsCommand: false,
@@ -1613,6 +1618,19 @@ function validateCodexInstaller(root, checks, errors) {
   const text = readFileSync(absolutePath, "utf8");
   checks.codexInstaller.readsManifestSkills = /manifest\.skills/.test(text);
   checks.codexInstaller.writesCodexInstallState = text.includes(".agent-spectrum-kernel/codex-install-state.json") && text.includes("managed_files");
+  checks.codexInstaller.hasWorkflowProfiles = text.includes("CODEX_PROFILES") && text.includes("DEFAULT_PROFILE") && text.includes("--profile");
+  checks.codexInstaller.validatesSkillClosure = text.includes("SKILL_RELATIONSHIPS") && text.includes("validateSkillClosure") && text.includes("required_skills");
+  checks.codexInstaller.validatesRouterReachabilityClosure =
+    text.includes("PROFILE_ROUTING_FIXTURES") &&
+    text.includes("routingFixturesForProfile") &&
+    text.includes("router_reachable_skills") &&
+    text.includes("routing_fixtures");
+  checks.codexInstaller.validatesInstalledReferences = text.includes("validateManagedReferences") && text.includes("source-repository-only Codex prompt path");
+  checks.codexInstaller.managesPromptCommandStale =
+    text.includes("retained_stale_prompts") &&
+    text.includes("retained_stale_commands") &&
+    text.includes("stale_codex_prompt") &&
+    text.includes("stale_codex_command");
   checks.codexInstaller.projectsAgentsSkills = text.includes(".agents/skills") && text.includes("codex_skill");
   checks.codexInstaller.installsPrompts = text.includes(".agents/prompts") && text.includes("PROMPT_TEMPLATES");
   checks.codexInstaller.installsCommand = text.includes(".agents/commands") && text.includes("COMMAND_TEMPLATES");
@@ -1623,8 +1641,13 @@ function validateCodexInstaller(root, checks, errors) {
   checks.codexInstaller.hasPrune = text.includes("--prune") && /prune/.test(text);
   checks.codexInstaller.verifiesPruneHash = text.includes("modified managed file; refusing to prune") && /currentHash\s*!==\s*record\.sha256/.test(text);
   checks.codexInstaller.prunesManagedFileOnly = text.includes("unlinkSync") && !text.includes("rmSync(");
+  const codexInstallerExecutableText = text
+    .replace(/release-readiness-gate/g, "")
+    .replace(/- Do not chain this template to publish, deploy, release, send notifications, or mutate production state without .+? and explicit approval\./g, "")
+    .replace(/no hooks, telemetry, secrets, deploys, external publication, or Git commands\./gi, "")
+    .replace(/no hooks, telemetry, secrets, deploys, external publication/gi, "");
   checks.codexInstaller.avoidsHooksTelemetryExternal =
-    !/\.claude|hooks\.json|webhook|https?:\/\/|telemetry|deploy|publish|release/i.test(text.replace(/no hooks, telemetry, secrets, deploys, external publication/gi, ""));
+    !/\.claude|hooks\.json|webhook|https?:\/\/|telemetry|deploy|publish|release/i.test(codexInstallerExecutableText);
 
   for (const [field, ok] of Object.entries(checks.codexInstaller)) {
     if (!ok) {
@@ -1832,6 +1855,11 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- installer present: ${claudeAdapterChecks.codexInstaller.installerPresent ? "ok" : "missing"}`,
     `- reads manifest skills: ${claudeAdapterChecks.codexInstaller.readsManifestSkills ? "ok" : "invalid"}`,
     `- writes Codex install state: ${claudeAdapterChecks.codexInstaller.writesCodexInstallState ? "ok" : "invalid"}`,
+    `- workflow profiles: ${claudeAdapterChecks.codexInstaller.hasWorkflowProfiles ? "ok" : "invalid"}`,
+    `- skill closure validation: ${claudeAdapterChecks.codexInstaller.validatesSkillClosure ? "ok" : "invalid"}`,
+    `- router reachability closure: ${claudeAdapterChecks.codexInstaller.validatesRouterReachabilityClosure ? "ok" : "invalid"}`,
+    `- installed-reference validation: ${claudeAdapterChecks.codexInstaller.validatesInstalledReferences ? "ok" : "invalid"}`,
+    `- prompt/command stale lifecycle: ${claudeAdapterChecks.codexInstaller.managesPromptCommandStale ? "ok" : "invalid"}`,
     `- projects .agents/skills: ${claudeAdapterChecks.codexInstaller.projectsAgentsSkills ? "ok" : "invalid"}`,
     `- installs prompt templates: ${claudeAdapterChecks.codexInstaller.installsPrompts ? "ok" : "invalid"}`,
     `- installs command templates: ${claudeAdapterChecks.codexInstaller.installsCommand ? "ok" : "invalid"}`,
