@@ -19,7 +19,7 @@ The Codex adapter installer projects Codex-specific files into another repositor
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents
 ```
 
-It updates `AGENTS.md`, `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. It does not create hooks, telemetry, GitHub Actions, external publication, secrets, deploys, or releases.
+It updates `AGENTS.md`, profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. It does not create hooks, telemetry, GitHub Actions, external publication, secrets, deploys, or releases.
 
 ## Codex Projection Model
 
@@ -40,70 +40,28 @@ Codex documentation supports `AGENTS.md`, repo-scoped skills under `.agents/skil
 ## Minimum Setup In An Adopting Repository
 
 1. Run `node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents`.
-2. Use `--skills <csv>` to project a narrower set than `manifest.json.skills` when needed.
+2. Use `--profile <name>` to choose a supported workflow profile. The default is `implementation`.
 3. Rerun the installer after pulling this repository's updates.
 4. Use a template from `.agents/prompts/` as the task prompt, or adapt the command pattern in `.agents/commands/codex-exec.md`.
 5. Run repository-specific verification commands before claiming correctness, readiness, safety, reliability, or no regression.
 
-## Recommended Skill Sets
+## Workflow Profiles
 
-Implementation work:
+Use profiles instead of arbitrary partial skill sets for normal installs:
 
-- `operating-mode-router`
-- `skill-router`
-- `requirement-grill` when business intent or responsibility boundary is unclear
-- `work-package-compiler` when a confirmed Requirement Contract should become an agent-ready task
-- `spec-driven-development`
-- `test-first-verification`
-- `controlled-implementation`
-- `evidence-ledger`
-- `risk-gate`
+| Profile | Intended use |
+|---|---|
+| `minimal` | Verification and handoff without installing broad routing/review skills. |
+| `implementation` | Default scoped implementation work. |
+| `investigation` | Bug, regression, reliability, and unknown-root-cause work. |
+| `review` | PR, diff, generated-output, and readiness review. |
+| `adoption` | Project adoption and durable context setup. |
+| `observability` | Skill effectiveness, adoption metrics, and capability evaluation. |
+| `full` | All manifest skills and all Codex prompt templates. |
 
-Investigation work:
+Each profile installs a closed command/prompt/skill set. Installed command examples only reference prompt files selected by that profile.
 
-- `operating-mode-router`
-- `skill-router`
-- `doubt-driven-development`
-- `test-first-verification`
-- `controlled-implementation`
-- `evidence-ledger`
-- `risk-gate`
-
-Review work:
-
-- `review-router`
-- `review-automated-gate`
-- `review-ai-quality`
-- `review-code-health`
-- `review-domain-impact`
-- `review-to-rule-compiler` when review evidence should become domain rule candidates
-- `review-architecture-impact`
-- `review-output-quality`
-- `review-adversarial-risk`
-- `review-final-merge-gate`
-- `evidence-ledger`
-- `risk-gate`
-- `adr-review`
-- `improvement-ledger`
-
-Decision-support and learning work:
-
-- `next-best-change-finder`
-- `requirement-grill`
-- `work-package-compiler`
-- `review-to-rule-compiler`
-- `domain-rule-ledger`
-
-Full-layer reusable intelligence work:
-
-- `engineering-pattern-ledger`
-- `verification-pattern-ledger`
-- `review-finding-compiler`
-- `documentation-knowledge-compiler`
-- `architecture-decision-memory`
-- `engineering-capability-evaluation`
-
-Project only the full-layer skills that match the adopting repository's need. Their ledgers are evidence sources for selected workflows, not mandatory inputs for every Codex task.
+Use `--skills <csv>` only as an advanced override. The override must include all required skills for installed prompt templates, command templates, and dependencies of the specified skills. Invalid combinations fail before any files are written.
 
 ## Prompt Templates
 
@@ -117,7 +75,15 @@ Use these files as copy-paste prompts or as `codex exec` prompt files:
 
 They route through the existing core skills and require evidence-backed outputs. They do not store raw prompts, secrets, customer data, personal data, full command output, or full file contents.
 
-For non-trivial continuation, handoff, interrupted work, or risk-gated work, handoff prompts may include the bounded resume state from `docs/agent-session-state-contract.md`. The adapter does not require session state for trivial or fully captured simple local tasks.
+Prompt templates define entry intent, mutation level, evidence requirements, and output contract. They do not duplicate the canonical skill-routing procedure; routing remains in `operating-mode-router`, `skill-router`, review routing, or explicitly named relevant skills.
+
+For non-trivial continuation, handoff, interrupted work, or risk-gated work, handoff prompts may include bounded resume state when useful. The adapter does not require session state for trivial or fully captured simple local tasks.
+
+## Stale Managed Files
+
+The installer records managed skills, prompts, and commands in `.agent-spectrum-kernel/codex-install-state.json`.
+
+When a later install no longer selects a previously managed file, the installer reports it as stale and retains it by default. Use `--prune` to delete stale managed files only when the current file hash still matches the previous managed hash. Modified managed files are preserved and cause prune to fail before deletion.
 
 ## Capability Downgrades
 

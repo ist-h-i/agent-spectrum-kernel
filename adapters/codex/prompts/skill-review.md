@@ -4,11 +4,18 @@ description: Run the Agent Spectrum Kernel review flow for the current PR, branc
 
 Use the repository `AGENTS.md` and projected skills from `.agents/skills`.
 
-Start with `review-router` to decide applicable review layers. Run only required gates. End with `review-final-merge-gate` style output.
+Entry intent: review.
+Mutation level: read-only unless the user explicitly asks for fixes after the review.
+Routing source: use `review-router` to decide applicable review layers, then run only required gates. Do not treat this prompt as a second routing source.
 
-If the checked-out workspace, PR head, changed files, relevant docs, generated output, or verification evidence is unavailable, mark the affected layer as `insufficient evidence` instead of treating it as skipped.
+Evidence requirements:
 
-Review output:
+- inspect the checked-out workspace, diff, generated output, relevant docs, and verification evidence when available
+- mark affected layers as `insufficient evidence` when required inputs are missing
+- keep current blockers separate from non-blocking improvement candidates
+- use `risk-gate` before any external comment, label, check, metric, notification, deploy, release, or production mutation
+
+Output contract:
 
 ```text
 Decision:
@@ -40,6 +47,6 @@ Residual risk:
 - ...
 ```
 
-Keep current-PR blockers separate from non-blocking improvement-ledger candidates. Do not publish comments, labels, checks, metrics, or notifications externally unless the user explicitly requested that external action and `risk-gate` approved it.
+Do not publish comments, labels, checks, metrics, or notifications externally unless the user explicitly requested that external action and `risk-gate` approved it.
 
 $ARGUMENTS

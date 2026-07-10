@@ -4,18 +4,40 @@ description: Investigate a bug, regression, performance issue, or unknown root c
 
 Use the repository `AGENTS.md` and projected skills from `.agents/skills`.
 
-Start with `operating-mode-router` when the operating layer is unclear, then use `skill-router`. For bug, regression, performance, reliability, or unknown-root-cause work, use `doubt-driven-development`.
+Entry intent: investigation.
+Mutation level: start read-only; local edits are allowed only after the cause and verification path are clear.
+Routing source: use `operating-mode-router` when the operating layer is unclear, then use `skill-router` or an explicitly named relevant skill. Do not treat this prompt as a second routing source.
 
-Investigation requirements:
+Evidence requirements:
 
-- reproduce or falsify the reported behavior when feasible
-- define a Verification Contract with `test-first-verification` before or alongside the fix path
+- reproduce, falsify, or narrow the reported behavior when feasible
 - separate Verified, Supported, Hypothesis, Unknown, and Falsified statements
-- inspect relevant repo code, tests, docs, scripts, and logs before changing behavior
+- inspect relevant code, tests, docs, scripts, and logs before changing behavior
+- define the regression proof before or alongside a fix
 - keep cleanup separate from the root-cause fix unless required
-- stop for `risk-gate` before destructive, external, production, auth, secret, dependency, migration, billing, email, telemetry, or infra-impacting actions
+- use `risk-gate` before destructive, external, production, auth, secret, dependency, migration, billing, email, telemetry, or infrastructure-impacting actions
 
-If a fix is in scope, use `controlled-implementation` and verify the regression proof. End with evidence, remaining unknowns, and the next narrow verification step.
+Output contract:
+
+```text
+Findings:
+- ...
+
+Cause:
+- ...
+
+Changed:
+- ...
+
+Verified:
+- ...
+
+Unknown / not verified:
+- ...
+
+Next:
+- ...
+```
 
 Do not include raw prompts, secrets, customer data, personal data, full command output, or full file contents.
 

@@ -121,6 +121,12 @@ function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, 
   for (const skill of state.retained_stale_skills ?? []) {
     report.warnings.push(`${label} retained stale managed skill projection: ${skill}`);
   }
+  for (const prompt of state.retained_stale_prompts ?? []) {
+    report.warnings.push(`${label} retained stale managed prompt projection: ${prompt}`);
+  }
+  for (const command of state.retained_stale_commands ?? []) {
+    report.warnings.push(`${label} retained stale managed command projection: ${command}`);
+  }
 
   for (const [managedPath, record] of Object.entries(state.managed_files)) {
     const destination = resolve(target, managedPath);
@@ -160,7 +166,16 @@ function sourcePathForManagedRecord(managedPath, record) {
   if (record.kind === "codex_prompt" && record.prompt) {
     return resolve(REPO_ROOT, "adapters/codex/prompts", record.prompt);
   }
+  if (record.kind === "stale_codex_prompt" && record.prompt) {
+    return resolve(REPO_ROOT, "adapters/codex/prompts", record.prompt);
+  }
+  if ((record.kind === "codex_command" || record.kind === "stale_codex_command") && record.generated === true) {
+    return null;
+  }
   if (record.kind === "codex_command" && record.command) {
+    return resolve(REPO_ROOT, "adapters/codex/commands", record.command);
+  }
+  if (record.kind === "stale_codex_command" && record.command) {
     return resolve(REPO_ROOT, "adapters/codex/commands", record.command);
   }
   return null;
