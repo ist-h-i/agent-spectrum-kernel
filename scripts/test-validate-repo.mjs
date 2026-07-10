@@ -306,6 +306,20 @@ jobs:
 
   mkdirSync(resolve(root, "scripts"), { recursive: true });
   writeFileSync(
+    resolve(root, "scripts/installer-lifecycle.mjs"),
+    `export const LIFECYCLE_SCHEMA_VERSION = 3;
+function assertManagedDeleteSafe() {
+  const currentHash = "current";
+  const record = { sha256: "expected" };
+  if (currentHash !== record.sha256) throw new Error("modified managed file; refusing to prune/delete");
+  unlinkSync("managed-file");
+}
+function applyLifecyclePlan() {
+  return "install_status" + "previous_successful_state" + "managed_blocks" + "managed_hooks" + "--rollback" + "--detach" + "--force" + "--check";
+}
+`,
+  );
+  writeFileSync(
     resolve(root, "scripts/install-kernel.mjs"),
     `const STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const MANAGED_START = "<!-- agent-spectrum-kernel:start -->";
@@ -1884,8 +1898,47 @@ function assertInstallerScripts() {
   if (existsSync(resolve(target, ".claude/hooks/hooks.json"))) {
     throw new Error("installer should remove legacy adapter-owned .claude/hooks/hooks.json and use settings.json as hook source of truth");
   }
-  if (!existsSync(resolve(target, "docs/ai/improvement-ledger.md")) || !existsSync(resolve(target, "docs/debt-lifecycle-contract.md"))) {
+  const claudeState = JSON.parse(readFileSync(resolve(target, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  if (
+    claudeState.schema_version !== 3 ||
+    claudeState.install_status !== "installed" ||
+    claudeState.selected_profile !== "full" ||
+    !Array.isArray(claudeState.managed_hooks) ||
+    claudeState.managed_hooks.length === 0 ||
+    !claudeState.managed_partial_files?.[".claude/settings.json"]?.sha256
+  ) {
+    throw new Error(`installer should write shared Claude lifecycle state\n${JSON.stringify(claudeState, null, 2)}`);
+  }
+  writeFileSync(resolve(target, ".claude/commands/skill-handoff.md"), "# local command change\n");
+  assertRuntimeFail(
+    "installer local managed command conflict",
+    runRepoScript([installer, "--target", target]),
+    "managed file conflict",
+  );
+  assertRuntimePass("installer force updates managed command", runRepoScript([installer, "--target", target, "--force"]));
+  if (readFileSync(resolve(target, ".claude/commands/skill-handoff.md"), "utf8") !== readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/commands/skill-handoff.md"), "utf8")) {
+    throw new Error("installer --force should refresh locally modified managed commands");
+  }
+  if (!existsSync(resolve(target, "docs/ai/improvement-ledger.md")) || !existsSync(resolve(target, "docs/ai/skill-adoption-metrics.md")) || !existsSync(resolve(target, "docs/debt-lifecycle-contract.md"))) {
     throw new Error("installer should project command-required docs and ledger assets");
+  }
+  const projectLedgerContent = "# Project Improvement Ledger\n\nproject-specific ledger entry must survive reinstall\n";
+  const projectMetricsContent = "# Project Skill Adoption Metrics\n\nproject-specific adoption metrics must survive reinstall\n";
+  writeFileSync(resolve(target, "docs/ai/improvement-ledger.md"), projectLedgerContent);
+  writeFileSync(resolve(target, "docs/ai/skill-adoption-metrics.md"), projectMetricsContent);
+  assertRuntimePass("installer full preserves project state assets", runRepoScript([installer, "--target", target]));
+  if (
+    readFileSync(resolve(target, "docs/ai/improvement-ledger.md"), "utf8") !== projectLedgerContent ||
+    readFileSync(resolve(target, "docs/ai/skill-adoption-metrics.md"), "utf8") !== projectMetricsContent
+  ) {
+    throw new Error("installer full profile rerun should preserve existing project state assets");
+  }
+  assertRuntimePass("installer observability preserves project state assets", runRepoScript([installer, "--target", target, "--profile", "observability"]));
+  if (
+    readFileSync(resolve(target, "docs/ai/improvement-ledger.md"), "utf8") !== projectLedgerContent ||
+    readFileSync(resolve(target, "docs/ai/skill-adoption-metrics.md"), "utf8") !== projectMetricsContent
+  ) {
+    throw new Error("installer observability profile rerun should preserve existing project state assets");
   }
 
   const implementationTarget = resolve(fixtureRoot, "install-implementation-profile-target");
@@ -1898,6 +1951,48 @@ function assertInstallerScripts() {
   }
   if (existsSync(resolve(implementationTarget, ".claude/commands/skill-review.md"))) {
     throw new Error("implementation profile should not install review command");
+  }
+
+  const rollbackTarget = resolve(fixtureRoot, "install-claude-rollback-target");
+  assertRuntimePass("installer rollback core setup", runRepoScript([coreInstaller, "--target", rollbackTarget]));
+  assertRuntimePass("installer rollback first profile", runRepoScript([installer, "--target", rollbackTarget, "--profile", "implementation"]));
+  assertRuntimePass("installer rollback second profile", runRepoScript([installer, "--target", rollbackTarget, "--profile", "review"]));
+  assertRuntimePass("installer rollback", runRepoScript([installer, "--target", rollbackTarget, "--rollback"]));
+  if (existsSync(resolve(rollbackTarget, ".claude/commands/skill-review.md")) || !existsSync(resolve(rollbackTarget, ".claude/commands/skill-implement.md"))) {
+    throw new Error("installer rollback should restore the previous successful Claude projection");
+  }
+
+  const rollbackConflictTarget = resolve(fixtureRoot, "install-claude-rollback-conflict-target");
+  assertRuntimePass("installer rollback conflict core setup", runRepoScript([coreInstaller, "--target", rollbackConflictTarget]));
+  assertRuntimePass("installer rollback conflict first profile", runRepoScript([installer, "--target", rollbackConflictTarget, "--profile", "implementation"]));
+  assertRuntimePass("installer rollback conflict second profile", runRepoScript([installer, "--target", rollbackConflictTarget, "--profile", "review"]));
+  const rollbackConflictSettingsPath = resolve(rollbackConflictTarget, ".claude/settings.json");
+  const rollbackConflictSettings = JSON.parse(readFileSync(rollbackConflictSettingsPath, "utf8"));
+  rollbackConflictSettings.localPreference = true;
+  writeFileSync(rollbackConflictSettingsPath, `${JSON.stringify(rollbackConflictSettings, null, 2)}\n`);
+  assertRuntimeFail(
+    "installer rollback partial settings conflict",
+    runRepoScript([installer, "--target", rollbackConflictTarget, "--rollback"]),
+    "managed partial file conflict",
+  );
+
+  const detachTarget = resolve(fixtureRoot, "install-claude-detach-target");
+  assertRuntimePass("installer detach core setup", runRepoScript([coreInstaller, "--target", detachTarget]));
+  assertRuntimePass("installer detach setup", runRepoScript([installer, "--target", detachTarget, "--profile", "implementation"]));
+  mkdirSync(resolve(detachTarget, "docs/ai/metrics"), { recursive: true });
+  writeFileSync(resolve(detachTarget, "docs/ai/metrics/events.jsonl"), "{\"keep\":true}\n");
+  assertRuntimePass("installer detach", runRepoScript([installer, "--target", detachTarget, "--detach"]));
+  const detachedClaudeState = JSON.parse(readFileSync(resolve(detachTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  const detachedSettings = existsSync(resolve(detachTarget, ".claude/settings.json"))
+    ? readFileSync(resolve(detachTarget, ".claude/settings.json"), "utf8")
+    : "";
+  if (
+    existsSync(resolve(detachTarget, ".claude/commands/skill-implement.md")) ||
+    detachedSettings.includes("ai-metrics-record") ||
+    !existsSync(resolve(detachTarget, "docs/ai/metrics/events.jsonl")) ||
+    detachedClaudeState.install_status !== "detached"
+  ) {
+    throw new Error("installer detach should remove Claude execution surfaces while preserving local metrics evidence");
   }
 
   const noRuntimeTarget = resolve(fixtureRoot, "install-no-runtime-target");
@@ -2027,9 +2122,17 @@ function assertCoreInstallerScripts() {
   }
 
   writeFileSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"), "# local stale copy\n");
-  assertRuntimePass("kernel installer updates managed skills", runRepoScript([installer, "--target", freshTarget]));
+  assertRuntimeFail(
+    "kernel installer local managed skill conflict",
+    runRepoScript([installer, "--target", freshTarget]),
+    "managed file conflict",
+  );
+  if (readFileSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"), "utf8") !== "# local stale copy\n") {
+    throw new Error("kernel installer should preserve locally modified managed skills without --force");
+  }
+  assertRuntimePass("kernel installer force updates managed skills", runRepoScript([installer, "--target", freshTarget, "--force"]));
   if (readFileSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"), "utf8") !== readFileSync(resolve(repoRoot, "skills/operating-mode-router/SKILL.md"), "utf8")) {
-    throw new Error("kernel installer should refresh managed skills from the current checkout");
+    throw new Error("kernel installer --force should refresh managed skills from the current checkout");
   }
 
   const mergeTarget = resolve(fixtureRoot, "kernel-install-merge");
@@ -2093,6 +2196,36 @@ function assertCoreInstallerScripts() {
   const prunedState = JSON.parse(readFileSync(resolve(staleTarget, ".agent-spectrum-kernel/install-state.json"), "utf8"));
   if (prunedState.installed_skills.includes("test-first-verification")) {
     throw new Error(`kernel installer should remove pruned skills from state\n${JSON.stringify(prunedState, null, 2)}`);
+  }
+
+  const rollbackTarget = resolve(fixtureRoot, "kernel-install-rollback");
+  assertRuntimePass("kernel installer rollback first install", runRepoScript([installer, "--target", rollbackTarget, "--skills", "operating-mode-router"]));
+  assertRuntimePass("kernel installer rollback second install", runRepoScript([installer, "--target", rollbackTarget, "--skills", "operating-mode-router,test-first-verification"]));
+  assertRuntimePass("kernel installer rollback", runRepoScript([installer, "--target", rollbackTarget, "--rollback"]));
+  if (existsSync(resolve(rollbackTarget, "skills/test-first-verification/SKILL.md")) || !existsSync(resolve(rollbackTarget, "skills/operating-mode-router/SKILL.md"))) {
+    throw new Error("kernel installer rollback should restore the previous successful managed file set");
+  }
+
+  const blockConflictTarget = resolve(fixtureRoot, "kernel-install-rollback-block-conflict");
+  assertRuntimePass("kernel installer rollback block conflict first install", runRepoScript([installer, "--target", blockConflictTarget, "--skills", "operating-mode-router"]));
+  assertRuntimePass("kernel installer rollback block conflict second install", runRepoScript([installer, "--target", blockConflictTarget, "--skills", "operating-mode-router,test-first-verification"]));
+  const blockConflictAgentsPath = resolve(blockConflictTarget, "AGENTS.md");
+  writeFileSync(blockConflictAgentsPath, readFileSync(blockConflictAgentsPath, "utf8").replace("Agent Spectrum Kernel", "Locally Modified Kernel"));
+  assertRuntimeFail(
+    "kernel installer rollback managed block conflict",
+    runRepoScript([installer, "--target", blockConflictTarget, "--rollback"]),
+    "managed block conflict",
+  );
+
+  const detachTarget = resolve(fixtureRoot, "kernel-install-detach");
+  mkdirSync(detachTarget, { recursive: true });
+  writeFileSync(resolve(detachTarget, "AGENTS.md"), "# Project Rules\n\nKeep me.\n");
+  assertRuntimePass("kernel installer detach setup", runRepoScript([installer, "--target", detachTarget, "--skills", "operating-mode-router", "--merge-agents"]));
+  assertRuntimePass("kernel installer detach", runRepoScript([installer, "--target", detachTarget, "--detach"]));
+  const detachedAgents = readFileSync(resolve(detachTarget, "AGENTS.md"), "utf8");
+  const detachedState = JSON.parse(readFileSync(resolve(detachTarget, ".agent-spectrum-kernel/install-state.json"), "utf8"));
+  if (!detachedAgents.includes("Keep me.") || detachedAgents.includes("agent-spectrum-kernel:start") || existsSync(resolve(detachTarget, "skills/operating-mode-router/SKILL.md")) || detachedState.install_status !== "detached") {
+    throw new Error("kernel installer detach should remove execution surfaces while preserving project AGENTS.md content");
   }
 
   const modifiedPruneTarget = resolve(fixtureRoot, "kernel-install-modified-prune");
@@ -2202,9 +2335,17 @@ function assertCodexInstallerScripts() {
   }
 
   writeFileSync(resolve(freshTarget, ".agents/skills/controlled-implementation/SKILL.md"), "# local stale copy\n");
-  assertRuntimePass("codex installer updates managed skills", runRepoScript([installer, "--target", freshTarget]));
+  assertRuntimeFail(
+    "codex installer local managed skill conflict",
+    runRepoScript([installer, "--target", freshTarget]),
+    "managed file conflict",
+  );
+  if (readFileSync(resolve(freshTarget, ".agents/skills/controlled-implementation/SKILL.md"), "utf8") !== "# local stale copy\n") {
+    throw new Error("codex installer should preserve locally modified managed skills without --force");
+  }
+  assertRuntimePass("codex installer force updates managed skills", runRepoScript([installer, "--target", freshTarget, "--force"]));
   if (readFileSync(resolve(freshTarget, ".agents/skills/controlled-implementation/SKILL.md"), "utf8") !== readFileSync(resolve(repoRoot, "skills/controlled-implementation/SKILL.md"), "utf8")) {
-    throw new Error("codex installer should refresh managed Codex skills from the current checkout");
+    throw new Error("codex installer --force should refresh managed Codex skills from the current checkout");
   }
 
   const mergeTarget = resolve(fixtureRoot, "codex-install-merge");
@@ -2367,6 +2508,15 @@ function assertDoctorScript() {
   if (!healthyResult.stdout.includes("Exit code 1 means installation health failed")) {
     throw new Error(`doctor should document exit code semantics\n${healthyResult.stdout}\n${healthyResult.stderr}`);
   }
+
+  const inProgressTarget = resolve(fixtureRoot, "doctor-in-progress");
+  assertRuntimePass("doctor setup in-progress install", runRepoScript([installer, "--target", inProgressTarget, "--skills", "operating-mode-router"]));
+  writeFileSync(resolve(inProgressTarget, ".agent-spectrum-kernel/install-state.json.in-progress.json"), "{}\n");
+  assertRuntimeFail(
+    "doctor interrupted install marker",
+    runRepoScript([doctorScript, "--target", inProgressTarget]),
+    "install is in progress or was interrupted",
+  );
 
   const missingSkillTarget = resolve(fixtureRoot, "doctor-missing-skill");
   assertRuntimePass("doctor setup missing skill install", runRepoScript([installer, "--target", missingSkillTarget, "--skills", "operating-mode-router"]));

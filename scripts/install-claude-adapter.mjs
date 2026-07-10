@@ -2,9 +2,11 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as lifecycle from "./installer-lifecycle.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
+const STATE_PATH = ".agent-spectrum-kernel/claude-install-state.json";
 const DEFAULT_PROFILE = "full";
 const HOOK_MARKER = "agent-spectrum-kernel:claude-adapter-hook";
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
@@ -90,25 +92,38 @@ const COMMAND_METADATA = {
   "skill-handoff.md": {
     requiredSkills: ["handoff-generation", "evidence-ledger"],
     requiredAssets: ["docs/agent-session-state-contract.md"],
+    initialProjectStateAssets: [],
+    runtimeDirectories: [],
   },
   "skill-report.md": {
     requiredSkills: ["skill-adoption-metrics", "evidence-ledger"],
     requiredAssets: [
-      "docs/ai/improvement-ledger.md",
-      "docs/ai/skill-adoption-metrics.md",
       "docs/ai/adoption-report-template.md",
       "docs/ai/metrics/README.md",
       "docs/ai/reports/README.md",
       "docs/metrics-event-contract.md",
       "docs/observability-runtime-contract.md",
     ],
+    initialProjectStateAssets: [
+      "docs/ai/improvement-ledger.md",
+      "docs/ai/skill-adoption-metrics.md",
+    ],
+    runtimeDirectories: [
+      "docs/ai/metrics",
+      "docs/ai/reports",
+    ],
   },
   "skill-ledger-refresh.md": {
     requiredSkills: ["improvement-ledger", "evidence-ledger"],
     requiredAssets: [
-      "docs/ai/improvement-ledger.md",
       "docs/debt-lifecycle-contract.md",
       "docs/metrics-event-contract.md",
+    ],
+    initialProjectStateAssets: [
+      "docs/ai/improvement-ledger.md",
+    ],
+    runtimeDirectories: [
+      "docs/ai/metrics",
     ],
   },
 };
@@ -349,6 +364,11 @@ function parseArgs(argv) {
     dryRun: false,
     skipHooks: false,
     skipRuntime: false,
+    prune: false,
+    force: false,
+    check: false,
+    rollback: false,
+    detach: false,
     skills: null,
   };
 
@@ -364,6 +384,16 @@ function parseArgs(argv) {
       args.skipHooks = true;
     } else if (arg === "--skip-runtime") {
       args.skipRuntime = true;
+    } else if (arg === "--prune") {
+      args.prune = true;
+    } else if (arg === "--force") {
+      args.force = true;
+    } else if (arg === "--check") {
+      args.check = true;
+    } else if (arg === "--rollback") {
+      args.rollback = true;
+    } else if (arg === "--detach" || arg === "--uninstall") {
+      args.detach = true;
     } else if (arg === "--skills") {
       args.skills = argv[++i].split(",").map((skill) => skill.trim()).filter(Boolean);
     } else if (arg === "--help" || arg === "-h") {
@@ -386,13 +416,19 @@ Options:
   --skills <csv>       Advanced skill override. Installed commands must remain closed over required skills and assets.
   --skip-hooks         Do not copy hook config.
   --skip-runtime       Do not copy local runtime scripts or config.
+  --prune              Delete stale managed Claude files from the previous install state.
+  --force              Overwrite locally modified managed files.
+  --check              Validate the update plan without changing files.
+  --rollback           Restore the previous successful managed snapshot.
+  --detach, --uninstall Remove Claude execution surfaces and mark the install detached.
   --dry-run            Print planned writes without changing files.
   -h, --help           Show this help.
 
 Install the ASK core first with scripts/install-kernel.mjs. Default mode is
-upgrade-safe: projected files are overwritten from this checkout, unrelated
-existing settings are preserved, and adapter-owned hooks in .claude/settings.json
-are replaced without duplicating hook commands.
+three-way update safe: managed files are updated only when the target still
+matches the previous managed hash, unless --force is used. Unrelated existing
+settings are preserved, and adapter-owned hooks in .claude/settings.json are
+replaced without duplicating hook commands.
 `);
 }
 
@@ -414,42 +450,133 @@ function ensureSource(path) {
   }
 }
 
-function copyFilePlanned(source, destination, args, writes) {
-  ensureSource(source);
-  writes.push(destination);
-  if (args.dryRun) {
-    return;
-  }
-  mkdirSync(dirname(destination), { recursive: true });
-  copyFileSync(source, destination);
+function hasLifecyclePlan(args) {
+  return args.managedFiles && args.operations && args.rollback;
 }
 
-function writeFilePlanned(destination, content, args, writes) {
-  writes.push(destination);
-  if (args.dryRun) {
+function copyFilePlanned(source, destination, args, writes, record = { kind: "claude_file" }) {
+  ensureSource(source);
+  if (!hasLifecyclePlan(args)) {
+    writes.push(destination);
+    if (args.dryRun) {
+      return;
+    }
+    mkdirSync(dirname(destination), { recursive: true });
+    copyFileSync(source, destination);
     return;
   }
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, content);
+  const content = readFileSync(source, "utf8");
+  const relativePath = relative(args.target, destination);
+  args.managedFiles[relativePath] = lifecycle.createManagedFileRecord({ ...record, content });
+  lifecycle.planWriteManaged(args.operations, {
+    target: args.target,
+    relativePath,
+    content,
+    reason: record.kind,
+    previousState: args.previousState,
+    force: args.force,
+    rollback: args.rollback,
+  });
+  writes.push(destination);
+}
+
+function copyFileIfAbsentPlanned(source, destination, args, writes) {
+  ensureSource(source);
+  if (existsSync(destination)) {
+    return;
+  }
+  const content = readFileSync(source, "utf8");
+  writeFilePlanned(destination, content, args, writes);
+}
+
+function ensureDirectoryPlanned(destination, args, writes) {
+  if (existsSync(destination)) {
+    if (!statSync(destination).isDirectory()) {
+      throw new Error(`Required directory path exists but is not a directory: ${relative(args.target, destination)}`);
+    }
+    return;
+  }
+  const relativePath = relative(args.target, destination);
+  writes.push(destination);
+  if (!hasLifecyclePlan(args)) {
+    if (!args.dryRun) {
+      mkdirSync(destination, { recursive: true });
+    }
+    return;
+  }
+  args.operations.push({ kind: "mkdir", destination, relativePath, reason: "runtime_directory", unchanged: false });
+}
+
+function writeFilePlanned(destination, content, args, writes, record = null, { partialRecord = null } = {}) {
+  if (!hasLifecyclePlan(args)) {
+    writes.push(destination);
+    if (args.dryRun) {
+      return;
+    }
+    mkdirSync(dirname(destination), { recursive: true });
+    writeFileSync(destination, content);
+    return;
+  }
+  const relativePath = relative(args.target, destination);
+  if (record) {
+    args.managedFiles[relativePath] = lifecycle.createManagedFileRecord({ ...record, content });
+    lifecycle.planWriteManaged(args.operations, {
+      target: args.target,
+      relativePath,
+      content,
+      reason: record.kind,
+      previousState: args.previousState,
+      force: args.force,
+      rollback: args.rollback,
+    });
+  } else {
+    if (partialRecord) {
+      args.managedPartialFiles[relativePath] = lifecycle.createManagedFileRecord({ ...partialRecord, content });
+    }
+    lifecycle.captureRollbackFile(args.rollback, args.target, relativePath);
+    args.operations.push({
+      kind: "write",
+      destination,
+      relativePath,
+      content,
+      reason: "partial_file",
+      unchanged: existsSync(destination) && readFileSync(destination, "utf8") === content,
+    });
+  }
+  writes.push(destination);
 }
 
 function deleteFilePlanned(destination, args, writes) {
-  writes.push(destination);
-  if (args.dryRun || !existsSync(destination)) {
+  if (!hasLifecyclePlan(args)) {
+    writes.push(destination);
+    if (args.dryRun || !existsSync(destination)) {
+      return;
+    }
+    unlinkSync(destination);
+    const directory = dirname(destination);
+    if (existsSync(directory) && statSync(directory).isDirectory() && readdirSync(directory).length === 0) {
+      rmdirSync(directory);
+    }
     return;
   }
-  unlinkSync(destination);
-  const directory = dirname(destination);
-  if (existsSync(directory) && statSync(directory).isDirectory() && readdirSync(directory).length === 0) {
-    rmdirSync(directory);
-  }
+  const relativePath = relative(args.target, destination);
+  lifecycle.captureRollbackFile(args.rollback, args.target, relativePath);
+  args.operations.push({
+    kind: "delete_file",
+    destination,
+    relativePath,
+    reason: "remove_legacy_adapter_file",
+    unchanged: !existsSync(destination),
+  });
+  lifecycle.planRemoveEmptyDirectory(args.operations, args.target, relative(args.target, dirname(destination)), "empty managed directory");
+  writes.push(destination);
 }
 
 function installSkills(args, writes) {
   for (const skill of args.selectedSkills) {
     const source = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
     const destination = resolve(args.target, ".claude", "skills", skill, "SKILL.md");
-    copyFilePlanned(source, destination, args, writes);
+    copyFilePlanned(source, destination, args, writes, { kind: "claude_skill", skill });
   }
 }
 
@@ -457,13 +584,14 @@ function installCommands(args, writes) {
   for (const command of args.selectedCommands) {
     const source = resolve(REPO_ROOT, "adapters/claude-code/project/.claude/commands", command);
     const destination = resolve(args.target, ".claude", "commands", command);
-    copyFilePlanned(source, destination, args, writes);
+    copyFilePlanned(source, destination, args, writes, { kind: "claude_command", command });
   }
 }
 
 function installHooks(args, writes) {
   if (args.skipHooks || args.skipRuntime) {
     removeManagedHooks(args, writes);
+    args.managedHooks = [];
     return;
   }
   const hooksSource = resolve(REPO_ROOT, "adapters/claude-code/project/.claude/hooks/hooks.json");
@@ -474,7 +602,8 @@ function installHooks(args, writes) {
     settings = JSON.parse(readFileSync(settingsPath, "utf8"));
   }
   settings.hooks = mergeHooks(settings.hooks ?? {}, hooksSettings.hooks ?? {});
-  writeFilePlanned(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, args, writes);
+  args.managedHooks = normalizeHooks(hooksSettings.hooks ?? {});
+  writeFilePlanned(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, args, writes, null, { partialRecord: { kind: "claude_settings" } });
   removeLegacyHooksFile(args, writes);
 }
 
@@ -522,7 +651,7 @@ function removeManagedHooks(args, writes) {
     const nextHooks = removeAdapterOwnedHooks(settings.hooks ?? {});
     const nextSettings = { ...settings, hooks: nextHooks };
     if (JSON.stringify(settings.hooks ?? {}) !== JSON.stringify(nextHooks)) {
-      writeFilePlanned(settingsPath, `${JSON.stringify(nextSettings, null, 2)}\n`, args, writes);
+      writeFilePlanned(settingsPath, `${JSON.stringify(nextSettings, null, 2)}\n`, args, writes, null, { partialRecord: { kind: "claude_settings" } });
     }
   }
   removeLegacyHooksFile(args, writes);
@@ -591,23 +720,28 @@ function installRuntime(args, writes) {
     return;
   }
   for (const script of RUNTIME_SCRIPTS) {
-    copyFilePlanned(resolve(REPO_ROOT, "scripts", script), resolve(args.target, "scripts", script), args, writes);
+    copyFilePlanned(resolve(REPO_ROOT, "scripts", script), resolve(args.target, "scripts", script), args, writes, { kind: "claude_runtime", script });
   }
   copyFilePlanned(
     resolve(REPO_ROOT, "docs/ai/observability-config.yml"),
     resolve(args.target, "docs/ai/observability-config.yml"),
     args,
     writes,
+    { kind: "claude_config", config: "docs/ai/observability-config.yml" },
   );
-  if (!args.dryRun) {
-    mkdirSync(resolve(args.target, "docs/ai/metrics"), { recursive: true });
-    mkdirSync(resolve(args.target, "docs/ai/reports"), { recursive: true });
-  }
+  ensureDirectoryPlanned(resolve(args.target, "docs/ai/metrics"), args, writes);
+  ensureDirectoryPlanned(resolve(args.target, "docs/ai/reports"), args, writes);
 }
 
 function installAssets(args, writes) {
   for (const asset of args.requiredAssets) {
-    copyFilePlanned(resolve(REPO_ROOT, asset), resolve(args.target, asset), args, writes);
+    copyFilePlanned(resolve(REPO_ROOT, asset), resolve(args.target, asset), args, writes, { kind: "claude_asset", asset });
+  }
+  for (const asset of args.initialProjectStateAssets) {
+    copyFileIfAbsentPlanned(resolve(REPO_ROOT, asset), resolve(args.target, asset), args, writes);
+  }
+  for (const directory of args.runtimeDirectories) {
+    ensureDirectoryPlanned(resolve(args.target, directory), args, writes);
   }
 }
 
@@ -657,6 +791,14 @@ function validateCoreInstalled(args) {
   }
 }
 
+function readPreviousState(target) {
+  const statePath = resolve(target, STATE_PATH);
+  if (!existsSync(statePath)) {
+    return null;
+  }
+  return readJson(statePath);
+}
+
 function resolveSelection(args) {
   const manifest = readManifest();
   const profile = CLAUDE_PROFILES[args.profile];
@@ -685,15 +827,142 @@ function resolveSelection(args) {
     throw new Error(`Selected Claude commands are not closed over installed skills: ${missingRequiredSkills.join(", ")}`);
   }
   const requiredAssets = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].requiredAssets))].sort();
+  const initialProjectStateAssets = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].initialProjectStateAssets ?? []))].sort();
+  const runtimeDirectories = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].runtimeDirectories ?? []))].sort();
   args.selectedSkills = selectedSkills;
   args.selectedCommands = selectedCommands;
   args.requiredAssets = requiredAssets;
+  args.initialProjectStateAssets = initialProjectStateAssets;
+  args.runtimeDirectories = runtimeDirectories;
+}
+
+function normalizeHooks(hooks) {
+  const normalized = [];
+  for (const [eventName, groups] of Object.entries(hooks ?? {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const hook of Array.isArray(group.hooks) ? group.hooks : []) {
+        if (isAdapterOwnedHook(hook)) {
+          normalized.push({
+            event: eventName,
+            matcher: group.matcher ?? "",
+            type: hook.type ?? "",
+            command: hook.command ?? "",
+            sha256: lifecycle.hashText(JSON.stringify([eventName, group.matcher ?? "", hook.type ?? "", hook.command ?? ""])),
+          });
+        }
+      }
+    }
+  }
+  return normalized.sort((a, b) => `${a.event}:${a.matcher}:${a.command}`.localeCompare(`${b.event}:${b.matcher}:${b.command}`));
+}
+
+function manageStaleFiles(args, writes) {
+  const currentPaths = new Set(Object.keys(args.managedFiles));
+  args.retainedStaleFiles = [];
+  for (const [relativePath, record] of Object.entries(args.previousState?.managed_files ?? {}).sort()) {
+    if (currentPaths.has(relativePath)) {
+      continue;
+    }
+    if (!String(record.kind ?? "").startsWith("claude_") && !String(record.kind ?? "").startsWith("stale_claude_")) {
+      continue;
+    }
+    if (args.prune) {
+      lifecycle.planDeleteManaged(args.operations, {
+        target: args.target,
+        relativePath,
+        previousState: args.previousState,
+        force: args.force,
+        rollback: args.rollback,
+        reason: `stale Claude managed projection:${relativePath}`,
+      });
+      lifecycle.planRemoveEmptyDirectory(args.operations, args.target, dirname(relativePath), `empty stale Claude managed projection directory:${relativePath}`);
+    } else {
+      args.managedFiles[relativePath] = { ...record, kind: `stale_${String(record.kind ?? "claude_file").replace(/^stale_/, "")}` };
+      args.retainedStaleFiles.push(relativePath);
+    }
+    writes.push(resolve(args.target, relativePath));
+  }
+}
+
+function buildState(args, manifest) {
+  const selectedSkills = args.selectedSkills;
+  const retainedStaleSkills = args.retainedStaleFiles
+    .filter((path) => path.startsWith(".claude/skills/"))
+    .map((path) => path.split("/")[2])
+    .filter(Boolean)
+    .sort();
+  const installedSkills = [...new Set([...selectedSkills, ...retainedStaleSkills])].sort();
+  return lifecycle.buildLifecycleState({
+    manifest,
+    repoRoot: REPO_ROOT,
+    adapterName: "agent-spectrum-claude-adapter",
+    adapterVersion: 3,
+    selectedProfile: args.profile,
+    target: {
+      skills_root: ".claude/skills",
+      commands_root: ".claude/commands",
+      settings: ".claude/settings.json",
+      runtime_scripts_root: "scripts",
+    },
+    installedSkills,
+    selectedSkills,
+    managedFiles: args.managedFiles,
+    managedPartialFiles: args.managedPartialFiles,
+    managedHooks: args.managedHooks,
+    previousState: args.previousState,
+    rollback: args.rollback,
+    extra: {
+      installed_commands: [...new Set([...args.selectedCommands, ...args.retainedStaleFiles.filter((path) => path.startsWith(".claude/commands/")).map((path) => path.split("/").at(-1))])].sort(),
+      selected_commands: args.selectedCommands,
+      retained_stale_files: args.retainedStaleFiles,
+      retained_stale_skills: retainedStaleSkills,
+      required_assets: args.requiredAssets,
+      initial_project_state_assets: args.initialProjectStateAssets,
+      runtime_directories: args.runtimeDirectories,
+    },
+  });
 }
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const writes = [];
 
+  if (args.rollback) {
+    const operations = lifecycle.rollbackLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force });
+    console.log(`${args.dryRun || args.check ? "Claude adapter rollback dry run" : "Claude adapter rolled back"}: ${args.target}`);
+    lifecycle.printOperations(args.target, operations);
+    return;
+  }
+  if (args.detach) {
+    const state = readJson(resolve(args.target, STATE_PATH));
+    const hookArgs = {
+      ...args,
+      previousState: state,
+      operations: [],
+      managedFiles: {},
+      managedPartialFiles: {},
+      rollback: lifecycle.createRollbackSnapshot(),
+    };
+    const hookWrites = [];
+    removeManagedHooks(hookArgs, hookWrites);
+    const detachOperations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: true, force: args.force });
+    const operations = [...hookArgs.operations, ...detachOperations];
+    if (!args.dryRun && !args.check) {
+      lifecycle.applyOperations(operations, false);
+      writeFileSync(resolve(args.target, STATE_PATH), `${JSON.stringify({ ...lifecycle.stripRollbackState(state), install_status: "detached", detached_at: new Date().toISOString() }, null, 2)}\n`);
+    }
+    console.log(`${args.dryRun || args.check ? "Claude adapter detach dry run" : "Claude adapter detached"}: ${args.target}`);
+    lifecycle.printOperations(args.target, operations);
+    return;
+  }
+
+  const manifest = readManifest();
+  args.previousState = readPreviousState(args.target);
+  args.operations = [];
+  args.managedFiles = {};
+  args.managedPartialFiles = {};
+  args.managedHooks = [];
+  args.rollback = lifecycle.createRollbackSnapshot();
   resolveSelection(args);
   validateCoreInstalled(args);
   installSkills(args, writes);
@@ -701,8 +970,11 @@ function main() {
   installAssets(args, writes);
   installHooks(args, writes);
   installRuntime(args, writes);
+  manageStaleFiles(args, writes);
+  const state = buildState(args, manifest);
+  lifecycle.applyLifecyclePlan({ target: args.target, statePath: STATE_PATH, operations: args.operations, state, dryRun: args.dryRun || args.check });
 
-  const label = args.dryRun ? "Claude adapter dry run" : "Claude adapter installed";
+  const label = args.check ? "Claude adapter check" : args.dryRun ? "Claude adapter dry run" : "Claude adapter installed";
   console.log(`${label}: ${args.target}`);
   console.log(`- profile: ${args.profile}`);
   if (args.skipRuntime) {
@@ -713,6 +985,7 @@ function main() {
   for (const destination of writes) {
     console.log(`- ${relative(args.target, destination)}`);
   }
+  console.log(`- ${STATE_PATH}`);
   console.log("Privacy defaults: local project storage, no external publication, no raw prompt storage.");
 }
 

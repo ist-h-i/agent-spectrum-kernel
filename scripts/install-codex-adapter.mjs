@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as lifecycle from "./installer-lifecycle.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
@@ -388,6 +389,10 @@ function parseArgs(argv) {
     skipCommand: false,
     noOverwriteSkills: false,
     prune: false,
+    force: false,
+    check: false,
+    rollback: false,
+    detach: false,
     dryRun: false,
   };
 
@@ -411,6 +416,14 @@ function parseArgs(argv) {
       args.noOverwriteSkills = true;
     } else if (arg === "--prune") {
       args.prune = true;
+    } else if (arg === "--force") {
+      args.force = true;
+    } else if (arg === "--check") {
+      args.check = true;
+    } else if (arg === "--rollback") {
+      args.rollback = true;
+    } else if (arg === "--detach" || arg === "--uninstall") {
+      args.detach = true;
     } else if (arg === "--dry-run") {
       args.dryRun = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -441,16 +454,20 @@ Options:
   --skip-command        Do not copy the codex exec command template into .agents/commands.
   --no-overwrite-skills Fail when an existing Codex skill projection would be overwritten.
   --prune               Delete stale managed Codex skills, prompts, and commands from the previous install state.
+  --force               Overwrite locally modified managed files.
+  --check               Validate the update plan without changing files.
+  --rollback            Restore the previous successful managed snapshot.
+  --detach, --uninstall Remove Codex execution surfaces and mark the install detached.
   --dry-run             Print planned changes without changing files.
   -h, --help            Show this help.
 
 Profiles:
 ${profileLines}
 
-Default mode is update-safe: profile-selected .agents/skills, .agents/prompts,
-and .agents/commands are updated from this checkout, AGENTS.md is only written
-when missing or when a managed block exists, and existing project-local AGENTS.md
-content is preserved.
+Default mode is three-way update safe: managed files are updated only when the
+target still matches the previous managed hash, unless --force is used.
+AGENTS.md ownership is limited to the managed block, so existing project-local
+AGENTS.md content is preserved.
 
 Use --profile for normal installs. Use --skills only for advanced overrides; the
 installer fails before writing files when the override is not closed over required
@@ -633,42 +650,47 @@ function buildState({
   routerReachableSkills,
   routingFixtures,
   managedFiles,
+  managedBlocks,
+  previousState,
+  rollback,
 }) {
-  return {
-    schema_version: 2,
-    installer: "agent-spectrum-codex-adapter",
-    source: {
-      name: manifest.name ?? "agent-spectrum-kernel",
-      version: manifest.version ?? null,
-      git_revision: readGitRevision(),
-    },
+  return lifecycle.buildLifecycleState({
+    manifest,
+    repoRoot: REPO_ROOT,
+    adapterName: "agent-spectrum-codex-adapter",
+    adapterVersion: 3,
+    selectedProfile: profileName,
     target: {
       kernel: "AGENTS.md",
       skills_root: ".agents/skills",
       prompts_root: ".agents/prompts",
       commands_root: ".agents/commands",
     },
-    selected_profile: profileName,
-    profile_description: profile.description,
-    installed_skills: skills,
-    selected_skills: selectedSkills,
-    retained_stale_skills: retainedStaleSkills,
-    installed_prompts: promptTemplates,
-    selected_prompts: selectedPrompts,
-    retained_stale_prompts: retainedStalePrompts,
-    installed_commands: commandTemplates,
-    selected_commands: selectedCommands,
-    retained_stale_commands: retainedStaleCommands,
-    prompt_templates: promptTemplates,
-    command_templates: commandTemplates,
-    skill_closure: {
-      required_skills: requiredSkills,
-      recommended_skills: recommendedSkills,
-      router_reachable_skills: routerReachableSkills,
-      routing_fixtures: routingFixtures,
+    installedSkills: skills,
+    selectedSkills,
+    managedFiles,
+    managedBlocks,
+    previousState,
+    rollback,
+    extra: {
+      profile_description: profile.description,
+      retained_stale_skills: retainedStaleSkills,
+      installed_prompts: promptTemplates,
+      selected_prompts: selectedPrompts,
+      retained_stale_prompts: retainedStalePrompts,
+      installed_commands: commandTemplates,
+      selected_commands: selectedCommands,
+      retained_stale_commands: retainedStaleCommands,
+      prompt_templates: promptTemplates,
+      command_templates: commandTemplates,
+      skill_closure: {
+        required_skills: requiredSkills,
+        recommended_skills: recommendedSkills,
+        router_reachable_skills: routerReachableSkills,
+        routing_fixtures: routingFixtures,
+      },
     },
-    managed_files: managedFiles,
-  };
+  });
 }
 
 function previousManagedRecord(previousState, relativePath) {
@@ -928,6 +950,8 @@ function buildPlan(args) {
   const staleCommands = [...previousCommands].filter((command) => !selectedCommands.has(command)).sort();
   const operations = [];
   const managedFiles = {};
+  const managedBlocks = {};
+  const rollback = lifecycle.createRollbackSnapshot();
 
   if (!args.skipAgents) {
     const agentsSource = resolve(REPO_ROOT, "AGENTS.md");
@@ -937,8 +961,21 @@ function buildPlan(args) {
     const agentsContent = existsSync(agentsDestination)
       ? replaceOrAppendManagedBlock(readText(agentsDestination), agentsBlock, args.mergeAgents)
       : agentsBlock;
-    managedFiles["AGENTS.md"] = { kind: "kernel", sha256: hashText(agentsContent) };
-    planWrite(operations, agentsDestination, agentsContent, "kernel");
+    managedBlocks["AGENTS.md#agent-spectrum-kernel"] = lifecycle.createManagedBlockRecord({
+      path: "AGENTS.md",
+      marker: "agent-spectrum-kernel",
+      content: agentsBlock.trimEnd(),
+    });
+    lifecycle.planWriteManagedBlock(operations, {
+      target: args.target,
+      relativePath: "AGENTS.md",
+      blockKey: "AGENTS.md#agent-spectrum-kernel",
+      content: agentsContent,
+      reason: "kernel",
+      previousState,
+      force: args.force,
+      rollback,
+    });
   }
 
   for (const skill of skills) {
@@ -950,8 +987,16 @@ function buildPlan(args) {
     if (args.noOverwriteSkills && existsSync(destination) && readText(destination) !== content) {
       throw new Error(`Projected Codex skill already exists and would be overwritten: ${relativePath}`);
     }
-    managedFiles[relativePath] = { kind: "codex_skill", skill, sha256: hashText(content) };
-    planWrite(operations, destination, content, `codex_skill:${skill}`);
+    managedFiles[relativePath] = lifecycle.createManagedFileRecord({ kind: "codex_skill", skill, content });
+    lifecycle.planWriteManaged(operations, {
+      target: args.target,
+      relativePath,
+      content,
+      reason: `codex_skill:${skill}`,
+      previousState,
+      force: args.force,
+      rollback,
+    });
   }
 
   for (const prompt of selectedPromptTemplates) {
@@ -960,14 +1005,21 @@ function buildPlan(args) {
     const content = readText(source);
     const relativePath = `.agents/prompts/${prompt}`;
     managedFiles[relativePath] = {
-      kind: "codex_prompt",
+      ...lifecycle.createManagedFileRecord({ kind: "codex_prompt", prompt, content }),
       prompt,
       required_skills: [...(PROMPT_METADATA[prompt]?.requiredSkills ?? [])].sort(),
       recommended_skills: [...(PROMPT_METADATA[prompt]?.recommendedSkills ?? [])].sort(),
-      sha256: hashText(content),
       content,
     };
-    planWrite(operations, resolve(args.target, relativePath), content, `codex_prompt:${prompt}`);
+    lifecycle.planWriteManaged(operations, {
+      target: args.target,
+      relativePath,
+      content,
+      reason: `codex_prompt:${prompt}`,
+      previousState,
+      force: args.force,
+      rollback,
+    });
   }
 
   for (const command of selectedCommandTemplates) {
@@ -975,14 +1027,34 @@ function buildPlan(args) {
     ensureSource(source, `adapters/codex/commands/${command}`);
     const content = commandContent(command, selectedPromptTemplates);
     const relativePath = `.agents/commands/${command}`;
-    managedFiles[relativePath] = { kind: "codex_command", command, generated: command === "codex-exec.md", sha256: hashText(content), content };
-    planWrite(operations, resolve(args.target, relativePath), content, `codex_command:${command}`);
+    managedFiles[relativePath] = {
+      ...lifecycle.createManagedFileRecord({ kind: "codex_command", command, content }),
+      generated: command === "codex-exec.md",
+      content,
+    };
+    lifecycle.planWriteManaged(operations, {
+      target: args.target,
+      relativePath,
+      content,
+      reason: `codex_command:${command}`,
+      previousState,
+      force: args.force,
+      rollback,
+    });
   }
 
   for (const skill of staleSkills) {
     const relativePath = `.agents/skills/${skill}/SKILL.md`;
     if (args.prune) {
-      planPruneManagedFile({ operations, previousState, target: args.target, relativePath, reason: `skill:${skill}` });
+      lifecycle.planDeleteManaged(operations, {
+        target: args.target,
+        relativePath,
+        previousState,
+        force: args.force,
+        rollback,
+        reason: `stale Codex managed projection:skill:${skill}`,
+      });
+      lifecycle.planRemoveEmptyDirectory(operations, args.target, dirname(relativePath), `empty stale Codex managed projection directory:skill:${skill}`);
     } else {
       const record = previousManagedRecord(previousState, relativePath);
       if (record) {
@@ -994,7 +1066,14 @@ function buildPlan(args) {
   for (const prompt of stalePrompts) {
     const relativePath = `.agents/prompts/${prompt}`;
     if (args.prune) {
-      planPruneManagedFile({ operations, previousState, target: args.target, relativePath, reason: `prompt:${prompt}` });
+      lifecycle.planDeleteManaged(operations, {
+        target: args.target,
+        relativePath,
+        previousState,
+        force: args.force,
+        rollback,
+        reason: `stale Codex managed projection:prompt:${prompt}`,
+      });
     } else {
       const record = previousManagedRecord(previousState, relativePath);
       if (record) {
@@ -1006,7 +1085,14 @@ function buildPlan(args) {
   for (const command of staleCommands) {
     const relativePath = `.agents/commands/${command}`;
     if (args.prune) {
-      planPruneManagedFile({ operations, previousState, target: args.target, relativePath, reason: `command:${command}` });
+      lifecycle.planDeleteManaged(operations, {
+        target: args.target,
+        relativePath,
+        previousState,
+        force: args.force,
+        rollback,
+        reason: `stale Codex managed projection:command:${command}`,
+      });
     } else {
       const record = previousManagedRecord(previousState, relativePath);
       if (record) {
@@ -1042,41 +1128,20 @@ function buildPlan(args) {
     routerReachableSkills,
     routingFixtures,
     managedFiles,
+    managedBlocks,
+    previousState,
+    rollback,
   });
-  const stateContent = `${JSON.stringify(state, null, 2)}\n`;
-  planWrite(operations, resolve(args.target, STATE_PATH), stateContent, "codex_install_state");
 
   return { operations, staleSkills, stalePrompts, staleCommands, state, recommendedSkills };
 }
 
-function applyOperations(operations, dryRun) {
-  if (dryRun) {
-    return;
-  }
-  for (const operation of operations) {
-    if (operation.kind === "write") {
-      mkdirSync(dirname(operation.destination), { recursive: true });
-      writeFileSync(operation.destination, operation.content);
-    } else if (operation.kind === "delete_file") {
-      if (existsSync(operation.destination)) {
-        unlinkSync(operation.destination);
-      }
-    } else if (operation.kind === "remove_empty_dir") {
-      if (existsSync(operation.destination) && statSync(operation.destination).isDirectory() && readdirSync(operation.destination).length === 0) {
-        rmdirSync(operation.destination);
-      }
-    }
-  }
-}
-
 function printPlan(args, plan) {
-  const label = args.dryRun ? "Codex adapter installer dry run" : "Codex adapter installed";
+  const label = args.check ? "Codex adapter installer check" : args.dryRun ? "Codex adapter installer dry run" : "Codex adapter installed";
   console.log(`${label}: ${args.target}`);
   console.log(`- profile: ${args.profile}`);
-  for (const operation of plan.operations) {
-    const marker = operation.kind === "delete_file" ? "delete" : operation.kind === "remove_empty_dir" ? "rmdir-if-empty" : operation.unchanged ? "unchanged" : "write";
-    console.log(`- ${marker}: ${relative(args.target, operation.destination)} (${operation.reason})`);
-  }
+  lifecycle.printOperations(args.target, plan.operations);
+  console.log(`- write: ${STATE_PATH} (codex_install_state)`);
   for (const skill of plan.staleSkills) {
     const action = args.prune ? "pruned" : "stale Codex managed projection";
     console.log(`- ${action}: .agents/skills/${skill}`);
@@ -1097,8 +1162,20 @@ function printPlan(args, plan) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (args.rollback) {
+    const operations = lifecycle.rollbackLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force });
+    console.log(`${args.dryRun || args.check ? "Codex adapter rollback dry run" : "Codex adapter rolled back"}: ${args.target}`);
+    lifecycle.printOperations(args.target, operations);
+    return;
+  }
+  if (args.detach) {
+    const operations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force });
+    console.log(`${args.dryRun || args.check ? "Codex adapter detach dry run" : "Codex adapter detached"}: ${args.target}`);
+    lifecycle.printOperations(args.target, operations);
+    return;
+  }
   const plan = buildPlan(args);
-  applyOperations(plan.operations, args.dryRun);
+  lifecycle.applyLifecyclePlan({ target: args.target, statePath: STATE_PATH, operations: plan.operations, state: plan.state, dryRun: args.dryRun || args.check });
   printPlan(args, plan);
 }
 

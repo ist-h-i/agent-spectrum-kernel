@@ -12,6 +12,7 @@ import {
 
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
+const CLAUDE_STATE_PATH = ".agent-spectrum-kernel/claude-install-state.json";
 
 function parseArgs(argv) {
   const args = {
@@ -79,6 +80,15 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
     optional: true,
   });
 
+  checkManagedInstallState({
+    target,
+    statePath: CLAUDE_STATE_PATH,
+    label: "Claude adapter",
+    targetSkillsRoot: ".claude/skills",
+    report,
+    optional: !existsSync(resolve(target, ".claude")),
+  });
+
   checkClaudeAdapter(target, report);
   checkUnsupportedClaims(target, report);
   checkPrivacyDefaults(target, report);
@@ -93,6 +103,10 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
 
 function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, report, optional = false }) {
   const absoluteStatePath = resolve(target, statePath);
+  const inProgressPath = `${absoluteStatePath}.in-progress.json`;
+  if (existsSync(inProgressPath)) {
+    report.failures.push(`${label} install is in progress or was interrupted: ${relative(target, inProgressPath)}`);
+  }
   const stateResult = readJsonIfExists(absoluteStatePath);
   if (!stateResult.ok) {
     const message = `${label} install state is ${stateResult.error === "missing" ? "missing" : `invalid: ${stateResult.error}`}: ${statePath}`;
@@ -105,6 +119,9 @@ function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, 
   }
 
   const state = stateResult.value;
+  if (state.install_status && state.install_status !== "installed") {
+    report.warnings.push(`${label} install status is ${state.install_status}: ${statePath}`);
+  }
   report.installed.push(`${label}: install state present (${statePath})`);
   if (!state || typeof state !== "object" || !Array.isArray(state.installed_skills) || !state.managed_files || typeof state.managed_files !== "object") {
     report.failures.push(`${label} install state has invalid shape: ${statePath}`);
@@ -162,6 +179,21 @@ function sourcePathForManagedRecord(managedPath, record) {
   }
   if ((record.kind === "codex_skill" || record.kind === "stale_codex_skill") && record.skill) {
     return resolve(REPO_ROOT, "skills", record.skill, "SKILL.md");
+  }
+  if ((record.kind === "claude_skill" || record.kind === "stale_claude_skill") && record.skill) {
+    return resolve(REPO_ROOT, "skills", record.skill, "SKILL.md");
+  }
+  if (record.kind === "claude_command" && record.command) {
+    return resolve(REPO_ROOT, "adapters/claude-code/project/.claude/commands", record.command);
+  }
+  if (record.kind === "claude_runtime" && record.script) {
+    return resolve(REPO_ROOT, "scripts", record.script);
+  }
+  if (record.kind === "claude_config" && record.config) {
+    return resolve(REPO_ROOT, record.config);
+  }
+  if (record.kind === "claude_asset" && record.asset) {
+    return resolve(REPO_ROOT, record.asset);
   }
   if (record.kind === "codex_prompt" && record.prompt) {
     return resolve(REPO_ROOT, "adapters/codex/prompts", record.prompt);
