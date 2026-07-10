@@ -1870,8 +1870,47 @@ function assertInstallerScripts() {
   mkdirSync(resolve(target, ".claude/hooks"), { recursive: true });
   writeFileSync(resolve(target, ".claude/hooks/hooks.json"), readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/hooks/hooks.json"), "utf8"));
 
-  assertRuntimePass("installer first run", runRepoScript([installer, "--target", target]));
-  assertRuntimePass("installer second run", runRepoScript([installer, "--target", target]));
+  const firstInstall = runRepoScript([installer, "--target", target]);
+  assertRuntimePass("installer first run", firstInstall);
+  if (
+    !firstInstall.stdout.includes("- initialize: docs/ai/improvement-ledger.md") ||
+    !firstInstall.stdout.includes("- initialize: docs/ai/skill-adoption-metrics.md")
+  ) {
+    throw new Error(`installer first run should initialize project-owned ledger assets\n${firstInstall.stdout}`);
+  }
+
+  const projectLedger = "# Project improvement ledger\n\nProject-owned evidence must survive adapter updates.\n";
+  const projectMetrics = "# Project adoption metrics\n\nProject-owned metric definitions must survive adapter updates.\n";
+  const projectEvents = '{"event_id":"project-owned-event"}\n';
+  const projectReport = "# Project-owned report\n";
+  writeFileSync(resolve(target, "docs/ai/improvement-ledger.md"), projectLedger);
+  writeFileSync(resolve(target, "docs/ai/skill-adoption-metrics.md"), projectMetrics);
+  writeFileSync(resolve(target, "docs/ai/metrics/events.jsonl"), projectEvents);
+  writeFileSync(resolve(target, "docs/ai/reports/project-report.md"), projectReport);
+
+  const fullDryRun = runRepoScript([installer, "--target", target, "--profile", "full", "--dry-run"]);
+  assertRuntimePass("installer full dry run with project state", fullDryRun);
+  if (
+    !fullDryRun.stdout.includes("- preserve: docs/ai/improvement-ledger.md") ||
+    !fullDryRun.stdout.includes("- preserve: docs/ai/skill-adoption-metrics.md") ||
+    !fullDryRun.stdout.includes("- refresh: docs/ai/adoption-report-template.md")
+  ) {
+    throw new Error(`installer dry run should distinguish preserved state from refreshed references\n${fullDryRun.stdout}`);
+  }
+
+  assertRuntimePass("installer full rerun", runRepoScript([installer, "--target", target, "--profile", "full"]));
+  assertRuntimePass("installer observability rerun", runRepoScript([installer, "--target", target, "--profile", "observability"]));
+  for (const [path, expected] of [
+    ["docs/ai/improvement-ledger.md", projectLedger],
+    ["docs/ai/skill-adoption-metrics.md", projectMetrics],
+    ["docs/ai/metrics/events.jsonl", projectEvents],
+    ["docs/ai/reports/project-report.md", projectReport],
+  ]) {
+    const actual = readFileSync(resolve(target, path), "utf8");
+    if (actual !== expected) {
+      throw new Error(`installer should preserve project-owned state on full and observability reruns: ${path}`);
+    }
+  }
 
   const settings = JSON.parse(readFileSync(resolve(target, ".claude/settings.json"), "utf8"));
   const identities = hookIdentities(settings.hooks);

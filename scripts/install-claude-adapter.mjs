@@ -70,6 +70,10 @@ const RUNTIME_SCRIPTS = [
   "ai-metrics-summarize.mjs",
   "ai-ledger-refresh.mjs",
 ];
+const RUNTIME_DIRECTORIES = [
+  "docs/ai/metrics",
+  "docs/ai/reports",
+];
 const COMMAND_METADATA = {
   "skill-review.md": {
     requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
@@ -94,22 +98,24 @@ const COMMAND_METADATA = {
   "skill-report.md": {
     requiredSkills: ["skill-adoption-metrics", "evidence-ledger"],
     requiredAssets: [
-      "docs/ai/improvement-ledger.md",
-      "docs/ai/skill-adoption-metrics.md",
       "docs/ai/adoption-report-template.md",
       "docs/ai/metrics/README.md",
       "docs/ai/reports/README.md",
       "docs/metrics-event-contract.md",
       "docs/observability-runtime-contract.md",
     ],
+    initializeOnlyAssets: [
+      "docs/ai/improvement-ledger.md",
+      "docs/ai/skill-adoption-metrics.md",
+    ],
   },
   "skill-ledger-refresh.md": {
     requiredSkills: ["improvement-ledger", "evidence-ledger"],
     requiredAssets: [
-      "docs/ai/improvement-ledger.md",
       "docs/debt-lifecycle-contract.md",
       "docs/metrics-event-contract.md",
     ],
+    initializeOnlyAssets: ["docs/ai/improvement-ledger.md"],
   },
 };
 const SKILL_RELATIONSHIPS = {
@@ -414,9 +420,13 @@ function ensureSource(path) {
   }
 }
 
-function copyFilePlanned(source, destination, args, writes) {
+function recordOperation(operations, action, destination) {
+  operations.push({ action, destination });
+}
+
+function copyFilePlanned(source, destination, args, operations, action = "refresh") {
   ensureSource(source);
-  writes.push(destination);
+  recordOperation(operations, action, destination);
   if (args.dryRun) {
     return;
   }
@@ -424,8 +434,22 @@ function copyFilePlanned(source, destination, args, writes) {
   copyFileSync(source, destination);
 }
 
-function writeFilePlanned(destination, content, args, writes) {
-  writes.push(destination);
+function initializeFilePlanned(source, destination, args, operations) {
+  ensureSource(source);
+  if (existsSync(destination)) {
+    recordOperation(operations, "preserve", destination);
+    return;
+  }
+  recordOperation(operations, "initialize", destination);
+  if (args.dryRun) {
+    return;
+  }
+  mkdirSync(dirname(destination), { recursive: true });
+  copyFileSync(source, destination);
+}
+
+function writeFilePlanned(destination, content, args, operations) {
+  recordOperation(operations, "merge", destination);
   if (args.dryRun) {
     return;
   }
@@ -433,8 +457,8 @@ function writeFilePlanned(destination, content, args, writes) {
   writeFileSync(destination, content);
 }
 
-function deleteFilePlanned(destination, args, writes) {
-  writes.push(destination);
+function deleteFilePlanned(destination, args, operations) {
+  recordOperation(operations, "delete", destination);
   if (args.dryRun || !existsSync(destination)) {
     return;
   }
@@ -443,6 +467,14 @@ function deleteFilePlanned(destination, args, writes) {
   if (existsSync(directory) && statSync(directory).isDirectory() && readdirSync(directory).length === 0) {
     rmdirSync(directory);
   }
+}
+
+function ensureDirectoryPlanned(destination, args, operations) {
+  recordOperation(operations, existsSync(destination) ? "preserve directory" : "initialize directory", destination);
+  if (args.dryRun) {
+    return;
+  }
+  mkdirSync(destination, { recursive: true });
 }
 
 function installSkills(args, writes) {
@@ -586,28 +618,30 @@ function hookIdentity(eventName, group, hook) {
   ]);
 }
 
-function installRuntime(args, writes) {
+function installRuntime(args, operations) {
   if (args.skipRuntime) {
     return;
   }
   for (const script of RUNTIME_SCRIPTS) {
-    copyFilePlanned(resolve(REPO_ROOT, "scripts", script), resolve(args.target, "scripts", script), args, writes);
+    copyFilePlanned(resolve(REPO_ROOT, "scripts", script), resolve(args.target, "scripts", script), args, operations);
   }
   copyFilePlanned(
     resolve(REPO_ROOT, "docs/ai/observability-config.yml"),
     resolve(args.target, "docs/ai/observability-config.yml"),
     args,
-    writes,
+    operations,
   );
-  if (!args.dryRun) {
-    mkdirSync(resolve(args.target, "docs/ai/metrics"), { recursive: true });
-    mkdirSync(resolve(args.target, "docs/ai/reports"), { recursive: true });
+  for (const directory of RUNTIME_DIRECTORIES) {
+    ensureDirectoryPlanned(resolve(args.target, directory), args, operations);
   }
 }
 
-function installAssets(args, writes) {
+function installAssets(args, operations) {
   for (const asset of args.requiredAssets) {
-    copyFilePlanned(resolve(REPO_ROOT, asset), resolve(args.target, asset), args, writes);
+    copyFilePlanned(resolve(REPO_ROOT, asset), resolve(args.target, asset), args, operations);
+  }
+  for (const asset of args.initializeOnlyAssets) {
+    initializeFilePlanned(resolve(REPO_ROOT, asset), resolve(args.target, asset), args, operations);
   }
 }
 
@@ -685,22 +719,24 @@ function resolveSelection(args) {
     throw new Error(`Selected Claude commands are not closed over installed skills: ${missingRequiredSkills.join(", ")}`);
   }
   const requiredAssets = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].requiredAssets))].sort();
+  const initializeOnlyAssets = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].initializeOnlyAssets ?? []))].sort();
   args.selectedSkills = selectedSkills;
   args.selectedCommands = selectedCommands;
   args.requiredAssets = requiredAssets;
+  args.initializeOnlyAssets = initializeOnlyAssets;
 }
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  const writes = [];
+  const operations = [];
 
   resolveSelection(args);
   validateCoreInstalled(args);
-  installSkills(args, writes);
-  installCommands(args, writes);
-  installAssets(args, writes);
-  installHooks(args, writes);
-  installRuntime(args, writes);
+  installSkills(args, operations);
+  installCommands(args, operations);
+  installAssets(args, operations);
+  installHooks(args, operations);
+  installRuntime(args, operations);
 
   const label = args.dryRun ? "Claude adapter dry run" : "Claude adapter installed";
   console.log(`${label}: ${args.target}`);
@@ -710,8 +746,8 @@ function main() {
   } else if (args.skipHooks) {
     console.log("- runtime hooks: skipped because --skip-hooks was used");
   }
-  for (const destination of writes) {
-    console.log(`- ${relative(args.target, destination)}`);
+  for (const operation of operations) {
+    console.log(`- ${operation.action}: ${relative(args.target, operation.destination)}`);
   }
   console.log("Privacy defaults: local project storage, no external publication, no raw prompt storage.");
 }
