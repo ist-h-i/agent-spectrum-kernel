@@ -33,7 +33,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "test -f \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" && node \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" --hook-event PostToolUse --event-kind verification_attempt --non-blocking >/dev/null 2>&1 || true # agent-spectrum-kernel:claude-adapter-hook"
+            "command": "test -f \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" && node \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" --hook-event PostToolUse --event-kind command_attempt --non-blocking >/dev/null 2>&1 || true # agent-spectrum-kernel:claude-adapter-hook"
           }
         ]
       }

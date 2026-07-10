@@ -14,6 +14,7 @@ capture:
   task_boundary_source: session_id
   record_file_change_events: true
   record_verification_attempts: true
+  record_command_attempts: true
   record_task_stop_candidates: true
   record_command_hash: false
   record_command_preview: false
@@ -35,3 +36,14 @@ safety:
   http_hooks_enabled: false
   webhook_hooks_enabled: false
   block_on_record_failure: false
+
+lifecycle:
+  commit_events_to_git: false
+  retention_days: 90
+  rotate_when_bytes: 5242880
+  schema_mismatch_action: quarantine
+  quarantine_dir: docs/ai/metrics/quarantine
+  deduplication_key: event_id
+  schema_migration: manual_review_required
+  report_retention_days: 180
+  opt_out: delete_local_runtime_files_and_run_adapter_detach

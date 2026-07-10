@@ -130,6 +130,7 @@
     "docs/debt-lifecycle-contract.md",
     "docs/adapter-conformance-contract.md",
     "docs/adapter-capability-matrix.md",
+    "docs/adapter-deployment-governance.md",
     "docs/claude-github-review-setup.md",
     "docs/ai/review-context.md",
     "docs/ai/implementation-context.md",

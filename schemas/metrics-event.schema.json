@@ -214,6 +214,19 @@
       "type": "string",
       "maxLength": 2000
     },
+    "command_attempt_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command_kind", "classified_as_verification"],
+      "properties": {
+        "command_kind": { "type": "string", "enum": ["test", "lint", "typecheck", "build", "validate", "unknown"] },
+        "classified_as_verification": { "type": "boolean", "const": false }
+      }
+    },
+    "command_attempt_summary": {
+      "type": "string",
+      "maxLength": 2000
+    },
     "debt_inventory_snapshot": {
       "$ref": "#/$defs/debt_inventory_snapshot"
     },

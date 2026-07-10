@@ -2,6 +2,8 @@
 
 Adapters project Agent Spectrum Kernel into a specific coding tool without changing the core quality model. An adapter may be a local project projection, plugin, command set, or hosted workflow template.
 
+Deployment profile support, Installed/Activated/Operational state criteria, approval ownership, metrics governance, and withdrawal criteria are defined in `docs/adapter-deployment-governance.md`. Passing this conformance contract does not by itself prove a deployment is Operational.
+
 ## Core Requirement
 
 Every adapter must preserve these core behaviors or explicitly downgrade its claims:

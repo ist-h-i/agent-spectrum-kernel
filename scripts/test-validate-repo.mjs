@@ -180,10 +180,14 @@ function writeAdapterFixture(root) {
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    writeFileSync(resolve(root, path), '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object" }\n');
+    const content = path === "schemas/metrics-event.schema.json"
+      ? '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "properties": { "command_attempt_metrics": { "properties": { "classified_as_verification": { "type": "boolean" } } } } }\n'
+      : '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object" }\n';
+    writeFileSync(resolve(root, path), content);
   }
 
   const docs = [
+    "docs/adapter-deployment-governance.md",
     "docs/observability-runtime-contract.md",
     "docs/operation-automation-contract.md",
     "docs/debt-lifecycle-contract.md",
@@ -195,7 +199,7 @@ function writeAdapterFixture(root) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
     writeFileSync(
       resolve(root, path),
-      "# Fixture\n\nLocal hooks are the default local observability path. Pattern B is optional. No raw prompt storage by default. No external publication by default.\n",
+      "# Fixture\n\nLocal hooks are the default local observability path. Pattern B is optional. No raw prompt storage by default. No external publication by default.\n\nLocal minimal, Local observed, Shared PR review, Plugin distribution, and Codex projection are documented. Installed, Activated, and Operational states are separate; File copy alone is insufficient. Validate, Update, Detach, and Unsupported combinations are covered. Coexistence And Precedence mentions CLAUDE_PLUGIN_ROOT and .claude/settings.json. Ownership And Approvals covers GitHub Actions approval. Observability lifecycle includes commit_events_to_git, retention_days, schema_mismatch_action, deduplication_key, and schema_migration. Runtime health uses .agent-spectrum-kernel/runtime-health.jsonl and ask-doctor without full error messages. command_attempt and verification_attempt semantics state that a generic Bash hook must not classify every command as verification. Metrics guardrails prohibit HR, compensation, promotion, individual productivity rankings, and personal identifiers. Success criteria include re-review count, missed blocker rate, false positive rate, senior correction effort, token/time cost, unsupported-causality, and Reduce, redesign, or remove conditions.\n",
     );
   }
   writeFileSync(
@@ -216,6 +220,7 @@ function writeAdapterFixture(root) {
 capture:
   allow_session_id_task_boundary: true
   task_boundary_source: session_id
+  record_command_attempts: true
   record_command_hash: false
   record_command_preview: false
 storage:
@@ -231,6 +236,29 @@ external_publication:
 safety:
   http_hooks_enabled: false
   webhook_hooks_enabled: false
+lifecycle:
+  commit_events_to_git: false
+  retention_days: 90
+  rotate_when_bytes: 5242880
+  schema_mismatch_action: quarantine
+  quarantine_dir: docs/ai/metrics/quarantine
+  deduplication_key: event_id
+  schema_migration: manual_review_required
+  report_retention_days: 180
+  opt_out: delete_local_runtime_files_and_run_adapter_detach
+`,
+  );
+
+  mkdirSync(resolve(root, "scripts"), { recursive: true });
+  writeFileSync(
+    resolve(root, "scripts/ai-metrics-record.mjs"),
+    `const event = { verification_metrics: {} };
+event.command_attempt_metrics = { command_kind: "unknown", classified_as_verification: false };
+event.verification_metrics.commands_run = [{ command_kind: "test" }];
+const path = ".agent-spectrum-kernel/runtime-health.jsonl";
+const code = "non_blocking_metrics_record_failure";
+const privacy = { full_error_message_stored: false };
+console.log(path, code, privacy);
 `,
   );
 
@@ -266,9 +294,9 @@ safety:
   }
 
   mkdirSync(resolve(root, "adapters/claude-code/project/.claude/hooks"), { recursive: true });
-  writeFileSync(resolve(root, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind task_stop --sidecar .claude/metrics/current-task.json --non-blocking >/dev/null 2>&1 || true" }] }] } }\n');
+  writeFileSync(resolve(root, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind command_attempt --non-blocking >/dev/null 2>&1 || true" }] }], "Stop": [{ "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind task_stop --sidecar .claude/metrics/current-task.json --non-blocking >/dev/null 2>&1 || true" }] }] } }\n');
   mkdirSync(resolve(root, "adapters/claude-code/plugin/hooks"), { recursive: true });
-  writeFileSync(resolve(root, "adapters/claude-code/plugin/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "ai-skills-metrics-record" }] }] } }\n');
+  writeFileSync(resolve(root, "adapters/claude-code/plugin/hooks/hooks.json"), '{ "hooks": { "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "test -x \\"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\\" && \\"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\\" --event-kind command_attempt --non-blocking >/dev/null 2>&1 || true" }] }], "Stop": [{ "hooks": [{ "type": "command", "command": "test -x \\"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\\" && \\"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\\" --event-kind task_stop --non-blocking >/dev/null 2>&1 || true" }] }] } }\n');
 
   mkdirSync(resolve(root, "adapters/claude-code/plugin/.claude-plugin"), { recursive: true });
   writeFileSync(resolve(root, "adapters/claude-code/plugin/.claude-plugin/plugin.json"), '{ "name": "ai-skills" }\n');
@@ -884,6 +912,38 @@ function assertRuntimeScripts() {
   }
 
   const metricsSchema = JSON.parse(readFileSync(resolve(repoRoot, "schemas/metrics-event.schema.json"), "utf8"));
+  const commandAttemptStore = resolve(root, "docs/ai/metrics/command-attempt-events.jsonl");
+  const commandAttemptResult = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--event-kind",
+      "command_attempt",
+      "--event-store",
+      commandAttemptStore,
+    ],
+    {
+      cwd: root,
+      input: JSON.stringify({
+        session_id: "S1A",
+        tool_name: "Bash",
+        tool_input: {
+          command: "npm test",
+        },
+      }),
+    },
+  );
+  assertRuntimePass("metrics recorder command attempt smoke", commandAttemptResult);
+  const commandAttemptEvent = JSON.parse(readFileSync(commandAttemptStore, "utf8"));
+  assertSchemaPass("recorded command attempt event", metricsSchema, commandAttemptEvent);
+  if (
+    commandAttemptEvent.command_attempt_metrics?.command_kind !== "test" ||
+    commandAttemptEvent.command_attempt_metrics?.classified_as_verification !== false ||
+    commandAttemptEvent.verification_metrics.commands_run ||
+    !commandAttemptEvent.command_attempt_summary?.includes("not counted as verified work")
+  ) {
+    throw new Error(`command_attempt should not be recorded as verification evidence\n${JSON.stringify(commandAttemptEvent, null, 2)}`);
+  }
+
   const gateDecisionStore = resolve(root, "docs/ai/metrics/gate-decision-record-events.jsonl");
   const gateDecisionRecordResult = runRepoScript([
     resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
@@ -1082,6 +1142,18 @@ function assertRuntimeScripts() {
   assertRuntimePass("metrics recorder non-blocking failure", nonBlockingFailure);
   if (nonBlockingFailure.stdout || nonBlockingFailure.stderr) {
     throw new Error(`non-blocking metrics failures should stay silent\nstdout:\n${nonBlockingFailure.stdout}\nstderr:\n${nonBlockingFailure.stderr}`);
+  }
+  const runtimeHealthPath = resolve(root, ".agent-spectrum-kernel/runtime-health.jsonl");
+  if (!existsSync(runtimeHealthPath)) {
+    throw new Error("non-blocking metrics failures should write a local runtime-health entry");
+  }
+  const runtimeHealthEntry = JSON.parse(readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).at(-1));
+  if (
+    runtimeHealthEntry.error_code !== "non_blocking_metrics_record_failure" ||
+    runtimeHealthEntry.privacy_note?.full_error_message_stored !== false ||
+    JSON.stringify(runtimeHealthEntry).includes("EISDIR")
+  ) {
+    throw new Error(`runtime-health entry should be sanitized\n${JSON.stringify(runtimeHealthEntry, null, 2)}`);
   }
 
   const routingRecordStore = resolve(root, "docs/ai/metrics/routing-record-events.jsonl");
@@ -2079,6 +2151,15 @@ function assertInstallerScripts() {
   if (!pluginHookCommands.every((command) => command.includes("--non-blocking") && isFailOpenHookCommand(command))) {
     throw new Error(`plugin hooks should be non-blocking and shell-level fail-open\n${pluginHookCommands.join("\n")}`);
   }
+  const pluginBashCommands = (pluginHooks.hooks?.PostToolUse ?? [])
+    .filter((group) => group.matcher === "Bash")
+    .flatMap((group) => (group.hooks ?? []).map((hook) => hook.command ?? ""));
+  if (
+    pluginBashCommands.length === 0 ||
+    pluginBashCommands.some((command) => !command.includes("--event-kind command_attempt") || command.includes("--event-kind verification_attempt"))
+  ) {
+    throw new Error(`plugin Bash hooks should record command_attempt, not verification_attempt\n${pluginBashCommands.join("\n")}`);
+  }
   const pluginBinSmokeRoot = resolve(fixtureRoot, "plugin-bin-no-runtime");
   mkdirSync(pluginBinSmokeRoot, { recursive: true });
   const pluginBinSmoke = runRepoScript([resolve(repoRoot, "adapters/claude-code/plugin/bin/ai-skills-metrics-record"), "--event-kind", "task_stop"], {
@@ -2562,6 +2643,19 @@ function assertDoctorScript() {
   assertRuntimePass("doctor unsupported capability warning", unsupportedClaimResult);
   if (!unsupportedClaimResult.stdout.includes("ASK doctor: warn") || !unsupportedClaimResult.stdout.includes("Local metrics event recording evidence level is unsupported")) {
     throw new Error(`doctor should warn on unsupported adapter capability claims\n${unsupportedClaimResult.stdout}\n${unsupportedClaimResult.stderr}`);
+  }
+
+  const runtimeHealthTarget = resolve(fixtureRoot, "doctor-runtime-health");
+  assertRuntimePass("doctor setup runtime health install", runRepoScript([installer, "--target", runtimeHealthTarget, "--skills", "operating-mode-router"]));
+  mkdirSync(resolve(runtimeHealthTarget, ".agent-spectrum-kernel"), { recursive: true });
+  writeFileSync(
+    resolve(runtimeHealthTarget, ".agent-spectrum-kernel/runtime-health.jsonl"),
+    '{"schema_version":"1.0.0","occurred_at":"2999-01-01T00:00:00.000Z","component":"ai-metrics-record","status":"error","error_code":"non_blocking_metrics_record_failure","message":"details omitted","privacy_note":{"raw_prompts_stored":false,"full_error_message_stored":false}}\n',
+  );
+  const runtimeHealthResult = runRepoScript([doctorScript, "--target", runtimeHealthTarget]);
+  assertRuntimePass("doctor runtime-health warning", runtimeHealthResult);
+  if (!runtimeHealthResult.stdout.includes("ASK doctor: warn") || !runtimeHealthResult.stdout.includes("adapter runtime health issue: ai-metrics-record non_blocking_metrics_record_failure")) {
+    throw new Error(`doctor should surface sanitized runtime-health issues\n${runtimeHealthResult.stdout}\n${runtimeHealthResult.stderr}`);
   }
 
   const runtimeProbeTarget = resolve(fixtureRoot, "doctor-runtime-probe");
@@ -3102,6 +3196,15 @@ function assertSidecarAdapterInstructions() {
     if (!command.includes("--non-blocking") || !isFailOpenHookCommand(command)) {
       throw new Error(`project metrics hook should be shell-level fail-open and silent\n${command}`);
     }
+  }
+  const projectBashCommands = (hooks.hooks?.PostToolUse ?? [])
+    .filter((group) => group.matcher === "Bash")
+    .flatMap((group) => (group.hooks ?? []).map((hook) => hook.command ?? ""));
+  if (
+    projectBashCommands.length === 0 ||
+    projectBashCommands.some((command) => !command.includes("--event-kind command_attempt") || command.includes("--event-kind verification_attempt"))
+  ) {
+    throw new Error(`project Bash hooks should record command_attempt, not verification_attempt\n${projectBashCommands.join("\n")}`);
   }
 
   const stopCommands = (hooks.hooks?.Stop ?? []).flatMap((group) => (group.hooks ?? []).map((hook) => hook.command ?? ""));

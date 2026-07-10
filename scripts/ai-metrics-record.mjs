@@ -14,6 +14,7 @@ const DEFAULT_CONFIG = {
     task_boundary_source: "session_id",
     record_file_change_events: true,
     record_verification_attempts: true,
+    record_command_attempts: true,
     record_task_stop_candidates: true,
     record_command_hash: false,
     record_command_preview: false,
@@ -100,7 +101,7 @@ function printHelp() {
   console.log(`Usage: node scripts/ai-metrics-record.mjs [options]
 
 Options:
-  --event-kind <kind>       file_change | verification_attempt | task_stop | ledger_refresh | report
+  --event-kind <kind>       file_change | command_attempt | verification_attempt | task_stop | ledger_refresh | report
   --hook-event <name>       Claude hook event name.
   --task-id <id>            Optional explicit task boundary. Defaults to configured hook boundary source.
   --task-type <type>        implementation | review | validation | report | other.
@@ -212,6 +213,9 @@ function shouldRecord(args, hookInput, config) {
   }
   if (args.eventKind === "verification_attempt" && !config.capture.record_verification_attempts) {
     return { ok: false, reason: "verification_capture_disabled" };
+  }
+  if (args.eventKind === "command_attempt" && config.capture.record_command_attempts === false) {
+    return { ok: false, reason: "command_attempt_capture_disabled" };
   }
   if (args.eventKind === "task_stop" && !config.capture.record_task_stop_candidates) {
     return { ok: false, reason: "task_stop_capture_disabled" };
@@ -406,6 +410,14 @@ function buildEvent(args, hookInput, config, taskId) {
     event.verification_result_summary = "Verification command attempted; command text and full command output omitted by default.";
   }
 
+  if (args.eventKind === "command_attempt") {
+    event.command_attempt_metrics = {
+      command_kind: commandKind(command),
+      classified_as_verification: false,
+    };
+    event.command_attempt_summary = "Command attempted; command text and full command output omitted by default. This is not counted as verified work.";
+  }
+
   if (args.eventKind === "task_stop") {
     event.outcome_metrics.task_completed = true;
   }
@@ -578,8 +590,35 @@ try {
   main();
 } catch (error) {
   if (process.argv.includes("--non-blocking")) {
+    recordRuntimeHealthFailure(error);
     process.exit(0);
   }
   console.error(`ai-metrics-record failed: ${error.message}`);
   process.exit(1);
+}
+
+function recordRuntimeHealthFailure(error) {
+  try {
+    const path = resolve(".agent-spectrum-kernel/runtime-health.jsonl");
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(path, `${JSON.stringify({
+      schema_version: "1.0.0",
+      occurred_at: new Date().toISOString(),
+      component: "ai-metrics-record",
+      status: "error",
+      error_code: "non_blocking_metrics_record_failure",
+      error_name: sanitizeText(error?.name ?? "Error", 80),
+      message: "Non-blocking metrics recorder failed; raw error details omitted by default.",
+      privacy_note: {
+        raw_prompts_stored: false,
+        secrets_stored: false,
+        customer_data_stored: false,
+        personal_data_stored: false,
+        full_command_output_stored: false,
+        full_error_message_stored: false,
+      },
+    })}\n`);
+  } catch {
+    // Non-blocking hook failures must not interrupt the developer task.
+  }
 }

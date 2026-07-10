@@ -13,6 +13,7 @@ import {
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const CLAUDE_STATE_PATH = ".agent-spectrum-kernel/claude-install-state.json";
+const RUNTIME_HEALTH_PATH = ".agent-spectrum-kernel/runtime-health.jsonl";
 
 function parseArgs(argv) {
   const args = {
@@ -92,6 +93,7 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
   checkClaudeAdapter(target, report);
   checkUnsupportedClaims(target, report);
   checkPrivacyDefaults(target, report);
+  checkRuntimeHealth(target, report);
   if (runtimeProbe) {
     checkRuntimeConformanceProbe(target, report);
   }
@@ -281,6 +283,33 @@ function checkPrivacyDefaults(target, report) {
   const concerns = findPrivacyStorageConcerns(target);
   for (const concern of concerns) {
     report.failures.push(`privacy default concern: ${concern.file} contains ${concern.id}`);
+  }
+}
+
+function checkRuntimeHealth(target, report) {
+  const healthPath = resolve(target, RUNTIME_HEALTH_PATH);
+  if (!existsSync(healthPath)) {
+    return;
+  }
+  let entries = [];
+  try {
+    entries = readFileSync(healthPath, "utf8")
+      .split(/\r?\n/)
+      .filter((line) => line.trim())
+      .slice(-10)
+      .map((line) => JSON.parse(line));
+  } catch (error) {
+    report.warnings.push(`adapter runtime health log is unreadable: ${RUNTIME_HEALTH_PATH}: ${error.message}`);
+    return;
+  }
+  for (const entry of entries) {
+    if (entry?.status !== "error") {
+      continue;
+    }
+    const component = typeof entry.component === "string" && entry.component ? entry.component : "unknown-component";
+    const code = typeof entry.error_code === "string" && entry.error_code ? entry.error_code : "runtime_error";
+    const occurredAt = typeof entry.occurred_at === "string" && entry.occurred_at ? entry.occurred_at : "unknown-time";
+    report.warnings.push(`adapter runtime health issue: ${component} ${code} at ${occurredAt} (${RUNTIME_HEALTH_PATH})`);
   }
 }
 

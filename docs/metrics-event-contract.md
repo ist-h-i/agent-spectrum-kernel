@@ -76,6 +76,10 @@ Metrics event candidate:
     - command_kind:
     - command_hash: optional
     - redacted_command_preview: optional explicit opt-in
+- command_attempt_metrics:
+  - command_kind:
+  - classified_as_verification: false
+- command_attempt_summary:
 - debt_movement_metrics:
   - debt_items_detected:
   - debt_items_recorded:
@@ -118,6 +122,18 @@ capture.task_boundary_source: session_id
 This means file-change and verification events are recorded under a session-scoped task ID such as `session:<id>`, then the Stop event marks that task boundary complete. If neither an explicit task ID nor an allowed session boundary is available, adapters must `skip` rather than create noisy unbounded events.
 
 Command text is not recorded by default. Verification events record `command_kind` only. `command_hash` and `redacted_command_preview` require explicit opt-in and must not include secrets.
+
+`command_attempt` records a shell command attempt without treating it as verification evidence. It sets `classified_as_verification: false` and must not populate `verification_metrics.commands_run`.
+
+`verification_attempt` is reserved for commands that match the verification classifier or have explicit evidence linkage. A generic Bash hook must not classify every command as verification.
+
+Non-blocking recorder failures append a sanitized local health entry to:
+
+```text
+.agent-spectrum-kernel/runtime-health.jsonl
+```
+
+`ask-doctor` reads that file and reports a warning. Runtime-health entries must omit raw prompts, secrets, customer data, personal data, full command output, and full error messages.
 
 ## Skill Command Sidecar
 
@@ -163,6 +179,7 @@ Meaningful events include:
 - Finding converted to a rule or executable check.
 - Verification completed or insufficient evidence explicitly reported.
 - Weekly or monthly report generated from project-local events.
+- Command attempts, when command-attempt capture is enabled, as non-verification operational context.
 
 Do not emit for:
 
@@ -224,4 +241,6 @@ detected -> recorded -> planned -> in_progress -> resolved
 - Summaries must mask or omit secrets, customer data, personal data, and sensitive project details.
 - Metrics are for adoption support, coaching, and workflow improvement.
 - Metrics must not be framed as HR, compensation, promotion, or personnel evaluation.
+- Metrics must not be used for individual productivity rankings or individual performance scoring.
+- Avoid personal identifiers unless project policy explicitly approves the purpose, access boundary, retention, and opt-out path.
 - Adoption effect should be reported as a signal or correlation unless stronger evidence supports causality.

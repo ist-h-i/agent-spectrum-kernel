@@ -225,6 +225,8 @@ Supported Claude profiles are `implementation`, `investigation`, `review`, `obse
 
 Defaults are project-local: no external publication, no raw prompt storage, no secrets/customer/personal data storage, and no full file contents or full command output in metrics events.
 
+Deployment readiness is stateful. File projection only proves `Installed`; `Activated` and `Operational` require profile selection, approval boundaries, runtime health, and task evidence as defined in `docs/adapter-deployment-governance.md`.
+
 ## Codex adapter
 
 For Codex, use the prompt-driven adapter in `adapters/codex/`.
@@ -289,7 +291,7 @@ First-time users should start with `docs/quickstart-ja.md`.
 - `docs/routing-model.md`: operating-mode routing and skill group model.
 - `docs/usage-ja.md`: representative usage guide for common operating patterns.
 - `docs/skill-matrix.md`: reference matrix for workflow selection.
-- `docs/adapter-conformance-contract.md` and `docs/adapter-capability-matrix.md`: adapter portability and capability evidence.
+- `docs/adapter-conformance-contract.md`, `docs/adapter-capability-matrix.md`, and `docs/adapter-deployment-governance.md`: adapter portability, capability evidence, supported deployment profiles, and operational governance.
 - Full-layer intelligence ledger templates: `docs/ai/engineering-pattern-ledger.md`, `docs/ai/verification-pattern-ledger.md`, `docs/ai/review-rule-ledger.md`, `docs/ai/documentation-knowledge-ledger.md`, `docs/ai/architecture-decision-memory.md`, and `docs/ai/engineering-capability-ledger.md`.
 - `docs/ai/stakeholder-readiness-report-template.md`: stakeholder-specific readiness reports that separate internal quality, release readiness, and client-value readiness.
 - `docs/ai/reports/examples/`: fixture-backed stakeholder-readiness samples for senior engineering, development management, business unit, and AI promotion views.
