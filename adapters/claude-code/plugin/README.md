@@ -17,6 +17,8 @@ The plugin remains an adapter. Core skills in `skills/*/SKILL.md` remain the sou
 
 The bundled hook config records only summarized project-local events by delegating to project runtime scripts when present. It does not enable HTTP hooks, webhook hooks, external publication, raw prompt storage, or credential handling.
 
+Plugin hooks invoke `${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record` directly instead of relying on `PATH`. The wrapper exits successfully when the adopting project has not installed the project-local metrics runtime.
+
 ## Install / Test
 
 From a checkout of this repository:

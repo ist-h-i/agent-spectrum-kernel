@@ -71,7 +71,7 @@ repo-root/
   .claude/
     skills/
     commands/
-    hooks/
+    settings.json
   docs/ai/observability-config.yml
 ```
 
@@ -171,6 +171,7 @@ AIの出力は、通常の説明では作業モードと次アクションを示
 Claude Code では、core skills を project-local adapter として投影するのが推奨です。
 
 ```bash
+node scripts/install-kernel.mjs --target /path/to/project --merge-agents
 node scripts/install-claude-adapter.mjs --target /path/to/project
 ```
 
@@ -184,7 +185,15 @@ node scripts/install-claude-adapter.mjs --target /path/to/project
 5. project-local events と ledger から週次/月次reportを生成する。
 ```
 
+Claude adapter installer は core installer が作る `.agent-spectrum-kernel/install-state.json` を要求します。core state がない場合は `.claude/` を書き込む前に失敗します。
+
+対応profileは `implementation`、`investigation`、`review`、`observability`、`full` です。default は `full` です。narrow profile は、選択commandの必須Skill、Skill依存、通常routerが到達し得るSkillを含むよう閉じています。`--skills <csv>` はadvanced overrideで、閉包を満たさない場合は書き込み前に失敗します。
+
+Claude project adapter のHook正本は `.claude/settings.json` です。`.claude/hooks/hooks.json` は新規には投影せず、旧adapter-owned hookだけのlegacy fileは削除します。`--skip-runtime` はruntime scriptを入れず、adapter-owned metrics hooksも入れません。`--skip-hooks` はhooksだけをskip/removeし、runtime scriptは入れます。
+
 Local hooks はローカル作業のdefaultです。`docs/ai/metrics/events.jsonl` に要約イベントだけを保存し、raw prompt、secret、customer data、personal data、full file contents、full command output は既定で保存しません。
+
+Optional plugin は project adapter と併用できます。project adapter はproject-local commands/runtime/settings hooksを所有し、plugin hooksは `${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record` 経由で実行されます。project runtimeがない場合、plugin metrics wrapperはno-opします。
 
 GitHub Actions は任意です。`@claude review` コメントでだけ動かすPR共有adapterであり、常時PR reviewやlocal observabilityの代替ではありません。
 

@@ -68,6 +68,7 @@ Skill非対応ツールでは、必要な `SKILL.md` だけをプロンプトに
 Claude Code では project-local adapter を使うと、core skills を `.claude/skills/` に投影できます。
 
 ```bash
+node scripts/install-kernel.mjs --target /path/to/project --merge-agents
 node scripts/install-claude-adapter.mjs --target /path/to/project
 ```
 
@@ -80,6 +81,14 @@ node scripts/install-claude-adapter.mjs --target /path/to/project
 4. Pattern B `@claude review` GitHub Actions only when PR-level shared review is needed
 5. local weekly/monthly adoption and debt reports
 ```
+
+Claude adapter は core install state `.agent-spectrum-kernel/install-state.json` を前提にします。未導入の場合は `.claude/` を書き込む前に失敗します。
+
+対応profileは `implementation`、`investigation`、`review`、`observability`、`full` です。default は `full` で、全manifest Skillと全Claude commandを投影します。narrow profile は、選択command、Skill依存、router到達可能routeを含む閉包を自動投影します。`--skills <csv>` はadvanced overrideで、閉包を満たさない場合は書き込み前に失敗します。
+
+Hookの正本は `.claude/settings.json` です。`.claude/hooks/hooks.json` は新規には投影しません。`--skip-runtime` はruntime scriptとadapter-owned metrics hooksを両方skip/removeします。`--skip-hooks` はhooksだけをskip/removeし、runtime scriptは入れます。
+
+Optional plugin はproject adapterと併用できます。plugin hooksは `${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record` を通して実行され、project runtimeがない場合はno-opします。
 
 ## 使い分け
 

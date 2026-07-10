@@ -189,31 +189,49 @@ function checkClaudeAdapter(target, report) {
   }
   report.installed.push("Claude adapter: .claude directory present");
 
-  const requiredCommandDir = resolve(REPO_ROOT, "adapters/claude-code/project/.claude/commands");
-  if (existsSync(requiredCommandDir)) {
-    for (const entry of readdirSync(requiredCommandDir).sort()) {
-      if (!entry.endsWith(".md")) {
-        continue;
-      }
-      const targetPath = resolve(target, ".claude/commands", entry);
-      if (!existsSync(targetPath)) {
-        report.failures.push(`Claude adapter command is missing: .claude/commands/${entry}`);
+  const commandsDir = resolve(target, ".claude/commands");
+  if (!existsSync(commandsDir)) {
+    report.failures.push("Claude adapter commands directory is missing: .claude/commands");
+  } else if (!statSync(commandsDir).isDirectory()) {
+    report.failures.push("Claude adapter commands path is not a directory: .claude/commands");
+  } else {
+    const commandEntries = readdirSync(commandsDir).filter((entry) => entry.endsWith(".md")).sort();
+    if (commandEntries.length === 0) {
+      report.failures.push("Claude adapter has no installed commands: .claude/commands");
+    }
+    for (const entry of commandEntries) {
+      const targetPath = resolve(commandsDir, entry);
+      try {
+        if (!readFileSync(targetPath, "utf8").trim()) {
+          report.failures.push(`Claude adapter command is empty: .claude/commands/${entry}`);
+        }
+      } catch (error) {
+        report.failures.push(`Claude adapter command is not readable: .claude/commands/${entry}: ${error.message}`);
       }
     }
   }
 
-  const hooksPath = resolve(target, ".claude/hooks/hooks.json");
-  if (existsSync(hooksPath)) {
+  for (const hookConfig of claudeHookConfigPaths(target)) {
+    if (!existsSync(hookConfig.path)) {
+      continue;
+    }
     try {
-      const hooks = JSON.parse(readFileSync(hooksPath, "utf8"));
+      const hooks = JSON.parse(readFileSync(hookConfig.path, "utf8"));
       const serialized = JSON.stringify(hooks);
       if (/https?:\/\//i.test(serialized) || /webhook/i.test(serialized)) {
-        report.failures.push("Claude adapter hooks contain an enabled external destination or webhook reference");
+        report.failures.push(`Claude adapter hooks contain an enabled external destination or webhook reference: ${hookConfig.label}`);
       }
     } catch (error) {
-      report.failures.push(`Claude adapter hooks are invalid JSON: ${error.message}`);
+      report.failures.push(`Claude adapter hooks are invalid JSON: ${hookConfig.label}: ${error.message}`);
     }
   }
+}
+
+function claudeHookConfigPaths(target) {
+  return [
+    { path: resolve(target, ".claude/settings.json"), label: ".claude/settings.json" },
+    { path: resolve(target, ".claude/hooks/hooks.json"), label: ".claude/hooks/hooks.json" },
+  ];
 }
 
 function checkUnsupportedClaims(target, report) {
@@ -240,7 +258,8 @@ function checkRuntimeConformanceProbe(target, report) {
     checkReadableDirectory(resolve(target, ".claude/commands"), ".claude/commands", probe);
     checkReadableDirectory(resolve(target, ".claude/skills"), ".claude/skills", probe, { optional: true });
     checkProjectedSkills(resolve(target, ".claude/skills"), ".claude/skills", probe);
-    checkClaudeHooksShape(resolve(target, ".claude/hooks/hooks.json"), probe);
+    checkClaudeHooksShape(resolve(target, ".claude/settings.json"), ".claude/settings.json", probe);
+    checkClaudeHooksShape(resolve(target, ".claude/hooks/hooks.json"), ".claude/hooks/hooks.json", probe);
   }
 
   const agentsRoot = resolve(target, ".agents");
@@ -313,7 +332,7 @@ function checkProjectedSkills(skillsRoot, label, probe) {
   }
 }
 
-function checkClaudeHooksShape(hooksPath, probe) {
+function checkClaudeHooksShape(hooksPath, label, probe) {
   if (!existsSync(hooksPath)) {
     return;
   }
@@ -321,32 +340,32 @@ function checkClaudeHooksShape(hooksPath, probe) {
   try {
     hooksConfig = JSON.parse(readFileSync(hooksPath, "utf8"));
   } catch (error) {
-    probe.failures.push(`Claude adapter hooks shape is invalid: .claude/hooks/hooks.json: ${error.message}`);
+    probe.failures.push(`Claude adapter hooks shape is invalid: ${label}: ${error.message}`);
     return;
   }
 
   const hooks = hooksConfig?.hooks;
   if (!hooks || typeof hooks !== "object" || Array.isArray(hooks)) {
-    probe.failures.push("Claude adapter hooks shape is invalid: .claude/hooks/hooks.json");
+    probe.failures.push(`Claude adapter hooks shape is invalid: ${label}`);
     return;
   }
   for (const [eventName, groups] of Object.entries(hooks)) {
     if (!Array.isArray(groups)) {
-      probe.failures.push(`Claude adapter hooks shape is invalid: .claude/hooks/hooks.json (${eventName} must be an array)`);
+      probe.failures.push(`Claude adapter hooks shape is invalid: ${label} (${eventName} must be an array)`);
       continue;
     }
     for (const [groupIndex, group] of groups.entries()) {
       if (!group || typeof group !== "object" || !Array.isArray(group.hooks)) {
-        probe.failures.push(`Claude adapter hooks shape is invalid: .claude/hooks/hooks.json (${eventName}[${groupIndex}].hooks must be an array)`);
+        probe.failures.push(`Claude adapter hooks shape is invalid: ${label} (${eventName}[${groupIndex}].hooks must be an array)`);
         continue;
       }
       for (const [hookIndex, hook] of group.hooks.entries()) {
         if (!hook || typeof hook !== "object" || typeof hook.type !== "string") {
-          probe.failures.push(`Claude adapter hooks shape is invalid: .claude/hooks/hooks.json (${eventName}[${groupIndex}].hooks[${hookIndex}] must include a string type)`);
+          probe.failures.push(`Claude adapter hooks shape is invalid: ${label} (${eventName}[${groupIndex}].hooks[${hookIndex}] must include a string type)`);
           continue;
         }
         if (hook.type === "command" && typeof hook.command !== "string") {
-          probe.failures.push(`Claude adapter hooks shape is invalid: .claude/hooks/hooks.json (${eventName}[${groupIndex}].hooks[${hookIndex}] command must be a string)`);
+          probe.failures.push(`Claude adapter hooks shape is invalid: ${label} (${eventName}[${groupIndex}].hooks[${hookIndex}] command must be a string)`);
         }
       }
     }

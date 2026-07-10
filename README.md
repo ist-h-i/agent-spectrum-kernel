@@ -199,6 +199,7 @@ For tools that only support a single custom instruction field, use `CUSTOM_INSTR
 For Claude Code, use the local-first adapter instead of changing core skills.
 
 ```bash
+node scripts/install-kernel.mjs --target /path/to/project --merge-agents
 node scripts/install-claude-adapter.mjs --target /path/to/project
 ```
 
@@ -211,6 +212,12 @@ Recommended adoption path:
 4. Use Pattern B @claude review GitHub Actions only when PR-level shared review is needed.
 5. Generate local weekly/monthly adoption and debt reports.
 ```
+
+The Claude installer requires the core install state, then updates profile-selected `.claude/skills`, `.claude/commands`, command-required docs/assets, local runtime scripts, and managed hooks in `.claude/settings.json`. It does not use `.claude/hooks/hooks.json` as the project hook source of truth.
+
+Supported Claude profiles are `implementation`, `investigation`, `review`, `observability`, and `full`. The default is `full`; narrow profiles are closed over command requirements and router-reachable skills. Use `--skills <csv>` only as an advanced override; the installer fails before writing files when the override is not closed.
+
+`--skip-runtime` also skips/removes adapter-owned metrics hooks. `--skip-hooks` skips/removes hooks but still installs runtime scripts. The optional plugin may be combined with the project adapter; plugin hooks resolve through `CLAUDE_PLUGIN_ROOT` and no-op when the project runtime is absent.
 
 Defaults are project-local: no external publication, no raw prompt storage, no secrets/customer/personal data storage, and no full file contents or full command output in metrics events.
 
