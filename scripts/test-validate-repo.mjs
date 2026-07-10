@@ -369,7 +369,9 @@ function install(manifest, options) {
   );
   writeFileSync(
     resolve(root, "scripts/install-claude-adapter.mjs"),
-    `const DEFAULT_SKILLS = [
+    `const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
+const DEFAULT_PROFILE = "full";
+const DEFAULT_SKILLS = [
   "operating-mode-router",
   "skill-router",
   "next-best-change-finder",
@@ -403,6 +405,20 @@ function install(manifest, options) {
   "skill-adoption-metrics",
   "engineering-capability-evaluation",
 ];
+const COMMAND_METADATA = {
+  "skill-review.md": { requiredSkills: ["review-router"], requiredAssets: [] },
+};
+const CLAUDE_PROFILES = { full: { skills: DEFAULT_SKILLS, commands: COMMAND_TEMPLATES } };
+const PROFILE_ROUTING_FIXTURES = {
+  implementation: [
+    { id: "unfamiliar_repository" },
+    { id: "unclear_scope" },
+    { id: "boundary_decision" },
+  ],
+  investigation: [{ id: "bug_investigation" }],
+  review: [{ id: "review" }],
+};
+const HELP = "--profile";
 const COMMAND_TEMPLATES = [
   "skill-review.md",
   "skill-implement.md",
@@ -412,6 +428,28 @@ const COMMAND_TEMPLATES = [
   "skill-report.md",
   "skill-ledger-refresh.md",
 ];
+function validateCoreInstalled() {
+  return CORE_STATE_PATH;
+}
+function installAssets(command) {
+  return command.requiredAssets;
+}
+function routingFixturesForProfile() {
+  return PROFILE_ROUTING_FIXTURES;
+}
+function computeRequiredClosure() {
+  return routingFixturesForProfile();
+}
+function removeManagedHooks() {
+  return "remove managed hooks";
+}
+function removeAdapterOwnedHooks() {
+  return "agent-spectrum-kernel:claude-adapter-hook";
+}
+function install(args) {
+  if (args.skipHooks || args.skipRuntime) removeManagedHooks();
+  if (args.profile || DEFAULT_PROFILE) return HELP + "Selected Claude commands are not closed over installed skills" + "settings.json" + installAssets(COMMAND_METADATA["skill-review.md"]) + validateCoreInstalled();
+}
 `,
   );
 }
@@ -1807,7 +1845,10 @@ function assertRuntimeScripts() {
 }
 
 function assertInstallerScripts() {
+  const coreInstaller = resolve(repoRoot, "scripts/install-kernel.mjs");
+  const installer = resolve(repoRoot, "scripts/install-claude-adapter.mjs");
   const target = resolve(fixtureRoot, "install-target");
+  assertRuntimePass("installer core setup", runRepoScript([coreInstaller, "--target", target]));
   mkdirSync(resolve(target, ".claude"), { recursive: true });
   writeFileSync(
     resolve(target, ".claude/settings.json"),
@@ -1826,8 +1867,9 @@ function assertInstallerScripts() {
       2,
     ),
   );
+  mkdirSync(resolve(target, ".claude/hooks"), { recursive: true });
+  writeFileSync(resolve(target, ".claude/hooks/hooks.json"), readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/hooks/hooks.json"), "utf8"));
 
-  const installer = resolve(repoRoot, "scripts/install-claude-adapter.mjs");
   assertRuntimePass("installer first run", runRepoScript([installer, "--target", target]));
   assertRuntimePass("installer second run", runRepoScript([installer, "--target", target]));
 
@@ -1839,8 +1881,110 @@ function assertInstallerScripts() {
   if (!identities.some((identity) => identity.includes("echo unrelated"))) {
     throw new Error(`installer should preserve unrelated hooks\n${JSON.stringify(settings.hooks, null, 2)}`);
   }
+  if (existsSync(resolve(target, ".claude/hooks/hooks.json"))) {
+    throw new Error("installer should remove legacy adapter-owned .claude/hooks/hooks.json and use settings.json as hook source of truth");
+  }
+  if (!existsSync(resolve(target, "docs/ai/improvement-ledger.md")) || !existsSync(resolve(target, "docs/debt-lifecycle-contract.md"))) {
+    throw new Error("installer should project command-required docs and ledger assets");
+  }
+
+  const implementationTarget = resolve(fixtureRoot, "install-implementation-profile-target");
+  assertRuntimePass("installer implementation profile core setup", runRepoScript([coreInstaller, "--target", implementationTarget]));
+  assertRuntimePass("installer implementation profile", runRepoScript([installer, "--target", implementationTarget, "--profile", "implementation"]));
+  for (const skill of ["repository-orientation", "scope-control", "application-boundary-architecture"]) {
+    if (!existsSync(resolve(implementationTarget, ".claude/skills", skill, "SKILL.md"))) {
+      throw new Error(`implementation profile should include router-reachable skill: ${skill}`);
+    }
+  }
+  if (existsSync(resolve(implementationTarget, ".claude/commands/skill-review.md"))) {
+    throw new Error("implementation profile should not install review command");
+  }
+
+  const noRuntimeTarget = resolve(fixtureRoot, "install-no-runtime-target");
+  assertRuntimePass("installer no-runtime core setup", runRepoScript([coreInstaller, "--target", noRuntimeTarget]));
+  assertRuntimePass("installer no-runtime", runRepoScript([installer, "--target", noRuntimeTarget, "--skip-runtime"]));
+  if (existsSync(resolve(noRuntimeTarget, "scripts/ai-metrics-record.mjs"))) {
+    throw new Error("installer --skip-runtime should not install metrics runtime scripts");
+  }
+  if (existsSync(resolve(noRuntimeTarget, ".claude/settings.json"))) {
+    const noRuntimeSettings = JSON.parse(readFileSync(resolve(noRuntimeTarget, ".claude/settings.json"), "utf8"));
+    if (JSON.stringify(noRuntimeSettings).includes("ai-metrics-record")) {
+      throw new Error(`installer --skip-runtime should not install metrics hooks\n${JSON.stringify(noRuntimeSettings, null, 2)}`);
+    }
+  }
+
+  const noHooksTarget = resolve(fixtureRoot, "install-no-hooks-target");
+  assertRuntimePass("installer no-hooks core setup", runRepoScript([coreInstaller, "--target", noHooksTarget]));
+  assertRuntimePass("installer no-hooks", runRepoScript([installer, "--target", noHooksTarget, "--skip-hooks"]));
+  if (!existsSync(resolve(noHooksTarget, "scripts/ai-metrics-record.mjs"))) {
+    throw new Error("installer --skip-hooks should still install runtime scripts when runtime is not skipped");
+  }
+  if (existsSync(resolve(noHooksTarget, ".claude/settings.json"))) {
+    const noHooksSettings = JSON.parse(readFileSync(resolve(noHooksTarget, ".claude/settings.json"), "utf8"));
+    if (JSON.stringify(noHooksSettings).includes("ai-metrics-record")) {
+      throw new Error(`installer --skip-hooks should not install metrics hooks\n${JSON.stringify(noHooksSettings, null, 2)}`);
+    }
+  }
+
+  const missingCoreTarget = resolve(fixtureRoot, "install-missing-core-target");
+  assertRuntimeFail(
+    "installer missing core",
+    runRepoScript([installer, "--target", missingCoreTarget]),
+    "ASK core install state is missing",
+  );
+  if (existsSync(resolve(missingCoreTarget, ".claude"))) {
+    throw new Error("installer missing core failure should not write adapter files");
+  }
+
+  const invalidPartialTarget = resolve(fixtureRoot, "install-invalid-partial-target");
+  assertRuntimePass("installer invalid partial core setup", runRepoScript([coreInstaller, "--target", invalidPartialTarget]));
+  assertRuntimeFail(
+    "installer invalid partial skills",
+    runRepoScript([installer, "--target", invalidPartialTarget, "--skills", "operating-mode-router"]),
+    "Selected Claude commands are not closed over installed skills",
+  );
+  if (existsSync(resolve(invalidPartialTarget, ".claude/commands/skill-review.md"))) {
+    throw new Error("installer invalid partial skills should not install commands");
+  }
+
+  const invalidRoutingTarget = resolve(fixtureRoot, "install-invalid-routing-profile-target");
+  assertRuntimePass("installer invalid routing core setup", runRepoScript([coreInstaller, "--target", invalidRoutingTarget]));
+  assertRuntimeFail(
+    "installer invalid routing closure",
+    runRepoScript([
+      installer,
+      "--target",
+      invalidRoutingTarget,
+      "--profile",
+      "implementation",
+      "--skills",
+      "operating-mode-router,skill-router,test-first-verification,controlled-implementation,evidence-ledger,risk-gate,handoff-generation",
+    ]),
+    "repository-orientation",
+  );
+  if (existsSync(resolve(invalidRoutingTarget, ".claude/commands/skill-implement.md"))) {
+    throw new Error("installer invalid routing closure should not install commands");
+  }
+
+  const pluginHooks = JSON.parse(readFileSync(resolve(repoRoot, "adapters/claude-code/plugin/hooks/hooks.json"), "utf8"));
+  const pluginHookCommands = Object.values(pluginHooks.hooks ?? {}).flatMap((groups) =>
+    groups.flatMap((group) => (group.hooks ?? []).map((hook) => hook.command ?? "")),
+  );
+  if (!pluginHookCommands.every((command) => command.includes("${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record")) || pluginHookCommands.some((command) => /^ai-skills-metrics-record\b/.test(command))) {
+    throw new Error(`plugin hooks should resolve through CLAUDE_PLUGIN_ROOT instead of relying on PATH\n${pluginHookCommands.join("\n")}`);
+  }
+  if (!pluginHookCommands.every((command) => command.includes("--non-blocking") && isFailOpenHookCommand(command))) {
+    throw new Error(`plugin hooks should be non-blocking and shell-level fail-open\n${pluginHookCommands.join("\n")}`);
+  }
+  const pluginBinSmokeRoot = resolve(fixtureRoot, "plugin-bin-no-runtime");
+  mkdirSync(pluginBinSmokeRoot, { recursive: true });
+  const pluginBinSmoke = runRepoScript([resolve(repoRoot, "adapters/claude-code/plugin/bin/ai-skills-metrics-record"), "--event-kind", "task_stop"], {
+    cwd: pluginBinSmokeRoot,
+  });
+  assertRuntimePass("plugin metrics wrapper skips missing project runtime", pluginBinSmoke);
 
   const dryRunTarget = resolve(fixtureRoot, "install-dry-run-target");
+  assertRuntimePass("installer dry-run core setup", runRepoScript([coreInstaller, "--target", dryRunTarget]));
   const dryRun = runRepoScript([installer, "--target", dryRunTarget, "--dry-run"]);
   assertRuntimePass("installer dry run", dryRun);
   if (!dryRun.stdout.includes(".claude/settings.json") || !dryRun.stdout.includes("skill-handoff.md")) {
@@ -2256,8 +2400,8 @@ function assertDoctorScript() {
 
   const runtimeProbeTarget = resolve(fixtureRoot, "doctor-runtime-probe");
   assertRuntimePass("doctor runtime probe core setup", runRepoScript([installer, "--target", runtimeProbeTarget, "--skills", "operating-mode-router"]));
-  assertRuntimePass("doctor runtime probe Claude adapter setup", runRepoScript([claudeInstaller, "--target", runtimeProbeTarget, "--skills", "operating-mode-router", "--skip-runtime"]));
-  writeFileSync(resolve(runtimeProbeTarget, ".claude/hooks/hooks.json"), '{ "hooks": { "Stop": { "hooks": [] } } }\n');
+  assertRuntimePass("doctor runtime probe Claude adapter setup", runRepoScript([claudeInstaller, "--target", runtimeProbeTarget, "--profile", "implementation", "--skip-runtime"]));
+  writeFileSync(resolve(runtimeProbeTarget, ".claude/settings.json"), '{ "hooks": { "Stop": { "hooks": [] } } }\n');
   writeFileSync(resolve(runtimeProbeTarget, "README.md"), "# Runtime probe\n\nUse `.claude/commands/missing-runtime.md` during local review.\n");
   const runtimeProbeResult = runRepoScript([doctorScript, "--target", runtimeProbeTarget, "--runtime-probe"]);
   assertRuntimePass("doctor runtime probe remains report-only", runtimeProbeResult);
@@ -2652,7 +2796,7 @@ function assertStakeholderReadinessSamples() {
 }
 
 function isFailOpenHookCommand(command) {
-  return />\/dev\/null\s+2>&1\s+\|\|\s+true\s*$/.test(command);
+  return />\/dev\/null\s+2>&1\s+\|\|\s+true(?:\s+#\s+agent-spectrum-kernel:[\w-]+)?\s*$/.test(command);
 }
 
 function assertSidecarAdapterInstructions() {

@@ -2,7 +2,7 @@
 
 This adapter projects the core Agent Spectrum Kernel skills into Claude Code without changing the core `skills/` directory design.
 
-Use the project-local adapter when you want short project commands such as `/review-router` and local hook-based observability in one repository. Use the optional plugin package when the same entry points should be distributed across several projects or a team.
+Use the project-local adapter when you want short project commands such as `/skill-review` and local hook-based observability in one repository. Use the optional plugin package when the same entry points should be distributed across several projects or a team.
 
 ## What This Adapter Installs
 
@@ -10,17 +10,26 @@ The installer can copy:
 
 - selected core skills into `.claude/skills/<skill>/SKILL.md`,
 - command templates into `.claude/commands/`,
-- hook configuration into `.claude/hooks/hooks.json`,
+- managed project hook configuration into `.claude/settings.json`,
 - local metrics and ledger runtime scripts into `scripts/`,
+- command-required docs and ledger assets into `docs/`,
 - the local observability config template into `docs/ai/observability-config.yml`.
 
-The copied skills remain a projection of the canonical core skills in this repository. Update by rerunning the installer from a newer checkout of this repository. The default mode is upgrade-safe: projected files are overwritten from the current checkout, unrelated existing settings are preserved, and adapter hook commands are merged without duplication.
+The copied skills remain a projection of the canonical core skills in this repository. Update by rerunning the installer from a newer checkout of this repository. The default mode is upgrade-safe: projected files are overwritten from the current checkout, unrelated existing settings are preserved, and adapter-owned hook commands are replaced without duplication.
+
+Hook source of truth:
+
+- The project adapter writes managed hooks to `.claude/settings.json`.
+- It no longer installs `.claude/hooks/hooks.json`.
+- A legacy `.claude/hooks/hooks.json` is removed only when it contains adapter-owned hooks.
+- Existing unrelated hooks in `.claude/settings.json` are preserved.
 
 ## Install
 
-From this repository:
+Install the core kernel first, then install the Claude adapter:
 
 ```bash
+node scripts/install-kernel.mjs --target /path/to/adopting-project --merge-agents
 node scripts/install-claude-adapter.mjs --target /path/to/adopting-project
 ```
 
@@ -28,15 +37,37 @@ Useful flags:
 
 ```bash
 node scripts/install-claude-adapter.mjs --target /path/to/project --dry-run
+node scripts/install-claude-adapter.mjs --target /path/to/project --profile implementation
+node scripts/install-claude-adapter.mjs --target /path/to/project --profile review
 node scripts/install-claude-adapter.mjs --target /path/to/project --skip-hooks
 node scripts/install-claude-adapter.mjs --target /path/to/project --skip-runtime
 ```
 
+The Claude adapter requires `.agent-spectrum-kernel/install-state.json` from the core installer. If the core state is missing, the adapter fails before writing `.claude/`.
+
 The installer does not enable external publication. It does not create secrets, tokens, webhooks, or cloud telemetry destinations.
+
+## Profiles
+
+Supported profiles:
+
+| Profile | Installs |
+|---|---|
+| `implementation` | Implementation, verification, and handoff commands plus implementation router closure. |
+| `investigation` | Investigation, verification, and handoff commands plus bug-investigation router closure. |
+| `review` | Review, verification, and handoff commands plus review gates. |
+| `observability` | Report, ledger refresh, verification, and handoff commands plus local metrics/evaluation skills. |
+| `full` | All manifest skills and all Claude project commands. This is the default. |
+
+Profiles are closed over command requirements, skill dependencies, and normal router-reachable routes for their task scope. For example, `implementation` includes routes such as `repository-orientation`, `scope-control`, `application-boundary-architecture`, `domain-rule-ledger`, `grill-design`, `grill-with-docs`, and `planning-with-files`.
+
+Use `--skills <csv>` only as an advanced override. The installer fails before writing files if the override is not closed over the selected profile's commands and router-reachable skills.
 
 ## Installed Skills
 
-Default workflow projection:
+The `full` profile projects all skills in `manifest.json`. Narrow profiles project only their closed task-scope subset.
+
+Legacy full workflow projection:
 
 - `operating-mode-router`
 - `skill-router`
@@ -104,6 +135,23 @@ docs/ai/reports/
 ```
 
 The runtime omits raw prompts, secrets, customer data, personal data, full file contents, and full command output by default.
+
+Runtime and hook flags:
+
+- `--skip-runtime` does not install local metrics runtime scripts and also skips/removes adapter-owned metrics hooks.
+- `--skip-hooks` skips/removes adapter-owned metrics hooks but still installs runtime scripts.
+- Plugin hooks resolve their wrapper through `${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record` and fail open when the project runtime is absent.
+
+## Project Adapter and Plugin
+
+The project adapter and optional plugin can be combined when a team wants shared plugin entry points and project-local commands/runtime in the same repository.
+
+Operational boundary:
+
+- Project adapter: owns `.claude/skills/`, `.claude/commands/`, `.claude/settings.json` managed hooks, local runtime scripts, and project-local metrics files.
+- Plugin: owns plugin-packaged commands/hooks and resolves its metrics wrapper through `CLAUDE_PLUGIN_ROOT`.
+- Local metrics recording requires the project runtime. Plugin hooks no-op when the project runtime is not present.
+- Avoid enabling two independent metrics paths for the same task unless duplicate local events are acceptable.
 
 ## GitHub Actions
 

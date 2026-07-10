@@ -1356,6 +1356,14 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
       missingDefaultReviewSkills: [],
       commandTemplates: [],
       missingCommandTemplates: [],
+      hasProfiles: false,
+      validatesCoreState: false,
+      validatesCommandClosure: false,
+      validatesRoutingClosure: false,
+      installsCommandAssets: false,
+      skipRuntimeSkipsHooks: false,
+      settingsSourceOfTruth: false,
+      replacesManagedHooks: false,
     },
     coreInstaller: {
       installerPresent: false,
@@ -1671,12 +1679,40 @@ function validateInstallerProjection(root, checks, errors) {
   checks.installerProjection.commandTemplates = commandTemplates;
   checks.installerProjection.missingDefaultReviewSkills = REQUIRED_DEFAULT_REVIEW_SKILLS.filter((skill) => !defaultSkills.includes(skill));
   checks.installerProjection.missingCommandTemplates = REQUIRED_COMMAND_TEMPLATES.filter((command) => !commandTemplates.includes(command));
+  checks.installerProjection.hasProfiles = text.includes("CLAUDE_PROFILES") && text.includes("DEFAULT_PROFILE") && text.includes("--profile");
+  checks.installerProjection.validatesCoreState = text.includes(".agent-spectrum-kernel/install-state.json") && text.includes("validateCoreInstalled");
+  checks.installerProjection.validatesCommandClosure = text.includes("COMMAND_METADATA") && text.includes("Selected Claude commands are not closed over installed skills");
+  checks.installerProjection.validatesRoutingClosure =
+    text.includes("PROFILE_ROUTING_FIXTURES") &&
+    text.includes("routingFixturesForProfile") &&
+    text.includes("computeRequiredClosure") &&
+    ["unfamiliar_repository", "unclear_scope", "boundary_decision", "bug_investigation", "review"].every((fixtureId) => text.includes(fixtureId));
+  checks.installerProjection.installsCommandAssets = text.includes("requiredAssets") && text.includes("installAssets");
+  checks.installerProjection.skipRuntimeSkipsHooks = text.includes("args.skipHooks || args.skipRuntime") && text.includes("removeManagedHooks");
+  checks.installerProjection.settingsSourceOfTruth =
+    text.includes("\"settings.json\"") &&
+    !text.includes("copyDirectoryFiles(\n    resolve(REPO_ROOT, \"adapters/claude-code/project/.claude/hooks\")");
+  checks.installerProjection.replacesManagedHooks = text.includes("removeAdapterOwnedHooks") && text.includes("agent-spectrum-kernel:claude-adapter-hook");
 
   for (const skill of checks.installerProjection.missingDefaultReviewSkills) {
     fail(errors, "claude adapter installer", `${CLAUDE_ADAPTER_INSTALLER_PATH} DEFAULT_SKILLS is missing required review skill: ${skill}`);
   }
   for (const command of checks.installerProjection.missingCommandTemplates) {
     fail(errors, "claude adapter installer", `${CLAUDE_ADAPTER_INSTALLER_PATH} COMMAND_TEMPLATES is missing required command template: ${command}`);
+  }
+  for (const field of [
+    "hasProfiles",
+    "validatesCoreState",
+    "validatesCommandClosure",
+    "validatesRoutingClosure",
+    "installsCommandAssets",
+    "skipRuntimeSkipsHooks",
+    "settingsSourceOfTruth",
+    "replacesManagedHooks",
+  ]) {
+    if (!checks.installerProjection[field]) {
+      fail(errors, "claude adapter installer", `${CLAUDE_ADAPTER_INSTALLER_PATH} failed Claude installer check: ${field}`);
+    }
   }
 }
 
@@ -1918,6 +1954,14 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- installer present: ${claudeAdapterChecks.installerProjection.installerPresent ? "ok" : "missing"}`,
     `- default review skills projected: ${claudeAdapterChecks.installerProjection.missingDefaultReviewSkills.length === 0 ? "ok" : `missing ${claudeAdapterChecks.installerProjection.missingDefaultReviewSkills.join(", ")}`}`,
     `- command templates projected: ${claudeAdapterChecks.installerProjection.missingCommandTemplates.length === 0 ? "ok" : `missing ${claudeAdapterChecks.installerProjection.missingCommandTemplates.join(", ")}`}`,
+    `- profiles: ${claudeAdapterChecks.installerProjection.hasProfiles ? "ok" : "invalid"}`,
+    `- core state validation: ${claudeAdapterChecks.installerProjection.validatesCoreState ? "ok" : "invalid"}`,
+    `- command closure validation: ${claudeAdapterChecks.installerProjection.validatesCommandClosure ? "ok" : "invalid"}`,
+    `- routing closure validation: ${claudeAdapterChecks.installerProjection.validatesRoutingClosure ? "ok" : "invalid"}`,
+    `- command assets projection: ${claudeAdapterChecks.installerProjection.installsCommandAssets ? "ok" : "invalid"}`,
+    `- skip-runtime skips hooks: ${claudeAdapterChecks.installerProjection.skipRuntimeSkipsHooks ? "ok" : "invalid"}`,
+    `- settings.json hook source of truth: ${claudeAdapterChecks.installerProjection.settingsSourceOfTruth ? "ok" : "invalid"}`,
+    `- managed hook replacement: ${claudeAdapterChecks.installerProjection.replacesManagedHooks ? "ok" : "invalid"}`,
     "",
     "## Documentation consistency checks",
     "",

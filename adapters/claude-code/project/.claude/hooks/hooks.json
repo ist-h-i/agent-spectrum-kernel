@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event PostToolUse --event-kind file_change --non-blocking >/dev/null 2>&1 || true"
+            "command": "test -f \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" && node \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" --hook-event PostToolUse --event-kind file_change --non-blocking >/dev/null 2>&1 || true # agent-spectrum-kernel:claude-adapter-hook"
           }
         ]
       },
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event PostToolUse --event-kind file_change --non-blocking >/dev/null 2>&1 || true"
+            "command": "test -f \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" && node \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" --hook-event PostToolUse --event-kind file_change --non-blocking >/dev/null 2>&1 || true # agent-spectrum-kernel:claude-adapter-hook"
           }
         ]
       },
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event PostToolUse --event-kind file_change --non-blocking >/dev/null 2>&1 || true"
+            "command": "test -f \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" && node \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" --hook-event PostToolUse --event-kind file_change --non-blocking >/dev/null 2>&1 || true # agent-spectrum-kernel:claude-adapter-hook"
           }
         ]
       },
@@ -33,7 +33,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event PostToolUse --event-kind verification_attempt --non-blocking >/dev/null 2>&1 || true"
+            "command": "test -f \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" && node \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" --hook-event PostToolUse --event-kind verification_attempt --non-blocking >/dev/null 2>&1 || true # agent-spectrum-kernel:claude-adapter-hook"
           }
         ]
       }
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs --hook-event Stop --event-kind task_stop --sidecar ${CLAUDE_PROJECT_DIR}/.claude/metrics/current-task.json --non-blocking >/dev/null 2>&1 || true"
+            "command": "test -f \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" && node \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" --hook-event Stop --event-kind task_stop --sidecar \"${CLAUDE_PROJECT_DIR}/.claude/metrics/current-task.json\" --non-blocking >/dev/null 2>&1 || true # agent-spectrum-kernel:claude-adapter-hook"
           }
         ]
       }
