@@ -79,6 +79,10 @@ const REQUIRED_CODEX_ADAPTER_PATHS = [
   "adapters/codex/prompts/skill-verify.md",
   "adapters/codex/prompts/skill-handoff.md",
 ];
+const REQUIRED_ADAPTER_RUNTIME_PATHS = [
+  "scripts/adapter-runtime-smoke.mjs",
+  "scripts/codex-exec-runner.mjs",
+];
 const REQUIRED_OBSERVABILITY_DOCS = [
   "docs/observability-runtime-contract.md",
   "docs/operation-automation-contract.md",
@@ -635,7 +639,10 @@ function validateRoutingAdapterDowngrade(root, routing, checks, errors) {
   checks.unsupportedCapabilityDowngrade =
     downgrade.unknown_status === "downgrade_to_unknown" &&
     downgrade.unsupported_status === "downgrade_to_unsupported" &&
-    downgrade.partial_status === "claim_only_partial_support";
+    downgrade.projected_status === "claim_projection_only" &&
+    downgrade.runtime_detected_status === "claim_runtime_detection_only" &&
+    downgrade.executed_status === "claim_execution_only" &&
+    downgrade.behavior_verified_status === "claim_behavior_verified";
   if (!checks.unsupportedCapabilityDowngrade) {
     fail(errors, "routing manifest", "manifest.json.routing.unsupported_adapter_capability must preserve adapter capability downgrades");
   }
@@ -1422,6 +1429,14 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
     }
   }
 
+  for (const path of REQUIRED_ADAPTER_RUNTIME_PATHS) {
+    const ok = existsSync(resolve(root, path));
+    checks.requiredCodexAdapterPaths.push({ path, ok });
+    if (!ok) {
+      fail(errors, "adapter runtime", `required adapter runtime path is missing: ${path}`);
+    }
+  }
+
   for (const path of REQUIRED_SCHEMA_PATHS) {
     const absolutePath = resolve(root, path);
     const ok = existsSync(absolutePath);
@@ -1646,6 +1661,7 @@ function validateCodexInstaller(root, checks, errors) {
   checks.codexInstaller.projectsAgentsSkills = text.includes(".agents/skills") && text.includes("codex_skill");
   checks.codexInstaller.installsPrompts = text.includes(".agents/prompts") && text.includes("PROMPT_TEMPLATES");
   checks.codexInstaller.installsCommand = text.includes(".agents/commands") && text.includes("COMMAND_TEMPLATES");
+  checks.codexInstaller.installsRuntimeRunner = text.includes("CODEX_RUNTIME_SCRIPTS") && text.includes("codex_runtime") && text.includes("codex-exec-runner.mjs");
   checks.codexInstaller.hasDryRun = text.includes("--dry-run") && /dryRun/.test(text);
   checks.codexInstaller.hasMergeAgents = text.includes("--merge-agents") && text.includes("agent-spectrum-kernel:start") && text.includes("agent-spectrum-kernel:end");
   checks.codexInstaller.hasSkipAgents = text.includes("--skip-agents") && /skipAgents/.test(text);

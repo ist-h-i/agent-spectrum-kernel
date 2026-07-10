@@ -189,8 +189,8 @@ function unsupportedCapabilitySensor(target) {
   return sensor(
     "unsupported_capability",
     "fail",
-    `Unsupported or partial adapter capability overclaims detected: ${findings.map((finding) => `${finding.adapter}:${finding.capability}:${finding.status}`).join("; ")}.`,
-    "Downgrade adapter capability claims to the status in docs/adapter-capability-matrix.md.",
+    `Adapter capability overclaims detected: ${findings.map((finding) => `${finding.adapter}:${finding.capability}:${finding.status}`).join("; ")}.`,
+    "Downgrade adapter capability claims to the evidence level in docs/adapter-capability-matrix.md.",
   );
 }
 

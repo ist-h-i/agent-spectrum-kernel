@@ -8,10 +8,10 @@ Use this adapter when a repository wants Codex to follow the core kernel, route 
 
 - A Codex usage guide for `AGENTS.md`, repo skills, prompt templates, and `codex exec`.
 - Prompt templates for implementation, investigation, review, verification, and handoff workflows.
-- A command template showing bounded `codex exec` invocation patterns.
+- A command template and runner showing bounded `codex exec` invocation patterns.
 - A mapping from core skills to Codex execution style.
-- A Codex adapter installer for `.agents/skills`, `.agents/prompts`, and `.agents/commands`.
-- Explicit capability downgrades for unsupported automation, telemetry, hooks, and shared PR workflows.
+- A Codex adapter installer for `.agents/skills`, `.agents/prompts`, `.agents/commands`, and the local runner/sensor runtime used by the command template.
+- Explicit evidence-level downgrades for projected-only workflows, unsupported automation, telemetry, hooks, and shared PR workflows.
 
 The Codex adapter installer projects Codex-specific files into another repository:
 
@@ -19,7 +19,7 @@ The Codex adapter installer projects Codex-specific files into another repositor
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents
 ```
 
-It updates `AGENTS.md`, profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. It does not create hooks, telemetry, GitHub Actions, external publication, secrets, deploys, or releases.
+It updates `AGENTS.md`, profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, `scripts/codex-exec-runner.mjs`, the local sensor runtime used by that runner, and `.agent-spectrum-kernel/codex-install-state.json`. It does not create hooks, telemetry, GitHub Actions, external publication, secrets, deploys, or releases.
 
 ## Codex Projection Model
 
@@ -27,11 +27,11 @@ Codex-compatible projection uses these surfaces:
 
 | Core model | Codex surface | Adapter status |
 |---|---|---|
-| Always-on kernel | Repository `AGENTS.md` | supported by documentation/template guidance |
-| Reusable workflows | Repo-scoped `.agents/skills/<skill>/SKILL.md` projections of canonical `skills/<name>/SKILL.md` | supported for local projection; runtime skill loading remains Codex-controlled |
-| Task commands | Prompt templates passed to Codex or `codex exec` | supported for local template projection; runtime execution is user-controlled |
-| Review / implementation routing | `operating-mode-router`, then `skill-router` or named specific skills | partial; prompt templates preserve route requirements |
-| Risk and evidence gates | `risk-gate`, `test-first-verification`, `evidence-ledger` | partial; preserved in prompts, not mechanically enforced by this adapter |
+| Always-on kernel | Repository `AGENTS.md` | `behavior_verified` for projection |
+| Reusable workflows | Repo-scoped `.agents/skills/<skill>/SKILL.md` projections of canonical `skills/<name>/SKILL.md` | `behavior_verified` for projection; runtime skill loading remains Codex-controlled |
+| Task commands | Prompt templates passed to Codex through `scripts/codex-exec-runner.mjs` | `executed` only after the runner captures output; business correctness remains unproven |
+| Review / implementation routing | `operating-mode-router`, then `skill-router` or named specific skills | `projected`; prompt templates preserve route requirements |
+| Risk and evidence gates | `risk-gate`, `test-first-verification`, `evidence-ledger` | `projected`; preserved in prompts, not mechanically enforced by this adapter |
 | Metrics / observability | Project-local metrics contract only when separately enabled | unsupported in this adapter; no Codex hook or telemetry integration is shipped |
 | Shared PR automation | Codex GitHub Action or workflow defined by an adopting project | unsupported in this adapter; no workflow is provided here |
 
@@ -42,7 +42,7 @@ Codex documentation supports `AGENTS.md`, repo-scoped skills under `.agents/skil
 1. Run `node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents`.
 2. Use `--profile <name>` to choose a supported workflow profile. The default is `implementation`.
 3. Rerun the installer after pulling this repository's updates.
-4. Use a template from `.agents/prompts/` as the task prompt, or adapt the command pattern in `.agents/commands/codex-exec.md`.
+4. Use `.agents/commands/codex-exec.md` or call `node scripts/codex-exec-runner.mjs --prompt <file>` directly.
 5. Run repository-specific verification commands before claiming correctness, readiness, safety, reliability, or no regression.
 
 ## Workflow Profiles
@@ -59,7 +59,7 @@ Use profiles instead of arbitrary partial skill sets for normal installs:
 | `observability` | Skill effectiveness, adoption metrics, and capability evaluation. |
 | `full` | All manifest skills and all Codex prompt templates. |
 
-Each profile installs a closed command/prompt/skill set. Installed command examples only reference prompt files selected by that profile.
+Each profile installs a closed command/prompt/skill/runtime set. Installed command examples only reference prompt files and runtime scripts selected by that profile.
 
 Profile closure includes representative router-reachable routes for the profile's declared task scope. For example, the implementation profile includes routes for unfamiliar repositories, unclear scope, boundary decisions, domain-rule impact, design grill, docs/ADR constraints, and long-running work; investigation includes bug investigation routes; review includes the review-router gate family.
 
@@ -83,7 +83,7 @@ For non-trivial continuation, handoff, interrupted work, or risk-gated work, han
 
 ## Stale Managed Files
 
-The installer records managed skills, prompts, and commands in `.agent-spectrum-kernel/codex-install-state.json`.
+The installer records managed skills, prompts, commands, and Codex runner runtime scripts in `.agent-spectrum-kernel/codex-install-state.json`.
 
 When a later install no longer selects a previously managed file, the installer reports it as stale and retains it by default. Use `--prune` to delete stale managed files only when the current file hash still matches the previous managed hash. Modified managed files are preserved and cause prune to fail before deletion.
 
@@ -95,7 +95,7 @@ This adapter is intentionally narrower than the Claude Code adapter.
 - No GitHub Actions workflow: do not claim shared PR review, fork guardrails, or comment-trigger support from this adapter.
 - No hidden telemetry: the adapter ships prompt files and documentation only; any telemetry must be a separate, explicit project decision.
 - No external publication: the adapter does not publish, comment, deploy, release, or notify externally.
-- Runtime behavior: mark Codex output as insufficient evidence when the workspace, diff, PR head, tests, or required command results are unavailable.
+- Runtime behavior: `codex-exec-runner.mjs` can report `executed` after `codex exec` returns output and `ask-sensors` passes. It must still report `insufficient_evidence` when the workspace, diff, PR head, tests, or required command results are unavailable.
 
 ## Validation
 

@@ -95,6 +95,7 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
   if (runtimeProbe) {
     checkRuntimeConformanceProbe(target, report);
   }
+  report.layerStatuses = buildLayerStatuses(target, report, { runtimeProbe });
 
   const runtimeFindings = report.runtimeProbe.warnings.length > 0 || report.runtimeProbe.failures.length > 0;
   const status = report.failures.length > 0 ? "fail" : report.warnings.length > 0 || report.unsupportedClaims.length > 0 || runtimeFindings ? "warn" : "pass";
@@ -210,6 +211,9 @@ function sourcePathForManagedRecord(managedPath, record) {
   if (record.kind === "stale_codex_command" && record.command) {
     return resolve(REPO_ROOT, "adapters/codex/commands", record.command);
   }
+  if ((record.kind === "codex_runtime" || record.kind === "stale_codex_runtime") && record.script) {
+    return resolve(REPO_ROOT, "scripts", record.script);
+  }
   return null;
 }
 
@@ -269,7 +273,7 @@ function claudeHookConfigPaths(target) {
 function checkUnsupportedClaims(target, report) {
   const claims = findUnsupportedCapabilityClaims(target);
   for (const claim of claims) {
-    report.unsupportedClaims.push(`${claim.file}: ${claim.adapter} ${claim.capability} is ${claim.status}, but text claims full support`);
+    report.unsupportedClaims.push(`${claim.file}: ${claim.adapter} ${claim.capability} evidence level is ${claim.status}, but text claims full support`);
   }
 }
 
@@ -283,6 +287,7 @@ function checkPrivacyDefaults(target, report) {
 function checkRuntimeConformanceProbe(target, report) {
   const probe = report.runtimeProbe;
   probe.checked.push("runtime probe is local/static/dry-run only; it does not invoke external adapter runtimes");
+  checkAdapterVersionConsistency(target, probe);
 
   const claudeRoot = resolve(target, ".claude");
   if (existsSync(claudeRoot)) {
@@ -292,6 +297,9 @@ function checkRuntimeConformanceProbe(target, report) {
     checkProjectedSkills(resolve(target, ".claude/skills"), ".claude/skills", probe);
     checkClaudeHooksShape(resolve(target, ".claude/settings.json"), ".claude/settings.json", probe);
     checkClaudeHooksShape(resolve(target, ".claude/hooks/hooks.json"), ".claude/hooks/hooks.json", probe);
+    checkClaudeHookExecutables(target, probe);
+    checkRuntimeEventStore(target, probe);
+    checkReportInputs(target, probe);
   }
 
   const agentsRoot = resolve(target, ".agents");
@@ -313,6 +321,79 @@ function checkRuntimeConformanceProbe(target, report) {
   if (probe.checked.length === 1) {
     probe.checked.push("No projected adapter runtime surfaces detected");
   }
+}
+
+function buildLayerStatuses(target, report, { runtimeProbe }) {
+  const installationFailures = [];
+  const installationWarnings = [];
+  const projectionFailures = [];
+  const projectionWarnings = [];
+
+  for (const statePath of [CORE_STATE_PATH, CODEX_STATE_PATH, CLAUDE_STATE_PATH]) {
+    const absoluteStatePath = resolve(target, statePath);
+    const stateResult = readJsonIfExists(absoluteStatePath);
+    if (!stateResult.ok) {
+      if (statePath === CORE_STATE_PATH || existsSync(resolve(target, statePath.includes("codex") ? ".agents" : ".claude"))) {
+        installationFailures.push(`${statePath}: ${stateResult.error}`);
+      }
+      continue;
+    }
+    const state = stateResult.value;
+    if (state.install_status && state.install_status !== "installed") {
+      installationWarnings.push(`${statePath}: ${state.install_status}`);
+    }
+    for (const [managedPath, record] of Object.entries(state.managed_files ?? {})) {
+      const destination = resolve(target, managedPath);
+      if (!existsSync(destination)) {
+        projectionFailures.push(`missing managed file: ${managedPath}`);
+      } else if (record?.sha256 && hashFile(destination) !== record.sha256) {
+        projectionFailures.push(`managed file hash mismatch: ${managedPath}`);
+      }
+    }
+    for (const skill of state.selected_skills ?? []) {
+      const root = statePath === CLAUDE_STATE_PATH ? ".claude/skills" : statePath === CODEX_STATE_PATH ? ".agents/skills" : "skills";
+      if (!existsSync(resolve(target, root, skill, "SKILL.md"))) {
+        projectionFailures.push(`missing selected skill: ${root}/${skill}/SKILL.md`);
+      }
+    }
+  }
+
+  if (report.warnings.length > 0) {
+    projectionWarnings.push(...report.warnings.filter((warning) => warning.includes("stale managed")));
+  }
+
+  const runtimeStatus = !runtimeProbe
+    ? { status: "unknown", detail: "runtime probe was not requested" }
+    : statusEntry(report.runtimeProbe.failures, report.runtimeProbe.warnings, "runtime probe completed");
+  const behavioralFailures = [];
+  const behavioralWarnings = [...report.unsupportedClaims];
+  const behavioralStatus = behavioralFailures.length > 0
+    ? "fail"
+    : behavioralWarnings.length > 0
+      ? "warn"
+      : "insufficient_evidence";
+
+  return {
+    installation_health: statusEntry(installationFailures, installationWarnings, "install states are readable"),
+    adapter_projection: statusEntry(projectionFailures, projectionWarnings, "managed projections are present"),
+    runtime_readiness: runtimeStatus,
+    behavioral_evidence: {
+      status: behavioralStatus,
+      detail: behavioralStatus === "insufficient_evidence"
+        ? "no captured adapter execution output was evaluated by ask-sensors"
+        : "behavioral evidence claims were checked against adapter capability levels",
+    },
+  };
+}
+
+function statusEntry(failures, warnings, passDetail) {
+  if (failures.length > 0) {
+    return { status: "fail", detail: failures.join("; ") };
+  }
+  if (warnings.length > 0) {
+    return { status: "warn", detail: warnings.join("; ") };
+  }
+  return { status: "pass", detail: passDetail };
 }
 
 function checkReadableDirectory(path, label, probe, { optional = false } = {}) {
@@ -429,6 +510,111 @@ function checkCodexRuntimeState(target, state, probe) {
   }
 }
 
+function checkAdapterVersionConsistency(target, probe) {
+  const core = readJsonIfExists(resolve(target, CORE_STATE_PATH));
+  const states = [
+    ["Codex", readJsonIfExists(resolve(target, CODEX_STATE_PATH))],
+    ["Claude", readJsonIfExists(resolve(target, CLAUDE_STATE_PATH))],
+  ];
+  if (!core.ok) {
+    return;
+  }
+  for (const [label, stateResult] of states) {
+    if (!stateResult.ok) {
+      continue;
+    }
+    const sameVersion = core.value?.source?.version === stateResult.value?.source?.version;
+    const sameRevision = core.value?.source?.git_revision === stateResult.value?.source?.git_revision;
+    if (sameVersion && sameRevision) {
+      probe.checked.push(`${label} adapter source matches core install state`);
+    } else {
+      probe.warnings.push(`${label} adapter source differs from core install state`);
+    }
+  }
+}
+
+function checkClaudeHookExecutables(target, probe) {
+  const settingsPath = resolve(target, ".claude/settings.json");
+  if (!existsSync(settingsPath)) {
+    return;
+  }
+  let settings;
+  try {
+    settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+  } catch {
+    return;
+  }
+  for (const command of collectHookCommands(settings.hooks ?? {})) {
+    if (command.includes("scripts/ai-metrics-record.mjs") && !existsSync(resolve(target, "scripts/ai-metrics-record.mjs"))) {
+      probe.failures.push("Claude adapter hook executable is missing: scripts/ai-metrics-record.mjs");
+    }
+    if (command.includes("${CLAUDE_PLUGIN_ROOT}") && !process.env.CLAUDE_PLUGIN_ROOT) {
+      probe.failures.push("Claude plugin hook command references CLAUDE_PLUGIN_ROOT, but the environment variable is not set");
+    }
+  }
+}
+
+function collectHookCommands(hooks) {
+  const commands = [];
+  for (const groups of Object.values(hooks ?? {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const hook of Array.isArray(group.hooks) ? group.hooks : []) {
+        if (hook?.type === "command" && typeof hook.command === "string") {
+          commands.push(hook.command);
+        }
+      }
+    }
+  }
+  return commands;
+}
+
+function readObservabilityValue(target, pathParts, fallback) {
+  const configPath = resolve(target, "docs/ai/observability-config.yml");
+  if (!existsSync(configPath)) {
+    return fallback;
+  }
+  const stack = [];
+  for (const rawLine of readFileSync(configPath, "utf8").split(/\r?\n/)) {
+    const withoutComment = rawLine.replace(/\s+#.*$/, "");
+    if (!withoutComment.trim()) continue;
+    const match = withoutComment.match(/^(\s*)([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!match) continue;
+    const level = Math.floor(match[1].length / 2);
+    const key = match[2];
+    const value = match[3].trim();
+    stack.length = level;
+    if (!value) {
+      stack[level] = key;
+      continue;
+    }
+    if ([...stack.slice(0, level), key].join(".") === pathParts.join(".")) {
+      return value.replace(/^["']|["']$/g, "");
+    }
+  }
+  return fallback;
+}
+
+function checkRuntimeEventStore(target, probe) {
+  const eventStore = readObservabilityValue(target, ["storage", "event_store"], "docs/ai/metrics/events.jsonl");
+  const eventDir = resolve(target, eventStore.split("/").slice(0, -1).join("/") || ".");
+  if (!existsSync(eventDir) || !statSync(eventDir).isDirectory()) {
+    probe.failures.push(`runtime event-store directory is missing: ${eventStore}`);
+    return;
+  }
+  probe.checked.push(`runtime event-store directory is present: ${eventStore}`);
+}
+
+function checkReportInputs(target, probe) {
+  for (const path of ["docs/ai/adoption-report-template.md", "docs/ai/metrics/README.md", "docs/ai/reports"]) {
+    const absolutePath = resolve(target, path);
+    if (!existsSync(absolutePath)) {
+      probe.warnings.push(`report input is missing: ${path}`);
+    } else {
+      probe.checked.push(`report input is present: ${path}`);
+    }
+  }
+}
+
 function checkRuntimeCommandReferences(target, probe) {
   const files = collectTextFiles(target, ["README.md", "AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "docs", ".claude", ".agents"]);
   const references = new Set();
@@ -484,6 +670,11 @@ function printReport(target, report) {
   console.log("");
   console.log("Unsupported claims:");
   printList(report.unsupportedClaims);
+  console.log("");
+  console.log("Layer statuses:");
+  for (const [name, entry] of Object.entries(report.layerStatuses ?? {})) {
+    console.log(`- ${name}: ${entry.status} - ${entry.detail}`);
+  }
   console.log("");
   console.log(`Runtime conformance probe: ${report.runtimeProbe.enabled ? "enabled" : "disabled"}`);
   if (report.runtimeProbe.enabled) {

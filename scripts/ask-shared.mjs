@@ -80,6 +80,15 @@ export const APPROVAL_REQUIRED_SURFACES = [
 ];
 
 export const APPROVAL_REQUIRED_SURFACE_IDS = new Set(APPROVAL_REQUIRED_SURFACES.map((surface) => surface.id));
+export const ADAPTER_EVIDENCE_LEVELS = [
+  "projected",
+  "runtime_detected",
+  "executed",
+  "behavior_verified",
+  "unsupported",
+  "unknown",
+];
+export const ADAPTER_LEVELS_THAT_SUPPORT_CAPABILITY_CLAIMS = new Set(["behavior_verified"]);
 
 export function hashText(text) {
   return createHash("sha256").update(text).digest("hex");
@@ -236,9 +245,9 @@ export function findUnsupportedCapabilityClaims(targetRoot, matrixRoot = REPO_RO
           continue;
         }
         for (const [adapter, status] of Object.entries(row.statuses)) {
-          if (status === "supported") {
-            continue;
-          }
+        if (ADAPTER_LEVELS_THAT_SUPPORT_CAPABILITY_CLAIMS.has(status)) {
+          continue;
+        }
           const adapterTokens = adapter.split("_");
           if (!adapterTokens.every((token) => normalized.includes(token))) {
             continue;
