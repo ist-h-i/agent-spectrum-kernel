@@ -2733,7 +2733,9 @@ function assertAdapterRuntimeSmokeScript() {
 
 function assertCodexRunnerScript() {
   const installer = resolve(repoRoot, "scripts/install-codex-adapter.mjs");
+  const coreInstaller = resolve(repoRoot, "scripts/install-kernel.mjs");
   const target = resolve(fixtureRoot, "codex-runner-target");
+  assertRuntimePass("codex runner core setup", runRepoScript([coreInstaller, "--target", target]));
   assertRuntimePass("codex runner install setup", runRepoScript([installer, "--target", target, "--profile", "implementation"]));
 
   const fakeCodex = resolve(target, "fake-codex");
@@ -2793,13 +2795,13 @@ EOF
     "--output",
     "codex-weak-output.md",
   ]);
-  assertRuntimePass("codex runner insufficient evidence is normalized", weakResult);
+  assertRuntimeFail("codex runner insufficient evidence is normalized", weakResult, "Codex runner: insufficient_evidence");
   if (!weakResult.stdout.includes("Codex runner: insufficient_evidence") || !weakResult.stdout.includes("Sensor status: fail")) {
     throw new Error(`codex runner should normalize weak output as insufficient evidence\n${weakResult.stdout}\n${weakResult.stderr}`);
   }
 
   const missingPromptResult = runRepoScript([codexRunnerScript, "--target", target, "--prompt", "missing.md", "--codex-bin", fakeCodex]);
-  assertRuntimeFail("codex runner missing prompt preflight", missingPromptResult, "installed prompt is missing");
+  assertRuntimeFail("codex runner missing prompt preflight", missingPromptResult, "prompt has no validated execution profile");
 }
 
 function assertSensorsScript() {
