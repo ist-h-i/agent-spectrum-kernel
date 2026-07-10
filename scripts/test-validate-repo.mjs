@@ -1941,7 +1941,7 @@ function assertInstallerScripts() {
   if (
     claudeState.schema_version !== 3 ||
     claudeState.install_status !== "installed" ||
-    claudeState.selected_profile !== "full" ||
+    claudeState.selected_profile !== "observability" ||
     !Array.isArray(claudeState.managed_hooks) ||
     claudeState.managed_hooks.length === 0 ||
     !claudeState.managed_partial_files?.[".claude/settings.json"]?.sha256

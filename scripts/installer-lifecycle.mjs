@@ -427,7 +427,21 @@ export function applyLifecyclePlan({ target, statePath, operations, state, dryRu
 
 export function printOperations(target, operations) {
   for (const operation of operations) {
-    const marker = operation.kind === "delete_file" ? "delete" : operation.kind === "remove_empty_dir" ? "rmdir-if-empty" : operation.kind === "mkdir" ? "mkdir" : operation.unchanged ? "unchanged" : "write";
+    const marker = operation.reason === "initialize_project_state"
+      ? "initialize"
+      : operation.reason === "preserve_project_state"
+        ? "preserve"
+      : operation.reason?.startsWith("claude_")
+        ? "refresh"
+        : operation.kind === "delete_file"
+          ? "delete"
+          : operation.kind === "remove_empty_dir"
+            ? "rmdir-if-empty"
+            : operation.kind === "mkdir"
+              ? "mkdir"
+              : operation.unchanged
+                ? "unchanged"
+                : "write";
     console.log(`- ${marker}: ${relative(target, operation.destination)} (${operation.reason})`);
   }
 }

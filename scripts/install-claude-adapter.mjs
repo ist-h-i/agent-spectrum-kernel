@@ -487,9 +487,33 @@ function copyFilePlanned(source, destination, args, writes, record = { kind: "cl
 function copyFileIfAbsentPlanned(source, destination, args, writes) {
   ensureSource(source);
   if (existsSync(destination)) {
+    if (hasLifecyclePlan(args)) {
+      args.operations.push({
+        kind: "write",
+        destination,
+        relativePath: relative(args.target, destination),
+        content: readFileSync(destination, "utf8"),
+        reason: "preserve_project_state",
+        unchanged: true,
+      });
+      writes.push(destination);
+    }
     return;
   }
   const content = readFileSync(source, "utf8");
+  if (hasLifecyclePlan(args)) {
+    const relativePath = relative(args.target, destination);
+    args.operations.push({
+      kind: "write",
+      destination,
+      relativePath,
+      content,
+      reason: "initialize_project_state",
+      unchanged: false,
+    });
+    writes.push(destination);
+    return;
+  }
   writeFilePlanned(destination, content, args, writes);
 }
 
