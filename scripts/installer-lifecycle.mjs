@@ -413,7 +413,16 @@ export function applyLifecyclePlan({ target, statePath, operations, state, dryRu
   const absoluteStatePath = resolve(target, statePath);
   const markerPath = stateInProgressPath(absoluteStatePath);
   mkdirSync(dirname(absoluteStatePath), { recursive: true });
-  writeFileSync(markerPath, `${JSON.stringify({ install_status: "in_progress", state_path: statePath, started_at: new Date().toISOString() }, null, 2)}\n`);
+  writeFileSync(
+    markerPath,
+    `${JSON.stringify({
+      install_status: "in_progress",
+      state_path: statePath,
+      started_at: new Date().toISOString(),
+      pending_state: state,
+      operations: operations.map(({ kind, relativePath, reason }) => ({ kind, relative_path: relativePath, reason })),
+    }, null, 2)}\n`,
+  );
   try {
     applyOperations(operations, false);
     writeFileSync(absoluteStatePath, `${JSON.stringify(state, null, 2)}\n`);
@@ -448,7 +457,9 @@ export function printOperations(target, operations) {
 
 export function rollbackLifecycleState({ target, statePath, dryRun = false, force = false }) {
   const absoluteStatePath = resolve(target, statePath);
-  const state = readJsonIfExists(absoluteStatePath);
+  const markerPath = stateInProgressPath(absoluteStatePath);
+  const pending = readJsonIfExists(markerPath);
+  const state = pending?.pending_state ?? readJsonIfExists(absoluteStatePath);
   if (!state) {
     throw new Error(`install state is missing: ${statePath}`);
   }
