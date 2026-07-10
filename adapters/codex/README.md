@@ -43,7 +43,7 @@ Codex documentation supports `AGENTS.md`, repo-scoped skills under `.agents/skil
 1. Run the core installer, then `node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo`.
 2. Use `--profile <name>` to choose a supported workflow profile. The default is `implementation`.
 3. Rerun the installer after pulling this repository's updates.
-4. Use `.agents/commands/codex-exec.md` or call `node scripts/codex-exec-runner.mjs --prompt <file>` directly.
+4. From the adopting repository, use `.agents/commands/codex-exec.md` or call its installed `node ./scripts/codex-exec-runner.mjs --prompt <file>` directly.
 5. Run repository-specific verification commands before claiming correctness, readiness, safety, reliability, or no regression.
 
 ## Workflow Profiles

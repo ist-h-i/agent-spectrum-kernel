@@ -2351,6 +2351,13 @@ function assertCodexInstallerScripts() {
   const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
   const markerPattern = /<!-- agent-spectrum-kernel:start -->/g;
   const profiles = ["minimal", "implementation", "investigation", "review", "adoption", "observability", "full"];
+  const sourceCommand = readFileSync(resolve(repoRoot, "adapters/codex/commands/codex-exec.md"), "utf8");
+  for (const [prompt, contract] of Object.entries(CODEX_PROMPT_CONTRACTS)) {
+    const expectedInvocation = `--prompt ${prompt} --mode ${contract.mode} --sandbox ${contract.sandbox}`;
+    if (!sourceCommand.includes(expectedInvocation)) {
+      throw new Error(`source Codex command template must use the managed contract for ${prompt}: ${expectedInvocation}`);
+    }
+  }
 
   const freshTarget = resolve(fixtureRoot, "codex-install-fresh");
   assertRuntimePass("codex installer core setup", runRepoScript([coreInstaller, "--target", freshTarget]));
@@ -2737,6 +2744,28 @@ function assertAdapterRuntimeSmokeScript() {
   writeFileSync(resolve(missingEventStoreTarget, "docs/ai/metrics"), "not a directory\n");
   const missingEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", missingEventStoreTarget, "--adapter", "claude"]);
   assertRuntimeFail("adapter runtime smoke detects configured event store failure", missingEventStoreResult, "configured event-store directory is missing or invalid");
+
+  const directoryEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-directory-event-store");
+  assertRuntimePass("adapter smoke directory event store core setup", runRepoScript([coreInstaller, "--target", directoryEventStoreTarget]));
+  assertRuntimePass("adapter smoke directory event store Claude setup", runRepoScript([claudeInstaller, "--target", directoryEventStoreTarget, "--profile", "full"]));
+  rmSync(resolve(directoryEventStoreTarget, "docs/ai/metrics/events.jsonl"), { force: true });
+  mkdirSync(resolve(directoryEventStoreTarget, "docs/ai/metrics/events.jsonl"));
+  const directoryEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", directoryEventStoreTarget, "--adapter", "claude"]);
+  assertRuntimeFail("adapter runtime smoke rejects directory event store", directoryEventStoreResult, "configured event-store must be a regular file");
+
+  const readOnlyEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-read-only-event-store");
+  assertRuntimePass("adapter smoke read-only event store core setup", runRepoScript([coreInstaller, "--target", readOnlyEventStoreTarget]));
+  assertRuntimePass("adapter smoke read-only event store Claude setup", runRepoScript([claudeInstaller, "--target", readOnlyEventStoreTarget, "--profile", "full"]));
+  const readOnlyEventStorePath = resolve(readOnlyEventStoreTarget, "docs/ai/metrics/events.jsonl");
+  const readOnlyEventStoreContent = "existing event content\n";
+  writeFileSync(readOnlyEventStorePath, readOnlyEventStoreContent);
+  chmodSync(readOnlyEventStorePath, 0o444);
+  const readOnlyEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", readOnlyEventStoreTarget, "--adapter", "claude"]);
+  chmodSync(readOnlyEventStorePath, 0o644);
+  assertRuntimeFail("adapter runtime smoke rejects non-appendable event store", readOnlyEventStoreResult, "configured event-store is not append-openable");
+  if (readFileSync(readOnlyEventStorePath, "utf8") !== readOnlyEventStoreContent) {
+    throw new Error("configured event-store append probe must not modify existing event content");
+  }
 }
 
 function assertCodexRunnerScript() {
@@ -2745,6 +2774,7 @@ function assertCodexRunnerScript() {
   const target = resolve(fixtureRoot, "codex-runner-target");
   assertRuntimePass("codex runner core setup", runRepoScript([coreInstaller, "--target", target]));
   assertRuntimePass("codex runner install setup", runRepoScript([installer, "--target", target, "--profile", "implementation"]));
+  const targetRunnerScript = resolve(target, "scripts/codex-exec-runner.mjs");
 
   const fakeCodex = resolve(target, "fake-codex");
   writeFileSync(
@@ -2774,7 +2804,7 @@ EOF
   );
   chmodSync(fakeCodex, 0o755);
   const passResult = runRepoScript([
-    codexRunnerScript,
+    targetRunnerScript,
     "--target",
     target,
     "--prompt",
@@ -2790,6 +2820,9 @@ EOF
   if (!passResult.stdout.includes("Codex runner: executed") || !passResult.stdout.includes("Evidence level: executed") || !existsSync(resolve(target, "codex-output.md"))) {
     throw new Error(`codex runner should capture output and report executed evidence\n${passResult.stdout}\n${passResult.stderr}`);
   }
+
+  const sourceRunnerResult = runRepoScript([codexRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects a runner from another checkout", sourceRunnerResult, "running runner is not the target managed runner");
 
   const failedOutputPath = resolve(target, "codex-preserved-output.md");
   writeFileSync(failedOutputPath, "previous successful output\n");
@@ -2807,7 +2840,7 @@ exit 9
   );
   chmodSync(fakeFailingCodex, 0o755);
   const failedOutputResult = runRepoScript([
-    codexRunnerScript,
+    targetRunnerScript,
     "--target",
     target,
     "--prompt",
@@ -2822,11 +2855,11 @@ exit 9
     throw new Error("codex runner must preserve the previous official output when Codex exits non-zero");
   }
 
-  const mismatchResult = runRepoScript([codexRunnerScript, "--target", target, "--prompt", "skill-investigate.md", "--mode", "implementation", "--codex-bin", fakeCodex]);
+  const mismatchResult = runRepoScript([targetRunnerScript, "--target", target, "--prompt", "skill-investigate.md", "--mode", "implementation", "--codex-bin", fakeCodex]);
   assertRuntimeFail("codex runner rejects prompt mode mismatch", mismatchResult, "prompt/mode mismatch");
-  const escapeResult = runRepoScript([codexRunnerScript, "--target", target, "--output", "../escape.md", "--codex-bin", fakeCodex]);
+  const escapeResult = runRepoScript([targetRunnerScript, "--target", target, "--output", "../escape.md", "--codex-bin", fakeCodex]);
   assertRuntimeFail("codex runner rejects output escape", escapeResult, "output must be a relative path inside target");
-  const diffOptionResult = runRepoScript([codexRunnerScript, "--target", target, "--diff-base", "--output=/tmp/ask-injected.diff", "--dry-run"]);
+  const diffOptionResult = runRepoScript([targetRunnerScript, "--target", target, "--diff-base", "--output=/tmp/ask-injected.diff", "--dry-run"]);
   assertRuntimeFail("codex runner rejects git option diff base", diffOptionResult, "invalid --diff-base");
   if (existsSync("/tmp/ask-injected.diff")) {
     throw new Error("codex runner must not permit --diff-base to create an external file");
@@ -2837,14 +2870,14 @@ exit 9
   const stateWithoutPromptRecord = JSON.parse(originalState);
   delete stateWithoutPromptRecord.managed_files[".agents/prompts/skill-implement.md"];
   writeFileSync(statePath, `${JSON.stringify(stateWithoutPromptRecord, null, 2)}\n`);
-  const missingPromptRecordResult = runRepoScript([codexRunnerScript, "--target", target, "--codex-bin", fakeCodex]);
+  const missingPromptRecordResult = runRepoScript([targetRunnerScript, "--target", target, "--codex-bin", fakeCodex]);
   assertRuntimeFail("codex runner requires selected prompt managed record", missingPromptRecordResult, "selected prompt has no managed Codex prompt record");
   writeFileSync(statePath, originalState);
 
   const detachedState = JSON.parse(originalState);
   detachedState.install_status = "detached";
   writeFileSync(statePath, `${JSON.stringify(detachedState, null, 2)}\n`);
-  const detachedDryRunResult = runRepoScript([codexRunnerScript, "--target", target, "--dry-run"]);
+  const detachedDryRunResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
   assertRuntimeFail("codex runner rejects detached install state", detachedDryRunResult, "Codex install status must be installed");
   if (detachedDryRunResult.stdout.includes("codex exec exited undefined")) {
     throw new Error("preflight failures must not report an undefined Codex exit code");
@@ -2854,11 +2887,11 @@ exit 9
   const sensorRuntimePath = resolve(target, "scripts/ask-sensors.mjs");
   const originalSensorRuntime = readFileSync(sensorRuntimePath, "utf8");
   writeFileSync(sensorRuntimePath, `${originalSensorRuntime}\n// local modification\n`);
-  const runtimeHashResult = runRepoScript([codexRunnerScript, "--target", target, "--codex-bin", fakeCodex]);
+  const runtimeHashResult = runRepoScript([targetRunnerScript, "--target", target, "--codex-bin", fakeCodex]);
   assertRuntimeFail("codex runner rejects modified sensor runtime", runtimeHashResult, "managed Codex runtime hash mismatch: scripts/ask-sensors.mjs");
   writeFileSync(sensorRuntimePath, originalSensorRuntime);
 
-  const missingBinaryResult = runRepoScript([codexRunnerScript, "--target", target, "--codex-bin", "missing-codex-binary-for-fixture"]);
+  const missingBinaryResult = runRepoScript([targetRunnerScript, "--target", target, "--codex-bin", "missing-codex-binary-for-fixture"]);
   assertRuntimeFail("codex runner reports unavailable executable as projected failure", missingBinaryResult, "codex exec could not start");
   if (!missingBinaryResult.stdout.includes("Evidence level: projected")) {
     throw new Error(`unavailable Codex executable must remain projected\n${missingBinaryResult.stdout}`);
@@ -2868,7 +2901,7 @@ exit 9
   writeFileSync(fakeWeakCodex, "#!/bin/sh\necho 'Looks good.'\n");
   chmodSync(fakeWeakCodex, 0o755);
   const weakResult = runRepoScript([
-    codexRunnerScript,
+    targetRunnerScript,
     "--target",
     target,
     "--prompt",
@@ -2885,7 +2918,7 @@ exit 9
     throw new Error(`codex runner should normalize weak output as insufficient evidence\n${weakResult.stdout}\n${weakResult.stderr}`);
   }
 
-  const missingPromptResult = runRepoScript([codexRunnerScript, "--target", target, "--prompt", "missing.md", "--codex-bin", fakeCodex]);
+  const missingPromptResult = runRepoScript([targetRunnerScript, "--target", target, "--prompt", "missing.md", "--codex-bin", fakeCodex]);
   assertRuntimeFail("codex runner missing prompt preflight", missingPromptResult, "prompt has no validated execution profile");
 }
 

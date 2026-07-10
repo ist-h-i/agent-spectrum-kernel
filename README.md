@@ -266,7 +266,8 @@ node scripts/adapter-runtime-smoke.mjs --target /path/to/adopting-repo --adapter
 For Codex non-interactive runs, use the installed bounded runner instead of invoking `codex exec` directly:
 
 ```bash
-node scripts/codex-exec-runner.mjs --target /path/to/adopting-repo --prompt skill-implement.md --mode implementation
+cd /path/to/adopting-repo
+node ./scripts/codex-exec-runner.mjs --prompt skill-implement.md --mode implementation
 ```
 
 The Codex runner can report `executed` after capturing output and running `ask-sensors`; that still does not prove business correctness, product readiness, or no regression.

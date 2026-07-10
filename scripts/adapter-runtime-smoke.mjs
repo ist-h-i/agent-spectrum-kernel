@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
@@ -186,8 +186,18 @@ function runClaudeSmoke(target, { dryRun }) {
     const configuredEventDir = dirname(configuredEventStorePath);
     if (!pathIsDirectory(configuredEventDir)) {
       checks.push(check("fail", "configured_event_store", `configured event-store directory is missing or invalid: ${configuredEventStore}`));
+    } else if (existsSync(configuredEventStorePath) && !pathIsFile(configuredEventStorePath)) {
+      checks.push(check("fail", "configured_event_store", `configured event-store must be a regular file: ${configuredEventStore}`));
     } else if (dryRun) {
       checks.push(check("pass", "configured_event_store", `configured event-store location planned: ${configuredEventStore}`));
+    } else if (existsSync(configuredEventStorePath)) {
+      try {
+        const descriptor = openSync(configuredEventStorePath, "a");
+        closeSync(descriptor);
+        checks.push(check("pass", "configured_event_store", `configured event-store is append-openable: ${configuredEventStore}`));
+      } catch (error) {
+        checks.push(check("fail", "configured_event_store", `configured event-store is not append-openable: ${configuredEventStore}: ${error.message}`));
+      }
     } else {
       const probePath = resolve(configuredEventDir, `.ask-runtime-smoke-probe-${process.pid}-${Date.now()}`);
       try {

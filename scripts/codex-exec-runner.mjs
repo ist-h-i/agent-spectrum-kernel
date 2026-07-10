@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
 
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const DEFAULT_OUTPUT = ".agents/runs/codex-last-output.md";
 const SENSOR_STATUS_PATTERN = /^ASK sensors:\s+(\w+)/m;
+const RUNNING_RUNNER_PATH = realpathSync(fileURLToPath(import.meta.url));
 
 function hashText(value) { return createHash("sha256").update(value).digest("hex"); }
 
@@ -128,7 +130,11 @@ function preflight(args) {
     failures.push(`prompt hash does not match Codex install state: ${args.prompt}`);
   }
   try { args.outputPath = resolveWithinTarget(args.target, args.output, "output"); } catch (error) { failures.push(error.message); }
-  const sensorsPath = resolve(args.target, "scripts/ask-sensors.mjs");
+  const managedRunnerCandidate = resolve(args.target, "scripts/codex-exec-runner.mjs");
+  const managedRunnerPath = existsSync(managedRunnerCandidate) ? realpathSync(managedRunnerCandidate) : managedRunnerCandidate;
+  if (RUNNING_RUNNER_PATH !== managedRunnerPath) {
+    failures.push(`running runner is not the target managed runner: expected ${managedRunnerPath}, received ${RUNNING_RUNNER_PATH}`);
+  }
   for (const runtime of ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs"]) {
     const relativePath = `scripts/${runtime}`;
     const record = state?.managed_files?.[relativePath];
