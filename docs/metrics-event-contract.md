@@ -133,7 +133,7 @@ Non-blocking recorder failures append a sanitized local health entry under `CLAU
 .agent-spectrum-kernel/runtime-health.jsonl
 ```
 
-An `error` entry opens a component/error-code health issue; a later `recovered` entry closes it. `ask-doctor` warns only for unresolved entries inside the configured freshness window and reports older unresolved entries as historical. Health history is capped by `runtime_health.max_entries`. Runtime-health entries must omit raw prompts, secrets, customer data, personal data, full command output, and full error messages.
+An `error` entry opens a component/error-code health issue. Repeated identical failures update `last_seen_at` and `occurrence_count` while preserving `first_seen_at`; a later `recovered` entry closes it. `ask-doctor` uses `last_seen_at` for freshness, warns only for unresolved entries inside the configured freshness window, and reports older unresolved entries as historical. Health history is capped by `runtime_health.max_entries` and updated atomically. Runtime-health entries must omit raw prompts, secrets, customer data, personal data, full command output, and full error messages.
 
 ## Skill Command Sidecar
 

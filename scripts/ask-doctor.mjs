@@ -7,6 +7,7 @@ import {
   findPrivacyStorageConcerns,
   findUnsupportedCapabilityClaims,
   hashFile,
+  hashText,
   readJsonIfExists,
 } from "./ask-shared.mjs";
 
@@ -73,6 +74,7 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
     label: "core kernel",
     targetSkillsRoot: "skills",
     report,
+    installerName: "agent-spectrum-kernel",
   });
 
   checkManagedInstallState({
@@ -81,6 +83,7 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
     label: "Codex adapter",
     targetSkillsRoot: ".agents/skills",
     report,
+    installerName: "agent-spectrum-codex-adapter",
     optional: true,
   });
 
@@ -90,6 +93,7 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
     label: "Claude adapter",
     targetSkillsRoot: ".claude/skills",
     report,
+    installerName: "agent-spectrum-claude-adapter",
     optional: !existsSync(resolve(target, ".claude")),
   });
 
@@ -109,24 +113,28 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
 }
 
 function buildDeploymentStatus(report) {
-  const installed = report.layerStatuses.installation_health.status === "pass" && report.layerStatuses.adapter_projection.status === "pass";
+  const layerStatuses = [report.layerStatuses.installation_health.status, report.layerStatuses.adapter_projection.status];
+  const installedStatus = layerStatuses.includes("fail") ? "fail" : layerStatuses.includes("warn") ? "warn" : "pass";
+  const currentHealthBlocker = report.warnings.some((warning) => warning.startsWith("adapter runtime health issue:"));
   return {
     Installed: {
-      status: installed ? "pass" : "warn",
-      detail: installed ? "managed installation evidence is healthy" : "managed installation evidence is incomplete or warning-level",
+      status: installedStatus,
+      detail: installedStatus === "pass" ? "managed installation and projection evidence is healthy" : "managed installation or projection evidence is not healthy",
     },
     Activated: {
       status: "insufficient_evidence",
       detail: "requires an explicit project profile/approval artifact; doctor does not infer human activation",
     },
     Operational: {
-      status: "insufficient_evidence",
-      detail: "requires bounded task evidence and a governance judgment; projection, smoke, and policy keys alone are insufficient",
+      status: currentHealthBlocker ? "blocked" : "insufficient_evidence",
+      detail: currentHealthBlocker
+        ? "blocked by unresolved current runtime-health issue"
+        : "requires bounded task evidence and a governance judgment; projection, smoke, and policy keys alone are insufficient",
     },
   };
 }
 
-function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, report, optional = false }) {
+function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, report, optional = false, installerName }) {
   const absoluteStatePath = resolve(target, statePath);
   const inProgressPath = `${absoluteStatePath}.in-progress.json`;
   if (existsSync(inProgressPath)) {
@@ -144,11 +152,13 @@ function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, 
   }
 
   const state = stateResult.value;
-  if (state.install_status && state.install_status !== "installed") {
-    report.warnings.push(`${label} install status is ${state.install_status}: ${statePath}`);
-  }
+  if (state.install_status !== "installed") report.failures.push(`${label} install_status must be installed: ${statePath}`);
   report.installed.push(`${label}: install state present (${statePath})`);
-  if (!state || typeof state !== "object" || !Array.isArray(state.installed_skills) || !state.managed_files || typeof state.managed_files !== "object") {
+  if (
+    !state || typeof state !== "object" || state.schema_version !== 3 || state.installer !== installerName ||
+    !state.adapter || state.adapter.name !== installerName || !Array.isArray(state.installed_skills) ||
+    !state.managed_files || typeof state.managed_files !== "object" || !state.managed_blocks || typeof state.managed_blocks !== "object"
+  ) {
     report.failures.push(`${label} install state has invalid shape: ${statePath}`);
     return;
   }
@@ -190,6 +200,30 @@ function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, 
       report.warnings.push(`${label} managed file is stale relative to this ASK checkout: ${managedPath}`);
     }
   }
+  for (const [blockKey, record] of Object.entries(state.managed_blocks)) {
+    const destination = resolve(target, record?.path || "");
+    if (!record || typeof record.path !== "string" || typeof record.sha256 !== "string" || !existsSync(destination)) {
+      report.failures.push(`${label} managed block is missing: ${blockKey}`);
+      continue;
+    }
+    const text = readFileSync(destination, "utf8");
+    const start = text.indexOf("<!-- agent-spectrum-kernel:start -->");
+    const endMarker = "<!-- agent-spectrum-kernel:end -->";
+    const end = text.indexOf(endMarker, start);
+    if (start < 0 || end < start) {
+      report.failures.push(`${label} managed block is missing from ${record.path}: ${blockKey}`);
+      continue;
+    }
+    const block = text.slice(start, end + endMarker.length);
+    if (hashFileContent(block) !== record.sha256) report.failures.push(`${label} managed block hash mismatch: ${blockKey}`);
+  }
+  if (installerName === "agent-spectrum-kernel" && !Object.hasOwn(state.managed_blocks, "AGENTS.md#agent-spectrum-kernel")) {
+    report.failures.push(`${label} required AGENTS.md managed block record is missing: ${statePath}`);
+  }
+}
+
+function hashFileContent(content) {
+  return hashText(content);
 }
 
 function sourcePathForManagedRecord(managedPath, record) {
@@ -339,7 +373,9 @@ function checkRuntimeHealth(target, report) {
   for (const entry of unresolved.values()) {
     const component = typeof entry.component === "string" && entry.component ? entry.component : "unknown-component";
     const code = typeof entry.error_code === "string" && entry.error_code ? entry.error_code : "runtime_error";
-    const occurredAt = typeof entry.occurred_at === "string" && entry.occurred_at ? entry.occurred_at : "unknown-time";
+    const occurredAt = typeof entry.last_seen_at === "string" && entry.last_seen_at
+      ? entry.last_seen_at
+      : typeof entry.occurred_at === "string" && entry.occurred_at ? entry.occurred_at : "unknown-time";
     const occurredMs = Date.parse(occurredAt);
     if (!Number.isFinite(occurredMs) || Date.now() - occurredMs > freshnessMs) {
       report.installed.push(`historical adapter runtime health issue: ${component} ${code} at ${occurredAt} (${RUNTIME_HEALTH_PATH})`);
@@ -394,7 +430,12 @@ function buildLayerStatuses(target, report, { runtimeProbe }) {
   const projectionFailures = [];
   const projectionWarnings = [];
 
-  for (const statePath of [CORE_STATE_PATH, CODEX_STATE_PATH, CLAUDE_STATE_PATH]) {
+  const stateSpecs = [
+    [CORE_STATE_PATH, "agent-spectrum-kernel", "skills"],
+    [CODEX_STATE_PATH, "agent-spectrum-codex-adapter", ".agents/skills"],
+    [CLAUDE_STATE_PATH, "agent-spectrum-claude-adapter", ".claude/skills"],
+  ];
+  for (const [statePath, installerName, skillsRoot] of stateSpecs) {
     const absoluteStatePath = resolve(target, statePath);
     const stateResult = readJsonIfExists(absoluteStatePath);
     if (!stateResult.ok) {
@@ -404,8 +445,11 @@ function buildLayerStatuses(target, report, { runtimeProbe }) {
       continue;
     }
     const state = stateResult.value;
-    if (state.install_status && state.install_status !== "installed") {
-      installationWarnings.push(`${statePath}: ${state.install_status}`);
+    if (state.install_status !== "installed") {
+      installationFailures.push(`${statePath}: install_status must be installed`);
+    }
+    if (state.schema_version !== 3 || state.installer !== installerName || state.adapter?.name !== installerName || !state.managed_blocks || typeof state.managed_blocks !== "object") {
+      installationFailures.push(`${statePath}: invalid state schema or installer identity`);
     }
     for (const [managedPath, record] of Object.entries(state.managed_files ?? {})) {
       const destination = resolve(target, managedPath);
@@ -415,10 +459,26 @@ function buildLayerStatuses(target, report, { runtimeProbe }) {
         projectionFailures.push(`managed file hash mismatch: ${managedPath}`);
       }
     }
+    for (const [blockKey, record] of Object.entries(state.managed_blocks ?? {})) {
+      const destination = resolve(target, record?.path || "");
+      if (!record || typeof record.path !== "string" || typeof record.sha256 !== "string" || !existsSync(destination)) {
+        projectionFailures.push(`missing managed block: ${blockKey}`);
+        continue;
+      }
+      const text = readFileSync(destination, "utf8");
+      const start = text.indexOf("<!-- agent-spectrum-kernel:start -->");
+      const endMarker = "<!-- agent-spectrum-kernel:end -->";
+      const end = text.indexOf(endMarker, start);
+      if (start < 0 || end < start || hashText(text.slice(start, end + endMarker.length)) !== record.sha256) {
+        projectionFailures.push(`managed block hash mismatch: ${blockKey}`);
+      }
+    }
+    if (installerName === "agent-spectrum-kernel" && !Object.hasOwn(state.managed_blocks ?? {}, "AGENTS.md#agent-spectrum-kernel")) {
+      installationFailures.push(`${statePath}: required AGENTS.md managed block record is missing`);
+    }
     for (const skill of state.selected_skills ?? []) {
-      const root = statePath === CLAUDE_STATE_PATH ? ".claude/skills" : statePath === CODEX_STATE_PATH ? ".agents/skills" : "skills";
-      if (!existsSync(resolve(target, root, skill, "SKILL.md"))) {
-        projectionFailures.push(`missing selected skill: ${root}/${skill}/SKILL.md`);
+      if (!existsSync(resolve(target, skillsRoot, skill, "SKILL.md"))) {
+        projectionFailures.push(`missing selected skill: ${skillsRoot}/${skill}/SKILL.md`);
       }
     }
   }

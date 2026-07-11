@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 
@@ -605,10 +605,34 @@ function healthKey(entry) {
 function appendRuntimeHealth(path, entry, maxEntries) {
   const { entries } = readRuntimeHealth(path);
   const latest = [...entries].reverse().find((candidate) => healthKey(candidate) === healthKey(entry));
-  if (latest?.status === entry.status) return;
+  const now = entry.occurred_at;
+  if (latest?.status === entry.status) {
+    const index = entries.lastIndexOf(latest);
+    entries[index] = {
+      ...latest,
+      first_seen_at: latest.first_seen_at || latest.occurred_at || now,
+      last_seen_at: now,
+      occurrence_count: Math.max(1, Number(latest.occurrence_count) || 1) + 1,
+      occurred_at: now,
+    };
+  } else {
+    entries.push({
+      ...entry,
+      first_seen_at: entry.first_seen_at || now,
+      last_seen_at: entry.last_seen_at || now,
+      occurrence_count: Math.max(1, Number(entry.occurrence_count) || 1),
+    });
+  }
   mkdirSync(dirname(path), { recursive: true });
-  const bounded = [...entries, entry].slice(-Math.max(1, Number(maxEntries) || 100));
-  writeFileSync(path, `${bounded.map((candidate) => JSON.stringify(candidate)).join("\n")}\n`);
+  const bounded = entries.slice(-Math.max(1, Number(maxEntries) || 100));
+  const temporaryPath = `${path}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    writeFileSync(temporaryPath, `${bounded.map((candidate) => JSON.stringify(candidate)).join("\n")}\n`);
+    renameSync(temporaryPath, path);
+  } catch (error) {
+    try { rmSync(temporaryPath, { force: true }); } catch { /* fail-open health path */ }
+    throw error;
+  }
 }
 
 function runtimeHealthPath(args, eventStore = null) {

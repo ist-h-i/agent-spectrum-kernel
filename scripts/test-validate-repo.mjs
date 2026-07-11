@@ -1169,7 +1169,13 @@ function assertRuntimeScripts() {
     { cwd: root, input: JSON.stringify({ session_id: "S5-repeat" }) },
   );
   assertRuntimePass("metrics recorder repeated non-blocking failure", repeatedFailure);
-  if (readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).length !== 1) {
+  const repeatedHealthEntry = JSON.parse(readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).at(-1));
+  if (
+    readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).length !== 1 ||
+    repeatedHealthEntry.occurrence_count !== 2 ||
+    Date.parse(repeatedHealthEntry.last_seen_at) <= Date.parse(repeatedHealthEntry.first_seen_at) ||
+    Date.now() - Date.parse(repeatedHealthEntry.last_seen_at) > 60_000
+  ) {
     throw new Error("repeated identical runtime-health failures should be deduplicated");
   }
 
@@ -2669,6 +2675,43 @@ function assertDoctorScript() {
     throw new Error(`doctor must distinguish Installed from unsupported Operational evidence\n${healthyJsonResult.stdout}`);
   }
 
+  const doctorStateFixture = (name) => {
+    const target = resolve(fixtureRoot, `doctor-state-${name}`);
+    assertRuntimePass(`doctor ${name} setup`, runRepoScript([installer, "--target", target, "--skills", "operating-mode-router"]));
+    return target;
+  };
+  const missingBlockTarget = doctorStateFixture("missing-block");
+  writeFileSync(resolve(missingBlockTarget, "AGENTS.md"), "# local project rules\n");
+  assertRuntimeFail("doctor missing AGENTS managed block", runRepoScript([doctorScript, "--target", missingBlockTarget]), "managed block is missing from AGENTS.md");
+
+  const modifiedBlockTarget = doctorStateFixture("modified-block");
+  const modifiedAgentsPath = resolve(modifiedBlockTarget, "AGENTS.md");
+  writeFileSync(modifiedAgentsPath, readFileSync(modifiedAgentsPath, "utf8").replace("<!-- Source: Agent Spectrum Kernel.", "<!-- Source: Modified Agent Spectrum Kernel."));
+  assertRuntimeFail("doctor modified AGENTS managed block", runRepoScript([doctorScript, "--target", modifiedBlockTarget]), "managed block hash mismatch: AGENTS.md#agent-spectrum-kernel");
+
+  const missingStatusTarget = doctorStateFixture("missing-status");
+  const missingStatusPath = resolve(missingStatusTarget, ".agent-spectrum-kernel/install-state.json");
+  const missingStatusState = JSON.parse(readFileSync(missingStatusPath, "utf8"));
+  delete missingStatusState.install_status;
+  writeFileSync(missingStatusPath, `${JSON.stringify(missingStatusState)}\n`);
+  assertRuntimeFail("doctor missing install status", runRepoScript([doctorScript, "--target", missingStatusTarget]), "install_status must be installed");
+
+  const detachedStateTarget = doctorStateFixture("detached-state");
+  const detachedStatePath = resolve(detachedStateTarget, ".agent-spectrum-kernel/install-state.json");
+  const detachedState = JSON.parse(readFileSync(detachedStatePath, "utf8"));
+  detachedState.install_status = "detached";
+  writeFileSync(detachedStatePath, `${JSON.stringify(detachedState)}\n`);
+  const detachedDoctorResult = runRepoScript([doctorScript, "--target", detachedStateTarget, "--json"]);
+  assertRuntimeFail("doctor detached state", detachedDoctorResult, "install_status must be installed");
+  const detachedDoctorJson = JSON.parse(detachedDoctorResult.stdout);
+  if (detachedDoctorJson.deploymentStatus?.Installed?.status !== "fail") {
+    throw new Error(`detached state must make Installed fail\n${detachedDoctorResult.stdout}`);
+  }
+
+  const missingManagedFileTarget = doctorStateFixture("missing-managed-file");
+  rmSync(resolve(missingManagedFileTarget, "CUSTOM_INSTRUCTIONS.md"));
+  assertRuntimeFail("doctor missing managed file", runRepoScript([doctorScript, "--target", missingManagedFileTarget]), "managed file is missing: CUSTOM_INSTRUCTIONS.md");
+
   const inProgressTarget = resolve(fixtureRoot, "doctor-in-progress");
   assertRuntimePass("doctor setup in-progress install", runRepoScript([installer, "--target", inProgressTarget, "--skills", "operating-mode-router"]));
   writeFileSync(resolve(inProgressTarget, ".agent-spectrum-kernel/install-state.json.in-progress.json"), "{}\n");
@@ -2719,6 +2762,10 @@ function assertDoctorScript() {
   assertRuntimePass("doctor runtime-health warning", runtimeHealthResult);
   if (!runtimeHealthResult.stdout.includes("ASK doctor: warn") || !runtimeHealthResult.stdout.includes("adapter runtime health issue: ai-metrics-record non_blocking_metrics_record_failure")) {
     throw new Error(`doctor should surface sanitized runtime-health issues\n${runtimeHealthResult.stdout}\n${runtimeHealthResult.stderr}`);
+  }
+  const blockedHealthJson = JSON.parse(runRepoScript([doctorScript, "--target", runtimeHealthTarget, "--json"]).stdout);
+  if (blockedHealthJson.deploymentStatus?.Installed?.status !== "pass" || blockedHealthJson.deploymentStatus?.Operational?.status !== "blocked") {
+    throw new Error(`current runtime-health issues should block Operational without changing Installed\n${JSON.stringify(blockedHealthJson, null, 2)}`);
   }
   writeFileSync(
     resolve(runtimeHealthTarget, ".agent-spectrum-kernel/runtime-health.jsonl"),
