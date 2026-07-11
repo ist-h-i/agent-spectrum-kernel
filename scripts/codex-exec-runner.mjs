@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSy
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
+import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
 
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const DEFAULT_OUTPUT = ".agents/runs/codex-last-output.md";
@@ -17,6 +17,14 @@ function resolveWithinTarget(target, value, label) {
   if (!value || value.includes("\0") || value.startsWith("/") || value.split(/[\\/]/).includes("..")) throw new Error(`${label} must be a relative path inside target`);
   const resolved = resolve(target, value);
   if (resolved !== target && !resolved.startsWith(`${target}/`)) throw new Error(`${label} escapes target`);
+  let existingParent = resolved;
+  while (!existsSync(existingParent)) {
+    const parent = dirname(existingParent);
+    if (parent === existingParent) throw new Error(`${label} has no existing parent inside target`);
+    existingParent = parent;
+  }
+  const canonicalParent = realpathSync(existingParent);
+  if (canonicalParent !== target && !canonicalParent.startsWith(`${target}/`)) throw new Error(`${label} escapes target through a symbolic link`);
   return resolved;
 }
 
@@ -100,6 +108,7 @@ function preflight(args) {
     failures.push(`target is missing: ${args.target}`);
     return { failures, warnings, state: null, promptPath: null };
   }
+  args.target = realpathSync(args.target);
   const statePath = resolve(args.target, CODEX_STATE_PATH);
   let state = null;
   if (!existsSync(statePath)) {
@@ -130,19 +139,32 @@ function preflight(args) {
     failures.push(`prompt hash does not match Codex install state: ${args.prompt}`);
   }
   try { args.outputPath = resolveWithinTarget(args.target, args.output, "output"); } catch (error) { failures.push(error.message); }
-  const managedRunnerCandidate = resolve(args.target, "scripts/codex-exec-runner.mjs");
-  const managedRunnerPath = existsSync(managedRunnerCandidate) ? realpathSync(managedRunnerCandidate) : managedRunnerCandidate;
-  if (RUNNING_RUNNER_PATH !== managedRunnerPath) {
-    failures.push(`running runner is not the target managed runner: expected ${managedRunnerPath}, received ${RUNNING_RUNNER_PATH}`);
+  try {
+    const managedRunnerPath = resolveWithinTarget(args.target, "scripts/codex-exec-runner.mjs", "managed runner");
+    const canonicalManagedRunnerPath = existsSync(managedRunnerPath) ? realpathSync(managedRunnerPath) : managedRunnerPath;
+    if (RUNNING_RUNNER_PATH !== canonicalManagedRunnerPath) {
+      failures.push(`running runner is not the target managed runner: expected ${canonicalManagedRunnerPath}, received ${RUNNING_RUNNER_PATH}`);
+    }
+  } catch (error) {
+    failures.push(error.message);
   }
   for (const runtime of ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs"]) {
     const relativePath = `scripts/${runtime}`;
     const record = state?.managed_files?.[relativePath];
-    const runtimePath = resolve(args.target, relativePath);
+    let runtimePath = null;
+    try {
+      runtimePath = resolveWithinTarget(args.target, relativePath, "managed Codex runtime");
+    } catch (error) {
+      failures.push(error.message);
+      continue;
+    }
     if (!state?.selected_runtime_scripts?.includes(runtime) || record?.kind !== "codex_runtime" || !existsSync(runtimePath)) {
       failures.push(`managed Codex runtime is missing or unselected: ${relativePath}`);
     } else if (hashText(readFileSync(runtimePath, "utf8")) !== record.sha256) {
       failures.push(`managed Codex runtime hash mismatch: ${relativePath}`);
+    }
+    if (runtime === "ask-shared.mjs" && existsSync(runtimePath) && ASK_SHARED_MODULE_PATH !== realpathSync(runtimePath)) {
+      failures.push(`imported ask-shared runtime is not the target managed runtime: expected ${realpathSync(runtimePath)}, received ${ASK_SHARED_MODULE_PATH}`);
     }
   }
   if (args.diffBase) {
@@ -255,7 +277,7 @@ function resultStatus({ preflightResult, codexResult, sensorResult, dryRun }) {
     return { status: "execution_failed", evidenceLevel: "runtime_detected" };
   }
   if (!codexResult.finalOutput.trim()) {
-    return { status: "insufficient_evidence", evidenceLevel: "executed" };
+    return { status: "insufficient_evidence", evidenceLevel: "runtime_detected" };
   }
   if (sensorResult?.exitCode === 0 && sensorResult?.status === "pass") {
     return { status: "executed", evidenceLevel: "executed" };

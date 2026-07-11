@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { chmodSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -2766,6 +2766,17 @@ function assertAdapterRuntimeSmokeScript() {
   if (readFileSync(readOnlyEventStorePath, "utf8") !== readOnlyEventStoreContent) {
     throw new Error("configured event-store append probe must not modify existing event content");
   }
+
+  const symlinkEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-symlink-event-store");
+  assertRuntimePass("adapter smoke symlink event store core setup", runRepoScript([coreInstaller, "--target", symlinkEventStoreTarget]));
+  assertRuntimePass("adapter smoke symlink event store Claude setup", runRepoScript([claudeInstaller, "--target", symlinkEventStoreTarget, "--profile", "full"]));
+  const outsideEventStore = resolve(fixtureRoot, "outside-event-store.jsonl");
+  writeFileSync(outsideEventStore, "outside event store\n");
+  const symlinkEventStorePath = resolve(symlinkEventStoreTarget, "docs/ai/metrics/events.jsonl");
+  rmSync(symlinkEventStorePath, { force: true });
+  symlinkSync(outsideEventStore, symlinkEventStorePath);
+  const symlinkEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", symlinkEventStoreTarget, "--adapter", "claude"]);
+  assertRuntimeFail("adapter runtime smoke rejects symlink event store escape", symlinkEventStoreResult, "configured event store escapes target through a symbolic link");
 }
 
 function assertCodexRunnerScript() {
@@ -2823,6 +2834,43 @@ EOF
 
   const sourceRunnerResult = runRepoScript([codexRunnerScript, "--target", target, "--dry-run"]);
   assertRuntimeFail("codex runner rejects a runner from another checkout", sourceRunnerResult, "running runner is not the target managed runner");
+
+  const originalRunnerRuntime = readFileSync(targetRunnerScript, "utf8");
+  const originalSharedRuntime = readFileSync(resolve(target, "scripts/ask-shared.mjs"), "utf8");
+  const outsideRuntimeDir = resolve(fixtureRoot, "outside-codex-runtime", "scripts");
+  mkdirSync(outsideRuntimeDir, { recursive: true });
+  const outsideRunnerPath = resolve(outsideRuntimeDir, "codex-exec-runner.mjs");
+  writeFileSync(outsideRunnerPath, originalRunnerRuntime);
+  writeFileSync(resolve(outsideRuntimeDir, "ask-shared.mjs"), originalSharedRuntime);
+  rmSync(targetRunnerScript);
+  symlinkSync(outsideRunnerPath, targetRunnerScript);
+  const symlinkRunnerResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects symlink runner escape", symlinkRunnerResult, "managed runner escapes target through a symbolic link");
+  rmSync(targetRunnerScript);
+  writeFileSync(targetRunnerScript, originalRunnerRuntime);
+
+  const sharedRuntimePath = resolve(target, "scripts/ask-shared.mjs");
+  const outsideSharedPath = resolve(outsideRuntimeDir, "outside-ask-shared.mjs");
+  writeFileSync(outsideSharedPath, originalSharedRuntime);
+  rmSync(sharedRuntimePath);
+  symlinkSync(outsideSharedPath, sharedRuntimePath);
+  const symlinkSharedResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects imported ask-shared symlink escape", symlinkSharedResult, "managed Codex runtime escapes target through a symbolic link");
+  rmSync(sharedRuntimePath);
+  writeFileSync(sharedRuntimePath, originalSharedRuntime);
+
+  const runsPath = resolve(target, ".agents/runs");
+  const outsideRunsPath = resolve(fixtureRoot, "outside-codex-runs");
+  rmSync(runsPath, { recursive: true, force: true });
+  mkdirSync(outsideRunsPath, { recursive: true });
+  symlinkSync(outsideRunsPath, runsPath);
+  const symlinkOutputResult = runRepoScript([targetRunnerScript, "--target", target, "--output", ".agents/runs/escape.md", "--dry-run"]);
+  assertRuntimeFail("codex runner rejects symlink output parent escape", symlinkOutputResult, "output escapes target through a symbolic link");
+  if (existsSync(resolve(outsideRunsPath, "escape.md"))) {
+    throw new Error("codex runner must not write output through a symbolic link outside target");
+  }
+  rmSync(runsPath);
+  mkdirSync(runsPath, { recursive: true });
 
   const failedOutputPath = resolve(target, "codex-preserved-output.md");
   writeFileSync(failedOutputPath, "previous successful output\n");
@@ -2914,7 +2962,7 @@ exit 9
     "codex-weak-output.md",
   ]);
   assertRuntimeFail("codex runner insufficient evidence is normalized", weakResult, "Codex runner: insufficient_evidence");
-  if (!weakResult.stdout.includes("Codex runner: insufficient_evidence") || !weakResult.stdout.includes("Sensor status: not run")) {
+  if (!weakResult.stdout.includes("Codex runner: insufficient_evidence") || !weakResult.stdout.includes("Sensor status: not run") || !weakResult.stdout.includes("Evidence level: runtime_detected")) {
     throw new Error(`codex runner should normalize weak output as insufficient evidence\n${weakResult.stdout}\n${weakResult.stderr}`);
   }
 

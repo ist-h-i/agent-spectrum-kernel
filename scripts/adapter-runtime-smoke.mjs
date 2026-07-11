@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
@@ -88,6 +88,14 @@ function resolveWithinTarget(target, value, label) {
   }
   const path = resolve(target, value);
   if (path !== target && !path.startsWith(`${target}/`)) throw new Error(`${label} escapes target`);
+  let existingParent = path;
+  while (!existsSync(existingParent)) {
+    const parent = dirname(existingParent);
+    if (parent === existingParent) throw new Error(`${label} has no existing parent inside target`);
+    existingParent = parent;
+  }
+  const canonicalParent = realpathSync(existingParent);
+  if (canonicalParent !== target && !canonicalParent.startsWith(`${target}/`)) throw new Error(`${label} escapes target through a symbolic link`);
   return path;
 }
 
@@ -315,6 +323,7 @@ function printReport(report, json) {
 
 try {
   const args = parseArgs(process.argv.slice(2));
+  args.target = realpathSync(args.target);
   const adapters = [];
   if (args.adapter === "all" || args.adapter === "claude") {
     adapters.push(runClaudeSmoke(args.target, { dryRun: args.dryRun }));
