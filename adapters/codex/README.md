@@ -16,10 +16,11 @@ Use this adapter when a repository wants Codex to follow the core kernel, route 
 The Codex adapter installer projects Codex-specific files into another repository:
 
 ```bash
-node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents
+node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
+node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-It updates `AGENTS.md`, profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, `scripts/codex-exec-runner.mjs`, the local sensor runtime used by that runner, and `.agent-spectrum-kernel/codex-install-state.json`. It does not create hooks, telemetry, GitHub Actions, external publication, secrets, deploys, or releases.
+The core installer owns `AGENTS.md`. The Codex adapter updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, `scripts/codex-exec-runner.mjs`, the local sensor runtime used by that runner, and `.agent-spectrum-kernel/codex-install-state.json`. It does not create hooks, telemetry, GitHub Actions, external publication, secrets, deploys, or releases.
 
 ## Codex Projection Model
 
@@ -39,10 +40,10 @@ Codex documentation supports `AGENTS.md`, repo-scoped skills under `.agents/skil
 
 ## Minimum Setup In An Adopting Repository
 
-1. Run `node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents`.
+1. Run the core installer, then `node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo`.
 2. Use `--profile <name>` to choose a supported workflow profile. The default is `implementation`.
 3. Rerun the installer after pulling this repository's updates.
-4. Use `.agents/commands/codex-exec.md` or call `node scripts/codex-exec-runner.mjs --prompt <file>` directly.
+4. From the adopting repository, use `.agents/commands/codex-exec.md` or call its installed `node ./scripts/codex-exec-runner.mjs --prompt <file>` directly.
 5. Run repository-specific verification commands before claiming correctness, readiness, safety, reliability, or no regression.
 
 ## Workflow Profiles

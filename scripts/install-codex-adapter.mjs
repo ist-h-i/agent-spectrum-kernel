@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, statSync, 
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
+import { CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
@@ -24,19 +25,19 @@ const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-
 const PROMPT_METADATA = {
   "skill-implement.md": {
     label: "Implementation",
-    sandbox: "workspace-write",
+    execution: CODEX_PROMPT_CONTRACTS["skill-implement.md"],
     requiredSkills: ["operating-mode-router", "skill-router", "controlled-implementation", "test-first-verification", "evidence-ledger", "risk-gate"],
     recommendedSkills: ["spec-driven-development", "requirement-grill", "work-package-compiler"],
   },
   "skill-investigate.md": {
     label: "Investigation",
-    sandbox: "workspace-write",
+    execution: CODEX_PROMPT_CONTRACTS["skill-investigate.md"],
     requiredSkills: ["operating-mode-router", "skill-router", "doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
     recommendedSkills: [],
   },
   "skill-review.md": {
     label: "Review",
-    sandbox: "read-only",
+    execution: CODEX_PROMPT_CONTRACTS["skill-review.md"],
     requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
     recommendedSkills: [
       "review-automated-gate",
@@ -52,13 +53,13 @@ const PROMPT_METADATA = {
   },
   "skill-verify.md": {
     label: "Verification",
-    sandbox: "workspace-write",
+    execution: CODEX_PROMPT_CONTRACTS["skill-verify.md"],
     requiredSkills: ["test-first-verification", "evidence-ledger"],
     recommendedSkills: [],
   },
   "skill-handoff.md": {
     label: "Handoff",
-    sandbox: "read-only",
+    execution: CODEX_PROMPT_CONTRACTS["skill-handoff.md"],
     requiredSkills: ["handoff-generation", "evidence-ledger"],
     recommendedSkills: [],
   },
@@ -405,10 +406,8 @@ function parseArgs(argv) {
       args.profile = argv[++i];
     } else if (arg === "--skills") {
       args.skills = argv[++i].split(",").map((skill) => skill.trim()).filter(Boolean);
-    } else if (arg === "--merge-agents") {
-      args.mergeAgents = true;
-    } else if (arg === "--skip-agents") {
-      args.skipAgents = true;
+    } else if (arg === "--merge-agents" || arg === "--skip-agents") {
+      throw new Error(`${arg} is no longer supported; install the core first with scripts/install-kernel.mjs --merge-agents.`);
     } else if (arg === "--skip-prompts") {
       args.skipPrompts = true;
     } else if (arg === "--skip-command") {
@@ -449,8 +448,6 @@ Options:
   --target <path>       Adopting project root. Defaults to cwd.
   --profile <name>      Workflow profile. Defaults to ${DEFAULT_PROFILE}.
   --skills <csv>        Advanced override for projected skills. Must satisfy selected prompt, command, router reachability, and skill dependency closure.
-  --merge-agents        Add or update the managed block in an existing AGENTS.md.
-  --skip-agents         Do not install or merge AGENTS.md.
   --skip-prompts        Do not copy Codex prompt templates into .agents/prompts.
   --skip-command        Do not copy the codex exec command template into .agents/commands.
   --no-overwrite-skills Fail when an existing Codex skill projection would be overwritten.
@@ -467,8 +464,7 @@ ${profileLines}
 
 Default mode is three-way update safe: managed files are updated only when the
 target still matches the previous managed hash, unless --force is used.
-AGENTS.md ownership is limited to the managed block, so existing project-local
-AGENTS.md content is preserved.
+AGENTS.md is owned by the core installer. Install or update core before this adapter.
 
 Use --profile for normal installs. Use --skills only for advanced overrides; the
 installer fails before writing files when the override is not closed over required
@@ -490,6 +486,18 @@ function readManifest() {
     throw new Error("manifest.json.skills must be an array");
   }
   return manifest;
+}
+
+function validateCoreInstalled(target, statePath) {
+  if (!existsSync(statePath)) throw new Error("ASK core install state is missing: .agent-spectrum-kernel/install-state.json. Run scripts/install-kernel.mjs before installing the Codex adapter.");
+  let state;
+  try { state = readJson(statePath); } catch { throw new Error("ASK core install state is invalid JSON."); }
+  const record = state?.managed_blocks?.["AGENTS.md#agent-spectrum-kernel"];
+  const agentsPath = resolve(target, "AGENTS.md");
+  const block = existsSync(agentsPath) ? lifecycle.extractManagedBlock(readText(agentsPath)) : null;
+  if (state?.install_status !== "installed" || !record?.sha256 || !block || lifecycle.hashText(block.content) !== record.sha256) {
+    throw new Error("ASK core installation is not active or its AGENTS.md managed block does not match install state.");
+  }
 }
 
 function readPreviousState(target) {
@@ -657,6 +665,7 @@ function buildState({
   managedBlocks,
   previousState,
   rollback,
+  hasMutations,
 }) {
   return lifecycle.buildLifecycleState({
     manifest,
@@ -676,6 +685,7 @@ function buildState({
     managedBlocks,
     previousState,
     rollback,
+    hasMutations,
     extra: {
       profile_description: profile.description,
       retained_stale_skills: retainedStaleSkills,
@@ -880,7 +890,7 @@ function commandSectionForPrompt(prompt) {
     return `## ${metadata.label}
 
 \`\`\`bash
-node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode review --sandbox ${metadata.sandbox} --diff-base origin/main...HEAD --output codex-review.md
+node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox} --diff-base origin/main...HEAD --output codex-review.md
 \`\`\`
 
 Treat this as diff-only review unless the runner output also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.`;
@@ -889,13 +899,13 @@ Treat this as diff-only review unless the runner output also provides the checke
     return `## ${metadata.label}
 
 \`\`\`bash
-node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode implementation --sandbox ${metadata.sandbox} --output codex-implementation.md
+node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox} --output codex-implementation.md
 \`\`\``;
   }
   return `## ${metadata.label}
 
 \`\`\`bash
-node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode implementation --sandbox ${metadata.sandbox}
+node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox}
 \`\`\``;
 }
 
@@ -947,6 +957,8 @@ function buildPlan(args) {
 
   validateSkillNames(skills, manifestSkills);
   validateSkillClosure({ selectedSkills: skills, requiredSkills, profileName: args.profile });
+  const coreStatePath = resolve(args.target, ".agent-spectrum-kernel/install-state.json");
+  validateCoreInstalled(args.target, coreStatePath);
 
   const previousState = readPreviousState(args.target);
   const previousSkillNames = previousItems(previousState, "installed_skills", ["codex_skill", "stale_codex_skill"], "skill").filter((skill) =>
@@ -972,31 +984,6 @@ function buildPlan(args) {
   const managedFiles = {};
   const managedBlocks = {};
   const rollback = lifecycle.createRollbackSnapshot();
-
-  if (!args.skipAgents) {
-    const agentsSource = resolve(REPO_ROOT, "AGENTS.md");
-    ensureSource(agentsSource, "AGENTS.md");
-    const agentsDestination = resolve(args.target, "AGENTS.md");
-    const agentsBlock = buildAgentsBlock(readText(agentsSource));
-    const agentsContent = existsSync(agentsDestination)
-      ? replaceOrAppendManagedBlock(readText(agentsDestination), agentsBlock, args.mergeAgents)
-      : agentsBlock;
-    managedBlocks["AGENTS.md#agent-spectrum-kernel"] = lifecycle.createManagedBlockRecord({
-      path: "AGENTS.md",
-      marker: "agent-spectrum-kernel",
-      content: agentsBlock.trimEnd(),
-    });
-    lifecycle.planWriteManagedBlock(operations, {
-      target: args.target,
-      relativePath: "AGENTS.md",
-      blockKey: "AGENTS.md#agent-spectrum-kernel",
-      content: agentsContent,
-      reason: "kernel",
-      previousState,
-      force: args.force,
-      rollback,
-    });
-  }
 
   for (const skill of skills) {
     const source = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
@@ -1196,6 +1183,7 @@ function buildPlan(args) {
     managedBlocks,
     previousState,
     rollback,
+    hasMutations: operations.some((operation) => !operation.unchanged),
   });
 
   return { operations, staleSkills, stalePrompts, staleCommands, state, recommendedSkills };

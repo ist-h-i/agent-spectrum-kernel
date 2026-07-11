@@ -19,8 +19,8 @@ Levels:
 | Risk-gate preservation | projected | projected | unknown | unknown | unknown | unknown |
 | Verification-first workflow support | projected | projected | unknown | unknown | unknown | unknown |
 | Evidence-ledger output support | projected | projected | unknown | unknown | unknown | unknown |
-| Adapter runtime smoke | runtime_detected | projected | unknown | unknown | unknown | unknown |
-| Bounded adapter execution runner | unsupported | executed | unknown | unknown | unknown | unknown |
+| Adapter runtime smoke | behavior_verified | projected | unknown | unknown | unknown | unknown |
+| Bounded adapter execution runner | unsupported | behavior_verified | unknown | unknown | unknown | unknown |
 | Local metrics event recording | runtime_detected | unsupported | unknown | unknown | unknown | unknown |
 | Hidden telemetry disabled by default | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
 | External publication disabled by default | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
@@ -43,7 +43,7 @@ Codex:
 
 - Evidence: `scripts/install-codex-adapter.mjs`, `adapters/codex/README.md`, `adapters/codex/project/.agents/skills/README.md`, `adapters/codex/prompts/`, `adapters/codex/commands/codex-exec.md`, `manifest.json`, and validation coverage in `scripts/validate-repo.mjs` / `scripts/test-validate-repo.mjs`.
 - Supported areas: the adapter ships no hidden telemetry, webhook, publication, deploy, release, or external notification path by default.
-- Projected-only areas: workflow routing, risk gates, verification, and evidence outputs are preserved in projected skills and prompts, but runtime execution remains user-controlled. The Codex runner can reach `executed` for a captured `codex exec` output, but sensors remain report-only and do not prove business correctness.
+- Projected-only areas: workflow routing, risk gates, verification, and evidence outputs are preserved in projected skills and prompts, but runtime execution remains user-controlled. A per-run Codex runner result may reach `executed`; this matrix records only repository-level fixture evidence.
 - Unsupported areas: local metrics event recording, shared PR workflow, and fork/comment-trigger guardrails are not implemented by this adapter. Do not claim them for Codex from this repository evidence.
 
 Cursor, Cline, Devin, Kiro:

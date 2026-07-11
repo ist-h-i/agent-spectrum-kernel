@@ -72,6 +72,10 @@ const RUNTIME_SCRIPTS = [
   "ai-metrics-summarize.mjs",
   "ai-ledger-refresh.mjs",
 ];
+const RUNTIME_DIRECTORIES = [
+  "docs/ai/metrics",
+  "docs/ai/reports",
+];
 const COMMAND_METADATA = {
   "skill-review.md": {
     requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
@@ -483,9 +487,33 @@ function copyFilePlanned(source, destination, args, writes, record = { kind: "cl
 function copyFileIfAbsentPlanned(source, destination, args, writes) {
   ensureSource(source);
   if (existsSync(destination)) {
+    if (hasLifecyclePlan(args)) {
+      args.operations.push({
+        kind: "write",
+        destination,
+        relativePath: relative(args.target, destination),
+        content: readFileSync(destination, "utf8"),
+        reason: "preserve_project_state",
+        unchanged: true,
+      });
+      writes.push(destination);
+    }
     return;
   }
   const content = readFileSync(source, "utf8");
+  if (hasLifecyclePlan(args)) {
+    const relativePath = relative(args.target, destination);
+    args.operations.push({
+      kind: "write",
+      destination,
+      relativePath,
+      content,
+      reason: "initialize_project_state",
+      unchanged: false,
+    });
+    writes.push(destination);
+    return;
+  }
   writeFilePlanned(destination, content, args, writes);
 }
 
@@ -531,9 +559,11 @@ function writeFilePlanned(destination, content, args, writes, record = null, { p
     });
   } else {
     if (partialRecord) {
-      args.managedPartialFiles[relativePath] = lifecycle.createManagedFileRecord({ ...partialRecord, content });
+      args.managedPartialFiles[relativePath] = lifecycle.createManagedFileRecord({ ...partialRecord, content: partialRecord.content ?? content });
     }
-    lifecycle.captureRollbackFile(args.rollback, args.target, relativePath);
+    if (!partialRecord?.skipRollback) {
+      lifecycle.captureRollbackFile(args.rollback, args.target, relativePath);
+    }
     args.operations.push({
       kind: "write",
       destination,
@@ -601,9 +631,10 @@ function installHooks(args, writes) {
   if (existsSync(settingsPath)) {
     settings = JSON.parse(readFileSync(settingsPath, "utf8"));
   }
+  prepareManagedHookMutation(settings, args);
   settings.hooks = mergeHooks(settings.hooks ?? {}, hooksSettings.hooks ?? {});
   args.managedHooks = normalizeHooks(hooksSettings.hooks ?? {});
-  writeFilePlanned(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, args, writes, null, { partialRecord: { kind: "claude_settings" } });
+  writeFilePlanned(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, args, writes, null, { partialRecord: { kind: "claude_settings", content: JSON.stringify(args.managedHooks), skipRollback: true } });
   removeLegacyHooksFile(args, writes);
 }
 
@@ -648,13 +679,26 @@ function removeManagedHooks(args, writes) {
   const settingsPath = resolve(args.target, ".claude", "settings.json");
   if (existsSync(settingsPath)) {
     const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+    prepareManagedHookMutation(settings, args);
     const nextHooks = removeAdapterOwnedHooks(settings.hooks ?? {});
     const nextSettings = { ...settings, hooks: nextHooks };
     if (JSON.stringify(settings.hooks ?? {}) !== JSON.stringify(nextHooks)) {
-      writeFilePlanned(settingsPath, `${JSON.stringify(nextSettings, null, 2)}\n`, args, writes, null, { partialRecord: { kind: "claude_settings" } });
+      writeFilePlanned(settingsPath, `${JSON.stringify(nextSettings, null, 2)}\n`, args, writes, null, { partialRecord: { kind: "claude_settings", content: JSON.stringify(normalizeHooks(nextHooks)), skipRollback: true } });
     }
   }
   removeLegacyHooksFile(args, writes);
+}
+
+function prepareManagedHookMutation(settings, args) {
+  const subset = normalizeHooks(settings.hooks ?? {});
+  const currentHash = lifecycle.hashText(JSON.stringify(subset));
+  const expectedHash = args.previousState?.managed_partial_files?.[".claude/settings.json"]?.sha256;
+  if (expectedHash && currentHash !== expectedHash && !args.force) {
+    throw new Error("managed hook subset conflict: .claude/settings.json ASK hooks were modified locally. Use --force to overwrite.");
+  }
+  if (args.force && !Object.hasOwn(args.rollback.hooks, ".claude/settings.json")) {
+    args.rollback.hooks[".claude/settings.json"] = subset;
+  }
 }
 
 function removeLegacyHooksFile(args, writes) {
@@ -789,6 +833,14 @@ function validateCoreInstalled(args) {
   if (!existsSync(statePath)) {
     throw new Error(`ASK core install state is missing: ${CORE_STATE_PATH}. Run: node scripts/install-kernel.mjs --target ${args.target} --merge-agents`);
   }
+  let state;
+  try { state = readJson(statePath); } catch { throw new Error("ASK core install state is invalid JSON."); }
+  const record = state?.managed_blocks?.["AGENTS.md#agent-spectrum-kernel"];
+  const agentsPath = resolve(args.target, "AGENTS.md");
+  const block = existsSync(agentsPath) ? lifecycle.extractManagedBlock(readFileSync(agentsPath, "utf8")) : null;
+  if (state?.install_status !== "installed" || !record?.sha256 || !block || lifecycle.hashText(block.content) !== record.sha256) {
+    throw new Error("ASK core installation is not active or its AGENTS.md managed block does not match install state.");
+  }
 }
 
 function readPreviousState(target) {
@@ -856,6 +908,42 @@ function normalizeHooks(hooks) {
   return normalized.sort((a, b) => `${a.event}:${a.matcher}:${a.command}`.localeCompare(`${b.event}:${b.matcher}:${b.command}`));
 }
 
+function hooksFromManagedRecords(records) {
+  const hooks = {};
+  for (const record of records ?? []) {
+    const groups = hooks[record.event] ?? [];
+    let group = groups.find((item) => (item.matcher ?? "") === record.matcher);
+    if (!group) {
+      group = { ...(record.matcher ? { matcher: record.matcher } : {}), hooks: [] };
+      groups.push(group);
+      hooks[record.event] = groups;
+    }
+    group.hooks.push({ type: record.type, command: record.command });
+  }
+  return hooks;
+}
+
+function restoreManagedHookSubset(target, state, { force }) {
+  const settingsPath = resolve(target, ".claude/settings.json");
+  const settings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, "utf8")) : {};
+  const currentSubset = normalizeHooks(settings.hooks ?? {});
+  const currentHash = lifecycle.hashText(JSON.stringify(currentSubset));
+  const pendingHash = state.managed_partial_files?.[".claude/settings.json"]?.sha256;
+  const rollbackRecords = state.rollback?.hooks?.[".claude/settings.json"] ?? state.previous_successful_state?.managed_hooks ?? [];
+  const rollbackHash = lifecycle.hashText(JSON.stringify(rollbackRecords));
+  if (currentHash === rollbackHash) {
+    return null;
+  }
+  if (!force && currentHash !== pendingHash) {
+    throw new Error("managed hook subset conflict: .claude/settings.json ASK hooks were modified locally. Use --force to overwrite.");
+  }
+  const restoredHooks = mergeHooks(settings.hooks ?? {}, hooksFromManagedRecords(rollbackRecords));
+  const content = `${JSON.stringify({ ...settings, hooks: restoredHooks }, null, 2)}\n`;
+  const existing = existsSync(settingsPath) ? readFileSync(settingsPath, "utf8") : null;
+  const operation = { kind: "write", destination: settingsPath, relativePath: ".claude/settings.json", content, reason: "rollback:restore-managed-hook-subset", unchanged: existing === content };
+  return operation;
+}
+
 function manageStaleFiles(args, writes) {
   const currentPaths = new Set(Object.keys(args.managedFiles));
   args.retainedStaleFiles = [];
@@ -911,6 +999,7 @@ function buildState(args, manifest) {
     managedHooks: args.managedHooks,
     previousState: args.previousState,
     rollback: args.rollback,
+    hasMutations: args.operations.some((operation) => !operation.unchanged),
     extra: {
       installed_commands: [...new Set([...args.selectedCommands, ...args.retainedStaleFiles.filter((path) => path.startsWith(".claude/commands/")).map((path) => path.split("/").at(-1))])].sort(),
       selected_commands: args.selectedCommands,
@@ -928,7 +1017,16 @@ function main() {
   const writes = [];
 
   if (args.rollback) {
-    const operations = lifecycle.rollbackLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force });
+    const operations = lifecycle.rollbackLifecycleState({
+      target: args.target,
+      statePath: STATE_PATH,
+      dryRun: args.dryRun || args.check,
+      force: args.force,
+      extendOperations: ({ state, operations: plan }) => {
+        const hookOperation = restoreManagedHookSubset(args.target, state, { force: args.force });
+        if (hookOperation) plan.push(hookOperation);
+      },
+    });
     console.log(`${args.dryRun || args.check ? "Claude adapter rollback dry run" : "Claude adapter rolled back"}: ${args.target}`);
     lifecycle.printOperations(args.target, operations);
     return;
@@ -982,9 +1080,7 @@ function main() {
   } else if (args.skipHooks) {
     console.log("- runtime hooks: skipped because --skip-hooks was used");
   }
-  for (const destination of writes) {
-    console.log(`- ${relative(args.target, destination)}`);
-  }
+  lifecycle.printOperations(args.target, args.operations);
   console.log(`- ${STATE_PATH}`);
   console.log("Privacy defaults: local project storage, no external publication, no raw prompt storage.");
 }

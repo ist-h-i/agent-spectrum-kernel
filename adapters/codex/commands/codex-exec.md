@@ -4,6 +4,8 @@ Use these examples from an adopting repository after projecting `AGENTS.md`, the
 
 The installer generates a profile-limited `.agents/commands/codex-exec.md` in adopting repositories. This source template shows the full command family.
 
+Run these commands from the adopting repository so that `scripts/codex-exec-runner.mjs` is the installed, managed runner for that repository.
+
 ## Implementation
 
 ```bash
@@ -11,6 +13,14 @@ node scripts/codex-exec-runner.mjs --prompt skill-implement.md --mode implementa
 ```
 
 If the prompt file is not installed for the selected profile, rerun the installer with a profile that includes it, paste the template text directly into Codex, or provide an equivalent local path.
+
+## Investigation
+
+```bash
+node scripts/codex-exec-runner.mjs --prompt skill-investigate.md --mode investigation --sandbox workspace-write
+```
+
+Start with reproduction and evidence gathering. Make local edits only after the cause and verification path are clear.
 
 ## Review
 
@@ -23,7 +33,7 @@ Treat this as diff-only review unless the command also provides the checked-out 
 ## Verification
 
 ```bash
-node scripts/codex-exec-runner.mjs --prompt skill-verify.md --mode implementation --sandbox workspace-write
+node scripts/codex-exec-runner.mjs --prompt skill-verify.md --mode verification --sandbox workspace-write
 ```
 
 Use the repository's actual test, lint, build, or validation commands. Do not claim no regression from a template alone.
@@ -31,7 +41,7 @@ Use the repository's actual test, lint, build, or validation commands. Do not cl
 ## Handoff
 
 ```bash
-node scripts/codex-exec-runner.mjs --prompt skill-handoff.md --mode implementation --sandbox read-only
+node scripts/codex-exec-runner.mjs --prompt skill-handoff.md --mode handoff --sandbox read-only
 ```
 
 The runner performs local preflight, invokes `codex exec`, captures final output,

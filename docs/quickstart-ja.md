@@ -54,7 +54,8 @@ node scripts/adapter-runtime-smoke.mjs --target /path/to/adopting-repo --adapter
 Codex の `.agents/skills`、prompt template、`codex exec` command template も投影する場合:
 
 ```bash
-node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo --merge-agents
+node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
+node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
 Codex installer は profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile minimal|implementation|investigation|review|adoption|observability|full` を使い、`--skills <csv>` は選択 prompt / command、router到達可能route、指定 skill 依存の閉包検証付き advanced override として扱います。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。hook、telemetry、外部公開、GitHub Actions は作りません。

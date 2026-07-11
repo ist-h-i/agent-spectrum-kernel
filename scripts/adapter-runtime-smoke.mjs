@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
@@ -47,9 +47,9 @@ Options:
   --json                Print machine-readable result JSON.
 
 This smoke check is local-only. For Claude it verifies installed commands,
-selected skills, hook executable resolution, event-store writability, report
-input availability, and appends one non-sensitive smoke event unless --dry-run
-is used. It does not invoke Claude or prove product/business correctness.
+selected skills, hook executable resolution, and report input availability. A
+probe event is written only to an isolated runtime-smoke store. It does not
+invoke Claude or prove product/business correctness.
 `);
 }
 
@@ -80,6 +80,23 @@ function pathIsFile(path) {
 
 function pathIsDirectory(path) {
   return existsSync(path) && statSync(path).isDirectory();
+}
+
+function resolveWithinTarget(target, value, label) {
+  if (!value || value.includes("\0") || value.startsWith("/") || value.split(/[\\/]/).includes("..")) {
+    throw new Error(`${label} must be a relative path inside target`);
+  }
+  const path = resolve(target, value);
+  if (path !== target && !path.startsWith(`${target}/`)) throw new Error(`${label} escapes target`);
+  let existingParent = path;
+  while (!existsSync(existingParent)) {
+    const parent = dirname(existingParent);
+    if (parent === existingParent) throw new Error(`${label} has no existing parent inside target`);
+    existingParent = parent;
+  }
+  const canonicalParent = realpathSync(existingParent);
+  if (canonicalParent !== target && !canonicalParent.startsWith(`${target}/`)) throw new Error(`${label} escapes target through a symbolic link`);
+  return path;
 }
 
 function readConfigValue(target, pathParts, fallback) {
@@ -155,8 +172,9 @@ function runClaudeSmoke(target, { dryRun }) {
     for (const command of hookCommands) {
       if (command.includes("${CLAUDE_PLUGIN_ROOT}")) {
         const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
-        const resolved = pluginRoot ? command.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, pluginRoot) : "";
-        checks.push(check(resolved && resolved.includes("ai-skills-metrics-record") ? "pass" : "fail", "plugin_hook_resolution", "Claude plugin hook command requires CLAUDE_PLUGIN_ROOT"));
+        const match = pluginRoot ? command.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, pluginRoot).match(/([^\s"']*ai-skills-metrics-record)/) : null;
+        const executable = match?.[1] && pathIsFile(match[1]) && (statSync(match[1]).mode & 0o111) !== 0;
+        checks.push(check(executable ? "pass" : "fail", "plugin_hook_resolution", "Claude plugin hook executable must resolve through CLAUDE_PLUGIN_ROOT"));
       }
       if (command.includes("scripts/ai-metrics-record.mjs")) {
         const scriptPath = resolve(target, "scripts/ai-metrics-record.mjs");
@@ -165,11 +183,47 @@ function runClaudeSmoke(target, { dryRun }) {
     }
   }
 
-  const eventStore = readConfigValue(target, ["storage", "event_store"], DEFAULT_EVENT_STORE);
+  const configuredEventStore = readConfigValue(target, ["storage", "event_store"], DEFAULT_EVENT_STORE);
+  let configuredEventStorePath = null;
+  try {
+    configuredEventStorePath = resolveWithinTarget(target, configuredEventStore, "configured event store");
+  } catch (error) {
+    checks.push(check("fail", "configured_event_store", error.message));
+  }
+  if (configuredEventStorePath) {
+    const configuredEventDir = dirname(configuredEventStorePath);
+    if (!pathIsDirectory(configuredEventDir)) {
+      checks.push(check("fail", "configured_event_store", `configured event-store directory is missing or invalid: ${configuredEventStore}`));
+    } else if (existsSync(configuredEventStorePath) && !pathIsFile(configuredEventStorePath)) {
+      checks.push(check("fail", "configured_event_store", `configured event-store must be a regular file: ${configuredEventStore}`));
+    } else if (dryRun) {
+      checks.push(check("pass", "configured_event_store", `configured event-store location planned: ${configuredEventStore}`));
+    } else if (existsSync(configuredEventStorePath)) {
+      try {
+        const descriptor = openSync(configuredEventStorePath, "a");
+        closeSync(descriptor);
+        checks.push(check("pass", "configured_event_store", `configured event-store is append-openable: ${configuredEventStore}`));
+      } catch (error) {
+        checks.push(check("fail", "configured_event_store", `configured event-store is not append-openable: ${configuredEventStore}: ${error.message}`));
+      }
+    } else {
+      const probePath = resolve(configuredEventDir, `.ask-runtime-smoke-probe-${process.pid}-${Date.now()}`);
+      try {
+        writeFileSync(probePath, "probe\n", { flag: "wx" });
+        unlinkSync(probePath);
+        checks.push(check("pass", "configured_event_store", `configured event-store directory is writable: ${configuredEventStore}`));
+      } catch (error) {
+        if (existsSync(probePath)) unlinkSync(probePath);
+        checks.push(check("fail", "configured_event_store", `configured event-store directory is not writable: ${configuredEventStore}: ${error.message}`));
+      }
+    }
+  }
+
+  const eventStore = ".agent-spectrum-kernel/runtime-smoke/events.jsonl";
   const eventStorePath = resolve(target, eventStore);
   const eventDir = dirname(eventStorePath);
-  if (!pathIsDirectory(eventDir)) {
-    checks.push(check("fail", "event_store_directory", `event-store directory is missing: ${eventStore}`));
+  if (!pathIsDirectory(eventDir) && dryRun) {
+    checks.push(check("pass", "event_store_directory", `event-store location planned: ${eventStore}`));
   } else if (!dryRun) {
     try {
       const event = {
@@ -180,7 +234,7 @@ function runClaudeSmoke(target, { dryRun }) {
         occurred_at: new Date().toISOString(),
         skills_used: [],
         routing_result: {},
-        outcome_metrics: { task_completed: true },
+        outcome_metrics: { task_completed: false },
         verification_metrics: {},
         debt_movement_metrics: {},
         evidence_references: ["adapter-runtime-smoke"],
@@ -195,7 +249,7 @@ function runClaudeSmoke(target, { dryRun }) {
       };
       mkdirSync(eventDir, { recursive: true });
       appendFileSync(eventStorePath, `${JSON.stringify(event)}\n`);
-      checks.push(check("pass", "smoke_event", `non-sensitive smoke event appended: ${eventStore}`));
+      checks.push(check("pass", "smoke_event", `isolated non-sensitive smoke event appended: ${eventStore}`));
     } catch (error) {
       checks.push(check("fail", "smoke_event", `event-store is not writable: ${eventStore}: ${error.message}`));
     }
@@ -269,6 +323,7 @@ function printReport(report, json) {
 
 try {
   const args = parseArgs(process.argv.slice(2));
+  args.target = realpathSync(args.target);
   const adapters = [];
   if (args.adapter === "all" || args.adapter === "claude") {
     adapters.push(runClaudeSmoke(args.target, { dryRun: args.dryRun }));

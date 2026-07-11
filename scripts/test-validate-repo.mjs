@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import { chmodSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { APPROVAL_REQUIRED_SURFACES, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
+import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -2027,8 +2027,47 @@ function assertInstallerScripts() {
   mkdirSync(resolve(target, ".claude/hooks"), { recursive: true });
   writeFileSync(resolve(target, ".claude/hooks/hooks.json"), readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/hooks/hooks.json"), "utf8"));
 
-  assertRuntimePass("installer first run", runRepoScript([installer, "--target", target]));
-  assertRuntimePass("installer second run", runRepoScript([installer, "--target", target]));
+  const firstInstall = runRepoScript([installer, "--target", target]);
+  assertRuntimePass("installer first run", firstInstall);
+  if (
+    !firstInstall.stdout.includes("- initialize: docs/ai/improvement-ledger.md") ||
+    !firstInstall.stdout.includes("- initialize: docs/ai/skill-adoption-metrics.md")
+  ) {
+    throw new Error(`installer first run should initialize project-owned ledger assets\n${firstInstall.stdout}`);
+  }
+
+  const projectLedger = "# Project improvement ledger\n\nProject-owned evidence must survive adapter updates.\n";
+  const projectMetrics = "# Project adoption metrics\n\nProject-owned metric definitions must survive adapter updates.\n";
+  const projectEvents = '{"event_id":"project-owned-event"}\n';
+  const projectReport = "# Project-owned report\n";
+  writeFileSync(resolve(target, "docs/ai/improvement-ledger.md"), projectLedger);
+  writeFileSync(resolve(target, "docs/ai/skill-adoption-metrics.md"), projectMetrics);
+  writeFileSync(resolve(target, "docs/ai/metrics/events.jsonl"), projectEvents);
+  writeFileSync(resolve(target, "docs/ai/reports/project-report.md"), projectReport);
+
+  const fullDryRun = runRepoScript([installer, "--target", target, "--profile", "full", "--dry-run"]);
+  assertRuntimePass("installer full dry run with project state", fullDryRun);
+  if (
+    !fullDryRun.stdout.includes("- preserve: docs/ai/improvement-ledger.md") ||
+    !fullDryRun.stdout.includes("- preserve: docs/ai/skill-adoption-metrics.md") ||
+    !fullDryRun.stdout.includes("- refresh: docs/ai/adoption-report-template.md")
+  ) {
+    throw new Error(`installer dry run should distinguish preserved state from refreshed references\n${fullDryRun.stdout}`);
+  }
+
+  assertRuntimePass("installer full rerun", runRepoScript([installer, "--target", target, "--profile", "full"]));
+  assertRuntimePass("installer observability rerun", runRepoScript([installer, "--target", target, "--profile", "observability"]));
+  for (const [path, expected] of [
+    ["docs/ai/improvement-ledger.md", projectLedger],
+    ["docs/ai/skill-adoption-metrics.md", projectMetrics],
+    ["docs/ai/metrics/events.jsonl", projectEvents],
+    ["docs/ai/reports/project-report.md", projectReport],
+  ]) {
+    const actual = readFileSync(resolve(target, path), "utf8");
+    if (actual !== expected) {
+      throw new Error(`installer should preserve project-owned state on full and observability reruns: ${path}`);
+    }
+  }
 
   const settings = JSON.parse(readFileSync(resolve(target, ".claude/settings.json"), "utf8"));
   const identities = hookIdentities(settings.hooks);
@@ -2045,7 +2084,7 @@ function assertInstallerScripts() {
   if (
     claudeState.schema_version !== 3 ||
     claudeState.install_status !== "installed" ||
-    claudeState.selected_profile !== "full" ||
+    claudeState.selected_profile !== "observability" ||
     !Array.isArray(claudeState.managed_hooks) ||
     claudeState.managed_hooks.length === 0 ||
     !claudeState.managed_partial_files?.[".claude/settings.json"]?.sha256
@@ -2113,11 +2152,43 @@ function assertInstallerScripts() {
   const rollbackConflictSettings = JSON.parse(readFileSync(rollbackConflictSettingsPath, "utf8"));
   rollbackConflictSettings.localPreference = true;
   writeFileSync(rollbackConflictSettingsPath, `${JSON.stringify(rollbackConflictSettings, null, 2)}\n`);
-  assertRuntimeFail(
-    "installer rollback partial settings conflict",
-    runRepoScript([installer, "--target", rollbackConflictTarget, "--rollback"]),
-    "managed partial file conflict",
-  );
+  assertRuntimePass("installer rollback preserves unrelated settings", runRepoScript([installer, "--target", rollbackConflictTarget, "--rollback"]));
+  const restoredSettings = JSON.parse(readFileSync(rollbackConflictSettingsPath, "utf8"));
+  if (restoredSettings.localPreference !== true) {
+    throw new Error("installer rollback should preserve unrelated .claude/settings.json fields");
+  }
+
+  const interruptedHooksTarget = resolve(fixtureRoot, "install-claude-interrupted-hooks-target");
+  assertRuntimePass("installer interrupted hooks core setup", runRepoScript([coreInstaller, "--target", interruptedHooksTarget]));
+  assertRuntimePass("installer interrupted hooks first install", runRepoScript([installer, "--target", interruptedHooksTarget, "--profile", "implementation"]));
+  const interruptedSettingsPath = resolve(interruptedHooksTarget, ".claude/settings.json");
+  const hooksBeforeRemoval = readFileSync(interruptedSettingsPath, "utf8");
+  assertRuntimePass("installer interrupted hooks removal", runRepoScript([installer, "--target", interruptedHooksTarget, "--profile", "implementation", "--skip-hooks"]));
+  const pendingHookState = JSON.parse(readFileSync(resolve(interruptedHooksTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  writeFileSync(resolve(interruptedHooksTarget, ".agent-spectrum-kernel/claude-install-state.json.in-progress.json"), `${JSON.stringify({ pending_state: pendingHookState }, null, 2)}\n`);
+  writeFileSync(interruptedSettingsPath, hooksBeforeRemoval);
+  assertRuntimePass("installer interrupted hooks before-write rollback", runRepoScript([installer, "--target", interruptedHooksTarget, "--rollback"]));
+  if (readFileSync(interruptedSettingsPath, "utf8") !== hooksBeforeRemoval) {
+    throw new Error("rollback should accept an unapplied hook removal as already restored");
+  }
+
+  assertRuntimePass("installer interrupted hooks second removal", runRepoScript([installer, "--target", interruptedHooksTarget, "--profile", "implementation", "--skip-hooks"]));
+  const pendingHookWriteState = JSON.parse(readFileSync(resolve(interruptedHooksTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  writeFileSync(resolve(interruptedHooksTarget, ".agent-spectrum-kernel/claude-install-state.json.in-progress.json"), `${JSON.stringify({ pending_state: pendingHookWriteState }, null, 2)}\n`);
+  assertRuntimePass("installer interrupted hooks after-write rollback", runRepoScript([installer, "--target", interruptedHooksTarget, "--rollback"]));
+  if (!readFileSync(interruptedSettingsPath, "utf8").includes("ai-metrics-record")) {
+    throw new Error("rollback should restore hooks after an applied hook removal");
+  }
+
+  const missingSettingsRollbackTarget = resolve(fixtureRoot, "install-claude-missing-settings-rollback-target");
+  assertRuntimePass("installer missing settings rollback core setup", runRepoScript([coreInstaller, "--target", missingSettingsRollbackTarget]));
+  assertRuntimePass("installer missing settings rollback first install", runRepoScript([installer, "--target", missingSettingsRollbackTarget, "--profile", "implementation"]));
+  assertRuntimePass("installer missing settings rollback second install", runRepoScript([installer, "--target", missingSettingsRollbackTarget, "--profile", "review"]));
+  rmSync(resolve(missingSettingsRollbackTarget, ".claude/settings.json"));
+  assertRuntimePass("installer missing settings force rollback", runRepoScript([installer, "--target", missingSettingsRollbackTarget, "--rollback", "--force"]));
+  if (!existsSync(resolve(missingSettingsRollbackTarget, ".claude/settings.json"))) {
+    throw new Error("force rollback should create settings.json when restoring managed hooks");
+  }
 
   const detachTarget = resolve(fixtureRoot, "install-claude-detach-target");
   assertRuntimePass("installer detach core setup", runRepoScript([coreInstaller, "--target", detachTarget]));
@@ -2168,7 +2239,7 @@ function assertInstallerScripts() {
   assertRuntimeFail(
     "installer missing core",
     runRepoScript([installer, "--target", missingCoreTarget]),
-    "ASK core install state is missing",
+    "--merge-agents",
   );
   if (existsSync(resolve(missingCoreTarget, ".claude"))) {
     throw new Error("installer missing core failure should not write adapter files");
@@ -2286,6 +2357,10 @@ function assertCoreInstallerScripts() {
   if (readFileSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"), "utf8") !== readFileSync(resolve(repoRoot, "skills/operating-mode-router/SKILL.md"), "utf8")) {
     throw new Error("kernel installer --force should refresh managed skills from the current checkout");
   }
+  assertRuntimePass("kernel installer force rollback", runRepoScript([installer, "--target", freshTarget, "--rollback"]));
+  if (readFileSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"), "utf8") !== "# local stale copy\n") {
+    throw new Error("kernel installer rollback should restore the immediate pre-force local content");
+  }
 
   const mergeTarget = resolve(fixtureRoot, "kernel-install-merge");
   mkdirSync(mergeTarget, { recursive: true });
@@ -2366,7 +2441,7 @@ function assertCoreInstallerScripts() {
   assertRuntimeFail(
     "kernel installer rollback managed block conflict",
     runRepoScript([installer, "--target", blockConflictTarget, "--rollback"]),
-    "managed block conflict",
+    "rollback block conflict",
   );
 
   const detachTarget = resolve(fixtureRoot, "kernel-install-detach");
@@ -2416,11 +2491,20 @@ function assertCoreInstallerScripts() {
 
 function assertCodexInstallerScripts() {
   const installer = resolve(repoRoot, "scripts/install-codex-adapter.mjs");
+  const coreInstaller = resolve(repoRoot, "scripts/install-kernel.mjs");
   const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
   const markerPattern = /<!-- agent-spectrum-kernel:start -->/g;
   const profiles = ["minimal", "implementation", "investigation", "review", "adoption", "observability", "full"];
+  const sourceCommand = readFileSync(resolve(repoRoot, "adapters/codex/commands/codex-exec.md"), "utf8");
+  for (const [prompt, contract] of Object.entries(CODEX_PROMPT_CONTRACTS)) {
+    const expectedInvocation = `--prompt ${prompt} --mode ${contract.mode} --sandbox ${contract.sandbox}`;
+    if (!sourceCommand.includes(expectedInvocation)) {
+      throw new Error(`source Codex command template must use the managed contract for ${prompt}: ${expectedInvocation}`);
+    }
+  }
 
   const freshTarget = resolve(fixtureRoot, "codex-install-fresh");
+  assertRuntimePass("codex installer core setup", runRepoScript([coreInstaller, "--target", freshTarget]));
   const freshRun = runRepoScript([installer, "--target", freshTarget]);
   assertRuntimePass("codex installer fresh run", freshRun);
   const freshState = readCodexInstallState(freshTarget);
@@ -2467,6 +2551,7 @@ function assertCodexInstallerScripts() {
 
   for (const profile of profiles) {
     const profileTarget = resolve(fixtureRoot, `codex-install-profile-${profile}`);
+    assertRuntimePass(`codex installer ${profile} core setup`, runRepoScript([coreInstaller, "--target", profileTarget]));
     assertRuntimePass(`codex installer ${profile} profile`, runRepoScript([installer, "--target", profileTarget, "--profile", profile]));
     const profileState = readCodexInstallState(profileTarget);
     if (profileState.selected_profile !== profile) {
@@ -2474,6 +2559,14 @@ function assertCodexInstallerScripts() {
     }
     if (profile === "full" && profileState.selected_skills.length !== manifest.skills.length) {
       throw new Error(`codex full profile should install every manifest skill\n${JSON.stringify(profileState, null, 2)}`);
+    }
+    const generatedCommand = readFileSync(resolve(profileTarget, ".agents/commands/codex-exec.md"), "utf8");
+    for (const prompt of profileState.selected_prompts) {
+      const contract = CODEX_PROMPT_CONTRACTS[prompt];
+      const expectedInvocation = `--prompt ${prompt} --mode ${contract.mode} --sandbox ${contract.sandbox}`;
+      if (!generatedCommand.includes(expectedInvocation)) {
+        throw new Error(`codex command template must use the managed contract for ${prompt}: ${expectedInvocation}`);
+      }
     }
     assertCodexInstallClosed(`codex installer ${profile} profile`, profileTarget);
     if (profile === "implementation") {
@@ -2503,12 +2596,17 @@ function assertCodexInstallerScripts() {
   if (readFileSync(resolve(freshTarget, ".agents/skills/controlled-implementation/SKILL.md"), "utf8") !== readFileSync(resolve(repoRoot, "skills/controlled-implementation/SKILL.md"), "utf8")) {
     throw new Error("codex installer --force should refresh managed Codex skills from the current checkout");
   }
+  assertRuntimePass("codex installer force rollback", runRepoScript([installer, "--target", freshTarget, "--rollback"]));
+  if (readFileSync(resolve(freshTarget, ".agents/skills/controlled-implementation/SKILL.md"), "utf8") !== "# local stale copy\n") {
+    throw new Error("codex installer rollback should restore the immediate pre-force local content");
+  }
 
   const mergeTarget = resolve(fixtureRoot, "codex-install-merge");
   mkdirSync(mergeTarget, { recursive: true });
   writeFileSync(resolve(mergeTarget, "AGENTS.md"), "# Project Rules\n\nKeep this Codex project overlay.\n");
-  assertRuntimePass("codex installer merge agents", runRepoScript([installer, "--target", mergeTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--merge-agents"]));
-  assertRuntimePass("codex installer merge agents rerun", runRepoScript([installer, "--target", mergeTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--merge-agents"]));
+  assertRuntimePass("codex installer merge core setup", runRepoScript([coreInstaller, "--target", mergeTarget, "--merge-agents"]));
+  assertRuntimePass("codex installer core-owned agents", runRepoScript([installer, "--target", mergeTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command"]));
+  assertRuntimePass("codex installer core-owned agents rerun", runRepoScript([installer, "--target", mergeTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command"]));
   const mergedAgents = readFileSync(resolve(mergeTarget, "AGENTS.md"), "utf8");
   if (!mergedAgents.includes("Keep this Codex project overlay.") || (mergedAgents.match(markerPattern) ?? []).length !== 1) {
     throw new Error(`codex installer should preserve existing AGENTS.md content and keep one managed block\n${mergedAgents}`);
@@ -2517,8 +2615,10 @@ function assertCodexInstallerScripts() {
   const skipAgentsTarget = resolve(fixtureRoot, "codex-install-skip-agents");
   mkdirSync(skipAgentsTarget, { recursive: true });
   writeFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "# Existing AGENTS\n");
-  assertRuntimePass("codex installer skip agents", runRepoScript([installer, "--target", skipAgentsTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--skip-agents"]));
-  if (readFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "utf8") !== "# Existing AGENTS\n") {
+  assertRuntimePass("codex installer skip agents core setup", runRepoScript([coreInstaller, "--target", skipAgentsTarget, "--merge-agents"]));
+  const agentsBeforeCodex = readFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "utf8");
+  assertRuntimePass("codex installer leaves core-owned agents", runRepoScript([installer, "--target", skipAgentsTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command"]));
+  if (readFileSync(resolve(skipAgentsTarget, "AGENTS.md"), "utf8") !== agentsBeforeCodex) {
     throw new Error("codex installer --skip-agents should leave AGENTS.md untouched");
   }
 
@@ -2528,13 +2628,14 @@ function assertCodexInstallerScripts() {
   assertRuntimeFail(
     "codex installer existing AGENTS without merge",
     runRepoScript([installer, "--target", conflictTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command"]),
-    "--merge-agents",
+    "ASK core install state is missing",
   );
   if (existsSync(resolve(conflictTarget, ".agent-spectrum-kernel/codex-install-state.json")) || existsSync(resolve(conflictTarget, ".agents/skills/test-first-verification/SKILL.md"))) {
     throw new Error("codex installer preflight failure should not partially write files");
   }
 
   const dryRunTarget = resolve(fixtureRoot, "codex-install-dry-run");
+  assertRuntimePass("codex installer dry-run core setup", runRepoScript([coreInstaller, "--target", dryRunTarget]));
   const dryRun = runRepoScript([installer, "--target", dryRunTarget, "--dry-run"]);
   assertRuntimePass("codex installer dry run", dryRun);
   if (
@@ -2551,6 +2652,7 @@ function assertCodexInstallerScripts() {
   }
 
   const staleTarget = resolve(fixtureRoot, "codex-install-stale");
+  assertRuntimePass("codex installer stale core setup", runRepoScript([coreInstaller, "--target", staleTarget]));
   assertRuntimePass("codex installer stale setup", runRepoScript([installer, "--target", staleTarget, "--profile", "full"]));
   const staleRun = runRepoScript([installer, "--target", staleTarget, "--profile", "review"]);
   assertRuntimePass("codex installer stale report", staleRun);
@@ -2583,6 +2685,7 @@ function assertCodexInstallerScripts() {
   assertCodexInstallClosed("codex installer pruned review profile", staleTarget);
 
   const modifiedPruneTarget = resolve(fixtureRoot, "codex-install-modified-prune");
+  assertRuntimePass("codex installer modified prune core setup", runRepoScript([coreInstaller, "--target", modifiedPruneTarget]));
   assertRuntimePass("codex installer modified prune setup", runRepoScript([installer, "--target", modifiedPruneTarget, "--profile", "full"]));
   assertRuntimePass("codex installer modified prune stale setup", runRepoScript([installer, "--target", modifiedPruneTarget, "--profile", "review"]));
   writeFileSync(resolve(modifiedPruneTarget, ".agents/prompts/skill-implement.md"), "# locally modified Codex managed file\n");
@@ -2642,11 +2745,12 @@ function assertCodexInstallerScripts() {
   }
 
   const overwriteTarget = resolve(fixtureRoot, "codex-install-no-overwrite");
+  assertRuntimePass("codex installer no-overwrite core setup", runRepoScript([coreInstaller, "--target", overwriteTarget]));
   mkdirSync(resolve(overwriteTarget, ".agents/skills/test-first-verification"), { recursive: true });
   writeFileSync(resolve(overwriteTarget, ".agents/skills/test-first-verification/SKILL.md"), "# local codex skill\n");
   assertRuntimeFail(
     "codex installer no-overwrite skill conflict",
-    runRepoScript([installer, "--target", overwriteTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--no-overwrite-skills", "--skip-agents"]),
+    runRepoScript([installer, "--target", overwriteTarget, "--skills", "test-first-verification", "--skip-prompts", "--skip-command", "--no-overwrite-skills"]),
     "would be overwritten",
   );
   if (existsSync(resolve(overwriteTarget, ".agent-spectrum-kernel/codex-install-state.json"))) {
@@ -2855,8 +2959,8 @@ function assertAdapterRuntimeSmokeScript() {
 
   const smokeResult = runRepoScript([runtimeSmokeScript, "--target", target, "--adapter", "claude"]);
   assertRuntimePass("adapter runtime smoke Claude pass", smokeResult);
-  if (!smokeResult.stdout.includes("ASK adapter runtime smoke: pass") || !readFileSync(resolve(target, "docs/ai/metrics/events.jsonl"), "utf8").includes("adapter-runtime-smoke")) {
-    throw new Error(`adapter runtime smoke should append a non-sensitive event\n${smokeResult.stdout}\n${smokeResult.stderr}`);
+  if (!smokeResult.stdout.includes("ASK adapter runtime smoke: pass") || !readFileSync(resolve(target, ".agent-spectrum-kernel/runtime-smoke/events.jsonl"), "utf8").includes("adapter-runtime-smoke")) {
+    throw new Error(`adapter runtime smoke should append an isolated non-sensitive event\n${smokeResult.stdout}\n${smokeResult.stderr}`);
   }
 
   const missingRuntimeTarget = resolve(fixtureRoot, "adapter-runtime-smoke-missing-runtime");
@@ -2872,19 +2976,59 @@ function assertAdapterRuntimeSmokeScript() {
   rmSync(resolve(missingEventStoreTarget, "docs/ai/metrics"), { recursive: true, force: true });
   writeFileSync(resolve(missingEventStoreTarget, "docs/ai/metrics"), "not a directory\n");
   const missingEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", missingEventStoreTarget, "--adapter", "claude"]);
-  assertRuntimeFail("adapter runtime smoke missing event store", missingEventStoreResult, "event-store directory is missing");
+  assertRuntimeFail("adapter runtime smoke detects configured event store failure", missingEventStoreResult, "configured event-store directory is missing or invalid");
+
+  const directoryEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-directory-event-store");
+  assertRuntimePass("adapter smoke directory event store core setup", runRepoScript([coreInstaller, "--target", directoryEventStoreTarget]));
+  assertRuntimePass("adapter smoke directory event store Claude setup", runRepoScript([claudeInstaller, "--target", directoryEventStoreTarget, "--profile", "full"]));
+  rmSync(resolve(directoryEventStoreTarget, "docs/ai/metrics/events.jsonl"), { force: true });
+  mkdirSync(resolve(directoryEventStoreTarget, "docs/ai/metrics/events.jsonl"));
+  const directoryEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", directoryEventStoreTarget, "--adapter", "claude"]);
+  assertRuntimeFail("adapter runtime smoke rejects directory event store", directoryEventStoreResult, "configured event-store must be a regular file");
+
+  const readOnlyEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-read-only-event-store");
+  assertRuntimePass("adapter smoke read-only event store core setup", runRepoScript([coreInstaller, "--target", readOnlyEventStoreTarget]));
+  assertRuntimePass("adapter smoke read-only event store Claude setup", runRepoScript([claudeInstaller, "--target", readOnlyEventStoreTarget, "--profile", "full"]));
+  const readOnlyEventStorePath = resolve(readOnlyEventStoreTarget, "docs/ai/metrics/events.jsonl");
+  const readOnlyEventStoreContent = "existing event content\n";
+  writeFileSync(readOnlyEventStorePath, readOnlyEventStoreContent);
+  chmodSync(readOnlyEventStorePath, 0o444);
+  const readOnlyEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", readOnlyEventStoreTarget, "--adapter", "claude"]);
+  chmodSync(readOnlyEventStorePath, 0o644);
+  assertRuntimeFail("adapter runtime smoke rejects non-appendable event store", readOnlyEventStoreResult, "configured event-store is not append-openable");
+  if (readFileSync(readOnlyEventStorePath, "utf8") !== readOnlyEventStoreContent) {
+    throw new Error("configured event-store append probe must not modify existing event content");
+  }
+
+  const symlinkEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-symlink-event-store");
+  assertRuntimePass("adapter smoke symlink event store core setup", runRepoScript([coreInstaller, "--target", symlinkEventStoreTarget]));
+  assertRuntimePass("adapter smoke symlink event store Claude setup", runRepoScript([claudeInstaller, "--target", symlinkEventStoreTarget, "--profile", "full"]));
+  const outsideEventStore = resolve(fixtureRoot, "outside-event-store.jsonl");
+  writeFileSync(outsideEventStore, "outside event store\n");
+  const symlinkEventStorePath = resolve(symlinkEventStoreTarget, "docs/ai/metrics/events.jsonl");
+  rmSync(symlinkEventStorePath, { force: true });
+  symlinkSync(outsideEventStore, symlinkEventStorePath);
+  const symlinkEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", symlinkEventStoreTarget, "--adapter", "claude"]);
+  assertRuntimeFail("adapter runtime smoke rejects symlink event store escape", symlinkEventStoreResult, "configured event store escapes target through a symbolic link");
 }
 
 function assertCodexRunnerScript() {
   const installer = resolve(repoRoot, "scripts/install-codex-adapter.mjs");
+  const coreInstaller = resolve(repoRoot, "scripts/install-kernel.mjs");
   const target = resolve(fixtureRoot, "codex-runner-target");
+  assertRuntimePass("codex runner core setup", runRepoScript([coreInstaller, "--target", target]));
   assertRuntimePass("codex runner install setup", runRepoScript([installer, "--target", target, "--profile", "implementation"]));
+  const targetRunnerScript = resolve(target, "scripts/codex-exec-runner.mjs");
 
   const fakeCodex = resolve(target, "fake-codex");
   writeFileSync(
     fakeCodex,
     `#!/bin/sh
-cat <<'EOF'
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
 Changed:
 - Ran fake Codex implementation.
 
@@ -2904,7 +3048,7 @@ EOF
   );
   chmodSync(fakeCodex, 0o755);
   const passResult = runRepoScript([
-    codexRunnerScript,
+    targetRunnerScript,
     "--target",
     target,
     "--prompt",
@@ -2921,11 +3065,124 @@ EOF
     throw new Error(`codex runner should capture output and report executed evidence\n${passResult.stdout}\n${passResult.stderr}`);
   }
 
+  const sourceRunnerResult = runRepoScript([codexRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects a runner from another checkout", sourceRunnerResult, "running runner is not the target managed runner");
+
+  const originalRunnerRuntime = readFileSync(targetRunnerScript, "utf8");
+  const originalSharedRuntime = readFileSync(resolve(target, "scripts/ask-shared.mjs"), "utf8");
+  const outsideRuntimeDir = resolve(fixtureRoot, "outside-codex-runtime", "scripts");
+  mkdirSync(outsideRuntimeDir, { recursive: true });
+  const outsideRunnerPath = resolve(outsideRuntimeDir, "codex-exec-runner.mjs");
+  writeFileSync(outsideRunnerPath, originalRunnerRuntime);
+  writeFileSync(resolve(outsideRuntimeDir, "ask-shared.mjs"), originalSharedRuntime);
+  rmSync(targetRunnerScript);
+  symlinkSync(outsideRunnerPath, targetRunnerScript);
+  const symlinkRunnerResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects symlink runner escape", symlinkRunnerResult, "managed runner escapes target through a symbolic link");
+  rmSync(targetRunnerScript);
+  writeFileSync(targetRunnerScript, originalRunnerRuntime);
+
+  const sharedRuntimePath = resolve(target, "scripts/ask-shared.mjs");
+  const outsideSharedPath = resolve(outsideRuntimeDir, "outside-ask-shared.mjs");
+  writeFileSync(outsideSharedPath, originalSharedRuntime);
+  rmSync(sharedRuntimePath);
+  symlinkSync(outsideSharedPath, sharedRuntimePath);
+  const symlinkSharedResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects imported ask-shared symlink escape", symlinkSharedResult, "managed Codex runtime escapes target through a symbolic link");
+  rmSync(sharedRuntimePath);
+  writeFileSync(sharedRuntimePath, originalSharedRuntime);
+
+  const runsPath = resolve(target, ".agents/runs");
+  const outsideRunsPath = resolve(fixtureRoot, "outside-codex-runs");
+  rmSync(runsPath, { recursive: true, force: true });
+  mkdirSync(outsideRunsPath, { recursive: true });
+  symlinkSync(outsideRunsPath, runsPath);
+  const symlinkOutputResult = runRepoScript([targetRunnerScript, "--target", target, "--output", ".agents/runs/escape.md", "--dry-run"]);
+  assertRuntimeFail("codex runner rejects symlink output parent escape", symlinkOutputResult, "output escapes target through a symbolic link");
+  if (existsSync(resolve(outsideRunsPath, "escape.md"))) {
+    throw new Error("codex runner must not write output through a symbolic link outside target");
+  }
+  rmSync(runsPath);
+  mkdirSync(runsPath, { recursive: true });
+
+  const failedOutputPath = resolve(target, "codex-preserved-output.md");
+  writeFileSync(failedOutputPath, "previous successful output\n");
+  const fakeFailingCodex = resolve(target, "fake-failing-codex");
+  writeFileSync(
+    fakeFailingCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+echo 'partial failed output' > "$output"
+exit 9
+`,
+  );
+  chmodSync(fakeFailingCodex, 0o755);
+  const failedOutputResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--codex-bin",
+    fakeFailingCodex,
+    "--output",
+    "codex-preserved-output.md",
+  ]);
+  assertRuntimeFail("codex runner preserves prior output on process failure", failedOutputResult, "codex exec exited 9");
+  if (readFileSync(failedOutputPath, "utf8") !== "previous successful output\n") {
+    throw new Error("codex runner must preserve the previous official output when Codex exits non-zero");
+  }
+
+  const mismatchResult = runRepoScript([targetRunnerScript, "--target", target, "--prompt", "skill-investigate.md", "--mode", "implementation", "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner rejects prompt mode mismatch", mismatchResult, "prompt/mode mismatch");
+  const escapeResult = runRepoScript([targetRunnerScript, "--target", target, "--output", "../escape.md", "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner rejects output escape", escapeResult, "output must be a relative path inside target");
+  const diffOptionResult = runRepoScript([targetRunnerScript, "--target", target, "--diff-base", "--output=/tmp/ask-injected.diff", "--dry-run"]);
+  assertRuntimeFail("codex runner rejects git option diff base", diffOptionResult, "invalid --diff-base");
+  if (existsSync("/tmp/ask-injected.diff")) {
+    throw new Error("codex runner must not permit --diff-base to create an external file");
+  }
+
+  const statePath = resolve(target, ".agent-spectrum-kernel/codex-install-state.json");
+  const originalState = readFileSync(statePath, "utf8");
+  const stateWithoutPromptRecord = JSON.parse(originalState);
+  delete stateWithoutPromptRecord.managed_files[".agents/prompts/skill-implement.md"];
+  writeFileSync(statePath, `${JSON.stringify(stateWithoutPromptRecord, null, 2)}\n`);
+  const missingPromptRecordResult = runRepoScript([targetRunnerScript, "--target", target, "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner requires selected prompt managed record", missingPromptRecordResult, "selected prompt has no managed Codex prompt record");
+  writeFileSync(statePath, originalState);
+
+  const detachedState = JSON.parse(originalState);
+  detachedState.install_status = "detached";
+  writeFileSync(statePath, `${JSON.stringify(detachedState, null, 2)}\n`);
+  const detachedDryRunResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects detached install state", detachedDryRunResult, "Codex install status must be installed");
+  if (detachedDryRunResult.stdout.includes("codex exec exited undefined")) {
+    throw new Error("preflight failures must not report an undefined Codex exit code");
+  }
+  writeFileSync(statePath, originalState);
+
+  const sensorRuntimePath = resolve(target, "scripts/ask-sensors.mjs");
+  const originalSensorRuntime = readFileSync(sensorRuntimePath, "utf8");
+  writeFileSync(sensorRuntimePath, `${originalSensorRuntime}\n// local modification\n`);
+  const runtimeHashResult = runRepoScript([targetRunnerScript, "--target", target, "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner rejects modified sensor runtime", runtimeHashResult, "managed Codex runtime hash mismatch: scripts/ask-sensors.mjs");
+  writeFileSync(sensorRuntimePath, originalSensorRuntime);
+
+  const missingBinaryResult = runRepoScript([targetRunnerScript, "--target", target, "--codex-bin", "missing-codex-binary-for-fixture"]);
+  assertRuntimeFail("codex runner reports unavailable executable as projected failure", missingBinaryResult, "codex exec could not start");
+  if (!missingBinaryResult.stdout.includes("Evidence level: projected")) {
+    throw new Error(`unavailable Codex executable must remain projected\n${missingBinaryResult.stdout}`);
+  }
+
   const fakeWeakCodex = resolve(target, "fake-weak-codex");
   writeFileSync(fakeWeakCodex, "#!/bin/sh\necho 'Looks good.'\n");
   chmodSync(fakeWeakCodex, 0o755);
   const weakResult = runRepoScript([
-    codexRunnerScript,
+    targetRunnerScript,
     "--target",
     target,
     "--prompt",
@@ -2937,13 +3194,13 @@ EOF
     "--output",
     "codex-weak-output.md",
   ]);
-  assertRuntimePass("codex runner insufficient evidence is normalized", weakResult);
-  if (!weakResult.stdout.includes("Codex runner: insufficient_evidence") || !weakResult.stdout.includes("Sensor status: fail")) {
+  assertRuntimeFail("codex runner insufficient evidence is normalized", weakResult, "Codex runner: insufficient_evidence");
+  if (!weakResult.stdout.includes("Codex runner: insufficient_evidence") || !weakResult.stdout.includes("Sensor status: not run") || !weakResult.stdout.includes("Evidence level: runtime_detected")) {
     throw new Error(`codex runner should normalize weak output as insufficient evidence\n${weakResult.stdout}\n${weakResult.stderr}`);
   }
 
-  const missingPromptResult = runRepoScript([codexRunnerScript, "--target", target, "--prompt", "missing.md", "--codex-bin", fakeCodex]);
-  assertRuntimeFail("codex runner missing prompt preflight", missingPromptResult, "installed prompt is missing");
+  const missingPromptResult = runRepoScript([targetRunnerScript, "--target", target, "--prompt", "missing.md", "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner missing prompt preflight", missingPromptResult, "prompt has no validated execution profile");
 }
 
 function assertSensorsScript() {
@@ -3075,6 +3332,21 @@ Layer summary:
   assertRuntimePass("sensors review pass", reviewPassResult);
   if (!reviewPassResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`review contract fixture should pass sensors\n${reviewPassResult.stdout}`);
+  }
+
+  const promptContracts = [
+    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nUnknown / not verified:\n- External runtime.\n\nNext:\n- Continue investigation.\n"],
+    ["verification", "Verification Contract:\n- Behavior to prove: fixture.\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\nNot verified:\n- External runtime.\n\nNext verification:\n- Run integration coverage.\n"],
+    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nStop condition:\n- Missing evidence.\n"],
+  ];
+  for (const [mode, content] of promptContracts) {
+    const input = resolve(target, `${mode}-contract.txt`);
+    writeFileSync(input, content);
+    const contractResult = runRepoScript([sensorsScript, "--target", target, "--mode", mode, "--input", input]);
+    assertRuntimePass(`sensors ${mode} contract pass`, contractResult);
+    if (!contractResult.stdout.includes("ASK sensors: pass")) {
+      throw new Error(`${mode} prompt contract should pass sensors\n${contractResult.stdout}`);
+    }
   }
 
   const riskInput = resolve(target, "risk.txt");
