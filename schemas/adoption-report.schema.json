@@ -27,7 +27,9 @@
         "completed_tasks": { "type": "integer", "minimum": 0 },
         "validation_passed": { "type": "integer", "minimum": 0 },
         "validation_failed": { "type": "integer", "minimum": 0 },
-        "insufficient_evidence": { "type": "integer", "minimum": 0 }
+        "insufficient_evidence": { "type": "integer", "minimum": 0 },
+        "command_attempts": { "type": "integer", "minimum": 0 },
+        "verification_commands": { "type": "integer", "minimum": 0 }
       }
     },
     "instruction_maturity": {

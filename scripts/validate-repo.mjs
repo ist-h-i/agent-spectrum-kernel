@@ -84,6 +84,7 @@ const REQUIRED_ADAPTER_RUNTIME_PATHS = [
   "scripts/codex-exec-runner.mjs",
 ];
 const REQUIRED_OBSERVABILITY_DOCS = [
+  "docs/adapter-deployment-governance.md",
   "docs/observability-runtime-contract.md",
   "docs/operation-automation-contract.md",
   "docs/debt-lifecycle-contract.md",
@@ -93,6 +94,7 @@ const REQUIRED_OBSERVABILITY_DOCS = [
   "docs/ai/observability-config.yml",
 ];
 const OBSERVABILITY_CONFIG_PATH = "docs/ai/observability-config.yml";
+const ADAPTER_DEPLOYMENT_GOVERNANCE_PATH = "docs/adapter-deployment-governance.md";
 const PATTERN_B_WORKFLOW_PATH = "adapters/claude-code/github-actions/claude-review-on-mention.yml";
 const CORE_KERNEL_INSTALLER_PATH = "scripts/install-kernel.mjs";
 const CODEX_ADAPTER_INSTALLER_PATH = "scripts/install-codex-adapter.mjs";
@@ -1331,11 +1333,22 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
       reportDirLocal: false,
       sessionBoundaryFallbackEnabled: false,
       sessionBoundarySource: false,
+      commandAttemptCaptureEnabled: false,
       externalPublicationDisabled: false,
       rawPromptStorageDisabled: false,
       sensitiveStorageDisabled: false,
       httpHooksDisabled: false,
       webhookHooksDisabled: false,
+      commitEventsDisabled: false,
+      retentionConfigured: false,
+      rotationConfigured: false,
+      schemaMismatchQuarantines: false,
+      deduplicationKeyEventId: false,
+      schemaMigrationManualReview: false,
+      optOutDocumented: false,
+      bashHooksUseCommandAttempt: false,
+      metricsRecorderCommandAttemptSeparate: false,
+      metricsRecorderRuntimeHealthSurface: false,
     },
     externalPublicationSafety: {
       noHttpHookHandlers: true,
@@ -1411,6 +1424,18 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
       mentionsNoRawPromptDefault: false,
       mentionsNoExternalPublicationDefault: false,
     },
+    adapterGovernance: {
+      supportMatrixProfiles: false,
+      deploymentStates: false,
+      profileLifecycleGuidance: false,
+      coexistencePrecedence: false,
+      ownershipApprovals: false,
+      observabilityLifecycle: false,
+      runtimeHealthSurface: false,
+      commandAttemptSemantics: false,
+      metricsGuardrails: false,
+      successWithdrawalSignals: false,
+    },
   };
 
   for (const path of REQUIRED_CLAUDE_ADAPTER_PATHS) {
@@ -1480,11 +1505,13 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
 
   validateObservabilityConfig(root, checks, errors);
   validateHookSafety(root, checks, errors);
+  validateMetricsRuntime(root, checks, errors);
   validateCoreInstaller(root, checks, errors);
   validateCodexInstaller(root, checks, errors);
   validateInstallerProjection(root, checks, errors);
   validatePatternBWorkflow(root, checks, errors);
   validateAdapterDocumentation(root, checks, errors);
+  validateAdapterGovernance(root, checks, errors);
 
   return checks;
 }
@@ -1503,6 +1530,7 @@ function validateObservabilityConfig(root, checks, errors) {
   checks.localObservability.reportDirLocal = typeof reportDir === "string" && reportDir.startsWith("docs/ai/") && !/^https?:\/\//i.test(reportDir);
   checks.localObservability.sessionBoundaryFallbackEnabled = readObjectPath(config, "capture.allow_session_id_task_boundary") === true;
   checks.localObservability.sessionBoundarySource = readObjectPath(config, "capture.task_boundary_source") === "session_id";
+  checks.localObservability.commandAttemptCaptureEnabled = readObjectPath(config, "capture.record_command_attempts") === true;
   checks.localObservability.externalPublicationDisabled = readObjectPath(config, "external_publication.enabled") === false;
   checks.localObservability.rawPromptStorageDisabled = readObjectPath(config, "privacy.raw_prompt_storage") === false;
   checks.localObservability.sensitiveStorageDisabled =
@@ -1511,9 +1539,17 @@ function validateObservabilityConfig(root, checks, errors) {
     readObjectPath(config, "privacy.personal_data_storage") === false;
   checks.localObservability.httpHooksDisabled = readObjectPath(config, "safety.http_hooks_enabled") === false;
   checks.localObservability.webhookHooksDisabled = readObjectPath(config, "safety.webhook_hooks_enabled") === false;
+  checks.localObservability.commitEventsDisabled = readObjectPath(config, "lifecycle.commit_events_to_git") === false;
+  checks.localObservability.lifecyclePolicyOnly = readObjectPath(config, "lifecycle.enforcement") === "policy_only";
+  checks.localObservability.retentionConfigured = Number(readObjectPath(config, "lifecycle.retention_days")) > 0 && Number(readObjectPath(config, "lifecycle.report_retention_days")) > 0;
+  checks.localObservability.rotationConfigured = Number(readObjectPath(config, "lifecycle.rotate_when_bytes")) > 0;
+  checks.localObservability.schemaMismatchQuarantines = readObjectPath(config, "lifecycle.schema_mismatch_action") === "quarantine" && typeof readObjectPath(config, "lifecycle.quarantine_dir") === "string";
+  checks.localObservability.deduplicationKeyEventId = readObjectPath(config, "lifecycle.deduplication_key") === "event_id";
+  checks.localObservability.schemaMigrationManualReview = readObjectPath(config, "lifecycle.schema_migration") === "manual_review_required";
+  checks.localObservability.optOutDocumented = typeof readObjectPath(config, "lifecycle.opt_out") === "string" && readObjectPath(config, "lifecycle.opt_out").includes("detach");
 
   for (const [field, ok] of Object.entries(checks.localObservability)) {
-    if (field === "configPresent") {
+    if (field === "configPresent" || field === "bashHooksUseCommandAttempt" || field === "metricsRecorderCommandAttemptSeparate" || field === "metricsRecorderRuntimeHealthSurface") {
       continue;
     }
     if (!ok) {
@@ -1553,6 +1589,7 @@ function parseYamlScalar(value) {
   if (trimmed === "true") return true;
   if (trimmed === "false") return false;
   if (trimmed === "null") return null;
+  if (/^-?\d+$/.test(trimmed)) return Number(trimmed);
   return trimmed.replace(/^["']|["']$/g, "");
 }
 
@@ -1601,6 +1638,65 @@ function validateHookSafety(root, checks, errors) {
       checks.externalPublicationSafety.noExternalDestinationEnabled = false;
       fail(errors, "external publication safety", `${path} contains an enabled external destination`);
     }
+    const bashHookCommands = hookCommandsForMatcher(hookConfig, "Bash");
+    if (bashHookCommands.length > 0) {
+      const ok = bashHookCommands.every((command) => command.includes("--event-kind command_attempt")) && bashHookCommands.every((command) => !command.includes("--event-kind verification_attempt"));
+      checks.localObservability.bashHooksUseCommandAttempt = checks.localObservability.bashHooksUseCommandAttempt || ok;
+      if (!ok) {
+        fail(errors, "local observability", `${path} Bash hooks must use command_attempt instead of verification_attempt`);
+      }
+    }
+  }
+  if (!checks.localObservability.bashHooksUseCommandAttempt) {
+    fail(errors, "local observability", "Claude Bash hooks must record command_attempt events by default");
+  }
+}
+
+function hookCommandsForMatcher(hookConfig, matcher) {
+  const commands = [];
+  const groups = hookConfig?.hooks?.PostToolUse;
+  if (!Array.isArray(groups)) {
+    return commands;
+  }
+  for (const group of groups) {
+    if (group?.matcher !== matcher || !Array.isArray(group.hooks)) {
+      continue;
+    }
+    for (const hook of group.hooks) {
+      if (hook?.type === "command" && typeof hook.command === "string") {
+        commands.push(hook.command);
+      }
+    }
+  }
+  return commands;
+}
+
+function validateMetricsRuntime(root, checks, errors) {
+  const recorderPath = resolve(root, "scripts/ai-metrics-record.mjs");
+  const schemaPath = resolve(root, "schemas/metrics-event.schema.json");
+  if (existsSync(recorderPath)) {
+    const text = readFileSync(recorderPath, "utf8");
+    checks.localObservability.metricsRecorderCommandAttemptSeparate =
+      text.includes("command_attempt_metrics") &&
+      text.includes("classified_as_verification") &&
+      text.includes("verification_metrics.commands_run");
+    checks.localObservability.metricsRecorderRuntimeHealthSurface =
+      text.includes(".agent-spectrum-kernel/runtime-health.jsonl") &&
+      text.includes("non_blocking_metrics_record_failure") &&
+      text.includes("full_error_message_stored");
+  }
+  if (existsSync(schemaPath)) {
+    const text = readFileSync(schemaPath, "utf8");
+    checks.localObservability.metricsRecorderCommandAttemptSeparate =
+      checks.localObservability.metricsRecorderCommandAttemptSeparate &&
+      text.includes("\"command_attempt_metrics\"") &&
+      text.includes("\"classified_as_verification\"");
+  }
+  if (!checks.localObservability.metricsRecorderCommandAttemptSeparate) {
+    fail(errors, "local observability", "metrics recorder/schema must separate command_attempt from verification_attempt");
+  }
+  if (!checks.localObservability.metricsRecorderRuntimeHealthSurface) {
+    fail(errors, "local observability", "metrics recorder must write sanitized runtime-health entries for non-blocking failures");
   }
 }
 
@@ -1818,6 +1914,73 @@ function validateAdapterDocumentation(root, checks, errors) {
   }
 }
 
+function validateAdapterGovernance(root, checks, errors) {
+  const absolutePath = resolve(root, ADAPTER_DEPLOYMENT_GOVERNANCE_PATH);
+  if (!existsSync(absolutePath)) {
+    return;
+  }
+  const text = readFileSync(absolutePath, "utf8");
+  checks.adapterGovernance.supportMatrixProfiles =
+    /Local minimal/.test(text) &&
+    /Local observed/.test(text) &&
+    /Shared PR review/.test(text) &&
+    /Plugin distribution/.test(text) &&
+    /Codex projection/.test(text);
+  checks.adapterGovernance.deploymentStates =
+    /\bInstalled\b/.test(text) &&
+    /\bActivated\b/.test(text) &&
+    /\bOperational\b/.test(text) &&
+    /File copy alone/.test(text);
+  checks.adapterGovernance.profileLifecycleGuidance =
+    /Install/.test(text) &&
+    /Validate/.test(text) &&
+    /Update/.test(text) &&
+    /Detach/.test(text) &&
+    /Unsupported combinations/.test(text);
+  checks.adapterGovernance.coexistencePrecedence =
+    /Coexistence And Precedence/.test(text) &&
+    /CLAUDE_PLUGIN_ROOT/.test(text) &&
+    /\.claude\/settings\.json/.test(text);
+  checks.adapterGovernance.ownershipApprovals =
+    /Ownership And Approvals/.test(text) &&
+    /GitHub Actions/.test(text) &&
+    /approval/.test(text);
+  checks.adapterGovernance.observabilityLifecycle =
+    /commit_events_to_git/.test(text) &&
+    /schema_mismatch_action/.test(text) &&
+    /deduplication_key/.test(text) &&
+    /schema_migration/.test(text) &&
+    /retention_days/.test(text);
+  checks.adapterGovernance.runtimeHealthSurface =
+    /\.agent-spectrum-kernel\/runtime-health\.jsonl/.test(text) &&
+    /ask-doctor/.test(text) &&
+    /full error messages/.test(text);
+  checks.adapterGovernance.commandAttemptSemantics =
+    /command_attempt/.test(text) &&
+    /verification_attempt/.test(text) &&
+    /generic Bash hook must not classify every command as verification/.test(text);
+  checks.adapterGovernance.metricsGuardrails =
+    /HR/.test(text) &&
+    /compensation/.test(text) &&
+    /promotion/.test(text) &&
+    /individual productivity rankings/.test(text) &&
+    /personal identifiers/.test(text);
+  checks.adapterGovernance.successWithdrawalSignals =
+    /re-review count/.test(text) &&
+    /missed blocker rate/.test(text) &&
+    /false positive rate/.test(text) &&
+    /senior correction effort/.test(text) &&
+    /token\/time cost/.test(text) &&
+    /unsupported-causality/.test(text) &&
+    /Reduce, redesign, or remove/.test(text);
+
+  for (const [field, ok] of Object.entries(checks.adapterGovernance)) {
+    if (!ok) {
+      fail(errors, "adapter deployment governance", `${ADAPTER_DEPLOYMENT_GOVERNANCE_PATH} failed governance check: ${field}`);
+    }
+  }
+}
+
 function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
@@ -1935,11 +2098,23 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- report dir local: ${claudeAdapterChecks.localObservability.reportDirLocal ? "ok" : "invalid"}`,
     `- session boundary fallback enabled: ${claudeAdapterChecks.localObservability.sessionBoundaryFallbackEnabled ? "ok" : "invalid"}`,
     `- session boundary source is session_id: ${claudeAdapterChecks.localObservability.sessionBoundarySource ? "ok" : "invalid"}`,
+    `- command attempt capture enabled: ${claudeAdapterChecks.localObservability.commandAttemptCaptureEnabled ? "ok" : "invalid"}`,
     `- external publication disabled: ${claudeAdapterChecks.localObservability.externalPublicationDisabled ? "ok" : "invalid"}`,
     `- raw prompt storage disabled: ${claudeAdapterChecks.localObservability.rawPromptStorageDisabled ? "ok" : "invalid"}`,
     `- sensitive storage disabled: ${claudeAdapterChecks.localObservability.sensitiveStorageDisabled ? "ok" : "invalid"}`,
     `- HTTP hooks disabled: ${claudeAdapterChecks.localObservability.httpHooksDisabled ? "ok" : "invalid"}`,
     `- webhook hooks disabled: ${claudeAdapterChecks.localObservability.webhookHooksDisabled ? "ok" : "invalid"}`,
+    `- commit events disabled: ${claudeAdapterChecks.localObservability.commitEventsDisabled ? "ok" : "invalid"}`,
+    `- lifecycle enforcement is policy-only: ${claudeAdapterChecks.localObservability.lifecyclePolicyOnly ? "declared" : "invalid"}`,
+    `- retention policy declared: ${claudeAdapterChecks.localObservability.retentionConfigured ? "declared" : "invalid"}`,
+    `- rotation policy declared: ${claudeAdapterChecks.localObservability.rotationConfigured ? "declared" : "invalid"}`,
+    `- schema mismatch policy declared: ${claudeAdapterChecks.localObservability.schemaMismatchQuarantines ? "declared" : "invalid"}`,
+    `- deduplication policy declared: ${claudeAdapterChecks.localObservability.deduplicationKeyEventId ? "declared" : "invalid"}`,
+    `- schema migration policy declared: ${claudeAdapterChecks.localObservability.schemaMigrationManualReview ? "declared" : "invalid"}`,
+    `- detach/purge policy documented: ${claudeAdapterChecks.localObservability.optOutDocumented ? "ok" : "invalid"}`,
+    `- Bash hooks use command_attempt: ${claudeAdapterChecks.localObservability.bashHooksUseCommandAttempt ? "ok" : "invalid"}`,
+    `- command_attempt separated from verification_attempt: ${claudeAdapterChecks.localObservability.metricsRecorderCommandAttemptSeparate ? "ok" : "invalid"}`,
+    `- runtime-health surface present: ${claudeAdapterChecks.localObservability.metricsRecorderRuntimeHealthSurface ? "ok" : "invalid"}`,
     "",
     "## External publication safety checks",
     "",
@@ -1989,6 +2164,19 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- Pattern B documented as optional: ${claudeAdapterChecks.documentationConsistency.mentionsPatternBOptional ? "ok" : "missing"}`,
     `- no raw prompt storage by default documented: ${claudeAdapterChecks.documentationConsistency.mentionsNoRawPromptDefault ? "ok" : "missing"}`,
     `- no external publication by default documented: ${claudeAdapterChecks.documentationConsistency.mentionsNoExternalPublicationDefault ? "ok" : "missing"}`,
+    "",
+    "## Adapter deployment governance checks",
+    "",
+    `- support matrix profiles: ${claudeAdapterChecks.adapterGovernance.supportMatrixProfiles ? "ok" : "missing"}`,
+    `- deployment states: ${claudeAdapterChecks.adapterGovernance.deploymentStates ? "ok" : "missing"}`,
+    `- profile lifecycle guidance: ${claudeAdapterChecks.adapterGovernance.profileLifecycleGuidance ? "ok" : "missing"}`,
+    `- coexistence precedence: ${claudeAdapterChecks.adapterGovernance.coexistencePrecedence ? "ok" : "missing"}`,
+    `- ownership approvals: ${claudeAdapterChecks.adapterGovernance.ownershipApprovals ? "ok" : "missing"}`,
+    `- observability lifecycle: ${claudeAdapterChecks.adapterGovernance.observabilityLifecycle ? "ok" : "missing"}`,
+    `- runtime health surface: ${claudeAdapterChecks.adapterGovernance.runtimeHealthSurface ? "ok" : "missing"}`,
+    `- command attempt semantics: ${claudeAdapterChecks.adapterGovernance.commandAttemptSemantics ? "ok" : "missing"}`,
+    `- metrics guardrails: ${claudeAdapterChecks.adapterGovernance.metricsGuardrails ? "ok" : "missing"}`,
+    `- success and withdrawal signals: ${claudeAdapterChecks.adapterGovernance.successWithdrawalSignals ? "ok" : "missing"}`,
     "",
     "## Document path checks",
     "",

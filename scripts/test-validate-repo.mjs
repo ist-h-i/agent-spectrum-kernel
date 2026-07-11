@@ -180,10 +180,14 @@ function writeAdapterFixture(root) {
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    writeFileSync(resolve(root, path), '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object" }\n');
+    const content = path === "schemas/metrics-event.schema.json"
+      ? '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "properties": { "command_attempt_metrics": { "properties": { "classified_as_verification": { "type": "boolean" } } } } }\n'
+      : '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object" }\n';
+    writeFileSync(resolve(root, path), content);
   }
 
   const docs = [
+    "docs/adapter-deployment-governance.md",
     "docs/observability-runtime-contract.md",
     "docs/operation-automation-contract.md",
     "docs/debt-lifecycle-contract.md",
@@ -195,7 +199,7 @@ function writeAdapterFixture(root) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
     writeFileSync(
       resolve(root, path),
-      "# Fixture\n\nLocal hooks are the default local observability path. Pattern B is optional. No raw prompt storage by default. No external publication by default.\n",
+      "# Fixture\n\nLocal hooks are the default local observability path. Pattern B is optional. No raw prompt storage by default. No external publication by default.\n\nLocal minimal, Local observed, Shared PR review, Plugin distribution, and Codex projection are documented. Installed, Activated, and Operational states are separate; File copy alone is insufficient. Validate, Update, Detach, and Unsupported combinations are covered. Coexistence And Precedence mentions CLAUDE_PLUGIN_ROOT and .claude/settings.json. Ownership And Approvals covers GitHub Actions approval. Observability lifecycle includes commit_events_to_git, retention_days, schema_mismatch_action, deduplication_key, and schema_migration. Runtime health uses .agent-spectrum-kernel/runtime-health.jsonl and ask-doctor without full error messages. command_attempt and verification_attempt semantics state that a generic Bash hook must not classify every command as verification. Metrics guardrails prohibit HR, compensation, promotion, individual productivity rankings, and personal identifiers. Success criteria include re-review count, missed blocker rate, false positive rate, senior correction effort, token/time cost, unsupported-causality, and Reduce, redesign, or remove conditions.\n",
     );
   }
   writeFileSync(
@@ -216,6 +220,7 @@ function writeAdapterFixture(root) {
 capture:
   allow_session_id_task_boundary: true
   task_boundary_source: session_id
+  record_command_attempts: true
   record_command_hash: false
   record_command_preview: false
 storage:
@@ -231,6 +236,30 @@ external_publication:
 safety:
   http_hooks_enabled: false
   webhook_hooks_enabled: false
+lifecycle:
+  enforcement: policy_only
+  commit_events_to_git: false
+  retention_days: 90
+  rotate_when_bytes: 5242880
+  schema_mismatch_action: quarantine
+  quarantine_dir: docs/ai/metrics/quarantine
+  deduplication_key: event_id
+  schema_migration: manual_review_required
+  report_retention_days: 180
+  opt_out: detach_preserves_project_data; purge_runtime_data_is_a_separate_approved_manual_action
+`,
+  );
+
+  mkdirSync(resolve(root, "scripts"), { recursive: true });
+  writeFileSync(
+    resolve(root, "scripts/ai-metrics-record.mjs"),
+    `const event = { verification_metrics: {} };
+event.command_attempt_metrics = { command_kind: "unknown", classified_as_verification: false };
+event.verification_metrics.commands_run = [{ command_kind: "test" }];
+const path = ".agent-spectrum-kernel/runtime-health.jsonl";
+const code = "non_blocking_metrics_record_failure";
+const privacy = { full_error_message_stored: false };
+console.log(path, code, privacy);
 `,
   );
 
@@ -266,9 +295,9 @@ safety:
   }
 
   mkdirSync(resolve(root, "adapters/claude-code/project/.claude/hooks"), { recursive: true });
-  writeFileSync(resolve(root, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind task_stop --sidecar .claude/metrics/current-task.json --non-blocking >/dev/null 2>&1 || true" }] }] } }\n');
+  writeFileSync(resolve(root, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind command_attempt --non-blocking >/dev/null 2>&1 || true" }] }], "Stop": [{ "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind task_stop --sidecar .claude/metrics/current-task.json --non-blocking >/dev/null 2>&1 || true" }] }] } }\n');
   mkdirSync(resolve(root, "adapters/claude-code/plugin/hooks"), { recursive: true });
-  writeFileSync(resolve(root, "adapters/claude-code/plugin/hooks/hooks.json"), '{ "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "ai-skills-metrics-record" }] }] } }\n');
+  writeFileSync(resolve(root, "adapters/claude-code/plugin/hooks/hooks.json"), '{ "hooks": { "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "test -x \\"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\\" && \\"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\\" --event-kind command_attempt --non-blocking >/dev/null 2>&1 || true" }] }], "Stop": [{ "hooks": [{ "type": "command", "command": "test -x \\"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\\" && \\"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\\" --event-kind task_stop --non-blocking >/dev/null 2>&1 || true" }] }] } }\n');
 
   mkdirSync(resolve(root, "adapters/claude-code/plugin/.claude-plugin"), { recursive: true });
   writeFileSync(resolve(root, "adapters/claude-code/plugin/.claude-plugin/plugin.json"), '{ "name": "ai-skills" }\n');
@@ -682,6 +711,7 @@ function runRepoScript(args, options = {}) {
     cwd: options.cwd ?? repoRoot,
     input: options.input,
     encoding: "utf8",
+    env: options.env ? { ...process.env, ...options.env } : process.env,
   });
 }
 
@@ -884,6 +914,38 @@ function assertRuntimeScripts() {
   }
 
   const metricsSchema = JSON.parse(readFileSync(resolve(repoRoot, "schemas/metrics-event.schema.json"), "utf8"));
+  const commandAttemptStore = resolve(root, "docs/ai/metrics/command-attempt-events.jsonl");
+  const commandAttemptResult = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--event-kind",
+      "command_attempt",
+      "--event-store",
+      commandAttemptStore,
+    ],
+    {
+      cwd: root,
+      input: JSON.stringify({
+        session_id: "S1A",
+        tool_name: "Bash",
+        tool_input: {
+          command: "npm test",
+        },
+      }),
+    },
+  );
+  assertRuntimePass("metrics recorder command attempt smoke", commandAttemptResult);
+  const commandAttemptEvent = JSON.parse(readFileSync(commandAttemptStore, "utf8"));
+  assertSchemaPass("recorded command attempt event", metricsSchema, commandAttemptEvent);
+  if (
+    commandAttemptEvent.command_attempt_metrics?.command_kind !== "test" ||
+    commandAttemptEvent.command_attempt_metrics?.classified_as_verification !== false ||
+    commandAttemptEvent.verification_metrics.commands_run ||
+    !commandAttemptEvent.command_attempt_summary?.includes("not counted as verified work")
+  ) {
+    throw new Error(`command_attempt should not be recorded as verification evidence\n${JSON.stringify(commandAttemptEvent, null, 2)}`);
+  }
+
   const gateDecisionStore = resolve(root, "docs/ai/metrics/gate-decision-record-events.jsonl");
   const gateDecisionRecordResult = runRepoScript([
     resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
@@ -1083,6 +1145,87 @@ function assertRuntimeScripts() {
   if (nonBlockingFailure.stdout || nonBlockingFailure.stderr) {
     throw new Error(`non-blocking metrics failures should stay silent\nstdout:\n${nonBlockingFailure.stdout}\nstderr:\n${nonBlockingFailure.stderr}`);
   }
+  const runtimeHealthPath = resolve(root, ".agent-spectrum-kernel/runtime-health.jsonl");
+  if (!existsSync(runtimeHealthPath)) {
+    throw new Error("non-blocking metrics failures should write a local runtime-health entry");
+  }
+  const runtimeHealthEntry = JSON.parse(readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).at(-1));
+  if (
+    runtimeHealthEntry.error_code !== "non_blocking_metrics_record_failure" ||
+    runtimeHealthEntry.privacy_note?.full_error_message_stored !== false ||
+    JSON.stringify(runtimeHealthEntry).includes("EISDIR")
+  ) {
+    throw new Error(`runtime-health entry should be sanitized\n${JSON.stringify(runtimeHealthEntry, null, 2)}`);
+  }
+  const repeatedFailure = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--event-kind",
+      "task_stop",
+      "--event-store",
+      resolve(root, "docs/ai/metrics"),
+      "--non-blocking",
+    ],
+    { cwd: root, input: JSON.stringify({ session_id: "S5-repeat" }) },
+  );
+  assertRuntimePass("metrics recorder repeated non-blocking failure", repeatedFailure);
+  const repeatedHealthEntry = JSON.parse(readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).at(-1));
+  if (
+    readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).length !== 1 ||
+    repeatedHealthEntry.occurrence_count !== 2 ||
+    Date.parse(repeatedHealthEntry.last_seen_at) <= Date.parse(repeatedHealthEntry.first_seen_at) ||
+    Date.now() - Date.parse(repeatedHealthEntry.last_seen_at) > 60_000
+  ) {
+    throw new Error("repeated identical runtime-health failures should be deduplicated");
+  }
+
+  writeFileSync(resolve(root, "docs/ai/observability-config.yml"), "runtime_health:\n  max_entries: 3\n");
+  const healthEntry = (component, code) => ({
+    schema_version: "1.0.0",
+    occurred_at: "2000-01-01T00:00:00.000Z",
+    first_seen_at: "2000-01-01T00:00:00.000Z",
+    last_seen_at: "2000-01-01T00:00:00.000Z",
+    occurrence_count: 1,
+    component,
+    status: "error",
+    error_code: code,
+  });
+  writeFileSync(runtimeHealthPath, `${JSON.stringify(healthEntry("ai-metrics-record", "non_blocking_metrics_record_failure"))}\n${JSON.stringify(healthEntry("component-b", "failure-b"))}\n${JSON.stringify(healthEntry("component-c", "failure-c"))}\n`);
+  assertRuntimePass("metrics recorder moves recurring health entry to the tail", runRepoScript([resolve(repoRoot, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--event-store", resolve(root, "docs/ai/metrics"), "--non-blocking"], { cwd: root, input: JSON.stringify({ session_id: "S5-multi-key" }) }));
+  const multiKeyHealth = readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  if (multiKeyHealth.length !== 3 || multiKeyHealth.at(-1)?.component !== "ai-metrics-record" || Date.parse(multiKeyHealth.at(-1)?.last_seen_at) <= Date.parse(multiKeyHealth.at(-1)?.first_seen_at)) {
+    throw new Error(`recurring health entries must be retained by latest observation time\n${JSON.stringify(multiKeyHealth, null, 2)}`);
+  }
+
+  const nestedRuntimeCwd = resolve(root, "nested/hook-cwd");
+  mkdirSync(nestedRuntimeCwd, { recursive: true });
+  const recoveredResult = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--event-kind",
+      "task_stop",
+      "--event-store",
+      resolve(root, "docs/ai/metrics/recovered-events.jsonl"),
+      "--non-blocking",
+    ],
+    {
+      cwd: nestedRuntimeCwd,
+      env: { CLAUDE_PROJECT_DIR: root },
+      input: JSON.stringify({ session_id: "S5-recovered" }),
+    },
+  );
+  assertRuntimePass("metrics recorder writes recovery at Claude project root", recoveredResult);
+  const recoveredEntries = readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  if (recoveredEntries.at(-1)?.status !== "recovered" || existsSync(resolve(nestedRuntimeCwd, ".agent-spectrum-kernel/runtime-health.jsonl"))) {
+    throw new Error("successful nested hook execution should recover health at CLAUDE_PROJECT_DIR, not CWD");
+  }
+
+  writeFileSync(resolve(root, "docs/ai/observability-config.yml"), "runtime_health:\n  max_entries: 2\n");
+  assertRuntimePass("metrics recorder bounded health failure", runRepoScript([resolve(repoRoot, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--event-store", resolve(root, "docs/ai/metrics"), "--non-blocking"], { cwd: root, input: JSON.stringify({ session_id: "S5-bounded-error" }) }));
+  assertRuntimePass("metrics recorder bounded health recovery", runRepoScript([resolve(repoRoot, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--event-store", resolve(root, "docs/ai/metrics/bounded-events.jsonl"), "--non-blocking"], { cwd: root, input: JSON.stringify({ session_id: "S5-bounded-recovery" }) }));
+  if (readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).length > 2) {
+    throw new Error("runtime-health history must stay within configured max_entries");
+  }
 
   const routingRecordStore = resolve(root, "docs/ai/metrics/routing-record-events.jsonl");
   const routingRecordResult = runRepoScript([
@@ -1163,6 +1306,10 @@ function assertRuntimeScripts() {
     event_id: "evt-verification-1",
     verification_metrics: { commands_run: [{ command_kind: "test" }] },
   });
+  taskEvents.push(
+    { ...taskEvents[0], event_id: "evt-command-attempt-1", command_attempt_metrics: { command_kind: "test", classified_as_verification: false } },
+    { ...taskEvents[0], event_id: "evt-command-attempt-2", command_attempt_metrics: { command_kind: "test", classified_as_verification: false } },
+  );
   taskEvents.push({
     ...taskEvents[0],
     event_id: "evt-verification-2",
@@ -1190,7 +1337,13 @@ function assertRuntimeScripts() {
   ]);
   assertRuntimePass("metrics summarizer task aggregation smoke", summarizeResult);
   const report = JSON.parse(readFileSync(resolve(root, "docs/ai/reports/report.json"), "utf8"));
-  if (report.summary.event_count !== 8 || report.summary.tasks_reviewed !== 1 || report.summary.completed_tasks !== 1) {
+  if (
+    report.summary.event_count !== 10 ||
+    report.summary.tasks_reviewed !== 1 ||
+    report.summary.completed_tasks !== 1 ||
+    report.summary.command_attempts !== 2 ||
+    report.summary.verification_commands !== 2
+  ) {
     throw new Error(`summarizer should separate event count from task count\n${JSON.stringify(report.summary, null, 2)}`);
   }
 
@@ -2150,6 +2303,15 @@ function assertInstallerScripts() {
   if (!pluginHookCommands.every((command) => command.includes("--non-blocking") && isFailOpenHookCommand(command))) {
     throw new Error(`plugin hooks should be non-blocking and shell-level fail-open\n${pluginHookCommands.join("\n")}`);
   }
+  const pluginBashCommands = (pluginHooks.hooks?.PostToolUse ?? [])
+    .filter((group) => group.matcher === "Bash")
+    .flatMap((group) => (group.hooks ?? []).map((hook) => hook.command ?? ""));
+  if (
+    pluginBashCommands.length === 0 ||
+    pluginBashCommands.some((command) => !command.includes("--event-kind command_attempt") || command.includes("--event-kind verification_attempt"))
+  ) {
+    throw new Error(`plugin Bash hooks should record command_attempt, not verification_attempt\n${pluginBashCommands.join("\n")}`);
+  }
   const pluginBinSmokeRoot = resolve(fixtureRoot, "plugin-bin-no-runtime");
   mkdirSync(pluginBinSmokeRoot, { recursive: true });
   const pluginBinSmoke = runRepoScript([resolve(repoRoot, "adapters/claude-code/plugin/bin/ai-skills-metrics-record"), "--event-kind", "task_stop"], {
@@ -2628,6 +2790,57 @@ function assertDoctorScript() {
   if (!healthyResult.stdout.includes("Layer statuses:") || !healthyResult.stdout.includes("behavioral_evidence: insufficient_evidence")) {
     throw new Error(`doctor should report separated layer statuses\n${healthyResult.stdout}\n${healthyResult.stderr}`);
   }
+  const healthyJsonResult = runRepoScript([doctorScript, "--target", healthyTarget, "--json"]);
+  assertRuntimePass("doctor machine-readable deployment status", healthyJsonResult);
+  const healthyJson = JSON.parse(healthyJsonResult.stdout);
+  if (healthyJson.deploymentStatus?.Installed?.status !== "pass" || healthyJson.deploymentStatus?.Operational?.status !== "insufficient_evidence") {
+    throw new Error(`doctor must distinguish Installed from unsupported Operational evidence\n${healthyJsonResult.stdout}`);
+  }
+
+  const doctorStateFixture = (name) => {
+    const target = resolve(fixtureRoot, `doctor-state-${name}`);
+    assertRuntimePass(`doctor ${name} setup`, runRepoScript([installer, "--target", target, "--skills", "operating-mode-router"]));
+    return target;
+  };
+  const missingBlockTarget = doctorStateFixture("missing-block");
+  writeFileSync(resolve(missingBlockTarget, "AGENTS.md"), "# local project rules\n");
+  assertRuntimeFail("doctor missing AGENTS managed block", runRepoScript([doctorScript, "--target", missingBlockTarget]), "managed block is missing from AGENTS.md");
+
+  const modifiedBlockTarget = doctorStateFixture("modified-block");
+  const modifiedAgentsPath = resolve(modifiedBlockTarget, "AGENTS.md");
+  writeFileSync(modifiedAgentsPath, readFileSync(modifiedAgentsPath, "utf8").replace("<!-- Source: Agent Spectrum Kernel.", "<!-- Source: Modified Agent Spectrum Kernel."));
+  assertRuntimeFail("doctor modified AGENTS managed block", runRepoScript([doctorScript, "--target", modifiedBlockTarget]), "managed block hash mismatch: AGENTS.md#agent-spectrum-kernel");
+
+  const missingStatusTarget = doctorStateFixture("missing-status");
+  const missingStatusPath = resolve(missingStatusTarget, ".agent-spectrum-kernel/install-state.json");
+  const missingStatusState = JSON.parse(readFileSync(missingStatusPath, "utf8"));
+  delete missingStatusState.install_status;
+  writeFileSync(missingStatusPath, `${JSON.stringify(missingStatusState)}\n`);
+  assertRuntimeFail("doctor missing install status", runRepoScript([doctorScript, "--target", missingStatusTarget]), "install_status must be installed");
+
+  const detachedStateTarget = doctorStateFixture("detached-state");
+  const detachedStatePath = resolve(detachedStateTarget, ".agent-spectrum-kernel/install-state.json");
+  const detachedState = JSON.parse(readFileSync(detachedStatePath, "utf8"));
+  detachedState.install_status = "detached";
+  writeFileSync(detachedStatePath, `${JSON.stringify(detachedState)}\n`);
+  const detachedDoctorResult = runRepoScript([doctorScript, "--target", detachedStateTarget, "--json"]);
+  assertRuntimeFail("doctor detached state", detachedDoctorResult, "install_status must be installed");
+  const detachedDoctorJson = JSON.parse(detachedDoctorResult.stdout);
+  if (detachedDoctorJson.deploymentStatus?.Installed?.status !== "fail") {
+    throw new Error(`detached state must make Installed fail\n${detachedDoctorResult.stdout}`);
+  }
+
+  const missingManagedFileTarget = doctorStateFixture("missing-managed-file");
+  rmSync(resolve(missingManagedFileTarget, "CUSTOM_INSTRUCTIONS.md"));
+  assertRuntimeFail("doctor missing managed file", runRepoScript([doctorScript, "--target", missingManagedFileTarget]), "managed file is missing: CUSTOM_INSTRUCTIONS.md");
+
+  const missingCodexStateTarget = doctorStateFixture("missing-codex-state");
+  mkdirSync(resolve(missingCodexStateTarget, ".agents"), { recursive: true });
+  const missingCodexStateResult = runRepoScript([doctorScript, "--target", missingCodexStateTarget, "--json"]);
+  assertRuntimeFail("doctor detects projected Codex without state", missingCodexStateResult, "codex-install-state.json: missing");
+  if (JSON.parse(missingCodexStateResult.stdout).deploymentStatus?.Installed?.status !== "fail") {
+    throw new Error(`projected adapter without install state must make Installed fail\n${missingCodexStateResult.stdout}`);
+  }
 
   const inProgressTarget = resolve(fixtureRoot, "doctor-in-progress");
   assertRuntimePass("doctor setup in-progress install", runRepoScript([installer, "--target", inProgressTarget, "--skills", "operating-mode-router"]));
@@ -2666,6 +2879,52 @@ function assertDoctorScript() {
   assertRuntimePass("doctor unsupported capability warning", unsupportedClaimResult);
   if (!unsupportedClaimResult.stdout.includes("ASK doctor: warn") || !unsupportedClaimResult.stdout.includes("Local metrics event recording evidence level is unsupported")) {
     throw new Error(`doctor should warn on unsupported adapter capability claims\n${unsupportedClaimResult.stdout}\n${unsupportedClaimResult.stderr}`);
+  }
+
+  const runtimeHealthTarget = resolve(fixtureRoot, "doctor-runtime-health");
+  assertRuntimePass("doctor setup runtime health install", runRepoScript([installer, "--target", runtimeHealthTarget, "--skills", "operating-mode-router"]));
+  mkdirSync(resolve(runtimeHealthTarget, ".agent-spectrum-kernel"), { recursive: true });
+  writeFileSync(
+    resolve(runtimeHealthTarget, ".agent-spectrum-kernel/runtime-health.jsonl"),
+    '{"schema_version":"1.0.0","occurred_at":"2999-01-01T00:00:00.000Z","component":"ai-metrics-record","status":"error","error_code":"non_blocking_metrics_record_failure","message":"details omitted","privacy_note":{"raw_prompts_stored":false,"full_error_message_stored":false}}\n',
+  );
+  const runtimeHealthResult = runRepoScript([doctorScript, "--target", runtimeHealthTarget]);
+  assertRuntimePass("doctor runtime-health warning", runtimeHealthResult);
+  if (!runtimeHealthResult.stdout.includes("ASK doctor: warn") || !runtimeHealthResult.stdout.includes("adapter runtime health issue: ai-metrics-record non_blocking_metrics_record_failure")) {
+    throw new Error(`doctor should surface sanitized runtime-health issues\n${runtimeHealthResult.stdout}\n${runtimeHealthResult.stderr}`);
+  }
+  const blockedHealthJson = JSON.parse(runRepoScript([doctorScript, "--target", runtimeHealthTarget, "--json"]).stdout);
+  if (blockedHealthJson.deploymentStatus?.Installed?.status !== "pass" || blockedHealthJson.deploymentStatus?.Operational?.status !== "blocked") {
+    throw new Error(`current runtime-health issues should block Operational without changing Installed\n${JSON.stringify(blockedHealthJson, null, 2)}`);
+  }
+  writeFileSync(
+    resolve(runtimeHealthTarget, ".agent-spectrum-kernel/runtime-health.jsonl"),
+    `${readFileSync(resolve(runtimeHealthTarget, ".agent-spectrum-kernel/runtime-health.jsonl"), "utf8")}{"schema_version":"1.0.0","occurred_at":"2999-01-01T00:01:00.000Z","component":"ai-metrics-record","status":"recovered","error_code":"non_blocking_metrics_record_failure"}\n`,
+  );
+  const recoveredHealthResult = runRepoScript([doctorScript, "--target", runtimeHealthTarget]);
+  assertRuntimePass("doctor runtime-health recovery", recoveredHealthResult);
+  if (recoveredHealthResult.stdout.includes("adapter runtime health issue: ai-metrics-record non_blocking_metrics_record_failure")) {
+    throw new Error(`doctor should close a runtime-health issue after recovery\n${recoveredHealthResult.stdout}`);
+  }
+
+  const staleHealthTarget = resolve(fixtureRoot, "doctor-stale-runtime-health");
+  assertRuntimePass("doctor setup stale runtime health install", runRepoScript([installer, "--target", staleHealthTarget, "--skills", "operating-mode-router"]));
+  mkdirSync(resolve(staleHealthTarget, ".agent-spectrum-kernel"), { recursive: true });
+  writeFileSync(resolve(staleHealthTarget, ".agent-spectrum-kernel/runtime-health.jsonl"), '{"schema_version":"1.0.0","occurred_at":"2000-01-01T00:00:00.000Z","component":"ai-metrics-record","status":"error","error_code":"non_blocking_metrics_record_failure"}\n');
+  const staleHealthResult = runRepoScript([doctorScript, "--target", staleHealthTarget]);
+  assertRuntimePass("doctor stale runtime health is historical", staleHealthResult);
+  if (staleHealthResult.stdout.includes("ASK doctor: warn") || !staleHealthResult.stdout.includes("historical adapter runtime health issue")) {
+    throw new Error(`doctor should report stale unresolved health as historical\n${staleHealthResult.stdout}`);
+  }
+
+  const malformedHealthTarget = resolve(fixtureRoot, "doctor-malformed-runtime-health");
+  assertRuntimePass("doctor setup malformed runtime health install", runRepoScript([installer, "--target", malformedHealthTarget, "--skills", "operating-mode-router"]));
+  mkdirSync(resolve(malformedHealthTarget, ".agent-spectrum-kernel"), { recursive: true });
+  writeFileSync(resolve(malformedHealthTarget, ".agent-spectrum-kernel/runtime-health.jsonl"), 'not json\n{"schema_version":"1.0.0","occurred_at":"2999-01-01T00:00:00.000Z","component":"ai-metrics-record","status":"error","error_code":"non_blocking_metrics_record_failure"}\n');
+  const malformedHealthResult = runRepoScript([doctorScript, "--target", malformedHealthTarget]);
+  assertRuntimePass("doctor malformed runtime health continues", malformedHealthResult);
+  if (!malformedHealthResult.stdout.includes("malformed entry") || !malformedHealthResult.stdout.includes("adapter runtime health issue: ai-metrics-record non_blocking_metrics_record_failure")) {
+    throw new Error(`doctor should retain valid runtime-health entries after malformed lines\n${malformedHealthResult.stdout}`);
   }
 
   const runtimeProbeTarget = resolve(fixtureRoot, "doctor-runtime-probe");
@@ -3374,6 +3633,15 @@ function assertSidecarAdapterInstructions() {
     if (!command.includes("--non-blocking") || !isFailOpenHookCommand(command)) {
       throw new Error(`project metrics hook should be shell-level fail-open and silent\n${command}`);
     }
+  }
+  const projectBashCommands = (hooks.hooks?.PostToolUse ?? [])
+    .filter((group) => group.matcher === "Bash")
+    .flatMap((group) => (group.hooks ?? []).map((hook) => hook.command ?? ""));
+  if (
+    projectBashCommands.length === 0 ||
+    projectBashCommands.some((command) => !command.includes("--event-kind command_attempt") || command.includes("--event-kind verification_attempt"))
+  ) {
+    throw new Error(`project Bash hooks should record command_attempt, not verification_attempt\n${projectBashCommands.join("\n")}`);
   }
 
   const stopCommands = (hooks.hooks?.Stop ?? []).flatMap((group) => (group.hooks ?? []).map((hook) => hook.command ?? ""));

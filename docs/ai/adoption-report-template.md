@@ -47,6 +47,10 @@ Review quality:
 - required fixes count:
 - insufficient evidence tasks:
 - insufficient evidence layers:
+- re-review count:
+- missed blocker rate:
+- false positive rate:
+- senior correction effort:
 
 Debt movement:
 - detected:
@@ -74,6 +78,13 @@ Debt inventory snapshot:
 Next intervention:
 - ...
 
+Value / cost:
+- review duration:
+- token/time cost:
+- routing success without manual skill naming:
+- unsupported completion/readiness claim count:
+- scope deviation count:
+
 Evidence:
 - ...
 
@@ -81,6 +92,8 @@ Privacy / safety note:
 - Raw prompt storage:
 - Sensitive data handling:
 - Personnel-evaluation boundary:
+- Access boundary:
+- Opt-out path:
 ```
 
 ## Monthly Adoption Report
@@ -124,6 +137,17 @@ Adoption effect:
 - Unknown:
 - Unsupported causality claims to avoid:
 
+Value / cost:
+- re-review count:
+- missed blocker rate:
+- false positive rate:
+- unsupported completion/readiness claim count:
+- scope deviation count:
+- review duration:
+- senior correction effort:
+- token/time cost:
+- routing success without manual skill naming:
+
 Recommended next intervention:
 - ...
 
@@ -141,10 +165,13 @@ Privacy / safety note:
 - Metric event recording happens at meaningful task boundaries and only when adoption metrics are enabled or requested.
 - Period summary generation consumes metrics events or reviewed evidence over a defined period.
 - Period summaries aggregate by `task_id`; event count and task count are reported separately.
+- `command_attempts` are reported separately from `verification_commands`; generic Bash command capture must not increase verification coverage, verified-task counts, or completion metrics.
 - Debt movement is a delta for the period. Debt inventory snapshot is a separate latest-status view.
 - Sparse early-adoption reports use `null` for unavailable averages and rates. `null` means unknown, not zero.
 - Review and routing summaries store counts, gates, and decisions only; raw review text and prompts remain out of scope.
 - Normal reports summarize `gate_decisions` by coverage, skipped reason category, insufficient evidence, under-processing, over-processing, missing skip reasons, and top repeated deviation patterns. Full gate decision details remain drill-down data in JSON/event artifacts.
+- Reports must not produce HR, compensation, promotion, personnel-evaluation, individual productivity ranking, or individual performance-scoring outputs.
+- Reports must include value and cost signals together, and must keep unsupported causality unknown instead of implying business impact from adoption correlation alone.
 - Weekly/monthly report templates shape the output, but do not create new skills.
 - External scheduling belongs to the operation layer.
 - Local reports are project-local by default and must not publish externally without opt-in approval.

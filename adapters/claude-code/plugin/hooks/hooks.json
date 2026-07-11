@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "test -x \"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\" && \"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\" --hook-event PostToolUse --event-kind verification_attempt --non-blocking >/dev/null 2>&1 || true # agent-spectrum-kernel:claude-plugin-hook"
+            "command": "test -x \"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\" && \"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\" --hook-event PostToolUse --event-kind command_attempt --non-blocking >/dev/null 2>&1 || true # agent-spectrum-kernel:claude-plugin-hook"
           }
         ]
       }

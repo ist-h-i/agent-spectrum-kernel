@@ -133,6 +133,8 @@ function summarize(events, invalidLines, args) {
   const tasks = aggregateTasks(filtered);
   const skills = unique(tasks.flatMap((task) => task.skills_used));
   const completed = tasks.filter((task) => task.outcome_metrics.task_completed === true).length;
+  const commandAttempts = filtered.filter((event) => event.command_attempt_metrics?.classified_as_verification === false).length;
+  const verificationCommands = tasks.reduce((total, task) => total + (task.verification_metrics.commands_run?.length ?? 0), 0);
   const validationPassed = tasks.filter((task) => task.outcome_metrics.validation_passed === true).length;
   const validationFailed = tasks.filter((task) => task.outcome_metrics.validation_passed === false).length;
   const insufficientEvidence = tasks.filter((task) => taskHasInsufficientEvidence(task)).length;
@@ -156,6 +158,8 @@ function summarize(events, invalidLines, args) {
       validation_passed: validationPassed,
       validation_failed: validationFailed,
       insufficient_evidence: insufficientEvidence,
+      command_attempts: commandAttempts,
+      verification_commands: verificationCommands,
     },
     instruction_maturity: {
       average_goal_clarity: average(tasks, "instruction_quality_metrics.goal_clarity"),

@@ -9,7 +9,9 @@ source_scope: "generic empty template; no project-specific adoption metrics reco
 
 This is a generic template. Project-specific metrics should be stored only in the adopting project.
 
-Do not store raw prompts by default. Do not store secrets, customer data, personal data, or sensitive project details. Metrics are for adoption support, coaching, and workflow improvement, not HR or personnel evaluation.
+Do not store raw prompts by default. Do not store secrets, customer data, personal data, or sensitive project details. Metrics are for adoption support, coaching, workflow improvement, and adapter capability evaluation, not HR, compensation, promotion, personnel evaluation, individual productivity ranking, or individual performance scoring.
+
+Every project-specific metrics program should state its purpose, access boundary, retention, opt-out path, and unsupported causality limits before publishing reports. Avoid personal identifiers unless project policy explicitly approves them.
 
 Machine-readable metrics events should conform to `schemas/metrics-event.schema.json`. Period summaries and generated reports should conform to `schemas/adoption-report.schema.json` when emitted as JSON.
 
@@ -38,6 +40,8 @@ Excluded data:
 - Secrets
 - Customer data
 - Sensitive personal data
+- Personal identifiers unless explicitly approved by project policy
+- Individual rankings or personnel-evaluation fields
 - Project-specific confidential details
 ```
 
@@ -197,6 +201,17 @@ Task outcomes:
 - Debt items converted_to_check:
 - Stale debt items:
 
+Value / cost signals:
+- re-review count:
+- missed blocker rate:
+- false positive rate:
+- unsupported completion/readiness claim count:
+- scope deviation count:
+- review duration:
+- senior correction effort:
+- token/time cost:
+- routing success without manual skill naming:
+
 Maturity movement:
 - Initial level:
 - Current level:
@@ -207,12 +222,16 @@ Adoption effect:
 - Strong signal:
 - Weak signal:
 - Unknown:
+- Unsupported causality claims:
 - Recommended next intervention:
 
 Privacy / safety note:
 - Raw prompt storage:
 - Sensitive data handling:
 - Personnel-evaluation boundary:
+- Access boundary:
+- Retention:
+- Opt-out path:
 ```
 
 Use `null` for unavailable numeric averages and rates in generated JSON reports. Unknown routing or gate coverage is not the same as zero coverage.

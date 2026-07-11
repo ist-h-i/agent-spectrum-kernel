@@ -7,17 +7,20 @@ import {
   findPrivacyStorageConcerns,
   findUnsupportedCapabilityClaims,
   hashFile,
+  hashText,
   readJsonIfExists,
 } from "./ask-shared.mjs";
 
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const CLAUDE_STATE_PATH = ".agent-spectrum-kernel/claude-install-state.json";
+const RUNTIME_HEALTH_PATH = ".agent-spectrum-kernel/runtime-health.jsonl";
 
 function parseArgs(argv) {
   const args = {
     target: process.cwd(),
     runtimeProbe: false,
+    json: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -25,6 +28,8 @@ function parseArgs(argv) {
       args.target = resolve(argv[++index]);
     } else if (arg === "--runtime-probe") {
       args.runtimeProbe = true;
+    } else if (arg === "--json") {
+      args.json = true;
     } else if (arg === "--help" || arg === "-h") {
       printHelp();
       process.exit(0);
@@ -36,7 +41,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Usage: node scripts/ask-doctor.mjs --target /path/to/adopting-repo [--runtime-probe]
+  console.log(`Usage: node scripts/ask-doctor.mjs --target /path/to/adopting-repo [--runtime-probe] [--json]
 
 Checks Agent Spectrum Kernel installation health without mutating files.
 Doctor is an adoption/update health check, not a per-task execution gate.
@@ -69,6 +74,7 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
     label: "core kernel",
     targetSkillsRoot: "skills",
     report,
+    installerName: "agent-spectrum-kernel",
   });
 
   checkManagedInstallState({
@@ -77,6 +83,7 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
     label: "Codex adapter",
     targetSkillsRoot: ".agents/skills",
     report,
+    installerName: "agent-spectrum-codex-adapter",
     optional: true,
   });
 
@@ -86,23 +93,68 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
     label: "Claude adapter",
     targetSkillsRoot: ".claude/skills",
     report,
+    installerName: "agent-spectrum-claude-adapter",
     optional: !existsSync(resolve(target, ".claude")),
   });
 
   checkClaudeAdapter(target, report);
   checkUnsupportedClaims(target, report);
   checkPrivacyDefaults(target, report);
+  checkRuntimeHealth(target, report);
   if (runtimeProbe) {
     checkRuntimeConformanceProbe(target, report);
   }
   report.layerStatuses = buildLayerStatuses(target, report, { runtimeProbe });
+  integrateLayerFindings(report);
+  report.deploymentStatus = buildDeploymentStatus(report);
 
   const runtimeFindings = report.runtimeProbe.warnings.length > 0 || report.runtimeProbe.failures.length > 0;
   const status = report.failures.length > 0 ? "fail" : report.warnings.length > 0 || report.unsupportedClaims.length > 0 || runtimeFindings ? "warn" : "pass";
   return { ...report, status };
 }
 
-function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, report, optional = false }) {
+function integrateLayerFindings(report) {
+  report.findings = [
+    ...report.failures.map((message) => ({ severity: "fail", source: "doctor", message })),
+    ...report.warnings.map((message) => ({ severity: "warn", source: "doctor", message })),
+  ];
+  for (const [layer, entry] of Object.entries(report.layerStatuses)) {
+    if (!["installation_health", "adapter_projection"].includes(layer)) continue;
+    if (entry.status === "fail") {
+      const message = `${layer}: ${entry.detail}`;
+      report.failures.push(message);
+      report.findings.push({ severity: "fail", source: "layer", layer, message });
+    } else if (entry.status === "warn") {
+      const message = `${layer}: ${entry.detail}`;
+      report.warnings.push(message);
+      report.findings.push({ severity: "warn", source: "layer", layer, message });
+    }
+  }
+}
+
+function buildDeploymentStatus(report) {
+  const layerStatuses = [report.layerStatuses.installation_health.status, report.layerStatuses.adapter_projection.status];
+  const installedStatus = layerStatuses.includes("fail") ? "fail" : layerStatuses.includes("warn") ? "warn" : "pass";
+  const currentHealthBlocker = report.warnings.some((warning) => warning.startsWith("adapter runtime health issue:"));
+  return {
+    Installed: {
+      status: installedStatus,
+      detail: installedStatus === "pass" ? "managed installation and projection evidence is healthy" : "managed installation or projection evidence is not healthy",
+    },
+    Activated: {
+      status: "insufficient_evidence",
+      detail: "requires an explicit project profile/approval artifact; doctor does not infer human activation",
+    },
+    Operational: {
+      status: currentHealthBlocker ? "blocked" : "insufficient_evidence",
+      detail: currentHealthBlocker
+        ? "blocked by unresolved current runtime-health issue"
+        : "requires bounded task evidence and a governance judgment; projection, smoke, and policy keys alone are insufficient",
+    },
+  };
+}
+
+function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, report, optional = false, installerName }) {
   const absoluteStatePath = resolve(target, statePath);
   const inProgressPath = `${absoluteStatePath}.in-progress.json`;
   if (existsSync(inProgressPath)) {
@@ -120,11 +172,13 @@ function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, 
   }
 
   const state = stateResult.value;
-  if (state.install_status && state.install_status !== "installed") {
-    report.warnings.push(`${label} install status is ${state.install_status}: ${statePath}`);
-  }
+  if (state.install_status !== "installed") report.failures.push(`${label} install_status must be installed: ${statePath}`);
   report.installed.push(`${label}: install state present (${statePath})`);
-  if (!state || typeof state !== "object" || !Array.isArray(state.installed_skills) || !state.managed_files || typeof state.managed_files !== "object") {
+  if (
+    !state || typeof state !== "object" || state.schema_version !== 3 || state.installer !== installerName ||
+    !state.adapter || state.adapter.name !== installerName || !Array.isArray(state.installed_skills) ||
+    !state.managed_files || typeof state.managed_files !== "object" || !state.managed_blocks || typeof state.managed_blocks !== "object"
+  ) {
     report.failures.push(`${label} install state has invalid shape: ${statePath}`);
     return;
   }
@@ -166,6 +220,30 @@ function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, 
       report.warnings.push(`${label} managed file is stale relative to this ASK checkout: ${managedPath}`);
     }
   }
+  for (const [blockKey, record] of Object.entries(state.managed_blocks)) {
+    const destination = resolve(target, record?.path || "");
+    if (!record || typeof record.path !== "string" || typeof record.sha256 !== "string" || !existsSync(destination)) {
+      report.failures.push(`${label} managed block is missing: ${blockKey}`);
+      continue;
+    }
+    const text = readFileSync(destination, "utf8");
+    const start = text.indexOf("<!-- agent-spectrum-kernel:start -->");
+    const endMarker = "<!-- agent-spectrum-kernel:end -->";
+    const end = text.indexOf(endMarker, start);
+    if (start < 0 || end < start) {
+      report.failures.push(`${label} managed block is missing from ${record.path}: ${blockKey}`);
+      continue;
+    }
+    const block = text.slice(start, end + endMarker.length);
+    if (hashFileContent(block) !== record.sha256) report.failures.push(`${label} managed block hash mismatch: ${blockKey}`);
+  }
+  if (installerName === "agent-spectrum-kernel" && !Object.hasOwn(state.managed_blocks, "AGENTS.md#agent-spectrum-kernel")) {
+    report.failures.push(`${label} required AGENTS.md managed block record is missing: ${statePath}`);
+  }
+}
+
+function hashFileContent(content) {
+  return hashText(content);
 }
 
 function sourcePathForManagedRecord(managedPath, record) {
@@ -284,6 +362,49 @@ function checkPrivacyDefaults(target, report) {
   }
 }
 
+function checkRuntimeHealth(target, report) {
+  const healthPath = resolve(target, RUNTIME_HEALTH_PATH);
+  if (!existsSync(healthPath)) {
+    return;
+  }
+  const entries = [];
+  let malformed = 0;
+  for (const line of readFileSync(healthPath, "utf8").split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      const entry = JSON.parse(line);
+      if (entry && typeof entry === "object") entries.push(entry);
+      else malformed += 1;
+    } catch {
+      malformed += 1;
+    }
+  }
+  if (malformed > 0) report.warnings.push(`adapter runtime health log contains ${malformed} malformed entry/entries: ${RUNTIME_HEALTH_PATH}`);
+  const unresolved = new Map();
+  for (const entry of entries) {
+    const component = typeof entry.component === "string" && entry.component ? entry.component : "unknown-component";
+    const code = typeof entry.error_code === "string" && entry.error_code ? entry.error_code : "runtime_error";
+    const key = `${component}:${code}`;
+    if (entry.status === "error") unresolved.set(key, entry);
+    if (entry.status === "recovered") unresolved.delete(key);
+  }
+  const freshnessHours = Math.max(1, Number(readObservabilityValue(target, ["runtime_health", "freshness_hours"], "24")) || 24);
+  const freshnessMs = freshnessHours * 60 * 60 * 1000;
+  for (const entry of unresolved.values()) {
+    const component = typeof entry.component === "string" && entry.component ? entry.component : "unknown-component";
+    const code = typeof entry.error_code === "string" && entry.error_code ? entry.error_code : "runtime_error";
+    const occurredAt = typeof entry.last_seen_at === "string" && entry.last_seen_at
+      ? entry.last_seen_at
+      : typeof entry.occurred_at === "string" && entry.occurred_at ? entry.occurred_at : "unknown-time";
+    const occurredMs = Date.parse(occurredAt);
+    if (!Number.isFinite(occurredMs) || Date.now() - occurredMs > freshnessMs) {
+      report.installed.push(`historical adapter runtime health issue: ${component} ${code} at ${occurredAt} (${RUNTIME_HEALTH_PATH})`);
+    } else {
+      report.warnings.push(`adapter runtime health issue: ${component} ${code} at ${occurredAt} (${RUNTIME_HEALTH_PATH})`);
+    }
+  }
+}
+
 function checkRuntimeConformanceProbe(target, report) {
   const probe = report.runtimeProbe;
   probe.checked.push("runtime probe is local/static/dry-run only; it does not invoke external adapter runtimes");
@@ -329,7 +450,12 @@ function buildLayerStatuses(target, report, { runtimeProbe }) {
   const projectionFailures = [];
   const projectionWarnings = [];
 
-  for (const statePath of [CORE_STATE_PATH, CODEX_STATE_PATH, CLAUDE_STATE_PATH]) {
+  const stateSpecs = [
+    [CORE_STATE_PATH, "agent-spectrum-kernel", "skills"],
+    [CODEX_STATE_PATH, "agent-spectrum-codex-adapter", ".agents/skills"],
+    [CLAUDE_STATE_PATH, "agent-spectrum-claude-adapter", ".claude/skills"],
+  ];
+  for (const [statePath, installerName, skillsRoot] of stateSpecs) {
     const absoluteStatePath = resolve(target, statePath);
     const stateResult = readJsonIfExists(absoluteStatePath);
     if (!stateResult.ok) {
@@ -339,8 +465,11 @@ function buildLayerStatuses(target, report, { runtimeProbe }) {
       continue;
     }
     const state = stateResult.value;
-    if (state.install_status && state.install_status !== "installed") {
-      installationWarnings.push(`${statePath}: ${state.install_status}`);
+    if (state.install_status !== "installed") {
+      installationFailures.push(`${statePath}: install_status must be installed`);
+    }
+    if (state.schema_version !== 3 || state.installer !== installerName || state.adapter?.name !== installerName || !state.managed_blocks || typeof state.managed_blocks !== "object") {
+      installationFailures.push(`${statePath}: invalid state schema or installer identity`);
     }
     for (const [managedPath, record] of Object.entries(state.managed_files ?? {})) {
       const destination = resolve(target, managedPath);
@@ -350,16 +479,32 @@ function buildLayerStatuses(target, report, { runtimeProbe }) {
         projectionFailures.push(`managed file hash mismatch: ${managedPath}`);
       }
     }
+    for (const [blockKey, record] of Object.entries(state.managed_blocks ?? {})) {
+      const destination = resolve(target, record?.path || "");
+      if (!record || typeof record.path !== "string" || typeof record.sha256 !== "string" || !existsSync(destination)) {
+        projectionFailures.push(`missing managed block: ${blockKey}`);
+        continue;
+      }
+      const text = readFileSync(destination, "utf8");
+      const start = text.indexOf("<!-- agent-spectrum-kernel:start -->");
+      const endMarker = "<!-- agent-spectrum-kernel:end -->";
+      const end = text.indexOf(endMarker, start);
+      if (start < 0 || end < start || hashText(text.slice(start, end + endMarker.length)) !== record.sha256) {
+        projectionFailures.push(`managed block hash mismatch: ${blockKey}`);
+      }
+    }
+    if (installerName === "agent-spectrum-kernel" && !Object.hasOwn(state.managed_blocks ?? {}, "AGENTS.md#agent-spectrum-kernel")) {
+      installationFailures.push(`${statePath}: required AGENTS.md managed block record is missing`);
+    }
     for (const skill of state.selected_skills ?? []) {
-      const root = statePath === CLAUDE_STATE_PATH ? ".claude/skills" : statePath === CODEX_STATE_PATH ? ".agents/skills" : "skills";
-      if (!existsSync(resolve(target, root, skill, "SKILL.md"))) {
-        projectionFailures.push(`missing selected skill: ${root}/${skill}/SKILL.md`);
+      if (!existsSync(resolve(target, skillsRoot, skill, "SKILL.md"))) {
+        projectionFailures.push(`missing selected skill: ${skillsRoot}/${skill}/SKILL.md`);
       }
     }
   }
 
   if (report.warnings.length > 0) {
-    projectionWarnings.push(...report.warnings.filter((warning) => warning.includes("stale managed")));
+    projectionWarnings.push(...report.warnings.filter((warning) => warning.includes("managed file is stale relative to this ASK checkout")));
   }
 
   const runtimeStatus = !runtimeProbe
@@ -656,7 +801,11 @@ function isProhibitiveOverlayStatement(unit) {
   );
 }
 
-function printReport(target, report) {
+function printReport(target, report, { json = false } = {}) {
+  if (json) {
+    console.log(JSON.stringify({ target, ...report }, null, 2));
+    return;
+  }
   console.log(`ASK doctor: ${report.status}`);
   console.log("");
   console.log("Installed:");
@@ -673,6 +822,10 @@ function printReport(target, report) {
   console.log("");
   console.log("Layer statuses:");
   for (const [name, entry] of Object.entries(report.layerStatuses ?? {})) {
+    console.log(`- ${name}: ${entry.status} - ${entry.detail}`);
+  }
+  console.log("Deployment statuses:");
+  for (const [name, entry] of Object.entries(report.deploymentStatus ?? {})) {
     console.log(`- ${name}: ${entry.status} - ${entry.detail}`);
   }
   console.log("");
@@ -719,7 +872,7 @@ try {
     throw new Error(`Target is not a directory: ${args.target}`);
   }
   const report = buildDoctorReport(args.target, { runtimeProbe: args.runtimeProbe });
-  printReport(args.target, report);
+  printReport(args.target, report, { json: args.json });
   process.exit(report.status === "fail" ? 1 : 0);
 } catch (error) {
   console.error(`ASK doctor failed: ${error.message}`);
