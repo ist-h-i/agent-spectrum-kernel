@@ -1540,6 +1540,7 @@ function validateObservabilityConfig(root, checks, errors) {
   checks.localObservability.httpHooksDisabled = readObjectPath(config, "safety.http_hooks_enabled") === false;
   checks.localObservability.webhookHooksDisabled = readObjectPath(config, "safety.webhook_hooks_enabled") === false;
   checks.localObservability.commitEventsDisabled = readObjectPath(config, "lifecycle.commit_events_to_git") === false;
+  checks.localObservability.lifecyclePolicyOnly = readObjectPath(config, "lifecycle.enforcement") === "policy_only";
   checks.localObservability.retentionConfigured = Number(readObjectPath(config, "lifecycle.retention_days")) > 0 && Number(readObjectPath(config, "lifecycle.report_retention_days")) > 0;
   checks.localObservability.rotationConfigured = Number(readObjectPath(config, "lifecycle.rotate_when_bytes")) > 0;
   checks.localObservability.schemaMismatchQuarantines = readObjectPath(config, "lifecycle.schema_mismatch_action") === "quarantine" && typeof readObjectPath(config, "lifecycle.quarantine_dir") === "string";
@@ -2104,12 +2105,13 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- HTTP hooks disabled: ${claudeAdapterChecks.localObservability.httpHooksDisabled ? "ok" : "invalid"}`,
     `- webhook hooks disabled: ${claudeAdapterChecks.localObservability.webhookHooksDisabled ? "ok" : "invalid"}`,
     `- commit events disabled: ${claudeAdapterChecks.localObservability.commitEventsDisabled ? "ok" : "invalid"}`,
-    `- retention configured: ${claudeAdapterChecks.localObservability.retentionConfigured ? "ok" : "invalid"}`,
-    `- rotation configured: ${claudeAdapterChecks.localObservability.rotationConfigured ? "ok" : "invalid"}`,
-    `- schema mismatch quarantines: ${claudeAdapterChecks.localObservability.schemaMismatchQuarantines ? "ok" : "invalid"}`,
-    `- deduplication key is event_id: ${claudeAdapterChecks.localObservability.deduplicationKeyEventId ? "ok" : "invalid"}`,
-    `- schema migration requires manual review: ${claudeAdapterChecks.localObservability.schemaMigrationManualReview ? "ok" : "invalid"}`,
-    `- opt-out path documented: ${claudeAdapterChecks.localObservability.optOutDocumented ? "ok" : "invalid"}`,
+    `- lifecycle enforcement is policy-only: ${claudeAdapterChecks.localObservability.lifecyclePolicyOnly ? "declared" : "invalid"}`,
+    `- retention policy declared: ${claudeAdapterChecks.localObservability.retentionConfigured ? "declared" : "invalid"}`,
+    `- rotation policy declared: ${claudeAdapterChecks.localObservability.rotationConfigured ? "declared" : "invalid"}`,
+    `- schema mismatch policy declared: ${claudeAdapterChecks.localObservability.schemaMismatchQuarantines ? "declared" : "invalid"}`,
+    `- deduplication policy declared: ${claudeAdapterChecks.localObservability.deduplicationKeyEventId ? "declared" : "invalid"}`,
+    `- schema migration policy declared: ${claudeAdapterChecks.localObservability.schemaMigrationManualReview ? "declared" : "invalid"}`,
+    `- detach/purge policy documented: ${claudeAdapterChecks.localObservability.optOutDocumented ? "ok" : "invalid"}`,
     `- Bash hooks use command_attempt: ${claudeAdapterChecks.localObservability.bashHooksUseCommandAttempt ? "ok" : "invalid"}`,
     `- command_attempt separated from verification_attempt: ${claudeAdapterChecks.localObservability.metricsRecorderCommandAttemptSeparate ? "ok" : "invalid"}`,
     `- runtime-health surface present: ${claudeAdapterChecks.localObservability.metricsRecorderRuntimeHealthSurface ? "ok" : "invalid"}`,

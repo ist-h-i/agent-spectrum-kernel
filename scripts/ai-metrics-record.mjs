@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 
@@ -31,6 +31,10 @@ const DEFAULT_CONFIG = {
   external_publication: {
     enabled: false,
   },
+  runtime_health: {
+    freshness_hours: 24,
+    max_entries: 100,
+  },
 };
 
 const VERIFICATION_COMMAND_PATTERN = /\b(test|lint|typecheck|tsc|build|validate|check|pytest|vitest|jest|mocha|cargo test|go test|mvn test|gradle test)\b/i;
@@ -40,6 +44,7 @@ const ALLOWED_TASK_TYPES = new Set(["implementation", "review", "refactor", "inv
 function parseArgs(argv) {
   const args = {
     config: "docs/ai/observability-config.yml",
+    projectRoot: process.env.CLAUDE_PROJECT_DIR || "",
     eventStore: null,
     eventKind: "task_event",
     hookEvent: null,
@@ -59,6 +64,8 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === "--config") {
       args.config = argv[++i];
+    } else if (arg === "--project-root") {
+      args.projectRoot = argv[++i];
     } else if (arg === "--event-store") {
       args.eventStore = argv[++i];
     } else if (arg === "--event-kind") {
@@ -115,6 +122,7 @@ Options:
   --sidecar <path>          Optional project-local task sidecar. Defaults to .claude/metrics/current-task.json.
   --event-store <path>      JSONL event store path.
   --config <path>           Observability config. Defaults to docs/ai/observability-config.yml.
+  --project-root <path>     Adopting project root for runtime-health; CLAUDE_PROJECT_DIR takes precedence.
   --non-blocking            Exit successfully and stay silent if metrics recording fails.
   --dry-run                 Print event without writing.
   --print-result            Print result JSON.
@@ -564,8 +572,79 @@ function appendEvent(eventStore, event) {
   appendFileSync(eventStore, `${JSON.stringify(event)}\n`);
 }
 
-function main() {
-  const args = parseArgs(process.argv.slice(2));
+function resolveProjectRoot(args, eventStore = null) {
+  if (process.env.CLAUDE_PROJECT_DIR) return resolve(process.env.CLAUDE_PROJECT_DIR);
+  if (args.projectRoot) return resolve(args.projectRoot);
+  const configPath = resolve(args.config);
+  if (configPath.endsWith("/docs/ai/observability-config.yml")) return resolve(dirname(configPath), "../..");
+  if (eventStore && eventStore.includes("/docs/ai/")) return resolve(eventStore.slice(0, eventStore.indexOf("/docs/ai/")));
+  return process.cwd();
+}
+
+function readRuntimeHealth(path) {
+  if (!existsSync(path)) return { entries: [], malformed: 0 };
+  const entries = [];
+  let malformed = 0;
+  for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      const entry = JSON.parse(line);
+      if (entry && typeof entry === "object") entries.push(entry);
+      else malformed += 1;
+    } catch {
+      malformed += 1;
+    }
+  }
+  return { entries, malformed };
+}
+
+function healthKey(entry) {
+  return `${entry.component ?? "unknown-component"}:${entry.error_code ?? "runtime_error"}`;
+}
+
+function appendRuntimeHealth(path, entry, maxEntries) {
+  const { entries } = readRuntimeHealth(path);
+  const latest = [...entries].reverse().find((candidate) => healthKey(candidate) === healthKey(entry));
+  if (latest?.status === entry.status) return;
+  mkdirSync(dirname(path), { recursive: true });
+  const bounded = [...entries, entry].slice(-Math.max(1, Number(maxEntries) || 100));
+  writeFileSync(path, `${bounded.map((candidate) => JSON.stringify(candidate)).join("\n")}\n`);
+}
+
+function runtimeHealthPath(args, eventStore = null) {
+  return resolve(resolveProjectRoot(args, eventStore), ".agent-spectrum-kernel/runtime-health.jsonl");
+}
+
+function runtimeHealthEntry(status) {
+  return {
+    schema_version: "1.0.0",
+    occurred_at: new Date().toISOString(),
+    component: "ai-metrics-record",
+    status,
+    error_code: "non_blocking_metrics_record_failure",
+    message: status === "recovered" ? "Metrics recorder recovered; raw error details omitted by default." : "Non-blocking metrics recorder failed; raw error details omitted by default.",
+    privacy_note: {
+      raw_prompts_stored: false,
+      secrets_stored: false,
+      customer_data_stored: false,
+      personal_data_stored: false,
+      full_command_output_stored: false,
+      full_error_message_stored: false,
+    },
+  };
+}
+
+function recordRuntimeHealthRecovery(args, config, eventStore) {
+  try {
+    const path = runtimeHealthPath(args, eventStore);
+    const latest = [...readRuntimeHealth(path).entries].reverse().find((entry) => healthKey(entry) === "ai-metrics-record:non_blocking_metrics_record_failure");
+    if (latest?.status === "error") appendRuntimeHealth(path, runtimeHealthEntry("recovered"), config.runtime_health?.max_entries);
+  } catch {
+    // Health recording remains fail-open for hooks.
+  }
+}
+
+function main(args) {
   const hookInput = readStdinJson();
   applySidecar(args, readSidecar(args));
   const config = readConfig(args.config);
@@ -580,44 +659,31 @@ function main() {
   const eventStore = resolve(args.eventStore || config.storage.event_store || DEFAULT_CONFIG.storage.event_store);
   if (!args.dryRun) {
     appendEvent(eventStore, event);
+    if (args.nonBlocking) recordRuntimeHealthRecovery(args, config, eventStore);
   }
   if (args.printResult) {
     console.log(JSON.stringify({ status: args.dryRun ? "dry-run" : "recorded", event }, null, 2));
   }
 }
 
+let runtimeArgs = null;
 try {
-  main();
+  runtimeArgs = parseArgs(process.argv.slice(2));
+  main(runtimeArgs);
 } catch (error) {
   if (process.argv.includes("--non-blocking")) {
-    recordRuntimeHealthFailure(error);
+    recordRuntimeHealthFailure(error, runtimeArgs ?? parseArgs(process.argv.slice(2)));
     process.exit(0);
   }
   console.error(`ai-metrics-record failed: ${error.message}`);
   process.exit(1);
 }
 
-function recordRuntimeHealthFailure(error) {
+function recordRuntimeHealthFailure(error, args) {
   try {
-    const path = resolve(".agent-spectrum-kernel/runtime-health.jsonl");
-    mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, `${JSON.stringify({
-      schema_version: "1.0.0",
-      occurred_at: new Date().toISOString(),
-      component: "ai-metrics-record",
-      status: "error",
-      error_code: "non_blocking_metrics_record_failure",
-      error_name: sanitizeText(error?.name ?? "Error", 80),
-      message: "Non-blocking metrics recorder failed; raw error details omitted by default.",
-      privacy_note: {
-        raw_prompts_stored: false,
-        secrets_stored: false,
-        customer_data_stored: false,
-        personal_data_stored: false,
-        full_command_output_stored: false,
-        full_error_message_stored: false,
-      },
-    })}\n`);
+    const config = readConfig(args.config);
+    const eventStore = resolve(args.eventStore || config.storage.event_store || DEFAULT_CONFIG.storage.event_store);
+    appendRuntimeHealth(runtimeHealthPath(args, eventStore), runtimeHealthEntry("error"), config.runtime_health?.max_entries);
   } catch {
     // Non-blocking hook failures must not interrupt the developer task.
   }

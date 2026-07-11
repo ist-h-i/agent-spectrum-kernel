@@ -165,6 +165,7 @@ Privacy / safety note:
 - Metric event recording happens at meaningful task boundaries and only when adoption metrics are enabled or requested.
 - Period summary generation consumes metrics events or reviewed evidence over a defined period.
 - Period summaries aggregate by `task_id`; event count and task count are reported separately.
+- `command_attempts` are reported separately from `verification_commands`; generic Bash command capture must not increase verification coverage, verified-task counts, or completion metrics.
 - Debt movement is a delta for the period. Debt inventory snapshot is a separate latest-status view.
 - Sparse early-adoption reports use `null` for unavailable averages and rates. `null` means unknown, not zero.
 - Review and routing summaries store counts, gates, and decisions only; raw review text and prompts remain out of scope.

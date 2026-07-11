@@ -127,13 +127,13 @@ Command text is not recorded by default. Verification events record `command_kin
 
 `verification_attempt` is reserved for commands that match the verification classifier or have explicit evidence linkage. A generic Bash hook must not classify every command as verification.
 
-Non-blocking recorder failures append a sanitized local health entry to:
+Non-blocking recorder failures append a sanitized local health entry under `CLAUDE_PROJECT_DIR` when available, then an explicit recorder project root, then the resolved project config/event-store root:
 
 ```text
 .agent-spectrum-kernel/runtime-health.jsonl
 ```
 
-`ask-doctor` reads that file and reports a warning. Runtime-health entries must omit raw prompts, secrets, customer data, personal data, full command output, and full error messages.
+An `error` entry opens a component/error-code health issue; a later `recovered` entry closes it. `ask-doctor` warns only for unresolved entries inside the configured freshness window and reports older unresolved entries as historical. Health history is capped by `runtime_health.max_entries`. Runtime-health entries must omit raw prompts, secrets, customer data, personal data, full command output, and full error messages.
 
 ## Skill Command Sidecar
 

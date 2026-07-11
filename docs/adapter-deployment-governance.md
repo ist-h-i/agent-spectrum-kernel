@@ -8,7 +8,7 @@ This document defines the supported deployment profiles and operating responsibi
 |---|---|---|
 | Installed | Core or adapter installer completed, install state exists, managed files match recorded hashes, and `ask-doctor` installation health is not failing. | File copy alone. |
 | Activated | A human or project policy has selected the profile, hooks or commands are enabled for that profile, and required approval gates for external effects are resolved. | Installed assets that nobody invokes. |
-| Operational | A bounded task used the adapter, local health has no unresolved runtime errors, evidence was captured at the appropriate evidence level, and unsupported readiness claims were downgraded. | Passing projection checks without runtime or task evidence. |
+| Operational | A governance judgment supported by one bounded task run, no unresolved current runtime-health issue, appropriate evidence capture, and unsupported-claim downgrade. `ask-doctor` reports the underlying machine evidence; it does not infer human profile approval or declare Operational by itself. | Passing projection checks, policy keys, or a smoke event without task evidence. |
 
 Do not report deployment completion from file copy alone. A deployment can be Installed without being Activated, and Activated without being Operational.
 
@@ -48,17 +48,14 @@ Risk-gated approval is required for destructive, irreversible, credential-sensit
 
 ## Observability Lifecycle
 
-Default observability is local-first and bounded by `docs/ai/observability-config.yml`:
+Default observability is local-first. The `lifecycle` fields in `docs/ai/observability-config.yml` are **policy declarations, not enforced by the current recorder runtime**:
 
 - `commit_events_to_git: false`; event stores are project-local runtime data, not source artifacts by default.
-- `retention_days: 90`; report retention defaults to `report_retention_days: 180`.
-- `rotate_when_bytes: 5242880`; projects should rotate before event stores become review artifacts.
-- `schema_mismatch_action: quarantine`; mismatched events move to `docs/ai/metrics/quarantine`.
-- `deduplication_key: event_id`; duplicate events are ignored or merged by event ID.
-- `schema_migration: manual_review_required`; migration is not automatic.
-- `opt_out: delete_local_runtime_files_and_run_adapter_detach`; opt-out removes execution surfaces and project-local runtime files according to project policy.
+- `retention_days`, `report_retention_days`, `rotate_when_bytes`, `schema_mismatch_action`, `quarantine_dir`, `deduplication_key`, and `schema_migration` describe the adopting project's required operational policy. They do not prove rotation, retention, quarantine, deduplication, or migration enforcement.
+- `detach` removes managed execution surfaces and adapter-owned hooks while preserving project-owned metrics, reports, and ledgers.
+- `purge-runtime-data` is a separate destructive, project-approved manual operation for event, health, and report data. ASK does not currently provide an automatic purge command.
 
-Runtime hook failures are non-blocking, but not invisible. Non-blocking recorder failures append a sanitized local health entry to `.agent-spectrum-kernel/runtime-health.jsonl`. `ask-doctor` reads that file and reports a warning without storing raw prompts, secrets, customer data, personal data, full command output, or full error messages.
+Runtime hook failures are non-blocking, but not invisible. Non-blocking recorder failures append a sanitized local health entry under the adopting project root at `.agent-spectrum-kernel/runtime-health.jsonl`. A later successful non-blocking recorder run writes a recovery entry. `ask-doctor` warns only for unresolved entries inside `runtime_health.freshness_hours`; malformed entries are reported without preventing valid entries from being read. Health history is capped by `runtime_health.max_entries` and omits raw prompts, secrets, customer data, personal data, full command output, and full error messages.
 
 ## Event Semantics
 

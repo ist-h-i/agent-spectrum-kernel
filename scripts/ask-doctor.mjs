@@ -19,6 +19,7 @@ function parseArgs(argv) {
   const args = {
     target: process.cwd(),
     runtimeProbe: false,
+    json: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -26,6 +27,8 @@ function parseArgs(argv) {
       args.target = resolve(argv[++index]);
     } else if (arg === "--runtime-probe") {
       args.runtimeProbe = true;
+    } else if (arg === "--json") {
+      args.json = true;
     } else if (arg === "--help" || arg === "-h") {
       printHelp();
       process.exit(0);
@@ -37,7 +40,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Usage: node scripts/ask-doctor.mjs --target /path/to/adopting-repo [--runtime-probe]
+  console.log(`Usage: node scripts/ask-doctor.mjs --target /path/to/adopting-repo [--runtime-probe] [--json]
 
 Checks Agent Spectrum Kernel installation health without mutating files.
 Doctor is an adoption/update health check, not a per-task execution gate.
@@ -98,10 +101,29 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
     checkRuntimeConformanceProbe(target, report);
   }
   report.layerStatuses = buildLayerStatuses(target, report, { runtimeProbe });
+  report.deploymentStatus = buildDeploymentStatus(report);
 
   const runtimeFindings = report.runtimeProbe.warnings.length > 0 || report.runtimeProbe.failures.length > 0;
   const status = report.failures.length > 0 ? "fail" : report.warnings.length > 0 || report.unsupportedClaims.length > 0 || runtimeFindings ? "warn" : "pass";
   return { ...report, status };
+}
+
+function buildDeploymentStatus(report) {
+  const installed = report.layerStatuses.installation_health.status === "pass" && report.layerStatuses.adapter_projection.status === "pass";
+  return {
+    Installed: {
+      status: installed ? "pass" : "warn",
+      detail: installed ? "managed installation evidence is healthy" : "managed installation evidence is incomplete or warning-level",
+    },
+    Activated: {
+      status: "insufficient_evidence",
+      detail: "requires an explicit project profile/approval artifact; doctor does not infer human activation",
+    },
+    Operational: {
+      status: "insufficient_evidence",
+      detail: "requires bounded task evidence and a governance judgment; projection, smoke, and policy keys alone are insufficient",
+    },
+  };
 }
 
 function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, report, optional = false }) {
@@ -291,25 +313,39 @@ function checkRuntimeHealth(target, report) {
   if (!existsSync(healthPath)) {
     return;
   }
-  let entries = [];
-  try {
-    entries = readFileSync(healthPath, "utf8")
-      .split(/\r?\n/)
-      .filter((line) => line.trim())
-      .slice(-10)
-      .map((line) => JSON.parse(line));
-  } catch (error) {
-    report.warnings.push(`adapter runtime health log is unreadable: ${RUNTIME_HEALTH_PATH}: ${error.message}`);
-    return;
-  }
-  for (const entry of entries) {
-    if (entry?.status !== "error") {
-      continue;
+  const entries = [];
+  let malformed = 0;
+  for (const line of readFileSync(healthPath, "utf8").split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      const entry = JSON.parse(line);
+      if (entry && typeof entry === "object") entries.push(entry);
+      else malformed += 1;
+    } catch {
+      malformed += 1;
     }
+  }
+  if (malformed > 0) report.warnings.push(`adapter runtime health log contains ${malformed} malformed entry/entries: ${RUNTIME_HEALTH_PATH}`);
+  const unresolved = new Map();
+  for (const entry of entries) {
+    const component = typeof entry.component === "string" && entry.component ? entry.component : "unknown-component";
+    const code = typeof entry.error_code === "string" && entry.error_code ? entry.error_code : "runtime_error";
+    const key = `${component}:${code}`;
+    if (entry.status === "error") unresolved.set(key, entry);
+    if (entry.status === "recovered") unresolved.delete(key);
+  }
+  const freshnessHours = Math.max(1, Number(readObservabilityValue(target, ["runtime_health", "freshness_hours"], "24")) || 24);
+  const freshnessMs = freshnessHours * 60 * 60 * 1000;
+  for (const entry of unresolved.values()) {
     const component = typeof entry.component === "string" && entry.component ? entry.component : "unknown-component";
     const code = typeof entry.error_code === "string" && entry.error_code ? entry.error_code : "runtime_error";
     const occurredAt = typeof entry.occurred_at === "string" && entry.occurred_at ? entry.occurred_at : "unknown-time";
-    report.warnings.push(`adapter runtime health issue: ${component} ${code} at ${occurredAt} (${RUNTIME_HEALTH_PATH})`);
+    const occurredMs = Date.parse(occurredAt);
+    if (!Number.isFinite(occurredMs) || Date.now() - occurredMs > freshnessMs) {
+      report.installed.push(`historical adapter runtime health issue: ${component} ${code} at ${occurredAt} (${RUNTIME_HEALTH_PATH})`);
+    } else {
+      report.warnings.push(`adapter runtime health issue: ${component} ${code} at ${occurredAt} (${RUNTIME_HEALTH_PATH})`);
+    }
   }
 }
 
@@ -685,7 +721,11 @@ function isProhibitiveOverlayStatement(unit) {
   );
 }
 
-function printReport(target, report) {
+function printReport(target, report, { json = false } = {}) {
+  if (json) {
+    console.log(JSON.stringify({ target, ...report }, null, 2));
+    return;
+  }
   console.log(`ASK doctor: ${report.status}`);
   console.log("");
   console.log("Installed:");
@@ -702,6 +742,10 @@ function printReport(target, report) {
   console.log("");
   console.log("Layer statuses:");
   for (const [name, entry] of Object.entries(report.layerStatuses ?? {})) {
+    console.log(`- ${name}: ${entry.status} - ${entry.detail}`);
+  }
+  console.log("Deployment statuses:");
+  for (const [name, entry] of Object.entries(report.deploymentStatus ?? {})) {
     console.log(`- ${name}: ${entry.status} - ${entry.detail}`);
   }
   console.log("");
@@ -748,7 +792,7 @@ try {
     throw new Error(`Target is not a directory: ${args.target}`);
   }
   const report = buildDoctorReport(args.target, { runtimeProbe: args.runtimeProbe });
-  printReport(args.target, report);
+  printReport(args.target, report, { json: args.json });
   process.exit(report.status === "fail" ? 1 : 0);
 } catch (error) {
   console.error(`ASK doctor failed: ${error.message}`);

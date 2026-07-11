@@ -38,6 +38,7 @@ safety:
   block_on_record_failure: false
 
 lifecycle:
+  enforcement: policy_only
   commit_events_to_git: false
   retention_days: 90
   rotate_when_bytes: 5242880
@@ -46,4 +47,8 @@ lifecycle:
   deduplication_key: event_id
   schema_migration: manual_review_required
   report_retention_days: 180
-  opt_out: delete_local_runtime_files_and_run_adapter_detach
+  opt_out: detach_preserves_project_data; purge_runtime_data_is_a_separate_approved_manual_action
+
+runtime_health:
+  freshness_hours: 24
+  max_entries: 100

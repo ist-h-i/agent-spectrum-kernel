@@ -237,6 +237,7 @@ safety:
   http_hooks_enabled: false
   webhook_hooks_enabled: false
 lifecycle:
+  enforcement: policy_only
   commit_events_to_git: false
   retention_days: 90
   rotate_when_bytes: 5242880
@@ -245,7 +246,7 @@ lifecycle:
   deduplication_key: event_id
   schema_migration: manual_review_required
   report_retention_days: 180
-  opt_out: delete_local_runtime_files_and_run_adapter_detach
+  opt_out: detach_preserves_project_data; purge_runtime_data_is_a_separate_approved_manual_action
 `,
   );
 
@@ -710,6 +711,7 @@ function runRepoScript(args, options = {}) {
     cwd: options.cwd ?? repoRoot,
     input: options.input,
     encoding: "utf8",
+    env: options.env ? { ...process.env, ...options.env } : process.env,
   });
 }
 
@@ -1155,6 +1157,51 @@ function assertRuntimeScripts() {
   ) {
     throw new Error(`runtime-health entry should be sanitized\n${JSON.stringify(runtimeHealthEntry, null, 2)}`);
   }
+  const repeatedFailure = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--event-kind",
+      "task_stop",
+      "--event-store",
+      resolve(root, "docs/ai/metrics"),
+      "--non-blocking",
+    ],
+    { cwd: root, input: JSON.stringify({ session_id: "S5-repeat" }) },
+  );
+  assertRuntimePass("metrics recorder repeated non-blocking failure", repeatedFailure);
+  if (readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).length !== 1) {
+    throw new Error("repeated identical runtime-health failures should be deduplicated");
+  }
+
+  const nestedRuntimeCwd = resolve(root, "nested/hook-cwd");
+  mkdirSync(nestedRuntimeCwd, { recursive: true });
+  const recoveredResult = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--event-kind",
+      "task_stop",
+      "--event-store",
+      resolve(root, "docs/ai/metrics/recovered-events.jsonl"),
+      "--non-blocking",
+    ],
+    {
+      cwd: nestedRuntimeCwd,
+      env: { CLAUDE_PROJECT_DIR: root },
+      input: JSON.stringify({ session_id: "S5-recovered" }),
+    },
+  );
+  assertRuntimePass("metrics recorder writes recovery at Claude project root", recoveredResult);
+  const recoveredEntries = readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  if (recoveredEntries.at(-1)?.status !== "recovered" || existsSync(resolve(nestedRuntimeCwd, ".agent-spectrum-kernel/runtime-health.jsonl"))) {
+    throw new Error("successful nested hook execution should recover health at CLAUDE_PROJECT_DIR, not CWD");
+  }
+
+  writeFileSync(resolve(root, "docs/ai/observability-config.yml"), "runtime_health:\n  max_entries: 2\n");
+  assertRuntimePass("metrics recorder bounded health failure", runRepoScript([resolve(repoRoot, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--event-store", resolve(root, "docs/ai/metrics"), "--non-blocking"], { cwd: root, input: JSON.stringify({ session_id: "S5-bounded-error" }) }));
+  assertRuntimePass("metrics recorder bounded health recovery", runRepoScript([resolve(repoRoot, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--event-store", resolve(root, "docs/ai/metrics/bounded-events.jsonl"), "--non-blocking"], { cwd: root, input: JSON.stringify({ session_id: "S5-bounded-recovery" }) }));
+  if (readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).length > 2) {
+    throw new Error("runtime-health history must stay within configured max_entries");
+  }
 
   const routingRecordStore = resolve(root, "docs/ai/metrics/routing-record-events.jsonl");
   const routingRecordResult = runRepoScript([
@@ -1235,6 +1282,10 @@ function assertRuntimeScripts() {
     event_id: "evt-verification-1",
     verification_metrics: { commands_run: [{ command_kind: "test" }] },
   });
+  taskEvents.push(
+    { ...taskEvents[0], event_id: "evt-command-attempt-1", command_attempt_metrics: { command_kind: "test", classified_as_verification: false } },
+    { ...taskEvents[0], event_id: "evt-command-attempt-2", command_attempt_metrics: { command_kind: "test", classified_as_verification: false } },
+  );
   taskEvents.push({
     ...taskEvents[0],
     event_id: "evt-verification-2",
@@ -1262,7 +1313,13 @@ function assertRuntimeScripts() {
   ]);
   assertRuntimePass("metrics summarizer task aggregation smoke", summarizeResult);
   const report = JSON.parse(readFileSync(resolve(root, "docs/ai/reports/report.json"), "utf8"));
-  if (report.summary.event_count !== 8 || report.summary.tasks_reviewed !== 1 || report.summary.completed_tasks !== 1) {
+  if (
+    report.summary.event_count !== 10 ||
+    report.summary.tasks_reviewed !== 1 ||
+    report.summary.completed_tasks !== 1 ||
+    report.summary.command_attempts !== 2 ||
+    report.summary.verification_commands !== 2
+  ) {
     throw new Error(`summarizer should separate event count from task count\n${JSON.stringify(report.summary, null, 2)}`);
   }
 
@@ -2605,6 +2662,12 @@ function assertDoctorScript() {
   if (!healthyResult.stdout.includes("Layer statuses:") || !healthyResult.stdout.includes("behavioral_evidence: insufficient_evidence")) {
     throw new Error(`doctor should report separated layer statuses\n${healthyResult.stdout}\n${healthyResult.stderr}`);
   }
+  const healthyJsonResult = runRepoScript([doctorScript, "--target", healthyTarget, "--json"]);
+  assertRuntimePass("doctor machine-readable deployment status", healthyJsonResult);
+  const healthyJson = JSON.parse(healthyJsonResult.stdout);
+  if (healthyJson.deploymentStatus?.Installed?.status !== "pass" || healthyJson.deploymentStatus?.Operational?.status !== "insufficient_evidence") {
+    throw new Error(`doctor must distinguish Installed from unsupported Operational evidence\n${healthyJsonResult.stdout}`);
+  }
 
   const inProgressTarget = resolve(fixtureRoot, "doctor-in-progress");
   assertRuntimePass("doctor setup in-progress install", runRepoScript([installer, "--target", inProgressTarget, "--skills", "operating-mode-router"]));
@@ -2656,6 +2719,35 @@ function assertDoctorScript() {
   assertRuntimePass("doctor runtime-health warning", runtimeHealthResult);
   if (!runtimeHealthResult.stdout.includes("ASK doctor: warn") || !runtimeHealthResult.stdout.includes("adapter runtime health issue: ai-metrics-record non_blocking_metrics_record_failure")) {
     throw new Error(`doctor should surface sanitized runtime-health issues\n${runtimeHealthResult.stdout}\n${runtimeHealthResult.stderr}`);
+  }
+  writeFileSync(
+    resolve(runtimeHealthTarget, ".agent-spectrum-kernel/runtime-health.jsonl"),
+    `${readFileSync(resolve(runtimeHealthTarget, ".agent-spectrum-kernel/runtime-health.jsonl"), "utf8")}{"schema_version":"1.0.0","occurred_at":"2999-01-01T00:01:00.000Z","component":"ai-metrics-record","status":"recovered","error_code":"non_blocking_metrics_record_failure"}\n`,
+  );
+  const recoveredHealthResult = runRepoScript([doctorScript, "--target", runtimeHealthTarget]);
+  assertRuntimePass("doctor runtime-health recovery", recoveredHealthResult);
+  if (recoveredHealthResult.stdout.includes("adapter runtime health issue: ai-metrics-record non_blocking_metrics_record_failure")) {
+    throw new Error(`doctor should close a runtime-health issue after recovery\n${recoveredHealthResult.stdout}`);
+  }
+
+  const staleHealthTarget = resolve(fixtureRoot, "doctor-stale-runtime-health");
+  assertRuntimePass("doctor setup stale runtime health install", runRepoScript([installer, "--target", staleHealthTarget, "--skills", "operating-mode-router"]));
+  mkdirSync(resolve(staleHealthTarget, ".agent-spectrum-kernel"), { recursive: true });
+  writeFileSync(resolve(staleHealthTarget, ".agent-spectrum-kernel/runtime-health.jsonl"), '{"schema_version":"1.0.0","occurred_at":"2000-01-01T00:00:00.000Z","component":"ai-metrics-record","status":"error","error_code":"non_blocking_metrics_record_failure"}\n');
+  const staleHealthResult = runRepoScript([doctorScript, "--target", staleHealthTarget]);
+  assertRuntimePass("doctor stale runtime health is historical", staleHealthResult);
+  if (staleHealthResult.stdout.includes("ASK doctor: warn") || !staleHealthResult.stdout.includes("historical adapter runtime health issue")) {
+    throw new Error(`doctor should report stale unresolved health as historical\n${staleHealthResult.stdout}`);
+  }
+
+  const malformedHealthTarget = resolve(fixtureRoot, "doctor-malformed-runtime-health");
+  assertRuntimePass("doctor setup malformed runtime health install", runRepoScript([installer, "--target", malformedHealthTarget, "--skills", "operating-mode-router"]));
+  mkdirSync(resolve(malformedHealthTarget, ".agent-spectrum-kernel"), { recursive: true });
+  writeFileSync(resolve(malformedHealthTarget, ".agent-spectrum-kernel/runtime-health.jsonl"), 'not json\n{"schema_version":"1.0.0","occurred_at":"2999-01-01T00:00:00.000Z","component":"ai-metrics-record","status":"error","error_code":"non_blocking_metrics_record_failure"}\n');
+  const malformedHealthResult = runRepoScript([doctorScript, "--target", malformedHealthTarget]);
+  assertRuntimePass("doctor malformed runtime health continues", malformedHealthResult);
+  if (!malformedHealthResult.stdout.includes("malformed entry") || !malformedHealthResult.stdout.includes("adapter runtime health issue: ai-metrics-record non_blocking_metrics_record_failure")) {
+    throw new Error(`doctor should retain valid runtime-health entries after malformed lines\n${malformedHealthResult.stdout}`);
   }
 
   const runtimeProbeTarget = resolve(fixtureRoot, "doctor-runtime-probe");
