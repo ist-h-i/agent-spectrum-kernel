@@ -232,6 +232,20 @@ function buildPlan(args) {
     });
   }
 
+  const signalRegistrySource = resolve(REPO_ROOT, "schemas/review-signal-gate-map.json");
+  ensureSource(signalRegistrySource, "schemas/review-signal-gate-map.json");
+  const signalRegistryContent = readText(signalRegistrySource);
+  managedFiles["schemas/review-signal-gate-map.json"] = createManagedFileRecord({ kind: "signal_registry", content: signalRegistryContent });
+  planWriteManaged(operations, {
+    target: args.target,
+    relativePath: "schemas/review-signal-gate-map.json",
+    content: signalRegistryContent,
+    reason: "signal_registry",
+    previousState,
+    force: args.force,
+    rollback,
+  });
+
   for (const skill of skills) {
     const source = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
     ensureSource(source, `skills/${skill}/SKILL.md`);

@@ -156,21 +156,21 @@ Use when:
 Do not confuse with:
 - 最終判断を出す `review-final-merge-gate`。
 
-## Layer applicability
+## Signal-first review route
 
 Meaning:
-- レビュー層ごとに `required | skipped | insufficient evidence` を判断する工程です。
+- 観測した Change signals から必要なgateを選び、missing inputは `insufficient evidence` として残す工程です。
 
 Use when:
 - PR/diffレビューで、必要なgateだけを選びたい場合。
 
 Do not confuse with:
-- gate実行後のpass/fail判断。
+- gate実行後のmerge判断。
 
-## Layer summary
+## Merge evidence summary
 
 Meaning:
-- 最終レビューで各層を `pass | fail | skipped | insufficient evidence` として要約したものです。
+- 最終レビューで Blocking evidence、Passed required gates、Insufficient evidence、Non-blocking follow-ups、Residual risk を要約したものです。完全な層診断は検証/debug 用の補助情報です。
 
 Use when:
 - merge可否や残リスクを一目で確認したい場合。

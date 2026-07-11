@@ -93,7 +93,7 @@ The user-facing route should describe work steps and stop points without requiri
 | Scope/refactor risk | `scope-control` | `controlled-implementation` if proceeding to code; review phase uses `review-router` -> required gates, with scope findings generally routed to `review-ai-quality` |
 | Bug/unknown cause | `doubt-driven-development` | `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof |
 | Hard-to-reverse architecture decision or ADR need | `adr-review` | `grill-with-docs`; `application-boundary-architecture` if boundary mechanics are unresolved |
-| PR/diff/generated code review | `review-router` | Required gates from layer applicability, including `review-code-health`, `review-architecture-impact`, `review-output-quality`, and `review-adversarial-risk` when applicable; then `review-final-merge-gate` |
+| PR/diff/generated code review | `review-router` | Required gates from observed change signals, including `review-code-health`, `review-architecture-impact`, `review-output-quality`, and `review-adversarial-risk` when applicable; then `review-final-merge-gate` |
 | Repeated or high-impact review findings should become prevention knowledge | `review-finding-compiler` | Route domain/business rules to `review-to-rule-compiler`; route non-blocking work to `improvement-ledger`; route implementation and verification lessons to their ledgers |
 | Release candidate or bundled change-set readiness | `release-readiness-gate` | `risk-gate` before deploy, publish, migration, external notification, or release execution; `review-final-merge-gate` remains the PR-level decision gate |
 | Technical debt, code smell, or refactor candidate review | `review-router` | `review-code-health`; specialized gates only when findings cross into architecture, adversarial, risk, or evidence concerns |
@@ -119,7 +119,7 @@ The user-facing route should describe work steps and stop points without requiri
    - Evidence overlay: use `evidence-ledger` whenever the response makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
 
 8. Preserve review gate minimality.
-   - When routing to `review-router`, require the layer applicability contract to include evidence-backed `required`, `skipped`, or `insufficient evidence` status for each layer.
+   - When routing to `review-router`, require observed change signals and trace each required gate to a signal and evidence.
    - Missing changed-file, diff, context, output, or verification evidence must be reported as `insufficient evidence`, not as a skipped gate.
    - Required gates not present in executed gate evidence must be reported as under-processing.
    - Heavy gates selected without trigger signals must be reported as over-processing warnings.

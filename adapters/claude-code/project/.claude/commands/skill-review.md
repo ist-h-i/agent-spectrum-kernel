@@ -4,18 +4,35 @@ description: Run the Agent Spectrum Kernel review flow for the current PR or dif
 
 Use the installed project skills from this repository projection.
 
-Start with `/review-router` to decide applicable review layers. Run only the required gates. End with `/review-final-merge-gate` style output:
+Start with `/review-router` to extract observed change signals and map them to required gates. Run only the required gates. End with `/review-final-merge-gate` style output:
+
+Before extracting signals, read `schemas/review-signal-gate-map.json`. Emit only its exact signal IDs and use its signal-to-gate mapping; do not invent free-form trigger IDs.
 
 - decision: `approve`, `approve with comments`, `request changes`, `block`, or `insufficient evidence`
-- layer summary
-- required fixes
-- suggestions
-- improvement-ledger candidates when applicable
-- evidence reviewed
+- blocking evidence
+- passed required gates
+- insufficient evidence
+- non-blocking follow-ups
 - residual risk
 - one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`
 
-Keep current-PR blockers separate from non-blocking improvement-ledger candidates. Do not publish metrics externally.
+Keep current-PR blockers separate from non-blocking improvement-ledger candidates and suggestions. Do not publish metrics externally.
+
+Normal review route:
+
+Change signals:
+- signal: observed evidence
+
+Required gates:
+- gate: reason; triggered by signal(s)
+
+Skipped heavy gates:
+- gate/layer: observed reason
+
+Missing evidence:
+- input: why it is required and what remains unknown
+
+Do not emit a fixed layer-by-layer applicability table unless validation or debugging explicitly requests the diagnostic artifact.
 
 Silent metrics sidecar:
 

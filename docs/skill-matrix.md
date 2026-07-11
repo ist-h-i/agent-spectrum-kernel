@@ -55,7 +55,7 @@ Route outputs should include `Selected work mode`, `User-facing route`, `Interna
 | Risk of scope creep/refactor sprawl | `scope-control` | `controlled-implementation` if proceeding to code; review phase uses `review-router` -> required gates, with scope findings generally routed to `review-ai-quality` | Scope contract, scoped implementation path, or review route |
 | Bug, regression, or unknown root cause | `doubt-driven-development` | `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof | Hypothesis, reproduction evidence, Verification Contract, scoped fix, regression proof |
 | Hard-to-reverse architecture decision or ADR need | `adr-review` | `grill-with-docs`; `application-boundary-architecture` if boundary mechanics are unresolved | ADR action and decision record |
-| PR/diff/commit review | `review-router` | `review-code-health` when debt, smell, refactor, dependency/tooling, or repeated-finding analysis is applicable; `review-architecture-impact` when structural or boundary impact may exist; `review-output-quality` when consumer-facing or machine-consumed output may change; `review-adversarial-risk` when severe failure paths or blast radius may exist; `review-final-merge-gate` for the final decision; `improvement-ledger` only when non-blocking follow-up needs durable tracking | Layer applicability, required gates, gate evidence, merge decision, and optional improvement-ledger candidates / rule feedback / deferred code-health risks when applicable |
+| PR/diff/commit review | `review-router` | `review-code-health` when debt, smell, refactor, dependency/tooling, or repeated-finding analysis is applicable; `review-architecture-impact` when structural or boundary impact may exist; `review-output-quality` when consumer-facing or machine-consumed output may change; `review-adversarial-risk` when severe failure paths or blast radius may exist; `review-final-merge-gate` for the final decision; `improvement-ledger` only when non-blocking follow-up needs durable tracking | Change signals, required gates, gate evidence, merge decision, and optional improvement-ledger candidates / rule feedback / deferred code-health risks when applicable |
 | Repeated or high-impact review findings should become prevention knowledge | `review-finding-compiler` | Route domain/business rules to `review-to-rule-compiler`; non-blocking work to `improvement-ledger`; implementation and verification lessons to their ledgers | Review rule candidate, prevention target, current PR blocker policy, false-positive risk, suppression rule, and durable routing |
 | Domain behavior or business-rule review | `review-domain-impact` | `review-router` selects it when domain impact may exist; `review-to-rule-compiler` after review only for rule candidates | Domain input sources, domain rule checks, AI-verifiable checks, human decision points, and domain impact decision |
 | Technical debt / code smell / refactor candidate review | `review-router` | `review-code-health`; specialized gates only when findings cross into architecture, adversarial, risk, or evidence concerns | Evidence-backed code-health findings with category, severity, urgency, recommended action, scope guidance, and AI-rule feedback |
@@ -131,7 +131,7 @@ Full-layer reusable intelligence:
 engineering-pattern-ledger / verification-pattern-ledger / review-finding-compiler / documentation-knowledge-compiler / architecture-decision-memory -> selected implementation, verification, review, documentation, or architecture workflow by evidence status
 
 Review:
-review-router -> layer applicability -> required gates, including review-code-health, review-architecture-impact, review-output-quality, and review-adversarial-risk when needed -> review-final-merge-gate -> improvement-ledger for non-blocking debt/rule feedback when needed
+review-router -> observed change signals -> required gates, including review-code-health, review-architecture-impact, review-output-quality, and review-adversarial-risk when needed -> review-final-merge-gate -> improvement-ledger for non-blocking debt/rule feedback when needed
 
 Improvement ledger:
 review-code-health findings or final-gate improvement candidates -> improvement-ledger -> separate PR, backlog, rule/check feedback, accepted risk, or stale review
@@ -152,7 +152,7 @@ Claude local observability:
 Claude project adapter or plugin -> local hooks -> docs/ai/metrics/events.jsonl -> ai-metrics-summarize -> docs/ai/reports/
 
 Pattern B PR review:
-@claude review comment -> optional GitHub Actions adapter -> review-router -> layer applicability -> required gates -> review-final-merge-gate
+@claude review comment -> optional GitHub Actions adapter -> review-router -> observed change signals -> required gates -> review-final-merge-gate
 
 Adoption reports:
 operation_automation layer -> skill-adoption-metrics period summary -> docs/ai/adoption-report-template.md

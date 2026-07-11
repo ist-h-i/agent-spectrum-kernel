@@ -71,8 +71,23 @@ Skill route:
 - operating_mode:
 - primary_skill:
 - secondary_skills:
+- change_signals:
+  - signal:
+    evidence:
 - required_gates:
+- required_gate_routes:
+  - gate:
+    reason:
+    trigger_signals:
 - executed_gates:
+- skipped_heavy_gates:
+  - gate:
+    layer:
+    reason:
+    observed_evidence:
+- missing_evidence:
+  - input:
+    reason:
 - skipped_gates:
   - gate:
   - reason:

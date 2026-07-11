@@ -1,17 +1,30 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const HEAVY_REVIEW_GATES = new Set([
-  "review-domain-impact",
-  "review-architecture-impact",
-  "review-output-quality",
-  "review-adversarial-risk",
-  "review-code-health",
-  "risk-gate",
-  "adr-review",
-  "release-readiness-gate",
-]);
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const SIGNAL_REGISTRY_PATH = resolve(REPO_ROOT, "schemas/review-signal-gate-map.json");
+
+function loadSignalRegistry() {
+  if (!existsSync(SIGNAL_REGISTRY_PATH)) {
+    throw new Error(`Controlled review signal registry is missing: ${SIGNAL_REGISTRY_PATH}`);
+  }
+  let registry;
+  try {
+    registry = JSON.parse(readFileSync(SIGNAL_REGISTRY_PATH, "utf8"));
+  } catch (error) {
+    throw new Error(`Controlled review signal registry is invalid JSON: ${error.message}`);
+  }
+  if (!Array.isArray(registry.heavy_gates) || !registry.heavy_gates.length || !registry.signal_to_gates || typeof registry.signal_to_gates !== "object") {
+    throw new Error("Controlled review signal registry must define heavy_gates and signal_to_gates");
+  }
+  return registry;
+}
+
+const SIGNAL_REGISTRY = loadSignalRegistry();
+const HEAVY_REVIEW_GATES = new Set(SIGNAL_REGISTRY.heavy_gates);
+const SIGNAL_TO_GATES = new Map(Object.entries(SIGNAL_REGISTRY.signal_to_gates));
 
 function parseArgs(argv) {
   const args = {
@@ -239,6 +252,10 @@ function aggregateTasks(events) {
           secondary_skills: new Set(),
           required_gates: new Set(),
           executed_gates: new Set(),
+          change_signals: [],
+          required_gate_routes: [],
+          skipped_heavy_gates: [],
+          missing_evidence: [],
           skipped_gates: [],
           gate_applicability: [],
         },
@@ -285,6 +302,10 @@ function aggregateTasks(events) {
       secondary_skills: [...task.routing_result.secondary_skills].sort(),
       required_gates: [...task.routing_result.required_gates].sort(),
       executed_gates: [...task.routing_result.executed_gates].sort(),
+      change_signals: task.routing_result.change_signals,
+      required_gate_routes: task.routing_result.required_gate_routes,
+      skipped_heavy_gates: task.routing_result.skipped_heavy_gates,
+      missing_evidence: task.routing_result.missing_evidence,
       skipped_gates: task.routing_result.skipped_gates,
       gate_applicability: task.routing_result.gate_applicability,
     },
@@ -368,6 +389,12 @@ function mergeRouting(target, source) {
   if (typeof source.correct_routing === "boolean") {
     target.correct_routing = source.correct_routing === false ? false : target.correct_routing ?? true;
   }
+  if (Array.isArray(source.change_signals)) {
+    for (const item of source.change_signals) {
+      const signal = normalizeChangeSignal(item);
+      if (signal) target.change_signals.push(signal);
+    }
+  }
   for (const field of ["secondary_skills", "required_gates", "executed_gates"]) {
     if (!Array.isArray(source[field])) {
       continue;
@@ -376,6 +403,24 @@ function mergeRouting(target, source) {
       if (typeof value === "string" && value) {
         target[field].add(value);
       }
+    }
+  }
+  if (Array.isArray(source.required_gate_routes)) {
+    for (const item of source.required_gate_routes) {
+      const route = normalizeRequiredGateRoute(item);
+      if (route) target.required_gate_routes.push(route);
+    }
+  }
+  if (Array.isArray(source.skipped_heavy_gates)) {
+    for (const item of source.skipped_heavy_gates) {
+      const skipped = normalizeSkippedHeavyGate(item);
+      if (skipped) target.skipped_heavy_gates.push(skipped);
+    }
+  }
+  if (Array.isArray(source.missing_evidence)) {
+    for (const item of source.missing_evidence) {
+      const missing = normalizeMissingEvidence(item);
+      if (missing) target.missing_evidence.push(missing);
     }
   }
   if (Array.isArray(source.skipped_gates)) {
@@ -393,6 +438,33 @@ function mergeRouting(target, source) {
       }
     }
   }
+}
+
+function normalizeChangeSignal(item) {
+  if (!item || typeof item.signal !== "string" || typeof item.evidence !== "string" || !item.signal || !item.evidence) return null;
+  return { signal: item.signal, evidence: item.evidence };
+}
+
+function normalizeRequiredGateRoute(item) {
+  if (!item || typeof item.gate !== "string" || typeof item.reason !== "string" || !Array.isArray(item.trigger_signals) || item.trigger_signals.length === 0) return null;
+  return {
+    gate: item.gate,
+    reason: item.reason,
+    trigger_signals: unique(item.trigger_signals.filter((value) => typeof value === "string" && value)),
+  };
+}
+
+function normalizeSkippedHeavyGate(item) {
+  if (!item || typeof item.gate !== "string" || typeof item.reason !== "string") return null;
+  const result = { gate: item.gate, reason: item.reason };
+  if (typeof item.layer === "string" && item.layer) result.layer = item.layer;
+  if (typeof item.observed_evidence === "string" && item.observed_evidence) result.observed_evidence = item.observed_evidence;
+  return result;
+}
+
+function normalizeMissingEvidence(item) {
+  if (!item || typeof item.input !== "string" || typeof item.reason !== "string" || !item.input || !item.reason) return null;
+  return { input: item.input, reason: item.reason };
 }
 
 function normalizeGateApplicability(item) {
@@ -456,6 +528,7 @@ function taskHasInsufficientEvidence(task) {
     task.review_result.decision === "insufficient_evidence" ||
     task.review_result.insufficient_evidence_layers.length > 0 ||
     task.gate_decisions.some((decision) => decision.status === "insufficient_evidence") ||
+    task.routing_result.missing_evidence.length > 0 ||
     task.routing_result.gate_applicability.some((item) => item.status === "insufficient_evidence" || requiredApplicabilityMissingGate(item))
   );
 }
@@ -539,6 +612,9 @@ function effectiveRequiredGates(task) {
       required.add(item.gate);
     }
   }
+  for (const item of task.routing_result.required_gate_routes ?? []) {
+    if (item.gate) required.add(item.gate);
+  }
   return [...required].sort();
 }
 
@@ -573,12 +649,17 @@ function summarizeGateDecisions(tasks) {
     }
 
     for (const gate of executed) {
-      if (!required.has(gate) && HEAVY_REVIEW_GATES.has(gate)) {
-        const decision = task.gate_decisions.find((item) => item.gate === gate && item.status === "executed");
-        if (!decision || decision.triggering_signals.length === 0) {
-          increment(overProcessing, gate);
-        }
+      if (HEAVY_REVIEW_GATES.has(gate) && !hasGateTriggerEvidence(task, gate)) {
+        increment(overProcessing, gate);
       }
+    }
+
+    for (const item of task.routing_result.missing_evidence ?? []) {
+      const key = JSON.stringify([item.input, ""]);
+      if (!insufficientEvidence.has(key)) {
+        insufficientEvidence.set(key, { gate: item.input, count: 0 });
+      }
+      insufficientEvidence.get(key).count += 1;
     }
 
     for (const decision of task.gate_decisions) {
@@ -697,6 +778,7 @@ function routingDeviationWarnings(tasks) {
     const required = new Set(effectiveRequiredGates(task));
     const executed = new Set(effectiveExecutedGates(task));
     const applicability = task.routing_result.gate_applicability ?? [];
+    const requiredRoutes = task.routing_result.required_gate_routes ?? [];
 
     for (const gate of required) {
       if (!executed.has(gate)) {
@@ -732,19 +814,29 @@ function routingDeviationWarnings(tasks) {
       }
     }
 
-    for (const gate of new Set([...required, ...executed])) {
+    for (const item of task.routing_result.missing_evidence ?? []) {
+      add({
+        type: "missing_evidence",
+        task_id: task.task_id,
+        gate: item.input,
+        reason: item.reason,
+      });
+    }
+
+    for (const gate of executed) {
       if (!HEAVY_REVIEW_GATES.has(gate)) {
         continue;
       }
       const item = applicability.find((candidate) => candidate.gate === gate);
-      const hasTriggerSignals = item?.status === "required" && Array.isArray(item.trigger_signals) && item.trigger_signals.length > 0;
+      const route = requiredRoutes.find((candidate) => candidate.gate === gate);
+      const hasTriggerSignals = hasGateTriggerEvidence(task, gate);
       if (!hasTriggerSignals) {
         add({
           type: "over_processing",
           task_id: task.task_id,
           gate,
           layer: item?.layer,
-          reason: heavyGateTriggerWarningReason(item, executed.has(gate)),
+          reason: heavyGateTriggerWarningReason(item, route, executed.has(gate)),
         });
       }
     }
@@ -753,20 +845,51 @@ function routingDeviationWarnings(tasks) {
   return warnings;
 }
 
-function heavyGateTriggerWarningReason(item, gateIsExecuted) {
-  if (!item) {
-    return "Heavy gate selected without a gate_applicability row or trigger signals.";
+function heavyGateTriggerWarningReason(item, route, gateIsExecuted) {
+  if (!item && !route) {
+    return "Heavy gate selected without a required gate route or diagnostic applicability row with trigger signals.";
   }
-  if (item.status === "required") {
+  if (item?.status === "required" || route) {
     return "Heavy gate marked required without recorded trigger signals.";
   }
-  if (item.status === "skipped" && gateIsExecuted) {
+  if (item?.status === "skipped" && gateIsExecuted) {
     return `Executed heavy gate despite skipped applicability: ${item.reason}`;
   }
   if (gateIsExecuted) {
     return "Executed heavy gate without required applicability trigger signals.";
   }
   return "Heavy gate selected without required applicability trigger signals.";
+}
+
+function hasGateTriggerEvidence(task, gate) {
+  const observedSignals = new Set(
+    (task.routing_result.change_signals ?? [])
+      .map((item) => item?.signal)
+      .filter((signal) => typeof signal === "string" && signal),
+  );
+  const signalsMatch = (signals) => Array.isArray(signals)
+    && signals.length > 0
+    && signals.every((signal) => observedSignals.has(signal) && SIGNAL_TO_GATES.get(signal)?.includes(gate));
+
+  const route = (task.routing_result.required_gate_routes ?? []).find((candidate) => candidate.gate === gate);
+  if (route) {
+    return signalsMatch(route.trigger_signals);
+  }
+
+  const gateDecisions = task.gate_decisions.filter(
+    (candidate) => candidate.gate === gate && ["required", "executed"].includes(candidate.status),
+  );
+  if (gateDecisions.length > 0) {
+    return gateDecisions.every((candidate) => signalsMatch(candidate.triggering_signals));
+  }
+
+  const applicability = task.routing_result.gate_applicability ?? [];
+  const diagnostic = applicability.find((candidate) => candidate.gate === gate);
+  if (diagnostic) {
+    return diagnostic.status === "required" && signalsMatch(diagnostic.trigger_signals);
+  }
+
+  return [...observedSignals].some((signal) => SIGNAL_TO_GATES.get(signal)?.includes(gate));
 }
 
 function requiredApplicabilityMissingGate(item) {

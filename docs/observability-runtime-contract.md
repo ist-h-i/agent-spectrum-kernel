@@ -130,7 +130,7 @@ Meaning:
 | `wont_fix` | The finding is closed without action with rationale. |
 | `stale` | Evidence, owner, urgency, or status no longer matches reality. |
 
-Current-PR blockers remain in review required fixes. Non-blocking findings may become improvement-ledger candidates. Metrics must count movement deltas separately from inventory snapshots and must not duplicate full findings.
+Current-PR blockers remain in review Blocking evidence (with detailed Required fixes when needed). Non-blocking findings may become improvement-ledger candidates. Metrics must count movement deltas separately from inventory snapshots and must not duplicate full findings.
 
 ## Report Contract
 

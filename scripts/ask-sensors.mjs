@@ -16,7 +16,14 @@ const KNOWN_OUTPUT_SECTIONS = [
   "Risks / assumptions:",
   "Next:",
   "Decision:",
-  "Layer summary:",
+  "Change signals:",
+  "Required gates:",
+  "Skipped heavy gates:",
+  "Missing evidence:",
+  "Blocking evidence:",
+  "Passed required gates:",
+  "Insufficient evidence:",
+  "Non-blocking follow-ups:",
   "Evidence:",
   "Required fixes:",
   "Suggestions:",
@@ -164,16 +171,41 @@ function reviewLayerSummarySensor(text) {
   if (!text.trim()) {
     return sensor("review_layer_summary", "warn", "No review output text was provided.");
   }
-  const missing = codexPromptContractForMode("review").requiredSections.filter((section) => !text.includes(section));
+  if (hasTopLevelSection(text, "Layer summary:")) {
+    return sensor(
+      "review_layer_summary",
+      "fail",
+      "Review output uses the removed fixed layer summary contract.",
+      "Use Decision, Blocking evidence, Passed required gates, Insufficient evidence, Non-blocking follow-ups, and Residual risk. Use Diagnostic applicability only when a debug matrix is explicitly requested.",
+    );
+  }
+  const missing = codexPromptContractForMode("review").requiredSections.filter((section) => !hasTopLevelSection(text, section));
   if (missing.length > 0) {
     return sensor(
       "review_layer_summary",
       "fail",
       `Review output is missing required sections: ${missing.join(", ")}.`,
-      "Do not claim merge approval/readiness until the review decision and layer summary are present.",
+      "Do not claim merge approval/readiness until the signal-first routing and final decision sections are present.",
     );
   }
-  return sensor("review_layer_summary", "pass", "Review decision and layer summary sections are present.");
+  return sensor("review_layer_summary", "pass", "Signal-first routing and review decision sections are present.");
+}
+
+function hasTopLevelSection(text, section) {
+  let inFence = false;
+  for (const line of text.split(/\r?\n/)) {
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence || /^\s*(?:>|[-*+]\s)/.test(line)) {
+      continue;
+    }
+    if (line === section) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function riskSurfaceSensor(text, changedFiles) {
