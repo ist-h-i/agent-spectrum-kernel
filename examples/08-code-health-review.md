@@ -11,17 +11,20 @@ Review this diff for code-health risk. Separate current PR blockers from debt th
 Use:
 
 ```text
-review-router -> layer applicability -> review-code-health when applicable -> review-final-merge-gate -> improvement-ledger only for non-blocking follow-up
+review-router -> observed change signals -> review-code-health when applicable -> review-final-merge-gate -> improvement-ledger only for non-blocking follow-up
 ```
 
 ## Expected output
 
 ```text
-Layer applicability:
-- Style / maintainability:
-  status: required
-  reason: The diff changes shared validation helpers and may introduce maintainability or testability debt.
-  gate: review-code-health
+Change signals:
+- maintainability: The diff changes shared validation helpers and may introduce testability debt.
+
+Required gates:
+- review-code-health: assess the shared validation helper and separate current blockers from follow-up debt; triggered by maintainability.
+
+Missing evidence:
+- none
 
 Code health review:
 - Gate status: pass with findings

@@ -218,27 +218,17 @@ For review tasks, end with:
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
-Layer summary:
-- Domain: pass | fail | skipped | insufficient evidence - evidence/reason
-- Architecture: pass | fail | skipped | insufficient evidence - evidence/reason
-- Design: pass | fail | skipped | insufficient evidence - evidence/reason
-- Logic: pass | fail | skipped | insufficient evidence - evidence/reason
-- Output quality: pass | fail | skipped | insufficient evidence - evidence/reason
-- Test / verification: pass | fail | skipped | insufficient evidence - evidence/reason
-- Style / maintainability: pass | fail | skipped | insufficient evidence - evidence/reason
-- Mechanical: pass | fail | skipped | insufficient evidence - evidence/reason
-- Adversarial risk: pass | fail | skipped | insufficient evidence - evidence/reason
-- Risk: pass | fail | skipped | insufficient evidence - evidence/reason
-- Evidence: pass | fail | skipped | insufficient evidence - evidence/reason
+Blocking evidence:
+- [severity] gate/file:line — evidence, impact, and required fix or decision
 
-Required fixes:
-- [severity] file:line — issue, evidence, required fix
+Passed required gates:
+- gate — evidence checked
 
-Suggestions:
-- ...
+Insufficient evidence:
+- gate/input — what remains unknown and the next check
 
-Evidence reviewed:
-- ...
+Non-blocking follow-ups:
+- improvement-ledger candidate, rule feedback, or suggestion
 
 Residual risk:
 - ...

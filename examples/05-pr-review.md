@@ -11,92 +11,49 @@ Review this PR and tell me whether to merge.
 Use:
 
 ```text
-review-router → layer applicability → required gates, including review-architecture-impact, review-output-quality, and review-adversarial-risk when applicable → review-final-merge-gate
+review-router → observed change signals → required gates → review-final-merge-gate
 ```
 
-## Expected output
+## Expected routing output
 
 ```text
-Layer applicability:
-- Domain:
-  status: skipped
-  reason: CSV escaping changes export formatting but does not change business meaning.
-  gate:
-- Architecture:
-  status: skipped
-  reason: No public API, dependency, persistence, or deployment boundary changed.
-  gate:
-- Design:
-  status: required
-  reason: The change must stay inside the existing export path.
-  gate: review-ai-quality
-- Logic:
-  status: required
-  reason: CSV escaping correctness and edge cases determine whether the output is valid.
-  gate: review-ai-quality
-- Output quality:
-  status: required
-  reason: CSV export is a human-facing and system-consumed output contract.
-  gate: review-output-quality
-- Test / verification:
-  status: required
-  reason: The escaping behavior needs regression coverage.
-  gate: review-automated-gate
-- Style / maintainability:
-  status: required
-  reason: The local implementation should match nearby export code without scope creep.
-  gate: review-ai-quality
-- Mechanical:
-  status: required
-  reason: Focused tests and static checks are needed as merge evidence.
-  gate: review-automated-gate
-- Adversarial risk:
-  status: skipped
-  reason: No prompt, generated AI output, security, or privacy surface changed.
-  gate:
-- Risk:
-  status: skipped
-  reason: No destructive, external, auth, secret, production, dependency, migration, billing, email, or infra impact.
-  gate:
-- Evidence:
-  status: required
-  reason: The final decision makes correctness and readiness claims.
-  gate: evidence-ledger
+Change signals:
+- generated_output_change: CSV export path and escaping implementation changed.
+- verification: focused export tests are available.
 
-Review route:
-- Required gates: review-automated-gate, review-ai-quality, review-output-quality, review-final-merge-gate
-- Optional gates: evidence-ledger
-- Skipped gates: review-architecture-impact, review-domain-impact, review-adversarial-risk, adr-review, risk-gate
+Required gates:
+- review-output-quality: CSV is a system-consumed output contract; triggered by generated_output_change.
+- review-ai-quality: escaping correctness and edge cases need local logic review.
+- review-automated-gate: focused regression evidence is required; triggered by verification.
 
+Skipped heavy gates:
+- review-domain-impact: no business meaning or workflow responsibility changed.
+- review-architecture-impact: no public API, dependency, persistence, or deployment boundary changed.
+- review-adversarial-risk: no untrusted input, security/privacy, prompt, or critical workflow signal observed.
+- risk-gate: no destructive or external action is being executed.
+
+Missing evidence:
+- none
+```
+
+## Expected final output
+
+```text
 Decision:
 - request changes
 
-Layer summary:
-- Domain: skipped; CSV escaping does not change business meaning.
-- Architecture: skipped; no public API, dependency, persistence, or deployment boundary changed.
-- Design: pass; change stays inside the existing export path.
-- Logic: fail; quote escaping is missing for CSV fields.
-- Output quality: fail; the CSV output contract is not parseable for fields containing quotes.
-- Test / verification: insufficient evidence; comma coverage exists, but double-quote regression coverage is missing.
-- Style / maintainability: pass; local implementation shape matches nearby code.
-- Mechanical: pass; focused tests ran, except large-file benchmark was not run.
-- Adversarial risk: skipped; no prompt, generated AI output, security, or privacy surface changed.
-- Risk: skipped; no destructive, external, auth, secret, production, dependency, migration, billing, email, or infra impact.
-- Evidence: pass; reviewed diff, nearby tests, and focused command output.
+Blocking evidence:
+- [major] src/export.ts:42 — CSV escaping does not handle quotes. Existing tests cover commas but not double quotes; escape quotes and add a regression test.
 
-Required fixes:
-- [major] src/export.ts:42 — CSV escaping does not handle quotes.
-  Evidence: Existing tests cover commas but not double quotes; implementation only wraps fields.
-  Required fix: Escape double quotes according to CSV rules and add a regression test.
+Passed required gates:
+- review-automated-gate — focused tests ran for existing comma cases.
 
-Suggestions:
-- ...
+Insufficient evidence:
+- none
 
-Evidence reviewed:
-- diff
-- nearby tests
-- focused test command output
+Non-blocking follow-ups:
+- Large-file performance benchmark — separate follow-up; not a merge blocker.
 
 Residual risk:
-- Large-file performance was not benchmarked.
+- Performance was not benchmarked.
 ```

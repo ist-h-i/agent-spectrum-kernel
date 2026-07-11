@@ -452,10 +452,34 @@ function sanitizeRoutingResult(source) {
   if (typeof source.correct_routing === "boolean") {
     result.correct_routing = source.correct_routing;
   }
+  if (Array.isArray(source.change_signals)) {
+    result.change_signals = source.change_signals
+      .map((item) => sanitizeChangeSignal(item))
+      .filter(Boolean)
+      .slice(0, 50);
+  }
   for (const field of ["secondary_skills", "required_gates", "executed_gates"]) {
     if (Array.isArray(source[field])) {
       result[field] = unique(source[field].filter((value) => typeof value === "string"));
     }
+  }
+  if (Array.isArray(source.required_gate_routes)) {
+    result.required_gate_routes = source.required_gate_routes
+      .map((item) => sanitizeRequiredGateRoute(item))
+      .filter(Boolean)
+      .slice(0, 50);
+  }
+  if (Array.isArray(source.skipped_heavy_gates)) {
+    result.skipped_heavy_gates = source.skipped_heavy_gates
+      .map((item) => sanitizeSkippedHeavyGate(item))
+      .filter(Boolean)
+      .slice(0, 50);
+  }
+  if (Array.isArray(source.missing_evidence)) {
+    result.missing_evidence = source.missing_evidence
+      .map((item) => sanitizeMissingEvidence(item))
+      .filter(Boolean)
+      .slice(0, 50);
   }
   if (Array.isArray(source.skipped_gates)) {
     result.skipped_gates = source.skipped_gates
@@ -470,6 +494,52 @@ function sanitizeRoutingResult(source) {
       .slice(0, 50);
   }
   return result;
+}
+
+function sanitizeChangeSignal(item) {
+  if (!item || typeof item.signal !== "string" || typeof item.evidence !== "string") {
+    return null;
+  }
+  const signal = sanitizeText(item.signal, 120);
+  const evidence = sanitizeText(item.evidence, 500);
+  return signal && evidence ? { signal, evidence } : null;
+}
+
+function sanitizeRequiredGateRoute(item) {
+  if (!item || typeof item.gate !== "string" || typeof item.reason !== "string" || !Array.isArray(item.trigger_signals)) {
+    return null;
+  }
+  const gate = sanitizeText(item.gate, 120);
+  const reason = sanitizeText(item.reason, 500);
+  const triggerSignals = unique(item.trigger_signals.filter((value) => typeof value === "string").map((value) => sanitizeText(value, 120))).filter(Boolean).slice(0, 20);
+  return gate && reason && triggerSignals.length > 0 ? { gate, reason, trigger_signals: triggerSignals } : null;
+}
+
+function sanitizeSkippedHeavyGate(item) {
+  if (!item || typeof item.gate !== "string" || typeof item.reason !== "string" || typeof item.observed_evidence !== "string") {
+    return null;
+  }
+  const gate = sanitizeText(item.gate, 120);
+  const reason = sanitizeText(item.reason, 500);
+  const observedEvidence = sanitizeText(item.observed_evidence, 500);
+  if (!gate || !reason || !observedEvidence) {
+    return null;
+  }
+  const result = { gate, reason, observed_evidence: observedEvidence };
+  if (typeof item.layer === "string") {
+    const layer = sanitizeText(item.layer, 120);
+    if (layer) result.layer = layer;
+  }
+  return result;
+}
+
+function sanitizeMissingEvidence(item) {
+  if (!item || typeof item.input !== "string" || typeof item.reason !== "string") {
+    return null;
+  }
+  const input = sanitizeText(item.input, 120);
+  const reason = sanitizeText(item.reason, 500);
+  return input && reason ? { input, reason } : null;
 }
 
 function sanitizeGateApplicability(item) {

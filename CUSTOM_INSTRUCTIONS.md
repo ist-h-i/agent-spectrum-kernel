@@ -39,7 +39,7 @@ Core rules:
 - Bug/unknown root cause: `doubt-driven-development` -> `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof.
 - Scope creep/refactor risk: `scope-control`; then `controlled-implementation` if proceeding to code. In review, use `review-router` -> required gates; scope findings generally route to `review-ai-quality`.
 - Hard-to-reverse architecture decision or ADR need: `adr-review`.
-- Diff/PR/generated code review: `review-router` -> layer applicability -> required gates, including `review-architecture-impact` for structural or boundary impact, `review-output-quality` for consumer-facing or machine-consumed output, and `review-adversarial-risk` for severe failure paths -> `review-final-merge-gate`.
+- Diff/PR/generated code review: `review-router` -> observed change signals -> required gates, including `review-architecture-impact` for structural or boundary impact, `review-output-quality` for consumer-facing or machine-consumed output, and `review-adversarial-risk` for severe failure paths -> `review-final-merge-gate`.
 - Repeated implementation context: `implementation-context-generation` creates or updates `docs/ai/implementation-context.md` for stack inventory, commands, implementation/test patterns, boundaries, overlay hooks, stop conditions, and update triggers.
 - Repeated review context: `review-context-generation` creates or updates `docs/ai/review-context.md` for personas, output contracts, critical workflows, accepted risks, known issues, and noise-control rules.
 - MR/PR README, PR explanation, or durable change-context documentation: `mr-readme-generation`.

@@ -30,8 +30,23 @@ Metrics event candidate:
   - primary_skill:
   - correct_routing: optional boolean when reviewed
   - secondary_skills:
+  - change_signals:
+    - signal:
+      evidence:
   - required_gates:
+  - required_gate_routes:
+    - gate:
+      reason:
+      trigger_signals:
   - executed_gates:
+  - skipped_heavy_gates:
+    - gate:
+      layer: optional
+      reason:
+      observed_evidence:
+  - missing_evidence:
+    - input:
+      reason:
   - skipped_gates:
     - gate:
     - reason:
@@ -209,12 +224,14 @@ Routing and review fields are summaries only. They should capture which gates we
 
 Sparse early-adoption reports may emit `null` for averages and rates such as correct routing rate or required gate coverage. `null` means unknown or unavailable evidence; it must not be interpreted as `0`.
 
-Gate applicability summaries make routing deviations detectable without storing raw review text:
+Signal-first routing summaries make routing deviations detectable without storing raw review text:
 
 - `required` gates that are not present in `executed_gates` are under-processing warnings.
-- Heavy gates in `required_gates` or `executed_gates` without a required applicability row and trigger signals are over-processing warnings.
+- Heavy gates in `required_gates` or `executed_gates` without a `required_gate_routes` entry or diagnostic applicability row containing trigger signals are over-processing warnings.
 - Missing changed-file, diff, context, output, or verification evidence should be recorded as `insufficient_evidence`, not as a skipped gate.
-- Skipped gates require evidence-backed reasons.
+- Skipped heavy gates require evidence-backed reasons. Ordinary unaffected layers do not need a normal-route row.
+
+The minimal normal-route record is `change_signals`, `required_gates`, and `executed_gates`. `required_gate_routes` may add explicit human-readable traceability, while `skipped_heavy_gates` and `missing_evidence` are added only when those states exist. `gate_applicability` remains an optional complete diagnostic matrix for validation/debug use and must not be required for every review event.
 
 `gate_decisions` is the bounded drill-down form for gate-level judgment data. It stores short structured judgments only. It must not contain raw prompts, full review text, full command output, or full file contents.
 

@@ -111,25 +111,30 @@ jobs:
 
             Requirements:
             - Treat the checked-out workspace as the PR head workspace.
-            - Read .claude/pr-context.json, .claude/pr.diff, and .claude/pr-head-sha.txt before deciding layer applicability.
+            - Read .claude/pr-context.json, .claude/pr.diff, and .claude/pr-head-sha.txt before extracting change signals.
             - If the PR head workspace or diff evidence is unavailable, return insufficient evidence instead of a confident decision.
-            - Use review-router first.
+            - Use review-router first to extract observed change signals and map them to required gates.
             - Run only required gates.
             - Include review-code-health only when code-health risk or non-blocking debt is applicable.
             - End with review-final-merge-gate style output.
-            - Keep current-PR blockers in Required fixes.
-            - Put non-blocking follow-up under Improvement ledger candidates.
+            - Keep current-PR blockers in Blocking evidence (use Required fixes only as a detailed sub-list when needed).
+            - Put non-blocking follow-up under Non-blocking follow-ups and keep improvement-ledger candidates separate when applicable.
+            - Do not emit a fixed layer-by-layer applicability table in the normal route. Use Change signals, Required gates, Skipped heavy gates, and Missing evidence instead.
+            - Normal routing output:
+            - Change signals: signal and observed evidence
+            - Required gates: gate, reason, and triggering signal(s)
+            - Skipped heavy gates: gate/layer and observed reason
+            - Missing evidence: missing input and why it remains unknown
             - Do not deploy, merge, release, publish, or mutate production configuration.
             - Do not store secrets or raw prompts.
             - Emit exactly one fenced JSON Execution Envelope using docs/execution-envelope-contract.md. The serialized output must contain the literal `Execution Envelope:` heading immediately before the JSON fence. Do not repeat route, evidence, stop, or next-action metadata in the review artifact.
 
             Final output contract:
             - Decision: approve | approve with comments | request changes | block | insufficient evidence
-            - Layer summary
-            - Required fixes
-            - Suggestions
-            - Improvement ledger candidates when applicable
-            - Evidence reviewed
+            - Blocking evidence
+            - Passed required gates
+            - Insufficient evidence
+            - Non-blocking follow-ups
             - Residual risk
             Execution Envelope:
             ```json

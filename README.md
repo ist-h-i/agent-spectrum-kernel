@@ -284,7 +284,7 @@ node scripts/ask-sensors.mjs --target /path/to/repo --mode implementation --inpu
 node scripts/ask-sensors.mjs --target /path/to/repo --mode review --input review-output.txt
 ```
 
-Sensors are initial report-only checks. They detect control failures such as missing completion sections, missing review layer summary, risk surfaces, unsupported adapter capability claims, and evidence phrases without evidence. They do not prove business correctness. `fail` restricts unsupported completion/readiness/safety/merge claims; `hard_stop` is limited to AGENTS approval-required actions.
+Sensors are initial report-only checks. They detect control failures such as missing completion sections, missing review decision/signal-gate sections, risk surfaces, unsupported adapter capability claims, and evidence phrases without evidence. They do not prove business correctness. `fail` restricts unsupported completion/readiness/safety/merge claims; `hard_stop` is limited to AGENTS approval-required actions.
 
 ## 3分で使う / Quick start
 
@@ -355,7 +355,7 @@ Default outputs should describe the selected work mode, user-facing route, missi
 | スコープが広がりそう | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → required gates） |
 | 危険操作・外部影響 | `risk-gate` before the selected workflow proceeds to action |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
-| PR/diffレビュー | `review-router` → layer applicability → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
+| PR/diffレビュー | `review-router` → observed change signals → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
 | 繰り返し/高impact review findingsを予防知識へ変換 | `review-finding-compiler` |
 | 既存要件・業務ルールとの照合 | `review-domain-impact`（Requirement Contract / Work Package / Domain Rule Ledger を入力にできる） |
 | リリース候補のready判定 | `release-readiness-gate`（deploy / publish / migration / external notification / release execution は `risk-gate` と明示承認が先） |

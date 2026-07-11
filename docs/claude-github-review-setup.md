@@ -28,14 +28,14 @@ Local Claude hooks are the default path for local observability. GitHub Actions 
 The review comment should include:
 
 - decision: `approve`, `approve with comments`, `request changes`, `block`, or `insufficient evidence`,
-- layer summary,
-- required fixes,
-- suggestions,
-- improvement-ledger candidates when applicable,
-- evidence reviewed,
+- change signals and required gates,
+- blocking evidence,
+- passed required gates,
+- insufficient evidence,
+- non-blocking follow-ups,
 - residual risk.
 
-The workflow checks out the PR head workspace before invoking Claude. It captures PR metadata into `.claude/pr-context.json`, the patch diff into `.claude/pr.diff`, and the checked-out head SHA into `.claude/pr-head-sha.txt`. The prompt requires Claude to read those files before deciding layer applicability.
+The workflow checks out the PR head workspace before invoking Claude. It captures PR metadata into `.claude/pr-context.json`, the patch diff into `.claude/pr.diff`, and the checked-out head SHA into `.claude/pr-head-sha.txt`. The prompt requires Claude to read those files before extracting change signals and selecting gates.
 
 For fork PRs, the template blocks comment-triggered execution by default. A repository owner can intentionally review a fork by using `workflow_dispatch`, setting `pr_number`, and setting `allow_fork=true` after approving the data-exposure and cost risk.
 

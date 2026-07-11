@@ -2364,7 +2364,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
       ? `- Stale skill-count references found above: ${staleSkillCountFindings.length}.`
       : "- No stale skill-count references found.",
     "- No deleted legacy code-review adapter references found.",
-    "- Review route references use the current layer-aware route through `review-router`, layer applicability, required gates, and `review-final-merge-gate`.",
+    "- Review route references use the current signal-first route through `review-router`, observed change signals, required gates, and `review-final-merge-gate`.",
     "- Implementation route references use Verification Contract, Implementation Contract, `controlled-implementation`, and evidence-oriented verification wording.",
     "- Operating mode routing, skill group metadata, adoption workflows, observability metrics, and operation reporting are represented as separate layers.",
     "- Project overlay, stack overlay, review context, implementation context, and task progress terminology is explicitly separated in maintained auxiliary docs.",

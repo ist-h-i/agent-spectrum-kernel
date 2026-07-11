@@ -57,6 +57,19 @@
       "properties": {
         "operating_mode": { "type": "string" },
         "primary_skill": { "type": "string" },
+        "change_signals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["signal", "evidence"],
+            "properties": {
+              "signal": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "evidence": { "type": "string", "minLength": 1, "maxLength": 500 }
+            }
+          },
+          "maxItems": 50
+        },
         "correct_routing": { "type": "boolean" },
         "secondary_skills": {
           "type": "array",
@@ -72,6 +85,48 @@
           "type": "array",
           "items": { "type": "string" },
           "uniqueItems": true
+        },
+        "required_gate_routes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["gate", "reason", "trigger_signals"],
+            "properties": {
+              "gate": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 500 },
+              "trigger_signals": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 120 }, "uniqueItems": true, "maxItems": 20 }
+            }
+          },
+          "maxItems": 50
+        },
+        "skipped_heavy_gates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["gate", "reason", "observed_evidence"],
+            "properties": {
+              "gate": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "layer": { "type": "string", "maxLength": 120 },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 500 },
+              "observed_evidence": { "type": "string", "maxLength": 500 }
+            }
+          },
+          "maxItems": 50
+        },
+        "missing_evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["input", "reason"],
+            "properties": {
+              "input": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+            }
+          },
+          "maxItems": 50
         },
         "skipped_gates": {
           "type": "array",

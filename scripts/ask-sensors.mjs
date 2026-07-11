@@ -16,7 +16,14 @@ const KNOWN_OUTPUT_SECTIONS = [
   "Risks / assumptions:",
   "Next:",
   "Decision:",
-  "Layer summary:",
+  "Change signals:",
+  "Required gates:",
+  "Skipped heavy gates:",
+  "Missing evidence:",
+  "Blocking evidence:",
+  "Passed required gates:",
+  "Insufficient evidence:",
+  "Non-blocking follow-ups:",
   "Evidence:",
   "Required fixes:",
   "Suggestions:",
@@ -163,6 +170,14 @@ function completionContractSensor(text, mode, requiredSections) {
 function reviewLayerSummarySensor(text) {
   if (!text.trim()) {
     return sensor("review_layer_summary", "warn", "No review output text was provided.");
+  }
+  if (text.includes("Layer summary:")) {
+    return sensor(
+      "review_layer_summary",
+      "fail",
+      "Review output uses the removed fixed layer summary contract.",
+      "Use Decision, Blocking evidence, Passed required gates, Insufficient evidence, Non-blocking follow-ups, and Residual risk. Use Diagnostic applicability only when a debug matrix is explicitly requested.",
+    );
   }
   const missing = codexPromptContractForMode("review").requiredSections.filter((section) => !text.includes(section));
   if (missing.length > 0) {

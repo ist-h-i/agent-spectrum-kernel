@@ -38,7 +38,7 @@ The current rubric already separates static package/design readiness from runtim
 | Safety / external effects | 95+ | Destructive, irreversible, production, auth, secrets, billing, infra, and global-state actions require risk gate |
 | Design review | 95+ | Grill workflow asks one gating question at a time and answers from repo/docs when possible |
 | Spec quality | 95+ | Behavior, non-goals, edge cases, acceptance criteria, and verification are observable |
-| Review quality | 95+ | Review router determines layer applicability; required gates cover `review-architecture-impact`, `review-output-quality`, `review-adversarial-risk`, context generation, and final layer summary |
+| Review quality | 95+ | Review router extracts observed change signals; required gates cover `review-architecture-impact`, `review-output-quality`, `review-adversarial-risk`, context generation, and the final merge evidence summary |
 | Code health review | 95+ | `review-code-health` finds evidence-backed debt, smells, refactor candidates, maintainability/testability/performance/dependency risk, and security weakness signals without replacing specialized gates |
 | Technical debt lifecycle | 95+ | Findings can move from review to separate PR, backlog, accepted risk, stale review, rule feedback, executable check, or safe refactor without hiding blockers |
 | Improvement ledger quality | 95+ | Ledger rows require source, evidence, impact, severity, urgency, decision, owner/status, refresh date, and close condition |
@@ -89,7 +89,7 @@ The scores below are static package/design readiness scores. Runtime effectivene
 | Safety / external effects | 97 | Kernel gate plus `risk-gate` skill for high-risk operations |
 | Design review | 95 | Grill skill includes falsifiable outcome, decision tree, one-question rule |
 | Spec quality | 95 | Spec skill includes non-goals, edge cases, acceptance, verification, risks |
-| Review quality | 96 | `review-router` records layer applicability; review gates include `review-architecture-impact`, `review-output-quality`, `review-adversarial-risk`, `review-context-generation`, and `review-final-merge-gate` layer summary |
+| Review quality | 96 | `review-router` records signal-to-gate routing; review gates include `review-architecture-impact`, `review-output-quality`, `review-adversarial-risk`, `review-context-generation`, and `review-final-merge-gate` merge evidence |
 | Code health review | 95 | `review-code-health` now provides a dedicated debt/smell/refactor/maintainability review gate with scope guidance and rule/check feedback |
 | Technical debt lifecycle | 95 | `improvement-ledger` separates blockers from non-blocking debt and gives each tracked item owner/status, refresh, close, and prevention routing fields |
 | Improvement ledger quality | 95 | The ledger template defines required fields, lifecycle states, evidence key, conversion tables, stale review rules, and executable validation coverage |
@@ -108,7 +108,7 @@ The scores below are static package/design readiness scores. Runtime effectivene
 | Adapter conformance | 95 | `docs/adapter-conformance-contract.md`, `docs/adapter-capability-matrix.md`, and validation checks define adapter requirements and downgrade rules for unsupported capabilities |
 | Doctor installation health | 95 | `ask-doctor` separates installation failures, warnings, unsupported claims, and privacy defaults; README states it is not a per-task gate |
 | Runtime probe boundary | 95 | Runtime probe output is documented and printed as local/static/dry-run only; failures downgrade conformance/readiness claims rather than proving external runtime behavior |
-| Sensor control checks | 95 | `ask-sensors` is report-only and fixture-tested for completion sections, review layer summary, weak evidence, risk surfaces, unsupported capability claims, and scoped evidence phrases |
+| Sensor control checks | 95 | `ask-sensors` is report-only and fixture-tested for completion sections, review signal/gate sections, weak evidence, risk surfaces, unsupported capability claims, and scoped evidence phrases |
 | Sensor/probe noise monitoring | 90 | Fixture coverage includes several false-positive controls, but real adopting-project false-positive and false-negative rates for sensors and runtime probe remain unmeasured |
 | Stakeholder readiness reporting | 95 | `docs/ai/stakeholder-readiness-report-template.md` separates senior engineer, development manager, business unit leader, and AI promotion leader evidence needs |
 | Evidence handling | 97 | Evidence ledger is explicit and reusable across review/handoff/completion |

@@ -1297,8 +1297,21 @@ function assertRuntimeScripts() {
     routingRecordStore,
     "--routing-result-json",
     JSON.stringify({
+      change_signals: [
+        { signal: "public_api_change", evidence: "schema file changed" },
+        { signal: "generated_output_change", evidence: "docs output path changed" },
+      ],
       required_gates: ["review-router"],
       executed_gates: ["review-router"],
+      required_gate_routes: [
+        { gate: "review-router", reason: "Observed review target requires routing.", trigger_signals: ["public_api_change"] },
+      ],
+      skipped_heavy_gates: [
+        { gate: "review-adversarial-risk", layer: "Adversarial risk overlay", reason: "No security or misuse signal.", observed_evidence: "schema-only fixture" },
+      ],
+      missing_evidence: [
+        { input: "verification", reason: "Focused command output was not provided." },
+      ],
       gate_applicability: [
         {
           layer: "Architecture",
@@ -1333,6 +1346,40 @@ function assertRuntimeScripts() {
   ) {
     throw new Error(`metrics recorder should preserve sanitized gate_applicability from routing_result\n${JSON.stringify(routingRecordedEvent, null, 2)}`);
   }
+  const recordedRouting = routingRecordedEvent.routing_result;
+  if (
+    recordedRouting.change_signals?.length !== 2 ||
+    recordedRouting.required_gate_routes?.[0]?.trigger_signals?.[0] !== "public_api_change" ||
+    recordedRouting.skipped_heavy_gates?.[0]?.gate !== "review-adversarial-risk" ||
+    recordedRouting.missing_evidence?.[0]?.input !== "verification"
+  ) {
+    throw new Error(`metrics recorder should preserve the compact signal-first routing summary\n${JSON.stringify(routingRecordedEvent, null, 2)}`);
+  }
+  const sparseSignalRoutingEvent = {
+    schema_version: "1.0.0",
+    event_id: "evt:sparse-signal-routing",
+    task_id: "SPARSE-SIGNAL-ROUTING-1",
+    task_type: "review",
+    occurred_at: "2999-01-01T00:00:00.000Z",
+    skills_used: ["review-router"],
+    routing_result: {
+      change_signals: [{ signal: "docs_output_change", evidence: "docs/output.md changed" }],
+      required_gates: ["review-output-quality"],
+      executed_gates: ["review-output-quality"],
+    },
+    outcome_metrics: {},
+    verification_metrics: {},
+    debt_movement_metrics: {},
+    evidence_references: ["fixture"],
+    privacy_note: {
+      raw_prompts_stored: false,
+      secrets_stored: false,
+      customer_data_stored: false,
+      personal_data_stored: false,
+      external_publication: false,
+    },
+  };
+  assertSchemaPass("sparse signal-first routing event", metricsSchema, sparseSignalRoutingEvent);
 
   const taskEvents = [];
   for (let index = 0; index < 5; index += 1) {
@@ -1870,6 +1917,62 @@ function assertRuntimeScripts() {
     throw new Error(`boundary/API change should require and execute architecture gate without deviation warnings\n${JSON.stringify(boundaryReport.skill_usage, null, 2)}`);
   }
 
+  const signalFirstReport = summarizeEvents("signal-first-routing-report", [
+    routingEvent({
+      event_id: "evt-signal-first-routing",
+      task_id: "SIGNAL-FIRST-1",
+      changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
+      routing_result: {
+        change_signals: [{ signal: "public_api_change", evidence: "schema file changed" }],
+        required_gates: ["review-router", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-architecture-impact"],
+      },
+    }),
+  ]);
+  if (signalFirstReport.skill_usage.over_processing_count !== 0) {
+    throw new Error(`signal-first routing should preserve trigger evidence without requiring a diagnostic layer matrix\n${JSON.stringify(signalFirstReport, null, 2)}`);
+  }
+
+  const compactMissingEvidenceReport = summarizeEvents("compact-missing-evidence-routing-report", [
+    routingEvent({
+      event_id: "evt-compact-missing-evidence",
+      task_id: "COMPACT-MISSING-EVIDENCE-1",
+      routing_result: {
+        change_signals: [{ signal: "verification", evidence: "behavior changed" }],
+        required_gates: ["review-automated-gate"],
+        required_gate_routes: [
+          { gate: "review-automated-gate", reason: "Verification evidence is required.", trigger_signals: ["verification"] },
+        ],
+        executed_gates: ["review-router"],
+        missing_evidence: [{ input: "verification command output", reason: "Focused command output is unavailable." }],
+      },
+    }),
+  ]);
+  if (
+    compactMissingEvidenceReport.summary.insufficient_evidence !== 1 ||
+    compactMissingEvidenceReport.skill_usage.missing_evidence_count !== 1 ||
+    compactMissingEvidenceReport.skill_usage.under_processing_count !== 1
+  ) {
+    throw new Error(`compact missing evidence should remain insufficient evidence\n${JSON.stringify(compactMissingEvidenceReport, null, 2)}`);
+  }
+
+  const unexecutedHeavyGateReport = summarizeEvents("unexecuted-heavy-gate-routing-report", [
+    routingEvent({
+      event_id: "evt-unexecuted-heavy-gate",
+      task_id: "UNEXECUTED-HEAVY-GATE-1",
+      routing_result: {
+        required_gates: ["review-architecture-impact"],
+        executed_gates: [],
+      },
+    }),
+  ]);
+  if (
+    unexecutedHeavyGateReport.skill_usage.under_processing_count !== 1 ||
+    unexecutedHeavyGateReport.skill_usage.over_processing_count !== 0
+  ) {
+    throw new Error(`unexecuted heavy gate should be under-processing only\n${JSON.stringify(unexecutedHeavyGateReport, null, 2)}`);
+  }
+
   const missingHeavyApplicabilityReport = summarizeEvents("missing-heavy-applicability-routing-report", [
     routingEvent({
       event_id: "evt-missing-heavy-applicability",
@@ -1882,7 +1985,7 @@ function assertRuntimeScripts() {
     }),
   ]);
   if (
-    missingHeavyApplicabilityReport.skill_usage.over_processing_count !== 0 ||
+    missingHeavyApplicabilityReport.skill_usage.over_processing_count !== 1 ||
     !missingHeavyApplicabilityReport.adoption_effect.weak_signal.some((signal) => signal.includes("Over-processing") && signal.includes("review-architecture-impact"))
   ) {
     throw new Error(`heavy gate required/executed without applicability evidence should be flagged\n${JSON.stringify(missingHeavyApplicabilityReport, null, 2)}`);
@@ -1910,7 +2013,7 @@ function assertRuntimeScripts() {
     }),
   ]);
   if (
-    missingHeavyTriggerReport.skill_usage.over_processing_count !== 0 ||
+    missingHeavyTriggerReport.skill_usage.over_processing_count !== 1 ||
     !missingHeavyTriggerReport.adoption_effect.weak_signal.some((signal) => signal.includes("Over-processing") && signal.includes("review-architecture-impact"))
   ) {
     throw new Error(`heavy gate required/executed without trigger signals should be flagged\n${JSON.stringify(missingHeavyTriggerReport, null, 2)}`);
@@ -3442,9 +3545,20 @@ ${validEnvelopeBlock}
     `Decision:
 - approve with comments
 
-Layer summary:
-- Domain: skipped - no domain behavior signal.
-- Architecture: skipped - no boundary signal.
+Blocking evidence:
+- none
+
+Passed required gates:
+- review-automated-gate - focused validation
+
+Insufficient evidence:
+- none
+
+Non-blocking follow-ups:
+- none
+
+Residual risk:
+- none
 ${validEnvelopeBlock}
 `,
   );
@@ -3454,12 +3568,48 @@ ${validEnvelopeBlock}
     throw new Error(`review contract fixture should pass sensors\n${reviewPassResult.stdout}`);
   }
 
+  const separatedReviewOutput = resolve(target, "separated-review-output.txt");
+  writeFileSync(
+    separatedReviewOutput,
+    `Decision:\n- request changes\n\nBlocking evidence:\n- [major] review-output-quality - output contract is incomplete\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- IMP candidate: improve documentation example\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`,
+  );
+  const separatedReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", separatedReviewOutput]);
+  assertRuntimePass("review blocker and follow-up sections stay separate", separatedReviewResult);
+  if (!separatedReviewResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`review blocker/follow-up separation fixture should pass sensors\n${separatedReviewResult.stdout}`);
+  }
+
+  const legacyReviewOutput = resolve(target, "legacy-review-output.txt");
+  writeFileSync(
+    legacyReviewOutput,
+    `Decision:\n- approve\n\nLayer summary:\n- Domain: skipped\n\n${validEnvelopeBlock}`,
+  );
+  const legacyReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", legacyReviewOutput]);
+  assertRuntimePass("legacy fixed layer summary is rejected", legacyReviewResult);
+  if (!legacyReviewResult.stdout.includes("fixed layer summary contract")) {
+    throw new Error(`legacy review output should be rejected by the signal-first sensor\n${legacyReviewResult.stdout}`);
+  }
+
   const claudeReviewCommand = readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/commands/skill-review.md"), "utf8");
   if (!claudeReviewCommand.includes("fenced JSON `Execution Envelope`") || !claudeReviewCommand.includes("docs/execution-envelope-contract.md")) {
     throw new Error("Claude review adapter must require the shared fenced JSON Execution Envelope");
   }
+  const distributedReviewAdapters = [
+    "adapters/codex/prompts/skill-review.md",
+    "adapters/claude-code/project/.claude/commands/skill-review.md",
+    "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+    "adapters/claude-code/github-actions/claude-review-on-mention.yml",
+  ];
+  for (const adapterPath of distributedReviewAdapters) {
+    const adapterText = readFileSync(resolve(repoRoot, adapterPath), "utf8");
+    for (const section of ["Change signals:", "Required gates:", "Skipped heavy gates:", "Missing evidence:"]) {
+      if (!adapterText.includes(section)) {
+        throw new Error(`${adapterPath} must project the signal-first review route section: ${section}`);
+      }
+    }
+  }
   const claudeOutput = resolve(target, "claude-review-output.txt");
-  writeFileSync(claudeOutput, `Decision:\n- approve with comments\n\nLayer summary:\n- Domain: skipped - no domain behavior signal.\n- Architecture: skipped - no boundary signal.\n\n${validEnvelopeBlock}`);
+  writeFileSync(claudeOutput, `Decision:\n- approve with comments\n\nBlocking evidence:\n- none\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- none\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`);
   const claudeOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeOutput]);
   assertRuntimePass("Claude adapter output smoke", claudeOutputResult);
   if (!claudeOutputResult.stdout.includes("ASK sensors: pass")) {
@@ -3470,6 +3620,11 @@ ${validEnvelopeBlock}
   const claudePromptMatch = claudeGithubAction.match(/\n {10}prompt: \|\n([\s\S]*?)\n {10}claude_args:/);
   if (!claudePromptMatch) throw new Error("Claude GitHub Actions prompt block is missing");
   const claudePrompt = claudePromptMatch[1].split("\n").map((line) => line.startsWith("            ") ? line.slice(12) : line).join("\n");
+  for (const section of ["Change signals:", "Required gates:", "Skipped heavy gates:", "Missing evidence:"]) {
+    if (!claudePrompt.includes(section)) {
+      throw new Error(`Claude GitHub Actions prompt must require the signal-first review route section: ${section}`);
+    }
+  }
   const claudeActionEnvelope = inspectExecutionEnvelope(claudePrompt);
   if (claudeActionEnvelope.status !== "parsed" || claudeActionEnvelope.value.route.work_mode !== "レビュー") {
     throw new Error(`Claude GitHub Actions example must be a canonical schema-valid Japanese review envelope\n${JSON.stringify(claudeActionEnvelope, null, 2)}`);
@@ -3478,7 +3633,7 @@ ${validEnvelopeBlock}
     throw new Error("Claude GitHub Actions adapter must require a fenced JSON Execution Envelope");
   }
   const claudeGithubOutput = resolve(target, "claude-github-action-output.txt");
-  writeFileSync(claudeGithubOutput, `Decision:\n- approve with comments\n\nLayer summary:\n- Domain: skipped - no domain behavior signal.\n- Architecture: skipped - no boundary signal.\n\n${validEnvelopeBlock}`);
+  writeFileSync(claudeGithubOutput, `Decision:\n- approve with comments\n\nBlocking evidence:\n- none\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- none\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`);
   const claudeGithubOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeGithubOutput]);
   assertRuntimePass("Claude GitHub Actions adapter output smoke", claudeGithubOutputResult);
   if (!claudeGithubOutputResult.stdout.includes("ASK sensors: pass")) {
@@ -3490,7 +3645,7 @@ ${validEnvelopeBlock}
     throw new Error("Claude plugin review skill must require the shared fenced JSON Execution Envelope");
   }
   const claudePluginOutput = resolve(target, "claude-plugin-review-output.txt");
-  writeFileSync(claudePluginOutput, `Decision:\n- approve with comments\n\nLayer summary:\n- Domain: skipped - no domain behavior signal.\n- Architecture: skipped - no boundary signal.\n\n${validEnvelopeBlock}`);
+  writeFileSync(claudePluginOutput, `Decision:\n- approve with comments\n\nBlocking evidence:\n- none\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- none\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`);
   const claudePluginOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudePluginOutput]);
   assertRuntimePass("Claude plugin adapter output smoke", claudePluginOutputResult);
   if (!claudePluginOutputResult.stdout.includes("ASK sensors: pass")) {

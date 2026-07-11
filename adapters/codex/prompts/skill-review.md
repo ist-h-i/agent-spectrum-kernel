@@ -6,43 +6,45 @@ Use the repository `AGENTS.md` and projected skills from `.agents/skills`.
 
 Entry intent: review.
 Mutation level: read-only unless the user explicitly asks for fixes after the review.
-Routing source: use `review-router` to decide applicable review layers, then run only required gates. Do not treat this prompt as a second routing source.
+Routing source: use `review-router` to extract observed change signals, map them to required gates, then run only those gates. Do not treat this prompt as a second routing source.
 
 Evidence requirements:
 
 - inspect the checked-out workspace, diff, generated output, relevant docs, and verification evidence when available
-- mark affected layers as `insufficient evidence` when required inputs are missing
+- record missing diff, context, output, or verification inputs as `insufficient evidence`, never as skipped
 - keep current blockers separate from non-blocking improvement candidates
 - use `risk-gate` before any external comment, label, check, metric, notification, deploy, release, or production mutation
 
 Output contract:
 
-Append one shared `Execution Envelope` for the review boundary, following `docs/execution-envelope-contract.md`. Keep review findings and layer summaries in the artifact; do not repeat envelope metadata as separate route sections.
+Append one shared `Execution Envelope` for the review boundary, following `docs/execution-envelope-contract.md`. Keep review findings and signal/gate summaries in the artifact; do not repeat envelope metadata as separate route sections.
+
+Change signals:
+- signal: observed evidence
+
+Required gates:
+- gate: reason; triggered by signal(s)
+
+Skipped heavy gates:
+- gate/layer: observed reason
+
+Missing evidence:
+- input: why it is required and what remains unknown
 
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
-Layer summary:
-- Domain: pass | fail | skipped | insufficient evidence - evidence/reason
-- Architecture: pass | fail | skipped | insufficient evidence - evidence/reason
-- Design: pass | fail | skipped | insufficient evidence - evidence/reason
-- Logic: pass | fail | skipped | insufficient evidence - evidence/reason
-- Output quality: pass | fail | skipped | insufficient evidence - evidence/reason
-- Test / verification: pass | fail | skipped | insufficient evidence - evidence/reason
-- Style / maintainability: pass | fail | skipped | insufficient evidence - evidence/reason
-- Mechanical: pass | fail | skipped | insufficient evidence - evidence/reason
-- Adversarial risk: pass | fail | skipped | insufficient evidence - evidence/reason
-- Risk: pass | fail | skipped | insufficient evidence - evidence/reason
-- Evidence: pass | fail | skipped | insufficient evidence - evidence/reason
+Blocking evidence:
+- [severity] gate/file:line - evidence, impact, and required fix or decision
 
-Required fixes:
-- [severity] file:line - issue, evidence, required fix
+Passed required gates:
+- gate - evidence checked
 
-Suggestions:
-- ...
+Insufficient evidence:
+- gate/input - what remains unknown and the next check
 
-Evidence reviewed:
-- ...
+Non-blocking follow-ups:
+- improvement-ledger candidate, rule feedback, or suggestion
 
 Residual risk:
 - ...

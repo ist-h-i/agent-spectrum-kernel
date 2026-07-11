@@ -102,7 +102,7 @@ Future fixture matrix:
 | Sensor | Fixture coverage to preserve before changing behavior |
 |---|---|
 | `completion_contract` | Missing and present implementation completion sections. |
-| `review_layer_summary` | Missing and present review decision / layer summary sections. |
+| `review_layer_summary` | Missing and present review decision plus signal/gate result sections. |
 | `risk_surface` | True approval-required action, approved action, negated risk reference, and read-only mention. |
 | `unsupported_capability` | Unsupported, partial, downgraded, and supported adapter capability claims. |
 | `evidence_phrase` | Unsupported readiness/fixed/safe claims, quoted issue titles, and negated or scoped claims. |

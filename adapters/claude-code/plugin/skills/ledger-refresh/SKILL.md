@@ -15,6 +15,6 @@ Default to dry-run unless the user explicitly asks to edit the ledger. Summarize
 - accepted or wont_fix items,
 - metrics event candidate when adoption metrics are explicitly enabled.
 
-Keep current-PR blockers in review required fixes. Do not hide blockers inside the ledger.
+Keep current-PR blockers in review Blocking evidence or detailed Required fixes. Do not hide blockers inside the ledger.
 
 $ARGUMENTS

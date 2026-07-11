@@ -215,7 +215,7 @@ Workflow:
 
 ```text
 review-router
-layer applicability
+observed change signals
 required gates, including review-architecture-impact, review-output-quality, and review-adversarial-risk when applicable
 review-final-merge-gate
 ```
@@ -223,45 +223,32 @@ review-final-merge-gate
 Expected output:
 
 ```text
-Layer applicability:
-- Domain:
-  status: required | skipped | insufficient evidence
-  reason:
-  gate:
-- Architecture:
-  status: required | skipped | insufficient evidence
-  reason:
-  gate:
-- ...
+Change signals:
+- signal: observed evidence
 
-Review route:
-- required gates
-- skipped gates
+Required gates:
+- gate: reason; triggered by signal(s)
+
+Skipped heavy gates:
+- gate/layer: observed reason
+
+Missing evidence:
+- input: what remains unknown
 
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
-Layer summary:
-- Domain: pass | fail | skipped | insufficient evidence - evidence/reason
-- Architecture: pass | fail | skipped | insufficient evidence - evidence/reason
-- Design: pass | fail | skipped | insufficient evidence - evidence/reason
-- Logic: pass | fail | skipped | insufficient evidence - evidence/reason
-- Output quality: pass | fail | skipped | insufficient evidence - evidence/reason
-- Test / verification: pass | fail | skipped | insufficient evidence - evidence/reason
-- Style / maintainability: pass | fail | skipped | insufficient evidence - evidence/reason
-- Mechanical: pass | fail | skipped | insufficient evidence - evidence/reason
-- Adversarial risk: pass | fail | skipped | insufficient evidence - evidence/reason
-- Risk: pass | fail | skipped | insufficient evidence - evidence/reason
-- Evidence: pass | fail | skipped | insufficient evidence - evidence/reason
+Blocking evidence:
+- [severity] gate/file:line — issue, evidence, impact, required fix
 
-Required fixes:
-- [severity] file:line — issue, evidence, required fix
+Passed required gates:
+- gate — evidence checked
 
-Suggestions:
-- ...
+Insufficient evidence:
+- gate/input — next check
 
-Evidence reviewed:
-- ...
+Non-blocking follow-ups:
+- improvement-ledger candidate or suggestion
 
 Residual risk:
 - ...

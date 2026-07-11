@@ -64,8 +64,8 @@ The following belong in the skill artifact and should not be repeated in the env
 | `spec-driven-development` | Spec and implementation plan |
 | `test-first-verification` | Verification Contract and evidence |
 | `controlled-implementation` | Implementation Contract and implementation summary |
-| `review-router` / review gates | Layer applicability or review findings |
-| `review-final-merge-gate` | Final decision and layer summary |
+| `review-router` / review gates | Change signals, required gates, or review findings |
+| `review-final-merge-gate` | Final decision and merge evidence summary |
 | `handoff-generation` | Next-task handoff and bounded resume state |
 
 These artifacts may contain evidence, blockers, or next-step detail required by their own purpose. They should not reproduce `Selected work mode`, `User-facing route`, `Internal route`, `Route confidence`, `Evidence checked`, `Missing evidence`, and `Next action` as a second control contract when the shared envelope is already present.
