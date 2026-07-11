@@ -21,7 +21,6 @@ Output contract:
 
 Append one shared `Execution Envelope` for the task boundary, following `docs/execution-envelope-contract.md`. Do not repeat routing, evidence, stop, or next-action metadata in the investigation artifact.
 
-```text
 Findings:
 - ...
 
@@ -49,7 +48,6 @@ Execution Envelope:
   "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
   "next_action": "..."
 }
-```
 ```
 
 Do not include raw prompts, secrets, customer data, personal data, full command output, or full file contents.

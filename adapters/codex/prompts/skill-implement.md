@@ -20,7 +20,6 @@ Output contract:
 
 Append one shared `Execution Envelope` for the task boundary, following `docs/execution-envelope-contract.md`. Do not repeat routing, evidence, stop, or next-action metadata in the implementation artifact.
 
-```text
 Changed:
 - ...
 
@@ -45,7 +44,6 @@ Execution Envelope:
   "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
   "next_action": "..."
 }
-```
 ```
 
 Do not deploy, publish, release, send notifications, change secrets, or mutate production configuration from this prompt.

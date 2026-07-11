@@ -36,8 +36,19 @@ function loadReferencedSchema(ref, baseDir, rootSchema) {
 }
 
 function validFormat(value, format) {
-  if (format === "date") return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
-  if (format === "date-time") return !Number.isNaN(Date.parse(value)) && /T\d{2}:\d{2}/.test(value);
+  if (format === "date") {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return false;
+    const [, year, month, day] = match;
+    const date = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.getUTCFullYear() === Number(year) && date.getUTCMonth() + 1 === Number(month) && date.getUTCDate() === Number(day);
+  }
+  if (format === "date-time") {
+    const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.exec(value);
+    if (!match || !validFormat(match[1], "date")) return false;
+    const [, , hour, minute, second, , timezone] = match;
+    return Number(hour) <= 23 && Number(minute) <= 59 && Number(second) <= 59 && (timezone === "Z" || (Number(timezone.slice(1, 3)) <= 23 && Number(timezone.slice(4, 6)) <= 59));
+  }
   return true;
 }
 
@@ -66,6 +77,10 @@ function validateSchemaValue(value, schema, context, path = "$") {
     if (schema.maxLength !== undefined && value.length > schema.maxLength) errors.push(`${path}: exceeds maxLength`);
     if (schema.pattern && !new RegExp(schema.pattern).test(value)) errors.push(`${path}: does not match pattern`);
     if (schema.format && !validFormat(value, schema.format)) errors.push(`${path}: invalid ${schema.format}`);
+  }
+  if (typeof value === "number") {
+    if (typeof schema.minimum === "number" && value < schema.minimum) errors.push(`${path}: must be >= ${schema.minimum}`);
+    if (typeof schema.maximum === "number" && value > schema.maximum) errors.push(`${path}: must be <= ${schema.maximum}`);
   }
   if (Array.isArray(value)) {
     if (schema.minItems !== undefined && value.length < schema.minItems) errors.push(`${path}: has too few items`);

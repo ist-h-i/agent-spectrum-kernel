@@ -19,7 +19,6 @@ Output contract:
 
 Append one shared `Execution Envelope` for the handoff boundary, following `docs/execution-envelope-contract.md`. Keep the next-task handoff and bounded resume state in the artifact; do not repeat envelope metadata as separate route sections.
 
-```text
 Task:
 Context:
 Allowed scope:
@@ -37,7 +36,6 @@ Execution Envelope:
   "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
   "next_action": "..."
 }
-```
 ```
 
 Do not include raw prompts, secrets, customer data, personal data, full command output, or full file contents.

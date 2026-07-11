@@ -80,6 +80,7 @@ const EXECUTION_ENVELOPE_ADAPTER_PATHS = [
   "adapters/claude-code/project/.claude/commands/skill-verify.md",
   "adapters/claude-code/project/.claude/commands/skill-handoff.md",
   "adapters/claude-code/github-actions/claude-review-on-mention.yml",
+  "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
 ];
 const DUPLICATED_EXECUTION_ENVELOPE_FIELDS = ["Selected work mode:", "User-facing route:", "Internal route:", "Route confidence:", "Evidence checked:"];
 const REQUIRED_CLAUDE_ADAPTER_PATHS = [

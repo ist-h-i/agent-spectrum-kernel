@@ -25,7 +25,7 @@ Execution Envelope:
   "route": { "work_mode": "要件確認", "operating_mode": "delivery_quality", "user_facing": "既存要件とrepo根拠を確認する", "internal": { "primary": "requirement-grill", "secondary": ["domain-rule-ledger"], "next_if_resolved": "work-package-compiler" } },
   "evidence_status": { "checked": ["issue body", "relevant README/docs"], "missing": ["business decision"] },
   "stop_reason": { "status": "human_decision", "details": ["unresolved human-owned business decision remains"], "human_decision_required": ["business outcome"], "stop_if": ["business decision remains unresolved"] },
-  "next_action": "stop for human decision or proceed to implementation packaging"
+  "next_action": "request the unresolved business decision"
 }
 ```
 

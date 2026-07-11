@@ -19,7 +19,6 @@ Output contract:
 
 Append one shared `Execution Envelope` for the review boundary, following `docs/execution-envelope-contract.md`. Keep review findings and layer summaries in the artifact; do not repeat envelope metadata as separate route sections.
 
-```text
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
@@ -57,7 +56,6 @@ Execution Envelope:
   "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
   "next_action": "..."
 }
-```
 ```
 
 Do not publish comments, labels, checks, metrics, or notifications externally unless the user explicitly requested that external action and `risk-gate` approved it.

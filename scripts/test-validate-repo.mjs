@@ -32,6 +32,26 @@ function envelopeBlock(overrides = {}) {
 }
 
 const validEnvelopeBlock = envelopeBlock();
+const validMetricsCandidate = {
+  schema_version: "1.0.0",
+  event_id: "fixture:execution-envelope",
+  task_id: "fixture-task",
+  task_type: "implementation",
+  occurred_at: "2026-07-11T12:00:00Z",
+  skills_used: ["controlled-implementation"],
+  instruction_quality_metrics: { goal_clarity: 3 },
+  outcome_metrics: { rework_count: 0 },
+  verification_metrics: {},
+  debt_movement_metrics: {},
+  evidence_references: ["scripts/test-validate-repo.mjs"],
+  privacy_note: {
+    raw_prompts_stored: false,
+    secrets_stored: false,
+    customer_data_stored: false,
+    personal_data_stored: false,
+    external_publication: false,
+  },
+};
 const insufficientEvidenceEnvelopeBlock = envelopeBlock({
   evidence_status: { checked: [], missing: ["external runtime"] },
   stop_reason: {
@@ -3306,6 +3326,11 @@ ${validEnvelopeBlock}
     ["empty envelope next action", envelopeBlock({ next_action: "" }), "must not be empty"],
     ["inconsistent envelope stop reason", envelopeBlock({ stop_reason: { status: "none", details: ["blocked"], human_decision_required: [], stop_if: [] } }), "status none cannot include blocking details"],
     ["invalid metrics candidate", envelopeBlock({ metrics_event_candidate: {} }), "event_id: is required"],
+    ["negative rework count", envelopeBlock({ metrics_event_candidate: { ...validMetricsCandidate, outcome_metrics: { rework_count: -1 } } }), "rework_count: must be >= 0"],
+    ["score below minimum", envelopeBlock({ metrics_event_candidate: { ...validMetricsCandidate, instruction_quality_metrics: { goal_clarity: 0 } } }), "goal_clarity: must be >= 1"],
+    ["score above maximum", envelopeBlock({ metrics_event_candidate: { ...validMetricsCandidate, instruction_quality_metrics: { goal_clarity: 6 } } }), "goal_clarity: must be <= 5"],
+    ["timezone-less occurred_at", envelopeBlock({ metrics_event_candidate: { ...validMetricsCandidate, occurred_at: "2026-07-11T12:00:00" } }), "occurred_at: invalid date-time"],
+    ["impossible occurred_at date", envelopeBlock({ metrics_event_candidate: { ...validMetricsCandidate, occurred_at: "2026-02-30T12:00:00Z" } }), "occurred_at: invalid date-time"],
   ];
   for (const [name, content, expected] of envelopeNegativeFixtures) {
     const input = resolve(target, `${name.replaceAll(" ", "-")}.txt`);
@@ -3435,6 +3460,30 @@ ${validEnvelopeBlock}
   assertRuntimePass("Claude adapter output smoke", claudeOutputResult);
   if (!claudeOutputResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`Claude adapter output smoke should pass shared envelope validation\n${claudeOutputResult.stdout}`);
+  }
+
+  const claudeGithubAction = readFileSync(resolve(repoRoot, "adapters/claude-code/github-actions/claude-review-on-mention.yml"), "utf8");
+  if (!claudeGithubAction.includes("Emit exactly one fenced JSON block") || !claudeGithubAction.includes("```json")) {
+    throw new Error("Claude GitHub Actions adapter must require a fenced JSON Execution Envelope");
+  }
+  const claudeGithubOutput = resolve(target, "claude-github-action-output.txt");
+  writeFileSync(claudeGithubOutput, `Decision:\n- approve with comments\n\nLayer summary:\n- Domain: skipped - no domain behavior signal.\n- Architecture: skipped - no boundary signal.\n\n${validEnvelopeBlock}`);
+  const claudeGithubOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeGithubOutput]);
+  assertRuntimePass("Claude GitHub Actions adapter output smoke", claudeGithubOutputResult);
+  if (!claudeGithubOutputResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`Claude GitHub Actions adapter output smoke should pass shared envelope validation\n${claudeGithubOutputResult.stdout}`);
+  }
+
+  const claudePluginReviewSkill = readFileSync(resolve(repoRoot, "adapters/claude-code/plugin/skills/review-pr/SKILL.md"), "utf8");
+  if (!claudePluginReviewSkill.includes("fenced JSON `Execution Envelope`") || !claudePluginReviewSkill.includes("docs/execution-envelope-contract.md")) {
+    throw new Error("Claude plugin review skill must require the shared fenced JSON Execution Envelope");
+  }
+  const claudePluginOutput = resolve(target, "claude-plugin-review-output.txt");
+  writeFileSync(claudePluginOutput, `Decision:\n- approve with comments\n\nLayer summary:\n- Domain: skipped - no domain behavior signal.\n- Architecture: skipped - no boundary signal.\n\n${validEnvelopeBlock}`);
+  const claudePluginOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudePluginOutput]);
+  assertRuntimePass("Claude plugin adapter output smoke", claudePluginOutputResult);
+  if (!claudePluginOutputResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`Claude plugin adapter output smoke should pass shared envelope validation\n${claudePluginOutputResult.stdout}`);
   }
 
   const promptContracts = [
