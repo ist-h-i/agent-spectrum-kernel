@@ -27,6 +27,7 @@ const CODEX_RUNTIME_FILES = [
   { name: "execution-envelope.mjs", source: "scripts/execution-envelope.mjs", target: "scripts/execution-envelope.mjs" },
   { name: "execution-envelope.schema.json", source: "schemas/execution-envelope.schema.json", target: "scripts/execution-envelope.schema.json" },
   { name: "metrics-event.schema.json", source: "schemas/metrics-event.schema.json", target: "scripts/metrics-event.schema.json" },
+  { name: "review-signal-gate-map.json", source: "schemas/review-signal-gate-map.json", target: "schemas/review-signal-gate-map.json" },
 ];
 const CODEX_RUNTIME_SCRIPTS = CODEX_RUNTIME_FILES.map((file) => file.name);
 

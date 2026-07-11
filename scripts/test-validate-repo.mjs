@@ -219,6 +219,7 @@ function writeAdapterFixture(root) {
   const schemaPaths = [
     "schemas/metrics-event.schema.json",
     "schemas/execution-envelope.schema.json",
+    "schemas/review-signal-gate-map.json",
     "schemas/adoption-report.schema.json",
     "schemas/improvement-ledger-entry.schema.json",
     "schemas/domain-rule-ledger-entry.schema.json",
@@ -231,7 +232,9 @@ function writeAdapterFixture(root) {
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    const content = path === "schemas/metrics-event.schema.json"
+    const content = path === "schemas/review-signal-gate-map.json"
+      ? readFileSync(resolve(repoRoot, path), "utf8")
+      : path === "schemas/metrics-event.schema.json"
       ? '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "properties": { "command_attempt_metrics": { "properties": { "classified_as_verification": { "type": "boolean" } } } } }\n'
       : '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object" }\n';
     writeFileSync(resolve(root, path), content);
@@ -327,6 +330,7 @@ console.log(path, code, privacy);
     "adapters/claude-code/github-actions/README.md",
     "adapters/claude-code/plugin/README.md",
     "adapters/claude-code/plugin/contracts/execution-envelope-contract.md",
+    "adapters/claude-code/plugin/contracts/review-signal-gate-map.json",
     "adapters/claude-code/plugin/schemas/execution-envelope.schema.json",
     "adapters/claude-code/plugin/schemas/metrics-event.schema.json",
     "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
@@ -345,7 +349,12 @@ console.log(path, code, privacy);
   ];
   for (const path of adapterFiles) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    writeFileSync(resolve(root, path), "# Fixture\n");
+    writeFileSync(
+      resolve(root, path),
+      path === "adapters/claude-code/plugin/contracts/review-signal-gate-map.json"
+        ? readFileSync(resolve(repoRoot, path), "utf8")
+        : "# Fixture\n",
+    );
   }
 
   mkdirSync(resolve(root, "adapters/claude-code/project/.claude/hooks"), { recursive: true });
@@ -2284,6 +2293,10 @@ function assertInstallerScripts() {
 
   const firstInstall = runRepoScript([installer, "--target", target]);
   assertRuntimePass("installer first run", firstInstall);
+  const installedSignalRegistry = resolve(target, "schemas/review-signal-gate-map.json");
+  if (!existsSync(installedSignalRegistry) || readFileSync(installedSignalRegistry, "utf8") !== readFileSync(resolve(repoRoot, "schemas/review-signal-gate-map.json"), "utf8")) {
+    throw new Error("Claude project installer should project the canonical signal registry");
+  }
   if (
     !firstInstall.stdout.includes("- initialize: docs/ai/improvement-ledger.md") ||
     !firstInstall.stdout.includes("- initialize: docs/ai/skill-adoption-metrics.md")
@@ -2586,6 +2599,9 @@ function assertCoreInstallerScripts() {
   if (!existsSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"))) {
     throw new Error("kernel installer should project manifest skills");
   }
+  if (readFileSync(resolve(freshTarget, "schemas/review-signal-gate-map.json"), "utf8") !== readFileSync(resolve(repoRoot, "schemas/review-signal-gate-map.json"), "utf8")) {
+    throw new Error("kernel installer should project the canonical signal registry");
+  }
 
   const beforeRerunAgents = readFileSync(resolve(freshTarget, "AGENTS.md"), "utf8");
   const beforeRerunState = readFileSync(resolve(freshTarget, ".agent-spectrum-kernel/install-state.json"), "utf8");
@@ -2777,12 +2793,16 @@ function assertCodexInstallerScripts() {
     !existsSync(resolve(freshTarget, ".agents/prompts/skill-implement.md")) ||
     existsSync(resolve(freshTarget, ".agents/prompts/skill-review.md")) ||
     !existsSync(resolve(freshTarget, ".agents/commands/codex-exec.md")) ||
-    !existsSync(resolve(freshTarget, "scripts/codex-exec-runner.mjs"))
+    !existsSync(resolve(freshTarget, "scripts/codex-exec-runner.mjs")) ||
+    !existsSync(resolve(freshTarget, "schemas/review-signal-gate-map.json"))
   ) {
     throw new Error("codex installer should write profile-selected Codex AGENTS, skills, prompts, command templates, and runner runtime");
   }
   if (!freshState.selected_runtime_scripts?.includes("codex-exec-runner.mjs")) {
     throw new Error(`codex installer should record selected runner runtime\n${JSON.stringify(freshState, null, 2)}`);
+  }
+  if (readFileSync(resolve(freshTarget, "schemas/review-signal-gate-map.json"), "utf8") !== readFileSync(resolve(repoRoot, "schemas/review-signal-gate-map.json"), "utf8")) {
+    throw new Error("Codex installer should project the canonical signal registry");
   }
   assertCodexInstallClosed("codex installer fresh profile", freshTarget);
   assertCodexRoutingFixtures("codex installer fresh implementation routing", freshTarget, [
@@ -3709,6 +3729,12 @@ ${validEnvelopeBlock}
         throw new Error(`${adapterPath} must project the signal-first review route section: ${section}`);
       }
     }
+    const registryReference = adapterPath.startsWith("adapters/claude-code/plugin/")
+      ? "${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json"
+      : "schemas/review-signal-gate-map.json";
+    if (!adapterText.includes(registryReference)) {
+      throw new Error(`${adapterPath} must reference the controlled signal registry: ${registryReference}`);
+    }
   }
   const claudeOutput = resolve(target, "claude-review-output.txt");
   writeFileSync(claudeOutput, `Change signals:\n- verification: focused validation is available\n\nRequired gates:\n- review-automated-gate: regression evidence; triggered by verification\n\nSkipped heavy gates:\n- review-adversarial-risk: no security or misuse signal\n\nMissing evidence:\n- none\n\nDecision:\n- approve with comments\n\nBlocking evidence:\n- none\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- none\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`);
@@ -3758,6 +3784,7 @@ ${validEnvelopeBlock}
   for (const relativePath of [
     "skills/review-pr/SKILL.md",
     "contracts/execution-envelope-contract.md",
+    "contracts/review-signal-gate-map.json",
     "schemas/execution-envelope.schema.json",
     "schemas/metrics-event.schema.json",
   ]) {
@@ -3768,9 +3795,14 @@ ${validEnvelopeBlock}
   }
   const pluginSkill = readFileSync(resolve(pluginOnlyRoot, "skills/review-pr/SKILL.md"), "utf8");
   const pluginContract = resolve(pluginOnlyRoot, "contracts/execution-envelope-contract.md");
+  const pluginSignalRegistry = resolve(pluginOnlyRoot, "contracts/review-signal-gate-map.json");
   const pluginSchema = resolve(pluginOnlyRoot, "schemas/execution-envelope.schema.json");
-  if (!pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md") || !existsSync(pluginContract) || !existsSync(pluginSchema)) {
-    throw new Error("Claude plugin-only package must contain resolvable contract and schema assets");
+  if (!pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md") || !pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json") || !existsSync(pluginContract) || !existsSync(pluginSignalRegistry) || !existsSync(pluginSchema)) {
+    throw new Error("Claude plugin-only package must contain resolvable contract, signal registry, and schema assets");
+  }
+  const pluginRegistry = JSON.parse(readFileSync(pluginSignalRegistry, "utf8"));
+  if (!pluginRegistry.signal_to_gates?.public_api_change?.includes("review-architecture-impact") || !pluginRegistry.signal_to_gates?.generated_output_failure_mode?.includes("review-adversarial-risk")) {
+    throw new Error("Claude plugin-only package must expose the controlled signal registry mapping");
   }
   const pluginOnlyEnvelope = inspectExecutionEnvelope(validEnvelopeBlock, { schemaPath: pluginSchema });
   if (pluginOnlyEnvelope.status !== "parsed") {

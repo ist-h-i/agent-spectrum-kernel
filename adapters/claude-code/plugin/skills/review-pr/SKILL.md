@@ -6,7 +6,7 @@ description: Run the Agent Spectrum Kernel PR review flow through review-router 
 
 Use the core Agent Spectrum Kernel review model.
 
-Before reviewing, read the bundled canonical contract at `${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md` and the bundled schemas at `${CLAUDE_PLUGIN_ROOT}/schemas/`. The plugin package is self-contained; do not substitute a host repository document.
+Before reviewing, read the bundled canonical contract at `${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md`, the bundled signal registry at `${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json`, and the bundled schemas at `${CLAUDE_PLUGIN_ROOT}/schemas/`. The plugin package is self-contained; do not substitute a host repository document. Emit only registry signal IDs and use its signal-to-gate mapping.
 
 Process:
 

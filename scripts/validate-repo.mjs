@@ -38,6 +38,7 @@ const GENERATED_REPORT_PATH = "docs/validation-report.md";
 const REQUIRED_SCHEMA_PATHS = [
   "schemas/metrics-event.schema.json",
   "schemas/execution-envelope.schema.json",
+  "schemas/review-signal-gate-map.json",
   "schemas/adoption-report.schema.json",
   "schemas/improvement-ledger-entry.schema.json",
   "schemas/domain-rule-ledger-entry.schema.json",
@@ -53,7 +54,18 @@ const EXECUTION_ENVELOPE_PLUGIN_PROJECTION = [
   { canonical: EXECUTION_ENVELOPE_DOC_PATH, packaged: "adapters/claude-code/plugin/contracts/execution-envelope-contract.md" },
   { canonical: "schemas/execution-envelope.schema.json", packaged: "adapters/claude-code/plugin/schemas/execution-envelope.schema.json" },
   { canonical: "schemas/metrics-event.schema.json", packaged: "adapters/claude-code/plugin/schemas/metrics-event.schema.json" },
+  { canonical: "schemas/review-signal-gate-map.json", packaged: "adapters/claude-code/plugin/contracts/review-signal-gate-map.json" },
 ];
+const REVIEW_SIGNAL_GATE_REQUIREMENTS = {
+  "review-domain-impact": ["business_rule_change", "workflow_responsibility_change", "permission_change", "notification_change", "reporting_meaning_change", "state_semantics_change", "generated_business_text_change"],
+  "review-architecture-impact": ["public_api_change", "public_contract_change", "dependency_direction_change", "persistence_boundary_change", "state_ownership_change", "cross_module_responsibility_change", "infrastructure_change", "deployment_change", "lifecycle_boundary_change", "coupling_change", "boundary_weakness", "hard_to_reverse_boundary"],
+  "review-output-quality": ["ui_change", "docs_output_change", "report_output_change", "notification_output_change", "cli_output_change", "api_response_change", "generated_text_change", "generated_output_change", "ai_output_change", "ai_facing_output_change", "structured_output_change", "consumer_facing_wording_change"],
+  "review-adversarial-risk": ["untrusted_input", "security_impact", "privacy_impact", "prompt_failure_mode", "generated_output_failure_mode", "critical_workflow_blast_radius", "misuse_path", "release_readiness_risk", "safety_boundary_uncertainty"],
+  "review-code-health": ["technical_debt", "code_smell", "duplication", "dead_code", "maintainability_risk", "testability_risk", "performance_risk", "dependency_tooling_risk", "boundary_weakness", "repeated_finding"],
+  "risk-gate": ["destructive_action", "external_effect", "auth_change", "secret_change", "production_change", "dependency_change", "migration_change", "billing_change", "email_change", "infrastructure_change", "deployment_change"],
+  "adr-review": ["architecture_decision", "hard_to_reverse_boundary"],
+  "release-readiness-gate": ["release_readiness", "release_candidate"],
+};
 const EXECUTION_ENVELOPE_SESSION_STATE_PATH = "docs/agent-session-state-contract.md";
 const EXECUTION_ENVELOPE_SKILL_PATHS = [
   "skills/operating-mode-router/SKILL.md",
@@ -796,7 +808,9 @@ function validateExecutionEnvelope(root, manifest, errors) {
     const packagedPath = resolve(root, packaged);
     const canonicalPresent = existsSync(canonicalPath);
     const packagedPresent = existsSync(packagedPath);
-    const matches = canonicalPresent && packagedPresent && readFileSync(canonicalPath, "utf8") === readFileSync(packagedPath, "utf8");
+    const matches = canonicalPresent && packagedPresent && (canonical.endsWith(".json")
+      ? JSON.stringify(JSON.parse(readFileSync(canonicalPath, "utf8"))) === JSON.stringify(JSON.parse(readFileSync(packagedPath, "utf8")))
+      : readFileSync(canonicalPath, "utf8") === readFileSync(packagedPath, "utf8"));
     const check = { canonical, packaged, canonicalPresent, packagedPresent, matches, ok: matches };
     if (!canonicalPresent || !packagedPresent || !matches) {
       fail(errors, "execution envelope", `Claude plugin projection must match ${canonical}: ${packaged}`);
@@ -873,6 +887,62 @@ function validateExecutionEnvelope(root, manifest, errors) {
     }
   }
 
+  return checks;
+}
+
+function validateReviewSignalRegistry(root, manifest, errors) {
+  const path = "schemas/review-signal-gate-map.json";
+  const absolutePath = resolve(root, path);
+  const active = manifest?.name === "agent-spectrum-kernel";
+  const checks = { active, present: existsSync(absolutePath), schemaListed: manifest?.schemas?.includes(path) === true, gates: false, signals: false, coverage: false, pluginProjection: false };
+  if (!active) {
+    return checks;
+  }
+  if (!checks.present) {
+    fail(errors, "review signal registry", `canonical registry is missing: ${path}`);
+    return checks;
+  }
+  if (!checks.schemaListed) {
+    fail(errors, "review signal registry", `manifest.json.schemas must list ${path}`);
+  }
+  let registry;
+  try {
+    registry = JSON.parse(readFileSync(absolutePath, "utf8"));
+  } catch (error) {
+    fail(errors, "review signal registry", `${path} is not valid JSON: ${error.message}`);
+    return checks;
+  }
+  const heavyGates = Array.isArray(registry.heavy_gates) ? registry.heavy_gates : [];
+  const signalToGates = registry.signal_to_gates && typeof registry.signal_to_gates === "object" ? registry.signal_to_gates : {};
+  checks.gates = heavyGates.length === Object.keys(REVIEW_SIGNAL_GATE_REQUIREMENTS).length
+    && heavyGates.every((gate) => Object.hasOwn(REVIEW_SIGNAL_GATE_REQUIREMENTS, gate));
+  if (!checks.gates) {
+    fail(errors, "review signal registry", `${path}.heavy_gates must contain the canonical heavy gate set`);
+  }
+  checks.signals = Object.entries(signalToGates).every(([signal, gates]) => typeof signal === "string" && signal.length > 0 && Array.isArray(gates) && gates.length > 0 && gates.every((gate) => heavyGates.includes(gate)));
+  if (!checks.signals) {
+    fail(errors, "review signal registry", `${path}.signal_to_gates contains an empty, unknown, or invalid mapping`);
+  }
+  const missingCoverage = Object.entries(REVIEW_SIGNAL_GATE_REQUIREMENTS).flatMap(([gate, signals]) => signals.filter((signal) => !Array.isArray(signalToGates[signal]) || !signalToGates[signal].includes(gate)));
+  checks.coverage = missingCoverage.length === 0;
+  if (!checks.coverage) {
+    fail(errors, "review signal registry", `${path} is missing router trigger coverage: ${missingCoverage.join(", ")}`);
+  }
+  const pluginPath = "adapters/claude-code/plugin/contracts/review-signal-gate-map.json";
+  const pluginAbsolutePath = resolve(root, pluginPath);
+  if (!existsSync(pluginAbsolutePath)) {
+    fail(errors, "review signal registry", `Claude plugin registry projection is missing: ${pluginPath}`);
+  } else {
+    try {
+      const pluginRegistry = JSON.parse(readFileSync(pluginAbsolutePath, "utf8"));
+      checks.pluginProjection = JSON.stringify(pluginRegistry) === JSON.stringify(registry);
+    } catch {
+      checks.pluginProjection = false;
+    }
+    if (!checks.pluginProjection) {
+      fail(errors, "review signal registry", `Claude plugin registry projection must match ${path}: ${pluginPath}`);
+    }
+  }
   return checks;
 }
 
@@ -2144,7 +2214,7 @@ function validateAdapterGovernance(root, checks, errors) {
   }
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, reviewSignalRegistryChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -2199,6 +2269,14 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- session state uses envelope as control state: ${executionEnvelopeChecks.sessionState ? "ok" : "invalid"}`,
     `- canonical skills reference the contract: ${executionEnvelopeChecks.skills.every((check) => check.ok) ? "ok" : "invalid"}`,
     `- adapter prompts reference the contract: ${executionEnvelopeChecks.adapters.every((check) => check.ok) ? "ok" : "invalid"}`,
+    "",
+    "## Review signal registry checks",
+    "",
+    `- canonical registry: ${reviewSignalRegistryChecks.present ? "ok" : "missing"}`,
+    `- heavy gate set: ${reviewSignalRegistryChecks.gates ? "ok" : "invalid"}`,
+    `- signal mappings: ${reviewSignalRegistryChecks.signals ? "ok" : "invalid"}`,
+    `- router trigger coverage: ${reviewSignalRegistryChecks.coverage ? "ok" : "invalid"}`,
+    `- Claude plugin projection: ${reviewSignalRegistryChecks.pluginProjection ? "ok" : "invalid"}`,
     "",
     "## Context template status checks",
     "",
@@ -2431,10 +2509,11 @@ export function validateRepository(options) {
   const domainRuleLedgerChecks = validateDomainRuleLedger(root, errors);
   const claudeAdapterChecks = validateClaudeAdapterArchitecture(root, manifest, errors);
   const executionEnvelopeChecks = validateExecutionEnvelope(root, manifest, errors);
+  const reviewSignalRegistryChecks = validateReviewSignalRegistry(root, manifest, errors);
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, reviewSignalRegistryChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

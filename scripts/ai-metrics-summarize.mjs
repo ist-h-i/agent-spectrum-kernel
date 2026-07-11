@@ -1,68 +1,30 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const HEAVY_REVIEW_GATES = new Set([
-  "review-domain-impact",
-  "review-architecture-impact",
-  "review-output-quality",
-  "review-adversarial-risk",
-  "review-code-health",
-  "risk-gate",
-  "adr-review",
-  "release-readiness-gate",
-]);
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const SIGNAL_REGISTRY_PATH = resolve(REPO_ROOT, "schemas/review-signal-gate-map.json");
 
-const SIGNAL_TO_GATES = new Map([
-  ["business_rule_change", ["review-domain-impact"]],
-  ["workflow_responsibility_change", ["review-domain-impact"]],
-  ["permission_change", ["review-domain-impact"]],
-  ["notification_change", ["review-domain-impact", "review-output-quality"]],
-  ["reporting_meaning_change", ["review-domain-impact", "review-output-quality"]],
-  ["state_semantics_change", ["review-domain-impact"]],
-  ["public_api_change", ["review-architecture-impact"]],
-  ["dependency_direction_change", ["review-architecture-impact"]],
-  ["persistence_boundary_change", ["review-architecture-impact"]],
-  ["state_ownership_change", ["review-architecture-impact"]],
-  ["cross_module_responsibility_change", ["review-architecture-impact"]],
-  ["infrastructure_change", ["review-architecture-impact", "risk-gate"]],
-  ["deployment_change", ["review-architecture-impact", "risk-gate"]],
-  ["lifecycle_boundary_change", ["review-architecture-impact"]],
-  ["coupling_change", ["review-architecture-impact"]],
-  ["ui_change", ["review-output-quality"]],
-  ["docs_output_change", ["review-output-quality"]],
-  ["report_output_change", ["review-output-quality"]],
-  ["cli_output_change", ["review-output-quality"]],
-  ["api_response_change", ["review-output-quality"]],
-  ["generated_output_change", ["review-output-quality"]],
-  ["ai_output_change", ["review-output-quality"]],
-  ["structured_output_change", ["review-output-quality"]],
-  ["untrusted_input", ["review-adversarial-risk"]],
-  ["security_impact", ["review-adversarial-risk"]],
-  ["privacy_impact", ["review-adversarial-risk"]],
-  ["prompt_failure_mode", ["review-adversarial-risk"]],
-  ["misuse_path", ["review-adversarial-risk"]],
-  ["critical_workflow_blast_radius", ["review-adversarial-risk"]],
-  ["maintainability_risk", ["review-code-health"]],
-  ["technical_debt", ["review-code-health"]],
-  ["duplication", ["review-code-health"]],
-  ["testability_risk", ["review-code-health"]],
-  ["performance_risk", ["review-code-health"]],
-  ["destructive_action", ["risk-gate"]],
-  ["external_effect", ["risk-gate"]],
-  ["auth_change", ["risk-gate"]],
-  ["secret_change", ["risk-gate"]],
-  ["production_change", ["risk-gate"]],
-  ["dependency_change", ["risk-gate"]],
-  ["migration_change", ["risk-gate"]],
-  ["billing_change", ["risk-gate"]],
-  ["email_change", ["risk-gate"]],
-  ["architecture_decision", ["adr-review"]],
-  ["hard_to_reverse_boundary", ["adr-review"]],
-  ["release_readiness", ["release-readiness-gate"]],
-  ["公開API変更", ["review-architecture-impact"]],
-  ["出力変更", ["review-output-quality"]],
-]);
+function loadSignalRegistry() {
+  if (!existsSync(SIGNAL_REGISTRY_PATH)) {
+    throw new Error(`Controlled review signal registry is missing: ${SIGNAL_REGISTRY_PATH}`);
+  }
+  let registry;
+  try {
+    registry = JSON.parse(readFileSync(SIGNAL_REGISTRY_PATH, "utf8"));
+  } catch (error) {
+    throw new Error(`Controlled review signal registry is invalid JSON: ${error.message}`);
+  }
+  if (!Array.isArray(registry.heavy_gates) || !registry.heavy_gates.length || !registry.signal_to_gates || typeof registry.signal_to_gates !== "object") {
+    throw new Error("Controlled review signal registry must define heavy_gates and signal_to_gates");
+  }
+  return registry;
+}
+
+const SIGNAL_REGISTRY = loadSignalRegistry();
+const HEAVY_REVIEW_GATES = new Set(SIGNAL_REGISTRY.heavy_gates);
+const SIGNAL_TO_GATES = new Map(Object.entries(SIGNAL_REGISTRY.signal_to_gates));
 
 function parseArgs(argv) {
   const args = {

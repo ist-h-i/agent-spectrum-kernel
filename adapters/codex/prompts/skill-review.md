@@ -8,6 +8,8 @@ Entry intent: review.
 Mutation level: read-only unless the user explicitly asks for fixes after the review.
 Routing source: use `review-router` to extract observed change signals, map them to required gates, then run only those gates. Do not treat this prompt as a second routing source.
 
+Before extracting signals, read `schemas/review-signal-gate-map.json`. Emit only its exact signal IDs and use its signal-to-gate mapping; do not invent free-form trigger IDs.
+
 Evidence requirements:
 
 - inspect the checked-out workspace, diff, generated output, relevant docs, and verification evidence when available

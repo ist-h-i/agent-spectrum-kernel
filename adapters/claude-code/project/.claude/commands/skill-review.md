@@ -6,6 +6,8 @@ Use the installed project skills from this repository projection.
 
 Start with `/review-router` to extract observed change signals and map them to required gates. Run only the required gates. End with `/review-final-merge-gate` style output:
 
+Before extracting signals, read `schemas/review-signal-gate-map.json`. Emit only its exact signal IDs and use its signal-to-gate mapping; do not invent free-form trigger IDs.
+
 - decision: `approve`, `approve with comments`, `request changes`, `block`, or `insufficient evidence`
 - blocking evidence
 - passed required gates

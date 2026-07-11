@@ -113,6 +113,7 @@ jobs:
             - Treat the checked-out workspace as the PR head workspace.
             - Read .claude/pr-context.json, .claude/pr.diff, and .claude/pr-head-sha.txt before extracting change signals.
             - If the PR head workspace or diff evidence is unavailable, return insufficient evidence instead of a confident decision.
+            - Read schemas/review-signal-gate-map.json before extracting signals; emit only its exact signal IDs and use its signal-to-gate mapping.
             - Use review-router first to extract observed change signals and map them to required gates.
             - Run only required gates.
             - Include review-code-health only when code-health risk or non-blocking debt is applicable.

@@ -30,7 +30,7 @@ Select the smallest set of review gates needed to make the merge decision defens
 
 2. Extract observed change signals before choosing gates.
    - Record a short signal and the evidence that made it observable, for example `public contract`, `domain meaning`, `generated output`, `untrusted input`, `maintainability`, or `verification`.
-   - Use the controlled signal IDs documented by the metrics contract. `evidence` is explanatory text only and never acts as a trigger ID.
+   - Read `schemas/review-signal-gate-map.json` as the machine-readable signal registry. Use only its exact signal IDs and mapping. `evidence` is explanatory text only and never acts as a trigger ID.
    - Do not infer a trigger from the existence of a review layer.
    - If changed-file, diff, context, output, or verification evidence is unavailable, record that input under `Missing evidence` as `insufficient evidence`.
 

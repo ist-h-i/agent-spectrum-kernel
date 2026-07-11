@@ -79,7 +79,7 @@ const RUNTIME_DIRECTORIES = [
 const COMMAND_METADATA = {
   "skill-review.md": {
     requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
-    requiredAssets: ["docs/execution-envelope-contract.md"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "schemas/review-signal-gate-map.json"],
   },
   "skill-implement.md": {
     requiredSkills: ["skill-router", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
@@ -766,6 +766,13 @@ function installRuntime(args, writes) {
   for (const script of RUNTIME_SCRIPTS) {
     copyFilePlanned(resolve(REPO_ROOT, "scripts", script), resolve(args.target, "scripts", script), args, writes, { kind: "claude_runtime", script });
   }
+  copyFilePlanned(
+    resolve(REPO_ROOT, "schemas/review-signal-gate-map.json"),
+    resolve(args.target, "schemas/review-signal-gate-map.json"),
+    args,
+    writes,
+    { kind: "claude_runtime_asset", asset: "schemas/review-signal-gate-map.json" },
+  );
   copyFilePlanned(
     resolve(REPO_ROOT, "docs/ai/observability-config.yml"),
     resolve(args.target, "docs/ai/observability-config.yml"),
