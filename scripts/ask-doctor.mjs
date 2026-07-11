@@ -174,20 +174,21 @@ function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, 
   }
 
   const state = stateResult.value;
+  if (
+    !state || typeof state !== "object" || state.schema_version !== 3 || state.installer !== installerName ||
+    !state.adapter || state.adapter.name !== installerName || !Array.isArray(state.installed_skills) ||
+    !state.managed_files || typeof state.managed_files !== "object" || Array.isArray(state.managed_files) ||
+    !state.managed_blocks || typeof state.managed_blocks !== "object" || Array.isArray(state.managed_blocks)
+  ) {
+    report.failures.push(`${label} install state has invalid shape: ${statePath}`);
+    return;
+  }
   if (allowDetached && state.install_status === "detached") {
     report.installed.push(`${label}: detached (${statePath})`);
     return;
   }
   if (state.install_status !== "installed") report.failures.push(`${label} install_status must be installed: ${statePath}`);
   report.installed.push(`${label}: install state present (${statePath})`);
-  if (
-    !state || typeof state !== "object" || state.schema_version !== 3 || state.installer !== installerName ||
-    !state.adapter || state.adapter.name !== installerName || !Array.isArray(state.installed_skills) ||
-    !state.managed_files || typeof state.managed_files !== "object" || !state.managed_blocks || typeof state.managed_blocks !== "object"
-  ) {
-    report.failures.push(`${label} install state has invalid shape: ${statePath}`);
-    return;
-  }
 
   for (const skill of state.selected_skills ?? []) {
     const skillPath = resolve(target, targetSkillsRoot, skill, "SKILL.md");
@@ -303,7 +304,12 @@ function sourcePathForManagedRecord(managedPath, record) {
 
 function checkClaudeAdapter(target, report) {
   const stateResult = readJsonIfExists(resolve(target, CLAUDE_STATE_PATH));
-  if (stateResult.ok && stateResult.value?.install_status === "detached") {
+  const state = stateResult.ok ? stateResult.value : null;
+  const validDetachedState = state && typeof state === "object" && state.schema_version === 3 &&
+    state.installer === "agent-spectrum-claude-adapter" && state.adapter?.name === "agent-spectrum-claude-adapter" &&
+    Array.isArray(state.installed_skills) && state.managed_files && typeof state.managed_files === "object" && !Array.isArray(state.managed_files) &&
+    state.managed_blocks && typeof state.managed_blocks === "object" && !Array.isArray(state.managed_blocks) && state.install_status === "detached";
+  if (validDetachedState) {
     report.installed.push("Claude adapter: detached");
     return;
   }

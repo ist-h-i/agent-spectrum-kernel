@@ -3109,6 +3109,26 @@ function assertDoctorScript() {
     throw new Error(`detached state must make Installed fail\n${detachedDoctorResult.stdout}`);
   }
 
+  const detachedAdapterTarget = resolve(fixtureRoot, "doctor-detached-claude-adapter");
+  assertRuntimePass("doctor detached Claude core setup", runRepoScript([installer, "--target", detachedAdapterTarget, "--skills", "operating-mode-router"]));
+  assertRuntimePass("doctor detached Claude adapter setup", runRepoScript([claudeInstaller, "--target", detachedAdapterTarget, "--profile", "implementation"]));
+  assertRuntimePass("doctor detached Claude adapter detach", runRepoScript([claudeInstaller, "--target", detachedAdapterTarget, "--detach"]));
+  const detachedAdapterStatePath = resolve(detachedAdapterTarget, ".agent-spectrum-kernel/claude-install-state.json");
+  const validDetachedAdapterState = JSON.parse(readFileSync(detachedAdapterStatePath, "utf8"));
+  const malformedDetachedStates = [
+    ["missing schema_version", (state) => { delete state.schema_version; }, "install state has invalid shape"],
+    ["wrong installer identity", (state) => { state.installer = "wrong-installer"; }, "install state has invalid shape"],
+    ["invalid managed_files", (state) => { state.managed_files = []; }, "install state has invalid shape"],
+  ];
+  for (const [label, mutate, expected] of malformedDetachedStates) {
+    const malformedState = JSON.parse(JSON.stringify(validDetachedAdapterState));
+    mutate(malformedState);
+    writeFileSync(detachedAdapterStatePath, `${JSON.stringify(malformedState)}\n`);
+    assertRuntimeFail(`doctor ${label}`, runRepoScript([doctorScript, "--target", detachedAdapterTarget, "--json"]), expected);
+  }
+  writeFileSync(detachedAdapterStatePath, `${JSON.stringify(validDetachedAdapterState)}\n`);
+  assertRuntimePass("doctor valid detached Claude adapter", runRepoScript([doctorScript, "--target", detachedAdapterTarget, "--json"]));
+
   const missingManagedFileTarget = doctorStateFixture("missing-managed-file");
   rmSync(resolve(missingManagedFileTarget, "CUSTOM_INSTRUCTIONS.md"));
   assertRuntimeFail("doctor missing managed file", runRepoScript([doctorScript, "--target", missingManagedFileTarget]), "managed file is missing: CUSTOM_INSTRUCTIONS.md");
