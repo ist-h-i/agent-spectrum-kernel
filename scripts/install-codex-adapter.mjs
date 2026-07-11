@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, statSync, 
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
+import { CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
@@ -19,23 +20,24 @@ const PROMPT_TEMPLATES = [
   "skill-handoff.md",
 ];
 const COMMAND_TEMPLATES = ["codex-exec.md"];
+const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs"];
 
 const PROMPT_METADATA = {
   "skill-implement.md": {
     label: "Implementation",
-    sandbox: "workspace-write",
+    execution: CODEX_PROMPT_CONTRACTS["skill-implement.md"],
     requiredSkills: ["operating-mode-router", "skill-router", "controlled-implementation", "test-first-verification", "evidence-ledger", "risk-gate"],
     recommendedSkills: ["spec-driven-development", "requirement-grill", "work-package-compiler"],
   },
   "skill-investigate.md": {
     label: "Investigation",
-    sandbox: "workspace-write",
+    execution: CODEX_PROMPT_CONTRACTS["skill-investigate.md"],
     requiredSkills: ["operating-mode-router", "skill-router", "doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
     recommendedSkills: [],
   },
   "skill-review.md": {
     label: "Review",
-    sandbox: "read-only",
+    execution: CODEX_PROMPT_CONTRACTS["skill-review.md"],
     requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
     recommendedSkills: [
       "review-automated-gate",
@@ -51,13 +53,13 @@ const PROMPT_METADATA = {
   },
   "skill-verify.md": {
     label: "Verification",
-    sandbox: "workspace-write",
+    execution: CODEX_PROMPT_CONTRACTS["skill-verify.md"],
     requiredSkills: ["test-first-verification", "evidence-ledger"],
     recommendedSkills: [],
   },
   "skill-handoff.md": {
     label: "Handoff",
-    sandbox: "read-only",
+    execution: CODEX_PROMPT_CONTRACTS["skill-handoff.md"],
     requiredSkills: ["handoff-generation", "evidence-ledger"],
     recommendedSkills: [],
   },
@@ -652,6 +654,9 @@ function buildState({
   commandTemplates,
   selectedCommands,
   retainedStaleCommands,
+  runtimeScripts,
+  selectedRuntimeScripts,
+  retainedStaleRuntimeScripts,
   requiredSkills,
   recommendedSkills,
   routerReachableSkills,
@@ -690,8 +695,12 @@ function buildState({
       installed_commands: commandTemplates,
       selected_commands: selectedCommands,
       retained_stale_commands: retainedStaleCommands,
+      installed_runtime_scripts: runtimeScripts,
+      selected_runtime_scripts: selectedRuntimeScripts,
+      retained_stale_runtime_scripts: retainedStaleRuntimeScripts,
       prompt_templates: promptTemplates,
       command_templates: commandTemplates,
+      runtime_scripts: runtimeScripts,
       skill_closure: {
         required_skills: requiredSkills,
         recommended_skills: recommendedSkills,
@@ -881,32 +890,33 @@ function commandSectionForPrompt(prompt) {
     return `## ${metadata.label}
 
 \`\`\`bash
-git diff --patch origin/main...HEAD | codex exec --sandbox ${metadata.sandbox} "$(cat ${promptPath})"
+node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox} --diff-base origin/main...HEAD --output codex-review.md
 \`\`\`
 
-Treat this as diff-only review unless the command also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.`;
+Treat this as diff-only review unless the runner output also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.`;
   }
   if (prompt === "skill-implement.md") {
     return `## ${metadata.label}
 
 \`\`\`bash
-codex exec --sandbox ${metadata.sandbox} --output-last-message codex-implementation.md "$(cat ${promptPath})"
+node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox} --output codex-implementation.md
 \`\`\``;
   }
   return `## ${metadata.label}
 
 \`\`\`bash
-codex exec --sandbox ${metadata.sandbox} "$(cat ${promptPath})"
+node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox}
 \`\`\``;
 }
 
 function validateManagedReferences(managedFiles) {
   const managedPaths = new Set(Object.keys(managedFiles));
   const referencePattern = /\.agents\/(?:prompts|commands)\/[A-Za-z0-9._/-]+\.md/g;
+  const runtimeReferencePattern = /scripts\/[A-Za-z0-9._/-]+\.mjs/g;
   const sourceOnlyPattern = /adapters\/codex\/prompts\/[A-Za-z0-9._/-]+\.md/g;
 
   for (const [managedPath, record] of Object.entries(managedFiles)) {
-    if (record.kind !== "codex_prompt" && record.kind !== "codex_command") {
+    if (record.kind !== "codex_prompt" && record.kind !== "codex_command" && record.kind !== "codex_runtime") {
       continue;
     }
     const content = record.content ?? "";
@@ -919,6 +929,12 @@ function validateManagedReferences(managedFiles) {
       .filter((reference) => !managedPaths.has(reference));
     if (missing.length > 0) {
       throw new Error(`${managedPath} references prompt/command file(s) that are not selected for installation: ${[...new Set(missing)].join(", ")}`);
+    }
+    const missingRuntime = [...content.matchAll(runtimeReferencePattern)]
+      .map((match) => match[0])
+      .filter((reference) => !managedPaths.has(reference));
+    if (missingRuntime.length > 0) {
+      throw new Error(`${managedPath} references runtime script(s) that are not selected for installation: ${[...new Set(missingRuntime)].join(", ")}`);
     }
   }
 
@@ -950,15 +966,20 @@ function buildPlan(args) {
   );
   const previousPromptNames = previousItems(previousState, "installed_prompts", ["codex_prompt", "stale_codex_prompt"], "prompt");
   const previousCommandNames = previousItems(previousState, "installed_commands", ["codex_command", "stale_codex_command"], "command");
+  const previousRuntimeNames = previousItems(previousState, "installed_runtime_scripts", ["codex_runtime", "stale_codex_runtime"], "script");
   const previousSkills = new Set(previousSkillNames);
   const previousPrompts = new Set(previousPromptNames);
   const previousCommands = new Set(previousCommandNames);
+  const selectedRuntimeScripts = selectedCommandTemplates.includes("codex-exec.md") ? CODEX_RUNTIME_SCRIPTS : [];
+  const previousRuntimeScripts = new Set(previousRuntimeNames);
   const selectedSkills = new Set(skills);
   const selectedPrompts = new Set(selectedPromptTemplates);
   const selectedCommands = new Set(selectedCommandTemplates);
+  const selectedRuntime = new Set(selectedRuntimeScripts);
   const staleSkills = [...previousSkills].filter((skill) => !selectedSkills.has(skill)).sort();
   const stalePrompts = [...previousPrompts].filter((prompt) => !selectedPrompts.has(prompt)).sort();
   const staleCommands = [...previousCommands].filter((command) => !selectedCommands.has(command)).sort();
+  const staleRuntimeScripts = [...previousRuntimeScripts].filter((script) => !selectedRuntime.has(script)).sort();
   const operations = [];
   const managedFiles = {};
   const managedBlocks = {};
@@ -1029,6 +1050,27 @@ function buildPlan(args) {
     });
   }
 
+  for (const script of selectedRuntimeScripts) {
+    const source = resolve(REPO_ROOT, "scripts", script);
+    ensureSource(source, `scripts/${script}`);
+    const content = readText(source);
+    const relativePath = `scripts/${script}`;
+    managedFiles[relativePath] = {
+      ...lifecycle.createManagedFileRecord({ kind: "codex_runtime", script, content }),
+      script,
+      content,
+    };
+    lifecycle.planWriteManaged(operations, {
+      target: args.target,
+      relativePath,
+      content,
+      reason: `codex_runtime:${script}`,
+      previousState,
+      force: args.force,
+      rollback,
+    });
+  }
+
   for (const skill of staleSkills) {
     const relativePath = `.agents/skills/${skill}/SKILL.md`;
     if (args.prune) {
@@ -1087,6 +1129,25 @@ function buildPlan(args) {
     }
   }
 
+  for (const script of staleRuntimeScripts) {
+    const relativePath = `scripts/${script}`;
+    if (args.prune) {
+      lifecycle.planDeleteManaged(operations, {
+        target: args.target,
+        relativePath,
+        previousState,
+        force: args.force,
+        rollback,
+        reason: `stale Codex managed projection:runtime:${script}`,
+      });
+    } else {
+      const record = previousManagedRecord(previousState, relativePath);
+      if (record) {
+        managedFiles[relativePath] = { ...record, kind: "stale_codex_runtime", script };
+      }
+    }
+  }
+
   validateManagedReferences(managedFiles);
 
   const stateSkills = args.prune ? skills : [...new Set([...skills, ...staleSkills])].sort();
@@ -1095,6 +1156,8 @@ function buildPlan(args) {
   const retainedStalePrompts = args.prune ? [] : stalePrompts;
   const stateCommands = args.prune ? selectedCommandTemplates : [...new Set([...selectedCommandTemplates, ...staleCommands])].sort();
   const retainedStaleCommands = args.prune ? [] : staleCommands;
+  const stateRuntimeScripts = args.prune ? selectedRuntimeScripts : [...new Set([...selectedRuntimeScripts, ...staleRuntimeScripts])].sort();
+  const retainedStaleRuntimeScripts = args.prune ? [] : staleRuntimeScripts;
   const recommendedSkills = computeRecommendedSkills(skills, selectedPromptTemplates);
   const state = buildState({
     manifest,
@@ -1109,6 +1172,9 @@ function buildPlan(args) {
     commandTemplates: stateCommands,
     selectedCommands: selectedCommandTemplates,
     retainedStaleCommands,
+    runtimeScripts: stateRuntimeScripts,
+    selectedRuntimeScripts,
+    retainedStaleRuntimeScripts,
     requiredSkills,
     recommendedSkills,
     routerReachableSkills,

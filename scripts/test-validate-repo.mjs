@@ -1,15 +1,17 @@
 #!/usr/bin/env node
-import { existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { APPROVAL_REQUIRED_SURFACES, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
+import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
 const doctorScript = resolve(repoRoot, "scripts/ask-doctor.mjs");
 const sensorsScript = resolve(repoRoot, "scripts/ask-sensors.mjs");
+const runtimeSmokeScript = resolve(repoRoot, "scripts/adapter-runtime-smoke.mjs");
+const codexRunnerScript = resolve(repoRoot, "scripts/codex-exec-runner.mjs");
 const fixtureRoot = mkdtempSync(resolve(tmpdir(), "validate-repo-"));
 
 function validSkill(name) {
@@ -119,7 +121,10 @@ function routingFixture() {
       source: "docs/adapter-capability-matrix.md",
       unknown_status: "downgrade_to_unknown",
       unsupported_status: "downgrade_to_unsupported",
-      partial_status: "claim_only_partial_support",
+      projected_status: "claim_projection_only",
+      runtime_detected_status: "claim_runtime_detection_only",
+      executed_status: "claim_execution_only",
+      behavior_verified_status: "claim_behavior_verified",
     },
   };
 }
@@ -199,8 +204,8 @@ function writeAdapterFixture(root) {
 
 | Capability | Claude Code | Codex | Cursor |
 |---|---|---|---|
-| Local metrics event recording | partial | unsupported | unknown |
-| Project-local skill projection | supported | supported | unknown |
+| Local metrics event recording | runtime_detected | unsupported | unknown |
+| Project-local skill projection | behavior_verified | behavior_verified | unknown |
 `,
   );
 
@@ -347,6 +352,7 @@ const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const DEFAULT_PROFILE = "implementation";
 const PROMPT_TEMPLATES = ["skill-implement.md"];
 const COMMAND_TEMPLATES = ["codex-exec.md"];
+const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs"];
 const CODEX_PROFILES = { implementation: { skills: ["operating-mode-router"], prompts: PROMPT_TEMPLATES, commands: COMMAND_TEMPLATES } };
 const PROFILE_ROUTING_FIXTURES = { implementation: [{ id: "unfamiliar_repository", selected_route: "repository-orientation", required_skills: ["repository-orientation"] }] };
 const SKILL_RELATIONSHIPS = { "controlled-implementation": { requires: ["test-first-verification"], recommends: ["evidence-ledger"], incompatibleWith: [] } };
@@ -377,10 +383,12 @@ function install(manifest, options) {
   if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
   if (skipAgents) return ".agents/skills";
   if (options["--prune"]) return "stale Codex managed projection";
-  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill" + profile + retained_stale_prompts + retained_stale_commands + stale_codex_prompt + stale_codex_command + validateSkillClosure().required_skills + routingFixturesForProfile().router_reachable_skills + routingFixturesForProfile().routing_fixtures + validateManagedReferences();
+  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill" + "codex_runtime" + "codex-exec-runner.mjs" + CODEX_RUNTIME_SCRIPTS + profile + retained_stale_prompts + retained_stale_commands + stale_codex_prompt + stale_codex_command + validateSkillClosure().required_skills + routingFixturesForProfile().router_reachable_skills + routingFixturesForProfile().routing_fixtures + validateManagedReferences();
 }
 `,
   );
+  writeFileSync(resolve(root, "scripts/adapter-runtime-smoke.mjs"), "console.log('adapter runtime smoke');\n");
+  writeFileSync(resolve(root, "scripts/codex-exec-runner.mjs"), "console.log('codex runner');\n");
   writeFileSync(
     resolve(root, "scripts/install-claude-adapter.mjs"),
     `const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
@@ -2343,6 +2351,13 @@ function assertCodexInstallerScripts() {
   const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
   const markerPattern = /<!-- agent-spectrum-kernel:start -->/g;
   const profiles = ["minimal", "implementation", "investigation", "review", "adoption", "observability", "full"];
+  const sourceCommand = readFileSync(resolve(repoRoot, "adapters/codex/commands/codex-exec.md"), "utf8");
+  for (const [prompt, contract] of Object.entries(CODEX_PROMPT_CONTRACTS)) {
+    const expectedInvocation = `--prompt ${prompt} --mode ${contract.mode} --sandbox ${contract.sandbox}`;
+    if (!sourceCommand.includes(expectedInvocation)) {
+      throw new Error(`source Codex command template must use the managed contract for ${prompt}: ${expectedInvocation}`);
+    }
+  }
 
   const freshTarget = resolve(fixtureRoot, "codex-install-fresh");
   assertRuntimePass("codex installer core setup", runRepoScript([coreInstaller, "--target", freshTarget]));
@@ -2362,9 +2377,13 @@ function assertCodexInstallerScripts() {
     !existsSync(resolve(freshTarget, ".agents/skills/controlled-implementation/SKILL.md")) ||
     !existsSync(resolve(freshTarget, ".agents/prompts/skill-implement.md")) ||
     existsSync(resolve(freshTarget, ".agents/prompts/skill-review.md")) ||
-    !existsSync(resolve(freshTarget, ".agents/commands/codex-exec.md"))
+    !existsSync(resolve(freshTarget, ".agents/commands/codex-exec.md")) ||
+    !existsSync(resolve(freshTarget, "scripts/codex-exec-runner.mjs"))
   ) {
-    throw new Error("codex installer should write profile-selected Codex AGENTS, skills, prompts, and command templates");
+    throw new Error("codex installer should write profile-selected Codex AGENTS, skills, prompts, command templates, and runner runtime");
+  }
+  if (!freshState.selected_runtime_scripts?.includes("codex-exec-runner.mjs")) {
+    throw new Error(`codex installer should record selected runner runtime\n${JSON.stringify(freshState, null, 2)}`);
   }
   assertCodexInstallClosed("codex installer fresh profile", freshTarget);
   assertCodexRoutingFixtures("codex installer fresh implementation routing", freshTarget, [
@@ -2396,6 +2415,14 @@ function assertCodexInstallerScripts() {
     }
     if (profile === "full" && profileState.selected_skills.length !== manifest.skills.length) {
       throw new Error(`codex full profile should install every manifest skill\n${JSON.stringify(profileState, null, 2)}`);
+    }
+    const generatedCommand = readFileSync(resolve(profileTarget, ".agents/commands/codex-exec.md"), "utf8");
+    for (const prompt of profileState.selected_prompts) {
+      const contract = CODEX_PROMPT_CONTRACTS[prompt];
+      const expectedInvocation = `--prompt ${prompt} --mode ${contract.mode} --sandbox ${contract.sandbox}`;
+      if (!generatedCommand.includes(expectedInvocation)) {
+        throw new Error(`codex command template must use the managed contract for ${prompt}: ${expectedInvocation}`);
+      }
     }
     assertCodexInstallClosed(`codex installer ${profile} profile`, profileTarget);
     if (profile === "implementation") {
@@ -2471,7 +2498,8 @@ function assertCodexInstallerScripts() {
     !dryRun.stdout.includes(".agent-spectrum-kernel/codex-install-state.json") ||
     !dryRun.stdout.includes(".agents/skills/controlled-implementation/SKILL.md") ||
     !dryRun.stdout.includes(".agents/prompts/skill-implement.md") ||
-    !dryRun.stdout.includes(".agents/commands/codex-exec.md")
+    !dryRun.stdout.includes(".agents/commands/codex-exec.md") ||
+    !dryRun.stdout.includes("scripts/codex-exec-runner.mjs")
   ) {
     throw new Error(`codex installer dry run should list planned writes\n${dryRun.stdout}`);
   }
@@ -2597,6 +2625,9 @@ function assertDoctorScript() {
   if (!healthyResult.stdout.includes("Exit code 1 means installation health failed")) {
     throw new Error(`doctor should document exit code semantics\n${healthyResult.stdout}\n${healthyResult.stderr}`);
   }
+  if (!healthyResult.stdout.includes("Layer statuses:") || !healthyResult.stdout.includes("behavioral_evidence: insufficient_evidence")) {
+    throw new Error(`doctor should report separated layer statuses\n${healthyResult.stdout}\n${healthyResult.stderr}`);
+  }
 
   const inProgressTarget = resolve(fixtureRoot, "doctor-in-progress");
   assertRuntimePass("doctor setup in-progress install", runRepoScript([installer, "--target", inProgressTarget, "--skills", "operating-mode-router"]));
@@ -2633,7 +2664,7 @@ function assertDoctorScript() {
   writeFileSync(resolve(unsupportedClaimTarget, "README.md"), "# Claim\n\nCodex local metrics event recording is supported.\n");
   const unsupportedClaimResult = runRepoScript([doctorScript, "--target", unsupportedClaimTarget]);
   assertRuntimePass("doctor unsupported capability warning", unsupportedClaimResult);
-  if (!unsupportedClaimResult.stdout.includes("ASK doctor: warn") || !unsupportedClaimResult.stdout.includes("Local metrics event recording is unsupported")) {
+  if (!unsupportedClaimResult.stdout.includes("ASK doctor: warn") || !unsupportedClaimResult.stdout.includes("Local metrics event recording evidence level is unsupported")) {
     throw new Error(`doctor should warn on unsupported adapter capability claims\n${unsupportedClaimResult.stdout}\n${unsupportedClaimResult.stderr}`);
   }
 
@@ -2647,6 +2678,7 @@ function assertDoctorScript() {
   if (
     !runtimeProbeResult.stdout.includes("ASK doctor: warn") ||
     !runtimeProbeResult.stdout.includes("Runtime conformance probe: enabled") ||
+    !runtimeProbeResult.stdout.includes("runtime_readiness:") ||
     !runtimeProbeResult.stdout.includes("Claude adapter hooks shape is invalid") ||
     !runtimeProbeResult.stdout.includes("runtime command/template reference is missing: .claude/commands/missing-runtime.md") ||
     !runtimeProbeResult.stdout.includes("local/static/dry-run only")
@@ -2683,6 +2715,259 @@ Bypassing verification is prohibited.
   if (!unsafeOverlayResult.stdout.includes("ASK doctor: warn") || !unsafeOverlayResult.stdout.includes("possible project-overlay contradiction")) {
     throw new Error(`runtime probe should still warn on overlay statements that permit bypassing ASK rules\n${unsafeOverlayResult.stdout}\n${unsafeOverlayResult.stderr}`);
   }
+}
+
+function assertAdapterRuntimeSmokeScript() {
+  const coreInstaller = resolve(repoRoot, "scripts/install-kernel.mjs");
+  const claudeInstaller = resolve(repoRoot, "scripts/install-claude-adapter.mjs");
+  const target = resolve(fixtureRoot, "adapter-runtime-smoke-claude");
+  assertRuntimePass("adapter smoke core setup", runRepoScript([coreInstaller, "--target", target]));
+  assertRuntimePass("adapter smoke Claude setup", runRepoScript([claudeInstaller, "--target", target, "--profile", "full"]));
+
+  const smokeResult = runRepoScript([runtimeSmokeScript, "--target", target, "--adapter", "claude"]);
+  assertRuntimePass("adapter runtime smoke Claude pass", smokeResult);
+  if (!smokeResult.stdout.includes("ASK adapter runtime smoke: pass") || !readFileSync(resolve(target, ".agent-spectrum-kernel/runtime-smoke/events.jsonl"), "utf8").includes("adapter-runtime-smoke")) {
+    throw new Error(`adapter runtime smoke should append an isolated non-sensitive event\n${smokeResult.stdout}\n${smokeResult.stderr}`);
+  }
+
+  const missingRuntimeTarget = resolve(fixtureRoot, "adapter-runtime-smoke-missing-runtime");
+  assertRuntimePass("adapter smoke missing runtime core setup", runRepoScript([coreInstaller, "--target", missingRuntimeTarget]));
+  assertRuntimePass("adapter smoke missing runtime Claude setup", runRepoScript([claudeInstaller, "--target", missingRuntimeTarget, "--profile", "full"]));
+  rmSync(resolve(missingRuntimeTarget, "scripts/ai-metrics-record.mjs"));
+  const missingRuntimeResult = runRepoScript([runtimeSmokeScript, "--target", missingRuntimeTarget, "--adapter", "claude"]);
+  assertRuntimeFail("adapter runtime smoke missing hook executable", missingRuntimeResult, "hook executable is missing");
+
+  const missingEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-missing-event-store");
+  assertRuntimePass("adapter smoke missing event store core setup", runRepoScript([coreInstaller, "--target", missingEventStoreTarget]));
+  assertRuntimePass("adapter smoke missing event store Claude setup", runRepoScript([claudeInstaller, "--target", missingEventStoreTarget, "--profile", "full"]));
+  rmSync(resolve(missingEventStoreTarget, "docs/ai/metrics"), { recursive: true, force: true });
+  writeFileSync(resolve(missingEventStoreTarget, "docs/ai/metrics"), "not a directory\n");
+  const missingEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", missingEventStoreTarget, "--adapter", "claude"]);
+  assertRuntimeFail("adapter runtime smoke detects configured event store failure", missingEventStoreResult, "configured event-store directory is missing or invalid");
+
+  const directoryEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-directory-event-store");
+  assertRuntimePass("adapter smoke directory event store core setup", runRepoScript([coreInstaller, "--target", directoryEventStoreTarget]));
+  assertRuntimePass("adapter smoke directory event store Claude setup", runRepoScript([claudeInstaller, "--target", directoryEventStoreTarget, "--profile", "full"]));
+  rmSync(resolve(directoryEventStoreTarget, "docs/ai/metrics/events.jsonl"), { force: true });
+  mkdirSync(resolve(directoryEventStoreTarget, "docs/ai/metrics/events.jsonl"));
+  const directoryEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", directoryEventStoreTarget, "--adapter", "claude"]);
+  assertRuntimeFail("adapter runtime smoke rejects directory event store", directoryEventStoreResult, "configured event-store must be a regular file");
+
+  const readOnlyEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-read-only-event-store");
+  assertRuntimePass("adapter smoke read-only event store core setup", runRepoScript([coreInstaller, "--target", readOnlyEventStoreTarget]));
+  assertRuntimePass("adapter smoke read-only event store Claude setup", runRepoScript([claudeInstaller, "--target", readOnlyEventStoreTarget, "--profile", "full"]));
+  const readOnlyEventStorePath = resolve(readOnlyEventStoreTarget, "docs/ai/metrics/events.jsonl");
+  const readOnlyEventStoreContent = "existing event content\n";
+  writeFileSync(readOnlyEventStorePath, readOnlyEventStoreContent);
+  chmodSync(readOnlyEventStorePath, 0o444);
+  const readOnlyEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", readOnlyEventStoreTarget, "--adapter", "claude"]);
+  chmodSync(readOnlyEventStorePath, 0o644);
+  assertRuntimeFail("adapter runtime smoke rejects non-appendable event store", readOnlyEventStoreResult, "configured event-store is not append-openable");
+  if (readFileSync(readOnlyEventStorePath, "utf8") !== readOnlyEventStoreContent) {
+    throw new Error("configured event-store append probe must not modify existing event content");
+  }
+
+  const symlinkEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-symlink-event-store");
+  assertRuntimePass("adapter smoke symlink event store core setup", runRepoScript([coreInstaller, "--target", symlinkEventStoreTarget]));
+  assertRuntimePass("adapter smoke symlink event store Claude setup", runRepoScript([claudeInstaller, "--target", symlinkEventStoreTarget, "--profile", "full"]));
+  const outsideEventStore = resolve(fixtureRoot, "outside-event-store.jsonl");
+  writeFileSync(outsideEventStore, "outside event store\n");
+  const symlinkEventStorePath = resolve(symlinkEventStoreTarget, "docs/ai/metrics/events.jsonl");
+  rmSync(symlinkEventStorePath, { force: true });
+  symlinkSync(outsideEventStore, symlinkEventStorePath);
+  const symlinkEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", symlinkEventStoreTarget, "--adapter", "claude"]);
+  assertRuntimeFail("adapter runtime smoke rejects symlink event store escape", symlinkEventStoreResult, "configured event store escapes target through a symbolic link");
+}
+
+function assertCodexRunnerScript() {
+  const installer = resolve(repoRoot, "scripts/install-codex-adapter.mjs");
+  const coreInstaller = resolve(repoRoot, "scripts/install-kernel.mjs");
+  const target = resolve(fixtureRoot, "codex-runner-target");
+  assertRuntimePass("codex runner core setup", runRepoScript([coreInstaller, "--target", target]));
+  assertRuntimePass("codex runner install setup", runRepoScript([installer, "--target", target, "--profile", "implementation"]));
+  const targetRunnerScript = resolve(target, "scripts/codex-exec-runner.mjs");
+
+  const fakeCodex = resolve(target, "fake-codex");
+  writeFileSync(
+    fakeCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
+Changed:
+- Ran fake Codex implementation.
+
+Verified:
+- node scripts/test-validate-repo.mjs
+
+Not verified:
+- Real Codex runtime.
+
+Risks / assumptions:
+- Fixture-only execution.
+
+Next:
+- Prepare review.
+EOF
+`,
+  );
+  chmodSync(fakeCodex, 0o755);
+  const passResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--mode",
+    "implementation",
+    "--codex-bin",
+    fakeCodex,
+    "--output",
+    "codex-output.md",
+  ]);
+  assertRuntimePass("codex runner captures and sensors output", passResult);
+  if (!passResult.stdout.includes("Codex runner: executed") || !passResult.stdout.includes("Evidence level: executed") || !existsSync(resolve(target, "codex-output.md"))) {
+    throw new Error(`codex runner should capture output and report executed evidence\n${passResult.stdout}\n${passResult.stderr}`);
+  }
+
+  const sourceRunnerResult = runRepoScript([codexRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects a runner from another checkout", sourceRunnerResult, "running runner is not the target managed runner");
+
+  const originalRunnerRuntime = readFileSync(targetRunnerScript, "utf8");
+  const originalSharedRuntime = readFileSync(resolve(target, "scripts/ask-shared.mjs"), "utf8");
+  const outsideRuntimeDir = resolve(fixtureRoot, "outside-codex-runtime", "scripts");
+  mkdirSync(outsideRuntimeDir, { recursive: true });
+  const outsideRunnerPath = resolve(outsideRuntimeDir, "codex-exec-runner.mjs");
+  writeFileSync(outsideRunnerPath, originalRunnerRuntime);
+  writeFileSync(resolve(outsideRuntimeDir, "ask-shared.mjs"), originalSharedRuntime);
+  rmSync(targetRunnerScript);
+  symlinkSync(outsideRunnerPath, targetRunnerScript);
+  const symlinkRunnerResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects symlink runner escape", symlinkRunnerResult, "managed runner escapes target through a symbolic link");
+  rmSync(targetRunnerScript);
+  writeFileSync(targetRunnerScript, originalRunnerRuntime);
+
+  const sharedRuntimePath = resolve(target, "scripts/ask-shared.mjs");
+  const outsideSharedPath = resolve(outsideRuntimeDir, "outside-ask-shared.mjs");
+  writeFileSync(outsideSharedPath, originalSharedRuntime);
+  rmSync(sharedRuntimePath);
+  symlinkSync(outsideSharedPath, sharedRuntimePath);
+  const symlinkSharedResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects imported ask-shared symlink escape", symlinkSharedResult, "managed Codex runtime escapes target through a symbolic link");
+  rmSync(sharedRuntimePath);
+  writeFileSync(sharedRuntimePath, originalSharedRuntime);
+
+  const runsPath = resolve(target, ".agents/runs");
+  const outsideRunsPath = resolve(fixtureRoot, "outside-codex-runs");
+  rmSync(runsPath, { recursive: true, force: true });
+  mkdirSync(outsideRunsPath, { recursive: true });
+  symlinkSync(outsideRunsPath, runsPath);
+  const symlinkOutputResult = runRepoScript([targetRunnerScript, "--target", target, "--output", ".agents/runs/escape.md", "--dry-run"]);
+  assertRuntimeFail("codex runner rejects symlink output parent escape", symlinkOutputResult, "output escapes target through a symbolic link");
+  if (existsSync(resolve(outsideRunsPath, "escape.md"))) {
+    throw new Error("codex runner must not write output through a symbolic link outside target");
+  }
+  rmSync(runsPath);
+  mkdirSync(runsPath, { recursive: true });
+
+  const failedOutputPath = resolve(target, "codex-preserved-output.md");
+  writeFileSync(failedOutputPath, "previous successful output\n");
+  const fakeFailingCodex = resolve(target, "fake-failing-codex");
+  writeFileSync(
+    fakeFailingCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+echo 'partial failed output' > "$output"
+exit 9
+`,
+  );
+  chmodSync(fakeFailingCodex, 0o755);
+  const failedOutputResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--codex-bin",
+    fakeFailingCodex,
+    "--output",
+    "codex-preserved-output.md",
+  ]);
+  assertRuntimeFail("codex runner preserves prior output on process failure", failedOutputResult, "codex exec exited 9");
+  if (readFileSync(failedOutputPath, "utf8") !== "previous successful output\n") {
+    throw new Error("codex runner must preserve the previous official output when Codex exits non-zero");
+  }
+
+  const mismatchResult = runRepoScript([targetRunnerScript, "--target", target, "--prompt", "skill-investigate.md", "--mode", "implementation", "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner rejects prompt mode mismatch", mismatchResult, "prompt/mode mismatch");
+  const escapeResult = runRepoScript([targetRunnerScript, "--target", target, "--output", "../escape.md", "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner rejects output escape", escapeResult, "output must be a relative path inside target");
+  const diffOptionResult = runRepoScript([targetRunnerScript, "--target", target, "--diff-base", "--output=/tmp/ask-injected.diff", "--dry-run"]);
+  assertRuntimeFail("codex runner rejects git option diff base", diffOptionResult, "invalid --diff-base");
+  if (existsSync("/tmp/ask-injected.diff")) {
+    throw new Error("codex runner must not permit --diff-base to create an external file");
+  }
+
+  const statePath = resolve(target, ".agent-spectrum-kernel/codex-install-state.json");
+  const originalState = readFileSync(statePath, "utf8");
+  const stateWithoutPromptRecord = JSON.parse(originalState);
+  delete stateWithoutPromptRecord.managed_files[".agents/prompts/skill-implement.md"];
+  writeFileSync(statePath, `${JSON.stringify(stateWithoutPromptRecord, null, 2)}\n`);
+  const missingPromptRecordResult = runRepoScript([targetRunnerScript, "--target", target, "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner requires selected prompt managed record", missingPromptRecordResult, "selected prompt has no managed Codex prompt record");
+  writeFileSync(statePath, originalState);
+
+  const detachedState = JSON.parse(originalState);
+  detachedState.install_status = "detached";
+  writeFileSync(statePath, `${JSON.stringify(detachedState, null, 2)}\n`);
+  const detachedDryRunResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects detached install state", detachedDryRunResult, "Codex install status must be installed");
+  if (detachedDryRunResult.stdout.includes("codex exec exited undefined")) {
+    throw new Error("preflight failures must not report an undefined Codex exit code");
+  }
+  writeFileSync(statePath, originalState);
+
+  const sensorRuntimePath = resolve(target, "scripts/ask-sensors.mjs");
+  const originalSensorRuntime = readFileSync(sensorRuntimePath, "utf8");
+  writeFileSync(sensorRuntimePath, `${originalSensorRuntime}\n// local modification\n`);
+  const runtimeHashResult = runRepoScript([targetRunnerScript, "--target", target, "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner rejects modified sensor runtime", runtimeHashResult, "managed Codex runtime hash mismatch: scripts/ask-sensors.mjs");
+  writeFileSync(sensorRuntimePath, originalSensorRuntime);
+
+  const missingBinaryResult = runRepoScript([targetRunnerScript, "--target", target, "--codex-bin", "missing-codex-binary-for-fixture"]);
+  assertRuntimeFail("codex runner reports unavailable executable as projected failure", missingBinaryResult, "codex exec could not start");
+  if (!missingBinaryResult.stdout.includes("Evidence level: projected")) {
+    throw new Error(`unavailable Codex executable must remain projected\n${missingBinaryResult.stdout}`);
+  }
+
+  const fakeWeakCodex = resolve(target, "fake-weak-codex");
+  writeFileSync(fakeWeakCodex, "#!/bin/sh\necho 'Looks good.'\n");
+  chmodSync(fakeWeakCodex, 0o755);
+  const weakResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--mode",
+    "implementation",
+    "--codex-bin",
+    fakeWeakCodex,
+    "--output",
+    "codex-weak-output.md",
+  ]);
+  assertRuntimeFail("codex runner insufficient evidence is normalized", weakResult, "Codex runner: insufficient_evidence");
+  if (!weakResult.stdout.includes("Codex runner: insufficient_evidence") || !weakResult.stdout.includes("Sensor status: not run") || !weakResult.stdout.includes("Evidence level: runtime_detected")) {
+    throw new Error(`codex runner should normalize weak output as insufficient evidence\n${weakResult.stdout}\n${weakResult.stderr}`);
+  }
+
+  const missingPromptResult = runRepoScript([targetRunnerScript, "--target", target, "--prompt", "missing.md", "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner missing prompt preflight", missingPromptResult, "prompt has no validated execution profile");
 }
 
 function assertSensorsScript() {
@@ -2816,6 +3101,21 @@ Layer summary:
     throw new Error(`review contract fixture should pass sensors\n${reviewPassResult.stdout}`);
   }
 
+  const promptContracts = [
+    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nUnknown / not verified:\n- External runtime.\n\nNext:\n- Continue investigation.\n"],
+    ["verification", "Verification Contract:\n- Behavior to prove: fixture.\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\nNot verified:\n- External runtime.\n\nNext verification:\n- Run integration coverage.\n"],
+    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nStop condition:\n- Missing evidence.\n"],
+  ];
+  for (const [mode, content] of promptContracts) {
+    const input = resolve(target, `${mode}-contract.txt`);
+    writeFileSync(input, content);
+    const contractResult = runRepoScript([sensorsScript, "--target", target, "--mode", mode, "--input", input]);
+    assertRuntimePass(`sensors ${mode} contract pass`, contractResult);
+    if (!contractResult.stdout.includes("ASK sensors: pass")) {
+      throw new Error(`${mode} prompt contract should pass sensors\n${contractResult.stdout}`);
+    }
+  }
+
   const riskInput = resolve(target, "risk.txt");
   writeFileSync(riskInput, "Next action: deploy production config.\n");
   const riskResult = runRepoScript([
@@ -2897,7 +3197,7 @@ Next:
   writeFileSync(resolve(unsupportedTarget, "README.md"), "# Claim\n\nCodex local metrics event recording is supported.\n");
   const unsupportedResult = runRepoScript([sensorsScript, "--target", unsupportedTarget, "--mode", "implementation", "--input", implementationPass]);
   assertRuntimePass("sensors unsupported capability is report-only", unsupportedResult);
-  if (!unsupportedResult.stdout.includes("ASK sensors: fail") || !unsupportedResult.stdout.includes("Unsupported or partial adapter capability overclaims")) {
+  if (!unsupportedResult.stdout.includes("ASK sensors: fail") || !unsupportedResult.stdout.includes("Adapter capability overclaims")) {
     throw new Error(`unsupported adapter claim should be report-only fail\n${unsupportedResult.stdout}`);
   }
 }
@@ -3105,6 +3405,8 @@ try {
   assertCoreInstallerScripts();
   assertCodexInstallerScripts();
   assertDoctorScript();
+  assertAdapterRuntimeSmokeScript();
+  assertCodexRunnerScript();
   assertSensorsScript();
   assertStakeholderReadinessSamples();
 

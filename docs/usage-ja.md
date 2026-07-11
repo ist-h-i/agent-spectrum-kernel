@@ -62,7 +62,15 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-このinstallerは profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile minimal|implementation|investigation|review|adoption|observability|full` を使います。`--skills <csv>` は advanced override で、選択 prompt / command、router到達可能route、指定 skill 依存の必須 skill 閉包を満たさない場合は書き込み前に失敗します。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。Codex用のローカル投影だけを行い、hook、telemetry、外部公開、GitHub Actions は作りません。
+このinstallerは profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile minimal|implementation|investigation|review|adoption|observability|full` を使います。`--skills <csv>` は advanced override で、選択 prompt / command、router到達可能route、指定 skill 依存の必須 skill 閉包を満たさない場合は書き込み前に失敗します。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。Codex用のローカル投影だけを行い、hook、telemetry、外部公開、GitHub Actions は作りません。
+
+Codex の非対話実行は、導入された runner 経由で行います。
+
+```bash
+node scripts/codex-exec-runner.mjs --target /path/to/adopting-repo --prompt skill-implement.md --mode implementation
+```
+
+runner は `codex exec` の出力を捕捉して `ask-sensors` に通し、`executed` と `insufficient_evidence` を分けます。これはbusiness correctness、product readiness、no regressionの証明ではありません。
 
 Skill非対応ツールでは、必要な `SKILL.md` だけをプロンプトに貼ります。
 
@@ -86,6 +94,12 @@ node scripts/install-claude-adapter.mjs --target /path/to/project
 Claude adapter は core install state `.agent-spectrum-kernel/install-state.json` を前提にします。未導入の場合は `.claude/` を書き込む前に失敗します。
 
 Claude adapter は `.agent-spectrum-kernel/claude-install-state.json` を記録し、core/Codexと同じ lifecycle semantics を使います。`--check`、`--dry-run`、`--prune`、`--force`、`--rollback`、`--detach` が使えます。`--detach` はClaude実行面とadapter-owned hooksを外し、local metrics、reports、ledgersは既定で残します。
+
+Claude の runtime smoke は明示実行です。hook executable resolution、event-store writability、非機密smoke event、report input availabilityを確認します。
+
+```bash
+node scripts/adapter-runtime-smoke.mjs --target /path/to/project --adapter claude
+```
 
 対応profileは `implementation`、`investigation`、`review`、`observability`、`full` です。default は `full` で、全manifest Skillと全Claude commandを投影します。narrow profile は、選択command、Skill依存、router到達可能routeを含む閉包を自動投影します。`--skills <csv>` はadvanced overrideで、閉包を満たさない場合は書き込み前に失敗します。
 

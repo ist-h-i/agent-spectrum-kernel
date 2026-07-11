@@ -2,12 +2,12 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  CODEX_PROMPT_MODES,
+  codexPromptContractForMode,
   detectApprovalRequiredSurfaces,
   findUnsupportedCapabilityClaims,
 } from "./ask-shared.mjs";
 
-const IMPLEMENTATION_SECTIONS = ["Changed:", "Verified:", "Not verified:", "Risks / assumptions:", "Next:"];
-const REVIEW_SECTIONS = ["Decision:", "Layer summary:"];
 const KNOWN_OUTPUT_SECTIONS = [
   "Changed:",
   "Verified:",
@@ -78,8 +78,8 @@ function parseArgs(argv) {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
-  if (!["implementation", "review"].includes(args.mode)) {
-    throw new Error("--mode must be implementation or review");
+  if (!CODEX_PROMPT_MODES.has(args.mode)) {
+    throw new Error(`--mode must be one of ${[...CODEX_PROMPT_MODES].join(", ")}`);
   }
   return args;
 }
@@ -89,7 +89,7 @@ function printHelp() {
 
 Options:
   --target <path>           Repository root to scan for capability claims. Defaults to cwd.
-  --mode <mode>             implementation | review. Defaults to implementation.
+  --mode <mode>             Managed Codex prompt contract mode. Defaults to implementation.
   --input <path>            Output text to inspect. If omitted, stdin is used when piped.
   --changed-files <csv>     Optional comma-separated changed file paths for risk-surface checks.
 
@@ -110,8 +110,11 @@ function readInput(args) {
 
 function runSensors({ target, mode, text, changedFiles }) {
   const sensors = [];
-  if (mode === "implementation") {
-    sensors.push(completionContractSensor(text));
+  const contract = codexPromptContractForMode(mode);
+  if (contract) {
+    sensors.push(completionContractSensor(text, mode, contract.requiredSections));
+  }
+  if (["implementation", "investigation"].includes(mode)) {
     sensors.push(evidenceQualitySensor(text));
   }
   if (mode === "review") {
@@ -125,27 +128,27 @@ function runSensors({ target, mode, text, changedFiles }) {
   return { status, sensors };
 }
 
-function completionContractSensor(text) {
+function completionContractSensor(text, mode, requiredSections) {
   if (!text.trim()) {
     return sensor("completion_contract", "warn", "No implementation output text was provided.");
   }
-  const missing = IMPLEMENTATION_SECTIONS.filter((section) => !text.includes(section));
+  const missing = requiredSections.filter((section) => !text.includes(section));
   if (missing.length > 0) {
     return sensor(
       "completion_contract",
       "fail",
-      `Implementation output is missing required sections: ${missing.join(", ")}.`,
-      "Do not claim implementation completion/readiness until the completion contract is present.",
+      `${mode} output is missing required sections: ${missing.join(", ")}.`,
+      `Do not claim ${mode} completion/readiness until the managed completion contract is present.`,
     );
   }
-  return sensor("completion_contract", "pass", "Implementation completion contract sections are present.");
+  return sensor("completion_contract", "pass", `${mode} completion contract sections are present.`);
 }
 
 function reviewLayerSummarySensor(text) {
   if (!text.trim()) {
     return sensor("review_layer_summary", "warn", "No review output text was provided.");
   }
-  const missing = REVIEW_SECTIONS.filter((section) => !text.includes(section));
+  const missing = codexPromptContractForMode("review").requiredSections.filter((section) => !text.includes(section));
   if (missing.length > 0) {
     return sensor(
       "review_layer_summary",
@@ -189,8 +192,8 @@ function unsupportedCapabilitySensor(target) {
   return sensor(
     "unsupported_capability",
     "fail",
-    `Unsupported or partial adapter capability overclaims detected: ${findings.map((finding) => `${finding.adapter}:${finding.capability}:${finding.status}`).join("; ")}.`,
-    "Downgrade adapter capability claims to the status in docs/adapter-capability-matrix.md.",
+    `Adapter capability overclaims detected: ${findings.map((finding) => `${finding.adapter}:${finding.capability}:${finding.status}`).join("; ")}.`,
+    "Downgrade adapter capability claims to the evidence level in docs/adapter-capability-matrix.md.",
   );
 }
 

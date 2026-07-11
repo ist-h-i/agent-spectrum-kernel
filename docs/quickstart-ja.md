@@ -45,6 +45,12 @@ node scripts/ask-doctor.mjs --target /path/to/adopting-repo
 
 `ask-doctor` は初回導入、kernel更新、adapter導入、skill投影更新、drift調査のためのhealth checkです。per-task gateではありません。exit code 1 は installation health failed を示すだけで、read-only investigation や local verification を禁止しません。failure は setup/readiness claim を下げる根拠として扱います。
 
+`ask-doctor --runtime-probe` は installation health、adapter projection、runtime readiness、behavioral evidence を別statusで出します。runtime probeのpassはClaude/Codex実行、GitHub Actions、deployment、product readinessの証明ではありません。Claudeのlocal write smokeは明示的に次を実行します。
+
+```bash
+node scripts/adapter-runtime-smoke.mjs --target /path/to/adopting-repo --adapter claude
+```
+
 Codex の `.agents/skills`、prompt template、`codex exec` command template も投影する場合:
 
 ```bash
@@ -52,7 +58,15 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-Codex installer は profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile minimal|implementation|investigation|review|adoption|observability|full` を使い、`--skills <csv>` は選択 prompt / command、router到達可能route、指定 skill 依存の閉包検証付き advanced override として扱います。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。hook、telemetry、外部公開、GitHub Actions は作りません。
+Codex installer は profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile minimal|implementation|investigation|review|adoption|observability|full` を使い、`--skills <csv>` は選択 prompt / command、router到達可能route、指定 skill 依存の閉包検証付き advanced override として扱います。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。hook、telemetry、外部公開、GitHub Actions は作りません。
+
+Codex の非対話実行は `codex exec` を直接呼ぶ代わりに、導入された runner を使います。
+
+```bash
+node scripts/codex-exec-runner.mjs --target /path/to/adopting-repo --prompt skill-implement.md --mode implementation
+```
+
+runner は出力を `ask-sensors` に通して `executed` / `insufficient_evidence` を分けますが、business correctness、product readiness、no regressionの証明にはなりません。
 
 完了報告やレビュー出力の制御リスクを確認する場合:
 

@@ -4,18 +4,28 @@ Use these examples from an adopting repository after projecting `AGENTS.md`, the
 
 The installer generates a profile-limited `.agents/commands/codex-exec.md` in adopting repositories. This source template shows the full command family.
 
+Run these commands from the adopting repository so that `scripts/codex-exec-runner.mjs` is the installed, managed runner for that repository.
+
 ## Implementation
 
 ```bash
-codex exec --sandbox workspace-write --output-last-message codex-implementation.md "$(cat .agents/prompts/skill-implement.md)"
+node scripts/codex-exec-runner.mjs --prompt skill-implement.md --mode implementation --sandbox workspace-write --output codex-implementation.md
 ```
 
 If the prompt file is not installed for the selected profile, rerun the installer with a profile that includes it, paste the template text directly into Codex, or provide an equivalent local path.
 
+## Investigation
+
+```bash
+node scripts/codex-exec-runner.mjs --prompt skill-investigate.md --mode investigation --sandbox workspace-write
+```
+
+Start with reproduction and evidence gathering. Make local edits only after the cause and verification path are clear.
+
 ## Review
 
 ```bash
-git diff --patch origin/main...HEAD | codex exec --sandbox read-only "$(cat .agents/prompts/skill-review.md)"
+node scripts/codex-exec-runner.mjs --prompt skill-review.md --mode review --sandbox read-only --diff-base origin/main...HEAD --output codex-review.md
 ```
 
 Treat this as diff-only review unless the command also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.
@@ -23,7 +33,7 @@ Treat this as diff-only review unless the command also provides the checked-out 
 ## Verification
 
 ```bash
-codex exec --sandbox workspace-write "$(cat .agents/prompts/skill-verify.md)"
+node scripts/codex-exec-runner.mjs --prompt skill-verify.md --mode verification --sandbox workspace-write
 ```
 
 Use the repository's actual test, lint, build, or validation commands. Do not claim no regression from a template alone.
@@ -31,8 +41,12 @@ Use the repository's actual test, lint, build, or validation commands. Do not cl
 ## Handoff
 
 ```bash
-codex exec --sandbox read-only "$(cat .agents/prompts/skill-handoff.md)"
+node scripts/codex-exec-runner.mjs --prompt skill-handoff.md --mode handoff --sandbox read-only
 ```
+
+The runner performs local preflight, invokes `codex exec`, captures final output,
+runs `ask-sensors`, and reports an evidence level. A passing sensor result is
+not proof of business correctness, product readiness, or no regression.
 
 Use this when a task needs a precise next-agent handoff with allowed scope, forbidden scope, expected output, verification, and stop condition.
 
