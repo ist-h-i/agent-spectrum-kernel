@@ -12,6 +12,7 @@ const MANAGED_START = "<!-- agent-spectrum-kernel:start -->";
 const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const DEFAULT_PROFILE = "implementation";
+const CANONICAL_REGISTRY_PATH = "schemas/review-signal-gate-map.json";
 const PROMPT_TEMPLATES = [
   "skill-implement.md",
   "skill-investigate.md",
@@ -27,7 +28,6 @@ const CODEX_RUNTIME_FILES = [
   { name: "execution-envelope.mjs", source: "scripts/execution-envelope.mjs", target: "scripts/execution-envelope.mjs" },
   { name: "execution-envelope.schema.json", source: "schemas/execution-envelope.schema.json", target: "scripts/execution-envelope.schema.json" },
   { name: "metrics-event.schema.json", source: "schemas/metrics-event.schema.json", target: "scripts/metrics-event.schema.json" },
-  { name: "review-signal-gate-map.json", source: "schemas/review-signal-gate-map.json", target: "schemas/review-signal-gate-map.json" },
 ];
 const CODEX_RUNTIME_SCRIPTS = CODEX_RUNTIME_FILES.map((file) => file.name);
 
@@ -507,6 +507,11 @@ function validateCoreInstalled(target, statePath) {
   if (state?.install_status !== "installed" || !record?.sha256 || !block || lifecycle.hashText(block.content) !== record.sha256) {
     throw new Error("ASK core installation is not active or its AGENTS.md managed block does not match install state.");
   }
+  const registryPath = resolve(target, CANONICAL_REGISTRY_PATH);
+  const registryRecord = state?.managed_files?.[CANONICAL_REGISTRY_PATH];
+  if (!registryRecord?.sha256 || !existsSync(registryPath) || hashText(readText(registryPath)) !== registryRecord.sha256) {
+    throw new Error(`ASK core canonical review signal registry is missing or does not match core install state: ${CANONICAL_REGISTRY_PATH}`);
+  }
 }
 
 function readPreviousState(target) {
@@ -980,7 +985,7 @@ function buildPlan(args) {
   const previousPrompts = new Set(previousPromptNames);
   const previousCommands = new Set(previousCommandNames);
   const selectedRuntimeScripts = selectedCommandTemplates.includes("codex-exec.md") ? CODEX_RUNTIME_SCRIPTS : [];
-  const previousRuntimeScripts = new Set(previousRuntimeNames);
+  const previousRuntimeScripts = new Set(previousRuntimeNames.filter((script) => script !== "review-signal-gate-map.json"));
   const selectedSkills = new Set(skills);
   const selectedPrompts = new Set(selectedPromptTemplates);
   const selectedCommands = new Set(selectedCommandTemplates);
@@ -1226,13 +1231,13 @@ function printPlan(args, plan) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.rollback) {
-    const operations = lifecycle.rollbackLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force });
+    const operations = lifecycle.rollbackLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force, preserve: [CANONICAL_REGISTRY_PATH] });
     console.log(`${args.dryRun || args.check ? "Codex adapter rollback dry run" : "Codex adapter rolled back"}: ${args.target}`);
     lifecycle.printOperations(args.target, operations);
     return;
   }
   if (args.detach) {
-    const operations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force });
+    const operations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force, preserve: [CANONICAL_REGISTRY_PATH] });
     console.log(`${args.dryRun || args.check ? "Codex adapter detach dry run" : "Codex adapter detached"}: ${args.target}`);
     lifecycle.printOperations(args.target, operations);
     return;

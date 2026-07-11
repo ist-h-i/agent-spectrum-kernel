@@ -233,7 +233,7 @@ Signal-first routing summaries make routing deviations detectable without storin
 
 The minimal normal-route record is `change_signals`, `required_gates`, and `executed_gates`. `required_gate_routes` may add explicit human-readable traceability, while `skipped_heavy_gates` and `missing_evidence` are added only when those states exist. `gate_applicability` remains an optional complete diagnostic matrix for validation/debug use and must not be required for every review event.
 
-Signal IDs are exact identifiers, not free-form prose. The single machine-readable source of truth is `schemas/review-signal-gate-map.json`, which is projected to Codex/core/Claude project installs and to the standalone Claude plugin contract. A route or gate decision trigger must be a member of `change_signals[].signal` and must map to the selected gate according to that registry. `change_signals[].evidence` is explanatory context and is never used for trigger matching.
+Signal IDs are exact identifiers, not free-form prose. The single machine-readable source of truth is `schemas/review-signal-gate-map.json`, which is owned and managed by the core installer. Codex and Claude project installers validate the core-owned file and never manage or delete it; the standalone Claude plugin keeps its independent bundled contract projection. A route or gate decision trigger must be a member of `change_signals[].signal` and must map to the selected gate according to that registry. `change_signals[].evidence` is explanatory context and is never used for trigger matching.
 
 `gate_decisions` is the bounded drill-down form for gate-level judgment data. It stores short structured judgments only. It must not contain raw prompts, full review text, full command output, or full file contents.
 

@@ -85,6 +85,7 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
     report,
     installerName: "agent-spectrum-codex-adapter",
     optional: true,
+    allowDetached: true,
   });
 
   checkManagedInstallState({
@@ -95,6 +96,7 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
     report,
     installerName: "agent-spectrum-claude-adapter",
     optional: !existsSync(resolve(target, ".claude")),
+    allowDetached: true,
   });
 
   checkClaudeAdapter(target, report);
@@ -154,7 +156,7 @@ function buildDeploymentStatus(report) {
   };
 }
 
-function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, report, optional = false, installerName }) {
+function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, report, optional = false, installerName, allowDetached = false }) {
   const absoluteStatePath = resolve(target, statePath);
   const inProgressPath = `${absoluteStatePath}.in-progress.json`;
   if (existsSync(inProgressPath)) {
@@ -172,6 +174,10 @@ function checkManagedInstallState({ target, statePath, label, targetSkillsRoot, 
   }
 
   const state = stateResult.value;
+  if (allowDetached && state.install_status === "detached") {
+    report.installed.push(`${label}: detached (${statePath})`);
+    return;
+  }
   if (state.install_status !== "installed") report.failures.push(`${label} install_status must be installed: ${statePath}`);
   report.installed.push(`${label}: install state present (${statePath})`);
   if (
@@ -296,6 +302,11 @@ function sourcePathForManagedRecord(managedPath, record) {
 }
 
 function checkClaudeAdapter(target, report) {
+  const stateResult = readJsonIfExists(resolve(target, CLAUDE_STATE_PATH));
+  if (stateResult.ok && stateResult.value?.install_status === "detached") {
+    report.installed.push("Claude adapter: detached");
+    return;
+  }
   const claudeRoot = resolve(target, ".claude");
   if (!existsSync(claudeRoot)) {
     report.installed.push("Claude adapter: not installed");
@@ -465,6 +476,9 @@ function buildLayerStatuses(target, report, { runtimeProbe }) {
       continue;
     }
     const state = stateResult.value;
+    if (state.install_status === "detached" && installerName !== "agent-spectrum-kernel") {
+      continue;
+    }
     if (state.install_status !== "installed") {
       installationFailures.push(`${statePath}: install_status must be installed`);
     }

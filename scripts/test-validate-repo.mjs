@@ -2297,6 +2297,10 @@ function assertInstallerScripts() {
   if (!existsSync(installedSignalRegistry) || readFileSync(installedSignalRegistry, "utf8") !== readFileSync(resolve(repoRoot, "schemas/review-signal-gate-map.json"), "utf8")) {
     throw new Error("Claude project installer should project the canonical signal registry");
   }
+  const firstClaudeState = JSON.parse(readFileSync(resolve(target, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  if (Object.hasOwn(firstClaudeState.managed_files ?? {}, "schemas/review-signal-gate-map.json")) {
+    throw new Error("Claude project installer must not claim ownership of the core canonical signal registry");
+  }
   if (
     !firstInstall.stdout.includes("- initialize: docs/ai/improvement-ledger.md") ||
     !firstInstall.stdout.includes("- initialize: docs/ai/skill-adoption-metrics.md")
@@ -2472,10 +2476,14 @@ function assertInstallerScripts() {
     existsSync(resolve(detachTarget, ".claude/commands/skill-implement.md")) ||
     detachedSettings.includes("ai-metrics-record") ||
     !existsSync(resolve(detachTarget, "docs/ai/metrics/events.jsonl")) ||
+    !existsSync(resolve(detachTarget, "schemas/review-signal-gate-map.json")) ||
     detachedClaudeState.install_status !== "detached"
   ) {
     throw new Error("installer detach should remove Claude execution surfaces while preserving local metrics evidence");
   }
+  assertRuntimePass("core check after Claude detach", runRepoScript([coreInstaller, "--target", detachTarget, "--check"]));
+  const doctorAfterClaudeDetach = runRepoScript([doctorScript, "--target", detachTarget, "--json"]);
+  assertRuntimePass("doctor after Claude detach", doctorAfterClaudeDetach);
 
   const noRuntimeTarget = resolve(fixtureRoot, "install-no-runtime-target");
   assertRuntimePass("installer no-runtime core setup", runRepoScript([coreInstaller, "--target", noRuntimeTarget]));
@@ -2801,6 +2809,9 @@ function assertCodexInstallerScripts() {
   if (!freshState.selected_runtime_scripts?.includes("codex-exec-runner.mjs")) {
     throw new Error(`codex installer should record selected runner runtime\n${JSON.stringify(freshState, null, 2)}`);
   }
+  if (Object.hasOwn(freshState.managed_files ?? {}, "schemas/review-signal-gate-map.json")) {
+    throw new Error("Codex adapter installer must not claim ownership of the core canonical signal registry");
+  }
   if (readFileSync(resolve(freshTarget, "schemas/review-signal-gate-map.json"), "utf8") !== readFileSync(resolve(repoRoot, "schemas/review-signal-gate-map.json"), "utf8")) {
     throw new Error("Codex installer should project the canonical signal registry");
   }
@@ -2875,6 +2886,17 @@ function assertCodexInstallerScripts() {
   if (readFileSync(resolve(freshTarget, ".agents/skills/controlled-implementation/SKILL.md"), "utf8") !== "# local stale copy\n") {
     throw new Error("codex installer rollback should restore the immediate pre-force local content");
   }
+
+  const detachTarget = resolve(fixtureRoot, "codex-install-detach-target");
+  assertRuntimePass("codex installer detach core setup", runRepoScript([coreInstaller, "--target", detachTarget]));
+  assertRuntimePass("codex installer detach setup", runRepoScript([installer, "--target", detachTarget, "--profile", "review"]));
+  assertRuntimePass("codex installer detach", runRepoScript([installer, "--target", detachTarget, "--detach"]));
+  if (!existsSync(resolve(detachTarget, "schemas/review-signal-gate-map.json"))) {
+    throw new Error("Codex adapter detach must preserve the core canonical signal registry");
+  }
+  assertRuntimePass("core check after Codex detach", runRepoScript([coreInstaller, "--target", detachTarget, "--check"]));
+  const doctorAfterCodexDetach = runRepoScript([doctorScript, "--target", detachTarget, "--json"]);
+  assertRuntimePass("doctor after Codex detach", doctorAfterCodexDetach);
 
   const mergeTarget = resolve(fixtureRoot, "codex-install-merge");
   mkdirSync(mergeTarget, { recursive: true });

@@ -7,6 +7,7 @@ import * as lifecycle from "./installer-lifecycle.mjs";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const STATE_PATH = ".agent-spectrum-kernel/claude-install-state.json";
+const CANONICAL_REGISTRY_PATH = "schemas/review-signal-gate-map.json";
 const DEFAULT_PROFILE = "full";
 const HOOK_MARKER = "agent-spectrum-kernel:claude-adapter-hook";
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
@@ -79,7 +80,7 @@ const RUNTIME_DIRECTORIES = [
 const COMMAND_METADATA = {
   "skill-review.md": {
     requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
-    requiredAssets: ["docs/execution-envelope-contract.md", "schemas/review-signal-gate-map.json"],
+    requiredAssets: ["docs/execution-envelope-contract.md"],
   },
   "skill-implement.md": {
     requiredSkills: ["skill-router", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
@@ -767,13 +768,6 @@ function installRuntime(args, writes) {
     copyFilePlanned(resolve(REPO_ROOT, "scripts", script), resolve(args.target, "scripts", script), args, writes, { kind: "claude_runtime", script });
   }
   copyFilePlanned(
-    resolve(REPO_ROOT, "schemas/review-signal-gate-map.json"),
-    resolve(args.target, "schemas/review-signal-gate-map.json"),
-    args,
-    writes,
-    { kind: "claude_runtime_asset", asset: "schemas/review-signal-gate-map.json" },
-  );
-  copyFilePlanned(
     resolve(REPO_ROOT, "docs/ai/observability-config.yml"),
     resolve(args.target, "docs/ai/observability-config.yml"),
     args,
@@ -847,6 +841,11 @@ function validateCoreInstalled(args) {
   const block = existsSync(agentsPath) ? lifecycle.extractManagedBlock(readFileSync(agentsPath, "utf8")) : null;
   if (state?.install_status !== "installed" || !record?.sha256 || !block || lifecycle.hashText(block.content) !== record.sha256) {
     throw new Error("ASK core installation is not active or its AGENTS.md managed block does not match install state.");
+  }
+  const registryPath = resolve(args.target, CANONICAL_REGISTRY_PATH);
+  const registryRecord = state?.managed_files?.[CANONICAL_REGISTRY_PATH];
+  if (!registryRecord?.sha256 || !existsSync(registryPath) || lifecycle.hashText(readFileSync(registryPath, "utf8")) !== registryRecord.sha256) {
+    throw new Error(`ASK core canonical review signal registry is missing or does not match core install state: ${CANONICAL_REGISTRY_PATH}`);
   }
 }
 
@@ -955,6 +954,9 @@ function manageStaleFiles(args, writes) {
   const currentPaths = new Set(Object.keys(args.managedFiles));
   args.retainedStaleFiles = [];
   for (const [relativePath, record] of Object.entries(args.previousState?.managed_files ?? {}).sort()) {
+    if (relativePath === CANONICAL_REGISTRY_PATH) {
+      continue;
+    }
     if (currentPaths.has(relativePath)) {
       continue;
     }
@@ -1029,6 +1031,7 @@ function main() {
       statePath: STATE_PATH,
       dryRun: args.dryRun || args.check,
       force: args.force,
+      preserve: [CANONICAL_REGISTRY_PATH],
       extendOperations: ({ state, operations: plan }) => {
         const hookOperation = restoreManagedHookSubset(args.target, state, { force: args.force });
         if (hookOperation) plan.push(hookOperation);
@@ -1050,7 +1053,7 @@ function main() {
     };
     const hookWrites = [];
     removeManagedHooks(hookArgs, hookWrites);
-    const detachOperations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: true, force: args.force });
+    const detachOperations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: true, force: args.force, preserve: [CANONICAL_REGISTRY_PATH] });
     const operations = [...hookArgs.operations, ...detachOperations];
     if (!args.dryRun && !args.check) {
       lifecycle.applyOperations(operations, false);

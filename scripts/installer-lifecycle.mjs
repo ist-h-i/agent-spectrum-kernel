@@ -456,7 +456,7 @@ export function printOperations(target, operations) {
   }
 }
 
-export function rollbackLifecycleState({ target, statePath, dryRun = false, force = false, extendOperations = null }) {
+export function rollbackLifecycleState({ target, statePath, dryRun = false, force = false, extendOperations = null, preserve = [] }) {
   const absoluteStatePath = resolve(target, statePath);
   const markerPath = stateInProgressPath(absoluteStatePath);
   const pending = readJsonIfExists(markerPath);
@@ -469,7 +469,11 @@ export function rollbackLifecycleState({ target, statePath, dryRun = false, forc
     throw new Error(`rollback snapshot is missing: ${statePath}`);
   }
   const operations = [];
+  const preserveSet = new Set(preserve);
   for (const [relativePath, snapshot] of Object.entries(rollback.files ?? {})) {
+    if (preserveSet.has(relativePath)) {
+      continue;
+    }
     if (state.managed_partial_files?.[relativePath]?.kind === "claude_settings") {
       continue;
     }
