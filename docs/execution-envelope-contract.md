@@ -14,28 +14,35 @@ This document is the human-readable source of truth. The machine-readable shape 
 
 ## Canonical shape
 
-```text
 Execution Envelope:
-- schema version: 1.0.0
-- route:
-  - work mode: 要件確認 | 実装準備 | 実装 | レビュー | 調査 | ドキュメント整理 | 知識蓄積 | 運用整理
-  - operating mode: delivery_quality | adoption_bootstrap | observability_metrics | operation_automation
-  - user-facing route:
-  - internal route:
-    - primary:
-    - secondary:
-    - next if resolved:
-- evidence status:
-  - checked:
-  - missing:
-- stop reason:
-  - status: none | human_decision | insufficient_evidence | risk_gate | completed | blocked
-  - details:
-  - human decision required:
-  - stop if:
-- next action:
-- metrics event candidate: omit unless explicitly enabled or requested
+```json
+{
+  "schema_version": "1.0.0",
+  "route": {
+    "work_mode": "実装",
+    "operating_mode": "delivery_quality",
+    "user_facing": "実装して検証する",
+    "internal": {
+      "primary": "controlled-implementation",
+      "secondary": ["test-first-verification"],
+      "next_if_resolved": "review-router"
+    }
+  },
+  "evidence_status": {
+    "checked": ["repository files", "focused test"],
+    "missing": []
+  },
+  "stop_reason": {
+    "status": "none",
+    "details": [],
+    "human_decision_required": [],
+    "stop_if": ["required verification is unavailable"]
+  },
+  "next_action": "run the focused verification"
+}
 ```
+
+The JSON object inside the fenced block is the only accepted serialized Envelope form. A heading or flat `- route: ...` list without a parseable JSON object is malformed and must not pass completion validation.
 
 ## Field rules
 
@@ -43,7 +50,7 @@ Execution Envelope:
 
 `evidence status` distinguishes what was directly checked from what is still missing. Do not convert missing evidence into a positive claim or hide it in a skill artifact.
 
-`stop reason` is explicit when work must pause. `human_decision` names the decision owner or decision needed, `insufficient_evidence` names the missing input or check, and `risk_gate` identifies the action requiring approval. `none` is valid only when the workflow can proceed.
+`stop reason` is explicit when work must pause. `human_decision` names the decision owner or decision needed, `insufficient_evidence` names the missing input or check, and `risk_gate` identifies the action requiring approval. `none` is valid only when the workflow can proceed. `stop_reason.stop_if` is the sole location for stop conditions; route metadata must not define another stop condition.
 
 `next action` is a concrete work action, not only a skill name. Examples include `run the focused validation`, `implement the scoped change`, `request domain clarification`, or `prepare the final merge decision`.
 
@@ -65,4 +72,4 @@ These artifacts may contain evidence, blockers, or next-step detail required by 
 
 ## Compatibility
 
-Adapters may keep their entry-specific output sections for compatibility. They must place the shared `Execution Envelope` at the workflow boundary and must not invent a second route or metrics contract. Codex execution profiles may continue to require `Changed`, `Verified`, `Not verified`, review, verification, or handoff sections; those are artifacts, not replacements for the envelope.
+Adapters may keep their entry-specific output sections for compatibility. They must place the shared `Execution Envelope` at the workflow boundary and must not invent a second route or metrics contract. Codex execution profiles may continue to require `Changed`, `Verified`, `Not verified`, review, verification, or handoff sections; those are artifacts, not replacements for the envelope. If a legacy `Next:` or `Stop condition:` section remains, it is follow-up detail only and cannot override the Envelope.

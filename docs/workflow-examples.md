@@ -18,26 +18,15 @@ then the smallest selected workflow
 
 Expected output shape:
 
-```text
 Execution Envelope:
-- route:
-  - work mode: 要件確認 / 実装準備
-  - operating mode: delivery_quality
-  - user-facing route: 既存要件とrepo根拠を確認し、不足する判断だけを人間判断として分離する。
-  - internal route:
-    - primary: requirement-grill
-    - secondary: domain-rule-ledger when matching confirmed or verified rules exist
-    - next if resolved: work-package-compiler
-- evidence status:
-  - checked: issue body; relevant README/docs; matching active ledgers
-  - missing:
-- stop reason:
-  - status: human_decision
-  - details: unresolved human-owned business decision remains
-  - human decision required:
-  - stop if: business decision remains unresolved
-- next action: stop for human decision or proceed to implementation packaging
-- metrics event candidate: omit
+```json
+{
+  "schema_version": "1.0.0",
+  "route": { "work_mode": "要件確認", "operating_mode": "delivery_quality", "user_facing": "既存要件とrepo根拠を確認する", "internal": { "primary": "requirement-grill", "secondary": ["domain-rule-ledger"], "next_if_resolved": "work-package-compiler" } },
+  "evidence_status": { "checked": ["issue body", "relevant README/docs"], "missing": ["business decision"] },
+  "stop_reason": { "status": "human_decision", "details": ["unresolved human-owned business decision remains"], "human_decision_required": ["business outcome"], "stop_if": ["business decision remains unresolved"] },
+  "next_action": "stop for human decision or proceed to implementation packaging"
+}
 ```
 
 Expected behavior:

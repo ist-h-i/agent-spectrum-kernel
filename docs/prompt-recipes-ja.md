@@ -32,26 +32,15 @@
 
 ### 期待する出力
 
-```text
 Execution Envelope:
-- route:
-  - work mode:
-  - operating mode: delivery_quality
-  - user-facing route: 作業用語で、次に何を確認し、何を止め、何を進めるか。
-  - internal route:
-    - primary:
-    - secondary:
-    - next if resolved:
-- evidence status:
-  - checked:
-  - missing:
-- stop reason:
-  - status:
-  - details:
-  - human decision required:
-  - stop if:
-- next action: implement scoped change, run review gates, create verification contract, stop for human decision, or create handoff
-- metrics event candidate: omit unless explicitly enabled or requested
+```json
+{
+  "schema_version": "1.0.0",
+  "route": { "work_mode": "実装", "operating_mode": "delivery_quality", "user_facing": "作業用語で次の確認・停止・実行を示す", "internal": { "primary": "controlled-implementation" } },
+  "evidence_status": { "checked": [], "missing": [] },
+  "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
+  "next_action": "implement scoped change"
+}
 ```
 
 ### 注意

@@ -86,14 +86,24 @@ User-facing route text should explain the work path in these terms. Skill names 
 
 Emit one shared `Execution Envelope` following `docs/execution-envelope-contract.md`. Do not emit a second copy of its route, evidence, stop, or next-action fields in this skill output.
 
-```text
 Execution Envelope:
-- route: include work mode, operating mode, user-facing route, and internal route
-- evidence status: include checked and missing evidence
-- stop reason: include status, details, human decision required, and stop-if condition
-- next action: one concrete work action
-- metrics event candidate: omit unless explicitly enabled or requested
+```json
+{
+  "schema_version": "1.0.0",
+  "route": { "work_mode": "実装", "operating_mode": "delivery_quality", "user_facing": "...", "internal": { "primary": "skill-router" } },
+  "evidence_status": { "checked": [], "missing": [] },
+  "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
+  "next_action": "..."
+}
 ```
+
+Routing Decision:
+- Decisive signals:
+- Reason for primary route:
+- Reason for each secondary route:
+- Intentionally skipped:
+- Risk overlay:
+- Uncertainty:
 
 ## Exit criteria
 

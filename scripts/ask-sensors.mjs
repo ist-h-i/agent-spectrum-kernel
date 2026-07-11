@@ -7,6 +7,7 @@ import {
   detectApprovalRequiredSurfaces,
   findUnsupportedCapabilityClaims,
 } from "./ask-shared.mjs";
+import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 
 const KNOWN_OUTPUT_SECTIONS = [
   "Changed:",
@@ -115,6 +116,7 @@ function runSensors({ target, mode, text, changedFiles }) {
   if (contract) {
     sensors.push(completionContractSensor(text, mode, contract.requiredSections));
   }
+  sensors.push(executionEnvelopeSensor(text));
   if (["implementation", "investigation"].includes(mode)) {
     sensors.push(evidenceQualitySensor(text));
   }
@@ -127,6 +129,19 @@ function runSensors({ target, mode, text, changedFiles }) {
 
   const status = strongestStatus(sensors.map((sensor) => sensor.status));
   return { status, sensors };
+}
+
+function executionEnvelopeSensor(text) {
+  const result = inspectExecutionEnvelope(text);
+  if (result.status === "parsed") {
+    return sensor("execution_envelope", "pass", "Execution Envelope is valid JSON and conforms to the shared schema.");
+  }
+  return sensor(
+    "execution_envelope",
+    "fail",
+    `Execution Envelope is ${result.status}: ${result.errors.join(" ")}.`,
+    "Emit exactly one fenced JSON Execution Envelope that conforms to schemas/execution-envelope.schema.json.",
+  );
 }
 
 function completionContractSensor(text, mode, requiredSections) {

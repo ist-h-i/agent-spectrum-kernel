@@ -14,7 +14,7 @@ Keep the change boundary narrow:
 - use `/risk-gate` before destructive, external, secret, production, auth, dependency, migration, billing, email, or infra-impacting actions
 - verify the observable behavior before claiming completion
 - use `/evidence-ledger` for correctness, readiness, safety, reliability, performance, or no-regression claims
-- emit one shared `Execution Envelope` per task boundary using `docs/execution-envelope-contract.md`; keep implementation details in the skill artifact
+- emit exactly one fenced JSON `Execution Envelope` per task boundary using `docs/execution-envelope-contract.md`; keep implementation details in the skill artifact
 
 Do not deploy, publish, release, send notifications, change secrets, or mutate production configuration from this command.
 

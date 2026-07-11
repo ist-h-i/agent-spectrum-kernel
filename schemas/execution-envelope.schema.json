@@ -32,8 +32,7 @@
           "properties": {
             "primary": { "type": "string" },
             "secondary": { "type": "array", "items": { "type": "string" } },
-            "next_if_resolved": { "type": "string" },
-            "stop_if": { "type": "string" }
+            "next_if_resolved": { "type": "string" }
           }
         }
       }
@@ -63,9 +62,8 @@
     },
     "next_action": { "type": "string", "minLength": 1 },
     "metrics_event_candidate": {
-      "type": "object",
-      "description": "Optional bounded summary governed by docs/metrics-event-contract.md. Omit unless metrics are explicitly enabled or requested.",
-      "additionalProperties": true
+      "$ref": "metrics-event.schema.json",
+      "description": "Optional bounded summary governed by docs/metrics-event-contract.md. Omit unless metrics are explicitly enabled or requested."
     }
   }
 }

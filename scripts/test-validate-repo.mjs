@@ -14,6 +14,35 @@ const runtimeSmokeScript = resolve(repoRoot, "scripts/adapter-runtime-smoke.mjs"
 const codexRunnerScript = resolve(repoRoot, "scripts/codex-exec-runner.mjs");
 const fixtureRoot = mkdtempSync(resolve(tmpdir(), "validate-repo-"));
 
+function envelopeBlock(overrides = {}) {
+  const envelope = {
+    schema_version: "1.0.0",
+    route: {
+      work_mode: "実装",
+      operating_mode: "delivery_quality",
+      user_facing: "実装して検証する",
+      internal: { primary: "controlled-implementation", secondary: ["test-first-verification"], next_if_resolved: "review-router" },
+    },
+    evidence_status: { checked: ["node scripts/test-validate-repo.mjs"], missing: [] },
+    stop_reason: { status: "none", details: [], human_decision_required: [], stop_if: ["required verification is unavailable"] },
+    next_action: "continue fixture verification",
+    ...overrides,
+  };
+  return `Execution Envelope:\n\`\`\`json\n${JSON.stringify(envelope, null, 2)}\n\`\`\`\n`;
+}
+
+const validEnvelopeBlock = envelopeBlock();
+const insufficientEvidenceEnvelopeBlock = envelopeBlock({
+  evidence_status: { checked: [], missing: ["external runtime"] },
+  stop_reason: {
+    status: "insufficient_evidence",
+    details: ["external runtime was not checked"],
+    human_decision_required: [],
+    stop_if: ["external runtime evidence is required"],
+  },
+  next_action: "collect missing evidence",
+});
+
 function validSkill(name) {
   const title = `${name.slice(0, 1).toUpperCase()}${name.slice(1)}`;
   return `---
@@ -382,7 +411,7 @@ const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const DEFAULT_PROFILE = "implementation";
 const PROMPT_TEMPLATES = ["skill-implement.md"];
 const COMMAND_TEMPLATES = ["codex-exec.md"];
-const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs"];
+const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs", "execution-envelope.mjs", "execution-envelope.schema.json", "metrics-event.schema.json"];
 const CODEX_PROFILES = { implementation: { skills: ["operating-mode-router"], prompts: PROMPT_TEMPLATES, commands: COMMAND_TEMPLATES } };
 const PROFILE_ROUTING_FIXTURES = { implementation: [{ id: "unfamiliar_repository", selected_route: "repository-orientation", required_skills: ["repository-orientation"] }] };
 const SKILL_RELATIONSHIPS = { "controlled-implementation": { requires: ["test-first-verification"], recommends: ["evidence-ledger"], incompatibleWith: [] } };
@@ -419,6 +448,7 @@ function install(manifest, options) {
   );
   writeFileSync(resolve(root, "scripts/adapter-runtime-smoke.mjs"), "console.log('adapter runtime smoke');\n");
   writeFileSync(resolve(root, "scripts/codex-exec-runner.mjs"), "console.log('codex runner');\n");
+  writeFileSync(resolve(root, "scripts/execution-envelope.mjs"), "console.log('execution envelope');\n");
   writeFileSync(
     resolve(root, "scripts/install-claude-adapter.mjs"),
     `const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
@@ -3070,12 +3100,7 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
-
-Execution Envelope:
-- route: fixture implementation
-- evidence status: checked
-- stop reason: none
-- next action: continue fixture verification
+${validEnvelopeBlock}
 EOF
 `,
   );
@@ -3255,12 +3280,7 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
-
-Execution Envelope:
-- route: fixture implementation
-- evidence status: checked
-- stop reason: none
-- next action: continue fixture verification
+${validEnvelopeBlock}
 `,
   );
   const implementationPassResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", implementationPass]);
@@ -3278,6 +3298,23 @@ Execution Envelope:
   assertRuntimePass("sensors missing execution envelope is report-only", missingEnvelopeResult);
   if (!missingEnvelopeResult.stdout.includes("ASK sensors: fail") || !missingEnvelopeResult.stdout.includes("Execution Envelope:")) {
     throw new Error(`missing execution envelope should be reported by the completion contract sensor\n${missingEnvelopeResult.stdout}`);
+  }
+
+  const envelopeNegativeFixtures = [
+    ["malformed envelope", "Execution Envelope:\n- route: flat\n- next action: continue\n", "fenced JSON object"],
+    ["unknown envelope status", envelopeBlock({ stop_reason: { status: "mystery", details: [], human_decision_required: [], stop_if: [] } }), "must be one of"],
+    ["empty envelope next action", envelopeBlock({ next_action: "" }), "must not be empty"],
+    ["inconsistent envelope stop reason", envelopeBlock({ stop_reason: { status: "none", details: ["blocked"], human_decision_required: [], stop_if: [] } }), "status none cannot include blocking details"],
+    ["invalid metrics candidate", envelopeBlock({ metrics_event_candidate: {} }), "event_id: is required"],
+  ];
+  for (const [name, content, expected] of envelopeNegativeFixtures) {
+    const input = resolve(target, `${name.replaceAll(" ", "-")}.txt`);
+    writeFileSync(input, content);
+    const result = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", input]);
+    assertRuntimePass(`sensors ${name} is report-only`, result);
+    if (!result.stdout.includes("ASK sensors: fail") || !result.stdout.includes(expected)) {
+      throw new Error(`${name} should fail envelope validation\n${result.stdout}`);
+    }
   }
 
   const implementationFail = resolve(target, "implementation-fail.txt");
@@ -3305,12 +3342,7 @@ Risks / assumptions:
 
 Next:
 - Ready for review.
-
-Execution Envelope:
-- route: fixture implementation
-- evidence status: checked
-- stop reason: none
-- next action: continue fixture verification
+${validEnvelopeBlock}
 `,
   );
   const weakEvidenceResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", weakEvidence]);
@@ -3340,12 +3372,7 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
-
-Execution Envelope:
-- route: fixture implementation
-- evidence status: checked
-- stop reason: none
-- next action: continue fixture verification
+${validEnvelopeBlock}
 `,
   );
   const testsPassWithoutCommandResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", testsPassWithoutCommand]);
@@ -3371,12 +3398,7 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
-
-Execution Envelope:
-- route: fixture implementation
-- evidence status: checked
-- stop reason: none
-- next action: continue fixture verification
+${validEnvelopeBlock}
 `,
   );
   const concreteEvidenceResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", concreteEvidence]);
@@ -3394,12 +3416,7 @@ Execution Envelope:
 Layer summary:
 - Domain: skipped - no domain behavior signal.
 - Architecture: skipped - no boundary signal.
-
-Execution Envelope:
-- route: fixture review
-- evidence status: checked
-- stop reason: none
-- next action: continue fixture verification
+${validEnvelopeBlock}
 `,
   );
   const reviewPassResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", reviewPass]);
@@ -3408,10 +3425,22 @@ Execution Envelope:
     throw new Error(`review contract fixture should pass sensors\n${reviewPassResult.stdout}`);
   }
 
+  const claudeReviewCommand = readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/commands/skill-review.md"), "utf8");
+  if (!claudeReviewCommand.includes("fenced JSON `Execution Envelope`") || !claudeReviewCommand.includes("docs/execution-envelope-contract.md")) {
+    throw new Error("Claude review adapter must require the shared fenced JSON Execution Envelope");
+  }
+  const claudeOutput = resolve(target, "claude-review-output.txt");
+  writeFileSync(claudeOutput, `Decision:\n- approve with comments\n\nLayer summary:\n- Domain: skipped - no domain behavior signal.\n- Architecture: skipped - no boundary signal.\n\n${validEnvelopeBlock}`);
+  const claudeOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeOutput]);
+  assertRuntimePass("Claude adapter output smoke", claudeOutputResult);
+  if (!claudeOutputResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`Claude adapter output smoke should pass shared envelope validation\n${claudeOutputResult.stdout}`);
+  }
+
   const promptContracts = [
-    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nUnknown / not verified:\n- External runtime.\n\nNext:\n- Continue investigation.\n\nExecution Envelope:\n- route: fixture investigation\n- evidence status: checked\n- stop reason: none\n- next action: continue fixture verification\n"],
-    ["verification", "Verification Contract:\n- Behavior to prove: fixture.\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\nNot verified:\n- External runtime.\n\nNext verification:\n- Run integration coverage.\n\nExecution Envelope:\n- route: fixture verification\n- evidence status: checked\n- stop reason: none\n- next action: continue fixture verification\n"],
-    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nStop condition:\n- Missing evidence.\n\nExecution Envelope:\n- route: fixture handoff\n- evidence status: checked\n- stop reason: insufficient_evidence\n- next action: collect missing evidence\n"],
+    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nUnknown / not verified:\n- External runtime.\n\nNext:\n- Continue investigation.\n\n" + validEnvelopeBlock],
+    ["verification", "Verification Contract:\n- Behavior to prove: fixture.\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\nNot verified:\n- External runtime.\n\nNext verification:\n- Run integration coverage.\n\n" + validEnvelopeBlock],
+    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nStop condition:\n- Missing evidence.\n\n" + insufficientEvidenceEnvelopeBlock],
   ];
   for (const [mode, content] of promptContracts) {
     const input = resolve(target, `${mode}-contract.txt`);
@@ -3459,12 +3488,7 @@ Risks / assumptions:
 
 Next:
 - Reviewed auth docs only.
-
-Execution Envelope:
-- route: fixture implementation
-- evidence status: checked
-- stop reason: none
-- next action: continue fixture verification
+${validEnvelopeBlock}
 `,
   );
   const negatedRiskResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", negatedRisk]);
@@ -3490,12 +3514,7 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
-
-Execution Envelope:
-- route: fixture implementation
-- evidence status: checked
-- stop reason: none
-- next action: continue fixture verification
+${validEnvelopeBlock}
 `,
   );
   const scopedEvidencePhraseResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", scopedEvidencePhrases]);

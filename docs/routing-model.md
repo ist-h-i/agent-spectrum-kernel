@@ -73,23 +73,15 @@ Users do not need to know skill names to start work. The default surface is a sm
 
 Default route output uses one shared Execution Envelope. The envelope separates user-facing work terms from internal routing and is emitted once per meaningful workflow boundary:
 
-```text
 Execution Envelope:
-- route:
-  - work mode:
-  - operating mode:
-  - user-facing route:
-  - internal route:
-- evidence status:
-  - checked:
-  - missing:
-- stop reason:
-  - status:
-  - details:
-  - human decision required:
-  - stop if:
-- next action:
-- metrics event candidate: omit unless explicitly enabled or requested
+```json
+{
+  "schema_version": "1.0.0",
+  "route": { "work_mode": "要件確認", "operating_mode": "delivery_quality", "user_facing": "要件とrepo根拠を確認する", "internal": { "primary": "requirement-grill" } },
+  "evidence_status": { "checked": [], "missing": [] },
+  "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
+  "next_action": "create the implementation package"
+}
 ```
 
 The user-facing route should not require skill-name knowledge. Skill names remain visible in `route.internal` for review, debugging, and advanced usage. Chained skills append their domain artifact and update the existing envelope instead of reproducing its fields.

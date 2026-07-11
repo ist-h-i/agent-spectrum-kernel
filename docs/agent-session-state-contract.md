@@ -22,15 +22,13 @@ Use ASK-native terms and truth-model labels.
 ```json
 {
   "task_intent": "Implement the scoped change or continue the named issue.",
-  "selected_mode": "delivery_quality",
-  "selected_skill": ["skill-router", "controlled-implementation"],
   "execution_envelope": {
     "schema_version": "1.0.0",
     "route": {
       "work_mode": "実装",
       "operating_mode": "delivery_quality",
       "user_facing": "実装して検証する",
-      "internal": { "primary": "controlled-implementation" }
+      "internal": { "primary": "controlled-implementation", "secondary": ["test-first-verification"] }
     },
     "evidence_status": { "checked": [], "missing": [] },
     "stop_reason": {
@@ -42,7 +40,7 @@ Use ASK-native terms and truth-model labels.
     "next_action": "run the focused verification"
   },
   "current_phase": "Verification Contract | Implementation Contract | implementation | verification | handoff | waiting for approval",
-  "last_verified_evidence": [
+  "evidence_details": [
     {
       "status": "Verified",
       "evidence": "Command, file, test, log, or user-provided input that was directly checked.",
@@ -55,29 +53,18 @@ Use ASK-native terms and truth-model labels.
       "assumption": "What is assumed and why it is reversible."
     }
   ],
-  "not_verified": [
-    "Specific behavior, command, integration, or claim that remains unchecked."
-  ],
-  "blocked_reason": null,
-  "required_human_approval": {
-    "required": false,
-    "action": null,
-    "approval_needed": null
-  },
-  "resume_instruction": "Concrete next safe action.",
-  "stop_conditions": [
-    "Stop before destructive, external, production, auth, secret, migration, dependency, infra, billing, email, telemetry, permission, or global machine-state changes without explicit approval."
-  ],
+  "resume_context": "Bounded non-control context needed to continue safely.",
   "updated_at": "2026-07-08T00:00:00+09:00"
 }
 ```
 
 ## Evidence Rules
 
-- `last_verified_evidence` must use `Verified`, `Supported`, `Hypothesis`, `Unknown`, `Falsified`, or a clearly mapped ASK truth-model label.
+- `execution_envelope` is the sole source of truth for route, evidence presence (`checked` / `missing`), stop reason, human approval requirement, and next action. Its shape must conform to `schemas/execution-envelope.schema.json`.
+- `evidence_details` must use `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified` and holds detailed proof or uncertainty that does not fit the bounded Envelope lists.
 - A session-state record does not prove readiness, safety, correctness, no regression, or production suitability.
-- Missing verification must remain in `not_verified`; do not convert it into an assumption.
-- Required approval must name the specific action and approval needed.
+- Missing verification remains in `execution_envelope.evidence_status.missing` and/or `evidence_details`; do not convert it into an assumption.
+- `stop_reason.stop_if` is the sole stop-condition field. Do not add parallel `blocked_reason`, `required_human_approval`, `resume_instruction`, or `stop_conditions` fields.
 
 ## Storage Boundary
 

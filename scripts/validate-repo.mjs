@@ -49,6 +49,7 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/verification-pattern-ledger-entry.schema.json",
 ];
 const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
+const EXECUTION_ENVELOPE_SESSION_STATE_PATH = "docs/agent-session-state-contract.md";
 const EXECUTION_ENVELOPE_SKILL_PATHS = [
   "skills/operating-mode-router/SKILL.md",
   "skills/skill-router/SKILL.md",
@@ -61,6 +62,11 @@ const EXECUTION_ENVELOPE_SKILL_PATHS = [
   "skills/review-router/SKILL.md",
   "skills/review-domain-impact/SKILL.md",
   "skills/review-final-merge-gate/SKILL.md",
+  "skills/handoff-generation/SKILL.md",
+];
+const ROUTING_DECISION_SKILL_PATHS = [
+  "skills/operating-mode-router/SKILL.md",
+  "skills/skill-router/SKILL.md",
 ];
 const EXECUTION_ENVELOPE_ADAPTER_PATHS = [
   "adapters/codex/prompts/skill-implement.md",
@@ -111,6 +117,7 @@ const REQUIRED_CODEX_ADAPTER_PATHS = [
 const REQUIRED_ADAPTER_RUNTIME_PATHS = [
   "scripts/adapter-runtime-smoke.mjs",
   "scripts/codex-exec-runner.mjs",
+  "scripts/execution-envelope.mjs",
 ];
 const REQUIRED_OBSERVABILITY_DOCS = [
   "docs/adapter-deployment-governance.md",
@@ -749,6 +756,7 @@ function validateExecutionEnvelope(root, manifest, errors) {
     contractPresent: existsSync(resolve(root, EXECUTION_ENVELOPE_DOC_PATH)),
     schemaListed: Array.isArray(manifest?.schemas) && manifest.schemas.includes("schemas/execution-envelope.schema.json"),
     docListed: Array.isArray(manifest?.docs) && manifest.docs.includes(EXECUTION_ENVELOPE_DOC_PATH),
+    sessionState: false,
     skills: [],
     adapters: [],
   };
@@ -773,6 +781,32 @@ function validateExecutionEnvelope(root, manifest, errors) {
   if (!checks.schemaListed) {
     fail(errors, "execution envelope", "manifest.json.schemas must list schemas/execution-envelope.schema.json");
   }
+  const sessionStatePath = resolve(root, EXECUTION_ENVELOPE_SESSION_STATE_PATH);
+  if (!existsSync(sessionStatePath)) {
+    fail(errors, "execution envelope", `session-state contract is missing: ${EXECUTION_ENVELOPE_SESSION_STATE_PATH}`);
+  } else {
+    const sessionState = readFileSync(sessionStatePath, "utf8");
+    const legacyControlFields = ["selected_mode", "selected_skill", "last_verified_evidence", "not_verified", "blocked_reason", "required_human_approval", "resume_instruction", "stop_conditions"];
+    const staleFields = legacyControlFields.filter((field) => new RegExp(`\\"${field}\\"\\s*:`).test(sessionState));
+    checks.sessionState = sessionState.includes("execution_envelope") && staleFields.length === 0;
+    if (!sessionState.includes("execution_envelope")) fail(errors, "execution envelope", `${EXECUTION_ENVELOPE_SESSION_STATE_PATH} must include execution_envelope`);
+    if (staleFields.length > 0) fail(errors, "execution envelope", `${EXECUTION_ENVELOPE_SESSION_STATE_PATH} retains duplicate control fields: ${staleFields.join(", ")}`);
+  }
+  const schemaPath = resolve(root, "schemas/execution-envelope.schema.json");
+  if (existsSync(schemaPath)) {
+    try {
+      const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+      const internalProperties = schema.properties?.route?.properties?.internal?.properties ?? {};
+      if (Object.hasOwn(internalProperties, "stop_if")) {
+        fail(errors, "execution envelope", "schemas/execution-envelope.schema.json must keep stop_if under stop_reason only");
+      }
+      if (schema.properties?.metrics_event_candidate?.$ref !== "metrics-event.schema.json") {
+        fail(errors, "execution envelope", "schemas/execution-envelope.schema.json.metrics_event_candidate must $ref metrics-event.schema.json");
+      }
+    } catch {
+      // The required-schema validation reports malformed JSON separately.
+    }
+  }
 
   for (const path of EXECUTION_ENVELOPE_SKILL_PATHS) {
     const absolutePath = resolve(root, path);
@@ -780,8 +814,11 @@ function validateExecutionEnvelope(root, manifest, errors) {
     const text = exists ? readFileSync(absolutePath, "utf8") : "";
     const referencesContract = text.includes(EXECUTION_ENVELOPE_DOC_PATH);
     const duplicatedFields = DUPLICATED_EXECUTION_ENVELOPE_FIELDS.filter((field) => text.includes(field));
-    const ok = exists && referencesContract && duplicatedFields.length === 0;
-    checks.skills.push({ path, exists, referencesContract, duplicatedFields, ok });
+    const requiresRoutingDecision = ROUTING_DECISION_SKILL_PATHS.includes(path);
+    const routingDecisionFields = ["Decisive signals:", "Reason for primary route:", "Reason for each secondary route:", "Intentionally skipped:", "Risk overlay:", "Uncertainty:"];
+    const missingRoutingDecisionFields = requiresRoutingDecision ? routingDecisionFields.filter((field) => !text.includes(field)) : [];
+    const ok = exists && referencesContract && duplicatedFields.length === 0 && missingRoutingDecisionFields.length === 0;
+    checks.skills.push({ path, exists, referencesContract, duplicatedFields, missingRoutingDecisionFields, ok });
     if (!exists) {
       fail(errors, "execution envelope", `canonical skill is missing: ${path}`);
     } else if (!referencesContract) {
@@ -789,6 +826,9 @@ function validateExecutionEnvelope(root, manifest, errors) {
     }
     if (duplicatedFields.length > 0) {
       fail(errors, "execution envelope", `${path} duplicates envelope fields: ${duplicatedFields.join(", ")}`);
+    }
+    if (missingRoutingDecisionFields.length > 0) {
+      fail(errors, "execution envelope", `${path} is missing Routing Decision fields: ${missingRoutingDecisionFields.join(", ")}`);
     }
   }
 
@@ -798,12 +838,13 @@ function validateExecutionEnvelope(root, manifest, errors) {
     const text = exists ? readFileSync(absolutePath, "utf8") : "";
     const referencesContract = text.includes(EXECUTION_ENVELOPE_DOC_PATH);
     const hasEnvelope = text.includes("Execution Envelope:") || text.includes("Execution Envelope");
-    const ok = exists && referencesContract && hasEnvelope;
-    checks.adapters.push({ path, exists, referencesContract, hasEnvelope, ok });
+    const hasStructuredEnvelope = text.includes("fenced JSON") || /Execution Envelope:\s*```json/.test(text);
+    const ok = exists && referencesContract && hasEnvelope && hasStructuredEnvelope;
+    checks.adapters.push({ path, exists, referencesContract, hasEnvelope, hasStructuredEnvelope, ok });
     if (!exists) {
       fail(errors, "execution envelope", `adapter prompt is missing: ${path}`);
-    } else if (!referencesContract || !hasEnvelope) {
-      fail(errors, "execution envelope", `${path} must reference and require the shared Execution Envelope`);
+    } else if (!referencesContract || !hasEnvelope || !hasStructuredEnvelope) {
+      fail(errors, "execution envelope", `${path} must reference and require one fenced JSON shared Execution Envelope`);
     }
   }
 
@@ -2129,6 +2170,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     "",
     `- canonical contract: ${executionEnvelopeChecks.contractPresent ? "ok" : "missing"}`,
     `- manifest doc/schema paths: ${executionEnvelopeChecks.docListed && executionEnvelopeChecks.schemaListed ? "ok" : "invalid"}`,
+    `- session state uses envelope as control state: ${executionEnvelopeChecks.sessionState ? "ok" : "invalid"}`,
     `- canonical skills reference the contract: ${executionEnvelopeChecks.skills.every((check) => check.ok) ? "ok" : "invalid"}`,
     `- adapter prompts reference the contract: ${executionEnvelopeChecks.adapters.every((check) => check.ok) ? "ok" : "invalid"}`,
     "",

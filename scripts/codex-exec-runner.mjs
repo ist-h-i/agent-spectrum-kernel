@@ -10,6 +10,14 @@ const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const DEFAULT_OUTPUT = ".agents/runs/codex-last-output.md";
 const SENSOR_STATUS_PATTERN = /^ASK sensors:\s+(\w+)/m;
 const RUNNING_RUNNER_PATH = realpathSync(fileURLToPath(import.meta.url));
+const MANAGED_CODEX_RUNTIME_FILES = [
+  "codex-exec-runner.mjs",
+  "ask-sensors.mjs",
+  "ask-shared.mjs",
+  "execution-envelope.mjs",
+  "execution-envelope.schema.json",
+  "metrics-event.schema.json",
+];
 
 function hashText(value) { return createHash("sha256").update(value).digest("hex"); }
 
@@ -148,7 +156,7 @@ function preflight(args) {
   } catch (error) {
     failures.push(error.message);
   }
-  for (const runtime of ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs"]) {
+  for (const runtime of MANAGED_CODEX_RUNTIME_FILES) {
     const relativePath = `scripts/${runtime}`;
     const record = state?.managed_files?.[relativePath];
     let runtimePath = null;

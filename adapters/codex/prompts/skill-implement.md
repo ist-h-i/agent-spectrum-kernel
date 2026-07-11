@@ -37,10 +37,15 @@ Next:
 - ...
 
 Execution Envelope:
-- route:
-- evidence status:
-- stop reason:
-- next action:
+```json
+{
+  "schema_version": "1.0.0",
+  "route": { "work_mode": "実装", "operating_mode": "delivery_quality", "user_facing": "...", "internal": { "primary": "controlled-implementation" } },
+  "evidence_status": { "checked": [], "missing": [] },
+  "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
+  "next_action": "..."
+}
+```
 ```
 
 Do not deploy, publish, release, send notifications, change secrets, or mutate production configuration from this prompt.

@@ -116,6 +116,7 @@ adapters/
 scripts/
   ask-doctor.mjs
   ask-sensors.mjs
+  execution-envelope.mjs
   adapter-runtime-smoke.mjs
   codex-exec-runner.mjs
   install-kernel.mjs

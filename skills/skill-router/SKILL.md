@@ -131,20 +131,24 @@ The user-facing route should describe work steps and stop points without requiri
 
 Emit or update one shared `Execution Envelope` following `docs/execution-envelope-contract.md`. The fields below are envelope data; do not emit them again as separate route sections.
 
-```text
 Execution Envelope:
-- route: include work mode, operating mode, user-facing route, and internal route
-- evidence status: include checked and missing evidence
-- stop reason: include status, details, human decision required, and stop-if condition
-- next action: one concrete work action
-- metrics event candidate: omit unless explicitly enabled or requested
-
-Selected workflow:
-- Primary:
-- Secondary:
-- Project overlay skills:
-- Skipped:
+```json
+{
+  "schema_version": "1.0.0",
+  "route": { "work_mode": "実装", "operating_mode": "delivery_quality", "user_facing": "...", "internal": { "primary": "controlled-implementation" } },
+  "evidence_status": { "checked": [], "missing": [] },
+  "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
+  "next_action": "..."
+}
 ```
+
+Routing Decision:
+- Decisive signals:
+- Reason for primary route:
+- Reason for each secondary route:
+- Intentionally skipped:
+- Risk overlay:
+- Uncertainty:
 
 ## Exit criteria
 
