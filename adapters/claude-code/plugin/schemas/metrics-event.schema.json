@@ -1,0 +1,340 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/metrics-event.schema.json",
+  "title": "AI Skills Metrics Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "task_id",
+    "task_type",
+    "occurred_at",
+    "skills_used",
+    "outcome_metrics",
+    "verification_metrics",
+    "debt_movement_metrics",
+    "evidence_references",
+    "privacy_note"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_type": {
+      "type": "string",
+      "enum": ["implementation", "review", "refactor", "investigation", "adoption", "documentation", "handoff", "validation", "report", "ledger_refresh", "other"]
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "period": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start": { "type": "string", "format": "date" },
+        "end": { "type": "string", "format": "date" }
+      }
+    },
+    "skills_used": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "routing_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operating_mode": { "type": "string" },
+        "primary_skill": { "type": "string" },
+        "correct_routing": { "type": "boolean" },
+        "secondary_skills": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "required_gates": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "executed_gates": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "skipped_gates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["gate", "reason"],
+            "properties": {
+              "gate": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+            }
+          },
+          "maxItems": 50
+        },
+        "gate_applicability": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["layer", "status", "reason", "evidence"],
+            "properties": {
+              "layer": { "type": "string", "minLength": 1 },
+              "status": { "type": "string", "enum": ["required", "skipped", "insufficient_evidence"] },
+              "gate": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+              "evidence": { "type": "string", "minLength": 1, "maxLength": 1000 },
+              "trigger_signals": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "uniqueItems": true,
+                "maxItems": 20
+              },
+              "inputs_still_needed": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "uniqueItems": true,
+                "maxItems": 20
+              }
+            }
+          },
+          "maxItems": 50
+        }
+      }
+    },
+    "gate_decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["gate", "status"],
+        "properties": {
+          "gate": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "layer": { "type": "string", "maxLength": 120 },
+          "status": { "type": "string", "enum": ["required", "executed", "skipped", "insufficient_evidence"] },
+          "judgment": { "type": "string", "maxLength": 500 },
+          "evidence_checked": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "uniqueItems": true,
+            "maxItems": 20
+          },
+          "triggering_signals": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "uniqueItems": true,
+            "maxItems": 20
+          },
+          "missing_inputs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "uniqueItems": true,
+            "maxItems": 20
+          },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "reason_category": {
+            "type": "string",
+            "enum": ["no_trigger_signal", "not_applicable", "covered_by_other_gate", "missing_context", "missing_evidence", "other"]
+          }
+        }
+      },
+      "maxItems": 100
+    },
+    "review_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": ["approve", "approve_with_comments", "request_changes", "block", "insufficient_evidence"]
+        },
+        "required_fixes_count": { "type": "integer", "minimum": 0 },
+        "insufficient_evidence_layers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "maxItems": 20
+        }
+      }
+    },
+    "instruction_quality_metrics": {
+      "$ref": "#/$defs/instruction_quality_metrics"
+    },
+    "outcome_metrics": {
+      "$ref": "#/$defs/outcome_metrics"
+    },
+    "verification_metrics": {
+      "$ref": "#/$defs/verification_metrics"
+    },
+    "debt_movement_metrics": {
+      "$ref": "#/$defs/debt_movement_metrics"
+    },
+    "related_ids": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prs": { "type": "array", "items": { "type": "string" } },
+        "issues": { "type": "array", "items": { "type": "string" } },
+        "improvement_ids": { "type": "array", "items": { "type": "string", "pattern": "^IMP-[0-9]{4}$" } },
+        "skill_adoption_metric_ids": { "type": "array", "items": { "type": "string", "pattern": "^SAM-[0-9]{4}$" } }
+      }
+    },
+    "evidence_references": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "maxItems": 50
+    },
+    "changed_file_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "paths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 50
+        }
+      }
+    },
+    "verification_result_summary": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "command_attempt_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command_kind", "classified_as_verification"],
+      "properties": {
+        "command_kind": { "type": "string", "enum": ["test", "lint", "typecheck", "build", "validate", "unknown"] },
+        "classified_as_verification": { "type": "boolean", "const": false }
+      }
+    },
+    "command_attempt_summary": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "debt_inventory_snapshot": {
+      "$ref": "#/$defs/debt_inventory_snapshot"
+    },
+    "privacy_note": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_prompts_stored", "secrets_stored", "customer_data_stored", "personal_data_stored", "external_publication"],
+      "properties": {
+        "raw_prompts_stored": { "type": "boolean", "const": false },
+        "secrets_stored": { "type": "boolean", "const": false },
+        "customer_data_stored": { "type": "boolean", "const": false },
+        "personal_data_stored": { "type": "boolean", "const": false },
+        "external_publication": { "type": "boolean", "const": false },
+        "note": { "type": "string", "maxLength": 1000 }
+      }
+    }
+  },
+  "$defs": {
+    "score": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "presence": {
+      "type": "string",
+      "enum": ["present", "partial", "missing", "not_applicable", "unknown"]
+    },
+    "instruction_quality_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "goal_clarity": { "$ref": "#/$defs/score" },
+        "scope_clarity": { "$ref": "#/$defs/score" },
+        "context_sufficiency": { "$ref": "#/$defs/score" },
+        "verification_instruction": { "$ref": "#/$defs/presence" },
+        "risk_awareness": { "$ref": "#/$defs/presence" },
+        "stop_condition_clarity": { "$ref": "#/$defs/presence" }
+      }
+    },
+    "outcome_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_completed": { "type": "boolean" },
+        "pr_created": { "type": "boolean" },
+        "pr_merged": { "type": "boolean" },
+        "validation_passed": { "type": "boolean" },
+        "rework_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "verification_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "verification_contract_defined": { "type": "boolean" },
+        "tests_added_or_updated": { "type": "boolean" },
+        "insufficient_evidence_reported": { "type": "boolean" },
+        "commands_run": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["command_kind"],
+            "properties": {
+              "command_kind": { "type": "string", "enum": ["test", "lint", "typecheck", "build", "validate", "unknown"] },
+              "command_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "redacted_command_preview": { "type": "string", "maxLength": 120 }
+            }
+          }
+        }
+      }
+    },
+    "debt_movement_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "debt_items_detected": { "type": "integer", "minimum": 0 },
+        "debt_items_recorded": { "type": "integer", "minimum": 0 },
+        "debt_items_planned": { "type": "integer", "minimum": 0 },
+        "debt_items_in_progress": { "type": "integer", "minimum": 0 },
+        "debt_items_resolved": { "type": "integer", "minimum": 0 },
+        "debt_items_converted_to_rule": { "type": "integer", "minimum": 0 },
+        "debt_items_converted_to_check": { "type": "integer", "minimum": 0 },
+        "debt_items_accepted": { "type": "integer", "minimum": 0 },
+        "debt_items_wont_fix": { "type": "integer", "minimum": 0 },
+        "stale_debt_items": { "type": "integer", "minimum": 0 },
+        "refactor_candidates_created": { "type": "integer", "minimum": 0 },
+        "refactor_candidates_implemented": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "debt_inventory_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "detected": { "type": "integer", "minimum": 0 },
+        "recorded": { "type": "integer", "minimum": 0 },
+        "open": { "type": "integer", "minimum": 0 },
+        "triaged": { "type": "integer", "minimum": 0 },
+        "accepted": { "type": "integer", "minimum": 0 },
+        "planned": { "type": "integer", "minimum": 0 },
+        "in_progress": { "type": "integer", "minimum": 0 },
+        "resolved": { "type": "integer", "minimum": 0 },
+        "converted_to_rule": { "type": "integer", "minimum": 0 },
+        "converted_to_check": { "type": "integer", "minimum": 0 },
+        "wont_fix": { "type": "integer", "minimum": 0 },
+        "stale": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

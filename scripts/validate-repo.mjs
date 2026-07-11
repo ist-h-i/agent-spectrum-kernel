@@ -49,6 +49,11 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/verification-pattern-ledger-entry.schema.json",
 ];
 const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
+const EXECUTION_ENVELOPE_PLUGIN_PROJECTION = [
+  { canonical: EXECUTION_ENVELOPE_DOC_PATH, packaged: "adapters/claude-code/plugin/contracts/execution-envelope-contract.md" },
+  { canonical: "schemas/execution-envelope.schema.json", packaged: "adapters/claude-code/plugin/schemas/execution-envelope.schema.json" },
+  { canonical: "schemas/metrics-event.schema.json", packaged: "adapters/claude-code/plugin/schemas/metrics-event.schema.json" },
+];
 const EXECUTION_ENVELOPE_SESSION_STATE_PATH = "docs/agent-session-state-contract.md";
 const EXECUTION_ENVELOPE_SKILL_PATHS = [
   "skills/operating-mode-router/SKILL.md",
@@ -98,6 +103,9 @@ const REQUIRED_CLAUDE_ADAPTER_PATHS = [
   "adapters/claude-code/github-actions/README.md",
   "adapters/claude-code/plugin/.claude-plugin/plugin.json",
   "adapters/claude-code/plugin/README.md",
+  "adapters/claude-code/plugin/contracts/execution-envelope-contract.md",
+  "adapters/claude-code/plugin/schemas/execution-envelope.schema.json",
+  "adapters/claude-code/plugin/schemas/metrics-event.schema.json",
   "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
   "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
   "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
@@ -757,6 +765,7 @@ function validateExecutionEnvelope(root, manifest, errors) {
     contractPresent: existsSync(resolve(root, EXECUTION_ENVELOPE_DOC_PATH)),
     schemaListed: Array.isArray(manifest?.schemas) && manifest.schemas.includes("schemas/execution-envelope.schema.json"),
     docListed: Array.isArray(manifest?.docs) && manifest.docs.includes(EXECUTION_ENVELOPE_DOC_PATH),
+    pluginProjection: [],
     sessionState: false,
     skills: [],
     adapters: [],
@@ -782,6 +791,18 @@ function validateExecutionEnvelope(root, manifest, errors) {
   if (!checks.schemaListed) {
     fail(errors, "execution envelope", "manifest.json.schemas must list schemas/execution-envelope.schema.json");
   }
+  checks.pluginProjection = EXECUTION_ENVELOPE_PLUGIN_PROJECTION.map(({ canonical, packaged }) => {
+    const canonicalPath = resolve(root, canonical);
+    const packagedPath = resolve(root, packaged);
+    const canonicalPresent = existsSync(canonicalPath);
+    const packagedPresent = existsSync(packagedPath);
+    const matches = canonicalPresent && packagedPresent && readFileSync(canonicalPath, "utf8") === readFileSync(packagedPath, "utf8");
+    const check = { canonical, packaged, canonicalPresent, packagedPresent, matches, ok: matches };
+    if (!canonicalPresent || !packagedPresent || !matches) {
+      fail(errors, "execution envelope", `Claude plugin projection must match ${canonical}: ${packaged}`);
+    }
+    return check;
+  });
   const sessionStatePath = resolve(root, EXECUTION_ENVELOPE_SESSION_STATE_PATH);
   if (!existsSync(sessionStatePath)) {
     fail(errors, "execution envelope", `session-state contract is missing: ${EXECUTION_ENVELOPE_SESSION_STATE_PATH}`);
@@ -837,11 +858,14 @@ function validateExecutionEnvelope(root, manifest, errors) {
     const absolutePath = resolve(root, path);
     const exists = existsSync(absolutePath);
     const text = exists ? readFileSync(absolutePath, "utf8") : "";
-    const referencesContract = text.includes(EXECUTION_ENVELOPE_DOC_PATH);
+    const expectedContractReference = path.startsWith("adapters/claude-code/plugin/")
+      ? "${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md"
+      : EXECUTION_ENVELOPE_DOC_PATH;
+    const referencesContract = text.includes(expectedContractReference);
     const hasEnvelope = text.includes("Execution Envelope:") || text.includes("Execution Envelope");
     const hasStructuredEnvelope = text.includes("fenced JSON") || /Execution Envelope:\s*```json/.test(text);
     const ok = exists && referencesContract && hasEnvelope && hasStructuredEnvelope;
-    checks.adapters.push({ path, exists, referencesContract, hasEnvelope, hasStructuredEnvelope, ok });
+    checks.adapters.push({ path, expectedContractReference, exists, referencesContract, hasEnvelope, hasStructuredEnvelope, ok });
     if (!exists) {
       fail(errors, "execution envelope", `adapter prompt is missing: ${path}`);
     } else if (!referencesContract || !hasEnvelope || !hasStructuredEnvelope) {
@@ -2171,6 +2195,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     "",
     `- canonical contract: ${executionEnvelopeChecks.contractPresent ? "ok" : "missing"}`,
     `- manifest doc/schema paths: ${executionEnvelopeChecks.docListed && executionEnvelopeChecks.schemaListed ? "ok" : "invalid"}`,
+    `- Claude plugin contract/schema projection: ${executionEnvelopeChecks.pluginProjection.every((check) => check.ok) ? "ok" : "invalid"}`,
     `- session state uses envelope as control state: ${executionEnvelopeChecks.sessionState ? "ok" : "invalid"}`,
     `- canonical skills reference the contract: ${executionEnvelopeChecks.skills.every((check) => check.ok) ? "ok" : "invalid"}`,
     `- adapter prompts reference the contract: ${executionEnvelopeChecks.adapters.every((check) => check.ok) ? "ok" : "invalid"}`,

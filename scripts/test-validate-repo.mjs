@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
+import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -325,6 +326,9 @@ console.log(path, code, privacy);
     "adapters/claude-code/project/.claude/commands/skill-ledger-refresh.md",
     "adapters/claude-code/github-actions/README.md",
     "adapters/claude-code/plugin/README.md",
+    "adapters/claude-code/plugin/contracts/execution-envelope-contract.md",
+    "adapters/claude-code/plugin/schemas/execution-envelope.schema.json",
+    "adapters/claude-code/plugin/schemas/metrics-event.schema.json",
     "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
     "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
     "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
@@ -3463,7 +3467,14 @@ ${validEnvelopeBlock}
   }
 
   const claudeGithubAction = readFileSync(resolve(repoRoot, "adapters/claude-code/github-actions/claude-review-on-mention.yml"), "utf8");
-  if (!claudeGithubAction.includes("Emit exactly one fenced JSON block") || !claudeGithubAction.includes("```json")) {
+  const claudePromptMatch = claudeGithubAction.match(/\n {10}prompt: \|\n([\s\S]*?)\n {10}claude_args:/);
+  if (!claudePromptMatch) throw new Error("Claude GitHub Actions prompt block is missing");
+  const claudePrompt = claudePromptMatch[1].split("\n").map((line) => line.startsWith("            ") ? line.slice(12) : line).join("\n");
+  const claudeActionEnvelope = inspectExecutionEnvelope(claudePrompt);
+  if (claudeActionEnvelope.status !== "parsed" || claudeActionEnvelope.value.route.work_mode !== "レビュー") {
+    throw new Error(`Claude GitHub Actions example must be a canonical schema-valid Japanese review envelope\n${JSON.stringify(claudeActionEnvelope, null, 2)}`);
+  }
+  if (!claudeGithubAction.includes("Emit exactly one fenced JSON Execution Envelope") || !claudeGithubAction.includes("Execution Envelope:\n")) {
     throw new Error("Claude GitHub Actions adapter must require a fenced JSON Execution Envelope");
   }
   const claudeGithubOutput = resolve(target, "claude-github-action-output.txt");
@@ -3475,7 +3486,7 @@ ${validEnvelopeBlock}
   }
 
   const claudePluginReviewSkill = readFileSync(resolve(repoRoot, "adapters/claude-code/plugin/skills/review-pr/SKILL.md"), "utf8");
-  if (!claudePluginReviewSkill.includes("fenced JSON `Execution Envelope`") || !claudePluginReviewSkill.includes("docs/execution-envelope-contract.md")) {
+  if (!claudePluginReviewSkill.includes("fenced JSON `Execution Envelope`") || !claudePluginReviewSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md")) {
     throw new Error("Claude plugin review skill must require the shared fenced JSON Execution Envelope");
   }
   const claudePluginOutput = resolve(target, "claude-plugin-review-output.txt");
@@ -3484,6 +3495,29 @@ ${validEnvelopeBlock}
   assertRuntimePass("Claude plugin adapter output smoke", claudePluginOutputResult);
   if (!claudePluginOutputResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`Claude plugin adapter output smoke should pass shared envelope validation\n${claudePluginOutputResult.stdout}`);
+  }
+
+  const pluginOnlyRoot = resolve(fixtureRoot, "claude-plugin-only-package");
+  for (const relativePath of [
+    "skills/review-pr/SKILL.md",
+    "contracts/execution-envelope-contract.md",
+    "schemas/execution-envelope.schema.json",
+    "schemas/metrics-event.schema.json",
+  ]) {
+    const sourcePath = resolve(repoRoot, "adapters/claude-code/plugin", relativePath);
+    const targetPath = resolve(pluginOnlyRoot, relativePath);
+    mkdirSync(dirname(targetPath), { recursive: true });
+    writeFileSync(targetPath, readFileSync(sourcePath));
+  }
+  const pluginSkill = readFileSync(resolve(pluginOnlyRoot, "skills/review-pr/SKILL.md"), "utf8");
+  const pluginContract = resolve(pluginOnlyRoot, "contracts/execution-envelope-contract.md");
+  const pluginSchema = resolve(pluginOnlyRoot, "schemas/execution-envelope.schema.json");
+  if (!pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md") || !existsSync(pluginContract) || !existsSync(pluginSchema)) {
+    throw new Error("Claude plugin-only package must contain resolvable contract and schema assets");
+  }
+  const pluginOnlyEnvelope = inspectExecutionEnvelope(validEnvelopeBlock, { schemaPath: pluginSchema });
+  if (pluginOnlyEnvelope.status !== "parsed") {
+    throw new Error(`Claude plugin-only package schema must validate the shared envelope\n${JSON.stringify(pluginOnlyEnvelope, null, 2)}`);
   }
 
   const promptContracts = [
