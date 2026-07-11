@@ -17,6 +17,7 @@ Pattern B means:
 - start with `review-router`,
 - run only required gates,
 - end with `review-final-merge-gate` style output.
+- emit one shared Execution Envelope from `docs/execution-envelope-contract.md` at the review boundary.
 
 ## Install
 

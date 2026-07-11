@@ -37,6 +37,7 @@ const MAINTAINED_SCAN_ROOTS = ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "README.md
 const GENERATED_REPORT_PATH = "docs/validation-report.md";
 const REQUIRED_SCHEMA_PATHS = [
   "schemas/metrics-event.schema.json",
+  "schemas/execution-envelope.schema.json",
   "schemas/adoption-report.schema.json",
   "schemas/improvement-ledger-entry.schema.json",
   "schemas/domain-rule-ledger-entry.schema.json",
@@ -47,6 +48,46 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/review-rule-ledger-entry.schema.json",
   "schemas/verification-pattern-ledger-entry.schema.json",
 ];
+const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
+const EXECUTION_ENVELOPE_PLUGIN_PROJECTION = [
+  { canonical: EXECUTION_ENVELOPE_DOC_PATH, packaged: "adapters/claude-code/plugin/contracts/execution-envelope-contract.md" },
+  { canonical: "schemas/execution-envelope.schema.json", packaged: "adapters/claude-code/plugin/schemas/execution-envelope.schema.json" },
+  { canonical: "schemas/metrics-event.schema.json", packaged: "adapters/claude-code/plugin/schemas/metrics-event.schema.json" },
+];
+const EXECUTION_ENVELOPE_SESSION_STATE_PATH = "docs/agent-session-state-contract.md";
+const EXECUTION_ENVELOPE_SKILL_PATHS = [
+  "skills/operating-mode-router/SKILL.md",
+  "skills/skill-router/SKILL.md",
+  "skills/requirement-grill/SKILL.md",
+  "skills/spec-driven-development/SKILL.md",
+  "skills/work-package-compiler/SKILL.md",
+  "skills/controlled-implementation/SKILL.md",
+  "skills/test-first-verification/SKILL.md",
+  "skills/doubt-driven-development/SKILL.md",
+  "skills/review-router/SKILL.md",
+  "skills/review-domain-impact/SKILL.md",
+  "skills/review-final-merge-gate/SKILL.md",
+  "skills/handoff-generation/SKILL.md",
+];
+const ROUTING_DECISION_SKILL_PATHS = [
+  "skills/operating-mode-router/SKILL.md",
+  "skills/skill-router/SKILL.md",
+];
+const EXECUTION_ENVELOPE_ADAPTER_PATHS = [
+  "adapters/codex/prompts/skill-implement.md",
+  "adapters/codex/prompts/skill-investigate.md",
+  "adapters/codex/prompts/skill-review.md",
+  "adapters/codex/prompts/skill-verify.md",
+  "adapters/codex/prompts/skill-handoff.md",
+  "adapters/claude-code/project/.claude/commands/skill-implement.md",
+  "adapters/claude-code/project/.claude/commands/skill-investigate.md",
+  "adapters/claude-code/project/.claude/commands/skill-review.md",
+  "adapters/claude-code/project/.claude/commands/skill-verify.md",
+  "adapters/claude-code/project/.claude/commands/skill-handoff.md",
+  "adapters/claude-code/github-actions/claude-review-on-mention.yml",
+  "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+];
+const DUPLICATED_EXECUTION_ENVELOPE_FIELDS = ["Selected work mode:", "User-facing route:", "Internal route:", "Route confidence:", "Evidence checked:"];
 const REQUIRED_CLAUDE_ADAPTER_PATHS = [
   "adapters/claude-code/README.md",
   "adapters/claude-code/project/.claude/skills/README.md",
@@ -62,6 +103,9 @@ const REQUIRED_CLAUDE_ADAPTER_PATHS = [
   "adapters/claude-code/github-actions/README.md",
   "adapters/claude-code/plugin/.claude-plugin/plugin.json",
   "adapters/claude-code/plugin/README.md",
+  "adapters/claude-code/plugin/contracts/execution-envelope-contract.md",
+  "adapters/claude-code/plugin/schemas/execution-envelope.schema.json",
+  "adapters/claude-code/plugin/schemas/metrics-event.schema.json",
   "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
   "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
   "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
@@ -82,6 +126,7 @@ const REQUIRED_CODEX_ADAPTER_PATHS = [
 const REQUIRED_ADAPTER_RUNTIME_PATHS = [
   "scripts/adapter-runtime-smoke.mjs",
   "scripts/codex-exec-runner.mjs",
+  "scripts/execution-envelope.mjs",
 ];
 const REQUIRED_OBSERVABILITY_DOCS = [
   "docs/adapter-deployment-governance.md",
@@ -711,6 +756,124 @@ function validateManifestPaths(root, manifest, errors) {
       }
     }
   }
+}
+
+function validateExecutionEnvelope(root, manifest, errors) {
+  const active = manifest?.name === "agent-spectrum-kernel";
+  const checks = {
+    active,
+    contractPresent: existsSync(resolve(root, EXECUTION_ENVELOPE_DOC_PATH)),
+    schemaListed: Array.isArray(manifest?.schemas) && manifest.schemas.includes("schemas/execution-envelope.schema.json"),
+    docListed: Array.isArray(manifest?.docs) && manifest.docs.includes(EXECUTION_ENVELOPE_DOC_PATH),
+    pluginProjection: [],
+    sessionState: false,
+    skills: [],
+    adapters: [],
+  };
+
+  if (!active) {
+    return checks;
+  }
+
+  if (!checks.contractPresent) {
+    fail(errors, "execution envelope", `canonical contract is missing: ${EXECUTION_ENVELOPE_DOC_PATH}`);
+  } else {
+    const contract = readFileSync(resolve(root, EXECUTION_ENVELOPE_DOC_PATH), "utf8");
+    for (const phrase of ["route", "evidence status", "stop reason", "next action", "Metrics event candidate"]) {
+      if (!contract.toLowerCase().includes(phrase.toLowerCase())) {
+        fail(errors, "execution envelope", `${EXECUTION_ENVELOPE_DOC_PATH} is missing canonical field guidance: ${phrase}`);
+      }
+    }
+  }
+  if (!checks.docListed) {
+    fail(errors, "execution envelope", `manifest.json.docs must list ${EXECUTION_ENVELOPE_DOC_PATH}`);
+  }
+  if (!checks.schemaListed) {
+    fail(errors, "execution envelope", "manifest.json.schemas must list schemas/execution-envelope.schema.json");
+  }
+  checks.pluginProjection = EXECUTION_ENVELOPE_PLUGIN_PROJECTION.map(({ canonical, packaged }) => {
+    const canonicalPath = resolve(root, canonical);
+    const packagedPath = resolve(root, packaged);
+    const canonicalPresent = existsSync(canonicalPath);
+    const packagedPresent = existsSync(packagedPath);
+    const matches = canonicalPresent && packagedPresent && readFileSync(canonicalPath, "utf8") === readFileSync(packagedPath, "utf8");
+    const check = { canonical, packaged, canonicalPresent, packagedPresent, matches, ok: matches };
+    if (!canonicalPresent || !packagedPresent || !matches) {
+      fail(errors, "execution envelope", `Claude plugin projection must match ${canonical}: ${packaged}`);
+    }
+    return check;
+  });
+  const sessionStatePath = resolve(root, EXECUTION_ENVELOPE_SESSION_STATE_PATH);
+  if (!existsSync(sessionStatePath)) {
+    fail(errors, "execution envelope", `session-state contract is missing: ${EXECUTION_ENVELOPE_SESSION_STATE_PATH}`);
+  } else {
+    const sessionState = readFileSync(sessionStatePath, "utf8");
+    const legacyControlFields = ["selected_mode", "selected_skill", "last_verified_evidence", "not_verified", "blocked_reason", "required_human_approval", "resume_instruction", "stop_conditions"];
+    const staleFields = legacyControlFields.filter((field) => new RegExp(`\\"${field}\\"\\s*:`).test(sessionState));
+    checks.sessionState = sessionState.includes("execution_envelope") && staleFields.length === 0;
+    if (!sessionState.includes("execution_envelope")) fail(errors, "execution envelope", `${EXECUTION_ENVELOPE_SESSION_STATE_PATH} must include execution_envelope`);
+    if (staleFields.length > 0) fail(errors, "execution envelope", `${EXECUTION_ENVELOPE_SESSION_STATE_PATH} retains duplicate control fields: ${staleFields.join(", ")}`);
+  }
+  const schemaPath = resolve(root, "schemas/execution-envelope.schema.json");
+  if (existsSync(schemaPath)) {
+    try {
+      const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+      const internalProperties = schema.properties?.route?.properties?.internal?.properties ?? {};
+      if (Object.hasOwn(internalProperties, "stop_if")) {
+        fail(errors, "execution envelope", "schemas/execution-envelope.schema.json must keep stop_if under stop_reason only");
+      }
+      if (schema.properties?.metrics_event_candidate?.$ref !== "metrics-event.schema.json") {
+        fail(errors, "execution envelope", "schemas/execution-envelope.schema.json.metrics_event_candidate must $ref metrics-event.schema.json");
+      }
+    } catch {
+      // The required-schema validation reports malformed JSON separately.
+    }
+  }
+
+  for (const path of EXECUTION_ENVELOPE_SKILL_PATHS) {
+    const absolutePath = resolve(root, path);
+    const exists = existsSync(absolutePath);
+    const text = exists ? readFileSync(absolutePath, "utf8") : "";
+    const referencesContract = text.includes(EXECUTION_ENVELOPE_DOC_PATH);
+    const duplicatedFields = DUPLICATED_EXECUTION_ENVELOPE_FIELDS.filter((field) => text.includes(field));
+    const requiresRoutingDecision = ROUTING_DECISION_SKILL_PATHS.includes(path);
+    const routingDecisionFields = ["Decisive signals:", "Reason for primary route:", "Reason for each secondary route:", "Intentionally skipped:", "Risk overlay:", "Uncertainty:"];
+    const missingRoutingDecisionFields = requiresRoutingDecision ? routingDecisionFields.filter((field) => !text.includes(field)) : [];
+    const ok = exists && referencesContract && duplicatedFields.length === 0 && missingRoutingDecisionFields.length === 0;
+    checks.skills.push({ path, exists, referencesContract, duplicatedFields, missingRoutingDecisionFields, ok });
+    if (!exists) {
+      fail(errors, "execution envelope", `canonical skill is missing: ${path}`);
+    } else if (!referencesContract) {
+      fail(errors, "execution envelope", `${path} must reference ${EXECUTION_ENVELOPE_DOC_PATH}`);
+    }
+    if (duplicatedFields.length > 0) {
+      fail(errors, "execution envelope", `${path} duplicates envelope fields: ${duplicatedFields.join(", ")}`);
+    }
+    if (missingRoutingDecisionFields.length > 0) {
+      fail(errors, "execution envelope", `${path} is missing Routing Decision fields: ${missingRoutingDecisionFields.join(", ")}`);
+    }
+  }
+
+  for (const path of EXECUTION_ENVELOPE_ADAPTER_PATHS) {
+    const absolutePath = resolve(root, path);
+    const exists = existsSync(absolutePath);
+    const text = exists ? readFileSync(absolutePath, "utf8") : "";
+    const expectedContractReference = path.startsWith("adapters/claude-code/plugin/")
+      ? "${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md"
+      : EXECUTION_ENVELOPE_DOC_PATH;
+    const referencesContract = text.includes(expectedContractReference);
+    const hasEnvelope = text.includes("Execution Envelope:") || text.includes("Execution Envelope");
+    const hasStructuredEnvelope = text.includes("fenced JSON") || /Execution Envelope:\s*```json/.test(text);
+    const ok = exists && referencesContract && hasEnvelope && hasStructuredEnvelope;
+    checks.adapters.push({ path, expectedContractReference, exists, referencesContract, hasEnvelope, hasStructuredEnvelope, ok });
+    if (!exists) {
+      fail(errors, "execution envelope", `adapter prompt is missing: ${path}`);
+    } else if (!referencesContract || !hasEnvelope || !hasStructuredEnvelope) {
+      fail(errors, "execution envelope", `${path} must reference and require one fenced JSON shared Execution Envelope`);
+    }
+  }
+
+  return checks;
 }
 
 function validateSkills(root, skillDirectories, errors) {
@@ -1981,7 +2144,7 @@ function validateAdapterGovernance(root, checks, errors) {
   }
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -2027,6 +2190,15 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     ...skillChecks.map(
       (check) => `- \`${check.path}\`: words=${check.words}, name_ok=${check.nameOk ? "True" : "False"}, missing=${check.missing.length > 0 ? check.missing.join(", ") : "none"}`,
     ),
+    "",
+    "## Execution Envelope checks",
+    "",
+    `- canonical contract: ${executionEnvelopeChecks.contractPresent ? "ok" : "missing"}`,
+    `- manifest doc/schema paths: ${executionEnvelopeChecks.docListed && executionEnvelopeChecks.schemaListed ? "ok" : "invalid"}`,
+    `- Claude plugin contract/schema projection: ${executionEnvelopeChecks.pluginProjection.every((check) => check.ok) ? "ok" : "invalid"}`,
+    `- session state uses envelope as control state: ${executionEnvelopeChecks.sessionState ? "ok" : "invalid"}`,
+    `- canonical skills reference the contract: ${executionEnvelopeChecks.skills.every((check) => check.ok) ? "ok" : "invalid"}`,
+    `- adapter prompts reference the contract: ${executionEnvelopeChecks.adapters.every((check) => check.ok) ? "ok" : "invalid"}`,
     "",
     "## Context template status checks",
     "",
@@ -2258,10 +2430,11 @@ export function validateRepository(options) {
   const improvementLedgerChecks = validateImprovementLedger(root, errors);
   const domainRuleLedgerChecks = validateDomainRuleLedger(root, errors);
   const claudeAdapterChecks = validateClaudeAdapterArchitecture(root, manifest, errors);
+  const executionEnvelopeChecks = validateExecutionEnvelope(root, manifest, errors);
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

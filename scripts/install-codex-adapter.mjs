@@ -20,7 +20,15 @@ const PROMPT_TEMPLATES = [
   "skill-handoff.md",
 ];
 const COMMAND_TEMPLATES = ["codex-exec.md"];
-const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs"];
+const CODEX_RUNTIME_FILES = [
+  { name: "codex-exec-runner.mjs", source: "scripts/codex-exec-runner.mjs", target: "scripts/codex-exec-runner.mjs" },
+  { name: "ask-sensors.mjs", source: "scripts/ask-sensors.mjs", target: "scripts/ask-sensors.mjs" },
+  { name: "ask-shared.mjs", source: "scripts/ask-shared.mjs", target: "scripts/ask-shared.mjs" },
+  { name: "execution-envelope.mjs", source: "scripts/execution-envelope.mjs", target: "scripts/execution-envelope.mjs" },
+  { name: "execution-envelope.schema.json", source: "schemas/execution-envelope.schema.json", target: "scripts/execution-envelope.schema.json" },
+  { name: "metrics-event.schema.json", source: "schemas/metrics-event.schema.json", target: "scripts/metrics-event.schema.json" },
+];
+const CODEX_RUNTIME_SCRIPTS = CODEX_RUNTIME_FILES.map((file) => file.name);
 
 const PROMPT_METADATA = {
   "skill-implement.md": {
@@ -1051,10 +1059,11 @@ function buildPlan(args) {
   }
 
   for (const script of selectedRuntimeScripts) {
-    const source = resolve(REPO_ROOT, "scripts", script);
-    ensureSource(source, `scripts/${script}`);
+    const runtimeFile = CODEX_RUNTIME_FILES.find((file) => file.name === script);
+    const source = resolve(REPO_ROOT, runtimeFile?.source ?? "");
+    ensureSource(source, runtimeFile?.source ?? script);
     const content = readText(source);
-    const relativePath = `scripts/${script}`;
+    const relativePath = runtimeFile?.target ?? `scripts/${script}`;
     managedFiles[relativePath] = {
       ...lifecycle.createManagedFileRecord({ kind: "codex_runtime", script, content }),
       script,

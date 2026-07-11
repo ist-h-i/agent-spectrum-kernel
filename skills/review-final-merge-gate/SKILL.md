@@ -92,13 +92,9 @@ Make the final merge decision from gate evidence without hiding missing checks, 
 
 Include the improvement-ledger, rule-feedback, and deferred-risk sections only when applicable.
 
+Emit or update one shared `Execution Envelope` following `docs/execution-envelope-contract.md`. The final-gate artifact below owns the merge decision and layer summary; it does not repeat envelope route, evidence, stop, or next-action fields.
+
 ```text
-Selected work mode:
-- レビュー
-
-User-facing route:
-- Whether the target can merge, what must change first, what evidence is missing, and what optional follow-up should be preserved.
-
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
@@ -136,14 +132,6 @@ Evidence reviewed:
 Residual risk:
 - ...
 
-Internal route:
-- Primary: review-final-merge-gate
-- Secondary:
-- Next if approved:
-- Stop if:
-
-Next action:
-- prepare PR explanation | fix required changes | request missing evidence | capture durable knowledge candidate | create handoff | no further action needed
 ```
 
 ## Optional Metrics Event Candidate

@@ -82,13 +82,9 @@ Verification Contract:
 
 ## Output
 
+Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits the Verification Contract and evidence artifact below; it does not repeat the envelope fields.
+
 ```text
-Selected work mode:
-- 実装準備 | 実装
-
-User-facing route:
-- What behavior must be proven, which checks provide evidence, and what remains insufficient before completion or review.
-
 Verification Contract:
 - Behavior to prove:
 - Regression to prevent:
@@ -101,12 +97,6 @@ Verification Contract:
 - Stack overlay verification supplement:
 - Verification pattern ledger:
 - What remains unverified:
-- Stop if:
-
-Internal route:
-- Primary: test-first-verification
-- Secondary:
-- Next if evidence passes:
 - Stop if:
 
 Verification plan:
@@ -123,9 +113,6 @@ Not verified:
 
 Next verification:
 - ...
-
-Next action:
-- add focused test | run verification command | implement scoped change | run review gates | report insufficient evidence | no further action needed
 ```
 
 ## Optional Metrics Event Candidate

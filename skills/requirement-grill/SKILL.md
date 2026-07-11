@@ -83,13 +83,9 @@ Requirement Contract:
 
 ## Output
 
+Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits the Requirement Contract and decision boundary below; it does not repeat the envelope fields.
+
 ```text
-Selected work mode:
-- 要件確認
-
-User-facing route:
-- What can be decided from evidence, what remains a human decision, and whether the work can proceed to packaging or design refinement.
-
 Requirement Contract:
 - User intent:
 - Business object:
@@ -106,28 +102,10 @@ Requirement Contract:
 - Evidence status:
 - Route next:
 
-Internal route:
-- Primary: requirement-grill
-- Secondary:
-- Next if resolved:
-- Stop if:
-
 Decision boundary:
 - AI-supported:
 - Human decision required:
 - Do not compile yet:
-
-Route confidence:
-- high | medium | low
-
-Evidence checked:
-- ...
-
-Missing evidence:
-- ...
-
-Next action:
-- proceed to implementation packaging | refine requirement | refine technical design | stop for human decision | no further action needed
 ```
 
 ## Exit criteria

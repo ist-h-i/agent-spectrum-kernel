@@ -11,7 +11,9 @@ Use the project-local adapter when one repository needs short commands such as `
 - `/ai-skills:ledger-refresh`
 - `/ai-skills:implementation-context-check`
 
-The plugin remains an adapter. Core skills in `skills/*/SKILL.md` remain the source of truth.
+The plugin remains an adapter. Core skills in `skills/*/SKILL.md` remain the source of truth. The package also includes the canonical Execution Envelope contract and its referenced schemas under `contracts/` and `schemas/`, so the review entry point is portable without root-level ASK docs.
+
+The bundled contract and schemas are projections of `docs/execution-envelope-contract.md`, `schemas/execution-envelope.schema.json`, and `schemas/metrics-event.schema.json`. Repository validation requires byte-for-byte equality with those canonical files.
 
 ## Local-First Hooks
 

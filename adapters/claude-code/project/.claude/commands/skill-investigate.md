@@ -15,6 +15,7 @@ Investigation requirements:
 - stop for `/risk-gate` before destructive, external, production, auth, secret, dependency, migration, billing, email, or infra-impacting actions
 
 End with evidence, remaining unknowns, and the next narrow verification step.
+Emit exactly one fenced JSON `Execution Envelope` per task boundary using `docs/execution-envelope-contract.md`; keep investigation findings separate from control metadata.
 
 Silent metrics sidecar:
 

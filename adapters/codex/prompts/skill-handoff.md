@@ -17,7 +17,8 @@ Evidence requirements:
 
 Output contract:
 
-```text
+Append one shared `Execution Envelope` for the handoff boundary, following `docs/execution-envelope-contract.md`. Keep the next-task handoff and bounded resume state in the artifact; do not repeat envelope metadata as separate route sections.
+
 Task:
 Context:
 Allowed scope:
@@ -25,6 +26,16 @@ Forbidden scope:
 Expected output:
 Verification:
 Stop condition:
+
+Execution Envelope:
+```json
+{
+  "schema_version": "1.0.0",
+  "route": { "work_mode": "ドキュメント整理", "operating_mode": "delivery_quality", "user_facing": "次の作業を安全に引き継ぐ", "internal": { "primary": "handoff-generation" } },
+  "evidence_status": { "checked": [], "missing": [] },
+  "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
+  "next_action": "..."
+}
 ```
 
 Do not include raw prompts, secrets, customer data, personal data, full command output, or full file contents.

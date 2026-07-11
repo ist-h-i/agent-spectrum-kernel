@@ -129,45 +129,26 @@ The user-facing route should describe work steps and stop points without requiri
 
 ## Output
 
-```text
-Selected work mode:
-- 要件確認 | 実装準備 | 実装 | レビュー | 調査 | ドキュメント整理 | 知識蓄積
+Emit or update one shared `Execution Envelope` following `docs/execution-envelope-contract.md`. The fields below are envelope data; do not emit them again as separate route sections.
 
-User-facing route:
-- Work-term explanation of the selected path, expected checks, stop points, and what happens next.
-
-Internal route:
-- Primary:
-- Secondary:
-- Next if resolved:
-- Stop if:
-
-Selected workflow:
-- Primary:
-- Secondary:
-- Project overlay skills:
-- Skipped:
-
-Route confidence:
-- high | medium | low
-
-Evidence checked:
-- ...
-
-Missing evidence:
-- ...
-
-Human decision required:
-- ...
-
-Reason:
-- Task class:
-- Risk level:
-- Decisive signal:
-
-Next action:
-- proceed to implementation packaging | stop for human decision | refine requirement | refine technical design | create verification contract | implement scoped change | run review gates | prepare PR explanation | capture durable knowledge candidate | create handoff | no further action needed
+Execution Envelope:
+```json
+{
+  "schema_version": "1.0.0",
+  "route": { "work_mode": "実装", "operating_mode": "delivery_quality", "user_facing": "...", "internal": { "primary": "controlled-implementation" } },
+  "evidence_status": { "checked": [], "missing": [] },
+  "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
+  "next_action": "..."
+}
 ```
+
+Routing Decision:
+- Decisive signals:
+- Reason for primary route:
+- Reason for each secondary route:
+- Intentionally skipped:
+- Risk overlay:
+- Uncertainty:
 
 ## Exit criteria
 

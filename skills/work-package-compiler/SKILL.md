@@ -81,13 +81,9 @@ Work Package:
 
 ## Output
 
+Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits the Work Package below; it does not repeat the envelope fields.
+
 ```text
-Selected work mode:
-- 実装準備
-
-User-facing route:
-- How the confirmed requirement becomes scoped work, what evidence and checks are required, and what still blocks execution.
-
 Work Package:
 - Title:
 - Goal:
@@ -111,27 +107,6 @@ Work Package:
 
 Route:
 - executable | requirement-grill | grill-design | needs human decision
-
-Internal route:
-- Primary: work-package-compiler
-- Secondary:
-- Next if executable:
-- Stop if:
-
-Route confidence:
-- high | medium | low
-
-Evidence checked:
-- ...
-
-Missing evidence:
-- ...
-
-Human decision required:
-- ...
-
-Next action:
-- implement scoped change | create verification contract | run review gates | refine requirement | refine technical design | stop for human decision | create handoff
 ```
 
 ## Exit criteria

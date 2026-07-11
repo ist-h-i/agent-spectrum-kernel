@@ -13,6 +13,7 @@ Start with `/review-router` to decide applicable review layers. Run only the req
 - improvement-ledger candidates when applicable
 - evidence reviewed
 - residual risk
+- one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`
 
 Keep current-PR blockers separate from non-blocking improvement-ledger candidates. Do not publish metrics externally.
 

@@ -84,42 +84,26 @@ User-facing route text should explain the work path in these terms. Skill names 
 
 ## Output
 
-```text
-Selected work mode:
-- 要件確認 | 実装準備 | 実装 | レビュー | 調査 | ドキュメント整理 | 知識蓄積 | 運用整理
+Emit one shared `Execution Envelope` following `docs/execution-envelope-contract.md`. Do not emit a second copy of its route, evidence, stop, or next-action fields in this skill output.
 
-User-facing route:
-- Work-term explanation of what will be checked, what can proceed, and where the work must stop.
-
-Operating mode:
-- delivery_quality | adoption_bootstrap | observability_metrics | operation_automation
-
-Internal route:
-- Primary:
-- Secondary:
-- Next if resolved:
-- Stop if:
-
-Route confidence:
-- high | medium | low
-
-Evidence checked:
-- ...
-
-Missing evidence:
-- ...
-
-Human decision required:
-- ...
-
-Reason:
-- Decisive signal:
-- What was intentionally not invoked:
-- Risk overlay:
-
-Next action:
-- proceed to implementation packaging | stop for human decision | refine requirement | refine technical design | create verification contract | implement scoped change | run review gates | prepare PR explanation | capture durable knowledge candidate | create handoff | no further action needed
+Execution Envelope:
+```json
+{
+  "schema_version": "1.0.0",
+  "route": { "work_mode": "実装", "operating_mode": "delivery_quality", "user_facing": "...", "internal": { "primary": "skill-router" } },
+  "evidence_status": { "checked": [], "missing": [] },
+  "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
+  "next_action": "..."
+}
 ```
+
+Routing Decision:
+- Decisive signals:
+- Reason for primary route:
+- Reason for each secondary route:
+- Intentionally skipped:
+- Risk overlay:
+- Uncertainty:
 
 ## Exit criteria
 

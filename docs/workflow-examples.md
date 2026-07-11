@@ -18,38 +18,15 @@ then the smallest selected workflow
 
 Expected output shape:
 
-```text
-Selected work mode:
-- 要件確認 / 実装準備
-
-User-facing route:
-- まず既存要件、関連docs、repo根拠から判断できる点を確認します。
-- 不足している判断だけを人間判断として分離します。
-- 実行可能なら、実装可能な作業単位、検証条件、レビュー観点に変換します。
-
-Internal route:
-- Primary: requirement-grill
-- Secondary: domain-rule-ledger when matching confirmed or verified rules exist
-- Next if resolved: work-package-compiler
-- Stop if: unresolved human-owned business decision remains
-
-Route confidence:
-- medium
-
-Evidence checked:
-- issue body
-- README / docs relevant to the request
-- matching active ledgers when they materially affect the task
-
-Missing evidence:
-- ...
-
-Human decision required:
-- ...
-
-Next action:
-- stop for human decision
-- proceed to implementation packaging
+Execution Envelope:
+```json
+{
+  "schema_version": "1.0.0",
+  "route": { "work_mode": "要件確認", "operating_mode": "delivery_quality", "user_facing": "既存要件とrepo根拠を確認する", "internal": { "primary": "requirement-grill", "secondary": ["domain-rule-ledger"], "next_if_resolved": "work-package-compiler" } },
+  "evidence_status": { "checked": ["issue body", "relevant README/docs"], "missing": ["business decision"] },
+  "stop_reason": { "status": "human_decision", "details": ["unresolved human-owned business decision remains"], "human_decision_required": ["business outcome"], "stop_if": ["business decision remains unresolved"] },
+  "next_action": "request the unresolved business decision"
+}
 ```
 
 Expected behavior:

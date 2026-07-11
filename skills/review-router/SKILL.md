@@ -103,13 +103,9 @@ Select the smallest set of review gates needed to make the merge decision defens
 
 ## Output
 
+Emit or update one shared `Execution Envelope` following `docs/execution-envelope-contract.md`. The review-specific artifact below owns layer applicability and gate selection; it does not repeat envelope route, evidence, stop, or next-action fields.
+
 ```text
-Selected work mode:
-- レビュー
-
-User-facing route:
-- What review layers matter, what evidence is missing, which checks must run before a merge decision, and where human approval is required.
-
 Layer applicability:
 - Domain:
   status: required | skipped | insufficient evidence
@@ -198,24 +194,6 @@ Review route:
 - Reason:
 - Inputs still needed:
 
-Internal route:
-- Primary: review-router
-- Secondary:
-- Next if routed:
-- Stop if:
-
-Route confidence:
-- high | medium | low
-
-Evidence checked:
-- ...
-
-Missing evidence:
-- ...
-
-Human decision required:
-- ...
-
 Deviation check:
 - Under-processing:
   - gate:
@@ -227,8 +205,6 @@ Deviation check:
   - layer:
     reason:
 
-Next action:
-- run required review gates | request missing review evidence | stop for human approval | prepare final merge decision | capture durable knowledge candidate | no further action needed
 ```
 
 ## Optional Metrics Event Candidate

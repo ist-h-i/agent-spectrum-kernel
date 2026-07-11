@@ -12,6 +12,7 @@ Use this adapter when a repository wants Codex to follow the core kernel, route 
 - A mapping from core skills to Codex execution style.
 - A Codex adapter installer for `.agents/skills`, `.agents/prompts`, `.agents/commands`, and the local runner/sensor runtime used by the command template.
 - Explicit evidence-level downgrades for projected-only workflows, unsupported automation, telemetry, hooks, and shared PR workflows.
+- A shared Execution Envelope contract for routing, evidence state, stop reasons, and next actions at workflow boundaries.
 
 The Codex adapter installer projects Codex-specific files into another repository:
 
@@ -78,7 +79,7 @@ Use these files as copy-paste prompts or as `codex exec` prompt files:
 
 They route through the existing core skills and require evidence-backed outputs. They do not store raw prompts, secrets, customer data, personal data, full command output, or full file contents.
 
-Prompt templates define entry intent, mutation level, evidence requirements, and output contract. They do not duplicate the canonical skill-routing procedure; routing remains in `operating-mode-router`, `skill-router`, review routing, or explicitly named relevant skills.
+Prompt templates define entry intent, mutation level, evidence requirements, and output contract. They use the shared `docs/execution-envelope-contract.md` for one boundary-level control record and do not duplicate the canonical skill-routing procedure; routing remains in `operating-mode-router`, `skill-router`, review routing, or explicitly named relevant skills.
 
 For non-trivial continuation, handoff, interrupted work, or risk-gated work, handoff prompts may include bounded resume state when useful. The adapter does not require session state for trivial or fully captured simple local tasks.
 

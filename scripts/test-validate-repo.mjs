@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
+import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -13,6 +14,55 @@ const sensorsScript = resolve(repoRoot, "scripts/ask-sensors.mjs");
 const runtimeSmokeScript = resolve(repoRoot, "scripts/adapter-runtime-smoke.mjs");
 const codexRunnerScript = resolve(repoRoot, "scripts/codex-exec-runner.mjs");
 const fixtureRoot = mkdtempSync(resolve(tmpdir(), "validate-repo-"));
+
+function envelopeBlock(overrides = {}) {
+  const envelope = {
+    schema_version: "1.0.0",
+    route: {
+      work_mode: "実装",
+      operating_mode: "delivery_quality",
+      user_facing: "実装して検証する",
+      internal: { primary: "controlled-implementation", secondary: ["test-first-verification"], next_if_resolved: "review-router" },
+    },
+    evidence_status: { checked: ["node scripts/test-validate-repo.mjs"], missing: [] },
+    stop_reason: { status: "none", details: [], human_decision_required: [], stop_if: ["required verification is unavailable"] },
+    next_action: "continue fixture verification",
+    ...overrides,
+  };
+  return `Execution Envelope:\n\`\`\`json\n${JSON.stringify(envelope, null, 2)}\n\`\`\`\n`;
+}
+
+const validEnvelopeBlock = envelopeBlock();
+const validMetricsCandidate = {
+  schema_version: "1.0.0",
+  event_id: "fixture:execution-envelope",
+  task_id: "fixture-task",
+  task_type: "implementation",
+  occurred_at: "2026-07-11T12:00:00Z",
+  skills_used: ["controlled-implementation"],
+  instruction_quality_metrics: { goal_clarity: 3 },
+  outcome_metrics: { rework_count: 0 },
+  verification_metrics: {},
+  debt_movement_metrics: {},
+  evidence_references: ["scripts/test-validate-repo.mjs"],
+  privacy_note: {
+    raw_prompts_stored: false,
+    secrets_stored: false,
+    customer_data_stored: false,
+    personal_data_stored: false,
+    external_publication: false,
+  },
+};
+const insufficientEvidenceEnvelopeBlock = envelopeBlock({
+  evidence_status: { checked: [], missing: ["external runtime"] },
+  stop_reason: {
+    status: "insufficient_evidence",
+    details: ["external runtime was not checked"],
+    human_decision_required: [],
+    stop_if: ["external runtime evidence is required"],
+  },
+  next_action: "collect missing evidence",
+});
 
 function validSkill(name) {
   const title = `${name.slice(0, 1).toUpperCase()}${name.slice(1)}`;
@@ -168,6 +218,7 @@ function writeFixture(root, skills = ["alpha"]) {
 function writeAdapterFixture(root) {
   const schemaPaths = [
     "schemas/metrics-event.schema.json",
+    "schemas/execution-envelope.schema.json",
     "schemas/adoption-report.schema.json",
     "schemas/improvement-ledger-entry.schema.json",
     "schemas/domain-rule-ledger-entry.schema.json",
@@ -275,6 +326,9 @@ console.log(path, code, privacy);
     "adapters/claude-code/project/.claude/commands/skill-ledger-refresh.md",
     "adapters/claude-code/github-actions/README.md",
     "adapters/claude-code/plugin/README.md",
+    "adapters/claude-code/plugin/contracts/execution-envelope-contract.md",
+    "adapters/claude-code/plugin/schemas/execution-envelope.schema.json",
+    "adapters/claude-code/plugin/schemas/metrics-event.schema.json",
     "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
     "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
     "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
@@ -381,7 +435,7 @@ const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const DEFAULT_PROFILE = "implementation";
 const PROMPT_TEMPLATES = ["skill-implement.md"];
 const COMMAND_TEMPLATES = ["codex-exec.md"];
-const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs"];
+const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs", "execution-envelope.mjs", "execution-envelope.schema.json", "metrics-event.schema.json"];
 const CODEX_PROFILES = { implementation: { skills: ["operating-mode-router"], prompts: PROMPT_TEMPLATES, commands: COMMAND_TEMPLATES } };
 const PROFILE_ROUTING_FIXTURES = { implementation: [{ id: "unfamiliar_repository", selected_route: "repository-orientation", required_skills: ["repository-orientation"] }] };
 const SKILL_RELATIONSHIPS = { "controlled-implementation": { requires: ["test-first-verification"], recommends: ["evidence-ledger"], incompatibleWith: [] } };
@@ -418,6 +472,7 @@ function install(manifest, options) {
   );
   writeFileSync(resolve(root, "scripts/adapter-runtime-smoke.mjs"), "console.log('adapter runtime smoke');\n");
   writeFileSync(resolve(root, "scripts/codex-exec-runner.mjs"), "console.log('codex runner');\n");
+  writeFileSync(resolve(root, "scripts/execution-envelope.mjs"), "console.log('execution envelope');\n");
   writeFileSync(
     resolve(root, "scripts/install-claude-adapter.mjs"),
     `const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
@@ -3069,6 +3124,7 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
+${validEnvelopeBlock}
 EOF
 `,
   );
@@ -3248,12 +3304,46 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
+${validEnvelopeBlock}
 `,
   );
   const implementationPassResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", implementationPass]);
   assertRuntimePass("sensors implementation pass", implementationPassResult);
   if (!implementationPassResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`implementation contract fixture should pass sensors\n${implementationPassResult.stdout}`);
+  }
+
+  const missingEnvelope = resolve(target, "implementation-missing-envelope.txt");
+  writeFileSync(
+    missingEnvelope,
+    `Changed:\n- Added local validation wiring.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nNot verified:\n- External integrations.\n\nRisks / assumptions:\n- Fixture-only scope.\n\nNext:\n- Prepare review.\n`,
+  );
+  const missingEnvelopeResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", missingEnvelope]);
+  assertRuntimePass("sensors missing execution envelope is report-only", missingEnvelopeResult);
+  if (!missingEnvelopeResult.stdout.includes("ASK sensors: fail") || !missingEnvelopeResult.stdout.includes("Execution Envelope:")) {
+    throw new Error(`missing execution envelope should be reported by the completion contract sensor\n${missingEnvelopeResult.stdout}`);
+  }
+
+  const envelopeNegativeFixtures = [
+    ["malformed envelope", "Execution Envelope:\n- route: flat\n- next action: continue\n", "fenced JSON object"],
+    ["unknown envelope status", envelopeBlock({ stop_reason: { status: "mystery", details: [], human_decision_required: [], stop_if: [] } }), "must be one of"],
+    ["empty envelope next action", envelopeBlock({ next_action: "" }), "must not be empty"],
+    ["inconsistent envelope stop reason", envelopeBlock({ stop_reason: { status: "none", details: ["blocked"], human_decision_required: [], stop_if: [] } }), "status none cannot include blocking details"],
+    ["invalid metrics candidate", envelopeBlock({ metrics_event_candidate: {} }), "event_id: is required"],
+    ["negative rework count", envelopeBlock({ metrics_event_candidate: { ...validMetricsCandidate, outcome_metrics: { rework_count: -1 } } }), "rework_count: must be >= 0"],
+    ["score below minimum", envelopeBlock({ metrics_event_candidate: { ...validMetricsCandidate, instruction_quality_metrics: { goal_clarity: 0 } } }), "goal_clarity: must be >= 1"],
+    ["score above maximum", envelopeBlock({ metrics_event_candidate: { ...validMetricsCandidate, instruction_quality_metrics: { goal_clarity: 6 } } }), "goal_clarity: must be <= 5"],
+    ["timezone-less occurred_at", envelopeBlock({ metrics_event_candidate: { ...validMetricsCandidate, occurred_at: "2026-07-11T12:00:00" } }), "occurred_at: invalid date-time"],
+    ["impossible occurred_at date", envelopeBlock({ metrics_event_candidate: { ...validMetricsCandidate, occurred_at: "2026-02-30T12:00:00Z" } }), "occurred_at: invalid date-time"],
+  ];
+  for (const [name, content, expected] of envelopeNegativeFixtures) {
+    const input = resolve(target, `${name.replaceAll(" ", "-")}.txt`);
+    writeFileSync(input, content);
+    const result = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", input]);
+    assertRuntimePass(`sensors ${name} is report-only`, result);
+    if (!result.stdout.includes("ASK sensors: fail") || !result.stdout.includes(expected)) {
+      throw new Error(`${name} should fail envelope validation\n${result.stdout}`);
+    }
   }
 
   const implementationFail = resolve(target, "implementation-fail.txt");
@@ -3281,6 +3371,7 @@ Risks / assumptions:
 
 Next:
 - Ready for review.
+${validEnvelopeBlock}
 `,
   );
   const weakEvidenceResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", weakEvidence]);
@@ -3310,6 +3401,7 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
+${validEnvelopeBlock}
 `,
   );
   const testsPassWithoutCommandResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", testsPassWithoutCommand]);
@@ -3335,6 +3427,7 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
+${validEnvelopeBlock}
 `,
   );
   const concreteEvidenceResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", concreteEvidence]);
@@ -3352,6 +3445,7 @@ Next:
 Layer summary:
 - Domain: skipped - no domain behavior signal.
 - Architecture: skipped - no boundary signal.
+${validEnvelopeBlock}
 `,
   );
   const reviewPassResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", reviewPass]);
@@ -3360,10 +3454,76 @@ Layer summary:
     throw new Error(`review contract fixture should pass sensors\n${reviewPassResult.stdout}`);
   }
 
+  const claudeReviewCommand = readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/commands/skill-review.md"), "utf8");
+  if (!claudeReviewCommand.includes("fenced JSON `Execution Envelope`") || !claudeReviewCommand.includes("docs/execution-envelope-contract.md")) {
+    throw new Error("Claude review adapter must require the shared fenced JSON Execution Envelope");
+  }
+  const claudeOutput = resolve(target, "claude-review-output.txt");
+  writeFileSync(claudeOutput, `Decision:\n- approve with comments\n\nLayer summary:\n- Domain: skipped - no domain behavior signal.\n- Architecture: skipped - no boundary signal.\n\n${validEnvelopeBlock}`);
+  const claudeOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeOutput]);
+  assertRuntimePass("Claude adapter output smoke", claudeOutputResult);
+  if (!claudeOutputResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`Claude adapter output smoke should pass shared envelope validation\n${claudeOutputResult.stdout}`);
+  }
+
+  const claudeGithubAction = readFileSync(resolve(repoRoot, "adapters/claude-code/github-actions/claude-review-on-mention.yml"), "utf8");
+  const claudePromptMatch = claudeGithubAction.match(/\n {10}prompt: \|\n([\s\S]*?)\n {10}claude_args:/);
+  if (!claudePromptMatch) throw new Error("Claude GitHub Actions prompt block is missing");
+  const claudePrompt = claudePromptMatch[1].split("\n").map((line) => line.startsWith("            ") ? line.slice(12) : line).join("\n");
+  const claudeActionEnvelope = inspectExecutionEnvelope(claudePrompt);
+  if (claudeActionEnvelope.status !== "parsed" || claudeActionEnvelope.value.route.work_mode !== "レビュー") {
+    throw new Error(`Claude GitHub Actions example must be a canonical schema-valid Japanese review envelope\n${JSON.stringify(claudeActionEnvelope, null, 2)}`);
+  }
+  if (!claudeGithubAction.includes("Emit exactly one fenced JSON Execution Envelope") || !claudeGithubAction.includes("Execution Envelope:\n")) {
+    throw new Error("Claude GitHub Actions adapter must require a fenced JSON Execution Envelope");
+  }
+  const claudeGithubOutput = resolve(target, "claude-github-action-output.txt");
+  writeFileSync(claudeGithubOutput, `Decision:\n- approve with comments\n\nLayer summary:\n- Domain: skipped - no domain behavior signal.\n- Architecture: skipped - no boundary signal.\n\n${validEnvelopeBlock}`);
+  const claudeGithubOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeGithubOutput]);
+  assertRuntimePass("Claude GitHub Actions adapter output smoke", claudeGithubOutputResult);
+  if (!claudeGithubOutputResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`Claude GitHub Actions adapter output smoke should pass shared envelope validation\n${claudeGithubOutputResult.stdout}`);
+  }
+
+  const claudePluginReviewSkill = readFileSync(resolve(repoRoot, "adapters/claude-code/plugin/skills/review-pr/SKILL.md"), "utf8");
+  if (!claudePluginReviewSkill.includes("fenced JSON `Execution Envelope`") || !claudePluginReviewSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md")) {
+    throw new Error("Claude plugin review skill must require the shared fenced JSON Execution Envelope");
+  }
+  const claudePluginOutput = resolve(target, "claude-plugin-review-output.txt");
+  writeFileSync(claudePluginOutput, `Decision:\n- approve with comments\n\nLayer summary:\n- Domain: skipped - no domain behavior signal.\n- Architecture: skipped - no boundary signal.\n\n${validEnvelopeBlock}`);
+  const claudePluginOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudePluginOutput]);
+  assertRuntimePass("Claude plugin adapter output smoke", claudePluginOutputResult);
+  if (!claudePluginOutputResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`Claude plugin adapter output smoke should pass shared envelope validation\n${claudePluginOutputResult.stdout}`);
+  }
+
+  const pluginOnlyRoot = resolve(fixtureRoot, "claude-plugin-only-package");
+  for (const relativePath of [
+    "skills/review-pr/SKILL.md",
+    "contracts/execution-envelope-contract.md",
+    "schemas/execution-envelope.schema.json",
+    "schemas/metrics-event.schema.json",
+  ]) {
+    const sourcePath = resolve(repoRoot, "adapters/claude-code/plugin", relativePath);
+    const targetPath = resolve(pluginOnlyRoot, relativePath);
+    mkdirSync(dirname(targetPath), { recursive: true });
+    writeFileSync(targetPath, readFileSync(sourcePath));
+  }
+  const pluginSkill = readFileSync(resolve(pluginOnlyRoot, "skills/review-pr/SKILL.md"), "utf8");
+  const pluginContract = resolve(pluginOnlyRoot, "contracts/execution-envelope-contract.md");
+  const pluginSchema = resolve(pluginOnlyRoot, "schemas/execution-envelope.schema.json");
+  if (!pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md") || !existsSync(pluginContract) || !existsSync(pluginSchema)) {
+    throw new Error("Claude plugin-only package must contain resolvable contract and schema assets");
+  }
+  const pluginOnlyEnvelope = inspectExecutionEnvelope(validEnvelopeBlock, { schemaPath: pluginSchema });
+  if (pluginOnlyEnvelope.status !== "parsed") {
+    throw new Error(`Claude plugin-only package schema must validate the shared envelope\n${JSON.stringify(pluginOnlyEnvelope, null, 2)}`);
+  }
+
   const promptContracts = [
-    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nUnknown / not verified:\n- External runtime.\n\nNext:\n- Continue investigation.\n"],
-    ["verification", "Verification Contract:\n- Behavior to prove: fixture.\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\nNot verified:\n- External runtime.\n\nNext verification:\n- Run integration coverage.\n"],
-    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nStop condition:\n- Missing evidence.\n"],
+    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nUnknown / not verified:\n- External runtime.\n\nNext:\n- Continue investigation.\n\n" + validEnvelopeBlock],
+    ["verification", "Verification Contract:\n- Behavior to prove: fixture.\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\nNot verified:\n- External runtime.\n\nNext verification:\n- Run integration coverage.\n\n" + validEnvelopeBlock],
+    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nStop condition:\n- Missing evidence.\n\n" + insufficientEvidenceEnvelopeBlock],
   ];
   for (const [mode, content] of promptContracts) {
     const input = resolve(target, `${mode}-contract.txt`);
@@ -3411,6 +3571,7 @@ Risks / assumptions:
 
 Next:
 - Reviewed auth docs only.
+${validEnvelopeBlock}
 `,
   );
   const negatedRiskResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", negatedRisk]);
@@ -3436,6 +3597,7 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
+${validEnvelopeBlock}
 `,
   );
   const scopedEvidencePhraseResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", scopedEvidencePhrases]);

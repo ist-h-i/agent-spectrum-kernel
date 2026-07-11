@@ -121,6 +121,7 @@ jobs:
             - Put non-blocking follow-up under Improvement ledger candidates.
             - Do not deploy, merge, release, publish, or mutate production configuration.
             - Do not store secrets or raw prompts.
+            - Emit exactly one fenced JSON Execution Envelope using docs/execution-envelope-contract.md. The serialized output must contain the literal `Execution Envelope:` heading immediately before the JSON fence. Do not repeat route, evidence, stop, or next-action metadata in the review artifact.
 
             Final output contract:
             - Decision: approve | approve with comments | request changes | block | insufficient evidence
@@ -130,5 +131,15 @@ jobs:
             - Improvement ledger candidates when applicable
             - Evidence reviewed
             - Residual risk
+            Execution Envelope:
+            ```json
+            {
+              "schema_version": "1.0.0",
+              "route": { "work_mode": "レビュー", "operating_mode": "delivery_quality", "user_facing": "レビュー結果を記録する", "internal": { "primary": "review-router" } },
+              "evidence_status": { "checked": [], "missing": [] },
+              "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
+              "next_action": "record the review decision"
+            }
+            ```
           claude_args: |
             --max-turns 10
