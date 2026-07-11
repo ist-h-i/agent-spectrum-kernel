@@ -105,11 +105,31 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
     checkRuntimeConformanceProbe(target, report);
   }
   report.layerStatuses = buildLayerStatuses(target, report, { runtimeProbe });
+  integrateLayerFindings(report);
   report.deploymentStatus = buildDeploymentStatus(report);
 
   const runtimeFindings = report.runtimeProbe.warnings.length > 0 || report.runtimeProbe.failures.length > 0;
   const status = report.failures.length > 0 ? "fail" : report.warnings.length > 0 || report.unsupportedClaims.length > 0 || runtimeFindings ? "warn" : "pass";
   return { ...report, status };
+}
+
+function integrateLayerFindings(report) {
+  report.findings = [
+    ...report.failures.map((message) => ({ severity: "fail", source: "doctor", message })),
+    ...report.warnings.map((message) => ({ severity: "warn", source: "doctor", message })),
+  ];
+  for (const [layer, entry] of Object.entries(report.layerStatuses)) {
+    if (!["installation_health", "adapter_projection"].includes(layer)) continue;
+    if (entry.status === "fail") {
+      const message = `${layer}: ${entry.detail}`;
+      report.failures.push(message);
+      report.findings.push({ severity: "fail", source: "layer", layer, message });
+    } else if (entry.status === "warn") {
+      const message = `${layer}: ${entry.detail}`;
+      report.warnings.push(message);
+      report.findings.push({ severity: "warn", source: "layer", layer, message });
+    }
+  }
 }
 
 function buildDeploymentStatus(report) {
@@ -484,7 +504,7 @@ function buildLayerStatuses(target, report, { runtimeProbe }) {
   }
 
   if (report.warnings.length > 0) {
-    projectionWarnings.push(...report.warnings.filter((warning) => warning.includes("stale managed")));
+    projectionWarnings.push(...report.warnings.filter((warning) => warning.includes("managed file is stale relative to this ASK checkout")));
   }
 
   const runtimeStatus = !runtimeProbe

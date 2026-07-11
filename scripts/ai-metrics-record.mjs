@@ -608,13 +608,15 @@ function appendRuntimeHealth(path, entry, maxEntries) {
   const now = entry.occurred_at;
   if (latest?.status === entry.status) {
     const index = entries.lastIndexOf(latest);
-    entries[index] = {
+    const updated = {
       ...latest,
       first_seen_at: latest.first_seen_at || latest.occurred_at || now,
       last_seen_at: now,
       occurrence_count: Math.max(1, Number(latest.occurrence_count) || 1) + 1,
       occurred_at: now,
     };
+    entries.splice(index, 1);
+    entries.push(updated);
   } else {
     entries.push({
       ...entry,

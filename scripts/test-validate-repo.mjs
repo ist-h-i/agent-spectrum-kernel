@@ -1179,6 +1179,24 @@ function assertRuntimeScripts() {
     throw new Error("repeated identical runtime-health failures should be deduplicated");
   }
 
+  writeFileSync(resolve(root, "docs/ai/observability-config.yml"), "runtime_health:\n  max_entries: 3\n");
+  const healthEntry = (component, code) => ({
+    schema_version: "1.0.0",
+    occurred_at: "2000-01-01T00:00:00.000Z",
+    first_seen_at: "2000-01-01T00:00:00.000Z",
+    last_seen_at: "2000-01-01T00:00:00.000Z",
+    occurrence_count: 1,
+    component,
+    status: "error",
+    error_code: code,
+  });
+  writeFileSync(runtimeHealthPath, `${JSON.stringify(healthEntry("ai-metrics-record", "non_blocking_metrics_record_failure"))}\n${JSON.stringify(healthEntry("component-b", "failure-b"))}\n${JSON.stringify(healthEntry("component-c", "failure-c"))}\n`);
+  assertRuntimePass("metrics recorder moves recurring health entry to the tail", runRepoScript([resolve(repoRoot, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--event-store", resolve(root, "docs/ai/metrics"), "--non-blocking"], { cwd: root, input: JSON.stringify({ session_id: "S5-multi-key" }) }));
+  const multiKeyHealth = readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  if (multiKeyHealth.length !== 3 || multiKeyHealth.at(-1)?.component !== "ai-metrics-record" || Date.parse(multiKeyHealth.at(-1)?.last_seen_at) <= Date.parse(multiKeyHealth.at(-1)?.first_seen_at)) {
+    throw new Error(`recurring health entries must be retained by latest observation time\n${JSON.stringify(multiKeyHealth, null, 2)}`);
+  }
+
   const nestedRuntimeCwd = resolve(root, "nested/hook-cwd");
   mkdirSync(nestedRuntimeCwd, { recursive: true });
   const recoveredResult = runRepoScript(
@@ -2815,6 +2833,14 @@ function assertDoctorScript() {
   const missingManagedFileTarget = doctorStateFixture("missing-managed-file");
   rmSync(resolve(missingManagedFileTarget, "CUSTOM_INSTRUCTIONS.md"));
   assertRuntimeFail("doctor missing managed file", runRepoScript([doctorScript, "--target", missingManagedFileTarget]), "managed file is missing: CUSTOM_INSTRUCTIONS.md");
+
+  const missingCodexStateTarget = doctorStateFixture("missing-codex-state");
+  mkdirSync(resolve(missingCodexStateTarget, ".agents"), { recursive: true });
+  const missingCodexStateResult = runRepoScript([doctorScript, "--target", missingCodexStateTarget, "--json"]);
+  assertRuntimeFail("doctor detects projected Codex without state", missingCodexStateResult, "codex-install-state.json: missing");
+  if (JSON.parse(missingCodexStateResult.stdout).deploymentStatus?.Installed?.status !== "fail") {
+    throw new Error(`projected adapter without install state must make Installed fail\n${missingCodexStateResult.stdout}`);
+  }
 
   const inProgressTarget = resolve(fixtureRoot, "doctor-in-progress");
   assertRuntimePass("doctor setup in-progress install", runRepoScript([installer, "--target", inProgressTarget, "--skills", "operating-mode-router"]));
