@@ -28,6 +28,8 @@ Project overlay = リポジトリ固有の規約・コマンド・禁止範囲
 
 `skills/operating-mode-router/SKILL.md` は、通常のdelivery/quality作業と、project adoption、observability/metrics、operation/automationを先に分ける上位routerです。`skills/skill-router/SKILL.md` はdelivery/quality内のrouterとして使います。
 
+共通の制御メタデータ（route、evidence status、stop reason、next action）の正本は `docs/execution-envelope-contract.md` です。router、adapter、session state はこの Execution Envelope を意味のあるworkflow境界で一度だけ出し、個別SkillはRequirement Contract、Spec、Verification Contract、Implementation Summary、Review Findingsなどの固有artifactに集中します。Metrics event candidate は明示的なopt-in時だけ任意で出します。
+
 `manifest.json.routing` は routing の正本や workflow engine ではありません。machine-readable defaults / validation mirror として、route reference、override、risk-gate surface、adapter capability downgrade の静的検査を支えます。人間向けの手順は `SKILL.md` に残し、route mismatch は risk-gate 以外の自動blockにしません。
 
 `skills/*/SKILL.md` は分割します。Grill、Spec、ADR、検証、レビュー、Handoffのような重い手順を常時ルールに混ぜないためです。
@@ -291,6 +293,7 @@ First-time users should start with `docs/quickstart-ja.md`.
 - `docs/prompt-recipes-ja.md`: copy-paste requests organized by what the user wants to do.
 - `docs/glossary-ja.md`: operational definitions for Kernel, Skill, Gate, overlay, context, and contract terms.
 - `docs/routing-model.md`: operating-mode routing and skill group model.
+- `docs/execution-envelope-contract.md`: shared Execution Envelope source of truth for routing, evidence, stop reasons, and next actions.
 - `docs/usage-ja.md`: representative usage guide for common operating patterns.
 - `docs/skill-matrix.md`: reference matrix for workflow selection.
 - `docs/adapter-conformance-contract.md`, `docs/adapter-capability-matrix.md`, and `docs/adapter-deployment-governance.md`: adapter portability, capability evidence, supported deployment profiles, and operational governance.

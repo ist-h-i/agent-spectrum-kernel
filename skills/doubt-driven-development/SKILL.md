@@ -68,13 +68,9 @@ Ask:
 
 ## Output
 
+Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits the investigation artifact below; it does not repeat the envelope fields.
+
 ```text
-Selected work mode:
-- 調査
-
-User-facing route:
-- Which hypothesis is being tested, what evidence can falsify it, and what must be proven before implementation or closure.
-
 Hypothesis:
 - ...
 
@@ -88,17 +84,8 @@ Results:
 Conclusion:
 - verified | weakened | falsified | unknown
 
-Internal route:
-- Primary: doubt-driven-development
-- Secondary:
-- Next if verified:
-- Stop if:
-
 Next:
 - ...
-
-Next action:
-- collect missing evidence | create reproduction | create verification contract | implement scoped fix | report unknown cause | no further action needed
 ```
 
 ## Exit criteria

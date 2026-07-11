@@ -37,6 +37,7 @@ const MAINTAINED_SCAN_ROOTS = ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "README.md
 const GENERATED_REPORT_PATH = "docs/validation-report.md";
 const REQUIRED_SCHEMA_PATHS = [
   "schemas/metrics-event.schema.json",
+  "schemas/execution-envelope.schema.json",
   "schemas/adoption-report.schema.json",
   "schemas/improvement-ledger-entry.schema.json",
   "schemas/domain-rule-ledger-entry.schema.json",
@@ -47,6 +48,34 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/review-rule-ledger-entry.schema.json",
   "schemas/verification-pattern-ledger-entry.schema.json",
 ];
+const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
+const EXECUTION_ENVELOPE_SKILL_PATHS = [
+  "skills/operating-mode-router/SKILL.md",
+  "skills/skill-router/SKILL.md",
+  "skills/requirement-grill/SKILL.md",
+  "skills/spec-driven-development/SKILL.md",
+  "skills/work-package-compiler/SKILL.md",
+  "skills/controlled-implementation/SKILL.md",
+  "skills/test-first-verification/SKILL.md",
+  "skills/doubt-driven-development/SKILL.md",
+  "skills/review-router/SKILL.md",
+  "skills/review-domain-impact/SKILL.md",
+  "skills/review-final-merge-gate/SKILL.md",
+];
+const EXECUTION_ENVELOPE_ADAPTER_PATHS = [
+  "adapters/codex/prompts/skill-implement.md",
+  "adapters/codex/prompts/skill-investigate.md",
+  "adapters/codex/prompts/skill-review.md",
+  "adapters/codex/prompts/skill-verify.md",
+  "adapters/codex/prompts/skill-handoff.md",
+  "adapters/claude-code/project/.claude/commands/skill-implement.md",
+  "adapters/claude-code/project/.claude/commands/skill-investigate.md",
+  "adapters/claude-code/project/.claude/commands/skill-review.md",
+  "adapters/claude-code/project/.claude/commands/skill-verify.md",
+  "adapters/claude-code/project/.claude/commands/skill-handoff.md",
+  "adapters/claude-code/github-actions/claude-review-on-mention.yml",
+];
+const DUPLICATED_EXECUTION_ENVELOPE_FIELDS = ["Selected work mode:", "User-facing route:", "Internal route:", "Route confidence:", "Evidence checked:"];
 const REQUIRED_CLAUDE_ADAPTER_PATHS = [
   "adapters/claude-code/README.md",
   "adapters/claude-code/project/.claude/skills/README.md",
@@ -711,6 +740,74 @@ function validateManifestPaths(root, manifest, errors) {
       }
     }
   }
+}
+
+function validateExecutionEnvelope(root, manifest, errors) {
+  const active = manifest?.name === "agent-spectrum-kernel";
+  const checks = {
+    active,
+    contractPresent: existsSync(resolve(root, EXECUTION_ENVELOPE_DOC_PATH)),
+    schemaListed: Array.isArray(manifest?.schemas) && manifest.schemas.includes("schemas/execution-envelope.schema.json"),
+    docListed: Array.isArray(manifest?.docs) && manifest.docs.includes(EXECUTION_ENVELOPE_DOC_PATH),
+    skills: [],
+    adapters: [],
+  };
+
+  if (!active) {
+    return checks;
+  }
+
+  if (!checks.contractPresent) {
+    fail(errors, "execution envelope", `canonical contract is missing: ${EXECUTION_ENVELOPE_DOC_PATH}`);
+  } else {
+    const contract = readFileSync(resolve(root, EXECUTION_ENVELOPE_DOC_PATH), "utf8");
+    for (const phrase of ["route", "evidence status", "stop reason", "next action", "Metrics event candidate"]) {
+      if (!contract.toLowerCase().includes(phrase.toLowerCase())) {
+        fail(errors, "execution envelope", `${EXECUTION_ENVELOPE_DOC_PATH} is missing canonical field guidance: ${phrase}`);
+      }
+    }
+  }
+  if (!checks.docListed) {
+    fail(errors, "execution envelope", `manifest.json.docs must list ${EXECUTION_ENVELOPE_DOC_PATH}`);
+  }
+  if (!checks.schemaListed) {
+    fail(errors, "execution envelope", "manifest.json.schemas must list schemas/execution-envelope.schema.json");
+  }
+
+  for (const path of EXECUTION_ENVELOPE_SKILL_PATHS) {
+    const absolutePath = resolve(root, path);
+    const exists = existsSync(absolutePath);
+    const text = exists ? readFileSync(absolutePath, "utf8") : "";
+    const referencesContract = text.includes(EXECUTION_ENVELOPE_DOC_PATH);
+    const duplicatedFields = DUPLICATED_EXECUTION_ENVELOPE_FIELDS.filter((field) => text.includes(field));
+    const ok = exists && referencesContract && duplicatedFields.length === 0;
+    checks.skills.push({ path, exists, referencesContract, duplicatedFields, ok });
+    if (!exists) {
+      fail(errors, "execution envelope", `canonical skill is missing: ${path}`);
+    } else if (!referencesContract) {
+      fail(errors, "execution envelope", `${path} must reference ${EXECUTION_ENVELOPE_DOC_PATH}`);
+    }
+    if (duplicatedFields.length > 0) {
+      fail(errors, "execution envelope", `${path} duplicates envelope fields: ${duplicatedFields.join(", ")}`);
+    }
+  }
+
+  for (const path of EXECUTION_ENVELOPE_ADAPTER_PATHS) {
+    const absolutePath = resolve(root, path);
+    const exists = existsSync(absolutePath);
+    const text = exists ? readFileSync(absolutePath, "utf8") : "";
+    const referencesContract = text.includes(EXECUTION_ENVELOPE_DOC_PATH);
+    const hasEnvelope = text.includes("Execution Envelope:") || text.includes("Execution Envelope");
+    const ok = exists && referencesContract && hasEnvelope;
+    checks.adapters.push({ path, exists, referencesContract, hasEnvelope, ok });
+    if (!exists) {
+      fail(errors, "execution envelope", `adapter prompt is missing: ${path}`);
+    } else if (!referencesContract || !hasEnvelope) {
+      fail(errors, "execution envelope", `${path} must reference and require the shared Execution Envelope`);
+    }
+  }
+
+  return checks;
 }
 
 function validateSkills(root, skillDirectories, errors) {
@@ -1981,7 +2078,7 @@ function validateAdapterGovernance(root, checks, errors) {
   }
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -2027,6 +2124,13 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     ...skillChecks.map(
       (check) => `- \`${check.path}\`: words=${check.words}, name_ok=${check.nameOk ? "True" : "False"}, missing=${check.missing.length > 0 ? check.missing.join(", ") : "none"}`,
     ),
+    "",
+    "## Execution Envelope checks",
+    "",
+    `- canonical contract: ${executionEnvelopeChecks.contractPresent ? "ok" : "missing"}`,
+    `- manifest doc/schema paths: ${executionEnvelopeChecks.docListed && executionEnvelopeChecks.schemaListed ? "ok" : "invalid"}`,
+    `- canonical skills reference the contract: ${executionEnvelopeChecks.skills.every((check) => check.ok) ? "ok" : "invalid"}`,
+    `- adapter prompts reference the contract: ${executionEnvelopeChecks.adapters.every((check) => check.ok) ? "ok" : "invalid"}`,
     "",
     "## Context template status checks",
     "",
@@ -2258,10 +2362,11 @@ export function validateRepository(options) {
   const improvementLedgerChecks = validateImprovementLedger(root, errors);
   const domainRuleLedgerChecks = validateDomainRuleLedger(root, errors);
   const claudeAdapterChecks = validateClaudeAdapterArchitecture(root, manifest, errors);
+  const executionEnvelopeChecks = validateExecutionEnvelope(root, manifest, errors);
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

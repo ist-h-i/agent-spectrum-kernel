@@ -168,6 +168,7 @@ function writeFixture(root, skills = ["alpha"]) {
 function writeAdapterFixture(root) {
   const schemaPaths = [
     "schemas/metrics-event.schema.json",
+    "schemas/execution-envelope.schema.json",
     "schemas/adoption-report.schema.json",
     "schemas/improvement-ledger-entry.schema.json",
     "schemas/domain-rule-ledger-entry.schema.json",
@@ -3069,6 +3070,12 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
+
+Execution Envelope:
+- route: fixture implementation
+- evidence status: checked
+- stop reason: none
+- next action: continue fixture verification
 EOF
 `,
   );
@@ -3248,12 +3255,29 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
+
+Execution Envelope:
+- route: fixture implementation
+- evidence status: checked
+- stop reason: none
+- next action: continue fixture verification
 `,
   );
   const implementationPassResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", implementationPass]);
   assertRuntimePass("sensors implementation pass", implementationPassResult);
   if (!implementationPassResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`implementation contract fixture should pass sensors\n${implementationPassResult.stdout}`);
+  }
+
+  const missingEnvelope = resolve(target, "implementation-missing-envelope.txt");
+  writeFileSync(
+    missingEnvelope,
+    `Changed:\n- Added local validation wiring.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nNot verified:\n- External integrations.\n\nRisks / assumptions:\n- Fixture-only scope.\n\nNext:\n- Prepare review.\n`,
+  );
+  const missingEnvelopeResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", missingEnvelope]);
+  assertRuntimePass("sensors missing execution envelope is report-only", missingEnvelopeResult);
+  if (!missingEnvelopeResult.stdout.includes("ASK sensors: fail") || !missingEnvelopeResult.stdout.includes("Execution Envelope:")) {
+    throw new Error(`missing execution envelope should be reported by the completion contract sensor\n${missingEnvelopeResult.stdout}`);
   }
 
   const implementationFail = resolve(target, "implementation-fail.txt");
@@ -3281,6 +3305,12 @@ Risks / assumptions:
 
 Next:
 - Ready for review.
+
+Execution Envelope:
+- route: fixture implementation
+- evidence status: checked
+- stop reason: none
+- next action: continue fixture verification
 `,
   );
   const weakEvidenceResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", weakEvidence]);
@@ -3310,6 +3340,12 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
+
+Execution Envelope:
+- route: fixture implementation
+- evidence status: checked
+- stop reason: none
+- next action: continue fixture verification
 `,
   );
   const testsPassWithoutCommandResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", testsPassWithoutCommand]);
@@ -3335,6 +3371,12 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
+
+Execution Envelope:
+- route: fixture implementation
+- evidence status: checked
+- stop reason: none
+- next action: continue fixture verification
 `,
   );
   const concreteEvidenceResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", concreteEvidence]);
@@ -3352,6 +3394,12 @@ Next:
 Layer summary:
 - Domain: skipped - no domain behavior signal.
 - Architecture: skipped - no boundary signal.
+
+Execution Envelope:
+- route: fixture review
+- evidence status: checked
+- stop reason: none
+- next action: continue fixture verification
 `,
   );
   const reviewPassResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", reviewPass]);
@@ -3361,9 +3409,9 @@ Layer summary:
   }
 
   const promptContracts = [
-    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nUnknown / not verified:\n- External runtime.\n\nNext:\n- Continue investigation.\n"],
-    ["verification", "Verification Contract:\n- Behavior to prove: fixture.\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\nNot verified:\n- External runtime.\n\nNext verification:\n- Run integration coverage.\n"],
-    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nStop condition:\n- Missing evidence.\n"],
+    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nUnknown / not verified:\n- External runtime.\n\nNext:\n- Continue investigation.\n\nExecution Envelope:\n- route: fixture investigation\n- evidence status: checked\n- stop reason: none\n- next action: continue fixture verification\n"],
+    ["verification", "Verification Contract:\n- Behavior to prove: fixture.\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\nNot verified:\n- External runtime.\n\nNext verification:\n- Run integration coverage.\n\nExecution Envelope:\n- route: fixture verification\n- evidence status: checked\n- stop reason: none\n- next action: continue fixture verification\n"],
+    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nStop condition:\n- Missing evidence.\n\nExecution Envelope:\n- route: fixture handoff\n- evidence status: checked\n- stop reason: insufficient_evidence\n- next action: collect missing evidence\n"],
   ];
   for (const [mode, content] of promptContracts) {
     const input = resolve(target, `${mode}-contract.txt`);
@@ -3411,6 +3459,12 @@ Risks / assumptions:
 
 Next:
 - Reviewed auth docs only.
+
+Execution Envelope:
+- route: fixture implementation
+- evidence status: checked
+- stop reason: none
+- next action: continue fixture verification
 `,
   );
   const negatedRiskResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", negatedRisk]);
@@ -3436,6 +3490,12 @@ Risks / assumptions:
 
 Next:
 - Prepare review.
+
+Execution Envelope:
+- route: fixture implementation
+- evidence status: checked
+- stop reason: none
+- next action: continue fixture verification
 `,
   );
   const scopedEvidencePhraseResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", scopedEvidencePhrases]);

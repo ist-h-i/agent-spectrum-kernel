@@ -15,6 +15,7 @@ Verification output should include:
 - manual/runtime check when automated coverage is unavailable
 - evidence from exact commands run
 - what remains unverified
+- one shared `Execution Envelope` using `docs/execution-envelope-contract.md`
 
 Use `/evidence-ledger` when the result includes correctness, readiness, reliability, safety, performance, or no-regression claims. Do not invent command output.
 

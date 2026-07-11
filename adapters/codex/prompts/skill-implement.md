@@ -18,6 +18,8 @@ Evidence requirements:
 
 Output contract:
 
+Append one shared `Execution Envelope` for the task boundary, following `docs/execution-envelope-contract.md`. Do not repeat routing, evidence, stop, or next-action metadata in the implementation artifact.
+
 ```text
 Changed:
 - ...
@@ -33,6 +35,12 @@ Risks / assumptions:
 
 Next:
 - ...
+
+Execution Envelope:
+- route:
+- evidence status:
+- stop reason:
+- next action:
 ```
 
 Do not deploy, publish, release, send notifications, change secrets, or mutate production configuration from this prompt.

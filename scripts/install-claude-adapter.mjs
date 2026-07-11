@@ -79,23 +79,23 @@ const RUNTIME_DIRECTORIES = [
 const COMMAND_METADATA = {
   "skill-review.md": {
     requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
-    requiredAssets: [],
+    requiredAssets: ["docs/execution-envelope-contract.md"],
   },
   "skill-implement.md": {
     requiredSkills: ["skill-router", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
-    requiredAssets: [],
+    requiredAssets: ["docs/execution-envelope-contract.md"],
   },
   "skill-investigate.md": {
     requiredSkills: ["skill-router", "doubt-driven-development", "test-first-verification", "evidence-ledger", "risk-gate"],
-    requiredAssets: [],
+    requiredAssets: ["docs/execution-envelope-contract.md"],
   },
   "skill-verify.md": {
     requiredSkills: ["test-first-verification", "evidence-ledger"],
-    requiredAssets: [],
+    requiredAssets: ["docs/execution-envelope-contract.md"],
   },
   "skill-handoff.md": {
     requiredSkills: ["handoff-generation", "evidence-ledger"],
-    requiredAssets: ["docs/agent-session-state-contract.md"],
+    requiredAssets: ["docs/agent-session-state-contract.md", "docs/execution-envelope-contract.md"],
     initialProjectStateAssets: [],
     runtimeDirectories: [],
   },

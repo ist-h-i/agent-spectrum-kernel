@@ -135,13 +135,9 @@ Implementation is complete only when:
 
 ## Output
 
+Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits the Implementation Contract and implementation summary below; it does not repeat the envelope fields.
+
 ```text
-Selected work mode:
-- 実装
-
-User-facing route:
-- How the scoped change will be made, what boundaries are preserved, and what checks determine whether it is ready for review.
-
 Implementation Contract:
 - Goal:
 - Change class:
@@ -161,12 +157,6 @@ Implementation Contract:
 - Verification contract:
 - Stop conditions:
 
-Internal route:
-- Primary: controlled-implementation
-- Secondary:
-- Next if implemented:
-- Stop if:
-
 Implementation summary:
 - Goal:
 - Changed files:
@@ -176,9 +166,6 @@ Implementation summary:
 - Not verified:
 - Risks/assumptions:
 - Next:
-
-Next action:
-- run missing verification | run review gates | prepare PR explanation | create handoff | stop for human decision | no further action needed
 ```
 
 ## Optional Metrics Event Candidate

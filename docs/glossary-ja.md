@@ -35,6 +35,17 @@ Use when:
 Do not confuse with:
 - adoption、metrics、operationまで含む上位router。上位分類は `operating-mode-router` が行います。
 
+## Execution Envelope
+
+Meaning:
+- 意味のあるworkflow境界で一度だけ出す共通の制御記録です。route、evidence status、stop reason、next actionをまとめます。正本は `docs/execution-envelope-contract.md`、機械形状は `schemas/execution-envelope.schema.json` です。
+
+Use when:
+- router、adapter、session state、またはworkflow境界の出力で、次の進行判断と証拠状態を共有する場合です。
+
+Do not confuse with:
+- Requirement Contract、Spec、Verification Contract、Implementation Summary、Review FindingsなどのSkill固有artifact。Metrics event candidateも明示opt-in時だけの任意項目です。
+
 ## Operating mode router
 
 Meaning:

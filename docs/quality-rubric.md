@@ -25,6 +25,7 @@ The current rubric already separates static package/design readiness from runtim
 | Operating mode routing | 95+ | Delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation are separated before workflow selection |
 | Routing source separation | 95+ | `operating-mode-router` and `skill-router` remain procedural routing sources; `manifest.json.routing` remains machine-readable defaults / validation mirror, not a workflow engine or procedural authority |
 | Skill separation | 95+ | Heavy workflows are modular; each has use cases, exit criteria, output, failure modes |
+| Execution Envelope | 95+ | A canonical route/evidence/stop/next-action contract is emitted once per meaningful boundary; skill artifacts do not duplicate control metadata and metrics remain opt-in |
 | Skill group metadata | 95+ | Every skill is classified into validated manifest groups without moving directories; allowed multi-group membership is explicit |
 | Repository awareness | 95+ | Agents inspect actual repo conventions and commands before non-trivial edits |
 | Scope control | 95+ | Allowed/forbidden scope, diff budget, and escalation are explicit |
@@ -75,6 +76,7 @@ The scores below are static package/design readiness scores. Runtime effectivene
 | Operating mode routing | 95 | `operating-mode-router` separates delivery/quality, adoption/bootstrap, observability/metrics, and operation/automation before lower-level routing |
 | Routing source separation | 95 | `docs/routing-model.md` and `manifest.json.routing.purpose` keep manifest routing as defaults / validation mirror while routers remain the procedural sources |
 | Skill separation | 96 | Focused skills; each skill keeps process, output, exit criteria, or failure modes close to one workflow responsibility |
+| Execution Envelope | 95 | `docs/execution-envelope-contract.md` and `schemas/execution-envelope.schema.json` centralize workflow control metadata while preserving skill-specific artifacts and optional metrics |
 | Skill group metadata | 95 | `manifest.json.skill_groups` and validation cover unclassified, unknown, duplicate, invalid, and unsupported multi-group skill entries |
 | Repository awareness | 95 | Dedicated orientation skill plus kernel repository-first rules |
 | Scope control | 96 | Kernel scope rules plus dedicated scope-control skill and diff audit |

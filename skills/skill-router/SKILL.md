@@ -129,44 +129,21 @@ The user-facing route should describe work steps and stop points without requiri
 
 ## Output
 
+Emit or update one shared `Execution Envelope` following `docs/execution-envelope-contract.md`. The fields below are envelope data; do not emit them again as separate route sections.
+
 ```text
-Selected work mode:
-- 要件確認 | 実装準備 | 実装 | レビュー | 調査 | ドキュメント整理 | 知識蓄積
-
-User-facing route:
-- Work-term explanation of the selected path, expected checks, stop points, and what happens next.
-
-Internal route:
-- Primary:
-- Secondary:
-- Next if resolved:
-- Stop if:
+Execution Envelope:
+- route: include work mode, operating mode, user-facing route, and internal route
+- evidence status: include checked and missing evidence
+- stop reason: include status, details, human decision required, and stop-if condition
+- next action: one concrete work action
+- metrics event candidate: omit unless explicitly enabled or requested
 
 Selected workflow:
 - Primary:
 - Secondary:
 - Project overlay skills:
 - Skipped:
-
-Route confidence:
-- high | medium | low
-
-Evidence checked:
-- ...
-
-Missing evidence:
-- ...
-
-Human decision required:
-- ...
-
-Reason:
-- Task class:
-- Risk level:
-- Decisive signal:
-
-Next action:
-- proceed to implementation packaging | stop for human decision | refine requirement | refine technical design | create verification contract | implement scoped change | run review gates | prepare PR explanation | capture durable knowledge candidate | create handoff | no further action needed
 ```
 
 ## Exit criteria

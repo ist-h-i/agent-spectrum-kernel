@@ -124,6 +124,7 @@
     "CUSTOM_INSTRUCTIONS.md",
     "docs/routing-model.md",
     "docs/agent-session-state-contract.md",
+    "docs/execution-envelope-contract.md",
     "docs/skill-matrix.md",
     "docs/observability-runtime-contract.md",
     "docs/operation-automation-contract.md",
@@ -183,6 +184,7 @@
   ],
   "schemas": [
     "schemas/metrics-event.schema.json",
+    "schemas/execution-envelope.schema.json",
     "schemas/adoption-report.schema.json",
     "schemas/improvement-ledger-entry.schema.json",
     "schemas/domain-rule-ledger-entry.schema.json",

@@ -24,6 +24,7 @@ Output contract:
 - Improvement ledger candidates when applicable
 - Evidence reviewed
 - Residual risk
+- one shared `Execution Envelope` using `docs/execution-envelope-contract.md`
 
 Do not merge, deploy, publish, or mutate production configuration.
 

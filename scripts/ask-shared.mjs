@@ -98,27 +98,27 @@ export const CODEX_PROMPT_CONTRACTS = {
   "skill-implement.md": {
     mode: "implementation",
     sandbox: "workspace-write",
-    requiredSections: ["Changed:", "Verified:", "Not verified:", "Risks / assumptions:", "Next:"],
+    requiredSections: ["Changed:", "Verified:", "Not verified:", "Risks / assumptions:", "Next:", "Execution Envelope:"],
   },
   "skill-investigate.md": {
     mode: "investigation",
     sandbox: "workspace-write",
-    requiredSections: ["Findings:", "Cause:", "Changed:", "Verified:", "Unknown / not verified:", "Next:"],
+    requiredSections: ["Findings:", "Cause:", "Changed:", "Verified:", "Unknown / not verified:", "Next:", "Execution Envelope:"],
   },
   "skill-review.md": {
     mode: "review",
     sandbox: "read-only",
-    requiredSections: ["Decision:", "Layer summary:"],
+    requiredSections: ["Decision:", "Layer summary:", "Execution Envelope:"],
   },
   "skill-verify.md": {
     mode: "verification",
     sandbox: "workspace-write",
-    requiredSections: ["Verification Contract:", "Evidence:", "Not verified:", "Next verification:"],
+    requiredSections: ["Verification Contract:", "Evidence:", "Not verified:", "Next verification:", "Execution Envelope:"],
   },
   "skill-handoff.md": {
     mode: "handoff",
     sandbox: "read-only",
-    requiredSections: ["Task:", "Context:", "Allowed scope:", "Forbidden scope:", "Expected output:", "Verification:", "Stop condition:"],
+    requiredSections: ["Task:", "Context:", "Allowed scope:", "Forbidden scope:", "Expected output:", "Verification:", "Stop condition:", "Execution Envelope:"],
   },
 };
 

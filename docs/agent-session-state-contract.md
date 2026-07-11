@@ -2,6 +2,8 @@
 
 This contract defines the smallest durable state needed to resume Agent Spectrum Kernel work. It is not a lifecycle engine, not a stage taxonomy, and not proof that work is correct.
 
+The shared control metadata for a resumable workflow is the [Execution Envelope](execution-envelope-contract.md). Session state may embed the latest envelope under `execution_envelope`; the envelope contract remains canonical for route, evidence status, stop reason, next action, and optional metrics behavior.
+
 ## Applicability
 
 Write or refresh session state only when at least one condition applies:
@@ -22,6 +24,23 @@ Use ASK-native terms and truth-model labels.
   "task_intent": "Implement the scoped change or continue the named issue.",
   "selected_mode": "delivery_quality",
   "selected_skill": ["skill-router", "controlled-implementation"],
+  "execution_envelope": {
+    "schema_version": "1.0.0",
+    "route": {
+      "work_mode": "実装",
+      "operating_mode": "delivery_quality",
+      "user_facing": "実装して検証する",
+      "internal": { "primary": "controlled-implementation" }
+    },
+    "evidence_status": { "checked": [], "missing": [] },
+    "stop_reason": {
+      "status": "none",
+      "details": [],
+      "human_decision_required": [],
+      "stop_if": []
+    },
+    "next_action": "run the focused verification"
+  },
   "current_phase": "Verification Contract | Implementation Contract | implementation | verification | handoff | waiting for approval",
   "last_verified_evidence": [
     {

@@ -121,6 +121,7 @@ jobs:
             - Put non-blocking follow-up under Improvement ledger candidates.
             - Do not deploy, merge, release, publish, or mutate production configuration.
             - Do not store secrets or raw prompts.
+            - Emit one shared Execution Envelope using docs/execution-envelope-contract.md. Do not repeat route, evidence, stop, or next-action metadata in the review artifact.
 
             Final output contract:
             - Decision: approve | approve with comments | request changes | block | insufficient evidence
@@ -130,5 +131,10 @@ jobs:
             - Improvement ledger candidates when applicable
             - Evidence reviewed
             - Residual risk
+            - Execution Envelope:
+              - route
+              - evidence status
+              - stop reason
+              - next action
           claude_args: |
             --max-turns 10

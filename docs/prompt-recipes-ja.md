@@ -33,38 +33,32 @@
 ### 期待する出力
 
 ```text
-Selected work mode:
-- 要件確認 | 実装準備 | 実装 | レビュー | 調査 | ドキュメント整理 | 知識蓄積
-
-User-facing route:
-- 作業用語で、次に何を確認し、何を止め、何を進めるか。
-
-Internal route:
-- Primary:
-- Secondary:
-- Next if resolved:
-- Stop if:
-
-Route confidence:
-- high | medium | low
-
-Evidence checked:
-- ...
-
-Missing evidence:
-- ...
-
-Human decision required:
-- ...
-
-Next action:
-- implement scoped change | run review gates | create verification contract | stop for human decision | create handoff | no further action needed
+Execution Envelope:
+- route:
+  - work mode:
+  - operating mode: delivery_quality
+  - user-facing route: 作業用語で、次に何を確認し、何を止め、何を進めるか。
+  - internal route:
+    - primary:
+    - secondary:
+    - next if resolved:
+- evidence status:
+  - checked:
+  - missing:
+- stop reason:
+  - status:
+  - details:
+  - human decision required:
+  - stop if:
+- next action: implement scoped change, run review gates, create verification contract, stop for human decision, or create handoff
+- metrics event candidate: omit unless explicitly enabled or requested
 ```
 
 ### 注意
 
-- `User-facing route` と `Next action` はSkill名だけで終わらせません。
-- `Internal route` はdebugやreviewのためにSkill名を出して構いません。
+- `route.user-facing` と `next action` はSkill名だけで終わらせません。
+- `route.internal` はdebugやreviewのためにSkill名を出して構いません。
+- chained Skill は固有artifactだけを追加し、Execution Envelope の項目を複製しません。
 - 次のrouteは推薦です。ユーザーが継続を求めていない場合、全Skill chainを自動実行しません。
 - `template`、`stale`、`archived`、`contradicted`、`Hypothesis` のledger entryをenforcement evidenceとして扱いません。
 - deploy、migration、release、外部通知、secret、auth、permission、production config は `risk-gate` と明示承認が先です。

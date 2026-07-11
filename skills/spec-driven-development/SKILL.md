@@ -76,13 +76,9 @@ Each task must:
 
 ## Output
 
+Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits the spec artifact below; it does not repeat the envelope fields.
+
 ```text
-Selected work mode:
-- 実装準備
-
-User-facing route:
-- How the request becomes a scoped, testable implementation slice and what would stop implementation.
-
 Spec summary:
 - ...
 
@@ -97,15 +93,6 @@ Verification:
 
 Open assumptions:
 - ...
-
-Internal route:
-- Primary: spec-driven-development
-- Secondary:
-- Next if resolved:
-- Stop if:
-
-Next action:
-- create verification contract | implement scoped change | refine requirement | refine technical design | stop for human decision | no further action needed
 ```
 
 ## Exit criteria

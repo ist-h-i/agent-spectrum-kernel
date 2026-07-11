@@ -20,6 +20,7 @@ const KNOWN_OUTPUT_SECTIONS = [
   "Required fixes:",
   "Suggestions:",
   "Residual risk:",
+  "Execution Envelope:",
 ];
 const CLAIM_PATTERNS = [
   /\btests?\s+pass(?:ed|es)?\b/i,

@@ -19,37 +19,25 @@ then the smallest selected workflow
 Expected output shape:
 
 ```text
-Selected work mode:
-- 要件確認 / 実装準備
-
-User-facing route:
-- まず既存要件、関連docs、repo根拠から判断できる点を確認します。
-- 不足している判断だけを人間判断として分離します。
-- 実行可能なら、実装可能な作業単位、検証条件、レビュー観点に変換します。
-
-Internal route:
-- Primary: requirement-grill
-- Secondary: domain-rule-ledger when matching confirmed or verified rules exist
-- Next if resolved: work-package-compiler
-- Stop if: unresolved human-owned business decision remains
-
-Route confidence:
-- medium
-
-Evidence checked:
-- issue body
-- README / docs relevant to the request
-- matching active ledgers when they materially affect the task
-
-Missing evidence:
-- ...
-
-Human decision required:
-- ...
-
-Next action:
-- stop for human decision
-- proceed to implementation packaging
+Execution Envelope:
+- route:
+  - work mode: 要件確認 / 実装準備
+  - operating mode: delivery_quality
+  - user-facing route: 既存要件とrepo根拠を確認し、不足する判断だけを人間判断として分離する。
+  - internal route:
+    - primary: requirement-grill
+    - secondary: domain-rule-ledger when matching confirmed or verified rules exist
+    - next if resolved: work-package-compiler
+- evidence status:
+  - checked: issue body; relevant README/docs; matching active ledgers
+  - missing:
+- stop reason:
+  - status: human_decision
+  - details: unresolved human-owned business decision remains
+  - human decision required:
+  - stop if: business decision remains unresolved
+- next action: stop for human decision or proceed to implementation packaging
+- metrics event candidate: omit
 ```
 
 Expected behavior:

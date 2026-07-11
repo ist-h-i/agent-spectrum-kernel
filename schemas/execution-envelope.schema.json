@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/execution-envelope.schema.json",
+  "title": "Agent Spectrum Kernel Execution Envelope",
+  "description": "Shared control metadata emitted once per meaningful workflow boundary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "route", "evidence_status", "stop_reason", "next_action"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["work_mode", "operating_mode", "user_facing", "internal"],
+      "properties": {
+        "work_mode": {
+          "type": "string",
+          "enum": ["要件確認", "実装準備", "実装", "レビュー", "調査", "ドキュメント整理", "知識蓄積", "運用整理"]
+        },
+        "operating_mode": {
+          "type": "string",
+          "enum": ["delivery_quality", "adoption_bootstrap", "observability_metrics", "operation_automation"]
+        },
+        "user_facing": { "type": "string" },
+        "internal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["primary"],
+          "properties": {
+            "primary": { "type": "string" },
+            "secondary": { "type": "array", "items": { "type": "string" } },
+            "next_if_resolved": { "type": "string" },
+            "stop_if": { "type": "string" }
+          }
+        }
+      }
+    },
+    "evidence_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checked", "missing"],
+      "properties": {
+        "checked": { "type": "array", "items": { "type": "string" } },
+        "missing": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "stop_reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "details", "human_decision_required", "stop_if"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["none", "human_decision", "insufficient_evidence", "risk_gate", "completed", "blocked"]
+        },
+        "details": { "type": "array", "items": { "type": "string" } },
+        "human_decision_required": { "type": "array", "items": { "type": "string" } },
+        "stop_if": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "next_action": { "type": "string", "minLength": 1 },
+    "metrics_event_candidate": {
+      "type": "object",
+      "description": "Optional bounded summary governed by docs/metrics-event-contract.md. Omit unless metrics are explicitly enabled or requested.",
+      "additionalProperties": true
+    }
+  }
+}

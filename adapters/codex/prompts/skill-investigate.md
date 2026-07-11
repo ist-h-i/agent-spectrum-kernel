@@ -19,6 +19,8 @@ Evidence requirements:
 
 Output contract:
 
+Append one shared `Execution Envelope` for the task boundary, following `docs/execution-envelope-contract.md`. Do not repeat routing, evidence, stop, or next-action metadata in the investigation artifact.
+
 ```text
 Findings:
 - ...
@@ -37,6 +39,12 @@ Unknown / not verified:
 
 Next:
 - ...
+
+Execution Envelope:
+- route:
+- evidence status:
+- stop reason:
+- next action:
 ```
 
 Do not include raw prompts, secrets, customer data, personal data, full command output, or full file contents.
