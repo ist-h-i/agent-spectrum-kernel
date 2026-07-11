@@ -108,7 +108,7 @@ export const CODEX_PROMPT_CONTRACTS = {
   "skill-review.md": {
     mode: "review",
     sandbox: "read-only",
-    requiredSections: ["Decision:", "Blocking evidence:", "Passed required gates:", "Insufficient evidence:", "Non-blocking follow-ups:", "Residual risk:", "Execution Envelope:"],
+    requiredSections: ["Change signals:", "Required gates:", "Skipped heavy gates:", "Missing evidence:", "Decision:", "Blocking evidence:", "Passed required gates:", "Insufficient evidence:", "Non-blocking follow-ups:", "Residual risk:", "Execution Envelope:"],
   },
   "skill-verify.md": {
     mode: "verification",

@@ -30,6 +30,7 @@ Select the smallest set of review gates needed to make the merge decision defens
 
 2. Extract observed change signals before choosing gates.
    - Record a short signal and the evidence that made it observable, for example `public contract`, `domain meaning`, `generated output`, `untrusted input`, `maintainability`, or `verification`.
+   - Use the controlled signal IDs documented by the metrics contract. `evidence` is explanatory text only and never acts as a trigger ID.
    - Do not infer a trigger from the existence of a review layer.
    - If changed-file, diff, context, output, or verification evidence is unavailable, record that input under `Missing evidence` as `insufficient evidence`.
 
@@ -44,6 +45,7 @@ Select the smallest set of review gates needed to make the merge decision defens
    - `review-ai-quality`: local design, logic, scope, and implementation-quality signals not covered by a specialized gate.
    - `evidence-ledger`: the review makes a correctness, readiness, reliability, performance, security, UX, cost, or maintainability claim.
    - `review-final-merge-gate`: always last when a merge decision is requested.
+   - A route or gate decision trigger is valid only when every trigger ID is present in `change_signals[].signal` and the controlled mapping includes that gate. Unknown, mismatched, negated, or free-form evidence text does not justify a gate.
 
 4. Order the route by decision impact.
    - Domain and architecture signals precede technical review when applicable.
@@ -53,7 +55,7 @@ Select the smallest set of review gates needed to make the merge decision defens
 
 5. Detect routing deviations.
    - Under-processing: a required gate is absent from executed gate evidence.
-   - Over-processing: a heavy gate is selected or executed without trigger evidence for that gate.
+   - Over-processing: an executed heavy gate has no matching observed trigger signal.
    - Missing-evidence deviation: unavailable inputs are represented as skipped or omitted instead of insufficient evidence.
    - Heavy gates are `review-domain-impact`, `review-architecture-impact`, `review-output-quality`, `review-adversarial-risk`, `review-code-health`, `risk-gate`, `adr-review`, and `release-readiness-gate`.
 
@@ -82,7 +84,7 @@ Missing evidence:
 
 Routing deviations:
 - Under-processing: gate — required but not executed
-- Over-processing: gate — selected without trigger evidence
+- Over-processing: gate — executed without matching observed trigger signal
 ```
 
 Use `- none` for empty sections. For validation or debugging only, append a `Diagnostic applicability` object with complete layer statuses (`required | skipped | insufficient evidence`), reasons, evidence, trigger signals, selected gate, and inputs still needed. That diagnostic object is not required in the normal route.
@@ -107,7 +109,7 @@ Only when adoption metrics are explicitly enabled or requested, and the review r
 - Missing inputs are reported as `insufficient evidence`, never silently as skipped.
 - Heavy gates skipped in the normal route have evidence-backed reasons.
 - Required-but-not-executed gates are reported as under-processing.
-- Heavy gates selected without trigger evidence are reported as over-processing warnings.
+- Executed heavy gates without matching observed trigger signals are reported as over-processing warnings.
 - Domain, architecture, output, adversarial, code-health, and risk signals route to their specialized gates rather than being hidden in generic review.
 - The route does not run every gate by default.
 - Final merge decisions are delegated to `review-final-merge-gate`.

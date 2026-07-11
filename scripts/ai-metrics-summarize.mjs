@@ -13,15 +13,55 @@ const HEAVY_REVIEW_GATES = new Set([
   "release-readiness-gate",
 ]);
 
-const HEAVY_GATE_SIGNAL_PATTERNS = new Map([
-  ["review-domain-impact", /business|domain|workflow|permission|notification|reporting|state|rule|generated[_ -]?business/i],
-  ["review-architecture-impact", /public|api|contract|dependency|persistence|ownership|module|infrastructure|deployment|lifecycle|coupling|boundary|schema/i],
-  ["review-output-quality", /ui|docs?|report|notification|cli|api[_ -]?response|generated[_ -]?output|ai[_ -]?output|structured|consumer|wording/i],
-  ["review-adversarial-risk", /untrusted|security|privacy|prompt|generated[_ -]?output|critical|blast|misuse|safety|release[_ -]?readiness/i],
-  ["review-code-health", /maintain|debt|smell|duplication|dead[_ -]?code|testability|performance|dependency|tooling|boundary|repeated/i],
-  ["risk-gate", /destructive|external|auth|secret|production|dependency|migration|billing|payment|email|infrastructure/i],
-  ["adr-review", /architecture[_ -]?decision|hard[_ -]?to[_ -]?reverse|record[_ -]?worthy/i],
-  ["release-readiness-gate", /release|production|deploy|publish/i],
+const SIGNAL_TO_GATES = new Map([
+  ["business_rule_change", ["review-domain-impact"]],
+  ["workflow_responsibility_change", ["review-domain-impact"]],
+  ["permission_change", ["review-domain-impact"]],
+  ["notification_change", ["review-domain-impact", "review-output-quality"]],
+  ["reporting_meaning_change", ["review-domain-impact", "review-output-quality"]],
+  ["state_semantics_change", ["review-domain-impact"]],
+  ["public_api_change", ["review-architecture-impact"]],
+  ["dependency_direction_change", ["review-architecture-impact"]],
+  ["persistence_boundary_change", ["review-architecture-impact"]],
+  ["state_ownership_change", ["review-architecture-impact"]],
+  ["cross_module_responsibility_change", ["review-architecture-impact"]],
+  ["infrastructure_change", ["review-architecture-impact", "risk-gate"]],
+  ["deployment_change", ["review-architecture-impact", "risk-gate"]],
+  ["lifecycle_boundary_change", ["review-architecture-impact"]],
+  ["coupling_change", ["review-architecture-impact"]],
+  ["ui_change", ["review-output-quality"]],
+  ["docs_output_change", ["review-output-quality"]],
+  ["report_output_change", ["review-output-quality"]],
+  ["cli_output_change", ["review-output-quality"]],
+  ["api_response_change", ["review-output-quality"]],
+  ["generated_output_change", ["review-output-quality"]],
+  ["ai_output_change", ["review-output-quality"]],
+  ["structured_output_change", ["review-output-quality"]],
+  ["untrusted_input", ["review-adversarial-risk"]],
+  ["security_impact", ["review-adversarial-risk"]],
+  ["privacy_impact", ["review-adversarial-risk"]],
+  ["prompt_failure_mode", ["review-adversarial-risk"]],
+  ["misuse_path", ["review-adversarial-risk"]],
+  ["critical_workflow_blast_radius", ["review-adversarial-risk"]],
+  ["maintainability_risk", ["review-code-health"]],
+  ["technical_debt", ["review-code-health"]],
+  ["duplication", ["review-code-health"]],
+  ["testability_risk", ["review-code-health"]],
+  ["performance_risk", ["review-code-health"]],
+  ["destructive_action", ["risk-gate"]],
+  ["external_effect", ["risk-gate"]],
+  ["auth_change", ["risk-gate"]],
+  ["secret_change", ["risk-gate"]],
+  ["production_change", ["risk-gate"]],
+  ["dependency_change", ["risk-gate"]],
+  ["migration_change", ["risk-gate"]],
+  ["billing_change", ["risk-gate"]],
+  ["email_change", ["risk-gate"]],
+  ["architecture_decision", ["adr-review"]],
+  ["hard_to_reverse_boundary", ["adr-review"]],
+  ["release_readiness", ["release-readiness-gate"]],
+  ["公開API変更", ["review-architecture-impact"]],
+  ["出力変更", ["review-output-quality"]],
 ]);
 
 function parseArgs(argv) {
@@ -860,26 +900,34 @@ function heavyGateTriggerWarningReason(item, route, gateIsExecuted) {
 }
 
 function hasGateTriggerEvidence(task, gate) {
-  const gateDecision = task.gate_decisions.find((candidate) => candidate.gate === gate && Array.isArray(candidate.triggering_signals) && candidate.triggering_signals.length > 0);
-  if (gateDecision) {
-    return true;
-  }
-  const applicability = task.routing_result.gate_applicability ?? [];
+  const observedSignals = new Set(
+    (task.routing_result.change_signals ?? [])
+      .map((item) => item?.signal)
+      .filter((signal) => typeof signal === "string" && signal),
+  );
+  const signalsMatch = (signals) => Array.isArray(signals)
+    && signals.length > 0
+    && signals.every((signal) => observedSignals.has(signal) && SIGNAL_TO_GATES.get(signal)?.includes(gate));
+
   const route = (task.routing_result.required_gate_routes ?? []).find((candidate) => candidate.gate === gate);
-  const diagnostic = applicability.find((candidate) => candidate.gate === gate);
-  if (Array.isArray(route?.trigger_signals) && route.trigger_signals.length > 0) {
-    return true;
-  }
-  if (diagnostic?.status === "required" && Array.isArray(diagnostic.trigger_signals) && diagnostic.trigger_signals.length > 0) {
-    return true;
+  if (route) {
+    return signalsMatch(route.trigger_signals);
   }
 
-  const signals = [
-    ...(task.routing_result.change_signals ?? []).map((item) => item?.signal),
-    ...(task.routing_result.change_signals ?? []).map((item) => item?.evidence),
-  ].filter((value) => typeof value === "string" && value);
-  const pattern = HEAVY_GATE_SIGNAL_PATTERNS.get(gate);
-  return Boolean(pattern && signals.some((signal) => pattern.test(signal)));
+  const gateDecisions = task.gate_decisions.filter(
+    (candidate) => candidate.gate === gate && ["required", "executed"].includes(candidate.status),
+  );
+  if (gateDecisions.length > 0) {
+    return gateDecisions.every((candidate) => signalsMatch(candidate.triggering_signals));
+  }
+
+  const applicability = task.routing_result.gate_applicability ?? [];
+  const diagnostic = applicability.find((candidate) => candidate.gate === gate);
+  if (diagnostic) {
+    return diagnostic.status === "required" && signalsMatch(diagnostic.trigger_signals);
+  }
+
+  return [...observedSignals].some((signal) => SIGNAL_TO_GATES.get(signal)?.includes(gate));
 }
 
 function requiredApplicabilityMissingGate(item) {

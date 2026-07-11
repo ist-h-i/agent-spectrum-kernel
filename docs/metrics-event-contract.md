@@ -227,11 +227,13 @@ Sparse early-adoption reports may emit `null` for averages and rates such as cor
 Signal-first routing summaries make routing deviations detectable without storing raw review text:
 
 - `required` gates that are not present in `executed_gates` are under-processing warnings.
-- Heavy gates in `required_gates` or `executed_gates` without a `required_gate_routes` entry or diagnostic applicability row containing trigger signals are over-processing warnings.
+- Executed heavy gates without a matching observed trigger signal are over-processing warnings.
 - Missing changed-file, diff, context, output, or verification evidence should be recorded as `insufficient_evidence`, not as a skipped gate.
 - Skipped heavy gates require evidence-backed reasons. Ordinary unaffected layers do not need a normal-route row.
 
 The minimal normal-route record is `change_signals`, `required_gates`, and `executed_gates`. `required_gate_routes` may add explicit human-readable traceability, while `skipped_heavy_gates` and `missing_evidence` are added only when those states exist. `gate_applicability` remains an optional complete diagnostic matrix for validation/debug use and must not be required for every review event.
+
+Signal IDs are exact identifiers, not free-form prose. The runtime mapping includes identifiers such as `public_api_change` → `review-architecture-impact`, `docs_output_change` / `generated_output_change` → `review-output-quality`, `security_impact` / `untrusted_input` → `review-adversarial-risk`, and `destructive_action` / `external_effect` → `risk-gate`; the controlled Japanese IDs `公開API変更` and `出力変更` map to architecture and output quality respectively. A route or gate decision trigger must be a member of `change_signals[].signal` and must map to the selected gate. `change_signals[].evidence` is explanatory context and is never used for trigger matching.
 
 `gate_decisions` is the bounded drill-down form for gate-level judgment data. It stores short structured judgments only. It must not contain raw prompts, full review text, full command output, or full file contents.
 
