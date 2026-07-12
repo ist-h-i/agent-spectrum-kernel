@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0.0",
+  "profiles": [
+    {
+      "schema_version": "1.0.0",
+      "profile_id": "claude-code-local-observed-v1",
+      "adapter_id": "claude_code",
+      "canonical_contract": {
+        "revision": "ask-3.0.0",
+        "source_digest": "fixture:canonical-ask-3.0.0",
+        "source_paths": ["AGENTS.md", "skills/skill-router/SKILL.md", "docs/execution-envelope-contract.md"]
+      },
+      "capabilities": [
+        { "capability_id": "progressive_instruction_loading", "support": "supported", "evidence_level": "behavior_verified", "evidence_refs": ["scripts/test-validate-repo.mjs"], "limitations": [], "downgrade_behavior": "claim_behavior_verified" },
+        { "capability_id": "lifecycle_hooks", "support": "supported", "evidence_level": "runtime_detected", "evidence_refs": ["scripts/adapter-runtime-smoke.mjs"], "limitations": [], "downgrade_behavior": "claim_runtime_detection_only" },
+        { "capability_id": "agent_orchestration", "support": "partial", "evidence_level": "projected", "evidence_refs": ["adapters/claude-code/project/.claude/commands"], "limitations": ["Canonical ASK does not prove custom-agent execution from projected commands."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "permission_sandbox_enforcement", "support": "partial", "evidence_level": "projected", "evidence_refs": ["adapters/claude-code/project/.claude/hooks/hooks.json"], "limitations": ["Repository projection does not prove runtime enforcement."], "downgrade_behavior": "manual_step" },
+        { "capability_id": "runtime_asset_load_evidence", "support": "partial", "evidence_level": "runtime_detected", "evidence_refs": ["scripts/ask-doctor.mjs"], "limitations": ["Detection does not prove per-task application."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "programmatic_tool_execution", "support": "unknown", "evidence_level": "none", "evidence_refs": [], "limitations": ["External product runtime was not probed by this fixture."], "downgrade_behavior": "unknown" },
+        { "capability_id": "persistent_resumable_state", "support": "partial", "evidence_level": "projected", "evidence_refs": ["docs/agent-session-state-contract.md"], "limitations": ["Projected state contract is not runtime resume evidence."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "local_event_emission", "support": "supported", "evidence_level": "runtime_detected", "evidence_refs": ["scripts/adapter-runtime-smoke.mjs"], "limitations": [], "downgrade_behavior": "claim_runtime_detection_only" },
+        { "capability_id": "shared_pr_execution", "support": "partial", "evidence_level": "projected", "evidence_refs": ["adapters/claude-code/github-actions/claude-review-on-mention.yml"], "limitations": ["Repository setup and trusted PR-head evidence remain external."], "downgrade_behavior": "manual_step" }
+      ],
+      "rendering": {
+        "renderer_id": "install-claude-adapter",
+        "renderer_version": "1",
+        "output_root": ".claude",
+        "asset_kinds": ["instructions", "skills", "commands", "hooks", "schemas"],
+        "deterministic_input_refs": ["canonical_contract.revision", "canonical_contract.source_digest", "profile_id"]
+      },
+      "generated_assets": {
+        "owner": "adapter",
+        "managed_paths": [".claude/commands", ".claude/settings.json"],
+        "lifecycle_operations": ["install", "update", "rollback", "detach"],
+        "drift_policy": "fail"
+      },
+      "privacy": {
+        "event_collection": "local_opt_in",
+        "external_publication": "approval_required",
+        "raw_prompt_storage": "prohibited",
+        "sensitive_payload_storage": "prohibited"
+      },
+      "normalized_event_schema_refs": ["schemas/metrics-event.schema.json"]
+    },
+    {
+      "schema_version": "1.0.0",
+      "profile_id": "codex-local-projection-v1",
+      "adapter_id": "codex",
+      "canonical_contract": {
+        "revision": "ask-3.0.0",
+        "source_digest": "fixture:canonical-ask-3.0.0",
+        "source_paths": ["AGENTS.md", "skills/skill-router/SKILL.md", "docs/execution-envelope-contract.md"]
+      },
+      "capabilities": [
+        { "capability_id": "progressive_instruction_loading", "support": "supported", "evidence_level": "behavior_verified", "evidence_refs": ["scripts/test-validate-repo.mjs"], "limitations": [], "downgrade_behavior": "claim_behavior_verified" },
+        { "capability_id": "lifecycle_hooks", "support": "unsupported", "evidence_level": "behavior_verified", "evidence_refs": ["docs/adapter-capability-matrix.md"], "limitations": ["The Codex adapter ships no hooks."], "downgrade_behavior": "unsupported" },
+        { "capability_id": "agent_orchestration", "support": "partial", "evidence_level": "projected", "evidence_refs": ["adapters/codex/prompts"], "limitations": ["Projected prompts do not prove subagent execution."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "permission_sandbox_enforcement", "support": "partial", "evidence_level": "projected", "evidence_refs": ["adapters/codex/README.md"], "limitations": ["Runtime approval and sandbox behavior remain user-controlled."], "downgrade_behavior": "manual_step" },
+        { "capability_id": "runtime_asset_load_evidence", "support": "partial", "evidence_level": "runtime_detected", "evidence_refs": ["scripts/ask-doctor.mjs"], "limitations": ["Detection does not prove per-task application."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "programmatic_tool_execution", "support": "supported", "evidence_level": "executed", "evidence_refs": ["scripts/codex-exec-runner.mjs"], "limitations": [], "downgrade_behavior": "claim_execution_only" },
+        { "capability_id": "persistent_resumable_state", "support": "partial", "evidence_level": "projected", "evidence_refs": ["docs/agent-session-state-contract.md"], "limitations": ["Projected state contract is not runtime resume evidence."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "local_event_emission", "support": "unsupported", "evidence_level": "behavior_verified", "evidence_refs": ["docs/adapter-capability-matrix.md"], "limitations": ["The Codex adapter ships no local metrics collector."], "downgrade_behavior": "unsupported" },
+        { "capability_id": "shared_pr_execution", "support": "unsupported", "evidence_level": "behavior_verified", "evidence_refs": ["docs/adapter-capability-matrix.md"], "limitations": ["The Codex adapter ships no shared PR workflow."], "downgrade_behavior": "unsupported" }
+      ],
+      "rendering": {
+        "renderer_id": "install-codex-adapter",
+        "renderer_version": "1",
+        "output_root": ".agents",
+        "asset_kinds": ["instructions", "skills", "commands", "prompts", "runner", "schemas"],
+        "deterministic_input_refs": ["canonical_contract.revision", "canonical_contract.source_digest", "profile_id"]
+      },
+      "generated_assets": {
+        "owner": "adapter",
+        "managed_paths": [".agents/skills", ".agents/prompts", ".agents/commands"],
+        "lifecycle_operations": ["install", "update", "rollback", "detach"],
+        "drift_policy": "fail"
+      },
+      "privacy": {
+        "event_collection": "disabled",
+        "external_publication": "disabled",
+        "raw_prompt_storage": "prohibited",
+        "sensitive_payload_storage": "prohibited"
+      },
+      "normalized_event_schema_refs": []
+    }
+  ]
+}

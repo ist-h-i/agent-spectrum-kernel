@@ -38,6 +38,7 @@ const GENERATED_REPORT_PATH = "docs/validation-report.md";
 const REQUIRED_SCHEMA_PATHS = [
   "schemas/metrics-event.schema.json",
   "schemas/execution-envelope.schema.json",
+  "schemas/adapter-runtime-profile.schema.json",
   "schemas/review-signal-gate-map.json",
   "schemas/adoption-report.schema.json",
   "schemas/improvement-ledger-entry.schema.json",
@@ -50,6 +51,23 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/verification-pattern-ledger-entry.schema.json",
 ];
 const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
+const ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH = "docs/adapter-runtime-boundary-contract.md";
+const ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH = "schemas/adapter-runtime-profile.schema.json";
+const ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH = "docs/fixtures/adapter-runtime-profiles.json";
+const ADAPTER_RUNTIME_CAPABILITY_IDS = [
+  "progressive_instruction_loading",
+  "lifecycle_hooks",
+  "agent_orchestration",
+  "permission_sandbox_enforcement",
+  "runtime_asset_load_evidence",
+  "programmatic_tool_execution",
+  "persistent_resumable_state",
+  "local_event_emission",
+  "shared_pr_execution",
+];
+const ADAPTER_RUNTIME_SUPPORT_STATUSES = ["supported", "partial", "unsupported", "unknown"];
+const ADAPTER_RUNTIME_EVIDENCE_LEVELS = ["none", "projected", "runtime_detected", "executed", "behavior_verified"];
+const ADAPTER_RUNTIME_LIFECYCLE_OPERATIONS = ["install", "update", "rollback", "detach"];
 const LIFECYCLE_ARTIFACT_CONTRACT_PATH = "docs/lifecycle-artifact-contract.md";
 const LIFECYCLE_ARTIFACT_FIXTURE_PATH = "docs/fixtures/lifecycle-artifact-chains.json";
 const LIFECYCLE_TRACEABILITY_CONTRACT_PATH = "docs/lifecycle-traceability-contract.md";
@@ -1163,6 +1181,168 @@ function validateExecutionEnvelope(root, manifest, errors) {
     }
   }
 
+  return checks;
+}
+
+function adapterProfileHasModelField(value) {
+  if (!value || typeof value !== "object") return false;
+  if (Array.isArray(value)) return value.some(adapterProfileHasModelField);
+  return Object.entries(value).some(([key, child]) => /(^|_)model(_|$)/i.test(key) || adapterProfileHasModelField(child));
+}
+
+export function inspectAdapterRuntimeProfile(profile) {
+  const issues = [];
+  const add = (message) => issues.push(message);
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) return ["profile must be an object"];
+  if (profile.schema_version !== "1.0.0") add("schema_version must be 1.0.0");
+  for (const field of ["profile_id", "adapter_id"]) {
+    if (typeof profile[field] !== "string" || profile[field].trim() === "") add(`${field} must be a non-empty string`);
+  }
+  if (adapterProfileHasModelField(profile)) add("profile must not contain model-dependent fields");
+
+  const canonical = profile.canonical_contract;
+  if (!canonical || typeof canonical !== "object" || Array.isArray(canonical)) {
+    add("canonical_contract must be an object");
+  } else {
+    for (const field of ["revision", "source_digest"]) {
+      if (typeof canonical[field] !== "string" || canonical[field].trim() === "") add(`canonical_contract.${field} must be a non-empty string`);
+    }
+    if (!Array.isArray(canonical.source_paths) || canonical.source_paths.length === 0) add("canonical_contract.source_paths must be non-empty");
+  }
+
+  if (!Array.isArray(profile.capabilities)) {
+    add("capabilities must be an array");
+  } else {
+    const ids = profile.capabilities.map((capability) => capability?.capability_id);
+    for (const capabilityId of ADAPTER_RUNTIME_CAPABILITY_IDS) {
+      if (!ids.includes(capabilityId)) add(`capabilities must include ${capabilityId}`);
+    }
+    const duplicates = ids.filter((id, index) => id && ids.indexOf(id) !== index);
+    if (duplicates.length > 0) add(`capability_id must be unique: ${[...new Set(duplicates)].join(", ")}`);
+    for (const capability of profile.capabilities) {
+      const id = capability?.capability_id ?? "<missing>";
+      if (!ADAPTER_RUNTIME_CAPABILITY_IDS.includes(id)) add(`unknown capability_id: ${id}`);
+      if (!ADAPTER_RUNTIME_SUPPORT_STATUSES.includes(capability?.support)) add(`${id}.support is invalid`);
+      if (!ADAPTER_RUNTIME_EVIDENCE_LEVELS.includes(capability?.evidence_level)) add(`${id}.evidence_level is invalid`);
+      if (!Array.isArray(capability?.evidence_refs)) add(`${id}.evidence_refs must be an array`);
+      if (!Array.isArray(capability?.limitations)) add(`${id}.limitations must be an array`);
+      if (capability?.evidence_level !== "none" && (!Array.isArray(capability?.evidence_refs) || capability.evidence_refs.length === 0)) {
+        add(`${id} requires evidence_refs for ${capability?.evidence_level}`);
+      }
+      if (capability?.support === "partial" && (!Array.isArray(capability?.limitations) || capability.limitations.length === 0)) {
+        add(`${id} partial support requires limitations`);
+      }
+      const allowedDowngrades = capability?.support === "unknown"
+        ? ["unknown"]
+        : capability?.support === "unsupported"
+          ? ["unsupported"]
+          : capability?.support === "partial"
+            ? ["insufficient_evidence", "manual_step", "omit"]
+            : {
+                none: ["insufficient_evidence"],
+                projected: ["claim_projection_only"],
+                runtime_detected: ["claim_runtime_detection_only"],
+                executed: ["claim_execution_only"],
+                behavior_verified: ["claim_behavior_verified"],
+              }[capability?.evidence_level] ?? [];
+      if (!allowedDowngrades.includes(capability?.downgrade_behavior)) {
+        add(`${id} downgrade_behavior ${capability?.downgrade_behavior ?? "<missing>"} is inconsistent with ${capability?.support}/${capability?.evidence_level}`);
+      }
+    }
+  }
+
+  const rendering = profile.rendering;
+  if (!rendering || typeof rendering !== "object" || Array.isArray(rendering)) {
+    add("rendering must be an object");
+  } else {
+    for (const field of ["renderer_id", "renderer_version", "output_root"]) {
+      if (typeof rendering[field] !== "string" || rendering[field].trim() === "") add(`rendering.${field} must be a non-empty string`);
+    }
+    if (!Array.isArray(rendering.asset_kinds) || rendering.asset_kinds.length === 0) add("rendering.asset_kinds must be non-empty");
+    for (const ref of ["canonical_contract.revision", "canonical_contract.source_digest", "profile_id"]) {
+      if (!Array.isArray(rendering.deterministic_input_refs) || !rendering.deterministic_input_refs.includes(ref)) add(`rendering.deterministic_input_refs must include ${ref}`);
+    }
+  }
+
+  const assets = profile.generated_assets;
+  if (!assets || typeof assets !== "object" || Array.isArray(assets)) {
+    add("generated_assets must be an object");
+  } else {
+    if (assets.owner !== "adapter") add("generated_assets.owner must be adapter");
+    if (!Array.isArray(assets.managed_paths) || assets.managed_paths.length === 0) add("generated_assets.managed_paths must be non-empty");
+    for (const operation of ADAPTER_RUNTIME_LIFECYCLE_OPERATIONS) {
+      if (!Array.isArray(assets.lifecycle_operations) || !assets.lifecycle_operations.includes(operation)) add(`generated_assets.lifecycle_operations must include ${operation}`);
+    }
+    if (!["fail", "report", "regenerate"].includes(assets.drift_policy)) add("generated_assets.drift_policy is invalid");
+  }
+
+  const privacy = profile.privacy;
+  if (!privacy || typeof privacy !== "object" || Array.isArray(privacy)) {
+    add("privacy must be an object");
+  } else {
+    if (!["disabled", "local_opt_in", "local_enabled"].includes(privacy.event_collection)) add("privacy.event_collection is invalid");
+    if (!["disabled", "approval_required"].includes(privacy.external_publication)) add("privacy.external_publication must be disabled or approval_required");
+    if (privacy.raw_prompt_storage !== "prohibited") add("privacy.raw_prompt_storage must be prohibited");
+    if (privacy.sensitive_payload_storage !== "prohibited") add("privacy.sensitive_payload_storage must be prohibited");
+  }
+  if (!Array.isArray(profile.normalized_event_schema_refs)) add("normalized_event_schema_refs must be an array");
+  return issues;
+}
+
+function validateAdapterRuntimeProfileContract(root, manifest, errors) {
+  const active = manifest?.name === "agent-spectrum-kernel";
+  const checks = { active, contractPresent: false, schemaPresent: false, fixturePresent: false, profiles: [] };
+  if (!active) return checks;
+  checks.contractPresent = existsSync(resolve(root, ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH));
+  checks.schemaPresent = existsSync(resolve(root, ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH));
+  checks.fixturePresent = existsSync(resolve(root, ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH));
+  if (!checks.contractPresent) fail(errors, "adapter runtime profile", `contract is missing: ${ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH}`);
+  if (!checks.schemaPresent) fail(errors, "adapter runtime profile", `schema is missing: ${ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH}`);
+  if (!checks.fixturePresent) fail(errors, "adapter runtime profile", `fixture is missing: ${ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH}`);
+  if (!manifest.docs?.includes(ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH) || !manifest.docs?.includes(ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH)) {
+    fail(errors, "adapter runtime profile", "manifest.json.docs must list the adapter runtime contract and fixture");
+  }
+  if (!manifest.schemas?.includes(ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH)) {
+    fail(errors, "adapter runtime profile", `manifest.json.schemas must list ${ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH}`);
+  }
+  if (checks.contractPresent) {
+    const contract = readFileSync(resolve(root, ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH), "utf8");
+    for (const phrase of ["Canonical ASK owns", "Adapter runtime owns", "Required downgrade", "Deterministic rendering contract", "model name"]) {
+      if (!contract.includes(phrase)) fail(errors, "adapter runtime profile", `${ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH} is missing ${phrase}`);
+    }
+  }
+  if (checks.schemaPresent) {
+    try {
+      const schema = JSON.parse(readFileSync(resolve(root, ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH), "utf8"));
+      const capabilityProperties = schema.properties?.capabilities?.items?.properties ?? {};
+      for (const id of ADAPTER_RUNTIME_CAPABILITY_IDS) {
+        if (!capabilityProperties.capability_id?.enum?.includes(id)) fail(errors, "adapter runtime profile", `schema capability enum is missing ${id}`);
+      }
+      for (const status of ADAPTER_RUNTIME_SUPPORT_STATUSES) {
+        if (!capabilityProperties.support?.enum?.includes(status)) fail(errors, "adapter runtime profile", `schema support enum is missing ${status}`);
+      }
+      for (const level of ADAPTER_RUNTIME_EVIDENCE_LEVELS) {
+        if (!capabilityProperties.evidence_level?.enum?.includes(level)) fail(errors, "adapter runtime profile", `schema evidence enum is missing ${level}`);
+      }
+    } catch {
+      // Required-schema validation reports malformed JSON separately.
+    }
+  }
+  if (checks.fixturePresent) {
+    try {
+      const fixture = JSON.parse(readFileSync(resolve(root, ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH), "utf8"));
+      for (const profile of fixture.profiles ?? []) {
+        const issues = inspectAdapterRuntimeProfile(profile);
+        checks.profiles.push({ profileId: profile.profile_id, issues, ok: issues.length === 0 });
+        for (const issue of issues) fail(errors, "adapter runtime profile", `${profile.profile_id ?? "<missing>"}: ${issue}`);
+      }
+      for (const adapterId of ["claude_code", "codex"]) {
+        if (!(fixture.profiles ?? []).some((profile) => profile.adapter_id === adapterId)) fail(errors, "adapter runtime profile", `fixture must include ${adapterId}`);
+      }
+    } catch (error) {
+      fail(errors, "adapter runtime profile", `fixture is invalid JSON: ${error.message}`);
+    }
+  }
   return checks;
 }
 
@@ -3134,7 +3314,7 @@ function validateAdapterGovernance(root, checks, errors) {
   }
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -3194,6 +3374,12 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     `- session state uses envelope as control state: ${executionEnvelopeChecks.sessionState ? "ok" : "invalid"}`,
     `- canonical skills reference the contract: ${executionEnvelopeChecks.skills.every((check) => check.ok) ? "ok" : "invalid"}`,
     `- adapter prompts reference the contract: ${executionEnvelopeChecks.adapters.every((check) => check.ok) ? "ok" : "invalid"}`,
+    "",
+    "## Adapter runtime profile checks",
+    "",
+    `- canonical boundary contract: ${adapterRuntimeProfileChecks.contractPresent ? "ok" : "missing"}`,
+    `- machine-readable schema: ${adapterRuntimeProfileChecks.schemaPresent ? "ok" : "missing"}`,
+    `- Claude/Codex fixtures: ${adapterRuntimeProfileChecks.fixturePresent && adapterRuntimeProfileChecks.profiles.length === 2 && adapterRuntimeProfileChecks.profiles.every((profile) => profile.ok) ? "ok" : "invalid"}`,
     "",
     "## Lifecycle artifact contract checks",
     "",
@@ -3459,13 +3645,14 @@ export function validateRepository(options) {
   const domainRuleLedgerChecks = validateDomainRuleLedger(root, errors);
   const claudeAdapterChecks = validateClaudeAdapterArchitecture(root, manifest, errors);
   const executionEnvelopeChecks = validateExecutionEnvelope(root, manifest, errors);
+  const adapterRuntimeProfileChecks = validateAdapterRuntimeProfileContract(root, manifest, errors);
   const lifecycleArtifactChecks = validateLifecycleArtifactContract(root, manifest, errors);
   const lifecycleTraceabilityChecks = validateLifecycleTraceabilityContract(root, manifest, errors);
   const reviewSignalRegistryChecks = validateReviewSignalRegistry(root, manifest, errors);
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

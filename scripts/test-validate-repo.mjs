@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
-import { REQUIRED_TRACEABILITY_SCENARIOS, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
+import { REQUIRED_TRACEABILITY_SCENARIOS, inspectAdapterRuntimeProfile, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -260,6 +260,7 @@ function writeAdapterFixture(root) {
   const schemaPaths = [
     "schemas/metrics-event.schema.json",
     "schemas/execution-envelope.schema.json",
+    "schemas/adapter-runtime-profile.schema.json",
     "schemas/review-signal-gate-map.json",
     "schemas/adoption-report.schema.json",
     "schemas/improvement-ledger-entry.schema.json",
@@ -4560,6 +4561,32 @@ function assertSidecarAdapterInstructions() {
 }
 
 try {
+  const adapterProfileSchema = JSON.parse(readFileSync(resolve(repoRoot, "schemas/adapter-runtime-profile.schema.json"), "utf8"));
+  const adapterProfileFixture = JSON.parse(readFileSync(resolve(repoRoot, "docs/fixtures/adapter-runtime-profiles.json"), "utf8"));
+  for (const profile of adapterProfileFixture.profiles) {
+    assertSchemaPass(`adapter profile schema ${profile.profile_id}`, adapterProfileSchema, profile);
+    const issues = inspectAdapterRuntimeProfile(profile);
+    if (issues.length > 0) throw new Error(`${profile.profile_id} should pass semantic profile validation\n${issues.join("\n")}`);
+  }
+  const invalidDowngradeProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
+  invalidDowngradeProfile.capabilities.find((capability) => capability.capability_id === "lifecycle_hooks").downgrade_behavior = "none";
+  const invalidDowngradeIssues = inspectAdapterRuntimeProfile(invalidDowngradeProfile);
+  if (!invalidDowngradeIssues.some((issue) => issue.includes("inconsistent with supported/runtime_detected"))) {
+    throw new Error(`invalid adapter downgrade should fail closed\n${invalidDowngradeIssues.join("\n")}`);
+  }
+  const missingCapabilityProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+  missingCapabilityProfile.capabilities = missingCapabilityProfile.capabilities.filter((capability) => capability.capability_id !== "shared_pr_execution");
+  const missingCapabilityIssues = inspectAdapterRuntimeProfile(missingCapabilityProfile);
+  if (!missingCapabilityIssues.includes("capabilities must include shared_pr_execution")) {
+    throw new Error(`missing required adapter capability should fail closed\n${missingCapabilityIssues.join("\n")}`);
+  }
+  const modelDependentProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+  modelDependentProfile.rendering.model_name = "current-model";
+  const modelDependentIssues = inspectAdapterRuntimeProfile(modelDependentProfile);
+  if (!modelDependentIssues.includes("profile must not contain model-dependent fields")) {
+    throw new Error(`model-dependent adapter profile should fail closed\n${modelDependentIssues.join("\n")}`);
+  }
+
   const lifecycleFixture = JSON.parse(readFileSync(resolve(repoRoot, "docs/fixtures/lifecycle-artifact-chains.json"), "utf8"));
   for (const scenario of lifecycleFixture.scenarios) {
     const issues = inspectLifecycleScenario(scenario);
