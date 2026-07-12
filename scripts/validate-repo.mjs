@@ -79,6 +79,11 @@ const TRACEABILITY_GAP_ITEM_KINDS = {
 };
 const TRACEABILITY_EXEMPTION_FACTS = ["localized_scope", "no_claim", "no_required_gate"];
 const TRACEABILITY_ACCEPTED_RISK_STAGES = ["review", "release"];
+const TRACEABILITY_CLAIM_FINDING_RULES = {
+  completion: { blockers: false, acceptedRiskStages: [] },
+  merge: { blockers: true, acceptedRiskStages: ["review"] },
+  release: { blockers: true, acceptedRiskStages: TRACEABILITY_ACCEPTED_RISK_STAGES },
+};
 export const REQUIRED_TRACEABILITY_SCENARIOS = new Map([
   ["complete-implementation-to-review", "valid"],
   ["complete-review-to-release", "valid"],
@@ -122,6 +127,8 @@ export const REQUIRED_TRACEABILITY_SCENARIOS = new Map([
   ["accepted-risk-stage-invalid", "invalid"],
   ["merge-future-accepted-risk", "invalid"],
   ["release-stage-accepted-risk", "valid"],
+  ["completion-with-explicit-later-review-blocker", "invalid"],
+  ["completion-with-explicit-review-accepted-risk", "invalid"],
 ]);
 const TRACEABILITY_SKILL_PATHS = [
   "skills/requirement-grill/SKILL.md",
@@ -1552,10 +1559,13 @@ export function inspectTraceabilityScenarioResult(scenario) {
     const evidenceResolutions = inspectRefs(claim.id, "evidence_refs", claim.evidence_refs, { requireItem: true });
     const blockerResolutions = inspectRefs(claim.id, "blocker_refs", claim.blocker_refs, { requireItem: true });
     const acceptedRiskResolutions = inspectRefs(claim.id, "accepted_risk_refs", claim.accepted_risk_refs, { requireItem: true });
+    const findingRules = TRACEABILITY_CLAIM_FINDING_RULES[claim.type] ?? { blockers: false, acceptedRiskStages: [] };
     if (!Array.isArray(claim.subject_refs) || claim.subject_refs.length === 0) issues.push(`${claim.id} requires subject_refs`);
     if (claim.status === "supported" && (!Array.isArray(claim.evidence_refs) || claim.evidence_refs.length === 0)) issues.push(`${claim.id} supported claim requires evidence_refs`);
     if (claim.status === "supported" && Array.isArray(claim.blocker_refs) && claim.blocker_refs.length > 0) issues.push(`${claim.id} supported claim cannot retain blocker_refs`);
     if (claim.status === "blocked" && (!Array.isArray(claim.blocker_refs) || claim.blocker_refs.length === 0)) issues.push(`${claim.id} blocked claim requires blocker_refs`);
+    if (!findingRules.blockers && Array.isArray(claim.blocker_refs) && claim.blocker_refs.length > 0) issues.push(`${claim.id} ${claim.type} claim cannot use blocker_refs`);
+    if (findingRules.acceptedRiskStages.length === 0 && Array.isArray(claim.accepted_risk_refs) && claim.accepted_risk_refs.length > 0) issues.push(`${claim.id} ${claim.type} claim cannot use accepted_risk_refs`);
     for (const resolution of evidenceResolutions) {
       if (resolution.structureValid && resolution.artifact && resolution.current && (!resolution.item || resolution.artifact.type !== "evidence" || resolution.item.kind !== "evidence")) {
         issues.push(`${claim.id} evidence_refs must point to evidence items: ${resolution.label}`);
@@ -1574,10 +1584,8 @@ export function inspectTraceabilityScenarioResult(scenario) {
         && resolution.artifact?.type === "review"
         && resolution.item?.kind === "accepted_risk"
         && resolution.current
-        && !(
-          (claim.type === "merge" && resolution.item.accepted_stage === "review")
-          || (claim.type === "release" && TRACEABILITY_ACCEPTED_RISK_STAGES.includes(resolution.item.accepted_stage))
-        )
+        && findingRules.acceptedRiskStages.length > 0
+        && !findingRules.acceptedRiskStages.includes(resolution.item.accepted_stage)
       ) {
         issues.push(`${claim.id} accepted_risk_refs cannot use accepted_stage ${resolution.item.accepted_stage} for ${claim.type} claim: ${resolution.label}`);
       }
@@ -1680,12 +1688,12 @@ export function inspectTraceabilityScenarioResult(scenario) {
     }
     const declaredBlockerKeys = new Set(blockerResolutions.filter((resolution) => resolution.structureValid).map((resolution) => itemRefKey(resolution.ref)));
     const declaredRiskKeys = new Set(acceptedRiskResolutions.filter((resolution) => resolution.structureValid).map((resolution) => itemRefKey(resolution.ref)));
-    for (const artifact of claim.type === "completion" ? [] : artifactById.values()) {
+    for (const artifact of artifactById.values()) {
       if (artifact.type !== "review") continue;
       for (const item of artifact.itemById.values()) {
         if (!["blocker", "accepted_risk"].includes(item.kind)) continue;
-        if (item.kind === "accepted_risk" && claim.type === "merge" && item.accepted_stage !== "review") continue;
-        if (item.kind === "accepted_risk" && claim.type === "release" && !TRACEABILITY_ACCEPTED_RISK_STAGES.includes(item.accepted_stage)) continue;
+        if (item.kind === "blocker" && !findingRules.blockers) continue;
+        if (item.kind === "accepted_risk" && !findingRules.acceptedRiskStages.includes(item.accepted_stage)) continue;
         const ref = { artifact_id: artifact.id, item_id: item.id, observed_revision: artifact.revision };
         const resolution = { artifact, item, ref, current: true, structureValid: true, label: traceRefLabel(ref) };
         if (!validSubjects.some((subjectResolution) => subjectConnectsRequired(subjectResolution, resolution, claim.type))) continue;
@@ -1756,7 +1764,7 @@ function validateLifecycleTraceabilityContract(root, manifest, errors) {
   }
   if (!checks.contractPresent || !checks.fixturePresent) return checks;
   const contract = readFileSync(resolve(root, LIFECYCLE_TRACEABILITY_CONTRACT_PATH), "utf8");
-  for (const phrase of ["Stable reference model", "observed_revision", "Claim record", "insufficient evidence", "Trivial or localized", "observed facts", "never waives", "upstream_refs` remains the canonical", "must not be mixed", "same resolver rules", "collision-free tuple", "multiple items must define", "Completion subjects", "Every resolved required ref", "Every blocker ref", "Finding closure is stage-scoped", "completion claims do not consume later Review findings", "accepted_stage` of `review` or `release", "sorted set of collision-free subject tuples", "duplicate subject refs are invalid", "sibling exception", "must reach the exact required item", "kind is `blocker`", "missing_item_ref: undeclared", "Structured gaps", "non-empty `expected_errors`", "Required scenario IDs", "accepted_by", "acceptance`, `verification`, `review`, `approval`, and `rollback", "Release Readiness", "No central server"]) {
+  for (const phrase of ["Stable reference model", "observed_revision", "Claim record", "insufficient evidence", "Trivial or localized", "observed facts", "never waives", "upstream_refs` remains the canonical", "must not be mixed", "same resolver rules", "collision-free tuple", "multiple items must define", "Completion subjects", "Every resolved required ref", "Finding fields are claim-type restricted", "completion claims forbid both `blocker_refs` and `accepted_risk_refs`", "Finding closure uses the same claim-type rules", "completion claims do not consume later Review findings", "accepted_stage` of `review` or `release", "sorted set of collision-free subject tuples", "duplicate subject refs are invalid", "sibling exception", "must reach the exact required item", "kind is `blocker`", "missing_item_ref: undeclared", "Structured gaps", "non-empty `expected_errors`", "Required scenario IDs", "accepted_by", "acceptance`, `verification`, `review`, `approval`, and `rollback", "Release Readiness", "No central server"]) {
     if (!contract.toLowerCase().includes(phrase.toLowerCase())) fail(errors, "lifecycle traceability", `${LIFECYCLE_TRACEABILITY_CONTRACT_PATH} is missing ${phrase}`);
   }
   for (const path of TRACEABILITY_SKILL_PATHS) {
