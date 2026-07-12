@@ -203,6 +203,8 @@ node scripts/ask-benchmark.mjs validate --config benchmarks/checkpoint-b2.config
 node scripts/test-ask-benchmark.mjs
 ```
 
+The measured B2 result is in `benchmarks/results/checkpoint-b2-report.md`. In this bounded run, Kernel-only improved the hard transfer fixture from 76.9% to 100%, while Full ASK added no quality over Kernel-only and more than doubled tokens on all four fixtures.
+
 ## Minimum setup
 
 1. Put `AGENTS.md` at the repository root or project instruction location.

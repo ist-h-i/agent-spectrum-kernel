@@ -35,3 +35,5 @@ node scripts/ask-benchmark.mjs score --config benchmarks/checkpoint-b2.config.js
 ```
 
 See [protocol-b2.md](protocol-b2.md) for frozen quality-gain thresholds. B2 can establish value only for its fixtures and controlled runtime; replication remains required before architecture-wide conclusions.
+
+The measured B2 summary is [results/checkpoint-b2-report.md](results/checkpoint-b2-report.md); the reproducible automated score is `results/checkpoint-b2-2026-07-12.json`.

@@ -173,6 +173,7 @@
     "benchmarks/fixtures/checkpoint-b2/VALIDATION.md",
     "benchmarks/report-template.md",
     "benchmarks/results/checkpoint-b-report.md",
+    "benchmarks/results/checkpoint-b2-report.md",
     "CHANGELOG.md"
   ],
   "examples": [
