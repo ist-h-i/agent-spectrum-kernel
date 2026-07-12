@@ -18,6 +18,18 @@ Start from what the user wants to do. The internal route can name skills, but th
 
 Route outputs should include `Selected work mode`, `User-facing route`, `Internal route`, `Route confidence`, `Evidence checked`, `Missing evidence`, `Human decision required`, and a work-term `Next action`.
 
+## Responsibility Plane Matrix
+
+The authoritative per-Skill assignment is `manifest.json.skill_planes`. This compact view explains selection behavior:
+
+| Plane | Skill responsibility | Selection rule |
+|---|---|---|
+| Execution | Current-task requirement, design, implementation, investigation, verification, review, readiness, docs, and handoff. | Select from current-task signals and scope. |
+| Knowledge | Durable rules, architecture memory, engineering/verification patterns, contexts, review findings, and improvement lifecycle. | Require an explicit lifecycle request or material reusable-knowledge trigger with destination, evidence boundary, owner, and stop condition. |
+| Control | Routers, scope/risk gates, evidence classification, and effectiveness/adoption/capability evaluation. | May select, constrain, observe, or validate; does not authorize mutation in another plane. |
+
+Current-task blockers stay in execution/review output. A knowledge-plane candidate is an additional explicit follow-up, never a replacement.
+
 ## Operating Mode Routes
 
 | Operating mode | Use when | Primary route | Expected output |

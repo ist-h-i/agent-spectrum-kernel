@@ -54,6 +54,8 @@ Use profiles instead of arbitrary partial skill sets for normal installs:
 
 | Profile | Intended use |
 |---|---|
+| `daily` | Manifest `daily_delivery` pack with execution and control Skills only. |
+| `organizational` | Manifest `organizational_intelligence` pack with all three planes for explicit knowledge lifecycle work. |
 | `minimal` | Verification and handoff without installing broad routing/review skills. |
 | `implementation` | Default scoped implementation work. |
 | `investigation` | Bug, regression, reliability, and unknown-root-cause work. |
@@ -64,7 +66,9 @@ Use profiles instead of arbitrary partial skill sets for normal installs:
 
 Each profile installs a closed command/prompt/skill/runtime/contract-asset set. Installed command examples only reference files present in the adopting repository. Selecting `spec-driven-development` requires `work-package-compiler`; advanced overrides that omit it fail before writes.
 
-Profile closure includes representative router-reachable routes for the profile's declared task scope. For example, the implementation profile includes routes for unfamiliar repositories, unclear scope, boundary decisions, domain-rule impact, design grill, docs/ADR constraints, and long-running work; investigation includes bug investigation routes; review includes the review-router gate family.
+The `daily` and `organizational` profile skill lists are read from `manifest.json.projection_packs`. Both preserve `knowledge_write_policy: explicit_only`; installing a knowledge Skill does not authorize a ledger or memory update.
+
+Profile closure includes representative router-reachable routes for the profile's declared task scope. For example, the implementation profile includes routes for unfamiliar repositories, unclear scope, boundary decisions, design grill, docs/ADR constraints, and long-running work; investigation includes bug investigation routes; review includes the review-router gate family. Durable domain-rule work requires an explicit knowledge-plane profile or advanced override.
 
 Use `--skills <csv>` only as an advanced override. The override must include all required skills for installed prompt templates, command templates, router-reachable routes, and dependencies of the specified skills. Invalid combinations fail before any files are written.
 

@@ -133,6 +133,26 @@ function skillGroupsFor(skills, overrides = {}) {
   };
 }
 
+function planeModelFor(skills) {
+  return {
+    skill_planes: Object.fromEntries(skills.map((skill) => [skill, "execution"])),
+    projection_packs: {
+      daily_delivery: {
+        description: "Daily execution and control without durable knowledge lifecycle skills.",
+        planes: ["execution", "control"],
+        skills,
+        knowledge_write_policy: "explicit_only",
+      },
+      organizational_intelligence: {
+        description: "Daily delivery plus explicitly invoked organizational knowledge lifecycle skills.",
+        planes: ["execution", "knowledge", "control"],
+        skills,
+        knowledge_write_policy: "explicit_only",
+      },
+    },
+  };
+}
+
 function routingFixture() {
   const task_classes = {};
   for (const taskClass of TASK_CLASSES) {
@@ -158,6 +178,7 @@ function routingFixture() {
     task_classes,
     operating_modes,
     default_routes: [],
+    cross_plane_transitions: [],
     risk_gate: {
       required_route: "kernel",
       hard_stop_surfaces: APPROVAL_REQUIRED_SURFACES.map((surface) => surface.id),
@@ -204,6 +225,7 @@ function writeFixture(root, skills = ["alpha"]) {
         kernel: "AGENTS.md",
         copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
         skills,
+        ...planeModelFor(skills),
         skill_groups: skillGroupsFor(skills),
         allowed_multi_group_skills: [],
         routing: routingFixture(),
@@ -2305,6 +2327,7 @@ function assertRuntimeScripts() {
 function assertInstallerScripts() {
   const coreInstaller = resolve(repoRoot, "scripts/install-kernel.mjs");
   const installer = resolve(repoRoot, "scripts/install-claude-adapter.mjs");
+  const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
   const target = resolve(fixtureRoot, "install-target");
   assertRuntimePass("installer core setup", runRepoScript([coreInstaller, "--target", target]));
   mkdirSync(resolve(target, ".claude"), { recursive: true });
@@ -2452,6 +2475,21 @@ function assertInstallerScripts() {
   }
   if (existsSync(resolve(implementationTarget, ".claude/commands/skill-review.md"))) {
     throw new Error("implementation profile should not install review command");
+  }
+
+  for (const [profile, packName] of [["daily", "daily_delivery"], ["organizational", "organizational_intelligence"]]) {
+    const profileTarget = resolve(fixtureRoot, `install-${profile}-profile-target`);
+    assertRuntimePass(`installer ${profile} profile core setup`, runRepoScript([coreInstaller, "--target", profileTarget]));
+    assertRuntimePass(`installer ${profile} profile`, runRepoScript([installer, "--target", profileTarget, "--profile", profile]));
+    const profileState = JSON.parse(readFileSync(resolve(profileTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+    const expectedSkills = [...manifest.projection_packs[packName].skills].sort();
+    if (
+      JSON.stringify(profileState.selected_skills) !== JSON.stringify(expectedSkills) ||
+      profileState.selected_projection_pack !== packName ||
+      profileState.knowledge_write_policy !== "explicit_only"
+    ) {
+      throw new Error(`Claude ${profile} profile must match manifest projection pack ${packName}\n${JSON.stringify(profileState, null, 2)}`);
+    }
   }
 
   const corePruneOwnershipTarget = resolve(fixtureRoot, "install-claude-core-prune-ownership");
@@ -2914,7 +2952,7 @@ function assertCodexInstallerScripts() {
   const coreInstaller = resolve(repoRoot, "scripts/install-kernel.mjs");
   const manifest = JSON.parse(readFileSync(resolve(repoRoot, "manifest.json"), "utf8"));
   const markerPattern = /<!-- agent-spectrum-kernel:start -->/g;
-  const profiles = ["minimal", "implementation", "investigation", "review", "adoption", "observability", "full"];
+  const profiles = ["daily", "organizational", "minimal", "implementation", "investigation", "review", "adoption", "observability", "full"];
   const sourceCommand = readFileSync(resolve(repoRoot, "adapters/codex/commands/codex-exec.md"), "utf8");
   for (const [prompt, contract] of Object.entries(CODEX_PROMPT_CONTRACTS)) {
     const expectedInvocation = `--prompt ${prompt} --mode ${contract.mode} --sandbox ${contract.sandbox}`;
@@ -3030,6 +3068,17 @@ function assertCodexInstallerScripts() {
     }
     if (profile === "full" && profileState.selected_skills.length !== manifest.skills.length) {
       throw new Error(`codex full profile should install every manifest skill\n${JSON.stringify(profileState, null, 2)}`);
+    }
+    const projectionPack = profile === "daily" ? "daily_delivery" : profile === "organizational" ? "organizational_intelligence" : null;
+    if (projectionPack) {
+      const expectedSkills = [...manifest.projection_packs[projectionPack].skills].sort();
+      if (
+        JSON.stringify(profileState.selected_skills) !== JSON.stringify(expectedSkills) ||
+        profileState.selected_projection_pack !== projectionPack ||
+        profileState.knowledge_write_policy !== "explicit_only"
+      ) {
+        throw new Error(`codex ${profile} profile must match manifest projection pack ${projectionPack}\n${JSON.stringify(profileState, null, 2)}`);
+      }
     }
     const generatedCommand = readFileSync(resolve(profileTarget, ".agents/commands/codex-exec.md"), "utf8");
     for (const prompt of profileState.selected_prompts) {
@@ -4496,6 +4545,7 @@ jobs:
         kernel: "AGENTS.md",
         copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
         skills: ["alpha"],
+        ...planeModelFor(["alpha"]),
         skill_groups: skillGroupsFor(["alpha"]),
         allowed_multi_group_skills: [],
         docs: ["docs/missing.md"],
@@ -4682,6 +4732,7 @@ jobs:
         kernel: "AGENTS.md",
         copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
         skills: ["alpha"],
+        ...planeModelFor(["alpha"]),
         skill_groups: skillGroupsFor(["alpha"], { adoption_bootstrap: ["alpha"] }),
         allowed_multi_group_skills: ["alpha"],
         routing: routingFixture(),
@@ -4694,6 +4745,57 @@ jobs:
     ),
   );
   assertPass("allowed multi-group skill", allowedMultiGroupRoot);
+
+  const missingSkillPlaneRoot = cloneFixture("missing-skill-plane");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(missingSkillPlaneRoot, "manifest.json"), "utf8"));
+    delete manifest.skill_planes.alpha;
+    writeFileSync(resolve(missingSkillPlaneRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("missing skill plane", missingSkillPlaneRoot, "is not assigned to a plane");
+
+  const invalidSkillPlaneRoot = cloneFixture("invalid-skill-plane");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(invalidSkillPlaneRoot, "manifest.json"), "utf8"));
+    manifest.skill_planes.alpha = "operations";
+    writeFileSync(resolve(invalidSkillPlaneRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("invalid skill plane", invalidSkillPlaneRoot, "invalid plane 'operations'");
+
+  const dishonestProjectionPackRoot = cloneFixture("dishonest-projection-pack");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(dishonestProjectionPackRoot, "manifest.json"), "utf8"));
+    manifest.skill_planes.alpha = "knowledge";
+    manifest.projection_packs.daily_delivery.planes = ["execution", "control"];
+    writeFileSync(resolve(dishonestProjectionPackRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("dishonest projection pack", dishonestProjectionPackRoot, "does not declare plane 'knowledge'");
+
+  const incompleteOrganizationalPackRoot = cloneFixture("incomplete-organizational-pack");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(incompleteOrganizationalPackRoot, "manifest.json"), "utf8"));
+    manifest.skill_planes.alpha = "knowledge";
+    manifest.projection_packs.organizational_intelligence.skills = [];
+    writeFileSync(resolve(incompleteOrganizationalPackRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("incomplete organizational projection", incompleteOrganizationalPackRoot, "must include every manifest skill");
+
+  const invalidCrossPlaneRouteRoot = cloneFixture("invalid-cross-plane-route");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(invalidCrossPlaneRouteRoot, "manifest.json"), "utf8"));
+    manifest.routing.cross_plane_transitions = [{
+      id: "execution-to-knowledge",
+      from: "execution",
+      to: "knowledge",
+      trigger: "explicit reusable-knowledge request",
+      destination: "missing-skill",
+      evidence_boundary: "current task evidence",
+      owner: "requesting workflow",
+      stop_condition: "destination and evidence boundary are unresolved",
+    }];
+    writeFileSync(resolve(invalidCrossPlaneRouteRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("invalid cross-plane route", invalidCrossPlaneRouteRoot, "references unknown skill 'missing-skill'");
 
   const missingRoutingRoot = cloneFixture("missing-routing");
   {
@@ -4902,6 +5004,7 @@ jobs:
         kernel: "AGENTS.md",
         copy_paste_kernel: "CUSTOM_INSTRUCTIONS.md",
         skills: ["alpha"],
+        ...planeModelFor(["alpha"]),
         skill_groups: skillGroupsFor(["alpha"]),
         allowed_multi_group_skills: [],
         routing: routingFixture(),

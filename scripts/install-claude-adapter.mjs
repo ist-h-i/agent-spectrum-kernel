@@ -164,6 +164,14 @@ const SKILL_RELATIONSHIPS = {
   },
 };
 const CLAUDE_PROFILES = {
+  daily: {
+    projectionPack: "daily_delivery",
+    commands: ["skill-review.md", "skill-implement.md", "skill-investigate.md", "skill-verify.md", "skill-handoff.md"],
+  },
+  organizational: {
+    projectionPack: "organizational_intelligence",
+    commands: COMMAND_TEMPLATES,
+  },
   implementation: {
     skills: [
       "operating-mode-router",
@@ -259,12 +267,6 @@ const PROFILE_ROUTING_FIXTURES = {
       router: "skill-router",
       selectedRoute: "application-boundary-architecture",
       requiredSkills: ["application-boundary-architecture"],
-    },
-    {
-      id: "domain_rule_impact",
-      router: "skill-router",
-      selectedRoute: "domain-rule-ledger",
-      requiredSkills: ["domain-rule-ledger"],
     },
     {
       id: "design_grill",
@@ -419,7 +421,7 @@ function printHelp() {
 
 Options:
   --target <path>      Adopting project root. Defaults to cwd.
-  --profile <name>     Supported profile: implementation, investigation, review, observability, full. Defaults to ${DEFAULT_PROFILE}.
+  --profile <name>     Supported profile: daily, organizational, implementation, investigation, review, observability, full. Defaults to ${DEFAULT_PROFILE}.
   --skills <csv>       Advanced skill override. Installed commands must remain closed over required skills and assets.
   --skip-hooks         Do not copy hook config.
   --skip-runtime       Do not copy local runtime scripts or config.
@@ -891,7 +893,12 @@ function resolveSelection(args) {
     throw new Error(`Unknown profile: ${args.profile}`);
   }
   const manifestSkillSet = new Set(manifest.skills);
-  const profileSkills = profile.skills === null ? manifest.skills : profile.skills;
+  const profileSkills = profile.projectionPack
+    ? manifest.projection_packs?.[profile.projectionPack]?.skills
+    : profile.skills === null ? manifest.skills : profile.skills;
+  if (!Array.isArray(profileSkills)) {
+    throw new Error(`Profile '${args.profile}' references missing projection pack '${profile.projectionPack}'`);
+  }
   const selectedCommands = [...profile.commands];
   const skillSeed = args.skills ?? profileSkills;
   const routingFixtures = routingFixturesForProfile(args.profile, skillSeed, selectedCommands);
@@ -1015,6 +1022,8 @@ function manageStaleFiles(args, writes) {
 }
 
 function buildState(args, manifest) {
+  const projectionPackName = CLAUDE_PROFILES[args.profile]?.projectionPack ?? null;
+  const projectionPack = projectionPackName ? manifest.projection_packs?.[projectionPackName] : null;
   const selectedSkills = args.selectedSkills;
   const retainedStaleSkills = args.retainedStaleFiles
     .filter((path) => path.startsWith(".claude/skills/"))
@@ -1043,6 +1052,9 @@ function buildState(args, manifest) {
     rollback: args.rollback,
     hasMutations: args.operations.some((operation) => !operation.unchanged),
     extra: {
+      selected_projection_pack: projectionPackName,
+      selected_planes: projectionPack?.planes ?? null,
+      knowledge_write_policy: projectionPack?.knowledge_write_policy ?? "explicit_only",
       installed_commands: [...new Set([...args.selectedCommands, ...args.retainedStaleFiles.filter((path) => path.startsWith(".claude/commands/")).map((path) => path.split("/").at(-1))])].sort(),
       selected_commands: args.selectedCommands,
       retained_stale_files: args.retainedStaleFiles,

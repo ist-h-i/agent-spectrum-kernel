@@ -51,7 +51,7 @@ Select the smallest set of review gates needed to make the merge decision defens
    - Domain and architecture signals precede technical review when applicable.
    - Output and adversarial overlays run when their signals are observed.
    - Automated evidence runs before the final merge gate.
-   - `review-finding-compiler` and `improvement-ledger` are follow-ups only for reusable or non-blocking findings; they never hide current-PR blockers.
+   - `review-finding-compiler` and `improvement-ledger` are knowledge-plane follow-ups only after an explicit promotion trigger identifies the destination, evidence boundary, owner, and stop condition; they never hide current-PR blockers and are never updated as a side effect of review completion.
 
 5. Detect routing deviations.
    - Under-processing: a required gate is absent from executed gate evidence.

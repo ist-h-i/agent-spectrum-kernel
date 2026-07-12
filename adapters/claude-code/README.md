@@ -38,6 +38,8 @@ Useful flags:
 
 ```bash
 node scripts/install-claude-adapter.mjs --target /path/to/project --dry-run
+node scripts/install-claude-adapter.mjs --target /path/to/project --profile daily
+node scripts/install-claude-adapter.mjs --target /path/to/project --profile organizational
 node scripts/install-claude-adapter.mjs --target /path/to/project --profile implementation
 node scripts/install-claude-adapter.mjs --target /path/to/project --profile review
 node scripts/install-claude-adapter.mjs --target /path/to/project --skip-hooks
@@ -67,19 +69,21 @@ Supported profiles:
 
 | Profile | Installs |
 |---|---|
+| `daily` | Manifest `daily_delivery` pack: execution and control Skills, without durable knowledge lifecycle Skills. |
+| `organizational` | Manifest `organizational_intelligence` pack: all three planes for explicitly authorized knowledge work. |
 | `implementation` | Implementation, verification, and handoff commands plus implementation router closure. |
 | `investigation` | Investigation, verification, and handoff commands plus bug-investigation router closure. |
 | `review` | Review, verification, and handoff commands plus review gates. |
 | `observability` | Report, ledger refresh, verification, and handoff commands plus local metrics/evaluation skills. |
 | `full` | All manifest skills and all Claude project commands. This is the default. |
 
-Profiles are closed over command requirements, skill dependencies, managed contract assets, and normal router-reachable routes for their task scope. `spec-driven-development` requires `work-package-compiler`; an advanced override that omits it fails before writes. For example, `implementation` includes routes such as `repository-orientation`, `scope-control`, `application-boundary-architecture`, `domain-rule-ledger`, `grill-design`, `grill-with-docs`, and `planning-with-files`.
+Profiles are closed over command requirements, skill dependencies, managed contract assets, and normal router-reachable routes for their task scope. `spec-driven-development` requires `work-package-compiler`; an advanced override that omits it fails before writes. For example, `implementation` includes routes such as `repository-orientation`, `scope-control`, `application-boundary-architecture`, `grill-design`, `grill-with-docs`, and `planning-with-files`. Durable domain-rule work requires an explicit knowledge-plane profile or advanced override.
 
 Use `--skills <csv>` only as an advanced override. The installer fails before writing files if the override is not closed over the selected profile's commands and router-reachable skills.
 
 ## Installed Skills
 
-The `full` profile projects all skills in `manifest.json`. Narrow profiles project only their closed task-scope subset.
+The `full` and `organizational` profiles project all skills in `manifest.json`. `daily` projects the smaller manifest-governed daily pack. Other narrow profiles project only their closed task-scope subset. Availability never authorizes a knowledge write: ledger and memory updates remain explicit.
 
 Legacy full workflow projection:
 

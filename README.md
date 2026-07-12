@@ -32,6 +32,8 @@ Project overlay = リポジトリ固有の規約・コマンド・禁止範囲
 
 `manifest.json.routing` は routing の正本や workflow engine ではありません。machine-readable defaults / validation mirror として、route reference、override、risk-gate surface、adapter capability downgrade の静的検査を支えます。人間向けの手順は `SKILL.md` に残し、route mismatch は risk-gate 以外の自動blockにしません。
 
+`manifest.json.skill_planes` は各canonical Skillを `execution`、`knowledge`、`control` のいずれか1つに分類します。通常作業はexecution/control内で完結し、knowledgeへの遷移には明示的なlifecycle trigger、destination、evidence boundary、owner、stop conditionが必要です。単に実装やレビューが完了しただけではledgerを更新しません。`manifest.json.projection_packs` は、knowledge planeを省いた `daily_delivery` と、明示的な組織知運用向けの `organizational_intelligence` を定義します。
+
 `skills/*/SKILL.md` は分割します。Grill、Spec、ADR、検証、レビュー、Handoffのような重い手順を常時ルールに混ぜないためです。
 
 ## File layout
@@ -255,7 +257,7 @@ The Claude installer requires the core install state, then updates profile-selec
 
 The Claude adapter records `.agent-spectrum-kernel/claude-install-state.json` with the same lifecycle schema as the core and Codex installers, including managed hook identifiers and partial-file hashes for `.claude/settings.json`. It supports `--check`, `--dry-run`, `--prune`, `--force`, `--rollback`, and `--detach`; detach removes projected Claude execution surfaces and adapter-owned hooks while preserving local metrics, reports, and ledgers by default.
 
-Supported Claude profiles are `implementation`, `investigation`, `review`, `observability`, and `full`. The default is `full`; narrow profiles are closed over command requirements and router-reachable skills. Use `--skills <csv>` only as an advanced override; the installer fails before writing files when the override is not closed.
+Supported Claude profiles are `daily`, `organizational`, `implementation`, `investigation`, `review`, `observability`, and `full`. `daily` projects the manifest `daily_delivery` pack; `organizational` projects `organizational_intelligence`. The default remains `full` for compatibility; narrow profiles are closed over command requirements and router-reachable skills. Use `--skills <csv>` only as an advanced override; the installer fails before writing files when the override is not closed.
 
 `--skip-runtime` also skips/removes adapter-owned metrics hooks. `--skip-hooks` skips/removes hooks but still installs runtime scripts. The optional plugin may be combined with the project adapter; plugin hooks resolve through `CLAUDE_PLUGIN_ROOT` and no-op when the project runtime is absent.
 
@@ -274,7 +276,7 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-The core installer owns `AGENTS.md`; the Codex installer updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. The default profile is `implementation`, not every manifest skill. Supported profiles are `minimal`, `implementation`, `investigation`, `review`, `adoption`, `observability`, and `full`.
+The core installer owns `AGENTS.md`; the Codex installer updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. The default profile is `implementation`, not every manifest skill. Supported profiles are `daily`, `organizational`, `minimal`, `implementation`, `investigation`, `review`, `adoption`, `observability`, and `full`.
 
 Use `--profile <name>` for normal installs. Use `--skills <csv>` only as an advanced override; the installer fails before writing files when the override is not closed over required skills for the selected prompts, commands, router-reachable routes, and dependencies of the specified skills.
 

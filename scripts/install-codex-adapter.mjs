@@ -127,6 +127,18 @@ const SKILL_RELATIONSHIPS = {
 };
 
 const CODEX_PROFILES = {
+  daily: {
+    description: "Daily delivery projection with execution and control skills only.",
+    projectionPack: "daily_delivery",
+    prompts: PROMPT_TEMPLATES,
+    commands: COMMAND_TEMPLATES,
+  },
+  organizational: {
+    description: "Daily delivery plus explicitly invoked organizational knowledge lifecycle skills.",
+    projectionPack: "organizational_intelligence",
+    prompts: PROMPT_TEMPLATES,
+    commands: COMMAND_TEMPLATES,
+  },
   minimal: {
     description: "Small verification and handoff profile for read-mostly Codex use.",
     skills: ["test-first-verification", "handoff-generation", "evidence-ledger", "risk-gate"],
@@ -259,13 +271,6 @@ const PROFILE_ROUTING_FIXTURES = {
       router: "skill-router",
       selected_route: "application-boundary-architecture",
       requiredSkills: ["application-boundary-architecture"],
-    },
-    {
-      id: "domain_rule_impact",
-      signal: "Business rule or domain workflow impact appears during implementation",
-      router: "skill-router",
-      selected_route: "domain-rule-ledger",
-      requiredSkills: ["domain-rule-ledger"],
     },
     {
       id: "design_grill",
@@ -716,6 +721,9 @@ function buildState({
     hasMutations,
     extra: {
       profile_description: profile.description,
+      selected_projection_pack: profile.projectionPack ?? null,
+      selected_planes: profile.projectionPack ? manifest.projection_packs?.[profile.projectionPack]?.planes ?? null : null,
+      knowledge_write_policy: profile.projectionPack ? manifest.projection_packs?.[profile.projectionPack]?.knowledge_write_policy ?? null : "explicit_only",
       retained_stale_skills: retainedStaleSkills,
       installed_prompts: promptTemplates,
       selected_prompts: selectedPrompts,
@@ -780,7 +788,7 @@ function planPruneManagedFile({ operations, previousState, target, relativePath,
   planRemoveEmptyDirectory(operations, dirname(destination), `empty stale Codex managed projection directory:${reason}`);
 }
 
-function resolveProfile(name, manifestSkills) {
+function resolveProfile(name, manifest) {
   const profile = CODEX_PROFILES[name];
   if (!profile) {
     throw new Error(`Unknown profile: ${name}. Supported profiles: ${Object.keys(CODEX_PROFILES).join(", ")}`);
@@ -791,7 +799,12 @@ function resolveProfile(name, manifestSkills) {
   validateTemplateNames(prompts, PROMPT_TEMPLATES, "prompt template");
   validateTemplateNames(commands, COMMAND_TEMPLATES, "command template");
 
-  const profileSkills = profile.skills === null ? manifestSkills : profile.skills;
+  const profileSkills = profile.projectionPack
+    ? manifest.projection_packs?.[profile.projectionPack]?.skills
+    : profile.skills === null ? manifest.skills : profile.skills;
+  if (!Array.isArray(profileSkills)) {
+    throw new Error(`Profile '${name}' references missing projection pack '${profile.projectionPack}'`);
+  }
   return {
     profile,
     skills: [...profileSkills].sort(),
@@ -992,7 +1005,7 @@ function validateManagedReferences(managedFiles) {
 function buildPlan(args) {
   const manifest = readManifest();
   const manifestSkills = [...manifest.skills].sort();
-  const resolvedProfile = resolveProfile(args.profile, manifestSkills);
+  const resolvedProfile = resolveProfile(args.profile, manifest);
   const selectedPromptTemplates = args.skipPrompts ? [] : resolvedProfile.prompts;
   const selectedCommandTemplates = args.skipCommand ? [] : resolvedProfile.commands;
   const skillSeed = args.skills ?? resolvedProfile.skills;

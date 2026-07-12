@@ -62,7 +62,7 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-このinstallerは profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile minimal|implementation|investigation|review|adoption|observability|full` を使います。`--skills <csv>` は advanced override で、選択 prompt / command、router到達可能route、指定 skill 依存の必須 skill 閉包を満たさない場合は書き込み前に失敗します。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。Codex用のローカル投影だけを行い、hook、telemetry、外部公開、GitHub Actions は作りません。
+このinstallerは profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile daily|organizational|minimal|implementation|investigation|review|adoption|observability|full` を使います。`daily` と `organizational` はそれぞれmanifestの `daily_delivery` と `organizational_intelligence` projection packを使います。`--skills <csv>` は advanced override で、選択 prompt / command、router到達可能route、指定 skill 依存の必須 skill 閉包を満たさない場合は書き込み前に失敗します。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。Codex用のローカル投影だけを行い、hook、telemetry、外部公開、GitHub Actions は作りません。
 
 Codex の非対話実行は、導入された runner 経由で行います。
 
@@ -101,7 +101,7 @@ Claude の runtime smoke は明示実行です。hook executable resolution、ev
 node scripts/adapter-runtime-smoke.mjs --target /path/to/project --adapter claude
 ```
 
-対応profileは `implementation`、`investigation`、`review`、`observability`、`full` です。default は `full` で、全manifest Skillと全Claude commandを投影します。narrow profile は、選択command、Skill依存、router到達可能routeを含む閉包を自動投影します。`--skills <csv>` はadvanced overrideで、閉包を満たさない場合は書き込み前に失敗します。
+対応profileは `daily`、`organizational`、`implementation`、`investigation`、`review`、`observability`、`full` です。default は `full` です。`daily` はknowledge planeを除いた通常作業向け、`organizational` は明示的な組織知運用向けです。narrow profile は、選択command、Skill依存、router到達可能routeを含む閉包を自動投影します。`--skills <csv>` はadvanced overrideで、閉包を満たさない場合は書き込み前に失敗します。
 
 Hookの正本は `.claude/settings.json` です。`.claude/hooks/hooks.json` は新規には投影しません。`--skip-runtime` はruntime scriptとadapter-owned metrics hooksを両方skip/removeします。`--skip-hooks` はhooksだけをskip/removeし、runtime scriptは入れます。
 
