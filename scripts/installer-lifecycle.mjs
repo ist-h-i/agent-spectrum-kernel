@@ -5,6 +5,17 @@ import { dirname, relative, resolve } from "node:path";
 export const LIFECYCLE_SCHEMA_VERSION = 3;
 export const MANAGED_START = "<!-- agent-spectrum-kernel:start -->";
 export const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
+export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
+  "docs/adapter-conformance-contract.md",
+  "docs/agent-session-state-contract.md",
+  "docs/debt-lifecycle-contract.md",
+  "docs/execution-envelope-contract.md",
+  "docs/lifecycle-artifact-contract.md",
+  "docs/metrics-event-contract.md",
+  "docs/observability-runtime-contract.md",
+  "docs/operation-automation-contract.md",
+  "docs/stack-implementation-overlay-contract.md",
+]);
 
 export function hashText(text) {
   return createHash("sha256").update(text).digest("hex");

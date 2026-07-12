@@ -1063,11 +1063,18 @@ function validateLifecycleArtifactContract(root, manifest, errors) {
       : path === "adapters/codex/prompts/skill-verify.md"
         ? ["Not verified:", "Next verification:"]
         : [];
+    const requiredHeaderPhrases = path.endsWith("skill-implement.md")
+      ? ["Artifact ID", "Artifact type: implementation", "Upstream refs"]
+      : path.endsWith("skill-verify.md")
+        ? ["Artifact ID", "Artifact type: verification", "Upstream refs"]
+        : [];
     const duplicates = forbiddenDuplicateSections.filter((section) => new RegExp(`^${section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "m").test(text));
-    const ok = referencesContract && duplicates.length === 0;
-    checks.adapters.push({ path, referencesContract, duplicates, ok });
+    const missingHeaders = requiredHeaderPhrases.filter((phrase) => !text.includes(phrase));
+    const ok = referencesContract && duplicates.length === 0 && missingHeaders.length === 0;
+    checks.adapters.push({ path, referencesContract, duplicates, missingHeaders, ok });
     if (!referencesContract) fail(errors, "lifecycle artifact contract", `${path} must reference ${LIFECYCLE_ARTIFACT_CONTRACT_PATH}`);
     if (duplicates.length > 0) fail(errors, "lifecycle artifact contract", `${path} duplicates lifecycle or next-action output sections: ${duplicates.join(", ")}`);
+    if (missingHeaders.length > 0) fail(errors, "lifecycle artifact contract", `${path} is missing canonical artifact header fields: ${missingHeaders.join(", ")}`);
   }
 
   let fixture;
@@ -2155,7 +2162,7 @@ function validateCoreInstaller(root, checks, errors) {
   checks.coreInstaller.verifiesPruneHash = combinedText.includes("modified managed file; refusing to prune") && /currentHash\s*!==\s*record\.sha256/.test(combinedText);
   checks.coreInstaller.prunesManagedFileOnly = combinedText.includes("unlinkSync") && !combinedText.includes("rmSync(");
   checks.coreInstaller.avoidsCodexProjectionDefault = !/\.agents\/skills/.test(text);
-  checks.coreInstaller.projectsSkillDocDependencies = text.includes("dependencyAssetsForSkills") && text.includes("skill_dependency_asset");
+  checks.coreInstaller.alwaysOwnsImmutableContracts = text.includes("CORE_IMMUTABLE_CONTRACT_ASSETS") && text.includes("immutable_contract");
 
   for (const [field, ok] of Object.entries(checks.coreInstaller)) {
     if (!ok) {
@@ -2195,6 +2202,8 @@ function validateCodexInstaller(root, checks, errors) {
   checks.codexInstaller.installsCommand = text.includes(".agents/commands") && text.includes("COMMAND_TEMPLATES");
   checks.codexInstaller.installsRuntimeRunner = text.includes("CODEX_RUNTIME_SCRIPTS") && text.includes("codex_runtime") && text.includes("codex-exec-runner.mjs");
   checks.codexInstaller.projectsLifecycleContract = text.includes("docs/lifecycle-artifact-contract.md") && text.includes("requiredAssetsForPrompts");
+  checks.codexInstaller.resolvesSkillOnlyAssets = text.includes("requiredAssetsForSkills") && text.includes("CORE_OWNED_IMMUTABLE_ASSETS");
+  checks.codexInstaller.preservesCoreContracts = text.includes("CORE_PRESERVE_PATHS") && text.includes("ASK core immutable contract is missing or stale");
   checks.codexInstaller.requiresWorkPackageCompiler = /"spec-driven-development"\s*:\s*\{[\s\S]{0,200}requires:\s*\[[^\]]*"work-package-compiler"/.test(text);
   checks.codexInstaller.hasDryRun = text.includes("--dry-run") && /dryRun/.test(text);
   checks.codexInstaller.hasMergeAgents = text.includes("--merge-agents") && text.includes("agent-spectrum-kernel:start") && text.includes("agent-spectrum-kernel:end");
@@ -2243,6 +2252,7 @@ function validateInstallerProjection(root, checks, errors) {
     ["unfamiliar_repository", "unclear_scope", "boundary_decision", "bug_investigation", "review"].every((fixtureId) => text.includes(fixtureId));
   checks.installerProjection.installsCommandAssets = text.includes("requiredAssets") && text.includes("installAssets");
   checks.installerProjection.projectsLifecycleContract = text.includes("docs/lifecycle-artifact-contract.md") && text.includes("coreOwnedRequiredAssets");
+  checks.installerProjection.preservesCoreContracts = text.includes("CORE_PRESERVE_PATHS") && text.includes("ASK core immutable contract is missing or stale");
   checks.installerProjection.requiresWorkPackageCompiler = /"spec-driven-development"\s*:\s*\{[\s\S]{0,200}requires:\s*\[[^\]]*"work-package-compiler"/.test(text);
   checks.installerProjection.skipRuntimeSkipsHooks = text.includes("args.skipHooks || args.skipRuntime") && text.includes("removeManagedHooks");
   checks.installerProjection.settingsSourceOfTruth =
@@ -2263,6 +2273,7 @@ function validateInstallerProjection(root, checks, errors) {
     "validatesRoutingClosure",
     "installsCommandAssets",
     "projectsLifecycleContract",
+    "preservesCoreContracts",
     "requiresWorkPackageCompiler",
     "skipRuntimeSkipsHooks",
     "settingsSourceOfTruth",
@@ -2535,7 +2546,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- prune hash verification: ${claudeAdapterChecks.coreInstaller.verifiesPruneHash ? "ok" : "invalid"}`,
     `- prune limited to managed files: ${claudeAdapterChecks.coreInstaller.prunesManagedFileOnly ? "ok" : "invalid"}`,
     `- no Codex-specific projection by default: ${claudeAdapterChecks.coreInstaller.avoidsCodexProjectionDefault ? "ok" : "invalid"}`,
-    `- skill doc dependency assets projected: ${claudeAdapterChecks.coreInstaller.projectsSkillDocDependencies ? "ok" : "invalid"}`,
+    `- immutable contracts always core-owned: ${claudeAdapterChecks.coreInstaller.alwaysOwnsImmutableContracts ? "ok" : "invalid"}`,
     "",
     "## Codex adapter installer checks",
     "",
@@ -2551,6 +2562,8 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- installs prompt templates: ${claudeAdapterChecks.codexInstaller.installsPrompts ? "ok" : "invalid"}`,
     `- installs command templates: ${claudeAdapterChecks.codexInstaller.installsCommand ? "ok" : "invalid"}`,
     `- lifecycle contract asset projected: ${claudeAdapterChecks.codexInstaller.projectsLifecycleContract ? "ok" : "invalid"}`,
+    `- skill-only contract dependencies resolved: ${claudeAdapterChecks.codexInstaller.resolvesSkillOnlyAssets ? "ok" : "invalid"}`,
+    `- core contract ownership preserved: ${claudeAdapterChecks.codexInstaller.preservesCoreContracts ? "ok" : "invalid"}`,
     `- spec route requires Work Package Compiler: ${claudeAdapterChecks.codexInstaller.requiresWorkPackageCompiler ? "ok" : "invalid"}`,
     `- dry-run supported: ${claudeAdapterChecks.codexInstaller.hasDryRun ? "ok" : "invalid"}`,
     `- managed AGENTS.md merge supported: ${claudeAdapterChecks.codexInstaller.hasMergeAgents ? "ok" : "invalid"}`,
@@ -2625,6 +2638,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- routing closure validation: ${claudeAdapterChecks.installerProjection.validatesRoutingClosure ? "ok" : "invalid"}`,
     `- command assets projection: ${claudeAdapterChecks.installerProjection.installsCommandAssets ? "ok" : "invalid"}`,
     `- lifecycle contract asset projection: ${claudeAdapterChecks.installerProjection.projectsLifecycleContract ? "ok" : "invalid"}`,
+    `- core contract ownership preserved: ${claudeAdapterChecks.installerProjection.preservesCoreContracts ? "ok" : "invalid"}`,
     `- spec route requires Work Package Compiler: ${claudeAdapterChecks.installerProjection.requiresWorkPackageCompiler ? "ok" : "invalid"}`,
     `- skip-runtime skips hooks: ${claudeAdapterChecks.installerProjection.skipRuntimeSkipsHooks ? "ok" : "invalid"}`,
     `- settings.json hook source of truth: ${claudeAdapterChecks.installerProjection.settingsSourceOfTruth ? "ok" : "invalid"}`,

@@ -55,7 +55,7 @@ The installer does not enable external publication. It does not create secrets, 
 
 ## Asset Lifecycle
 
-- Immutable contracts referenced by selected skills are projected by the core installer. Claude commands declare `docs/lifecycle-artifact-contract.md` as a required managed dependency and reuse the core-owned file when its hash matches.
+- The core installer always owns the root immutable Execution Envelope and Lifecycle Artifact contracts, independent of selected skills. Claude commands declare them as required dependencies but never own or repair them; a missing or stale core contract stops adapter installation and requires a core reinstall.
 - Other managed references such as schemas, README files, and fixed templates are refreshed from the ASK checkout on each install.
 - Project-owned state such as `docs/ai/improvement-ledger.md` and `docs/ai/skill-adoption-metrics.md` is initialized only when absent. A later install, including `full` and `observability`, preserves existing content.
 - `docs/ai/metrics/` and `docs/ai/reports/` are runtime directories only. The installer creates the directories but does not seed or replace event or report data.

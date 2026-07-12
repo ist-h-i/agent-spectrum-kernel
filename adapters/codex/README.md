@@ -22,7 +22,7 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-The core installer owns `AGENTS.md` and immutable contract docs referenced by selected skills. The Codex adapter updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, prompt-required contract assets not already owned by core, `scripts/codex-exec-runner.mjs`, the local sensor runtime used by that runner, and `.agent-spectrum-kernel/codex-install-state.json`. It does not create hooks, telemetry, GitHub Actions, external publication, secrets, deploys, or releases.
+The core installer always owns `AGENTS.md` and the root immutable Execution Envelope and Lifecycle Artifact contracts, independent of selected skills. The Codex adapter updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, `scripts/codex-exec-runner.mjs`, the local sensor runtime used by that runner, and `.agent-spectrum-kernel/codex-install-state.json`. It records required core assets but never owns or repairs them; a missing or stale core contract stops installation and requires a core reinstall. It does not create hooks, telemetry, GitHub Actions, external publication, secrets, deploys, or releases.
 
 ## Codex Projection Model
 

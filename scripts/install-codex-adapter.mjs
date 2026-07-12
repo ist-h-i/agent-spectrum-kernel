@@ -13,6 +13,8 @@ const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const DEFAULT_PROFILE = "implementation";
 const CANONICAL_REGISTRY_PATH = "schemas/review-signal-gate-map.json";
+const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_IMMUTABLE_CONTRACT_ASSETS;
+const CORE_PRESERVE_PATHS = [CANONICAL_REGISTRY_PATH, ...CORE_OWNED_IMMUTABLE_ASSETS];
 const PROMPT_TEMPLATES = [
   "skill-implement.md",
   "skill-investigate.md",
@@ -499,7 +501,7 @@ function readManifest() {
   return manifest;
 }
 
-function validateCoreInstalled(target, statePath) {
+function validateCoreInstalled(target, statePath, requiredAssets) {
   if (!existsSync(statePath)) throw new Error("ASK core install state is missing: .agent-spectrum-kernel/install-state.json. Run scripts/install-kernel.mjs before installing the Codex adapter.");
   let state;
   try { state = readJson(statePath); } catch { throw new Error("ASK core install state is invalid JSON."); }
@@ -513,6 +515,14 @@ function validateCoreInstalled(target, statePath) {
   const registryRecord = state?.managed_files?.[CANONICAL_REGISTRY_PATH];
   if (!registryRecord?.sha256 || !existsSync(registryPath) || hashText(readText(registryPath)) !== registryRecord.sha256) {
     throw new Error(`ASK core canonical review signal registry is missing or does not match core install state: ${CANONICAL_REGISTRY_PATH}`);
+  }
+  for (const asset of requiredAssets.filter((path) => CORE_OWNED_IMMUTABLE_ASSETS.includes(path))) {
+    const sourceContent = readText(resolve(REPO_ROOT, asset));
+    const record = state?.managed_files?.[asset];
+    const targetPath = resolve(target, asset);
+    if (record?.kind !== "immutable_contract" || record.sha256 !== hashText(sourceContent) || !existsSync(targetPath) || hashText(readText(targetPath)) !== record.sha256) {
+      throw new Error(`ASK core immutable contract is missing or stale: ${asset}. Re-run scripts/install-kernel.mjs before installing the Codex adapter.`);
+    }
   }
   return state;
 }
@@ -798,6 +808,19 @@ function requiredAssetsForPrompts(prompts) {
   return [...new Set(prompts.flatMap((prompt) => PROMPT_METADATA[prompt]?.requiredAssets ?? []))].sort();
 }
 
+function requiredAssetsForSkills(skills) {
+  const assets = new Set();
+  for (const skill of skills) {
+    const source = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
+    ensureSource(source, `skills/${skill}/SKILL.md`);
+    const text = readText(source);
+    for (const asset of CORE_OWNED_IMMUTABLE_ASSETS) {
+      if (text.includes(asset)) assets.add(asset);
+    }
+  }
+  return [...assets].sort();
+}
+
 function recommendedSkillsForPrompts(prompts) {
   return prompts.flatMap((prompt) => PROMPT_METADATA[prompt]?.recommendedSkills ?? []);
 }
@@ -976,13 +999,13 @@ function buildPlan(args) {
   const routingFixtures = routingFixturesForProfile(args.profile, skillSeed, selectedPromptTemplates);
   const routerReachableSkills = skillsForRoutingFixtures(routingFixtures);
   const requiredSkills = computeRequiredClosure(skillSeed, selectedPromptTemplates, routingFixtures);
-  const requiredAssets = requiredAssetsForPrompts(selectedPromptTemplates);
   const skills = [...(args.skills ?? requiredSkills)].sort();
 
   validateSkillNames(skills, manifestSkills);
   validateSkillClosure({ selectedSkills: skills, requiredSkills, profileName: args.profile });
+  const requiredAssets = [...new Set([...requiredAssetsForPrompts(selectedPromptTemplates), ...requiredAssetsForSkills(skills)])].sort();
   const coreStatePath = resolve(args.target, ".agent-spectrum-kernel/install-state.json");
-  const coreState = validateCoreInstalled(args.target, coreStatePath);
+  validateCoreInstalled(args.target, coreStatePath, requiredAssets);
 
   const previousState = readPreviousState(args.target);
   const previousSkillNames = previousItems(previousState, "installed_skills", ["codex_skill", "stale_codex_skill"], "skill").filter((skill) =>
@@ -1018,9 +1041,7 @@ function buildPlan(args) {
     const source = resolve(REPO_ROOT, asset);
     ensureSource(source, asset);
     const content = readText(source);
-    const coreRecord = coreState?.managed_files?.[asset];
-    const targetPath = resolve(args.target, asset);
-    if (coreRecord?.sha256 === hashText(content) && existsSync(targetPath) && hashText(readText(targetPath)) === coreRecord.sha256) {
+    if (CORE_OWNED_IMMUTABLE_ASSETS.includes(asset)) {
       continue;
     }
     managedFiles[asset] = {
@@ -1292,13 +1313,13 @@ function printPlan(args, plan) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.rollback) {
-    const operations = lifecycle.rollbackLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force, preserve: [CANONICAL_REGISTRY_PATH] });
+    const operations = lifecycle.rollbackLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force, preserve: CORE_PRESERVE_PATHS });
     console.log(`${args.dryRun || args.check ? "Codex adapter rollback dry run" : "Codex adapter rolled back"}: ${args.target}`);
     lifecycle.printOperations(args.target, operations);
     return;
   }
   if (args.detach) {
-    const operations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force, preserve: [CANONICAL_REGISTRY_PATH] });
+    const operations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force, preserve: CORE_PRESERVE_PATHS });
     console.log(`${args.dryRun || args.check ? "Codex adapter detach dry run" : "Codex adapter detached"}: ${args.target}`);
     lifecycle.printOperations(args.target, operations);
     return;

@@ -24,6 +24,7 @@ Append one shared `Execution Envelope` for the task boundary, following `docs/ex
 
 Implementation Contract:
 - Artifact ID:
+- Artifact type: implementation
 - Upstream refs:
 - Actual files/components and change boundary:
 - Verification attempted:

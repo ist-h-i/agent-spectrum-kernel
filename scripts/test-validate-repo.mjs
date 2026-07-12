@@ -422,16 +422,17 @@ function applyLifecyclePlan() {
     `const STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const MANAGED_START = "<!-- agent-spectrum-kernel:start -->";
 const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
+const CORE_IMMUTABLE_CONTRACT_ASSETS = ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"];
 function install(manifest, options) {
   const skills = manifest.skills;
-  const dependencyAssetsForSkills = () => "skill_dependency_asset";
+  const immutableContract = "immutable_contract";
   const managed_files = {};
   const dryRun = options["--dry-run"];
   const currentHash = "current";
   const record = { sha256: "expected" };
   if (currentHash !== record.sha256) throw new Error("modified managed file; refusing to prune");
   unlinkSync("skills/example/SKILL.md");
-  if (dryRun) return { skills, managed_files, dependencyAssetsForSkills };
+  if (dryRun) return { skills, managed_files, CORE_IMMUTABLE_CONTRACT_ASSETS, immutableContract };
   if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
   if (options["--prune"]) return "stale managed projection";
   return STATE_PATH;
@@ -452,6 +453,9 @@ const PROFILE_ROUTING_FIXTURES = { implementation: [{ id: "unfamiliar_repository
 const SKILL_RELATIONSHIPS = { "controlled-implementation": { requires: ["test-first-verification"], recommends: ["evidence-ledger"], incompatibleWith: [] } };
 const LIFECYCLE_ASSET = "docs/lifecycle-artifact-contract.md";
 function requiredAssetsForPrompts() { return [LIFECYCLE_ASSET]; }
+const CORE_OWNED_IMMUTABLE_ASSETS = [LIFECYCLE_ASSET];
+const CORE_PRESERVE_PATHS = [LIFECYCLE_ASSET];
+function requiredAssetsForSkills() { return CORE_OWNED_IMMUTABLE_ASSETS; }
 function routingFixturesForProfile() {
   return { router_reachable_skills: ["repository-orientation"], routing_fixtures: PROFILE_ROUTING_FIXTURES.implementation };
 }
@@ -479,7 +483,7 @@ function install(manifest, options) {
   if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
   if (skipAgents) return ".agents/skills";
   if (options["--prune"]) return "stale Codex managed projection";
-  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill" + "codex_runtime" + "codex-exec-runner.mjs" + CODEX_RUNTIME_SCRIPTS + profile + retained_stale_prompts + retained_stale_commands + stale_codex_prompt + stale_codex_command + validateSkillClosure().required_skills + routingFixturesForProfile().router_reachable_skills + routingFixturesForProfile().routing_fixtures + validateManagedReferences() + requiredAssetsForPrompts() + '"spec-driven-development": { requires: ["work-package-compiler"] }';
+  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill" + "codex_runtime" + "codex-exec-runner.mjs" + CODEX_RUNTIME_SCRIPTS + profile + retained_stale_prompts + retained_stale_commands + stale_codex_prompt + stale_codex_command + validateSkillClosure().required_skills + routingFixturesForProfile().router_reachable_skills + routingFixturesForProfile().routing_fixtures + validateManagedReferences() + requiredAssetsForPrompts() + requiredAssetsForSkills() + CORE_PRESERVE_PATHS + "ASK core immutable contract is missing or stale" + '"spec-driven-development": { requires: ["work-package-compiler"] }';
 }
 `,
   );
@@ -529,6 +533,7 @@ const COMMAND_METADATA = {
 };
 const SKILL_RELATIONSHIPS = { "spec-driven-development": { requires: ["work-package-compiler"] } };
 const coreOwnedRequiredAssets = new Set();
+const CORE_PRESERVE_PATHS = ["docs/lifecycle-artifact-contract.md"];
 const CLAUDE_PROFILES = { full: { skills: DEFAULT_SKILLS, commands: COMMAND_TEMPLATES } };
 const PROFILE_ROUTING_FIXTURES = {
   implementation: [
@@ -569,7 +574,7 @@ function removeAdapterOwnedHooks() {
 }
 function install(args) {
   if (args.skipHooks || args.skipRuntime) removeManagedHooks();
-  if (args.profile || DEFAULT_PROFILE) return HELP + "Selected Claude commands are not closed over installed skills" + "settings.json" + installAssets(COMMAND_METADATA["skill-review.md"]) + validateCoreInstalled() + coreOwnedRequiredAssets + SKILL_RELATIONSHIPS;
+  if (args.profile || DEFAULT_PROFILE) return HELP + "Selected Claude commands are not closed over installed skills" + "settings.json" + installAssets(COMMAND_METADATA["skill-review.md"]) + validateCoreInstalled() + coreOwnedRequiredAssets + CORE_PRESERVE_PATHS + "ASK core immutable contract is missing or stale" + SKILL_RELATIONSHIPS;
 }
 `,
   );
@@ -2333,6 +2338,9 @@ function assertInstallerScripts() {
   if (!firstClaudeState.required_assets?.includes("docs/lifecycle-artifact-contract.md")) {
     throw new Error("Claude adapter state must record lifecycle contract as a required managed dependency");
   }
+  if (Object.hasOwn(firstClaudeState.managed_files ?? {}, "docs/lifecycle-artifact-contract.md")) {
+    throw new Error("Claude adapter must not claim ownership of the core lifecycle contract");
+  }
   if (Object.hasOwn(firstClaudeState.managed_files ?? {}, "schemas/review-signal-gate-map.json")) {
     throw new Error("Claude project installer must not claim ownership of the core canonical signal registry");
   }
@@ -2441,6 +2449,25 @@ function assertInstallerScripts() {
   if (existsSync(resolve(implementationTarget, ".claude/commands/skill-review.md"))) {
     throw new Error("implementation profile should not install review command");
   }
+
+  const corePruneOwnershipTarget = resolve(fixtureRoot, "install-claude-core-prune-ownership");
+  assertRuntimePass("Claude ownership full core setup", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget]));
+  assertRuntimePass("Claude ownership adapter setup", runRepoScript([installer, "--target", corePruneOwnershipTarget, "--profile", "implementation"]));
+  assertRuntimePass("Claude ownership core shrink prune", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget, "--skills", "evidence-ledger,risk-gate", "--prune"]));
+  if (!existsSync(resolve(corePruneOwnershipTarget, "docs/lifecycle-artifact-contract.md"))) {
+    throw new Error("core shrink prune must preserve immutable contracts required by an active Claude adapter");
+  }
+  assertInstalledDocReferences("Claude active adapter after core prune", corePruneOwnershipTarget, [".claude/skills", ".claude/commands"]);
+
+  const adapterDetachOwnershipTarget = resolve(fixtureRoot, "install-claude-adapter-detach-ownership");
+  assertRuntimePass("Claude ownership minimal core setup", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget, "--skills", "evidence-ledger,risk-gate"]));
+  assertRuntimePass("Claude ownership adapter install", runRepoScript([installer, "--target", adapterDetachOwnershipTarget, "--profile", "implementation"]));
+  assertRuntimePass("Claude ownership core expand", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget]));
+  assertRuntimePass("Claude ownership adapter detach", runRepoScript([installer, "--target", adapterDetachOwnershipTarget, "--detach"]));
+  if (!existsSync(resolve(adapterDetachOwnershipTarget, "docs/lifecycle-artifact-contract.md"))) {
+    throw new Error("Claude detach must preserve the core-owned lifecycle contract");
+  }
+  assertRuntimePass("core check after Claude ownership transition", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget, "--check"]));
 
   const rollbackTarget = resolve(fixtureRoot, "install-claude-rollback-target");
   assertRuntimePass("installer rollback core setup", runRepoScript([coreInstaller, "--target", rollbackTarget]));
@@ -2556,6 +2583,18 @@ function assertInstallerScripts() {
     throw new Error("installer missing core failure should not write adapter files");
   }
 
+  const missingCoreContractTarget = resolve(fixtureRoot, "install-claude-missing-core-contract");
+  assertRuntimePass("Claude missing contract core setup", runRepoScript([coreInstaller, "--target", missingCoreContractTarget]));
+  rmSync(resolve(missingCoreContractTarget, "docs/lifecycle-artifact-contract.md"));
+  assertRuntimeFail(
+    "Claude missing core contract",
+    runRepoScript([installer, "--target", missingCoreContractTarget, "--profile", "implementation"]),
+    "ASK core immutable contract is missing or stale",
+  );
+  if (existsSync(resolve(missingCoreContractTarget, ".claude"))) {
+    throw new Error("Claude adapter must not self-own or repair a missing core contract");
+  }
+
   const invalidPartialTarget = resolve(fixtureRoot, "install-invalid-partial-target");
   assertRuntimePass("installer invalid partial core setup", runRepoScript([coreInstaller, "--target", invalidPartialTarget]));
   assertRuntimeFail(
@@ -2661,8 +2700,8 @@ function assertCoreInstallerScripts() {
   if (!existsSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"))) {
     throw new Error("kernel installer should project manifest skills");
   }
-  if (freshState.managed_files?.["docs/lifecycle-artifact-contract.md"]?.kind !== "skill_dependency_asset") {
-    throw new Error("core installer state must manage lifecycle contract through skill dependency closure");
+  if (freshState.managed_files?.["docs/lifecycle-artifact-contract.md"]?.kind !== "immutable_contract") {
+    throw new Error("core installer state must always own the lifecycle contract as an immutable contract");
   }
   assertInstalledDocReferences("core installer dependency closure", freshTarget, ["skills"]);
   if (!existsSync(resolve(freshTarget, "docs/lifecycle-artifact-contract.md"))) {
@@ -2855,6 +2894,9 @@ function assertCodexInstallerScripts() {
   if (!freshState.required_assets?.includes("docs/lifecycle-artifact-contract.md")) {
     throw new Error("Codex adapter state must record lifecycle contract as a required managed dependency");
   }
+  if (Object.hasOwn(freshState.managed_files ?? {}, "docs/lifecycle-artifact-contract.md")) {
+    throw new Error("Codex adapter must not claim ownership of the core lifecycle contract");
+  }
   if (
     freshState.selected_profile !== "implementation" ||
     freshState.installed_skills.length >= manifest.skills.length ||
@@ -2890,6 +2932,40 @@ function assertCodexInstallerScripts() {
     "unclear_scope",
     "boundary_decision",
   ]);
+
+  const skillOnlyTarget = resolve(fixtureRoot, "codex-install-skill-only-contract");
+  assertRuntimePass("codex skill-only minimal core setup", runRepoScript([coreInstaller, "--target", skillOnlyTarget, "--skills", "evidence-ledger,risk-gate"]));
+  assertRuntimePass(
+    "codex skill-only lifecycle install",
+    runRepoScript([installer, "--target", skillOnlyTarget, "--skills", "test-first-verification,evidence-ledger", "--skip-prompts", "--skip-command"]),
+  );
+  const skillOnlyState = readCodexInstallState(skillOnlyTarget);
+  if (!skillOnlyState.required_assets?.includes("docs/lifecycle-artifact-contract.md") || !existsSync(resolve(skillOnlyTarget, ".agents/skills/test-first-verification/SKILL.md"))) {
+    throw new Error(`Codex skill-only install must close over lifecycle contract assets\n${JSON.stringify(skillOnlyState, null, 2)}`);
+  }
+  if (Object.hasOwn(skillOnlyState.managed_files ?? {}, "docs/lifecycle-artifact-contract.md")) {
+    throw new Error("Codex skill-only install must depend on, not own, the core lifecycle contract");
+  }
+  assertInstalledDocReferences("Codex skill-only install smoke", skillOnlyTarget, [".agents/skills"]);
+
+  const corePruneOwnershipTarget = resolve(fixtureRoot, "codex-install-core-prune-ownership");
+  assertRuntimePass("Codex ownership full core setup", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget]));
+  assertRuntimePass("Codex ownership adapter setup", runRepoScript([installer, "--target", corePruneOwnershipTarget]));
+  assertRuntimePass("Codex ownership core shrink prune", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget, "--skills", "evidence-ledger,risk-gate", "--prune"]));
+  if (!existsSync(resolve(corePruneOwnershipTarget, "docs/lifecycle-artifact-contract.md"))) {
+    throw new Error("core shrink prune must preserve immutable contracts required by an active Codex adapter");
+  }
+  assertInstalledDocReferences("Codex active adapter after core prune", corePruneOwnershipTarget, [".agents/skills", ".agents/prompts", ".agents/commands"]);
+
+  const adapterDetachOwnershipTarget = resolve(fixtureRoot, "codex-install-adapter-detach-ownership");
+  assertRuntimePass("Codex ownership minimal core setup", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget, "--skills", "evidence-ledger,risk-gate"]));
+  assertRuntimePass("Codex ownership adapter install", runRepoScript([installer, "--target", adapterDetachOwnershipTarget]));
+  assertRuntimePass("Codex ownership core expand", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget]));
+  assertRuntimePass("Codex ownership adapter detach", runRepoScript([installer, "--target", adapterDetachOwnershipTarget, "--detach"]));
+  if (!existsSync(resolve(adapterDetachOwnershipTarget, "docs/lifecycle-artifact-contract.md"))) {
+    throw new Error("Codex detach must preserve the core-owned lifecycle contract");
+  }
+  assertRuntimePass("core check after Codex ownership transition", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget, "--check"]));
 
   const beforeRerunAgents = readFileSync(resolve(freshTarget, "AGENTS.md"), "utf8");
   const beforeRerunState = readFileSync(resolve(freshTarget, ".agent-spectrum-kernel/codex-install-state.json"), "utf8");
@@ -3068,6 +3144,18 @@ function assertCodexInstallerScripts() {
     runRepoScript([installer, "--target", resolve(fixtureRoot, "codex-install-unknown"), "--skills", "missing-skill", "--skip-prompts", "--skip-command"]),
     "Unknown skill",
   );
+
+  const missingCoreContractTarget = resolve(fixtureRoot, "codex-install-missing-core-contract");
+  assertRuntimePass("Codex missing contract core setup", runRepoScript([coreInstaller, "--target", missingCoreContractTarget]));
+  rmSync(resolve(missingCoreContractTarget, "docs/lifecycle-artifact-contract.md"));
+  assertRuntimeFail(
+    "Codex missing core contract",
+    runRepoScript([installer, "--target", missingCoreContractTarget]),
+    "ASK core immutable contract is missing or stale",
+  );
+  if (existsSync(resolve(missingCoreContractTarget, ".agents"))) {
+    throw new Error("Codex adapter must not self-own or repair a missing core contract");
+  }
 
   const invalidClosureTarget = resolve(fixtureRoot, "codex-install-invalid-closure");
   assertRuntimeFail(

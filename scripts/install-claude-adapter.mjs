@@ -8,6 +8,8 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const STATE_PATH = ".agent-spectrum-kernel/claude-install-state.json";
 const CANONICAL_REGISTRY_PATH = "schemas/review-signal-gate-map.json";
+const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_IMMUTABLE_CONTRACT_ASSETS;
+const CORE_PRESERVE_PATHS = [CANONICAL_REGISTRY_PATH, ...CORE_OWNED_IMMUTABLE_ASSETS];
 const DEFAULT_PROFILE = "full";
 const HOOK_MARKER = "agent-spectrum-kernel:claude-adapter-hook";
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
@@ -780,10 +782,7 @@ function installRuntime(args, writes) {
 
 function installAssets(args, writes) {
   for (const asset of args.requiredAssets) {
-    const coreRecord = args.coreState?.managed_files?.[asset];
-    const sourceContent = readFileSync(resolve(REPO_ROOT, asset), "utf8");
-    const targetPath = resolve(args.target, asset);
-    if (coreRecord?.sha256 === lifecycle.hashText(sourceContent) && existsSync(targetPath) && lifecycle.hashText(readFileSync(targetPath, "utf8")) === coreRecord.sha256) {
+    if (CORE_OWNED_IMMUTABLE_ASSETS.includes(asset)) {
       args.coreOwnedRequiredAssets.add(asset);
       continue;
     }
@@ -854,7 +853,14 @@ function validateCoreInstalled(args) {
   if (!registryRecord?.sha256 || !existsSync(registryPath) || lifecycle.hashText(readFileSync(registryPath, "utf8")) !== registryRecord.sha256) {
     throw new Error(`ASK core canonical review signal registry is missing or does not match core install state: ${CANONICAL_REGISTRY_PATH}`);
   }
-  args.coreState = state;
+  for (const asset of args.requiredAssets.filter((path) => CORE_OWNED_IMMUTABLE_ASSETS.includes(path))) {
+    const sourceContent = readFileSync(resolve(REPO_ROOT, asset), "utf8");
+    const record = state?.managed_files?.[asset];
+    const targetPath = resolve(args.target, asset);
+    if (record?.kind !== "immutable_contract" || record.sha256 !== lifecycle.hashText(sourceContent) || !existsSync(targetPath) || lifecycle.hashText(readFileSync(targetPath, "utf8")) !== record.sha256) {
+      throw new Error(`ASK core immutable contract is missing or stale: ${asset}. Re-run scripts/install-kernel.mjs before installing the Claude adapter.`);
+    }
+  }
 }
 
 function readPreviousState(target) {
@@ -1042,7 +1048,7 @@ function main() {
       statePath: STATE_PATH,
       dryRun: args.dryRun || args.check,
       force: args.force,
-      preserve: [CANONICAL_REGISTRY_PATH],
+      preserve: CORE_PRESERVE_PATHS,
       extendOperations: ({ state, operations: plan }) => {
         const hookOperation = restoreManagedHookSubset(args.target, state, { force: args.force });
         if (hookOperation) plan.push(hookOperation);
@@ -1064,7 +1070,7 @@ function main() {
     };
     const hookWrites = [];
     removeManagedHooks(hookArgs, hookWrites);
-    const detachOperations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: true, force: args.force, preserve: [CANONICAL_REGISTRY_PATH] });
+    const detachOperations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: true, force: args.force, preserve: CORE_PRESERVE_PATHS });
     const operations = [...hookArgs.operations, ...detachOperations];
     if (!args.dryRun && !args.check) {
       lifecycle.applyOperations(operations, false);

@@ -23,6 +23,7 @@ Append one shared `Execution Envelope` for the verification boundary, following 
 
 Verification Contract:
 - Artifact ID:
+- Artifact type: verification
 - Upstream refs:
 - Behavior to prove:
 - Focused checks:

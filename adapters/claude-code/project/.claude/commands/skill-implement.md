@@ -18,7 +18,7 @@ Keep the change boundary narrow:
 - use `/evidence-ledger` for correctness, readiness, safety, reliability, performance, or no-regression claims
 - emit exactly one fenced JSON `Execution Envelope` per task boundary using `docs/execution-envelope-contract.md`; keep implementation details in the skill artifact
 
-The Implementation Contract records only upstream refs, implementation decisions not fixed upstream, actual change boundary, verification attempts, evidence refs, remaining limitations, handoff state, and any present deviation/discovery/delta.
+The Implementation Contract preserves the canonical header (`Artifact ID`, `Artifact type: implementation`, and `Upstream refs`) and records only implementation decisions not fixed upstream, actual change boundary, verification attempts, evidence refs, remaining limitations, handoff state, and any present deviation/discovery/delta.
 
 Do not deploy, publish, release, send notifications, change secrets, or mutate production configuration from this command.
 

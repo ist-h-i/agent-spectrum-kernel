@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildAgentsBlock,
+  CORE_IMMUTABLE_CONTRACT_ASSETS,
   buildLifecycleState,
   createManagedBlockRecord,
   createManagedFileRecord,
@@ -28,8 +29,6 @@ const STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const MANAGED_START = "<!-- agent-spectrum-kernel:start -->";
 const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
-const DOC_REFERENCE_PATTERN = /\bdocs\/[A-Za-z0-9._/-]+/g;
-
 function parseArgs(argv) {
   const args = {
     target: process.cwd(),
@@ -140,21 +139,6 @@ function ensureSource(path, label) {
   }
 }
 
-function dependencyAssetsForSkills(skills) {
-  const assets = new Set();
-  for (const skill of skills) {
-    const source = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
-    ensureSource(source, `skills/${skill}/SKILL.md`);
-    for (const match of readText(source).matchAll(DOC_REFERENCE_PATTERN)) {
-      const asset = match[0];
-      const assetPath = resolve(REPO_ROOT, asset);
-      const isImmutableContract = asset.endsWith("-contract.md") && !asset.startsWith("docs/ai/");
-      if (isImmutableContract && existsSync(assetPath) && statSync(assetPath).isFile()) assets.add(asset);
-    }
-  }
-  return [...assets].sort();
-}
-
 function buildState({ manifest, skills, selectedSkills, retainedStaleSkills, managedFiles, managedBlocks, previousState, rollback, hasMutations }) {
   return buildLifecycleState({
     manifest,
@@ -200,12 +184,6 @@ function buildPlan(args) {
   );
   const previousSkills = new Set(previousSkillNames);
   const selectedSkills = new Set(skills);
-  const dependencyAssets = dependencyAssetsForSkills(skills);
-  const selectedDependencyAssets = new Set(dependencyAssets);
-  const previousDependencyAssets = Object.entries(previousState?.managed_files ?? {})
-    .filter(([, record]) => record?.kind === "skill_dependency_asset" || record?.kind === "stale_skill_dependency_asset")
-    .map(([path]) => path);
-  const staleDependencyAssets = previousDependencyAssets.filter((asset) => !selectedDependencyAssets.has(asset)).sort();
   const staleSkills = [...previousSkills].filter((skill) => !selectedSkills.has(skill)).sort();
   const operations = [];
   const managedFiles = {};
@@ -268,16 +246,16 @@ function buildPlan(args) {
     rollback,
   });
 
-  for (const asset of dependencyAssets) {
+  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
     const source = resolve(REPO_ROOT, asset);
     ensureSource(source, asset);
     const content = readText(source);
-    managedFiles[asset] = createManagedFileRecord({ kind: "skill_dependency_asset", asset, content });
+    managedFiles[asset] = createManagedFileRecord({ kind: "immutable_contract", asset, content });
     planWriteManaged(operations, {
       target: args.target,
       relativePath: asset,
       content,
-      reason: `skill_dependency_asset:${asset}`,
+      reason: `immutable_contract:${asset}`,
       previousState,
       force: args.force,
       rollback,
@@ -318,21 +296,11 @@ function buildPlan(args) {
     }
   }
 
-  for (const asset of staleDependencyAssets) {
-    if (args.prune) {
-      planDeleteManaged(operations, { target: args.target, relativePath: asset, previousState, force: args.force, rollback, reason: `stale skill dependency asset:${asset}` });
-      planRemoveEmptyDirectory(operations, args.target, dirname(asset), `empty stale skill dependency asset directory:${asset}`);
-    } else {
-      const record = previousManagedRecord(previousState, asset);
-      if (record) managedFiles[asset] = { ...record, kind: "stale_skill_dependency_asset", asset };
-    }
-  }
-
   const stateSkills = args.prune ? skills : [...new Set([...skills, ...staleSkills])].sort();
   const retainedStaleSkills = args.prune ? [] : staleSkills;
   const state = buildState({ manifest, skills: stateSkills, selectedSkills: skills, retainedStaleSkills, managedFiles, managedBlocks, previousState, rollback, hasMutations: operations.some((operation) => !operation.unchanged) });
 
-  return { operations, staleSkills, staleDependencyAssets, state };
+  return { operations, staleSkills, state };
 }
 
 function printPlan(args, plan) {
@@ -343,10 +311,6 @@ function printPlan(args, plan) {
   for (const skill of plan.staleSkills) {
     const action = args.prune ? "pruned" : "stale managed projection";
     console.log(`- ${action}: skills/${skill}`);
-  }
-  for (const asset of plan.staleDependencyAssets) {
-    const action = args.prune ? "pruned" : "stale skill dependency asset";
-    console.log(`- ${action}: ${asset}`);
   }
   console.log("Safety defaults: local file projection only; no hooks, telemetry, secrets, deploys, external publication, or Git commands.");
 }
