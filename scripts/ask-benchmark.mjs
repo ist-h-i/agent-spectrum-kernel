@@ -264,6 +264,7 @@ function executeCases(args) {
       const prompt = readFileSync(resolve(target, "BENCHMARK_TASK.md"), "utf8");
       const commandArgs = [
         "exec",
+        ...(entry.workspace_subdir ? ["--skip-git-repo-check"] : []),
         "--ephemeral",
         "--ignore-user-config",
         "--ignore-rules",
