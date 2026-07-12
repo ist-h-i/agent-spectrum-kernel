@@ -1343,37 +1343,81 @@ export function inspectTraceabilityScenarioResult(scenario) {
     artifactById.set(artifact.id, { ...artifact, itemById });
   }
 
-  function inspectRefs(owner, field, refs) {
+  function resolveTraceRef(owner, field, ref, { requireItem = false, reportResolutionIssues = true } = {}) {
+    const result = { ref, label: traceRefLabel(ref), structureValid: false, artifact: null, item: null, current: false };
+    if (typeof ref === "string") {
+      issues.push(`${owner} ${field} contains unversioned reference ${ref}`);
+      return result;
+    }
+    if (!ref || typeof ref !== "object" || Array.isArray(ref)) {
+      issues.push(`${owner} ${field} contains malformed reference`);
+      return result;
+    }
+    if (typeof ref.artifact_id !== "string" || !ref.artifact_id.trim()) {
+      issues.push(`${owner} ${field} contains malformed artifact_id`);
+      return result;
+    }
+    if (!Object.hasOwn(ref, "observed_revision")) {
+      issues.push(`${owner} ${field} contains reference without observed_revision`);
+      return result;
+    }
+    if (!Number.isInteger(ref.observed_revision) || ref.observed_revision < 1) {
+      issues.push(`${owner} ${field} requires positive observed_revision`);
+      return result;
+    }
+    if (requireItem && (typeof ref.item_id !== "string" || !ref.item_id.trim())) {
+      issues.push(`${owner} ${field} requires non-empty item_id`);
+      return result;
+    }
+    if (ref.item_id !== undefined && (typeof ref.item_id !== "string" || !ref.item_id.trim())) {
+      issues.push(`${owner} ${field} contains malformed item_id`);
+      return result;
+    }
+    result.structureValid = true;
+    result.artifact = artifactById.get(ref.artifact_id) ?? null;
+    if (!result.artifact) {
+      if (reportResolutionIssues) issues.push(`${owner} ${field} references missing artifact ${ref.artifact_id}`);
+      return result;
+    }
+    result.current = ref.observed_revision === result.artifact.revision;
+    if (!result.current && reportResolutionIssues) {
+      issues.push(`${owner} ${field} references stale ${ref.artifact_id}@${ref.observed_revision}; current revision is ${result.artifact.revision}`);
+    }
+    result.item = ref.item_id ? result.artifact.itemById.get(ref.item_id) ?? null : null;
+    if (ref.item_id && !result.item && reportResolutionIssues) issues.push(`${owner} ${field} references missing item ${result.label}`);
+    return result;
+  }
+
+  function inspectRefs(owner, field, refs, { requireItem = false } = {}) {
     if (!Array.isArray(refs)) {
       issues.push(`${owner} ${field} must be an array`);
-      return;
+      return [];
     }
     const hasStructured = refs.some((ref) => ref && typeof ref === "object" && !Array.isArray(ref));
     const hasUnversioned = refs.some((ref) => typeof ref === "string");
     if (hasStructured && hasUnversioned) issues.push(`${owner} ${field} cannot mix structured and unversioned refs`);
-    for (const ref of refs) {
-      if (typeof ref === "string") {
-        issues.push(`${owner} ${field} contains unversioned reference ${ref}`);
-        continue;
+    return refs.map((ref) => resolveTraceRef(owner, field, ref, { requireItem }));
+  }
+
+  function evidenceReachesRequired(evidenceResolution, requiredRef) {
+    if (!evidenceResolution?.structureValid || !evidenceResolution.artifact || !evidenceResolution.current) return false;
+    if (evidenceResolution.ref.artifact_id === requiredRef.artifact_id && evidenceResolution.ref.item_id === requiredRef.item_id && evidenceResolution.ref.observed_revision === requiredRef.observed_revision) return true;
+    const visited = new Set();
+    const queue = [evidenceResolution.artifact.id];
+    while (queue.length > 0) {
+      const artifactId = queue.shift();
+      if (visited.has(artifactId)) continue;
+      visited.add(artifactId);
+      const artifact = artifactById.get(artifactId);
+      for (const upstreamRef of artifact?.upstream_refs ?? []) {
+        if (!upstreamRef || typeof upstreamRef !== "object" || Array.isArray(upstreamRef)) continue;
+        const upstreamArtifact = artifactById.get(upstreamRef.artifact_id);
+        if (!upstreamArtifact || upstreamRef.observed_revision !== upstreamArtifact.revision) continue;
+        if (upstreamRef.artifact_id === requiredRef.artifact_id && upstreamRef.item_id === requiredRef.item_id && upstreamRef.observed_revision === requiredRef.observed_revision) return true;
+        queue.push(upstreamRef.artifact_id);
       }
-      if (ref && typeof ref === "object" && typeof ref.artifact_id === "string" && !Number.isInteger(ref.observed_revision)) {
-        issues.push(`${owner} ${field} contains reference without observed_revision`);
-        continue;
-      }
-      if (!ref || typeof ref !== "object" || typeof ref.artifact_id !== "string") {
-        issues.push(`${owner} ${field} contains malformed reference`);
-        continue;
-      }
-      const artifact = artifactById.get(ref.artifact_id);
-      if (!artifact) {
-        issues.push(`${owner} ${field} references missing artifact ${ref.artifact_id}`);
-        continue;
-      }
-      if (ref.observed_revision !== artifact.revision) {
-        issues.push(`${owner} ${field} references stale ${ref.artifact_id}@${ref.observed_revision}; current revision is ${artifact.revision}`);
-      }
-      if (ref.item_id !== undefined && !artifact.itemById.has(ref.item_id)) issues.push(`${owner} ${field} references missing item ${traceRefLabel(ref)}`);
     }
+    return false;
   }
 
   for (const artifact of artifactById.values()) inspectRefs(artifact.id, "upstream_refs", artifact.upstream_refs);
@@ -1388,18 +1432,28 @@ export function inspectTraceabilityScenarioResult(scenario) {
     if (claimById.has(claim.id)) issues.push(`duplicate traceability claim id ${claim.id}`);
     if (!["completion", "merge", "release"].includes(claim.type)) issues.push(`${claim.id} has invalid claim type ${claim.type}`);
     if (!["supported", "blocked", "insufficient_evidence"].includes(claim.status)) issues.push(`${claim.id} has invalid claim status ${claim.status}`);
-    for (const field of ["subject_refs", "evidence_refs", "blocker_refs", "accepted_risk_refs"]) inspectRefs(claim.id, field, claim[field]);
+    inspectRefs(claim.id, "subject_refs", claim.subject_refs);
+    const evidenceResolutions = inspectRefs(claim.id, "evidence_refs", claim.evidence_refs, { requireItem: true });
+    const blockerResolutions = inspectRefs(claim.id, "blocker_refs", claim.blocker_refs, { requireItem: true });
+    const acceptedRiskResolutions = inspectRefs(claim.id, "accepted_risk_refs", claim.accepted_risk_refs, { requireItem: true });
     if (!Array.isArray(claim.subject_refs) || claim.subject_refs.length === 0) issues.push(`${claim.id} requires subject_refs`);
     if (claim.status === "supported" && (!Array.isArray(claim.evidence_refs) || claim.evidence_refs.length === 0)) issues.push(`${claim.id} supported claim requires evidence_refs`);
     if (claim.status === "supported" && Array.isArray(claim.blocker_refs) && claim.blocker_refs.length > 0) issues.push(`${claim.id} supported claim cannot retain blocker_refs`);
     if (claim.status === "blocked" && (!Array.isArray(claim.blocker_refs) || claim.blocker_refs.length === 0)) issues.push(`${claim.id} blocked claim requires blocker_refs`);
-    for (const ref of claim.evidence_refs ?? []) {
-      const item = artifactById.get(ref.artifact_id)?.itemById.get(ref.item_id);
-      if (!item || item.kind !== "evidence") issues.push(`${claim.id} evidence_refs must point to evidence items: ${traceRefLabel(ref)}`);
+    for (const resolution of evidenceResolutions) {
+      if (resolution.structureValid && resolution.artifact && resolution.current && (!resolution.item || resolution.artifact.type !== "evidence" || resolution.item.kind !== "evidence")) {
+        issues.push(`${claim.id} evidence_refs must point to evidence items: ${resolution.label}`);
+      }
     }
-    for (const ref of claim.accepted_risk_refs ?? []) {
-      const item = artifactById.get(ref.artifact_id)?.itemById.get(ref.item_id);
-      if (!item || item.kind !== "accepted_risk") issues.push(`${claim.id} accepted_risk_refs must point to accepted_risk items: ${traceRefLabel(ref)}`);
+    for (const resolution of blockerResolutions) {
+      if (resolution.structureValid && resolution.artifact && resolution.current && (!resolution.item || resolution.artifact.type !== "review" || resolution.item.kind !== "blocker")) {
+        issues.push(`${claim.id} blocker_refs must point to review blocker items: ${resolution.label}`);
+      }
+    }
+    for (const resolution of acceptedRiskResolutions) {
+      if (resolution.structureValid && resolution.artifact && resolution.current && (!resolution.item || resolution.artifact.type !== "review" || resolution.item.kind !== "accepted_risk")) {
+        issues.push(`${claim.id} accepted_risk_refs must point to accepted_risk items: ${resolution.label}`);
+      }
     }
 
     const allowedGapTypes = TRACEABILITY_CLAIM_GAP_TYPES[claim.type] ?? [];
@@ -1422,10 +1476,11 @@ export function inspectTraceabilityScenarioResult(scenario) {
 
     const requiredRefs = Array.isArray(claim.required_refs) ? claim.required_refs : [];
     const claimGaps = [];
+    const supportGapLabels = new Set();
     for (const gapType of applicableGapTypes) {
       const entries = requiredRefs.filter((entry) => entry?.gap_type === gapType);
       if (entries.length === 0) {
-        claimGaps.push({ gap_type: gapType, required_by_claim: claim.id, missing_item_ref: "undeclared", stage: claim.type === "merge" ? "review" : claim.type });
+        issues.push(`${claim.id} applicable ${gapType} requires exact required_refs item_ref`);
       }
     }
     for (const entry of requiredRefs) {
@@ -1434,18 +1489,23 @@ export function inspectTraceabilityScenarioResult(scenario) {
         continue;
       }
       const ref = entry.item_ref;
-      const label = traceRefLabel(ref);
-      const artifact = ref && typeof ref === "object" ? artifactById.get(ref.artifact_id) : null;
-      const item = artifact && ref?.item_id ? artifact.itemById.get(ref.item_id) : null;
-      const current = artifact && Number.isInteger(ref?.observed_revision) && ref.observed_revision === artifact.revision;
-      const kindAllowed = item && (TRACEABILITY_GAP_ITEM_KINDS[entry.gap_type] ?? []).includes(item.kind);
-      if (!artifact || !item || !current || !kindAllowed) {
-        claimGaps.push({ gap_type: entry.gap_type, required_by_claim: claim.id, missing_item_ref: label, stage: claim.type === "merge" ? "review" : claim.type });
+      const field = `required_refs[${entry.gap_type}].item_ref`;
+      const resolution = resolveTraceRef(claim.id, field, ref, { requireItem: true, reportResolutionIssues: false });
+      if (!resolution.structureValid) continue;
+      const kindAllowed = resolution.item && (TRACEABILITY_GAP_ITEM_KINDS[entry.gap_type] ?? []).includes(resolution.item.kind);
+      if (!resolution.artifact || !resolution.item || !resolution.current || !kindAllowed) {
+        claimGaps.push({ gap_type: entry.gap_type, required_by_claim: claim.id, missing_item_ref: resolution.label, stage: claim.type === "merge" ? "review" : claim.type });
+        continue;
+      }
+      if (["acceptance", "verification"].includes(entry.gap_type) && !evidenceResolutions.some((evidenceResolution) => evidenceReachesRequired(evidenceResolution, ref))) {
+        claimGaps.push({ gap_type: entry.gap_type, required_by_claim: claim.id, missing_item_ref: resolution.label, stage: claim.type === "merge" ? "review" : claim.type });
+        supportGapLabels.add(`${entry.gap_type}:${resolution.label}`);
+        if (claim.status === "supported") issues.push(`${claim.id} evidence_refs cannot reach required ${entry.gap_type} ${resolution.label}`);
       }
     }
     for (const gap of claimGaps) {
       gaps.push(gap);
-      if (claim.status === "supported") issues.push(`${claim.id} supported claim has ${gap.gap_type} gap at ${gap.missing_item_ref}`);
+      if (claim.status === "supported" && !supportGapLabels.has(`${gap.gap_type}:${gap.missing_item_ref}`)) issues.push(`${claim.id} supported claim has ${gap.gap_type} gap at ${gap.missing_item_ref}`);
     }
     if (claim.status === "insufficient_evidence" && claimGaps.length === 0) issues.push(`${claim.id} insufficient_evidence claim requires at least one structured gap`);
 
@@ -1488,7 +1548,7 @@ function validateLifecycleTraceabilityContract(root, manifest, errors) {
   }
   if (!checks.contractPresent || !checks.fixturePresent) return checks;
   const contract = readFileSync(resolve(root, LIFECYCLE_TRACEABILITY_CONTRACT_PATH), "utf8");
-  for (const phrase of ["Stable reference model", "observed_revision", "Claim record", "insufficient evidence", "Trivial or localized", "observed facts", "never waives", "upstream_refs` remains the canonical", "must not be mixed", "Structured gaps", "accepted_by", "acceptance`, `verification`, `review`, `approval`, and `rollback", "Release Readiness", "No central server"]) {
+  for (const phrase of ["Stable reference model", "observed_revision", "Claim record", "insufficient evidence", "Trivial or localized", "observed facts", "never waives", "upstream_refs` remains the canonical", "must not be mixed", "same resolver rules", "must reach the exact required item", "kind is `blocker`", "missing_item_ref: undeclared", "Structured gaps", "accepted_by", "acceptance`, `verification`, `review`, `approval`, and `rollback", "Release Readiness", "No central server"]) {
     if (!contract.toLowerCase().includes(phrase.toLowerCase())) fail(errors, "lifecycle traceability", `${LIFECYCLE_TRACEABILITY_CONTRACT_PATH} is missing ${phrase}`);
   }
   for (const path of TRACEABILITY_SKILL_PATHS) {
@@ -1522,6 +1582,13 @@ function validateLifecycleTraceabilityContract(root, manifest, errors) {
     "release-gap-rollback-negative",
     "mixed-reference-formats",
     "revision-omitted-ref",
+    "disconnected-evidence",
+    "required-ref-revision-omitted",
+    "required-ref-string",
+    "subject-ref-revision-omitted",
+    "blocker-ref-revision-omitted",
+    "release-required-ref-omitted",
+    "wrong-kind-blocker-ref",
     "stale-reference",
     "contradictory-claims",
   ]);

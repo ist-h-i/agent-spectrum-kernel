@@ -4,7 +4,7 @@
 
 Changes:
 
-- Added an optional lifecycle traceability contract with stable item/revision refs, claim-scoped evidence sufficiency, accepted-risk ownership, implementation-to-review and review-to-release examples, and validation for complete, partial, exempt, stale, contradictory, and exact release-gap chains.
+- Added an optional lifecycle traceability contract with stable item/revision refs, claim-scoped evidence reachability, typed blocker refs, accepted-risk ownership, implementation-to-review and review-to-release examples, and validation for complete, partial, exempt, stale, malformed, disconnected, contradictory, and exact release-gap chains.
 - Added execution, knowledge, and control plane metadata for every canonical Skill, explicit cross-plane transition guards, manifest-governed daily/organizational projection packs, Claude/Codex profile support, and validation for invalid assignments, packs, and route references.
 - Made pack-profile shrink fail closed without `--prune`, derived selected/installed planes and pack identity from actual Skill sets, recorded custom overrides honestly, and added adapter capability stops for routes absent from `selected_skills`.
 - Added the canonical lifecycle artifact contract for Requirement, Spec, Work Package, Verification, and Implementation responsibilities, including reference-plus-delta inheritance, compact/partial paths, contradiction stops, aligned skills/adapters, and eight validated workflow-chain scenarios.

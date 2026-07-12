@@ -40,6 +40,8 @@ The portable structured form is:
 
 Claim fields such as `subject_refs`, `evidence_refs`, `blocker_refs`, `accepted_risk_refs`, and `required_refs[].item_ref` are typed uses of the same structured reference. They map a claim; they do not replace `upstream_refs`.
 
+Every one of those fields uses the same resolver rules: the ref must be an object with a non-empty `artifact_id`, a positive integer `observed_revision`, and a non-empty `item_id` where an item is required. String refs are invalid. A malformed required ref is a structural error, not an evidence gap.
+
 Canonical item kinds:
 
 | Artifact | Stable item kinds |
@@ -89,8 +91,10 @@ Rules:
 - Each claim classifies every allowed gap type as applicable or not applicable. Applicable types require an exact expected item ref; every not-applicable type requires a reason and evidence. This is how a partial chain is distinguished from an insufficient chain without allowing silent or self-serving omission.
 - Completion classifies `acceptance` and `verification`; merge classifies `implementation` and `review`; release classifies `acceptance`, `verification`, `review`, `approval`, and `rollback`.
 - `supported` requires at least one current evidence ref, every applicable required ref to resolve at its observed revision, and no unresolved blocker ref.
-- `blocked` requires exact blocker refs.
+- For `acceptance` and `verification`, at least one claim evidence ref must reach the exact required item by following current `upstream_refs`. Merely listing unrelated current refs in the same claim does not establish support.
+- `blocked` requires exact blocker refs, and every blocker ref resolves to a `review` artifact item whose kind is `blocker`.
 - `insufficient_evidence` emits one structured gap for every missing, stale, or wrong-kind required ref. It names the expected ref; it does not synthesize the absent artifact.
+- If an applicable gap type has no `required_refs` entry, the claim is structurally invalid. It must not emit `missing_item_ref: undeclared` or pass as ordinary insufficient evidence.
 - Two claims about the same type and subjects with incompatible statuses are contradictory unless the later claim lists every displaced claim in `supersedes_claim_refs`.
 - A complete chain is evidence of trace coverage, not proof of business correctness.
 

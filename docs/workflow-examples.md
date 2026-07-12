@@ -220,6 +220,8 @@ REL-001@1
      status: supported
 ```
 
+`EVID-REL@1#CI-PASS` must reference, directly or transitively through current `upstream_refs`, the exact acceptance and verification items it supports. Co-locating disconnected refs in `CLAIM-RELEASE-001` is invalid.
+
 A release claim with missing evidence emits one structured record per gap:
 
 ```text
