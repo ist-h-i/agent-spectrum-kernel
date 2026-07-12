@@ -1,0 +1,176 @@
+--- a/src/auth-service.mjs
++++ b/src/auth-service.mjs
+@@ -28,4 +28,22 @@
+       expiresAt: session.expiresAt
+     };
+   }
++
++  async refresh(rawRefreshToken) {
++    if (typeof rawRefreshToken !== 'string' || rawRefreshToken.length < 8) throw new AuthError();
++    const currentHash = hashRefreshToken(rawRefreshToken);
++    const session = this.sessions.findByRefreshHash(currentHash);
++    if (!session) throw new AuthError();
++    if (session.expiresAt < this.clock.now()) throw new AuthError('Session expired');
++
++    const nextRefreshToken = this.tokenIssuer.issueRefreshToken();
++    await this.sessions.rotate(session.id, currentHash, hashRefreshToken(nextRefreshToken));
++    const accessToken = await this.tokenIssuer.issueAccessToken({
++      id: session.accountId,
++      tenantId: session.tenantId,
++      role: session.role
++    });
++
++    return { accessToken, refreshToken: nextRefreshToken, expiresAt: session.expiresAt };
++  }
+ }
+--- a/src/errors.mjs
++++ b/src/errors.mjs
+@@ -5,3 +5,11 @@
+     this.code = 'AUTH_FAILED';
+   }
+ }
++
++export class StaleSessionError extends AuthError {
++  constructor() {
++    super('Refresh token was already rotated');
++    this.name = 'StaleSessionError';
++    this.code = 'STALE_SESSION';
++  }
++}
+--- a/src/http-handlers.mjs
++++ b/src/http-handlers.mjs
+@@ -1,4 +1,4 @@
+-import { AuthError } from './errors.mjs';
++import { AuthError, StaleSessionError } from './errors.mjs';
+ 
+ export function createLoginHandler(authService) {
+   return async function loginHandler(request) {
+@@ -11,3 +11,17 @@
+     }
+   };
+ }
++
++export function createRefreshHandler(authService) {
++  return async function refreshHandler(request) {
++    try {
++      const result = await authService.refresh(request.body?.refreshToken);
++      return { status: 200, headers: { 'cache-control': 'no-store' }, body: result };
++    } catch (error) {
++      if (error instanceof AuthError || error instanceof StaleSessionError) {
++        return { status: 401, body: { error: error.code } };
++      }
++      return { status: 500, body: { error: 'INTERNAL' } };
++    }
++  };
++}
+--- a/src/session-store.mjs
++++ b/src/session-store.mjs
+@@ -1,16 +1,41 @@
+ import { AuthError } from './errors.mjs';
++import { sameDigest } from './tokens.mjs';
+ 
+ export class SessionStore {
+   #records = new Map();
++  #refreshIndex = new Map();
++
++  constructor({ beforeWrite = async () => {} } = {}) {
++    this.beforeWrite = beforeWrite;
++  }
+ 
+   create(session) {
+     if (this.#records.has(session.id)) throw new AuthError('Duplicate session');
+-    this.#records.set(session.id, structuredClone(session));
+-    return structuredClone(session);
++    const copy = structuredClone(session);
++    this.#records.set(copy.id, copy);
++    this.#refreshIndex.set(copy.refreshHash, copy.id);
++    return structuredClone(copy);
+   }
+ 
+   getById(id) {
+     const session = this.#records.get(id);
+     return session ? structuredClone(session) : null;
+   }
++
++  findByRefreshHash(refreshHash) {
++    const id = this.#refreshIndex.get(refreshHash);
++    const session = id ? this.#records.get(id) : null;
++    if (!session || !sameDigest(session.refreshHash, refreshHash)) return null;
++    return structuredClone(session);
++  }
++
++  async rotate(id, expectedRefreshHash, nextRefreshHash) {
++    await this.beforeWrite({ id, expectedRefreshHash, nextRefreshHash });
++    const session = this.#records.get(id);
++    if (!session) throw new AuthError();
++    this.#refreshIndex.delete(expectedRefreshHash);
++    session.refreshHash = nextRefreshHash;
++    this.#refreshIndex.set(nextRefreshHash, id);
++    return structuredClone(session);
++  }
+ }
+--- a/src/tokens.mjs
++++ b/src/tokens.mjs
+@@ -1,5 +1,12 @@
+-import { createHash } from 'node:crypto';
++import { createHash, timingSafeEqual } from 'node:crypto';
+ 
+ export function hashRefreshToken(rawToken) {
+   return createHash('sha256').update(rawToken, 'utf8').digest('hex');
+ }
++
++export function sameDigest(left, right) {
++  const leftBuffer = Buffer.from(left, 'hex');
++  const rightBuffer = Buffer.from(right, 'hex');
++  if (leftBuffer.length !== rightBuffer.length) return false;
++  return timingSafeEqual(leftBuffer, rightBuffer);
++}
+--- a/test/auth-service.test.mjs
++++ b/test/auth-service.test.mjs
+@@ -3,10 +3,12 @@
+ import { AccountStore } from '../src/account-store.mjs';
+ import { SessionStore } from '../src/session-store.mjs';
+ import { AuthService } from '../src/auth-service.mjs';
++import { hashRefreshToken } from '../src/tokens.mjs';
+ 
+ function issuer() {
++  const refreshTokens = ['refresh-login', 'refresh-next'];
+   return {
+-    issueRefreshToken: () => 'refresh-1',
++    issueRefreshToken: () => refreshTokens.shift(),
+     issueSessionId: () => 'session-1',
+     issueAccessToken: async ({ id, role }) => `access:${id}:${role}`
+   };
+@@ -20,3 +22,17 @@
+   assert.equal(result.accessToken, 'access:a1:member');
+   assert.ok(sessions.getById('session-1'));
+ });
++
++test('refresh returns a new pair and invalidates the old refresh token', async () => {
++  const accounts = new AccountStore([{ id: 'a1', tenantId: 't1', role: 'member', active: true }]);
++  const sessions = new SessionStore();
++  sessions.create({
++    id: 's1', accountId: 'a1', tenantId: 't1', role: 'member',
++    refreshHash: hashRefreshToken('refresh-old'), expiresAt: 1_000
++  });
++  const service = new AuthService({ sessions, accounts, tokenIssuer: issuer(), clock: { now: () => 100 } });
++  const result = await service.refresh('refresh-old');
++  assert.equal(result.refreshToken, 'refresh-login');
++  assert.equal(result.accessToken, 'access:a1:member');
++  assert.equal(sessions.findByRefreshHash(hashRefreshToken('refresh-old')), null);
++});
+--- /dev/null
++++ b/test/http-handlers.test.mjs
+@@ -0,0 +1,12 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { createRefreshHandler } from '../src/http-handlers.mjs';
++
++test('refresh responses disable caching', async () => {
++  const handler = createRefreshHandler({
++    refresh: async () => ({ accessToken: 'a', refreshToken: 'r', expiresAt: 10 })
++  });
++  const response = await handler({ body: { refreshToken: 'refresh-ok' } });
++  assert.equal(response.status, 200);
++  assert.equal(response.headers['cache-control'], 'no-store');
++});

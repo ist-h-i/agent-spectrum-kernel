@@ -196,6 +196,13 @@ See `benchmarks/protocol.md` for frozen thresholds, blinding, evaluator rules, p
 
 The first measured Checkpoint B result is in `benchmarks/results/checkpoint-b-report.md`; its normalized machine-readable evidence is in `benchmarks/results/checkpoint-b-2026-07-12.json`.
 
+Checkpoint B2 adds two medium-hard and two hard fixtures to test cross-file contracts, concurrency, atomic rollback, idempotency, false-positive control, and scope discipline without overwriting the original baseline:
+
+```bash
+node scripts/ask-benchmark.mjs validate --config benchmarks/checkpoint-b2.config.json
+node scripts/test-ask-benchmark.mjs
+```
+
 ## Minimum setup
 
 1. Put `AGENTS.md` at the repository root or project instruction location.

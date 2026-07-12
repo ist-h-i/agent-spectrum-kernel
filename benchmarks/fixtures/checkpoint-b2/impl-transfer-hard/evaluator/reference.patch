@@ -1,0 +1,224 @@
+--- a/src/account-store.mjs
++++ b/src/account-store.mjs
+@@ -1,9 +1,17 @@
+-import { AccountNotFoundError, InsufficientFundsError } from './errors.mjs';
++import {
++  AccountNotFoundError,
++  CurrencyMismatchError,
++  IdempotencyConflictError,
++  InsufficientFundsError,
++  VersionConflictError
++} from './errors.mjs';
+ import { SerialExecutor } from './serial-executor.mjs';
+ 
+ export class AccountStore {
+   #accounts = new Map();
+   #transfers = [];
++  #requests = new Map();
++  #nextTransferSequence = 1;
+   #executor = new SerialExecutor();
+ 
+   constructor(accounts = [], { auditSink = async () => {} } = {}) {
+@@ -40,4 +48,53 @@
+     account.version += 1;
+     return this.getAccount(id);
+   }
++
++  executeTransfer(request) {
++    return this.runExclusive(async () => {
++      const previous = this.#requests.get(request.requestId);
++      if (previous) {
++        if (previous.fingerprint !== request.fingerprint) throw new IdempotencyConflictError(request.requestId);
++        return structuredClone(previous.receipt);
++      }
++
++      const from = this.#accounts.get(request.fromAccountId);
++      const to = this.#accounts.get(request.toAccountId);
++      if (!from) throw new AccountNotFoundError(request.fromAccountId);
++      if (!to) throw new AccountNotFoundError(request.toAccountId);
++      if (from.version !== request.expectedVersions.from || to.version !== request.expectedVersions.to) {
++        throw new VersionConflictError();
++      }
++      if (from.currency !== to.currency) throw new CurrencyMismatchError();
++      if (from.balance - request.amount < from.minBalance) throw new InsufficientFundsError();
++
++      const nextFrom = { ...from, balance: from.balance - request.amount, version: from.version + 1 };
++      const nextTo = { ...to, balance: to.balance + request.amount, version: to.version + 1 };
++      const transferId = `tr_${String(this.#nextTransferSequence).padStart(6, '0')}`;
++      const receipt = {
++        requestId: request.requestId,
++        transferId,
++        amount: request.amount,
++        currency: from.currency,
++        from: { id: nextFrom.id, balance: nextFrom.balance, version: nextFrom.version },
++        to: { id: nextTo.id, balance: nextTo.balance, version: nextTo.version }
++      };
++      const auditRecord = {
++        transferId,
++        requestId: request.requestId,
++        fromAccountId: from.id,
++        toAccountId: to.id,
++        amount: request.amount,
++        currency: from.currency
++      };
++
++      await this.auditSink(structuredClone(auditRecord));
++
++      this.#accounts.set(from.id, nextFrom);
++      this.#accounts.set(to.id, nextTo);
++      this.#transfers.push(structuredClone(auditRecord));
++      this.#requests.set(request.requestId, { fingerprint: request.fingerprint, receipt: structuredClone(receipt) });
++      this.#nextTransferSequence += 1;
++      return structuredClone(receipt);
++    });
++  }
+ }
+--- a/src/errors.mjs
++++ b/src/errors.mjs
+@@ -13,3 +13,16 @@
+ export class VersionConflictError extends Error {
+   constructor() { super('Account version conflict'); this.name = 'VersionConflictError'; this.code = 'VERSION_CONFLICT'; }
+ }
++
++export class CurrencyMismatchError extends Error {
++  constructor() { super('Account currencies differ'); this.name = 'CurrencyMismatchError'; this.code = 'CURRENCY_MISMATCH'; }
++}
++
++export class IdempotencyConflictError extends Error {
++  constructor(requestId) {
++    super(`Request ID ${requestId} was already used with a different payload`);
++    this.name = 'IdempotencyConflictError';
++    this.code = 'IDEMPOTENCY_CONFLICT';
++    this.requestId = requestId;
++  }
++}
+--- a/src/index.mjs
++++ b/src/index.mjs
+@@ -4,5 +4,7 @@
+   TransferValidationError,
+   AccountNotFoundError,
+   InsufficientFundsError,
+-  VersionConflictError
++  VersionConflictError,
++  CurrencyMismatchError,
++  IdempotencyConflictError
+ } from './errors.mjs';
+--- a/src/transfer-service.mjs
++++ b/src/transfer-service.mjs
+@@ -1,4 +1,4 @@
+-import { validateAccountId, validatePositiveAmount } from './validation.mjs';
++import { normalizeTransferRequest, validateAccountId, validatePositiveAmount } from './validation.mjs';
+ 
+ export class TransferService {
+   constructor(store) {
+@@ -21,7 +21,7 @@
+     return this.store.listTransfers();
+   }
+ 
+-  async transfer(_request) {
+-    throw new Error('Not implemented');
++  async transfer(request) {
++    return this.store.executeTransfer(normalizeTransferRequest(request));
+   }
+ }
+--- a/src/validation.mjs
++++ b/src/validation.mjs
+@@ -14,6 +14,40 @@
+   return amount;
+ }
+ 
+-export function normalizeTransferRequest(_request) {
+-  throw new Error('Not implemented');
++function assertExactKeys(object, allowed, required) {
++  if (!object || typeof object !== 'object' || Array.isArray(object)) {
++    throw new TransferValidationError('Expected an object');
++  }
++  const keys = Object.keys(object);
++  if (keys.some((key) => !allowed.includes(key)) || required.some((key) => !keys.includes(key))) {
++    throw new TransferValidationError('Object shape does not match schema');
++  }
+ }
++
++export function normalizeTransferRequest(request) {
++  assertExactKeys(
++    request,
++    ['requestId', 'fromAccountId', 'toAccountId', 'amount', 'expectedVersions'],
++    ['requestId', 'fromAccountId', 'toAccountId', 'amount', 'expectedVersions']
++  );
++  if (typeof request.requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(request.requestId)) {
++    throw new TransferValidationError('Invalid request ID');
++  }
++  const fromAccountId = validateAccountId(request.fromAccountId);
++  const toAccountId = validateAccountId(request.toAccountId);
++  if (fromAccountId === toAccountId) throw new TransferValidationError('Accounts must be distinct');
++  const amount = validatePositiveAmount(request.amount);
++  assertExactKeys(request.expectedVersions, ['from', 'to'], ['from', 'to']);
++  if (!Number.isSafeInteger(request.expectedVersions.from) || request.expectedVersions.from < 0 ||
++      !Number.isSafeInteger(request.expectedVersions.to) || request.expectedVersions.to < 0) {
++    throw new TransferValidationError('Invalid expected versions');
++  }
++  const normalized = {
++    requestId: request.requestId,
++    fromAccountId,
++    toAccountId,
++    amount,
++    expectedVersions: { from: request.expectedVersions.from, to: request.expectedVersions.to }
++  };
++  return { ...normalized, fingerprint: JSON.stringify(normalized) };
++}
+--- /dev/null
++++ b/test/transfer-service.additional.test.mjs
+@@ -0,0 +1,53 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { AccountStore, TransferService } from '../src/index.mjs';
++
++const accounts = () => [
++  { id: 'acct_from1', currency: 'USD', balance: 100, minBalance: 0, version: 0 },
++  { id: 'acct_to001', currency: 'USD', balance: 10, minBalance: 0, version: 0 }
++];
++const request = (overrides = {}) => ({
++  requestId: 'request-1', fromAccountId: 'acct_from1', toAccountId: 'acct_to001', amount: 40,
++  expectedVersions: { from: 0, to: 0 }, ...overrides
++});
++
++test('audit failure rolls back and does not consume the transfer sequence', async () => {
++  let fail = true;
++  const store = new AccountStore(accounts(), { auditSink: async () => { if (fail) throw new Error('audit down'); } });
++  const service = new TransferService(store);
++  await assert.rejects(() => service.transfer(request()), /audit down/);
++  assert.equal(service.getAccount('acct_from1').balance, 100);
++  assert.deepEqual(service.listTransfers(), []);
++  fail = false;
++  assert.equal((await service.transfer(request())).transferId, 'tr_000001');
++});
++
++test('concurrent calls cannot both spend the same version and balance', async () => {
++  const service = new TransferService(new AccountStore(accounts()));
++  const outcomes = await Promise.allSettled([
++    service.transfer(request({ requestId: 'request-a', amount: 80 })),
++    service.transfer(request({ requestId: 'request-b', amount: 80 }))
++  ]);
++  assert.equal(outcomes.filter((outcome) => outcome.status === 'fulfilled').length, 1);
++  assert.equal(service.getAccount('acct_from1').balance, 20);
++  assert.equal(service.listTransfers().length, 1);
++});
++
++test('concurrent identical requests commit once', async () => {
++  let audits = 0;
++  const service = new TransferService(new AccountStore(accounts(), { auditSink: async () => { audits += 1; } }));
++  const [left, right] = await Promise.all([service.transfer(request()), service.transfer(request())]);
++  assert.deepEqual(left, right);
++  assert.equal(audits, 1);
++  assert.equal(service.listTransfers().length, 1);
++});
++
++test('receipt and history mutations cannot change account or stored history', async () => {
++  const service = new TransferService(new AccountStore(accounts()));
++  const receipt = await service.transfer(request());
++  receipt.from.balance = 999;
++  const history = service.listTransfers();
++  history[0].amount = 999;
++  assert.equal(service.getAccount('acct_from1').balance, 60);
++  assert.equal(service.listTransfers()[0].amount, 40);
++});

@@ -1,0 +1,200 @@
+--- a/src/errors.mjs
++++ b/src/errors.mjs
+@@ -15,3 +15,12 @@
+     this.actual = actual;
+   }
+ }
++
++export class IdempotencyConflictError extends Error {
++  constructor(requestId) {
++    super(`Request ID ${requestId} was already used with a different payload`);
++    this.name = 'IdempotencyConflictError';
++    this.code = 'IDEMPOTENCY_CONFLICT';
++    this.requestId = requestId;
++  }
++}
+--- a/src/index.mjs
++++ b/src/index.mjs
+@@ -1,3 +1,3 @@
+ export { RuleService } from './rule-service.mjs';
+ export { RuleStore } from './rule-store.mjs';
+-export { RuleValidationError, VersionConflictError } from './errors.mjs';
++export { RuleValidationError, VersionConflictError, IdempotencyConflictError } from './errors.mjs';
+--- a/src/rule-service.mjs
++++ b/src/rule-service.mjs
+@@ -1,4 +1,4 @@
+-import { canonicalizeKey, validateScalar } from './validation.mjs';
++import { canonicalizeKey, normalizeBatchRequest, validateScalar } from './validation.mjs';
+ 
+ export class RuleService {
+   constructor(store) {
+@@ -21,7 +21,7 @@
+     return this.store.delete(canonicalizeKey(key));
+   }
+ 
+-  applyBatch(_request) {
+-    throw new Error('Not implemented');
++  applyBatch(request) {
++    return this.store.applyBatch(normalizeBatchRequest(request));
+   }
+ }
+--- a/src/rule-store.mjs
++++ b/src/rule-store.mjs
+@@ -1,8 +1,13 @@
+-import { VersionConflictError } from './errors.mjs';
++import { IdempotencyConflictError, VersionConflictError } from './errors.mjs';
++
++function cloneReceipt(receipt) {
++  return structuredClone(receipt);
++}
+ 
+ export class RuleStore {
+   #rules = new Map();
+   #version = 0;
++  #requests = new Map();
+ 
+   constructor(initialRules = {}) {
+     for (const [key, value] of Object.entries(initialRules)) this.#rules.set(key, structuredClone(value));
+@@ -35,4 +40,30 @@
+   assertVersion(expectedVersion) {
+     if (expectedVersion !== this.#version) throw new VersionConflictError(expectedVersion, this.#version);
+   }
++
++  applyBatch({ requestId, expectedVersion, operations, fingerprint }) {
++    const prior = this.#requests.get(requestId);
++    if (prior) {
++      if (prior.fingerprint !== fingerprint) throw new IdempotencyConflictError(requestId);
++      return cloneReceipt(prior.receipt);
++    }
++    this.assertVersion(expectedVersion);
++
++    const nextRules = new Map(this.#rules);
++    for (const operation of operations) {
++      if (operation.op === 'set') nextRules.set(operation.key, structuredClone(operation.value));
++      else nextRules.delete(operation.key);
++    }
++    const nextVersion = this.#version + 1;
++    const sortedRules = Object.fromEntries(
++      [...nextRules.entries()].sort(([left], [right]) => left.localeCompare(right))
++        .map(([key, value]) => [key, structuredClone(value)])
++    );
++    const receipt = { requestId, version: nextVersion, rules: sortedRules };
++
++    this.#rules = nextRules;
++    this.#version = nextVersion;
++    this.#requests.set(requestId, { fingerprint, receipt: cloneReceipt(receipt) });
++    return cloneReceipt(receipt);
++  }
+ }
+--- a/src/validation.mjs
++++ b/src/validation.mjs
+@@ -15,6 +15,47 @@
+   throw new RuleValidationError('Value must be a documented scalar');
+ }
+ 
+-export function normalizeBatchRequest(_request) {
+-  throw new Error('Not implemented');
++function assertExactKeys(object, allowed, required) {
++  if (!object || typeof object !== 'object' || Array.isArray(object)) {
++    throw new RuleValidationError('Expected an object');
++  }
++  const keys = Object.keys(object);
++  if (keys.some((key) => !allowed.includes(key)) || required.some((key) => !keys.includes(key))) {
++    throw new RuleValidationError('Object shape does not match schema');
++  }
+ }
++
++export function normalizeBatchRequest(request) {
++  assertExactKeys(request, ['requestId', 'expectedVersion', 'operations'], ['requestId', 'expectedVersion', 'operations']);
++  if (typeof request.requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(request.requestId)) {
++    throw new RuleValidationError('Invalid requestId');
++  }
++  if (!Number.isSafeInteger(request.expectedVersion) || request.expectedVersion < 0) {
++    throw new RuleValidationError('Invalid expectedVersion');
++  }
++  if (!Array.isArray(request.operations) || request.operations.length < 1 || request.operations.length > 20) {
++    throw new RuleValidationError('operations must contain 1 through 20 items');
++  }
++
++  const seen = new Set();
++  const operations = request.operations.map((operation) => {
++    if (operation?.op === 'set') {
++      assertExactKeys(operation, ['op', 'key', 'value'], ['op', 'key', 'value']);
++      const key = canonicalizeKey(operation.key);
++      if (seen.has(key)) throw new RuleValidationError('Duplicate canonical key');
++      seen.add(key);
++      return { op: 'set', key, value: validateScalar(operation.value) };
++    }
++    if (operation?.op === 'delete') {
++      assertExactKeys(operation, ['op', 'key'], ['op', 'key']);
++      const key = canonicalizeKey(operation.key);
++      if (seen.has(key)) throw new RuleValidationError('Duplicate canonical key');
++      seen.add(key);
++      return { op: 'delete', key };
++    }
++    throw new RuleValidationError('Unknown operation');
++  });
++
++  const normalized = { requestId: request.requestId, expectedVersion: request.expectedVersion, operations };
++  return { ...normalized, fingerprint: JSON.stringify(normalized) };
++}
+--- /dev/null
++++ b/test/rule-service.additional.test.mjs
+@@ -0,0 +1,57 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { IdempotencyConflictError, RuleService, RuleStore } from '../src/index.mjs';
++
++test('a later invalid operation rolls back the entire batch', () => {
++  const store = new RuleStore({ keep: true });
++  const service = new RuleService(store);
++  assert.throws(() => service.applyBatch({
++    requestId: 'req-rollback', expectedVersion: 0,
++    operations: [
++      { op: 'set', key: 'new', value: 1 },
++      { op: 'set', key: 'bad key', value: 2 }
++    ]
++  }));
++  assert.deepEqual(service.list(), { keep: true });
++  assert.equal(store.version, 0);
++});
++
++test('normalized replay returns the original receipt and collisions fail', () => {
++  const service = new RuleService(new RuleStore());
++  const first = service.applyBatch({
++    requestId: 'req-idem', expectedVersion: 0,
++    operations: [{ op: 'set', key: ' A ', value: 1 }]
++  });
++  service.put('other', 2);
++  assert.deepEqual(service.applyBatch({
++    requestId: 'req-idem', expectedVersion: 0,
++    operations: [{ op: 'set', key: 'a', value: 1 }]
++  }), first);
++  assert.throws(() => service.applyBatch({
++    requestId: 'req-idem', expectedVersion: 0,
++    operations: [{ op: 'set', key: 'a', value: 9 }]
++  }), IdempotencyConflictError);
++});
++
++test('duplicate canonical keys are rejected', () => {
++  const service = new RuleService(new RuleStore());
++  assert.throws(() => service.applyBatch({
++    requestId: 'req-dup', expectedVersion: 0,
++    operations: [
++      { op: 'set', key: ' Alpha ', value: true },
++      { op: 'delete', key: 'alpha' }
++    ]
++  }));
++});
++
++test('request and receipt mutations cannot change stored rules', () => {
++  const service = new RuleService(new RuleStore());
++  const request = {
++    requestId: 'req-alias', expectedVersion: 0,
++    operations: [{ op: 'set', key: 'a', value: 'original' }]
++  };
++  const receipt = service.applyBatch(request);
++  request.operations[0].value = 'input-change';
++  receipt.rules.a = 'receipt-change';
++  assert.equal(service.get('a'), 'original');
++});

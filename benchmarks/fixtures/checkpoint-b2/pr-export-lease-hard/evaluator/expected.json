@@ -1,0 +1,146 @@
+{
+  "fixture_id": "pr-export-lease-hard",
+  "class": "pr-review",
+  "difficulty": "hard",
+  "target_minutes": 15,
+  "merge_decision": "request_changes",
+  "findings": [
+    {
+      "id": "JOB-001",
+      "severity": "critical",
+      "title": "Operator retry bypasses tenant isolation",
+      "match_terms": ["operator", "retry", "tenant", "cross-tenant", "isolation", "authorization"],
+      "evidence": [
+        {
+          "file": "src/export-service.mjs",
+          "lines": "28-32"
+        },
+        {
+          "file": "src/job-store.mjs",
+          "lines": "14-16"
+        },
+        {
+          "file": "docs/export-jobs.md",
+          "lines": "3-4"
+        }
+      ],
+      "impact": "An operator in one tenant can retry and mutate a job in another tenant by guessing its ID.",
+      "blocker": true,
+      "hidden_tests": [
+        "operators cannot retry jobs from another tenant"
+      ]
+    },
+    {
+      "id": "JOB-002",
+      "severity": "high",
+      "title": "Claim selection and mutation are separated by an await without revalidation",
+      "match_terms": ["concurrent", "claim", "await", "revalidation", "two workers", "duplicate", "race"],
+      "evidence": [
+        {
+          "file": "src/job-store.mjs",
+          "lines": "25-35"
+        },
+        {
+          "file": "docs/export-jobs.md",
+          "lines": "6-8"
+        }
+      ],
+      "impact": "Two workers can both claim and execute the same export; attempts is incremented twice and duplicate external work can occur.",
+      "blocker": true,
+      "hidden_tests": [
+        "concurrent claims return the job to only one worker"
+      ]
+    },
+    {
+      "id": "JOB-003",
+      "severity": "high",
+      "title": "Terminal writes do not enforce the active lease boundary",
+      "match_terms": ["lease", "owner", "expired", "terminal", "complete", "fail", "reassigned"],
+      "evidence": [
+        {
+          "file": "src/job-store.mjs",
+          "lines": "38-63"
+        },
+        {
+          "file": "docs/export-jobs.md",
+          "lines": "6-8"
+        }
+      ],
+      "impact": "A non-owner or expired worker can overwrite a reassigned job result or failure state.",
+      "blocker": true,
+      "hidden_tests": [
+        "terminal writes require the active lease owner and an unexpired lease"
+      ]
+    },
+    {
+      "id": "JOB-004",
+      "severity": "high",
+      "title": "Manual retry mutates fields before validating the transition",
+      "match_terms": ["manual retry", "mutates", "before", "validation", "succeeded", "state unchanged", "diagnostic"],
+      "evidence": [
+        {
+          "file": "src/job-store.mjs",
+          "lines": "66-74"
+        },
+        {
+          "file": "docs/export-jobs.md",
+          "lines": "10-12"
+        }
+      ],
+      "impact": "Calling retry on a succeeded or exhausted job clears diagnostic state and changes scheduling data even though the operation fails.",
+      "blocker": true,
+      "hidden_tests": [
+        "rejected manual retry leaves job state unchanged"
+      ]
+    },
+    {
+      "id": "JOB-005",
+      "severity": "high",
+      "title": "Automatic retry ignores maxAttempts",
+      "match_terms": ["automatic retry", "maxattempts", "limit", "forever", "requeue", "exhausted"],
+      "evidence": [
+        {
+          "file": "src/job-store.mjs",
+          "lines": "49-63"
+        },
+        {
+          "file": "docs/export-jobs.md",
+          "lines": "10-12"
+        }
+      ],
+      "impact": "Permanently failing exports can be requeued forever, consuming worker capacity and violating retry limits.",
+      "blocker": true,
+      "hidden_tests": [
+        "retryable failure at maxAttempts remains failed"
+      ]
+    }
+  ],
+  "correct_but_suspicious_changes": [
+    {
+      "id": "JOB-NF-001",
+      "evidence": [
+        {
+          "file": "src/retry-policy.mjs",
+          "lines": "1-3"
+        }
+      ],
+      "reason": "The attempts - 1 exponent matches the documented definition where attempts already includes the failed claim."
+    },
+    {
+      "id": "JOB-NF-002",
+      "evidence": [
+        {
+          "file": "src/job-store.mjs",
+          "lines": "38-46"
+        }
+      ],
+      "reason": "structuredClone on result is intentional isolation and is not the cause of the lease defect."
+    }
+  ],
+  "false_positive_boundary": [
+    "Do not count the exponential backoff formula as off-by-one; the documentation defines it explicitly.",
+    "Do not count returning null when no job is claimable as an error.",
+    "Do not report in-memory persistence as a defect; durability is outside this synthetic repository contract.",
+    "Lease-owner and lease-expiry omissions are one root finding even though they affect complete and fail."
+  ]
+}

@@ -168,6 +168,9 @@
     "docs/validation-report.md",
     "benchmarks/README.md",
     "benchmarks/protocol.md",
+    "benchmarks/protocol-b2.md",
+    "benchmarks/fixtures/checkpoint-b2/README.md",
+    "benchmarks/fixtures/checkpoint-b2/VALIDATION.md",
     "benchmarks/report-template.md",
     "benchmarks/results/checkpoint-b-report.md",
     "CHANGELOG.md"

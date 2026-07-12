@@ -4,6 +4,7 @@
 
 Changes:
 
+- Added Checkpoint B2 with four hash-pinned medium-hard/hard benchmark fixtures, nested-workspace isolation, requirement-to-hidden-test scoring, frozen quality-gain thresholds, and config-selectable benchmark execution.
 - Added a preregistered comparative benchmark for Plain Agent, Kernel-only, and Full ASK, including review and implementation fixtures, a bounded Codex runner, normalized results, evaluator rules, fixed thresholds, and a separate post-#179 checkpoint.
 - Renamed project-facing branding to Agent Spectrum Kernel across repository metadata, README files, docs, and adapter descriptions.
 - Added the Requirement-to-Rule Loop skills: `next-best-change-finder`, `requirement-grill`, `work-package-compiler`, `review-to-rule-compiler`, and `domain-rule-ledger`.

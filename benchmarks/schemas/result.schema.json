@@ -15,9 +15,14 @@
         "valid_blocking_or_major_findings": { "$ref": "#/$defs/nullableNonNegative" },
         "major_findings_missed": { "$ref": "#/$defs/nullableNonNegative" },
         "unsupported_or_false_positive_findings": { "$ref": "#/$defs/nullableNonNegative" },
+        "merge_decision_correct": { "type": ["boolean", "null"] },
         "requirement_satisfaction_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "requirements_total": { "type": "integer", "minimum": 0 },
+        "requirements_satisfied": { "type": ["integer", "null"], "minimum": 0 },
+        "requirement_failures": { "type": "array", "items": { "type": "string" } },
         "scope_deviations": { "type": "integer", "minimum": 0 },
         "unverified_completion_or_readiness_claims": { "type": "integer", "minimum": 0 },
+        "automated_correction_units": { "type": ["number", "null"], "minimum": 0 },
         "rework_count": { "$ref": "#/$defs/nullableNonNegative" },
         "hidden_tests": {
           "type": "object",
@@ -27,6 +32,8 @@
             "total": { "type": "integer", "minimum": 0 },
             "passed": { "type": ["integer", "null"], "minimum": 0 },
             "failed": { "type": ["integer", "null"], "minimum": 0 },
+            "passed_names": { "type": "array", "items": { "type": "string" } },
+            "failed_names": { "type": "array", "items": { "type": "string" } },
             "exit_code": { "type": ["integer", "null"] }
           }
         },
@@ -36,7 +43,7 @@
   },
   "properties": {
     "schema_version": { "const": "1.0.0" },
-    "checkpoint": { "enum": ["B", "C"] },
+    "checkpoint": { "enum": ["B", "B2", "C"] },
     "protocol": {
       "type": "object",
       "additionalProperties": false,
@@ -60,6 +67,7 @@
         "model": { "type": "string" },
         "reasoning_effort": { "type": "string" },
         "sequential": { "type": "boolean" },
+        "case_timeout_ms": { "type": "integer", "minimum": 1 },
         "network_required_by_fixtures": { "type": "boolean" }
       }
     },
@@ -74,6 +82,8 @@
           "case_id": { "type": "string" },
           "fixture_id": { "type": "string" },
           "task_class": { "enum": ["review", "implementation"] },
+          "difficulty": { "type": ["string", "null"] },
+          "repetition": { "type": "integer", "minimum": 1 },
           "condition": { "$ref": "#/$defs/condition" },
           "outcome_quality": { "$ref": "#/$defs/quality" },
           "human_effort": {
@@ -143,6 +153,8 @@
               "quality_metric": { "enum": ["valid_blocking_or_major_findings", "requirement_satisfaction_rate"] },
               "kernel_only_quality": { "type": ["number", "null"], "minimum": 0 },
               "full_ask_quality": { "type": ["number", "null"], "minimum": 0 },
+              "quality_gain": { "type": ["number", "null"] },
+              "automated_correction_units_delta": { "type": ["number", "null"] },
               "duration_overhead_percent": { "type": ["number", "null"] },
               "token_overhead_percent": { "type": ["number", "null"] },
               "senior_correction_reduction_percent": { "type": ["number", "null"] },
@@ -172,8 +184,16 @@
             "rework_reduction_percent": { "type": "number", "minimum": 0 },
             "maximum_duration_overhead_percent": { "type": "number", "minimum": 0 },
             "maximum_token_overhead_percent": { "type": "number", "minimum": 0 },
+            "minimum_review_valid_finding_gain": { "type": "number", "minimum": 0 },
+            "minimum_implementation_requirement_rate_gain": { "type": "number", "minimum": 0, "maximum": 1 },
+            "maximum_false_positive_increase": { "type": "number", "minimum": 0 },
+            "maximum_scope_deviation_increase": { "type": "number", "minimum": 0 },
+            "maximum_unverified_claim_increase": { "type": "number", "minimum": 0 },
+            "maximum_duration_overhead_with_quality_gain_percent": { "type": "number", "minimum": 0 },
+            "maximum_token_overhead_with_quality_gain_percent": { "type": "number", "minimum": 0 },
             "require_non_inferior_quality": { "const": true },
-            "allow_expand_with_primary_metrics_unknown": { "const": false }
+            "allow_expand_with_primary_metrics_unknown": { "const": false },
+            "allow_expand_with_material_quality_gain": { "type": "boolean" }
           }
         }
       }

@@ -16,14 +16,13 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, isAbsolute, resolve } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const CONFIG_PATH = resolve(ROOT, "benchmarks/checkpoint-b.config.json");
+const DEFAULT_CONFIG_PATH = resolve(ROOT, "benchmarks/checkpoint-b.config.json");
 const OUTPUT_SCHEMA_PATH = resolve(ROOT, "benchmarks/schemas/agent-output.schema.json");
-const FIXTURE_ROOT = resolve(ROOT, "benchmarks/fixtures");
 const CONDITIONS = ["plain", "kernel_only", "full_ask"];
 
 function sha256(value) {
@@ -41,13 +40,14 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, runDir: null, seed: null, agentBin: "codex" };
+  const args = { command, output: null, runDir: null, seed: null, agentBin: "codex", configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
     else if (flag === "--run-dir") args.runDir = resolve(argv.shift());
     else if (flag === "--seed") args.seed = argv.shift();
     else if (flag === "--agent-bin") args.agentBin = resolve(argv.shift());
+    else if (flag === "--config") args.configPath = resolve(argv.shift());
     else if (flag === "--help" || flag === "-h") args.command = "help";
     else throw new Error(`Unknown argument: ${flag}`);
   }
@@ -58,11 +58,25 @@ function help() {
   console.log(`Usage: node scripts/ask-benchmark.mjs <command> [options]
 
 Commands:
-  validate
-  prepare --output <empty-directory> --seed <value>
-  run --run-dir <prepared-directory> --agent-bin <codex-path>
-  score --run-dir <completed-directory> --output <normalized-result.json>
+  validate [--config <config.json>]
+  prepare [--config <config.json>] --output <empty-directory> --seed <value>
+  run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
+  score [--config <config.json>] --run-dir <completed-directory> --output <normalized-result.json>
 `);
+}
+
+function resolveRepoPath(value, label) {
+  const path = resolve(ROOT, value);
+  if (path !== ROOT && !path.startsWith(`${ROOT}${sep}`)) throw new Error(`${label} must stay inside the repository`);
+  return path;
+}
+
+function fixtureRoot(config) {
+  return resolveRepoPath(config.fixture_root ?? "benchmarks/fixtures", "fixture_root");
+}
+
+function fixtureFile(config, fixture, value) {
+  return resolve(fixtureRoot(config), fixture.id, value);
 }
 
 function git(cwd, args, options = {}) {
@@ -71,27 +85,52 @@ function git(cwd, args, options = {}) {
   return result.stdout.trim();
 }
 
-function validateProtocol() {
-  const config = readJson(CONFIG_PATH);
+function validateProtocol(configPath = DEFAULT_CONFIG_PATH) {
+  const canonicalConfigPath = resolveRepoPath(relative(ROOT, configPath), "config");
+  const config = readJson(canonicalConfigPath);
   const outputSchema = readJson(OUTPUT_SCHEMA_PATH);
   const errors = [];
   if (config.protocol_status !== "frozen") errors.push("protocol_status must be frozen before execution");
   if (JSON.stringify(config.conditions) !== JSON.stringify(CONDITIONS)) errors.push("conditions must be plain, kernel_only, full_ask");
-  if (config.fixtures.length !== 2 || !config.fixtures.some((entry) => entry.task_class === "review") || !config.fixtures.some((entry) => entry.task_class === "implementation")) errors.push("review and implementation fixtures are required");
+  if (!Array.isArray(config.fixtures) || config.fixtures.length < 2 || !config.fixtures.some((entry) => entry.task_class === "review") || !config.fixtures.some((entry) => entry.task_class === "implementation")) errors.push("review and implementation fixtures are required");
+  if (!Number.isInteger(config.repetitions ?? 1) || (config.repetitions ?? 1) < 1) errors.push("repetitions must be a positive integer");
   if (config.thresholds.allow_expand_with_primary_metrics_unknown !== false) errors.push("expand must be prohibited when primary metrics are unknown");
   if (config.privacy.store_raw_prompts || config.privacy.store_full_outputs || config.privacy.store_full_source || config.privacy.store_secrets_customer_or_personal_data) errors.push("durable raw or sensitive capture must be disabled");
   if (!outputSchema.required?.includes("route") || !outputSchema.required?.includes("verification_commands")) errors.push("agent output schema must require route and verification evidence fields");
   if (JSON.stringify(outputSchema).includes('"oneOf"')) errors.push("agent output schema must avoid response-format-unsupported oneOf");
+  const protocolPath = resolveRepoPath(config.protocol_path ?? "benchmarks/protocol.md", "protocol_path");
+  if (!existsSync(protocolPath)) errors.push(`protocol is missing: ${relative(ROOT, protocolPath)}`);
   for (const fixture of config.fixtures) {
-    const root = resolve(FIXTURE_ROOT, fixture.id);
-    for (const path of ["task.md", "expected.json", "workspace/package.json"]) {
+    const root = resolve(fixtureRoot(config), fixture.id);
+    const expectedPath = fixture.expected_path ?? "expected.json";
+    for (const path of ["task.md", expectedPath, "workspace/package.json"]) {
       if (!existsSync(resolve(root, path))) errors.push(`${fixture.id}/${path} is missing`);
     }
-    if (fixture.task_class === "review" && !existsSync(resolve(root, "candidate.patch"))) errors.push(`${fixture.id}/candidate.patch is missing`);
-    if (fixture.task_class === "implementation" && !existsSync(resolve(root, "hidden-tests.mjs"))) errors.push(`${fixture.id}/hidden-tests.mjs is missing`);
+    if (fixture.task_class === "review") {
+      const reviewSource = fixture.review_source ?? "candidate_patch";
+      const reviewPath = reviewSource === "embedded_diff" ? "workspace/pr.diff" : "candidate.patch";
+      if (!existsSync(resolve(root, reviewPath))) errors.push(`${fixture.id}/${reviewPath} is missing`);
+      if (existsSync(resolve(root, expectedPath))) {
+        const expected = readJson(resolve(root, expectedPath));
+        if (Array.isArray(expected.findings) && expected.findings.some((entry) => !Array.isArray(entry.match_terms) || entry.match_terms.length < 2)) errors.push(`${fixture.id} review findings require at least two frozen match_terms`);
+      }
+    }
+    if (fixture.task_class === "implementation") {
+      const hiddenPath = fixture.hidden_tests_path ?? "hidden-tests.mjs";
+      if (!existsSync(resolve(root, hiddenPath))) errors.push(`${fixture.id}/${hiddenPath} is missing`);
+      if (existsSync(resolve(root, expectedPath))) {
+        const expected = readJson(resolve(root, expectedPath));
+        if (Array.isArray(expected.requirements) && expected.requirements.some((entry) => !Array.isArray(entry.hidden_tests) || entry.hidden_tests.length === 0)) errors.push(`${fixture.id} requirements must map to hidden tests`);
+      }
+    }
+  }
+  const inputVerifier = resolve(fixtureRoot(config), "verify-inputs.mjs");
+  if (existsSync(inputVerifier)) {
+    const verified = spawnSync(process.execPath, [inputVerifier], { cwd: fixtureRoot(config), encoding: "utf8" });
+    if (verified.status !== 0) errors.push(`agent-visible input verification failed: ${verified.stderr || verified.stdout}`);
   }
   if (errors.length > 0) throw new Error(errors.join("\n"));
-  return config;
+  return { ...config, _configPath: canonicalConfigPath, _protocolPath: protocolPath };
 }
 
 function ensureEmptyDirectory(path) {
@@ -120,31 +159,41 @@ function projectCondition(target, condition) {
 }
 
 function prepare(args) {
-  const config = validateProtocol();
+  const config = validateProtocol(args.configPath);
   if (!args.output || !args.seed) throw new Error("prepare requires --output and --seed");
   ensureEmptyDirectory(args.output);
   const cases = [];
   for (const fixture of config.fixtures) {
-    for (const condition of CONDITIONS) {
-      const caseId = `case-${sha256(`${args.seed}:${fixture.id}:${condition}`).slice(0, 12)}`;
-      const target = resolve(args.output, caseId);
-      cpSync(resolve(FIXTURE_ROOT, fixture.id, "workspace"), target, { recursive: true });
-      copyFileSync(resolve(FIXTURE_ROOT, fixture.id, "task.md"), resolve(target, "BENCHMARK_TASK.md"));
-      projectCondition(target, condition);
-      git(target, ["init", "-q"]);
-      git(target, ["config", "user.name", "ASK Benchmark"]);
-      git(target, ["config", "user.email", "benchmark.invalid@example.invalid"]);
-      git(target, ["add", "-A"]);
-      git(target, ["commit", "-q", "-m", "benchmark baseline"]);
-      if (fixture.task_class === "review") git(target, ["apply", resolve(FIXTURE_ROOT, fixture.id, "candidate.patch")]);
-      cases.push({
-        case_id: caseId,
-        fixture_id: fixture.id,
-        task_class: fixture.task_class,
-        sandbox: fixture.sandbox,
-        condition,
-        order_key: sha256(`${args.seed}:order:${caseId}`),
-      });
+    for (let repetition = 1; repetition <= (config.repetitions ?? 1); repetition += 1) {
+      for (const condition of CONDITIONS) {
+        const caseId = `case-${sha256(`${args.seed}:${fixture.id}:${repetition}:${condition}`).slice(0, 12)}`;
+        const target = resolve(args.output, caseId);
+        const nested = fixture.layout === "nested";
+        const workspace = nested ? resolve(target, "workspace") : target;
+        mkdirSync(target, { recursive: true });
+        cpSync(fixtureFile(config, fixture, "workspace"), workspace, { recursive: true });
+        copyFileSync(fixtureFile(config, fixture, "task.md"), resolve(target, "BENCHMARK_TASK.md"));
+        projectCondition(target, condition);
+        git(workspace, ["init", "-q"]);
+        git(workspace, ["config", "user.name", "ASK Benchmark"]);
+        git(workspace, ["config", "user.email", "benchmark.invalid@example.invalid"]);
+        git(workspace, ["add", "-A"]);
+        git(workspace, ["commit", "-q", "-m", "benchmark baseline"]);
+        if (fixture.task_class === "review" && (fixture.review_source ?? "candidate_patch") === "candidate_patch") git(workspace, ["apply", fixtureFile(config, fixture, "candidate.patch")]);
+        cases.push({
+          case_id: caseId,
+          fixture_id: fixture.id,
+          task_class: fixture.task_class,
+          difficulty: fixture.difficulty ?? null,
+          repetition,
+          sandbox: fixture.sandbox,
+          condition,
+          workspace_subdir: nested ? "workspace" : null,
+          expected_path: fixture.expected_path ?? "expected.json",
+          hidden_tests_path: fixture.hidden_tests_path ?? (fixture.task_class === "implementation" ? "hidden-tests.mjs" : null),
+          order_key: sha256(`${args.seed}:order:${caseId}`),
+        });
+      }
     }
   }
   cases.sort((left, right) => left.order_key.localeCompare(right.order_key));
@@ -152,8 +201,10 @@ function prepare(args) {
     schema_version: "1.0.0",
     checkpoint: config.checkpoint,
     seed_sha256: sha256(args.seed),
-    protocol_sha256: sha256(readFileSync(resolve(ROOT, "benchmarks/protocol.md"))),
-    config_sha256: sha256(readFileSync(CONFIG_PATH)),
+    protocol_path: relative(ROOT, config._protocolPath),
+    protocol_sha256: sha256(readFileSync(config._protocolPath)),
+    config_path: relative(ROOT, config._configPath),
+    config_sha256: sha256(readFileSync(config._configPath)),
     repository_revision: git(ROOT, ["rev-parse", "HEAD"]),
     cases,
   });
@@ -192,10 +243,11 @@ function tokenUsageFromJsonl(text) {
 }
 
 function executeCases(args) {
-  const config = validateProtocol();
+  const config = validateProtocol(args.configPath);
   if (!args.runDir || !existsSync(resolve(args.runDir, "run.json"))) throw new Error("run requires a prepared --run-dir");
   if (!existsSync(args.agentBin) || !lstatSync(args.agentBin).isFile()) throw new Error(`agent binary is unavailable: ${args.agentBin}`);
   const manifest = readJson(resolve(args.runDir, "run.json"));
+  if (manifest.checkpoint !== config.checkpoint || manifest.config_sha256 !== sha256(readFileSync(config._configPath))) throw new Error("run manifest does not match the selected frozen config");
   const version = spawnSync(args.agentBin, ["--version"], { encoding: "utf8" });
   if (version.status !== 0) throw new Error(`agent version check failed: ${version.stderr || version.stdout}`);
   const observedVersion = version.stdout.trim();
@@ -230,6 +282,7 @@ function executeCases(args) {
         input: prompt,
         env: { ...process.env, CODEX_HOME: codexHome },
         maxBuffer: 50 * 1024 * 1024,
+        timeout: config.runtime.case_timeout_ms,
       });
       const durationMs = Number(process.hrtime.bigint() - started) / 1_000_000;
       const output = existsSync(finalPath) ? readFileSync(finalPath) : Buffer.from("");
@@ -240,7 +293,7 @@ function executeCases(args) {
         ...usage,
         output_sha256: output.length > 0 ? sha256(output) : null,
         output_bytes: output.length,
-        runtime_error: result.error ? "agent_process_failed" : result.status === 0 ? null : "agent_nonzero_exit",
+        runtime_error: result.error?.code === "ETIMEDOUT" ? "case_timeout" : result.error ? "agent_process_failed" : result.status === 0 ? null : "agent_nonzero_exit",
       });
       writeFileSync(resolve(target, ".benchmark-events.jsonl"), result.stdout ?? "");
       writeFileSync(resolve(target, ".benchmark-stderr.txt"), result.stderr ?? "");
@@ -256,27 +309,48 @@ function parseFinal(path) {
   try { return readJson(path); } catch { return null; }
 }
 
+function normalizeFindingPath(value) {
+  return String(value ?? "").replace(/^\.\//, "").replace(/^workspace\//, "");
+}
+
+function reviewOracles(expected) {
+  if (Array.isArray(expected.major_findings)) {
+    return expected.major_findings.map((entry) => ({ id: entry.id, files: [entry.file], terms: entry.terms }));
+  }
+  return (expected.findings ?? []).map((entry) => ({
+    id: entry.id,
+    files: (entry.evidence ?? []).map((evidence) => evidence.file),
+    terms: entry.match_terms,
+  }));
+}
+
 function reviewMetrics(final, expected) {
   const findings = Array.isArray(final?.findings) ? final.findings.filter((entry) => ["blocking", "major"].includes(entry.severity)) : [];
+  const oracles = reviewOracles(expected);
   const matched = new Set();
   for (let index = 0; index < findings.length; index += 1) {
     const finding = findings[index];
     const text = `${finding.summary ?? ""} ${finding.evidence ?? ""}`.toLowerCase();
-    for (const oracle of expected.major_findings) {
+    for (const oracle of oracles) {
       const termCount = oracle.terms.filter((term) => text.includes(term.toLowerCase())).length;
-      if (finding.file === oracle.file && termCount >= 2 && ![...matched].some((value) => value.endsWith(`:${oracle.id}`))) {
+      const fileMatches = oracle.files.map(normalizeFindingPath).includes(normalizeFindingPath(finding.file));
+      if (fileMatches && termCount >= 2 && ![...matched].some((value) => value.endsWith(`:${oracle.id}`))) {
         matched.add(`${index}:${oracle.id}`);
         break;
       }
     }
   }
   const validIndexes = new Set([...matched].map((value) => Number(value.split(":")[0])));
+  const falsePositives = findings.filter((_, index) => !validIndexes.has(index)).length;
+  const missed = oracles.length - matched.size;
   return {
     valid_blocking_or_major_findings: matched.size,
-    major_findings_missed: expected.major_findings.length - matched.size,
-    unsupported_or_false_positive_findings: findings.filter((_, index) => !validIndexes.has(index)).length,
+    major_findings_missed: missed,
+    unsupported_or_false_positive_findings: falsePositives,
+    merge_decision_correct: expected.merge_decision ? ["request_changes", "block"].includes(final?.decision) : null,
     requirement_satisfaction_rate: null,
     scope_deviations: 0,
+    automated_correction_units: missed + falsePositives,
   };
 }
 
@@ -284,25 +358,46 @@ function testSummary(result) {
   const text = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
   const pass = text.match(/# pass (\d+)/);
   const fail = text.match(/# fail (\d+)/);
-  return { passed: pass ? Number(pass[1]) : null, failed: fail ? Number(fail[1]) : null, exit_code: result.status };
+  const passedNames = [...text.matchAll(/^ok \d+ - (.+?)(?: #.*)?$/gm)].map((match) => match[1].trim());
+  const failedNames = [...text.matchAll(/^not ok \d+ - (.+?)(?: #.*)?$/gm)].map((match) => match[1].trim());
+  return { passed: pass ? Number(pass[1]) : null, failed: fail ? Number(fail[1]) : null, passed_names: passedNames, failed_names: failedNames, exit_code: result.status };
 }
 
-function implementationMetrics(caseRoot, expected, fixtureId) {
-  const hidden = spawnSync(process.execPath, [resolve(FIXTURE_ROOT, fixtureId, "hidden-tests.mjs"), caseRoot], { cwd: caseRoot, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
+function globMatches(path, pattern) {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*\*/g, "::DOUBLE_STAR::").replace(/\*/g, "[^/]*").replace(/::DOUBLE_STAR::/g, ".*");
+  return new RegExp(`^${escaped}$`).test(path);
+}
+
+function implementationMetrics(caseRoot, workspace, expected, hiddenTestsPath) {
+  const hidden = spawnSync(process.execPath, [hiddenTestsPath, workspace], { cwd: caseRoot, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
   const summary = testSummary(hidden);
-  const tracked = git(caseRoot, ["diff", "--name-only", "HEAD", "--"]).split("\n").filter(Boolean);
-  const untracked = git(caseRoot, ["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean);
+  const tracked = git(workspace, ["diff", "--name-only", "HEAD", "--"]).split("\n").filter(Boolean);
+  const untracked = git(workspace, ["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean);
   const changed = [...new Set([...tracked, ...untracked])].filter((path) => !path.startsWith(".benchmark-"));
-  const deviations = changed.filter((path) => !expected.allowed_paths.includes(path));
-  const total = expected.requirement_ids.length;
+  const allowedPatterns = expected.allowed_paths ?? expected.allowed_files ?? [];
+  const deviations = changed.filter((path) => !allowedPatterns.some((pattern) => globMatches(path, pattern)));
+  const requirements = Array.isArray(expected.requirements) ? expected.requirements : (expected.requirement_ids ?? []).map((id) => ({ id }));
+  const passedNames = new Set(summary.passed_names);
+  const satisfied = Array.isArray(expected.requirements)
+    ? requirements.filter((requirement) => requirement.hidden_tests.every((name) => passedNames.has(name))).length
+    : Math.min(summary.passed ?? 0, requirements.length);
+  const requirementFailures = Array.isArray(expected.requirements)
+    ? requirements.filter((requirement) => !requirement.hidden_tests.every((name) => passedNames.has(name))).map((requirement) => requirement.id)
+    : [];
+  const total = requirements.length;
   return {
     valid_blocking_or_major_findings: null,
     major_findings_missed: null,
     unsupported_or_false_positive_findings: null,
-    requirement_satisfaction_rate: summary.passed === null ? null : summary.passed / total,
-    hidden_tests: { total, ...summary },
+    merge_decision_correct: null,
+    requirement_satisfaction_rate: summary.passed === null ? null : satisfied / total,
+    requirements_total: total,
+    requirements_satisfied: summary.passed === null ? null : satisfied,
+    requirement_failures: requirementFailures,
+    hidden_tests: { total: (summary.passed ?? 0) + (summary.failed ?? 0), ...summary },
     scope_deviations: deviations.length,
     changed_file_count: changed.length,
+    automated_correction_units: summary.passed === null ? null : (total - satisfied) + deviations.length,
   };
 }
 
@@ -318,18 +413,42 @@ function percentChange(baseline, candidate) {
   return ((candidate - baseline) / baseline) * 100;
 }
 
+function mean(values) {
+  const numeric = values.filter(Number.isFinite);
+  return numeric.length === 0 ? null : numeric.reduce((sum, value) => sum + value, 0) / numeric.length;
+}
+
 function aggregate(runs, fixtureId, condition) {
   const rows = runs.filter((entry) => entry.fixture_id === fixtureId && entry.condition === condition);
   if (rows.length === 0) return null;
-  const row = rows[0];
   return {
-    quality: row.outcome_quality,
-    duration_ms: row.cost_latency.total_duration_ms,
-    total_tokens: Number.isFinite(row.cost_latency.input_tokens) && Number.isFinite(row.cost_latency.output_tokens) ? row.cost_latency.input_tokens + row.cost_latency.output_tokens : null,
-    rework_count: row.outcome_quality.rework_count,
-    senior_review_minutes: row.human_effort.senior_review_minutes,
-    abandoned: row.runtime_evidence.execution_status !== "executed",
+    quality: {
+      valid_blocking_or_major_findings: mean(rows.map((row) => row.outcome_quality.valid_blocking_or_major_findings)),
+      requirement_satisfaction_rate: mean(rows.map((row) => row.outcome_quality.requirement_satisfaction_rate)),
+      unsupported_or_false_positive_findings: mean(rows.map((row) => row.outcome_quality.unsupported_or_false_positive_findings)),
+      scope_deviations: mean(rows.map((row) => row.outcome_quality.scope_deviations)),
+      unverified_completion_or_readiness_claims: mean(rows.map((row) => row.outcome_quality.unverified_completion_or_readiness_claims)),
+    },
+    duration_ms: mean(rows.map((row) => row.cost_latency.total_duration_ms)),
+    total_tokens: mean(rows.map((row) => Number.isFinite(row.cost_latency.input_tokens) && Number.isFinite(row.cost_latency.output_tokens) ? row.cost_latency.input_tokens + row.cost_latency.output_tokens : null)),
+    rework_count: mean(rows.map((row) => row.outcome_quality.rework_count)),
+    senior_review_minutes: mean(rows.map((row) => row.human_effort.senior_review_minutes)),
+    automated_correction_units: mean(rows.map((row) => row.outcome_quality.automated_correction_units)),
+    abandoned: rows.some((row) => row.runtime_evidence.execution_status !== "executed"),
   };
+}
+
+function materialQualityGain(config, fixture, kernel, full) {
+  if (fixture.task_class === "review") {
+    return (full.quality.valid_blocking_or_major_findings - kernel.quality.valid_blocking_or_major_findings) >= (config.thresholds.minimum_review_valid_finding_gain ?? Number.POSITIVE_INFINITY);
+  }
+  return (full.quality.requirement_satisfaction_rate - kernel.quality.requirement_satisfaction_rate) >= (config.thresholds.minimum_implementation_requirement_rate_gain ?? Number.POSITIVE_INFINITY);
+}
+
+function qualityGuardrailWorsened(config, kernel, full) {
+  return ((full.quality.unsupported_or_false_positive_findings ?? 0) - (kernel.quality.unsupported_or_false_positive_findings ?? 0)) > (config.thresholds.maximum_false_positive_increase ?? 0)
+    || ((full.quality.scope_deviations ?? 0) - (kernel.quality.scope_deviations ?? 0)) > (config.thresholds.maximum_scope_deviation_increase ?? 0)
+    || ((full.quality.unverified_completion_or_readiness_claims ?? 0) - (kernel.quality.unverified_completion_or_readiness_claims ?? 0)) > (config.thresholds.maximum_unverified_claim_increase ?? 0);
 }
 
 function recommendationFor(config, runs, fixture) {
@@ -340,16 +459,21 @@ function recommendationFor(config, runs, fixture) {
   const fullQuality = full.quality[qualityKey];
   const kernelQuality = kernel.quality[qualityKey];
   if (Number.isFinite(fullQuality) && Number.isFinite(kernelQuality) && fullQuality < kernelQuality) return { fixture_id: fixture.id, recommendation: "stop", reason: "Full ASK quality was lower than Kernel-only." };
-  if ((full.quality.unsupported_or_false_positive_findings ?? 0) > (kernel.quality.unsupported_or_false_positive_findings ?? 0)) return { fixture_id: fixture.id, recommendation: "stop", reason: "Full ASK added unsupported blocking/major findings." };
+  if (qualityGuardrailWorsened(config, kernel, full)) return { fixture_id: fixture.id, recommendation: "stop", reason: "Full ASK worsened a frozen quality guardrail." };
   const seniorReduction = percentChange(kernel.senior_review_minutes, full.senior_review_minutes);
   const reworkReduction = percentChange(kernel.rework_count, full.rework_count);
   const durationOverhead = percentChange(kernel.duration_ms, full.duration_ms);
   const tokenOverhead = percentChange(kernel.total_tokens, full.total_tokens);
-  const primaryMet = (seniorReduction !== null && seniorReduction <= -config.thresholds.senior_correction_reduction_percent)
+  const qualityGain = materialQualityGain(config, fixture, kernel, full) && config.thresholds.allow_expand_with_material_quality_gain === true;
+  const primaryMet = qualityGain
+    || (seniorReduction !== null && seniorReduction <= -config.thresholds.senior_correction_reduction_percent)
     || (reworkReduction !== null && reworkReduction <= -config.thresholds.rework_reduction_percent);
-  const overheadAcceptable = (durationOverhead === null || durationOverhead <= config.thresholds.maximum_duration_overhead_percent)
-    && (tokenOverhead === null || tokenOverhead <= config.thresholds.maximum_token_overhead_percent);
+  const durationLimit = qualityGain ? config.thresholds.maximum_duration_overhead_with_quality_gain_percent : config.thresholds.maximum_duration_overhead_percent;
+  const tokenLimit = qualityGain ? config.thresholds.maximum_token_overhead_with_quality_gain_percent : config.thresholds.maximum_token_overhead_percent;
+  const overheadAcceptable = (durationOverhead === null || durationOverhead <= durationLimit)
+    && (tokenOverhead === null || tokenOverhead <= tokenLimit);
   if (primaryMet && overheadAcceptable) return { fixture_id: fixture.id, recommendation: "expand", reason: "A fixed primary improvement threshold and all guardrails were met." };
+  if (qualityGain && !overheadAcceptable) return { fixture_id: fixture.id, recommendation: "retain", reason: "Full ASK improved quality, but exceeded the frozen quality-gain overhead allowance." };
   if (!primaryMet && !overheadAcceptable) return { fixture_id: fixture.id, recommendation: "simplify", reason: "Material improvement was unproven and Full ASK exceeded a fixed overhead guardrail." };
   return { fixture_id: fixture.id, recommendation: "retain", reason: "Quality was non-inferior, but material incremental value was not proven." };
 }
@@ -364,6 +488,8 @@ function comparisonFor(runs, fixture) {
     quality_metric: qualityKey,
     kernel_only_quality: kernel?.quality?.[qualityKey] ?? null,
     full_ask_quality: full?.quality?.[qualityKey] ?? null,
+    quality_gain: Number.isFinite(kernel?.quality?.[qualityKey]) && Number.isFinite(full?.quality?.[qualityKey]) ? full.quality[qualityKey] - kernel.quality[qualityKey] : null,
+    automated_correction_units_delta: Number.isFinite(kernel?.automated_correction_units) && Number.isFinite(full?.automated_correction_units) ? full.automated_correction_units - kernel.automated_correction_units : null,
     duration_overhead_percent: percentChange(kernel?.duration_ms, full?.duration_ms),
     token_overhead_percent: percentChange(kernel?.total_tokens, full?.total_tokens),
     senior_correction_reduction_percent: percentChange(kernel?.senior_review_minutes, full?.senior_review_minutes),
@@ -372,24 +498,32 @@ function comparisonFor(runs, fixture) {
 }
 
 function score(args) {
-  const config = validateProtocol();
+  const config = validateProtocol(args.configPath);
   if (!args.runDir || !args.output) throw new Error("score requires --run-dir and --output");
   const manifest = readJson(resolve(args.runDir, "run.json"));
+  if (manifest.checkpoint !== config.checkpoint || manifest.config_sha256 !== sha256(readFileSync(config._configPath))) throw new Error("run manifest does not match the selected frozen config");
+  const configuredFixtures = new Map(config.fixtures.map((fixture) => [fixture.id, fixture]));
   const runs = manifest.cases.map((entry) => {
     const caseRoot = resolve(args.runDir, entry.case_id);
+    const workspace = entry.workspace_subdir ? resolve(caseRoot, entry.workspace_subdir) : caseRoot;
+    const fixture = configuredFixtures.get(entry.fixture_id);
     const final = parseFinal(resolve(caseRoot, ".benchmark-final.json"));
     const runtime = existsSync(resolve(caseRoot, ".benchmark-run.json")) ? readJson(resolve(caseRoot, ".benchmark-run.json")) : {};
-    const expected = readJson(resolve(FIXTURE_ROOT, entry.fixture_id, "expected.json"));
-    const quality = entry.task_class === "review" ? reviewMetrics(final, expected) : implementationMetrics(caseRoot, expected, entry.fixture_id);
+    const expected = readJson(fixtureFile(config, fixture, entry.expected_path));
+    const hiddenTestsPath = entry.hidden_tests_path ? fixtureFile(config, fixture, entry.hidden_tests_path) : null;
+    const quality = entry.task_class === "review" ? reviewMetrics(final, expected) : implementationMetrics(caseRoot, workspace, expected, hiddenTestsPath);
     const claimedComplete = final?.completion_claim === "complete";
     const verificationPassed = final?.verification_commands?.some((command) => command.result === "passed") ?? false;
     const objectiveFailure = quality.hidden_tests?.exit_code ? quality.hidden_tests.exit_code !== 0 : false;
     quality.unverified_completion_or_readiness_claims = claimedComplete && (!verificationPassed || objectiveFailure) ? 1 : 0;
+    if (Number.isFinite(quality.automated_correction_units)) quality.automated_correction_units += quality.unverified_completion_or_readiness_claims;
     quality.rework_count = null;
     return {
       case_id: entry.case_id,
       fixture_id: entry.fixture_id,
       task_class: entry.task_class,
+      difficulty: entry.difficulty,
+      repetition: entry.repetition,
       condition: entry.condition,
       outcome_quality: quality,
       human_effort: { senior_review_minutes: null, additional_investigation_minutes: null, unresolved_human_decisions: null },
@@ -430,9 +564,10 @@ function score(args) {
       thresholds: config.thresholds,
     },
     limitations: [
-      "One synthetic fixture per workflow does not establish universal or causal value.",
+      `${config.fixtures.length} synthetic fixtures with ${config.repetitions ?? 1} repetition(s) do not establish universal or causal value.`,
       "Senior correction time, additional investigation time, unresolved human decisions, rework, and usage cost are unknown until a blinded human evaluator records them.",
       "Review finding matching is a frozen semantic heuristic and may undercount or overcount paraphrases.",
+      "Automated correction units are a bounded quality proxy, not human effort or rework.",
       "Checkpoint C remains pending until #179 and must separate architecture changes from model, CLI, repository, and adapter changes."
     ],
     privacy: {
@@ -450,7 +585,7 @@ function score(args) {
 try {
   const args = parseArgs(process.argv.slice(2));
   if (args.command === "validate") {
-    validateProtocol();
+    validateProtocol(args.configPath);
     console.log("ASK benchmark protocol validation passed");
   } else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);

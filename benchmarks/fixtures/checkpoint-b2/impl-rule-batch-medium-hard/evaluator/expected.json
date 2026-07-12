@@ -1,0 +1,113 @@
+{
+  "fixture_id": "impl-rule-batch-medium-hard",
+  "class": "implementation-verification",
+  "difficulty": "medium-hard",
+  "target_minutes": 15,
+  "requirements": [
+    {
+      "id": "RULE-REQ-01",
+      "oracle": "Public applyBatch API and IdempotencyConflictError export exist.",
+      "hidden_tests": [
+        "normal batch, lexical receipt order, and one version increment"
+      ]
+    },
+    {
+      "id": "RULE-REQ-02",
+      "oracle": "Top-level/operation shapes, requestId, expectedVersion, and 1..20 limits are strict.",
+      "hidden_tests": [
+        "boundary sizes and strict scalar/shape validation"
+      ]
+    },
+    {
+      "id": "RULE-REQ-03",
+      "oracle": "Keys trim/lowercase and duplicate canonical keys reject.",
+      "hidden_tests": [
+        "boundary sizes and strict scalar/shape validation"
+      ]
+    },
+    {
+      "id": "RULE-REQ-04",
+      "oracle": "Only null/string/boolean/finite-number values are accepted.",
+      "hidden_tests": [
+        "boundary sizes and strict scalar/shape validation"
+      ]
+    },
+    {
+      "id": "RULE-REQ-05",
+      "oracle": "Validation and expectedVersion failures are atomic.",
+      "hidden_tests": [
+        "validation and version failures preserve all state"
+      ]
+    },
+    {
+      "id": "RULE-REQ-06",
+      "oracle": "Set/delete apply on a copy; missing delete is allowed; accepted batch bumps version once.",
+      "hidden_tests": [
+        "normal batch, lexical receipt order, and one version increment"
+      ]
+    },
+    {
+      "id": "RULE-REQ-07",
+      "oracle": "Replay is checked before version; normalized same request replays; collision errors.",
+      "hidden_tests": [
+        "idempotent replay precedes version checking and collisions preserve state"
+      ]
+    },
+    {
+      "id": "RULE-REQ-08",
+      "oracle": "Inputs, receipts, and stored values are detached.",
+      "hidden_tests": [
+        "inputs and receipts do not alias internal state"
+      ]
+    },
+    {
+      "id": "RULE-REQ-09",
+      "oracle": "Receipt has exact fields and lexical key order.",
+      "hidden_tests": [
+        "normal batch, lexical receipt order, and one version increment"
+      ]
+    },
+    {
+      "id": "RULE-REQ-10",
+      "oracle": "Legacy APIs retain prior behavior.",
+      "hidden_tests": [
+        "legacy APIs remain compatible"
+      ]
+    },
+    {
+      "id": "RULE-REQ-SCOPE",
+      "oracle": "Only allowed files change; docs/package/source-module set remain intact.",
+      "hidden_tests": [
+        "scope-protected files and source-module set are unchanged"
+      ]
+    }
+  ],
+  "expected_agent_tests": [
+    "Atomic rollback when a later operation is invalid.",
+    "Version conflict leaves rules/version/idempotency unchanged.",
+    "Same normalized idempotency replay after the store version advances.",
+    "Request ID collision with different payload.",
+    "Duplicate keys after trim/lowercase canonicalization.",
+    "Mutating request and receipt does not alter stored state."
+  ],
+  "allowed_files": [
+    "src/errors.mjs",
+    "src/validation.mjs",
+    "src/rule-store.mjs",
+    "src/rule-service.mjs",
+    "src/index.mjs",
+    "test/*.test.mjs"
+  ],
+  "prohibited_files": [
+    "package.json",
+    "docs/**",
+    "new src modules"
+  ],
+  "ambiguity_resolution": {
+    "prompt_phrase": "documented scalar / canonical key / strict shape",
+    "authoritative_sources": [
+      "docs/rule-batches.md",
+      "docs/rule-batch.schema.json"
+    ]
+  }
+}

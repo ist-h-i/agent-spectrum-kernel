@@ -1,0 +1,129 @@
+{
+  "fixture_id": "pr-session-refresh-medium-hard",
+  "class": "pr-review",
+  "difficulty": "medium-hard",
+  "target_minutes": 15,
+  "merge_decision": "request_changes",
+  "findings": [
+    {
+      "id": "SESSION-001",
+      "severity": "critical",
+      "title": "Refresh trusts stale session claims instead of current account state",
+      "match_terms": ["stale", "current account", "disabled", "demoted", "role", "tenant"],
+      "evidence": [
+        {
+          "file": "src/auth-service.mjs",
+          "lines": "32-45"
+        },
+        {
+          "file": "src/account-store.mjs",
+          "lines": "8-10"
+        },
+        {
+          "file": "docs/sessions.md",
+          "lines": "6-8"
+        }
+      ],
+      "impact": "A disabled, demoted, or tenant-moved account can continue receiving access tokens from stale session claims.",
+      "blocker": true,
+      "hidden_tests": [
+        "refresh reloads current account state and claims"
+      ]
+    },
+    {
+      "id": "SESSION-002",
+      "severity": "high",
+      "title": "Expiry check accepts a token at expiresAt",
+      "match_terms": ["expiresat", "expiry", "boundary", "exact", "expired", "comparison"],
+      "evidence": [
+        {
+          "file": "src/auth-service.mjs",
+          "lines": "37-37"
+        },
+        {
+          "file": "docs/sessions.md",
+          "lines": "3-4"
+        }
+      ],
+      "impact": "A refresh token remains usable for one boundary instant outside the documented validity interval.",
+      "blocker": true,
+      "hidden_tests": [
+        "a token is expired at the exact expiresAt boundary"
+      ]
+    },
+    {
+      "id": "SESSION-003",
+      "severity": "high",
+      "title": "Rotation is committed before access-token signing succeeds",
+      "match_terms": ["rotation", "signing", "signer", "failure", "refresh token", "rollback", "consumes"],
+      "evidence": [
+        {
+          "file": "src/auth-service.mjs",
+          "lines": "39-45"
+        },
+        {
+          "file": "docs/sessions.md",
+          "lines": "10-12"
+        }
+      ],
+      "impact": "A transient signer failure consumes the only valid refresh token without returning a replacement, forcing an avoidable logout.",
+      "blocker": true,
+      "hidden_tests": [
+        "token-signing failure preserves the original refresh token"
+      ]
+    },
+    {
+      "id": "SESSION-004",
+      "severity": "high",
+      "title": "Session rotation does not compare-and-swap after the asynchronous write boundary",
+      "match_terms": ["concurrent", "compare-and-swap", "cas", "race", "both succeed", "rotation", "async"],
+      "evidence": [
+        {
+          "file": "src/session-store.mjs",
+          "lines": "32-39"
+        },
+        {
+          "file": "src/auth-service.mjs",
+          "lines": "34-40"
+        },
+        {
+          "file": "docs/sessions.md",
+          "lines": "10-12"
+        }
+      ],
+      "impact": "Two refreshes can both succeed; one caller receives a refresh token that is immediately superseded, and stale index entries can accumulate.",
+      "blocker": true,
+      "hidden_tests": [
+        "concurrent refresh calls allow only one rotation"
+      ]
+    }
+  ],
+  "correct_but_suspicious_changes": [
+    {
+      "id": "SESSION-NF-001",
+      "evidence": [
+        {
+          "file": "src/tokens.mjs",
+          "lines": "7-11"
+        }
+      ],
+      "reason": "Checking buffer lengths before timingSafeEqual is required because timingSafeEqual throws for unequal lengths."
+    },
+    {
+      "id": "SESSION-NF-002",
+      "evidence": [
+        {
+          "file": "src/http-handlers.mjs",
+          "lines": "15-24"
+        }
+      ],
+      "reason": "Cache-Control: no-store and mapping stale refreshes to an authentication response match the documented boundary."
+    }
+  ],
+  "false_positive_boundary": [
+    "Do not count style, naming, or a request for more tests without a concrete failing execution path.",
+    "Do not count use of SHA-256 digests or timingSafeEqual as a defect in this fixture.",
+    "Do not split disabled-account and stale-role behavior into multiple findings; they have the same root cause.",
+    "A finding must identify a changed line or a changed execution path plus the relevant repository contract."
+  ]
+}

@@ -22,3 +22,16 @@ Run `prepare` only after [protocol.md](protocol.md) and [checkpoint-b.config.jso
 Checkpoint C must use a new config and result after #179. Do not overwrite the Checkpoint B baseline or combine architecture, model, repository, CLI, or adapter changes into one comparison variable.
 
 The measured Checkpoint B summary is [results/checkpoint-b-report.md](results/checkpoint-b-report.md). The corresponding normalized result is `results/checkpoint-b-2026-07-12.json`; [report-template.md](report-template.md) is the reusable Checkpoint B/C report structure.
+
+## Difficulty-expanded Checkpoint B2
+
+B2 preserves the original B baseline and adds four fixtures under `fixtures/checkpoint-b2/`: medium-hard and hard review tasks plus medium-hard and hard implementation tasks. Agent-visible inputs are hash-pinned; evaluator oracles, hidden tests, and reference patches remain outside prepared case workspaces.
+
+```bash
+node scripts/ask-benchmark.mjs validate --config benchmarks/checkpoint-b2.config.json
+node scripts/ask-benchmark.mjs prepare --config benchmarks/checkpoint-b2.config.json --output /tmp/ask-benchmark-checkpoint-b2 --seed checkpoint-b2-2026-07-12
+node scripts/ask-benchmark.mjs run --config benchmarks/checkpoint-b2.config.json --run-dir /tmp/ask-benchmark-checkpoint-b2 --agent-bin /absolute/path/to/codex
+node scripts/ask-benchmark.mjs score --config benchmarks/checkpoint-b2.config.json --run-dir /tmp/ask-benchmark-checkpoint-b2 --output benchmarks/results/checkpoint-b2-2026-07-12.json
+```
+
+See [protocol-b2.md](protocol-b2.md) for frozen quality-gain thresholds. B2 can establish value only for its fixtures and controlled runtime; replication remains required before architecture-wide conclusions.

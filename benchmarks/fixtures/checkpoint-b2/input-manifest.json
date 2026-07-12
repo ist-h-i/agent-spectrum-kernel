@@ -1,0 +1,265 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "pr-session-refresh-medium-hard": {
+      "class": "pr-review",
+      "difficulty": "medium-hard",
+      "target_minutes": 15,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "095f77ee0d45258a1d8dd296c15cef45d612803c36336ad7735ac1427d0dbba1",
+          "bytes": 718
+        },
+        {
+          "path": "workspace/docs/session.schema.json",
+          "sha256": "eadfb80107ac828d4ddd967608fc9f08ae0e1080a56965da51edbd35d1e9d44a",
+          "bytes": 277
+        },
+        {
+          "path": "workspace/docs/sessions.md",
+          "sha256": "9cacdcb98c33df74e8514e377312bdc4b02111bc3b497bcc7b520f4a595a0fd5",
+          "bytes": 756
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "efc56df678cbbe98cec6a46333eb6025a7636221a6b49d65c28308d05f783800",
+          "bytes": 178
+        },
+        {
+          "path": "workspace/pr.diff",
+          "sha256": "167309c39b2b74fce78dd24f6f1747a43b540c299c86ef548c55ac4bef0be538",
+          "bytes": 6259
+        },
+        {
+          "path": "workspace/src/account-store.mjs",
+          "sha256": "870438141aa53a65943400bcd40a05a8bec65360da7feb15f12d59ecee8b9679",
+          "bytes": 534
+        },
+        {
+          "path": "workspace/src/auth-service.mjs",
+          "sha256": "3d3de9371f5e97b1cff057ad8befae63c41895b044464756b16d9307efd9c522",
+          "bytes": 1746
+        },
+        {
+          "path": "workspace/src/errors.mjs",
+          "sha256": "90bc437e8995db0150f1bcc077e57b72990eb3747b73d8d2adf70aaf47abbb4e",
+          "bytes": 370
+        },
+        {
+          "path": "workspace/src/http-handlers.mjs",
+          "sha256": "25bbee20b4c023033347aac57e522e56fdcb5848fbc90b7ebadba5ce9c81bc7a",
+          "bytes": 986
+        },
+        {
+          "path": "workspace/src/session-store.mjs",
+          "sha256": "64ec24551aec17f0e169a652839f4242df5cef04b08e886997daac9d069796c7",
+          "bytes": 1326
+        },
+        {
+          "path": "workspace/src/tokens.mjs",
+          "sha256": "ccbcc0747a161e17b5243e8aebfa9184351056484e2c4dc62773901b8e1d4c27",
+          "bytes": 431
+        },
+        {
+          "path": "workspace/test/auth-service.test.mjs",
+          "sha256": "fb4e5731084d71a55416c24c39b0947d89c9dc6a7b6f72cf2498516036793a9b",
+          "bytes": 1759
+        },
+        {
+          "path": "workspace/test/http-handlers.test.mjs",
+          "sha256": "33211dc930531e6eca73707e24dc5199604771d1aa52da8687583020e0f100ef",
+          "bytes": 503
+        }
+      ]
+    },
+    "pr-export-lease-hard": {
+      "class": "pr-review",
+      "difficulty": "hard",
+      "target_minutes": 15,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "9f8895818b4e40f541ced4b8fde85f7a3e51c539ae8fce03d2771ec43f359b35",
+          "bytes": 596
+        },
+        {
+          "path": "workspace/docs/export-jobs.md",
+          "sha256": "9910c8cbfd9aa0c08a4e4dc2f92192edd22d92741067d7c39b3555625cb25887",
+          "bytes": 952
+        },
+        {
+          "path": "workspace/docs/job.schema.json",
+          "sha256": "291247dfda7a9606da1b3240768ec153498450a331fa108cd77889bf57ff5a71",
+          "bytes": 534
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "55747f63f474bb3e5c12910eb2baa3af5c7e2b973c7ab5a79668e0f1d7407012",
+          "bytes": 175
+        },
+        {
+          "path": "workspace/pr.diff",
+          "sha256": "e79dfdc696123c59834233e98822767029b2856cb5be27ab20c470044c966a99",
+          "bytes": 6491
+        },
+        {
+          "path": "workspace/src/errors.mjs",
+          "sha256": "f92e3b8d824459478bd0b14eb4ddeaba537856bff2b826a47503b8df02826554",
+          "bytes": 478
+        },
+        {
+          "path": "workspace/src/export-service.mjs",
+          "sha256": "41870061ebf5d774809982b78ea471824f1c4793143b2d545ab7b832b90f0a6e",
+          "bytes": 1096
+        },
+        {
+          "path": "workspace/src/http-handlers.mjs",
+          "sha256": "ee2583a9a3d092eb714bd6d1a2c1bafbd62e1e5d52a0b1d4d4861709aa1324e5",
+          "bytes": 665
+        },
+        {
+          "path": "workspace/src/job-store.mjs",
+          "sha256": "b1a88a4c7ddb0cfa717686bbee2f1dc8a1d967d11bb6697dbe6abc55a18d807f",
+          "bytes": 2560
+        },
+        {
+          "path": "workspace/src/retry-policy.mjs",
+          "sha256": "5839e0199091f681a57aadfab644a63e8541770c73774eed97fcf1afa5f23873",
+          "bytes": 121
+        },
+        {
+          "path": "workspace/test/export-service.test.mjs",
+          "sha256": "705f6e0c9cf13c7dc9a8527f8eff1df3cd599218edc40c320abd0dbe65fa87cf",
+          "bytes": 624
+        },
+        {
+          "path": "workspace/test/job-store.test.mjs",
+          "sha256": "6997112a21ce3a34943095232622de7654eb4bb56c01175f8cb117f7edf410ca",
+          "bytes": 922
+        }
+      ]
+    },
+    "impl-rule-batch-medium-hard": {
+      "class": "implementation-verification",
+      "difficulty": "medium-hard",
+      "target_minutes": 15,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "e26c65961b950a0830a58f791ee1e12dae9fd2e4caac35203564a104c11531b1",
+          "bytes": 1893
+        },
+        {
+          "path": "workspace/docs/rule-batch.schema.json",
+          "sha256": "f96825608b1524ab0752eddf5112da0a7180b2751addd1a3bfb29ed54083fcf0",
+          "bytes": 924
+        },
+        {
+          "path": "workspace/docs/rule-batches.md",
+          "sha256": "055595f77b6d31523c0875465c6e96a77a7824963c5e4561c3a904d4077e110f",
+          "bytes": 1276
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "a5dace66e989ce4aff59cd8e2c2646192a97f02b49505a6f992ffb0871d6570d",
+          "bytes": 173
+        },
+        {
+          "path": "workspace/src/errors.mjs",
+          "sha256": "f6dc6160a815dc1335528645da2e409b9c2f0a631bc57f779e5c10bc9d64cdec",
+          "bytes": 455
+        },
+        {
+          "path": "workspace/src/index.mjs",
+          "sha256": "b684404aa931ac51a96739558e3fa6830066f0910a5410ac40c5fd07ac126d5c",
+          "bytes": 170
+        },
+        {
+          "path": "workspace/src/rule-service.mjs",
+          "sha256": "7ef339154d45b24df96295d3fc3812e9913945b7f88ee1f13594b46044d5fff8",
+          "bytes": 502
+        },
+        {
+          "path": "workspace/src/rule-store.mjs",
+          "sha256": "e57341c23abf700bb90dd2b2e33093d6204d8f61452165542f8648bfab8770fa",
+          "bytes": 1000
+        },
+        {
+          "path": "workspace/src/validation.mjs",
+          "sha256": "9ffdcbc30dd5e19dcec44f9c8fbed368dd873746cefe56d8facfbd9313f03748",
+          "bytes": 730
+        },
+        {
+          "path": "workspace/test/rule-service.test.mjs",
+          "sha256": "9f26362d343a047f869abb85d46b63a7674a7da1096d63feaa7cc500d9d143b4",
+          "bytes": 1064
+        }
+      ]
+    },
+    "impl-transfer-hard": {
+      "class": "implementation-verification",
+      "difficulty": "hard",
+      "target_minutes": 15,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "bfb8f4da52b8fe98c1947fca7c36456f64b849c82f44174fe18e24fd3779be4d",
+          "bytes": 2166
+        },
+        {
+          "path": "workspace/docs/transfer.schema.json",
+          "sha256": "658335dce2ed31eb3644e2c2280fe05b1bdff71d0d5b161bf673258b3cb0276a",
+          "bytes": 778
+        },
+        {
+          "path": "workspace/docs/transfers.md",
+          "sha256": "f3d95be226bb970d9e2cc08a4f55fde84d958e3979905570e72ad72cbc08ba23",
+          "bytes": 1410
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "084ae0db79f5b172a2ee67db4a726352d1c3bdbc5431bf5f2ebf89364293c018",
+          "bytes": 171
+        },
+        {
+          "path": "workspace/src/account-store.mjs",
+          "sha256": "b48a380d1af9e74f778f4dbcf7197282d104368c4ecae94cb33e2ee1d3a511cd",
+          "bytes": 1230
+        },
+        {
+          "path": "workspace/src/errors.mjs",
+          "sha256": "fb088f6581e1638668d24cd663dc58e0214d4b1ef2fae551629aacfa94957963",
+          "bytes": 723
+        },
+        {
+          "path": "workspace/src/index.mjs",
+          "sha256": "6dc8b0e64da3cb76a7ff215faec2a92fe6d48e6e2c706e809e84b4f420111599",
+          "bytes": 242
+        },
+        {
+          "path": "workspace/src/serial-executor.mjs",
+          "sha256": "2f8aa7f9b32242f1babcc5e831a8919f9dad5c1dab533fb9b68914a9efd37bd6",
+          "bytes": 203
+        },
+        {
+          "path": "workspace/src/transfer-service.mjs",
+          "sha256": "81de9f321e5d6819544e505cc5dbdc4e5a7682487ba66d56c274222ca2974e7f",
+          "bytes": 606
+        },
+        {
+          "path": "workspace/src/validation.mjs",
+          "sha256": "11f4032a160af9ada5fe3a6f75d57144ce47ab60b1d7c28d08eb42dd5c2e5679",
+          "bytes": 548
+        },
+        {
+          "path": "workspace/test/transfer-service.test.mjs",
+          "sha256": "d23f51e8ef535c97e5d886ded6994491078096c2eaf8ec7f425a407929bb75a6",
+          "bytes": 1582
+        }
+      ]
+    }
+  }
+}

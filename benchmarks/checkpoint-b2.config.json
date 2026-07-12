@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.1.0",
+  "checkpoint": "B2",
+  "protocol_path": "benchmarks/protocol-b2.md",
+  "fixture_root": "benchmarks/fixtures/checkpoint-b2",
+  "protocol_status": "frozen",
+  "protocol_frozen_at": "2026-07-12T10:30:00+09:00",
+  "conditions": ["plain", "kernel_only", "full_ask"],
+  "repetitions": 1,
+  "fixtures": [
+    {
+      "id": "pr-session-refresh-medium-hard",
+      "task_class": "review",
+      "difficulty": "medium-hard",
+      "sandbox": "read-only",
+      "layout": "nested",
+      "review_source": "embedded_diff",
+      "expected_path": "evaluator/expected.json"
+    },
+    {
+      "id": "pr-export-lease-hard",
+      "task_class": "review",
+      "difficulty": "hard",
+      "sandbox": "read-only",
+      "layout": "nested",
+      "review_source": "embedded_diff",
+      "expected_path": "evaluator/expected.json"
+    },
+    {
+      "id": "impl-rule-batch-medium-hard",
+      "task_class": "implementation",
+      "difficulty": "medium-hard",
+      "sandbox": "workspace-write",
+      "layout": "nested",
+      "expected_path": "evaluator/expected.json",
+      "hidden_tests_path": "evaluator/hidden-tests.mjs"
+    },
+    {
+      "id": "impl-transfer-hard",
+      "task_class": "implementation",
+      "difficulty": "hard",
+      "sandbox": "workspace-write",
+      "layout": "nested",
+      "expected_path": "evaluator/expected.json",
+      "hidden_tests_path": "evaluator/hidden-tests.mjs"
+    }
+  ],
+  "runtime": {
+    "agent": "codex-cli",
+    "agent_version": "0.144.1",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "sequential": true,
+    "case_timeout_ms": 900000,
+    "network_required_by_fixtures": false
+  },
+  "thresholds": {
+    "senior_correction_reduction_percent": 25,
+    "rework_reduction_percent": 20,
+    "minimum_review_valid_finding_gain": 1,
+    "minimum_implementation_requirement_rate_gain": 0.1,
+    "maximum_false_positive_increase": 0,
+    "maximum_scope_deviation_increase": 0,
+    "maximum_unverified_claim_increase": 0,
+    "maximum_duration_overhead_percent": 50,
+    "maximum_token_overhead_percent": 50,
+    "maximum_duration_overhead_with_quality_gain_percent": 100,
+    "maximum_token_overhead_with_quality_gain_percent": 150,
+    "require_non_inferior_quality": true,
+    "allow_expand_with_primary_metrics_unknown": false,
+    "allow_expand_with_material_quality_gain": true
+  },
+  "privacy": {
+    "store_raw_prompts": false,
+    "store_full_outputs": false,
+    "store_full_source": false,
+    "store_secrets_customer_or_personal_data": false
+  }
+}

@@ -1,0 +1,2 @@
+benchmarks/fixtures/checkpoint-b2/**/evaluator/*.patch whitespace=-blank-at-eol
+benchmarks/fixtures/checkpoint-b2/**/workspace/pr.diff whitespace=-blank-at-eol

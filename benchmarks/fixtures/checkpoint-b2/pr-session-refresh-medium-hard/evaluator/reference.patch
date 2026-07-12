@@ -1,0 +1,39 @@
+--- a/src/auth-service.mjs
++++ b/src/auth-service.mjs
+@@ -34,15 +34,14 @@
+     const currentHash = hashRefreshToken(rawRefreshToken);
+     const session = this.sessions.findByRefreshHash(currentHash);
+     if (!session) throw new AuthError();
+-    if (session.expiresAt < this.clock.now()) throw new AuthError('Session expired');
++    if (session.expiresAt <= this.clock.now()) throw new AuthError('Session expired');
++
++    const account = this.accounts.getById(session.accountId);
++    if (!account?.active || account.tenantId !== session.tenantId) throw new AuthError();
+ 
+     const nextRefreshToken = this.tokenIssuer.issueRefreshToken();
++    const accessToken = await this.tokenIssuer.issueAccessToken(account);
+     await this.sessions.rotate(session.id, currentHash, hashRefreshToken(nextRefreshToken));
+-    const accessToken = await this.tokenIssuer.issueAccessToken({
+-      id: session.accountId,
+-      tenantId: session.tenantId,
+-      role: session.role
+-    });
+ 
+     return { accessToken, refreshToken: nextRefreshToken, expiresAt: session.expiresAt };
+   }
+--- a/src/session-store.mjs
++++ b/src/session-store.mjs
+@@ -1,4 +1,4 @@
+-import { AuthError } from './errors.mjs';
++import { AuthError, StaleSessionError } from './errors.mjs';
+ import { sameDigest } from './tokens.mjs';
+ 
+ export class SessionStore {
+@@ -33,6 +33,7 @@
+     await this.beforeWrite({ id, expectedRefreshHash, nextRefreshHash });
+     const session = this.#records.get(id);
+     if (!session) throw new AuthError();
++    if (!sameDigest(session.refreshHash, expectedRefreshHash)) throw new StaleSessionError();
+     this.#refreshIndex.delete(expectedRefreshHash);
+     session.refreshHash = nextRefreshHash;
+     this.#refreshIndex.set(nextRefreshHash, id);
