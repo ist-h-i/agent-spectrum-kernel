@@ -61,9 +61,9 @@ The following belong in the skill artifact and should not be repeated in the env
 | Skill | Primary artifact |
 |---|---|
 | `requirement-grill` | Requirement Contract |
-| `spec-driven-development` | Spec and implementation plan |
+| `spec-driven-development` | Spec behavior delta and acceptance criteria |
 | `test-first-verification` | Verification Contract and evidence |
-| `controlled-implementation` | Implementation Contract and implementation summary |
+| `controlled-implementation` | Implementation Contract and evidence references |
 | `review-router` / review gates | Change signals, required gates, or review findings |
 | `review-final-merge-gate` | Final decision and merge evidence summary |
 | `handoff-generation` | Next-task handoff and bounded resume state |
@@ -72,4 +72,4 @@ These artifacts may contain evidence, blockers, or next-step detail required by 
 
 ## Compatibility
 
-Adapters may keep their entry-specific output sections for compatibility. They must place the shared `Execution Envelope` at the workflow boundary and must not invent a second route or metrics contract. Codex execution profiles may continue to require `Changed`, `Verified`, `Not verified`, review, verification, or handoff sections; those are artifacts, not replacements for the envelope. If a legacy `Next:` or `Stop condition:` section remains, it is follow-up detail only and cannot override the Envelope.
+Adapters may keep entry-specific artifacts only when they do not duplicate lifecycle or control fields. They must place the shared `Execution Envelope` at the workflow boundary and must not invent a second route or metrics contract. Codex implementation and verification profiles use their canonical Contract plus Evidence record; they do not add legacy `Changed`, `Verified`, `Not verified`, or `Next` summaries. `next_action` remains owned by the Envelope.

@@ -125,6 +125,8 @@
     "docs/routing-model.md",
     "docs/agent-session-state-contract.md",
     "docs/execution-envelope-contract.md",
+    "docs/lifecycle-artifact-contract.md",
+    "docs/fixtures/lifecycle-artifact-chains.json",
     "docs/skill-matrix.md",
     "docs/observability-runtime-contract.md",
     "docs/operation-automation-contract.md",

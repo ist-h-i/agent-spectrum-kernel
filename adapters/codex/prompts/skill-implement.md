@@ -10,9 +10,11 @@ Routing source: use `operating-mode-router` when the operating layer is unclear,
 
 Evidence requirements:
 
-- define allowed and forbidden scope before editing
+- follow `docs/lifecycle-artifact-contract.md`; consume Requirement, Spec, Work Package, and Verification artifact refs without copying unchanged fields
+- use the Work Package ref for allowed/forbidden scope; if no upstream package exists, use the compact path
 - read nearby implementation, tests, docs, and scripts before changing behavior
-- define the observable verification before or alongside the edit
+- define or reuse one Verification Contract ID before the edit and attach executed evidence to that same ID
+- record changed assumptions, acceptance criteria, scope, or proof obligations as explicit deltas with decision evidence
 - use `risk-gate` before destructive, external, secret, production, auth, dependency, migration, billing, email, telemetry, or infrastructure-impacting actions
 - use `evidence-ledger` before claims about correctness, readiness, reliability, safety, performance, or no regression
 
@@ -20,20 +22,22 @@ Output contract:
 
 Append one shared `Execution Envelope` for the task boundary, following `docs/execution-envelope-contract.md`. Do not repeat routing, evidence, stop, or next-action metadata in the implementation artifact.
 
-Changed:
-- ...
+Implementation Contract:
+- Artifact ID:
+- Artifact type: implementation
+- Upstream refs:
+- Actual files/components and change boundary:
+- Verification attempted:
+- Evidence references:
+- Handoff state:
 
-Verified:
-- ...
+Conditional fields may be omitted. Include implementation decisions not fixed upstream, remaining limitations, deviations, discoveries, blockers, or approved deltas only when present. Do not replay upstream lifecycle prose.
 
-Not verified:
-- ...
-
-Risks / assumptions:
-- ...
-
-Next:
-- ...
+Evidence:
+- Implementation Contract ref:
+- command or observation:
+  result:
+- Insufficient evidence observed, when present:
 
 Execution Envelope:
 ```json

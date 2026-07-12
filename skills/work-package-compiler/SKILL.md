@@ -1,13 +1,13 @@
 ---
 name: work-package-compiler
-description: Convert a confirmed Requirement Contract into an agent-ready Work Package with scope, review gates, verification, and blockers.
+description: Convert confirmed Requirement, Spec, or design artifacts into an agent-ready Work Package with executable scope, dependencies, stop conditions, and evidence expectations.
 ---
 
 # Work Package Compiler
 
 ## Goal
 
-Convert a confirmed Requirement Contract or equivalent approved spec into an agent-ready Work Package.
+Convert confirmed upstream contracts into an agent-ready Work Package without replaying their rationale or behavior prose.
 
 This is a transformation skill. It does not make business decisions and must route back to `requirement-grill` when required decisions are unresolved.
 
@@ -27,7 +27,7 @@ This is a transformation skill. It does not make business decisions and must rou
 
 ## Process
 
-1. Verify inputs.
+1. Read `docs/lifecycle-artifact-contract.md` and verify inputs.
    - Requirement Contract from `requirement-grill` or equivalent approved spec.
    - Relevant repo facts and project overlay.
    - Domain rules from `docs/ai/domain-rule-ledger.md` when present.
@@ -49,29 +49,25 @@ This is a transformation skill. It does not make business decisions and must rou
    - Use `Verified` and `Human-confirmed` engineering, verification, and architecture memory entries only when their scope matches the Work Package.
    - Treat `template`, stale, archived, missing, or hypothesis ledger entries as insufficient evidence for constraints.
 
-4. Produce a Work Package.
+4. Produce a Work Package that owns only the executable change boundary.
 
 ```text
 Work Package:
-- Title:
-- Goal:
-- Why now:
-- User/business value:
-- Non-goals:
-- Target scope:
-- Files/modules likely touched:
-- Do-not-touch zones:
-- Acceptance criteria:
-- Verification contract:
-- Required review gates:
-- Domain rules applied:
-- Engineering patterns applied:
-- Verification patterns applied:
-- Architecture memory applied:
-- Risk gates:
-- Agent prompt:
-- Reviewer checklist:
-- Open blockers:
+- Artifact ID:
+- Artifact type: work_package
+- Upstream refs:
+- Allowed scope:
+- Forbidden scope:
+- Ordered implementation tasks:
+- Dependencies:
+- Stop conditions:
+- Expected implementation and verification evidence:
+
+Conditional fields, omit when irrelevant:
+- Likely files/modules with evidence status:
+- Required review or risk gates:
+- Applicable memory or rule IDs:
+- Deltas to upstream scope or acceptance conditions:
 ```
 
 5. Confirm execution readiness.
@@ -85,25 +81,21 @@ Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` f
 
 ```text
 Work Package:
-- Title:
-- Goal:
-- Why now:
-- User/business value:
-- Non-goals:
-- Target scope:
-- Files/modules likely touched:
-- Do-not-touch zones:
-- Acceptance criteria:
-- Verification contract:
-- Required review gates:
-- Domain rules applied:
-- Engineering patterns applied:
-- Verification patterns applied:
-- Architecture memory applied:
-- Risk gates:
-- Agent prompt:
-- Reviewer checklist:
-- Open blockers:
+- Artifact ID:
+- Artifact type: work_package
+- Upstream refs:
+- Allowed scope:
+- Forbidden scope:
+- Ordered implementation tasks:
+- Dependencies:
+- Stop conditions:
+- Expected implementation and verification evidence:
+
+Conditional fields, omit when irrelevant:
+- Likely files/modules with evidence status:
+- Required review or risk gates:
+- Applicable memory or rule IDs:
+- Deltas: target ref / field / previous / new / reason / decision evidence:
 
 Route:
 - executable | requirement-grill | grill-design | needs human decision
@@ -116,6 +108,7 @@ Route:
 - Verification and review gates are named.
 - Domain rules are applied according to evidence status.
 - The reviewer can tell what must not be touched.
+- Requirement and Spec content is inherited by reference instead of copied.
 
 ## Failure modes
 

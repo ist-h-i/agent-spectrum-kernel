@@ -29,7 +29,7 @@ The current rubric already separates static package/design readiness from runtim
 | Skill group metadata | 95+ | Every skill is classified into validated manifest groups without moving directories; allowed multi-group membership is explicit |
 | Repository awareness | 95+ | Agents inspect actual repo conventions and commands before non-trivial edits |
 | Scope control | 95+ | Allowed/forbidden scope, diff budget, and escalation are explicit |
-| Implementation control | 95+ | Implementation Contract fixes goal, non-goals, allowed/forbidden scope, context, verification, and stop conditions before edits |
+| Implementation control | 95+ | Implementation Contract references upstream decision/behavior/scope/proof artifacts and records only implementation decisions, actual boundary, deviations, evidence refs, limitations, and handoff state |
 | Implementation context reuse | 95+ | Durable implementation context records stack, commands, patterns, boundaries, overlay hooks, and update triggers without storing task progress |
 | Engineering pattern memory | 95+ | Reusable implementation patterns require source, evidence status, accepted shape, rejected alternatives, consumers, verification expectation, and stale trigger without replacing project overlays |
 | Verification discipline | 95+ | Verification Contract is defined before or alongside implementation; claims require evidence; insufficient evidence is reported explicitly |
@@ -80,7 +80,7 @@ The scores below are static package/design readiness scores. Runtime effectivene
 | Skill group metadata | 95 | `manifest.json.skill_groups` and validation cover unclassified, unknown, duplicate, invalid, and unsupported multi-group skill entries |
 | Repository awareness | 95 | Dedicated orientation skill plus kernel repository-first rules |
 | Scope control | 96 | Kernel scope rules plus dedicated scope-control skill and diff audit |
-| Implementation control | 96 | `controlled-implementation` requires an Implementation Contract before edits, including goal, non-goals, boundaries, context, verification, and stop conditions |
+| Implementation control | 96 | `controlled-implementation` starts from upstream artifact refs, avoids replaying unchanged lifecycle content, and completes the Implementation Contract with actual boundary, deviations, verification attempts/evidence refs, limitations, and handoff state |
 | Implementation context reuse | 95 | `implementation-context-generation` and `docs/ai/implementation-context.md` provide reusable implementation facts without becoming task progress |
 | Engineering pattern memory | 95 | `engineering-pattern-ledger` and `docs/ai/engineering-pattern-ledger.md` preserve reusable implementation judgment with evidence status and stale triggers |
 | Verification discipline | 96 | Kernel verification rules plus `test-first-verification`; Verification Contract is defined before or alongside implementation and insufficient evidence is an explicit outcome |

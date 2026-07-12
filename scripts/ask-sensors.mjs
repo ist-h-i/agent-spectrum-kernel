@@ -10,6 +10,8 @@ import {
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 
 const KNOWN_OUTPUT_SECTIONS = [
+  "Implementation Contract:",
+  "Verification Contract:",
   "Changed:",
   "Verified:",
   "Not verified:",
@@ -273,9 +275,9 @@ function evidenceQualitySensor(text) {
     return sensor("evidence_quality", "pass", "No implementation output text to inspect for evidence quality.");
   }
 
-  const verifiedBody = extractSectionBody(text, "Verified:");
+  const verifiedBody = extractSectionBody(text, "Verified:") ?? extractSectionBody(text, "Evidence:");
   if (verifiedBody === null) {
-    return sensor("evidence_quality", "pass", "Verified section is unavailable; completion_contract handles missing sections.");
+    return sensor("evidence_quality", "pass", "Evidence section is unavailable; completion_contract handles missing sections.");
   }
 
   const findings = [];

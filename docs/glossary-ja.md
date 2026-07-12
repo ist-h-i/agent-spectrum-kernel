@@ -280,24 +280,35 @@ Do not confuse with:
 ## Implementation Contract
 
 Meaning:
-- 実装前に、goal、non-goals、allowed/forbidden scope、public/data impact、既存pattern、検証、stop conditionを固定する契約です。
+- 上流artifactを参照し、上流で未決定だった実装判断、実際の変更境界、逸脱、検証attemptとevidence参照、残課題、handoff状態だけを記録する契約です。
 
 Use when:
 - 非自明な実装でscope driftを避けたい場合。
 
 Do not confuse with:
-- 成功をどう証明するかを決めるVerification Contract。
+- Requirement、Spec、Work Package、Verification Contractの再掲。変更がある場合は暗黙に上書きせずexplicit deltaにします。
 
 ## Verification Contract
 
 Meaning:
-- 実装前または実装中に、証明する挙動、回帰防止、既存coverage、追加test、commands、未検証事項を定義する契約です。
+- 実装前にproof obligationを定義し、実装後も同じIDを参照してevidenceを追加する再利用可能な契約です。
 
 Use when:
 - fixed、correct、no regression などの主張に根拠が必要な場合。
 
 Do not confuse with:
-- 実装範囲を固定するImplementation Contract。
+- 実行済みtest結果そのもの、または実装範囲。test実行後もcontractとevidence recordは分けます。
+
+## Lifecycle artifact delta
+
+Meaning:
+- Requirement、Spec、Work Package、Verification、Implementationの下流artifactが、上流の変更点だけを `target ref / field / previous / new / reason / decision evidence` として記録する形式です。
+
+Use when:
+- assumption、acceptance condition、scope boundary、proof obligationが上流artifactから変わる場合。
+
+Do not confuse with:
+- unchanged fieldのコピー。変更がなければartifact IDを参照して継承します。正本は `docs/lifecycle-artifact-contract.md` です。
 
 ## Handoff
 

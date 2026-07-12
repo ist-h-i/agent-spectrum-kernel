@@ -23,7 +23,7 @@ Make success observable before declaring the work complete.
 
 ## Process
 
-1. Produce the Verification Contract before or alongside implementation planning.
+1. Read `docs/lifecycle-artifact-contract.md` and produce the Verification Contract before or alongside implementation planning.
 
 Use available repository context for commands, existing coverage, and test patterns. If a stack or project overlay supplies verification supplements, apply it without hard-coding stack-specific rules into this skill.
 
@@ -37,20 +37,23 @@ Stored verification patterns do not prove current task behavior. Current command
 
 ```text
 Verification Contract:
+- Artifact ID:
+- Artifact type: verification
+- Upstream refs:
 - Behavior to prove:
-- Regression to prevent:
-- Existing coverage:
-- New or focused test needed:
+- Focused checks:
+- Required evidence:
+- Insufficient-evidence conditions:
+- Evidence required before completion claim:
+
+Conditional fields, omit when irrelevant:
+- Regression obligations and broader checks:
 - Negative cases:
-- Manual/runtime check:
-- Commands:
-- Evidence required:
-- Stack overlay verification supplement:
-  - none | project-specific | stack-specific
-- Verification pattern ledger:
-  - active | template | missing | archived | not needed
-- What remains unverified:
-- Stop if:
+- Manual/runtime checks:
+- Measurement methods:
+- Merge or release claim evidence:
+- Existing coverage and verification-pattern refs:
+- Deltas to upstream proof obligations:
 ```
 
 2. Tie the contract to the change type.
@@ -73,7 +76,7 @@ Verification Contract:
 | Manual/runtime check | User-visible or integration behavior lacks automated coverage. |
 | Benchmark/security check | Performance/security claim is being made. |
 
-5. Run verification and record exact evidence.
+5. Run verification and record exact evidence as records that reference the same Verification Contract. Do not rewrite the contract because checks were executed.
 
 6. If verification fails, report failure. Do not bury it under partial success.
 
@@ -86,34 +89,31 @@ Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` f
 
 ```text
 Verification Contract:
+- Artifact ID:
+- Artifact type: verification
+- Upstream refs:
 - Behavior to prove:
-- Regression to prevent:
-- Existing coverage:
-- New or focused test needed:
-- Negative cases:
-- Manual/runtime check:
-- Commands:
-- Evidence required:
-- Stack overlay verification supplement:
-- Verification pattern ledger:
-- What remains unverified:
-- Stop if:
+- Focused checks:
+- Required evidence:
+- Insufficient-evidence conditions:
+- Evidence required before completion claim:
 
-Verification plan:
-- ...
+Conditional fields, omit when irrelevant:
+- Regression / broader / negative / manual / runtime / measurement obligations:
+- Merge or release claim evidence:
+- Existing coverage and verification-pattern refs:
+- Deltas:
 
 Evidence:
+- Verification Contract ref:
 - command:
   result:
 - command:
   result:
-
-Not verified:
-- ...
-
-Next verification:
-- ...
+- Insufficient evidence observed, when present:
 ```
+
+Keep the next action only in the shared Execution Envelope. Do not add separate `Not verified` or `Next verification` summaries; attach missing proof to the Evidence record and envelope evidence status.
 
 ## Optional Metrics Event Candidate
 
@@ -124,6 +124,7 @@ Record whether a Verification Contract was defined, whether tests were added or 
 ## Exit criteria
 
 - The Verification Contract exists or the change is explicitly exempt.
+- The pre-implementation and post-implementation evidence use the same contract reference.
 - The changed behavior has an observable check.
 - Commands/results are exact.
 - Unverified items are explicit and not presented as fixed or proven.

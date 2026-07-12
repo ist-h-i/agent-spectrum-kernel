@@ -8,6 +8,8 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const STATE_PATH = ".agent-spectrum-kernel/claude-install-state.json";
 const CANONICAL_REGISTRY_PATH = "schemas/review-signal-gate-map.json";
+const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_IMMUTABLE_CONTRACT_ASSETS;
+const CORE_PRESERVE_PATHS = [CANONICAL_REGISTRY_PATH, ...CORE_OWNED_IMMUTABLE_ASSETS];
 const DEFAULT_PROFILE = "full";
 const HOOK_MARKER = "agent-spectrum-kernel:claude-adapter-hook";
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
@@ -84,7 +86,7 @@ const COMMAND_METADATA = {
   },
   "skill-implement.md": {
     requiredSkills: ["skill-router", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
-    requiredAssets: ["docs/execution-envelope-contract.md"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"],
   },
   "skill-investigate.md": {
     requiredSkills: ["skill-router", "doubt-driven-development", "test-first-verification", "evidence-ledger", "risk-gate"],
@@ -92,7 +94,7 @@ const COMMAND_METADATA = {
   },
   "skill-verify.md": {
     requiredSkills: ["test-first-verification", "evidence-ledger"],
-    requiredAssets: ["docs/execution-envelope-contract.md"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"],
   },
   "skill-handoff.md": {
     requiredSkills: ["handoff-generation", "evidence-ledger"],
@@ -140,7 +142,7 @@ const SKILL_RELATIONSHIPS = {
     requires: ["test-first-verification"],
   },
   "spec-driven-development": {
-    requires: ["test-first-verification", "controlled-implementation"],
+    requires: ["work-package-compiler", "test-first-verification", "controlled-implementation"],
   },
   "review-final-merge-gate": {
     requires: ["review-router"],
@@ -780,6 +782,9 @@ function installRuntime(args, writes) {
 
 function installAssets(args, writes) {
   for (const asset of args.requiredAssets) {
+    if (CORE_OWNED_IMMUTABLE_ASSETS.includes(asset)) {
+      continue;
+    }
     copyFilePlanned(resolve(REPO_ROOT, asset), resolve(args.target, asset), args, writes, { kind: "claude_asset", asset });
   }
   for (const asset of args.initialProjectStateAssets) {
@@ -792,6 +797,20 @@ function installAssets(args, writes) {
 
 function requiredSkillsForCommands(commands) {
   return commands.flatMap((command) => COMMAND_METADATA[command]?.requiredSkills ?? []);
+}
+
+function requiredAssetsForSkills(skills) {
+  const assets = new Set();
+  for (const skill of skills) {
+    const sourcePath = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
+    const content = readFileSync(sourcePath, "utf8");
+    for (const asset of CORE_OWNED_IMMUTABLE_ASSETS) {
+      if (content.includes(asset)) {
+        assets.add(asset);
+      }
+    }
+  }
+  return [...assets].sort();
 }
 
 function routingFixturesForProfile(profileName, seedSkills, selectedCommands) {
@@ -847,6 +866,14 @@ function validateCoreInstalled(args) {
   if (!registryRecord?.sha256 || !existsSync(registryPath) || lifecycle.hashText(readFileSync(registryPath, "utf8")) !== registryRecord.sha256) {
     throw new Error(`ASK core canonical review signal registry is missing or does not match core install state: ${CANONICAL_REGISTRY_PATH}`);
   }
+  for (const asset of args.requiredAssets.filter((path) => CORE_OWNED_IMMUTABLE_ASSETS.includes(path))) {
+    const sourceContent = readFileSync(resolve(REPO_ROOT, asset), "utf8");
+    const record = state?.managed_files?.[asset];
+    const targetPath = resolve(args.target, asset);
+    if (record?.kind !== "immutable_contract" || record.sha256 !== lifecycle.hashText(sourceContent) || !existsSync(targetPath) || lifecycle.hashText(readFileSync(targetPath, "utf8")) !== record.sha256) {
+      throw new Error(`ASK core immutable contract is missing or stale: ${asset}. Re-run scripts/install-kernel.mjs before installing the Claude adapter.`);
+    }
+  }
 }
 
 function readPreviousState(target) {
@@ -884,7 +911,10 @@ function resolveSelection(args) {
   if (missingRequiredSkills.length > 0) {
     throw new Error(`Selected Claude commands are not closed over installed skills: ${missingRequiredSkills.join(", ")}`);
   }
-  const requiredAssets = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].requiredAssets))].sort();
+  const requiredAssets = [...new Set([
+    ...selectedCommands.flatMap((command) => COMMAND_METADATA[command].requiredAssets),
+    ...requiredAssetsForSkills(selectedSkills),
+  ])].sort();
   const initialProjectStateAssets = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].initialProjectStateAssets ?? []))].sort();
   const runtimeDirectories = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].runtimeDirectories ?? []))].sort();
   args.selectedSkills = selectedSkills;
@@ -955,6 +985,9 @@ function manageStaleFiles(args, writes) {
   args.retainedStaleFiles = [];
   for (const [relativePath, record] of Object.entries(args.previousState?.managed_files ?? {}).sort()) {
     if (relativePath === CANONICAL_REGISTRY_PATH) {
+      continue;
+    }
+    if (CORE_OWNED_IMMUTABLE_ASSETS.includes(relativePath)) {
       continue;
     }
     if (currentPaths.has(relativePath)) {
@@ -1031,7 +1064,7 @@ function main() {
       statePath: STATE_PATH,
       dryRun: args.dryRun || args.check,
       force: args.force,
-      preserve: [CANONICAL_REGISTRY_PATH],
+      preserve: CORE_PRESERVE_PATHS,
       extendOperations: ({ state, operations: plan }) => {
         const hookOperation = restoreManagedHookSubset(args.target, state, { force: args.force });
         if (hookOperation) plan.push(hookOperation);
@@ -1053,7 +1086,7 @@ function main() {
     };
     const hookWrites = [];
     removeManagedHooks(hookArgs, hookWrites);
-    const detachOperations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: true, force: args.force, preserve: [CANONICAL_REGISTRY_PATH] });
+    const detachOperations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: true, force: args.force, preserve: CORE_PRESERVE_PATHS });
     const operations = [...hookArgs.operations, ...detachOperations];
     if (!args.dryRun && !args.check) {
       lifecycle.applyOperations(operations, false);

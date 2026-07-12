@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildAgentsBlock,
+  CORE_IMMUTABLE_CONTRACT_ASSETS,
   buildLifecycleState,
   createManagedBlockRecord,
   createManagedFileRecord,
@@ -28,7 +29,6 @@ const STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const MANAGED_START = "<!-- agent-spectrum-kernel:start -->";
 const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
-
 function parseArgs(argv) {
   const args = {
     target: process.cwd(),
@@ -245,6 +245,22 @@ function buildPlan(args) {
     force: args.force,
     rollback,
   });
+
+  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
+    const source = resolve(REPO_ROOT, asset);
+    ensureSource(source, asset);
+    const content = readText(source);
+    managedFiles[asset] = createManagedFileRecord({ kind: "immutable_contract", asset, content });
+    planWriteManaged(operations, {
+      target: args.target,
+      relativePath: asset,
+      content,
+      reason: `immutable_contract:${asset}`,
+      previousState,
+      force: args.force,
+      rollback,
+    });
+  }
 
   for (const skill of skills) {
     const source = resolve(REPO_ROOT, "skills", skill, "SKILL.md");

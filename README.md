@@ -44,6 +44,8 @@ README.md
 CHANGELOG.md
 docs/
   routing-model.md
+  lifecycle-artifact-contract.md
+  fixtures/lifecycle-artifact-chains.json
   agent-session-state-contract.md
   metrics-event-contract.md
   observability-runtime-contract.md

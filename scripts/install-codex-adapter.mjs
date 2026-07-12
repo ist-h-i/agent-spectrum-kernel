@@ -13,6 +13,8 @@ const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const DEFAULT_PROFILE = "implementation";
 const CANONICAL_REGISTRY_PATH = "schemas/review-signal-gate-map.json";
+const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_IMMUTABLE_CONTRACT_ASSETS;
+const CORE_PRESERVE_PATHS = [CANONICAL_REGISTRY_PATH, ...CORE_OWNED_IMMUTABLE_ASSETS];
 const PROMPT_TEMPLATES = [
   "skill-implement.md",
   "skill-investigate.md",
@@ -37,6 +39,7 @@ const PROMPT_METADATA = {
     execution: CODEX_PROMPT_CONTRACTS["skill-implement.md"],
     requiredSkills: ["operating-mode-router", "skill-router", "controlled-implementation", "test-first-verification", "evidence-ledger", "risk-gate"],
     recommendedSkills: ["spec-driven-development", "requirement-grill", "work-package-compiler"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"],
   },
   "skill-investigate.md": {
     label: "Investigation",
@@ -65,6 +68,7 @@ const PROMPT_METADATA = {
     execution: CODEX_PROMPT_CONTRACTS["skill-verify.md"],
     requiredSkills: ["test-first-verification", "evidence-ledger"],
     recommendedSkills: [],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"],
   },
   "skill-handoff.md": {
     label: "Handoff",
@@ -86,7 +90,7 @@ const SKILL_RELATIONSHIPS = {
     incompatibleWith: [],
   },
   "spec-driven-development": {
-    requires: ["test-first-verification"],
+    requires: ["work-package-compiler", "test-first-verification"],
     recommends: ["controlled-implementation"],
     incompatibleWith: [],
   },
@@ -497,7 +501,7 @@ function readManifest() {
   return manifest;
 }
 
-function validateCoreInstalled(target, statePath) {
+function validateCoreInstalled(target, statePath, requiredAssets) {
   if (!existsSync(statePath)) throw new Error("ASK core install state is missing: .agent-spectrum-kernel/install-state.json. Run scripts/install-kernel.mjs before installing the Codex adapter.");
   let state;
   try { state = readJson(statePath); } catch { throw new Error("ASK core install state is invalid JSON."); }
@@ -512,6 +516,15 @@ function validateCoreInstalled(target, statePath) {
   if (!registryRecord?.sha256 || !existsSync(registryPath) || hashText(readText(registryPath)) !== registryRecord.sha256) {
     throw new Error(`ASK core canonical review signal registry is missing or does not match core install state: ${CANONICAL_REGISTRY_PATH}`);
   }
+  for (const asset of requiredAssets.filter((path) => CORE_OWNED_IMMUTABLE_ASSETS.includes(path))) {
+    const sourceContent = readText(resolve(REPO_ROOT, asset));
+    const record = state?.managed_files?.[asset];
+    const targetPath = resolve(target, asset);
+    if (record?.kind !== "immutable_contract" || record.sha256 !== hashText(sourceContent) || !existsSync(targetPath) || hashText(readText(targetPath)) !== record.sha256) {
+      throw new Error(`ASK core immutable contract is missing or stale: ${asset}. Re-run scripts/install-kernel.mjs before installing the Codex adapter.`);
+    }
+  }
+  return state;
 }
 
 function readPreviousState(target) {
@@ -675,6 +688,7 @@ function buildState({
   recommendedSkills,
   routerReachableSkills,
   routingFixtures,
+  requiredAssets,
   managedFiles,
   managedBlocks,
   previousState,
@@ -715,6 +729,7 @@ function buildState({
       prompt_templates: promptTemplates,
       command_templates: commandTemplates,
       runtime_scripts: runtimeScripts,
+      required_assets: requiredAssets,
       skill_closure: {
         required_skills: requiredSkills,
         recommended_skills: recommendedSkills,
@@ -787,6 +802,23 @@ function resolveProfile(name, manifestSkills) {
 
 function requiredSkillsForPrompts(prompts) {
   return prompts.flatMap((prompt) => PROMPT_METADATA[prompt]?.requiredSkills ?? []);
+}
+
+function requiredAssetsForPrompts(prompts) {
+  return [...new Set(prompts.flatMap((prompt) => PROMPT_METADATA[prompt]?.requiredAssets ?? []))].sort();
+}
+
+function requiredAssetsForSkills(skills) {
+  const assets = new Set();
+  for (const skill of skills) {
+    const source = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
+    ensureSource(source, `skills/${skill}/SKILL.md`);
+    const text = readText(source);
+    for (const asset of CORE_OWNED_IMMUTABLE_ASSETS) {
+      if (text.includes(asset)) assets.add(asset);
+    }
+  }
+  return [...assets].sort();
 }
 
 function recommendedSkillsForPrompts(prompts) {
@@ -971,8 +1003,9 @@ function buildPlan(args) {
 
   validateSkillNames(skills, manifestSkills);
   validateSkillClosure({ selectedSkills: skills, requiredSkills, profileName: args.profile });
+  const requiredAssets = [...new Set([...requiredAssetsForPrompts(selectedPromptTemplates), ...requiredAssetsForSkills(skills)])].sort();
   const coreStatePath = resolve(args.target, ".agent-spectrum-kernel/install-state.json");
-  validateCoreInstalled(args.target, coreStatePath);
+  validateCoreInstalled(args.target, coreStatePath, requiredAssets);
 
   const previousState = readPreviousState(args.target);
   const previousSkillNames = previousItems(previousState, "installed_skills", ["codex_skill", "stale_codex_skill"], "skill").filter((skill) =>
@@ -981,6 +1014,9 @@ function buildPlan(args) {
   const previousPromptNames = previousItems(previousState, "installed_prompts", ["codex_prompt", "stale_codex_prompt"], "prompt");
   const previousCommandNames = previousItems(previousState, "installed_commands", ["codex_command", "stale_codex_command"], "command");
   const previousRuntimeNames = previousItems(previousState, "installed_runtime_scripts", ["codex_runtime", "stale_codex_runtime"], "script");
+  const previousAssetNames = Object.entries(previousState?.managed_files ?? {})
+    .filter(([, record]) => record?.kind === "codex_asset" || record?.kind === "stale_codex_asset")
+    .map(([path]) => path);
   const previousSkills = new Set(previousSkillNames);
   const previousPrompts = new Set(previousPromptNames);
   const previousCommands = new Set(previousCommandNames);
@@ -990,14 +1026,38 @@ function buildPlan(args) {
   const selectedPrompts = new Set(selectedPromptTemplates);
   const selectedCommands = new Set(selectedCommandTemplates);
   const selectedRuntime = new Set(selectedRuntimeScripts);
+  const selectedAssets = new Set(requiredAssets);
   const staleSkills = [...previousSkills].filter((skill) => !selectedSkills.has(skill)).sort();
   const stalePrompts = [...previousPrompts].filter((prompt) => !selectedPrompts.has(prompt)).sort();
   const staleCommands = [...previousCommands].filter((command) => !selectedCommands.has(command)).sort();
   const staleRuntimeScripts = [...previousRuntimeScripts].filter((script) => !selectedRuntime.has(script)).sort();
+  const staleAssets = previousAssetNames.filter((asset) => !selectedAssets.has(asset)).sort();
   const operations = [];
   const managedFiles = {};
   const managedBlocks = {};
   const rollback = lifecycle.createRollbackSnapshot();
+
+  for (const asset of requiredAssets) {
+    const source = resolve(REPO_ROOT, asset);
+    ensureSource(source, asset);
+    const content = readText(source);
+    if (CORE_OWNED_IMMUTABLE_ASSETS.includes(asset)) {
+      continue;
+    }
+    managedFiles[asset] = {
+      ...lifecycle.createManagedFileRecord({ kind: "codex_asset", asset, content }),
+      asset,
+    };
+    lifecycle.planWriteManaged(operations, {
+      target: args.target,
+      relativePath: asset,
+      content,
+      reason: `codex_asset:${asset}`,
+      previousState,
+      force: args.force,
+      rollback,
+    });
+  }
 
   for (const skill of skills) {
     const source = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
@@ -1163,6 +1223,23 @@ function buildPlan(args) {
     }
   }
 
+  for (const asset of staleAssets) {
+    if (args.prune) {
+      lifecycle.planDeleteManaged(operations, {
+        target: args.target,
+        relativePath: asset,
+        previousState,
+        force: args.force,
+        rollback,
+        reason: `stale Codex managed projection:asset:${asset}`,
+      });
+      lifecycle.planRemoveEmptyDirectory(operations, args.target, dirname(asset), `empty stale Codex managed projection directory:asset:${asset}`);
+    } else {
+      const record = previousManagedRecord(previousState, asset);
+      if (record) managedFiles[asset] = { ...record, kind: "stale_codex_asset", asset };
+    }
+  }
+
   validateManagedReferences(managedFiles);
 
   const stateSkills = args.prune ? skills : [...new Set([...skills, ...staleSkills])].sort();
@@ -1194,6 +1271,7 @@ function buildPlan(args) {
     recommendedSkills,
     routerReachableSkills,
     routingFixtures,
+    requiredAssets,
     managedFiles,
     managedBlocks,
     previousState,
@@ -1201,7 +1279,7 @@ function buildPlan(args) {
     hasMutations: operations.some((operation) => !operation.unchanged),
   });
 
-  return { operations, staleSkills, stalePrompts, staleCommands, state, recommendedSkills };
+  return { operations, staleSkills, stalePrompts, staleCommands, staleAssets, state, recommendedSkills };
 }
 
 function printPlan(args, plan) {
@@ -1222,6 +1300,10 @@ function printPlan(args, plan) {
     const action = args.prune ? "pruned" : "stale Codex managed projection";
     console.log(`- ${action}: .agents/commands/${command}`);
   }
+  for (const asset of plan.staleAssets) {
+    const action = args.prune ? "pruned" : "stale Codex managed projection";
+    console.log(`- ${action}: ${asset}`);
+  }
   if (plan.recommendedSkills.length > 0) {
     console.log(`Recommended but not required skill(s): ${plan.recommendedSkills.join(", ")}`);
   }
@@ -1231,13 +1313,13 @@ function printPlan(args, plan) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.rollback) {
-    const operations = lifecycle.rollbackLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force, preserve: [CANONICAL_REGISTRY_PATH] });
+    const operations = lifecycle.rollbackLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force, preserve: CORE_PRESERVE_PATHS });
     console.log(`${args.dryRun || args.check ? "Codex adapter rollback dry run" : "Codex adapter rolled back"}: ${args.target}`);
     lifecycle.printOperations(args.target, operations);
     return;
   }
   if (args.detach) {
-    const operations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force, preserve: [CANONICAL_REGISTRY_PATH] });
+    const operations = lifecycle.detachLifecycleState({ target: args.target, statePath: STATE_PATH, dryRun: args.dryRun || args.check, force: args.force, preserve: CORE_PRESERVE_PATHS });
     console.log(`${args.dryRun || args.check ? "Codex adapter detach dry run" : "Codex adapter detached"}: ${args.target}`);
     lifecycle.printOperations(args.target, operations);
     return;
