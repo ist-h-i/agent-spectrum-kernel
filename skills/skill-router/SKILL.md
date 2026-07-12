@@ -66,14 +66,20 @@ The user-facing route should describe work steps and stop points without requiri
 | High | Public API/schema, auth/security, persistence, migration, performance claim, broad refactor. |
 | Critical | Production deploy, destructive command, credentials, payments, email sending, data deletion. |
 
-4. Apply the plane gate before selecting a workflow.
+4. Apply the active adapter capability gate.
+   - Read the relevant active adapter state at `.agent-spectrum-kernel/claude-install-state.json` or `.agent-spectrum-kernel/codex-install-state.json` when present. Route availability comes from `selected_skills`, not `installed_skills` or directory presence.
+   - Check the intended primary and required secondary Skills before delegating. If any required route is absent, stop with `stop_reason.status: capability_missing`, list the missing Skills, and recommend a profile or explicit closed `--skills` override.
+   - For a `daily` installation, ordinary implementation and review routes remain available. Knowledge promotion, adoption, and observability routes omitted by the pack stop and recommend `organizational`.
+   - Never infer or execute a missing Skill's procedure. If capability availability cannot be established, report insufficient evidence.
+
+5. Apply the plane gate before selecting a workflow.
    - `execution`: advances the current requirement, design, implementation, verification, review, release-readiness, documentation, or handoff task.
    - `knowledge`: creates, promotes, refreshes, contradicts, archives, or consumes durable reusable knowledge. Select it only for an explicit lifecycle request or a material reusable-knowledge trigger with a named destination, evidence boundary, owner, and stop condition.
    - `control`: selects, constrains, observes, or validates workflows. Observation does not authorize mutation in either other plane.
    - Existing approved knowledge may be read only when applicability and freshness are evidenced. The existence of a ledger or completion of ordinary work is not a trigger to read or update it.
    - Current-task blockers remain in the execution artifact. A knowledge candidate never replaces or downgrades them.
 
-5. Select the workflow.
+6. Select the workflow.
 
 | Situation | Primary | Secondary |
 |---|---|---|
@@ -114,28 +120,28 @@ The user-facing route should describe work steps and stop points without requiri
 | Claim validation | `evidence-ledger` | `doubt-driven-development` |
 | End of work | `handoff-generation` | — |
 
-6. Apply project overlay skill selection.
+7. Apply project overlay skill selection.
    - If a project overlay contains framework, domain, UI/UX, architecture, CI, data, security, or other repository-specific skills, consider them after generic workflow selection.
    - Select overlay skills only when the overlay signal applies to the selected work type.
    - Do not add project-specific skills to the generic routing table.
    - For stack-specific implementation overlays, follow `docs/stack-implementation-overlay-contract.md`. They may supplement `controlled-implementation` and `test-first-verification`, but must not replace the generic workflow.
 
-7. State what is intentionally skipped.
+8. State what is intentionally skipped.
 
-8. Apply overlays before action.
+9. Apply overlays before action.
    - Risk overlay: if any task involves destructive, external, production, auth, secret, dependency, migration, billing, email, or infra impact, run `risk-gate` before the selected workflow proceeds to action.
    - Evidence overlay: use `evidence-ledger` whenever the response makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
 
-9. Preserve review gate minimality.
+10. Preserve review gate minimality.
    - When routing to `review-router`, require observed change signals and trace each required gate to a signal and evidence.
    - Missing changed-file, diff, context, output, or verification evidence must be reported as `insufficient evidence`, not as a skipped gate.
    - Required gates not present in executed gate evidence must be reported as under-processing.
    - Heavy gates selected without trigger signals must be reported as over-processing warnings.
    - Do not select every review gate by default.
 
-10. Continue into the selected primary workflow unless the task requires user approval.
+11. Continue into the selected primary workflow only when the capability gate passes and the task does not require user approval.
 
-11. Preserve lifecycle responsibility boundaries.
+12. Preserve lifecycle responsibility boundaries.
    - Use `docs/lifecycle-artifact-contract.md` as the canonical Requirement -> Spec -> Work Package -> Verification -> Implementation boundary.
    - Downstream artifacts reference upstream IDs and emit only owned fields or explicit deltas.
    - Missing upstream artifacts do not force synthetic reconstruction; use the compact path for localized work.

@@ -554,7 +554,7 @@ function validateSkillGroups(manifest, errors) {
 }
 
 function validatePlaneModel(root, manifest, errors) {
-  const checks = { assignments: {}, projectionPacks: [], crossPlaneTransitions: [] };
+  const checks = { assignments: {}, projectionPacks: [], crossPlaneTransitions: [], capabilityGate: false };
   if (!manifest) return checks;
 
   const manifestSkills = Array.isArray(manifest.skills) ? manifest.skills : [];
@@ -672,6 +672,17 @@ function validatePlaneModel(root, manifest, errors) {
     }
     checks.crossPlaneTransitions.push(transition.id ?? `index:${index}`);
   }
+  if (manifest.name === "agent-spectrum-kernel") {
+    const routerPaths = ["skills/operating-mode-router/SKILL.md", "skills/skill-router/SKILL.md"];
+    checks.capabilityGate = routerPaths.every((path) => {
+      const text = existsSync(resolve(root, path)) ? readFileSync(resolve(root, path), "utf8") : "";
+      return text.includes("selected_skills") && text.includes("capability_missing") && text.includes("organizational") && (text.includes("Do not infer") || text.includes("Never infer"));
+    });
+    if (!checks.capabilityGate) {
+      fail(errors, "skill planes", "entry routers must fail closed with capability_missing when selected_skills omits a route");
+    }
+    if (transitions.length === 0) fail(errors, "skill planes", "canonical routing must define cross-plane transitions");
+  }
   return checks;
 }
 
@@ -684,6 +695,7 @@ function validateRoutingManifest(root, manifest, errors) {
     routeOverridePreserved: false,
     riskGateHardStopLimited: false,
     unsupportedCapabilityDowngrade: false,
+    adapterCapabilityGate: false,
   };
   if (!manifest) {
     return checks;
@@ -706,11 +718,29 @@ function validateRoutingManifest(root, manifest, errors) {
   validateRoutingTaskClasses(root, manifest, routing, checks, errors);
   validateRoutingOperatingModes(root, manifest, routing, checks, errors);
   validateRoutingDefaultRoutes(root, manifest, routing, checks, errors);
+  validateRoutingCapabilityGate(routing, checks, errors);
   validateRoutingRiskGate(root, manifest, routing, checks, errors);
   validateRoutingOverride(routing, checks, errors);
   validateRoutingAdapterDowngrade(root, routing, checks, errors);
 
   return checks;
+}
+
+function validateRoutingCapabilityGate(routing, checks, errors) {
+  const gate = routing.adapter_capability_gate;
+  const expectedPaths = [".agent-spectrum-kernel/claude-install-state.json", ".agent-spectrum-kernel/codex-install-state.json"];
+  checks.adapterCapabilityGate = Boolean(
+    gate &&
+    Array.isArray(gate.state_paths) && expectedPaths.every((path) => gate.state_paths.includes(path)) &&
+    gate.availability_field === "selected_skills" &&
+    gate.physical_discovery_field === "installed_skills" &&
+    gate.missing_status === "capability_missing" &&
+    gate.missing_route_policy === "stop_without_inference" &&
+    gate.daily_upgrade_profile === "organizational"
+  );
+  if (!checks.adapterCapabilityGate) {
+    fail(errors, "routing manifest", "manifest.json.routing.adapter_capability_gate must fail closed from adapter selected_skills and distinguish installed_skills");
+  }
 }
 
 function validateRoutingTaskClasses(root, manifest, routing, checks, errors) {
@@ -2605,6 +2635,8 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     `- plane assignments: ${SKILL_PLANES.map((plane) => `${plane}=${planeChecks.assignments[plane] ?? 0}`).join(", ")}`,
     `- projection packs: ${planeChecks.projectionPacks.map((pack) => `${pack.name}=${pack.skillCount}`).join(", ") || "none"}`,
     `- cross-plane transitions: ${planeChecks.crossPlaneTransitions.length}`,
+    `- adapter capability gate: ${planeChecks.capabilityGate ? "ok" : "not applicable"}`,
+    `- machine-readable capability gate: ${routingChecks.adapterCapabilityGate ? "ok" : "invalid"}`,
     "",
     "## Skill section checks",
     "",

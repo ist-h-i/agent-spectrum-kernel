@@ -136,9 +136,9 @@ export function validateExecutionEnvelope(value, { schemaPath = ENVELOPE_SCHEMA_
   const humanDecision = value?.stop_reason?.human_decision_required ?? [];
   const stopIf = value?.stop_reason?.stop_if ?? [];
   if (status === "none" && (details.length > 0 || humanDecision.length > 0)) errors.push("$.stop_reason: status none cannot include blocking details");
-  if (["human_decision", "insufficient_evidence", "risk_gate", "blocked"].includes(status) && stopIf.length === 0) errors.push("$.stop_reason.stop_if: required for a stopping status");
+  if (["human_decision", "insufficient_evidence", "capability_missing", "risk_gate", "blocked"].includes(status) && stopIf.length === 0) errors.push("$.stop_reason.stop_if: required for a stopping status");
   if (status === "human_decision" && humanDecision.length === 0) errors.push("$.stop_reason.human_decision_required: required for human_decision status");
-  if (["insufficient_evidence", "risk_gate", "blocked"].includes(status) && details.length === 0) errors.push("$.stop_reason.details: required for the stopping status");
+  if (["insufficient_evidence", "capability_missing", "risk_gate", "blocked"].includes(status) && details.length === 0) errors.push("$.stop_reason.details: required for the stopping status");
   return errors;
 }
 

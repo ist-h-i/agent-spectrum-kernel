@@ -68,6 +68,8 @@ Each profile installs a closed command/prompt/skill/runtime/contract-asset set. 
 
 The `daily` and `organizational` profile skill lists are read from `manifest.json.projection_packs`. Both preserve `knowledge_write_policy: explicit_only`; installing a knowledge Skill does not authorize a ledger or memory update.
 
+Pack profiles are strict projection boundaries. When changing from `full` or `organizational` to `daily`, rerun with `--prune`; without it the installer fails before writing so excluded Skills cannot remain discoverable. A locally modified excluded Skill makes prune fail and is preserved for manual resolution. Install state derives `selected_planes` and `installed_planes` from actual Skill sets; `--skills` is recorded as `selection_mode: custom`, and `selected_projection_pack` is set only for an exact pack match.
+
 Profile closure includes representative router-reachable routes for the profile's declared task scope. For example, the implementation profile includes routes for unfamiliar repositories, unclear scope, boundary decisions, design grill, docs/ADR constraints, and long-running work; investigation includes bug investigation routes; review includes the review-router gate family. Durable domain-rule work requires an explicit knowledge-plane profile or advanced override.
 
 Use `--skills <csv>` only as an advanced override. The override must include all required skills for installed prompt templates, command templates, router-reachable routes, and dependencies of the specified skills. Invalid combinations fail before any files are written.

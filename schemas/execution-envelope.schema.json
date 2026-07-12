@@ -53,7 +53,7 @@
       "properties": {
         "status": {
           "type": "string",
-          "enum": ["none", "human_decision", "insufficient_evidence", "risk_gate", "completed", "blocked"]
+          "enum": ["none", "human_decision", "insufficient_evidence", "capability_missing", "risk_gate", "completed", "blocked"]
         },
         "details": { "type": "array", "items": { "type": "string" } },
         "human_decision_required": { "type": "array", "items": { "type": "string" } },

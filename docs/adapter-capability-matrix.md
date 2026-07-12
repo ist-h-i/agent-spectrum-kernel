@@ -32,6 +32,8 @@ Levels:
 
 The repository also ships `scripts/install-kernel.mjs`, which supports three-way update-safe projection of the generic core `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, and `skills/<name>/SKILL.md` files into an adopting repository. Codex-specific `.agents/skills`, prompt, and command projection is handled separately by `scripts/install-codex-adapter.mjs`; Claude projection is handled by `scripts/install-claude-adapter.mjs`. The installers share lifecycle semantics for `--check`, `--dry-run`, `--prune`, `--force`, `--rollback`, and `--detach`.
 
+Adapter install state reports `selected_skills` / `selected_planes` separately from physically discoverable `installed_skills` / `installed_planes`. Routing capability is bounded by the selected set. Pack identity is reported only for an exact set match; custom overrides are labeled `selection_mode: custom`. A missing selected route is `capability_missing`, not permission to infer an unavailable Skill.
+
 ## Tool Notes
 
 Claude Code:

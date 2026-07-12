@@ -65,6 +65,15 @@ const insufficientEvidenceEnvelopeBlock = envelopeBlock({
   },
   next_action: "collect missing evidence",
 });
+const capabilityMissingEnvelopeBlock = envelopeBlock({
+  stop_reason: {
+    status: "capability_missing",
+    details: ["review-finding-compiler is absent from active adapter selected_skills; use the organizational profile or an explicit closed --skills override"],
+    human_decision_required: [],
+    stop_if: ["the selected route is absent from active adapter selected_skills"],
+  },
+  next_action: "install the required capability before continuing",
+});
 
 function validSkill(name) {
   const title = `${name.slice(0, 1).toUpperCase()}${name.slice(1)}`;
@@ -179,6 +188,14 @@ function routingFixture() {
     operating_modes,
     default_routes: [],
     cross_plane_transitions: [],
+    adapter_capability_gate: {
+      state_paths: [".agent-spectrum-kernel/claude-install-state.json", ".agent-spectrum-kernel/codex-install-state.json"],
+      availability_field: "selected_skills",
+      physical_discovery_field: "installed_skills",
+      missing_status: "capability_missing",
+      missing_route_policy: "stop_without_inference",
+      daily_upgrade_profile: "organizational",
+    },
     risk_gate: {
       required_route: "kernel",
       hard_stop_surfaces: APPROVAL_REQUIRED_SURFACES.map((surface) => surface.id),
@@ -836,6 +853,20 @@ function readCodexInstallState(target) {
   return JSON.parse(readFileSync(resolve(target, ".agent-spectrum-kernel/codex-install-state.json"), "utf8"));
 }
 
+function installedSkillDirectories(target, relativeRoot) {
+  const root = resolve(target, relativeRoot);
+  return existsSync(root)
+    ? readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory() && existsSync(resolve(root, entry.name, "SKILL.md"))).map((entry) => entry.name).sort()
+    : [];
+}
+
+function assertNoKnowledgeSkills(name, target, relativeRoot, manifest) {
+  const knowledgeSkills = installedSkillDirectories(target, relativeRoot).filter((skill) => manifest.skill_planes[skill] === "knowledge");
+  if (knowledgeSkills.length > 0) {
+    throw new Error(`${name} leaves knowledge skills discoverable: ${knowledgeSkills.join(", ")}`);
+  }
+}
+
 function assertCodexInstallClosed(name, target) {
   const state = readCodexInstallState(target);
   const selectedSkills = new Set(state.selected_skills ?? []);
@@ -861,6 +892,12 @@ function assertCodexInstallClosed(name, target) {
   }
 
   for (const fixture of state.skill_closure?.routing_fixtures ?? []) {
+    if (fixture.outcome === "capability_missing") {
+      if (selectedSkills.has(fixture.selected_route) || fixture.recommended_profile !== "organizational") {
+        throw new Error(`${name} capability-missing fixture '${fixture.id}' is not fail-closed\n${JSON.stringify(state, null, 2)}`);
+      }
+      continue;
+    }
     if (fixture.selected_route && !selectedSkills.has(fixture.selected_route)) {
       throw new Error(`${name} routing fixture '${fixture.id}' selected missing route '${fixture.selected_route}'\n${JSON.stringify(state, null, 2)}`);
     }
@@ -2483,13 +2520,78 @@ function assertInstallerScripts() {
     assertRuntimePass(`installer ${profile} profile`, runRepoScript([installer, "--target", profileTarget, "--profile", profile]));
     const profileState = JSON.parse(readFileSync(resolve(profileTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
     const expectedSkills = [...manifest.projection_packs[packName].skills].sort();
+    const expectedPlanes = packName === "daily_delivery" ? ["execution", "control"] : ["execution", "knowledge", "control"];
     if (
       JSON.stringify(profileState.selected_skills) !== JSON.stringify(expectedSkills) ||
       profileState.selected_projection_pack !== packName ||
+      profileState.selection_mode !== "projection_pack" ||
+      JSON.stringify(profileState.selected_planes) !== JSON.stringify(expectedPlanes) ||
+      JSON.stringify(profileState.installed_planes) !== JSON.stringify(expectedPlanes) ||
       profileState.knowledge_write_policy !== "explicit_only"
     ) {
       throw new Error(`Claude ${profile} profile must match manifest projection pack ${packName}\n${JSON.stringify(profileState, null, 2)}`);
     }
+    if (profile === "daily") {
+      const fixtures = new Map((profileState.skill_closure?.routing_fixtures ?? []).map((fixture) => [fixture.id, fixture]));
+      for (const id of ["daily_implementation_available", "daily_review_available"]) {
+        if (fixtures.get(id)?.outcome !== "available" || !profileState.selected_skills.includes(fixtures.get(id)?.selected_route)) {
+          throw new Error(`Claude daily available fixture '${id}' is invalid\n${JSON.stringify(profileState, null, 2)}`);
+        }
+      }
+      for (const id of ["daily_knowledge_capability_missing", "daily_adoption_capability_missing", "daily_observability_capability_missing"]) {
+        if (fixtures.get(id)?.outcome !== "capability_missing" || profileState.selected_skills.includes(fixtures.get(id)?.selected_route) || fixtures.get(id)?.recommended_profile !== "organizational") {
+          throw new Error(`Claude daily capability fixture '${id}' is not fail-closed\n${JSON.stringify(profileState, null, 2)}`);
+        }
+      }
+    }
+  }
+
+  const claudeStalePlaneTarget = resolve(fixtureRoot, "install-claude-stale-installed-planes");
+  assertRuntimePass("Claude stale plane core setup", runRepoScript([coreInstaller, "--target", claudeStalePlaneTarget]));
+  assertRuntimePass("Claude stale plane organizational setup", runRepoScript([installer, "--target", claudeStalePlaneTarget, "--profile", "organizational"]));
+  assertRuntimePass("Claude stale plane implementation transition", runRepoScript([installer, "--target", claudeStalePlaneTarget, "--profile", "implementation"]));
+  const claudeStalePlaneState = JSON.parse(readFileSync(resolve(claudeStalePlaneTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  if (JSON.stringify(claudeStalePlaneState.selected_planes) !== JSON.stringify(["execution", "control"]) || JSON.stringify(claudeStalePlaneState.installed_planes) !== JSON.stringify(["execution", "knowledge", "control"])) {
+    throw new Error(`Claude selected/installed planes must distinguish retained stale skills\n${JSON.stringify(claudeStalePlaneState, null, 2)}`);
+  }
+
+  for (const sourceProfile of ["organizational", "full"]) {
+    const transitionTarget = resolve(fixtureRoot, `install-claude-${sourceProfile}-to-daily`);
+    assertRuntimePass(`Claude ${sourceProfile} to daily core setup`, runRepoScript([coreInstaller, "--target", transitionTarget]));
+    assertRuntimePass(`Claude ${sourceProfile} setup`, runRepoScript([installer, "--target", transitionTarget, "--profile", sourceProfile]));
+    assertRuntimeFail(
+      `Claude ${sourceProfile} to daily requires prune`,
+      runRepoScript([installer, "--target", transitionTarget, "--profile", "daily"]),
+      "--prune",
+    );
+    assertRuntimePass(`Claude ${sourceProfile} to daily prune`, runRepoScript([installer, "--target", transitionTarget, "--profile", "daily", "--prune"]));
+    assertNoKnowledgeSkills(`Claude ${sourceProfile} to daily`, transitionTarget, ".claude/skills", manifest);
+  }
+
+  const modifiedKnowledgeTarget = resolve(fixtureRoot, "install-claude-modified-knowledge-to-daily");
+  assertRuntimePass("Claude modified knowledge core setup", runRepoScript([coreInstaller, "--target", modifiedKnowledgeTarget]));
+  assertRuntimePass("Claude modified knowledge organizational setup", runRepoScript([installer, "--target", modifiedKnowledgeTarget, "--profile", "organizational"]));
+  const modifiedClaudeKnowledgePath = resolve(modifiedKnowledgeTarget, ".claude/skills/domain-rule-ledger/SKILL.md");
+  writeFileSync(modifiedClaudeKnowledgePath, `${readFileSync(modifiedClaudeKnowledgePath, "utf8")}\nLocal modification.\n`);
+  assertRuntimeFail(
+    "Claude modified knowledge shrink is protected",
+    runRepoScript([installer, "--target", modifiedKnowledgeTarget, "--profile", "daily", "--prune"]),
+    "modified managed file",
+  );
+  if (!existsSync(modifiedClaudeKnowledgePath)) throw new Error("Claude modified knowledge skill must be preserved on failed shrink");
+
+  const claudeOverrideTarget = resolve(fixtureRoot, "install-claude-daily-custom-override");
+  const claudeOverrideSkills = [...manifest.projection_packs.daily_delivery.skills, "domain-rule-ledger"].join(",");
+  assertRuntimePass("Claude custom override core setup", runRepoScript([coreInstaller, "--target", claudeOverrideTarget]));
+  assertRuntimePass("Claude custom override", runRepoScript([installer, "--target", claudeOverrideTarget, "--profile", "daily", "--skills", claudeOverrideSkills]));
+  const claudeOverrideState = JSON.parse(readFileSync(resolve(claudeOverrideTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  if (
+    claudeOverrideState.selection_mode !== "custom" ||
+    claudeOverrideState.selected_projection_pack !== null ||
+    JSON.stringify(claudeOverrideState.selected_planes) !== JSON.stringify(["execution", "knowledge", "control"]) ||
+    JSON.stringify(claudeOverrideState.installed_planes) !== JSON.stringify(["execution", "knowledge", "control"])
+  ) {
+    throw new Error(`Claude custom override state is not honest\n${JSON.stringify(claudeOverrideState, null, 2)}`);
   }
 
   const corePruneOwnershipTarget = resolve(fixtureRoot, "install-claude-core-prune-ownership");
@@ -3072,9 +3174,13 @@ function assertCodexInstallerScripts() {
     const projectionPack = profile === "daily" ? "daily_delivery" : profile === "organizational" ? "organizational_intelligence" : null;
     if (projectionPack) {
       const expectedSkills = [...manifest.projection_packs[projectionPack].skills].sort();
+      const expectedPlanes = projectionPack === "daily_delivery" ? ["execution", "control"] : ["execution", "knowledge", "control"];
       if (
         JSON.stringify(profileState.selected_skills) !== JSON.stringify(expectedSkills) ||
         profileState.selected_projection_pack !== projectionPack ||
+        profileState.selection_mode !== "projection_pack" ||
+        JSON.stringify(profileState.selected_planes) !== JSON.stringify(expectedPlanes) ||
+        JSON.stringify(profileState.installed_planes) !== JSON.stringify(expectedPlanes) ||
         profileState.knowledge_write_policy !== "explicit_only"
       ) {
         throw new Error(`codex ${profile} profile must match manifest projection pack ${projectionPack}\n${JSON.stringify(profileState, null, 2)}`);
@@ -3100,7 +3206,63 @@ function assertCodexInstallerScripts() {
       assertCodexRoutingFixtures(`codex installer ${profile} routing fixtures`, profileTarget, ["bug_investigation"]);
     } else if (profile === "review") {
       assertCodexRoutingFixtures(`codex installer ${profile} routing fixtures`, profileTarget, ["review"]);
+    } else if (profile === "daily") {
+      assertCodexRoutingFixtures(`codex installer ${profile} routing fixtures`, profileTarget, [
+        "daily_implementation_available",
+        "daily_review_available",
+        "daily_knowledge_capability_missing",
+        "daily_adoption_capability_missing",
+        "daily_observability_capability_missing",
+      ]);
     }
+  }
+
+  const codexStalePlaneTarget = resolve(fixtureRoot, "codex-install-stale-installed-planes");
+  assertRuntimePass("Codex stale plane core setup", runRepoScript([coreInstaller, "--target", codexStalePlaneTarget]));
+  assertRuntimePass("Codex stale plane organizational setup", runRepoScript([installer, "--target", codexStalePlaneTarget, "--profile", "organizational"]));
+  assertRuntimePass("Codex stale plane implementation transition", runRepoScript([installer, "--target", codexStalePlaneTarget, "--profile", "implementation"]));
+  const codexStalePlaneState = readCodexInstallState(codexStalePlaneTarget);
+  if (JSON.stringify(codexStalePlaneState.selected_planes) !== JSON.stringify(["execution", "control"]) || JSON.stringify(codexStalePlaneState.installed_planes) !== JSON.stringify(["execution", "knowledge", "control"])) {
+    throw new Error(`Codex selected/installed planes must distinguish retained stale skills\n${JSON.stringify(codexStalePlaneState, null, 2)}`);
+  }
+
+  for (const sourceProfile of ["organizational", "full"]) {
+    const transitionTarget = resolve(fixtureRoot, `codex-install-${sourceProfile}-to-daily`);
+    assertRuntimePass(`Codex ${sourceProfile} to daily core setup`, runRepoScript([coreInstaller, "--target", transitionTarget]));
+    assertRuntimePass(`Codex ${sourceProfile} setup`, runRepoScript([installer, "--target", transitionTarget, "--profile", sourceProfile]));
+    assertRuntimeFail(
+      `Codex ${sourceProfile} to daily requires prune`,
+      runRepoScript([installer, "--target", transitionTarget, "--profile", "daily"]),
+      "--prune",
+    );
+    assertRuntimePass(`Codex ${sourceProfile} to daily prune`, runRepoScript([installer, "--target", transitionTarget, "--profile", "daily", "--prune"]));
+    assertNoKnowledgeSkills(`Codex ${sourceProfile} to daily`, transitionTarget, ".agents/skills", manifest);
+  }
+
+  const modifiedKnowledgeTarget = resolve(fixtureRoot, "codex-install-modified-knowledge-to-daily");
+  assertRuntimePass("Codex modified knowledge core setup", runRepoScript([coreInstaller, "--target", modifiedKnowledgeTarget]));
+  assertRuntimePass("Codex modified knowledge organizational setup", runRepoScript([installer, "--target", modifiedKnowledgeTarget, "--profile", "organizational"]));
+  const modifiedCodexKnowledgePath = resolve(modifiedKnowledgeTarget, ".agents/skills/domain-rule-ledger/SKILL.md");
+  writeFileSync(modifiedCodexKnowledgePath, `${readFileSync(modifiedCodexKnowledgePath, "utf8")}\nLocal modification.\n`);
+  assertRuntimeFail(
+    "Codex modified knowledge shrink is protected",
+    runRepoScript([installer, "--target", modifiedKnowledgeTarget, "--profile", "daily", "--prune"]),
+    "modified managed file",
+  );
+  if (!existsSync(modifiedCodexKnowledgePath)) throw new Error("Codex modified knowledge skill must be preserved on failed shrink");
+
+  const codexOverrideTarget = resolve(fixtureRoot, "codex-install-daily-custom-override");
+  const codexOverrideSkills = [...manifest.projection_packs.daily_delivery.skills, "domain-rule-ledger"].join(",");
+  assertRuntimePass("Codex custom override core setup", runRepoScript([coreInstaller, "--target", codexOverrideTarget]));
+  assertRuntimePass("Codex custom override", runRepoScript([installer, "--target", codexOverrideTarget, "--profile", "daily", "--skills", codexOverrideSkills]));
+  const codexOverrideState = readCodexInstallState(codexOverrideTarget);
+  if (
+    codexOverrideState.selection_mode !== "custom" ||
+    codexOverrideState.selected_projection_pack !== null ||
+    JSON.stringify(codexOverrideState.selected_planes) !== JSON.stringify(["execution", "knowledge", "control"]) ||
+    JSON.stringify(codexOverrideState.installed_planes) !== JSON.stringify(["execution", "knowledge", "control"])
+  ) {
+    throw new Error(`Codex custom override state is not honest\n${JSON.stringify(codexOverrideState, null, 2)}`);
   }
 
   writeFileSync(resolve(freshTarget, ".agents/skills/controlled-implementation/SKILL.md"), "# local stale copy\n");
@@ -3818,6 +3980,11 @@ ${validEnvelopeBlock}
   assertRuntimePass("sensors missing execution envelope is report-only", missingEnvelopeResult);
   if (!missingEnvelopeResult.stdout.includes("ASK sensors: fail") || !missingEnvelopeResult.stdout.includes("Execution Envelope:")) {
     throw new Error(`missing execution envelope should be reported by the completion contract sensor\n${missingEnvelopeResult.stdout}`);
+  }
+
+  const capabilityMissingEnvelope = inspectExecutionEnvelope(capabilityMissingEnvelopeBlock);
+  if (capabilityMissingEnvelope.status !== "parsed") {
+    throw new Error(`capability_missing must be a valid fail-closed envelope status\n${JSON.stringify(capabilityMissingEnvelope, null, 2)}`);
   }
 
   const envelopeNegativeFixtures = [
@@ -4796,6 +4963,14 @@ jobs:
     writeFileSync(resolve(invalidCrossPlaneRouteRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   }
   assertFail("invalid cross-plane route", invalidCrossPlaneRouteRoot, "references unknown skill 'missing-skill'");
+
+  const invalidCapabilityGateRoot = cloneFixture("invalid-capability-gate");
+  {
+    const manifest = JSON.parse(readFileSync(resolve(invalidCapabilityGateRoot, "manifest.json"), "utf8"));
+    manifest.routing.adapter_capability_gate.availability_field = "installed_skills";
+    writeFileSync(resolve(invalidCapabilityGateRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail("invalid adapter capability gate", invalidCapabilityGateRoot, "must fail closed from adapter selected_skills");
 
   const missingRoutingRoot = cloneFixture("missing-routing");
   {

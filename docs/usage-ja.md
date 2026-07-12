@@ -101,7 +101,7 @@ Claude の runtime smoke は明示実行です。hook executable resolution、ev
 node scripts/adapter-runtime-smoke.mjs --target /path/to/project --adapter claude
 ```
 
-対応profileは `daily`、`organizational`、`implementation`、`investigation`、`review`、`observability`、`full` です。default は `full` です。`daily` はknowledge planeを除いた通常作業向け、`organizational` は明示的な組織知運用向けです。narrow profile は、選択command、Skill依存、router到達可能routeを含む閉包を自動投影します。`--skills <csv>` はadvanced overrideで、閉包を満たさない場合は書き込み前に失敗します。
+対応profileは `daily`、`organizational`、`implementation`、`investigation`、`review`、`observability`、`full` です。default は `full` です。`daily` はknowledge planeを除いた通常作業向け、`organizational` は明示的な組織知運用向けです。`full` / `organizational` から `daily` へ縮小する場合は `--prune` が必須で、付けない場合は書込み前に停止します。ローカル変更済みSkillはpruneせず停止します。narrow profile は、選択command、Skill依存、router到達可能routeを含む閉包を自動投影します。`--skills <csv>` はcustom selectionとして記録され、実際のselected/installed Skillからplanesが算出されます。
 
 Hookの正本は `.claude/settings.json` です。`.claude/hooks/hooks.json` は新規には投影しません。`--skip-runtime` はruntime scriptとadapter-owned metrics hooksを両方skip/removeします。`--skip-hooks` はhooksだけをskip/removeし、runtime scriptは入れます。
 

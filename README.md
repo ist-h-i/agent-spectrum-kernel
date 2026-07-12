@@ -34,6 +34,8 @@ Project overlay = リポジトリ固有の規約・コマンド・禁止範囲
 
 `manifest.json.skill_planes` は各canonical Skillを `execution`、`knowledge`、`control` のいずれか1つに分類します。通常作業はexecution/control内で完結し、knowledgeへの遷移には明示的なlifecycle trigger、destination、evidence boundary、owner、stop conditionが必要です。単に実装やレビューが完了しただけではledgerを更新しません。`manifest.json.projection_packs` は、knowledge planeを省いた `daily_delivery` と、明示的な組織知運用向けの `organizational_intelligence` を定義します。
 
+Pack profileは厳密な発見境界です。`full` / `organizational` から `daily` への縮小にはadapter installerの `--prune` が必要で、未指定時は書込み前に停止します。install stateは実際の集合から `selected_planes` / `installed_planes` を分けて算出し、`--skills` はcustom selectionとして記録します。routerはactive stateの `selected_skills` にないSkillへ進まず、`capability_missing` で必要profileまたはoverrideを案内します。
+
 `skills/*/SKILL.md` は分割します。Grill、Spec、ADR、検証、レビュー、Handoffのような重い手順を常時ルールに混ぜないためです。
 
 ## File layout

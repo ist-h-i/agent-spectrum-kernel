@@ -12,6 +12,12 @@ This document defines the supported deployment profiles and operating responsibi
 
 Do not report deployment completion from file copy alone. A deployment can be Installed without being Activated, and Activated without being Operational.
 
+## Profile Transition Integrity
+
+Manifest pack profiles are strict discovery boundaries. Shrinking Claude or Codex from `full` / `organizational` to `daily` requires `--prune`; without it the adapter installer fails before writing. Prune removes only unchanged adapter-managed files. A modified excluded Skill is preserved and blocks the transition for explicit owner resolution.
+
+Install state separates requested availability from physical discovery: `selected_skills` and derived `selected_planes` govern routing, while `installed_skills` and derived `installed_planes` report files that remain discoverable. `selected_projection_pack` is present only when the selected Skill set exactly matches a manifest pack. `--skills` sets `selection_mode: custom`. Routers fail with `capability_missing` when a destination is absent from `selected_skills`; they do not infer the missing workflow.
+
 ## Supported Deployment Profiles
 
 | Deployment profile | Install / required assets | Compatible adapters | Unsupported combinations | Observability and external effects | Validate | Update | Detach |

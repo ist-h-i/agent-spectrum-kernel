@@ -11,6 +11,7 @@ const STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const MANAGED_START = "<!-- agent-spectrum-kernel:start -->";
 const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+const PLANE_ORDER = ["execution", "knowledge", "control"];
 const DEFAULT_PROFILE = "implementation";
 const CANONICAL_REGISTRY_PATH = "schemas/review-signal-gate-map.json";
 const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_IMMUTABLE_CONTRACT_ASSETS;
@@ -242,6 +243,13 @@ const CODEX_PROFILES = {
 };
 
 const PROFILE_ROUTING_FIXTURES = {
+  daily: [
+    { id: "daily_implementation_available", signal: "Ordinary implementation", router: "skill-router", selected_route: "controlled-implementation", outcome: "available", requiredSkills: ["controlled-implementation"] },
+    { id: "daily_review_available", signal: "Ordinary review", router: "skill-router", selected_route: "review-router", outcome: "available", requiredSkills: ["review-router"] },
+    { id: "daily_knowledge_capability_missing", signal: "Explicit knowledge promotion", router: "skill-router", selected_route: "review-finding-compiler", outcome: "capability_missing", recommendedProfile: "organizational", requiredSkills: [] },
+    { id: "daily_adoption_capability_missing", signal: "Adoption request", router: "operating-mode-router", selected_route: "project-adoption-pack-generation", outcome: "capability_missing", recommendedProfile: "organizational", requiredSkills: [] },
+    { id: "daily_observability_capability_missing", signal: "Observability request", router: "operating-mode-router", selected_route: "skill-effectiveness-evaluation", outcome: "capability_missing", recommendedProfile: "organizational", requiredSkills: [] },
+  ],
   minimal: [],
   implementation: [
     {
@@ -699,7 +707,9 @@ function buildState({
   previousState,
   rollback,
   hasMutations,
+  customSelection,
 }) {
+  const selectedProjectionPack = matchingProjectionPack(selectedSkills, manifest);
   return lifecycle.buildLifecycleState({
     manifest,
     repoRoot: REPO_ROOT,
@@ -721,9 +731,11 @@ function buildState({
     hasMutations,
     extra: {
       profile_description: profile.description,
-      selected_projection_pack: profile.projectionPack ?? null,
-      selected_planes: profile.projectionPack ? manifest.projection_packs?.[profile.projectionPack]?.planes ?? null : null,
-      knowledge_write_policy: profile.projectionPack ? manifest.projection_packs?.[profile.projectionPack]?.knowledge_write_policy ?? null : "explicit_only",
+      selection_mode: customSelection ? "custom" : profile.projectionPack ? "projection_pack" : "profile",
+      selected_projection_pack: selectedProjectionPack,
+      selected_planes: planesForSkills(selectedSkills, manifest),
+      installed_planes: planesForSkills(skills, manifest),
+      knowledge_write_policy: "explicit_only",
       retained_stale_skills: retainedStaleSkills,
       installed_prompts: promptTemplates,
       selected_prompts: selectedPrompts,
@@ -746,6 +758,20 @@ function buildState({
       },
     },
   });
+}
+
+function planesForSkills(skills, manifest) {
+  const present = new Set(skills.map((skill) => manifest.skill_planes?.[skill]).filter(Boolean));
+  return PLANE_ORDER.filter((plane) => present.has(plane));
+}
+
+function matchingProjectionPack(skills, manifest) {
+  const selected = [...new Set(skills)].sort();
+  for (const [name, pack] of Object.entries(manifest.projection_packs ?? {})) {
+    const packed = [...new Set(pack.skills ?? [])].sort();
+    if (selected.length === packed.length && selected.every((skill, index) => skill === packed[index])) return name;
+  }
+  return null;
 }
 
 function previousManagedRecord(previousState, relativePath) {
@@ -847,13 +873,16 @@ function routingFixturesForProfile(profileName, seedSkills, promptTemplates) {
       signal: fixture.signal,
       router: fixture.router,
       selected_route: fixture.selected_route,
-      required_skills: [...fixture.requiredSkills].sort(),
+      outcome: fixture.outcome ?? "available",
+      recommended_profile: fixture.recommendedProfile ?? null,
+      required_skills: [...(fixture.requiredSkills ?? [])].sort(),
     }));
 }
 
 function skillsForRoutingFixtures(routingFixtures) {
   const skills = new Set();
   for (const fixture of routingFixtures) {
+    if (fixture.outcome === "capability_missing") continue;
     if (fixture.selected_route && SKILL_NAME_PATTERN.test(fixture.selected_route)) {
       skills.add(fixture.selected_route);
     }
@@ -1045,6 +1074,9 @@ function buildPlan(args) {
   const staleCommands = [...previousCommands].filter((command) => !selectedCommands.has(command)).sort();
   const staleRuntimeScripts = [...previousRuntimeScripts].filter((script) => !selectedRuntime.has(script)).sort();
   const staleAssets = previousAssetNames.filter((asset) => !selectedAssets.has(asset)).sort();
+  if (resolvedProfile.profile.projectionPack && args.skills === null && staleSkills.length > 0 && !args.prune) {
+    throw new Error(`Profile '${args.profile}' is a strict projection boundary and excludes managed skill(s): ${staleSkills.join(", ")}. Re-run with --profile ${args.profile} --prune.`);
+  }
   const operations = [];
   const managedFiles = {};
   const managedBlocks = {};
@@ -1290,6 +1322,7 @@ function buildPlan(args) {
     previousState,
     rollback,
     hasMutations: operations.some((operation) => !operation.unchanged),
+    customSelection: args.skills !== null,
   });
 
   return { operations, staleSkills, stalePrompts, staleCommands, staleAssets, state, recommendedSkills };

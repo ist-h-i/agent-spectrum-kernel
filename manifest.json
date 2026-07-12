@@ -555,6 +555,17 @@
         "stop_condition": "Stop when authorization, destination, owner, evidence boundary, or mutation scope is absent; observation alone never authorizes mutation."
       }
     ],
+    "adapter_capability_gate": {
+      "state_paths": [
+        ".agent-spectrum-kernel/claude-install-state.json",
+        ".agent-spectrum-kernel/codex-install-state.json"
+      ],
+      "availability_field": "selected_skills",
+      "physical_discovery_field": "installed_skills",
+      "missing_status": "capability_missing",
+      "missing_route_policy": "stop_without_inference",
+      "daily_upgrade_profile": "organizational"
+    },
     "risk_gate": {
       "required_route": "risk-gate",
       "hard_stop_surfaces": [

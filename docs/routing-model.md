@@ -217,6 +217,12 @@ Allowed cross-plane transitions are machine-readable in `manifest.json.routing.c
 
 Both packs keep `knowledge_write_policy: explicit_only`. Claude and Codex expose them as `daily` and `organizational` profiles. Existing profiles remain supported for compatibility.
 
+## Adapter Capability Gate
+
+When an active Claude or Codex adapter state exists, routers use its `selected_skills` as the available route set. `installed_skills` reports physical discovery state and may be broader only for non-pack legacy/profile selections; it never authorizes a route. Before delegation, the router checks the intended Skill destination. An absent destination stops with `capability_missing`, names the missing Skill, and recommends the required profile or a closed explicit override. It does not guess the missing procedure.
+
+For `daily`, ordinary implementation and review fixtures are available. Knowledge promotion, adoption, and observability fixtures intentionally stop with `capability_missing` and recommend `organizational`.
+
 ## Routing Rules
 
 - Normal development tasks route to `delivery_quality` and then to `skill-router`.
