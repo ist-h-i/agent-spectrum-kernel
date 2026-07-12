@@ -81,6 +81,7 @@ function validateProtocol() {
   if (config.thresholds.allow_expand_with_primary_metrics_unknown !== false) errors.push("expand must be prohibited when primary metrics are unknown");
   if (config.privacy.store_raw_prompts || config.privacy.store_full_outputs || config.privacy.store_full_source || config.privacy.store_secrets_customer_or_personal_data) errors.push("durable raw or sensitive capture must be disabled");
   if (!outputSchema.required?.includes("route") || !outputSchema.required?.includes("verification_commands")) errors.push("agent output schema must require route and verification evidence fields");
+  if (JSON.stringify(outputSchema).includes('"oneOf"')) errors.push("agent output schema must avoid response-format-unsupported oneOf");
   for (const fixture of config.fixtures) {
     const root = resolve(FIXTURE_ROOT, fixture.id);
     for (const path of ["task.md", "expected.json", "workspace/package.json"]) {

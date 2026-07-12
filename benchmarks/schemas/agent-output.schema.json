@@ -49,19 +49,14 @@
     },
     "completion_claim": { "enum": ["complete", "incomplete", "insufficient_evidence", "not_applicable"] },
     "route": {
-      "oneOf": [
-        { "type": "null" },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["operating_mode", "primary_workflow", "evidence"],
-          "properties": {
-            "operating_mode": { "type": "string" },
-            "primary_workflow": { "type": "string" },
-            "evidence": { "type": "string" }
-          }
-        }
-      ]
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["operating_mode", "primary_workflow", "evidence"],
+      "properties": {
+        "operating_mode": { "type": "string" },
+        "primary_workflow": { "type": "string" },
+        "evidence": { "type": "string" }
+      }
     },
     "summary": { "type": "string" }
   }
