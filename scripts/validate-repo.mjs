@@ -1403,6 +1403,14 @@ export function inspectTraceabilityScenarioResult(scenario) {
     return JSON.stringify([ref.artifact_id, ref.observed_revision, ref.item_id]);
   }
 
+  function copyItemRef(ref) {
+    return {
+      artifact_id: ref.artifact_id,
+      item_id: ref.item_id,
+      observed_revision: ref.observed_revision,
+    };
+  }
+
   function itemRefReaches(startRef, requiredRef) {
     if (!startRef?.item_id || !requiredRef?.item_id) return false;
     if (itemRefKey(startRef) === itemRefKey(requiredRef)) return true;
@@ -1519,32 +1527,38 @@ export function inspectTraceabilityScenarioResult(scenario) {
 
     const requiredRefs = Array.isArray(claim.required_refs) ? claim.required_refs : [];
     const claimGaps = [];
-    const supportGapLabels = new Set();
+    const supportGapKeys = new Set();
     const resolvedRequiredRefs = [];
+    let requiredStructureInvalid = false;
     for (const gapType of applicableGapTypes) {
       const entries = requiredRefs.filter((entry) => entry?.gap_type === gapType);
       if (entries.length === 0) {
         issues.push(`${claim.id} applicable ${gapType} requires exact required_refs item_ref`);
+        requiredStructureInvalid = true;
       }
     }
     for (const entry of requiredRefs) {
       if (!entry || !applicableGapTypes.includes(entry.gap_type)) {
         issues.push(`${claim.id} required_refs contains non-applicable gap type ${entry?.gap_type ?? "missing"}`);
+        requiredStructureInvalid = true;
         continue;
       }
       const ref = entry.item_ref;
       const field = `required_refs[${entry.gap_type}].item_ref`;
       const resolution = resolveTraceRef(claim.id, field, ref, { requireItem: true, reportResolutionIssues: false });
-      if (!resolution.structureValid) continue;
+      if (!resolution.structureValid) {
+        requiredStructureInvalid = true;
+        continue;
+      }
       const kindAllowed = resolution.item && (TRACEABILITY_GAP_ITEM_KINDS[entry.gap_type] ?? []).includes(resolution.item.kind);
       if (!resolution.artifact || !resolution.item || !resolution.current || !kindAllowed) {
-        claimGaps.push({ gap_type: entry.gap_type, required_by_claim: claim.id, missing_item_ref: resolution.label, stage: claim.type === "merge" ? "review" : claim.type });
+        claimGaps.push({ gap_type: entry.gap_type, required_by_claim: claim.id, missing_item_ref: copyItemRef(ref), stage: claim.type === "merge" ? "review" : claim.type });
         continue;
       }
       resolvedRequiredRefs.push({ entry, resolution });
       if (["acceptance", "verification"].includes(entry.gap_type) && !evidenceResolutions.some((evidenceResolution) => evidenceReachesRequired(evidenceResolution, ref))) {
-        claimGaps.push({ gap_type: entry.gap_type, required_by_claim: claim.id, missing_item_ref: resolution.label, stage: claim.type === "merge" ? "review" : claim.type });
-        supportGapLabels.add(`${entry.gap_type}:${resolution.label}`);
+        claimGaps.push({ gap_type: entry.gap_type, required_by_claim: claim.id, missing_item_ref: copyItemRef(ref), stage: claim.type === "merge" ? "review" : claim.type });
+        supportGapKeys.add(`${entry.gap_type}:${itemRefKey(ref)}`);
         if (claim.status === "supported") issues.push(`${claim.id} evidence_refs cannot reach required ${entry.gap_type} ${resolution.label}`);
       }
     }
@@ -1588,19 +1602,50 @@ export function inspectTraceabilityScenarioResult(scenario) {
         issues.push(`${claim.id} accepted_risk_refs are disconnected from subject_refs: ${riskResolution.label}`);
       }
     }
+    const declaredBlockerKeys = new Set(blockerResolutions.filter((resolution) => resolution.structureValid).map((resolution) => itemRefKey(resolution.ref)));
+    const declaredRiskKeys = new Set(acceptedRiskResolutions.filter((resolution) => resolution.structureValid).map((resolution) => itemRefKey(resolution.ref)));
+    for (const artifact of artifactById.values()) {
+      if (artifact.type !== "review") continue;
+      for (const item of artifact.itemById.values()) {
+        if (!["blocker", "accepted_risk"].includes(item.kind)) continue;
+        const ref = { artifact_id: artifact.id, item_id: item.id, observed_revision: artifact.revision };
+        const resolution = { artifact, item, ref, current: true, structureValid: true, label: traceRefLabel(ref) };
+        if (!validSubjects.some((subjectResolution) => subjectConnectsRequired(subjectResolution, resolution, claim.type))) continue;
+        if (item.kind === "blocker" && !declaredBlockerKeys.has(itemRefKey(ref))) issues.push(`${claim.id} omits connected blocker_refs: ${resolution.label}`);
+        if (item.kind === "accepted_risk" && !declaredRiskKeys.has(itemRefKey(ref))) issues.push(`${claim.id} omits connected accepted_risk_refs: ${resolution.label}`);
+      }
+    }
     for (const gap of claimGaps) {
       gaps.push(gap);
-      if (claim.status === "supported" && !supportGapLabels.has(`${gap.gap_type}:${gap.missing_item_ref}`)) issues.push(`${claim.id} supported claim has ${gap.gap_type} gap at ${gap.missing_item_ref}`);
+      const missingLabel = traceRefLabel(gap.missing_item_ref);
+      if (claim.status === "supported" && !supportGapKeys.has(`${gap.gap_type}:${itemRefKey(gap.missing_item_ref)}`)) issues.push(`${claim.id} supported claim has ${gap.gap_type} gap at ${missingLabel}`);
     }
-    if (claim.status === "insufficient_evidence" && claimGaps.length === 0) issues.push(`${claim.id} insufficient_evidence claim requires at least one structured gap`);
+    if (claim.status === "insufficient_evidence" && claimGaps.length === 0 && !requiredStructureInvalid) issues.push(`${claim.id} insufficient_evidence claim requires at least one structured gap`);
 
-    const subjectKey = `${claim.type}:${(claim.subject_refs ?? []).map(traceRefLabel).sort().join(",")}`;
+    const subjectKeys = subjectResolutions.filter((resolution) => resolution.structureValid).map((resolution) => itemRefKey(resolution.ref));
+    const uniqueSubjectKeys = [...new Set(subjectKeys)].sort();
+    if (uniqueSubjectKeys.length !== subjectKeys.length) {
+      const seenSubjectKeys = new Set();
+      let duplicateLabel = "unknown";
+      for (const resolution of subjectResolutions) {
+        if (!resolution.structureValid) continue;
+        const key = itemRefKey(resolution.ref);
+        if (seenSubjectKeys.has(key)) {
+          duplicateLabel = resolution.label;
+          break;
+        }
+        seenSubjectKeys.add(key);
+      }
+      issues.push(`${claim.id} subject_refs contains duplicate ref ${duplicateLabel}`);
+    }
+    const subjectKey = JSON.stringify([claim.type, uniqueSubjectKeys]);
     const priorClaims = claimsBySubject.get(subjectKey) ?? [];
     for (const prior of priorClaims) {
       if (prior.status === claim.status) continue;
       const supersedes = new Set(claim.supersedes_claim_refs ?? []);
       if (!supersedes.has(prior.id)) {
-        issues.push(`contradictory ${claim.type} claims for ${(claim.subject_refs ?? []).map(traceRefLabel).sort().join(", ")} require supersedes_claim_refs`);
+        const subjectLabels = [...new Set(subjectResolutions.filter((resolution) => resolution.structureValid).map((resolution) => resolution.label))].sort();
+        issues.push(`contradictory ${claim.type} claims for ${subjectLabels.join(", ")} require supersedes_claim_refs`);
         break;
       }
     }
@@ -1633,7 +1678,7 @@ function validateLifecycleTraceabilityContract(root, manifest, errors) {
   }
   if (!checks.contractPresent || !checks.fixturePresent) return checks;
   const contract = readFileSync(resolve(root, LIFECYCLE_TRACEABILITY_CONTRACT_PATH), "utf8");
-  for (const phrase of ["Stable reference model", "observed_revision", "Claim record", "insufficient evidence", "Trivial or localized", "observed facts", "never waives", "upstream_refs` remains the canonical", "must not be mixed", "same resolver rules", "collision-free tuple", "multiple items must define", "Completion subjects", "Every resolved required ref", "Every blocker ref", "sibling exception", "must reach the exact required item", "kind is `blocker`", "missing_item_ref: undeclared", "Structured gaps", "accepted_by", "acceptance`, `verification`, `review`, `approval`, and `rollback", "Release Readiness", "No central server"]) {
+  for (const phrase of ["Stable reference model", "observed_revision", "Claim record", "insufficient evidence", "Trivial or localized", "observed facts", "never waives", "upstream_refs` remains the canonical", "must not be mixed", "same resolver rules", "collision-free tuple", "multiple items must define", "Completion subjects", "Every resolved required ref", "Every blocker ref", "connected finding closure", "sorted set of collision-free subject tuples", "duplicate subject refs are invalid", "sibling exception", "must reach the exact required item", "kind is `blocker`", "missing_item_ref: undeclared", "Structured gaps", "complete ordered `issues`", "accepted_by", "acceptance`, `verification`, `review`, `approval`, and `rollback", "Release Readiness", "No central server"]) {
     if (!contract.toLowerCase().includes(phrase.toLowerCase())) fail(errors, "lifecycle traceability", `${LIFECYCLE_TRACEABILITY_CONTRACT_PATH} is missing ${phrase}`);
   }
   for (const path of TRACEABILITY_SKILL_PATHS) {
@@ -1680,6 +1725,11 @@ function validateLifecycleTraceabilityContract(root, manifest, errors) {
     "typed-blocker-unrelated-subject",
     "release-unrelated-review-required",
     "item-key-collision",
+    "related-blocker-omitted",
+    "one-of-two-blockers-omitted",
+    "accepted-risk-omitted",
+    "claim-subject-label-collision",
+    "duplicate-subject-contradiction",
     "stale-reference",
     "contradictory-claims",
   ]);
@@ -1689,7 +1739,7 @@ function validateLifecycleTraceabilityContract(root, manifest, errors) {
     const expectedErrors = Array.isArray(scenario.expected_errors) ? scenario.expected_errors : [];
     const issueExpectationOk = scenario.expected === "valid"
       ? issues.length === 0
-      : scenario.expected === "invalid" && issues.length > 0 && expectedErrors.every((expected) => issues.includes(expected));
+      : scenario.expected === "invalid" && lifecycleValuesEqual(issues, expectedErrors);
     const gapsOk = lifecycleValuesEqual(gaps, scenario.expected_gaps ?? []);
     const ok = issueExpectationOk && gapsOk;
     checks.scenarios.push({ id: scenario.id, expected: scenario.expected, issues, gaps, ok });

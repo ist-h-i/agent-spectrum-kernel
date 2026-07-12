@@ -96,12 +96,13 @@ Rules:
 - For `acceptance` and `verification`, at least one claim evidence ref must reach the exact required item by following current `upstream_refs`. Merely listing unrelated current refs in the same claim does not establish support.
 - Completion subjects are Spec `behavior` / `acceptance` items or Work Package `task` items. Merge subjects are Implementation `change` items. Release subjects are Release Readiness `check` items.
 - Every resolved required ref must be the same item as, or have a valid item-level trace relationship to, at least one subject. Every subject must likewise connect to at least one resolved required ref.
-- Every blocker ref and accepted-risk ref must connect to at least one subject; type correctness alone does not establish claim scope.
+- Every blocker ref and accepted-risk ref must connect to at least one subject; type correctness alone does not establish claim scope. The claim must also include every current Review `blocker` and `accepted_risk` item connected to any subject. Validators derive that connected finding closure from the trace graph, so omitting a related finding never turns a blocked or risk-bearing claim into a supported claim.
 - The Release Readiness sibling exception applies only when a Release Readiness `check` subject and an `approval` or `rollback` required item belong to the same Release Readiness artifact. It never connects an unrelated review decision, blocker, accepted risk, or other item kind.
 - `blocked` requires exact blocker refs, and every blocker ref resolves to a `review` artifact item whose kind is `blocker`.
 - `insufficient_evidence` emits one structured gap for every missing, stale, or wrong-kind required ref. It names the expected ref; it does not synthesize the absent artifact.
 - If an applicable gap type has no `required_refs` entry, the claim is structurally invalid. It must not emit `missing_item_ref: undeclared` or pass as ordinary insufficient evidence.
-- Two claims about the same type and subjects with incompatible statuses are contradictory unless the later claim lists every displaced claim in `supersedes_claim_refs`.
+- Claim identity uses the sorted set of collision-free subject tuples `[artifact_id, observed_revision, item_id]`. Subject order is immaterial, duplicate subject refs are invalid, and delimiter-formatted display labels never determine identity.
+- Two claims about the same type and normalized subject set with incompatible statuses are contradictory unless the later claim lists every displaced claim in `supersedes_claim_refs`.
 - A complete chain is evidence of trace coverage, not proof of business correctness.
 
 Structured gaps use this portable shape:
@@ -109,11 +110,16 @@ Structured gaps use this portable shape:
 ```text
 - gap_type: acceptance | verification | implementation | review | approval | rollback
 - required_by_claim: claim ID
-- missing_item_ref: expected structured item ref
+- missing_item_ref:
+    artifact_id: expected artifact ID
+    item_id: expected item ID
+    observed_revision: expected positive revision
 - stage: completion | review | release
 ```
 
 A Release Readiness report uses only the five release gap types: `acceptance`, `verification`, `review`, `approval`, and `rollback`. It must preserve each type rather than collapsing all failures into a generic missing-reference message.
+
+Negative fixtures compare the complete ordered `issues` result with their oracle. A fixture intended to prove one exact gap connects every other required ref to the subject; fixtures that intentionally exercise multiple failures list every expected issue.
 
 ## Claim-dependent sufficiency
 

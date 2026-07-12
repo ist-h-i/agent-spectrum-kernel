@@ -4577,8 +4577,8 @@ try {
     if (scenario.expected === "valid" && issues.length > 0) {
       throw new Error(`traceability scenario ${scenario.id} should pass\n${issues.join("\n")}`);
     }
-    if (scenario.expected === "invalid" && !(scenario.expected_errors ?? []).every((expected) => issues.includes(expected))) {
-      throw new Error(`traceability scenario ${scenario.id} should expose expected stale or contradictory references\n${issues.join("\n")}`);
+    if (scenario.expected === "invalid" && JSON.stringify(issues) !== JSON.stringify(scenario.expected_errors ?? [])) {
+      throw new Error(`traceability scenario ${scenario.id} should expose exactly the expected errors\nexpected=${JSON.stringify(scenario.expected_errors ?? [])}\nactual=${JSON.stringify(issues)}`);
     }
     if (JSON.stringify(gaps) !== JSON.stringify(scenario.expected_gaps ?? [])) {
       throw new Error(`traceability scenario ${scenario.id} should expose structured gaps\nexpected=${JSON.stringify(scenario.expected_gaps ?? [])}\nactual=${JSON.stringify(gaps)}`);
