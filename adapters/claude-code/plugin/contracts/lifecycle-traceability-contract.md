@@ -57,7 +57,7 @@ Canonical item kinds:
 | Review | `decision`, `blocker`, `accepted_risk` |
 | Release Readiness | `check`, `approval`, `rollback` |
 
-An accepted-risk item must record `accepted_by` and `accepted_stage`. Approval evidence remains a referenceable item; it is not inferred from a lack of objections.
+An accepted-risk item must record `accepted_by` and an `accepted_stage` of `review` or `release`. Approval evidence remains a referenceable item; it is not inferred from a lack of objections.
 
 ## Propagation and delta rules
 
@@ -96,7 +96,7 @@ Rules:
 - For `acceptance` and `verification`, at least one claim evidence ref must reach the exact required item by following current `upstream_refs`. Merely listing unrelated current refs in the same claim does not establish support.
 - Completion subjects are Spec `behavior` / `acceptance` items or Work Package `task` items. Merge subjects are Implementation `change` items. Release subjects are Release Readiness `check` items.
 - Every resolved required ref must be the same item as, or have a valid item-level trace relationship to, at least one subject. Every subject must likewise connect to at least one resolved required ref.
-- Every blocker ref and accepted-risk ref must connect to at least one subject; type correctness alone does not establish claim scope. The claim must also include every current Review `blocker` and `accepted_risk` item connected to any subject. Validators derive that connected finding closure from the trace graph, so omitting a related finding never turns a blocked or risk-bearing claim into a supported claim.
+- Every blocker ref and accepted-risk ref must connect to at least one subject; type correctness alone does not establish claim scope. Finding closure is stage-scoped: completion claims do not consume later Review findings; merge claims include every connected current Review `blocker` and every connected `accepted_risk` whose `accepted_stage` is `review`; release claims include connected current Review blockers and accepted risks whose stage is `review` or `release`. Current means the item remains in the current Review artifact revision. Validators derive only that stage-applicable closure, so omitting a related finding never turns a blocked or risk-bearing merge or release claim into a supported claim.
 - The Release Readiness sibling exception applies only when a Release Readiness `check` subject and an `approval` or `rollback` required item belong to the same Release Readiness artifact. It never connects an unrelated review decision, blocker, accepted risk, or other item kind.
 - `blocked` requires exact blocker refs, and every blocker ref resolves to a `review` artifact item whose kind is `blocker`.
 - `insufficient_evidence` emits one structured gap for every missing, stale, or wrong-kind required ref. It names the expected ref; it does not synthesize the absent artifact.
@@ -119,7 +119,7 @@ Structured gaps use this portable shape:
 
 A Release Readiness report uses only the five release gap types: `acceptance`, `verification`, `review`, `approval`, and `rollback`. It must preserve each type rather than collapsing all failures into a generic missing-reference message.
 
-Negative fixtures compare the complete ordered `issues` result with their oracle. A fixture intended to prove one exact gap connects every other required ref to the subject; fixtures that intentionally exercise multiple failures list every expected issue.
+Negative fixtures require a non-empty `expected_errors` oracle and a non-empty actual `issues` result, then compare the complete ordered arrays. Required scenario IDs also fix their expected valid/invalid outcome. A fixture intended to prove one exact gap connects every other required ref to the subject; fixtures that intentionally exercise multiple failures list every expected issue.
 
 ## Claim-dependent sufficiency
 

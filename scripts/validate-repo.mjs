@@ -78,6 +78,51 @@ const TRACEABILITY_GAP_ITEM_KINDS = {
   rollback: ["rollback"],
 };
 const TRACEABILITY_EXEMPTION_FACTS = ["localized_scope", "no_claim", "no_required_gate"];
+const TRACEABILITY_ACCEPTED_RISK_STAGES = ["review", "release"];
+export const REQUIRED_TRACEABILITY_SCENARIOS = new Map([
+  ["complete-implementation-to-review", "valid"],
+  ["complete-review-to-release", "valid"],
+  ["partial-no-claim", "valid"],
+  ["partial-completion-claim-missing-verification", "invalid"],
+  ["partial-merge-claim-missing-review", "invalid"],
+  ["intentionally-skipped-trivial", "valid"],
+  ["trivial-exemption-with-release-claim", "invalid"],
+  ["trivial-exemption-with-required-gate", "invalid"],
+  ["trivial-exemption-without-observed-facts", "invalid"],
+  ["release-exact-gaps", "valid"],
+  ["release-gap-acceptance-negative", "invalid"],
+  ["release-gap-verification-negative", "invalid"],
+  ["release-gap-review-negative", "invalid"],
+  ["release-gap-approval-negative", "invalid"],
+  ["release-gap-rollback-negative", "invalid"],
+  ["stale-reference", "invalid"],
+  ["contradictory-claims", "invalid"],
+  ["mixed-reference-formats", "invalid"],
+  ["revision-omitted-ref", "invalid"],
+  ["disconnected-evidence", "invalid"],
+  ["required-ref-revision-omitted", "invalid"],
+  ["required-ref-string", "invalid"],
+  ["subject-ref-revision-omitted", "invalid"],
+  ["blocker-ref-revision-omitted", "invalid"],
+  ["release-required-ref-omitted", "invalid"],
+  ["wrong-kind-blocker-ref", "invalid"],
+  ["evidence-item-cross-contamination", "invalid"],
+  ["subject-required-disconnected", "invalid"],
+  ["merge-unrelated-review-required", "invalid"],
+  ["typed-blocker-unrelated-subject", "invalid"],
+  ["release-unrelated-review-required", "invalid"],
+  ["item-key-collision", "invalid"],
+  ["related-blocker-omitted", "invalid"],
+  ["one-of-two-blockers-omitted", "invalid"],
+  ["accepted-risk-omitted", "invalid"],
+  ["claim-subject-label-collision", "valid"],
+  ["duplicate-subject-contradiction", "invalid"],
+  ["completion-with-later-review-blocker", "valid"],
+  ["same-chain-merge-blocker-omitted", "invalid"],
+  ["accepted-risk-stage-invalid", "invalid"],
+  ["merge-future-accepted-risk", "invalid"],
+  ["release-stage-accepted-risk", "valid"],
+]);
 const TRACEABILITY_SKILL_PATHS = [
   "skills/requirement-grill/SKILL.md",
   "skills/spec-driven-development/SKILL.md",
@@ -1118,6 +1163,22 @@ function lifecycleValuesEqual(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+export function traceabilityScenarioMatchesExpectation(scenario, issues) {
+  if (scenario.expected === "valid") return issues.length === 0;
+  const expectedErrors = Array.isArray(scenario.expected_errors) ? scenario.expected_errors : [];
+  return scenario.expected === "invalid"
+    && expectedErrors.length > 0
+    && issues.length > 0
+    && lifecycleValuesEqual(issues, expectedErrors);
+}
+
+export function traceabilityRequiredOutcomeIssue(scenario) {
+  const requiredExpected = REQUIRED_TRACEABILITY_SCENARIOS.get(scenario.id);
+  return requiredExpected && scenario.expected !== requiredExpected
+    ? `required scenario ${scenario.id} must remain ${requiredExpected}, got ${scenario.expected}`
+    : null;
+}
+
 export function inspectLifecycleScenario(scenario) {
   const issues = [];
   const artifacts = Array.isArray(scenario.artifacts) ? scenario.artifacts : [];
@@ -1337,7 +1398,11 @@ export function inspectTraceabilityScenarioResult(scenario) {
       }
       if (itemById.has(item.id)) issues.push(`${artifact.id} has duplicate item id ${item.id}`);
       if (!(TRACEABILITY_ARTIFACT_ITEM_KINDS[artifact.type] ?? []).includes(item.kind)) issues.push(`${artifact.id}#${item.id} has invalid kind ${item.kind}`);
-      if (item.kind === "accepted_risk" && (!item.accepted_by || !item.accepted_stage)) issues.push(`${artifact.id}#${item.id} accepted risk requires accepted_by and accepted_stage`);
+      if (item.kind === "accepted_risk" && (!item.accepted_by || !item.accepted_stage)) {
+        issues.push(`${artifact.id}#${item.id} accepted risk requires accepted_by and accepted_stage`);
+      } else if (item.kind === "accepted_risk" && !TRACEABILITY_ACCEPTED_RISK_STAGES.includes(item.accepted_stage)) {
+        issues.push(`${artifact.id}#${item.id} accepted_stage must be review or release`);
+      }
       itemById.set(item.id, item);
     }
     artifactById.set(artifact.id, { ...artifact, itemById });
@@ -1504,6 +1569,17 @@ export function inspectTraceabilityScenarioResult(scenario) {
     for (const resolution of acceptedRiskResolutions) {
       if (resolution.structureValid && resolution.artifact && resolution.current && (!resolution.item || resolution.artifact.type !== "review" || resolution.item.kind !== "accepted_risk")) {
         issues.push(`${claim.id} accepted_risk_refs must point to accepted_risk items: ${resolution.label}`);
+      } else if (
+        resolution.structureValid
+        && resolution.artifact?.type === "review"
+        && resolution.item?.kind === "accepted_risk"
+        && resolution.current
+        && !(
+          (claim.type === "merge" && resolution.item.accepted_stage === "review")
+          || (claim.type === "release" && TRACEABILITY_ACCEPTED_RISK_STAGES.includes(resolution.item.accepted_stage))
+        )
+      ) {
+        issues.push(`${claim.id} accepted_risk_refs cannot use accepted_stage ${resolution.item.accepted_stage} for ${claim.type} claim: ${resolution.label}`);
       }
     }
 
@@ -1604,10 +1680,12 @@ export function inspectTraceabilityScenarioResult(scenario) {
     }
     const declaredBlockerKeys = new Set(blockerResolutions.filter((resolution) => resolution.structureValid).map((resolution) => itemRefKey(resolution.ref)));
     const declaredRiskKeys = new Set(acceptedRiskResolutions.filter((resolution) => resolution.structureValid).map((resolution) => itemRefKey(resolution.ref)));
-    for (const artifact of artifactById.values()) {
+    for (const artifact of claim.type === "completion" ? [] : artifactById.values()) {
       if (artifact.type !== "review") continue;
       for (const item of artifact.itemById.values()) {
         if (!["blocker", "accepted_risk"].includes(item.kind)) continue;
+        if (item.kind === "accepted_risk" && claim.type === "merge" && item.accepted_stage !== "review") continue;
+        if (item.kind === "accepted_risk" && claim.type === "release" && !TRACEABILITY_ACCEPTED_RISK_STAGES.includes(item.accepted_stage)) continue;
         const ref = { artifact_id: artifact.id, item_id: item.id, observed_revision: artifact.revision };
         const resolution = { artifact, item, ref, current: true, structureValid: true, label: traceRefLabel(ref) };
         if (!validSubjects.some((subjectResolution) => subjectConnectsRequired(subjectResolution, resolution, claim.type))) continue;
@@ -1678,7 +1756,7 @@ function validateLifecycleTraceabilityContract(root, manifest, errors) {
   }
   if (!checks.contractPresent || !checks.fixturePresent) return checks;
   const contract = readFileSync(resolve(root, LIFECYCLE_TRACEABILITY_CONTRACT_PATH), "utf8");
-  for (const phrase of ["Stable reference model", "observed_revision", "Claim record", "insufficient evidence", "Trivial or localized", "observed facts", "never waives", "upstream_refs` remains the canonical", "must not be mixed", "same resolver rules", "collision-free tuple", "multiple items must define", "Completion subjects", "Every resolved required ref", "Every blocker ref", "connected finding closure", "sorted set of collision-free subject tuples", "duplicate subject refs are invalid", "sibling exception", "must reach the exact required item", "kind is `blocker`", "missing_item_ref: undeclared", "Structured gaps", "complete ordered `issues`", "accepted_by", "acceptance`, `verification`, `review`, `approval`, and `rollback", "Release Readiness", "No central server"]) {
+  for (const phrase of ["Stable reference model", "observed_revision", "Claim record", "insufficient evidence", "Trivial or localized", "observed facts", "never waives", "upstream_refs` remains the canonical", "must not be mixed", "same resolver rules", "collision-free tuple", "multiple items must define", "Completion subjects", "Every resolved required ref", "Every blocker ref", "Finding closure is stage-scoped", "completion claims do not consume later Review findings", "accepted_stage` of `review` or `release", "sorted set of collision-free subject tuples", "duplicate subject refs are invalid", "sibling exception", "must reach the exact required item", "kind is `blocker`", "missing_item_ref: undeclared", "Structured gaps", "non-empty `expected_errors`", "Required scenario IDs", "accepted_by", "acceptance`, `verification`, `review`, `approval`, and `rollback", "Release Readiness", "No central server"]) {
     if (!contract.toLowerCase().includes(phrase.toLowerCase())) fail(errors, "lifecycle traceability", `${LIFECYCLE_TRACEABILITY_CONTRACT_PATH} is missing ${phrase}`);
   }
   for (const path of TRACEABILITY_SKILL_PATHS) {
@@ -1694,58 +1772,19 @@ function validateLifecycleTraceabilityContract(root, manifest, errors) {
     fail(errors, "lifecycle traceability", `${LIFECYCLE_TRACEABILITY_FIXTURE_PATH} is not valid JSON: ${error.message}`);
     return checks;
   }
-  const requiredScenarios = new Set([
-    "complete-implementation-to-review",
-    "complete-review-to-release",
-    "partial-no-claim",
-    "partial-completion-claim-missing-verification",
-    "partial-merge-claim-missing-review",
-    "intentionally-skipped-trivial",
-    "trivial-exemption-with-release-claim",
-    "trivial-exemption-with-required-gate",
-    "trivial-exemption-without-observed-facts",
-    "release-exact-gaps",
-    "release-gap-acceptance-negative",
-    "release-gap-verification-negative",
-    "release-gap-review-negative",
-    "release-gap-approval-negative",
-    "release-gap-rollback-negative",
-    "mixed-reference-formats",
-    "revision-omitted-ref",
-    "disconnected-evidence",
-    "required-ref-revision-omitted",
-    "required-ref-string",
-    "subject-ref-revision-omitted",
-    "blocker-ref-revision-omitted",
-    "release-required-ref-omitted",
-    "wrong-kind-blocker-ref",
-    "evidence-item-cross-contamination",
-    "subject-required-disconnected",
-    "merge-unrelated-review-required",
-    "typed-blocker-unrelated-subject",
-    "release-unrelated-review-required",
-    "item-key-collision",
-    "related-blocker-omitted",
-    "one-of-two-blockers-omitted",
-    "accepted-risk-omitted",
-    "claim-subject-label-collision",
-    "duplicate-subject-contradiction",
-    "stale-reference",
-    "contradictory-claims",
-  ]);
+  const requiredScenarios = new Map(REQUIRED_TRACEABILITY_SCENARIOS);
   for (const scenario of fixture.scenarios ?? []) {
+    const requiredOutcomeIssue = traceabilityRequiredOutcomeIssue(scenario);
+    if (requiredOutcomeIssue) fail(errors, "lifecycle traceability", requiredOutcomeIssue);
     requiredScenarios.delete(scenario.id);
     const { issues, gaps } = inspectTraceabilityScenarioResult(scenario);
-    const expectedErrors = Array.isArray(scenario.expected_errors) ? scenario.expected_errors : [];
-    const issueExpectationOk = scenario.expected === "valid"
-      ? issues.length === 0
-      : scenario.expected === "invalid" && lifecycleValuesEqual(issues, expectedErrors);
+    const issueExpectationOk = traceabilityScenarioMatchesExpectation(scenario, issues);
     const gapsOk = lifecycleValuesEqual(gaps, scenario.expected_gaps ?? []);
     const ok = issueExpectationOk && gapsOk;
     checks.scenarios.push({ id: scenario.id, expected: scenario.expected, issues, gaps, ok });
     if (!ok) fail(errors, "lifecycle traceability", `scenario ${scenario.id} did not match expectation: issues=${issues.join("; ") || "none"}; gaps=${JSON.stringify(gaps)}`);
   }
-  if (requiredScenarios.size > 0) fail(errors, "lifecycle traceability", `missing scenarios: ${[...requiredScenarios].join(", ")}`);
+  if (requiredScenarios.size > 0) fail(errors, "lifecycle traceability", `missing scenarios: ${[...requiredScenarios.keys()].join(", ")}`);
   return checks;
 }
 

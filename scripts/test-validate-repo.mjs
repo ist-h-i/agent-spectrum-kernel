@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
-import { inspectLifecycleScenario, inspectTraceabilityScenarioResult } from "./validate-repo.mjs";
+import { REQUIRED_TRACEABILITY_SCENARIOS, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -4572,12 +4572,25 @@ try {
   }
 
   const traceabilityFixture = JSON.parse(readFileSync(resolve(repoRoot, "docs/fixtures/lifecycle-traceability-chains.json"), "utf8"));
+  if (traceabilityScenarioMatchesExpectation({ expected: "invalid", expected_errors: [] }, [])) {
+    throw new Error("traceability invalid scenario must not pass with an empty error oracle");
+  }
+  for (const [scenarioId, expectedOutcome] of REQUIRED_TRACEABILITY_SCENARIOS) {
+    const scenario = traceabilityFixture.scenarios.find((entry) => entry.id === scenarioId);
+    if (!scenario || scenario.expected !== expectedOutcome) {
+      throw new Error(`required traceability scenario ${scenarioId} must remain ${expectedOutcome}`);
+    }
+  }
+  const requiredNegative = traceabilityFixture.scenarios.find((entry) => entry.id === "related-blocker-omitted");
+  if (!traceabilityRequiredOutcomeIssue({ ...requiredNegative, expected: "valid" })) {
+    throw new Error("required negative traceability scenario must not be relabeled valid");
+  }
   for (const scenario of traceabilityFixture.scenarios) {
     const { issues, gaps } = inspectTraceabilityScenarioResult(scenario);
     if (scenario.expected === "valid" && issues.length > 0) {
       throw new Error(`traceability scenario ${scenario.id} should pass\n${issues.join("\n")}`);
     }
-    if (scenario.expected === "invalid" && JSON.stringify(issues) !== JSON.stringify(scenario.expected_errors ?? [])) {
+    if (!traceabilityScenarioMatchesExpectation(scenario, issues)) {
       throw new Error(`traceability scenario ${scenario.id} should expose exactly the expected errors\nexpected=${JSON.stringify(scenario.expected_errors ?? [])}\nactual=${JSON.stringify(issues)}`);
     }
     if (JSON.stringify(gaps) !== JSON.stringify(scenario.expected_gaps ?? [])) {
