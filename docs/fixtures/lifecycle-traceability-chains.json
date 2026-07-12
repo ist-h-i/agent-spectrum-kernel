@@ -1,0 +1,178 @@
+{
+  "schema_version": "1.1.0",
+  "scenarios": [
+    {
+      "id": "complete-implementation-to-review",
+      "expected": "valid",
+      "artifacts": [
+        { "id": "SPEC-CSV", "type": "spec", "revision": 1, "upstream_refs": [], "items": [{ "id": "AC-ESCAPE", "kind": "acceptance" }] },
+        { "id": "VER-CSV", "type": "verification", "revision": 1, "upstream_refs": [{ "artifact_id": "SPEC-CSV", "item_id": "AC-ESCAPE", "observed_revision": 1 }], "items": [{ "id": "OBL-ESCAPE", "kind": "obligation" }] },
+        { "id": "IMPL-CSV", "type": "implementation", "revision": 1, "upstream_refs": [{ "artifact_id": "VER-CSV", "item_id": "OBL-ESCAPE", "observed_revision": 1 }], "items": [{ "id": "CHANGE-EXPORT", "kind": "change" }] },
+        { "id": "EVID-CSV", "type": "evidence", "revision": 1, "upstream_refs": [{ "artifact_id": "VER-CSV", "item_id": "OBL-ESCAPE", "observed_revision": 1 }], "items": [{ "id": "TEST-ESCAPE", "kind": "evidence" }] },
+        { "id": "REV-CSV", "type": "review", "revision": 1, "upstream_refs": [{ "artifact_id": "IMPL-CSV", "item_id": "CHANGE-EXPORT", "observed_revision": 1 }], "items": [{ "id": "DECISION-APPROVE", "kind": "decision" }] }
+      ],
+      "claims": [
+        { "id": "CLAIM-MERGE-CSV", "type": "merge", "status": "supported", "subject_refs": [{ "artifact_id": "IMPL-CSV", "item_id": "CHANGE-EXPORT", "observed_revision": 1 }], "evidence_refs": [{ "artifact_id": "EVID-CSV", "item_id": "TEST-ESCAPE", "observed_revision": 1 }], "blocker_refs": [], "accepted_risk_refs": [], "applicable_gap_types": ["implementation", "review"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "implementation", "item_ref": { "artifact_id": "IMPL-CSV", "item_id": "CHANGE-EXPORT", "observed_revision": 1 } }, { "gap_type": "review", "item_ref": { "artifact_id": "REV-CSV", "item_id": "DECISION-APPROVE", "observed_revision": 1 } }] }
+      ]
+    },
+    {
+      "id": "complete-review-to-release",
+      "expected": "valid",
+      "artifacts": [
+        { "id": "SPEC-REL", "type": "spec", "revision": 1, "upstream_refs": [], "items": [{ "id": "AC-REL", "kind": "acceptance" }] },
+        { "id": "EVID-REL", "type": "evidence", "revision": 1, "upstream_refs": [], "items": [{ "id": "CI-PASS", "kind": "evidence" }] },
+        { "id": "REV-REL", "type": "review", "revision": 2, "upstream_refs": [{ "artifact_id": "EVID-REL", "item_id": "CI-PASS", "observed_revision": 1 }], "items": [{ "id": "DECISION-MERGE", "kind": "decision" }, { "id": "RISK-MANUAL-ROLLBACK", "kind": "accepted_risk", "accepted_by": "release owner", "accepted_stage": "review" }] },
+        { "id": "REL-001", "type": "release_readiness", "revision": 1, "upstream_refs": [{ "artifact_id": "REV-REL", "observed_revision": 2 }], "items": [{ "id": "APPROVAL-OWNER", "kind": "approval" }, { "id": "ROLLBACK-PLAN", "kind": "rollback" }] }
+      ],
+      "claims": [
+        { "id": "CLAIM-RELEASE-001", "type": "release", "status": "supported", "subject_refs": [{ "artifact_id": "REL-001", "observed_revision": 1 }], "evidence_refs": [{ "artifact_id": "EVID-REL", "item_id": "CI-PASS", "observed_revision": 1 }], "blocker_refs": [], "accepted_risk_refs": [{ "artifact_id": "REV-REL", "item_id": "RISK-MANUAL-ROLLBACK", "observed_revision": 2 }], "applicable_gap_types": ["acceptance", "verification", "review", "approval", "rollback"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "acceptance", "item_ref": { "artifact_id": "SPEC-REL", "item_id": "AC-REL", "observed_revision": 1 } }, { "gap_type": "verification", "item_ref": { "artifact_id": "EVID-REL", "item_id": "CI-PASS", "observed_revision": 1 } }, { "gap_type": "review", "item_ref": { "artifact_id": "REV-REL", "item_id": "DECISION-MERGE", "observed_revision": 2 } }, { "gap_type": "approval", "item_ref": { "artifact_id": "REL-001", "item_id": "APPROVAL-OWNER", "observed_revision": 1 } }, { "gap_type": "rollback", "item_ref": { "artifact_id": "REL-001", "item_id": "ROLLBACK-PLAN", "observed_revision": 1 } }] }
+      ]
+    },
+    {
+      "id": "partial-no-claim",
+      "expected": "valid",
+      "artifacts": [{ "id": "SPEC-PARTIAL", "type": "spec", "revision": 1, "upstream_refs": [], "items": [{ "id": "AC-PARTIAL", "kind": "acceptance" }] }],
+      "claims": []
+    },
+    {
+      "id": "partial-completion-claim-missing-verification",
+      "expected": "invalid",
+      "expected_errors": ["CLAIM-PARTIAL-COMPLETION supported claim has verification gap at VER-PARTIAL@1#EVID-MISSING"],
+      "expected_gaps": [{ "gap_type": "verification", "required_by_claim": "CLAIM-PARTIAL-COMPLETION", "missing_item_ref": "VER-PARTIAL@1#EVID-MISSING", "stage": "completion" }],
+      "artifacts": [
+        { "id": "SPEC-PARTIAL", "type": "spec", "revision": 1, "upstream_refs": [], "items": [{ "id": "AC-PARTIAL", "kind": "acceptance" }] },
+        { "id": "EVID-PARTIAL", "type": "evidence", "revision": 1, "upstream_refs": [], "items": [{ "id": "OTHER-EVIDENCE", "kind": "evidence" }] }
+      ],
+      "claims": [{ "id": "CLAIM-PARTIAL-COMPLETION", "type": "completion", "status": "supported", "subject_refs": [{ "artifact_id": "SPEC-PARTIAL", "item_id": "AC-PARTIAL", "observed_revision": 1 }], "evidence_refs": [{ "artifact_id": "EVID-PARTIAL", "item_id": "OTHER-EVIDENCE", "observed_revision": 1 }], "blocker_refs": [], "accepted_risk_refs": [], "applicable_gap_types": ["acceptance", "verification"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "acceptance", "item_ref": { "artifact_id": "SPEC-PARTIAL", "item_id": "AC-PARTIAL", "observed_revision": 1 } }, { "gap_type": "verification", "item_ref": { "artifact_id": "VER-PARTIAL", "item_id": "EVID-MISSING", "observed_revision": 1 } }] }]
+    },
+    {
+      "id": "partial-merge-claim-missing-review",
+      "expected": "invalid",
+      "expected_errors": ["CLAIM-PARTIAL-MERGE supported claim has review gap at REV-PARTIAL@1#DECISION-MISSING"],
+      "expected_gaps": [{ "gap_type": "review", "required_by_claim": "CLAIM-PARTIAL-MERGE", "missing_item_ref": "REV-PARTIAL@1#DECISION-MISSING", "stage": "review" }],
+      "artifacts": [
+        { "id": "IMPL-PARTIAL", "type": "implementation", "revision": 1, "upstream_refs": [], "items": [{ "id": "CHANGE-1", "kind": "change" }] },
+        { "id": "EVID-PARTIAL", "type": "evidence", "revision": 1, "upstream_refs": [], "items": [{ "id": "TEST-1", "kind": "evidence" }] }
+      ],
+      "claims": [{ "id": "CLAIM-PARTIAL-MERGE", "type": "merge", "status": "supported", "subject_refs": [{ "artifact_id": "IMPL-PARTIAL", "item_id": "CHANGE-1", "observed_revision": 1 }], "evidence_refs": [{ "artifact_id": "EVID-PARTIAL", "item_id": "TEST-1", "observed_revision": 1 }], "blocker_refs": [], "accepted_risk_refs": [], "applicable_gap_types": ["implementation", "review"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "implementation", "item_ref": { "artifact_id": "IMPL-PARTIAL", "item_id": "CHANGE-1", "observed_revision": 1 } }, { "gap_type": "review", "item_ref": { "artifact_id": "REV-PARTIAL", "item_id": "DECISION-MISSING", "observed_revision": 1 } }] }]
+    },
+    {
+      "id": "intentionally-skipped-trivial",
+      "expected": "valid",
+      "required_gates": [],
+      "exemption": { "kind": "trivial_localized", "reason": "local label-only change", "source_ref": "issue:label-copy", "observed_facts": [{ "signal": "localized_scope", "evidence": "diff touches one label resource" }, { "signal": "no_claim", "evidence": "no completion, merge, or release claim requested" }, { "signal": "no_required_gate", "evidence": "diff inspection found no risk-gate signal" }] },
+      "artifacts": [],
+      "claims": []
+    },
+    {
+      "id": "trivial-exemption-with-release-claim",
+      "expected": "invalid",
+      "expected_errors": ["traceability exemption cannot be combined with completion, merge, or release claims", "CLAIM-TRIVIAL-RELEASE supported claim has approval gap at REL-TRIVIAL@1#APPROVAL-MISSING", "CLAIM-TRIVIAL-RELEASE supported claim has rollback gap at REL-TRIVIAL@1#ROLLBACK-MISSING"],
+      "expected_gaps": [{ "gap_type": "approval", "required_by_claim": "CLAIM-TRIVIAL-RELEASE", "missing_item_ref": "REL-TRIVIAL@1#APPROVAL-MISSING", "stage": "release" }, { "gap_type": "rollback", "required_by_claim": "CLAIM-TRIVIAL-RELEASE", "missing_item_ref": "REL-TRIVIAL@1#ROLLBACK-MISSING", "stage": "release" }],
+      "required_gates": [],
+      "exemption": { "kind": "trivial_localized", "reason": "claimed label-only", "source_ref": "issue:label-copy", "observed_facts": [{ "signal": "localized_scope", "evidence": "one file claimed" }, { "signal": "no_claim", "evidence": "contradicted by release claim" }, { "signal": "no_required_gate", "evidence": "no gate listed" }] },
+      "artifacts": [],
+      "claims": [{ "id": "CLAIM-TRIVIAL-RELEASE", "type": "release", "status": "supported", "subject_refs": [], "evidence_refs": [], "blocker_refs": [], "accepted_risk_refs": [], "applicable_gap_types": ["approval", "rollback"], "not_applicable_gap_types": ["acceptance", "verification", "review"], "not_applicable_reasons": [{ "gap_type": "acceptance", "reason": "no behavior acceptance in claimed scope", "evidence": "label-only source claim" }, { "gap_type": "verification", "reason": "no runtime behavior in claimed scope", "evidence": "label-only source claim" }, { "gap_type": "review", "reason": "no merge review in claimed scope", "evidence": "standalone release claim" }], "required_refs": [{ "gap_type": "approval", "item_ref": { "artifact_id": "REL-TRIVIAL", "item_id": "APPROVAL-MISSING", "observed_revision": 1 } }, { "gap_type": "rollback", "item_ref": { "artifact_id": "REL-TRIVIAL", "item_id": "ROLLBACK-MISSING", "observed_revision": 1 } }] }]
+    },
+    {
+      "id": "trivial-exemption-with-required-gate",
+      "expected": "invalid",
+      "expected_errors": ["traceability exemption cannot bypass required gates: risk-gate:security"],
+      "required_gates": ["risk-gate:security"],
+      "exemption": { "kind": "trivial_localized", "reason": "small permission diff", "source_ref": "diff:permission", "observed_facts": [{ "signal": "localized_scope", "evidence": "one permission file" }, { "signal": "no_claim", "evidence": "no lifecycle claim" }, { "signal": "no_required_gate", "evidence": "contradicted by required gate" }] },
+      "artifacts": [],
+      "claims": []
+    },
+    {
+      "id": "trivial-exemption-without-observed-facts",
+      "expected": "invalid",
+      "expected_errors": ["traceability exemption requires observed facts: localized_scope, no_claim, no_required_gate"],
+      "required_gates": [],
+      "exemption": { "kind": "trivial_localized", "reason": "self-declared trivial", "source_ref": "user:trivial", "observed_facts": [] },
+      "artifacts": [],
+      "claims": []
+    },
+    {
+      "id": "release-exact-gaps",
+      "expected": "valid",
+      "expected_gaps": [
+        { "gap_type": "acceptance", "required_by_claim": "CLAIM-RELEASE-GAPS", "missing_item_ref": "SPEC-GAPS@1#AC-MISSING", "stage": "release" },
+        { "gap_type": "verification", "required_by_claim": "CLAIM-RELEASE-GAPS", "missing_item_ref": "VER-GAPS@1#OBL-MISSING", "stage": "release" },
+        { "gap_type": "review", "required_by_claim": "CLAIM-RELEASE-GAPS", "missing_item_ref": "REV-GAPS@1#DECISION-MISSING", "stage": "release" },
+        { "gap_type": "approval", "required_by_claim": "CLAIM-RELEASE-GAPS", "missing_item_ref": "REL-GAPS@1#APPROVAL-MISSING", "stage": "release" },
+        { "gap_type": "rollback", "required_by_claim": "CLAIM-RELEASE-GAPS", "missing_item_ref": "REL-GAPS@1#ROLLBACK-MISSING", "stage": "release" }
+      ],
+      "artifacts": [{ "id": "REL-GAPS", "type": "release_readiness", "revision": 1, "upstream_refs": [], "items": [{ "id": "REPORT", "kind": "check" }] }],
+      "claims": [{ "id": "CLAIM-RELEASE-GAPS", "type": "release", "status": "insufficient_evidence", "subject_refs": [{ "artifact_id": "REL-GAPS", "item_id": "REPORT", "observed_revision": 1 }], "evidence_refs": [], "blocker_refs": [], "accepted_risk_refs": [], "applicable_gap_types": ["acceptance", "verification", "review", "approval", "rollback"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "acceptance", "item_ref": { "artifact_id": "SPEC-GAPS", "item_id": "AC-MISSING", "observed_revision": 1 } }, { "gap_type": "verification", "item_ref": { "artifact_id": "VER-GAPS", "item_id": "OBL-MISSING", "observed_revision": 1 } }, { "gap_type": "review", "item_ref": { "artifact_id": "REV-GAPS", "item_id": "DECISION-MISSING", "observed_revision": 1 } }, { "gap_type": "approval", "item_ref": { "artifact_id": "REL-GAPS", "item_id": "APPROVAL-MISSING", "observed_revision": 1 } }, { "gap_type": "rollback", "item_ref": { "artifact_id": "REL-GAPS", "item_id": "ROLLBACK-MISSING", "observed_revision": 1 } }] }]
+    },
+    {
+      "id": "release-gap-acceptance-negative",
+      "expected": "invalid",
+      "expected_errors": ["CLAIM-REL-AC supported claim has acceptance gap at SPEC-AC@1#AC-MISSING"],
+      "expected_gaps": [{ "gap_type": "acceptance", "required_by_claim": "CLAIM-REL-AC", "missing_item_ref": "SPEC-AC@1#AC-MISSING", "stage": "release" }],
+      "artifacts": [{ "id": "SPEC-AC", "type": "spec", "revision": 1, "upstream_refs": [], "items": [] }, { "id": "VER-AC", "type": "verification", "revision": 1, "upstream_refs": [], "items": [{ "id": "OBL", "kind": "obligation" }] }, { "id": "EVID-AC", "type": "evidence", "revision": 1, "upstream_refs": [], "items": [{ "id": "EVID", "kind": "evidence" }] }, { "id": "REV-AC", "type": "review", "revision": 1, "upstream_refs": [], "items": [{ "id": "DECISION", "kind": "decision" }] }, { "id": "REL-AC", "type": "release_readiness", "revision": 1, "upstream_refs": [], "items": [{ "id": "REPORT", "kind": "check" }, { "id": "APPROVAL", "kind": "approval" }, { "id": "ROLLBACK", "kind": "rollback" }] }],
+      "claims": [{ "id": "CLAIM-REL-AC", "type": "release", "status": "supported", "subject_refs": [{ "artifact_id": "REL-AC", "item_id": "REPORT", "observed_revision": 1 }], "evidence_refs": [{ "artifact_id": "EVID-AC", "item_id": "EVID", "observed_revision": 1 }], "blocker_refs": [], "accepted_risk_refs": [], "applicable_gap_types": ["acceptance", "verification", "review", "approval", "rollback"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "acceptance", "item_ref": { "artifact_id": "SPEC-AC", "item_id": "AC-MISSING", "observed_revision": 1 } }, { "gap_type": "verification", "item_ref": { "artifact_id": "VER-AC", "item_id": "OBL", "observed_revision": 1 } }, { "gap_type": "review", "item_ref": { "artifact_id": "REV-AC", "item_id": "DECISION", "observed_revision": 1 } }, { "gap_type": "approval", "item_ref": { "artifact_id": "REL-AC", "item_id": "APPROVAL", "observed_revision": 1 } }, { "gap_type": "rollback", "item_ref": { "artifact_id": "REL-AC", "item_id": "ROLLBACK", "observed_revision": 1 } }] }]
+    },
+    {
+      "id": "release-gap-verification-negative",
+      "expected": "invalid",
+      "expected_errors": ["CLAIM-REL-VER supported claim has verification gap at VER-VER@1#OBL-MISSING"],
+      "expected_gaps": [{ "gap_type": "verification", "required_by_claim": "CLAIM-REL-VER", "missing_item_ref": "VER-VER@1#OBL-MISSING", "stage": "release" }],
+      "artifacts": [{ "id": "SPEC-VER", "type": "spec", "revision": 1, "upstream_refs": [], "items": [{ "id": "AC", "kind": "acceptance" }] }, { "id": "VER-VER", "type": "verification", "revision": 1, "upstream_refs": [], "items": [] }, { "id": "EVID-VER", "type": "evidence", "revision": 1, "upstream_refs": [], "items": [{ "id": "EVID", "kind": "evidence" }] }, { "id": "REV-VER", "type": "review", "revision": 1, "upstream_refs": [], "items": [{ "id": "DECISION", "kind": "decision" }] }, { "id": "REL-VER", "type": "release_readiness", "revision": 1, "upstream_refs": [], "items": [{ "id": "REPORT", "kind": "check" }, { "id": "APPROVAL", "kind": "approval" }, { "id": "ROLLBACK", "kind": "rollback" }] }],
+      "claims": [{ "id": "CLAIM-REL-VER", "type": "release", "status": "supported", "subject_refs": [{ "artifact_id": "REL-VER", "item_id": "REPORT", "observed_revision": 1 }], "evidence_refs": [{ "artifact_id": "EVID-VER", "item_id": "EVID", "observed_revision": 1 }], "blocker_refs": [], "accepted_risk_refs": [], "applicable_gap_types": ["acceptance", "verification", "review", "approval", "rollback"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "acceptance", "item_ref": { "artifact_id": "SPEC-VER", "item_id": "AC", "observed_revision": 1 } }, { "gap_type": "verification", "item_ref": { "artifact_id": "VER-VER", "item_id": "OBL-MISSING", "observed_revision": 1 } }, { "gap_type": "review", "item_ref": { "artifact_id": "REV-VER", "item_id": "DECISION", "observed_revision": 1 } }, { "gap_type": "approval", "item_ref": { "artifact_id": "REL-VER", "item_id": "APPROVAL", "observed_revision": 1 } }, { "gap_type": "rollback", "item_ref": { "artifact_id": "REL-VER", "item_id": "ROLLBACK", "observed_revision": 1 } }] }]
+    },
+    {
+      "id": "release-gap-review-negative",
+      "expected": "invalid",
+      "expected_errors": ["CLAIM-REL-REV supported claim has review gap at REV-REV@1#DECISION-MISSING"],
+      "expected_gaps": [{ "gap_type": "review", "required_by_claim": "CLAIM-REL-REV", "missing_item_ref": "REV-REV@1#DECISION-MISSING", "stage": "release" }],
+      "artifacts": [{ "id": "SPEC-REV", "type": "spec", "revision": 1, "upstream_refs": [], "items": [{ "id": "AC", "kind": "acceptance" }] }, { "id": "VER-REV", "type": "verification", "revision": 1, "upstream_refs": [], "items": [{ "id": "OBL", "kind": "obligation" }] }, { "id": "EVID-REV", "type": "evidence", "revision": 1, "upstream_refs": [], "items": [{ "id": "EVID", "kind": "evidence" }] }, { "id": "REV-REV", "type": "review", "revision": 1, "upstream_refs": [], "items": [] }, { "id": "REL-REV", "type": "release_readiness", "revision": 1, "upstream_refs": [], "items": [{ "id": "REPORT", "kind": "check" }, { "id": "APPROVAL", "kind": "approval" }, { "id": "ROLLBACK", "kind": "rollback" }] }],
+      "claims": [{ "id": "CLAIM-REL-REV", "type": "release", "status": "supported", "subject_refs": [{ "artifact_id": "REL-REV", "item_id": "REPORT", "observed_revision": 1 }], "evidence_refs": [{ "artifact_id": "EVID-REV", "item_id": "EVID", "observed_revision": 1 }], "blocker_refs": [], "accepted_risk_refs": [], "applicable_gap_types": ["acceptance", "verification", "review", "approval", "rollback"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "acceptance", "item_ref": { "artifact_id": "SPEC-REV", "item_id": "AC", "observed_revision": 1 } }, { "gap_type": "verification", "item_ref": { "artifact_id": "VER-REV", "item_id": "OBL", "observed_revision": 1 } }, { "gap_type": "review", "item_ref": { "artifact_id": "REV-REV", "item_id": "DECISION-MISSING", "observed_revision": 1 } }, { "gap_type": "approval", "item_ref": { "artifact_id": "REL-REV", "item_id": "APPROVAL", "observed_revision": 1 } }, { "gap_type": "rollback", "item_ref": { "artifact_id": "REL-REV", "item_id": "ROLLBACK", "observed_revision": 1 } }] }]
+    },
+    {
+      "id": "release-gap-approval-negative",
+      "expected": "invalid",
+      "expected_errors": ["CLAIM-REL-APP supported claim has approval gap at REL-APP@1#APPROVAL-MISSING"],
+      "expected_gaps": [{ "gap_type": "approval", "required_by_claim": "CLAIM-REL-APP", "missing_item_ref": "REL-APP@1#APPROVAL-MISSING", "stage": "release" }],
+      "artifacts": [{ "id": "SPEC-APP", "type": "spec", "revision": 1, "upstream_refs": [], "items": [{ "id": "AC", "kind": "acceptance" }] }, { "id": "VER-APP", "type": "verification", "revision": 1, "upstream_refs": [], "items": [{ "id": "OBL", "kind": "obligation" }] }, { "id": "EVID-APP", "type": "evidence", "revision": 1, "upstream_refs": [], "items": [{ "id": "EVID", "kind": "evidence" }] }, { "id": "REV-APP", "type": "review", "revision": 1, "upstream_refs": [], "items": [{ "id": "DECISION", "kind": "decision" }] }, { "id": "REL-APP", "type": "release_readiness", "revision": 1, "upstream_refs": [], "items": [{ "id": "REPORT", "kind": "check" }, { "id": "ROLLBACK", "kind": "rollback" }] }],
+      "claims": [{ "id": "CLAIM-REL-APP", "type": "release", "status": "supported", "subject_refs": [{ "artifact_id": "REL-APP", "item_id": "REPORT", "observed_revision": 1 }], "evidence_refs": [{ "artifact_id": "EVID-APP", "item_id": "EVID", "observed_revision": 1 }], "blocker_refs": [], "accepted_risk_refs": [], "applicable_gap_types": ["acceptance", "verification", "review", "approval", "rollback"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "acceptance", "item_ref": { "artifact_id": "SPEC-APP", "item_id": "AC", "observed_revision": 1 } }, { "gap_type": "verification", "item_ref": { "artifact_id": "VER-APP", "item_id": "OBL", "observed_revision": 1 } }, { "gap_type": "review", "item_ref": { "artifact_id": "REV-APP", "item_id": "DECISION", "observed_revision": 1 } }, { "gap_type": "approval", "item_ref": { "artifact_id": "REL-APP", "item_id": "APPROVAL-MISSING", "observed_revision": 1 } }, { "gap_type": "rollback", "item_ref": { "artifact_id": "REL-APP", "item_id": "ROLLBACK", "observed_revision": 1 } }] }]
+    },
+    {
+      "id": "release-gap-rollback-negative",
+      "expected": "invalid",
+      "expected_errors": ["CLAIM-REL-ROLL supported claim has rollback gap at REL-ROLL@1#ROLLBACK-MISSING"],
+      "expected_gaps": [{ "gap_type": "rollback", "required_by_claim": "CLAIM-REL-ROLL", "missing_item_ref": "REL-ROLL@1#ROLLBACK-MISSING", "stage": "release" }],
+      "artifacts": [{ "id": "SPEC-ROLL", "type": "spec", "revision": 1, "upstream_refs": [], "items": [{ "id": "AC", "kind": "acceptance" }] }, { "id": "VER-ROLL", "type": "verification", "revision": 1, "upstream_refs": [], "items": [{ "id": "OBL", "kind": "obligation" }] }, { "id": "EVID-ROLL", "type": "evidence", "revision": 1, "upstream_refs": [], "items": [{ "id": "EVID", "kind": "evidence" }] }, { "id": "REV-ROLL", "type": "review", "revision": 1, "upstream_refs": [], "items": [{ "id": "DECISION", "kind": "decision" }] }, { "id": "REL-ROLL", "type": "release_readiness", "revision": 1, "upstream_refs": [], "items": [{ "id": "REPORT", "kind": "check" }, { "id": "APPROVAL", "kind": "approval" }] }],
+      "claims": [{ "id": "CLAIM-REL-ROLL", "type": "release", "status": "supported", "subject_refs": [{ "artifact_id": "REL-ROLL", "item_id": "REPORT", "observed_revision": 1 }], "evidence_refs": [{ "artifact_id": "EVID-ROLL", "item_id": "EVID", "observed_revision": 1 }], "blocker_refs": [], "accepted_risk_refs": [], "applicable_gap_types": ["acceptance", "verification", "review", "approval", "rollback"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "acceptance", "item_ref": { "artifact_id": "SPEC-ROLL", "item_id": "AC", "observed_revision": 1 } }, { "gap_type": "verification", "item_ref": { "artifact_id": "VER-ROLL", "item_id": "OBL", "observed_revision": 1 } }, { "gap_type": "review", "item_ref": { "artifact_id": "REV-ROLL", "item_id": "DECISION", "observed_revision": 1 } }, { "gap_type": "approval", "item_ref": { "artifact_id": "REL-ROLL", "item_id": "APPROVAL", "observed_revision": 1 } }, { "gap_type": "rollback", "item_ref": { "artifact_id": "REL-ROLL", "item_id": "ROLLBACK-MISSING", "observed_revision": 1 } }] }]
+    },
+    {
+      "id": "stale-reference",
+      "expected": "invalid",
+      "expected_errors": ["CLAIM-STALE subject_refs references stale SPEC-STALE@1; current revision is 2", "CLAIM-STALE supported claim has acceptance gap at SPEC-STALE@1#AC-CURRENT"],
+      "expected_gaps": [{ "gap_type": "acceptance", "required_by_claim": "CLAIM-STALE", "missing_item_ref": "SPEC-STALE@1#AC-CURRENT", "stage": "completion" }],
+      "artifacts": [{ "id": "SPEC-STALE", "type": "spec", "revision": 2, "upstream_refs": [], "items": [{ "id": "AC-CURRENT", "kind": "acceptance" }] }, { "id": "EVID-STALE", "type": "evidence", "revision": 1, "upstream_refs": [], "items": [{ "id": "TEST-CURRENT", "kind": "evidence" }] }],
+      "claims": [{ "id": "CLAIM-STALE", "type": "completion", "status": "supported", "subject_refs": [{ "artifact_id": "SPEC-STALE", "item_id": "AC-CURRENT", "observed_revision": 1 }], "evidence_refs": [{ "artifact_id": "EVID-STALE", "item_id": "TEST-CURRENT", "observed_revision": 1 }], "blocker_refs": [], "accepted_risk_refs": [], "applicable_gap_types": ["acceptance", "verification"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "acceptance", "item_ref": { "artifact_id": "SPEC-STALE", "item_id": "AC-CURRENT", "observed_revision": 1 } }, { "gap_type": "verification", "item_ref": { "artifact_id": "EVID-STALE", "item_id": "TEST-CURRENT", "observed_revision": 1 } }] }]
+    },
+    {
+      "id": "contradictory-claims",
+      "expected": "invalid",
+      "expected_errors": ["contradictory merge claims for IMPL-CONFLICT@1#CHANGE-1 require supersedes_claim_refs"],
+      "artifacts": [{ "id": "IMPL-CONFLICT", "type": "implementation", "revision": 1, "upstream_refs": [], "items": [{ "id": "CHANGE-1", "kind": "change" }] }, { "id": "EVID-CONFLICT", "type": "evidence", "revision": 1, "upstream_refs": [], "items": [{ "id": "TEST-1", "kind": "evidence" }] }, { "id": "REV-CONFLICT", "type": "review", "revision": 1, "upstream_refs": [], "items": [{ "id": "DECISION-1", "kind": "decision" }, { "id": "BLOCK-1", "kind": "blocker" }] }],
+      "claims": [{ "id": "CLAIM-MERGE-PASS", "type": "merge", "status": "supported", "subject_refs": [{ "artifact_id": "IMPL-CONFLICT", "item_id": "CHANGE-1", "observed_revision": 1 }], "evidence_refs": [{ "artifact_id": "EVID-CONFLICT", "item_id": "TEST-1", "observed_revision": 1 }], "blocker_refs": [], "accepted_risk_refs": [], "applicable_gap_types": ["implementation", "review"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "implementation", "item_ref": { "artifact_id": "IMPL-CONFLICT", "item_id": "CHANGE-1", "observed_revision": 1 } }, { "gap_type": "review", "item_ref": { "artifact_id": "REV-CONFLICT", "item_id": "DECISION-1", "observed_revision": 1 } }] }, { "id": "CLAIM-MERGE-BLOCK", "type": "merge", "status": "blocked", "subject_refs": [{ "artifact_id": "IMPL-CONFLICT", "item_id": "CHANGE-1", "observed_revision": 1 }], "evidence_refs": [], "blocker_refs": [{ "artifact_id": "REV-CONFLICT", "item_id": "BLOCK-1", "observed_revision": 1 }], "accepted_risk_refs": [], "applicable_gap_types": ["implementation", "review"], "not_applicable_gap_types": [], "required_refs": [{ "gap_type": "implementation", "item_ref": { "artifact_id": "IMPL-CONFLICT", "item_id": "CHANGE-1", "observed_revision": 1 } }, { "gap_type": "review", "item_ref": { "artifact_id": "REV-CONFLICT", "item_id": "DECISION-1", "observed_revision": 1 } }] }]
+    },
+    {
+      "id": "mixed-reference-formats",
+      "expected": "invalid",
+      "expected_errors": ["IMPL-MIX upstream_refs cannot mix structured and unversioned refs"],
+      "artifacts": [{ "id": "SPEC-MIX", "type": "spec", "revision": 1, "upstream_refs": [], "items": [{ "id": "AC-1", "kind": "acceptance" }] }, { "id": "IMPL-MIX", "type": "implementation", "revision": 1, "upstream_refs": ["SPEC-MIX", { "artifact_id": "SPEC-MIX", "item_id": "AC-1", "observed_revision": 1 }], "items": [{ "id": "CHANGE-1", "kind": "change" }] }],
+      "claims": []
+    },
+    {
+      "id": "revision-omitted-ref",
+      "expected": "invalid",
+      "expected_errors": ["IMPL-NOREV upstream_refs contains reference without observed_revision"],
+      "artifacts": [{ "id": "SPEC-NOREV", "type": "spec", "revision": 1, "upstream_refs": [], "items": [{ "id": "AC-1", "kind": "acceptance" }] }, { "id": "IMPL-NOREV", "type": "implementation", "revision": 1, "upstream_refs": [{ "artifact_id": "SPEC-NOREV", "item_id": "AC-1" }], "items": [{ "id": "CHANGE-1", "kind": "change" }] }],
+      "claims": []
+    }
+  ]
+}

@@ -22,7 +22,7 @@ Make the final merge decision from executed gate evidence without replaying the 
 
 ## Process
 
-1. Collect the signal route and gate results from `review-router`, required gates, automated checks, and `evidence-ledger` when claims need classification.
+1. Collect the signal route and gate results from `review-router`, required gates, automated checks, and `evidence-ledger` when claims need classification. Use `docs/lifecycle-traceability-contract.md` when the merge decision depends on lifecycle evidence: reference current acceptance, change, evidence, blocker, and accepted-risk items instead of restating them.
 2. Apply precedence.
    - Domain, architecture, output quality, adversarial risk, risk, and evidence issues take precedence over mechanical success.
    - A mechanical pass proves only its own checks.
@@ -47,6 +47,12 @@ Make the final merge decision from executed gate evidence without replaying the 
 Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This artifact owns the merge decision and does not repeat envelope fields.
 
 ```text
+Trace refs, when required for the merge claim:
+- Review artifact ID / revision:
+- Claim ID:
+- Subject / evidence / blocker / accepted-risk refs:
+- Applicable / not-applicable gap types and required refs:
+
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
@@ -75,6 +81,7 @@ Include `Improvement ledger candidates`, `Rule feedback`, or `Deferred / accepte
 - Blocking evidence is separated from passed gates and non-blocking follow-ups.
 - Upper-layer and cross-cutting failures are not overridden by lower-layer passes.
 - Required but missing gate evidence prevents approval.
+- Claim-relevant refs are current, or stale/missing refs are reported as insufficient evidence.
 - Suggestions do not become merge blockers unless they identify required missing evidence or a failing gate.
 - Complete per-layer diagnostics, when needed, remain validation/debug detail rather than normal final output.
 

@@ -83,11 +83,11 @@ const RUNTIME_DIRECTORIES = [
 const COMMAND_METADATA = {
   "skill-review.md": {
     requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
-    requiredAssets: ["docs/execution-envelope-contract.md"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-implement.md": {
     requiredSkills: ["skill-router", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
-    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-investigate.md": {
     requiredSkills: ["skill-router", "doubt-driven-development", "test-first-verification", "evidence-ledger", "risk-gate"],
@@ -95,7 +95,7 @@ const COMMAND_METADATA = {
   },
   "skill-verify.md": {
     requiredSkills: ["test-first-verification", "evidence-ledger"],
-    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-handoff.md": {
     requiredSkills: ["handoff-generation", "evidence-ledger"],

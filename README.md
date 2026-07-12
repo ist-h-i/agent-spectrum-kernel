@@ -30,6 +30,8 @@ Project overlay = リポジトリ固有の規約・コマンド・禁止範囲
 
 共通の制御メタデータ（route、evidence status、stop reason、next action）の正本は `docs/execution-envelope-contract.md` です。router、adapter、session state はこの Execution Envelope を意味のあるworkflow境界で一度だけ出し、個別SkillはRequirement Contract、Spec、Verification Contract、Implementation Summary、Review Findingsなどの固有artifactに集中します。Metrics event candidate は明示的なopt-in時だけ任意で出します。
 
+claim に必要な lifecycle evidence の接続は `docs/lifecycle-traceability-contract.md` が正本です。Requirement から Release Readiness までを stable item ref と observed revision で必要な範囲だけ結び、stale・contradictory・claim-relevant missing evidence を検出します。release gap は acceptance / verification / review / approval / rollback を区別します。trivial/localized task のtrace免除には観測事実が必要で、approvalやrisk gateは免除されません。中央serverやworkflow databaseは不要です。
+
 `manifest.json.routing` は routing の正本や workflow engine ではありません。machine-readable defaults / validation mirror として、route reference、override、risk-gate surface、adapter capability downgrade の静的検査を支えます。人間向けの手順は `SKILL.md` に残し、route mismatch は risk-gate 以外の自動blockにしません。
 
 `manifest.json.skill_planes` は各canonical Skillを `execution`、`knowledge`、`control` のいずれか1つに分類します。通常作業はexecution/control内で完結し、knowledgeへの遷移には明示的なlifecycle trigger、destination、evidence boundary、owner、stop conditionが必要です。単に実装やレビューが完了しただけではledgerを更新しません。`manifest.json.projection_packs` は、knowledge planeを省いた `daily_delivery` と、明示的な組織知運用向けの `organizational_intelligence` を定義します。
@@ -49,7 +51,9 @@ CHANGELOG.md
 docs/
   routing-model.md
   lifecycle-artifact-contract.md
+  lifecycle-traceability-contract.md
   fixtures/lifecycle-artifact-chains.json
+  fixtures/lifecycle-traceability-chains.json
   agent-session-state-contract.md
   metrics-event-contract.md
   observability-runtime-contract.md

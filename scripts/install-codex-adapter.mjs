@@ -40,7 +40,7 @@ const PROMPT_METADATA = {
     execution: CODEX_PROMPT_CONTRACTS["skill-implement.md"],
     requiredSkills: ["operating-mode-router", "skill-router", "controlled-implementation", "test-first-verification", "evidence-ledger", "risk-gate"],
     recommendedSkills: ["spec-driven-development", "requirement-grill", "work-package-compiler"],
-    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-investigate.md": {
     label: "Investigation",
@@ -63,13 +63,14 @@ const PROMPT_METADATA = {
       "review-finding-compiler",
       "improvement-ledger",
     ],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-verify.md": {
     label: "Verification",
     execution: CODEX_PROMPT_CONTRACTS["skill-verify.md"],
     requiredSkills: ["test-first-verification", "evidence-ledger"],
     recommendedSkills: [],
-    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-handoff.md": {
     label: "Handoff",

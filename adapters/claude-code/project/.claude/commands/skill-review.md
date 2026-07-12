@@ -16,6 +16,8 @@ Before extracting signals, read `schemas/review-signal-gate-map.json`. Emit only
 - residual risk
 - one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`
 
+When the merge claim depends on lifecycle evidence, use stable refs from `docs/lifecycle-traceability-contract.md`; do not copy acceptance, evidence, blocker, or accepted-risk content into another lifecycle section.
+
 Keep current-PR blockers separate from non-blocking improvement-ledger candidates and suggestions. Do not publish metrics externally.
 
 Normal review route:

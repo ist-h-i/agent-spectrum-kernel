@@ -15,6 +15,7 @@ Evidence requirements:
 - inspect the checked-out workspace, diff, generated output, relevant docs, and verification evidence when available
 - record missing diff, context, output, or verification inputs as `insufficient evidence`, never as skipped
 - keep current blockers separate from non-blocking improvement candidates
+- when the merge claim depends on lifecycle evidence, use stable refs from `docs/lifecycle-traceability-contract.md` and report stale or missing refs as `insufficient evidence`
 - use `risk-gate` before any external comment, label, check, metric, notification, deploy, release, or production mutation
 
 Output contract:

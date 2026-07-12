@@ -24,7 +24,7 @@ Implement the required behavior without scope drift, speculative architecture, o
 
 ## Process
 
-1. Read `docs/lifecycle-artifact-contract.md` and start the Implementation Contract before editing.
+1. Read `docs/lifecycle-artifact-contract.md` and start the Implementation Contract before editing. When the implementation will feed a completion, merge, or release claim, use `docs/lifecycle-traceability-contract.md` to retain current upstream revisions and assign stable change refs; trivial/localized changes remain exempt.
 
 Read `docs/ai/implementation-context.md` when it exists. Check `context_status` before using it:
 
@@ -49,6 +49,7 @@ Implementation Contract:
 - Upstream refs:
 
 Conditional entry fields, omit when irrelevant:
+- Trace change IDs:
 - Change class: feature | bug fix | refactor | cleanup | test | docs
 - Implementation decisions not fixed upstream:
 - Implementation context / engineering pattern / architecture memory / stack overlay refs:
@@ -117,6 +118,7 @@ Implementation completion:
 - Handoff state:
 
 Conditional fields, omit when irrelevant:
+- Trace change IDs and observed upstream revisions:
 - Deviations from upstream contracts:
 - Newly discovered assumptions, risks, or blockers:
 - Remaining limitations:
