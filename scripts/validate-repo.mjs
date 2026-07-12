@@ -1400,7 +1400,7 @@ export function inspectTraceabilityScenarioResult(scenario) {
   }
 
   function itemRefKey(ref) {
-    return `${ref.artifact_id}@${ref.observed_revision}#${ref.item_id}`;
+    return JSON.stringify([ref.artifact_id, ref.observed_revision, ref.item_id]);
   }
 
   function itemRefReaches(startRef, requiredRef) {
@@ -1438,7 +1438,12 @@ export function inspectTraceabilityScenarioResult(scenario) {
   function subjectConnectsRequired(subjectResolution, requiredResolution, claimType) {
     if (!subjectResolution?.item || !requiredResolution?.item || !subjectResolution.current || !requiredResolution.current) return false;
     if (itemRefKey(subjectResolution.ref) === itemRefKey(requiredResolution.ref)) return true;
-    if (claimType === "release" && subjectResolution.artifact.type === "release_readiness" && requiredResolution.artifact.id === subjectResolution.artifact.id) return true;
+    if (
+      claimType === "release"
+      && subjectResolution.artifact.type === "release_readiness"
+      && requiredResolution.artifact.id === subjectResolution.artifact.id
+      && ["approval", "rollback"].includes(requiredResolution.item.kind)
+    ) return true;
     return itemRefReaches(subjectResolution.ref, requiredResolution.ref) || itemRefReaches(requiredResolution.ref, subjectResolution.ref);
   }
 
@@ -1553,6 +1558,36 @@ export function inspectTraceabilityScenarioResult(scenario) {
         issues.push(`${claim.id} subject_refs are disconnected from required_refs: ${subjectResolution.label}`);
       }
     }
+    const validSubjects = subjectResolutions.filter((resolution) => resolution.structureValid && resolution.artifact && resolution.item && resolution.current && subjectKindAllowed(claim.type, resolution));
+    for (const { entry, resolution } of resolvedRequiredRefs) {
+      if (validSubjects.length > 0 && !validSubjects.some((subjectResolution) => subjectConnectsRequired(subjectResolution, resolution, claim.type))) {
+        issues.push(`${claim.id} required_refs[${entry.gap_type}] are disconnected from subject_refs: ${resolution.label}`);
+      }
+    }
+    for (const blockerResolution of blockerResolutions) {
+      if (
+        blockerResolution.structureValid
+        && blockerResolution.artifact?.type === "review"
+        && blockerResolution.item?.kind === "blocker"
+        && blockerResolution.current
+        && validSubjects.length > 0
+        && !validSubjects.some((subjectResolution) => subjectConnectsRequired(subjectResolution, blockerResolution, claim.type))
+      ) {
+        issues.push(`${claim.id} blocker_refs are disconnected from subject_refs: ${blockerResolution.label}`);
+      }
+    }
+    for (const riskResolution of acceptedRiskResolutions) {
+      if (
+        riskResolution.structureValid
+        && riskResolution.artifact?.type === "review"
+        && riskResolution.item?.kind === "accepted_risk"
+        && riskResolution.current
+        && validSubjects.length > 0
+        && !validSubjects.some((subjectResolution) => subjectConnectsRequired(subjectResolution, riskResolution, claim.type))
+      ) {
+        issues.push(`${claim.id} accepted_risk_refs are disconnected from subject_refs: ${riskResolution.label}`);
+      }
+    }
     for (const gap of claimGaps) {
       gaps.push(gap);
       if (claim.status === "supported" && !supportGapLabels.has(`${gap.gap_type}:${gap.missing_item_ref}`)) issues.push(`${claim.id} supported claim has ${gap.gap_type} gap at ${gap.missing_item_ref}`);
@@ -1598,7 +1633,7 @@ function validateLifecycleTraceabilityContract(root, manifest, errors) {
   }
   if (!checks.contractPresent || !checks.fixturePresent) return checks;
   const contract = readFileSync(resolve(root, LIFECYCLE_TRACEABILITY_CONTRACT_PATH), "utf8");
-  for (const phrase of ["Stable reference model", "observed_revision", "Claim record", "insufficient evidence", "Trivial or localized", "observed facts", "never waives", "upstream_refs` remains the canonical", "must not be mixed", "same resolver rules", "reachability nodes are", "multiple items must define", "Completion subjects", "Every subject must be", "must reach the exact required item", "kind is `blocker`", "missing_item_ref: undeclared", "Structured gaps", "accepted_by", "acceptance`, `verification`, `review`, `approval`, and `rollback", "Release Readiness", "No central server"]) {
+  for (const phrase of ["Stable reference model", "observed_revision", "Claim record", "insufficient evidence", "Trivial or localized", "observed facts", "never waives", "upstream_refs` remains the canonical", "must not be mixed", "same resolver rules", "collision-free tuple", "multiple items must define", "Completion subjects", "Every resolved required ref", "Every blocker ref", "sibling exception", "must reach the exact required item", "kind is `blocker`", "missing_item_ref: undeclared", "Structured gaps", "accepted_by", "acceptance`, `verification`, `review`, `approval`, and `rollback", "Release Readiness", "No central server"]) {
     if (!contract.toLowerCase().includes(phrase.toLowerCase())) fail(errors, "lifecycle traceability", `${LIFECYCLE_TRACEABILITY_CONTRACT_PATH} is missing ${phrase}`);
   }
   for (const path of TRACEABILITY_SKILL_PATHS) {
@@ -1641,6 +1676,10 @@ function validateLifecycleTraceabilityContract(root, manifest, errors) {
     "wrong-kind-blocker-ref",
     "evidence-item-cross-contamination",
     "subject-required-disconnected",
+    "merge-unrelated-review-required",
+    "typed-blocker-unrelated-subject",
+    "release-unrelated-review-required",
+    "item-key-collision",
     "stale-reference",
     "contradictory-claims",
   ]);

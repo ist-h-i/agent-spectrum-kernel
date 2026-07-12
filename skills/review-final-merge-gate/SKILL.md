@@ -23,6 +23,7 @@ Make the final merge decision from executed gate evidence without replaying the 
 ## Process
 
 1. Collect the signal route and gate results from `review-router`, required gates, automated checks, and `evidence-ledger` when claims need classification. Use `docs/lifecycle-traceability-contract.md` when the merge decision depends on lifecycle evidence: reference current acceptance, change, evidence, blocker, and accepted-risk items instead of restating them.
+   - Confirm every required review item, blocker, and accepted risk connects to the merge subject; matching only the implementation required ref is insufficient.
 2. Apply precedence.
    - Domain, architecture, output quality, adversarial risk, risk, and evidence issues take precedence over mechanical success.
    - A mechanical pass proves only its own checks.

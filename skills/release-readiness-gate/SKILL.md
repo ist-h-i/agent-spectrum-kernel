@@ -44,6 +44,7 @@ This skill evaluates the release package. It does not deploy, publish, notify cu
    - Confirm that claim evidence reaches every applicable acceptance and verification item through current upstream refs.
    - Preserve evidence-item identity during traversal; multi-item Evidence artifacts require item-level support edges.
    - Confirm that the release subject is a Release Readiness check connected to the claim's required refs.
+   - Limit same-artifact sibling scope to approval and rollback items; review decisions, blockers, and accepted risks still require trace edges.
    - Treat malformed or omitted required refs as contract errors, not generic release gaps.
    - Identify included PRs, commits, issues, and release artifacts.
    - Identify excluded changes that may be confused with the release.

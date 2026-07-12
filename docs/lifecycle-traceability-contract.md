@@ -40,7 +40,7 @@ The portable structured form is:
 
 Claim fields such as `subject_refs`, `evidence_refs`, `blocker_refs`, `accepted_risk_refs`, and `required_refs[].item_ref` are typed uses of the same structured reference. They map a claim; they do not replace `upstream_refs`.
 
-Exact support edges are item-level. An item may define `upstream_refs`, and reachability nodes are `artifact_id@revision#item_id`, not artifact IDs. An Evidence artifact with exactly one evidence item may use its artifact-level `upstream_refs` as that sole item's support edges for compact compatibility. An Evidence artifact with multiple items must define `upstream_refs` on each evidence item; artifact-level refs never let one evidence item inherit another item's support.
+Exact support edges are item-level. An item may define `upstream_refs`, and reachability nodes are the collision-free tuple `[artifact_id, revision, item_id]`, not a delimiter-concatenated string or an artifact ID. An Evidence artifact with exactly one evidence item may use its artifact-level `upstream_refs` as that sole item's support edges for compact compatibility. An Evidence artifact with multiple items must define `upstream_refs` on each evidence item; artifact-level refs never let one evidence item inherit another item's support.
 
 Every one of those fields uses the same resolver rules: the ref must be an object with a non-empty `artifact_id`, a positive integer `observed_revision`, and a non-empty `item_id` where an item is required. String refs are invalid. A malformed required ref is a structural error, not an evidence gap.
 
@@ -95,7 +95,9 @@ Rules:
 - `supported` requires at least one current evidence ref, every applicable required ref to resolve at its observed revision, and no unresolved blocker ref.
 - For `acceptance` and `verification`, at least one claim evidence ref must reach the exact required item by following current `upstream_refs`. Merely listing unrelated current refs in the same claim does not establish support.
 - Completion subjects are Spec `behavior` / `acceptance` items or Work Package `task` items. Merge subjects are Implementation `change` items. Release subjects are Release Readiness `check` items.
-- Every subject must be the same item as, or have a valid item-level trace relationship to, at least one resolved required ref. Release Readiness check subjects also scope sibling readiness items such as approval and rollback in the same Release Readiness artifact.
+- Every resolved required ref must be the same item as, or have a valid item-level trace relationship to, at least one subject. Every subject must likewise connect to at least one resolved required ref.
+- Every blocker ref and accepted-risk ref must connect to at least one subject; type correctness alone does not establish claim scope.
+- The Release Readiness sibling exception applies only when a Release Readiness `check` subject and an `approval` or `rollback` required item belong to the same Release Readiness artifact. It never connects an unrelated review decision, blocker, accepted risk, or other item kind.
 - `blocked` requires exact blocker refs, and every blocker ref resolves to a `review` artifact item whose kind is `blocker`.
 - `insufficient_evidence` emits one structured gap for every missing, stale, or wrong-kind required ref. It names the expected ref; it does not synthesize the absent artifact.
 - If an applicable gap type has no `required_refs` entry, the claim is structurally invalid. It must not emit `missing_item_ref: undeclared` or pass as ordinary insufficient evidence.

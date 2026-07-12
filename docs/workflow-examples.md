@@ -224,6 +224,8 @@ REL-001@1
 
 When an Evidence artifact contains multiple evidence items, each item owns its support edges. `TEST-PAYMENT` cannot inherit `TEST-EXPORT` mappings merely because both live in one artifact. Completion, merge, and release subjects must also match their claim-type contract and connect to the required refs.
 
+Every required review item, blocker, and accepted risk connects to the claim subject; an implementation subject matching only its implementation required ref is insufficient. Reference identity uses a structured tuple, so `@` or `#` inside IDs cannot create key collisions.
+
 A release claim with missing evidence emits one structured record per gap:
 
 ```text
