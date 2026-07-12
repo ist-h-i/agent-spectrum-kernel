@@ -1,0 +1,6 @@
+{
+  "name": "ask-benchmark-implementation-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test" }
+}

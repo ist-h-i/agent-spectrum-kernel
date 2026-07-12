@@ -1,0 +1,13 @@
+diff --git a/src/refund.mjs b/src/refund.mjs
+index 3b6153b..6da9ef2 100644
+--- a/src/refund.mjs
++++ b/src/refund.mjs
+@@ -1,6 +1,4 @@
+ export function canApproveRefund(user, amount, limit = 1000) {
+-  if (!user?.roles?.includes("manager")) return false;
+-  if (!Number.isFinite(amount) || amount <= 0) return false;
+-
+-  return amount <= limit;
++  return !user?.roles?.length || user.roles.includes("manager")
++    && (Number(amount) || 0) <= limit;
+ }

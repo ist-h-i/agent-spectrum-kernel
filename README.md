@@ -125,6 +125,15 @@ scripts/
   ai-metrics-record.mjs
   ai-metrics-summarize.mjs
   ai-ledger-refresh.mjs
+  ask-benchmark.mjs
+  test-ask-benchmark.mjs
+benchmarks/
+  README.md
+  protocol.md
+  checkpoint-b.config.json
+  schemas/
+  fixtures/
+  results/
 skills/
   operating-mode-router/SKILL.md
   skill-router/SKILL.md
@@ -173,6 +182,17 @@ skills/
   review-to-rule-compiler/SKILL.md
   work-package-compiler/SKILL.md
 ```
+
+## Comparative benchmark
+
+`benchmarks/` contains the preregistered Checkpoint B comparison for Plain Agent, Kernel-only, and Full ASK. It covers review and medium-complexity implementation fixtures, keeps raw prompts and full outputs outside the repository, records unavailable measurements as `null`, and compares Full ASK directly against Kernel-only.
+
+```bash
+node scripts/ask-benchmark.mjs validate
+node scripts/test-ask-benchmark.mjs
+```
+
+See `benchmarks/protocol.md` for frozen thresholds, blinding, evaluator rules, privacy boundaries, and the separate post-#179 Checkpoint C rerun.
 
 ## Minimum setup
 

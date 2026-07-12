@@ -166,6 +166,8 @@
     "docs/quality-rubric.md",
     "docs/references.md",
     "docs/validation-report.md",
+    "benchmarks/README.md",
+    "benchmarks/protocol.md",
     "CHANGELOG.md"
   ],
   "examples": [
@@ -194,7 +196,9 @@
     "schemas/engineering-capability-ledger-entry.schema.json",
     "schemas/engineering-pattern-ledger-entry.schema.json",
     "schemas/review-rule-ledger-entry.schema.json",
-    "schemas/verification-pattern-ledger-entry.schema.json"
+    "schemas/verification-pattern-ledger-entry.schema.json",
+    "benchmarks/schemas/agent-output.schema.json",
+    "benchmarks/schemas/result.schema.json"
   ],
   "adapters": [
     "adapters/claude-code/README.md",
