@@ -1,0 +1,349 @@
+{
+  "schema_version": "1.0.0",
+  "checkpoint": "B",
+  "protocol": {
+    "status": "frozen",
+    "frozen_at": "2026-07-12T00:00:00+09:00",
+    "protocol_sha256": "2a1f78b7f088884284a8af6de96845e746e6d6ffcb354842928993dc37a47e2e",
+    "config_sha256": "4104ecd5dcb9b83719a523a5e46650ef97577a028715bc89d90feda66fc3adff",
+    "repository_revision": "6daae5eb40194db4b814322022494c230be18fc3"
+  },
+  "runtime": {
+    "agent": "codex-cli",
+    "agent_version": "0.144.1",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "sequential": true,
+    "network_required_by_fixtures": false,
+    "observed_agent_version": "codex-cli 0.144.1"
+  },
+  "runs": [
+    {
+      "case_id": "case-a171b7690f57",
+      "fixture_id": "review-001",
+      "task_class": "review",
+      "condition": "full_ask",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": 2,
+        "major_findings_missed": 0,
+        "unsupported_or_false_positive_findings": 0,
+        "requirement_satisfaction_rate": null,
+        "scope_deviations": 0,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 84415,
+        "ai_tool_execution_ms": 84415,
+        "input_tokens": 243975,
+        "output_tokens": 2759,
+        "usage_cost": null,
+        "final_output_bytes": 2865
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "present",
+        "full_skill_projection_available": true,
+        "execution_status": "executed",
+        "output_sha256": "b9d92e9c2f2f321c93f4c0c6214c42829e0543e4a93d7f2463773c244d3197b8",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-0040b4aa9849",
+      "fixture_id": "implementation-001",
+      "task_class": "implementation",
+      "condition": "kernel_only",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": null,
+        "major_findings_missed": null,
+        "unsupported_or_false_positive_findings": null,
+        "requirement_satisfaction_rate": 1,
+        "hidden_tests": {
+          "total": 7,
+          "passed": 7,
+          "failed": 0,
+          "exit_code": 0
+        },
+        "scope_deviations": 0,
+        "changed_file_count": 2,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 81241,
+        "ai_tool_execution_ms": 81241,
+        "input_tokens": 101619,
+        "output_tokens": 3768,
+        "usage_cost": null,
+        "final_output_bytes": 1702
+      },
+      "adoption_behavior": {
+        "correct_route": false,
+        "under_processing": true,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "present",
+        "full_skill_projection_available": null,
+        "execution_status": "executed",
+        "output_sha256": "0fae7f47f0afa6e30c2b48a984a1405e4b48af0f10b6b22f267dc8e07dd2689b",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-d96ec91ae251",
+      "fixture_id": "implementation-001",
+      "task_class": "implementation",
+      "condition": "plain",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": null,
+        "major_findings_missed": null,
+        "unsupported_or_false_positive_findings": null,
+        "requirement_satisfaction_rate": 1,
+        "hidden_tests": {
+          "total": 7,
+          "passed": 7,
+          "failed": 0,
+          "exit_code": 0
+        },
+        "scope_deviations": 0,
+        "changed_file_count": 2,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 76051,
+        "ai_tool_execution_ms": 76051,
+        "input_tokens": 89332,
+        "output_tokens": 3580,
+        "usage_cost": null,
+        "final_output_bytes": 1636
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "not_applicable",
+        "full_skill_projection_available": null,
+        "execution_status": "executed",
+        "output_sha256": "0c0d6e57fd27ca9eb85199160326c27ab6e2ff8da2d8c5e2820d552ecbafbc2e",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-793a06ea9035",
+      "fixture_id": "implementation-001",
+      "task_class": "implementation",
+      "condition": "full_ask",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": null,
+        "major_findings_missed": null,
+        "unsupported_or_false_positive_findings": null,
+        "requirement_satisfaction_rate": 1,
+        "hidden_tests": {
+          "total": 7,
+          "passed": 7,
+          "failed": 0,
+          "exit_code": 0
+        },
+        "scope_deviations": 0,
+        "changed_file_count": 2,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 109734,
+        "ai_tool_execution_ms": 109734,
+        "input_tokens": 217519,
+        "output_tokens": 4285,
+        "usage_cost": null,
+        "final_output_bytes": 1762
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "present",
+        "full_skill_projection_available": true,
+        "execution_status": "executed",
+        "output_sha256": "d5e9e40c462c3fb3a326e77ccbe763276c116775cf7236e75c2c288c0d35bd8f",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-f465d4c248cb",
+      "fixture_id": "review-001",
+      "task_class": "review",
+      "condition": "kernel_only",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": 2,
+        "major_findings_missed": 0,
+        "unsupported_or_false_positive_findings": 0,
+        "requirement_satisfaction_rate": null,
+        "scope_deviations": 0,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 47551,
+        "ai_tool_execution_ms": 47551,
+        "input_tokens": 93479,
+        "output_tokens": 1895,
+        "usage_cost": null,
+        "final_output_bytes": 2358
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "present",
+        "full_skill_projection_available": null,
+        "execution_status": "executed",
+        "output_sha256": "9d3d9baf0874145e9499fb95f13639d38bfbd268f31bd345f98af69ae8da2cb6",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-25a8f384789a",
+      "fixture_id": "review-001",
+      "task_class": "review",
+      "condition": "plain",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": 2,
+        "major_findings_missed": 0,
+        "unsupported_or_false_positive_findings": 0,
+        "requirement_satisfaction_rate": null,
+        "scope_deviations": 0,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 35268,
+        "ai_tool_execution_ms": 35268,
+        "input_tokens": 67413,
+        "output_tokens": 1413,
+        "usage_cost": null,
+        "final_output_bytes": 2157
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "not_applicable",
+        "full_skill_projection_available": null,
+        "execution_status": "executed",
+        "output_sha256": "b52ca983157e47fa945ceb959932ca1a46865de9d7b7b09130aa2b61fd204c8a",
+        "capability_downgrade": null
+      }
+    }
+  ],
+  "comparison": {
+    "primary_comparator": "kernel_only",
+    "workflow_comparisons": [
+      {
+        "fixture_id": "review-001",
+        "task_class": "review",
+        "quality_metric": "valid_blocking_or_major_findings",
+        "kernel_only_quality": 2,
+        "full_ask_quality": 2,
+        "duration_overhead_percent": 77.52518348720321,
+        "token_overhead_percent": 158.70153291253382,
+        "senior_correction_reduction_percent": null,
+        "rework_reduction_percent": null
+      },
+      {
+        "fixture_id": "implementation-001",
+        "task_class": "implementation",
+        "quality_metric": "requirement_satisfaction_rate",
+        "kernel_only_quality": 1,
+        "full_ask_quality": 1,
+        "duration_overhead_percent": 35.07219261210472,
+        "token_overhead_percent": 110.46618653154563,
+        "senior_correction_reduction_percent": null,
+        "rework_reduction_percent": null
+      }
+    ],
+    "workflow_recommendations": [
+      {
+        "fixture_id": "review-001",
+        "recommendation": "simplify",
+        "reason": "Material improvement was unproven and Full ASK exceeded a fixed overhead guardrail."
+      },
+      {
+        "fixture_id": "implementation-001",
+        "recommendation": "simplify",
+        "reason": "Material improvement was unproven and Full ASK exceeded a fixed overhead guardrail."
+      }
+    ],
+    "thresholds": {
+      "senior_correction_reduction_percent": 25,
+      "rework_reduction_percent": 20,
+      "maximum_duration_overhead_percent": 50,
+      "maximum_token_overhead_percent": 50,
+      "require_non_inferior_quality": true,
+      "allow_expand_with_primary_metrics_unknown": false
+    }
+  },
+  "limitations": [
+    "One synthetic fixture per workflow does not establish universal or causal value.",
+    "Senior correction time, additional investigation time, unresolved human decisions, rework, and usage cost are unknown until a blinded human evaluator records them.",
+    "Review finding matching is a frozen semantic heuristic and may undercount or overcount paraphrases.",
+    "Checkpoint C remains pending until #179 and must separate architecture changes from model, CLI, repository, and adapter changes."
+  ],
+  "privacy": {
+    "raw_prompts_stored_in_result": false,
+    "full_outputs_stored_in_result": false,
+    "full_source_stored_in_result": false,
+    "secrets_customer_or_personal_data_stored": false,
+    "temporary_run_directory": "operator-managed and not committed"
+  }
+}

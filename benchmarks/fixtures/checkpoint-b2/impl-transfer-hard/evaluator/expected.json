@@ -1,0 +1,124 @@
+{
+  "fixture_id": "impl-transfer-hard",
+  "class": "implementation-verification",
+  "difficulty": "hard",
+  "target_minutes": 15,
+  "requirements": [
+    {
+      "id": "TRANSFER-REQ-01",
+      "oracle": "Async transfer public API and public errors are exported.",
+      "hidden_tests": [
+        "normal transfer updates both accounts, receipt, and history exactly once"
+      ]
+    },
+    {
+      "id": "TRANSFER-REQ-02",
+      "oracle": "Strict schema validation, safe integers, no coercion/unknown fields, distinct IDs.",
+      "hidden_tests": [
+        "floor boundary succeeds and one unit below the floor fails without mutation"
+      ]
+    },
+    {
+      "id": "TRANSFER-REQ-03",
+      "oracle": "Accounts exist, currencies match, and expected versions match.",
+      "hidden_tests": [
+        "version and idempotency conflicts preserve state; replay precedes version checks"
+      ]
+    },
+    {
+      "id": "TRANSFER-REQ-04",
+      "oracle": "Post-debit balance may equal but not cross minBalance.",
+      "hidden_tests": [
+        "floor boundary succeeds and one unit below the floor fails without mutation"
+      ]
+    },
+    {
+      "id": "TRANSFER-REQ-05",
+      "oracle": "Idempotency is checked inside exclusivity before mutable preconditions.",
+      "hidden_tests": [
+        "version and idempotency conflicts preserve state; replay precedes version checks",
+        "concurrent duplicate requests commit once and return the same receipt"
+      ]
+    },
+    {
+      "id": "TRANSFER-REQ-06",
+      "oracle": "Existing SerialExecutor boundary serializes competing transfers.",
+      "hidden_tests": [
+        "concurrent transfers cannot overspend",
+        "concurrent duplicate requests commit once and return the same receipt"
+      ]
+    },
+    {
+      "id": "TRANSFER-REQ-07",
+      "oracle": "Success updates both accounts once, allocates one sequence, and appends one record.",
+      "hidden_tests": [
+        "normal transfer updates both accounts, receipt, and history exactly once"
+      ]
+    },
+    {
+      "id": "TRANSFER-REQ-08",
+      "oracle": "Audit rejection commits no internal state and does not consume sequence/idempotency.",
+      "hidden_tests": [
+        "audit rejection rolls back accounts, sequence, history, and idempotency"
+      ]
+    },
+    {
+      "id": "TRANSFER-REQ-09",
+      "oracle": "Receipt exact shape uses post-state and documented transfer ID.",
+      "hidden_tests": [
+        "normal transfer updates both accounts, receipt, and history exactly once"
+      ]
+    },
+    {
+      "id": "TRANSFER-REQ-10",
+      "oracle": "All input/output/history/audit boundaries are detached.",
+      "hidden_tests": [
+        "input, receipt, history, and audit objects are detached"
+      ]
+    },
+    {
+      "id": "TRANSFER-REQ-11",
+      "oracle": "All failure modes preserve account/history/idempotency/sequence state.",
+      "hidden_tests": [
+        "audit rejection rolls back accounts, sequence, history, and idempotency",
+        "version and idempotency conflicts preserve state; replay precedes version checks"
+      ]
+    },
+    {
+      "id": "TRANSFER-REQ-12",
+      "oracle": "Legacy credit/debit/get/list behavior remains compatible.",
+      "hidden_tests": [
+        "legacy APIs remain compatible"
+      ]
+    },
+    {
+      "id": "TRANSFER-REQ-SCOPE",
+      "oracle": "Only allowed files change; executor/docs/package/source set remain intact.",
+      "hidden_tests": [
+        "scope-protected files and source-module set are unchanged"
+      ]
+    }
+  ],
+  "expected_agent_tests": [
+    "Audit sink rejection leaves balances, versions, sequence, history, and idempotency unchanged.",
+    "Two concurrent transfers cannot both spend the same source balance.",
+    "Two concurrent identical requests return one receipt and create one audit record.",
+    "Replay works after account versions change; request-ID collision fails.",
+    "Exact minBalance succeeds and one unit below fails atomically.",
+    "Mutation of input, receipt, history, or audit argument cannot alter internal state."
+  ],
+  "allowed_files": [
+    "src/errors.mjs",
+    "src/validation.mjs",
+    "src/account-store.mjs",
+    "src/transfer-service.mjs",
+    "src/index.mjs",
+    "test/*.test.mjs"
+  ],
+  "prohibited_files": [
+    "src/serial-executor.mjs",
+    "package.json",
+    "docs/**",
+    "new src modules"
+  ]
+}

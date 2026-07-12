@@ -1,0 +1,71 @@
+--- a/src/export-service.mjs
++++ b/src/export-service.mjs
+@@ -28,6 +28,7 @@
+   retry(jobId, principal) {
+     const job = this.store.get(jobId);
+     if (!job) throw new JobNotFoundError();
++    if (job.tenantId !== principal.tenantId) throw new AuthorizationError();
+     if (job.ownerId !== principal.userId && principal.role !== 'operator') throw new AuthorizationError();
+     return this.store.retry(jobId, this.clock.now());
+   }
+--- a/src/job-store.mjs
++++ b/src/job-store.mjs
+@@ -28,17 +28,25 @@
+     );
+     if (!candidate) return null;
+     await this.beforeClaim(structuredClone(candidate));
+-    candidate.status = 'running';
+-    candidate.leaseOwner = workerId;
+-    candidate.leaseExpiresAt = now + this.leaseMs;
+-    candidate.attempts += 1;
+-    return structuredClone(candidate);
++    const current = this.#jobs.get(candidate.id);
++    if (!current || current.status !== 'queued' || current.availableAt > now) return null;
++    current.status = 'running';
++    current.leaseOwner = workerId;
++    current.leaseExpiresAt = now + this.leaseMs;
++    current.attempts += 1;
++    return structuredClone(current);
++  }
++
++  #assertActiveLease(job, workerId, now) {
++    if (job.status !== 'running' || job.leaseOwner !== workerId || now >= job.leaseExpiresAt) {
++      throw new JobConflictError('Lease is not active');
++    }
+   }
+ 
+   complete(id, workerId, result, now) {
+     const job = this.#jobs.get(id);
+     if (!job) throw new JobNotFoundError();
+-    if (job.status !== 'running') throw new JobConflictError();
++    this.#assertActiveLease(job, workerId, now);
+     job.status = 'succeeded';
+     job.result = structuredClone(result);
+     job.leaseOwner = null;
+@@ -49,11 +57,11 @@
+   fail(id, workerId, error, now) {
+     const job = this.#jobs.get(id);
+     if (!job) throw new JobNotFoundError();
+-    if (job.status !== 'running' || job.leaseOwner !== workerId) throw new JobConflictError();
++    this.#assertActiveLease(job, workerId, now);
+     job.lastError = { code: error.code ?? 'EXPORT_FAILED', message: error.message, retryable: Boolean(error.retryable) };
+     job.leaseOwner = null;
+     job.leaseExpiresAt = null;
+-    if (error.retryable) {
++    if (error.retryable && job.attempts < job.maxAttempts) {
+       job.status = 'queued';
+       job.availableAt = now + computeBackoff(job.attempts, this.baseDelayMs);
+     } else {
+@@ -66,10 +74,10 @@
+   retry(id, now) {
+     const job = this.#jobs.get(id);
+     if (!job) throw new JobNotFoundError();
++    if (job.status !== 'failed') throw new JobConflictError();
++    if (job.attempts >= job.maxAttempts) throw new JobConflictError('Attempts exhausted');
+     job.lastError = null;
+     job.availableAt = now + computeBackoff(job.attempts, this.baseDelayMs);
+-    if (job.status !== 'failed') throw new JobConflictError();
+-    if (job.attempts >= job.maxAttempts) throw new JobConflictError('Attempts exhausted');
+     job.status = 'queued';
+     return this.get(id);
+   }

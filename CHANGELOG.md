@@ -4,6 +4,8 @@
 
 Changes:
 
+- Added Checkpoint B2 with four hash-pinned medium-hard/hard benchmark fixtures, nested-workspace isolation, requirement-to-hidden-test scoring, frozen quality-gain thresholds, config-selectable execution, and a measured Kernel-versus-Full-ASK value report.
+- Added a preregistered comparative benchmark for Plain Agent, Kernel-only, and Full ASK, including review and implementation fixtures, a bounded Codex runner, normalized results, evaluator rules, fixed thresholds, and a separate post-#179 checkpoint.
 - Renamed project-facing branding to Agent Spectrum Kernel across repository metadata, README files, docs, and adapter descriptions.
 - Added the Requirement-to-Rule Loop skills: `next-best-change-finder`, `requirement-grill`, `work-package-compiler`, `review-to-rule-compiler`, and `domain-rule-ledger`.
 - Added `docs/ai/domain-rule-ledger.md` and `schemas/domain-rule-ledger-entry.schema.json` for evidence-status-labeled domain rules.

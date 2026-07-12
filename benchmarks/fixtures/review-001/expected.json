@@ -1,0 +1,14 @@
+{
+  "major_findings": [
+    {
+      "id": "REV-1",
+      "file": "src/refund.mjs",
+      "terms": ["role", "missing", "without", "fail open", "authoriz", "approve"]
+    },
+    {
+      "id": "REV-2",
+      "file": "src/refund.mjs",
+      "terms": ["invalid", "non-positive", "negative", "zero", "number", "amount", "validation"]
+    }
+  ]
+}

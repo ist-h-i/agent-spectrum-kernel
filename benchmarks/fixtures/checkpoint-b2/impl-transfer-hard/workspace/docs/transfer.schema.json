@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["requestId", "fromAccountId", "toAccountId", "amount", "expectedVersions"],
+  "properties": {
+    "requestId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$" },
+    "fromAccountId": { "type": "string", "pattern": "^acct_[a-z0-9]{4,16}$" },
+    "toAccountId": { "type": "string", "pattern": "^acct_[a-z0-9]{4,16}$" },
+    "amount": { "type": "integer", "minimum": 1 },
+    "expectedVersions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "type": "integer", "minimum": 0 },
+        "to": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

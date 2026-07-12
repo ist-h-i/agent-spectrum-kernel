@@ -166,6 +166,14 @@
     "docs/quality-rubric.md",
     "docs/references.md",
     "docs/validation-report.md",
+    "benchmarks/README.md",
+    "benchmarks/protocol.md",
+    "benchmarks/protocol-b2.md",
+    "benchmarks/fixtures/checkpoint-b2/README.md",
+    "benchmarks/fixtures/checkpoint-b2/VALIDATION.md",
+    "benchmarks/report-template.md",
+    "benchmarks/results/checkpoint-b-report.md",
+    "benchmarks/results/checkpoint-b2-report.md",
     "CHANGELOG.md"
   ],
   "examples": [
@@ -194,7 +202,9 @@
     "schemas/engineering-capability-ledger-entry.schema.json",
     "schemas/engineering-pattern-ledger-entry.schema.json",
     "schemas/review-rule-ledger-entry.schema.json",
-    "schemas/verification-pattern-ledger-entry.schema.json"
+    "schemas/verification-pattern-ledger-entry.schema.json",
+    "benchmarks/schemas/agent-output.schema.json",
+    "benchmarks/schemas/result.schema.json"
   ],
   "adapters": [
     "adapters/claude-code/README.md",

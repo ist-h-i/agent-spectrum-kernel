@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "tenantId", "ownerId", "status", "attempts", "maxAttempts", "availableAt"],
+  "properties": {
+    "status": { "enum": ["queued", "running", "failed", "succeeded"] },
+    "attempts": { "type": "integer", "minimum": 0 },
+    "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 10 },
+    "availableAt": { "type": ["integer", "null"], "minimum": 0 },
+    "leaseExpiresAt": { "type": ["integer", "null"], "minimum": 0 }
+  }
+}
