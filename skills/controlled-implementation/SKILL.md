@@ -24,7 +24,7 @@ Implement the required behavior without scope drift, speculative architecture, o
 
 ## Process
 
-1. Produce the Implementation Contract before editing.
+1. Read `docs/lifecycle-artifact-contract.md` and start the Implementation Contract before editing.
 
 Read `docs/ai/implementation-context.md` when it exists. Check `context_status` before using it:
 
@@ -44,30 +44,17 @@ If the implementation decision depends on a prior architecture or boundary decis
 
 ```text
 Implementation Contract:
-- Goal:
-- Change class:
-  - feature | bug fix | refactor | cleanup | test | docs
-- Expected behavior:
-- Non-goals:
-- Allowed files/modules:
-- Forbidden files/modules:
-- Public contract impact:
-- Data/state impact:
-- Error handling expectation:
-- Existing patterns to reuse:
-- Boundary decision:
-  - resolved | unresolved | not needed
-- Implementation context:
-  - initialized | template | missing | stale | not needed
-- Engineering pattern ledger:
-  - active | template | missing | archived | not needed
-- Architecture decision memory:
-  - active | template | missing | archived | not needed
-- Stack overlay used:
-  - none | project-specific | stack-specific
-- Verification contract:
-- Stop conditions:
+- Artifact ID:
+- Artifact type: implementation
+- Upstream refs:
+
+Conditional entry fields, omit when irrelevant:
+- Change class: feature | bug fix | refactor | cleanup | test | docs
+- Implementation decisions not fixed upstream:
+- Implementation context / engineering pattern / architecture memory / stack overlay refs:
 ```
+
+Inherit behavior, acceptance criteria, allowed/forbidden scope, proof obligations, and stop conditions from upstream refs. If any must change, record an explicit delta and obtain the decision evidence required by the owning contract.
 
 Stop before implementation when:
 
@@ -110,7 +97,7 @@ Use `test-first-verification` when behavior needs proof or a bug/regression is i
 
 Run the narrowest relevant check first. Then run broader checks proportional to risk.
 
-6. Inspect the final diff.
+6. Complete the Implementation Contract with implementation-only facts, then inspect the final diff.
 
 Check for:
 
@@ -121,6 +108,20 @@ Check for:
 - missing tests,
 - unsupported claims.
 - next action summarized in work terms such as running missing checks, preparing review, or stopping for approval.
+
+```text
+Implementation completion:
+- Actual files/components and change boundary:
+- Verification attempted:
+- Evidence references:
+- Handoff state:
+
+Conditional fields, omit when irrelevant:
+- Deviations from upstream contracts:
+- Newly discovered assumptions, risks, or blockers:
+- Remaining limitations:
+- Approved deltas:
+```
 
 ## Exit criteria
 
@@ -139,33 +140,22 @@ Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` f
 
 ```text
 Implementation Contract:
-- Goal:
-- Change class:
-- Expected behavior:
-- Non-goals:
-- Allowed files/modules:
-- Forbidden files/modules:
-- Public contract impact:
-- Data/state impact:
-- Error handling expectation:
-- Existing patterns to reuse:
-- Boundary decision:
-- Implementation context:
-- Engineering pattern ledger:
-- Architecture decision memory:
-- Stack overlay used:
-- Verification contract:
-- Stop conditions:
+- Artifact ID:
+- Artifact type: implementation
+- Upstream refs:
+- Actual files/components and change boundary:
+- Verification attempted:
+- Evidence references:
+- Handoff state:
 
-Implementation summary:
-- Goal:
-- Changed files:
-- Behavior changed:
-- Scope kept:
-- Verification:
-- Not verified:
-- Risks/assumptions:
-- Next:
+Conditional fields, omit when irrelevant:
+- Change class:
+- Implementation decisions not fixed upstream:
+- Context, pattern, memory, or overlay refs:
+- Deviations:
+- Newly discovered assumptions, risks, or blockers:
+- Remaining limitations:
+- Approved deltas:
 ```
 
 ## Optional Metrics Event Candidate
@@ -182,3 +172,4 @@ Use counts, related IDs, verification references, and a privacy note. Do not sto
 | Refactors while implementing | Split cleanup unless required for the change. |
 | Copies patterns without checking tests | Inspect tests and contracts near the pattern. |
 | Claims complete from diff alone | Record verification evidence or downgrade claim. |
+| Replays Requirement, Spec, scope, or proof prose | Replace unchanged content with upstream refs. |

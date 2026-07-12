@@ -50,6 +50,37 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/verification-pattern-ledger-entry.schema.json",
 ];
 const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
+const LIFECYCLE_ARTIFACT_CONTRACT_PATH = "docs/lifecycle-artifact-contract.md";
+const LIFECYCLE_ARTIFACT_FIXTURE_PATH = "docs/fixtures/lifecycle-artifact-chains.json";
+const LIFECYCLE_ARTIFACT_TYPES = ["requirement", "spec", "work_package", "verification", "implementation"];
+const LIFECYCLE_ARTIFACT_SKILL_PATHS = [
+  "skills/requirement-grill/SKILL.md",
+  "skills/spec-driven-development/SKILL.md",
+  "skills/work-package-compiler/SKILL.md",
+  "skills/test-first-verification/SKILL.md",
+  "skills/controlled-implementation/SKILL.md",
+  "skills/skill-router/SKILL.md",
+];
+const LIFECYCLE_ARTIFACT_ADAPTER_PATHS = [
+  "adapters/codex/prompts/skill-implement.md",
+  "adapters/codex/prompts/skill-verify.md",
+  "adapters/claude-code/project/.claude/commands/skill-implement.md",
+  "adapters/claude-code/project/.claude/commands/skill-verify.md",
+];
+const LIFECYCLE_FIELD_OWNERS = {
+  requirement: ["why", "actor", "object", "outcome", "responsibility_boundary", "policy_boundary", "success_condition", "failure_condition", "unresolved_human_decisions", "domain_rule_constraints", "non_goals", "evidence_status"],
+  spec: ["behavior_delta", "inputs", "outputs", "state_changes", "error_cases", "edge_cases", "compatibility", "acceptance_criteria", "observable_constraints"],
+  work_package: ["allowed_scope", "forbidden_scope", "ordered_tasks", "dependencies", "stop_conditions", "evidence_expectations", "likely_files", "required_gates", "memory_refs"],
+  verification: ["behavior_obligations", "regression_obligations", "focused_checks", "broader_checks", "negative_cases", "manual_runtime_checks", "measurement_methods", "required_evidence", "insufficient_evidence_conditions", "completion_evidence", "merge_evidence", "release_evidence", "existing_coverage", "verification_pattern_refs"],
+  implementation: ["change_class", "implementation_decisions", "actual_change_boundary", "deviations", "discovered_assumptions", "risks", "blockers", "verification_attempts", "evidence_references", "remaining_limitations", "handoff_state"],
+};
+const LIFECYCLE_REQUIRED_FIELDS = {
+  requirement: ["why", "actor", "object", "outcome", "responsibility_boundary", "policy_boundary", "success_condition", "failure_condition"],
+  spec: ["behavior_delta", "acceptance_criteria"],
+  work_package: ["allowed_scope", "forbidden_scope", "ordered_tasks", "dependencies", "stop_conditions", "evidence_expectations"],
+  verification: ["behavior_obligations", "focused_checks", "required_evidence", "insufficient_evidence_conditions", "completion_evidence"],
+  implementation: ["actual_change_boundary", "verification_attempts", "evidence_references", "handoff_state"],
+};
 const EXECUTION_ENVELOPE_PLUGIN_PROJECTION = [
   { canonical: EXECUTION_ENVELOPE_DOC_PATH, packaged: "adapters/claude-code/plugin/contracts/execution-envelope-contract.md" },
   { canonical: "schemas/execution-envelope.schema.json", packaged: "adapters/claude-code/plugin/schemas/execution-envelope.schema.json" },
@@ -202,7 +233,7 @@ const REQUIRED_COMMAND_TEMPLATES = [
 const FORBIDDEN_OPERATION_AUTOMATION_SKILL = "skills/operation-automation/SKILL.md";
 const FORBIDDEN_OPERATION_AUTOMATION_SKILL_UNDERSCORE = "skills/operation_automation/SKILL.md";
 const ALLOWED_ROUTE_PHRASE_CONTEXTS = [
-  "spec-driven-development -> test-first-verification for Verification Contract -> controlled-implementation -> test-first-verification for evidence",
+  "spec-driven-development -> work-package-compiler when packaging is needed -> test-first-verification for reusable Verification Contract -> controlled-implementation -> test-first-verification for evidence",
   "doubt-driven-development -> test-first-verification for reproduction and Verification Contract -> controlled-implementation -> test-first-verification for regression proof",
 ];
 const REQUIRED_SKILL_GROUPS = [
@@ -887,6 +918,124 @@ function validateExecutionEnvelope(root, manifest, errors) {
     }
   }
 
+  return checks;
+}
+
+function lifecycleValuesEqual(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+export function inspectLifecycleScenario(scenario) {
+  const issues = [];
+  if (scenario.compact) {
+    const required = ["decision", "behavior_delta", "allowed_scope", "forbidden_scope", "proof_obligation", "evidence"];
+    const missing = required.filter((field) => !Object.hasOwn(scenario.compact, field));
+    if (missing.length > 0) issues.push(`compact path is missing ${missing.join(", ")}`);
+    return issues;
+  }
+
+  const artifacts = Array.isArray(scenario.artifacts) ? scenario.artifacts : [];
+  const seen = new Map();
+  for (const artifact of artifacts) {
+    if (!artifact || typeof artifact !== "object") {
+      issues.push("artifact must be an object");
+      continue;
+    }
+    if (typeof artifact.id !== "string" || artifact.id.length === 0) issues.push("artifact is missing id");
+    if (!LIFECYCLE_ARTIFACT_TYPES.includes(artifact.type)) {
+      issues.push(`${artifact.id ?? "artifact"} has unknown type ${artifact.type}`);
+      continue;
+    }
+    if (seen.has(artifact.id)) issues.push(`duplicate artifact id ${artifact.id}`);
+    const refs = Array.isArray(artifact.upstream_refs) ? artifact.upstream_refs : [];
+    for (const ref of refs) {
+      if (!seen.has(ref)) issues.push(`${artifact.id} references missing or downstream artifact ${ref}`);
+    }
+
+    const fields = artifact.fields && typeof artifact.fields === "object" && !Array.isArray(artifact.fields) ? artifact.fields : {};
+    const missing = LIFECYCLE_REQUIRED_FIELDS[artifact.type].filter((field) => !Object.hasOwn(fields, field));
+    if (missing.length > 0) issues.push(`${artifact.id} is missing required ${artifact.type} fields: ${missing.join(", ")}`);
+    for (const [field, value] of Object.entries(fields)) {
+      if (!LIFECYCLE_FIELD_OWNERS[artifact.type].includes(field)) {
+        issues.push(`${artifact.type} cannot own ${field}`);
+      }
+      for (const ref of refs) {
+        const upstream = seen.get(ref);
+        if (upstream && Object.hasOwn(upstream.fields, field) && !lifecycleValuesEqual(upstream.fields[field], value)) {
+          const hasDelta = Array.isArray(artifact.deltas) && artifact.deltas.some((delta) => delta.target_ref === ref && delta.field === field);
+          if (!hasDelta) issues.push(`changed upstream field ${field} requires an explicit delta`);
+        }
+      }
+    }
+
+    for (const delta of Array.isArray(artifact.deltas) ? artifact.deltas : []) {
+      const upstream = seen.get(delta.target_ref);
+      if (!upstream || !refs.includes(delta.target_ref)) {
+        issues.push(`${artifact.id} delta target ${delta.target_ref} is not an upstream ref`);
+        continue;
+      }
+      if (!Object.hasOwn(upstream.fields, delta.field)) issues.push(`${artifact.id} delta field ${delta.field} is absent from ${delta.target_ref}`);
+      if (!lifecycleValuesEqual(upstream.fields[delta.field], delta.from)) issues.push(`${artifact.id} delta from value does not match ${delta.target_ref}.${delta.field}`);
+      for (const field of ["to", "reason", "decision_evidence"]) {
+        if (!Object.hasOwn(delta, field) || delta[field] === "") issues.push(`${artifact.id} delta ${delta.field} is missing ${field}`);
+      }
+      if (LIFECYCLE_FIELD_OWNERS.requirement.includes(delta.field) && !/^Human-confirmed:|^Authoritative:/.test(delta.decision_evidence ?? "")) {
+        issues.push(`${artifact.id} changes Requirement-owned ${delta.field} without authoritative decision evidence`);
+      }
+    }
+    seen.set(artifact.id, { ...artifact, fields });
+  }
+  return issues;
+}
+
+function validateLifecycleArtifactContract(root, manifest, errors) {
+  const active = manifest?.name === "agent-spectrum-kernel";
+  const checks = { active, contractPresent: false, fixturePresent: false, skills: [], adapters: [], scenarios: [] };
+  if (!active) return checks;
+
+  checks.contractPresent = existsSync(resolve(root, LIFECYCLE_ARTIFACT_CONTRACT_PATH));
+  checks.fixturePresent = existsSync(resolve(root, LIFECYCLE_ARTIFACT_FIXTURE_PATH));
+  if (!checks.contractPresent) fail(errors, "lifecycle artifact contract", `canonical contract is missing: ${LIFECYCLE_ARTIFACT_CONTRACT_PATH}`);
+  if (!checks.fixturePresent) fail(errors, "lifecycle artifact contract", `fixture is missing: ${LIFECYCLE_ARTIFACT_FIXTURE_PATH}`);
+  if (!manifest?.docs?.includes(LIFECYCLE_ARTIFACT_CONTRACT_PATH) || !manifest?.docs?.includes(LIFECYCLE_ARTIFACT_FIXTURE_PATH)) {
+    fail(errors, "lifecycle artifact contract", "manifest.json.docs must list the canonical contract and lifecycle fixture");
+  }
+  if (!checks.contractPresent || !checks.fixturePresent) return checks;
+
+  const contract = readFileSync(resolve(root, LIFECYCLE_ARTIFACT_CONTRACT_PATH), "utf8");
+  for (const phrase of ["reference plus delta", "Requirement Contract", "Spec", "Work Package", "Verification Contract", "Implementation Contract", "Required fields", "Conditional fields", "Compact change", "Contradictory"]) {
+    if (!contract.toLowerCase().includes(phrase.toLowerCase())) fail(errors, "lifecycle artifact contract", `${LIFECYCLE_ARTIFACT_CONTRACT_PATH} is missing ${phrase}`);
+  }
+  for (const path of LIFECYCLE_ARTIFACT_SKILL_PATHS) {
+    const referencesContract = existsSync(resolve(root, path)) && readFileSync(resolve(root, path), "utf8").includes(LIFECYCLE_ARTIFACT_CONTRACT_PATH);
+    checks.skills.push({ path, referencesContract, ok: referencesContract });
+    if (!referencesContract) fail(errors, "lifecycle artifact contract", `${path} must reference ${LIFECYCLE_ARTIFACT_CONTRACT_PATH}`);
+  }
+  for (const path of LIFECYCLE_ARTIFACT_ADAPTER_PATHS) {
+    const referencesContract = existsSync(resolve(root, path)) && readFileSync(resolve(root, path), "utf8").includes(LIFECYCLE_ARTIFACT_CONTRACT_PATH);
+    checks.adapters.push({ path, referencesContract, ok: referencesContract });
+    if (!referencesContract) fail(errors, "lifecycle artifact contract", `${path} must reference ${LIFECYCLE_ARTIFACT_CONTRACT_PATH}`);
+  }
+
+  let fixture;
+  try {
+    fixture = JSON.parse(readFileSync(resolve(root, LIFECYCLE_ARTIFACT_FIXTURE_PATH), "utf8"));
+  } catch (error) {
+    fail(errors, "lifecycle artifact contract", `${LIFECYCLE_ARTIFACT_FIXTURE_PATH} is not valid JSON: ${error.message}`);
+    return checks;
+  }
+  const requiredScenarios = new Set(["complete", "partial", "compact", "changed-assumption", "contradictory"]);
+  for (const scenario of fixture.scenarios ?? []) {
+    requiredScenarios.delete(scenario.id);
+    const issues = inspectLifecycleScenario(scenario);
+    const expectedErrors = Array.isArray(scenario.expected_errors) ? scenario.expected_errors : [];
+    const ok = scenario.expected === "valid"
+      ? issues.length === 0
+      : scenario.expected === "invalid" && issues.length > 0 && expectedErrors.every((expected) => issues.includes(expected));
+    checks.scenarios.push({ id: scenario.id, expected: scenario.expected, issues, ok });
+    if (!ok) fail(errors, "lifecycle artifact contract", `scenario ${scenario.id} did not match expectation: ${issues.join("; ") || "no issues"}`);
+  }
+  if (requiredScenarios.size > 0) fail(errors, "lifecycle artifact contract", `missing scenarios: ${[...requiredScenarios].join(", ")}`);
   return checks;
 }
 
@@ -2214,7 +2363,7 @@ function validateAdapterGovernance(root, checks, errors) {
   }
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, reviewSignalRegistryChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, lifecycleArtifactChecks, reviewSignalRegistryChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -2269,6 +2418,14 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- session state uses envelope as control state: ${executionEnvelopeChecks.sessionState ? "ok" : "invalid"}`,
     `- canonical skills reference the contract: ${executionEnvelopeChecks.skills.every((check) => check.ok) ? "ok" : "invalid"}`,
     `- adapter prompts reference the contract: ${executionEnvelopeChecks.adapters.every((check) => check.ok) ? "ok" : "invalid"}`,
+    "",
+    "## Lifecycle artifact contract checks",
+    "",
+    `- canonical contract: ${lifecycleArtifactChecks.contractPresent ? "ok" : "missing"}`,
+    `- chain fixtures: ${lifecycleArtifactChecks.fixturePresent ? "ok" : "missing"}`,
+    `- canonical skills reference the contract: ${lifecycleArtifactChecks.skills.every((check) => check.ok) ? "ok" : "invalid"}`,
+    `- Claude/Codex prompts reference the contract: ${lifecycleArtifactChecks.adapters.every((check) => check.ok) ? "ok" : "invalid"}`,
+    `- scenarios: ${lifecycleArtifactChecks.scenarios.length > 0 && lifecycleArtifactChecks.scenarios.every((scenario) => scenario.ok) ? lifecycleArtifactChecks.scenarios.map((scenario) => scenario.id).join(", ") : "invalid"}`,
     "",
     "## Review signal registry checks",
     "",
@@ -2509,11 +2666,12 @@ export function validateRepository(options) {
   const domainRuleLedgerChecks = validateDomainRuleLedger(root, errors);
   const claudeAdapterChecks = validateClaudeAdapterArchitecture(root, manifest, errors);
   const executionEnvelopeChecks = validateExecutionEnvelope(root, manifest, errors);
+  const lifecycleArtifactChecks = validateLifecycleArtifactContract(root, manifest, errors);
   const reviewSignalRegistryChecks = validateReviewSignalRegistry(root, manifest, errors);
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, reviewSignalRegistryChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, lifecycleArtifactChecks, reviewSignalRegistryChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

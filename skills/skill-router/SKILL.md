@@ -77,7 +77,8 @@ The user-facing route should describe work steps and stop points without requiri
 | Weekly/monthly reporting, recurring summary, scheduler, or automation cadence | `operating-mode-router` | Route to `operation_automation`; use report templates or external operation, not a delivery skill |
 | Unfamiliar repo | `repository-orientation` | `scope-control` if target boundary is unclear; `planning-with-files` only if the task spans sessions/agents or durable state is needed |
 | Vague business intent, success condition, responsibility boundary, or domain rule impact before implementation | `requirement-grill` | `domain-rule-ledger` only to consume existing confirmed/verified rules or record explicitly requested durable rules; then route to `work-package-compiler`, `grill-design`, or `spec-driven-development` |
-| Confirmed Requirement Contract needs agent-ready task packaging | `work-package-compiler` | `review-domain-impact` as required review gate when domain rules or business behavior are involved; `grill-design` first if technical design choices remain |
+| Confirmed Requirement Contract needs observable behavior definition | `spec-driven-development` | Reference the Requirement Contract and emit behavior delta only; `grill-design` first if technical choices remain |
+| Confirmed Requirement/Spec needs agent-ready task packaging | `work-package-compiler` | Reference upstream artifacts; `review-domain-impact` is required when domain rules or business behavior are involved |
 | Repo-aware next change candidate discovery | `next-best-change-finder` | Default route to `requirement-grill` unless requirements are already confirmed; do not authorize implementation from candidates alone |
 | Ambiguous design / “grill me” | `grill-design` | `grill-with-docs` if docs/domain/ADR terms matter; then `spec-driven-development` only after design boundary and acceptance criteria are stable |
 | Existing docs/domain/ADR constraints | `grill-with-docs` | `adr-review` |
@@ -86,8 +87,8 @@ The user-facing route should describe work steps and stop points without requiri
 | Reusable verification expectation creation, refresh, deprecation, or contradiction | `verification-pattern-ledger` | `test-first-verification`, `work-package-compiler`, `review-automated-gate`, `review-final-merge-gate`, and `release-readiness-gate` consume only current matching entries |
 | Reusable architecture or boundary decision memory below ADR level | `architecture-decision-memory` | `adr-review` when formal ADR action is needed; `application-boundary-architecture` when mechanics are unresolved; `review-architecture-impact` when reviewing diffs |
 | Repeated implementation context setup | `implementation-context-generation` | `repository-orientation` for repo facts before drafting context |
-| New behavior | `spec-driven-development` | `test-first-verification` for Verification Contract -> `controlled-implementation` -> `test-first-verification` for evidence |
-| Implementation after plan exists | `controlled-implementation` | `test-first-verification` for Verification Contract before behavior changes when proof is needed; `scope-control` if scope is unclear |
+| New behavior | `spec-driven-development` | `work-package-compiler` when packaging is needed -> `test-first-verification` for a reusable Verification Contract -> `controlled-implementation` for implementation-only decisions and evidence refs |
+| Implementation after Work Package exists | `controlled-implementation` | Consume upstream refs; `test-first-verification` defines/reuses the Verification Contract before behavior changes when proof is needed; `scope-control` if scope is unclear |
 | Approved behavior-preserving refactor implementation | `refactor-implementation` | `test-first-verification` for regression proof; `application-boundary-architecture` first if responsibility, dependency direction, public contract, schema, UI behavior, or ownership boundaries may move; `improvement-ledger` for follow-up debt or prevention candidates |
 | Long-running/multi-agent work | `planning-with-files` | `handoff-generation` |
 | Scope/refactor risk | `scope-control` | `controlled-implementation` if proceeding to code; review phase uses `review-router` -> required gates, with scope findings generally routed to `review-ai-quality` |
@@ -126,6 +127,12 @@ The user-facing route should describe work steps and stop points without requiri
    - Do not select every review gate by default.
 
 9. Continue into the selected primary workflow unless the task requires user approval.
+
+10. Preserve lifecycle responsibility boundaries.
+   - Use `docs/lifecycle-artifact-contract.md` as the canonical Requirement -> Spec -> Work Package -> Verification -> Implementation boundary.
+   - Downstream artifacts reference upstream IDs and emit only owned fields or explicit deltas.
+   - Missing upstream artifacts do not force synthetic reconstruction; use the compact path for localized work.
+   - Stop on contradictory upstream values or Requirement-owned changes without authoritative decision evidence.
 
 ## Output
 

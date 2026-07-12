@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0.0",
+  "scenarios": [
+    {
+      "id": "complete",
+      "expected": "valid",
+      "artifacts": [
+        { "id": "REQ-001", "type": "requirement", "upstream_refs": [], "fields": { "why": "Reduce manual export work", "actor": "task owner", "object": "task list", "outcome": "downloadable CSV", "responsibility_boundary": "owner initiates export", "policy_boundary": "visible tasks only", "success_condition": "visible tasks are exported", "failure_condition": "hidden tasks are disclosed" } },
+        { "id": "SPEC-001", "type": "spec", "upstream_refs": ["REQ-001"], "fields": { "behavior_delta": "add CSV export action", "inputs": "visible task list", "outputs": "CSV file", "acceptance_criteria": ["escape commas", "preserve visible column order"] } },
+        { "id": "WP-001", "type": "work_package", "upstream_refs": ["REQ-001", "SPEC-001"], "fields": { "allowed_scope": ["task export action", "focused tests"], "forbidden_scope": ["task visibility policy"], "ordered_tasks": ["add export", "add tests"], "dependencies": ["existing task selector"], "stop_conditions": ["visibility policy is ambiguous"], "evidence_expectations": ["focused test result"] } },
+        { "id": "VER-001", "type": "verification", "upstream_refs": ["SPEC-001", "WP-001"], "fields": { "behavior_obligations": ["CSV matches visible tasks"], "focused_checks": ["CSV unit tests"], "required_evidence": ["test command and result"], "insufficient_evidence_conditions": ["escaping case is not exercised"], "completion_evidence": ["focused checks pass"] } },
+        { "id": "IMPL-001", "type": "implementation", "upstream_refs": ["WP-001", "VER-001"], "fields": { "actual_change_boundary": ["src/task-export.mjs", "test/task-export.test.mjs"], "verification_attempts": ["node --test test/task-export.test.mjs"], "evidence_references": ["local:test:task-export"], "remaining_limitations": ["browser download not exercised"], "handoff_state": "ready for review" } }
+      ]
+    },
+    {
+      "id": "partial",
+      "expected": "valid",
+      "artifacts": [
+        { "id": "SPEC-002", "type": "spec", "upstream_refs": [], "fields": { "behavior_delta": "return a structured validation error", "acceptance_criteria": ["error code is stable"] } },
+        { "id": "VER-002", "type": "verification", "upstream_refs": ["SPEC-002"], "fields": { "behavior_obligations": ["invalid input returns the stable code"], "focused_checks": ["validation unit test"], "required_evidence": ["failing then passing result"], "insufficient_evidence_conditions": ["error code is not asserted"], "completion_evidence": ["focused test passes"] } }
+      ]
+    },
+    {
+      "id": "compact",
+      "expected": "valid",
+      "compact": { "decision": "rename a local label", "behavior_delta": "Submit becomes Save", "allowed_scope": ["label resource"], "forbidden_scope": ["submit behavior"], "proof_obligation": "rendered label equals Save", "evidence": "focused resource test", "implementation_decisions": "reuse existing key" }
+    },
+    {
+      "id": "changed-assumption",
+      "expected": "valid",
+      "artifacts": [
+        { "id": "REQ-003", "type": "requirement", "upstream_refs": [], "fields": { "why": "limit export disclosure", "actor": "task owner", "object": "task list", "outcome": "safe export", "responsibility_boundary": "owner initiates export", "policy_boundary": "assigned tasks only", "success_condition": "allowed tasks export", "failure_condition": "disallowed tasks export" } },
+        { "id": "SPEC-003", "type": "spec", "upstream_refs": ["REQ-003"], "fields": { "behavior_delta": "export visible tasks", "acceptance_criteria": ["visible tasks export"] }, "deltas": [{ "target_ref": "REQ-003", "field": "policy_boundary", "from": "assigned tasks only", "to": "visible tasks only", "reason": "product owner clarified disclosure policy", "decision_evidence": "Human-confirmed: issue comment #42" }] }
+      ]
+    },
+    {
+      "id": "contradictory",
+      "expected": "invalid",
+      "expected_errors": ["implementation cannot own acceptance_criteria", "changed upstream field acceptance_criteria requires an explicit delta"],
+      "artifacts": [
+        { "id": "SPEC-004", "type": "spec", "upstream_refs": [], "fields": { "behavior_delta": "export visible tasks", "acceptance_criteria": ["include archived tasks"] } },
+        { "id": "IMPL-004", "type": "implementation", "upstream_refs": ["SPEC-004"], "fields": { "acceptance_criteria": ["exclude archived tasks"], "actual_change_boundary": ["src/task-export.mjs"], "verification_attempts": ["node --test"], "evidence_references": ["local:test"], "remaining_limitations": [], "handoff_state": "blocked" } }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
+import { inspectLifecycleScenario } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -4158,6 +4159,17 @@ function assertSidecarAdapterInstructions() {
 }
 
 try {
+  const lifecycleFixture = JSON.parse(readFileSync(resolve(repoRoot, "docs/fixtures/lifecycle-artifact-chains.json"), "utf8"));
+  for (const scenario of lifecycleFixture.scenarios) {
+    const issues = inspectLifecycleScenario(scenario);
+    if (scenario.expected === "valid" && issues.length > 0) {
+      throw new Error(`lifecycle scenario ${scenario.id} should pass\n${issues.join("\n")}`);
+    }
+    if (scenario.expected === "invalid" && !(scenario.expected_errors ?? []).every((expected) => issues.includes(expected))) {
+      throw new Error(`lifecycle scenario ${scenario.id} should expose expected contradictions\n${issues.join("\n")}`);
+    }
+  }
+
   const validRoot = cloneFixture("valid");
   assertPass("valid fixture", validRoot);
   assertSidecarAdapterInstructions();

@@ -76,34 +76,33 @@ test-first-verification for evidence
 Expected output before implementation:
 
 ```text
-Spec summary:
-- desired behavior
-- non-goals
-- edge cases
+Requirement Contract REQ-CSV (when business decisions are not already stable):
+- owns business actor/object/outcome and policy boundaries
+
+Spec SPEC-CSV:
+- upstream refs: REQ-CSV
+- observable behavior delta
 - acceptance criteria
 
-Plan:
-- files/modules
-- tests
-- verification
-
-Implementation Contract:
+Work Package WP-CSV:
+- upstream refs: REQ-CSV, SPEC-CSV
 - allowed/forbidden scope
-- public/data impact
-- implementation context
-- stack overlay used
-- verification contract
-- stop conditions
+- ordered tasks, dependencies, stop conditions, expected evidence
 
-Verification Contract:
-- behavior to prove
-- existing coverage
-- focused test or runtime check
-- commands and required evidence
-- remaining unverified items
+Verification Contract VER-CSV:
+- upstream refs: SPEC-CSV, WP-CSV
+- behavior proof obligations
+- focused checks, required evidence, insufficient-evidence conditions
+
+Implementation Contract IMPL-CSV:
+- upstream refs: WP-CSV, VER-CSV
+- implementation-only decisions
+- actual change boundary, evidence refs, limitations, handoff state
 ```
 
 Implementation must stay inside the agreed first slice.
+
+Unchanged fields are inherited by reference. If an acceptance criterion, scope boundary, assumption, or proof obligation changes, emit an explicit delta with its decision evidence. See `docs/lifecycle-artifact-contract.md`.
 
 ## 3. Bug with unknown root cause
 
@@ -156,6 +155,18 @@ Expected behavior:
 - Produce a Requirement Contract before compiling an agent task.
 - Refuse to convert unresolved business decisions into implementation scope.
 - Use confirmed or verified domain rules as constraints; use hypothesis rules only for questions.
+
+## 4.1 Complete, partial, compact, and changed chains
+
+Canonical behavior:
+
+- Complete: Requirement -> Spec -> Work Package -> Verification -> Implementation, using artifact refs rather than repeated prose.
+- Partial: start with the artifact actually required; do not synthesize missing upstream artifacts.
+- Compact: one localized change block may keep decision, behavior, scope, proof, and implementation decisions distinguishable.
+- Changed assumption: record target ref, field, previous/new value, reason, and decision evidence.
+- Contradictory: stop and report conflicts; do not silently select one upstream value.
+
+Executable fixtures live in `docs/fixtures/lifecycle-artifact-chains.json`.
 
 ## 5. Design review / “grill me”
 

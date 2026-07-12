@@ -10,7 +10,8 @@ Routing source: use `test-first-verification` for the verification contract. Use
 
 Evidence requirements:
 
-- state the behavior to prove and regression to prevent
+- follow `docs/lifecycle-artifact-contract.md`; reference the Spec, Work Package, or compact change being proved
+- state behavior proof obligations and regression obligations when applicable
 - identify existing coverage before adding new checks
 - run the focused command, broader command, or manual/runtime check that matches the claim
 - quote exact command names and outcomes; never invent command output
@@ -21,14 +22,18 @@ Output contract:
 Append one shared `Execution Envelope` for the verification boundary, following `docs/execution-envelope-contract.md`. Keep the Verification Contract and evidence in the artifact; do not repeat envelope metadata as separate route sections.
 
 Verification Contract:
+- Artifact ID:
+- Upstream refs:
 - Behavior to prove:
-- Regression to prevent:
-- Existing coverage:
-- Commands:
+- Focused checks:
 - Evidence required:
-- What remains unverified:
+- Insufficient-evidence conditions:
+- Evidence required before completion claim:
+
+Conditional fields may be omitted. Add regression, broader, negative, manual/runtime, measurement, merge, or release obligations only when applicable.
 
 Evidence:
+- Verification Contract ref:
 - command:
   result:
 

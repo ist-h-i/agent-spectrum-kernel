@@ -27,7 +27,7 @@ This is decision support. It may recommend a decision, but unresolved value, pri
 
 ## Process
 
-1. Gather the smallest useful evidence.
+1. Read `docs/lifecycle-artifact-contract.md` and gather the smallest useful evidence.
    - Current user request, issue, approved spec, or discussion.
    - Existing docs, ADRs, tests, or repo behavior when relevant.
    - `docs/ai/domain-rule-ledger.md` when present.
@@ -50,29 +50,30 @@ This is decision support. It may recommend a decision, but unresolved value, pri
    - Do not ask for facts that the repo or docs can answer.
    - If progress is possible, state the reversible assumption and keep it out of durable contracts.
 
-5. Produce a Requirement Contract.
+5. Produce a Requirement Contract that owns only the business decision.
 
 ```text
 Requirement Contract:
-- User intent:
-- Business object:
+- Artifact ID:
+- Artifact type: requirement
+- Why the change is needed:
 - Business actor:
-- Desired business outcome:
-- Current pain:
+- Business object:
+- Desired outcome:
+- Responsibility boundary:
+- Policy boundary:
 - Success condition:
 - Failure condition:
+
+Conditional fields, omit when irrelevant:
+- Upstream refs:
+- Unresolved human decisions:
+- Domain-rule constraints:
 - Non-goals:
-- Domain rules referenced:
-- New domain rule candidates:
-- Ambiguities:
-- Recommended decision:
 - Evidence status:
-- Route next:
-  - work-package-compiler
-  - grill-design
-  - spec-driven-development
-  - reject / needs human decision
 ```
+
+Do not add behavior, task, verification, or implementation fields. If a prior Requirement Contract exists, reference it and emit only an explicit delta; a Requirement-owned delta requires authoritative business decision evidence.
 
 6. Route next.
    - Use `work-package-compiler` only when required business decisions are resolved.
@@ -87,20 +88,26 @@ Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` f
 
 ```text
 Requirement Contract:
-- User intent:
-- Business object:
+- Artifact ID:
+- Artifact type: requirement
+- Why the change is needed:
 - Business actor:
-- Desired business outcome:
-- Current pain:
+- Business object:
+- Desired outcome:
+- Responsibility boundary:
+- Policy boundary:
 - Success condition:
 - Failure condition:
+
+Conditional fields, omit when irrelevant:
+- Upstream refs:
+- Unresolved human decisions:
+- Domain-rule constraints:
 - Non-goals:
-- Domain rules referenced:
-- New domain rule candidates:
-- Ambiguities:
-- Recommended decision:
 - Evidence status:
-- Route next:
+
+Deltas, only when changing a referenced Requirement:
+- Target ref / field / previous / new / reason / decision evidence:
 
 Decision boundary:
 - AI-supported:
@@ -114,6 +121,7 @@ Decision boundary:
 - Unresolved business decisions are not converted into implementation scope.
 - The next route is explicit and justified by evidence.
 - The output is compact enough to feed `work-package-compiler` or another focused skill.
+- Unchanged upstream values are referenced, not copied.
 
 ## Failure modes
 

@@ -1,13 +1,13 @@
 ---
 name: spec-driven-development
-description: Convert a feature or behavior request into a spec, plan, task breakdown, and verification plan before implementation. Use for new behavior, cross-file work, or vague requirements.
+description: Define the observable behavior delta and acceptance criteria for a feature or behavior request without recreating upstream business decisions or downstream execution plans.
 ---
 
 # Spec-Driven Development
 
 ## Goal
 
-Move from vague intent to executable constraints before writing code.
+Turn a stable Requirement Contract or behavior request into an observable behavior delta before work packaging or implementation.
 
 ## Use when
 
@@ -20,58 +20,43 @@ Move from vague intent to executable constraints before writing code.
 ## Do not use when
 
 - The task is a trivial localized edit.
-- A current spec and verification plan already exist.
+- A current Spec already exists and its acceptance criteria remain unchanged.
 
 ## Process
 
-1. Draft the spec at the smallest useful fidelity.
+1. Read `docs/lifecycle-artifact-contract.md` and inspect the current behavior plus any upstream Requirement or design artifact.
+
+2. Draft the Spec at the smallest useful fidelity.
 
 ```text
 Spec:
-- Problem:
-- Users/callers affected:
-- Desired behavior:
-- Non-goals:
-- Inputs:
-- Outputs:
-- State changes:
-- Error cases:
-- Edge cases:
-- Backward compatibility:
-- Security/privacy constraints:
-- Performance constraints:
+- Artifact ID:
+- Artifact type: spec
+- Upstream refs:
+- Observable behavior delta:
 - Acceptance criteria:
+
+Conditional fields, omit when irrelevant:
+- Inputs / outputs:
+- State changes:
+- Error / edge cases:
+- Compatibility constraints:
+- Observable security, privacy, or performance constraints:
+- Deltas to upstream assumptions or acceptance conditions:
 ```
 
-2. Validate the spec.
+3. Validate the Spec.
    - Are acceptance criteria observable?
-   - Are non-goals explicit?
    - Are edge cases represented?
    - Is there a smallest deliverable slice?
    - What would falsify success?
    - Which assumptions are still unresolved?
+   - Does every changed upstream assumption or acceptance condition have an explicit delta?
+   - Does every Requirement-owned delta have authoritative decision evidence?
 
-3. Create the implementation plan.
+4. Route executable scope to `work-package-compiler` and proof obligations to `test-first-verification`. Do not embed their fields in the Spec.
 
-```text
-Plan:
-- Files/modules likely touched:
-- Existing patterns to reuse:
-- New tests:
-- Migration/compatibility concerns:
-- Verification commands:
-- Rollback path:
-```
-
-4. Break into tasks.
-
-Each task must:
-- be independently reviewable,
-- have a clear verification method,
-- avoid mixing refactor and behavior change unless necessary,
-- preserve a working state after completion.
-
-5. Stop before implementation if the next task cannot be scoped or verified.
+5. Stop before implementation if behavior or acceptance criteria remain unresolved.
    - Present the next action in work terms. Use skill names only in the internal route or advanced/debug notes.
 
 ## Output
@@ -79,34 +64,34 @@ Each task must:
 Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This skill emits the spec artifact below; it does not repeat the envelope fields.
 
 ```text
-Spec summary:
-- ...
+Spec:
+- Artifact ID:
+- Artifact type: spec
+- Upstream refs:
+- Observable behavior delta:
+- Acceptance criteria:
 
-Plan:
-- ...
-
-Tasks:
-1. ...
-
-Verification:
-- ...
-
-Open assumptions:
-- ...
+Conditional fields, omit when irrelevant:
+- Inputs / outputs:
+- State changes:
+- Error / edge cases:
+- Compatibility constraints:
+- Observable constraints:
+- Deltas: target ref / field / previous / new / reason / decision evidence:
 ```
 
 ## Exit criteria
 
-- The next implementation task is narrow.
 - Acceptance criteria are testable.
-- Non-goals and edge cases are explicit.
-- Verification is defined before code changes.
+- Observable behavior is separated from business rationale and executable task scope.
+- Unchanged Requirement values are inherited by reference.
+- The next route is Work Package compilation, Verification Contract definition, or a human decision.
 
 ## Failure modes
 
 | Failure | Correction |
 |---|---|
 | Treating the prompt as the spec | Extract acceptance criteria. |
-| Listing tasks without verification | Attach verification to each task. |
+| Listing implementation tasks | Route executable packaging to `work-package-compiler`. |
 | Over-specifying trivial work | Use kernel only. |
-| Hiding assumptions in the plan | List them explicitly. |
+| Hiding a changed assumption | Emit an explicit delta or stop for the decision owner. |

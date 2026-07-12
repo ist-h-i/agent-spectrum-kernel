@@ -4,14 +4,15 @@ description: Define and run focused verification for a change or readiness claim
 
 Use the installed project skills from this repository projection.
 
-Use `/test-first-verification` to define the Verification Contract before claiming a behavior is correct, fixed, ready, safe, reliable, faster, or regression-free.
+Use `/test-first-verification` and `docs/lifecycle-artifact-contract.md` to define one reusable Verification Contract before claiming a behavior is correct, fixed, ready, safe, reliable, faster, or regression-free. Reference upstream behavior and attach later evidence to the same contract ID.
 
 Verification output should include:
 
 - behavior to prove
-- regression to prevent
-- existing coverage
-- focused test or validation command
+- upstream refs
+- focused checks and required evidence
+- insufficient-evidence and completion-claim conditions
+- regression, negative, broader, manual/runtime, or measurement obligations only when applicable
 - manual/runtime check when automated coverage is unavailable
 - evidence from exact commands run
 - what remains unverified

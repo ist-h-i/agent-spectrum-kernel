@@ -246,6 +246,7 @@ engineering-capability-evaluation
 
 ```text
 spec-driven-development
+work-package-compiler when packaging is needed
 test-first-verification for Verification Contract
 controlled-implementation
 test-first-verification for evidence
@@ -254,7 +255,7 @@ test-first-verification for evidence
 例:
 
 ```text
-spec-driven-development を使って、先に仕様・非目標・受け入れ条件・検証方法を出してください。実装はその後。
+spec-driven-development を使って、Requirement参照、observable behavior delta、受け入れ条件を出してください。必要ならWork Packageを作り、VerificationとImplementationでは上流内容をコピーせずartifact IDを参照してください。実装はその後。
 ```
 
 ### Angular stack overlay
