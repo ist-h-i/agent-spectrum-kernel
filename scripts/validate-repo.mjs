@@ -52,7 +52,7 @@ const REQUIRED_SCHEMA_PATHS = [
 const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
 const LIFECYCLE_ARTIFACT_CONTRACT_PATH = "docs/lifecycle-artifact-contract.md";
 const LIFECYCLE_ARTIFACT_FIXTURE_PATH = "docs/fixtures/lifecycle-artifact-chains.json";
-const LIFECYCLE_ARTIFACT_TYPES = ["requirement", "spec", "work_package", "verification", "implementation"];
+const LIFECYCLE_ARTIFACT_TYPES = ["requirement", "spec", "work_package", "verification", "implementation", "compact"];
 const LIFECYCLE_ARTIFACT_SKILL_PATHS = [
   "skills/requirement-grill/SKILL.md",
   "skills/spec-driven-development/SKILL.md",
@@ -73,6 +73,7 @@ const LIFECYCLE_FIELD_OWNERS = {
   work_package: ["allowed_scope", "forbidden_scope", "ordered_tasks", "dependencies", "stop_conditions", "evidence_expectations", "likely_files", "required_gates", "memory_refs"],
   verification: ["behavior_obligations", "regression_obligations", "focused_checks", "broader_checks", "negative_cases", "manual_runtime_checks", "measurement_methods", "required_evidence", "insufficient_evidence_conditions", "completion_evidence", "merge_evidence", "release_evidence", "existing_coverage", "verification_pattern_refs"],
   implementation: ["change_class", "implementation_decisions", "actual_change_boundary", "deviations", "discovered_assumptions", "risks", "blockers", "verification_attempts", "evidence_references", "remaining_limitations", "handoff_state"],
+  compact: ["decision", "behavior_delta", "allowed_scope", "forbidden_scope", "proof_obligation", "evidence", "implementation_decisions"],
 };
 const LIFECYCLE_REQUIRED_FIELDS = {
   requirement: ["why", "actor", "object", "outcome", "responsibility_boundary", "policy_boundary", "success_condition", "failure_condition"],
@@ -80,6 +81,7 @@ const LIFECYCLE_REQUIRED_FIELDS = {
   work_package: ["allowed_scope", "forbidden_scope", "ordered_tasks", "dependencies", "stop_conditions", "evidence_expectations"],
   verification: ["behavior_obligations", "focused_checks", "required_evidence", "insufficient_evidence_conditions", "completion_evidence"],
   implementation: ["actual_change_boundary", "verification_attempts", "evidence_references", "handoff_state"],
+  compact: ["decision", "behavior_delta", "allowed_scope", "forbidden_scope", "proof_obligation", "evidence"],
 };
 const EXECUTION_ENVELOPE_PLUGIN_PROJECTION = [
   { canonical: EXECUTION_ENVELOPE_DOC_PATH, packaged: "adapters/claude-code/plugin/contracts/execution-envelope-contract.md" },
@@ -927,13 +929,6 @@ function lifecycleValuesEqual(left, right) {
 
 export function inspectLifecycleScenario(scenario) {
   const issues = [];
-  if (scenario.compact) {
-    const required = ["decision", "behavior_delta", "allowed_scope", "forbidden_scope", "proof_obligation", "evidence"];
-    const missing = required.filter((field) => !Object.hasOwn(scenario.compact, field));
-    if (missing.length > 0) issues.push(`compact path is missing ${missing.join(", ")}`);
-    return issues;
-  }
-
   const artifacts = Array.isArray(scenario.artifacts) ? scenario.artifacts : [];
   const seen = new Map();
   for (const artifact of artifacts) {
@@ -952,38 +947,82 @@ export function inspectLifecycleScenario(scenario) {
       if (!seen.has(ref)) issues.push(`${artifact.id} references missing or downstream artifact ${ref}`);
     }
 
-    const fields = artifact.fields && typeof artifact.fields === "object" && !Array.isArray(artifact.fields) ? artifact.fields : {};
+    const fieldSource = artifact.type === "compact" ? artifact.boundaries : artifact.fields;
+    const fields = fieldSource && typeof fieldSource === "object" && !Array.isArray(fieldSource) ? fieldSource : {};
+    if (artifact.type === "compact") {
+      if (!Array.isArray(artifact.upstream_refs)) issues.push(`${artifact.id} compact artifact requires upstream_refs`);
+      if (!Array.isArray(artifact.deltas)) issues.push(`${artifact.id} compact artifact requires deltas`);
+    }
     const missing = LIFECYCLE_REQUIRED_FIELDS[artifact.type].filter((field) => !Object.hasOwn(fields, field));
     if (missing.length > 0) issues.push(`${artifact.id} is missing required ${artifact.type} fields: ${missing.join(", ")}`);
+
+    const inheritedByField = new Map();
+    for (const ref of refs) {
+      const upstream = seen.get(ref);
+      if (!upstream) continue;
+      for (const [field, value] of Object.entries(upstream.effectiveFields)) {
+        const values = inheritedByField.get(field) ?? [];
+        values.push({ ref, value });
+        inheritedByField.set(field, values);
+      }
+    }
+    const effectiveFields = {};
+    const conflictingFields = new Map();
+    for (const [field, values] of inheritedByField) {
+      const distinct = [];
+      for (const entry of values) {
+        if (!distinct.some((candidate) => lifecycleValuesEqual(candidate.value, entry.value))) distinct.push(entry);
+      }
+      if (distinct.length === 1) effectiveFields[field] = distinct[0].value;
+      else conflictingFields.set(field, values);
+    }
+
+    const deltas = Array.isArray(artifact.deltas) ? artifact.deltas : [];
+    for (const [field, values] of conflictingFields) {
+      const conflictRefs = [...new Set(values.map(({ ref }) => ref))].sort();
+      const resolvingDelta = deltas.find((delta) => {
+        const supersedes = Array.isArray(delta.supersedes_refs) ? [...new Set(delta.supersedes_refs)].sort() : [];
+        return delta.field === field && conflictRefs.every((ref) => supersedes.includes(ref));
+      });
+      if (!resolvingDelta) issues.push(`conflicting upstream field ${field} requires an explicit superseding delta for ${conflictRefs.join(", ")}`);
+    }
+
     for (const [field, value] of Object.entries(fields)) {
       if (!LIFECYCLE_FIELD_OWNERS[artifact.type].includes(field)) {
         issues.push(`${artifact.type} cannot own ${field}`);
       }
       for (const ref of refs) {
         const upstream = seen.get(ref);
-        if (upstream && Object.hasOwn(upstream.fields, field) && !lifecycleValuesEqual(upstream.fields[field], value)) {
-          const hasDelta = Array.isArray(artifact.deltas) && artifact.deltas.some((delta) => delta.target_ref === ref && delta.field === field);
+        if (upstream && Object.hasOwn(upstream.effectiveFields, field) && !lifecycleValuesEqual(upstream.effectiveFields[field], value)) {
+          const hasDelta = deltas.some((delta) => delta.target_ref === ref && delta.field === field && lifecycleValuesEqual(delta.to, value));
           if (!hasDelta) issues.push(`changed upstream field ${field} requires an explicit delta`);
         }
       }
     }
 
-    for (const delta of Array.isArray(artifact.deltas) ? artifact.deltas : []) {
+    for (const delta of deltas) {
       const upstream = seen.get(delta.target_ref);
       if (!upstream || !refs.includes(delta.target_ref)) {
         issues.push(`${artifact.id} delta target ${delta.target_ref} is not an upstream ref`);
         continue;
       }
-      if (!Object.hasOwn(upstream.fields, delta.field)) issues.push(`${artifact.id} delta field ${delta.field} is absent from ${delta.target_ref}`);
-      if (!lifecycleValuesEqual(upstream.fields[delta.field], delta.from)) issues.push(`${artifact.id} delta from value does not match ${delta.target_ref}.${delta.field}`);
+      if (!Object.hasOwn(upstream.effectiveFields, delta.field)) issues.push(`${artifact.id} delta field ${delta.field} is absent from effective ${delta.target_ref}`);
+      if (!lifecycleValuesEqual(upstream.effectiveFields[delta.field], delta.from)) issues.push(`${artifact.id} delta from value does not match effective ${delta.target_ref}.${delta.field}`);
       for (const field of ["to", "reason", "decision_evidence"]) {
         if (!Object.hasOwn(delta, field) || delta[field] === "") issues.push(`${artifact.id} delta ${delta.field} is missing ${field}`);
+      }
+      if (Array.isArray(delta.supersedes_refs)) {
+        for (const ref of delta.supersedes_refs) {
+          if (!refs.includes(ref)) issues.push(`${artifact.id} delta supersedes non-upstream ref ${ref}`);
+        }
       }
       if (LIFECYCLE_FIELD_OWNERS.requirement.includes(delta.field) && !/^Human-confirmed:|^Authoritative:/.test(delta.decision_evidence ?? "")) {
         issues.push(`${artifact.id} changes Requirement-owned ${delta.field} without authoritative decision evidence`);
       }
+      effectiveFields[delta.field] = delta.to;
     }
-    seen.set(artifact.id, { ...artifact, fields });
+    for (const [field, value] of Object.entries(fields)) effectiveFields[field] = value;
+    seen.set(artifact.id, { ...artifact, fields, effectiveFields });
   }
   return issues;
 }
@@ -1003,18 +1042,32 @@ function validateLifecycleArtifactContract(root, manifest, errors) {
   if (!checks.contractPresent || !checks.fixturePresent) return checks;
 
   const contract = readFileSync(resolve(root, LIFECYCLE_ARTIFACT_CONTRACT_PATH), "utf8");
-  for (const phrase of ["reference plus delta", "Requirement Contract", "Spec", "Work Package", "Verification Contract", "Implementation Contract", "Required fields", "Conditional fields", "Compact change", "Contradictory"]) {
+  for (const phrase of ["reference plus delta", "Requirement Contract", "Spec", "Work Package", "Verification Contract", "Implementation Contract", "Required fields", "Conditional fields", "Compact artifact", "effective field map", "supersedes_refs", "Contradictory"]) {
     if (!contract.toLowerCase().includes(phrase.toLowerCase())) fail(errors, "lifecycle artifact contract", `${LIFECYCLE_ARTIFACT_CONTRACT_PATH} is missing ${phrase}`);
   }
   for (const path of LIFECYCLE_ARTIFACT_SKILL_PATHS) {
-    const referencesContract = existsSync(resolve(root, path)) && readFileSync(resolve(root, path), "utf8").includes(LIFECYCLE_ARTIFACT_CONTRACT_PATH);
-    checks.skills.push({ path, referencesContract, ok: referencesContract });
+    const text = existsSync(resolve(root, path)) ? readFileSync(resolve(root, path), "utf8") : "";
+    const referencesContract = text.includes(LIFECYCLE_ARTIFACT_CONTRACT_PATH);
+    const forbiddenDuplicateSections = path === "skills/test-first-verification/SKILL.md" ? ["Not verified:", "Next verification:"] : [];
+    const duplicates = forbiddenDuplicateSections.filter((section) => new RegExp(`^${section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "m").test(text));
+    const ok = referencesContract && duplicates.length === 0;
+    checks.skills.push({ path, referencesContract, duplicates, ok });
     if (!referencesContract) fail(errors, "lifecycle artifact contract", `${path} must reference ${LIFECYCLE_ARTIFACT_CONTRACT_PATH}`);
+    if (duplicates.length > 0) fail(errors, "lifecycle artifact contract", `${path} duplicates verification evidence or next-action sections: ${duplicates.join(", ")}`);
   }
   for (const path of LIFECYCLE_ARTIFACT_ADAPTER_PATHS) {
-    const referencesContract = existsSync(resolve(root, path)) && readFileSync(resolve(root, path), "utf8").includes(LIFECYCLE_ARTIFACT_CONTRACT_PATH);
-    checks.adapters.push({ path, referencesContract, ok: referencesContract });
+    const text = existsSync(resolve(root, path)) ? readFileSync(resolve(root, path), "utf8") : "";
+    const referencesContract = text.includes(LIFECYCLE_ARTIFACT_CONTRACT_PATH);
+    const forbiddenDuplicateSections = path === "adapters/codex/prompts/skill-implement.md"
+      ? ["Changed:", "Verified:", "Not verified:", "Risks / assumptions:", "Next:"]
+      : path === "adapters/codex/prompts/skill-verify.md"
+        ? ["Not verified:", "Next verification:"]
+        : [];
+    const duplicates = forbiddenDuplicateSections.filter((section) => new RegExp(`^${section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "m").test(text));
+    const ok = referencesContract && duplicates.length === 0;
+    checks.adapters.push({ path, referencesContract, duplicates, ok });
     if (!referencesContract) fail(errors, "lifecycle artifact contract", `${path} must reference ${LIFECYCLE_ARTIFACT_CONTRACT_PATH}`);
+    if (duplicates.length > 0) fail(errors, "lifecycle artifact contract", `${path} duplicates lifecycle or next-action output sections: ${duplicates.join(", ")}`);
   }
 
   let fixture;
@@ -1024,7 +1077,7 @@ function validateLifecycleArtifactContract(root, manifest, errors) {
     fail(errors, "lifecycle artifact contract", `${LIFECYCLE_ARTIFACT_FIXTURE_PATH} is not valid JSON: ${error.message}`);
     return checks;
   }
-  const requiredScenarios = new Set(["complete", "partial", "compact", "changed-assumption", "contradictory"]);
+  const requiredScenarios = new Set(["complete", "partial", "compact", "changed-assumption", "contradictory", "conflicting-upstreams", "consecutive-deltas", "superseding-upstreams"]);
   for (const scenario of fixture.scenarios ?? []) {
     requiredScenarios.delete(scenario.id);
     const issues = inspectLifecycleScenario(scenario);
@@ -2102,6 +2155,7 @@ function validateCoreInstaller(root, checks, errors) {
   checks.coreInstaller.verifiesPruneHash = combinedText.includes("modified managed file; refusing to prune") && /currentHash\s*!==\s*record\.sha256/.test(combinedText);
   checks.coreInstaller.prunesManagedFileOnly = combinedText.includes("unlinkSync") && !combinedText.includes("rmSync(");
   checks.coreInstaller.avoidsCodexProjectionDefault = !/\.agents\/skills/.test(text);
+  checks.coreInstaller.projectsSkillDocDependencies = text.includes("dependencyAssetsForSkills") && text.includes("skill_dependency_asset");
 
   for (const [field, ok] of Object.entries(checks.coreInstaller)) {
     if (!ok) {
@@ -2140,6 +2194,8 @@ function validateCodexInstaller(root, checks, errors) {
   checks.codexInstaller.installsPrompts = text.includes(".agents/prompts") && text.includes("PROMPT_TEMPLATES");
   checks.codexInstaller.installsCommand = text.includes(".agents/commands") && text.includes("COMMAND_TEMPLATES");
   checks.codexInstaller.installsRuntimeRunner = text.includes("CODEX_RUNTIME_SCRIPTS") && text.includes("codex_runtime") && text.includes("codex-exec-runner.mjs");
+  checks.codexInstaller.projectsLifecycleContract = text.includes("docs/lifecycle-artifact-contract.md") && text.includes("requiredAssetsForPrompts");
+  checks.codexInstaller.requiresWorkPackageCompiler = /"spec-driven-development"\s*:\s*\{[\s\S]{0,200}requires:\s*\[[^\]]*"work-package-compiler"/.test(text);
   checks.codexInstaller.hasDryRun = text.includes("--dry-run") && /dryRun/.test(text);
   checks.codexInstaller.hasMergeAgents = text.includes("--merge-agents") && text.includes("agent-spectrum-kernel:start") && text.includes("agent-spectrum-kernel:end");
   checks.codexInstaller.hasSkipAgents = text.includes("--skip-agents") && /skipAgents/.test(text);
@@ -2186,6 +2242,8 @@ function validateInstallerProjection(root, checks, errors) {
     text.includes("computeRequiredClosure") &&
     ["unfamiliar_repository", "unclear_scope", "boundary_decision", "bug_investigation", "review"].every((fixtureId) => text.includes(fixtureId));
   checks.installerProjection.installsCommandAssets = text.includes("requiredAssets") && text.includes("installAssets");
+  checks.installerProjection.projectsLifecycleContract = text.includes("docs/lifecycle-artifact-contract.md") && text.includes("coreOwnedRequiredAssets");
+  checks.installerProjection.requiresWorkPackageCompiler = /"spec-driven-development"\s*:\s*\{[\s\S]{0,200}requires:\s*\[[^\]]*"work-package-compiler"/.test(text);
   checks.installerProjection.skipRuntimeSkipsHooks = text.includes("args.skipHooks || args.skipRuntime") && text.includes("removeManagedHooks");
   checks.installerProjection.settingsSourceOfTruth =
     text.includes("\"settings.json\"") &&
@@ -2204,6 +2262,8 @@ function validateInstallerProjection(root, checks, errors) {
     "validatesCommandClosure",
     "validatesRoutingClosure",
     "installsCommandAssets",
+    "projectsLifecycleContract",
+    "requiresWorkPackageCompiler",
     "skipRuntimeSkipsHooks",
     "settingsSourceOfTruth",
     "replacesManagedHooks",
@@ -2475,6 +2535,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- prune hash verification: ${claudeAdapterChecks.coreInstaller.verifiesPruneHash ? "ok" : "invalid"}`,
     `- prune limited to managed files: ${claudeAdapterChecks.coreInstaller.prunesManagedFileOnly ? "ok" : "invalid"}`,
     `- no Codex-specific projection by default: ${claudeAdapterChecks.coreInstaller.avoidsCodexProjectionDefault ? "ok" : "invalid"}`,
+    `- skill doc dependency assets projected: ${claudeAdapterChecks.coreInstaller.projectsSkillDocDependencies ? "ok" : "invalid"}`,
     "",
     "## Codex adapter installer checks",
     "",
@@ -2489,6 +2550,8 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- projects .agents/skills: ${claudeAdapterChecks.codexInstaller.projectsAgentsSkills ? "ok" : "invalid"}`,
     `- installs prompt templates: ${claudeAdapterChecks.codexInstaller.installsPrompts ? "ok" : "invalid"}`,
     `- installs command templates: ${claudeAdapterChecks.codexInstaller.installsCommand ? "ok" : "invalid"}`,
+    `- lifecycle contract asset projected: ${claudeAdapterChecks.codexInstaller.projectsLifecycleContract ? "ok" : "invalid"}`,
+    `- spec route requires Work Package Compiler: ${claudeAdapterChecks.codexInstaller.requiresWorkPackageCompiler ? "ok" : "invalid"}`,
     `- dry-run supported: ${claudeAdapterChecks.codexInstaller.hasDryRun ? "ok" : "invalid"}`,
     `- managed AGENTS.md merge supported: ${claudeAdapterChecks.codexInstaller.hasMergeAgents ? "ok" : "invalid"}`,
     `- skip AGENTS.md supported: ${claudeAdapterChecks.codexInstaller.hasSkipAgents ? "ok" : "invalid"}`,
@@ -2561,6 +2624,8 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- command closure validation: ${claudeAdapterChecks.installerProjection.validatesCommandClosure ? "ok" : "invalid"}`,
     `- routing closure validation: ${claudeAdapterChecks.installerProjection.validatesRoutingClosure ? "ok" : "invalid"}`,
     `- command assets projection: ${claudeAdapterChecks.installerProjection.installsCommandAssets ? "ok" : "invalid"}`,
+    `- lifecycle contract asset projection: ${claudeAdapterChecks.installerProjection.projectsLifecycleContract ? "ok" : "invalid"}`,
+    `- spec route requires Work Package Compiler: ${claudeAdapterChecks.installerProjection.requiresWorkPackageCompiler ? "ok" : "invalid"}`,
     `- skip-runtime skips hooks: ${claudeAdapterChecks.installerProjection.skipRuntimeSkipsHooks ? "ok" : "invalid"}`,
     `- settings.json hook source of truth: ${claudeAdapterChecks.installerProjection.settingsSourceOfTruth ? "ok" : "invalid"}`,
     `- managed hook replacement: ${claudeAdapterChecks.installerProjection.replacesManagedHooks ? "ok" : "invalid"}`,

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { chmodSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -424,13 +424,14 @@ const MANAGED_START = "<!-- agent-spectrum-kernel:start -->";
 const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 function install(manifest, options) {
   const skills = manifest.skills;
+  const dependencyAssetsForSkills = () => "skill_dependency_asset";
   const managed_files = {};
   const dryRun = options["--dry-run"];
   const currentHash = "current";
   const record = { sha256: "expected" };
   if (currentHash !== record.sha256) throw new Error("modified managed file; refusing to prune");
   unlinkSync("skills/example/SKILL.md");
-  if (dryRun) return { skills, managed_files };
+  if (dryRun) return { skills, managed_files, dependencyAssetsForSkills };
   if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
   if (options["--prune"]) return "stale managed projection";
   return STATE_PATH;
@@ -449,6 +450,8 @@ const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-
 const CODEX_PROFILES = { implementation: { skills: ["operating-mode-router"], prompts: PROMPT_TEMPLATES, commands: COMMAND_TEMPLATES } };
 const PROFILE_ROUTING_FIXTURES = { implementation: [{ id: "unfamiliar_repository", selected_route: "repository-orientation", required_skills: ["repository-orientation"] }] };
 const SKILL_RELATIONSHIPS = { "controlled-implementation": { requires: ["test-first-verification"], recommends: ["evidence-ledger"], incompatibleWith: [] } };
+const LIFECYCLE_ASSET = "docs/lifecycle-artifact-contract.md";
+function requiredAssetsForPrompts() { return [LIFECYCLE_ASSET]; }
 function routingFixturesForProfile() {
   return { router_reachable_skills: ["repository-orientation"], routing_fixtures: PROFILE_ROUTING_FIXTURES.implementation };
 }
@@ -476,7 +479,7 @@ function install(manifest, options) {
   if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
   if (skipAgents) return ".agents/skills";
   if (options["--prune"]) return "stale Codex managed projection";
-  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill" + "codex_runtime" + "codex-exec-runner.mjs" + CODEX_RUNTIME_SCRIPTS + profile + retained_stale_prompts + retained_stale_commands + stale_codex_prompt + stale_codex_command + validateSkillClosure().required_skills + routingFixturesForProfile().router_reachable_skills + routingFixturesForProfile().routing_fixtures + validateManagedReferences();
+  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill" + "codex_runtime" + "codex-exec-runner.mjs" + CODEX_RUNTIME_SCRIPTS + profile + retained_stale_prompts + retained_stale_commands + stale_codex_prompt + stale_codex_command + validateSkillClosure().required_skills + routingFixturesForProfile().router_reachable_skills + routingFixturesForProfile().routing_fixtures + validateManagedReferences() + requiredAssetsForPrompts() + '"spec-driven-development": { requires: ["work-package-compiler"] }';
 }
 `,
   );
@@ -522,8 +525,10 @@ const DEFAULT_SKILLS = [
   "engineering-capability-evaluation",
 ];
 const COMMAND_METADATA = {
-  "skill-review.md": { requiredSkills: ["review-router"], requiredAssets: [] },
+  "skill-review.md": { requiredSkills: ["review-router"], requiredAssets: ["docs/lifecycle-artifact-contract.md"] },
 };
+const SKILL_RELATIONSHIPS = { "spec-driven-development": { requires: ["work-package-compiler"] } };
+const coreOwnedRequiredAssets = new Set();
 const CLAUDE_PROFILES = { full: { skills: DEFAULT_SKILLS, commands: COMMAND_TEMPLATES } };
 const PROFILE_ROUTING_FIXTURES = {
   implementation: [
@@ -564,7 +569,7 @@ function removeAdapterOwnedHooks() {
 }
 function install(args) {
   if (args.skipHooks || args.skipRuntime) removeManagedHooks();
-  if (args.profile || DEFAULT_PROFILE) return HELP + "Selected Claude commands are not closed over installed skills" + "settings.json" + installAssets(COMMAND_METADATA["skill-review.md"]) + validateCoreInstalled();
+  if (args.profile || DEFAULT_PROFILE) return HELP + "Selected Claude commands are not closed over installed skills" + "settings.json" + installAssets(COMMAND_METADATA["skill-review.md"]) + validateCoreInstalled() + coreOwnedRequiredAssets + SKILL_RELATIONSHIPS;
 }
 `,
   );
@@ -867,6 +872,28 @@ function assertCodexReferenceIntegrity(name, target, state = readCodexInstallSta
       .filter((reference) => !managedPaths.has(reference) || !existsSync(resolve(target, reference)));
     if (missing.length > 0) {
       throw new Error(`${name} has missing installed prompt/command references in ${path}: ${[...new Set(missing)].join(", ")}`);
+    }
+  }
+}
+
+function assertInstalledDocReferences(name, target, relativeRoots) {
+  const files = [];
+  const visit = (path) => {
+    if (!existsSync(path)) return;
+    for (const entry of readdirSync(path, { withFileTypes: true })) {
+      const child = resolve(path, entry.name);
+      if (entry.isDirectory()) visit(child);
+      else if (entry.isFile() && entry.name.endsWith(".md")) files.push(child);
+    }
+  };
+  for (const root of relativeRoots) visit(resolve(target, root));
+  for (const file of files) {
+    const references = [...readFileSync(file, "utf8").matchAll(/\bdocs\/[A-Za-z0-9._/-]+/g)].map((match) => match[0]);
+    for (const reference of new Set(references)) {
+      const isManagedContract = reference.endsWith("-contract.md") && !reference.startsWith("docs/ai/");
+      if (isManagedContract && existsSync(resolve(repoRoot, reference)) && !existsSync(resolve(target, reference))) {
+        throw new Error(`${name} leaves unresolved managed doc reference ${reference} from ${file}`);
+      }
     }
   }
 }
@@ -2294,11 +2321,18 @@ function assertInstallerScripts() {
 
   const firstInstall = runRepoScript([installer, "--target", target]);
   assertRuntimePass("installer first run", firstInstall);
+  assertInstalledDocReferences("Claude adapter install smoke", target, [".claude/skills", ".claude/commands"]);
+  if (!existsSync(resolve(target, "docs/lifecycle-artifact-contract.md"))) {
+    throw new Error("Claude adapter install must provide the canonical lifecycle artifact contract");
+  }
   const installedSignalRegistry = resolve(target, "schemas/review-signal-gate-map.json");
   if (!existsSync(installedSignalRegistry) || readFileSync(installedSignalRegistry, "utf8") !== readFileSync(resolve(repoRoot, "schemas/review-signal-gate-map.json"), "utf8")) {
     throw new Error("Claude project installer should project the canonical signal registry");
   }
   const firstClaudeState = JSON.parse(readFileSync(resolve(target, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  if (!firstClaudeState.required_assets?.includes("docs/lifecycle-artifact-contract.md")) {
+    throw new Error("Claude adapter state must record lifecycle contract as a required managed dependency");
+  }
   if (Object.hasOwn(firstClaudeState.managed_files ?? {}, "schemas/review-signal-gate-map.json")) {
     throw new Error("Claude project installer must not claim ownership of the core canonical signal registry");
   }
@@ -2552,6 +2586,25 @@ function assertInstallerScripts() {
     throw new Error("installer invalid routing closure should not install commands");
   }
 
+  const missingWorkPackageTarget = resolve(fixtureRoot, "install-missing-work-package-target");
+  assertRuntimePass("installer missing work package core setup", runRepoScript([coreInstaller, "--target", missingWorkPackageTarget]));
+  assertRuntimeFail(
+    "installer spec override requires work package compiler",
+    runRepoScript([
+      installer,
+      "--target",
+      missingWorkPackageTarget,
+      "--profile",
+      "implementation",
+      "--skills",
+      "operating-mode-router,skill-router,requirement-grill,spec-driven-development,test-first-verification,controlled-implementation,evidence-ledger,risk-gate,handoff-generation,repository-orientation,scope-control,application-boundary-architecture,domain-rule-ledger,grill-design,grill-with-docs,planning-with-files",
+    ]),
+    "work-package-compiler",
+  );
+  if (existsSync(resolve(missingWorkPackageTarget, ".claude/commands/skill-implement.md"))) {
+    throw new Error("Claude missing work package closure must fail before installation");
+  }
+
   const pluginHooks = JSON.parse(readFileSync(resolve(repoRoot, "adapters/claude-code/plugin/hooks/hooks.json"), "utf8"));
   const pluginHookCommands = Object.values(pluginHooks.hooks ?? {}).flatMap((groups) =>
     groups.flatMap((group) => (group.hooks ?? []).map((hook) => hook.command ?? "")),
@@ -2607,6 +2660,13 @@ function assertCoreInstallerScripts() {
   }
   if (!existsSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"))) {
     throw new Error("kernel installer should project manifest skills");
+  }
+  if (freshState.managed_files?.["docs/lifecycle-artifact-contract.md"]?.kind !== "skill_dependency_asset") {
+    throw new Error("core installer state must manage lifecycle contract through skill dependency closure");
+  }
+  assertInstalledDocReferences("core installer dependency closure", freshTarget, ["skills"]);
+  if (!existsSync(resolve(freshTarget, "docs/lifecycle-artifact-contract.md"))) {
+    throw new Error("core installer must project lifecycle contract referenced by selected skills");
   }
   if (readFileSync(resolve(freshTarget, "schemas/review-signal-gate-map.json"), "utf8") !== readFileSync(resolve(repoRoot, "schemas/review-signal-gate-map.json"), "utf8")) {
     throw new Error("kernel installer should project the canonical signal registry");
@@ -2787,7 +2847,14 @@ function assertCodexInstallerScripts() {
   assertRuntimePass("codex installer core setup", runRepoScript([coreInstaller, "--target", freshTarget]));
   const freshRun = runRepoScript([installer, "--target", freshTarget]);
   assertRuntimePass("codex installer fresh run", freshRun);
+  assertInstalledDocReferences("Codex adapter install smoke", freshTarget, [".agents/skills", ".agents/prompts", ".agents/commands"]);
+  if (!existsSync(resolve(freshTarget, "docs/lifecycle-artifact-contract.md"))) {
+    throw new Error("Codex adapter install must provide the canonical lifecycle artifact contract");
+  }
   const freshState = readCodexInstallState(freshTarget);
+  if (!freshState.required_assets?.includes("docs/lifecycle-artifact-contract.md")) {
+    throw new Error("Codex adapter state must record lifecycle contract as a required managed dependency");
+  }
   if (
     freshState.selected_profile !== "implementation" ||
     freshState.installed_skills.length >= manifest.skills.length ||
@@ -3010,6 +3077,16 @@ function assertCodexInstallerScripts() {
   );
   if (existsSync(resolve(invalidClosureTarget, ".agent-spectrum-kernel/codex-install-state.json")) || existsSync(resolve(invalidClosureTarget, ".agents"))) {
     throw new Error("codex installer invalid skill closure should not write files");
+  }
+
+  const missingWorkPackageTarget = resolve(fixtureRoot, "codex-install-missing-work-package");
+  assertRuntimeFail(
+    "codex spec override requires work package compiler",
+    runRepoScript([installer, "--target", missingWorkPackageTarget, "--skills", "spec-driven-development,test-first-verification,controlled-implementation", "--skip-prompts", "--skip-command"]),
+    "Missing required skill(s): work-package-compiler",
+  );
+  if (existsSync(resolve(missingWorkPackageTarget, ".agent-spectrum-kernel/codex-install-state.json")) || existsSync(resolve(missingWorkPackageTarget, ".agents"))) {
+    throw new Error("Codex missing work package closure must fail before installation");
   }
 
   const invalidRouterClosureTarget = resolve(fixtureRoot, "codex-install-invalid-router-closure");
@@ -3355,20 +3432,18 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 cat <<'EOF' > "$output"
-Changed:
-- Ran fake Codex implementation.
+Implementation Contract:
+- Artifact ID: IMPL-FAKE
+- Upstream refs: WP-FAKE, VER-FAKE
+- Actual change boundary: local fixture
+- Verification attempted: node scripts/test-validate-repo.mjs
+- Evidence references: evidence below
+- Handoff state: review pending
 
-Verified:
-- node scripts/test-validate-repo.mjs
-
-Not verified:
-- Real Codex runtime.
-
-Risks / assumptions:
-- Fixture-only execution.
-
-Next:
-- Prepare review.
+Evidence:
+- Implementation Contract ref: IMPL-FAKE
+- command: node scripts/test-validate-repo.mjs
+  result: pass
 ${validEnvelopeBlock}
 EOF
 `,
@@ -3535,20 +3610,18 @@ function assertSensorsScript() {
   const implementationPass = resolve(target, "implementation-pass.txt");
   writeFileSync(
     implementationPass,
-    `Changed:
-- Added local validation wiring.
+    `Implementation Contract:
+- Artifact ID: IMPL-PASS
+- Upstream refs: WP-PASS, VER-PASS
+- Actual change boundary: local validation wiring
+- Verification attempted: node scripts/test-validate-repo.mjs
+- Evidence references: evidence below
+- Handoff state: review pending
 
-Verified:
-- node scripts/test-validate-repo.mjs
-
-Not verified:
-- External integrations.
-
-Risks / assumptions:
-- None beyond local fixture scope.
-
-Next:
-- Prepare review.
+Evidence:
+- Implementation Contract ref: IMPL-PASS
+- command: node scripts/test-validate-repo.mjs
+  result: pass
 ${validEnvelopeBlock}
 `,
   );
@@ -3561,7 +3634,7 @@ ${validEnvelopeBlock}
   const missingEnvelope = resolve(target, "implementation-missing-envelope.txt");
   writeFileSync(
     missingEnvelope,
-    `Changed:\n- Added local validation wiring.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nNot verified:\n- External integrations.\n\nRisks / assumptions:\n- Fixture-only scope.\n\nNext:\n- Prepare review.\n`,
+    `Implementation Contract:\n- Artifact ID: IMPL-MISSING-ENVELOPE\n- Upstream refs: WP-X\n- Actual change boundary: local validation wiring\n- Verification attempted: node scripts/test-validate-repo.mjs\n- Evidence references: evidence below\n- Handoff state: review pending\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n`,
   );
   const missingEnvelopeResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", missingEnvelope]);
   assertRuntimePass("sensors missing execution envelope is report-only", missingEnvelopeResult);
@@ -3592,7 +3665,7 @@ ${validEnvelopeBlock}
   }
 
   const implementationFail = resolve(target, "implementation-fail.txt");
-  writeFileSync(implementationFail, "Changed:\n- Updated code.\n\nVerified:\n- tests pass\n");
+  writeFileSync(implementationFail, "Implementation Contract:\n- Artifact ID: IMPL-INCOMPLETE\n");
   const implementationFailResult = runRepoScript([sensorsScript, "--target", target, "--mode", "implementation", "--input", implementationFail]);
   assertRuntimePass("sensors implementation fail is report-only", implementationFailResult);
   if (!implementationFailResult.stdout.includes("ASK sensors: fail") || !implementationFailResult.stdout.includes("missing required sections")) {
@@ -3602,20 +3675,16 @@ ${validEnvelopeBlock}
   const weakEvidence = resolve(target, "weak-evidence.txt");
   writeFileSync(
     weakEvidence,
-    `Changed:
-- Updated local validation wiring.
+    `Implementation Contract:
+- Artifact ID: IMPL-WEAK
+- Upstream refs: WP-WEAK
+- Actual change boundary: local validation wiring
+- Verification attempted: inspection
+- Evidence references: evidence below
+- Handoff state: review pending
 
-Verified:
+Evidence:
 - Looks good.
-
-Not verified:
-- none
-
-Risks / assumptions:
-- No additional risk identified.
-
-Next:
-- Ready for review.
 ${validEnvelopeBlock}
 `,
   );
@@ -3632,20 +3701,16 @@ ${validEnvelopeBlock}
   const testsPassWithoutCommand = resolve(target, "tests-pass-without-command.txt");
   writeFileSync(
     testsPassWithoutCommand,
-    `Changed:
-- Updated local validation wiring.
+    `Implementation Contract:
+- Artifact ID: IMPL-NO-COMMAND
+- Upstream refs: WP-NO-COMMAND
+- Actual change boundary: local validation wiring
+- Verification attempted: tests
+- Evidence references: evidence below
+- Handoff state: review pending
 
-Verified:
+Evidence:
 - tests pass
-
-Not verified:
-- none
-
-Risks / assumptions:
-- None beyond local fixture scope.
-
-Next:
-- Prepare review.
 ${validEnvelopeBlock}
 `,
   );
@@ -3658,20 +3723,17 @@ ${validEnvelopeBlock}
   const concreteEvidence = resolve(target, "concrete-evidence.txt");
   writeFileSync(
     concreteEvidence,
-    `Changed:
-- Added local validation wiring.
+    `Implementation Contract:
+- Artifact ID: IMPL-CONCRETE
+- Upstream refs: WP-CONCRETE
+- Actual change boundary: local validation wiring
+- Verification attempted: node scripts/test-validate-repo.mjs
+- Evidence references: evidence below
+- Handoff state: review pending
 
-Verified:
-- node scripts/test-validate-repo.mjs
-
-Not verified:
-- none
-
-Risks / assumptions:
-- None beyond local fixture scope.
-
-Next:
-- Prepare review.
+Evidence:
+- command: node scripts/test-validate-repo.mjs
+  result: pass
 ${validEnvelopeBlock}
 `,
   );
@@ -3854,7 +3916,7 @@ ${validEnvelopeBlock}
 
   const promptContracts = [
     ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nUnknown / not verified:\n- External runtime.\n\nNext:\n- Continue investigation.\n\n" + validEnvelopeBlock],
-    ["verification", "Verification Contract:\n- Behavior to prove: fixture.\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\nNot verified:\n- External runtime.\n\nNext verification:\n- Run integration coverage.\n\n" + validEnvelopeBlock],
+    ["verification", "Verification Contract:\n- Artifact ID: VER-FIXTURE\n- Behavior to prove: fixture.\n\nEvidence:\n- Verification Contract ref: VER-FIXTURE\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\n" + validEnvelopeBlock],
     ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nStop condition:\n- Missing evidence.\n\n" + insufficientEvidenceEnvelopeBlock],
   ];
   for (const [mode, content] of promptContracts) {
@@ -3888,21 +3950,18 @@ ${validEnvelopeBlock}
   const negatedRisk = resolve(target, "negated-risk.txt");
   writeFileSync(
     negatedRisk,
-    `Changed:
-- Documentation only. No deployment or release action was performed.
+    `Implementation Contract:
+- Artifact ID: IMPL-NEGATED-RISK
+- Upstream refs: WP-NEGATED-RISK
+- Actual change boundary: documentation only; no deployment or release action was performed
+- Verification attempted: node scripts/test-validate-repo.mjs
+- Evidence references: evidence below
+- Handoff state: reviewed auth docs only
+- Discovered scope: email behavior was not touched; auth code was not modified; telemetry is out of scope
 
-Verified:
-- node scripts/test-validate-repo.mjs
-
-Not verified:
-- Email notification behavior was not touched.
-
-Risks / assumptions:
-- Auth code was not modified.
-- Telemetry is out of scope.
-
-Next:
-- Reviewed auth docs only.
+Evidence:
+- command: node scripts/test-validate-repo.mjs
+  result: pass
 ${validEnvelopeBlock}
 `,
   );
@@ -3915,20 +3974,18 @@ ${validEnvelopeBlock}
   const scopedEvidencePhrases = resolve(target, "scoped-evidence-phrases.txt");
   writeFileSync(
     scopedEvidencePhrases,
-    `Changed:
-- Quoted issue title: "Fixed flaky sensor wording".
+    `Implementation Contract:
+- Artifact ID: IMPL-SCOPED-EVIDENCE
+- Upstream refs: WP-SCOPED-EVIDENCE
+- Actual change boundary: quoted issue title "Fixed flaky sensor wording"
+- Verification attempted: node scripts/test-validate-repo.mjs
+- Evidence references: evidence below
+- Handoff state: review pending
+- Discovered scope: correctness of unrelated adapters is not confirmed; read-only investigation remains allowed without a safety claim
 
-Verified:
-- node scripts/test-validate-repo.mjs
-
-Not verified:
-- Correctness of unrelated adapters is not confirmed correct.
-
-Risks / assumptions:
-- Safe read-only investigation remains allowed; no safety claim is made.
-
-Next:
-- Prepare review.
+Evidence:
+- command: node scripts/test-validate-repo.mjs
+  result: pass
 ${validEnvelopeBlock}
 `,
   );

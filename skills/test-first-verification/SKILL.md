@@ -110,13 +110,10 @@ Evidence:
   result:
 - command:
   result:
-
-Not verified:
-- ...
-
-Next verification:
-- ...
+- Insufficient evidence observed, when present:
 ```
+
+Keep the next action only in the shared Execution Envelope. Do not add separate `Not verified` or `Next verification` summaries; attach missing proof to the Evidence record and envelope evidence status.
 
 ## Optional Metrics Event Candidate
 

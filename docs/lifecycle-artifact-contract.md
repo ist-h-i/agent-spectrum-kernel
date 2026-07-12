@@ -18,12 +18,24 @@ A bounded inline summary is allowed only when the upstream artifact cannot trave
 ```text
 Artifact header:
 - Artifact ID:
-- Artifact type: requirement | spec | work_package | verification | implementation
+- Artifact type: requirement | spec | work_package | verification | implementation | compact
 - Upstream refs: artifact ID plus optional section/field
 - Deltas: target ref, field, previous value, new value, reason, and decision evidence
 ```
 
 For a delta to a Requirement-owned field, `decision evidence` must identify human confirmation or another authoritative business source. If that evidence is absent, stop for a human decision. Contradictory upstream artifacts are not resolved by choosing one silently; record the conflict and stop.
+
+### Effective values and superseding precedence
+
+Resolve a downstream artifact in this order:
+
+1. Resolve each referenced artifact's effective field map, including all of its inherited values and applied deltas.
+2. Merge equal effective values from `upstream_refs`; reference order never selects a winner.
+3. Treat different effective values for the same field as a conflict.
+4. Resolve a conflict only with a delta whose `supersedes_refs` names every conflicting upstream reference. Its `target_ref` and `from` identify the effective value being changed; its `to` becomes the downstream effective value.
+5. Apply remaining deltas in listed order, then overlay fields owned by the current artifact. A current owned field that changes an inherited value must equal the corresponding delta `to`.
+
+Because a delta updates the effective field map, later artifacts may form an explicit `A -> B -> C` chain by targeting the immediately preceding artifact. A delta's `from` is checked against the target artifact's effective value, not only its locally owned fields.
 
 ## Responsibility table
 
@@ -34,6 +46,7 @@ For a delta to a Requirement-owned field, `decision evidence` must identify huma
 | Work Package | Executable change boundary: allowed/forbidden scope, ordered tasks, dependencies, stop conditions, expected evidence | Requirement rationale, behavior prose, proof results, implementation history |
 | Verification Contract | Proof obligations: behavior/regression checks, negative/manual/runtime/measurement evidence, insufficient-evidence and claim gates | Implementation scope, code decisions, executed evidence as if it were the contract |
 | Implementation Contract | Implementation-only decisions and record: actual boundary, deviations, discoveries, attempts, evidence references, limitations, handoff | Unchanged Requirement, Spec, Work Package, or Verification content |
+| Compact artifact | A localized decision, behavior, scope, proof, and implementation boundary under one artifact identity | Anonymous or non-referenceable shorthand; expanded lifecycle prose |
 
 ## Requirement Contract
 
@@ -171,18 +184,25 @@ Do not copy goal, non-goals, expected behavior, acceptance criteria, allowed/for
 
 Missing upstream artifacts do not force synthetic reconstruction. Produce the smallest artifact required by the current task and set `upstream_refs` only for artifacts that exist.
 
-For trivial or localized work, one compact artifact may carry multiple boundaries if it keeps them distinguishable:
+For trivial or localized work, one compact artifact may carry multiple boundaries if it keeps them distinguishable. It remains a referenceable artifact and follows the same identity and delta rules:
 
 ```text
-Compact change:
-- Decision: requested outcome or source reference
-- Behavior delta:
-- Allowed / forbidden scope:
-- Proof obligation and evidence:
-- Implementation-only decisions or deviations:
+Compact artifact:
+- Artifact ID:
+- Artifact type: compact
+- Upstream refs:
+- Boundaries:
+  - Decision: requested outcome or source reference
+  - Behavior delta:
+  - Allowed scope:
+  - Forbidden scope:
+  - Proof obligation:
+  - Evidence:
+  - Implementation decisions: optional
+- Deltas: [] or explicit delta records
 ```
 
-Do not create empty lifecycle artifacts merely to complete the chain.
+Later Verification or Implementation artifacts may reference the compact artifact ID. Do not create empty lifecycle artifacts merely to complete the chain.
 
 ## Conflict and stop rules
 

@@ -13,6 +13,7 @@ Use this adapter when a repository wants Codex to follow the core kernel, route 
 - A Codex adapter installer for `.agents/skills`, `.agents/prompts`, `.agents/commands`, and the local runner/sensor runtime used by the command template.
 - Explicit evidence-level downgrades for projected-only workflows, unsupported automation, telemetry, hooks, and shared PR workflows.
 - A shared Execution Envelope contract for routing, evidence state, stop reasons, and next actions at workflow boundaries.
+- The canonical lifecycle artifact contract for Requirement, Spec, Work Package, Verification, Implementation, and compact artifact boundaries.
 
 The Codex adapter installer projects Codex-specific files into another repository:
 
@@ -21,7 +22,7 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-The core installer owns `AGENTS.md`. The Codex adapter updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, `scripts/codex-exec-runner.mjs`, the local sensor runtime used by that runner, and `.agent-spectrum-kernel/codex-install-state.json`. It does not create hooks, telemetry, GitHub Actions, external publication, secrets, deploys, or releases.
+The core installer owns `AGENTS.md` and immutable contract docs referenced by selected skills. The Codex adapter updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, prompt-required contract assets not already owned by core, `scripts/codex-exec-runner.mjs`, the local sensor runtime used by that runner, and `.agent-spectrum-kernel/codex-install-state.json`. It does not create hooks, telemetry, GitHub Actions, external publication, secrets, deploys, or releases.
 
 ## Codex Projection Model
 
@@ -61,7 +62,7 @@ Use profiles instead of arbitrary partial skill sets for normal installs:
 | `observability` | Skill effectiveness, adoption metrics, and capability evaluation. |
 | `full` | All manifest skills and all Codex prompt templates. |
 
-Each profile installs a closed command/prompt/skill/runtime set. Installed command examples only reference prompt files and runtime scripts selected by that profile.
+Each profile installs a closed command/prompt/skill/runtime/contract-asset set. Installed command examples only reference files present in the adopting repository. Selecting `spec-driven-development` requires `work-package-compiler`; advanced overrides that omit it fail before writes.
 
 Profile closure includes representative router-reachable routes for the profile's declared task scope. For example, the implementation profile includes routes for unfamiliar repositories, unclear scope, boundary decisions, domain-rule impact, design grill, docs/ADR constraints, and long-running work; investigation includes bug investigation routes; review includes the review-router gate family.
 
@@ -79,7 +80,7 @@ Use these files as copy-paste prompts or as `codex exec` prompt files:
 
 They route through the existing core skills and require evidence-backed outputs. They do not store raw prompts, secrets, customer data, personal data, full command output, or full file contents.
 
-Prompt templates define entry intent, mutation level, evidence requirements, and output contract. They use the shared `docs/execution-envelope-contract.md` for one boundary-level control record and do not duplicate the canonical skill-routing procedure; routing remains in `operating-mode-router`, `skill-router`, review routing, or explicitly named relevant skills.
+Prompt templates define entry intent, mutation level, evidence requirements, and output contract. They use `docs/lifecycle-artifact-contract.md` for lifecycle artifacts and the shared `docs/execution-envelope-contract.md` for one boundary-level control record. Implementation and verification outputs use one Contract plus Evidence record and keep `next_action` only in the Envelope.
 
 For non-trivial continuation, handoff, interrupted work, or risk-gated work, handoff prompts may include bounded resume state when useful. The adapter does not require session state for trivial or fully captured simple local tasks.
 

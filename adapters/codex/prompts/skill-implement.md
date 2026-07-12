@@ -32,20 +32,11 @@ Implementation Contract:
 
 Conditional fields may be omitted. Include implementation decisions not fixed upstream, remaining limitations, deviations, discoveries, blockers, or approved deltas only when present. Do not replay upstream lifecycle prose.
 
-Changed:
-- ...
-
-Verified:
-- ...
-
-Not verified:
-- ...
-
-Risks / assumptions:
-- ...
-
-Next:
-- ...
+Evidence:
+- Implementation Contract ref:
+- command or observation:
+  result:
+- Insufficient evidence observed, when present:
 
 Execution Envelope:
 ```json

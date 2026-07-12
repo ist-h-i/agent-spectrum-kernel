@@ -98,7 +98,7 @@ export const CODEX_PROMPT_CONTRACTS = {
   "skill-implement.md": {
     mode: "implementation",
     sandbox: "workspace-write",
-    requiredSections: ["Changed:", "Verified:", "Not verified:", "Risks / assumptions:", "Next:", "Execution Envelope:"],
+    requiredSections: ["Implementation Contract:", "Evidence:", "Execution Envelope:"],
   },
   "skill-investigate.md": {
     mode: "investigation",
@@ -113,7 +113,7 @@ export const CODEX_PROMPT_CONTRACTS = {
   "skill-verify.md": {
     mode: "verification",
     sandbox: "workspace-write",
-    requiredSections: ["Verification Contract:", "Evidence:", "Not verified:", "Next verification:", "Execution Envelope:"],
+    requiredSections: ["Verification Contract:", "Evidence:", "Execution Envelope:"],
   },
   "skill-handoff.md": {
     mode: "handoff",

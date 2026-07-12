@@ -23,7 +23,9 @@
     {
       "id": "compact",
       "expected": "valid",
-      "compact": { "decision": "rename a local label", "behavior_delta": "Submit becomes Save", "allowed_scope": ["label resource"], "forbidden_scope": ["submit behavior"], "proof_obligation": "rendered label equals Save", "evidence": "focused resource test", "implementation_decisions": "reuse existing key" }
+      "artifacts": [
+        { "id": "COMPACT-001", "type": "compact", "upstream_refs": [], "boundaries": { "decision": "rename a local label", "behavior_delta": "Submit becomes Save", "allowed_scope": ["label resource"], "forbidden_scope": ["submit behavior"], "proof_obligation": "rendered label equals Save", "evidence": "focused resource test", "implementation_decisions": "reuse existing key" }, "deltas": [] }
+      ]
     },
     {
       "id": "changed-assumption",
@@ -40,6 +42,34 @@
       "artifacts": [
         { "id": "SPEC-004", "type": "spec", "upstream_refs": [], "fields": { "behavior_delta": "export visible tasks", "acceptance_criteria": ["include archived tasks"] } },
         { "id": "IMPL-004", "type": "implementation", "upstream_refs": ["SPEC-004"], "fields": { "acceptance_criteria": ["exclude archived tasks"], "actual_change_boundary": ["src/task-export.mjs"], "verification_attempts": ["node --test"], "evidence_references": ["local:test"], "remaining_limitations": [], "handoff_state": "blocked" } }
+      ]
+    },
+    {
+      "id": "conflicting-upstreams",
+      "expected": "invalid",
+      "expected_errors": ["conflicting upstream field acceptance_criteria requires an explicit superseding delta for SPEC-005A, SPEC-005B"],
+      "artifacts": [
+        { "id": "SPEC-005A", "type": "spec", "upstream_refs": [], "fields": { "behavior_delta": "export task history", "acceptance_criteria": ["include archived tasks"] } },
+        { "id": "SPEC-005B", "type": "spec", "upstream_refs": [], "fields": { "behavior_delta": "export task history", "acceptance_criteria": ["exclude archived tasks"] } },
+        { "id": "WP-005", "type": "work_package", "upstream_refs": ["SPEC-005A", "SPEC-005B"], "fields": { "allowed_scope": ["task export"], "forbidden_scope": ["archive policy"], "ordered_tasks": ["implement export"], "dependencies": ["task history"], "stop_conditions": ["acceptance criteria conflict"], "evidence_expectations": ["focused export test"] } }
+      ]
+    },
+    {
+      "id": "consecutive-deltas",
+      "expected": "valid",
+      "artifacts": [
+        { "id": "REQ-006", "type": "requirement", "upstream_refs": [], "fields": { "why": "control export disclosure", "actor": "task owner", "object": "task history", "outcome": "policy-compliant export", "responsibility_boundary": "owner initiates export", "policy_boundary": "assigned tasks", "success_condition": "permitted tasks export", "failure_condition": "unpermitted tasks export" } },
+        { "id": "SPEC-006", "type": "spec", "upstream_refs": ["REQ-006"], "fields": { "behavior_delta": "export visible task history", "acceptance_criteria": ["visible history exports"] }, "deltas": [{ "target_ref": "REQ-006", "field": "policy_boundary", "from": "assigned tasks", "to": "visible tasks", "reason": "product owner clarified visibility", "decision_evidence": "Human-confirmed: issue comment #50" }] },
+        { "id": "WP-006", "type": "work_package", "upstream_refs": ["SPEC-006"], "fields": { "allowed_scope": ["task export"], "forbidden_scope": ["visibility calculation"], "ordered_tasks": ["implement export"], "dependencies": ["visible task selector"], "stop_conditions": ["policy evidence changes"], "evidence_expectations": ["focused export test"] }, "deltas": [{ "target_ref": "SPEC-006", "field": "policy_boundary", "from": "visible tasks", "to": "visible non-archived tasks", "reason": "domain owner clarified archive policy", "decision_evidence": "Human-confirmed: domain review #7" }] }
+      ]
+    },
+    {
+      "id": "superseding-upstreams",
+      "expected": "valid",
+      "artifacts": [
+        { "id": "SPEC-007A", "type": "spec", "upstream_refs": [], "fields": { "behavior_delta": "export task history", "acceptance_criteria": ["include archived tasks"] } },
+        { "id": "SPEC-007B", "type": "spec", "upstream_refs": [], "fields": { "behavior_delta": "export task history", "acceptance_criteria": ["exclude archived tasks"] } },
+        { "id": "WP-007", "type": "work_package", "upstream_refs": ["SPEC-007A", "SPEC-007B"], "fields": { "allowed_scope": ["task export"], "forbidden_scope": ["archive policy source"], "ordered_tasks": ["implement export"], "dependencies": ["task history"], "stop_conditions": ["superseding decision evidence becomes stale"], "evidence_expectations": ["focused export test"] }, "deltas": [{ "target_ref": "SPEC-007A", "supersedes_refs": ["SPEC-007A", "SPEC-007B"], "field": "acceptance_criteria", "from": ["include archived tasks"], "to": ["exclude archived tasks"], "reason": "approved Spec B supersedes Spec A", "decision_evidence": "Authoritative: approved spec review #9" }] }
       ]
     }
   ]

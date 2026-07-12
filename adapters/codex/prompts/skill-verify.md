@@ -36,12 +36,7 @@ Evidence:
 - Verification Contract ref:
 - command:
   result:
-
-Not verified:
-- ...
-
-Next verification:
-- ...
+- Insufficient evidence observed, when present:
 
 Execution Envelope:
 ```json

@@ -84,7 +84,7 @@ const COMMAND_METADATA = {
   },
   "skill-implement.md": {
     requiredSkills: ["skill-router", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
-    requiredAssets: ["docs/execution-envelope-contract.md"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"],
   },
   "skill-investigate.md": {
     requiredSkills: ["skill-router", "doubt-driven-development", "test-first-verification", "evidence-ledger", "risk-gate"],
@@ -92,7 +92,7 @@ const COMMAND_METADATA = {
   },
   "skill-verify.md": {
     requiredSkills: ["test-first-verification", "evidence-ledger"],
-    requiredAssets: ["docs/execution-envelope-contract.md"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"],
   },
   "skill-handoff.md": {
     requiredSkills: ["handoff-generation", "evidence-ledger"],
@@ -140,7 +140,7 @@ const SKILL_RELATIONSHIPS = {
     requires: ["test-first-verification"],
   },
   "spec-driven-development": {
-    requires: ["test-first-verification", "controlled-implementation"],
+    requires: ["work-package-compiler", "test-first-verification", "controlled-implementation"],
   },
   "review-final-merge-gate": {
     requires: ["review-router"],
@@ -780,6 +780,13 @@ function installRuntime(args, writes) {
 
 function installAssets(args, writes) {
   for (const asset of args.requiredAssets) {
+    const coreRecord = args.coreState?.managed_files?.[asset];
+    const sourceContent = readFileSync(resolve(REPO_ROOT, asset), "utf8");
+    const targetPath = resolve(args.target, asset);
+    if (coreRecord?.sha256 === lifecycle.hashText(sourceContent) && existsSync(targetPath) && lifecycle.hashText(readFileSync(targetPath, "utf8")) === coreRecord.sha256) {
+      args.coreOwnedRequiredAssets.add(asset);
+      continue;
+    }
     copyFilePlanned(resolve(REPO_ROOT, asset), resolve(args.target, asset), args, writes, { kind: "claude_asset", asset });
   }
   for (const asset of args.initialProjectStateAssets) {
@@ -847,6 +854,7 @@ function validateCoreInstalled(args) {
   if (!registryRecord?.sha256 || !existsSync(registryPath) || lifecycle.hashText(readFileSync(registryPath, "utf8")) !== registryRecord.sha256) {
     throw new Error(`ASK core canonical review signal registry is missing or does not match core install state: ${CANONICAL_REGISTRY_PATH}`);
   }
+  args.coreState = state;
 }
 
 function readPreviousState(target) {
@@ -955,6 +963,9 @@ function manageStaleFiles(args, writes) {
   args.retainedStaleFiles = [];
   for (const [relativePath, record] of Object.entries(args.previousState?.managed_files ?? {}).sort()) {
     if (relativePath === CANONICAL_REGISTRY_PATH) {
+      continue;
+    }
+    if (args.coreOwnedRequiredAssets.has(relativePath)) {
       continue;
     }
     if (currentPaths.has(relativePath)) {
@@ -1070,6 +1081,7 @@ function main() {
   args.managedFiles = {};
   args.managedPartialFiles = {};
   args.managedHooks = [];
+  args.coreOwnedRequiredAssets = new Set();
   args.rollback = lifecycle.createRollbackSnapshot();
   resolveSelection(args);
   validateCoreInstalled(args);

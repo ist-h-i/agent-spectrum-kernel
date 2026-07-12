@@ -55,7 +55,8 @@ The installer does not enable external publication. It does not create secrets, 
 
 ## Asset Lifecycle
 
-- Managed references such as contracts, schemas, README files, and fixed templates are refreshed from the ASK checkout on each install.
+- Immutable contracts referenced by selected skills are projected by the core installer. Claude commands declare `docs/lifecycle-artifact-contract.md` as a required managed dependency and reuse the core-owned file when its hash matches.
+- Other managed references such as schemas, README files, and fixed templates are refreshed from the ASK checkout on each install.
 - Project-owned state such as `docs/ai/improvement-ledger.md` and `docs/ai/skill-adoption-metrics.md` is initialized only when absent. A later install, including `full` and `observability`, preserves existing content.
 - `docs/ai/metrics/` and `docs/ai/reports/` are runtime directories only. The installer creates the directories but does not seed or replace event or report data.
 - `--dry-run` labels each planned file operation as `refresh`, `initialize`, or `preserve`; runtime directories are reported separately.
@@ -72,7 +73,7 @@ Supported profiles:
 | `observability` | Report, ledger refresh, verification, and handoff commands plus local metrics/evaluation skills. |
 | `full` | All manifest skills and all Claude project commands. This is the default. |
 
-Profiles are closed over command requirements, skill dependencies, and normal router-reachable routes for their task scope. For example, `implementation` includes routes such as `repository-orientation`, `scope-control`, `application-boundary-architecture`, `domain-rule-ledger`, `grill-design`, `grill-with-docs`, and `planning-with-files`.
+Profiles are closed over command requirements, skill dependencies, managed contract assets, and normal router-reachable routes for their task scope. `spec-driven-development` requires `work-package-compiler`; an advanced override that omits it fails before writes. For example, `implementation` includes routes such as `repository-orientation`, `scope-control`, `application-boundary-architecture`, `domain-rule-ledger`, `grill-design`, `grill-with-docs`, and `planning-with-files`.
 
 Use `--skills <csv>` only as an advanced override. The installer fails before writing files if the override is not closed over the selected profile's commands and router-reachable skills.
 
