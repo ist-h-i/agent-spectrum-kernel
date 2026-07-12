@@ -783,7 +783,6 @@ function installRuntime(args, writes) {
 function installAssets(args, writes) {
   for (const asset of args.requiredAssets) {
     if (CORE_OWNED_IMMUTABLE_ASSETS.includes(asset)) {
-      args.coreOwnedRequiredAssets.add(asset);
       continue;
     }
     copyFilePlanned(resolve(REPO_ROOT, asset), resolve(args.target, asset), args, writes, { kind: "claude_asset", asset });
@@ -798,6 +797,20 @@ function installAssets(args, writes) {
 
 function requiredSkillsForCommands(commands) {
   return commands.flatMap((command) => COMMAND_METADATA[command]?.requiredSkills ?? []);
+}
+
+function requiredAssetsForSkills(skills) {
+  const assets = new Set();
+  for (const skill of skills) {
+    const sourcePath = resolve(REPO_ROOT, "skills", skill, "SKILL.md");
+    const content = readFileSync(sourcePath, "utf8");
+    for (const asset of CORE_OWNED_IMMUTABLE_ASSETS) {
+      if (content.includes(asset)) {
+        assets.add(asset);
+      }
+    }
+  }
+  return [...assets].sort();
 }
 
 function routingFixturesForProfile(profileName, seedSkills, selectedCommands) {
@@ -898,7 +911,10 @@ function resolveSelection(args) {
   if (missingRequiredSkills.length > 0) {
     throw new Error(`Selected Claude commands are not closed over installed skills: ${missingRequiredSkills.join(", ")}`);
   }
-  const requiredAssets = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].requiredAssets))].sort();
+  const requiredAssets = [...new Set([
+    ...selectedCommands.flatMap((command) => COMMAND_METADATA[command].requiredAssets),
+    ...requiredAssetsForSkills(selectedSkills),
+  ])].sort();
   const initialProjectStateAssets = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].initialProjectStateAssets ?? []))].sort();
   const runtimeDirectories = [...new Set(selectedCommands.flatMap((command) => COMMAND_METADATA[command].runtimeDirectories ?? []))].sort();
   args.selectedSkills = selectedSkills;
@@ -971,7 +987,7 @@ function manageStaleFiles(args, writes) {
     if (relativePath === CANONICAL_REGISTRY_PATH) {
       continue;
     }
-    if (args.coreOwnedRequiredAssets.has(relativePath)) {
+    if (CORE_OWNED_IMMUTABLE_ASSETS.includes(relativePath)) {
       continue;
     }
     if (currentPaths.has(relativePath)) {
@@ -1087,7 +1103,6 @@ function main() {
   args.managedFiles = {};
   args.managedPartialFiles = {};
   args.managedHooks = [];
-  args.coreOwnedRequiredAssets = new Set();
   args.rollback = lifecycle.createRollbackSnapshot();
   resolveSelection(args);
   validateCoreInstalled(args);

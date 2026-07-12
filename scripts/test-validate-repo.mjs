@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
+import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
 import { inspectLifecycleScenario } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -532,7 +533,7 @@ const COMMAND_METADATA = {
   "skill-review.md": { requiredSkills: ["review-router"], requiredAssets: ["docs/lifecycle-artifact-contract.md"] },
 };
 const SKILL_RELATIONSHIPS = { "spec-driven-development": { requires: ["work-package-compiler"] } };
-const coreOwnedRequiredAssets = new Set();
+const CORE_OWNED_IMMUTABLE_ASSETS = ["docs/lifecycle-artifact-contract.md"];
 const CORE_PRESERVE_PATHS = ["docs/lifecycle-artifact-contract.md"];
 const CLAUDE_PROFILES = { full: { skills: DEFAULT_SKILLS, commands: COMMAND_TEMPLATES } };
 const PROFILE_ROUTING_FIXTURES = {
@@ -560,6 +561,9 @@ function validateCoreInstalled() {
 function installAssets(command) {
   return command.requiredAssets;
 }
+function requiredAssetsForSkills() {
+  return CORE_OWNED_IMMUTABLE_ASSETS;
+}
 function routingFixturesForProfile() {
   return PROFILE_ROUTING_FIXTURES;
 }
@@ -574,7 +578,7 @@ function removeAdapterOwnedHooks() {
 }
 function install(args) {
   if (args.skipHooks || args.skipRuntime) removeManagedHooks();
-  if (args.profile || DEFAULT_PROFILE) return HELP + "Selected Claude commands are not closed over installed skills" + "settings.json" + installAssets(COMMAND_METADATA["skill-review.md"]) + validateCoreInstalled() + coreOwnedRequiredAssets + CORE_PRESERVE_PATHS + "ASK core immutable contract is missing or stale" + SKILL_RELATIONSHIPS;
+  if (args.profile || DEFAULT_PROFILE) return HELP + "Selected Claude commands are not closed over installed skills" + "settings.json" + installAssets(COMMAND_METADATA["skill-review.md"]) + requiredAssetsForSkills() + validateCoreInstalled() + CORE_PRESERVE_PATHS + "ASK core immutable contract is missing or stale" + SKILL_RELATIONSHIPS;
 }
 `,
   );
@@ -2469,6 +2473,31 @@ function assertInstallerScripts() {
   }
   assertRuntimePass("core check after Claude ownership transition", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget, "--check"]));
 
+  const legacyOwnershipTarget = resolve(fixtureRoot, "install-claude-legacy-ownership-migration");
+  assertRuntimePass("legacy Claude ownership core setup", runRepoScript([coreInstaller, "--target", legacyOwnershipTarget]));
+  assertRuntimePass("legacy Claude ownership adapter setup", runRepoScript([installer, "--target", legacyOwnershipTarget, "--profile", "full"]));
+  const legacyClaudeStatePath = resolve(legacyOwnershipTarget, ".agent-spectrum-kernel/claude-install-state.json");
+  const legacyClaudeState = JSON.parse(readFileSync(legacyClaudeStatePath, "utf8"));
+  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
+    const content = readFileSync(resolve(legacyOwnershipTarget, asset), "utf8");
+    legacyClaudeState.managed_files[asset] = { kind: "claude_asset", asset, sha256: hashText(content) };
+  }
+  writeFileSync(legacyClaudeStatePath, `${JSON.stringify(legacyClaudeState, null, 2)}\n`);
+  assertRuntimePass("legacy Claude ownership new core install", runRepoScript([coreInstaller, "--target", legacyOwnershipTarget]));
+  assertRuntimePass("legacy Claude ownership implementation prune", runRepoScript([installer, "--target", legacyOwnershipTarget, "--profile", "implementation", "--prune"]));
+  const migratedCoreState = JSON.parse(readFileSync(resolve(legacyOwnershipTarget, ".agent-spectrum-kernel/install-state.json"), "utf8"));
+  const migratedClaudeState = JSON.parse(readFileSync(legacyClaudeStatePath, "utf8"));
+  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
+    const targetPath = resolve(legacyOwnershipTarget, asset);
+    const coreRecord = migratedCoreState.managed_files?.[asset];
+    if (!existsSync(targetPath) || coreRecord?.kind !== "immutable_contract" || hashText(readFileSync(targetPath, "utf8")) !== coreRecord.sha256) {
+      throw new Error(`legacy Claude ownership migration must preserve the core-owned immutable contract: ${asset}`);
+    }
+    if (Object.hasOwn(migratedClaudeState.managed_files ?? {}, asset)) {
+      throw new Error(`legacy Claude ownership migration must drop the adapter ownership record: ${asset}`);
+    }
+  }
+
   const rollbackTarget = resolve(fixtureRoot, "install-claude-rollback-target");
   assertRuntimePass("installer rollback core setup", runRepoScript([coreInstaller, "--target", rollbackTarget]));
   assertRuntimePass("installer rollback first profile", runRepoScript([installer, "--target", rollbackTarget, "--profile", "implementation"]));
@@ -2593,6 +2622,18 @@ function assertInstallerScripts() {
   );
   if (existsSync(resolve(missingCoreContractTarget, ".claude"))) {
     throw new Error("Claude adapter must not self-own or repair a missing core contract");
+  }
+
+  const missingSkillContractTarget = resolve(fixtureRoot, "install-claude-missing-skill-contract");
+  assertRuntimePass("Claude missing skill contract core setup", runRepoScript([coreInstaller, "--target", missingSkillContractTarget]));
+  rmSync(resolve(missingSkillContractTarget, "docs/stack-implementation-overlay-contract.md"));
+  assertRuntimeFail(
+    "Claude missing selected skill contract",
+    runRepoScript([installer, "--target", missingSkillContractTarget, "--profile", "full"]),
+    "ASK core immutable contract is missing or stale: docs/stack-implementation-overlay-contract.md",
+  );
+  if (existsSync(resolve(missingSkillContractTarget, ".claude"))) {
+    throw new Error("Claude selected-skill contract preflight must fail before writing adapter files");
   }
 
   const invalidPartialTarget = resolve(fixtureRoot, "install-invalid-partial-target");

@@ -55,7 +55,7 @@ The installer does not enable external publication. It does not create secrets, 
 
 ## Asset Lifecycle
 
-- The core installer always owns the root immutable Execution Envelope and Lifecycle Artifact contracts, independent of selected skills. Claude commands declare them as required dependencies but never own or repair them; a missing or stale core contract stops adapter installation and requires a core reinstall.
+- The core installer always owns every root immutable contract, independent of selected skills. Claude commands and selected skills declare them as required dependencies but never own or repair them; a missing or stale core contract stops adapter installation and requires a core reinstall. During migration, legacy Claude ownership records for these contracts are dropped without deleting the core-owned files.
 - Other managed references such as schemas, README files, and fixed templates are refreshed from the ASK checkout on each install.
 - Project-owned state such as `docs/ai/improvement-ledger.md` and `docs/ai/skill-adoption-metrics.md` is initialized only when absent. A later install, including `full` and `observability`, preserves existing content.
 - `docs/ai/metrics/` and `docs/ai/reports/` are runtime directories only. The installer creates the directories but does not seed or replace event or report data.

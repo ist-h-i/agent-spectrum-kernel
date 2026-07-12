@@ -1823,6 +1823,7 @@ function validateClaudeAdapterArchitecture(root, manifest, errors) {
       validatesCommandClosure: false,
       validatesRoutingClosure: false,
       installsCommandAssets: false,
+      resolvesSkillAssets: false,
       skipRuntimeSkipsHooks: false,
       settingsSourceOfTruth: false,
       replacesManagedHooks: false,
@@ -2251,7 +2252,8 @@ function validateInstallerProjection(root, checks, errors) {
     text.includes("computeRequiredClosure") &&
     ["unfamiliar_repository", "unclear_scope", "boundary_decision", "bug_investigation", "review"].every((fixtureId) => text.includes(fixtureId));
   checks.installerProjection.installsCommandAssets = text.includes("requiredAssets") && text.includes("installAssets");
-  checks.installerProjection.projectsLifecycleContract = text.includes("docs/lifecycle-artifact-contract.md") && text.includes("coreOwnedRequiredAssets");
+  checks.installerProjection.projectsLifecycleContract = text.includes("docs/lifecycle-artifact-contract.md") && text.includes("CORE_OWNED_IMMUTABLE_ASSETS");
+  checks.installerProjection.resolvesSkillAssets = text.includes("requiredAssetsForSkills") && text.includes("CORE_OWNED_IMMUTABLE_ASSETS");
   checks.installerProjection.preservesCoreContracts = text.includes("CORE_PRESERVE_PATHS") && text.includes("ASK core immutable contract is missing or stale");
   checks.installerProjection.requiresWorkPackageCompiler = /"spec-driven-development"\s*:\s*\{[\s\S]{0,200}requires:\s*\[[^\]]*"work-package-compiler"/.test(text);
   checks.installerProjection.skipRuntimeSkipsHooks = text.includes("args.skipHooks || args.skipRuntime") && text.includes("removeManagedHooks");
@@ -2272,6 +2274,7 @@ function validateInstallerProjection(root, checks, errors) {
     "validatesCommandClosure",
     "validatesRoutingClosure",
     "installsCommandAssets",
+    "resolvesSkillAssets",
     "projectsLifecycleContract",
     "preservesCoreContracts",
     "requiresWorkPackageCompiler",
@@ -2637,6 +2640,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- command closure validation: ${claudeAdapterChecks.installerProjection.validatesCommandClosure ? "ok" : "invalid"}`,
     `- routing closure validation: ${claudeAdapterChecks.installerProjection.validatesRoutingClosure ? "ok" : "invalid"}`,
     `- command assets projection: ${claudeAdapterChecks.installerProjection.installsCommandAssets ? "ok" : "invalid"}`,
+    `- selected skill assets resolved: ${claudeAdapterChecks.installerProjection.resolvesSkillAssets ? "ok" : "invalid"}`,
     `- lifecycle contract asset projection: ${claudeAdapterChecks.installerProjection.projectsLifecycleContract ? "ok" : "invalid"}`,
     `- core contract ownership preserved: ${claudeAdapterChecks.installerProjection.preservesCoreContracts ? "ok" : "invalid"}`,
     `- spec route requires Work Package Compiler: ${claudeAdapterChecks.installerProjection.requiresWorkPackageCompiler ? "ok" : "invalid"}`,
