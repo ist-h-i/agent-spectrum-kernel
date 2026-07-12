@@ -23,7 +23,7 @@ Make success observable before declaring the work complete.
 
 ## Process
 
-1. Read `docs/lifecycle-artifact-contract.md` and produce the Verification Contract before or alongside implementation planning. When evidence will support a completion, merge, or release claim, use `docs/lifecycle-traceability-contract.md` to assign stable obligation and evidence IDs and retain the observed upstream revision.
+1. Read `docs/lifecycle-artifact-contract.md` and produce the Verification Contract before or alongside implementation planning. When evidence will support a completion, merge, or release claim, use `docs/lifecycle-traceability-contract.md` to assign stable obligation and evidence IDs, retain the observed upstream revision, and map each evidence item to its exact supported items.
 
 Use available repository context for commands, existing coverage, and test patterns. If a stack or project overlay supplies verification supplements, apply it without hard-coding stack-specific rules into this skill.
 

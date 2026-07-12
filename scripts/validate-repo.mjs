@@ -1399,28 +1399,66 @@ export function inspectTraceabilityScenarioResult(scenario) {
     return refs.map((ref) => resolveTraceRef(owner, field, ref, { requireItem }));
   }
 
-  function evidenceReachesRequired(evidenceResolution, requiredRef) {
-    if (!evidenceResolution?.structureValid || !evidenceResolution.artifact || !evidenceResolution.current) return false;
-    if (evidenceResolution.ref.artifact_id === requiredRef.artifact_id && evidenceResolution.ref.item_id === requiredRef.item_id && evidenceResolution.ref.observed_revision === requiredRef.observed_revision) return true;
+  function itemRefKey(ref) {
+    return `${ref.artifact_id}@${ref.observed_revision}#${ref.item_id}`;
+  }
+
+  function itemRefReaches(startRef, requiredRef) {
+    if (!startRef?.item_id || !requiredRef?.item_id) return false;
+    if (itemRefKey(startRef) === itemRefKey(requiredRef)) return true;
     const visited = new Set();
-    const queue = [evidenceResolution.artifact.id];
+    const queue = [startRef];
     while (queue.length > 0) {
-      const artifactId = queue.shift();
-      if (visited.has(artifactId)) continue;
-      visited.add(artifactId);
-      const artifact = artifactById.get(artifactId);
-      for (const upstreamRef of artifact?.upstream_refs ?? []) {
+      const currentRef = queue.shift();
+      const currentKey = itemRefKey(currentRef);
+      if (visited.has(currentKey)) continue;
+      visited.add(currentKey);
+      const artifact = artifactById.get(currentRef.artifact_id);
+      if (!artifact || currentRef.observed_revision !== artifact.revision) continue;
+      const item = artifact.itemById.get(currentRef.item_id);
+      const upstreamRefs = item?.upstream_refs
+        ?? (artifact.type === "evidence" && artifact.itemById.size === 1 ? artifact.upstream_refs : []);
+      for (const upstreamRef of upstreamRefs) {
         if (!upstreamRef || typeof upstreamRef !== "object" || Array.isArray(upstreamRef)) continue;
         const upstreamArtifact = artifactById.get(upstreamRef.artifact_id);
-        if (!upstreamArtifact || upstreamRef.observed_revision !== upstreamArtifact.revision) continue;
-        if (upstreamRef.artifact_id === requiredRef.artifact_id && upstreamRef.item_id === requiredRef.item_id && upstreamRef.observed_revision === requiredRef.observed_revision) return true;
-        queue.push(upstreamRef.artifact_id);
+        if (!upstreamArtifact || upstreamRef.observed_revision !== upstreamArtifact.revision || !upstreamRef.item_id || !upstreamArtifact.itemById.has(upstreamRef.item_id)) continue;
+        if (itemRefKey(upstreamRef) === itemRefKey(requiredRef)) return true;
+        queue.push(upstreamRef);
       }
     }
     return false;
   }
 
-  for (const artifact of artifactById.values()) inspectRefs(artifact.id, "upstream_refs", artifact.upstream_refs);
+  function evidenceReachesRequired(evidenceResolution, requiredRef) {
+    return evidenceResolution?.structureValid && evidenceResolution.current && evidenceResolution.item
+      ? itemRefReaches(evidenceResolution.ref, requiredRef)
+      : false;
+  }
+
+  function subjectConnectsRequired(subjectResolution, requiredResolution, claimType) {
+    if (!subjectResolution?.item || !requiredResolution?.item || !subjectResolution.current || !requiredResolution.current) return false;
+    if (itemRefKey(subjectResolution.ref) === itemRefKey(requiredResolution.ref)) return true;
+    if (claimType === "release" && subjectResolution.artifact.type === "release_readiness" && requiredResolution.artifact.id === subjectResolution.artifact.id) return true;
+    return itemRefReaches(subjectResolution.ref, requiredResolution.ref) || itemRefReaches(requiredResolution.ref, subjectResolution.ref);
+  }
+
+  function subjectKindAllowed(claimType, resolution) {
+    if (!resolution?.artifact || !resolution.item) return false;
+    if (claimType === "completion") {
+      return (resolution.artifact.type === "spec" && ["behavior", "acceptance"].includes(resolution.item.kind))
+        || (resolution.artifact.type === "work_package" && resolution.item.kind === "task");
+    }
+    if (claimType === "merge") return resolution.artifact.type === "implementation" && resolution.item.kind === "change";
+    if (claimType === "release") return resolution.artifact.type === "release_readiness" && resolution.item.kind === "check";
+    return false;
+  }
+
+  for (const artifact of artifactById.values()) {
+    inspectRefs(artifact.id, "upstream_refs", artifact.upstream_refs);
+    for (const item of artifact.itemById.values()) {
+      if (item.upstream_refs !== undefined) inspectRefs(`${artifact.id}#${item.id}`, "upstream_refs", item.upstream_refs, { requireItem: true });
+    }
+  }
 
   const claimById = new Map();
   const claimsBySubject = new Map();
@@ -1432,7 +1470,7 @@ export function inspectTraceabilityScenarioResult(scenario) {
     if (claimById.has(claim.id)) issues.push(`duplicate traceability claim id ${claim.id}`);
     if (!["completion", "merge", "release"].includes(claim.type)) issues.push(`${claim.id} has invalid claim type ${claim.type}`);
     if (!["supported", "blocked", "insufficient_evidence"].includes(claim.status)) issues.push(`${claim.id} has invalid claim status ${claim.status}`);
-    inspectRefs(claim.id, "subject_refs", claim.subject_refs);
+    const subjectResolutions = inspectRefs(claim.id, "subject_refs", claim.subject_refs, { requireItem: true });
     const evidenceResolutions = inspectRefs(claim.id, "evidence_refs", claim.evidence_refs, { requireItem: true });
     const blockerResolutions = inspectRefs(claim.id, "blocker_refs", claim.blocker_refs, { requireItem: true });
     const acceptedRiskResolutions = inspectRefs(claim.id, "accepted_risk_refs", claim.accepted_risk_refs, { requireItem: true });
@@ -1477,6 +1515,7 @@ export function inspectTraceabilityScenarioResult(scenario) {
     const requiredRefs = Array.isArray(claim.required_refs) ? claim.required_refs : [];
     const claimGaps = [];
     const supportGapLabels = new Set();
+    const resolvedRequiredRefs = [];
     for (const gapType of applicableGapTypes) {
       const entries = requiredRefs.filter((entry) => entry?.gap_type === gapType);
       if (entries.length === 0) {
@@ -1497,10 +1536,21 @@ export function inspectTraceabilityScenarioResult(scenario) {
         claimGaps.push({ gap_type: entry.gap_type, required_by_claim: claim.id, missing_item_ref: resolution.label, stage: claim.type === "merge" ? "review" : claim.type });
         continue;
       }
+      resolvedRequiredRefs.push({ entry, resolution });
       if (["acceptance", "verification"].includes(entry.gap_type) && !evidenceResolutions.some((evidenceResolution) => evidenceReachesRequired(evidenceResolution, ref))) {
         claimGaps.push({ gap_type: entry.gap_type, required_by_claim: claim.id, missing_item_ref: resolution.label, stage: claim.type === "merge" ? "review" : claim.type });
         supportGapLabels.add(`${entry.gap_type}:${resolution.label}`);
         if (claim.status === "supported") issues.push(`${claim.id} evidence_refs cannot reach required ${entry.gap_type} ${resolution.label}`);
+      }
+    }
+    for (const subjectResolution of subjectResolutions) {
+      if (!subjectResolution.structureValid || !subjectResolution.artifact || !subjectResolution.item || !subjectResolution.current) continue;
+      if (!subjectKindAllowed(claim.type, subjectResolution)) {
+        issues.push(`${claim.id} subject_refs has invalid ${claim.type} subject: ${subjectResolution.label}`);
+        continue;
+      }
+      if (resolvedRequiredRefs.length > 0 && !resolvedRequiredRefs.some(({ resolution }) => subjectConnectsRequired(subjectResolution, resolution, claim.type))) {
+        issues.push(`${claim.id} subject_refs are disconnected from required_refs: ${subjectResolution.label}`);
       }
     }
     for (const gap of claimGaps) {
@@ -1548,7 +1598,7 @@ function validateLifecycleTraceabilityContract(root, manifest, errors) {
   }
   if (!checks.contractPresent || !checks.fixturePresent) return checks;
   const contract = readFileSync(resolve(root, LIFECYCLE_TRACEABILITY_CONTRACT_PATH), "utf8");
-  for (const phrase of ["Stable reference model", "observed_revision", "Claim record", "insufficient evidence", "Trivial or localized", "observed facts", "never waives", "upstream_refs` remains the canonical", "must not be mixed", "same resolver rules", "must reach the exact required item", "kind is `blocker`", "missing_item_ref: undeclared", "Structured gaps", "accepted_by", "acceptance`, `verification`, `review`, `approval`, and `rollback", "Release Readiness", "No central server"]) {
+  for (const phrase of ["Stable reference model", "observed_revision", "Claim record", "insufficient evidence", "Trivial or localized", "observed facts", "never waives", "upstream_refs` remains the canonical", "must not be mixed", "same resolver rules", "reachability nodes are", "multiple items must define", "Completion subjects", "Every subject must be", "must reach the exact required item", "kind is `blocker`", "missing_item_ref: undeclared", "Structured gaps", "accepted_by", "acceptance`, `verification`, `review`, `approval`, and `rollback", "Release Readiness", "No central server"]) {
     if (!contract.toLowerCase().includes(phrase.toLowerCase())) fail(errors, "lifecycle traceability", `${LIFECYCLE_TRACEABILITY_CONTRACT_PATH} is missing ${phrase}`);
   }
   for (const path of TRACEABILITY_SKILL_PATHS) {
@@ -1589,6 +1639,8 @@ function validateLifecycleTraceabilityContract(root, manifest, errors) {
     "blocker-ref-revision-omitted",
     "release-required-ref-omitted",
     "wrong-kind-blocker-ref",
+    "evidence-item-cross-contamination",
+    "subject-required-disconnected",
     "stale-reference",
     "contradictory-claims",
   ]);

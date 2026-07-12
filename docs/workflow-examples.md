@@ -222,6 +222,8 @@ REL-001@1
 
 `EVID-REL@1#CI-PASS` must reference, directly or transitively through current `upstream_refs`, the exact acceptance and verification items it supports. Co-locating disconnected refs in `CLAIM-RELEASE-001` is invalid.
 
+When an Evidence artifact contains multiple evidence items, each item owns its support edges. `TEST-PAYMENT` cannot inherit `TEST-EXPORT` mappings merely because both live in one artifact. Completion, merge, and release subjects must also match their claim-type contract and connect to the required refs.
+
 A release claim with missing evidence emits one structured record per gap:
 
 ```text
