@@ -47,19 +47,24 @@ Select the smallest set of review gates needed to make the merge decision defens
    - `review-final-merge-gate`: always last when a merge decision is requested.
    - A route or gate decision trigger is valid only when every trigger ID is present in `change_signals[].signal` and the controlled mapping includes that gate. Unknown, mismatched, negated, or free-form evidence text does not justify a gate.
 
-4. Order the route by decision impact.
+4. Apply the active adapter capability gate.
+   - When an adapter state is active, verify every selected gate and follow-up destination against `selected_skills`, not `installed_skills` or directory presence.
+   - Missing required review gates stop with `capability_missing`; do not approximate the missing review procedure.
+   - Missing knowledge follow-ups such as `review-finding-compiler` or `improvement-ledger` remain explicit candidates in the current review artifact, stop before promotion, and recommend the `organizational` profile or a closed override. They never affect the current merge blocker decision.
+
+5. Order the route by decision impact.
    - Domain and architecture signals precede technical review when applicable.
    - Output and adversarial overlays run when their signals are observed.
    - Automated evidence runs before the final merge gate.
-   - `review-finding-compiler` and `improvement-ledger` are follow-ups only for reusable or non-blocking findings; they never hide current-PR blockers.
+   - `review-finding-compiler` and `improvement-ledger` are knowledge-plane follow-ups only after an explicit promotion trigger identifies the destination, evidence boundary, owner, and stop condition; they never hide current-PR blockers and are never updated as a side effect of review completion.
 
-5. Detect routing deviations.
+6. Detect routing deviations.
    - Under-processing: a required gate is absent from executed gate evidence.
    - Over-processing: an executed heavy gate has no matching observed trigger signal.
    - Missing-evidence deviation: unavailable inputs are represented as skipped or omitted instead of insufficient evidence.
    - Heavy gates are `review-domain-impact`, `review-architecture-impact`, `review-output-quality`, `review-adversarial-risk`, `review-code-health`, `risk-gate`, `adr-review`, and `release-readiness-gate`.
 
-6. Keep the route minimal.
+7. Keep the route minimal.
    - Do not run a gate only because a layer exists.
    - A skipped heavy gate must cite observed evidence or an observed signal showing why it is not applicable.
    - The normal user-facing route does not enumerate unaffected layers.

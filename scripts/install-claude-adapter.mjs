@@ -13,6 +13,7 @@ const CORE_PRESERVE_PATHS = [CANONICAL_REGISTRY_PATH, ...CORE_OWNED_IMMUTABLE_AS
 const DEFAULT_PROFILE = "full";
 const HOOK_MARKER = "agent-spectrum-kernel:claude-adapter-hook";
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+const PLANE_ORDER = ["execution", "knowledge", "control"];
 const DEFAULT_SKILLS = [
   "adr-review",
   "angular-implementation-architecture",
@@ -164,6 +165,14 @@ const SKILL_RELATIONSHIPS = {
   },
 };
 const CLAUDE_PROFILES = {
+  daily: {
+    projectionPack: "daily_delivery",
+    commands: ["skill-review.md", "skill-implement.md", "skill-investigate.md", "skill-verify.md", "skill-handoff.md"],
+  },
+  organizational: {
+    projectionPack: "organizational_intelligence",
+    commands: COMMAND_TEMPLATES,
+  },
   implementation: {
     skills: [
       "operating-mode-router",
@@ -235,6 +244,13 @@ const CLAUDE_PROFILES = {
   },
 };
 const PROFILE_ROUTING_FIXTURES = {
+  daily: [
+    { id: "daily_implementation_available", router: "skill-router", selectedRoute: "controlled-implementation", outcome: "available", requiredSkills: ["controlled-implementation"] },
+    { id: "daily_review_available", router: "skill-router", selectedRoute: "review-router", outcome: "available", requiredSkills: ["review-router"] },
+    { id: "daily_knowledge_capability_missing", router: "skill-router", selectedRoute: "review-finding-compiler", outcome: "capability_missing", recommendedProfile: "organizational", requiredSkills: [] },
+    { id: "daily_adoption_capability_missing", router: "operating-mode-router", selectedRoute: "project-adoption-pack-generation", outcome: "capability_missing", recommendedProfile: "organizational", requiredSkills: [] },
+    { id: "daily_observability_capability_missing", router: "operating-mode-router", selectedRoute: "skill-effectiveness-evaluation", outcome: "capability_missing", recommendedProfile: "organizational", requiredSkills: [] },
+  ],
   implementation: [
     {
       id: "delivery_quality_mode",
@@ -259,12 +275,6 @@ const PROFILE_ROUTING_FIXTURES = {
       router: "skill-router",
       selectedRoute: "application-boundary-architecture",
       requiredSkills: ["application-boundary-architecture"],
-    },
-    {
-      id: "domain_rule_impact",
-      router: "skill-router",
-      selectedRoute: "domain-rule-ledger",
-      requiredSkills: ["domain-rule-ledger"],
     },
     {
       id: "design_grill",
@@ -419,7 +429,7 @@ function printHelp() {
 
 Options:
   --target <path>      Adopting project root. Defaults to cwd.
-  --profile <name>     Supported profile: implementation, investigation, review, observability, full. Defaults to ${DEFAULT_PROFILE}.
+  --profile <name>     Supported profile: daily, organizational, implementation, investigation, review, observability, full. Defaults to ${DEFAULT_PROFILE}.
   --skills <csv>       Advanced skill override. Installed commands must remain closed over required skills and assets.
   --skip-hooks         Do not copy hook config.
   --skip-runtime       Do not copy local runtime scripts or config.
@@ -821,6 +831,7 @@ function routingFixturesForProfile(profileName, seedSkills, selectedCommands) {
 function skillsForRoutingFixtures(routingFixtures) {
   const skills = new Set();
   for (const fixture of routingFixtures) {
+    if (fixture.outcome === "capability_missing") continue;
     if (fixture.selectedRoute && SKILL_NAME_PATTERN.test(fixture.selectedRoute)) {
       skills.add(fixture.selectedRoute);
     }
@@ -891,7 +902,12 @@ function resolveSelection(args) {
     throw new Error(`Unknown profile: ${args.profile}`);
   }
   const manifestSkillSet = new Set(manifest.skills);
-  const profileSkills = profile.skills === null ? manifest.skills : profile.skills;
+  const profileSkills = profile.projectionPack
+    ? manifest.projection_packs?.[profile.projectionPack]?.skills
+    : profile.skills === null ? manifest.skills : profile.skills;
+  if (!Array.isArray(profileSkills)) {
+    throw new Error(`Profile '${args.profile}' references missing projection pack '${profile.projectionPack}'`);
+  }
   const selectedCommands = [...profile.commands];
   const skillSeed = args.skills ?? profileSkills;
   const routingFixtures = routingFixturesForProfile(args.profile, skillSeed, selectedCommands);
@@ -922,6 +938,9 @@ function resolveSelection(args) {
   args.requiredAssets = requiredAssets;
   args.initialProjectStateAssets = initialProjectStateAssets;
   args.runtimeDirectories = runtimeDirectories;
+  args.routingFixtures = routingFixtures;
+  args.requiredSkills = requiredSkills;
+  args.routerReachableSkills = skillsForRoutingFixtures(routingFixtures);
 }
 
 function normalizeHooks(hooks) {
@@ -1014,6 +1033,30 @@ function manageStaleFiles(args, writes) {
   }
 }
 
+function planesForSkills(skills, manifest) {
+  const present = new Set(skills.map((skill) => manifest.skill_planes?.[skill]).filter(Boolean));
+  return PLANE_ORDER.filter((plane) => present.has(plane));
+}
+
+function matchingProjectionPack(skills, manifest) {
+  const selected = [...new Set(skills)].sort();
+  for (const [name, pack] of Object.entries(manifest.projection_packs ?? {})) {
+    const packed = [...new Set(pack.skills ?? [])].sort();
+    if (selected.length === packed.length && selected.every((skill, index) => skill === packed[index])) return name;
+  }
+  return null;
+}
+
+function enforceProjectionBoundary(args, manifest) {
+  const profile = CLAUDE_PROFILES[args.profile];
+  if (!profile?.projectionPack || args.skills !== null || !args.previousState) return;
+  const selected = new Set(args.selectedSkills);
+  const excluded = (args.previousState.installed_skills ?? []).filter((skill) => manifest.skills.includes(skill) && !selected.has(skill)).sort();
+  if (excluded.length > 0 && !args.prune) {
+    throw new Error(`Profile '${args.profile}' is a strict projection boundary and excludes managed skill(s): ${excluded.join(", ")}. Re-run with --profile ${args.profile} --prune.`);
+  }
+}
+
 function buildState(args, manifest) {
   const selectedSkills = args.selectedSkills;
   const retainedStaleSkills = args.retainedStaleFiles
@@ -1022,6 +1065,7 @@ function buildState(args, manifest) {
     .filter(Boolean)
     .sort();
   const installedSkills = [...new Set([...selectedSkills, ...retainedStaleSkills])].sort();
+  const projectionPackName = matchingProjectionPack(selectedSkills, manifest);
   return lifecycle.buildLifecycleState({
     manifest,
     repoRoot: REPO_ROOT,
@@ -1043,6 +1087,11 @@ function buildState(args, manifest) {
     rollback: args.rollback,
     hasMutations: args.operations.some((operation) => !operation.unchanged),
     extra: {
+      selection_mode: args.skills !== null ? "custom" : CLAUDE_PROFILES[args.profile]?.projectionPack ? "projection_pack" : "profile",
+      selected_projection_pack: projectionPackName,
+      selected_planes: planesForSkills(selectedSkills, manifest),
+      installed_planes: planesForSkills(installedSkills, manifest),
+      knowledge_write_policy: "explicit_only",
       installed_commands: [...new Set([...args.selectedCommands, ...args.retainedStaleFiles.filter((path) => path.startsWith(".claude/commands/")).map((path) => path.split("/").at(-1))])].sort(),
       selected_commands: args.selectedCommands,
       retained_stale_files: args.retainedStaleFiles,
@@ -1050,6 +1099,18 @@ function buildState(args, manifest) {
       required_assets: args.requiredAssets,
       initial_project_state_assets: args.initialProjectStateAssets,
       runtime_directories: args.runtimeDirectories,
+      skill_closure: {
+        required_skills: args.requiredSkills,
+        router_reachable_skills: args.routerReachableSkills,
+        routing_fixtures: args.routingFixtures.map((fixture) => ({
+          id: fixture.id,
+          router: fixture.router,
+          selected_route: fixture.selectedRoute,
+          outcome: fixture.outcome ?? "available",
+          recommended_profile: fixture.recommendedProfile ?? null,
+          required_skills: [...(fixture.requiredSkills ?? [])].sort(),
+        })),
+      },
     },
   });
 }
@@ -1105,6 +1166,7 @@ function main() {
   args.managedHooks = [];
   args.rollback = lifecycle.createRollbackSnapshot();
   resolveSelection(args);
+  enforceProjectionBoundary(args, manifest);
   validateCoreInstalled(args);
   installSkills(args, writes);
   installCommands(args, writes);

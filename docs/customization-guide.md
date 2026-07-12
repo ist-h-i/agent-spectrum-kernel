@@ -1,5 +1,13 @@
 # Agent Spectrum Kernel Customization Guide
 
+## Plane and projection customization
+
+Every canonical Skill must retain exactly one `manifest.json.skill_planes` assignment: `execution`, `knowledge`, or `control`. Add or move a Skill only after its stable responsibility is clear; do not use plane metadata to redefine lifecycle artifact ownership from `docs/lifecycle-artifact-contract.md`.
+
+Keep `daily_delivery` free of knowledge-plane Skills. Add durable knowledge workflows through `organizational_intelligence` or an explicit advanced `--skills` override, and preserve `knowledge_write_policy: explicit_only`. A custom cross-plane transition must name its trigger, destination route, owner, and stop condition. Validation rejects missing/invalid assignments, dishonest pack plane declarations, incomplete organizational packs, and unknown transition destinations.
+
+Existing `skill_groups` remain operating-mode compatibility metadata. A Skill's group membership and plane answer different questions and should not be mechanically derived from each other.
+
 ## Rule of placement
 
 Add a rule to `AGENTS.md` only if it should apply to a one-line typo fix.

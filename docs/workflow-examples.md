@@ -1,5 +1,19 @@
 # Agent Spectrum Kernel Workflow Examples
 
+## Responsibility-plane example
+
+```text
+Ordinary implementation or review
+-> execution + control planes
+-> finish with current-task evidence and follow-ups
+-> do not update a ledger merely because the task completed
+
+Explicit request to preserve a reusable lesson
+-> identify destination, evidence boundary, owner, and stop condition
+-> enter the knowledge plane through the matching lifecycle Skill
+-> keep any unresolved current-task blocker in the original review or implementation artifact
+```
+
 ## 0. Natural work request routing
 
 User request:

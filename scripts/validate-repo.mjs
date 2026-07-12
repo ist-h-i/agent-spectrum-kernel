@@ -246,6 +246,9 @@ const REQUIRED_SKILL_GROUPS = [
   "operation_automation",
 ];
 const REQUIRED_SKILL_GROUP_SET = new Set(REQUIRED_SKILL_GROUPS);
+const SKILL_PLANES = ["execution", "knowledge", "control"];
+const SKILL_PLANE_SET = new Set(SKILL_PLANES);
+const REQUIRED_PROJECTION_PACKS = ["daily_delivery", "organizational_intelligence"];
 const CONTEXT_METADATA_FILES = [
   "docs/ai/review-context.md",
   "docs/ai/implementation-context.md",
@@ -550,6 +553,139 @@ function validateSkillGroups(manifest, errors) {
   return checks;
 }
 
+function validatePlaneModel(root, manifest, errors) {
+  const checks = { assignments: {}, projectionPacks: [], crossPlaneTransitions: [], capabilityGate: false };
+  if (!manifest) return checks;
+
+  const manifestSkills = Array.isArray(manifest.skills) ? manifest.skills : [];
+  const manifestSkillSet = new Set(manifestSkills);
+  const assignments = manifest.skill_planes;
+  if (!assignments || Array.isArray(assignments) || typeof assignments !== "object") {
+    fail(errors, "skill planes", "manifest.json.skill_planes must exist and be an object");
+  } else {
+    for (const [skill, plane] of Object.entries(assignments)) {
+      if (!manifestSkillSet.has(skill)) {
+        fail(errors, "skill planes", `manifest.json.skill_planes contains unknown skill '${skill}'`);
+      }
+      if (!SKILL_PLANE_SET.has(plane)) {
+        fail(errors, "skill planes", `manifest.json.skill_planes.${skill} has invalid plane '${plane}'`);
+      } else {
+        checks.assignments[plane] = (checks.assignments[plane] ?? 0) + 1;
+      }
+    }
+    for (const skill of manifestSkills) {
+      if (!Object.hasOwn(assignments, skill)) {
+        fail(errors, "skill planes", `manifest.json.skills entry '${skill}' is not assigned to a plane`);
+      }
+    }
+  }
+
+  const packs = manifest.projection_packs;
+  if (!packs || Array.isArray(packs) || typeof packs !== "object") {
+    fail(errors, "projection packs", "manifest.json.projection_packs must exist and be an object");
+    return checks;
+  }
+  for (const name of Object.keys(packs)) {
+    if (!REQUIRED_PROJECTION_PACKS.includes(name)) {
+      fail(errors, "projection packs", `manifest.json.projection_packs contains unsupported pack '${name}'`);
+    }
+  }
+  for (const name of REQUIRED_PROJECTION_PACKS) {
+    const pack = packs[name];
+    const label = `manifest.json.projection_packs.${name}`;
+    if (!pack || Array.isArray(pack) || typeof pack !== "object") {
+      fail(errors, "projection packs", `${label} must exist and be an object`);
+      continue;
+    }
+    const planes = Array.isArray(pack.planes) ? pack.planes : [];
+    const skills = Array.isArray(pack.skills) ? pack.skills : [];
+    if (typeof pack.description !== "string" || pack.description.length === 0) {
+      fail(errors, "projection packs", `${label}.description must be a non-empty string`);
+    }
+    if (!Array.isArray(pack.planes) || planes.some((plane) => !SKILL_PLANE_SET.has(plane))) {
+      fail(errors, "projection packs", `${label}.planes must contain only execution, knowledge, or control`);
+    }
+    if (!Array.isArray(pack.skills)) {
+      fail(errors, "projection packs", `${label}.skills must be an array`);
+    }
+    if (pack.knowledge_write_policy !== "explicit_only") {
+      fail(errors, "projection packs", `${label}.knowledge_write_policy must be explicit_only`);
+    }
+    const duplicateSkills = skills.filter((skill, index) => skills.indexOf(skill) !== index);
+    if (duplicateSkills.length > 0) {
+      fail(errors, "projection packs", `${label}.skills contains duplicate entries: ${[...new Set(duplicateSkills)].join(", ")}`);
+    }
+    for (const skill of skills) {
+      if (!manifestSkillSet.has(skill)) {
+        fail(errors, "projection packs", `${label}.skills references unknown skill '${skill}'`);
+        continue;
+      }
+      const plane = assignments?.[skill];
+      if (SKILL_PLANE_SET.has(plane) && !planes.includes(plane)) {
+        fail(errors, "projection packs", `${label} includes '${skill}' but does not declare plane '${plane}'`);
+      }
+    }
+    if (name === "daily_delivery" && planes.includes("knowledge")) {
+      fail(errors, "projection packs", `${label} must omit the knowledge plane`);
+    }
+    if (name === "organizational_intelligence") {
+      const missing = manifestSkills.filter((skill) => !skills.includes(skill));
+      if (missing.length > 0) {
+        fail(errors, "projection packs", `${label} must include every manifest skill; missing: ${missing.join(", ")}`);
+      }
+      for (const plane of SKILL_PLANES) {
+        if (!planes.includes(plane)) fail(errors, "projection packs", `${label}.planes must include '${plane}'`);
+      }
+    }
+    checks.projectionPacks.push({ name, planes, skillCount: skills.length });
+  }
+
+  const transitions = manifest.routing?.cross_plane_transitions;
+  if (!Array.isArray(transitions)) {
+    fail(errors, "skill planes", "manifest.json.routing.cross_plane_transitions must be an array");
+    return checks;
+  }
+  const transitionIds = new Set();
+  for (const [index, transition] of transitions.entries()) {
+    const label = `manifest.json.routing.cross_plane_transitions[${index}]`;
+    if (!transition || Array.isArray(transition) || typeof transition !== "object") {
+      fail(errors, "skill planes", `${label} must be an object`);
+      continue;
+    }
+    if (typeof transition.id !== "string" || transition.id.length === 0 || transitionIds.has(transition.id)) {
+      fail(errors, "skill planes", `${label}.id must be a unique non-empty string`);
+    } else transitionIds.add(transition.id);
+    for (const field of ["from", "to"]) {
+      if (!SKILL_PLANE_SET.has(transition[field])) fail(errors, "skill planes", `${label}.${field} must be a valid plane`);
+    }
+    if (transition.from === transition.to) {
+      fail(errors, "skill planes", `${label} must cross between different planes`);
+    }
+    for (const field of ["trigger", "evidence_boundary", "owner", "stop_condition"]) {
+      if (typeof transition[field] !== "string" || transition[field].length === 0) {
+        fail(errors, "skill planes", `${label}.${field} must be a non-empty string`);
+      }
+    }
+    validateRouteReference(root, manifest, transition.destination, `${label}.destination`, errors);
+    if (manifestSkillSet.has(transition.destination) && assignments?.[transition.destination] !== transition.to) {
+      fail(errors, "skill planes", `${label}.destination '${transition.destination}' belongs to '${assignments?.[transition.destination] ?? "unassigned"}', not '${transition.to}'`);
+    }
+    checks.crossPlaneTransitions.push(transition.id ?? `index:${index}`);
+  }
+  if (manifest.name === "agent-spectrum-kernel") {
+    const routerPaths = ["skills/operating-mode-router/SKILL.md", "skills/skill-router/SKILL.md"];
+    checks.capabilityGate = routerPaths.every((path) => {
+      const text = existsSync(resolve(root, path)) ? readFileSync(resolve(root, path), "utf8") : "";
+      return text.includes("selected_skills") && text.includes("capability_missing") && text.includes("organizational") && (text.includes("Do not infer") || text.includes("Never infer"));
+    });
+    if (!checks.capabilityGate) {
+      fail(errors, "skill planes", "entry routers must fail closed with capability_missing when selected_skills omits a route");
+    }
+    if (transitions.length === 0) fail(errors, "skill planes", "canonical routing must define cross-plane transitions");
+  }
+  return checks;
+}
+
 function validateRoutingManifest(root, manifest, errors) {
   const checks = {
     present: false,
@@ -559,6 +695,7 @@ function validateRoutingManifest(root, manifest, errors) {
     routeOverridePreserved: false,
     riskGateHardStopLimited: false,
     unsupportedCapabilityDowngrade: false,
+    adapterCapabilityGate: false,
   };
   if (!manifest) {
     return checks;
@@ -581,11 +718,29 @@ function validateRoutingManifest(root, manifest, errors) {
   validateRoutingTaskClasses(root, manifest, routing, checks, errors);
   validateRoutingOperatingModes(root, manifest, routing, checks, errors);
   validateRoutingDefaultRoutes(root, manifest, routing, checks, errors);
+  validateRoutingCapabilityGate(routing, checks, errors);
   validateRoutingRiskGate(root, manifest, routing, checks, errors);
   validateRoutingOverride(routing, checks, errors);
   validateRoutingAdapterDowngrade(root, routing, checks, errors);
 
   return checks;
+}
+
+function validateRoutingCapabilityGate(routing, checks, errors) {
+  const gate = routing.adapter_capability_gate;
+  const expectedPaths = [".agent-spectrum-kernel/claude-install-state.json", ".agent-spectrum-kernel/codex-install-state.json"];
+  checks.adapterCapabilityGate = Boolean(
+    gate &&
+    Array.isArray(gate.state_paths) && expectedPaths.every((path) => gate.state_paths.includes(path)) &&
+    gate.availability_field === "selected_skills" &&
+    gate.physical_discovery_field === "installed_skills" &&
+    gate.missing_status === "capability_missing" &&
+    gate.missing_route_policy === "stop_without_inference" &&
+    gate.daily_upgrade_profile === "organizational"
+  );
+  if (!checks.adapterCapabilityGate) {
+    fail(errors, "routing manifest", "manifest.json.routing.adapter_capability_gate must fail closed from adapter selected_skills and distinguish installed_skills");
+  }
 }
 
 function validateRoutingTaskClasses(root, manifest, routing, checks, errors) {
@@ -2437,7 +2592,7 @@ function validateAdapterGovernance(root, checks, errors) {
   }
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, lifecycleArtifactChecks, reviewSignalRegistryChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, lifecycleArtifactChecks, reviewSignalRegistryChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -2477,6 +2632,11 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, routingChec
     `- route override preserved: ${routingChecks.routeOverridePreserved ? "ok" : "invalid"}`,
     `- hard_stop limited to AGENTS approval-required surfaces: ${routingChecks.riskGateHardStopLimited ? "ok" : "invalid"}`,
     `- unsupported adapter capability downgrade preserved: ${routingChecks.unsupportedCapabilityDowngrade ? "ok" : "invalid"}`,
+    `- plane assignments: ${SKILL_PLANES.map((plane) => `${plane}=${planeChecks.assignments[plane] ?? 0}`).join(", ")}`,
+    `- projection packs: ${planeChecks.projectionPacks.map((pack) => `${pack.name}=${pack.skillCount}`).join(", ") || "none"}`,
+    `- cross-plane transitions: ${planeChecks.crossPlaneTransitions.length}`,
+    `- adapter capability gate: ${planeChecks.capabilityGate ? "ok" : "not applicable"}`,
+    `- machine-readable capability gate: ${routingChecks.adapterCapabilityGate ? "ok" : "invalid"}`,
     "",
     "## Skill section checks",
     "",
@@ -2741,6 +2901,7 @@ export function validateRepository(options) {
 
   validateManifest(root, manifest, skillDirectories, errors);
   const skillGroupChecks = validateSkillGroups(manifest, errors);
+  const planeChecks = validatePlaneModel(root, manifest, errors);
   const routingChecks = validateRoutingManifest(root, manifest, errors);
   validateManifestPaths(root, manifest, errors);
   const skillChecks = validateSkills(root, skillDirectories, errors);
@@ -2754,7 +2915,7 @@ export function validateRepository(options) {
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, lifecycleArtifactChecks, reviewSignalRegistryChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, lifecycleArtifactChecks, reviewSignalRegistryChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

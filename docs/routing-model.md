@@ -194,6 +194,35 @@ operation_automation
 
 Some skills can belong to more than one group when their role is shared across delivery and adoption. Those exceptions must be listed in `manifest.json.allowed_multi_group_skills` and are validated by `scripts/validate-repo.mjs`.
 
+## Responsibility Planes
+
+Operating modes describe why work is happening; planes describe the stable responsibility of each Skill. `manifest.json.skill_planes` assigns every canonical Skill to exactly one plane.
+
+| Plane | Responsibility | Mutation boundary |
+|---|---|---|
+| `execution` | Advance the current requirement, design, implementation, verification, review, release-readiness, documentation, or handoff task. | May change current-task artifacts inside the selected scope. |
+| `knowledge` | Create, promote, refresh, contradict, archive, or consume durable reusable knowledge. | Requires an explicit lifecycle trigger, destination, evidence boundary, owner, and stop condition. |
+| `control` | Select, constrain, observe, or validate workflows and claims. | Observation or routing alone never authorizes execution or knowledge mutation. |
+
+Allowed cross-plane transitions are machine-readable in `manifest.json.routing.cross_plane_transitions`. Execution may consume approved knowledge only when applicability and freshness are evidenced. Execution never writes a ledger merely because work completed. Review blockers remain current-task blockers until resolved or separately tracked; a durable candidate cannot replace them. Control-plane observations require a separately authorized knowledge contract before they can mutate a durable artifact.
+
+## Projection Packs
+
+`manifest.json.projection_packs` defines adapter-neutral availability profiles without replacing existing `skill_groups` or operating modes:
+
+| Pack | Planes | Intended use |
+|---|---|---|
+| `daily_delivery` | execution + control | Smaller ordinary delivery surface; durable knowledge lifecycle Skills are omitted. |
+| `organizational_intelligence` | execution + knowledge + control | Optional full surface for explicitly authorized organizational knowledge work. |
+
+Both packs keep `knowledge_write_policy: explicit_only`. Claude and Codex expose them as `daily` and `organizational` profiles. Existing profiles remain supported for compatibility.
+
+## Adapter Capability Gate
+
+When an active Claude or Codex adapter state exists, routers use its `selected_skills` as the available route set. `installed_skills` reports physical discovery state and may be broader only for non-pack legacy/profile selections; it never authorizes a route. Before delegation, the router checks the intended Skill destination. An absent destination stops with `capability_missing`, names the missing Skill, and recommends the required profile or a closed explicit override. It does not guess the missing procedure.
+
+For `daily`, ordinary implementation and review fixtures are available. Knowledge promotion, adoption, and observability fixtures intentionally stop with `capability_missing` and recommend `organizational`.
+
 ## Routing Rules
 
 - Normal development tasks route to `delivery_quality` and then to `skill-router`.
@@ -237,6 +266,7 @@ Some skills can belong to more than one group when their role is shared across d
 - Do not physically reorganize `skills/` into group directories.
 - Do not replace `skill-router`; narrow it to delivery/quality routing.
 - Do not automatically run adoption or metrics workflows for ordinary development tasks.
+- Do not select or update knowledge-plane Skills merely because their files are installed or a task completed.
 - Do not create weekly/monthly reporting skills without a future explicit design.
 - Do not add hidden telemetry or background metrics collection.
 - Do not treat GitHub Actions as the default path for local work.

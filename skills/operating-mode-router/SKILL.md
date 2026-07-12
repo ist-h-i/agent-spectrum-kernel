@@ -33,16 +33,29 @@ This skill prevents ordinary delivery work from being polluted by adoption, metr
 
 ## Process
 
-1. Classify the operating mode.
+0. Preserve the three-plane boundary from `manifest.json.skill_planes`.
+   - Control-plane routing selects or constrains work; it does not itself authorize execution- or knowledge-plane mutation.
+   - Ordinary delivery stays in the execution and control planes.
+   - Enter the knowledge plane only for an explicit durable-knowledge request or a material reusable-knowledge trigger with a destination, evidence boundary, owner, and stop condition.
+   - Completing a task, review, report, or metric observation is not by itself a knowledge-write trigger.
+
+1. Apply the active adapter capability gate before delegating.
+   - Read the relevant active adapter state at `.agent-spectrum-kernel/claude-install-state.json` or `.agent-spectrum-kernel/codex-install-state.json` when present, and treat `selected_skills` as the available route set. `installed_skills` may include retained stale files and never authorizes routing.
+   - Before selecting a Skill destination, verify that the destination exists in `selected_skills`.
+   - If the destination is absent, emit an Execution Envelope with `stop_reason.status: capability_missing`, name the missing Skill, and recommend the profile or explicit closed `--skills` override that provides it. For knowledge, adoption, and observability destinations omitted by `daily`, recommend `organizational`.
+   - Do not infer, reproduce, or continue the procedure of a missing Skill. Continue only after adapter state proves that the capability is selected.
+   - If no adapter state applies, use the capabilities exposed by the current environment. If availability cannot be established, report insufficient evidence instead of assuming the route exists.
+
+2. Classify the operating mode.
 
 | Mode | Use when | Delegate to |
 |---|---|---|
-| `delivery_quality` | Implement, review, verify, refactor, investigate, document, decide, define requirements, compile work packages, govern domain rules, run release-readiness checks, or hand off a concrete development task | `skill-router`; `review-router` when review |
+| `delivery_quality` | Implement, review, verify, refactor, investigate, document, decide, define requirements, compile work packages, apply relevant approved domain rules, run release-readiness checks, or hand off a concrete development task | `skill-router`; `review-router` when review |
 | `adoption_bootstrap` | Introduce the skill set into a new repository, project, team, or client context | `project-adoption-pack-generation`; `repository-orientation`; `implementation-context-generation`; `review-context-generation` |
 | `observability_metrics` | Evaluate skill effectiveness, routing quality, instruction maturity, adoption impact, full-layer capability growth, or skill usage over time | `skill-effectiveness-evaluation`; `skill-adoption-metrics`; `engineering-capability-evaluation` |
 | `operation_automation` | Run or plan a periodic cadence such as weekly/monthly summaries, scheduler setup, or team routine | External operation layer; manual routine; ChatGPT automation; GitHub Actions; cron |
 
-2. Select the user-facing work mode.
+3. Select the user-facing work mode.
 
 | Work mode | Use when |
 |---|---|
@@ -57,26 +70,26 @@ This skill prevents ordinary delivery work from being polluted by adoption, metr
 
 User-facing route text should explain the work path in these terms. Skill names belong in `Internal route` for review and debugging.
 
-3. Distinguish close signals.
+4. Distinguish close signals.
    - One completed task effectiveness question: route to `skill-effectiveness-evaluation`.
    - Multiple tasks or a period-over-period adoption question: route to `skill-adoption-metrics`.
    - Evidence-backed full-layer engineering capability or reusable intelligence maturity question: route to `engineering-capability-evaluation`.
    - First-time repository rollout: route to `project-adoption-pack-generation`.
    - Weekly/monthly cadence: classify as `operation_automation`, then use report templates or external scheduling outside the skill set.
    - Release candidate readiness: classify as `delivery_quality`, then route through `skill-router` to `release-readiness-gate`; release execution still requires `risk-gate`.
-   - Requirement-to-Rule Loop work for a concrete repository task: classify as `delivery_quality`, then route through `skill-router` to `next-best-change-finder`, `requirement-grill`, `work-package-compiler`, `review-domain-impact`, `review-to-rule-compiler`, or `domain-rule-ledger` as appropriate.
+   - Requirement-to-Rule Loop work for a concrete repository task: keep requirement, packaging, and domain review in execution; enter `review-to-rule-compiler` or `domain-rule-ledger` only after the knowledge-promotion trigger is explicit and bounded.
    - Ordinary coding/review/investigation/refactor work: route to `skill-router`.
 
-4. Apply risk overlay before action.
+5. Apply risk overlay before action.
    - If the request includes destructive, irreversible, external, production, auth, secret, dependency, migration, billing, email, infra, or scheduler changes, run `risk-gate` before action.
    - Creating local templates or docs is not the same as enabling automation.
 
-5. Keep mode boundaries explicit.
+6. Keep mode boundaries explicit.
    - Do not invoke adoption or metrics workflows for normal development tasks unless the user asks for adoption or metrics.
    - Do not create weekly/monthly skills for reporting cadence.
    - Do not store raw prompts, secrets, customer data, or project-specific metrics in the generic repository.
 
-6. Delegate to the selected layer.
+7. Delegate to the selected layer.
    - For `delivery_quality`, continue with `skill-router`.
    - For `adoption_bootstrap`, produce or delegate to an adoption pack workflow.
    - For `observability_metrics`, choose one metrics/evaluation skill.

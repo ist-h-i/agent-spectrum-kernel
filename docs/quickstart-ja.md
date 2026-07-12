@@ -58,7 +58,7 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-Codex installer は profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile minimal|implementation|investigation|review|adoption|observability|full` を使い、`--skills <csv>` は選択 prompt / command、router到達可能route、指定 skill 依存の閉包検証付き advanced override として扱います。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。hook、telemetry、外部公開、GitHub Actions は作りません。
+Codex installer は profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile daily|organizational|minimal|implementation|investigation|review|adoption|observability|full` を使います。`daily` と `organizational` はmanifestのprojection packを使い、`--skills <csv>` は選択 prompt / command、router到達可能route、指定 skill 依存の閉包検証付き advanced override として扱います。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。hook、telemetry、外部公開、GitHub Actions は作りません。
 
 Codex の非対話実行は `codex exec` を直接呼ぶ代わりに、導入された runner を使います。
 
@@ -204,7 +204,7 @@ Claude adapter installer は core installer が作る `.agent-spectrum-kernel/in
 
 Claude adapter は `.agent-spectrum-kernel/claude-install-state.json` を記録し、core/Codexと同じ lifecycle semantics を使います。`--check`、`--dry-run`、`--prune`、`--force`、`--rollback`、`--detach` が使えます。`--detach` は `.claude/skills`、`.claude/commands`、runtime script、adapter-owned hooksを外し、local metrics、reports、ledgersは既定で残します。
 
-対応profileは `implementation`、`investigation`、`review`、`observability`、`full` です。default は `full` です。narrow profile は、選択commandの必須Skill、Skill依存、通常routerが到達し得るSkillを含むよう閉じています。`--skills <csv>` はadvanced overrideで、閉包を満たさない場合は書き込み前に失敗します。
+対応profileは `daily`、`organizational`、`implementation`、`investigation`、`review`、`observability`、`full` です。default は `full` です。`daily` はexecution/control plane、`organizational` は全3 planeをmanifestから投影します。`full` / `organizational` から `daily` へ切り替えるときは `--prune` を付け、除外Skillを発見対象から削除してください。`--prune`なし、または除外Skillがローカル変更済みの場合は安全に停止します。routerはactive adapter stateの `selected_skills` にないrouteを `capability_missing` として停止し、`organizational` または明示overrideを案内します。
 
 Claude project adapter のHook正本は `.claude/settings.json` です。`.claude/hooks/hooks.json` は新規には投影せず、旧adapter-owned hookだけのlegacy fileは削除します。`--skip-runtime` はruntime scriptを入れず、adapter-owned metrics hooksも入れません。`--skip-hooks` はhooksだけをskip/removeし、runtime scriptは入れます。
 
