@@ -168,6 +168,8 @@
     "docs/validation-report.md",
     "benchmarks/README.md",
     "benchmarks/protocol.md",
+    "benchmarks/report-template.md",
+    "benchmarks/results/checkpoint-b-report.md",
     "CHANGELOG.md"
   ],
   "examples": [

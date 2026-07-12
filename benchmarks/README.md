@@ -20,3 +20,5 @@ node scripts/ask-benchmark.mjs score --run-dir /tmp/ask-benchmark-checkpoint-b -
 Run `prepare` only after [protocol.md](protocol.md) and [checkpoint-b.config.json](checkpoint-b.config.json) are reviewed and frozen. Do not inspect condition outputs before the blinded cases have all completed. A human evaluator may add human-effort fields to a copy of the normalized result; unavailable measurements remain `null`, never `0`.
 
 Checkpoint C must use a new config and result after #179. Do not overwrite the Checkpoint B baseline or combine architecture, model, repository, CLI, or adapter changes into one comparison variable.
+
+The measured Checkpoint B summary is [results/checkpoint-b-report.md](results/checkpoint-b-report.md). The corresponding normalized result is `results/checkpoint-b-2026-07-12.json`; [report-template.md](report-template.md) is the reusable Checkpoint B/C report structure.

@@ -194,6 +194,8 @@ node scripts/test-ask-benchmark.mjs
 
 See `benchmarks/protocol.md` for frozen thresholds, blinding, evaluator rules, privacy boundaries, and the separate post-#179 Checkpoint C rerun.
 
+The first measured Checkpoint B result is in `benchmarks/results/checkpoint-b-report.md`; its normalized machine-readable evidence is in `benchmarks/results/checkpoint-b-2026-07-12.json`.
+
 ## Minimum setup
 
 1. Put `AGENTS.md` at the repository root or project instruction location.

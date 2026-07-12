@@ -196,6 +196,12 @@ function executeCases(args) {
   if (!args.runDir || !existsSync(resolve(args.runDir, "run.json"))) throw new Error("run requires a prepared --run-dir");
   if (!existsSync(args.agentBin) || !lstatSync(args.agentBin).isFile()) throw new Error(`agent binary is unavailable: ${args.agentBin}`);
   const manifest = readJson(resolve(args.runDir, "run.json"));
+  const version = spawnSync(args.agentBin, ["--version"], { encoding: "utf8" });
+  if (version.status !== 0) throw new Error(`agent version check failed: ${version.stderr || version.stdout}`);
+  const observedVersion = version.stdout.trim();
+  if (!observedVersion.includes(config.runtime.agent_version)) throw new Error(`agent version mismatch: expected ${config.runtime.agent_version}, received ${observedVersion}`);
+  manifest.runtime_observation = { agent_version: observedVersion };
+  writeJson(resolve(args.runDir, "run.json"), manifest);
   const codexHome = isolatedCodexHome();
   try {
     for (const entry of manifest.cases) {
@@ -284,7 +290,9 @@ function testSummary(result) {
 function implementationMetrics(caseRoot, expected, fixtureId) {
   const hidden = spawnSync(process.execPath, [resolve(FIXTURE_ROOT, fixtureId, "hidden-tests.mjs"), caseRoot], { cwd: caseRoot, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
   const summary = testSummary(hidden);
-  const changed = git(caseRoot, ["diff", "--name-only", "HEAD", "--"]).split("\n").filter(Boolean).filter((path) => !path.startsWith(".benchmark-"));
+  const tracked = git(caseRoot, ["diff", "--name-only", "HEAD", "--"]).split("\n").filter(Boolean);
+  const untracked = git(caseRoot, ["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean);
+  const changed = [...new Set([...tracked, ...untracked])].filter((path) => !path.startsWith(".benchmark-"));
   const deviations = changed.filter((path) => !expected.allowed_paths.includes(path));
   const total = expected.requirement_ids.length;
   return {
@@ -346,6 +354,23 @@ function recommendationFor(config, runs, fixture) {
   return { fixture_id: fixture.id, recommendation: "retain", reason: "Quality was non-inferior, but material incremental value was not proven." };
 }
 
+function comparisonFor(runs, fixture) {
+  const kernel = aggregate(runs, fixture.id, "kernel_only");
+  const full = aggregate(runs, fixture.id, "full_ask");
+  const qualityKey = fixture.task_class === "review" ? "valid_blocking_or_major_findings" : "requirement_satisfaction_rate";
+  return {
+    fixture_id: fixture.id,
+    task_class: fixture.task_class,
+    quality_metric: qualityKey,
+    kernel_only_quality: kernel?.quality?.[qualityKey] ?? null,
+    full_ask_quality: full?.quality?.[qualityKey] ?? null,
+    duration_overhead_percent: percentChange(kernel?.duration_ms, full?.duration_ms),
+    token_overhead_percent: percentChange(kernel?.total_tokens, full?.total_tokens),
+    senior_correction_reduction_percent: percentChange(kernel?.senior_review_minutes, full?.senior_review_minutes),
+    rework_reduction_percent: percentChange(kernel?.rework_count, full?.rework_count),
+  };
+}
+
 function score(args) {
   const config = validateProtocol();
   if (!args.runDir || !args.output) throw new Error("score requires --run-dir and --output");
@@ -396,10 +421,11 @@ function score(args) {
       config_sha256: manifest.config_sha256,
       repository_revision: manifest.repository_revision,
     },
-    runtime: config.runtime,
+    runtime: { ...config.runtime, observed_agent_version: manifest.runtime_observation?.agent_version ?? null },
     runs,
     comparison: {
       primary_comparator: "kernel_only",
+      workflow_comparisons: config.fixtures.map((fixture) => comparisonFor(runs, fixture)),
       workflow_recommendations: config.fixtures.map((fixture) => recommendationFor(config, runs, fixture)),
       thresholds: config.thresholds,
     },

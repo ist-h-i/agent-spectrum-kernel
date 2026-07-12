@@ -2,15 +2,194 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ASK comparative benchmark normalized result",
   "type": "object",
+  "additionalProperties": false,
   "required": ["schema_version", "checkpoint", "protocol", "runtime", "runs", "comparison", "limitations", "privacy"],
+  "$defs": {
+    "nullableNonNegative": { "type": ["number", "null"], "minimum": 0 },
+    "condition": { "enum": ["plain", "kernel_only", "full_ask"] },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["valid_blocking_or_major_findings", "major_findings_missed", "unsupported_or_false_positive_findings", "requirement_satisfaction_rate", "scope_deviations", "unverified_completion_or_readiness_claims", "rework_count"],
+      "properties": {
+        "valid_blocking_or_major_findings": { "$ref": "#/$defs/nullableNonNegative" },
+        "major_findings_missed": { "$ref": "#/$defs/nullableNonNegative" },
+        "unsupported_or_false_positive_findings": { "$ref": "#/$defs/nullableNonNegative" },
+        "requirement_satisfaction_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "scope_deviations": { "type": "integer", "minimum": 0 },
+        "unverified_completion_or_readiness_claims": { "type": "integer", "minimum": 0 },
+        "rework_count": { "$ref": "#/$defs/nullableNonNegative" },
+        "hidden_tests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total", "passed", "failed", "exit_code"],
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "passed": { "type": ["integer", "null"], "minimum": 0 },
+            "failed": { "type": ["integer", "null"], "minimum": 0 },
+            "exit_code": { "type": ["integer", "null"] }
+          }
+        },
+        "changed_file_count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "checkpoint": { "enum": ["B", "C"] },
-    "protocol": { "type": "object" },
-    "runtime": { "type": "object" },
-    "runs": { "type": "array", "minItems": 1 },
-    "comparison": { "type": "object" },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "frozen_at", "protocol_sha256", "config_sha256", "repository_revision"],
+      "properties": {
+        "status": { "const": "frozen" },
+        "frozen_at": { "type": "string" },
+        "protocol_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "config_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "repository_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent", "agent_version", "model", "reasoning_effort", "sequential", "network_required_by_fixtures", "observed_agent_version"],
+      "properties": {
+        "agent": { "type": "string" },
+        "agent_version": { "type": "string" },
+        "observed_agent_version": { "type": ["string", "null"] },
+        "model": { "type": "string" },
+        "reasoning_effort": { "type": "string" },
+        "sequential": { "type": "boolean" },
+        "network_required_by_fixtures": { "type": "boolean" }
+      }
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_id", "fixture_id", "task_class", "condition", "outcome_quality", "human_effort", "cost_latency", "adoption_behavior", "runtime_evidence"],
+        "properties": {
+          "case_id": { "type": "string" },
+          "fixture_id": { "type": "string" },
+          "task_class": { "enum": ["review", "implementation"] },
+          "condition": { "$ref": "#/$defs/condition" },
+          "outcome_quality": { "$ref": "#/$defs/quality" },
+          "human_effort": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["senior_review_minutes", "additional_investigation_minutes", "unresolved_human_decisions"],
+            "properties": {
+              "senior_review_minutes": { "$ref": "#/$defs/nullableNonNegative" },
+              "additional_investigation_minutes": { "$ref": "#/$defs/nullableNonNegative" },
+              "unresolved_human_decisions": { "$ref": "#/$defs/nullableNonNegative" }
+            }
+          },
+          "cost_latency": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["total_duration_ms", "ai_tool_execution_ms", "input_tokens", "output_tokens", "usage_cost", "final_output_bytes"],
+            "properties": {
+              "total_duration_ms": { "$ref": "#/$defs/nullableNonNegative" },
+              "ai_tool_execution_ms": { "$ref": "#/$defs/nullableNonNegative" },
+              "input_tokens": { "$ref": "#/$defs/nullableNonNegative" },
+              "output_tokens": { "$ref": "#/$defs/nullableNonNegative" },
+              "usage_cost": { "$ref": "#/$defs/nullableNonNegative" },
+              "final_output_bytes": { "$ref": "#/$defs/nullableNonNegative" }
+            }
+          },
+          "adoption_behavior": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["correct_route", "under_processing", "over_processing", "contracts_reported"],
+            "properties": {
+              "correct_route": { "type": ["boolean", "null"] },
+              "under_processing": { "type": ["boolean", "null"] },
+              "over_processing": { "type": ["boolean", "null"] },
+              "contracts_reported": { "type": "boolean" }
+            }
+          },
+          "runtime_evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["projected_assets_available", "full_skill_projection_available", "execution_status", "output_sha256", "capability_downgrade"],
+            "properties": {
+              "projected_assets_available": { "enum": ["present", "missing", "not_applicable"] },
+              "full_skill_projection_available": { "type": ["boolean", "null"] },
+              "execution_status": { "enum": ["executed", "failed", "unknown"] },
+              "output_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+              "capability_downgrade": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary_comparator", "workflow_comparisons", "workflow_recommendations", "thresholds"],
+      "properties": {
+        "primary_comparator": { "const": "kernel_only" },
+        "workflow_comparisons": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fixture_id", "task_class", "quality_metric", "kernel_only_quality", "full_ask_quality", "duration_overhead_percent", "token_overhead_percent", "senior_correction_reduction_percent", "rework_reduction_percent"],
+            "properties": {
+              "fixture_id": { "type": "string" },
+              "task_class": { "enum": ["review", "implementation"] },
+              "quality_metric": { "enum": ["valid_blocking_or_major_findings", "requirement_satisfaction_rate"] },
+              "kernel_only_quality": { "type": ["number", "null"], "minimum": 0 },
+              "full_ask_quality": { "type": ["number", "null"], "minimum": 0 },
+              "duration_overhead_percent": { "type": ["number", "null"] },
+              "token_overhead_percent": { "type": ["number", "null"] },
+              "senior_correction_reduction_percent": { "type": ["number", "null"] },
+              "rework_reduction_percent": { "type": ["number", "null"] }
+            }
+          }
+        },
+        "workflow_recommendations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fixture_id", "recommendation", "reason"],
+            "properties": {
+              "fixture_id": { "type": "string" },
+              "recommendation": { "enum": ["expand", "retain", "simplify", "stop"] },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["senior_correction_reduction_percent", "rework_reduction_percent", "maximum_duration_overhead_percent", "maximum_token_overhead_percent", "require_non_inferior_quality", "allow_expand_with_primary_metrics_unknown"],
+          "properties": {
+            "senior_correction_reduction_percent": { "type": "number", "minimum": 0 },
+            "rework_reduction_percent": { "type": "number", "minimum": 0 },
+            "maximum_duration_overhead_percent": { "type": "number", "minimum": 0 },
+            "maximum_token_overhead_percent": { "type": "number", "minimum": 0 },
+            "require_non_inferior_quality": { "const": true },
+            "allow_expand_with_primary_metrics_unknown": { "const": false }
+          }
+        }
+      }
+    },
     "limitations": { "type": "array", "items": { "type": "string" } },
-    "privacy": { "type": "object" }
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_prompts_stored_in_result", "full_outputs_stored_in_result", "full_source_stored_in_result", "secrets_customer_or_personal_data_stored", "temporary_run_directory"],
+      "properties": {
+        "raw_prompts_stored_in_result": { "const": false },
+        "full_outputs_stored_in_result": { "const": false },
+        "full_source_stored_in_result": { "const": false },
+        "secrets_customer_or_personal_data_stored": { "const": false },
+        "temporary_run_directory": { "type": "string" }
+      }
+    }
   }
 }
