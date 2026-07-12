@@ -7,39 +7,44 @@
       "adapter_id": "claude_code",
       "canonical_contract": {
         "revision": "ask-3.0.0",
-        "source_digest": "fixture:canonical-ask-3.0.0",
-        "source_paths": ["AGENTS.md", "skills/skill-router/SKILL.md", "docs/execution-envelope-contract.md"]
+        "source_digest": "sha256:b84be622e4aa2c793e9c43a05829c1d9dbc12b199c5b96b54c85681a082bf700",
+        "source_paths": ["AGENTS.md", "docs/adapter-runtime-boundary-contract.md", "docs/execution-envelope-contract.md", "schemas/adapter-runtime-profile.schema.json", "skills/skill-router/SKILL.md"]
       },
       "capabilities": [
-        { "capability_id": "progressive_instruction_loading", "support": "supported", "evidence_level": "behavior_verified", "evidence_refs": ["scripts/test-validate-repo.mjs"], "limitations": [], "downgrade_behavior": "claim_behavior_verified" },
-        { "capability_id": "lifecycle_hooks", "support": "supported", "evidence_level": "runtime_detected", "evidence_refs": ["scripts/adapter-runtime-smoke.mjs"], "limitations": [], "downgrade_behavior": "claim_runtime_detection_only" },
-        { "capability_id": "agent_orchestration", "support": "partial", "evidence_level": "projected", "evidence_refs": ["adapters/claude-code/project/.claude/commands"], "limitations": ["Canonical ASK does not prove custom-agent execution from projected commands."], "downgrade_behavior": "insufficient_evidence" },
-        { "capability_id": "permission_sandbox_enforcement", "support": "partial", "evidence_level": "projected", "evidence_refs": ["adapters/claude-code/project/.claude/hooks/hooks.json"], "limitations": ["Repository projection does not prove runtime enforcement."], "downgrade_behavior": "manual_step" },
-        { "capability_id": "runtime_asset_load_evidence", "support": "partial", "evidence_level": "runtime_detected", "evidence_refs": ["scripts/ask-doctor.mjs"], "limitations": ["Detection does not prove per-task application."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "progressive_instruction_loading", "support": "supported", "evidence_level": "projected", "evidence_refs": [{ "record_id": "claude-projection-manifest", "evidence_kind": "projection_manifest", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "projected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Runtime skill loading is not established by repository projection."], "downgrade_behavior": "claim_projection_only" },
+        { "capability_id": "lifecycle_hooks", "support": "partial", "evidence_level": "projected", "evidence_refs": [{ "record_id": "claude-projection-manifest", "evidence_kind": "projection_manifest", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "projected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Projected hook configuration does not prove runtime invocation."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "agent_orchestration", "support": "partial", "evidence_level": "projected", "evidence_refs": [{ "record_id": "claude-projection-manifest", "evidence_kind": "projection_manifest", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "projected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Canonical ASK does not prove custom-agent execution from projected commands."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "permission_sandbox_enforcement", "support": "partial", "evidence_level": "projected", "evidence_refs": [{ "record_id": "claude-projection-manifest", "evidence_kind": "projection_manifest", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "projected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Repository projection does not prove runtime enforcement."], "downgrade_behavior": "manual_step" },
+        { "capability_id": "runtime_asset_load_evidence", "support": "partial", "evidence_level": "projected", "evidence_refs": [{ "record_id": "claude-projection-manifest", "evidence_kind": "projection_manifest", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "projected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Per-task asset loading is not observed by this fixture."], "downgrade_behavior": "insufficient_evidence" },
         { "capability_id": "programmatic_tool_execution", "support": "unknown", "evidence_level": "none", "evidence_refs": [], "limitations": ["External product runtime was not probed by this fixture."], "downgrade_behavior": "unknown" },
-        { "capability_id": "persistent_resumable_state", "support": "partial", "evidence_level": "projected", "evidence_refs": ["docs/agent-session-state-contract.md"], "limitations": ["Projected state contract is not runtime resume evidence."], "downgrade_behavior": "insufficient_evidence" },
-        { "capability_id": "local_event_emission", "support": "supported", "evidence_level": "runtime_detected", "evidence_refs": ["scripts/adapter-runtime-smoke.mjs"], "limitations": [], "downgrade_behavior": "claim_runtime_detection_only" },
-        { "capability_id": "shared_pr_execution", "support": "partial", "evidence_level": "projected", "evidence_refs": ["adapters/claude-code/github-actions/claude-review-on-mention.yml"], "limitations": ["Repository setup and trusted PR-head evidence remain external."], "downgrade_behavior": "manual_step" }
+        { "capability_id": "persistent_resumable_state", "support": "partial", "evidence_level": "projected", "evidence_refs": [{ "record_id": "claude-projection-manifest", "evidence_kind": "projection_manifest", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "projected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Projected state contract is not runtime resume evidence."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "local_event_emission", "support": "supported", "evidence_level": "runtime_detected", "evidence_refs": [{ "record_id": "claude-local-event-runtime-probe", "evidence_kind": "runtime_probe_result", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "runtime_detected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Local smoke detection does not prove per-task hook execution."], "downgrade_behavior": "claim_runtime_detection_only" },
+        { "capability_id": "shared_pr_execution", "support": "partial", "evidence_level": "projected", "evidence_refs": [{ "record_id": "claude-projection-manifest", "evidence_kind": "projection_manifest", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "projected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Repository setup and trusted PR-head evidence remain external."], "downgrade_behavior": "manual_step" }
       ],
       "rendering": {
         "renderer_id": "install-claude-adapter",
         "renderer_version": "1",
-        "output_root": ".claude",
-        "asset_kinds": ["instructions", "skills", "commands", "hooks", "schemas"],
+        "output_root": ".",
+        "asset_kinds": ["skills", "commands", "hooks", "runner", "configuration", "runtime_data"],
         "deterministic_input_refs": ["canonical_contract.revision", "canonical_contract.source_digest", "profile_id"]
       },
       "generated_assets": {
         "owner": "adapter",
-        "managed_paths": [".claude/commands", ".claude/settings.json"],
+        "managed_assets": [
+          { "path": ".claude/skills", "asset_kind": "skills", "ownership_mode": "selected_files", "inventory_source_ref": "scripts/install-claude-adapter.mjs" },
+          { "path": ".claude/commands", "asset_kind": "commands", "ownership_mode": "selected_files", "inventory_source_ref": "scripts/install-claude-adapter.mjs" },
+          { "path": ".claude/settings.json", "asset_kind": "hooks", "ownership_mode": "partial_file", "inventory_source_ref": "scripts/install-claude-adapter.mjs" },
+          { "path": "scripts/ai-metrics-record.mjs", "asset_kind": "runner", "ownership_mode": "full_file", "inventory_source_ref": "scripts/install-claude-adapter.mjs" },
+          { "path": "scripts/ai-metrics-summarize.mjs", "asset_kind": "runner", "ownership_mode": "full_file", "inventory_source_ref": "scripts/install-claude-adapter.mjs" },
+          { "path": "scripts/ai-ledger-refresh.mjs", "asset_kind": "runner", "ownership_mode": "full_file", "inventory_source_ref": "scripts/install-claude-adapter.mjs" },
+          { "path": "docs/ai/observability-config.yml", "asset_kind": "configuration", "ownership_mode": "full_file", "inventory_source_ref": "scripts/install-claude-adapter.mjs" },
+          { "path": "docs/ai/metrics", "asset_kind": "runtime_data", "ownership_mode": "runtime_directory", "inventory_source_ref": "scripts/install-claude-adapter.mjs" },
+          { "path": "docs/ai/reports", "asset_kind": "runtime_data", "ownership_mode": "runtime_directory", "inventory_source_ref": "scripts/install-claude-adapter.mjs" }
+        ],
         "lifecycle_operations": ["install", "update", "rollback", "detach"],
         "drift_policy": "fail"
       },
-      "privacy": {
-        "event_collection": "local_opt_in",
-        "external_publication": "approval_required",
-        "raw_prompt_storage": "prohibited",
-        "sensitive_payload_storage": "prohibited"
-      },
+      "privacy": { "event_collection": "local_opt_in", "external_publication": "approval_required", "raw_prompt_storage": "prohibited", "sensitive_payload_storage": "prohibited" },
       "normalized_event_schema_refs": ["schemas/metrics-event.schema.json"]
     },
     {
@@ -48,39 +53,44 @@
       "adapter_id": "codex",
       "canonical_contract": {
         "revision": "ask-3.0.0",
-        "source_digest": "fixture:canonical-ask-3.0.0",
-        "source_paths": ["AGENTS.md", "skills/skill-router/SKILL.md", "docs/execution-envelope-contract.md"]
+        "source_digest": "sha256:b84be622e4aa2c793e9c43a05829c1d9dbc12b199c5b96b54c85681a082bf700",
+        "source_paths": ["AGENTS.md", "docs/adapter-runtime-boundary-contract.md", "docs/execution-envelope-contract.md", "schemas/adapter-runtime-profile.schema.json", "skills/skill-router/SKILL.md"]
       },
       "capabilities": [
-        { "capability_id": "progressive_instruction_loading", "support": "supported", "evidence_level": "behavior_verified", "evidence_refs": ["scripts/test-validate-repo.mjs"], "limitations": [], "downgrade_behavior": "claim_behavior_verified" },
-        { "capability_id": "lifecycle_hooks", "support": "unsupported", "evidence_level": "behavior_verified", "evidence_refs": ["docs/adapter-capability-matrix.md"], "limitations": ["The Codex adapter ships no hooks."], "downgrade_behavior": "unsupported" },
-        { "capability_id": "agent_orchestration", "support": "partial", "evidence_level": "projected", "evidence_refs": ["adapters/codex/prompts"], "limitations": ["Projected prompts do not prove subagent execution."], "downgrade_behavior": "insufficient_evidence" },
-        { "capability_id": "permission_sandbox_enforcement", "support": "partial", "evidence_level": "projected", "evidence_refs": ["adapters/codex/README.md"], "limitations": ["Runtime approval and sandbox behavior remain user-controlled."], "downgrade_behavior": "manual_step" },
-        { "capability_id": "runtime_asset_load_evidence", "support": "partial", "evidence_level": "runtime_detected", "evidence_refs": ["scripts/ask-doctor.mjs"], "limitations": ["Detection does not prove per-task application."], "downgrade_behavior": "insufficient_evidence" },
-        { "capability_id": "programmatic_tool_execution", "support": "supported", "evidence_level": "executed", "evidence_refs": ["scripts/codex-exec-runner.mjs"], "limitations": [], "downgrade_behavior": "claim_execution_only" },
-        { "capability_id": "persistent_resumable_state", "support": "partial", "evidence_level": "projected", "evidence_refs": ["docs/agent-session-state-contract.md"], "limitations": ["Projected state contract is not runtime resume evidence."], "downgrade_behavior": "insufficient_evidence" },
-        { "capability_id": "local_event_emission", "support": "unsupported", "evidence_level": "behavior_verified", "evidence_refs": ["docs/adapter-capability-matrix.md"], "limitations": ["The Codex adapter ships no local metrics collector."], "downgrade_behavior": "unsupported" },
-        { "capability_id": "shared_pr_execution", "support": "unsupported", "evidence_level": "behavior_verified", "evidence_refs": ["docs/adapter-capability-matrix.md"], "limitations": ["The Codex adapter ships no shared PR workflow."], "downgrade_behavior": "unsupported" }
+        { "capability_id": "progressive_instruction_loading", "support": "supported", "evidence_level": "projected", "evidence_refs": [{ "record_id": "codex-projection-manifest", "evidence_kind": "projection_manifest", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "projected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Runtime skill loading is not established by repository projection."], "downgrade_behavior": "claim_projection_only" },
+        { "capability_id": "lifecycle_hooks", "support": "unsupported", "evidence_level": "behavior_verified", "evidence_refs": [{ "record_id": "codex-unsupported-capability-fixture", "evidence_kind": "capability_fixture_result", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "behavior_verified", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["The Codex adapter ships no hooks."], "downgrade_behavior": "unsupported" },
+        { "capability_id": "agent_orchestration", "support": "partial", "evidence_level": "projected", "evidence_refs": [{ "record_id": "codex-projection-manifest", "evidence_kind": "projection_manifest", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "projected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Projected prompts do not prove subagent execution."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "permission_sandbox_enforcement", "support": "partial", "evidence_level": "projected", "evidence_refs": [{ "record_id": "codex-projection-manifest", "evidence_kind": "projection_manifest", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "projected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Runtime approval and sandbox behavior remain user-controlled."], "downgrade_behavior": "manual_step" },
+        { "capability_id": "runtime_asset_load_evidence", "support": "partial", "evidence_level": "projected", "evidence_refs": [{ "record_id": "codex-projection-manifest", "evidence_kind": "projection_manifest", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "projected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Per-task asset loading is not observed by this fixture."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "programmatic_tool_execution", "support": "supported", "evidence_level": "behavior_verified", "evidence_refs": [{ "record_id": "codex-runner-capability-fixture", "evidence_kind": "capability_fixture_result", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "behavior_verified", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["A repository fixture verifies runner behavior; no live external Codex run is claimed."], "downgrade_behavior": "claim_behavior_verified" },
+        { "capability_id": "persistent_resumable_state", "support": "partial", "evidence_level": "projected", "evidence_refs": [{ "record_id": "codex-projection-manifest", "evidence_kind": "projection_manifest", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "projected", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["Projected state contract is not runtime resume evidence."], "downgrade_behavior": "insufficient_evidence" },
+        { "capability_id": "local_event_emission", "support": "unsupported", "evidence_level": "behavior_verified", "evidence_refs": [{ "record_id": "codex-unsupported-capability-fixture", "evidence_kind": "capability_fixture_result", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "behavior_verified", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["The Codex adapter ships no local metrics collector."], "downgrade_behavior": "unsupported" },
+        { "capability_id": "shared_pr_execution", "support": "unsupported", "evidence_level": "behavior_verified", "evidence_refs": [{ "record_id": "codex-unsupported-capability-fixture", "evidence_kind": "capability_fixture_result", "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json", "result": "pass", "evidence_level": "behavior_verified", "artifact_digest": "sha256:61aa5866fad050c3bb7b323e825cf148c49556c5be8ca13d2adb08ddff826ac5" }], "limitations": ["The Codex adapter ships no shared PR workflow."], "downgrade_behavior": "unsupported" }
       ],
       "rendering": {
         "renderer_id": "install-codex-adapter",
         "renderer_version": "1",
-        "output_root": ".agents",
-        "asset_kinds": ["instructions", "skills", "commands", "prompts", "runner", "schemas"],
+        "output_root": ".",
+        "asset_kinds": ["skills", "prompts", "commands", "runner", "schemas"],
         "deterministic_input_refs": ["canonical_contract.revision", "canonical_contract.source_digest", "profile_id"]
       },
       "generated_assets": {
         "owner": "adapter",
-        "managed_paths": [".agents/skills", ".agents/prompts", ".agents/commands"],
+        "managed_assets": [
+          { "path": ".agents/skills", "asset_kind": "skills", "ownership_mode": "selected_files", "inventory_source_ref": "scripts/install-codex-adapter.mjs" },
+          { "path": ".agents/prompts", "asset_kind": "prompts", "ownership_mode": "selected_files", "inventory_source_ref": "scripts/install-codex-adapter.mjs" },
+          { "path": ".agents/commands", "asset_kind": "commands", "ownership_mode": "selected_files", "inventory_source_ref": "scripts/install-codex-adapter.mjs" },
+          { "path": "scripts/codex-exec-runner.mjs", "asset_kind": "runner", "ownership_mode": "full_file", "inventory_source_ref": "scripts/install-codex-adapter.mjs" },
+          { "path": "scripts/ask-sensors.mjs", "asset_kind": "runner", "ownership_mode": "full_file", "inventory_source_ref": "scripts/install-codex-adapter.mjs" },
+          { "path": "scripts/ask-shared.mjs", "asset_kind": "runner", "ownership_mode": "full_file", "inventory_source_ref": "scripts/install-codex-adapter.mjs" },
+          { "path": "scripts/execution-envelope.mjs", "asset_kind": "runner", "ownership_mode": "full_file", "inventory_source_ref": "scripts/install-codex-adapter.mjs" },
+          { "path": "scripts/execution-envelope.schema.json", "asset_kind": "schemas", "ownership_mode": "full_file", "inventory_source_ref": "scripts/install-codex-adapter.mjs" },
+          { "path": "scripts/metrics-event.schema.json", "asset_kind": "schemas", "ownership_mode": "full_file", "inventory_source_ref": "scripts/install-codex-adapter.mjs" }
+        ],
         "lifecycle_operations": ["install", "update", "rollback", "detach"],
         "drift_policy": "fail"
       },
-      "privacy": {
-        "event_collection": "disabled",
-        "external_publication": "disabled",
-        "raw_prompt_storage": "prohibited",
-        "sensitive_payload_storage": "prohibited"
-      },
+      "privacy": { "event_collection": "disabled", "external_publication": "disabled", "raw_prompt_storage": "prohibited", "sensitive_payload_storage": "prohibited" },
       "normalized_event_schema_refs": []
     }
   ]

@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSy
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
+import { CLAUDE_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
@@ -71,11 +72,7 @@ const COMMAND_TEMPLATES = [
   "skill-report.md",
   "skill-ledger-refresh.md",
 ];
-const RUNTIME_SCRIPTS = [
-  "ai-metrics-record.mjs",
-  "ai-metrics-summarize.mjs",
-  "ai-ledger-refresh.mjs",
-];
+const RUNTIME_SCRIPTS = CLAUDE_RUNTIME_FILES.map((file) => file.name);
 const RUNTIME_DIRECTORIES = [
   "docs/ai/metrics",
   "docs/ai/reports",

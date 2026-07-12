@@ -529,6 +529,7 @@ function install(manifest, options) {
 `,
   );
   writeFileSync(resolve(root, "scripts/adapter-runtime-smoke.mjs"), "console.log('adapter runtime smoke');\n");
+  writeFileSync(resolve(root, "scripts/adapter-runtime-inventory.mjs"), "export const CODEX_RUNTIME_FILES = [{ name: 'codex-exec-runner.mjs' }];\n");
   writeFileSync(resolve(root, "scripts/codex-exec-runner.mjs"), "console.log('codex runner');\n");
   writeFileSync(resolve(root, "scripts/execution-envelope.mjs"), "console.log('execution envelope');\n");
   writeFileSync(
@@ -4565,26 +4566,89 @@ try {
   const adapterProfileFixture = JSON.parse(readFileSync(resolve(repoRoot, "docs/fixtures/adapter-runtime-profiles.json"), "utf8"));
   for (const profile of adapterProfileFixture.profiles) {
     assertSchemaPass(`adapter profile schema ${profile.profile_id}`, adapterProfileSchema, profile);
-    const issues = inspectAdapterRuntimeProfile(profile);
+    const issues = inspectAdapterRuntimeProfile(profile, { root: repoRoot });
     if (issues.length > 0) throw new Error(`${profile.profile_id} should pass semantic profile validation\n${issues.join("\n")}`);
   }
   const invalidDowngradeProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
   invalidDowngradeProfile.capabilities.find((capability) => capability.capability_id === "lifecycle_hooks").downgrade_behavior = "none";
-  const invalidDowngradeIssues = inspectAdapterRuntimeProfile(invalidDowngradeProfile);
-  if (!invalidDowngradeIssues.some((issue) => issue.includes("inconsistent with supported/runtime_detected"))) {
+  const invalidDowngradeIssues = inspectAdapterRuntimeProfile(invalidDowngradeProfile, { root: repoRoot });
+  if (!invalidDowngradeIssues.some((issue) => issue.includes("inconsistent with partial/projected"))) {
     throw new Error(`invalid adapter downgrade should fail closed\n${invalidDowngradeIssues.join("\n")}`);
   }
   const missingCapabilityProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
   missingCapabilityProfile.capabilities = missingCapabilityProfile.capabilities.filter((capability) => capability.capability_id !== "shared_pr_execution");
-  const missingCapabilityIssues = inspectAdapterRuntimeProfile(missingCapabilityProfile);
+  const missingCapabilityIssues = inspectAdapterRuntimeProfile(missingCapabilityProfile, { root: repoRoot });
   if (!missingCapabilityIssues.includes("capabilities must include shared_pr_execution")) {
     throw new Error(`missing required adapter capability should fail closed\n${missingCapabilityIssues.join("\n")}`);
   }
   const modelDependentProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
   modelDependentProfile.rendering.model_name = "current-model";
-  const modelDependentIssues = inspectAdapterRuntimeProfile(modelDependentProfile);
+  const modelDependentIssues = inspectAdapterRuntimeProfile(modelDependentProfile, { root: repoRoot });
   if (!modelDependentIssues.includes("profile must not contain model-dependent fields")) {
     throw new Error(`model-dependent adapter profile should fail closed\n${modelDependentIssues.join("\n")}`);
+  }
+  const digestMismatchProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
+  digestMismatchProfile.canonical_contract.source_digest = `sha256:${"0".repeat(64)}`;
+  const digestMismatchIssues = inspectAdapterRuntimeProfile(digestMismatchProfile, { root: repoRoot });
+  if (!digestMismatchIssues.includes("canonical_contract.source_digest does not match canonical source_paths")) {
+    throw new Error(`canonical digest mismatch should fail closed\n${digestMismatchIssues.join("\n")}`);
+  }
+  const missingCanonicalPathProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
+  missingCanonicalPathProfile.canonical_contract.source_paths[1] = "docs/missing-contract.md";
+  const missingCanonicalPathIssues = inspectAdapterRuntimeProfile(missingCanonicalPathProfile, { root: repoRoot });
+  if (!missingCanonicalPathIssues.some((issue) => issue.includes("file is missing: docs/missing-contract.md"))) {
+    throw new Error(`missing canonical source should fail closed\n${missingCanonicalPathIssues.join("\n")}`);
+  }
+  const adapterCanonicalPathProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+  adapterCanonicalPathProfile.canonical_contract.source_paths[1] = "adapters/codex/README.md";
+  const adapterCanonicalPathIssues = inspectAdapterRuntimeProfile(adapterCanonicalPathProfile, { root: repoRoot });
+  if (!adapterCanonicalPathIssues.some((issue) => issue.includes("outside canonical ASK sources"))) {
+    throw new Error(`adapter source as canonical provenance should fail closed\n${adapterCanonicalPathIssues.join("\n")}`);
+  }
+  const fakeEvidenceProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+  fakeEvidenceProfile.capabilities[0].evidence_refs[0].artifact_ref = "docs/fixtures/missing-evidence.json";
+  const fakeEvidenceIssues = inspectAdapterRuntimeProfile(fakeEvidenceProfile, { root: repoRoot });
+  if (!fakeEvidenceIssues.some((issue) => issue.includes("evidence artifact is missing"))) {
+    throw new Error(`missing evidence artifact should fail closed\n${fakeEvidenceIssues.join("\n")}`);
+  }
+  const wrongEvidenceKindProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+  wrongEvidenceKindProfile.capabilities[0].evidence_refs[0].evidence_kind = "bounded_run_result";
+  const wrongEvidenceKindIssues = inspectAdapterRuntimeProfile(wrongEvidenceKindProfile, { root: repoRoot });
+  if (!wrongEvidenceKindIssues.some((issue) => issue.includes("projected requires projection_manifest"))) {
+    throw new Error(`wrong evidence kind should fail closed\n${wrongEvidenceKindIssues.join("\n")}`);
+  }
+  const missingRuntimeAssetProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+  missingRuntimeAssetProfile.generated_assets.managed_assets = missingRuntimeAssetProfile.generated_assets.managed_assets.filter((asset) => asset.path !== "scripts/codex-exec-runner.mjs");
+  const missingRuntimeAssetIssues = inspectAdapterRuntimeProfile(missingRuntimeAssetProfile, { root: repoRoot });
+  if (!missingRuntimeAssetIssues.some((issue) => issue.includes("managed asset inventory is missing scripts/codex-exec-runner.mjs"))) {
+    throw new Error(`missing runtime inventory should fail closed\n${missingRuntimeAssetIssues.join("\n")}`);
+  }
+  const canonicalOwnershipProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+  canonicalOwnershipProfile.generated_assets.managed_assets[0].path = "AGENTS.md";
+  const canonicalOwnershipIssues = inspectAdapterRuntimeProfile(canonicalOwnershipProfile, { root: repoRoot });
+  if (!canonicalOwnershipIssues.includes("managed asset path intersects canonical/core ownership: AGENTS.md")) {
+    throw new Error(`canonical ownership overlap should fail closed\n${canonicalOwnershipIssues.join("\n")}`);
+  }
+  const pathEscapeProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+  pathEscapeProfile.generated_assets.managed_assets[0].path = "../outside";
+  const pathEscapeIssues = inspectAdapterRuntimeProfile(pathEscapeProfile, { root: repoRoot });
+  if (!pathEscapeIssues.some((issue) => issue.includes("managed asset path is unsafe or non-normalized"))) {
+    throw new Error(`managed path escape should fail closed\n${pathEscapeIssues.join("\n")}`);
+  }
+  const symlinkRoot = resolve(fixtureRoot, "adapter-profile-symlink");
+  mkdirSync(symlinkRoot, { recursive: true });
+  symlinkSync(repoRoot, resolve(symlinkRoot, "escape-link"), "dir");
+  const symlinkEscapeProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+  symlinkEscapeProfile.generated_assets.managed_assets[0].path = "escape-link/AGENTS.md";
+  const symlinkEscapeIssues = inspectAdapterRuntimeProfile(symlinkEscapeProfile, { root: symlinkRoot });
+  if (!symlinkEscapeIssues.some((issue) => issue.includes("managed asset path traverses a symlink"))) {
+    throw new Error(`managed symlink escape should fail closed\n${symlinkEscapeIssues.join("\n")}`);
+  }
+  const missingEventSchemaProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
+  missingEventSchemaProfile.normalized_event_schema_refs = [];
+  const missingEventSchemaIssues = inspectAdapterRuntimeProfile(missingEventSchemaProfile, { root: repoRoot });
+  if (!missingEventSchemaIssues.includes("enabled event_collection requires a normalized event schema ref")) {
+    throw new Error(`enabled event collection without schema should fail closed\n${missingEventSchemaIssues.join("\n")}`);
   }
 
   const lifecycleFixture = JSON.parse(readFileSync(resolve(repoRoot, "docs/fixtures/lifecycle-artifact-chains.json"), "utf8"));

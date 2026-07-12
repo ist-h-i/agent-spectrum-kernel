@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ADAPTER_MANAGED_ASSET_REQUIREMENTS } from "./adapter-runtime-inventory.mjs";
 import { APPROVAL_REQUIRED_SURFACE_IDS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -54,6 +56,7 @@ const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
 const ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH = "docs/adapter-runtime-boundary-contract.md";
 const ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH = "schemas/adapter-runtime-profile.schema.json";
 const ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH = "docs/fixtures/adapter-runtime-profiles.json";
+const ADAPTER_RUNTIME_EVIDENCE_FIXTURE_PATH = "docs/fixtures/adapter-runtime-evidence.json";
 const ADAPTER_RUNTIME_CAPABILITY_IDS = [
   "progressive_instruction_loading",
   "lifecycle_hooks",
@@ -68,6 +71,13 @@ const ADAPTER_RUNTIME_CAPABILITY_IDS = [
 const ADAPTER_RUNTIME_SUPPORT_STATUSES = ["supported", "partial", "unsupported", "unknown"];
 const ADAPTER_RUNTIME_EVIDENCE_LEVELS = ["none", "projected", "runtime_detected", "executed", "behavior_verified"];
 const ADAPTER_RUNTIME_LIFECYCLE_OPERATIONS = ["install", "update", "rollback", "detach"];
+const ADAPTER_RUNTIME_EVIDENCE_KIND_BY_LEVEL = {
+  projected: "projection_manifest",
+  runtime_detected: "runtime_probe_result",
+  executed: "bounded_run_result",
+  behavior_verified: "capability_fixture_result",
+};
+const SHA256_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const LIFECYCLE_ARTIFACT_CONTRACT_PATH = "docs/lifecycle-artifact-contract.md";
 const LIFECYCLE_ARTIFACT_FIXTURE_PATH = "docs/fixtures/lifecycle-artifact-chains.json";
 const LIFECYCLE_TRACEABILITY_CONTRACT_PATH = "docs/lifecycle-traceability-contract.md";
@@ -1190,10 +1200,129 @@ function adapterProfileHasModelField(value) {
   return Object.entries(value).some(([key, child]) => /(^|_)model(_|$)/i.test(key) || adapterProfileHasModelField(child));
 }
 
-export function inspectAdapterRuntimeProfile(profile) {
+function normalizedRelativeProfilePath(path, { allowDot = false } = {}) {
+  if (typeof path !== "string" || path.trim() === "" || path.includes("\\") || path.includes("\0") || isAbsolute(path)) return null;
+  const segments = path.split("/");
+  if (segments.some((segment) => segment === "" || segment === ".." || (!allowDot && segment === "."))) return null;
+  if (path === "." && allowDot) return path;
+  return segments.filter((segment) => segment !== ".").join("/");
+}
+
+function profilePathHasSymlink(root, path) {
+  let current = resolve(root);
+  for (const segment of path.split("/")) {
+    current = resolve(current, segment);
+    if (!existsSync(current)) return false;
+    if (lstatSync(current).isSymbolicLink()) return true;
+  }
+  return false;
+}
+
+function isCanonicalSourcePath(path) {
+  return ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "manifest.json"].includes(path)
+    || /^skills\/[a-z0-9-]+\/SKILL\.md$/.test(path)
+    || /^docs\/[A-Za-z0-9._/-]+-contract\.md$/.test(path)
+    || /^schemas\/[A-Za-z0-9._/-]+\.(?:json|ya?ml)$/.test(path);
+}
+
+function isCanonicalOwnedTargetPath(path) {
+  return ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "manifest.json"].includes(path)
+    || path === "skills" || path.startsWith("skills/")
+    || path === "schemas" || path.startsWith("schemas/")
+    || /^docs\/[A-Za-z0-9._/-]+-contract\.md$/.test(path);
+}
+
+function sha256Bytes(bytes) {
+  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+export function computeProfilePathSetDigest(root, paths, { canonicalOnly = false } = {}) {
+  const normalized = [];
+  for (const candidate of paths ?? []) {
+    const path = normalizedRelativeProfilePath(candidate);
+    if (!path) throw new Error(`unsafe or non-normalized path: ${String(candidate)}`);
+    if (canonicalOnly && !isCanonicalSourcePath(path)) throw new Error(`path is outside canonical ASK sources: ${path}`);
+    if (profilePathHasSymlink(root, path)) throw new Error(`path traverses a symlink: ${path}`);
+    const absolutePath = resolve(root, path);
+    if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) throw new Error(`file is missing: ${path}`);
+    const rootReal = realpathSync(root);
+    const fileReal = realpathSync(absolutePath);
+    if (fileReal !== rootReal && !fileReal.startsWith(`${rootReal}/`)) throw new Error(`path escapes validation root: ${path}`);
+    normalized.push(path);
+  }
+  if (normalized.length === 0 || new Set(normalized).size !== normalized.length) throw new Error("paths must be non-empty and unique");
+  const sorted = [...normalized].sort();
+  if (JSON.stringify(normalized) !== JSON.stringify(sorted)) throw new Error("paths must use canonical lexicographic order");
+  const hash = createHash("sha256");
+  for (const path of sorted) {
+    const bytes = readFileSync(resolve(root, path));
+    hash.update(Buffer.from(`${path}\0${bytes.length}\0`, "utf8"));
+    hash.update(bytes);
+    hash.update(Buffer.from("\0", "utf8"));
+  }
+  return `sha256:${hash.digest("hex")}`;
+}
+
+export function computeCanonicalSourceDigest(root, paths) {
+  return computeProfilePathSetDigest(root, paths, { canonicalOnly: true });
+}
+
+function evidenceRecordFor(root, adapterId, capability, reference, add) {
+  const id = capability.capability_id ?? "<missing>";
+  const path = normalizedRelativeProfilePath(reference?.artifact_ref);
+  if (!path) {
+    add(`${id} evidence artifact_ref is unsafe or non-normalized`);
+    return null;
+  }
+  if (profilePathHasSymlink(root, path)) {
+    add(`${id} evidence artifact_ref traverses a symlink: ${path}`);
+    return null;
+  }
+  const absolutePath = resolve(root, path);
+  if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) {
+    add(`${id} evidence artifact is missing: ${path}`);
+    return null;
+  }
+  const actualArtifactDigest = sha256Bytes(readFileSync(absolutePath));
+  if (!SHA256_DIGEST_PATTERN.test(reference?.artifact_digest ?? "") || reference.artifact_digest !== actualArtifactDigest) {
+    add(`${id} evidence artifact_digest does not match ${path}`);
+    return null;
+  }
+  let artifact;
+  try {
+    artifact = JSON.parse(readFileSync(absolutePath, "utf8"));
+  } catch {
+    add(`${id} evidence artifact is not valid JSON: ${path}`);
+    return null;
+  }
+  const record = (artifact.records ?? []).find((candidate) => candidate.record_id === reference.record_id);
+  if (!record) {
+    add(`${id} evidence record is missing: ${reference.record_id ?? "<missing>"}`);
+    return null;
+  }
+  for (const field of ["evidence_kind", "evidence_level", "result"]) {
+    if (record[field] !== reference[field]) add(`${id} evidence ${field} does not match record ${record.record_id}`);
+  }
+  if (record.adapter_id !== adapterId || !(record.capability_ids ?? []).includes(id)) {
+    add(`${id} evidence record ${record.record_id} does not cover adapter/capability`);
+  }
+  if (record.result !== "pass") add(`${id} evidence record ${record.record_id} did not pass`);
+  try {
+    const actualSubjectDigest = computeProfilePathSetDigest(root, record.observed_paths);
+    if (!SHA256_DIGEST_PATTERN.test(record.subject_digest ?? "") || record.subject_digest !== actualSubjectDigest) {
+      add(`${id} evidence subject_digest does not match record ${record.record_id}`);
+    }
+  } catch (error) {
+    add(`${id} evidence record ${record.record_id} has invalid observed_paths: ${error.message}`);
+  }
+  return record;
+}
+
+export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
   const issues = [];
   const add = (message) => issues.push(message);
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) return ["profile must be an object"];
+  if (!root) return ["validation root is required"];
   if (profile.schema_version !== "1.0.0") add("schema_version must be 1.0.0");
   for (const field of ["profile_id", "adapter_id"]) {
     if (typeof profile[field] !== "string" || profile[field].trim() === "") add(`${field} must be a non-empty string`);
@@ -1204,10 +1333,17 @@ export function inspectAdapterRuntimeProfile(profile) {
   if (!canonical || typeof canonical !== "object" || Array.isArray(canonical)) {
     add("canonical_contract must be an object");
   } else {
-    for (const field of ["revision", "source_digest"]) {
-      if (typeof canonical[field] !== "string" || canonical[field].trim() === "") add(`canonical_contract.${field} must be a non-empty string`);
-    }
+    if (typeof canonical.revision !== "string" || canonical.revision.trim() === "") add("canonical_contract.revision must be a non-empty string");
+    if (!SHA256_DIGEST_PATTERN.test(canonical.source_digest ?? "")) add("canonical_contract.source_digest must use sha256:<64 lowercase hex>");
     if (!Array.isArray(canonical.source_paths) || canonical.source_paths.length === 0) add("canonical_contract.source_paths must be non-empty");
+    else {
+      try {
+        const actualDigest = computeCanonicalSourceDigest(root, canonical.source_paths);
+        if (canonical.source_digest !== actualDigest) add("canonical_contract.source_digest does not match canonical source_paths");
+      } catch (error) {
+        add(`canonical_contract.source_paths are invalid: ${error.message}`);
+      }
+    }
   }
 
   if (!Array.isArray(profile.capabilities)) {
@@ -1228,6 +1364,14 @@ export function inspectAdapterRuntimeProfile(profile) {
       if (!Array.isArray(capability?.limitations)) add(`${id}.limitations must be an array`);
       if (capability?.evidence_level !== "none" && (!Array.isArray(capability?.evidence_refs) || capability.evidence_refs.length === 0)) {
         add(`${id} requires evidence_refs for ${capability?.evidence_level}`);
+      }
+      if (capability?.evidence_level === "none" && Array.isArray(capability?.evidence_refs) && capability.evidence_refs.length > 0) add(`${id} none evidence_level must not have evidence_refs`);
+      for (const reference of Array.isArray(capability?.evidence_refs) ? capability.evidence_refs : []) {
+        const expectedKind = ADAPTER_RUNTIME_EVIDENCE_KIND_BY_LEVEL[capability.evidence_level];
+        if (reference?.evidence_kind !== expectedKind) add(`${id} ${capability.evidence_level} requires ${expectedKind}`);
+        if (reference?.evidence_level !== capability.evidence_level) add(`${id} evidence_ref level must match capability evidence_level`);
+        if (reference?.result !== "pass") add(`${id} evidence_ref result must be pass`);
+        evidenceRecordFor(root, profile.adapter_id, capability, reference, add);
       }
       if (capability?.support === "partial" && (!Array.isArray(capability?.limitations) || capability.limitations.length === 0)) {
         add(`${id} partial support requires limitations`);
@@ -1259,6 +1403,7 @@ export function inspectAdapterRuntimeProfile(profile) {
       if (typeof rendering[field] !== "string" || rendering[field].trim() === "") add(`rendering.${field} must be a non-empty string`);
     }
     if (!Array.isArray(rendering.asset_kinds) || rendering.asset_kinds.length === 0) add("rendering.asset_kinds must be non-empty");
+    if (!normalizedRelativeProfilePath(rendering.output_root, { allowDot: true })) add("rendering.output_root is unsafe or non-normalized");
     for (const ref of ["canonical_contract.revision", "canonical_contract.source_digest", "profile_id"]) {
       if (!Array.isArray(rendering.deterministic_input_refs) || !rendering.deterministic_input_refs.includes(ref)) add(`rendering.deterministic_input_refs must include ${ref}`);
     }
@@ -1269,7 +1414,33 @@ export function inspectAdapterRuntimeProfile(profile) {
     add("generated_assets must be an object");
   } else {
     if (assets.owner !== "adapter") add("generated_assets.owner must be adapter");
-    if (!Array.isArray(assets.managed_paths) || assets.managed_paths.length === 0) add("generated_assets.managed_paths must be non-empty");
+    if (!Array.isArray(assets.managed_assets) || assets.managed_assets.length === 0) add("generated_assets.managed_assets must be non-empty");
+    else {
+      const seenPaths = new Set();
+      for (const asset of assets.managed_assets) {
+        const path = normalizedRelativeProfilePath(asset?.path);
+        if (!path) {
+          add(`managed asset path is unsafe or non-normalized: ${String(asset?.path)}`);
+          continue;
+        }
+        if (seenPaths.has(path)) add(`managed asset path must be unique: ${path}`);
+        seenPaths.add(path);
+        if (profilePathHasSymlink(root, path)) add(`managed asset path traverses a symlink: ${path}`);
+        if (isCanonicalOwnedTargetPath(path)) add(`managed asset path intersects canonical/core ownership: ${path}`);
+        const sourceRef = normalizedRelativeProfilePath(asset?.inventory_source_ref);
+        if (!sourceRef || !existsSync(resolve(root, sourceRef))) add(`managed asset inventory_source_ref is missing or unsafe: ${String(asset?.inventory_source_ref)}`);
+      }
+      const expectedAssets = ADAPTER_MANAGED_ASSET_REQUIREMENTS[profile.adapter_id] ?? [];
+      for (const expected of expectedAssets) {
+        if (!assets.managed_assets.some((asset) => asset.path === expected.path && asset.asset_kind === expected.assetKind && asset.ownership_mode === expected.ownershipMode)) {
+          add(`managed asset inventory is missing ${expected.path} (${expected.assetKind}/${expected.ownershipMode})`);
+        }
+      }
+      const renderedKinds = new Set(rendering?.asset_kinds ?? []);
+      const inventoriedKinds = new Set(assets.managed_assets.map((asset) => asset.asset_kind));
+      for (const kind of renderedKinds) if (!inventoriedKinds.has(kind)) add(`rendering asset_kind has no managed inventory: ${kind}`);
+      for (const kind of inventoriedKinds) if (!renderedKinds.has(kind)) add(`managed inventory asset_kind is not rendered: ${kind}`);
+    }
     for (const operation of ADAPTER_RUNTIME_LIFECYCLE_OPERATIONS) {
       if (!Array.isArray(assets.lifecycle_operations) || !assets.lifecycle_operations.includes(operation)) add(`generated_assets.lifecycle_operations must include ${operation}`);
     }
@@ -1286,21 +1457,30 @@ export function inspectAdapterRuntimeProfile(profile) {
     if (privacy.sensitive_payload_storage !== "prohibited") add("privacy.sensitive_payload_storage must be prohibited");
   }
   if (!Array.isArray(profile.normalized_event_schema_refs)) add("normalized_event_schema_refs must be an array");
+  else {
+    if (privacy?.event_collection !== "disabled" && profile.normalized_event_schema_refs.length === 0) add("enabled event_collection requires a normalized event schema ref");
+    for (const reference of profile.normalized_event_schema_refs) {
+      const path = normalizedRelativeProfilePath(reference);
+      if (!path || !path.startsWith("schemas/") || !existsSync(resolve(root, path))) add(`normalized event schema ref is missing or non-canonical: ${String(reference)}`);
+    }
+  }
   return issues;
 }
 
 function validateAdapterRuntimeProfileContract(root, manifest, errors) {
   const active = manifest?.name === "agent-spectrum-kernel";
-  const checks = { active, contractPresent: false, schemaPresent: false, fixturePresent: false, profiles: [] };
+  const checks = { active, contractPresent: false, schemaPresent: false, fixturePresent: false, evidenceFixturePresent: false, requiredAdaptersPresent: false, profiles: [] };
   if (!active) return checks;
   checks.contractPresent = existsSync(resolve(root, ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH));
   checks.schemaPresent = existsSync(resolve(root, ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH));
   checks.fixturePresent = existsSync(resolve(root, ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH));
+  checks.evidenceFixturePresent = existsSync(resolve(root, ADAPTER_RUNTIME_EVIDENCE_FIXTURE_PATH));
   if (!checks.contractPresent) fail(errors, "adapter runtime profile", `contract is missing: ${ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH}`);
   if (!checks.schemaPresent) fail(errors, "adapter runtime profile", `schema is missing: ${ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH}`);
   if (!checks.fixturePresent) fail(errors, "adapter runtime profile", `fixture is missing: ${ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH}`);
-  if (!manifest.docs?.includes(ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH) || !manifest.docs?.includes(ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH)) {
-    fail(errors, "adapter runtime profile", "manifest.json.docs must list the adapter runtime contract and fixture");
+  if (!checks.evidenceFixturePresent) fail(errors, "adapter runtime profile", `evidence fixture is missing: ${ADAPTER_RUNTIME_EVIDENCE_FIXTURE_PATH}`);
+  if (!manifest.docs?.includes(ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH) || !manifest.docs?.includes(ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH) || !manifest.docs?.includes(ADAPTER_RUNTIME_EVIDENCE_FIXTURE_PATH)) {
+    fail(errors, "adapter runtime profile", "manifest.json.docs must list the adapter runtime contract, profile fixture, and evidence fixture");
   }
   if (!manifest.schemas?.includes(ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH)) {
     fail(errors, "adapter runtime profile", `manifest.json.schemas must list ${ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH}`);
@@ -1332,10 +1512,11 @@ function validateAdapterRuntimeProfileContract(root, manifest, errors) {
     try {
       const fixture = JSON.parse(readFileSync(resolve(root, ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH), "utf8"));
       for (const profile of fixture.profiles ?? []) {
-        const issues = inspectAdapterRuntimeProfile(profile);
+        const issues = inspectAdapterRuntimeProfile(profile, { root });
         checks.profiles.push({ profileId: profile.profile_id, issues, ok: issues.length === 0 });
         for (const issue of issues) fail(errors, "adapter runtime profile", `${profile.profile_id ?? "<missing>"}: ${issue}`);
       }
+      checks.requiredAdaptersPresent = ["claude_code", "codex"].every((adapterId) => (fixture.profiles ?? []).some((profile) => profile.adapter_id === adapterId));
       for (const adapterId of ["claude_code", "codex"]) {
         if (!(fixture.profiles ?? []).some((profile) => profile.adapter_id === adapterId)) fail(errors, "adapter runtime profile", `fixture must include ${adapterId}`);
       }
@@ -3059,7 +3240,8 @@ function validateCodexInstaller(root, checks, errors) {
 
   const text = readFileSync(absolutePath, "utf8");
   const lifecycleText = readFileSync(resolve(root, "scripts/installer-lifecycle.mjs"), "utf8");
-  const combinedText = `${text}\n${lifecycleText}`;
+  const runtimeInventoryText = readFileSync(resolve(root, "scripts/adapter-runtime-inventory.mjs"), "utf8");
+  const combinedText = `${text}\n${lifecycleText}\n${runtimeInventoryText}`;
   checks.codexInstaller.readsManifestSkills = /manifest\.skills/.test(text);
   checks.codexInstaller.writesCodexInstallState = text.includes(".agent-spectrum-kernel/codex-install-state.json") && text.includes("managed_files");
   checks.codexInstaller.hasWorkflowProfiles = text.includes("CODEX_PROFILES") && text.includes("DEFAULT_PROFILE") && text.includes("--profile");
@@ -3078,7 +3260,7 @@ function validateCodexInstaller(root, checks, errors) {
   checks.codexInstaller.projectsAgentsSkills = text.includes(".agents/skills") && text.includes("codex_skill");
   checks.codexInstaller.installsPrompts = text.includes(".agents/prompts") && text.includes("PROMPT_TEMPLATES");
   checks.codexInstaller.installsCommand = text.includes(".agents/commands") && text.includes("COMMAND_TEMPLATES");
-  checks.codexInstaller.installsRuntimeRunner = text.includes("CODEX_RUNTIME_SCRIPTS") && text.includes("codex_runtime") && text.includes("codex-exec-runner.mjs");
+  checks.codexInstaller.installsRuntimeRunner = text.includes("CODEX_RUNTIME_SCRIPTS") && text.includes("codex_runtime") && combinedText.includes("codex-exec-runner.mjs");
   checks.codexInstaller.projectsLifecycleContract = text.includes("docs/lifecycle-artifact-contract.md") && text.includes("requiredAssetsForPrompts");
   checks.codexInstaller.resolvesSkillOnlyAssets = text.includes("requiredAssetsForSkills") && text.includes("CORE_OWNED_IMMUTABLE_ASSETS");
   checks.codexInstaller.preservesCoreContracts = text.includes("CORE_PRESERVE_PATHS") && text.includes("ASK core immutable contract is missing or stale");
@@ -3379,7 +3561,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     "",
     `- canonical boundary contract: ${adapterRuntimeProfileChecks.contractPresent ? "ok" : "missing"}`,
     `- machine-readable schema: ${adapterRuntimeProfileChecks.schemaPresent ? "ok" : "missing"}`,
-    `- Claude/Codex fixtures: ${adapterRuntimeProfileChecks.fixturePresent && adapterRuntimeProfileChecks.profiles.length === 2 && adapterRuntimeProfileChecks.profiles.every((profile) => profile.ok) ? "ok" : "invalid"}`,
+    `- required adapter fixtures: ${adapterRuntimeProfileChecks.fixturePresent && adapterRuntimeProfileChecks.evidenceFixturePresent && adapterRuntimeProfileChecks.requiredAdaptersPresent && adapterRuntimeProfileChecks.profiles.every((profile) => profile.ok) ? "ok" : "invalid"}`,
     "",
     "## Lifecycle artifact contract checks",
     "",

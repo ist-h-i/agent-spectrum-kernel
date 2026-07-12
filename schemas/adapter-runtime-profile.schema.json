@@ -16,7 +16,7 @@
       "required": ["revision", "source_digest", "source_paths"],
       "properties": {
         "revision": { "type": "string", "minLength": 1 },
-        "source_digest": { "type": "string", "minLength": 1 },
+        "source_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
         "source_paths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
       }
     },
@@ -44,7 +44,23 @@
           },
           "support": { "type": "string", "enum": ["supported", "partial", "unsupported", "unknown"] },
           "evidence_level": { "type": "string", "enum": ["none", "projected", "runtime_detected", "executed", "behavior_verified"] },
-          "evidence_refs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "evidence_refs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["record_id", "evidence_kind", "artifact_ref", "result", "evidence_level", "artifact_digest"],
+              "properties": {
+                "record_id": { "type": "string", "minLength": 1 },
+                "evidence_kind": { "type": "string", "enum": ["projection_manifest", "runtime_probe_result", "bounded_run_result", "capability_fixture_result"] },
+                "artifact_ref": { "type": "string", "minLength": 1 },
+                "result": { "type": "string", "const": "pass" },
+                "evidence_level": { "type": "string", "enum": ["projected", "runtime_detected", "executed", "behavior_verified"] },
+                "artifact_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+              }
+            }
+          },
           "limitations": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
           "downgrade_behavior": {
             "type": "string",
@@ -61,17 +77,32 @@
         "renderer_id": { "type": "string", "minLength": 1 },
         "renderer_version": { "type": "string", "minLength": 1 },
         "output_root": { "type": "string", "minLength": 1 },
-        "asset_kinds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "enum": ["instructions", "skills", "commands", "prompts", "hooks", "permissions", "runner", "schemas"] } },
+        "asset_kinds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "enum": ["skills", "commands", "prompts", "hooks", "permissions", "runner", "schemas", "configuration", "runtime_data"] } },
         "deterministic_input_refs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
       }
     },
     "generated_assets": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["owner", "managed_paths", "lifecycle_operations", "drift_policy"],
+      "required": ["owner", "managed_assets", "lifecycle_operations", "drift_policy"],
       "properties": {
         "owner": { "type": "string", "const": "adapter" },
-        "managed_paths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "managed_assets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "asset_kind", "ownership_mode", "inventory_source_ref"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "asset_kind": { "type": "string", "enum": ["skills", "commands", "prompts", "hooks", "permissions", "runner", "schemas", "configuration", "runtime_data"] },
+              "ownership_mode": { "type": "string", "enum": ["full_file", "selected_files", "partial_file", "runtime_directory"] },
+              "inventory_source_ref": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
         "lifecycle_operations": { "type": "array", "minItems": 4, "uniqueItems": true, "items": { "type": "string", "enum": ["install", "update", "rollback", "detach"] } },
         "drift_policy": { "type": "string", "enum": ["fail", "report", "regenerate"] }
       }
@@ -88,5 +119,18 @@
       }
     },
     "normalized_event_schema_refs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "privacy": {
+            "properties": { "event_collection": { "enum": ["local_opt_in", "local_enabled"] } },
+            "required": ["event_collection"]
+          }
+        }
+      },
+      "then": { "properties": { "normalized_event_schema_refs": { "minItems": 1 } } }
+    }
+  ]
 }

@@ -41,6 +41,18 @@ Canonical sources include `AGENTS.md`, canonical `skills/*/SKILL.md`, `docs/*-co
 - managed-asset lifecycle and drift policy;
 - privacy and normalized-event boundaries.
 
+### Canonical source digest
+
+`source_paths` contains normalized, repository-relative canonical ASK files only. Paths are unique, lexicographically sorted, and may not be absolute, contain `..`, traverse a symlink, point into `adapters/`, or escape the repository root. Every path must exist.
+
+Canonical serialization is byte-preserving and deterministic. For each sorted path, append these bytes to one SHA-256 input stream:
+
+```text
+UTF8(path) + NUL + UTF8(raw_byte_length) + NUL + raw_file_bytes + NUL
+```
+
+The stored form is `sha256:<64 lowercase hex>`. Validation recalculates the digest from the current canonical files. A missing path, non-canonical path, unsafe path, or digest mismatch is drift and fails validation.
+
 ### Capability support
 
 | Status | Meaning |
@@ -66,6 +78,19 @@ none < projected < runtime_detected < executed < behavior_verified
 These are the canonical machine values established by #157. “Detected”, “runtime-observed”, and “behaviorally evidenced” in architecture prose map to `runtime_detected`, `executed`, and `behavior_verified`; adapters must not introduce aliases as competing schema values.
 
 Projection is not detection, detection is not execution, and execution is not behavioral correctness.
+
+Every non-`none` capability evidence reference is a typed result reference with `record_id`, `evidence_kind`, `artifact_ref`, `result`, `evidence_level`, and `artifact_digest`. Evidence artifacts use the same SHA-256 form, must exist inside the validation root, and contain a matching passing record for the same adapter and capability. The record binds its observed inputs with the canonical path-set serialization above.
+
+Evidence kind is fixed by level:
+
+| Evidence level | Required result kind |
+|---|---|
+| `projected` | `projection_manifest` |
+| `runtime_detected` | `runtime_probe_result` |
+| `executed` | `bounded_run_result` |
+| `behavior_verified` | `capability_fixture_result` |
+
+Implementation source alone is not an `executed` result. Missing, failed, stale, wrong-kind, wrong-capability, or digest-mismatched evidence cannot raise a capability level.
 
 ### Required downgrade
 
@@ -103,13 +128,17 @@ For identical inputs it must produce the same managed asset bytes and provenance
 
 Renderer output may contain tool-native prompts, commands, hooks, permissions, or runner configuration. It may reference canonical contracts but must not fork their normative content. A renderer must fail or report drift when its named canonical digest no longer matches the input source.
 
+`generated_assets.managed_assets` is the adapter lifecycle inventory. Each entry names a normalized relative path, asset kind, ownership mode (`full_file`, `selected_files`, `partial_file`, or `runtime_directory`), and inventory source. `asset_kinds` and inventory kinds must cover each other. The inventory must include the runtime files shared with the actual installers through `scripts/adapter-runtime-inventory.mjs`.
+
+Absolute paths, `..`, non-normalized paths, symlink traversal, and canonical/core-owned targets are forbidden. In particular, adapters cannot own root `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, `manifest.json`, canonical `skills/`, canonical `schemas/`, or canonical contract documents. Install/update/rollback/detach must use the same inventory boundary.
+
 ## Privacy and event boundary
 
-Profiles declare whether event collection is disabled, local opt-in, or locally enabled. External publication remains `disabled` or `approval_required`; a profile cannot silently enable it. Raw prompts and sensitive payload storage are prohibited by this schema. Normalized event schema references identify event meaning, not proof that a collector ran.
+Profiles declare whether event collection is disabled, local opt-in, or locally enabled. External publication remains `disabled` or `approval_required`; a profile cannot silently enable it. Raw prompts and sensitive payload storage are prohibited by this schema. Normalized event schema references identify event meaning, not proof that a collector ran. `local_opt_in` and `local_enabled` require at least one existing canonical normalized event schema reference.
 
 ## Conformance and consumers
 
-`docs/fixtures/adapter-runtime-profiles.json` contains representative Claude and Codex profiles. `node scripts/validate-repo.mjs` checks profile structure, required capability coverage, support/evidence downgrade consistency, provenance, lifecycle ownership, privacy boundaries, and the absence of model-dependent fields.
+`docs/fixtures/adapter-runtime-profiles.json` contains representative Claude and Codex profiles, and `docs/fixtures/adapter-runtime-evidence.json` contains their typed repository evidence records. `node scripts/validate-repo.mjs` checks profile structure, required capability coverage, support/evidence downgrade consistency, provenance, lifecycle ownership, privacy boundaries, and the absence of model-dependent fields.
 
 Child runtime work in #163 and #164 must consume this contract and schema. Those implementations may add adapter-owned renderer or collector fields only through a schema revision; they must not add independent canonical workflow, risk, evidence, lifecycle, traceability, or normalized-event definitions.
 

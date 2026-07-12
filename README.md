@@ -63,6 +63,7 @@ docs/
   adapter-capability-matrix.md
   adapter-runtime-boundary-contract.md
   fixtures/adapter-runtime-profiles.json
+  fixtures/adapter-runtime-evidence.json
   claude-github-review-setup.md
   ai/review-context.md
   ai/implementation-context.md
