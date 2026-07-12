@@ -27,7 +27,7 @@ This is decision support. It may recommend a decision, but unresolved value, pri
 
 ## Process
 
-1. Read `docs/lifecycle-artifact-contract.md` and gather the smallest useful evidence.
+1. Read `docs/lifecycle-artifact-contract.md` and gather the smallest useful evidence. When a later completion, merge, or release claim needs item-level mapping, also use `docs/lifecycle-traceability-contract.md` and assign stable IDs only to the decisions that claim will consume.
    - Current user request, issue, approved spec, or discussion.
    - Existing docs, ADRs, tests, or repo behavior when relevant.
    - `docs/ai/domain-rule-ledger.md` when present.
@@ -67,6 +67,7 @@ Requirement Contract:
 
 Conditional fields, omit when irrelevant:
 - Upstream refs:
+- Trace decision IDs:
 - Unresolved human decisions:
 - Domain-rule constraints:
 - Non-goals:
@@ -101,6 +102,7 @@ Requirement Contract:
 
 Conditional fields, omit when irrelevant:
 - Upstream refs:
+- Trace decision IDs:
 - Unresolved human decisions:
 - Domain-rule constraints:
 - Non-goals:

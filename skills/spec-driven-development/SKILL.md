@@ -24,7 +24,7 @@ Turn a stable Requirement Contract or behavior request into an observable behavi
 
 ## Process
 
-1. Read `docs/lifecycle-artifact-contract.md` and inspect the current behavior plus any upstream Requirement or design artifact.
+1. Read `docs/lifecycle-artifact-contract.md` and inspect the current behavior plus any upstream Requirement or design artifact. If acceptance or behavior must be mapped to a later claim, use `docs/lifecycle-traceability-contract.md` and assign stable item IDs without copying upstream content.
 
 2. Draft the Spec at the smallest useful fidelity.
 
@@ -37,6 +37,7 @@ Spec:
 - Acceptance criteria:
 
 Conditional fields, omit when irrelevant:
+- Trace behavior / acceptance IDs:
 - Inputs / outputs:
 - State changes:
 - Error / edge cases:
@@ -72,6 +73,7 @@ Spec:
 - Acceptance criteria:
 
 Conditional fields, omit when irrelevant:
+- Trace behavior / acceptance IDs:
 - Inputs / outputs:
 - State changes:
 - Error / edge cases:

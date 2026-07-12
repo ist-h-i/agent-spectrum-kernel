@@ -6,7 +6,7 @@ description: Run the Agent Spectrum Kernel PR review flow through review-router 
 
 Use the core Agent Spectrum Kernel review model.
 
-Before reviewing, read the bundled canonical contract at `${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md`, the bundled signal registry at `${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json`, and the bundled schemas at `${CLAUDE_PLUGIN_ROOT}/schemas/`. The plugin package is self-contained; do not substitute a host repository document. Emit only registry signal IDs and use its signal-to-gate mapping.
+Before reviewing, read the bundled canonical contracts at `${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md` and `${CLAUDE_PLUGIN_ROOT}/contracts/lifecycle-traceability-contract.md`, the bundled signal registry at `${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json`, and the bundled schemas at `${CLAUDE_PLUGIN_ROOT}/schemas/`. The plugin package is self-contained; do not substitute a host repository document. Emit only registry signal IDs and use its signal-to-gate mapping.
 
 Process:
 
@@ -16,6 +16,7 @@ Process:
 4. Keep current-PR blockers in Blocking evidence; use Required fixes only for detailed fix entries.
 5. Put non-blocking follow-up under Non-blocking follow-ups and separate improvement-ledger candidates when applicable.
 6. End with `review-final-merge-gate` style output.
+7. When the merge claim depends on lifecycle evidence, use stable refs from the bundled traceability contract and report stale or missing refs as `insufficient evidence`.
 
 Normal routing artifact:
 

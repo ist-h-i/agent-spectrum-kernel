@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
-import { inspectLifecycleScenario } from "./validate-repo.mjs";
+import { REQUIRED_TRACEABILITY_SCENARIOS, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -2391,19 +2391,19 @@ function assertInstallerScripts() {
   const firstInstall = runRepoScript([installer, "--target", target]);
   assertRuntimePass("installer first run", firstInstall);
   assertInstalledDocReferences("Claude adapter install smoke", target, [".claude/skills", ".claude/commands"]);
-  if (!existsSync(resolve(target, "docs/lifecycle-artifact-contract.md"))) {
-    throw new Error("Claude adapter install must provide the canonical lifecycle artifact contract");
+  if (!existsSync(resolve(target, "docs/lifecycle-artifact-contract.md")) || !existsSync(resolve(target, "docs/lifecycle-traceability-contract.md"))) {
+    throw new Error("Claude adapter install must provide the canonical lifecycle and traceability contracts");
   }
   const installedSignalRegistry = resolve(target, "schemas/review-signal-gate-map.json");
   if (!existsSync(installedSignalRegistry) || readFileSync(installedSignalRegistry, "utf8") !== readFileSync(resolve(repoRoot, "schemas/review-signal-gate-map.json"), "utf8")) {
     throw new Error("Claude project installer should project the canonical signal registry");
   }
   const firstClaudeState = JSON.parse(readFileSync(resolve(target, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
-  if (!firstClaudeState.required_assets?.includes("docs/lifecycle-artifact-contract.md")) {
-    throw new Error("Claude adapter state must record lifecycle contract as a required managed dependency");
+  if (!firstClaudeState.required_assets?.includes("docs/lifecycle-artifact-contract.md") || !firstClaudeState.required_assets?.includes("docs/lifecycle-traceability-contract.md")) {
+    throw new Error("Claude adapter state must record lifecycle and traceability contracts as required managed dependencies");
   }
-  if (Object.hasOwn(firstClaudeState.managed_files ?? {}, "docs/lifecycle-artifact-contract.md")) {
-    throw new Error("Claude adapter must not claim ownership of the core lifecycle contract");
+  if (Object.hasOwn(firstClaudeState.managed_files ?? {}, "docs/lifecycle-artifact-contract.md") || Object.hasOwn(firstClaudeState.managed_files ?? {}, "docs/lifecycle-traceability-contract.md")) {
+    throw new Error("Claude adapter must not claim ownership of core lifecycle contracts");
   }
   if (Object.hasOwn(firstClaudeState.managed_files ?? {}, "schemas/review-signal-gate-map.json")) {
     throw new Error("Claude project installer must not claim ownership of the core canonical signal registry");
@@ -2598,8 +2598,8 @@ function assertInstallerScripts() {
   assertRuntimePass("Claude ownership full core setup", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget]));
   assertRuntimePass("Claude ownership adapter setup", runRepoScript([installer, "--target", corePruneOwnershipTarget, "--profile", "implementation"]));
   assertRuntimePass("Claude ownership core shrink prune", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget, "--skills", "evidence-ledger,risk-gate", "--prune"]));
-  if (!existsSync(resolve(corePruneOwnershipTarget, "docs/lifecycle-artifact-contract.md"))) {
-    throw new Error("core shrink prune must preserve immutable contracts required by an active Claude adapter");
+  if (CORE_IMMUTABLE_CONTRACT_ASSETS.some((asset) => !existsSync(resolve(corePruneOwnershipTarget, asset)))) {
+    throw new Error("core shrink prune must preserve all immutable contracts required by an active Claude adapter");
   }
   assertInstalledDocReferences("Claude active adapter after core prune", corePruneOwnershipTarget, [".claude/skills", ".claude/commands"]);
 
@@ -2608,8 +2608,8 @@ function assertInstallerScripts() {
   assertRuntimePass("Claude ownership adapter install", runRepoScript([installer, "--target", adapterDetachOwnershipTarget, "--profile", "implementation"]));
   assertRuntimePass("Claude ownership core expand", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget]));
   assertRuntimePass("Claude ownership adapter detach", runRepoScript([installer, "--target", adapterDetachOwnershipTarget, "--detach"]));
-  if (!existsSync(resolve(adapterDetachOwnershipTarget, "docs/lifecycle-artifact-contract.md"))) {
-    throw new Error("Claude detach must preserve the core-owned lifecycle contract");
+  if (CORE_IMMUTABLE_CONTRACT_ASSETS.some((asset) => !existsSync(resolve(adapterDetachOwnershipTarget, asset)))) {
+    throw new Error("Claude detach must preserve all core-owned immutable contracts");
   }
   assertRuntimePass("core check after Claude ownership transition", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget, "--check"]));
 
@@ -2881,13 +2881,12 @@ function assertCoreInstallerScripts() {
   if (!existsSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"))) {
     throw new Error("kernel installer should project manifest skills");
   }
-  if (freshState.managed_files?.["docs/lifecycle-artifact-contract.md"]?.kind !== "immutable_contract") {
-    throw new Error("core installer state must always own the lifecycle contract as an immutable contract");
+  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
+    if (freshState.managed_files?.[asset]?.kind !== "immutable_contract" || !existsSync(resolve(freshTarget, asset))) {
+      throw new Error(`core installer state must own and project immutable contract: ${asset}`);
+    }
   }
   assertInstalledDocReferences("core installer dependency closure", freshTarget, ["skills"]);
-  if (!existsSync(resolve(freshTarget, "docs/lifecycle-artifact-contract.md"))) {
-    throw new Error("core installer must project lifecycle contract referenced by selected skills");
-  }
   if (readFileSync(resolve(freshTarget, "schemas/review-signal-gate-map.json"), "utf8") !== readFileSync(resolve(repoRoot, "schemas/review-signal-gate-map.json"), "utf8")) {
     throw new Error("kernel installer should project the canonical signal registry");
   }
@@ -3068,15 +3067,15 @@ function assertCodexInstallerScripts() {
   const freshRun = runRepoScript([installer, "--target", freshTarget]);
   assertRuntimePass("codex installer fresh run", freshRun);
   assertInstalledDocReferences("Codex adapter install smoke", freshTarget, [".agents/skills", ".agents/prompts", ".agents/commands"]);
-  if (!existsSync(resolve(freshTarget, "docs/lifecycle-artifact-contract.md"))) {
-    throw new Error("Codex adapter install must provide the canonical lifecycle artifact contract");
+  if (!existsSync(resolve(freshTarget, "docs/lifecycle-artifact-contract.md")) || !existsSync(resolve(freshTarget, "docs/lifecycle-traceability-contract.md"))) {
+    throw new Error("Codex adapter install must provide the canonical lifecycle and traceability contracts");
   }
   const freshState = readCodexInstallState(freshTarget);
-  if (!freshState.required_assets?.includes("docs/lifecycle-artifact-contract.md")) {
-    throw new Error("Codex adapter state must record lifecycle contract as a required managed dependency");
+  if (!freshState.required_assets?.includes("docs/lifecycle-artifact-contract.md") || !freshState.required_assets?.includes("docs/lifecycle-traceability-contract.md")) {
+    throw new Error("Codex adapter state must record lifecycle and traceability contracts as required managed dependencies");
   }
-  if (Object.hasOwn(freshState.managed_files ?? {}, "docs/lifecycle-artifact-contract.md")) {
-    throw new Error("Codex adapter must not claim ownership of the core lifecycle contract");
+  if (Object.hasOwn(freshState.managed_files ?? {}, "docs/lifecycle-artifact-contract.md") || Object.hasOwn(freshState.managed_files ?? {}, "docs/lifecycle-traceability-contract.md")) {
+    throw new Error("Codex adapter must not claim ownership of core lifecycle contracts");
   }
   if (
     freshState.selected_profile !== "implementation" ||
@@ -3121,11 +3120,11 @@ function assertCodexInstallerScripts() {
     runRepoScript([installer, "--target", skillOnlyTarget, "--skills", "test-first-verification,evidence-ledger", "--skip-prompts", "--skip-command"]),
   );
   const skillOnlyState = readCodexInstallState(skillOnlyTarget);
-  if (!skillOnlyState.required_assets?.includes("docs/lifecycle-artifact-contract.md") || !existsSync(resolve(skillOnlyTarget, ".agents/skills/test-first-verification/SKILL.md"))) {
+  if (!skillOnlyState.required_assets?.includes("docs/lifecycle-artifact-contract.md") || !skillOnlyState.required_assets?.includes("docs/lifecycle-traceability-contract.md") || !existsSync(resolve(skillOnlyTarget, ".agents/skills/test-first-verification/SKILL.md"))) {
     throw new Error(`Codex skill-only install must close over lifecycle contract assets\n${JSON.stringify(skillOnlyState, null, 2)}`);
   }
-  if (Object.hasOwn(skillOnlyState.managed_files ?? {}, "docs/lifecycle-artifact-contract.md")) {
-    throw new Error("Codex skill-only install must depend on, not own, the core lifecycle contract");
+  if (Object.hasOwn(skillOnlyState.managed_files ?? {}, "docs/lifecycle-artifact-contract.md") || Object.hasOwn(skillOnlyState.managed_files ?? {}, "docs/lifecycle-traceability-contract.md")) {
+    throw new Error("Codex skill-only install must depend on, not own, core lifecycle contracts");
   }
   assertInstalledDocReferences("Codex skill-only install smoke", skillOnlyTarget, [".agents/skills"]);
 
@@ -3133,8 +3132,8 @@ function assertCodexInstallerScripts() {
   assertRuntimePass("Codex ownership full core setup", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget]));
   assertRuntimePass("Codex ownership adapter setup", runRepoScript([installer, "--target", corePruneOwnershipTarget]));
   assertRuntimePass("Codex ownership core shrink prune", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget, "--skills", "evidence-ledger,risk-gate", "--prune"]));
-  if (!existsSync(resolve(corePruneOwnershipTarget, "docs/lifecycle-artifact-contract.md"))) {
-    throw new Error("core shrink prune must preserve immutable contracts required by an active Codex adapter");
+  if (CORE_IMMUTABLE_CONTRACT_ASSETS.some((asset) => !existsSync(resolve(corePruneOwnershipTarget, asset)))) {
+    throw new Error("core shrink prune must preserve all immutable contracts required by an active Codex adapter");
   }
   assertInstalledDocReferences("Codex active adapter after core prune", corePruneOwnershipTarget, [".agents/skills", ".agents/prompts", ".agents/commands"]);
 
@@ -3143,8 +3142,8 @@ function assertCodexInstallerScripts() {
   assertRuntimePass("Codex ownership adapter install", runRepoScript([installer, "--target", adapterDetachOwnershipTarget]));
   assertRuntimePass("Codex ownership core expand", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget]));
   assertRuntimePass("Codex ownership adapter detach", runRepoScript([installer, "--target", adapterDetachOwnershipTarget, "--detach"]));
-  if (!existsSync(resolve(adapterDetachOwnershipTarget, "docs/lifecycle-artifact-contract.md"))) {
-    throw new Error("Codex detach must preserve the core-owned lifecycle contract");
+  if (CORE_IMMUTABLE_CONTRACT_ASSETS.some((asset) => !existsSync(resolve(adapterDetachOwnershipTarget, asset)))) {
+    throw new Error("Codex detach must preserve all core-owned immutable contracts");
   }
   assertRuntimePass("core check after Codex ownership transition", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget, "--check"]));
 
@@ -4569,6 +4568,33 @@ try {
     }
     if (scenario.expected === "invalid" && !(scenario.expected_errors ?? []).every((expected) => issues.includes(expected))) {
       throw new Error(`lifecycle scenario ${scenario.id} should expose expected contradictions\n${issues.join("\n")}`);
+    }
+  }
+
+  const traceabilityFixture = JSON.parse(readFileSync(resolve(repoRoot, "docs/fixtures/lifecycle-traceability-chains.json"), "utf8"));
+  if (traceabilityScenarioMatchesExpectation({ expected: "invalid", expected_errors: [] }, [])) {
+    throw new Error("traceability invalid scenario must not pass with an empty error oracle");
+  }
+  for (const [scenarioId, expectedOutcome] of REQUIRED_TRACEABILITY_SCENARIOS) {
+    const scenario = traceabilityFixture.scenarios.find((entry) => entry.id === scenarioId);
+    if (!scenario || scenario.expected !== expectedOutcome) {
+      throw new Error(`required traceability scenario ${scenarioId} must remain ${expectedOutcome}`);
+    }
+  }
+  const requiredNegative = traceabilityFixture.scenarios.find((entry) => entry.id === "related-blocker-omitted");
+  if (!traceabilityRequiredOutcomeIssue({ ...requiredNegative, expected: "valid" })) {
+    throw new Error("required negative traceability scenario must not be relabeled valid");
+  }
+  for (const scenario of traceabilityFixture.scenarios) {
+    const { issues, gaps } = inspectTraceabilityScenarioResult(scenario);
+    if (scenario.expected === "valid" && issues.length > 0) {
+      throw new Error(`traceability scenario ${scenario.id} should pass\n${issues.join("\n")}`);
+    }
+    if (!traceabilityScenarioMatchesExpectation(scenario, issues)) {
+      throw new Error(`traceability scenario ${scenario.id} should expose exactly the expected errors\nexpected=${JSON.stringify(scenario.expected_errors ?? [])}\nactual=${JSON.stringify(issues)}`);
+    }
+    if (JSON.stringify(gaps) !== JSON.stringify(scenario.expected_gaps ?? [])) {
+      throw new Error(`traceability scenario ${scenario.id} should expose structured gaps\nexpected=${JSON.stringify(scenario.expected_gaps ?? [])}\nactual=${JSON.stringify(gaps)}`);
     }
   }
 

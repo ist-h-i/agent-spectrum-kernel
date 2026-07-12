@@ -27,7 +27,7 @@ This is a transformation skill. It does not make business decisions and must rou
 
 ## Process
 
-1. Read `docs/lifecycle-artifact-contract.md` and verify inputs.
+1. Read `docs/lifecycle-artifact-contract.md` and verify inputs. When task-level traceability is required for the current claim, use `docs/lifecycle-traceability-contract.md` and assign stable task IDs; do not require them for trivial or unrelated claims.
    - Requirement Contract from `requirement-grill` or equivalent approved spec.
    - Relevant repo facts and project overlay.
    - Domain rules from `docs/ai/domain-rule-ledger.md` when present.
@@ -64,6 +64,7 @@ Work Package:
 - Expected implementation and verification evidence:
 
 Conditional fields, omit when irrelevant:
+- Trace task IDs:
 - Likely files/modules with evidence status:
 - Required review or risk gates:
 - Applicable memory or rule IDs:
@@ -92,6 +93,7 @@ Work Package:
 - Expected implementation and verification evidence:
 
 Conditional fields, omit when irrelevant:
+- Trace task IDs:
 - Likely files/modules with evidence status:
 - Required review or risk gates:
 - Applicable memory or rule IDs:

@@ -40,7 +40,12 @@ This skill evaluates the release package. It does not deploy, publish, notify cu
 
 ## Process
 
-1. Confirm scope.
+1. Confirm scope. Read `docs/lifecycle-traceability-contract.md` when the readiness decision depends on lifecycle evidence, and use current refs to the reviewed change set instead of recreating acceptance, verification, or review content.
+   - Confirm that claim evidence reaches every applicable acceptance and verification item through current upstream refs.
+   - Preserve evidence-item identity during traversal; multi-item Evidence artifacts require item-level support edges.
+   - Confirm that the release subject is a Release Readiness check connected to the claim's required refs.
+   - Limit same-artifact sibling scope to approval and rollback items; review decisions, blockers, and accepted risks still require trace edges.
+   - Treat malformed or omitted required refs as contract errors, not generic release gaps.
    - Identify included PRs, commits, issues, and release artifacts.
    - Identify excluded changes that may be confused with the release.
    - If scope is unavailable, return `insufficient_evidence`.
@@ -92,6 +97,13 @@ Release readiness:
 ## Output
 
 ```text
+Trace refs, when required for the release claim:
+- Release Readiness artifact ID / revision:
+- Claim ID:
+- Subject / evidence / blocker / accepted-risk refs:
+- Applicable / not-applicable gap types:
+- Structured gaps: gap_type / required_by_claim / missing_item_ref / stage:
+
 Release readiness decision:
 - ready | ready_with_conditions | defer | block | insufficient_evidence
 
@@ -133,6 +145,8 @@ Risk gate:
 - The decision is one of `ready`, `ready_with_conditions`, `defer`, `block`, or `insufficient_evidence`.
 - Rollback, monitoring, post-release verification, customer impact, communication, approval, and residual risks are addressed.
 - PR merge readiness, release readiness, and risky action approval are not conflated.
+- Every claim-relevant gap names the exact current acceptance, verification, review, approval, or rollback ref.
+- Missing release evidence preserves its exact gap type instead of collapsing to a generic missing-reference result.
 - No deployment, migration, external notification, publish, or release action is performed by this skill.
 
 ## Failure modes

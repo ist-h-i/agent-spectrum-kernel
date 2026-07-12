@@ -182,6 +182,61 @@ Canonical behavior:
 
 Executable fixtures live in `docs/fixtures/lifecycle-artifact-chains.json`.
 
+## 4.2 Implementation-to-review trace
+
+Use traceability only for the merge claim that needs it:
+
+```text
+SPEC-CSV@1#AC-ESCAPE
+  -> VER-CSV@1#OBL-ESCAPE
+  -> EVID-CSV@1#TEST-ESCAPE
+
+IMPL-CSV@1#CHANGE-EXPORT
+  -> REV-CSV@1
+  -> CLAIM-MERGE-CSV
+     subjects: IMPL-CSV@1#CHANGE-EXPORT
+     evidence: EVID-CSV@1#TEST-ESCAPE
+     applicable: implementation, review
+     required: IMPL-CSV@1#CHANGE-EXPORT, REV-CSV@1#DECISION-APPROVE
+     status: supported
+```
+
+The Review record references the acceptance, change, and evidence; it does not copy their prose. If `SPEC-CSV` advances to revision 2, the revision-1 merge claim becomes stale until reviewed again.
+
+## 4.3 Review-to-release trace
+
+```text
+REV-REL@2#RISK-MANUAL-ROLLBACK
+  accepted_by: release owner
+  accepted_stage: review
+
+REL-001@1
+  checks: CHECK-CI, APPROVAL-OWNER, ROLLBACK-PLAN
+  -> CLAIM-RELEASE-001
+     evidence: EVID-REL@1#CI-PASS
+     accepted risk: REV-REL@2#RISK-MANUAL-ROLLBACK
+     applicable: acceptance, verification, review, approval, rollback
+     required: exact current item ref for each applicable type
+     status: supported
+```
+
+`EVID-REL@1#CI-PASS` must reference, directly or transitively through current `upstream_refs`, the exact acceptance and verification items it supports. Co-locating disconnected refs in `CLAIM-RELEASE-001` is invalid.
+
+When an Evidence artifact contains multiple evidence items, each item owns its support edges. `TEST-PAYMENT` cannot inherit `TEST-EXPORT` mappings merely because both live in one artifact. Completion, merge, and release subjects must also match their claim-type contract and connect to the required refs.
+
+Every required review item, blocker, and accepted risk connects to the claim subject; an implementation subject matching only its implementation required ref is insufficient. Reference identity uses a structured tuple, so `@` or `#` inside IDs cannot create key collisions.
+
+A release claim with missing evidence emits one structured record per gap:
+
+```text
+gap_type: approval
+required_by_claim: CLAIM-RELEASE-001
+missing_item_ref: REL-001@1#APPROVAL-OWNER
+stage: release
+```
+
+The five release types remain distinct: acceptance, verification, review, approval, and rollback. A partial chain without a claim is valid; adding a claim activates only its explicitly applicable types. A trivial exemption requires observed scope/claim/gate facts and never bypasses approval, rollback, or a required gate. See `docs/lifecycle-traceability-contract.md` and `docs/fixtures/lifecycle-traceability-chains.json`.
+
 ## 5. Design review / “grill me”
 
 User request:

@@ -11,6 +11,7 @@ export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "docs/debt-lifecycle-contract.md",
   "docs/execution-envelope-contract.md",
   "docs/lifecycle-artifact-contract.md",
+  "docs/lifecycle-traceability-contract.md",
   "docs/metrics-event-contract.md",
   "docs/observability-runtime-contract.md",
   "docs/operation-automation-contract.md",

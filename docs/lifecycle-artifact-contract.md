@@ -13,6 +13,8 @@ Every artifact has an `artifact_id`, an `artifact_type`, and zero or more `upstr
 - never converts an unresolved human-owned business decision into a technical assumption;
 - omits irrelevant conditional fields instead of writing `not needed`, `none`, or equivalent placeholders.
 
+When a completion, merge, or release claim needs item-level evidence mapping, this contract delegates reference encoding and claim sufficiency to `docs/lifecycle-traceability-contract.md`. `artifact_id` remains the stable logical artifact identity, and `upstream_refs` remains the one canonical dependency field. Trace-enabled artifacts add a separate positive `revision`; their `upstream_refs` entries use structured artifact/item refs with mandatory `observed_revision`. They must not mix those refs with unversioned strings. Stable decision, behavior, acceptance, task, obligation, change, and evidence item IDs do not move field ownership or require a full chain for trivial work.
+
 A bounded inline summary is allowed only when the upstream artifact cannot travel with the downstream artifact. The summary must name its source reference and must not become a second source of truth.
 
 ```text
@@ -21,7 +23,13 @@ Artifact header:
 - Artifact type: requirement | spec | work_package | verification | implementation | compact
 - Upstream refs: artifact ID plus optional section/field
 - Deltas: target ref, field, previous value, new value, reason, and decision evidence
+
+Conditional trace-enabled header, governed by docs/lifecycle-traceability-contract.md:
+- Revision: separate positive integer
+- Upstream refs: structured artifact_id / optional item_id / mandatory observed_revision
 ```
+
+Unversioned `upstream_refs` remain valid only outside a trace-enabled chain. Claim mappings use the structured refs defined by the traceability contract; they do not introduce a second artifact identity or dependency graph. A trace-enabled delta still changes the effective field owned here and records the target artifact ID plus the observed target revision.
 
 For a delta to a Requirement-owned field, `decision evidence` must identify human confirmation or another authoritative business source. If that evidence is absent, stop for a human decision. Contradictory upstream artifacts are not resolved by choosing one silently; record the conflict and stop.
 
@@ -225,3 +233,5 @@ Requirement Contract (business decision)
 ```
 
 Design artifacts may sit between Requirement and Work Package or Spec and Work Package. They follow the same reference-plus-delta rule.
+
+Review and Release Readiness do not redefine these lifecycle fields. They consume stable refs under `docs/lifecycle-traceability-contract.md` to map merge or release claims to the exact current acceptance, evidence, blocker, accepted-risk, approval, and rollback items that matter.

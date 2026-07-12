@@ -50,6 +50,8 @@ The JSON object inside the fenced block is the only accepted serialized Envelope
 
 `evidence status` distinguishes what was directly checked from what is still missing. Do not convert missing evidence into a positive claim or hide it in a skill artifact.
 
+When `docs/lifecycle-traceability-contract.md` applies, `evidence_status.checked`, `evidence_status.missing`, and `stop_reason.details` may carry stable artifact or item refs. The Envelope reports control state only; it does not copy acceptance conditions, evidence records, blockers, approvals, or rollback content from the trace chain.
+
 `stop reason` is explicit when work must pause. `human_decision` names the decision owner or decision needed, `insufficient_evidence` names the missing input or check, `capability_missing` names a selected route absent from the active adapter's `selected_skills`, and `risk_gate` identifies the action requiring approval. A `capability_missing` stop must name the missing Skill and the profile or explicit override that can provide it; it must not invent or continue the absent procedure. `none` is valid only when the workflow can proceed. `stop_reason.stop_if` is the sole location for stop conditions; route metadata must not define another stop condition.
 
 `next action` is a concrete work action, not only a skill name. Examples include `run the focused validation`, `implement the scoped change`, `request domain clarification`, or `prepare the final merge decision`.
