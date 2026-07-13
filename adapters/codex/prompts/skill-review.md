@@ -1,26 +1,17 @@
 ---
-description: Run the Agent Spectrum Kernel review flow for the current PR, branch diff, or generated output in Codex.
+description: Review a diff or output with the Codex compact ASK profile.
 ---
 
-Use the repository `AGENTS.md` and projected skills from `.agents/skills`.
+Entry mode is fixed to review. Primary contract: `review-router`. Read `schemas/review-signal-gate-map.json`, emit exact signal IDs, and run only gates triggered by observed signals.
 
-Entry intent: review.
-Mutation level: read-only unless the user explicitly asks for fixes after the review.
-Routing source: use `review-router` to extract observed change signals, map them to required gates, then run only those gates. Do not treat this prompt as a second routing source.
+Critical fallback controls:
 
-Before extracting signals, read `schemas/review-signal-gate-map.json`. Emit only its exact signal IDs and use its signal-to-gate mapping; do not invent free-form trigger IDs.
-
-Evidence requirements:
-
-- inspect the checked-out workspace, diff, generated output, relevant docs, and verification evidence when available
-- record missing diff, context, output, or verification inputs as `insufficient evidence`, never as skipped
-- keep current blockers separate from non-blocking improvement candidates
-- when the merge claim depends on lifecycle evidence, use stable refs from `docs/lifecycle-traceability-contract.md` and report stale or missing refs as `insufficient evidence`
-- use `risk-gate` before any external comment, label, check, metric, notification, deploy, release, or production mutation
-
-Output contract:
-
-Append one shared `Execution Envelope` for the review boundary, following `docs/execution-envelope-contract.md`. Keep review findings and signal/gate summaries in the artifact; do not repeat envelope metadata as separate route sections.
+- [scope] Stay read-only unless fixes were explicitly requested; inspect the workspace, diff/output, nearby contracts, and relevant tests.
+- [verification] Treat missing diff, context, output, tests, or lifecycle refs as insufficient evidence, not a skipped gate.
+- [risk_approval] Stop before any external comment, label, check, metric, notification, deploy, release, production, secret, auth, or destructive action without explicit approval.
+- [evidence] Put actionable blockers first with gate/file:line evidence and keep improvement candidates non-blocking.
+- [missing_evidence] Do not infer runtime Skill loading, executed checks, mergeability, correctness, or no regression.
+- [output] Record signal-to-gate mapping, required gate evidence, final decision, residual risk, and one shared Execution Envelope.
 
 Change signals:
 - signal: observed evidence
@@ -32,37 +23,29 @@ Skipped heavy gates:
 - gate/layer: observed reason
 
 Missing evidence:
-- input: why it is required and what remains unknown
+- input: impact and next check
 
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
 Blocking evidence:
-- [severity] gate/file:line - evidence, impact, and required fix or decision
+- [severity] gate/file:line - evidence, impact, required fix
 
 Passed required gates:
 - gate - evidence checked
 
 Insufficient evidence:
-- gate/input - what remains unknown and the next check
+- gate/input - unknown and next check
 
 Non-blocking follow-ups:
-- improvement-ledger candidate, rule feedback, or suggestion
+- ...
 
 Residual risk:
 - ...
 
 Execution Envelope:
 ```json
-{
-  "schema_version": "1.0.0",
-  "route": { "work_mode": "レビュー", "operating_mode": "delivery_quality", "user_facing": "...", "internal": { "primary": "review-router" } },
-  "evidence_status": { "checked": [], "missing": [] },
-  "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
-  "next_action": "..."
-}
+{"schema_version":"1.0.0","route":{"work_mode":"レビュー","operating_mode":"delivery_quality","user_facing":"...","internal":{"primary":"review-router"}},"evidence_status":{"checked":[],"missing":[]},"stop_reason":{"status":"none","details":[],"human_decision_required":[],"stop_if":[]},"next_action":"..."}
 ```
-
-Do not publish comments, labels, checks, metrics, or notifications externally unless the user explicitly requested that external action and `risk-gate` approved it.
 
 $ARGUMENTS

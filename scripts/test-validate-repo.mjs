@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
+import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
 import { CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
@@ -16,7 +16,13 @@ const doctorScript = resolve(repoRoot, "scripts/ask-doctor.mjs");
 const sensorsScript = resolve(repoRoot, "scripts/ask-sensors.mjs");
 const runtimeSmokeScript = resolve(repoRoot, "scripts/adapter-runtime-smoke.mjs");
 const codexRunnerScript = resolve(repoRoot, "scripts/codex-exec-runner.mjs");
+const codexCompactProfileTestScript = resolve(repoRoot, "scripts/test-codex-runtime-profile.mjs");
 const fixtureRoot = mkdtempSync(resolve(tmpdir(), "validate-repo-"));
+
+const compactProfileResult = spawnSync(process.execPath, [codexCompactProfileTestScript], { cwd: repoRoot, encoding: "utf8" });
+if (compactProfileResult.status !== 0) {
+  throw new Error(`Codex compact profile tests failed\n${compactProfileResult.stdout}\n${compactProfileResult.stderr}`);
+}
 
 function envelopeBlock(overrides = {}) {
   const envelope = {
@@ -533,6 +539,7 @@ function install(manifest, options) {
   );
   writeFileSync(resolve(root, "scripts/adapter-runtime-smoke.mjs"), "console.log('adapter runtime smoke');\n");
   writeFileSync(resolve(root, "scripts/adapter-runtime-inventory.mjs"), "export const CODEX_RUNTIME_FILES = [{ name: 'codex-exec-runner.mjs' }];\n");
+  writeFileSync(resolve(root, "scripts/codex-runtime-profile.mjs"), "console.log('codex compact profile');\n");
   writeFileSync(resolve(root, "scripts/codex-exec-runner.mjs"), "console.log('codex runner');\n");
   writeFileSync(resolve(root, "scripts/execution-envelope.mjs"), "console.log('execution envelope');\n");
   writeFileSync(
@@ -936,6 +943,26 @@ function assertCodexRoutingFixtures(name, target, expectedFixtureIds) {
     throw new Error(`${name} is missing routing fixture(s): ${missing.join(", ")}\n${JSON.stringify(state, null, 2)}`);
   }
   assertCodexInstallClosed(name, target);
+}
+
+function assertCodexCompactProfiles(name, target) {
+  const state = readCodexInstallState(target);
+  const selectedProfiles = state.compact_runtime_profiles ?? [];
+  if (selectedProfiles.length !== (state.selected_prompts ?? []).length) {
+    throw new Error(`${name} must record one compact profile per selected prompt\n${JSON.stringify(state, null, 2)}`);
+  }
+  for (const prompt of state.selected_prompts ?? []) {
+    const path = `.agents/prompts/${prompt}`;
+    const record = state.managed_files?.[path];
+    const content = readFileSync(resolve(target, path), "utf8");
+    const header = parseCodexCompactProfileHeader(content);
+    if (!record?.compact_profile || !header || header.id !== record.compact_profile.profile_id || header.digest !== record.compact_profile.canonical_digest) {
+      throw new Error(`${name} has invalid compact profile provenance for ${prompt}`);
+    }
+    if ((record.compact_profile.skipped_routers ?? []).join(",") !== "operating-mode-router,skill-router") {
+      throw new Error(`${name} must record skipped upper routers for ${prompt}`);
+    }
+  }
 }
 
 function assertCodexReferenceIntegrity(name, target, state = readCodexInstallState(target)) {
@@ -3076,12 +3103,10 @@ function assertCodexInstallerScripts() {
     throw new Error("Codex installer should project the canonical signal registry");
   }
   assertCodexInstallClosed("codex installer fresh profile", freshTarget);
-  assertCodexRoutingFixtures("codex installer fresh implementation routing", freshTarget, [
-    "delivery_quality_mode",
-    "unfamiliar_repository",
-    "unclear_scope",
-    "boundary_decision",
-  ]);
+  if ((freshState.skill_closure?.routing_fixtures ?? []).length !== 0 || freshState.selected_skills.includes("operating-mode-router") || freshState.selected_skills.includes("skill-router")) {
+    throw new Error("codex explicit implementation profile must skip upper-router closure");
+  }
+  assertCodexCompactProfiles("codex installer fresh implementation profiles", freshTarget);
 
   const skillOnlyTarget = resolve(fixtureRoot, "codex-install-skill-only-contract");
   assertRuntimePass("codex skill-only minimal core setup", runRepoScript([coreInstaller, "--target", skillOnlyTarget, "--skills", "evidence-ledger,risk-gate"]));
@@ -3133,6 +3158,54 @@ function assertCodexInstallerScripts() {
     throw new Error(`codex installer should not duplicate managed AGENTS blocks\n${afterRerunAgents}`);
   }
 
+  const compactMigrationTarget = resolve(fixtureRoot, "codex-install-legacy-compact-migration");
+  assertRuntimePass("Codex compact migration core setup", runRepoScript([coreInstaller, "--target", compactMigrationTarget]));
+  assertRuntimePass("Codex compact migration legacy setup", runRepoScript([installer, "--target", compactMigrationTarget, "--profile", "implementation"]));
+  const compactMigrationStatePath = resolve(compactMigrationTarget, ".agent-spectrum-kernel/codex-install-state.json");
+  const compactMigrationPromptPath = resolve(compactMigrationTarget, ".agents/prompts/skill-implement.md");
+  const legacyPrompt = "# Legacy managed Codex implementation prompt\n\n$ARGUMENTS\n";
+  const legacyState = readCodexInstallState(compactMigrationTarget);
+  writeFileSync(compactMigrationPromptPath, legacyPrompt);
+  legacyState.managed_files[".agents/prompts/skill-implement.md"] = {
+    ...legacyState.managed_files[".agents/prompts/skill-implement.md"],
+    sha256: hashText(legacyPrompt),
+    canonical_sha256: hashText(legacyPrompt),
+  };
+  delete legacyState.managed_files[".agents/prompts/skill-implement.md"].compact_profile;
+  legacyState.compact_runtime_profiles = (legacyState.compact_runtime_profiles ?? []).filter((profile) => profile.profile_id !== "codex-implementation-compact-v1");
+  writeFileSync(compactMigrationStatePath, `${JSON.stringify(legacyState, null, 2)}\n`);
+
+  assertRuntimePass("Codex compact migration updates legacy managed prompt", runRepoScript([installer, "--target", compactMigrationTarget, "--profile", "implementation"]));
+  const migratedState = readCodexInstallState(compactMigrationTarget);
+  const migratedPrompt = readFileSync(compactMigrationPromptPath, "utf8");
+  if (!parseCodexCompactProfileHeader(migratedPrompt) || !migratedState.managed_files[".agents/prompts/skill-implement.md"]?.compact_profile) {
+    throw new Error("Codex compact migration must replace legacy managed prompt with generated compact provenance");
+  }
+
+  assertRuntimePass("Codex compact migration rollback", runRepoScript([installer, "--target", compactMigrationTarget, "--rollback"]));
+  const rolledBackMigrationState = readCodexInstallState(compactMigrationTarget);
+  if (readFileSync(compactMigrationPromptPath, "utf8") !== legacyPrompt || rolledBackMigrationState.managed_files[".agents/prompts/skill-implement.md"]?.compact_profile) {
+    throw new Error("Codex compact migration rollback must restore the legacy managed prompt and state");
+  }
+
+  assertRuntimePass("Codex compact migration reapplies update", runRepoScript([installer, "--target", compactMigrationTarget, "--profile", "implementation"]));
+  assertRuntimePass("Codex compact migration retains stale ownership", runRepoScript([installer, "--target", compactMigrationTarget, "--profile", "minimal"]));
+  const staleMigrationState = readCodexInstallState(compactMigrationTarget);
+  if (
+    !existsSync(compactMigrationPromptPath) ||
+    staleMigrationState.managed_files[".agents/prompts/skill-implement.md"]?.kind !== "stale_codex_prompt" ||
+    !staleMigrationState.managed_files[".agents/prompts/skill-implement.md"]?.compact_profile
+  ) {
+    throw new Error("Codex compact migration must preserve compact provenance while ownership is retained as stale");
+  }
+
+  assertRuntimePass("Codex compact migration detach", runRepoScript([installer, "--target", compactMigrationTarget, "--detach"]));
+  const detachedMigrationState = readCodexInstallState(compactMigrationTarget);
+  if (existsSync(compactMigrationPromptPath) || detachedMigrationState.install_status !== "detached" || !existsSync(resolve(compactMigrationTarget, "AGENTS.md"))) {
+    throw new Error("Codex compact migration detach must remove adapter-owned stale prompts and preserve the core install");
+  }
+  assertRuntimePass("core check after Codex compact migration detach", runRepoScript([coreInstaller, "--target", compactMigrationTarget, "--check"]));
+
   for (const profile of profiles) {
     const profileTarget = resolve(fixtureRoot, `codex-install-profile-${profile}`);
     assertRuntimePass(`codex installer ${profile} core setup`, runRepoScript([coreInstaller, "--target", profileTarget]));
@@ -3168,15 +3241,11 @@ function assertCodexInstallerScripts() {
       }
     }
     assertCodexInstallClosed(`codex installer ${profile} profile`, profileTarget);
+    assertCodexCompactProfiles(`codex installer ${profile} compact profiles`, profileTarget);
     if (profile === "implementation") {
-      assertCodexRoutingFixtures(`codex installer ${profile} routing fixtures`, profileTarget, [
-        "delivery_quality_mode",
-        "unfamiliar_repository",
-        "unclear_scope",
-        "boundary_decision",
-      ]);
+      if ((profileState.skill_closure?.routing_fixtures ?? []).length !== 0) throw new Error("implementation compact profile must not retain upper-router fixtures");
     } else if (profile === "investigation") {
-      assertCodexRoutingFixtures(`codex installer ${profile} routing fixtures`, profileTarget, ["bug_investigation"]);
+      if ((profileState.skill_closure?.routing_fixtures ?? []).length !== 0) throw new Error("investigation compact profile must not retain upper-router fixtures");
     } else if (profile === "review") {
       assertCodexRoutingFixtures(`codex installer ${profile} routing fixtures`, profileTarget, ["review"]);
     } else if (profile === "daily") {
@@ -3880,6 +3949,73 @@ EOF
   if (!passResult.stdout.includes("Codex runner: executed") || !passResult.stdout.includes("Evidence level: executed") || !existsSync(resolve(target, "codex-output.md"))) {
     throw new Error(`codex runner should capture output and report executed evidence\n${passResult.stdout}\n${passResult.stderr}`);
   }
+  for (const expected of [
+    "Requested contracts: requested",
+    "Projected contracts: projected",
+    "Runtime-detected compact output profile: runtime_detected",
+    "Runtime-loaded contracts: unavailable",
+    "Applied output contracts: evidenced",
+    "Workflow contract application: unavailable",
+    "Risk/approval contract application: unavailable",
+    "Verification contract application: unavailable",
+  ]) {
+    if (!passResult.stdout.includes(expected)) throw new Error(`codex runner must distinguish execution evidence stage: ${expected}\n${passResult.stdout}`);
+  }
+
+  const jsonResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--codex-bin",
+    fakeCodex,
+    "--output",
+    "codex-output-json.md",
+    "--json",
+  ]);
+  assertRuntimePass("codex runner emits structured execution evidence", jsonResult);
+  const jsonReport = JSON.parse(jsonResult.stdout);
+  if (
+    jsonReport.execution_evidence?.requested_contracts?.status !== "requested" ||
+    jsonReport.execution_evidence?.projected_contracts?.status !== "projected" ||
+    jsonReport.execution_evidence?.runtime_detected_profile?.status !== "runtime_detected" ||
+    jsonReport.execution_evidence?.runtime_loaded_contracts?.status !== "unavailable" ||
+    jsonReport.execution_evidence?.runtime_loaded_contracts?.contracts?.length !== 0 ||
+    jsonReport.execution_evidence?.applied_output_contracts?.status !== "evidenced" ||
+    jsonReport.execution_evidence?.workflow_contract_application?.status !== "unavailable" ||
+    jsonReport.execution_evidence?.risk_approval_contract_application?.status !== "unavailable" ||
+    jsonReport.execution_evidence?.verification_contract_application?.status !== "unavailable" ||
+    Object.hasOwn(jsonReport.execution_evidence ?? {}, "applied")
+  ) {
+    throw new Error(`codex runner structured evidence stages are invalid\n${jsonResult.stdout}`);
+  }
+
+  const doctorResult = runRepoScript([doctorScript, "--target", target, "--runtime-probe", "--json"]);
+  assertRuntimePass("Codex doctor reports static compact-profile evidence", doctorResult);
+  const doctorReport = JSON.parse(doctorResult.stdout);
+  if (
+    doctorReport.runtimeProbe?.codex_evidence?.requested_contracts?.length !== 3 ||
+    doctorReport.runtimeProbe?.codex_evidence?.projected_contracts?.length !== 3 ||
+    doctorReport.runtimeProbe?.codex_evidence?.runtime_detected_profile !== "unavailable" ||
+    doctorReport.runtimeProbe?.codex_evidence?.runtime_loaded_contracts !== "unavailable" ||
+    doctorReport.runtimeProbe?.codex_evidence?.applied_output_contracts !== "unavailable" ||
+    doctorReport.runtimeProbe?.codex_evidence?.workflow_contract_application !== "unavailable" ||
+    doctorReport.runtimeProbe?.codex_evidence?.risk_approval_contract_application !== "unavailable" ||
+    doctorReport.runtimeProbe?.codex_evidence?.verification_contract_application !== "unavailable" ||
+    doctorReport.layerStatuses?.runtime_readiness?.status !== "insufficient_evidence"
+  ) {
+    throw new Error(`Codex doctor must not upgrade static projection to runtime/applied evidence\n${doctorResult.stdout}`);
+  }
+
+  const canonicalSkillPath = resolve(target, "skills/controlled-implementation/SKILL.md");
+  const canonicalSkillContent = readFileSync(canonicalSkillPath, "utf8");
+  writeFileSync(canonicalSkillPath, `${canonicalSkillContent}\nCanonical drift fixture.\n`);
+  const canonicalDriftResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
+  assertRuntimeFail("codex runner rejects canonical-only compact profile drift", canonicalDriftResult, "compact-profile canonical source drift: skills/controlled-implementation/SKILL.md");
+  const canonicalDriftDoctorResult = runRepoScript([doctorScript, "--target", target, "--runtime-probe", "--json"]);
+  assertRuntimeFail("Codex doctor rejects canonical-only compact profile drift", canonicalDriftDoctorResult, "Codex compact-profile canonical source drift: skills/controlled-implementation/SKILL.md");
+  writeFileSync(canonicalSkillPath, canonicalSkillContent);
 
   const sourceRunnerResult = runRepoScript([codexRunnerScript, "--target", target, "--dry-run"]);
   assertRuntimeFail("codex runner rejects a runner from another checkout", sourceRunnerResult, "running runner is not the target managed runner");
@@ -3964,6 +4100,13 @@ exit 9
 
   const statePath = resolve(target, ".agent-spectrum-kernel/codex-install-state.json");
   const originalState = readFileSync(statePath, "utf8");
+  const stateWithoutCompactProfile = JSON.parse(originalState);
+  delete stateWithoutCompactProfile.managed_files[".agents/prompts/skill-implement.md"].compact_profile;
+  writeFileSync(statePath, `${JSON.stringify(stateWithoutCompactProfile, null, 2)}\n`);
+  const missingCompactProfileResult = runRepoScript([targetRunnerScript, "--target", target, "--codex-bin", fakeCodex]);
+  assertRuntimeFail("codex runner rejects legacy prompt without compact provenance", missingCompactProfileResult, "selected prompt has no generated Codex compact-profile evidence");
+  writeFileSync(statePath, originalState);
+
   const stateWithoutPromptRecord = JSON.parse(originalState);
   delete stateWithoutPromptRecord.managed_files[".agents/prompts/skill-implement.md"];
   writeFileSync(statePath, `${JSON.stringify(stateWithoutPromptRecord, null, 2)}\n`);

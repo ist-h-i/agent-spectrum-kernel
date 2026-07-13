@@ -8,6 +8,7 @@ import { ADAPTER_RENDERER_METADATA } from "./adapter-runtime-inventory.mjs";
 import { APPROVAL_REQUIRED_SURFACE_IDS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
+import { codexCompactProfileCanonicalPaths } from "./codex-runtime-profile.mjs";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REQUIRED_SKILL_SIGNALS = [
@@ -323,6 +324,7 @@ const REQUIRED_CODEX_ADAPTER_PATHS = [
 ];
 const REQUIRED_ADAPTER_RUNTIME_PATHS = [
   "scripts/adapter-runtime-smoke.mjs",
+  "scripts/codex-runtime-profile.mjs",
   "scripts/codex-exec-runner.mjs",
   "scripts/execution-envelope.mjs",
 ];
@@ -1216,7 +1218,9 @@ function validateExecutionEnvelope(root, manifest, errors) {
     const expectedContractReference = path.startsWith("adapters/claude-code/plugin/")
       ? "${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md"
       : EXECUTION_ENVELOPE_DOC_PATH;
-    const referencesContract = text.includes(expectedContractReference);
+    const promptName = path.startsWith("adapters/codex/prompts/") ? path.split("/").at(-1) : null;
+    const referencesContract = text.includes(expectedContractReference)
+      || (promptName ? codexCompactProfileCanonicalPaths(promptName).includes(expectedContractReference) : false);
     const hasEnvelope = text.includes("Execution Envelope:") || text.includes("Execution Envelope");
     const hasStructuredEnvelope = text.includes("fenced JSON") || /Execution Envelope:\s*```json/.test(text);
     const ok = exists && referencesContract && hasEnvelope && hasStructuredEnvelope;
@@ -1916,7 +1920,9 @@ function validateLifecycleArtifactContract(root, manifest, errors) {
   }
   for (const path of LIFECYCLE_ARTIFACT_ADAPTER_PATHS) {
     const text = existsSync(resolve(root, path)) ? readFileSync(resolve(root, path), "utf8") : "";
-    const referencesContract = text.includes(LIFECYCLE_ARTIFACT_CONTRACT_PATH);
+    const promptName = path.startsWith("adapters/codex/prompts/") ? path.split("/").at(-1) : null;
+    const compactSources = promptName ? codexCompactProfileCanonicalPaths(promptName) : [];
+    const referencesContract = text.includes(LIFECYCLE_ARTIFACT_CONTRACT_PATH) || compactSources.includes(LIFECYCLE_ARTIFACT_CONTRACT_PATH);
     const forbiddenDuplicateSections = path === "adapters/codex/prompts/skill-implement.md"
       ? ["Changed:", "Verified:", "Not verified:", "Risks / assumptions:", "Next:"]
       : path === "adapters/codex/prompts/skill-verify.md"

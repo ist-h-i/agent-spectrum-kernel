@@ -11,7 +11,7 @@ Every adapter must preserve these core behaviors or explicitly downgrade its cla
 | Area | Required behavior |
 |---|---|
 | File projection | Kernel and selected `skills/<name>/SKILL.md` files remain traceable to this repository's canonical files. |
-| Invocation model | Local commands or tool entry points route through `operating-mode-router`, `skill-router`, or the named specific skill instead of duplicating workflow logic. |
+| Invocation model | Ambiguous entries route through `operating-mode-router` / `skill-router`; entries with fixed mode/task class may invoke the named specific Skill directly when critical canonical controls remain self-contained and provenance-validated. |
 | Review route support | A review-oriented adapter provides every gate referenced by `review-router` and `review-final-merge-gate`, including automated, AI-quality, domain, architecture, output-quality, adversarial-risk, evidence, ADR, risk, improvement-ledger, and adoption-metrics support. |
 | Risk gate behavior | Destructive, irreversible, external, production, credential, auth, dependency, migration, billing, email, or infra-impacting actions require `risk-gate` before action. |
 | Evidence output | Final outputs separate verified evidence, supported claims, hypotheses, unknowns, and residual risk. Unsupported readiness or no-regression claims are downgraded. |

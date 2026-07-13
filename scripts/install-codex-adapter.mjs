@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
 import { CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
 import { ADAPTER_RENDERER_METADATA, CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
+import { renderCodexCompactProfile } from "./codex-runtime-profile.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
@@ -31,14 +32,14 @@ const PROMPT_METADATA = {
   "skill-implement.md": {
     label: "Implementation",
     execution: CODEX_PROMPT_CONTRACTS["skill-implement.md"],
-    requiredSkills: ["operating-mode-router", "skill-router", "controlled-implementation", "test-first-verification", "evidence-ledger", "risk-gate"],
-    recommendedSkills: ["spec-driven-development", "requirement-grill", "work-package-compiler"],
+    requiredSkills: ["controlled-implementation", "test-first-verification", "evidence-ledger", "risk-gate"],
+    recommendedSkills: [],
     requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-investigate.md": {
     label: "Investigation",
     execution: CODEX_PROMPT_CONTRACTS["skill-investigate.md"],
-    requiredSkills: ["operating-mode-router", "skill-router", "doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
+    requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
     recommendedSkills: [],
   },
   "skill-review.md": {
@@ -61,14 +62,14 @@ const PROMPT_METADATA = {
   "skill-verify.md": {
     label: "Verification",
     execution: CODEX_PROMPT_CONTRACTS["skill-verify.md"],
-    requiredSkills: ["test-first-verification", "evidence-ledger"],
+    requiredSkills: ["test-first-verification", "evidence-ledger", "risk-gate"],
     recommendedSkills: [],
     requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-handoff.md": {
     label: "Handoff",
     execution: CODEX_PROMPT_CONTRACTS["skill-handoff.md"],
-    requiredSkills: ["handoff-generation", "evidence-ledger"],
+    requiredSkills: ["handoff-generation", "evidence-ledger", "risk-gate"],
     recommendedSkills: [],
   },
 };
@@ -143,11 +144,6 @@ const CODEX_PROFILES = {
   implementation: {
     description: "Default scoped implementation profile.",
     skills: [
-      "operating-mode-router",
-      "skill-router",
-      "requirement-grill",
-      "work-package-compiler",
-      "spec-driven-development",
       "test-first-verification",
       "controlled-implementation",
       "evidence-ledger",
@@ -160,8 +156,6 @@ const CODEX_PROFILES = {
   investigation: {
     description: "Bug, regression, reliability, and unknown-root-cause profile.",
     skills: [
-      "operating-mode-router",
-      "skill-router",
       "doubt-driven-development",
       "test-first-verification",
       "controlled-implementation",
@@ -695,6 +689,7 @@ function buildState({
   recommendedSkills,
   routerReachableSkills,
   routingFixtures,
+  compactProfiles,
   requiredAssets,
   managedFiles,
   managedBlocks,
@@ -747,6 +742,7 @@ function buildState({
       prompt_templates: promptTemplates,
       command_templates: commandTemplates,
       runtime_scripts: runtimeScripts,
+      compact_runtime_profiles: compactProfiles,
       required_assets: requiredAssets,
       applied_provenance: appliedProvenance,
       last_applied_provenance: appliedProvenance,
@@ -888,7 +884,7 @@ function resolveCodexProjectionSelection({ profileName, skills = null, skipPromp
   return { manifest, resolvedProfile, prompts, commands, skills: selectedSkills, requiredSkills, requiredAssets, routingFixtures, routerReachableSkills: skillsForRoutingFixtures(routingFixtures) };
 }
 
-function codexRendererInputsForSelection({ prompts, commands, skills, requiredAssets }) {
+function codexRendererInputsForSelection({ prompts, commands, skills, requiredAssets, compactProfiles }) {
   const runtimeFiles = commands.includes("codex-exec.md") ? CODEX_RUNTIME_FILES : [];
   const canonical = [
     { path: "AGENTS.md", role: "kernel" },
@@ -897,12 +893,14 @@ function codexRendererInputsForSelection({ prompts, commands, skills, requiredAs
     { path: "schemas/adapter-runtime-profile.schema.json", role: "schema" },
     { path: "schemas/adapter-runtime-evidence.schema.json", role: "schema" },
     { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
+    ...compactProfiles.flatMap((profile) => profile.canonical_sources.map((source) => ({ path: source.path, role: source.path.startsWith("skills/") ? "skill" : source.path.startsWith("schemas/") ? "schema" : source.path === "AGENTS.md" ? "kernel" : "contract" }))),
     ...skills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
     ...requiredAssets.map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : "contract" })),
     ...runtimeFiles.filter((file) => file.assetKind === "schemas").map((file) => ({ path: file.source, role: "schema" })),
   ];
   const adapterOwned = [
     { path: "scripts/install-codex-adapter.mjs", role: "renderer" },
+    { path: "scripts/codex-runtime-profile.mjs", role: "renderer" },
     { path: "scripts/installer-lifecycle.mjs", role: "runtime_source" },
     { path: "scripts/adapter-runtime-inventory.mjs", role: "inventory" },
     ...prompts.map((prompt) => ({ path: `adapters/codex/prompts/${prompt}`, role: "prompt_template" })),
@@ -937,8 +935,9 @@ function codexAssetKindForRecord(path, record) {
 
 export function buildCodexProjectionPlan({ profileName, skills = null, skipPrompts = false, skipCommand = false, previousState = null, prune = false } = {}) {
   const selection = resolveCodexProjectionSelection({ profileName, skills, skipPrompts, skipCommand });
+  const compactProfiles = selection.prompts.map((prompt) => renderCodexCompactProfile(prompt).metadata);
   const planShapingOptions = { skills: skills ? [...new Set(skills)].sort() : null, skip_prompts: skipPrompts, skip_command: skipCommand };
-  const rendererInputs = codexRendererInputsForSelection(selection);
+  const rendererInputs = codexRendererInputsForSelection({ ...selection, compactProfiles });
   const projectedManagedAssets = codexProjectedManagedAssets(selection);
   const actualByPath = new Map(projectedManagedAssets.map((asset) => [asset.path, { ...asset, retained_stale: false }]));
   if (!prune) {
@@ -957,7 +956,7 @@ export function buildCodexProjectionPlan({ profileName, skills = null, skipPromp
     rendererInputs,
     projectedManagedAssets,
   });
-  return { ...selection, ...provenance, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };
+  return { ...selection, ...provenance, compactProfiles, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };
 }
 
 export function codexRendererInputPathsForProfile(profileName) {
@@ -1159,6 +1158,7 @@ function buildPlan(args) {
     routerReachableSkills,
     requiredSkills,
     requiredAssets,
+    compactProfiles,
   } = projectionPlan;
   const coreStatePath = resolve(args.target, ".agent-spectrum-kernel/install-state.json");
   validateCoreInstalled(args.target, coreStatePath, requiredAssets);
@@ -1240,13 +1240,15 @@ function buildPlan(args) {
   for (const prompt of selectedPromptTemplates) {
     const source = resolve(REPO_ROOT, "adapters/codex/prompts", prompt);
     ensureSource(source, `adapters/codex/prompts/${prompt}`);
-    const content = readText(source);
+    const renderedProfile = renderCodexCompactProfile(prompt, readText(source));
+    const content = renderedProfile.content;
     const relativePath = `.agents/prompts/${prompt}`;
     managedFiles[relativePath] = {
       ...lifecycle.createManagedFileRecord({ kind: "codex_prompt", prompt, content }),
       prompt,
       required_skills: [...(PROMPT_METADATA[prompt]?.requiredSkills ?? [])].sort(),
       recommended_skills: [...(PROMPT_METADATA[prompt]?.recommendedSkills ?? [])].sort(),
+      compact_profile: renderedProfile.metadata,
       content,
     };
     lifecycle.planWriteManaged(operations, {
@@ -1462,6 +1464,7 @@ function buildPlan(args) {
     recommendedSkills,
     routerReachableSkills,
     routingFixtures,
+    compactProfiles,
     requiredAssets,
     managedFiles,
     managedBlocks,

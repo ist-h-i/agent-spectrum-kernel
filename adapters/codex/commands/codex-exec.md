@@ -12,7 +12,7 @@ Run these commands from the adopting repository so that `scripts/codex-exec-runn
 node scripts/codex-exec-runner.mjs --prompt skill-implement.md --mode implementation --sandbox workspace-write --output codex-implementation.md
 ```
 
-If the prompt file is not installed for the selected profile, rerun the installer with a profile that includes it, paste the template text directly into Codex, or provide an equivalent local path.
+If the prompt file is not installed for the selected profile, rerun the installer with a profile that includes it. Do not substitute the unrendered source template because it lacks generated canonical provenance.
 
 ## Investigation
 
@@ -44,9 +44,14 @@ Use the repository's actual test, lint, build, or validation commands. Do not cl
 node scripts/codex-exec-runner.mjs --prompt skill-handoff.md --mode handoff --sandbox read-only
 ```
 
-The runner performs local preflight, invokes `codex exec`, captures final output,
-runs `ask-sensors`, and reports an evidence level. A passing sensor result is
-not proof of business correctness, product readiness, or no regression.
+The runner performs local preflight, loads the generated compact prompt/profile,
+invokes `codex exec`, captures final output, runs `ask-sensors`, and reports
+requested contracts, projected contracts, runtime-loaded contracts, and applied
+output-contract evidence separately. Workflow, risk/approval, and verification
+application remain unavailable unless separately observed.
+Codex-controlled Skill loading remains unavailable unless separately observed.
+A passing sensor result is not proof of business correctness, product readiness,
+or no regression.
 
 Use this when a task needs a precise next-agent handoff with allowed scope, forbidden scope, expected output, verification, and stop condition.
 

@@ -136,6 +136,21 @@ For identical inputs it must produce the same managed asset bytes and provenance
 
 Renderer output may contain tool-native prompts, commands, hooks, permissions, or runner configuration. It may reference canonical contracts but must not fork their normative content. A renderer must fail or report drift when its named canonical digest no longer matches the input source.
 
+### Codex compact runtime profiles
+
+Codex explicit entry prompts are adapter-rendered compact profiles. When the command already fixes implementation, investigation, review, verification, or handoff mode, the rendered profile invokes its primary canonical contract directly and skips `operating-mode-router` and `skill-router`. Review still uses `review-router` because changed-file signals determine its required gates. Skipping an upper router does not remove scope, verification, risk, approval, evidence, stop, or output constraints.
+
+Each generated prompt embeds a bounded profile header and the install state records the full renderer metadata: requested canonical contracts, canonical revision, normalized canonical source text digests, required fallback controls, rendered digest, and route-depth measurement. The prompt body remains self-contained for critical controls because Codex-controlled Skill loading is not guaranteed to be observable. The renderer validates those controls and required output sections against the named canonical inputs before projection; it does not create independent workflow semantics. Runner preflight and the static doctor probe mechanically compare every recorded canonical source digest with the current projected canonical source, so a canonical-only change requires regeneration. Renderer fixtures also reject a hand-edited prompt that conflicts with canonical risk, approval, verification, or evidence controls.
+
+Codex diagnostics keep projection, load, output, and application claims separate:
+
+1. `requested`: the compact profile names the contracts requested for the entry mode;
+2. `projected`: installer state and managed prompt bytes match the generated profile;
+3. `runtime_detected`: the managed runner loaded the compact prompt/profile into the invocation context; Codex-controlled Skill loading remains `unavailable` unless separately observable;
+4. `applied_output_contracts: evidenced`: `ask-sensors` found the required sections in captured output. This is evidence for that bounded output shape only. Workflow-contract, risk/approval-contract, and verification-contract application remain `unavailable` unless separately observed; the runner's overall `executed` status does not upgrade them.
+
+`ask-doctor --runtime-probe` validates requested metadata, projected bytes, canonical source digests, prompt references, and state consistency only. It reports runtime load, applied-output, workflow, risk/approval, and verification application evidence as unavailable because it does not execute Codex.
+
 `generated_assets.managed_assets` is the static projected inventory for the Profile's declared plan-shaping options. Each entry names a normalized relative path, asset kind, ownership mode (`full_file`, `selected_files`, `partial_file`, or `runtime_directory`), and inventory source. `asset_kinds` and inventory kinds must cover each other. The shared pure plan builder resolves the exact Skill, command, prompt, non-core required asset, runtime file, partial file, and runtime directory set; the validator consumes that same builder. Validation rejects both missing and unexpected static entries and requires the registered inventory source to be a regular, non-symlink file.
 
 The applied install state separately records `actual_installed_inventory`. It must exactly cover the state-owned full files, partial files, and runtime directories after application, including retained stale entries only when prune is disabled. Removing a managed partial subset may retain its pre-change value in the rollback snapshot without retaining current lifecycle ownership. Rollback and detach consume this actual state boundary, not the static Profile inventory.
@@ -152,7 +167,7 @@ Profiles declare whether event collection is disabled, local opt-in, or locally 
 
 Projection evidence is profile-scoped. It records `profile_id`, `renderer_profile`, and a profile fingerprint derived from canonical digest, renderer ID/version/profile, plan-shaping options, renderer input digest, and static projected inventory digest. The repository fixtures provide evidence only for their declared default options; a non-default plan must use its own projection fingerprint and cannot reuse that static Profile evidence. Adapter-global evidence must declare a different scope and cannot satisfy a profile projection claim. Registered verifier fixtures bind both their declared verifier path and executable check callback.
 
-Child runtime work in #163 and #164 must consume this contract and schema. Those implementations may add adapter-owned renderer or collector fields only through a schema revision; they must not add independent canonical workflow, risk, evidence, lifecycle, traceability, or normalized-event definitions.
+Child runtime work in #163 and #164 consumes this contract and schema. Adapter-owned compact prompt metadata and collector records may differ, but they must not add independent canonical workflow, risk, evidence, lifecycle, traceability, or normalized-event definitions.
 
 ## Compatibility rule
 

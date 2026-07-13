@@ -128,6 +128,45 @@ export function codexPromptContractForMode(mode) {
   return Object.values(CODEX_PROMPT_CONTRACTS).find((contract) => contract.mode === mode) ?? null;
 }
 
+export function inspectCodexCompactCanonicalSources(target, sources = []) {
+  const findings = [];
+  for (const source of sources) {
+    const candidates = [resolve(target, source.path)];
+    if (source.path.startsWith("skills/")) {
+      candidates.push(resolve(target, ".agents/skills", source.path.slice("skills/".length)));
+    }
+    const sourcePath = candidates.find((candidate) => existsSync(candidate));
+    if (!sourcePath) {
+      findings.push({ path: source.path, status: "missing", expected_sha256: source.sha256 });
+      continue;
+    }
+    let canonicalText = readFileSync(sourcePath, "utf8");
+    if (source.path === "AGENTS.md") {
+      const managedBlock = canonicalText.match(/<!-- agent-spectrum-kernel:start -->\r?\n<!-- Source:[^\n]* -->\r?\n([\s\S]*?)\r?\n<!-- agent-spectrum-kernel:end -->/u);
+      if (!managedBlock) {
+        findings.push({ path: source.path, status: "missing_managed_block", expected_sha256: source.sha256 });
+        continue;
+      }
+      canonicalText = managedBlock[1];
+    }
+    const actualSha256 = `sha256:${hashText(canonicalText.trimEnd())}`;
+    if (actualSha256 !== source.sha256) {
+      findings.push({ path: source.path, status: "drift", expected_sha256: source.sha256, actual_sha256: actualSha256 });
+    }
+  }
+  return findings;
+}
+
+export function parseCodexCompactProfileHeader(content) {
+  const match = content.match(/^<!-- ASK_CODEX_COMPACT_PROFILE (\{[^\n]+\}) -->/u);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+}
+
 export function hashText(text) {
   return createHash("sha256").update(text).digest("hex");
 }

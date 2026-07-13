@@ -7,7 +7,7 @@
       "adapter_id": "claude_code",
       "canonical_contract": {
         "revision": "ask-3.0.0",
-        "source_digest": "sha256:84732d965fbe41f632b2470144a13193dd4773a2fc9212f1e76c0b1c5815a0cc",
+        "source_digest": "sha256:47dde5f9e0117e944745a86783e32760f7fb07de436f724a7557bdf9f1384f83",
         "source_paths": [
           "AGENTS.md",
           "docs/adapter-runtime-boundary-contract.md",
@@ -48,7 +48,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -67,7 +67,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -86,7 +86,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -105,7 +105,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -124,7 +124,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -153,7 +153,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -172,7 +172,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "behavior_verified",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -191,7 +191,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -236,7 +236,7 @@
             {
               "path": "docs/adapter-runtime-boundary-contract.md",
               "role": "contract",
-              "digest": "sha256:21990c08b199bf9c9bfc456cf8ceff13d447889b5e9fb82dcd74a0697ad77d20"
+              "digest": "sha256:805addf2a9c988167aa68638cf4556268e7e73dd3048a5d773dbaf2fd102a02f"
             },
             {
               "path": "docs/agent-session-state-contract.md",
@@ -423,7 +423,7 @@
             {
               "path": "scripts/adapter-runtime-inventory.mjs",
               "role": "inventory",
-              "digest": "sha256:002ce32ebf7e9730804689aa0a14119fa96c3199be3d2b3928f5ea23830ff5f3"
+              "digest": "sha256:be273843a67c6d0b7b9df172f1cf7d5df42621924d71a8f697563f05d48b0c4e"
             },
             {
               "path": "scripts/ai-ledger-refresh.mjs",
@@ -663,7 +663,7 @@
       "normalized_event_schema_refs": [
         "schemas/metrics-event.schema.json"
       ],
-      "profile_fingerprint": "sha256:5315774b3e6cca418b8b8ade3245bb04952d9e9f62134f1f97f169357c31fdeb"
+      "profile_fingerprint": "sha256:78854c677b8044a2871f06a2fb3192bfe469c9b926a954fa5f915039538d39f0"
     },
     {
       "schema_version": "1.0.0",
@@ -671,7 +671,7 @@
       "adapter_id": "codex",
       "canonical_contract": {
         "revision": "ask-3.0.0",
-        "source_digest": "sha256:0af453ade80e84c97038e016cdb85fbf437f40ac15882455a1cb07dbb67335f7",
+        "source_digest": "sha256:71bc5ac91220c4499a4627c7ddffc9dbf37d02e0776a68557b98f76b724d5790",
         "source_paths": [
           "AGENTS.md",
           "docs/adapter-runtime-boundary-contract.md",
@@ -680,29 +680,17 @@
           "docs/lifecycle-artifact-contract.md",
           "docs/lifecycle-traceability-contract.md",
           "docs/metrics-event-contract.md",
-          "docs/stack-implementation-overlay-contract.md",
           "manifest.json",
           "schemas/adapter-runtime-evidence.schema.json",
           "schemas/adapter-runtime-profile.schema.json",
           "schemas/execution-envelope.schema.json",
           "schemas/metrics-event.schema.json",
           "schemas/normalized-event-schema-registry.json",
-          "skills/application-boundary-architecture/SKILL.md",
           "skills/controlled-implementation/SKILL.md",
           "skills/evidence-ledger/SKILL.md",
-          "skills/grill-design/SKILL.md",
-          "skills/grill-with-docs/SKILL.md",
           "skills/handoff-generation/SKILL.md",
-          "skills/operating-mode-router/SKILL.md",
-          "skills/planning-with-files/SKILL.md",
-          "skills/repository-orientation/SKILL.md",
-          "skills/requirement-grill/SKILL.md",
           "skills/risk-gate/SKILL.md",
-          "skills/scope-control/SKILL.md",
-          "skills/skill-router/SKILL.md",
-          "skills/spec-driven-development/SKILL.md",
-          "skills/test-first-verification/SKILL.md",
-          "skills/work-package-compiler/SKILL.md"
+          "skills/test-first-verification/SKILL.md"
         ]
       },
       "capabilities": [
@@ -717,7 +705,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -736,7 +724,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -755,7 +743,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -774,7 +762,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -793,7 +781,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -812,7 +800,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -831,7 +819,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -850,7 +838,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -869,7 +857,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
+              "artifact_digest": "sha256:e0657256c4bde5d9dcfa7f35d7750f8364d97af16074801f5b58ac11c09eee7c"
             }
           ],
           "limitations": [
@@ -880,7 +868,7 @@
       ],
       "rendering": {
         "renderer_id": "install-codex-adapter",
-        "renderer_version": "3",
+        "renderer_version": "4",
         "plan_shaping_options": {
           "skills": null,
           "skip_prompts": false,
@@ -912,7 +900,7 @@
             {
               "path": "docs/adapter-runtime-boundary-contract.md",
               "role": "contract",
-              "digest": "sha256:21990c08b199bf9c9bfc456cf8ceff13d447889b5e9fb82dcd74a0697ad77d20"
+              "digest": "sha256:805addf2a9c988167aa68638cf4556268e7e73dd3048a5d773dbaf2fd102a02f"
             },
             {
               "path": "docs/agent-session-state-contract.md",
@@ -938,11 +926,6 @@
               "path": "docs/metrics-event-contract.md",
               "role": "contract",
               "digest": "sha256:68502e1cf351cfd3f5d79edba53e5eda70e79017904808d18ed608c8606d2d9d"
-            },
-            {
-              "path": "docs/stack-implementation-overlay-contract.md",
-              "role": "contract",
-              "digest": "sha256:9aa97f6c6ee9cca41e3b5b8881354c695777bfa7c5aab7eca578ccd729a5be7a"
             },
             {
               "path": "manifest.json",
@@ -975,11 +958,6 @@
               "digest": "sha256:a5ffa938593e53994af1f61c7a2981f9a364cbd6cfb81d1946c3158268e84245"
             },
             {
-              "path": "skills/application-boundary-architecture/SKILL.md",
-              "role": "skill",
-              "digest": "sha256:a941815b36632ea3b70da5dad46fd187259727cd2d66100aa7b3a7d24f3489d1"
-            },
-            {
               "path": "skills/controlled-implementation/SKILL.md",
               "role": "skill",
               "digest": "sha256:cc7cb04dda6ba574eabd83429035110f1dab4e203198da20e86bb1f8b5cd9e27"
@@ -990,39 +968,9 @@
               "digest": "sha256:b03609ab29cd0a9163df7edc4b428fbcc3800cfdb0932e94814be7d9df8025e3"
             },
             {
-              "path": "skills/grill-design/SKILL.md",
-              "role": "skill",
-              "digest": "sha256:0cd3d4f7750af54f757f3bef67c6cbdbe605cb75e18727c9edcbdde8e1b941fd"
-            },
-            {
-              "path": "skills/grill-with-docs/SKILL.md",
-              "role": "skill",
-              "digest": "sha256:7546463c3f6fb1f97c130a53657977f27f8e12cd61cfa3f6016c3999e0ceb0a9"
-            },
-            {
               "path": "skills/handoff-generation/SKILL.md",
               "role": "skill",
               "digest": "sha256:74c6353519954279fc6cf4562e505cb7f1060a721adc803986c9c1ebf25d7009"
-            },
-            {
-              "path": "skills/operating-mode-router/SKILL.md",
-              "role": "skill",
-              "digest": "sha256:0297ce968f0f80d4ee2c8cce493bc3ab14e0dba205aaf0e762a39d1b25d0f8fa"
-            },
-            {
-              "path": "skills/planning-with-files/SKILL.md",
-              "role": "skill",
-              "digest": "sha256:270655509ab476a66e47258fbc1c6bbfd41a0a870b1a691e040e5917e0a7cc80"
-            },
-            {
-              "path": "skills/repository-orientation/SKILL.md",
-              "role": "skill",
-              "digest": "sha256:d2843dd0832a28a3d8387b6d8796b1df3fb2b9bf63431865f19b3a767b2f2834"
-            },
-            {
-              "path": "skills/requirement-grill/SKILL.md",
-              "role": "skill",
-              "digest": "sha256:c6dddd803521ed8be2fd592848edf849c59a7c7043500dab396b54c3ff3be105"
             },
             {
               "path": "skills/risk-gate/SKILL.md",
@@ -1030,56 +978,36 @@
               "digest": "sha256:4ff0ef2cbc3f8c0c366526d6f5ddc8ef110c49e13552d2194134b6285e27584a"
             },
             {
-              "path": "skills/scope-control/SKILL.md",
-              "role": "skill",
-              "digest": "sha256:c9788b51bd5ff843138c80b95f0b340429bfeb44cbdebdd70b3c4ad0004726b2"
-            },
-            {
-              "path": "skills/skill-router/SKILL.md",
-              "role": "skill",
-              "digest": "sha256:2eccbfc8e61aad289b3b423ad874dfb10e1aa912f676ce219933c89a370a1019"
-            },
-            {
-              "path": "skills/spec-driven-development/SKILL.md",
-              "role": "skill",
-              "digest": "sha256:6ebc4b33f3f93dd487778856dbdbb7456eb1c169f54a94d2a4c320a19efac825"
-            },
-            {
               "path": "skills/test-first-verification/SKILL.md",
               "role": "skill",
               "digest": "sha256:6ab90c0cc61752132f25bb579a35b98e0e9b2ed1a8b36dc2a82db715b9e44684"
-            },
-            {
-              "path": "skills/work-package-compiler/SKILL.md",
-              "role": "skill",
-              "digest": "sha256:0237b9ffb3b12a7cd84977691de48e52823492e06b0a925f9a4bfdaa16af4a34"
             }
           ],
           "adapter_owned": [
             {
               "path": "adapters/codex/commands/codex-exec.md",
               "role": "command_template",
-              "digest": "sha256:56073a7a4a29db5386b38e7d0c676676af4d106bd03137e351dc3ea650945691"
+              "digest": "sha256:040bfceb6f1587059c90f82675e76f8d4e5b870e3d551711c285d438e0b65875"
             },
             {
               "path": "adapters/codex/prompts/skill-handoff.md",
               "role": "prompt_template",
-              "digest": "sha256:b06b05e210f470f8c0306d805d6073095c535b54deccd3c3e7609145fca4cd5a"
+              "digest": "sha256:93e15329a5a87d69b54ffdd1a7f08f2f6ac365281174f622982588f41eb85575"
             },
             {
               "path": "adapters/codex/prompts/skill-implement.md",
               "role": "prompt_template",
-              "digest": "sha256:8af01267df59f874517c24a0f203f40ee13017d0392905491593bddbec83456a"
+              "digest": "sha256:5ff63c57ee3bd3a8c0143695cdefbaa50229bbba61e08179bf37d9ed0993aca2"
             },
             {
               "path": "adapters/codex/prompts/skill-verify.md",
               "role": "prompt_template",
-              "digest": "sha256:c3922ad683bb5e5b356803a8d94f3a868cd6c88be663b12dc5c58b8096e71573"
+              "digest": "sha256:86c22260e7de7998d9de24b92b360870421a51b734a6917323066b4f090a022c"
             },
             {
               "path": "scripts/adapter-runtime-inventory.mjs",
               "role": "inventory",
-              "digest": "sha256:002ce32ebf7e9730804689aa0a14119fa96c3199be3d2b3928f5ea23830ff5f3"
+              "digest": "sha256:be273843a67c6d0b7b9df172f1cf7d5df42621924d71a8f697563f05d48b0c4e"
             },
             {
               "path": "scripts/ask-sensors.mjs",
@@ -1089,12 +1017,17 @@
             {
               "path": "scripts/ask-shared.mjs",
               "role": "runtime_source",
-              "digest": "sha256:5be767cf45502d3a534f7d24b0206f1fd623a27af5dceaa4e7915fcd1d678c69"
+              "digest": "sha256:5cc51e758eb01b3acd99fe6baef980ea28e0e539db4987c56c67d147a98b149b"
             },
             {
               "path": "scripts/codex-exec-runner.mjs",
               "role": "runtime_source",
-              "digest": "sha256:dda9dd785cc273d642ea4da7dffd119fd0b57814e366786fce1cdd11cfe3d039"
+              "digest": "sha256:223467002545830cd3d2f6972d82acc0c7a2bc0f95486a766691f3594d134ecd"
+            },
+            {
+              "path": "scripts/codex-runtime-profile.mjs",
+              "role": "renderer",
+              "digest": "sha256:d5efde86ed6458ccfac55d09e7789ffaa2f276525ee0b1a0a553bd99a181f9d7"
             },
             {
               "path": "scripts/execution-envelope.mjs",
@@ -1104,7 +1037,7 @@
             {
               "path": "scripts/install-codex-adapter.mjs",
               "role": "renderer",
-              "digest": "sha256:faa6da225629f1e86b9640759d991abe6506698fc3707f87f5c3e8bb23a63b14"
+              "digest": "sha256:1cbb7ca389aa8199ba74779e3446ec78adf9d89b2b40af87e7e4afbbc10c4949"
             },
             {
               "path": "scripts/installer-lifecycle.mjs",
@@ -1153,12 +1086,6 @@
             "inventory_source_ref": "scripts/install-codex-adapter.mjs"
           },
           {
-            "path": ".agents/skills/application-boundary-architecture/SKILL.md",
-            "asset_kind": "skills",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
             "path": ".agents/skills/controlled-implementation/SKILL.md",
             "asset_kind": "skills",
             "ownership_mode": "full_file",
@@ -1171,43 +1098,7 @@
             "inventory_source_ref": "scripts/install-codex-adapter.mjs"
           },
           {
-            "path": ".agents/skills/grill-design/SKILL.md",
-            "asset_kind": "skills",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
-            "path": ".agents/skills/grill-with-docs/SKILL.md",
-            "asset_kind": "skills",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
             "path": ".agents/skills/handoff-generation/SKILL.md",
-            "asset_kind": "skills",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
-            "path": ".agents/skills/operating-mode-router/SKILL.md",
-            "asset_kind": "skills",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
-            "path": ".agents/skills/planning-with-files/SKILL.md",
-            "asset_kind": "skills",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
-            "path": ".agents/skills/repository-orientation/SKILL.md",
-            "asset_kind": "skills",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
-            "path": ".agents/skills/requirement-grill/SKILL.md",
             "asset_kind": "skills",
             "ownership_mode": "full_file",
             "inventory_source_ref": "scripts/install-codex-adapter.mjs"
@@ -1219,31 +1110,7 @@
             "inventory_source_ref": "scripts/install-codex-adapter.mjs"
           },
           {
-            "path": ".agents/skills/scope-control/SKILL.md",
-            "asset_kind": "skills",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
-            "path": ".agents/skills/skill-router/SKILL.md",
-            "asset_kind": "skills",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
-            "path": ".agents/skills/spec-driven-development/SKILL.md",
-            "asset_kind": "skills",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
             "path": ".agents/skills/test-first-verification/SKILL.md",
-            "asset_kind": "skills",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
-            "path": ".agents/skills/work-package-compiler/SKILL.md",
             "asset_kind": "skills",
             "ownership_mode": "full_file",
             "inventory_source_ref": "scripts/install-codex-adapter.mjs"
@@ -1300,7 +1167,7 @@
         "sensitive_payload_storage": "prohibited"
       },
       "normalized_event_schema_refs": [],
-      "profile_fingerprint": "sha256:2cb9075408ed9a926123585f88da43e2274b33f50dfcd2b4832c4ea1a3414046"
+      "profile_fingerprint": "sha256:fd6e9d8143c31929ed197d13451a5536c551b46e035e6d240e915693ddf2af6e"
     }
   ]
 }
