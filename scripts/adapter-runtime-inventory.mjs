@@ -13,6 +13,19 @@ export const CODEX_RUNTIME_FILES = Object.freeze([
   { name: "metrics-event.schema.json", source: "schemas/metrics-event.schema.json", target: "scripts/metrics-event.schema.json", assetKind: "schemas" },
 ]);
 
+export const ADAPTER_RENDERER_METADATA = Object.freeze({
+  claude_code: Object.freeze({
+    rendererId: "install-claude-adapter",
+    rendererVersion: "3",
+    installerPath: "scripts/install-claude-adapter.mjs",
+  }),
+  codex: Object.freeze({
+    rendererId: "install-codex-adapter",
+    rendererVersion: "3",
+    installerPath: "scripts/install-codex-adapter.mjs",
+  }),
+});
+
 export const ADAPTER_MANAGED_ASSET_REQUIREMENTS = Object.freeze({
   claude_code: Object.freeze([
     { path: ".claude/skills", assetKind: "skills", ownershipMode: "selected_files" },

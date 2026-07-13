@@ -5,7 +5,7 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
 import { CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
-import { CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
+import { ADAPTER_RENDERER_METADATA, CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
@@ -702,13 +702,14 @@ function buildState({
   rollback,
   hasMutations,
   customSelection,
+  appliedProvenance,
 }) {
   const selectedProjectionPack = matchingProjectionPack(selectedSkills, manifest);
   return lifecycle.buildLifecycleState({
     manifest,
     repoRoot: REPO_ROOT,
     adapterName: "agent-spectrum-codex-adapter",
-    adapterVersion: 3,
+    adapterVersion: Number(ADAPTER_RENDERER_METADATA.codex.rendererVersion),
     selectedProfile: profileName,
     target: {
       kernel: "AGENTS.md",
@@ -744,6 +745,7 @@ function buildState({
       command_templates: commandTemplates,
       runtime_scripts: runtimeScripts,
       required_assets: requiredAssets,
+      applied_provenance: appliedProvenance,
       skill_closure: {
         required_skills: requiredSkills,
         recommended_skills: recommendedSkills,
@@ -883,6 +885,26 @@ export function codexRendererInputPathsForProfile(profileName) {
   ];
   const dedupe = (items) => [...new Map(items.map((item) => [item.path, item])).values()].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
   return { canonical: dedupe(canonical), adapter_owned: dedupe(adapterOwned) };
+}
+
+export function codexManagedAssetsForProfile(profileName) {
+  const manifest = readManifest();
+  const resolvedProfile = resolveProfile(profileName, manifest);
+  const prompts = [...resolvedProfile.prompts];
+  const commands = [...resolvedProfile.commands];
+  const routingFixtures = routingFixturesForProfile(profileName, resolvedProfile.skills, prompts);
+  const skills = computeRequiredClosure(resolvedProfile.skills, prompts, routingFixtures).sort();
+  const requiredAssets = [...new Set([...requiredAssetsForPrompts(prompts), ...requiredAssetsForSkills(skills)])].filter((path) => !CORE_OWNED_IMMUTABLE_ASSETS.includes(path)).sort();
+  const runtimeFiles = commands.includes("codex-exec.md") ? CODEX_RUNTIME_FILES : [];
+  const inventorySourceRef = "scripts/install-codex-adapter.mjs";
+  const assets = [
+    ...skills.map((skill) => ({ path: `.agents/skills/${skill}/SKILL.md`, asset_kind: "skills", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    ...prompts.map((prompt) => ({ path: `.agents/prompts/${prompt}`, asset_kind: "prompts", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    ...commands.map((command) => ({ path: `.agents/commands/${command}`, asset_kind: "commands", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    ...runtimeFiles.map((file) => ({ path: file.target, asset_kind: file.assetKind, ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    ...requiredAssets.map((path) => ({ path, asset_kind: "configuration", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+  ];
+  return [...new Map(assets.map((asset) => [asset.path, asset])).values()].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
 }
 
 function recommendedSkillsForPrompts(prompts) {
@@ -1321,6 +1343,14 @@ function buildPlan(args) {
   const stateRuntimeScripts = args.prune ? selectedRuntimeScripts : [...new Set([...selectedRuntimeScripts, ...staleRuntimeScripts])].sort();
   const retainedStaleRuntimeScripts = args.prune ? [] : staleRuntimeScripts;
   const recommendedSkills = computeRecommendedSkills(skills, selectedPromptTemplates);
+  const targetPartialFileState = Object.fromEntries(Object.keys(managedBlocks).sort().map((path) => [path, existsSync(resolve(args.target, path)) ? readFileSync(resolve(args.target, path), "utf8") : null]));
+  const appliedProvenance = lifecycle.buildAppliedProvenance({
+    cliOptions: { profile: args.profile, custom_skills: args.skills, skip_prompts: args.skipPrompts, skip_command: args.skipCommand, no_overwrite_skills: args.noOverwriteSkills, prune: args.prune, force: args.force },
+    sourceRevision: lifecycle.readGitRevision(REPO_ROOT),
+    previousManagedState: previousState,
+    managedPartialFiles: managedBlocks,
+    targetPartialFileState,
+  });
   const state = buildState({
     manifest,
     profileName: args.profile,
@@ -1348,6 +1378,7 @@ function buildPlan(args) {
     rollback,
     hasMutations: operations.some((operation) => !operation.unchanged),
     customSelection: args.skills !== null,
+    appliedProvenance,
   });
 
   return { operations, staleSkills, stalePrompts, staleCommands, staleAssets, state, recommendedSkills };

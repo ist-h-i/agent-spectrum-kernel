@@ -13,10 +13,14 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["record_id", "adapter_id", "capability_ids", "evidence_kind", "evidence_level", "result", "observed_paths", "subject_digest"],
+        "required": ["record_id", "scope", "adapter_id", "capability_ids", "evidence_kind", "evidence_level", "result", "observed_paths", "subject_digest"],
         "properties": {
           "record_id": { "type": "string", "minLength": 1 },
+          "scope": { "type": "string", "enum": ["profile_projection", "adapter_global"] },
           "adapter_id": { "type": "string", "minLength": 1 },
+          "profile_id": { "type": "string", "minLength": 1 },
+          "renderer_profile": { "type": "string", "minLength": 1 },
+          "profile_fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
           "capability_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
           "evidence_kind": { "type": "string", "enum": ["projection_manifest", "runtime_probe_result", "bounded_run_result", "capability_fixture_result"] },
           "evidence_level": { "type": "string", "enum": ["projected", "runtime_detected", "executed", "behavior_verified"] },
@@ -38,6 +42,13 @@
           }
         },
         "allOf": [
+          {
+            "if": { "properties": { "evidence_kind": { "const": "projection_manifest" } } },
+            "then": {
+              "required": ["profile_id", "renderer_profile", "profile_fingerprint"],
+              "properties": { "scope": { "const": "profile_projection" } }
+            }
+          },
           {
             "if": { "properties": { "evidence_kind": { "enum": ["runtime_probe_result", "bounded_run_result", "capability_fixture_result"] } } },
             "then": { "required": ["verification"] }

@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSy
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
-import { CLAUDE_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
+import { ADAPTER_RENDERER_METADATA, CLAUDE_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
@@ -969,6 +969,23 @@ export function claudeRendererInputPathsForProfile(profileName) {
   return { canonical: dedupe(canonical), adapter_owned: dedupe(adapterOwned) };
 }
 
+export function claudeManagedAssetsForProfile(profileName) {
+  const args = { profile: profileName, skills: null };
+  resolveSelection(args);
+  const inventorySourceRef = "scripts/install-claude-adapter.mjs";
+  const assets = [
+    ...args.selectedSkills.map((skill) => ({ path: `.claude/skills/${skill}/SKILL.md`, asset_kind: "skills", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    ...args.selectedCommands.map((command) => ({ path: `.claude/commands/${command}`, asset_kind: "commands", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    { path: ".claude/settings.json", asset_kind: "hooks", ownership_mode: "partial_file", inventory_source_ref: inventorySourceRef },
+    ...CLAUDE_RUNTIME_FILES.map((file) => ({ path: file.target, asset_kind: file.assetKind, ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    { path: "docs/ai/observability-config.yml", asset_kind: "configuration", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef },
+    ...args.requiredAssets.filter((path) => !CORE_OWNED_IMMUTABLE_ASSETS.includes(path)).map((path) => ({ path, asset_kind: "configuration", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    ...new Set([...(args.runtimeDirectories ?? []), ...RUNTIME_DIRECTORIES].map((path) => path)),
+  ];
+  const normalized = assets.flatMap((asset) => typeof asset === "string" ? [{ path: asset, asset_kind: "runtime_data", ownership_mode: "runtime_directory", inventory_source_ref: inventorySourceRef }] : [asset]);
+  return [...new Map(normalized.map((asset) => [asset.path, asset])).values()].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
+}
+
 function normalizeHooks(hooks) {
   const normalized = [];
   for (const [eventName, groups] of Object.entries(hooks ?? {})) {
@@ -1092,11 +1109,19 @@ function buildState(args, manifest) {
     .sort();
   const installedSkills = [...new Set([...selectedSkills, ...retainedStaleSkills])].sort();
   const projectionPackName = matchingProjectionPack(selectedSkills, manifest);
+  const targetPartialFileState = Object.fromEntries(Object.keys(args.managedPartialFiles).sort().map((path) => [path, existsSync(resolve(args.target, path)) ? readFileSync(resolve(args.target, path), "utf8") : null]));
+  const appliedProvenance = lifecycle.buildAppliedProvenance({
+    cliOptions: { profile: args.profile, custom_skills: args.skills, skip_hooks: args.skipHooks, skip_runtime: args.skipRuntime, prune: args.prune, force: args.force },
+    sourceRevision: lifecycle.readGitRevision(REPO_ROOT),
+    previousManagedState: args.previousState,
+    managedPartialFiles: args.managedPartialFiles,
+    targetPartialFileState,
+  });
   return lifecycle.buildLifecycleState({
     manifest,
     repoRoot: REPO_ROOT,
     adapterName: "agent-spectrum-claude-adapter",
-    adapterVersion: 3,
+    adapterVersion: Number(ADAPTER_RENDERER_METADATA.claude_code.rendererVersion),
     selectedProfile: args.profile,
     target: {
       skills_root: ".claude/skills",
@@ -1125,6 +1150,7 @@ function buildState(args, manifest) {
       required_assets: args.requiredAssets,
       initial_project_state_assets: args.initialProjectStateAssets,
       runtime_directories: args.runtimeDirectories,
+      applied_provenance: appliedProvenance,
       skill_closure: {
         required_skills: args.requiredSkills,
         router_reachable_skills: args.routerReachableSkills,

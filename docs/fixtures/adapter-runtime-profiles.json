@@ -7,7 +7,7 @@
       "adapter_id": "claude_code",
       "canonical_contract": {
         "revision": "ask-3.0.0",
-        "source_digest": "sha256:aa06e9af4496bf531e6cee1fd6ec7f87fe40d89df2a4c944ffe81763c5ec7fa7",
+        "source_digest": "sha256:9c4fde07c6891241612c869f44fd8110ee3b7cef96664df4c55e990431254bec",
         "source_paths": [
           "AGENTS.md",
           "docs/adapter-runtime-boundary-contract.md",
@@ -48,7 +48,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -67,7 +67,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -86,7 +86,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -105,7 +105,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -124,7 +124,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -153,7 +153,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -172,7 +172,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -191,7 +191,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -202,15 +202,15 @@
       ],
       "rendering": {
         "renderer_id": "install-claude-adapter",
-        "renderer_version": "1",
+        "renderer_version": "3",
         "output_root": ".",
         "asset_kinds": [
-          "skills",
           "commands",
+          "configuration",
           "hooks",
           "runner",
-          "configuration",
-          "runtime_data"
+          "runtime_data",
+          "skills"
         ],
         "deterministic_input_refs": [
           "canonical_contract.revision",
@@ -229,7 +229,7 @@
             {
               "path": "docs/adapter-runtime-boundary-contract.md",
               "role": "contract",
-              "digest": "sha256:5d42404f4a8f8a586b1283fbc52ac5f5e1d3f8078a1af77f2672a3ad6ebc79e4"
+              "digest": "sha256:9539690ea7d731b579c370c763482cfa54f7c7e950568d78decfff845d453922"
             },
             {
               "path": "docs/agent-session-state-contract.md",
@@ -279,12 +279,12 @@
             {
               "path": "schemas/adapter-runtime-evidence.schema.json",
               "role": "schema",
-              "digest": "sha256:00ebe651cb26e9be6c457c6c3c7081b736cf1ecbad98748710c84e5542264891"
+              "digest": "sha256:2d0d16275189b2248ea756f72acb8b7de9658b575927941355557a16186d074c"
             },
             {
               "path": "schemas/adapter-runtime-profile.schema.json",
               "role": "schema",
-              "digest": "sha256:0c02f56ea855f17c6fcbd676760de79ee017199b35061329e02825e9a4edbe32"
+              "digest": "sha256:2620e82912dcf5d544b80f63c6e4da3c026591365496d4d4585634c5658b23c1"
             },
             {
               "path": "schemas/metrics-event.schema.json",
@@ -406,7 +406,7 @@
             {
               "path": "scripts/adapter-runtime-inventory.mjs",
               "role": "inventory",
-              "digest": "sha256:d11bc037820f86bfe3fd1f2498bbc6e6a4363d73227a6cc4d8e32f0fac45884a"
+              "digest": "sha256:36567ab4066f1734c90b266578486dc013baa40875350fce852d730037bcb7e2"
             },
             {
               "path": "scripts/ai-ledger-refresh.mjs",
@@ -426,13 +426,24 @@
             {
               "path": "scripts/install-claude-adapter.mjs",
               "role": "renderer",
-              "digest": "sha256:4437fd2bfd1a47de3c6215573b1b455266378fe59f6985376d79620f172f0f91"
+              "digest": "sha256:cb33265dd82150286c7c112429456fede5bfc95ffd5c52a1466c0df45189e4da"
             },
             {
               "path": "scripts/installer-lifecycle.mjs",
               "role": "runtime_source",
-              "digest": "sha256:958a6a481fe0ae2abe4b58e8acce689037f178fb38b5329f7667f4c571f6c839"
+              "digest": "sha256:d468020db68c15ff9ec25717a0db10f980b0c16689393e254efc3fd1af456323"
             }
+          ]
+        },
+        "lifecycle_apply_contract": {
+          "plan_boundary": "pure_source_projection",
+          "target_state_dependent": true,
+          "applied_provenance_fields": [
+            "cli_options",
+            "source_revision",
+            "previous_managed_state_digest",
+            "partial_file_managed_subset_digest",
+            "target_partial_file_state_digest"
           ]
         }
       },
@@ -440,21 +451,135 @@
         "owner": "adapter",
         "managed_assets": [
           {
-            "path": ".claude/skills",
-            "asset_kind": "skills",
-            "ownership_mode": "selected_files",
+            "path": ".claude/commands/skill-handoff.md",
+            "asset_kind": "commands",
+            "ownership_mode": "full_file",
             "inventory_source_ref": "scripts/install-claude-adapter.mjs"
           },
           {
-            "path": ".claude/commands",
+            "path": ".claude/commands/skill-ledger-refresh.md",
             "asset_kind": "commands",
-            "ownership_mode": "selected_files",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": ".claude/commands/skill-report.md",
+            "asset_kind": "commands",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": ".claude/commands/skill-verify.md",
+            "asset_kind": "commands",
+            "ownership_mode": "full_file",
             "inventory_source_ref": "scripts/install-claude-adapter.mjs"
           },
           {
             "path": ".claude/settings.json",
             "asset_kind": "hooks",
             "ownership_mode": "partial_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": ".claude/skills/engineering-capability-evaluation/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": ".claude/skills/evidence-ledger/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": ".claude/skills/handoff-generation/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": ".claude/skills/improvement-ledger/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": ".claude/skills/operating-mode-router/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": ".claude/skills/risk-gate/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": ".claude/skills/skill-adoption-metrics/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": ".claude/skills/skill-effectiveness-evaluation/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": ".claude/skills/skill-router/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": ".claude/skills/test-first-verification/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": "docs/ai/adoption-report-template.md",
+            "asset_kind": "configuration",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": "docs/ai/metrics",
+            "asset_kind": "runtime_data",
+            "ownership_mode": "runtime_directory",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": "docs/ai/metrics/README.md",
+            "asset_kind": "configuration",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": "docs/ai/observability-config.yml",
+            "asset_kind": "configuration",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": "docs/ai/reports",
+            "asset_kind": "runtime_data",
+            "ownership_mode": "runtime_directory",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": "docs/ai/reports/README.md",
+            "asset_kind": "configuration",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": "scripts/ai-ledger-refresh.mjs",
+            "asset_kind": "runner",
+            "ownership_mode": "full_file",
             "inventory_source_ref": "scripts/install-claude-adapter.mjs"
           },
           {
@@ -467,30 +592,6 @@
             "path": "scripts/ai-metrics-summarize.mjs",
             "asset_kind": "runner",
             "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
-          },
-          {
-            "path": "scripts/ai-ledger-refresh.mjs",
-            "asset_kind": "runner",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
-          },
-          {
-            "path": "docs/ai/observability-config.yml",
-            "asset_kind": "configuration",
-            "ownership_mode": "full_file",
-            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
-          },
-          {
-            "path": "docs/ai/metrics",
-            "asset_kind": "runtime_data",
-            "ownership_mode": "runtime_directory",
-            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
-          },
-          {
-            "path": "docs/ai/reports",
-            "asset_kind": "runtime_data",
-            "ownership_mode": "runtime_directory",
             "inventory_source_ref": "scripts/install-claude-adapter.mjs"
           }
         ],
@@ -510,7 +611,8 @@
       },
       "normalized_event_schema_refs": [
         "schemas/metrics-event.schema.json"
-      ]
+      ],
+      "profile_fingerprint": "sha256:62aa858a1a243d2526d6e0a37ffb363d5a7dcfd30b3f84d687138a3a8691a9dc"
     },
     {
       "schema_version": "1.0.0",
@@ -518,7 +620,7 @@
       "adapter_id": "codex",
       "canonical_contract": {
         "revision": "ask-3.0.0",
-        "source_digest": "sha256:4dce43a1c3f891fe4399f59ad2faa2218cc13592d7a2859f0aee92f61c5031cd",
+        "source_digest": "sha256:f9e1b723b248ae41c7032875688f39ff84a8756e11848592985e62cfa7cc3950",
         "source_paths": [
           "AGENTS.md",
           "docs/adapter-runtime-boundary-contract.md",
@@ -564,7 +666,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -583,7 +685,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -602,7 +704,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -621,7 +723,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -640,7 +742,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -659,7 +761,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -678,7 +780,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -697,7 +799,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -716,7 +818,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:4996e0dc6ebbdac41d542d644c49a605cc5cf369f6825b79e157ae66c74f982e"
+              "artifact_digest": "sha256:3c45d344cd24eec9272332a2d5ae398bb9b4e24fd8d446ef29d864c373943888"
             }
           ],
           "limitations": [
@@ -727,14 +829,14 @@
       ],
       "rendering": {
         "renderer_id": "install-codex-adapter",
-        "renderer_version": "1",
+        "renderer_version": "3",
         "output_root": ".",
         "asset_kinds": [
-          "skills",
-          "prompts",
           "commands",
+          "prompts",
           "runner",
-          "schemas"
+          "schemas",
+          "skills"
         ],
         "deterministic_input_refs": [
           "canonical_contract.revision",
@@ -753,7 +855,7 @@
             {
               "path": "docs/adapter-runtime-boundary-contract.md",
               "role": "contract",
-              "digest": "sha256:5d42404f4a8f8a586b1283fbc52ac5f5e1d3f8078a1af77f2672a3ad6ebc79e4"
+              "digest": "sha256:9539690ea7d731b579c370c763482cfa54f7c7e950568d78decfff845d453922"
             },
             {
               "path": "docs/agent-session-state-contract.md",
@@ -793,12 +895,12 @@
             {
               "path": "schemas/adapter-runtime-evidence.schema.json",
               "role": "schema",
-              "digest": "sha256:00ebe651cb26e9be6c457c6c3c7081b736cf1ecbad98748710c84e5542264891"
+              "digest": "sha256:2d0d16275189b2248ea756f72acb8b7de9658b575927941355557a16186d074c"
             },
             {
               "path": "schemas/adapter-runtime-profile.schema.json",
               "role": "schema",
-              "digest": "sha256:0c02f56ea855f17c6fcbd676760de79ee017199b35061329e02825e9a4edbe32"
+              "digest": "sha256:2620e82912dcf5d544b80f63c6e4da3c026591365496d4d4585634c5658b23c1"
             },
             {
               "path": "schemas/execution-envelope.schema.json",
@@ -920,7 +1022,7 @@
             {
               "path": "scripts/adapter-runtime-inventory.mjs",
               "role": "inventory",
-              "digest": "sha256:d11bc037820f86bfe3fd1f2498bbc6e6a4363d73227a6cc4d8e32f0fac45884a"
+              "digest": "sha256:36567ab4066f1734c90b266578486dc013baa40875350fce852d730037bcb7e2"
             },
             {
               "path": "scripts/ask-sensors.mjs",
@@ -945,13 +1047,24 @@
             {
               "path": "scripts/install-codex-adapter.mjs",
               "role": "renderer",
-              "digest": "sha256:e9d1fdc1829a8a74e6648acb271cb1319f1fd387969e90844fb379cbda1b6452"
+              "digest": "sha256:874842e964e794e03ea8b074995420570b78b53db52733dbd8f541a8b9dab3cb"
             },
             {
               "path": "scripts/installer-lifecycle.mjs",
               "role": "runtime_source",
-              "digest": "sha256:958a6a481fe0ae2abe4b58e8acce689037f178fb38b5329f7667f4c571f6c839"
+              "digest": "sha256:d468020db68c15ff9ec25717a0db10f980b0c16689393e254efc3fd1af456323"
             }
+          ]
+        },
+        "lifecycle_apply_contract": {
+          "plan_boundary": "pure_source_projection",
+          "target_state_dependent": true,
+          "applied_provenance_fields": [
+            "cli_options",
+            "source_revision",
+            "previous_managed_state_digest",
+            "partial_file_managed_subset_digest",
+            "target_partial_file_state_digest"
           ]
         }
       },
@@ -959,26 +1072,122 @@
         "owner": "adapter",
         "managed_assets": [
           {
-            "path": ".agents/skills",
-            "asset_kind": "skills",
-            "ownership_mode": "selected_files",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
-            "path": ".agents/prompts",
-            "asset_kind": "prompts",
-            "ownership_mode": "selected_files",
-            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
-          },
-          {
-            "path": ".agents/commands",
+            "path": ".agents/commands/codex-exec.md",
             "asset_kind": "commands",
-            "ownership_mode": "selected_files",
+            "ownership_mode": "full_file",
             "inventory_source_ref": "scripts/install-codex-adapter.mjs"
           },
           {
-            "path": "scripts/codex-exec-runner.mjs",
-            "asset_kind": "runner",
+            "path": ".agents/prompts/skill-handoff.md",
+            "asset_kind": "prompts",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/prompts/skill-implement.md",
+            "asset_kind": "prompts",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/prompts/skill-verify.md",
+            "asset_kind": "prompts",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/application-boundary-architecture/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/controlled-implementation/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/evidence-ledger/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/grill-design/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/grill-with-docs/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/handoff-generation/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/operating-mode-router/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/planning-with-files/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/repository-orientation/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/requirement-grill/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/risk-gate/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/scope-control/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/skill-router/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/spec-driven-development/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/test-first-verification/SKILL.md",
+            "asset_kind": "skills",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": ".agents/skills/work-package-compiler/SKILL.md",
+            "asset_kind": "skills",
             "ownership_mode": "full_file",
             "inventory_source_ref": "scripts/install-codex-adapter.mjs"
           },
@@ -990,6 +1199,12 @@
           },
           {
             "path": "scripts/ask-shared.mjs",
+            "asset_kind": "runner",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-codex-adapter.mjs"
+          },
+          {
+            "path": "scripts/codex-exec-runner.mjs",
             "asset_kind": "runner",
             "ownership_mode": "full_file",
             "inventory_source_ref": "scripts/install-codex-adapter.mjs"
@@ -1027,7 +1242,8 @@
         "raw_prompt_storage": "prohibited",
         "sensitive_payload_storage": "prohibited"
       },
-      "normalized_event_schema_refs": []
+      "normalized_event_schema_refs": [],
+      "profile_fingerprint": "sha256:ee592d0096d52ad42fa27094a8d6190a63f183bb2893b1f7e59fb16feb1c1dca"
     }
   ]
 }

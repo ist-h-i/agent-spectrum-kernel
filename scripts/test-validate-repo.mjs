@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
-import { REQUIRED_TRACEABILITY_SCENARIOS, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
+import { REQUIRED_TRACEABILITY_SCENARIOS, computeAdapterAppliedProvenanceFingerprint, computeAdapterProfileFingerprint, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -2403,6 +2403,9 @@ function assertInstallerScripts() {
     throw new Error("Claude project installer should project the canonical signal registry");
   }
   const firstClaudeState = JSON.parse(readFileSync(resolve(target, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  if (!/^sha256:[a-f0-9]{64}$/.test(firstClaudeState.applied_provenance?.fingerprint ?? "") || !firstClaudeState.applied_provenance?.source_revision || !firstClaudeState.applied_provenance?.target_partial_file_state_digest) {
+    throw new Error(`Claude adapter state must record applied provenance\n${JSON.stringify(firstClaudeState.applied_provenance, null, 2)}`);
+  }
   if (!firstClaudeState.required_assets?.includes("docs/lifecycle-artifact-contract.md") || !firstClaudeState.required_assets?.includes("docs/lifecycle-traceability-contract.md")) {
     throw new Error("Claude adapter state must record lifecycle and traceability contracts as required managed dependencies");
   }
@@ -3075,6 +3078,9 @@ function assertCodexInstallerScripts() {
     throw new Error("Codex adapter install must provide the canonical lifecycle and traceability contracts");
   }
   const freshState = readCodexInstallState(freshTarget);
+  if (!/^sha256:[a-f0-9]{64}$/.test(freshState.applied_provenance?.fingerprint ?? "") || !freshState.applied_provenance?.source_revision || !freshState.applied_provenance?.previous_managed_state_digest) {
+    throw new Error(`Codex adapter state must record applied provenance\n${JSON.stringify(freshState.applied_provenance, null, 2)}`);
+  }
   if (!freshState.required_assets?.includes("docs/lifecycle-artifact-contract.md") || !freshState.required_assets?.includes("docs/lifecycle-traceability-contract.md")) {
     throw new Error("Codex adapter state must record lifecycle and traceability contracts as required managed dependencies");
   }
@@ -4645,6 +4651,29 @@ try {
   if (!wrongEvidenceKindIssues.some((issue) => issue.includes("projected requires projection_manifest"))) {
     throw new Error(`wrong evidence kind should fail closed\n${wrongEvidenceKindIssues.join("\n")}`);
   }
+  const reusedProjectionEvidenceProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+  reusedProjectionEvidenceProfile.profile_id = "codex-review-projection-v1";
+  reusedProjectionEvidenceProfile.rendering.renderer_profile = "review";
+  reusedProjectionEvidenceProfile.profile_fingerprint = computeAdapterProfileFingerprint(reusedProjectionEvidenceProfile);
+  const reusedProjectionEvidenceIssues = inspectAdapterRuntimeProfile(reusedProjectionEvidenceProfile, { root: repoRoot });
+  if (!reusedProjectionEvidenceIssues.some((issue) => issue.includes("does not match profile identity/fingerprint"))) throw new Error(`projection evidence reuse across profiles should fail closed\n${reusedProjectionEvidenceIssues.join("\n")}`);
+  for (const [field, value] of [["renderer_id", "unrelated-renderer"], ["renderer_version", "999"]]) {
+    const wrongRendererProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+    wrongRendererProfile.rendering[field] = value;
+    wrongRendererProfile.profile_fingerprint = computeAdapterProfileFingerprint(wrongRendererProfile);
+    const wrongRendererIssues = inspectAdapterRuntimeProfile(wrongRendererProfile, { root: repoRoot });
+    if (!wrongRendererIssues.some((issue) => issue.includes(`${field} must match adapter registry`))) throw new Error(`${field} mismatch should fail closed\n${wrongRendererIssues.join("\n")}`);
+  }
+  const appliedProvenance = {
+    cli_options: { profile: "observability", skip_hooks: false, skip_runtime: false },
+    source_revision: "a".repeat(40),
+    previous_managed_state_digest: `sha256:${"1".repeat(64)}`,
+    partial_file_managed_subset_digest: `sha256:${"2".repeat(64)}`,
+    target_partial_file_state_digest: `sha256:${"3".repeat(64)}`,
+  };
+  const appliedFingerprint = computeAdapterAppliedProvenanceFingerprint(appliedProvenance);
+  if (appliedFingerprint === computeAdapterAppliedProvenanceFingerprint({ ...appliedProvenance, source_revision: "b".repeat(40) })) throw new Error("Git revision changes must alter applied provenance fingerprint");
+  if (appliedFingerprint === computeAdapterAppliedProvenanceFingerprint({ ...appliedProvenance, target_partial_file_state_digest: `sha256:${"4".repeat(64)}` })) throw new Error("target hook state changes must alter applied provenance fingerprint");
   for (const [role, label] of [["skill", "selected skill"], ["prompt_template", "adapter template"], ["inventory", "runtime inventory"]]) {
     const staleRendererProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
     const input = [...staleRendererProfile.rendering.renderer_inputs.canonical, ...staleRendererProfile.rendering.renderer_inputs.adapter_owned].find((candidate) => candidate.role === role);
@@ -4672,6 +4701,16 @@ try {
   if (!missingRuntimeAssetIssues.some((issue) => issue.includes("managed asset inventory is missing scripts/codex-exec-runner.mjs"))) {
     throw new Error(`missing runtime inventory should fail closed\n${missingRuntimeAssetIssues.join("\n")}`);
   }
+  const missingRequiredAssetProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
+  missingRequiredAssetProfile.generated_assets.managed_assets = missingRequiredAssetProfile.generated_assets.managed_assets.filter((asset) => asset.path !== "docs/ai/adoption-report-template.md");
+  missingRequiredAssetProfile.profile_fingerprint = computeAdapterProfileFingerprint(missingRequiredAssetProfile);
+  const missingRequiredAssetIssues = inspectAdapterRuntimeProfile(missingRequiredAssetProfile, { root: repoRoot });
+  if (!missingRequiredAssetIssues.includes("managed asset inventory is missing docs/ai/adoption-report-template.md")) throw new Error(`missing resolved required asset should fail closed\n${missingRequiredAssetIssues.join("\n")}`);
+  const extraManagedAssetProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+  extraManagedAssetProfile.generated_assets.managed_assets.push({ path: "docs/ai/unowned.json", asset_kind: "configuration", ownership_mode: "full_file", inventory_source_ref: "scripts/install-codex-adapter.mjs" });
+  extraManagedAssetProfile.profile_fingerprint = computeAdapterProfileFingerprint(extraManagedAssetProfile);
+  const extraManagedAssetIssues = inspectAdapterRuntimeProfile(extraManagedAssetProfile, { root: repoRoot });
+  if (!extraManagedAssetIssues.includes("managed asset inventory has unexpected asset docs/ai/unowned.json")) throw new Error(`unexpected managed asset should fail closed\n${extraManagedAssetIssues.join("\n")}`);
   const canonicalOwnershipProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
   canonicalOwnershipProfile.generated_assets.managed_assets[0].path = "AGENTS.md";
   const canonicalOwnershipIssues = inspectAdapterRuntimeProfile(canonicalOwnershipProfile, { root: repoRoot });
@@ -4693,6 +4732,11 @@ try {
   if (!symlinkEscapeIssues.some((issue) => issue.includes("managed asset path traverses a symlink"))) {
     throw new Error(`managed symlink escape should fail closed\n${symlinkEscapeIssues.join("\n")}`);
   }
+  const inventorySourceSymlinkProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+  inventorySourceSymlinkProfile.generated_assets.managed_assets[0].inventory_source_ref = "escape-link/scripts/install-codex-adapter.mjs";
+  inventorySourceSymlinkProfile.profile_fingerprint = computeAdapterProfileFingerprint(inventorySourceSymlinkProfile);
+  const inventorySourceSymlinkIssues = inspectAdapterRuntimeProfile(inventorySourceSymlinkProfile, { root: symlinkRoot });
+  if (!inventorySourceSymlinkIssues.some((issue) => issue.includes("inventory_source_ref is missing, unsafe, or not a regular file"))) throw new Error(`inventory source symlink should fail closed\n${inventorySourceSymlinkIssues.join("\n")}`);
   const missingEventSchemaProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
   missingEventSchemaProfile.normalized_event_schema_refs = [];
   const missingEventSchemaIssues = inspectAdapterRuntimeProfile(missingEventSchemaProfile, { root: repoRoot });

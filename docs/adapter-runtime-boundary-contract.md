@@ -119,7 +119,9 @@ A renderer consumes only:
 2. the profile itself;
 3. explicitly named adapter-owned renderer inputs.
 
-`rendering.renderer_inputs` separates `canonical` and `adapter_owned` inputs. Every entry records a normalized path, semantic role, and SHA-256 digest. `renderer_profile` selects the installer profile whose resolved Skill/template/runtime/config closure must exactly match those entries. Canonical input paths are also the exact `canonical_contract.source_paths`; adapter-owned inputs are hashed separately and never folded into canonical ownership.
+`rendering.renderer_inputs` separates `canonical` and `adapter_owned` inputs. Every entry records a normalized path, semantic role, and SHA-256 digest. `renderer_profile` selects the installer profile whose resolved Skill/template/runtime/config closure must exactly match those entries. Canonical input paths are also the exact `canonical_contract.source_paths`; adapter-owned inputs are hashed separately and never folded into canonical ownership. Adapter ID, renderer ID, renderer version, input resolver, and managed-asset resolver are one registry entry; aliases or independent versions are invalid.
+
+The deterministic boundary ends at the pure source projection plan. Applying that plan to a target is state-dependent. Applied provenance records CLI options, source revision, previous managed-state digest, the managed subset digest for partial files, and the pre-apply target partial-file state digest for settings such as merged hooks. Changing Git revision or target-owned hook state therefore changes applied provenance without pretending the pure source plan changed.
 
 For identical inputs it must produce the same managed asset bytes and provenance metadata. Every generated asset records or is covered by:
 
@@ -132,7 +134,7 @@ For identical inputs it must produce the same managed asset bytes and provenance
 
 Renderer output may contain tool-native prompts, commands, hooks, permissions, or runner configuration. It may reference canonical contracts but must not fork their normative content. A renderer must fail or report drift when its named canonical digest no longer matches the input source.
 
-`generated_assets.managed_assets` is the adapter lifecycle inventory. Each entry names a normalized relative path, asset kind, ownership mode (`full_file`, `selected_files`, `partial_file`, or `runtime_directory`), and inventory source. `asset_kinds` and inventory kinds must cover each other. The inventory must include the runtime files shared with the actual installers through `scripts/adapter-runtime-inventory.mjs`.
+`generated_assets.managed_assets` is the adapter lifecycle inventory. Each entry names a normalized relative path, asset kind, ownership mode (`full_file`, `selected_files`, `partial_file`, or `runtime_directory`), and inventory source. `asset_kinds` and inventory kinds must cover each other. The selected installer profile resolves the exact Skill, command, prompt, non-core required asset, runtime file, partial file, and runtime directory set. Validation rejects both missing and unexpected inventory entries and requires the registered inventory source to be a regular, non-symlink file.
 
 Absolute paths, `..`, non-normalized paths, symlink traversal, and canonical/core-owned targets are forbidden. In particular, adapters cannot own root `AGENTS.md`, `CUSTOM_INSTRUCTIONS.md`, `manifest.json`, canonical `skills/`, canonical `schemas/`, or canonical contract documents. Install/update/rollback/detach must use the same inventory boundary.
 
@@ -143,6 +145,8 @@ Profiles declare whether event collection is disabled, local opt-in, or locally 
 ## Conformance and consumers
 
 `docs/fixtures/adapter-runtime-profiles.json` contains representative Claude and Codex profiles, and `docs/fixtures/adapter-runtime-evidence.json` contains their typed repository evidence records. `node scripts/validate-repo.mjs` checks profile structure, required capability coverage, support/evidence downgrade consistency, provenance, lifecycle ownership, privacy boundaries, and the absence of model-dependent fields.
+
+Projection evidence is profile-scoped. It records `profile_id`, `renderer_profile`, and a profile fingerprint derived from canonical digest, renderer ID/version/profile, renderer input digest, and managed inventory digest. Adapter-global evidence must declare a different scope and cannot satisfy a profile projection claim. Registered verifier fixtures bind both their declared verifier path and executable check callback.
 
 Child runtime work in #163 and #164 must consume this contract and schema. Those implementations may add adapter-owned renderer or collector fields only through a schema revision; they must not add independent canonical workflow, risk, evidence, lifecycle, traceability, or normalized-event definitions.
 

@@ -22,6 +22,24 @@ export function hashText(text) {
   return createHash("sha256").update(text).digest("hex");
 }
 
+function stableCanonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableCanonicalJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableCanonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+export function buildAppliedProvenance({ cliOptions, sourceRevision, previousManagedState, managedPartialFiles, targetPartialFileState }) {
+  const digest = (value) => `sha256:${hashText(stableCanonicalJson(value ?? null))}`;
+  const record = {
+    cli_options: cliOptions,
+    source_revision: sourceRevision,
+    previous_managed_state_digest: digest(stripRollbackState(previousManagedState)),
+    partial_file_managed_subset_digest: digest(managedPartialFiles ?? {}),
+    target_partial_file_state_digest: digest(targetPartialFileState ?? {}),
+  };
+  return { ...record, fingerprint: digest(record) };
+}
+
 export function readText(path) {
   return readFileSync(path, "utf8");
 }
@@ -167,7 +185,7 @@ export function buildLifecycleState({
 }
 
 function comparableState(state) {
-  const { previous_successful_state, rollback, ...rest } = state ?? {};
+  const { previous_successful_state, rollback, applied_provenance, ...rest } = state ?? {};
   return JSON.stringify(rest);
 }
 

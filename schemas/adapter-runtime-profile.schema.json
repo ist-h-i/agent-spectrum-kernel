@@ -5,10 +5,11 @@
   "description": "Capability and rendering profile for one adapter runtime projection. Canonical workflow meaning remains outside this profile.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "profile_id", "adapter_id", "canonical_contract", "capabilities", "rendering", "generated_assets", "privacy", "normalized_event_schema_refs"],
+  "required": ["schema_version", "profile_id", "profile_fingerprint", "adapter_id", "canonical_contract", "capabilities", "rendering", "generated_assets", "privacy", "normalized_event_schema_refs"],
   "properties": {
     "schema_version": { "type": "string", "const": "1.0.0" },
     "profile_id": { "type": "string", "minLength": 1 },
+    "profile_fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "adapter_id": { "type": "string", "minLength": 1 },
     "canonical_contract": {
       "type": "object",
@@ -72,7 +73,7 @@
     "rendering": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["renderer_id", "renderer_version", "renderer_profile", "output_root", "asset_kinds", "deterministic_input_refs", "renderer_inputs"],
+      "required": ["renderer_id", "renderer_version", "renderer_profile", "output_root", "asset_kinds", "deterministic_input_refs", "renderer_inputs", "lifecycle_apply_contract"],
       "properties": {
         "renderer_id": { "type": "string", "minLength": 1 },
         "renderer_version": { "type": "string", "minLength": 1 },
@@ -114,6 +115,21 @@
                   "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
                 }
               }
+            }
+          }
+        },
+        "lifecycle_apply_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["plan_boundary", "target_state_dependent", "applied_provenance_fields"],
+          "properties": {
+            "plan_boundary": { "type": "string", "const": "pure_source_projection" },
+            "target_state_dependent": { "type": "boolean", "const": true },
+            "applied_provenance_fields": {
+              "type": "array",
+              "minItems": 5,
+              "uniqueItems": true,
+              "items": { "type": "string", "enum": ["cli_options", "source_revision", "previous_managed_state_digest", "partial_file_managed_subset_digest", "target_partial_file_state_digest"] }
             }
           }
         }
