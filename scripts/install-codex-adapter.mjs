@@ -5,6 +5,7 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
 import { CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
+import { ADAPTER_RENDERER_METADATA, CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
@@ -24,14 +25,6 @@ const PROMPT_TEMPLATES = [
   "skill-handoff.md",
 ];
 const COMMAND_TEMPLATES = ["codex-exec.md"];
-const CODEX_RUNTIME_FILES = [
-  { name: "codex-exec-runner.mjs", source: "scripts/codex-exec-runner.mjs", target: "scripts/codex-exec-runner.mjs" },
-  { name: "ask-sensors.mjs", source: "scripts/ask-sensors.mjs", target: "scripts/ask-sensors.mjs" },
-  { name: "ask-shared.mjs", source: "scripts/ask-shared.mjs", target: "scripts/ask-shared.mjs" },
-  { name: "execution-envelope.mjs", source: "scripts/execution-envelope.mjs", target: "scripts/execution-envelope.mjs" },
-  { name: "execution-envelope.schema.json", source: "schemas/execution-envelope.schema.json", target: "scripts/execution-envelope.schema.json" },
-  { name: "metrics-event.schema.json", source: "schemas/metrics-event.schema.json", target: "scripts/metrics-event.schema.json" },
-];
 const CODEX_RUNTIME_SCRIPTS = CODEX_RUNTIME_FILES.map((file) => file.name);
 
 const PROMPT_METADATA = {
@@ -708,14 +701,18 @@ function buildState({
   previousState,
   rollback,
   hasMutations,
+  managedSubsetChanged,
+  managedSubsetFingerprint,
   customSelection,
+  appliedProvenance,
+  projectionPlan,
 }) {
   const selectedProjectionPack = matchingProjectionPack(selectedSkills, manifest);
   return lifecycle.buildLifecycleState({
     manifest,
     repoRoot: REPO_ROOT,
     adapterName: "agent-spectrum-codex-adapter",
-    adapterVersion: 3,
+    adapterVersion: Number(ADAPTER_RENDERER_METADATA.codex.rendererVersion),
     selectedProfile: profileName,
     target: {
       kernel: "AGENTS.md",
@@ -751,6 +748,21 @@ function buildState({
       command_templates: commandTemplates,
       runtime_scripts: runtimeScripts,
       required_assets: requiredAssets,
+      applied_provenance: appliedProvenance,
+      last_applied_provenance: appliedProvenance,
+      last_changed_provenance: hasMutations || managedSubsetChanged ? appliedProvenance : previousState?.last_changed_provenance ?? previousState?.applied_provenance ?? null,
+      managed_subset_fingerprint: managedSubsetFingerprint,
+      projection_plan: {
+        fingerprint: projectionPlan.fingerprint,
+        renderer_id: projectionPlan.renderer_id,
+        renderer_version: projectionPlan.renderer_version,
+        renderer_profile: projectionPlan.renderer_profile,
+        plan_shaping_options: projectionPlan.plan_shaping_options,
+        canonical_source_digest: projectionPlan.canonical_source_digest,
+        renderer_inputs: projectionPlan.renderer_inputs,
+        projected_managed_assets: projectionPlan.projectedManagedAssets,
+      },
+      actual_installed_inventory: projectionPlan.actualInstalledInventory,
       skill_closure: {
         required_skills: requiredSkills,
         recommended_skills: recommendedSkills,
@@ -859,6 +871,101 @@ function requiredAssetsForSkills(skills) {
     }
   }
   return [...assets].sort();
+}
+
+function resolveCodexProjectionSelection({ profileName, skills = null, skipPrompts = false, skipCommand = false }) {
+  const manifest = readManifest();
+  const resolvedProfile = resolveProfile(profileName, manifest);
+  const prompts = skipPrompts ? [] : [...resolvedProfile.prompts];
+  const commands = skipCommand ? [] : [...resolvedProfile.commands];
+  const skillSeed = skills ?? resolvedProfile.skills;
+  const routingFixtures = routingFixturesForProfile(profileName, skillSeed, prompts);
+  const requiredSkills = computeRequiredClosure(skillSeed, prompts, routingFixtures);
+  const selectedSkills = [...(skills ?? requiredSkills)].sort();
+  validateSkillNames(selectedSkills, [...manifest.skills].sort());
+  validateSkillClosure({ selectedSkills, requiredSkills, profileName });
+  const requiredAssets = [...new Set([...requiredAssetsForPrompts(prompts), ...requiredAssetsForSkills(selectedSkills)])].sort();
+  return { manifest, resolvedProfile, prompts, commands, skills: selectedSkills, requiredSkills, requiredAssets, routingFixtures, routerReachableSkills: skillsForRoutingFixtures(routingFixtures) };
+}
+
+function codexRendererInputsForSelection({ prompts, commands, skills, requiredAssets }) {
+  const runtimeFiles = commands.includes("codex-exec.md") ? CODEX_RUNTIME_FILES : [];
+  const canonical = [
+    { path: "AGENTS.md", role: "kernel" },
+    { path: "manifest.json", role: "manifest" },
+    { path: "docs/adapter-runtime-boundary-contract.md", role: "contract" },
+    { path: "schemas/adapter-runtime-profile.schema.json", role: "schema" },
+    { path: "schemas/adapter-runtime-evidence.schema.json", role: "schema" },
+    { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
+    ...skills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
+    ...requiredAssets.map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : "contract" })),
+    ...runtimeFiles.filter((file) => file.assetKind === "schemas").map((file) => ({ path: file.source, role: "schema" })),
+  ];
+  const adapterOwned = [
+    { path: "scripts/install-codex-adapter.mjs", role: "renderer" },
+    { path: "scripts/installer-lifecycle.mjs", role: "runtime_source" },
+    { path: "scripts/adapter-runtime-inventory.mjs", role: "inventory" },
+    ...prompts.map((prompt) => ({ path: `adapters/codex/prompts/${prompt}`, role: "prompt_template" })),
+    ...commands.map((command) => ({ path: `adapters/codex/commands/${command}`, role: "command_template" })),
+    ...runtimeFiles.filter((file) => file.assetKind !== "schemas").map((file) => ({ path: file.source, role: "runtime_source" })),
+  ];
+  const dedupe = (items) => [...new Map(items.map((item) => [item.path, item])).values()].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
+  return { canonical: dedupe(canonical), adapter_owned: dedupe(adapterOwned) };
+}
+
+function codexProjectedManagedAssets({ prompts, commands, skills, requiredAssets }) {
+  const adapterRequiredAssets = requiredAssets.filter((path) => !CORE_OWNED_IMMUTABLE_ASSETS.includes(path)).sort();
+  const runtimeFiles = commands.includes("codex-exec.md") ? CODEX_RUNTIME_FILES : [];
+  const inventorySourceRef = "scripts/install-codex-adapter.mjs";
+  const assets = [
+    ...skills.map((skill) => ({ path: `.agents/skills/${skill}/SKILL.md`, asset_kind: "skills", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    ...prompts.map((prompt) => ({ path: `.agents/prompts/${prompt}`, asset_kind: "prompts", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    ...commands.map((command) => ({ path: `.agents/commands/${command}`, asset_kind: "commands", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    ...runtimeFiles.map((file) => ({ path: file.target, asset_kind: file.assetKind, ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+    ...adapterRequiredAssets.map((path) => ({ path, asset_kind: "configuration", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
+  ];
+  return [...new Map(assets.map((asset) => [asset.path, asset])).values()].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
+}
+
+function codexAssetKindForRecord(path, record) {
+  if (path.startsWith(".agents/skills/")) return "skills";
+  if (path.startsWith(".agents/prompts/")) return "prompts";
+  if (path.startsWith(".agents/commands/")) return "commands";
+  if (String(record?.kind ?? "").includes("runtime")) return path.endsWith(".json") ? "schemas" : "runner";
+  return "configuration";
+}
+
+export function buildCodexProjectionPlan({ profileName, skills = null, skipPrompts = false, skipCommand = false, previousState = null, prune = false } = {}) {
+  const selection = resolveCodexProjectionSelection({ profileName, skills, skipPrompts, skipCommand });
+  const planShapingOptions = { skills: skills ? [...new Set(skills)].sort() : null, skip_prompts: skipPrompts, skip_command: skipCommand };
+  const rendererInputs = codexRendererInputsForSelection(selection);
+  const projectedManagedAssets = codexProjectedManagedAssets(selection);
+  const actualByPath = new Map(projectedManagedAssets.map((asset) => [asset.path, { ...asset, retained_stale: false }]));
+  if (!prune) {
+    for (const [path, record] of Object.entries(previousState?.managed_files ?? {})) {
+      if (!actualByPath.has(path) && (String(record?.kind ?? "").startsWith("codex_") || String(record?.kind ?? "").startsWith("stale_codex_"))) {
+        actualByPath.set(path, { path, asset_kind: codexAssetKindForRecord(path, record), ownership_mode: "full_file", inventory_source_ref: "scripts/install-codex-adapter.mjs", retained_stale: true });
+      }
+    }
+  }
+  const provenance = lifecycle.buildProjectionPlanProvenance({
+    repoRoot: REPO_ROOT,
+    rendererId: ADAPTER_RENDERER_METADATA.codex.rendererId,
+    rendererVersion: ADAPTER_RENDERER_METADATA.codex.rendererVersion,
+    rendererProfile: profileName,
+    planShapingOptions,
+    rendererInputs,
+    projectedManagedAssets,
+  });
+  return { ...selection, ...provenance, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };
+}
+
+export function codexRendererInputPathsForProfile(profileName) {
+  return buildCodexProjectionPlan({ profileName }).renderer_inputs;
+}
+
+export function codexManagedAssetsForProfile(profileName) {
+  return buildCodexProjectionPlan({ profileName }).projectedManagedAssets;
 }
 
 function recommendedSkillsForPrompts(prompts) {
@@ -1033,24 +1140,28 @@ function validateManagedReferences(managedFiles) {
 }
 
 function buildPlan(args) {
-  const manifest = readManifest();
-  const manifestSkills = [...manifest.skills].sort();
-  const resolvedProfile = resolveProfile(args.profile, manifest);
-  const selectedPromptTemplates = args.skipPrompts ? [] : resolvedProfile.prompts;
-  const selectedCommandTemplates = args.skipCommand ? [] : resolvedProfile.commands;
-  const skillSeed = args.skills ?? resolvedProfile.skills;
-  const routingFixtures = routingFixturesForProfile(args.profile, skillSeed, selectedPromptTemplates);
-  const routerReachableSkills = skillsForRoutingFixtures(routingFixtures);
-  const requiredSkills = computeRequiredClosure(skillSeed, selectedPromptTemplates, routingFixtures);
-  const skills = [...(args.skills ?? requiredSkills)].sort();
-
-  validateSkillNames(skills, manifestSkills);
-  validateSkillClosure({ selectedSkills: skills, requiredSkills, profileName: args.profile });
-  const requiredAssets = [...new Set([...requiredAssetsForPrompts(selectedPromptTemplates), ...requiredAssetsForSkills(skills)])].sort();
+  const previousState = readPreviousState(args.target);
+  const projectionPlan = buildCodexProjectionPlan({
+    profileName: args.profile,
+    skills: args.skills,
+    skipPrompts: args.skipPrompts,
+    skipCommand: args.skipCommand,
+    previousState,
+    prune: args.prune,
+  });
+  const {
+    manifest,
+    resolvedProfile,
+    prompts: selectedPromptTemplates,
+    commands: selectedCommandTemplates,
+    skills,
+    routingFixtures,
+    routerReachableSkills,
+    requiredSkills,
+    requiredAssets,
+  } = projectionPlan;
   const coreStatePath = resolve(args.target, ".agent-spectrum-kernel/install-state.json");
   validateCoreInstalled(args.target, coreStatePath, requiredAssets);
-
-  const previousState = readPreviousState(args.target);
   const previousSkillNames = previousItems(previousState, "installed_skills", ["codex_skill", "stale_codex_skill"], "skill").filter((skill) =>
     SKILL_NAME_PATTERN.test(skill),
   );
@@ -1297,6 +1408,40 @@ function buildPlan(args) {
   const stateRuntimeScripts = args.prune ? selectedRuntimeScripts : [...new Set([...selectedRuntimeScripts, ...staleRuntimeScripts])].sort();
   const retainedStaleRuntimeScripts = args.prune ? [] : staleRuntimeScripts;
   const recommendedSkills = computeRecommendedSkills(skills, selectedPromptTemplates);
+  const targetPartialFileState = Object.fromEntries(Object.keys(managedBlocks).sort().map((path) => [path, existsSync(resolve(args.target, path)) ? readFileSync(resolve(args.target, path), "utf8") : null]));
+  const appliedProvenance = lifecycle.buildAppliedProvenance({
+    cliOptions: { profile: args.profile, custom_skills: args.skills, skip_prompts: args.skipPrompts, skip_command: args.skipCommand, no_overwrite_skills: args.noOverwriteSkills, prune: args.prune, force: args.force },
+    sourceRevision: lifecycle.readGitRevision(REPO_ROOT),
+    previousManagedState: previousState,
+    managedPartialFiles: managedBlocks,
+    targetPartialFileState,
+  });
+  const plannedInventoryPaths = projectionPlan.actualInstalledInventory.map((asset) => asset.path).sort();
+  const stateInventoryPaths = Object.keys(managedFiles).sort();
+  if (JSON.stringify(plannedInventoryPaths) !== JSON.stringify(stateInventoryPaths)) {
+    throw new Error(`pure projection plan inventory does not match Codex lifecycle state: planned=${plannedInventoryPaths.join(",")} actual=${stateInventoryPaths.join(",")}`);
+  }
+  const managedSubset = {
+    projected_managed_assets: projectionPlan.projectedManagedAssets,
+    actual_installed_inventory: projectionPlan.actualInstalledInventory,
+    selected_skills: skills,
+    selected_prompts: selectedPromptTemplates,
+    selected_commands: selectedCommandTemplates,
+    selected_runtime_scripts: selectedRuntimeScripts,
+    managed_partial_paths: Object.keys(managedBlocks).sort(),
+  };
+  const previousManagedSubset = previousState ? {
+    projected_managed_assets: previousState.projection_plan?.projected_managed_assets ?? [],
+    actual_installed_inventory: previousState.actual_installed_inventory ?? [],
+    selected_skills: previousState.selected_skills ?? [],
+    selected_prompts: previousState.selected_prompts ?? [],
+    selected_commands: previousState.selected_commands ?? [],
+    selected_runtime_scripts: previousState.selected_runtime_scripts ?? [],
+    managed_partial_paths: Object.keys(previousState.managed_blocks ?? {}).sort(),
+  } : null;
+  const managedSubsetFingerprint = lifecycle.canonicalValueDigest(managedSubset);
+  const managedSubsetChanged = !previousManagedSubset || managedSubsetFingerprint !== lifecycle.canonicalValueDigest(previousManagedSubset);
+  const hasMutations = operations.some((operation) => !operation.unchanged);
   const state = buildState({
     manifest,
     profileName: args.profile,
@@ -1322,8 +1467,12 @@ function buildPlan(args) {
     managedBlocks,
     previousState,
     rollback,
-    hasMutations: operations.some((operation) => !operation.unchanged),
+    hasMutations,
+    managedSubsetChanged,
+    managedSubsetFingerprint,
     customSelection: args.skills !== null,
+    appliedProvenance,
+    projectionPlan,
   });
 
   return { operations, staleSkills, stalePrompts, staleCommands, staleAssets, state, recommendedSkills };
@@ -1376,9 +1525,11 @@ function main() {
   printPlan(args, plan);
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(`install-codex-adapter failed: ${error.message}`);
-  process.exit(1);
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    main();
+  } catch (error) {
+    console.error(`install-codex-adapter failed: ${error.message}`);
+    process.exit(1);
+  }
 }

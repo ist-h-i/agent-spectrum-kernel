@@ -61,6 +61,9 @@ docs/
   debt-lifecycle-contract.md
   adapter-conformance-contract.md
   adapter-capability-matrix.md
+  adapter-runtime-boundary-contract.md
+  fixtures/adapter-runtime-profiles.json
+  fixtures/adapter-runtime-evidence.json
   claude-github-review-setup.md
   ai/review-context.md
   ai/implementation-context.md
@@ -105,6 +108,9 @@ examples/
   12-claude-adapter-adoption.md
 schemas/
   metrics-event.schema.json
+  adapter-runtime-profile.schema.json
+  adapter-runtime-evidence.schema.json
+  normalized-event-schema-registry.json
   adoption-report.schema.json
   improvement-ledger-entry.schema.json
   domain-rule-ledger-entry.schema.json

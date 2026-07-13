@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/adapter-runtime-evidence.schema.json",
+  "title": "Agent Spectrum Kernel Adapter Runtime Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "records"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["record_id", "scope", "adapter_id", "capability_ids", "evidence_kind", "evidence_level", "result", "observed_paths", "subject_digest"],
+        "properties": {
+          "record_id": { "type": "string", "minLength": 1 },
+          "scope": { "type": "string", "enum": ["profile_projection", "adapter_global"] },
+          "adapter_id": { "type": "string", "minLength": 1 },
+          "profile_id": { "type": "string", "minLength": 1 },
+          "renderer_profile": { "type": "string", "minLength": 1 },
+          "profile_fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "capability_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "evidence_kind": { "type": "string", "enum": ["projection_manifest", "runtime_probe_result", "bounded_run_result", "capability_fixture_result"] },
+          "evidence_level": { "type": "string", "enum": ["projected", "runtime_detected", "executed", "behavior_verified"] },
+          "result": { "type": "string", "enum": ["pass", "fail"] },
+          "observed_paths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "subject_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "verification": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["verifier_path", "fixture_id", "target_paths", "expected_result", "actual_result", "exit_status"],
+            "properties": {
+              "verifier_path": { "type": "string", "minLength": 1 },
+              "fixture_id": { "type": "string", "minLength": 1 },
+              "target_paths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+              "expected_result": { "type": "string", "const": "pass" },
+              "actual_result": { "type": "string", "enum": ["pass", "fail"] },
+              "exit_status": { "type": "integer" }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "evidence_kind": { "const": "projection_manifest" } } },
+            "then": {
+              "required": ["profile_id", "renderer_profile", "profile_fingerprint"],
+              "properties": { "scope": { "const": "profile_projection" } }
+            }
+          },
+          {
+            "if": { "properties": { "evidence_kind": { "enum": ["runtime_probe_result", "bounded_run_result", "capability_fixture_result"] } } },
+            "then": { "required": ["verification"] }
+          }
+        ]
+      }
+    }
+  }
+}

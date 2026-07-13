@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/adapter-runtime-profile.schema.json",
+  "title": "Agent Spectrum Kernel Adapter Runtime Profile",
+  "description": "Capability and rendering profile for one adapter runtime projection. Canonical workflow meaning remains outside this profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile_id", "profile_fingerprint", "adapter_id", "canonical_contract", "capabilities", "rendering", "generated_assets", "privacy", "normalized_event_schema_refs"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "profile_id": { "type": "string", "minLength": 1 },
+    "profile_fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "adapter_id": { "type": "string", "minLength": 1 },
+    "canonical_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "source_digest", "source_paths"],
+      "properties": {
+        "revision": { "type": "string", "minLength": 1 },
+        "source_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "source_paths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capability_id", "support", "evidence_level", "evidence_refs", "limitations", "downgrade_behavior"],
+        "properties": {
+          "capability_id": {
+            "type": "string",
+            "enum": [
+              "progressive_instruction_loading",
+              "lifecycle_hooks",
+              "agent_orchestration",
+              "permission_sandbox_enforcement",
+              "runtime_asset_load_evidence",
+              "programmatic_tool_execution",
+              "persistent_resumable_state",
+              "local_event_emission",
+              "shared_pr_execution"
+            ]
+          },
+          "support": { "type": "string", "enum": ["supported", "partial", "unsupported", "unknown"] },
+          "evidence_level": { "type": "string", "enum": ["none", "projected", "runtime_detected", "executed", "behavior_verified"] },
+          "evidence_refs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["record_id", "evidence_kind", "artifact_ref", "result", "evidence_level", "artifact_digest"],
+              "properties": {
+                "record_id": { "type": "string", "minLength": 1 },
+                "evidence_kind": { "type": "string", "enum": ["projection_manifest", "runtime_probe_result", "bounded_run_result", "capability_fixture_result"] },
+                "artifact_ref": { "type": "string", "minLength": 1 },
+                "result": { "type": "string", "const": "pass" },
+                "evidence_level": { "type": "string", "enum": ["projected", "runtime_detected", "executed", "behavior_verified"] },
+                "artifact_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+              }
+            }
+          },
+          "limitations": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "downgrade_behavior": {
+            "type": "string",
+            "enum": ["claim_projection_only", "claim_runtime_detection_only", "claim_execution_only", "claim_behavior_verified", "insufficient_evidence", "manual_step", "omit", "unsupported", "unknown"]
+          }
+        }
+      }
+    },
+    "rendering": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["renderer_id", "renderer_version", "renderer_profile", "plan_shaping_options", "output_root", "asset_kinds", "deterministic_input_refs", "renderer_inputs", "lifecycle_apply_contract"],
+      "properties": {
+        "renderer_id": { "type": "string", "minLength": 1 },
+        "renderer_version": { "type": "string", "minLength": 1 },
+        "renderer_profile": { "type": "string", "minLength": 1 },
+        "plan_shaping_options": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["skills"],
+          "properties": {
+            "skills": { "type": ["array", "null"], "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+            "skip_hooks": { "type": "boolean" },
+            "skip_runtime": { "type": "boolean" },
+            "skip_prompts": { "type": "boolean" },
+            "skip_command": { "type": "boolean" }
+          },
+          "allOf": [
+            {
+              "oneOf": [
+                { "required": ["skip_hooks", "skip_runtime"], "not": { "anyOf": [{ "required": ["skip_prompts"] }, { "required": ["skip_command"] }] } },
+                { "required": ["skip_prompts", "skip_command"], "not": { "anyOf": [{ "required": ["skip_hooks"] }, { "required": ["skip_runtime"] }] } }
+              ]
+            }
+          ]
+        },
+        "output_root": { "type": "string", "minLength": 1 },
+        "asset_kinds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "enum": ["skills", "commands", "prompts", "hooks", "permissions", "runner", "schemas", "configuration", "runtime_data"] } },
+        "deterministic_input_refs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "renderer_inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["canonical", "adapter_owned"],
+          "properties": {
+            "canonical": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "role", "digest"],
+                "properties": {
+                  "path": { "type": "string", "minLength": 1 },
+                  "role": { "type": "string", "enum": ["kernel", "manifest", "skill", "contract", "schema"] },
+                  "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+                }
+              }
+            },
+            "adapter_owned": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "role", "digest"],
+                "properties": {
+                  "path": { "type": "string", "minLength": 1 },
+                  "role": { "type": "string", "enum": ["renderer", "inventory", "command_template", "prompt_template", "hook_template", "runtime_source", "runtime_schema", "config_source"] },
+                  "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+                }
+              }
+            }
+          }
+        },
+        "lifecycle_apply_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["plan_boundary", "target_state_dependent", "applied_provenance_fields"],
+          "properties": {
+            "plan_boundary": { "type": "string", "const": "pure_source_projection" },
+            "target_state_dependent": { "type": "boolean", "const": true },
+            "applied_provenance_fields": {
+              "type": "array",
+              "minItems": 5,
+              "uniqueItems": true,
+              "items": { "type": "string", "enum": ["cli_options", "source_revision", "previous_managed_state_digest", "partial_file_managed_subset_digest", "target_partial_file_state_digest"] }
+            }
+          }
+        }
+      }
+    },
+    "generated_assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "managed_assets", "lifecycle_operations", "drift_policy"],
+      "properties": {
+        "owner": { "type": "string", "const": "adapter" },
+        "managed_assets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "asset_kind", "ownership_mode", "inventory_source_ref"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "asset_kind": { "type": "string", "enum": ["skills", "commands", "prompts", "hooks", "permissions", "runner", "schemas", "configuration", "runtime_data"] },
+              "ownership_mode": { "type": "string", "enum": ["full_file", "selected_files", "partial_file", "runtime_directory"] },
+              "inventory_source_ref": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "lifecycle_operations": { "type": "array", "minItems": 4, "uniqueItems": true, "items": { "type": "string", "enum": ["install", "update", "rollback", "detach"] } },
+        "drift_policy": { "type": "string", "enum": ["fail", "report", "regenerate"] }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_collection", "external_publication", "raw_prompt_storage", "sensitive_payload_storage"],
+      "properties": {
+        "event_collection": { "type": "string", "enum": ["disabled", "local_opt_in", "local_enabled"] },
+        "external_publication": { "type": "string", "enum": ["disabled", "approval_required"] },
+        "raw_prompt_storage": { "type": "string", "const": "prohibited" },
+        "sensitive_payload_storage": { "type": "string", "const": "prohibited" }
+      }
+    },
+    "normalized_event_schema_refs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "privacy": {
+            "properties": { "event_collection": { "enum": ["local_opt_in", "local_enabled"] } },
+            "required": ["event_collection"]
+          }
+        }
+      },
+      "then": { "properties": { "normalized_event_schema_refs": { "minItems": 1 } } }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "schema_version": "1.0.0",
+  "schemas": [
+    {
+      "path": "schemas/metrics-event.schema.json",
+      "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/metrics-event.schema.json"
+    }
+  ]
+}

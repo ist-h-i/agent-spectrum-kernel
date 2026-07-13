@@ -22,6 +22,79 @@ export function hashText(text) {
   return createHash("sha256").update(text).digest("hex");
 }
 
+function stableCanonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableCanonicalJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableCanonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+export function canonicalValueDigest(value) {
+  return `sha256:${hashText(stableCanonicalJson(value ?? null))}`;
+}
+
+export function canonicalPathSetDigest(repoRoot, paths) {
+  const hash = createHash("sha256");
+  for (const path of [...new Set(paths)].sort()) {
+    const bytes = readFileSync(resolve(repoRoot, path));
+    hash.update(Buffer.from(path, "utf8"));
+    hash.update(Buffer.from([0]));
+    hash.update(Buffer.from(String(bytes.length), "utf8"));
+    hash.update(Buffer.from([0]));
+    hash.update(bytes);
+    hash.update(Buffer.from([0]));
+  }
+  return `sha256:${hash.digest("hex")}`;
+}
+
+export function rendererInputsWithDigests(repoRoot, inputs) {
+  return Object.fromEntries(Object.entries(inputs).map(([group, records]) => [group, records.map((record) => ({
+    ...record,
+    digest: `sha256:${hashText(readFileSync(resolve(repoRoot, record.path)))}`,
+  }))]));
+}
+
+export function buildProjectionPlanProvenance({ repoRoot, rendererId, rendererVersion, rendererProfile, planShapingOptions, rendererInputs, projectedManagedAssets }) {
+  const inputsWithDigests = rendererInputsWithDigests(repoRoot, rendererInputs);
+  const record = {
+    renderer_id: rendererId,
+    renderer_version: rendererVersion,
+    renderer_profile: rendererProfile,
+    plan_shaping_options: planShapingOptions,
+    canonical_source_digest: canonicalPathSetDigest(repoRoot, inputsWithDigests.canonical.map((input) => input.path)),
+    renderer_inputs: inputsWithDigests,
+    projected_managed_assets: projectedManagedAssets,
+  };
+  return {
+    ...record,
+    renderer_inputs_digest: canonicalValueDigest(inputsWithDigests),
+    managed_inventory_digest: canonicalValueDigest(projectedManagedAssets),
+    fingerprint: canonicalValueDigest({
+      canonical_source_digest: record.canonical_source_digest,
+      renderer_id: rendererId,
+      renderer_version: rendererVersion,
+      renderer_profile: rendererProfile,
+      plan_shaping_options: planShapingOptions,
+      renderer_inputs_digest: canonicalValueDigest(inputsWithDigests),
+      managed_inventory_digest: canonicalValueDigest(projectedManagedAssets),
+    }),
+  };
+}
+
+export function buildAppliedProvenance({ cliOptions, sourceRevision, previousManagedState, managedPartialFiles, targetPartialFileState }) {
+  const digest = canonicalValueDigest;
+  const previousManagedStateForDigest = previousManagedState && typeof previousManagedState === "object"
+    ? Object.fromEntries(Object.entries(stripRollbackState(previousManagedState)).filter(([key]) => !["applied_provenance", "last_applied_provenance", "last_changed_provenance"].includes(key)))
+    : null;
+  const record = {
+    cli_options: cliOptions,
+    source_revision: sourceRevision,
+    previous_managed_state_digest: digest(previousManagedStateForDigest),
+    partial_file_managed_subset_digest: digest(managedPartialFiles ?? {}),
+    target_partial_file_state_digest: digest(targetPartialFileState ?? {}),
+  };
+  return { ...record, fingerprint: digest(record) };
+}
+
 export function readText(path) {
   return readFileSync(path, "utf8");
 }
@@ -161,13 +234,16 @@ export function buildLifecycleState({
     rollback,
   };
   if (!hasMutations && previousState?.schema_version === LIFECYCLE_SCHEMA_VERSION && comparableState(previousState) === comparableState(state)) {
-    return previousState;
+    const provenanceFields = ["applied_provenance", "last_applied_provenance", "last_changed_provenance", "projection_plan", "actual_installed_inventory"];
+    const provenanceChanged = provenanceFields.some((field) => stableCanonicalJson(previousState?.[field] ?? null) !== stableCanonicalJson(state?.[field] ?? null));
+    if (!provenanceChanged) return previousState;
+    return Object.fromEntries(Object.entries({ ...previousState, ...Object.fromEntries(provenanceFields.map((field) => [field, state[field]])) }).filter(([, value]) => value !== undefined));
   }
   return state;
 }
 
 function comparableState(state) {
-  const { previous_successful_state, rollback, ...rest } = state ?? {};
+  const { previous_successful_state, rollback, applied_provenance, last_applied_provenance, last_changed_provenance, projection_plan, actual_installed_inventory, ...rest } = state ?? {};
   return JSON.stringify(rest);
 }
 
