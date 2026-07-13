@@ -349,6 +349,8 @@
     "schemas/metrics-event.schema.json",
     "schemas/execution-envelope.schema.json",
     "schemas/adapter-runtime-profile.schema.json",
+    "schemas/adapter-runtime-evidence.schema.json",
+    "schemas/normalized-event-schema-registry.json",
     "schemas/review-signal-gate-map.json",
     "schemas/adoption-report.schema.json",
     "schemas/improvement-ledger-entry.schema.json",

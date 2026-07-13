@@ -79,7 +79,7 @@ These are the canonical machine values established by #157. “Detected”, “r
 
 Projection is not detection, detection is not execution, and execution is not behavioral correctness.
 
-Every non-`none` capability evidence reference is a typed result reference with `record_id`, `evidence_kind`, `artifact_ref`, `result`, `evidence_level`, and `artifact_digest`. Evidence artifacts use the same SHA-256 form, must exist inside the validation root, and contain a matching passing record for the same adapter and capability. The record binds its observed inputs with the canonical path-set serialization above.
+Every non-`none` capability evidence reference is a typed result reference with `record_id`, `evidence_kind`, `artifact_ref`, `result`, `evidence_level`, and `artifact_digest`. Evidence artifacts conform to `schemas/adapter-runtime-evidence.schema.json`, use the same SHA-256 form, must exist inside the validation root, and contain a unique matching record for the same adapter and capability. The record binds its observed inputs with the canonical path-set serialization above.
 
 Evidence kind is fixed by level:
 
@@ -91,6 +91,8 @@ Evidence kind is fixed by level:
 | `behavior_verified` | `capability_fixture_result` |
 
 Implementation source alone is not an `executed` result. Missing, failed, stale, wrong-kind, wrong-capability, or digest-mismatched evidence cannot raise a capability level.
+
+`runtime_probe_result`, `bounded_run_result`, and `capability_fixture_result` additionally bind a verifier path, registered fixture ID, target paths, expected result, actual result, and exit status. Verifier and target paths must also be present in `observed_paths`, so their bytes participate in `subject_digest`. A passing string in a checked-in artifact is insufficient: the repository validator must recognize and execute the named verifier fixture. Unknown fixture IDs fail closed. Profiles in this revision intentionally remain at `projected` unless such a verifier is registered.
 
 ### Required downgrade
 
@@ -117,6 +119,8 @@ A renderer consumes only:
 2. the profile itself;
 3. explicitly named adapter-owned renderer inputs.
 
+`rendering.renderer_inputs` separates `canonical` and `adapter_owned` inputs. Every entry records a normalized path, semantic role, and SHA-256 digest. `renderer_profile` selects the installer profile whose resolved Skill/template/runtime/config closure must exactly match those entries. Canonical input paths are also the exact `canonical_contract.source_paths`; adapter-owned inputs are hashed separately and never folded into canonical ownership.
+
 For identical inputs it must produce the same managed asset bytes and provenance metadata. Every generated asset records or is covered by:
 
 - `profile_id` and adapter ID;
@@ -134,7 +138,7 @@ Absolute paths, `..`, non-normalized paths, symlink traversal, and canonical/cor
 
 ## Privacy and event boundary
 
-Profiles declare whether event collection is disabled, local opt-in, or locally enabled. External publication remains `disabled` or `approval_required`; a profile cannot silently enable it. Raw prompts and sensitive payload storage are prohibited by this schema. Normalized event schema references identify event meaning, not proof that a collector ran. `local_opt_in` and `local_enabled` require at least one existing canonical normalized event schema reference.
+Profiles declare whether event collection is disabled, local opt-in, or locally enabled. External publication remains `disabled` or `approval_required`; a profile cannot silently enable it. Raw prompts and sensitive payload storage are prohibited by this schema. Normalized event schema references identify event meaning, not proof that a collector ran. `local_opt_in` and `local_enabled` require at least one regular, non-symlink schema registered by path and matching `$id` in `schemas/normalized-event-schema-registry.json`.
 
 ## Conformance and consumers
 

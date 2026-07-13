@@ -4,57 +4,49 @@
     {
       "record_id": "claude-projection-manifest",
       "adapter_id": "claude_code",
-      "capability_ids": ["progressive_instruction_loading", "lifecycle_hooks", "agent_orchestration", "permission_sandbox_enforcement", "runtime_asset_load_evidence", "persistent_resumable_state", "shared_pr_execution"],
+      "capability_ids": [
+        "progressive_instruction_loading",
+        "lifecycle_hooks",
+        "agent_orchestration",
+        "permission_sandbox_enforcement",
+        "runtime_asset_load_evidence",
+        "persistent_resumable_state",
+        "local_event_emission",
+        "shared_pr_execution"
+      ],
       "evidence_kind": "projection_manifest",
       "evidence_level": "projected",
       "result": "pass",
-      "command": "node scripts/test-validate-repo.mjs",
-      "observed_paths": ["adapters/claude-code/README.md", "adapters/claude-code/project/.claude/hooks/hooks.json", "scripts/install-claude-adapter.mjs"],
-      "subject_digest": "sha256:a05b7e6d5d88d93417e0e9b3294318eb0b6e9cd672aac2bee0e20e2a80faff7f"
-    },
-    {
-      "record_id": "claude-local-event-runtime-probe",
-      "adapter_id": "claude_code",
-      "capability_ids": ["local_event_emission"],
-      "evidence_kind": "runtime_probe_result",
-      "evidence_level": "runtime_detected",
-      "result": "pass",
-      "command": "node scripts/test-validate-repo.mjs",
-      "observed_paths": ["scripts/adapter-runtime-smoke.mjs"],
-      "subject_digest": "sha256:884cff7a7e0d04151cd3c26387d84ce7a1565bcb92ff936594cca1ced64833e1"
+      "observed_paths": [
+        "adapters/claude-code/README.md",
+        "adapters/claude-code/project/.claude/hooks/hooks.json",
+        "scripts/install-claude-adapter.mjs"
+      ],
+      "subject_digest": "sha256:86732fb6f30b76777a47b395f61644812ef690974234c30677bbff174bc0c009"
     },
     {
       "record_id": "codex-projection-manifest",
       "adapter_id": "codex",
-      "capability_ids": ["progressive_instruction_loading", "agent_orchestration", "permission_sandbox_enforcement", "runtime_asset_load_evidence", "persistent_resumable_state"],
+      "capability_ids": [
+        "progressive_instruction_loading",
+        "lifecycle_hooks",
+        "agent_orchestration",
+        "permission_sandbox_enforcement",
+        "runtime_asset_load_evidence",
+        "programmatic_tool_execution",
+        "persistent_resumable_state",
+        "local_event_emission",
+        "shared_pr_execution"
+      ],
       "evidence_kind": "projection_manifest",
       "evidence_level": "projected",
       "result": "pass",
-      "command": "node scripts/test-validate-repo.mjs",
-      "observed_paths": ["adapters/codex/README.md", "adapters/codex/commands/codex-exec.md", "scripts/install-codex-adapter.mjs"],
-      "subject_digest": "sha256:f116c3df21c1e3b82950b85d60d186d0e47d0a78c9ff56c97ce5d87377be2d16"
-    },
-    {
-      "record_id": "codex-runner-capability-fixture",
-      "adapter_id": "codex",
-      "capability_ids": ["programmatic_tool_execution"],
-      "evidence_kind": "capability_fixture_result",
-      "evidence_level": "behavior_verified",
-      "result": "pass",
-      "command": "node scripts/test-validate-repo.mjs",
-      "observed_paths": ["scripts/codex-exec-runner.mjs"],
-      "subject_digest": "sha256:5a3bc88ae2876b28424e04a856b65588e934ae4027ef2c388d5c600b5e72ce0e"
-    },
-    {
-      "record_id": "codex-unsupported-capability-fixture",
-      "adapter_id": "codex",
-      "capability_ids": ["lifecycle_hooks", "local_event_emission", "shared_pr_execution"],
-      "evidence_kind": "capability_fixture_result",
-      "evidence_level": "behavior_verified",
-      "result": "pass",
-      "command": "node scripts/test-validate-repo.mjs",
-      "observed_paths": ["docs/adapter-capability-matrix.md"],
-      "subject_digest": "sha256:75d664549a631adf8321df8cd0472c4f0d827db6bc53b18496f7a6c1b7920f7c"
+      "observed_paths": [
+        "adapters/codex/README.md",
+        "adapters/codex/commands/codex-exec.md",
+        "scripts/install-codex-adapter.mjs"
+      ],
+      "subject_digest": "sha256:e2038ec644a4905ef81fd8374c2a4bc03345f8555de787a24448e7cc3ba8ebc9"
     }
   ]
 }

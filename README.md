@@ -109,6 +109,8 @@ examples/
 schemas/
   metrics-event.schema.json
   adapter-runtime-profile.schema.json
+  adapter-runtime-evidence.schema.json
+  normalized-event-schema-registry.json
   adoption-report.schema.json
   improvement-ledger-entry.schema.json
   domain-rule-ledger-entry.schema.json

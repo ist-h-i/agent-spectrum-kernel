@@ -940,6 +940,35 @@ function resolveSelection(args) {
   args.routerReachableSkills = skillsForRoutingFixtures(routingFixtures);
 }
 
+export function claudeRendererInputPathsForProfile(profileName) {
+  const args = { profile: profileName, skills: null };
+  resolveSelection(args);
+  const canonical = [
+    { path: "AGENTS.md", role: "kernel" },
+    { path: "manifest.json", role: "manifest" },
+    { path: "docs/adapter-runtime-boundary-contract.md", role: "contract" },
+    { path: "schemas/adapter-runtime-profile.schema.json", role: "schema" },
+    { path: "schemas/adapter-runtime-evidence.schema.json", role: "schema" },
+    { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
+    { path: "schemas/metrics-event.schema.json", role: "schema" },
+    ...args.selectedSkills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
+    ...args.requiredAssets.filter((path) => path.startsWith("schemas/") || path.endsWith("-contract.md")).map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : "contract" })),
+  ];
+  const adapterOwned = [
+    { path: "scripts/install-claude-adapter.mjs", role: "renderer" },
+    { path: "scripts/installer-lifecycle.mjs", role: "runtime_source" },
+    { path: "scripts/adapter-runtime-inventory.mjs", role: "inventory" },
+    { path: "adapters/claude-code/project/.claude/hooks/hooks.json", role: "hook_template" },
+    ...args.selectedCommands.map((command) => ({ path: `adapters/claude-code/project/.claude/commands/${command}`, role: "command_template" })),
+    ...CLAUDE_RUNTIME_FILES.map((file) => ({ path: `scripts/${file.name}`, role: "runtime_source" })),
+    { path: "docs/ai/observability-config.yml", role: "config_source" },
+    ...args.requiredAssets.filter((path) => !path.startsWith("schemas/") && !path.endsWith("-contract.md")).map((path) => ({ path, role: "config_source" })),
+    ...args.initialProjectStateAssets.map((path) => ({ path, role: "config_source" })),
+  ];
+  const dedupe = (items) => [...new Map(items.map((item) => [item.path, item])).values()].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
+  return { canonical: dedupe(canonical), adapter_owned: dedupe(adapterOwned) };
+}
+
 function normalizeHooks(hooks) {
   const normalized = [];
   for (const [eventName, groups] of Object.entries(hooks ?? {})) {
@@ -1187,9 +1216,11 @@ function main() {
   console.log("Privacy defaults: local project storage, no external publication, no raw prompt storage.");
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(`install-claude-adapter failed: ${error.message}`);
-  process.exit(1);
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    main();
+  } catch (error) {
+    console.error(`install-claude-adapter failed: ${error.message}`);
+    process.exit(1);
+  }
 }

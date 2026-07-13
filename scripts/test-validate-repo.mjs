@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
-import { REQUIRED_TRACEABILITY_SCENARIOS, inspectAdapterRuntimeProfile, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
+import { REQUIRED_TRACEABILITY_SCENARIOS, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -261,6 +261,8 @@ function writeAdapterFixture(root) {
     "schemas/metrics-event.schema.json",
     "schemas/execution-envelope.schema.json",
     "schemas/adapter-runtime-profile.schema.json",
+    "schemas/adapter-runtime-evidence.schema.json",
+    "schemas/normalized-event-schema-registry.json",
     "schemas/review-signal-gate-map.json",
     "schemas/adoption-report.schema.json",
     "schemas/improvement-ledger-entry.schema.json",
@@ -4563,6 +4565,32 @@ function assertSidecarAdapterInstructions() {
 
 try {
   const adapterProfileSchema = JSON.parse(readFileSync(resolve(repoRoot, "schemas/adapter-runtime-profile.schema.json"), "utf8"));
+  const adapterEvidenceSchema = JSON.parse(readFileSync(resolve(repoRoot, "schemas/adapter-runtime-evidence.schema.json"), "utf8"));
+  const adapterEvidenceFixture = JSON.parse(readFileSync(resolve(repoRoot, "docs/fixtures/adapter-runtime-evidence.json"), "utf8"));
+  assertSchemaPass("adapter evidence schema", adapterEvidenceSchema, adapterEvidenceFixture);
+  const adapterEvidenceIssues = inspectAdapterRuntimeEvidenceArtifact(adapterEvidenceFixture, { root: repoRoot });
+  if (adapterEvidenceIssues.length > 0) throw new Error(`adapter evidence fixture should pass\n${adapterEvidenceIssues.join("\n")}`);
+  const duplicateEvidenceArtifact = JSON.parse(JSON.stringify(adapterEvidenceFixture));
+  duplicateEvidenceArtifact.records.push(JSON.parse(JSON.stringify(duplicateEvidenceArtifact.records[0])));
+  const duplicateEvidenceIssues = inspectAdapterRuntimeEvidenceArtifact(duplicateEvidenceArtifact, { root: repoRoot });
+  if (!duplicateEvidenceIssues.some((issue) => issue.includes("evidence record_id must be unique"))) throw new Error(`duplicate evidence record should fail closed\n${duplicateEvidenceIssues.join("\n")}`);
+  const unregisteredBehaviorArtifact = JSON.parse(JSON.stringify(adapterEvidenceFixture));
+  const unregisteredBehaviorRecord = unregisteredBehaviorArtifact.records[0];
+  unregisteredBehaviorRecord.evidence_kind = "capability_fixture_result";
+  unregisteredBehaviorRecord.evidence_level = "behavior_verified";
+  unregisteredBehaviorRecord.verification = {
+    verifier_path: "scripts/test-validate-repo.mjs",
+    fixture_id: "forged-behavior-pass",
+    target_paths: ["scripts/install-claude-adapter.mjs"],
+    expected_result: "pass",
+    actual_result: "pass",
+    exit_status: 0,
+  };
+  const unregisteredBehaviorIssues = inspectAdapterRuntimeEvidenceArtifact(unregisteredBehaviorArtifact, { root: repoRoot });
+  if (!unregisteredBehaviorIssues.includes("claude-projection-manifest fixture_id is not registered: forged-behavior-pass")) throw new Error(`unregistered behavioral evidence should fail closed\n${unregisteredBehaviorIssues.join("\n")}`);
+  const incompleteBehaviorArtifact = JSON.parse(JSON.stringify(unregisteredBehaviorArtifact));
+  delete incompleteBehaviorArtifact.records[0].verification.fixture_id;
+  assertSchemaFail("behavior evidence missing fixture ID", adapterEvidenceSchema, incompleteBehaviorArtifact);
   const adapterProfileFixture = JSON.parse(readFileSync(resolve(repoRoot, "docs/fixtures/adapter-runtime-profiles.json"), "utf8"));
   for (const profile of adapterProfileFixture.profiles) {
     assertSchemaPass(`adapter profile schema ${profile.profile_id}`, adapterProfileSchema, profile);
@@ -4617,6 +4645,27 @@ try {
   if (!wrongEvidenceKindIssues.some((issue) => issue.includes("projected requires projection_manifest"))) {
     throw new Error(`wrong evidence kind should fail closed\n${wrongEvidenceKindIssues.join("\n")}`);
   }
+  for (const [role, label] of [["skill", "selected skill"], ["prompt_template", "adapter template"], ["inventory", "runtime inventory"]]) {
+    const staleRendererProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
+    const input = [...staleRendererProfile.rendering.renderer_inputs.canonical, ...staleRendererProfile.rendering.renderer_inputs.adapter_owned].find((candidate) => candidate.role === role);
+    const driftRoot = resolve(fixtureRoot, `adapter-renderer-drift-${role}`);
+    const validationPaths = new Set([
+      ...staleRendererProfile.rendering.renderer_inputs.canonical.map((candidate) => candidate.path),
+      ...staleRendererProfile.rendering.renderer_inputs.adapter_owned.map((candidate) => candidate.path),
+      ...staleRendererProfile.generated_assets.managed_assets.map((asset) => asset.inventory_source_ref),
+      ...staleRendererProfile.normalized_event_schema_refs,
+      "schemas/normalized-event-schema-registry.json",
+      "docs/fixtures/adapter-runtime-evidence.json",
+      ...adapterEvidenceFixture.records.flatMap((record) => record.observed_paths),
+    ]);
+    for (const path of validationPaths) {
+      mkdirSync(dirname(resolve(driftRoot, path)), { recursive: true });
+      writeFileSync(resolve(driftRoot, path), readFileSync(resolve(repoRoot, path)));
+    }
+    writeFileSync(resolve(driftRoot, input.path), `${readFileSync(resolve(driftRoot, input.path), "utf8")}\nfixture drift\n`);
+    const staleRendererIssues = inspectAdapterRuntimeProfile(staleRendererProfile, { root: driftRoot });
+    if (!staleRendererIssues.includes(`renderer input digest does not match: ${input.path}`)) throw new Error(`${label} drift should fail closed\n${staleRendererIssues.join("\n")}`);
+  }
   const missingRuntimeAssetProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[1]));
   missingRuntimeAssetProfile.generated_assets.managed_assets = missingRuntimeAssetProfile.generated_assets.managed_assets.filter((asset) => asset.path !== "scripts/codex-exec-runner.mjs");
   const missingRuntimeAssetIssues = inspectAdapterRuntimeProfile(missingRuntimeAssetProfile, { root: repoRoot });
@@ -4650,6 +4699,14 @@ try {
   if (!missingEventSchemaIssues.includes("enabled event_collection requires a normalized event schema ref")) {
     throw new Error(`enabled event collection without schema should fail closed\n${missingEventSchemaIssues.join("\n")}`);
   }
+  const wrongEventSchemaProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
+  wrongEventSchemaProfile.normalized_event_schema_refs = ["schemas/adapter-runtime-profile.schema.json"];
+  const wrongEventSchemaIssues = inspectAdapterRuntimeProfile(wrongEventSchemaProfile, { root: repoRoot });
+  if (!wrongEventSchemaIssues.includes("normalized event schema ref is not registered: schemas/adapter-runtime-profile.schema.json")) throw new Error(`non-event schema should fail registry validation\n${wrongEventSchemaIssues.join("\n")}`);
+  const eventSymlinkProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
+  eventSymlinkProfile.normalized_event_schema_refs = ["escape-link/schemas/metrics-event.schema.json"];
+  const eventSymlinkIssues = inspectAdapterRuntimeProfile(eventSymlinkProfile, { root: symlinkRoot });
+  if (!eventSymlinkIssues.some((issue) => issue.includes("normalized event schema ref is unsafe or traverses a symlink"))) throw new Error(`event schema symlink should fail closed\n${eventSymlinkIssues.join("\n")}`);
 
   const lifecycleFixture = JSON.parse(readFileSync(resolve(repoRoot, "docs/fixtures/lifecycle-artifact-chains.json"), "utf8"));
   for (const scenario of lifecycleFixture.scenarios) {

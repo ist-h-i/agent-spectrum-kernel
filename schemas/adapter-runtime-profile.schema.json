@@ -72,13 +72,51 @@
     "rendering": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["renderer_id", "renderer_version", "output_root", "asset_kinds", "deterministic_input_refs"],
+      "required": ["renderer_id", "renderer_version", "renderer_profile", "output_root", "asset_kinds", "deterministic_input_refs", "renderer_inputs"],
       "properties": {
         "renderer_id": { "type": "string", "minLength": 1 },
         "renderer_version": { "type": "string", "minLength": 1 },
+        "renderer_profile": { "type": "string", "minLength": 1 },
         "output_root": { "type": "string", "minLength": 1 },
         "asset_kinds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "enum": ["skills", "commands", "prompts", "hooks", "permissions", "runner", "schemas", "configuration", "runtime_data"] } },
-        "deterministic_input_refs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+        "deterministic_input_refs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "renderer_inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["canonical", "adapter_owned"],
+          "properties": {
+            "canonical": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "role", "digest"],
+                "properties": {
+                  "path": { "type": "string", "minLength": 1 },
+                  "role": { "type": "string", "enum": ["kernel", "manifest", "skill", "contract", "schema"] },
+                  "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+                }
+              }
+            },
+            "adapter_owned": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "role", "digest"],
+                "properties": {
+                  "path": { "type": "string", "minLength": 1 },
+                  "role": { "type": "string", "enum": ["renderer", "inventory", "command_template", "prompt_template", "hook_template", "runtime_source", "runtime_schema", "config_source"] },
+                  "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "generated_assets": {

@@ -854,6 +854,37 @@ function requiredAssetsForSkills(skills) {
   return [...assets].sort();
 }
 
+export function codexRendererInputPathsForProfile(profileName) {
+  const manifest = readManifest();
+  const resolvedProfile = resolveProfile(profileName, manifest);
+  const prompts = [...resolvedProfile.prompts];
+  const commands = [...resolvedProfile.commands];
+  const routingFixtures = routingFixturesForProfile(profileName, resolvedProfile.skills, prompts);
+  const skills = computeRequiredClosure(resolvedProfile.skills, prompts, routingFixtures).sort();
+  const requiredAssets = [...new Set([...requiredAssetsForPrompts(prompts), ...requiredAssetsForSkills(skills)])].sort();
+  const canonical = [
+    { path: "AGENTS.md", role: "kernel" },
+    { path: "manifest.json", role: "manifest" },
+    { path: "docs/adapter-runtime-boundary-contract.md", role: "contract" },
+    { path: "schemas/adapter-runtime-profile.schema.json", role: "schema" },
+    { path: "schemas/adapter-runtime-evidence.schema.json", role: "schema" },
+    { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
+    ...skills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
+    ...requiredAssets.map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : "contract" })),
+    ...CODEX_RUNTIME_FILES.filter((file) => file.assetKind === "schemas").map((file) => ({ path: file.source, role: "schema" })),
+  ];
+  const adapterOwned = [
+    { path: "scripts/install-codex-adapter.mjs", role: "renderer" },
+    { path: "scripts/installer-lifecycle.mjs", role: "runtime_source" },
+    { path: "scripts/adapter-runtime-inventory.mjs", role: "inventory" },
+    ...prompts.map((prompt) => ({ path: `adapters/codex/prompts/${prompt}`, role: "prompt_template" })),
+    ...commands.map((command) => ({ path: `adapters/codex/commands/${command}`, role: "command_template" })),
+    ...CODEX_RUNTIME_FILES.filter((file) => file.assetKind !== "schemas").map((file) => ({ path: file.source, role: "runtime_source" })),
+  ];
+  const dedupe = (items) => [...new Map(items.map((item) => [item.path, item])).values()].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
+  return { canonical: dedupe(canonical), adapter_owned: dedupe(adapterOwned) };
+}
+
 function recommendedSkillsForPrompts(prompts) {
   return prompts.flatMap((prompt) => PROMPT_METADATA[prompt]?.recommendedSkills ?? []);
 }
@@ -1369,9 +1400,11 @@ function main() {
   printPlan(args, plan);
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(`install-codex-adapter failed: ${error.message}`);
-  process.exit(1);
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    main();
+  } catch (error) {
+    console.error(`install-codex-adapter failed: ${error.message}`);
+    process.exit(1);
+  }
 }

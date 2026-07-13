@@ -5,6 +5,8 @@ import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ADAPTER_MANAGED_ASSET_REQUIREMENTS } from "./adapter-runtime-inventory.mjs";
 import { APPROVAL_REQUIRED_SURFACE_IDS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
+import { claudeRendererInputPathsForProfile } from "./install-claude-adapter.mjs";
+import { codexRendererInputPathsForProfile } from "./install-codex-adapter.mjs";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REQUIRED_SKILL_SIGNALS = [
@@ -41,6 +43,7 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/metrics-event.schema.json",
   "schemas/execution-envelope.schema.json",
   "schemas/adapter-runtime-profile.schema.json",
+  "schemas/adapter-runtime-evidence.schema.json",
   "schemas/review-signal-gate-map.json",
   "schemas/adoption-report.schema.json",
   "schemas/improvement-ledger-entry.schema.json",
@@ -57,6 +60,8 @@ const ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH = "docs/adapter-runtime-boundary-co
 const ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH = "schemas/adapter-runtime-profile.schema.json";
 const ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH = "docs/fixtures/adapter-runtime-profiles.json";
 const ADAPTER_RUNTIME_EVIDENCE_FIXTURE_PATH = "docs/fixtures/adapter-runtime-evidence.json";
+const ADAPTER_RUNTIME_EVIDENCE_SCHEMA_PATH = "schemas/adapter-runtime-evidence.schema.json";
+const NORMALIZED_EVENT_SCHEMA_REGISTRY_PATH = "schemas/normalized-event-schema-registry.json";
 const ADAPTER_RUNTIME_CAPABILITY_IDS = [
   "progressive_instruction_loading",
   "lifecycle_hooks",
@@ -78,6 +83,8 @@ const ADAPTER_RUNTIME_EVIDENCE_KIND_BY_LEVEL = {
   behavior_verified: "capability_fixture_result",
 };
 const SHA256_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
+const ADAPTER_RUNTIME_EVIDENCE_LEVEL_BY_KIND = Object.fromEntries(Object.entries(ADAPTER_RUNTIME_EVIDENCE_KIND_BY_LEVEL).map(([level, kind]) => [kind, level]));
+const ADAPTER_RUNTIME_VERIFIER_FIXTURES = new Map();
 const LIFECYCLE_ARTIFACT_CONTRACT_PATH = "docs/lifecycle-artifact-contract.md";
 const LIFECYCLE_ARTIFACT_FIXTURE_PATH = "docs/fixtures/lifecycle-artifact-chains.json";
 const LIFECYCLE_TRACEABILITY_CONTRACT_PATH = "docs/lifecycle-traceability-contract.md";
@@ -1267,6 +1274,60 @@ export function computeCanonicalSourceDigest(root, paths) {
   return computeProfilePathSetDigest(root, paths, { canonicalOnly: true });
 }
 
+export function inspectAdapterRuntimeEvidenceArtifact(artifact, { root = null } = {}) {
+  const issues = [];
+  const add = (message) => issues.push(message);
+  if (!root) return ["validation root is required"];
+  if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) return ["evidence artifact must be an object"];
+  if (artifact.schema_version !== "1.0.0") add("evidence artifact schema_version must be 1.0.0");
+  if (!Array.isArray(artifact.records) || artifact.records.length === 0) return [...issues, "evidence artifact records must be non-empty"];
+  const recordIds = artifact.records.map((record) => record?.record_id);
+  for (const duplicate of recordIds.filter((id, index) => id && recordIds.indexOf(id) !== index)) add(`evidence record_id must be unique: ${duplicate}`);
+  for (const record of artifact.records) {
+    const id = record?.record_id ?? "<missing>";
+    if (typeof record?.record_id !== "string" || record.record_id.trim() === "") add("evidence record_id must be non-empty");
+    if (typeof record?.adapter_id !== "string" || record.adapter_id.trim() === "") add(`${id} adapter_id must be non-empty`);
+    if (!Array.isArray(record?.capability_ids) || record.capability_ids.length === 0) add(`${id} capability_ids must be non-empty`);
+    const expectedLevel = ADAPTER_RUNTIME_EVIDENCE_LEVEL_BY_KIND[record?.evidence_kind];
+    if (!expectedLevel || record.evidence_level !== expectedLevel) add(`${id} evidence kind/level mapping is invalid`);
+    if (!["pass", "fail"].includes(record?.result)) add(`${id} result must be pass or fail`);
+    try {
+      const actualSubjectDigest = computeProfilePathSetDigest(root, record.observed_paths);
+      if (!SHA256_DIGEST_PATTERN.test(record.subject_digest ?? "") || record.subject_digest !== actualSubjectDigest) add(`${id} subject_digest does not match observed_paths`);
+    } catch (error) {
+      add(`${id} observed_paths are invalid: ${error.message}`);
+    }
+    if (record.evidence_kind === "projection_manifest") {
+      if (Object.hasOwn(record, "verification")) add(`${id} projection_manifest must not contain verification`);
+      continue;
+    }
+    const verification = record.verification;
+    if (!verification || typeof verification !== "object" || Array.isArray(verification)) {
+      add(`${id} ${record.evidence_kind} requires verification`);
+      continue;
+    }
+    const verifierPath = normalizedRelativeProfilePath(verification.verifier_path);
+    if (!verifierPath || profilePathHasSymlink(root, verifierPath) || !existsSync(resolve(root, verifierPath)) || !statSync(resolve(root, verifierPath)).isFile()) add(`${id} verifier_path is missing or unsafe`);
+    else if (!(record.observed_paths ?? []).includes(verifierPath)) add(`${id} verifier_path must be bound by observed_paths`);
+    if (!Array.isArray(verification.target_paths) || verification.target_paths.length === 0) add(`${id} verification target_paths must be non-empty`);
+    else {
+      for (const target of verification.target_paths) {
+        const path = normalizedRelativeProfilePath(target);
+        if (!path || profilePathHasSymlink(root, path) || !existsSync(resolve(root, path)) || !statSync(resolve(root, path)).isFile()) add(`${id} verification target is missing or unsafe: ${String(target)}`);
+        else if (!(record.observed_paths ?? []).includes(path)) add(`${id} verification target must be bound by observed_paths: ${path}`);
+      }
+    }
+    if (verification.expected_result !== "pass" || verification.actual_result !== "pass" || verification.exit_status !== 0 || record.result !== "pass") add(`${id} verification did not produce a passing result`);
+    const verifier = ADAPTER_RUNTIME_VERIFIER_FIXTURES.get(verification.fixture_id);
+    if (!verifier) add(`${id} fixture_id is not registered: ${String(verification.fixture_id)}`);
+    else {
+      const result = verifier({ root, record, verification });
+      if (result !== true) add(`${id} registered verifier failed: ${String(result)}`);
+    }
+  }
+  return [...new Set(issues)];
+}
+
 function evidenceRecordFor(root, adapterId, capability, reference, add) {
   const id = capability.capability_id ?? "<missing>";
   const path = normalizedRelativeProfilePath(reference?.artifact_ref);
@@ -1295,6 +1356,7 @@ function evidenceRecordFor(root, adapterId, capability, reference, add) {
     add(`${id} evidence artifact is not valid JSON: ${path}`);
     return null;
   }
+  for (const issue of inspectAdapterRuntimeEvidenceArtifact(artifact, { root })) add(`${id} evidence artifact invalid: ${issue}`);
   const record = (artifact.records ?? []).find((candidate) => candidate.record_id === reference.record_id);
   if (!record) {
     add(`${id} evidence record is missing: ${reference.record_id ?? "<missing>"}`);
@@ -1316,6 +1378,59 @@ function evidenceRecordFor(root, adapterId, capability, reference, add) {
     add(`${id} evidence record ${record.record_id} has invalid observed_paths: ${error.message}`);
   }
   return record;
+}
+
+function expectedRendererInputClosure(profile) {
+  if (profile.adapter_id === "claude_code") return claudeRendererInputPathsForProfile(profile.rendering?.renderer_profile);
+  if (profile.adapter_id === "codex") return codexRendererInputPathsForProfile(profile.rendering?.renderer_profile);
+  return null;
+}
+
+function inspectRendererInputGroup(root, groupName, actual, expected, add) {
+  if (!Array.isArray(actual) || actual.length === 0) {
+    add(`rendering.renderer_inputs.${groupName} must be non-empty`);
+    return;
+  }
+  const actualKeys = actual.map((input) => `${input?.path}\0${input?.role}`);
+  const expectedKeys = expected.map((input) => `${input.path}\0${input.role}`);
+  if (new Set(actualKeys).size !== actualKeys.length) add(`rendering.renderer_inputs.${groupName} paths/roles must be unique`);
+  for (const expectedKey of expectedKeys) if (!actualKeys.includes(expectedKey)) add(`rendering.renderer_inputs.${groupName} is missing ${expectedKey.replace("\0", " (")})`);
+  for (const actualKey of actualKeys) if (!expectedKeys.includes(actualKey)) add(`rendering.renderer_inputs.${groupName} has unexpected input ${actualKey.replace("\0", " (")})`);
+  for (const input of actual) {
+    const path = normalizedRelativeProfilePath(input?.path);
+    if (!path || profilePathHasSymlink(root, path)) {
+      add(`renderer input path is unsafe or traverses a symlink: ${String(input?.path)}`);
+      continue;
+    }
+    const absolutePath = resolve(root, path);
+    if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) {
+      add(`renderer input is missing: ${path}`);
+      continue;
+    }
+    const actualDigest = sha256Bytes(readFileSync(absolutePath));
+    if (!SHA256_DIGEST_PATTERN.test(input?.digest ?? "") || input.digest !== actualDigest) add(`renderer input digest does not match: ${path}`);
+  }
+}
+
+function normalizedEventSchemaIssue(root, reference) {
+  const path = normalizedRelativeProfilePath(reference);
+  if (!path || profilePathHasSymlink(root, path)) return `normalized event schema ref is unsafe or traverses a symlink: ${String(reference)}`;
+  const absolutePath = resolve(root, path);
+  if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) return `normalized event schema ref is missing or not a regular file: ${path}`;
+  const registryPath = resolve(root, NORMALIZED_EVENT_SCHEMA_REGISTRY_PATH);
+  if (!existsSync(registryPath) || profilePathHasSymlink(root, NORMALIZED_EVENT_SCHEMA_REGISTRY_PATH) || !statSync(registryPath).isFile()) return "normalized event schema registry is missing or unsafe";
+  let registry;
+  let schema;
+  try {
+    registry = JSON.parse(readFileSync(registryPath, "utf8"));
+    schema = JSON.parse(readFileSync(absolutePath, "utf8"));
+  } catch {
+    return `normalized event schema or registry is invalid JSON: ${path}`;
+  }
+  const entry = (registry.schemas ?? []).find((candidate) => candidate.path === path);
+  if (!entry) return `normalized event schema ref is not registered: ${path}`;
+  if (typeof schema.$id !== "string" || schema.$id !== entry.$id) return `normalized event schema $id does not match registry: ${path}`;
+  return null;
 }
 
 export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
@@ -1399,13 +1514,26 @@ export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
   if (!rendering || typeof rendering !== "object" || Array.isArray(rendering)) {
     add("rendering must be an object");
   } else {
-    for (const field of ["renderer_id", "renderer_version", "output_root"]) {
+    for (const field of ["renderer_id", "renderer_version", "renderer_profile", "output_root"]) {
       if (typeof rendering[field] !== "string" || rendering[field].trim() === "") add(`rendering.${field} must be a non-empty string`);
     }
     if (!Array.isArray(rendering.asset_kinds) || rendering.asset_kinds.length === 0) add("rendering.asset_kinds must be non-empty");
     if (!normalizedRelativeProfilePath(rendering.output_root, { allowDot: true })) add("rendering.output_root is unsafe or non-normalized");
-    for (const ref of ["canonical_contract.revision", "canonical_contract.source_digest", "profile_id"]) {
+    for (const ref of ["canonical_contract.revision", "canonical_contract.source_digest", "profile_id", "rendering.renderer_inputs"]) {
       if (!Array.isArray(rendering.deterministic_input_refs) || !rendering.deterministic_input_refs.includes(ref)) add(`rendering.deterministic_input_refs must include ${ref}`);
+    }
+    let expectedInputs = null;
+    try {
+      expectedInputs = expectedRendererInputClosure(profile);
+    } catch (error) {
+      add(`renderer_profile cannot resolve input closure: ${error.message}`);
+    }
+    if (!expectedInputs) add(`adapter has no renderer input closure: ${profile.adapter_id}`);
+    else {
+      inspectRendererInputGroup(root, "canonical", rendering.renderer_inputs?.canonical, expectedInputs.canonical, add);
+      inspectRendererInputGroup(root, "adapter_owned", rendering.renderer_inputs?.adapter_owned, expectedInputs.adapter_owned, add);
+      const canonicalInputPaths = (rendering.renderer_inputs?.canonical ?? []).map((input) => input.path);
+      if (JSON.stringify(canonical?.source_paths ?? []) !== JSON.stringify(canonicalInputPaths)) add("canonical_contract.source_paths must exactly match canonical renderer input paths");
     }
   }
 
@@ -1460,8 +1588,8 @@ export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
   else {
     if (privacy?.event_collection !== "disabled" && profile.normalized_event_schema_refs.length === 0) add("enabled event_collection requires a normalized event schema ref");
     for (const reference of profile.normalized_event_schema_refs) {
-      const path = normalizedRelativeProfilePath(reference);
-      if (!path || !path.startsWith("schemas/") || !existsSync(resolve(root, path))) add(`normalized event schema ref is missing or non-canonical: ${String(reference)}`);
+      const issue = normalizedEventSchemaIssue(root, reference);
+      if (issue) add(issue);
     }
   }
   return issues;
@@ -1469,14 +1597,18 @@ export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
 
 function validateAdapterRuntimeProfileContract(root, manifest, errors) {
   const active = manifest?.name === "agent-spectrum-kernel";
-  const checks = { active, contractPresent: false, schemaPresent: false, fixturePresent: false, evidenceFixturePresent: false, requiredAdaptersPresent: false, profiles: [] };
+  const checks = { active, contractPresent: false, schemaPresent: false, evidenceSchemaPresent: false, eventSchemaRegistryPresent: false, fixturePresent: false, evidenceFixturePresent: false, requiredAdaptersPresent: false, profiles: [] };
   if (!active) return checks;
   checks.contractPresent = existsSync(resolve(root, ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH));
   checks.schemaPresent = existsSync(resolve(root, ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH));
+  checks.evidenceSchemaPresent = existsSync(resolve(root, ADAPTER_RUNTIME_EVIDENCE_SCHEMA_PATH));
+  checks.eventSchemaRegistryPresent = existsSync(resolve(root, NORMALIZED_EVENT_SCHEMA_REGISTRY_PATH));
   checks.fixturePresent = existsSync(resolve(root, ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH));
   checks.evidenceFixturePresent = existsSync(resolve(root, ADAPTER_RUNTIME_EVIDENCE_FIXTURE_PATH));
   if (!checks.contractPresent) fail(errors, "adapter runtime profile", `contract is missing: ${ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH}`);
   if (!checks.schemaPresent) fail(errors, "adapter runtime profile", `schema is missing: ${ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH}`);
+  if (!checks.evidenceSchemaPresent) fail(errors, "adapter runtime profile", `schema is missing: ${ADAPTER_RUNTIME_EVIDENCE_SCHEMA_PATH}`);
+  if (!checks.eventSchemaRegistryPresent) fail(errors, "adapter runtime profile", `registry is missing: ${NORMALIZED_EVENT_SCHEMA_REGISTRY_PATH}`);
   if (!checks.fixturePresent) fail(errors, "adapter runtime profile", `fixture is missing: ${ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH}`);
   if (!checks.evidenceFixturePresent) fail(errors, "adapter runtime profile", `evidence fixture is missing: ${ADAPTER_RUNTIME_EVIDENCE_FIXTURE_PATH}`);
   if (!manifest.docs?.includes(ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH) || !manifest.docs?.includes(ADAPTER_RUNTIME_PROFILE_FIXTURE_PATH) || !manifest.docs?.includes(ADAPTER_RUNTIME_EVIDENCE_FIXTURE_PATH)) {
@@ -1484,6 +1616,9 @@ function validateAdapterRuntimeProfileContract(root, manifest, errors) {
   }
   if (!manifest.schemas?.includes(ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH)) {
     fail(errors, "adapter runtime profile", `manifest.json.schemas must list ${ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH}`);
+  }
+  if (!manifest.schemas?.includes(ADAPTER_RUNTIME_EVIDENCE_SCHEMA_PATH) || !manifest.schemas?.includes(NORMALIZED_EVENT_SCHEMA_REGISTRY_PATH)) {
+    fail(errors, "adapter runtime profile", "manifest.json.schemas must list the evidence schema and normalized event schema registry");
   }
   if (checks.contractPresent) {
     const contract = readFileSync(resolve(root, ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH), "utf8");
@@ -1522,6 +1657,14 @@ function validateAdapterRuntimeProfileContract(root, manifest, errors) {
       }
     } catch (error) {
       fail(errors, "adapter runtime profile", `fixture is invalid JSON: ${error.message}`);
+    }
+  }
+  if (checks.evidenceFixturePresent) {
+    try {
+      const artifact = JSON.parse(readFileSync(resolve(root, ADAPTER_RUNTIME_EVIDENCE_FIXTURE_PATH), "utf8"));
+      for (const issue of inspectAdapterRuntimeEvidenceArtifact(artifact, { root })) fail(errors, "adapter runtime evidence", issue);
+    } catch (error) {
+      fail(errors, "adapter runtime evidence", `fixture is invalid JSON: ${error.message}`);
     }
   }
   return checks;
@@ -3560,7 +3703,8 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     "## Adapter runtime profile checks",
     "",
     `- canonical boundary contract: ${adapterRuntimeProfileChecks.contractPresent ? "ok" : "missing"}`,
-    `- machine-readable schema: ${adapterRuntimeProfileChecks.schemaPresent ? "ok" : "missing"}`,
+    `- machine-readable profile/evidence schemas: ${adapterRuntimeProfileChecks.schemaPresent && adapterRuntimeProfileChecks.evidenceSchemaPresent ? "ok" : "missing"}`,
+    `- normalized event schema registry: ${adapterRuntimeProfileChecks.eventSchemaRegistryPresent ? "ok" : "missing"}`,
     `- required adapter fixtures: ${adapterRuntimeProfileChecks.fixturePresent && adapterRuntimeProfileChecks.evidenceFixturePresent && adapterRuntimeProfileChecks.requiredAdaptersPresent && adapterRuntimeProfileChecks.profiles.every((profile) => profile.ok) ? "ok" : "invalid"}`,
     "",
     "## Lifecycle artifact contract checks",
