@@ -4049,7 +4049,7 @@ EOF
       if (existsSync(invocationMarker)) throw new Error(`${name} must fail before invoking Codex`);
       if (checkDoctor) {
         const doctorResult = runRepoScript([doctorScript, "--target", target, "--runtime-probe", "--json"]);
-        if (doctorResult.error || ![0, 1].includes(doctorResult.status)) throw new Error(`${name} doctor did not produce a report\n${doctorResult.stdout}\n${doctorResult.stderr}`);
+        assertRuntimeFail(`${name} doctor`, doctorResult, expectedFailure);
         const doctorReport = JSON.parse(doctorResult.stdout);
         if (
           !doctorReport.runtimeProbe?.failures?.includes(expectedFailure) ||

@@ -553,6 +553,11 @@ function buildLayerStatuses(target, report, { runtimeProbe }) {
         projectionFailures.push(`missing selected skill: ${skillsRoot}/${skill}/SKILL.md`);
       }
     }
+    if (installerName === "agent-spectrum-codex-adapter") {
+      for (const finding of inspectCodexDiscoverySkillAssets(target, state)) {
+        projectionFailures.push(`Codex discovery skill ${finding.status}: ${finding.path}`);
+      }
+    }
   }
 
   if (report.warnings.length > 0) {
@@ -987,7 +992,7 @@ try {
   }
   const report = buildDoctorReport(args.target, { runtimeProbe: args.runtimeProbe });
   printReport(args.target, report, { json: args.json });
-  process.exit(report.status === "fail" ? 1 : 0);
+  process.exitCode = report.status === "fail" ? 1 : 0;
 } catch (error) {
   console.error(`ASK doctor failed: ${error.message}`);
   process.exit(1);
