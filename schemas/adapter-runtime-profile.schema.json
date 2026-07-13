@@ -73,11 +73,31 @@
     "rendering": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["renderer_id", "renderer_version", "renderer_profile", "output_root", "asset_kinds", "deterministic_input_refs", "renderer_inputs", "lifecycle_apply_contract"],
+      "required": ["renderer_id", "renderer_version", "renderer_profile", "plan_shaping_options", "output_root", "asset_kinds", "deterministic_input_refs", "renderer_inputs", "lifecycle_apply_contract"],
       "properties": {
         "renderer_id": { "type": "string", "minLength": 1 },
         "renderer_version": { "type": "string", "minLength": 1 },
         "renderer_profile": { "type": "string", "minLength": 1 },
+        "plan_shaping_options": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["skills"],
+          "properties": {
+            "skills": { "type": ["array", "null"], "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+            "skip_hooks": { "type": "boolean" },
+            "skip_runtime": { "type": "boolean" },
+            "skip_prompts": { "type": "boolean" },
+            "skip_command": { "type": "boolean" }
+          },
+          "allOf": [
+            {
+              "oneOf": [
+                { "required": ["skip_hooks", "skip_runtime"], "not": { "anyOf": [{ "required": ["skip_prompts"] }, { "required": ["skip_command"] }] } },
+                { "required": ["skip_prompts", "skip_command"], "not": { "anyOf": [{ "required": ["skip_hooks"] }, { "required": ["skip_runtime"] }] } }
+              ]
+            }
+          ]
+        },
         "output_root": { "type": "string", "minLength": 1 },
         "asset_kinds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "enum": ["skills", "commands", "prompts", "hooks", "permissions", "runner", "schemas", "configuration", "runtime_data"] } },
         "deterministic_input_refs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },

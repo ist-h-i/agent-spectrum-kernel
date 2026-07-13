@@ -857,6 +857,18 @@ function readCodexInstallState(target) {
   return JSON.parse(readFileSync(resolve(target, ".agent-spectrum-kernel/codex-install-state.json"), "utf8"));
 }
 
+function assertActualInventoryMatchesState(name, state) {
+  const expectedPaths = [
+    ...Object.keys(state.managed_files ?? {}),
+    ...Object.keys(state.managed_partial_files ?? {}),
+    ...(state.runtime_directories ?? []),
+  ].sort();
+  const actualPaths = (state.actual_installed_inventory ?? []).map((asset) => asset.path).sort();
+  if (JSON.stringify(actualPaths) !== JSON.stringify(expectedPaths)) {
+    throw new Error(`${name} actual inventory must exactly match lifecycle state\nexpected: ${JSON.stringify(expectedPaths)}\nactual: ${JSON.stringify(actualPaths)}`);
+  }
+}
+
 function installedSkillDirectories(target, relativeRoot) {
   const root = resolve(target, relativeRoot);
   return existsSync(root)
@@ -2749,6 +2761,50 @@ function assertInstallerScripts() {
     }
   }
 
+  const claudeInventoryTransitionTarget = resolve(fixtureRoot, "install-claude-full-to-review-no-prune");
+  assertRuntimePass("Claude inventory transition core setup", runRepoScript([coreInstaller, "--target", claudeInventoryTransitionTarget]));
+  assertRuntimePass("Claude inventory transition full setup", runRepoScript([installer, "--target", claudeInventoryTransitionTarget, "--profile", "full"]));
+  const claudeFullState = JSON.parse(readFileSync(resolve(claudeInventoryTransitionTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  assertRuntimePass("Claude inventory transition review", runRepoScript([installer, "--target", claudeInventoryTransitionTarget, "--profile", "review"]));
+  const claudeReviewState = JSON.parse(readFileSync(resolve(claudeInventoryTransitionTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  assertActualInventoryMatchesState("Claude full to review no-prune", claudeReviewState);
+  if (!(claudeReviewState.retained_stale_files ?? []).length || !(claudeReviewState.actual_installed_inventory ?? []).some((asset) => asset.retained_stale === true)) {
+    throw new Error(`Claude full to review must expose retained stale ownership\n${JSON.stringify(claudeReviewState, null, 2)}`);
+  }
+  if (claudeReviewState.projection_plan?.fingerprint === claudeFullState.projection_plan?.fingerprint) {
+    throw new Error("Claude profile transition must change pure projection fingerprint");
+  }
+
+  const claudeDefaultProjectionTarget = resolve(fixtureRoot, "install-claude-default-projection");
+  assertRuntimePass("Claude default projection core setup", runRepoScript([coreInstaller, "--target", claudeDefaultProjectionTarget]));
+  assertRuntimePass("Claude default projection install", runRepoScript([installer, "--target", claudeDefaultProjectionTarget, "--profile", "observability"]));
+  const claudeDefaultProjectionState = JSON.parse(readFileSync(resolve(claudeDefaultProjectionTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  const claudeSkipRuntimeState = JSON.parse(readFileSync(resolve(noRuntimeTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  if (
+    claudeDefaultProjectionState.projection_plan?.fingerprint === claudeSkipRuntimeState.projection_plan?.fingerprint ||
+    (claudeSkipRuntimeState.projection_plan?.renderer_inputs?.adapter_owned ?? []).some((input) => input.path === "scripts/ai-metrics-record.mjs") ||
+    (claudeSkipRuntimeState.projection_plan?.projected_managed_assets ?? []).some((asset) => asset.path === "scripts/ai-metrics-record.mjs")
+  ) {
+    throw new Error("Claude --skip-runtime must change projection identity, input closure, and projected inventory");
+  }
+
+  const staleRevisionState = { ...claudeDefaultProjectionState, source: { ...claudeDefaultProjectionState.source, git_revision: "0".repeat(40) }, last_applied_provenance: { ...claudeDefaultProjectionState.last_applied_provenance, source_revision: "0".repeat(40), fingerprint: `sha256:${"0".repeat(64)}` } };
+  writeFileSync(resolve(claudeDefaultProjectionTarget, ".agent-spectrum-kernel/claude-install-state.json"), `${JSON.stringify(staleRevisionState, null, 2)}\n`);
+  assertRuntimePass("Claude provenance revision refresh", runRepoScript([installer, "--target", claudeDefaultProjectionTarget, "--profile", "observability"]));
+  const revisionRefreshedState = JSON.parse(readFileSync(resolve(claudeDefaultProjectionTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  if (revisionRefreshedState.last_applied_provenance?.fingerprint === `sha256:${"0".repeat(64)}` || revisionRefreshedState.last_applied_provenance?.source_revision === "0".repeat(40)) {
+    throw new Error(`Claude rerun must persist refreshed source provenance\n${JSON.stringify(revisionRefreshedState.last_applied_provenance, null, 2)}`);
+  }
+  const settingsPathForProvenance = resolve(claudeDefaultProjectionTarget, ".claude/settings.json");
+  const settingsForProvenance = JSON.parse(readFileSync(settingsPathForProvenance, "utf8"));
+  settingsForProvenance.hooks.Stop.push({ matcher: "TargetOwned", hooks: [{ type: "command", command: "echo target-owned" }] });
+  writeFileSync(settingsPathForProvenance, `${JSON.stringify(settingsForProvenance, null, 2)}\n`);
+  assertRuntimePass("Claude provenance target hook refresh", runRepoScript([installer, "--target", claudeDefaultProjectionTarget, "--profile", "observability"]));
+  const hookRefreshedState = JSON.parse(readFileSync(resolve(claudeDefaultProjectionTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  if (hookRefreshedState.last_applied_provenance?.target_partial_file_state_digest === revisionRefreshedState.last_applied_provenance?.target_partial_file_state_digest) {
+    throw new Error("Claude rerun must persist target-owned hook provenance changes");
+  }
+
   const missingCoreTarget = resolve(fixtureRoot, "install-missing-core-target");
   assertRuntimeFail(
     "installer missing core",
@@ -3158,12 +3214,16 @@ function assertCodexInstallerScripts() {
   assertRuntimePass("core check after Codex ownership transition", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget, "--check"]));
 
   const beforeRerunAgents = readFileSync(resolve(freshTarget, "AGENTS.md"), "utf8");
-  const beforeRerunState = readFileSync(resolve(freshTarget, ".agent-spectrum-kernel/codex-install-state.json"), "utf8");
+  const beforeRerunState = readCodexInstallState(freshTarget);
   assertRuntimePass("codex installer rerun", runRepoScript([installer, "--target", freshTarget]));
   const afterRerunAgents = readFileSync(resolve(freshTarget, "AGENTS.md"), "utf8");
-  const afterRerunState = readFileSync(resolve(freshTarget, ".agent-spectrum-kernel/codex-install-state.json"), "utf8");
-  if (afterRerunAgents !== beforeRerunAgents || afterRerunState !== beforeRerunState) {
-    throw new Error("codex installer rerun should be idempotent when source did not change");
+  const afterRerunState = readCodexInstallState(freshTarget);
+  if (
+    afterRerunAgents !== beforeRerunAgents ||
+    JSON.stringify(afterRerunState.managed_files) !== JSON.stringify(beforeRerunState.managed_files) ||
+    afterRerunState.last_changed_provenance?.fingerprint !== beforeRerunState.last_changed_provenance?.fingerprint
+  ) {
+    throw new Error("codex installer rerun should preserve managed bytes and last-changed provenance when source did not change");
   }
   if ((afterRerunAgents.match(markerPattern) ?? []).length !== 1) {
     throw new Error(`codex installer should not duplicate managed AGENTS blocks\n${afterRerunAgents}`);
@@ -3233,6 +3293,34 @@ function assertCodexInstallerScripts() {
   const codexStalePlaneState = readCodexInstallState(codexStalePlaneTarget);
   if (JSON.stringify(codexStalePlaneState.selected_planes) !== JSON.stringify(["execution", "control"]) || JSON.stringify(codexStalePlaneState.installed_planes) !== JSON.stringify(["execution", "knowledge", "control"])) {
     throw new Error(`Codex selected/installed planes must distinguish retained stale skills\n${JSON.stringify(codexStalePlaneState, null, 2)}`);
+  }
+
+  const codexInventoryTransitionTarget = resolve(fixtureRoot, "codex-install-review-to-implementation-no-prune");
+  assertRuntimePass("Codex inventory transition core setup", runRepoScript([coreInstaller, "--target", codexInventoryTransitionTarget]));
+  assertRuntimePass("Codex inventory transition review setup", runRepoScript([installer, "--target", codexInventoryTransitionTarget, "--profile", "review"]));
+  const codexReviewProjectionState = readCodexInstallState(codexInventoryTransitionTarget);
+  assertRuntimePass("Codex inventory transition implementation", runRepoScript([installer, "--target", codexInventoryTransitionTarget, "--profile", "implementation"]));
+  const codexImplementationTransitionState = readCodexInstallState(codexInventoryTransitionTarget);
+  assertActualInventoryMatchesState("Codex review to implementation no-prune", codexImplementationTransitionState);
+  if (!(codexImplementationTransitionState.actual_installed_inventory ?? []).some((asset) => asset.retained_stale === true)) {
+    throw new Error(`Codex review to implementation must expose retained stale ownership\n${JSON.stringify(codexImplementationTransitionState, null, 2)}`);
+  }
+  if (codexReviewProjectionState.projection_plan?.fingerprint === codexImplementationTransitionState.projection_plan?.fingerprint) {
+    throw new Error("Codex profile transition must change pure projection fingerprint");
+  }
+
+  const codexOptionTarget = resolve(fixtureRoot, "codex-install-option-provenance");
+  assertRuntimePass("Codex option provenance core setup", runRepoScript([coreInstaller, "--target", codexOptionTarget]));
+  assertRuntimePass("Codex option provenance default", runRepoScript([installer, "--target", codexOptionTarget, "--profile", "implementation"]));
+  const codexDefaultOptionState = readCodexInstallState(codexOptionTarget);
+  assertRuntimePass("Codex option provenance skip prompts", runRepoScript([installer, "--target", codexOptionTarget, "--profile", "implementation", "--skip-prompts"]));
+  const codexSkipPromptState = readCodexInstallState(codexOptionTarget);
+  if (
+    codexDefaultOptionState.projection_plan?.fingerprint === codexSkipPromptState.projection_plan?.fingerprint ||
+    (codexSkipPromptState.projection_plan?.renderer_inputs?.adapter_owned ?? []).some((input) => input.role === "prompt_template") ||
+    (codexSkipPromptState.projection_plan?.projected_managed_assets ?? []).some((asset) => asset.asset_kind === "prompts")
+  ) {
+    throw new Error("Codex --skip-prompts must change projection identity, input closure, and projected inventory");
   }
 
   for (const sourceProfile of ["organizational", "full"]) {
@@ -4663,6 +4751,13 @@ try {
     wrongRendererProfile.profile_fingerprint = computeAdapterProfileFingerprint(wrongRendererProfile);
     const wrongRendererIssues = inspectAdapterRuntimeProfile(wrongRendererProfile, { root: repoRoot });
     if (!wrongRendererIssues.some((issue) => issue.includes(`${field} must match adapter registry`))) throw new Error(`${field} mismatch should fail closed\n${wrongRendererIssues.join("\n")}`);
+  }
+  const nonDefaultStaticEvidenceProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
+  nonDefaultStaticEvidenceProfile.rendering.plan_shaping_options.skip_runtime = true;
+  nonDefaultStaticEvidenceProfile.profile_fingerprint = computeAdapterProfileFingerprint(nonDefaultStaticEvidenceProfile);
+  const nonDefaultStaticEvidenceIssues = inspectAdapterRuntimeProfile(nonDefaultStaticEvidenceProfile, { root: repoRoot });
+  if (!nonDefaultStaticEvidenceIssues.includes("plan_shaping_options must match the static profile evidence projection")) {
+    throw new Error(`static projection evidence must reject non-default plan options\n${nonDefaultStaticEvidenceIssues.join("\n")}`);
   }
   const appliedProvenance = {
     cli_options: { profile: "observability", skip_hooks: false, skip_runtime: false },

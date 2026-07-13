@@ -5,8 +5,8 @@ import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ADAPTER_RENDERER_METADATA } from "./adapter-runtime-inventory.mjs";
 import { APPROVAL_REQUIRED_SURFACE_IDS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
-import { claudeManagedAssetsForProfile, claudeRendererInputPathsForProfile } from "./install-claude-adapter.mjs";
-import { codexManagedAssetsForProfile, codexRendererInputPathsForProfile } from "./install-codex-adapter.mjs";
+import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
+import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REQUIRED_SKILL_SIGNALS = [
@@ -86,8 +86,8 @@ const SHA256_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const ADAPTER_RUNTIME_EVIDENCE_LEVEL_BY_KIND = Object.fromEntries(Object.entries(ADAPTER_RUNTIME_EVIDENCE_KIND_BY_LEVEL).map(([level, kind]) => [kind, level]));
 const ADAPTER_RUNTIME_VERIFIER_FIXTURES = new Map();
 const ADAPTER_RUNTIME_RENDERER_REGISTRY = Object.freeze({
-  claude_code: Object.freeze({ ...ADAPTER_RENDERER_METADATA.claude_code, resolveInputs: claudeRendererInputPathsForProfile, resolveManagedAssets: claudeManagedAssetsForProfile }),
-  codex: Object.freeze({ ...ADAPTER_RENDERER_METADATA.codex, resolveInputs: codexRendererInputPathsForProfile, resolveManagedAssets: codexManagedAssetsForProfile }),
+  claude_code: Object.freeze({ ...ADAPTER_RENDERER_METADATA.claude_code, resolvePlan: (profile) => buildClaudeProjectionPlan({ profileName: profile }) }),
+  codex: Object.freeze({ ...ADAPTER_RENDERER_METADATA.codex, resolvePlan: (profile) => buildCodexProjectionPlan({ profileName: profile }) }),
 });
 const LIFECYCLE_ARTIFACT_CONTRACT_PATH = "docs/lifecycle-artifact-contract.md";
 const LIFECYCLE_ARTIFACT_FIXTURE_PATH = "docs/fixtures/lifecycle-artifact-chains.json";
@@ -1263,6 +1263,7 @@ export function computeAdapterProfileFingerprint(profile) {
     renderer_id: profile?.rendering?.renderer_id ?? null,
     renderer_version: profile?.rendering?.renderer_version ?? null,
     renderer_profile: profile?.rendering?.renderer_profile ?? null,
+    plan_shaping_options: profile?.rendering?.plan_shaping_options ?? null,
     renderer_inputs_digest: sha256CanonicalValue(profile?.rendering?.renderer_inputs ?? null),
     managed_inventory_digest: sha256CanonicalValue(profile?.generated_assets?.managed_assets ?? null),
   });
@@ -1425,7 +1426,7 @@ function evidenceRecordFor(root, profile, capability, reference, add) {
 
 function expectedRendererInputClosure(profile) {
   const registry = ADAPTER_RUNTIME_RENDERER_REGISTRY[profile.adapter_id];
-  return registry ? registry.resolveInputs(profile.rendering?.renderer_profile) : null;
+  return registry ? registry.resolvePlan(profile.rendering?.renderer_profile).renderer_inputs : null;
 }
 
 function inspectRendererInputGroup(root, groupName, actual, expected, add) {
@@ -1566,8 +1567,14 @@ export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
     else {
       if (rendering.renderer_id !== rendererRegistration.rendererId) add(`renderer_id must match adapter registry: ${rendererRegistration.rendererId}`);
       if (rendering.renderer_version !== rendererRegistration.rendererVersion) add(`renderer_version must match adapter registry: ${rendererRegistration.rendererVersion}`);
+      try {
+        const defaultPlan = rendererRegistration.resolvePlan(rendering.renderer_profile);
+        if (stableCanonicalJson(rendering.plan_shaping_options ?? null) !== stableCanonicalJson(defaultPlan.plan_shaping_options)) add("plan_shaping_options must match the static profile evidence projection");
+      } catch (error) {
+        add(`renderer_profile cannot resolve plan-shaping options: ${error.message}`);
+      }
     }
-    for (const ref of ["canonical_contract.revision", "canonical_contract.source_digest", "profile_id", "rendering.renderer_inputs"]) {
+    for (const ref of ["canonical_contract.revision", "canonical_contract.source_digest", "profile_id", "rendering.plan_shaping_options", "rendering.renderer_inputs"]) {
       if (!Array.isArray(rendering.deterministic_input_refs) || !rendering.deterministic_input_refs.includes(ref)) add(`rendering.deterministic_input_refs must include ${ref}`);
     }
     let expectedInputs = null;
@@ -1616,7 +1623,7 @@ export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
       }
       let expectedAssets = [];
       try {
-        expectedAssets = ADAPTER_RUNTIME_RENDERER_REGISTRY[profile.adapter_id]?.resolveManagedAssets(rendering?.renderer_profile) ?? [];
+        expectedAssets = ADAPTER_RUNTIME_RENDERER_REGISTRY[profile.adapter_id]?.resolvePlan(rendering?.renderer_profile)?.projectedManagedAssets ?? [];
       } catch (error) {
         add(`renderer_profile cannot resolve managed asset inventory: ${error.message}`);
       }

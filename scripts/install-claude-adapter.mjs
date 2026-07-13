@@ -940,9 +940,7 @@ function resolveSelection(args) {
   args.routerReachableSkills = skillsForRoutingFixtures(routingFixtures);
 }
 
-export function claudeRendererInputPathsForProfile(profileName) {
-  const args = { profile: profileName, skills: null };
-  resolveSelection(args);
+function claudeRendererInputsForSelection(args, { skipHooks, skipRuntime }) {
   const canonical = [
     { path: "AGENTS.md", role: "kernel" },
     { path: "manifest.json", role: "manifest" },
@@ -958,10 +956,10 @@ export function claudeRendererInputPathsForProfile(profileName) {
     { path: "scripts/install-claude-adapter.mjs", role: "renderer" },
     { path: "scripts/installer-lifecycle.mjs", role: "runtime_source" },
     { path: "scripts/adapter-runtime-inventory.mjs", role: "inventory" },
-    { path: "adapters/claude-code/project/.claude/hooks/hooks.json", role: "hook_template" },
+    ...(!skipHooks && !skipRuntime ? [{ path: "adapters/claude-code/project/.claude/hooks/hooks.json", role: "hook_template" }] : []),
     ...args.selectedCommands.map((command) => ({ path: `adapters/claude-code/project/.claude/commands/${command}`, role: "command_template" })),
-    ...CLAUDE_RUNTIME_FILES.map((file) => ({ path: `scripts/${file.name}`, role: "runtime_source" })),
-    { path: "docs/ai/observability-config.yml", role: "config_source" },
+    ...(!skipRuntime ? CLAUDE_RUNTIME_FILES.map((file) => ({ path: `scripts/${file.name}`, role: "runtime_source" })) : []),
+    ...(!skipRuntime ? [{ path: "docs/ai/observability-config.yml", role: "config_source" }] : []),
     ...args.requiredAssets.filter((path) => !path.startsWith("schemas/") && !path.endsWith("-contract.md")).map((path) => ({ path, role: "config_source" })),
     ...args.initialProjectStateAssets.map((path) => ({ path, role: "config_source" })),
   ];
@@ -969,21 +967,64 @@ export function claudeRendererInputPathsForProfile(profileName) {
   return { canonical: dedupe(canonical), adapter_owned: dedupe(adapterOwned) };
 }
 
-export function claudeManagedAssetsForProfile(profileName) {
-  const args = { profile: profileName, skills: null };
-  resolveSelection(args);
+function claudeProjectedManagedAssets(args, { skipHooks, skipRuntime }) {
   const inventorySourceRef = "scripts/install-claude-adapter.mjs";
   const assets = [
     ...args.selectedSkills.map((skill) => ({ path: `.claude/skills/${skill}/SKILL.md`, asset_kind: "skills", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
     ...args.selectedCommands.map((command) => ({ path: `.claude/commands/${command}`, asset_kind: "commands", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
-    { path: ".claude/settings.json", asset_kind: "hooks", ownership_mode: "partial_file", inventory_source_ref: inventorySourceRef },
-    ...CLAUDE_RUNTIME_FILES.map((file) => ({ path: file.target, asset_kind: file.assetKind, ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
-    { path: "docs/ai/observability-config.yml", asset_kind: "configuration", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef },
+    ...(!skipHooks && !skipRuntime ? [{ path: ".claude/settings.json", asset_kind: "hooks", ownership_mode: "partial_file", inventory_source_ref: inventorySourceRef }] : []),
+    ...(!skipRuntime ? CLAUDE_RUNTIME_FILES.map((file) => ({ path: file.target, asset_kind: file.assetKind, ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })) : []),
+    ...(!skipRuntime ? [{ path: "docs/ai/observability-config.yml", asset_kind: "configuration", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef }] : []),
     ...args.requiredAssets.filter((path) => !CORE_OWNED_IMMUTABLE_ASSETS.includes(path)).map((path) => ({ path, asset_kind: "configuration", ownership_mode: "full_file", inventory_source_ref: inventorySourceRef })),
-    ...new Set([...(args.runtimeDirectories ?? []), ...RUNTIME_DIRECTORIES].map((path) => path)),
+    ...new Set([...(args.runtimeDirectories ?? []), ...(!skipRuntime ? RUNTIME_DIRECTORIES : [])].map((path) => path)),
   ];
   const normalized = assets.flatMap((asset) => typeof asset === "string" ? [{ path: asset, asset_kind: "runtime_data", ownership_mode: "runtime_directory", inventory_source_ref: inventorySourceRef }] : [asset]);
   return [...new Map(normalized.map((asset) => [asset.path, asset])).values()].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
+}
+
+function claudeAssetKindForRecord(path, record) {
+  if (path.startsWith(".claude/skills/")) return "skills";
+  if (path.startsWith(".claude/commands/")) return "commands";
+  if (path === ".claude/settings.json") return "hooks";
+  if (String(record?.kind ?? "").includes("runtime")) return "runner";
+  return "configuration";
+}
+
+export function buildClaudeProjectionPlan({ profileName, skills = null, skipHooks = false, skipRuntime = false, previousState = null, prune = false } = {}) {
+  const args = { profile: profileName, skills };
+  resolveSelection(args);
+  const planShapingOptions = { skills: skills ? [...new Set(skills)].sort() : null, skip_hooks: skipHooks, skip_runtime: skipRuntime };
+  const rendererInputs = claudeRendererInputsForSelection(args, { skipHooks, skipRuntime });
+  const projectedManagedAssets = claudeProjectedManagedAssets(args, { skipHooks, skipRuntime });
+  const actualByPath = new Map(projectedManagedAssets.map((asset) => [asset.path, { ...asset, retained_stale: false }]));
+  if (!prune) {
+    for (const [path, record] of Object.entries(previousState?.managed_files ?? {})) {
+      if (!actualByPath.has(path) && (String(record?.kind ?? "").startsWith("claude_") || String(record?.kind ?? "").startsWith("stale_claude_"))) {
+        actualByPath.set(path, { path, asset_kind: claudeAssetKindForRecord(path, record), ownership_mode: "full_file", inventory_source_ref: "scripts/install-claude-adapter.mjs", retained_stale: true });
+      }
+    }
+  }
+  if (!actualByPath.has(".claude/settings.json") && previousState?.managed_partial_files?.[".claude/settings.json"]) {
+    actualByPath.set(".claude/settings.json", { path: ".claude/settings.json", asset_kind: "hooks", ownership_mode: "partial_file", inventory_source_ref: "scripts/install-claude-adapter.mjs", retained_stale: true });
+  }
+  const provenance = lifecycle.buildProjectionPlanProvenance({
+    repoRoot: REPO_ROOT,
+    rendererId: ADAPTER_RENDERER_METADATA.claude_code.rendererId,
+    rendererVersion: ADAPTER_RENDERER_METADATA.claude_code.rendererVersion,
+    rendererProfile: profileName,
+    planShapingOptions,
+    rendererInputs,
+    projectedManagedAssets,
+  });
+  return { ...args, ...provenance, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };
+}
+
+export function claudeRendererInputPathsForProfile(profileName) {
+  return buildClaudeProjectionPlan({ profileName }).renderer_inputs;
+}
+
+export function claudeManagedAssetsForProfile(profileName) {
+  return buildClaudeProjectionPlan({ profileName }).projectedManagedAssets;
 }
 
 function normalizeHooks(hooks) {
@@ -1101,6 +1142,15 @@ function enforceProjectionBoundary(args, manifest) {
 }
 
 function buildState(args, manifest) {
+  const plannedInventoryPaths = args.projectionPlan.actualInstalledInventory.map((asset) => asset.path).sort();
+  const stateInventoryPaths = [
+    ...Object.keys(args.managedFiles),
+    ...Object.keys(args.managedPartialFiles),
+    ...args.projectionPlan.actualInstalledInventory.filter((asset) => asset.ownership_mode === "runtime_directory").map((asset) => asset.path),
+  ].sort();
+  if (JSON.stringify(plannedInventoryPaths) !== JSON.stringify(stateInventoryPaths)) {
+    throw new Error(`pure projection plan inventory does not match Claude lifecycle state: planned=${plannedInventoryPaths.join(",")} actual=${stateInventoryPaths.join(",")}`);
+  }
   const selectedSkills = args.selectedSkills;
   const retainedStaleSkills = args.retainedStaleFiles
     .filter((path) => path.startsWith(".claude/skills/"))
@@ -1117,6 +1167,9 @@ function buildState(args, manifest) {
     managedPartialFiles: args.managedPartialFiles,
     targetPartialFileState,
   });
+  const lastChangedProvenance = args.operations.some((operation) => !operation.unchanged)
+    ? appliedProvenance
+    : args.previousState?.last_changed_provenance ?? args.previousState?.applied_provenance ?? null;
   return lifecycle.buildLifecycleState({
     manifest,
     repoRoot: REPO_ROOT,
@@ -1149,8 +1202,21 @@ function buildState(args, manifest) {
       retained_stale_skills: retainedStaleSkills,
       required_assets: args.requiredAssets,
       initial_project_state_assets: args.initialProjectStateAssets,
-      runtime_directories: args.runtimeDirectories,
+      runtime_directories: args.projectionPlan.actualInstalledInventory.filter((asset) => asset.ownership_mode === "runtime_directory").map((asset) => asset.path),
       applied_provenance: appliedProvenance,
+      last_applied_provenance: appliedProvenance,
+      last_changed_provenance: lastChangedProvenance,
+      projection_plan: {
+        fingerprint: args.projectionPlan.fingerprint,
+        renderer_id: args.projectionPlan.renderer_id,
+        renderer_version: args.projectionPlan.renderer_version,
+        renderer_profile: args.projectionPlan.renderer_profile,
+        plan_shaping_options: args.projectionPlan.plan_shaping_options,
+        canonical_source_digest: args.projectionPlan.canonical_source_digest,
+        renderer_inputs: args.projectionPlan.renderer_inputs,
+        projected_managed_assets: args.projectionPlan.projectedManagedAssets,
+      },
+      actual_installed_inventory: args.projectionPlan.actualInstalledInventory,
       skill_closure: {
         required_skills: args.requiredSkills,
         router_reachable_skills: args.routerReachableSkills,
@@ -1217,7 +1283,24 @@ function main() {
   args.managedPartialFiles = {};
   args.managedHooks = [];
   args.rollback = lifecycle.createRollbackSnapshot();
-  resolveSelection(args);
+  args.projectionPlan = buildClaudeProjectionPlan({
+    profileName: args.profile,
+    skills: args.skills,
+    skipHooks: args.skipHooks,
+    skipRuntime: args.skipRuntime,
+    previousState: args.previousState,
+    prune: args.prune,
+  });
+  Object.assign(args, {
+    selectedSkills: args.projectionPlan.selectedSkills,
+    selectedCommands: args.projectionPlan.selectedCommands,
+    requiredAssets: args.projectionPlan.requiredAssets,
+    initialProjectStateAssets: args.projectionPlan.initialProjectStateAssets,
+    runtimeDirectories: args.projectionPlan.runtimeDirectories,
+    routingFixtures: args.projectionPlan.routingFixtures,
+    requiredSkills: args.projectionPlan.requiredSkills,
+    routerReachableSkills: args.projectionPlan.routerReachableSkills,
+  });
   enforceProjectionBoundary(args, manifest);
   validateCoreInstalled(args);
   installSkills(args, writes);
