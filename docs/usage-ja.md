@@ -444,7 +444,7 @@ docs/ai/observability-config.yml
 
 通常Skillは作業を行い、adoption metrics が明示的に有効な場合だけ `Metrics event candidate` を出せます。bare router invocation、partial conversation、trivial edit、hidden telemetryでは出しません。
 
-Claude hook-first runtimeでは、task boundary があるときだけ `docs/ai/metrics/events.jsonl` に要約イベントを追記します。task boundary がない場合は `skip` とし、file editごとのノイズを出しません。
+Claude hook-first runtimeでは、Canonical Execution Envelope が検証できるtask boundaryだけをruntime-owned `ask-runtime/metrics/events.jsonl` に要約します。Git repositoryではGit metadata配下に解決されるため、read-only workflowはengineering working treeを変更しません。resultがない・malformed・schema-invalidの場合は `skip` とします。
 
 週次/月次reportは別Skillではなくoperation layerのreporting modeです。集計は `skill-adoption-metrics`、出力形は `docs/ai/adoption-report-template.md` を使います。local report は `docs/ai/reports/` に保存します。スケジューラ、外部通知、外部公開は `risk-gate` の対象です。
 

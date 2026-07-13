@@ -22,11 +22,11 @@
         "adapters/claude-code/project/.claude/hooks/hooks.json",
         "scripts/install-claude-adapter.mjs"
       ],
-      "subject_digest": "sha256:4a95743c3d84b2bf0b1662cd525ad33b0cf47234de591471cac28f5c0583d3df",
+      "subject_digest": "sha256:50a4a4324c985436fd865e0d67fd9bbd8824f27a41ef31b04dc9208714651ca2",
       "scope": "profile_projection",
       "profile_id": "claude-code-local-observed-v1",
       "renderer_profile": "observability",
-      "profile_fingerprint": "sha256:2dd4d83581a683baa32f5df1574a1f53d1ae5bc2428b036e197ead222bb51c20"
+      "profile_fingerprint": "sha256:5b473dd1e1800b03e6811607ad8e5fdff7a3dc5d1338fbc1ff9b3fbf3194d7d2"
     },
     {
       "record_id": "codex-projection-manifest",
@@ -54,7 +54,49 @@
       "scope": "profile_projection",
       "profile_id": "codex-local-projection-v1",
       "renderer_profile": "implementation",
-      "profile_fingerprint": "sha256:8ce4510a1ce24ef2d9365c77d581f1e62ee3d7a0c1fb174679872747d7a0176e"
+      "profile_fingerprint": "sha256:8abaeac35105fd729d931dee0f92cb6b60ecf08ffc93ae6dc589ef6041b04c42"
+    },
+    {
+      "record_id": "claude-canonical-metrics-collector",
+      "scope": "adapter_global",
+      "adapter_id": "claude_code",
+      "capability_ids": [
+        "local_event_emission"
+      ],
+      "evidence_kind": "capability_fixture_result",
+      "evidence_level": "behavior_verified",
+      "result": "pass",
+      "observed_paths": [
+        "adapters/claude-code/project/.claude/commands/skill-handoff.md",
+        "adapters/claude-code/project/.claude/commands/skill-implement.md",
+        "adapters/claude-code/project/.claude/commands/skill-investigate.md",
+        "adapters/claude-code/project/.claude/commands/skill-review.md",
+        "adapters/claude-code/project/.claude/commands/skill-verify.md",
+        "adapters/claude-code/project/.claude/hooks/hooks.json",
+        "schemas/execution-envelope.schema.json",
+        "schemas/metrics-event.schema.json",
+        "scripts/ai-metrics-record.mjs",
+        "scripts/execution-envelope.mjs",
+        "scripts/observability-paths.mjs",
+        "scripts/test-claude-metrics-collector.mjs"
+      ],
+      "subject_digest": "sha256:815530f3ea664042efe29ca4311fb10dc9b79987ea79b694b9234bfe8b1913a9",
+      "verification": {
+        "verifier_path": "scripts/test-claude-metrics-collector.mjs",
+        "fixture_id": "claude-canonical-metrics-collector",
+        "target_paths": [
+          "adapters/claude-code/project/.claude/commands/skill-handoff.md",
+          "adapters/claude-code/project/.claude/commands/skill-implement.md",
+          "adapters/claude-code/project/.claude/commands/skill-investigate.md",
+          "adapters/claude-code/project/.claude/commands/skill-review.md",
+          "adapters/claude-code/project/.claude/commands/skill-verify.md",
+          "adapters/claude-code/project/.claude/hooks/hooks.json",
+          "scripts/ai-metrics-record.mjs"
+        ],
+        "expected_result": "pass",
+        "actual_result": "pass",
+        "exit_status": 0
+      }
     }
   ]
 }

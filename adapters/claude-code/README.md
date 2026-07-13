@@ -150,11 +150,11 @@ Default local paths:
 
 ```text
 docs/ai/observability-config.yml
-docs/ai/metrics/events.jsonl
+ask-runtime/metrics/events.jsonl
 docs/ai/reports/
 ```
 
-The runtime omits raw prompts, secrets, customer data, personal data, full file contents, and full command output by default.
+The logical `ask-runtime/` store resolves under Git metadata (or `.agent-spectrum-kernel/runtime/` outside Git), so read-only workflows do not dirty the engineering working tree. The Stop hook validates the canonical Execution Envelope from `last_assistant_message`; command templates never write metrics directly. Missing or malformed results are skipped without changing the engineering decision, and duplicate project/plugin hooks converge through event-ID upsert. The runtime omits raw prompts, secrets, customer data, personal data, full file contents, and full command output by default.
 
 Runtime and hook flags:
 
@@ -171,7 +171,7 @@ Operational boundary:
 - Project adapter: owns `.claude/skills/`, `.claude/commands/`, `.claude/settings.json` managed hooks, local runtime scripts, and project-local metrics files.
 - Plugin: owns plugin-packaged commands/hooks and resolves its metrics wrapper through `CLAUDE_PLUGIN_ROOT`.
 - Local metrics recording requires the project runtime. Plugin hooks no-op when the project runtime is not present.
-- Avoid enabling two independent metrics paths for the same task unless duplicate local events are acceptable.
+- Project and plugin Stop hooks may coexist: the runtime-owned collector uses deterministic event IDs and idempotent upsert to prevent duplicate local rows.
 
 ## GitHub Actions
 

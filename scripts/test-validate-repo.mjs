@@ -355,7 +355,7 @@ lifecycle:
     `const event = { verification_metrics: {} };
 event.command_attempt_metrics = { command_kind: "unknown", classified_as_verification: false };
 event.verification_metrics.commands_run = [{ command_kind: "test" }];
-const path = ".agent-spectrum-kernel/runtime-health.jsonl";
+const path = "ask-runtime/runtime-health.jsonl";
 const code = "non_blocking_metrics_record_failure";
 const privacy = { full_error_message_stored: false };
 console.log(path, code, privacy);
@@ -403,7 +403,7 @@ console.log(path, code, privacy);
   }
 
   mkdirSync(resolve(root, "adapters/claude-code/project/.claude/hooks"), { recursive: true });
-  writeFileSync(resolve(root, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind command_attempt --non-blocking >/dev/null 2>&1 || true" }] }], "Stop": [{ "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind task_stop --sidecar .claude/metrics/current-task.json --non-blocking >/dev/null 2>&1 || true" }] }] } }\n');
+  writeFileSync(resolve(root, "adapters/claude-code/project/.claude/hooks/hooks.json"), '{ "hooks": { "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind command_attempt --non-blocking >/dev/null 2>&1 || true" }] }], "Stop": [{ "hooks": [{ "type": "command", "command": "node scripts/ai-metrics-record.mjs --event-kind task_stop --non-blocking >/dev/null 2>&1 || true" }] }] } }\n');
   mkdirSync(resolve(root, "adapters/claude-code/plugin/hooks"), { recursive: true });
   writeFileSync(resolve(root, "adapters/claude-code/plugin/hooks/hooks.json"), '{ "hooks": { "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "test -x \\"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\\" && \\"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\\" --event-kind command_attempt --non-blocking >/dev/null 2>&1 || true" }] }], "Stop": [{ "hooks": [{ "type": "command", "command": "test -x \\"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\\" && \\"${CLAUDE_PLUGIN_ROOT}/bin/ai-skills-metrics-record\\" --event-kind task_stop --non-blocking >/dev/null 2>&1 || true" }] }] } }\n');
 
@@ -1134,69 +1134,21 @@ function assertRuntimeScripts() {
   }
 
   const gateDecisionStore = resolve(root, "docs/ai/metrics/gate-decision-record-events.jsonl");
-  const gateDecisionRecordResult = runRepoScript([
-    resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
-    "--event-kind",
-    "task_stop",
-    "--task-id",
-    "GATE-RECORDER-1",
-    "--task-type",
-    "review",
-    "--skills",
-    "review-router",
-    "--event-store",
-    gateDecisionStore,
-    "--gate-decisions-json",
-    JSON.stringify([
-      {
-        gate: "review-architecture-impact",
-        layer: "Architecture",
-        status: "executed",
-        judgment: "Architecture gate checked public API surface.",
-        evidence_checked: ["changed files", "public API surface"],
-        triggering_signals: ["public_api_change"],
-        missing_inputs: [],
-        confidence: "high",
-        reason_category: "other",
-        raw_prompt: "must not be stored",
-      },
-    ]),
-  ]);
-  assertRuntimePass("metrics recorder gate decisions smoke", gateDecisionRecordResult);
-  const gateDecisionRecordedEvent = JSON.parse(readFileSync(gateDecisionStore, "utf8"));
-  assertSchemaPass("recorded gate decision event", metricsSchema, gateDecisionRecordedEvent);
-  if (
-    gateDecisionRecordedEvent.gate_decisions.length !== 1 ||
-    gateDecisionRecordedEvent.gate_decisions[0].gate !== "review-architecture-impact" ||
-    Object.hasOwn(gateDecisionRecordedEvent.gate_decisions[0], "raw_prompt") ||
-    JSON.stringify(gateDecisionRecordedEvent.gate_decisions).includes("must not be stored")
-  ) {
-    throw new Error(`metrics recorder should store sanitized structured gate decisions\n${JSON.stringify(gateDecisionRecordedEvent, null, 2)}`);
-  }
-
-  const sidecarDir = resolve(root, ".claude/metrics");
-  mkdirSync(sidecarDir, { recursive: true });
-  const sidecarPath = resolve(sidecarDir, "current-task.json");
-  const sidecarStore = resolve(root, "docs/ai/metrics/sidecar-review-events.jsonl");
-  writeFileSync(
-    sidecarPath,
-    JSON.stringify({
-      task_type: "review",
-      skills_used: ["review-router", "review-final-merge-gate"],
-      routing_result: {
-        operating_mode: "delivery_quality",
-        primary_skill: "review-router",
-        required_gates: ["review-router", "review-final-merge-gate"],
-        executed_gates: ["review-router", "review-final-merge-gate"],
-        raw_prompt: "raw prompt text must not be stored",
-      },
-      review_result: {
-        decision: "request_changes",
-        required_fixes_count: 2,
-        insufficient_evidence_layers: ["Architecture"],
-        full_review_text: "full review text must not be stored",
-      },
-      gate_decisions: [
+  const gateDecisionRecordResult = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--event-kind",
+      "task_stop",
+      "--task-id",
+      "GATE-RECORDER-1",
+      "--task-type",
+      "review",
+      "--skills",
+      "review-router",
+      "--event-store",
+      gateDecisionStore,
+      "--gate-decisions-json",
+      JSON.stringify([
         {
           gate: "review-architecture-impact",
           layer: "Architecture",
@@ -1209,110 +1161,26 @@ function assertRuntimeScripts() {
           reason_category: "other",
           raw_prompt: "must not be stored",
         },
-      ],
-      full_command_output: "secret command output must not be stored",
-      full_file_contents: "file contents must not be stored",
-      secret: "sk-test-secret",
-    }),
-  );
-  const sidecarResult = runRepoScript(
-    [
-      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
-      "--hook-event",
-      "Stop",
-      "--event-kind",
-      "task_stop",
-      "--event-store",
-      sidecarStore,
-      "--sidecar",
-      sidecarPath,
-      "--non-blocking",
+      ]),
     ],
-    {
-      cwd: root,
-      input: JSON.stringify({ session_id: "S2" }),
-    },
+    { cwd: root, input: JSON.stringify({ session_id: "S-GATE", last_assistant_message: validEnvelopeBlock }) },
   );
-  assertRuntimePass("metrics recorder review sidecar ingestion", sidecarResult);
-  if (sidecarResult.stdout || sidecarResult.stderr) {
-    throw new Error(`sidecar ingestion should not print routine output\nstdout:\n${sidecarResult.stdout}\nstderr:\n${sidecarResult.stderr}`);
-  }
-  if (existsSync(sidecarPath)) {
-    throw new Error("sidecar ingestion should consume current-task.json to avoid stale reuse");
-  }
-  const sidecarEvent = JSON.parse(readFileSync(sidecarStore, "utf8"));
-  assertSchemaPass("recorded sidecar review event", metricsSchema, sidecarEvent);
+  assertRuntimePass("metrics recorder gate decisions smoke", gateDecisionRecordResult);
+  const gateDecisionRecordedEvent = JSON.parse(readFileSync(gateDecisionStore, "utf8"));
+  assertSchemaPass("recorded gate decision event", metricsSchema, gateDecisionRecordedEvent);
   if (
-    sidecarEvent.task_id !== "session:S2" ||
-    sidecarEvent.task_type !== "review" ||
-    sidecarEvent.review_result?.decision !== "request_changes" ||
-    sidecarEvent.gate_decisions?.[0]?.gate !== "review-architecture-impact" ||
-    sidecarEvent.outcome_metrics.task_completed !== true ||
-    JSON.stringify(sidecarEvent).includes("sk-test-secret") ||
-    JSON.stringify(sidecarEvent).includes("raw prompt text must not be stored") ||
-    JSON.stringify(sidecarEvent).includes("full review text must not be stored") ||
-    JSON.stringify(sidecarEvent).includes("secret command output must not be stored") ||
-    JSON.stringify(sidecarEvent).includes("file contents must not be stored")
+    gateDecisionRecordedEvent.gate_decisions.length !== 1 ||
+    gateDecisionRecordedEvent.gate_decisions[0].gate !== "review-architecture-impact" ||
+    Object.hasOwn(gateDecisionRecordedEvent.gate_decisions[0], "raw_prompt") ||
+    JSON.stringify(gateDecisionRecordedEvent.gate_decisions).includes("must not be stored")
   ) {
-    throw new Error(`skill-review sidecar should produce a sanitized review_result event\n${JSON.stringify(sidecarEvent, null, 2)}`);
+    throw new Error(`metrics recorder should store sanitized structured gate decisions\n${JSON.stringify(gateDecisionRecordedEvent, null, 2)}`);
   }
 
-  const missingSidecarStore = resolve(root, "docs/ai/metrics/missing-sidecar-events.jsonl");
-  const missingSidecarResult = runRepoScript(
-    [
-      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
-      "--hook-event",
-      "Stop",
-      "--event-kind",
-      "task_stop",
-      "--event-store",
-      missingSidecarStore,
-      "--sidecar",
-      resolve(sidecarDir, "missing-current-task.json"),
-      "--non-blocking",
-    ],
-    {
-      cwd: root,
-      input: JSON.stringify({ session_id: "S3" }),
-    },
+  assertRuntimePass(
+    "Claude canonical metrics collector fixture",
+    runRepoScript([resolve(repoRoot, "scripts/test-claude-metrics-collector.mjs")]),
   );
-  assertRuntimePass("metrics recorder missing sidecar fallback", missingSidecarResult);
-  if (missingSidecarResult.stdout || missingSidecarResult.stderr) {
-    throw new Error(`missing sidecar fallback should stay silent\nstdout:\n${missingSidecarResult.stdout}\nstderr:\n${missingSidecarResult.stderr}`);
-  }
-  const missingSidecarEvent = JSON.parse(readFileSync(missingSidecarStore, "utf8"));
-  if (missingSidecarEvent.outcome_metrics.task_completed !== true || missingSidecarEvent.review_result || missingSidecarEvent.gate_decisions) {
-    throw new Error(`missing sidecar should still record a normal task_stop event\n${JSON.stringify(missingSidecarEvent, null, 2)}`);
-  }
-
-  const invalidSidecarStore = resolve(root, "docs/ai/metrics/invalid-sidecar-events.jsonl");
-  writeFileSync(sidecarPath, '{ "review_result": "invalid", "secret": "sk-invalid-secret"');
-  const invalidSidecarResult = runRepoScript(
-    [
-      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
-      "--hook-event",
-      "Stop",
-      "--event-kind",
-      "task_stop",
-      "--event-store",
-      invalidSidecarStore,
-      "--sidecar",
-      sidecarPath,
-      "--non-blocking",
-    ],
-    {
-      cwd: root,
-      input: JSON.stringify({ session_id: "S4" }),
-    },
-  );
-  assertRuntimePass("metrics recorder invalid sidecar fallback", invalidSidecarResult);
-  if (invalidSidecarResult.stdout || invalidSidecarResult.stderr) {
-    throw new Error(`invalid sidecar fallback should stay silent\nstdout:\n${invalidSidecarResult.stdout}\nstderr:\n${invalidSidecarResult.stderr}`);
-  }
-  const invalidSidecarEvent = JSON.parse(readFileSync(invalidSidecarStore, "utf8"));
-  if (invalidSidecarEvent.outcome_metrics.task_completed !== true || JSON.stringify(invalidSidecarEvent).includes("sk-invalid-secret")) {
-    throw new Error(`invalid sidecar should be skipped without leaking content\n${JSON.stringify(invalidSidecarEvent, null, 2)}`);
-  }
 
   const nonBlockingFailure = runRepoScript(
     [
@@ -1325,14 +1193,14 @@ function assertRuntimeScripts() {
     ],
     {
       cwd: root,
-      input: JSON.stringify({ session_id: "S5" }),
+      input: JSON.stringify({ session_id: "S5", last_assistant_message: validEnvelopeBlock }),
     },
   );
   assertRuntimePass("metrics recorder non-blocking failure", nonBlockingFailure);
   if (nonBlockingFailure.stdout || nonBlockingFailure.stderr) {
     throw new Error(`non-blocking metrics failures should stay silent\nstdout:\n${nonBlockingFailure.stdout}\nstderr:\n${nonBlockingFailure.stderr}`);
   }
-  const runtimeHealthPath = resolve(root, ".agent-spectrum-kernel/runtime-health.jsonl");
+  const runtimeHealthPath = resolve(root, ".agent-spectrum-kernel/runtime/runtime-health.jsonl");
   if (!existsSync(runtimeHealthPath)) {
     throw new Error("non-blocking metrics failures should write a local runtime-health entry");
   }
@@ -1353,7 +1221,7 @@ function assertRuntimeScripts() {
       resolve(root, "docs/ai/metrics"),
       "--non-blocking",
     ],
-    { cwd: root, input: JSON.stringify({ session_id: "S5-repeat" }) },
+    { cwd: root, input: JSON.stringify({ session_id: "S5-repeat", last_assistant_message: validEnvelopeBlock }) },
   );
   assertRuntimePass("metrics recorder repeated non-blocking failure", repeatedFailure);
   const repeatedHealthEntry = JSON.parse(readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).at(-1));
@@ -1378,7 +1246,7 @@ function assertRuntimeScripts() {
     error_code: code,
   });
   writeFileSync(runtimeHealthPath, `${JSON.stringify(healthEntry("ai-metrics-record", "non_blocking_metrics_record_failure"))}\n${JSON.stringify(healthEntry("component-b", "failure-b"))}\n${JSON.stringify(healthEntry("component-c", "failure-c"))}\n`);
-  assertRuntimePass("metrics recorder moves recurring health entry to the tail", runRepoScript([resolve(repoRoot, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--event-store", resolve(root, "docs/ai/metrics"), "--non-blocking"], { cwd: root, input: JSON.stringify({ session_id: "S5-multi-key" }) }));
+  assertRuntimePass("metrics recorder moves recurring health entry to the tail", runRepoScript([resolve(repoRoot, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--event-store", resolve(root, "docs/ai/metrics"), "--non-blocking"], { cwd: root, input: JSON.stringify({ session_id: "S5-multi-key", last_assistant_message: validEnvelopeBlock }) }));
   const multiKeyHealth = readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
   if (multiKeyHealth.length !== 3 || multiKeyHealth.at(-1)?.component !== "ai-metrics-record" || Date.parse(multiKeyHealth.at(-1)?.last_seen_at) <= Date.parse(multiKeyHealth.at(-1)?.first_seen_at)) {
     throw new Error(`recurring health entries must be retained by latest observation time\n${JSON.stringify(multiKeyHealth, null, 2)}`);
@@ -1398,37 +1266,38 @@ function assertRuntimeScripts() {
     {
       cwd: nestedRuntimeCwd,
       env: { CLAUDE_PROJECT_DIR: root },
-      input: JSON.stringify({ session_id: "S5-recovered" }),
+      input: JSON.stringify({ session_id: "S5-recovered", last_assistant_message: validEnvelopeBlock }),
     },
   );
   assertRuntimePass("metrics recorder writes recovery at Claude project root", recoveredResult);
   const recoveredEntries = readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
-  if (recoveredEntries.at(-1)?.status !== "recovered" || existsSync(resolve(nestedRuntimeCwd, ".agent-spectrum-kernel/runtime-health.jsonl"))) {
+  if (recoveredEntries.at(-1)?.status !== "recovered" || existsSync(resolve(nestedRuntimeCwd, ".agent-spectrum-kernel/runtime/runtime-health.jsonl"))) {
     throw new Error("successful nested hook execution should recover health at CLAUDE_PROJECT_DIR, not CWD");
   }
 
   writeFileSync(resolve(root, "docs/ai/observability-config.yml"), "runtime_health:\n  max_entries: 2\n");
-  assertRuntimePass("metrics recorder bounded health failure", runRepoScript([resolve(repoRoot, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--event-store", resolve(root, "docs/ai/metrics"), "--non-blocking"], { cwd: root, input: JSON.stringify({ session_id: "S5-bounded-error" }) }));
-  assertRuntimePass("metrics recorder bounded health recovery", runRepoScript([resolve(repoRoot, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--event-store", resolve(root, "docs/ai/metrics/bounded-events.jsonl"), "--non-blocking"], { cwd: root, input: JSON.stringify({ session_id: "S5-bounded-recovery" }) }));
+  assertRuntimePass("metrics recorder bounded health failure", runRepoScript([resolve(repoRoot, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--event-store", resolve(root, "docs/ai/metrics"), "--non-blocking"], { cwd: root, input: JSON.stringify({ session_id: "S5-bounded-error", last_assistant_message: validEnvelopeBlock }) }));
+  assertRuntimePass("metrics recorder bounded health recovery", runRepoScript([resolve(repoRoot, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--event-store", resolve(root, "docs/ai/metrics/bounded-events.jsonl"), "--non-blocking"], { cwd: root, input: JSON.stringify({ session_id: "S5-bounded-recovery", last_assistant_message: validEnvelopeBlock }) }));
   if (readFileSync(runtimeHealthPath, "utf8").trim().split(/\r?\n/).length > 2) {
     throw new Error("runtime-health history must stay within configured max_entries");
   }
 
   const routingRecordStore = resolve(root, "docs/ai/metrics/routing-record-events.jsonl");
-  const routingRecordResult = runRepoScript([
-    resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
-    "--event-kind",
-    "task_stop",
-    "--task-id",
-    "ROUTING-RECORDER-1",
-    "--task-type",
-    "review",
-    "--skills",
-    "review-router",
-    "--event-store",
-    routingRecordStore,
-    "--routing-result-json",
-    JSON.stringify({
+  const routingRecordResult = runRepoScript(
+    [
+      resolve(repoRoot, "scripts/ai-metrics-record.mjs"),
+      "--event-kind",
+      "task_stop",
+      "--task-id",
+      "ROUTING-RECORDER-1",
+      "--task-type",
+      "review",
+      "--skills",
+      "review-router",
+      "--event-store",
+      routingRecordStore,
+      "--routing-result-json",
+      JSON.stringify({
       change_signals: [
         { signal: "public_api_change", evidence: "schema file changed" },
         { signal: "generated_output_change", evidence: "docs output path changed" },
@@ -1462,8 +1331,10 @@ function assertRuntimeScripts() {
           evidence: "docs output path changed",
         },
       ],
-    }),
-  ]);
+      }),
+    ],
+    { cwd: root, input: JSON.stringify({ session_id: "S-ROUTING", last_assistant_message: validEnvelopeBlock }) },
+  );
   assertRuntimePass("metrics recorder routing applicability smoke", routingRecordResult);
   const routingRecordedEvent = JSON.parse(readFileSync(routingRecordStore, "utf8"));
   assertSchemaPass("recorded routing applicability event", metricsSchema, routingRecordedEvent);
@@ -3850,6 +3721,16 @@ function assertAdapterRuntimeSmokeScript() {
   assertRuntimePass("adapter smoke core setup", runRepoScript([coreInstaller, "--target", target]));
   assertRuntimePass("adapter smoke Claude setup", runRepoScript([claudeInstaller, "--target", target, "--profile", "full"]));
 
+  const installedCollectorResult = runRepoScript(
+    [resolve(target, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--print-result"],
+    { cwd: target, input: JSON.stringify({ session_id: "S-INSTALLED-COLLECTOR", last_assistant_message: validEnvelopeBlock }) },
+  );
+  assertRuntimePass("installed Claude canonical collector", installedCollectorResult);
+  const installedEventStore = resolve(target, ".agent-spectrum-kernel/runtime/metrics/events.jsonl");
+  if (!existsSync(installedEventStore) || !readFileSync(installedEventStore, "utf8").includes("session:S-INSTALLED-COLLECTOR")) {
+    throw new Error("installed Claude runtime should collect a canonical task result through its copied runtime dependencies");
+  }
+
   const smokeResult = runRepoScript([runtimeSmokeScript, "--target", target, "--adapter", "claude"]);
   assertRuntimePass("adapter runtime smoke Claude pass", smokeResult);
   if (!smokeResult.stdout.includes("ASK adapter runtime smoke: pass") || !readFileSync(resolve(target, ".agent-spectrum-kernel/runtime-smoke/events.jsonl"), "utf8").includes("adapter-runtime-smoke")) {
@@ -3866,23 +3747,23 @@ function assertAdapterRuntimeSmokeScript() {
   const missingEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-missing-event-store");
   assertRuntimePass("adapter smoke missing event store core setup", runRepoScript([coreInstaller, "--target", missingEventStoreTarget]));
   assertRuntimePass("adapter smoke missing event store Claude setup", runRepoScript([claudeInstaller, "--target", missingEventStoreTarget, "--profile", "full"]));
-  rmSync(resolve(missingEventStoreTarget, "docs/ai/metrics"), { recursive: true, force: true });
-  writeFileSync(resolve(missingEventStoreTarget, "docs/ai/metrics"), "not a directory\n");
+  mkdirSync(resolve(missingEventStoreTarget, ".agent-spectrum-kernel/runtime"), { recursive: true });
+  writeFileSync(resolve(missingEventStoreTarget, ".agent-spectrum-kernel/runtime/metrics"), "not a directory\n");
   const missingEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", missingEventStoreTarget, "--adapter", "claude"]);
-  assertRuntimeFail("adapter runtime smoke detects configured event store failure", missingEventStoreResult, "configured event-store directory is missing or invalid");
+  assertRuntimeFail("adapter runtime smoke detects configured event store failure", missingEventStoreResult, "configured event-store parent is not writable");
 
   const directoryEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-directory-event-store");
   assertRuntimePass("adapter smoke directory event store core setup", runRepoScript([coreInstaller, "--target", directoryEventStoreTarget]));
   assertRuntimePass("adapter smoke directory event store Claude setup", runRepoScript([claudeInstaller, "--target", directoryEventStoreTarget, "--profile", "full"]));
-  rmSync(resolve(directoryEventStoreTarget, "docs/ai/metrics/events.jsonl"), { force: true });
-  mkdirSync(resolve(directoryEventStoreTarget, "docs/ai/metrics/events.jsonl"));
+  mkdirSync(resolve(directoryEventStoreTarget, ".agent-spectrum-kernel/runtime/metrics/events.jsonl"), { recursive: true });
   const directoryEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", directoryEventStoreTarget, "--adapter", "claude"]);
   assertRuntimeFail("adapter runtime smoke rejects directory event store", directoryEventStoreResult, "configured event-store must be a regular file");
 
   const readOnlyEventStoreTarget = resolve(fixtureRoot, "adapter-runtime-smoke-read-only-event-store");
   assertRuntimePass("adapter smoke read-only event store core setup", runRepoScript([coreInstaller, "--target", readOnlyEventStoreTarget]));
   assertRuntimePass("adapter smoke read-only event store Claude setup", runRepoScript([claudeInstaller, "--target", readOnlyEventStoreTarget, "--profile", "full"]));
-  const readOnlyEventStorePath = resolve(readOnlyEventStoreTarget, "docs/ai/metrics/events.jsonl");
+  const readOnlyEventStorePath = resolve(readOnlyEventStoreTarget, ".agent-spectrum-kernel/runtime/metrics/events.jsonl");
+  mkdirSync(dirname(readOnlyEventStorePath), { recursive: true });
   const readOnlyEventStoreContent = "existing event content\n";
   writeFileSync(readOnlyEventStorePath, readOnlyEventStoreContent);
   chmodSync(readOnlyEventStorePath, 0o444);
@@ -3898,8 +3779,8 @@ function assertAdapterRuntimeSmokeScript() {
   assertRuntimePass("adapter smoke symlink event store Claude setup", runRepoScript([claudeInstaller, "--target", symlinkEventStoreTarget, "--profile", "full"]));
   const outsideEventStore = resolve(fixtureRoot, "outside-event-store.jsonl");
   writeFileSync(outsideEventStore, "outside event store\n");
-  const symlinkEventStorePath = resolve(symlinkEventStoreTarget, "docs/ai/metrics/events.jsonl");
-  rmSync(symlinkEventStorePath, { force: true });
+  const symlinkEventStorePath = resolve(symlinkEventStoreTarget, ".agent-spectrum-kernel/runtime/metrics/events.jsonl");
+  mkdirSync(dirname(symlinkEventStorePath), { recursive: true });
   symlinkSync(outsideEventStore, symlinkEventStorePath);
   const symlinkEventStoreResult = runRepoScript([runtimeSmokeScript, "--target", symlinkEventStoreTarget, "--adapter", "claude"]);
   assertRuntimeFail("adapter runtime smoke rejects symlink event store escape", symlinkEventStoreResult, "configured event store escapes target through a symbolic link");
@@ -4643,26 +4524,24 @@ function isFailOpenHookCommand(command) {
   return />\/dev\/null\s+2>&1\s+\|\|\s+true(?:\s+#\s+agent-spectrum-kernel:[\w-]+)?\s*$/.test(command);
 }
 
-function assertSidecarAdapterInstructions() {
+function assertCanonicalCollectorInstructions() {
   const commandNames = ["skill-review.md", "skill-implement.md", "skill-investigate.md", "skill-verify.md", "skill-handoff.md"];
   for (const commandName of commandNames) {
     const commandPath = resolve(repoRoot, "adapters/claude-code/project/.claude/commands", commandName);
     const content = readFileSync(commandPath, "utf8");
-    if (
-      !content.includes("Silent metrics sidecar") ||
-      !content.includes(".claude/metrics/current-task.json") ||
-      !content.includes("Do not mention metrics recording") ||
-      !content.includes("raw prompts") ||
-      !content.includes("full command output") ||
-      !content.includes("full file contents")
-    ) {
-      throw new Error(`${commandName} should include silent sidecar privacy instructions`);
+    if (content.includes("current-task.json") || content.includes("Silent metrics sidecar") || content.includes(".claude/metrics")) {
+      throw new Error(`${commandName} must not instruct the model to write metrics directly`);
     }
   }
 
-  const reviewCommand = readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/commands/skill-review.md"), "utf8");
-  if (!reviewCommand.includes("review_result") || !reviewCommand.includes("gate_decisions")) {
-    throw new Error("skill-review command should instruct review_result and gate_decisions sidecar summaries");
+  for (const skillPath of [
+    "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+    "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md",
+  ]) {
+    const content = readFileSync(resolve(repoRoot, skillPath), "utf8");
+    if (content.includes("current-task.json") || content.includes(".claude/metrics")) {
+      throw new Error(`${skillPath} must not instruct the model to write metrics directly`);
+    }
   }
 
   const hooks = JSON.parse(readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/hooks/hooks.json"), "utf8"));
@@ -4691,14 +4570,14 @@ function assertSidecarAdapterInstructions() {
   }
 
   const stopCommands = (hooks.hooks?.Stop ?? []).flatMap((group) => (group.hooks ?? []).map((hook) => hook.command ?? ""));
-  const sidecarStopCommand = stopCommands.find((command) => command.includes("--event-kind task_stop") && command.includes("--sidecar") && command.includes(".claude/metrics/current-task.json") && command.includes("--non-blocking"));
-  if (!sidecarStopCommand) {
-    throw new Error("project Stop hook should ingest the sidecar through the non-blocking metrics recorder");
+  const collectorStopCommand = stopCommands.find((command) => command.includes("--event-kind task_stop") && command.includes("--non-blocking"));
+  if (!collectorStopCommand || collectorStopCommand.includes("--sidecar") || collectorStopCommand.includes("current-task.json")) {
+    throw new Error("project Stop hook should invoke the runtime-owned canonical result collector without a sidecar");
   }
 
   const missingRuntimeRoot = resolve(fixtureRoot, "hook-missing-runtime");
-  mkdirSync(resolve(missingRuntimeRoot, ".claude/metrics"), { recursive: true });
-  const missingRuntimeResult = spawnSync("/bin/sh", ["-c", sidecarStopCommand], {
+  mkdirSync(missingRuntimeRoot, { recursive: true });
+  const missingRuntimeResult = spawnSync("/bin/sh", ["-c", collectorStopCommand], {
     cwd: missingRuntimeRoot,
     env: { ...process.env, CLAUDE_PROJECT_DIR: missingRuntimeRoot },
     input: JSON.stringify({ session_id: "S-MISSING-RUNTIME" }),
@@ -4940,7 +4819,7 @@ try {
 
   const validRoot = cloneFixture("valid");
   assertPass("valid fixture", validRoot);
-  assertSidecarAdapterInstructions();
+  assertCanonicalCollectorInstructions();
   assertRuntimeScripts();
   assertInstallerScripts();
   assertCoreInstallerScripts();

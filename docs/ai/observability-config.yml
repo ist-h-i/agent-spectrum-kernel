@@ -4,7 +4,7 @@
 enabled: true
 
 storage:
-  event_store: docs/ai/metrics/events.jsonl
+  event_store: ask-runtime/metrics/events.jsonl
   report_dir: docs/ai/reports
   improvement_ledger: docs/ai/improvement-ledger.md
 
@@ -38,12 +38,12 @@ safety:
   block_on_record_failure: false
 
 lifecycle:
-  enforcement: policy_only
+  enforcement: runtime_deduplication_plus_policy
   commit_events_to_git: false
   retention_days: 90
   rotate_when_bytes: 5242880
   schema_mismatch_action: quarantine
-  quarantine_dir: docs/ai/metrics/quarantine
+  quarantine_dir: ask-runtime/metrics/quarantine
   deduplication_key: event_id
   schema_migration: manual_review_required
   report_retention_days: 180

@@ -120,13 +120,13 @@ Metrics event candidate:
 
 ## Runtime Storage
 
-Default runtime storage is project-local:
+Default runtime storage is runtime-owned and local to the repository:
 
 ```text
-docs/ai/metrics/events.jsonl
+ask-runtime/metrics/events.jsonl
 ```
 
-Each line is one JSON object. The generic repository includes schemas and templates only; adopting projects own their project-specific event store.
+`ask-runtime/` is a logical path. In a Git repository it resolves under `.git/agent-spectrum-kernel/`; outside Git it resolves under `.agent-spectrum-kernel/runtime/`. Each line is one JSON object. Keeping runtime events outside versioned documentation means a read-only Claude workflow does not dirty the engineering working tree. The generic repository includes schemas and templates only; adopting projects own their project-specific event store.
 
 Adapters must prefer explicit task IDs when available. For Claude hooks, the default fallback boundary is `session_id`:
 
@@ -144,38 +144,21 @@ Command text is not recorded by default. Verification events record `command_kin
 
 `verification_attempt` is reserved for commands that match the verification classifier or have explicit evidence linkage. A generic Bash hook must not classify every command as verification.
 
-Non-blocking recorder failures append a sanitized local health entry under `CLAUDE_PROJECT_DIR` when available, then an explicit recorder project root, then the resolved project config/event-store root:
+Non-blocking recorder failures append a sanitized runtime-owned local health entry for `CLAUDE_PROJECT_DIR` when available, then an explicit recorder project root, then the resolved project config/event-store root:
 
 ```text
-.agent-spectrum-kernel/runtime-health.jsonl
+ask-runtime/runtime-health.jsonl
 ```
 
-An `error` entry opens a component/error-code health issue. Repeated identical failures update `last_seen_at` and `occurrence_count` while preserving `first_seen_at`; a later `recovered` entry closes it. `ask-doctor` uses `last_seen_at` for freshness, warns only for unresolved entries inside the configured freshness window, and reports older unresolved entries as historical. Health history is capped by `runtime_health.max_entries` and updated atomically. Runtime-health entries must omit raw prompts, secrets, customer data, personal data, full command output, and full error messages.
+Like the event store, this logical path resolves under Git metadata and therefore does not dirty a read-only workflow's engineering working tree. An `error` entry opens a component/error-code health issue. Repeated identical failures update `last_seen_at` and `occurrence_count` while preserving `first_seen_at`; a later `recovered` entry closes it. `ask-doctor` uses `last_seen_at` for freshness, warns only for unresolved entries inside the configured freshness window, and reports older unresolved entries as historical. Health history is capped by `runtime_health.max_entries` and updated atomically. Runtime-health entries must omit raw prompts, secrets, customer data, personal data, full command output, and full error messages.
 
-## Skill Command Sidecar
+## Claude Stop Collector
 
-Project-level Claude skill commands may write one transient project-local sidecar:
+Claude implementation, review, investigation, verification, and handoff instructions must not write metrics files. The runtime-owned Stop hook reads `last_assistant_message`, locates the canonical fenced `execution-envelope` result, validates it through `scripts/execution-envelope.mjs`, and only then normalizes a `task_stop` event.
 
-```text
-.claude/metrics/current-task.json
-```
+Missing, malformed, or schema-invalid canonical results are skipped. The collector records a sanitized runtime-health code for malformed or invalid input, but does not persist the assistant response or upgrade evidence, safety, readiness, review, or mergeability claims. Persistence failures are fail-open and cannot change the task result. Repeated project/plugin Stop hooks use the same deterministic event ID and atomically upsert the event, so upgrades and coexisting adapters do not create duplicate rows.
 
-The Stop hook reads this sidecar silently and folds the available structured summaries into the normal `task_stop` event. If the sidecar is missing, empty, invalid JSON, or contains unsupported fields, the Stop event still records normally from hook data. Sidecar ingestion is best-effort: metrics failures must not fail or interrupt the developer task, and adapters must not print routine "metrics recorded" status.
-
-Allowed sidecar fields:
-
-```json
-{
-  "task_id": "optional explicit task boundary",
-  "task_type": "implementation | review | investigation | validation | handoff | other",
-  "skills_used": ["skill-router"],
-  "routing_result": {},
-  "review_result": {},
-  "gate_decisions": []
-}
-```
-
-The sidecar must contain summarized structured data only. It must not include raw prompts, full review text, full command output, full file contents, secrets, customer data, sensitive personal data, or personnel-scoring data. Adapters may consume and remove the current-task sidecar after reading it to avoid stale data reuse.
+If the envelope contains the canonical optional `metrics_event_candidate`, the runtime consumes that candidate. Otherwise it derives the bounded task type, route, missing-evidence state, and completion state from the envelope. Raw prompts, full review text, full command output, full file contents, secrets, customer data, sensitive personal data, and personnel-scoring data are never copied from the assistant response.
 
 ## When To Emit
 

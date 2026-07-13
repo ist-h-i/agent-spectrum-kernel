@@ -72,7 +72,6 @@ const COMMAND_TEMPLATES = [
   "skill-report.md",
   "skill-ledger-refresh.md",
 ];
-const RUNTIME_SCRIPTS = CLAUDE_RUNTIME_FILES.map((file) => file.name);
 const RUNTIME_DIRECTORIES = [
   "docs/ai/metrics",
   "docs/ai/reports",
@@ -778,8 +777,8 @@ function installRuntime(args, writes) {
   if (args.skipRuntime) {
     return;
   }
-  for (const script of RUNTIME_SCRIPTS) {
-    copyFilePlanned(resolve(REPO_ROOT, "scripts", script), resolve(args.target, "scripts", script), args, writes, { kind: "claude_runtime", script });
+  for (const file of CLAUDE_RUNTIME_FILES) {
+    copyFilePlanned(resolve(REPO_ROOT, file.source), resolve(args.target, file.target), args, writes, { kind: "claude_runtime", script: file.name });
   }
   copyFilePlanned(
     resolve(REPO_ROOT, "docs/ai/observability-config.yml"),
@@ -963,7 +962,7 @@ function claudeRendererInputsForSelection(args, { skipHooks, skipRuntime }) {
     { path: "scripts/adapter-runtime-inventory.mjs", role: "inventory" },
     ...(!skipHooks && !skipRuntime ? [{ path: "adapters/claude-code/project/.claude/hooks/hooks.json", role: "hook_template" }] : []),
     ...args.selectedCommands.map((command) => ({ path: `adapters/claude-code/project/.claude/commands/${command}`, role: "command_template" })),
-    ...(!skipRuntime ? CLAUDE_RUNTIME_FILES.map((file) => ({ path: `scripts/${file.name}`, role: "runtime_source" })) : []),
+    ...(!skipRuntime ? CLAUDE_RUNTIME_FILES.map((file) => ({ path: file.source, role: file.assetKind === "schemas" ? "runtime_schema" : "runtime_source" })) : []),
     ...(!skipRuntime ? [{ path: "docs/ai/observability-config.yml", role: "config_source" }] : []),
     ...args.requiredAssets.filter((path) => !path.startsWith("schemas/") && !path.endsWith("-contract.md")).map((path) => ({ path, role: "config_source" })),
     ...args.initialProjectStateAssets.map((path) => ({ path, role: "config_source" })),

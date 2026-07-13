@@ -65,10 +65,11 @@ Verified in this repository:
 - Static and fixture validation checks the Codex adapter installer, Codex install state output, dry-run/check behavior, managed `AGENTS.md` merge/skip behavior, profile-selected `.agents/skills` projection, prompt/command projection, skill and router-reachability closure failures, installed-reference integrity, stale skill/prompt/command reporting, hash-checked managed-file pruning, rollback, detach, and local file preservation in stale skill directories.
 - Static and fixture validation checks the Claude adapter installer, Claude install state output, core-install-state precondition, supported profiles, command and router-reachability closure failures, command-required asset projection, local modification conflicts, partial `.claude/settings.json` rollback conflicts, `--force`, `--rollback`, `--detach`, `--skip-runtime` hook suppression, `.claude/settings.json` hook source of truth, managed hook replacement/removal, plugin hook wrapper resolution, local observability defaults, and Pattern B guardrails.
 - Fixture validation checks the Codex runner with captured pass and insufficient-evidence outputs, plus Claude runtime smoke event-store writing and missing-runtime failures.
+- Fixture validation checks the Claude runtime-owned Stop collector against the canonical Execution Envelope, including write/update, skip, malformed input, duplicate-hook idempotency, persistence failure isolation, privacy exclusions, and a clean read-only Git working tree.
 - Static validation checks the presence of required Codex adapter paths.
 
 Unknown:
 
-- Runtime behavior inside each external tool after users copy or modify adapter assets.
+- Runtime invocation inside each external tool after users copy or modify adapter assets. Repository fixtures verify bounded adapter behavior but do not prove an adopting installation invoked it.
 - Whether an adopting Codex repository copied the expected skills or ran the prompt templates against the intended workspace, diff, PR head, and verification commands.
 - Capabilities of tools without adapters in this repository.

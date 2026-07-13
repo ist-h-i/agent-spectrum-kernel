@@ -37,17 +37,19 @@ Forbidden by default:
 
 ## Storage
 
-Default storage is project-local.
+Default event storage is repository-local but runtime-owned. It is not a versioned engineering artifact.
 
 Recommended locations for adopting projects:
 
 ```text
 docs/ai/observability-config.yml
-docs/ai/metrics/events.jsonl
+ask-runtime/metrics/events.jsonl
 docs/ai/reports/
 docs/ai/improvement-ledger.md
 docs/ai/skill-adoption-metrics.md
 ```
+
+`ask-runtime/` resolves to `.git/agent-spectrum-kernel/` in Git repositories and `.agent-spectrum-kernel/runtime/` otherwise. This keeps read-only adapter workflows from modifying the engineering working tree. A project may opt into another path explicitly.
 
 Adapters may choose equivalent paths, but they must document:
 

@@ -1,12 +1,14 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
+import { DEFAULT_RUNTIME_EVENT_STORE, resolveObservabilityPath } from "./observability-paths.mjs";
 
 const DEFAULT_CONFIG = {
   enabled: true,
   storage: {
-    event_store: "docs/ai/metrics/events.jsonl",
+    event_store: DEFAULT_RUNTIME_EVENT_STORE,
   },
   capture: {
     task_boundary_required: true,
@@ -38,7 +40,7 @@ const DEFAULT_CONFIG = {
 };
 
 const VERIFICATION_COMMAND_PATTERN = /\b(test|lint|typecheck|tsc|build|validate|check|pytest|vitest|jest|mocha|cargo test|go test|mvn test|gradle test)\b/i;
-const UNSAFE_COMMAND_PREVIEW_PATTERN = /\b(api[_-]?key|token|secret|password|passwd|authorization|bearer|_authToken|npm publish|curl\s+-H)\b|sk-[A-Za-z0-9_-]+/i;
+const UNSAFE_COMMAND_PREVIEW_PATTERN = /\b(api[_-]?key|token|secret|password|passwd|authorization|bearer|_authToken|npm publish|curl\s+-H)\b|(?:^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]+/i;
 const ALLOWED_TASK_TYPES = new Set(["implementation", "review", "refactor", "investigation", "adoption", "documentation", "handoff", "validation", "report", "ledger_refresh", "other"]);
 
 function parseArgs(argv) {
@@ -54,7 +56,6 @@ function parseArgs(argv) {
     routingResultJson: process.env.AI_ROUTING_RESULT_JSON || "",
     reviewResultJson: process.env.AI_REVIEW_RESULT_JSON || "",
     gateDecisionsJson: process.env.AI_GATE_DECISIONS_JSON || "",
-    sidecar: process.env.AI_METRICS_SIDECAR || ".claude/metrics/current-task.json",
     nonBlocking: false,
     dryRun: false,
     printResult: false,
@@ -84,8 +85,6 @@ function parseArgs(argv) {
       args.reviewResultJson = argv[++i];
     } else if (arg === "--gate-decisions-json") {
       args.gateDecisionsJson = argv[++i];
-    } else if (arg === "--sidecar") {
-      args.sidecar = argv[++i];
     } else if (arg === "--non-blocking") {
       args.nonBlocking = true;
     } else if (arg === "--dry-run") {
@@ -119,8 +118,7 @@ Options:
                             Optional review decision summary without raw review text.
   --gate-decisions-json <json>
                             Optional structured gate decisions without raw review text.
-  --sidecar <path>          Optional project-local task sidecar. Defaults to .claude/metrics/current-task.json.
-  --event-store <path>      JSONL event store path.
+  --event-store <path>      JSONL event store path. Defaults to runtime-owned local storage.
   --config <path>           Observability config. Defaults to docs/ai/observability-config.yml.
   --project-root <path>     Adopting project root for runtime-health; CLAUDE_PROJECT_DIR takes precedence.
   --non-blocking            Exit successfully and stay silent if metrics recording fails.
@@ -256,56 +254,15 @@ function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function readSidecar(args) {
-  if (args.eventKind !== "task_stop" || !args.sidecar) {
-    return {};
-  }
-  const sidecarPath = resolve(args.sidecar);
-  if (!existsSync(sidecarPath)) {
-    return {};
-  }
-
-  try {
-    const input = readFileSync(sidecarPath, "utf8").trim();
-    if (!input) {
-      return {};
-    }
-    const parsed = JSON.parse(input);
-    return isPlainObject(parsed) ? parsed : {};
-  } catch {
-    return {};
-  } finally {
-    try {
-      rmSync(sidecarPath, { force: true });
-    } catch {
-      // Metrics sidecars are best-effort and must not affect the developer task.
-    }
-  }
-}
-
-function applySidecar(args, sidecar) {
-  if (!isPlainObject(sidecar)) {
-    return;
-  }
-  if (!args.taskId && typeof sidecar.task_id === "string" && sidecar.task_id) {
-    args.taskId = sidecar.task_id;
-  }
-  if (args.taskType === "other" && ALLOWED_TASK_TYPES.has(sidecar.task_type)) {
-    args.taskType = sidecar.task_type;
-  }
-  const sidecarSkills = Array.isArray(sidecar.skills_used) ? sidecar.skills_used : Array.isArray(sidecar.skills) ? sidecar.skills : [];
-  if (args.skills.length === 0 && sidecarSkills.length > 0) {
-    args.skills = sidecarSkills.filter((value) => typeof value === "string" && value);
-  }
-  if (!args.routingResultJson && isPlainObject(sidecar.routing_result)) {
-    args.routingResultJson = JSON.stringify(sidecar.routing_result);
-  }
-  if (!args.reviewResultJson && isPlainObject(sidecar.review_result)) {
-    args.reviewResultJson = JSON.stringify(sidecar.review_result);
-  }
-  if (!args.gateDecisionsJson && Array.isArray(sidecar.gate_decisions)) {
-    args.gateDecisionsJson = JSON.stringify(sidecar.gate_decisions);
-  }
+function collectCanonicalTaskResult(args, hookInput) {
+  if (args.eventKind !== "task_stop") return { status: "not_applicable", envelope: null };
+  const result = inspectExecutionEnvelope(String(hookInput.last_assistant_message ?? ""));
+  if (result.status === "parsed") return { status: "parsed", envelope: result.value };
+  return {
+    status: result.status,
+    envelope: null,
+    reason: `canonical_task_result_${result.status}`,
+  };
 }
 
 function changedPaths(hookInput, maxPaths) {
@@ -342,37 +299,61 @@ function safeCommandPreview(command) {
   return value;
 }
 
-function buildEvent(args, hookInput, config, taskId) {
+function buildEvent(args, hookInput, config, taskId, envelope = null) {
   const now = new Date().toISOString();
   const paths = changedPaths(hookInput, config.capture.max_paths_per_event ?? 50);
   const command = hookInput.tool_input?.command ?? "";
-  const skills = unique(args.skills);
+  const candidate = isPlainObject(envelope?.metrics_event_candidate)
+    ? structuredClone(envelope.metrics_event_candidate)
+    : null;
+  const envelopeSkills = [
+    envelope?.route?.internal?.primary,
+    ...(Array.isArray(envelope?.route?.internal?.secondary) ? envelope.route.internal.secondary : []),
+  ];
+  const skills = safeTextList([...(candidate?.skills_used ?? []), ...args.skills, ...envelopeSkills], 100, 120);
+  const envelopeRoutingResult = envelope ? {
+    operating_mode: envelope.route?.operating_mode,
+    primary_skill: envelope.route?.internal?.primary,
+    secondary_skills: envelope.route?.internal?.secondary,
+    missing_evidence: (envelope.evidence_status?.missing ?? []).map((input) => ({
+      input,
+      reason: "Canonical task result reported missing evidence.",
+    })),
+  } : {};
   const routingResult = sanitizeRoutingResult({
+    ...(candidate?.routing_result ?? {}),
+    ...envelopeRoutingResult,
     ...(hookInput.routing_result ?? {}),
     ...parseJsonOption(args.routingResultJson),
   });
   const reviewResult = sanitizeReviewResult({
+    ...(candidate?.review_result ?? {}),
     ...(hookInput.review_result ?? {}),
     ...parseJsonOption(args.reviewResultJson),
   });
   const gateDecisionOption = parseJsonOption(args.gateDecisionsJson, []);
   const gateDecisions = sanitizeGateDecisions([
+    ...(Array.isArray(candidate?.gate_decisions) ? candidate.gate_decisions : []),
     ...(Array.isArray(hookInput.gate_decisions) ? hookInput.gate_decisions : []),
     ...(Array.isArray(gateDecisionOption) ? gateDecisionOption : []),
   ]);
 
   const event = {
     schema_version: "1.0.0",
-    event_id: `evt:${now}:${randomUUID()}`,
-    task_id: taskId,
-    task_type: args.taskType,
-    occurred_at: now,
+    event_id: privacySafeText(candidate?.event_id, 200) || eventIdFor(args.eventKind, taskId, now),
+    task_id: privacySafeText(candidate?.task_id, 200) || taskId,
+    task_type: candidate?.task_type ?? taskTypeFromEnvelope(envelope, args.taskType),
+    occurred_at: candidate?.occurred_at ?? now,
     skills_used: skills,
     routing_result: routingResult,
-    outcome_metrics: {},
-    verification_metrics: {},
-    debt_movement_metrics: {},
-    evidence_references: [],
+    instruction_quality_metrics: { ...(candidate?.instruction_quality_metrics ?? {}) },
+    outcome_metrics: { ...(candidate?.outcome_metrics ?? {}) },
+    verification_metrics: sanitizeVerificationMetrics(candidate?.verification_metrics, config),
+    debt_movement_metrics: { ...(candidate?.debt_movement_metrics ?? {}) },
+    evidence_references: safeTextList([
+      ...(candidate?.evidence_references ?? []),
+      ...(envelope?.evidence_status?.checked ?? []),
+    ], 50, 500),
     privacy_note: {
       raw_prompts_stored: false,
       secrets_stored: false,
@@ -382,6 +363,16 @@ function buildEvent(args, hookInput, config, taskId) {
       note: "Summarized local event. Raw prompts, secrets, full file contents, and full command output omitted by default.",
     },
   };
+
+  if (candidate?.related_ids) event.related_ids = sanitizeRelatedIds(candidate.related_ids);
+  if (candidate?.debt_inventory_snapshot) event.debt_inventory_snapshot = { ...candidate.debt_inventory_snapshot };
+  if (typeof candidate?.verification_result_summary === "string") {
+    event.verification_result_summary = sanitizeText(candidate.verification_result_summary, 2000);
+  }
+  if (candidate?.changed_file_summary) {
+    const candidatePaths = safeTextList(candidate.changed_file_summary.paths ?? [], config.capture.max_paths_per_event ?? 50, 500);
+    event.changed_file_summary = { count: candidatePaths.length, paths: candidatePaths };
+  }
 
   if (Object.keys(reviewResult).length > 0) {
     event.review_result = reviewResult;
@@ -426,8 +417,16 @@ function buildEvent(args, hookInput, config, taskId) {
     event.command_attempt_summary = "Command attempted; command text and full command output omitted by default. This is not counted as verified work.";
   }
 
-  if (args.eventKind === "task_stop") {
+  if (args.eventKind === "task_stop" && !candidate && envelope?.stop_reason?.status === "completed") {
     event.outcome_metrics.task_completed = true;
+  }
+
+  if (
+    args.eventKind === "task_stop" &&
+    !candidate &&
+    ((envelope?.evidence_status?.missing?.length ?? 0) > 0 || envelope?.stop_reason?.status === "insufficient_evidence")
+  ) {
+    event.verification_metrics.insufficient_evidence_reported = true;
   }
 
   if (args.eventKind === "ledger_refresh") {
@@ -439,6 +438,29 @@ function buildEvent(args, hookInput, config, taskId) {
   }
 
   return event;
+}
+
+function eventIdFor(eventKind, taskId, now) {
+  if (eventKind !== "task_stop") return `evt:${now}:${randomUUID()}`;
+  const digest = createHash("sha256").update(`${taskId}\0task_stop`).digest("hex").slice(0, 24);
+  return `evt:task-stop:${digest}`;
+}
+
+function taskTypeFromEnvelope(envelope, fallback) {
+  if (ALLOWED_TASK_TYPES.has(fallback) && fallback !== "other") return fallback;
+  const primary = envelope?.route?.internal?.primary ?? "";
+  if (primary === "handoff-generation") return "handoff";
+  if (primary === "test-first-verification") return "validation";
+  if (primary === "skill-adoption-metrics") return "report";
+  if (primary === "improvement-ledger") return "ledger_refresh";
+  return {
+    "実装": "implementation",
+    "レビュー": "review",
+    "調査": "investigation",
+    "ドキュメント整理": "documentation",
+    "知識蓄積": "documentation",
+    "運用整理": "report",
+  }[envelope?.route?.work_mode] ?? "other";
 }
 
 function sanitizeRoutingResult(source) {
@@ -634,12 +656,98 @@ function sanitizeGateDecisions(source) {
 }
 
 function sanitizeText(value, maxLength) {
-  return String(value).replace(/\s+/g, " ").trim().slice(0, maxLength);
+  const sanitized = String(value).replace(/\s+/g, " ").trim().slice(0, maxLength);
+  return UNSAFE_COMMAND_PREVIEW_PATTERN.test(sanitized) ? "[redacted]" : sanitized;
 }
 
-function appendEvent(eventStore, event) {
+function privacySafeText(value, maxLength) {
+  if (typeof value !== "string") return "";
+  const sanitized = value.replace(/\s+/g, " ").trim().slice(0, maxLength);
+  return UNSAFE_COMMAND_PREVIEW_PATTERN.test(sanitized) ? "" : sanitized;
+}
+
+function safeTextList(values, maxItems, maxLength) {
+  return unique((Array.isArray(values) ? values : []).map((value) => privacySafeText(value, maxLength)).filter(Boolean)).slice(0, maxItems);
+}
+
+function sanitizeVerificationMetrics(source, config) {
+  if (!isPlainObject(source)) return {};
+  const result = { ...source };
+  if (!Array.isArray(source.commands_run)) return result;
+  result.commands_run = source.commands_run.slice(0, 20).map((command) => {
+    const record = { command_kind: command.command_kind };
+    if (config.capture.record_command_hash && typeof command.command_hash === "string") record.command_hash = command.command_hash;
+    if (config.capture.record_command_preview && typeof command.redacted_command_preview === "string") {
+      const preview = safeCommandPreview(command.redacted_command_preview);
+      if (preview) record.redacted_command_preview = preview;
+    }
+    return record;
+  });
+  return result;
+}
+
+function sanitizeRelatedIds(source) {
+  const result = {};
+  for (const field of ["prs", "issues", "improvement_ids", "skill_adoption_metric_ids"]) {
+    if (Array.isArray(source[field])) result[field] = safeTextList(source[field], 50, 120);
+  }
+  return result;
+}
+
+function upsertEvent(eventStore, event) {
   mkdirSync(dirname(eventStore), { recursive: true });
-  appendFileSync(eventStore, `${JSON.stringify(event)}\n`);
+  return withEventStoreLock(eventStore, () => {
+    const lines = existsSync(eventStore) ? readFileSync(eventStore, "utf8").split(/\r?\n/).filter(Boolean) : [];
+    let matchIndex = -1;
+    for (const [index, line] of lines.entries()) {
+      try {
+        if (JSON.parse(line)?.event_id === event.event_id) {
+          matchIndex = index;
+          break;
+        }
+      } catch {
+        // Preserve malformed historical lines; summary readers report them separately.
+      }
+    }
+    const serialized = JSON.stringify(event);
+    if (matchIndex >= 0 && lines[matchIndex] === serialized) return "unchanged";
+    if (matchIndex >= 0) lines[matchIndex] = serialized;
+    else lines.push(serialized);
+    const temporaryPath = `${eventStore}.tmp-${process.pid}-${Date.now()}`;
+    try {
+      writeFileSync(temporaryPath, `${lines.join("\n")}\n`);
+      renameSync(temporaryPath, eventStore);
+    } catch (error) {
+      try { rmSync(temporaryPath, { force: true }); } catch { /* preserve original error */ }
+      throw error;
+    }
+    return matchIndex >= 0 ? "updated" : "recorded";
+  });
+}
+
+function withEventStoreLock(eventStore, operation) {
+  const lockPath = `${eventStore}.lock`;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    let descriptor = null;
+    try {
+      descriptor = openSync(lockPath, "wx");
+      return operation();
+    } catch (error) {
+      if (descriptor !== null || error?.code !== "EEXIST") throw error;
+      try {
+        if (Date.now() - statSync(lockPath).mtimeMs > 30_000) unlinkSync(lockPath);
+      } catch {
+        // Another collector may have released the lock between checks.
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    } finally {
+      if (descriptor !== null) {
+        closeSync(descriptor);
+        try { unlinkSync(lockPath); } catch { /* lock cleanup is best-effort */ }
+      }
+    }
+  }
+  throw new Error("metrics event store lock timed out");
 }
 
 function resolveProjectRoot(args, eventStore = null) {
@@ -649,6 +757,11 @@ function resolveProjectRoot(args, eventStore = null) {
   if (configPath.endsWith("/docs/ai/observability-config.yml")) return resolve(dirname(configPath), "../..");
   if (eventStore && eventStore.includes("/docs/ai/")) return resolve(eventStore.slice(0, eventStore.indexOf("/docs/ai/")));
   return process.cwd();
+}
+
+function resolveEventStore(args, config) {
+  const projectRoot = resolveProjectRoot(args);
+  return resolveObservabilityPath(projectRoot, args.eventStore || config.storage.event_store || DEFAULT_CONFIG.storage.event_store);
 }
 
 function readRuntimeHealth(path) {
@@ -708,17 +821,17 @@ function appendRuntimeHealth(path, entry, maxEntries) {
 }
 
 function runtimeHealthPath(args, eventStore = null) {
-  return resolve(resolveProjectRoot(args, eventStore), ".agent-spectrum-kernel/runtime-health.jsonl");
+  return resolveObservabilityPath(resolveProjectRoot(args, eventStore), "ask-runtime/runtime-health.jsonl");
 }
 
-function runtimeHealthEntry(status) {
+function runtimeHealthEntry(status, errorCode = "non_blocking_metrics_record_failure") {
   return {
     schema_version: "1.0.0",
     occurred_at: new Date().toISOString(),
     component: "ai-metrics-record",
     status,
-    error_code: "non_blocking_metrics_record_failure",
-    message: status === "recovered" ? "Metrics recorder recovered; raw error details omitted by default." : "Non-blocking metrics recorder failed; raw error details omitted by default.",
+    error_code: errorCode,
+    message: status === "recovered" ? "Metrics collector recovered; raw details omitted by default." : "Metrics collector degraded; raw details omitted by default.",
     privacy_note: {
       raw_prompts_stored: false,
       secrets_stored: false,
@@ -733,8 +846,15 @@ function runtimeHealthEntry(status) {
 function recordRuntimeHealthRecovery(args, config, eventStore) {
   try {
     const path = runtimeHealthPath(args, eventStore);
-    const latest = [...readRuntimeHealth(path).entries].reverse().find((entry) => healthKey(entry) === "ai-metrics-record:non_blocking_metrics_record_failure");
-    if (latest?.status === "error") appendRuntimeHealth(path, runtimeHealthEntry("recovered"), config.runtime_health?.max_entries);
+    const unresolved = new Map();
+    for (const entry of readRuntimeHealth(path).entries) {
+      if (entry.component !== "ai-metrics-record") continue;
+      if (entry.status === "error") unresolved.set(entry.error_code, entry);
+      if (entry.status === "recovered") unresolved.delete(entry.error_code);
+    }
+    for (const errorCode of unresolved.keys()) {
+      appendRuntimeHealth(path, runtimeHealthEntry("recovered", errorCode), config.runtime_health?.max_entries);
+    }
   } catch {
     // Health recording remains fail-open for hooks.
   }
@@ -742,24 +862,68 @@ function recordRuntimeHealthRecovery(args, config, eventStore) {
 
 function main(args) {
   const hookInput = readStdinJson();
-  applySidecar(args, readSidecar(args));
   const config = readConfig(args.config);
-  const decision = shouldRecord(args, hookInput, config);
-  if (!decision.ok) {
-    if (args.printResult) {
-      console.log(JSON.stringify({ status: "skip", reason: decision.reason }));
-    }
+  if (!config.enabled) {
+    if (args.printResult) console.log(JSON.stringify(skipResult("observability_disabled")));
     return;
   }
-  const event = buildEvent(args, hookInput, config, decision.taskId);
-  const eventStore = resolve(args.eventStore || config.storage.event_store || DEFAULT_CONFIG.storage.event_store);
+  const eventStore = resolveEventStore(args, config);
+  const taskResult = collectCanonicalTaskResult(args, hookInput);
+  if (taskResult.status === "parsed" && taskResult.envelope?.metrics_event_candidate) {
+    args.taskId ||= taskResult.envelope.metrics_event_candidate.task_id;
+    if (args.taskType === "other") args.taskType = taskResult.envelope.metrics_event_candidate.task_type;
+  }
+  if (args.eventKind === "task_stop" && taskResult.status !== "parsed") {
+    if (args.nonBlocking && ["malformed", "invalid"].includes(taskResult.status)) {
+      try {
+        appendRuntimeHealth(
+          runtimeHealthPath(args, eventStore),
+          runtimeHealthEntry("error", taskResult.reason),
+          config.runtime_health?.max_entries,
+        );
+      } catch {
+        // A collector degradation must not change the engineering decision.
+      }
+    }
+    if (args.printResult) console.log(JSON.stringify(skipResult(taskResult.reason)));
+    return;
+  }
+  const decision = shouldRecord(args, hookInput, config);
+  if (!decision.ok) {
+    if (args.printResult) console.log(JSON.stringify(skipResult(decision.reason)));
+    return;
+  }
+  const event = buildEvent(args, hookInput, config, decision.taskId, taskResult.envelope);
+  let status = "dry-run";
   if (!args.dryRun) {
-    appendEvent(eventStore, event);
+    status = upsertEvent(eventStore, event);
     if (args.nonBlocking) recordRuntimeHealthRecovery(args, config, eventStore);
   }
   if (args.printResult) {
-    console.log(JSON.stringify({ status: args.dryRun ? "dry-run" : "recorded", event }, null, 2));
+    console.log(JSON.stringify({ status, event, capability: capabilityEvidence(args.dryRun ? "runtime_detected" : "executed") }, null, 2));
   }
+}
+
+function skipResult(reason) {
+  return {
+    status: "skip",
+    reason,
+    capability: {
+      capability_id: "local_event_emission",
+      support: "unknown",
+      evidence_level: "none",
+      downgrade_behavior: "unknown",
+    },
+  };
+}
+
+function capabilityEvidence(evidenceLevel) {
+  return {
+    capability_id: "local_event_emission",
+    support: "supported",
+    evidence_level: evidenceLevel,
+    downgrade_behavior: evidenceLevel === "executed" ? "claim_execution_only" : "claim_runtime_detection_only",
+  };
 }
 
 let runtimeArgs = null;
@@ -778,7 +942,7 @@ try {
 function recordRuntimeHealthFailure(error, args) {
   try {
     const config = readConfig(args.config);
-    const eventStore = resolve(args.eventStore || config.storage.event_store || DEFAULT_CONFIG.storage.event_store);
+    const eventStore = resolveEventStore(args, config);
     appendRuntimeHealth(runtimeHealthPath(args, eventStore), runtimeHealthEntry("error"), config.runtime_health?.max_entries);
   } catch {
     // Non-blocking hook failures must not interrupt the developer task.

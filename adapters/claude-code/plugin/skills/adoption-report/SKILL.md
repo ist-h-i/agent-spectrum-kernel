@@ -8,7 +8,7 @@ Use `skill-adoption-metrics`, `docs/metrics-event-contract.md`, and `docs/ai/ado
 
 Read project-local evidence only:
 
-- `docs/ai/metrics/events.jsonl`
+- runtime-owned `ask-runtime/metrics/events.jsonl`
 - `docs/ai/improvement-ledger.md`
 - explicit validation reports or review outputs referenced by the user
 

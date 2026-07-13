@@ -1,7 +1,11 @@
 export const CLAUDE_RUNTIME_FILES = Object.freeze([
-  { name: "ai-metrics-record.mjs", target: "scripts/ai-metrics-record.mjs", assetKind: "runner" },
-  { name: "ai-metrics-summarize.mjs", target: "scripts/ai-metrics-summarize.mjs", assetKind: "runner" },
-  { name: "ai-ledger-refresh.mjs", target: "scripts/ai-ledger-refresh.mjs", assetKind: "runner" },
+  { name: "ai-metrics-record.mjs", source: "scripts/ai-metrics-record.mjs", target: "scripts/ai-metrics-record.mjs", assetKind: "runner" },
+  { name: "ai-metrics-summarize.mjs", source: "scripts/ai-metrics-summarize.mjs", target: "scripts/ai-metrics-summarize.mjs", assetKind: "runner" },
+  { name: "ai-ledger-refresh.mjs", source: "scripts/ai-ledger-refresh.mjs", target: "scripts/ai-ledger-refresh.mjs", assetKind: "runner" },
+  { name: "execution-envelope.mjs", source: "scripts/execution-envelope.mjs", target: "scripts/execution-envelope.mjs", assetKind: "runner" },
+  { name: "observability-paths.mjs", source: "scripts/observability-paths.mjs", target: "scripts/observability-paths.mjs", assetKind: "runner" },
+  { name: "execution-envelope.schema.json", source: "schemas/execution-envelope.schema.json", target: "scripts/execution-envelope.schema.json", assetKind: "schemas" },
+  { name: "metrics-event.schema.json", source: "schemas/metrics-event.schema.json", target: "scripts/metrics-event.schema.json", assetKind: "schemas" },
 ]);
 
 export const CODEX_RUNTIME_FILES = Object.freeze([
@@ -16,7 +20,7 @@ export const CODEX_RUNTIME_FILES = Object.freeze([
 export const ADAPTER_RENDERER_METADATA = Object.freeze({
   claude_code: Object.freeze({
     rendererId: "install-claude-adapter",
-    rendererVersion: "3",
+    rendererVersion: "4",
     installerPath: "scripts/install-claude-adapter.mjs",
   }),
   codex: Object.freeze({
