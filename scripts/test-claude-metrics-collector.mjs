@@ -151,8 +151,11 @@ async function main() {
   const writeRoot = resolve(fixtureRoot, "write");
   const eventStore = resolve(writeRoot, "events.jsonl");
   mkdirSync(writeRoot, { recursive: true });
+  const transcriptPath = resolve(writeRoot, "transcript.jsonl");
+  writeFileSync(transcriptPath, `${JSON.stringify({ type: "assistant", uuid: "turn-a" })}\n`);
   const hookInput = {
     session_id: "S-COLLECTOR-1",
+    transcript_path: transcriptPath,
     hook_event_name: "Stop",
     last_assistant_message: envelope(),
   };
@@ -183,6 +186,29 @@ async function main() {
   if (!["updated", "unchanged"].includes(duplicateResult.status) || readEvents(eventStore).length !== 1) {
     throw new Error(`duplicate Stop hooks must be idempotent\n${JSON.stringify(duplicateResult, null, 2)}`);
   }
+  writeFileSync(transcriptPath, `${JSON.stringify({ type: "assistant", uuid: "turn-b-after-read-only-work" })}\n`, { flag: "a" });
+  const sameEnvelopeFollowupResult = resultJson(
+    "same-envelope follow-up after transcript-only turn",
+    runRecorder(writeRoot, ["--event-kind", "task_stop", "--event-store", eventStore, "--print-result"], hookInput),
+  );
+  writeFileSync(transcriptPath, `${JSON.stringify({ type: "assistant", uuid: "turn-c-after-conversation-only-work" })}\n`, { flag: "a" });
+  const sameEnvelopeRestartResult = resultJson(
+    "same-envelope follow-up after collector restart",
+    runRecorder(writeRoot, ["--event-kind", "task_stop", "--event-store", eventStore, "--print-result"], hookInput),
+  );
+  const sameEnvelopeEvents = readEvents(eventStore);
+  if (
+    sameEnvelopeFollowupResult.status !== "recorded" ||
+    sameEnvelopeRestartResult.status !== "recorded" ||
+    sameEnvelopeEvents.length !== 3 ||
+    new Set(sameEnvelopeEvents.map((event) => event.task_id)).size !== 3
+  ) {
+    throw new Error(`later read-only or conversation-only turns with the same Envelope must remain separate across collector processes\n${JSON.stringify({ sameEnvelopeFollowupResult, sameEnvelopeRestartResult, sameEnvelopeEvents }, null, 2)}`);
+  }
+  const persistedBoundaryState = readFileSync(resolve(writeRoot, ".agent-spectrum-kernel/runtime/task-boundaries.json"), "utf8");
+  if (persistedBoundaryState.includes(transcriptPath) || persistedBoundaryState.includes("turn-a") || persistedBoundaryState.includes("turn-b")) {
+    throw new Error(`task boundary state must persist only the hashed transcript identity\n${persistedBoundaryState}`);
+  }
   const distinctEnvelopeResult = resultJson(
     "same-session distinct task result",
     runRecorder(writeRoot, ["--event-kind", "task_stop", "--event-store", eventStore, "--print-result"], {
@@ -193,20 +219,22 @@ async function main() {
   const distinctEnvelopeEvents = readEvents(eventStore);
   if (
     distinctEnvelopeResult.status !== "recorded" ||
-    distinctEnvelopeEvents.length !== 2 ||
-    new Set(distinctEnvelopeEvents.map((event) => event.event_id)).size !== 2 ||
-    new Set(distinctEnvelopeEvents.map((event) => event.task_id)).size !== 2
+    distinctEnvelopeEvents.length !== 4 ||
+    new Set(distinctEnvelopeEvents.map((event) => event.event_id)).size !== 4 ||
+    new Set(distinctEnvelopeEvents.map((event) => event.task_id)).size !== 4
   ) {
     throw new Error(`same session with distinct canonical envelopes must retain two task boundaries\n${JSON.stringify({ distinctEnvelopeResult, distinctEnvelopeEvents }, null, 2)}`);
   }
   const distinctEnvelopeReport = summarizeStore(writeRoot, eventStore, "same-session-distinct-tasks");
-  if (distinctEnvelopeReport.summary.tasks_reviewed !== 2) {
+  if (distinctEnvelopeReport.summary.tasks_reviewed !== 4) {
     throw new Error(`same-session Stop boundaries must remain two tasks in the summarizer\n${JSON.stringify(distinctEnvelopeReport.summary, null, 2)}`);
   }
 
   const candidateRoot = resolve(fixtureRoot, "candidate");
   const candidateStore = resolve(candidateRoot, "events.jsonl");
   mkdirSync(candidateRoot, { recursive: true });
+  const candidateTranscriptPath = resolve(candidateRoot, "transcript.jsonl");
+  writeFileSync(candidateTranscriptPath, `${JSON.stringify({ type: "assistant", uuid: "candidate-turn-a" })}\n`);
   const firstCandidate = normalizedCandidate();
   const sensitiveValues = [
     "alice@example.com",
@@ -229,6 +257,7 @@ async function main() {
     "normalized candidate write",
     runRecorder(candidateRoot, ["--event-kind", "task_stop", "--event-store", candidateStore, "--print-result"], {
       session_id: "S-CANDIDATE",
+      transcript_path: candidateTranscriptPath,
       hook_event_name: "Stop",
       last_assistant_message: envelope({ metrics_event_candidate: firstCandidate }),
     }),
@@ -254,6 +283,7 @@ async function main() {
     "normalized candidate merge/update",
     runRecorder(candidateRoot, ["--event-kind", "task_stop", "--event-store", candidateStore, "--print-result"], {
       session_id: "S-CANDIDATE",
+      transcript_path: candidateTranscriptPath,
       hook_event_name: "Stop",
       last_assistant_message: envelope({ metrics_event_candidate: updatedCandidate }),
     }),
@@ -267,6 +297,25 @@ async function main() {
     candidateEvents[0].outcome_metrics?.rework_count !== 1
   ) {
     throw new Error(`same normalized event_id should update one JSONL row\n${JSON.stringify({ updateResult, candidateEvents }, null, 2)}`);
+  }
+  writeFileSync(candidateTranscriptPath, `${JSON.stringify({ type: "assistant", uuid: "candidate-turn-b" })}\n`, { flag: "a" });
+  const laterSameCandidateResult = resultJson(
+    "same candidate on a later transcript turn",
+    runRecorder(candidateRoot, ["--event-kind", "task_stop", "--event-store", candidateStore, "--print-result"], {
+      session_id: "S-CANDIDATE",
+      transcript_path: candidateTranscriptPath,
+      hook_event_name: "Stop",
+      last_assistant_message: envelope({ metrics_event_candidate: updatedCandidate }),
+    }),
+  );
+  const laterCandidateEvents = readEvents(candidateStore);
+  if (
+    laterSameCandidateResult.status !== "recorded" ||
+    laterCandidateEvents.length !== 2 ||
+    new Set(laterCandidateEvents.map((event) => event.event_id)).size !== 2 ||
+    new Set(laterCandidateEvents.map((event) => event.task_id)).size !== 2
+  ) {
+    throw new Error(`the same candidate event ID on a later transcript turn must be scoped to a new runtime task\n${JSON.stringify({ laterSameCandidateResult, laterCandidateEvents }, null, 2)}`);
   }
 
   const boundaryRoot = resolve(fixtureRoot, "task-boundary");
@@ -305,6 +354,37 @@ async function main() {
     boundaryReport.summary.tasks_reviewed !== 1
   ) {
     throw new Error(`PostToolUse and candidate Stop must share one task while duplicate Stops converge\n${JSON.stringify({ boundaryEvents, summary: boundaryReport.summary }, null, 2)}`);
+  }
+
+  const expiredClaimRoot = resolve(fixtureRoot, "expired-stop-claim");
+  const expiredClaimStore = resolve(expiredClaimRoot, "events.jsonl");
+  mkdirSync(expiredClaimRoot, { recursive: true });
+  const expiredClaimInput = {
+    session_id: "S-EXPIRED-STOP-CLAIM",
+    hook_event_name: "Stop",
+    last_assistant_message: envelope(),
+  };
+  const firstExpiredClaimResult = resultJson(
+    "initial fallback Stop claim",
+    runRecorder(expiredClaimRoot, ["--event-kind", "task_stop", "--hook-event", "Stop", "--event-store", expiredClaimStore, "--print-result"], expiredClaimInput),
+  );
+  const boundaryStatePath = resolve(expiredClaimRoot, ".agent-spectrum-kernel/runtime/task-boundaries.json");
+  const boundaryState = JSON.parse(readFileSync(boundaryStatePath, "utf8"));
+  const [sessionState] = Object.values(boundaryState.sessions);
+  sessionState.last_stop_claimed_at_ms = 0;
+  writeFileSync(boundaryStatePath, `${JSON.stringify(boundaryState)}\n`);
+  const restartedExpiredClaimResult = resultJson(
+    "expired fallback Stop claim after process restart",
+    runRecorder(expiredClaimRoot, ["--event-kind", "task_stop", "--hook-event", "Stop", "--event-store", expiredClaimStore, "--print-result"], expiredClaimInput),
+  );
+  const expiredClaimEvents = readEvents(expiredClaimStore);
+  if (
+    firstExpiredClaimResult.status !== "recorded" ||
+    restartedExpiredClaimResult.status !== "recorded" ||
+    expiredClaimEvents.length !== 2 ||
+    new Set(expiredClaimEvents.map((event) => event.task_id)).size !== 2
+  ) {
+    throw new Error(`an expired fallback Stop claim must not survive as an indefinite duplicate across process restarts\n${JSON.stringify({ firstExpiredClaimResult, restartedExpiredClaimResult, expiredClaimEvents }, null, 2)}`);
   }
 
   const signalRoot = resolve(fixtureRoot, "controlled-signals");
@@ -389,6 +469,55 @@ async function main() {
       !referenceEvent.evidence_references.includes("claude_hook:Stop")
     ) {
       throw new Error(`${referenceCount} candidate references plus the controlled hook reference must remain schema-valid\n${JSON.stringify(referenceEvent, null, 2)}`);
+    }
+  }
+
+  const pathLimitCases = [
+    { label: "50", configuredValue: "50" },
+    { label: "51", configuredValue: "51" },
+    { label: "100", configuredValue: "100" },
+    { label: "negative", configuredValue: "-1" },
+    { label: "non-numeric", configuredValue: "not-a-number" },
+  ];
+  const manyPaths = Array.from({ length: 100 }, (_, index) => ({ file_path: `src/path-${index}.mjs` }));
+  for (const { label, configuredValue } of pathLimitCases) {
+    const pathRoot = resolve(fixtureRoot, `path-limit-${label}`);
+    const pathStore = resolve(pathRoot, "events.jsonl");
+    const pathConfig = resolve(pathRoot, "observability.yml");
+    mkdirSync(pathRoot, { recursive: true });
+    writeFileSync(pathConfig, `capture:\n  max_paths_per_event: ${configuredValue}\n`);
+    const hookPathResult = resultJson(
+      `hook path limit ${label}`,
+      runRecorder(pathRoot, ["--event-kind", "file_change", "--hook-event", "PostToolUse", "--config", pathConfig, "--event-store", pathStore, "--print-result"], {
+        session_id: `S-PATH-LIMIT-${label}`,
+        hook_event_name: "PostToolUse",
+        tool_input: { edits: manyPaths },
+      }),
+    );
+    const pathCandidate = normalizedCandidate({
+      event_id: `task-result:path-limit-${label}`,
+      task_id: `TASK-PATH-LIMIT-${label}`,
+      changed_file_summary: {
+        count: 50,
+        paths: manyPaths.slice(0, 50).map((item) => item.file_path),
+      },
+    });
+    const candidatePathResult = resultJson(
+      `candidate path limit ${label}`,
+      runRecorder(pathRoot, ["--event-kind", "task_stop", "--hook-event", "Stop", "--config", pathConfig, "--event-store", pathStore, "--print-result"], {
+        session_id: `S-PATH-LIMIT-${label}`,
+        hook_event_name: "Stop",
+        last_assistant_message: envelope({ metrics_event_candidate: pathCandidate }),
+      }),
+    );
+    const [hookPathEvent, candidatePathEvent] = readEvents(pathStore);
+    if (
+      hookPathResult.status !== "recorded" ||
+      candidatePathResult.status !== "recorded" ||
+      hookPathEvent.changed_file_summary?.paths?.length !== 50 ||
+      candidatePathEvent.changed_file_summary?.paths?.length !== 50
+    ) {
+      throw new Error(`configured path limit ${label} must normalize to a schema-safe 50 paths\n${JSON.stringify({ hookPathResult, candidatePathResult, events: readEvents(pathStore) }, null, 2)}`);
     }
   }
 

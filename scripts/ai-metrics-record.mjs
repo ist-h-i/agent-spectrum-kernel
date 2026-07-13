@@ -44,6 +44,8 @@ const VERIFICATION_COMMAND_PATTERN = /\b(test|lint|typecheck|tsc|build|validate|
 const ALLOWED_TASK_TYPES = new Set(["implementation", "review", "refactor", "investigation", "adoption", "documentation", "handoff", "validation", "report", "ledger_refresh", "other"]);
 const ALLOWED_OPERATING_MODES = new Set(["delivery_quality", "adoption_bootstrap", "observability_metrics", "operation_automation"]);
 const ALLOWED_HOOK_EVENTS = new Set(["PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop", "SubagentStop"]);
+const MAX_CHANGED_PATHS = 50;
+const STOP_DUPLICATE_CLAIM_TTL_MS = 5_000;
 const RUNTIME_ROOT = dirname(fileURLToPath(import.meta.url));
 
 function parseArgs(argv) {
@@ -235,6 +237,43 @@ function stopBoundaryDigest(envelope) {
   return createHash("sha256").update(stableCanonicalJson(identity)).digest("hex");
 }
 
+function stopBoundaryClaim(hookInput, envelope) {
+  if (typeof hookInput.transcript_path === "string" && hookInput.transcript_path) {
+    try {
+      const transcriptPath = resolve(hookInput.transcript_path);
+      const transcript = statSync(transcriptPath);
+      if (transcript.isFile()) {
+        return {
+          identity: createHash("sha256").update(stableCanonicalJson({
+            transcript_path: transcriptPath,
+            size: transcript.size,
+            stop_digest: stopBoundaryDigest(envelope),
+          })).digest("hex"),
+          source: "transcript_snapshot",
+        };
+      }
+    } catch {
+      // Fall back to a short-lived claim when the transcript is unavailable.
+    }
+  }
+  return { identity: stopBoundaryDigest(envelope), source: "envelope_ttl" };
+}
+
+function activeDuplicateStopClaim(current, claim, now) {
+  if (
+    current.duplicate_open !== true ||
+    current.last_stop_claim_identity !== claim.identity ||
+    current.last_stop_claim_source !== claim.source ||
+    typeof current.last_stop_task_id !== "string"
+  ) {
+    return false;
+  }
+  if (claim.source === "transcript_snapshot") return true;
+  const claimedAt = Number(current.last_stop_claimed_at_ms);
+  const age = now - claimedAt;
+  return Number.isFinite(claimedAt) && age >= 0 && age <= STOP_DUPLICATE_CLAIM_TTL_MS;
+}
+
 function resolveSessionTaskBoundary(args, hookInput, eventStore, envelope) {
   const statePath = taskBoundaryStatePath(args, eventStore);
   const persist = !args.dryRun;
@@ -246,14 +285,17 @@ function resolveSessionTaskBoundary(args, hookInput, eventStore, envelope) {
     const nextSegment = Number.isInteger(current.next_segment) && current.next_segment >= 0 ? current.next_segment : 0;
 
     if (args.eventKind === "task_stop") {
-      const stopDigest = stopBoundaryDigest(envelope);
-      if (current.duplicate_open === true && current.last_stop_digest === stopDigest && typeof current.last_stop_task_id === "string") {
+      const now = Date.now();
+      const claim = stopBoundaryClaim(hookInput, envelope);
+      if (activeDuplicateStopClaim(current, claim, now)) {
         return current.last_stop_task_id;
       }
       const taskId = `session-boundary:${sessionKey}:${nextSegment}`;
       state.sessions[sessionKey] = {
         next_segment: nextSegment + 1,
-        last_stop_digest: stopDigest,
+        last_stop_claim_identity: claim.identity,
+        last_stop_claim_source: claim.source,
+        last_stop_claimed_at_ms: now,
         last_stop_task_id: taskId,
         duplicate_open: true,
       };
@@ -360,6 +402,12 @@ function changedPaths(hookInput, maxPaths) {
   ]).slice(0, maxPaths);
 }
 
+function normalizedMaxPaths(configuredValue) {
+  const parsed = Number(configuredValue);
+  if (!Number.isFinite(parsed) || parsed < 1) return MAX_CHANGED_PATHS;
+  return Math.min(Math.floor(parsed), MAX_CHANGED_PATHS);
+}
+
 function commandKind(command) {
   const normalized = String(command).toLowerCase();
   if (/\b(lint|eslint|ruff|rubocop)\b/.test(normalized)) return "lint";
@@ -376,7 +424,8 @@ function commandHash(command) {
 
 function buildEvent(args, hookInput, config, taskId, envelope = null, allowedSkillIds = new Set(), allowedSignalIds = new Set()) {
   const now = new Date().toISOString();
-  const paths = changedPaths(hookInput, config.capture.max_paths_per_event ?? 50);
+  const maxPaths = normalizedMaxPaths(config.capture.max_paths_per_event);
+  const paths = changedPaths(hookInput, maxPaths);
   const command = hookInput.tool_input?.command ?? "";
   const hookReference = ALLOWED_HOOK_EVENTS.has(args.hookEvent) ? `claude_hook:${args.hookEvent}` : "";
   const candidate = isPlainObject(envelope?.metrics_event_candidate)
@@ -416,7 +465,7 @@ function buildEvent(args, hookInput, config, taskId, envelope = null, allowedSki
 
   const event = {
     schema_version: "1.0.0",
-    event_id: candidate?.event_id ? hashedIdentifier("evt:candidate", candidate.event_id) : eventIdFor(args.eventKind, taskId, now, envelope),
+    event_id: candidate?.event_id ? hashedIdentifier("evt:candidate", `${taskId}\0${candidate.event_id}`) : eventIdFor(args.eventKind, taskId, now, envelope),
     task_id: hashedIdentifier("task", taskId),
     task_type: ALLOWED_TASK_TYPES.has(candidate?.task_type) ? candidate.task_type : taskTypeFromEnvelope(envelope, args.taskType),
     occurred_at: candidate?.occurred_at ?? now,
@@ -449,7 +498,7 @@ function buildEvent(args, hookInput, config, taskId, envelope = null, allowedSki
     event.debt_inventory_snapshot = sanitizeNonNegativeIntegerMetrics(candidate.debt_inventory_snapshot, DEBT_INVENTORY_FIELDS);
   }
   if (candidate?.changed_file_summary) {
-    const candidatePaths = referenceList(candidate.changed_file_summary.paths ?? [], "path", config.capture.max_paths_per_event ?? 50);
+    const candidatePaths = referenceList(candidate.changed_file_summary.paths ?? [], "path", maxPaths);
     const candidateCount = candidate.changed_file_summary.count;
     event.changed_file_summary = {
       count: Number.isInteger(candidateCount) && candidateCount >= 0 ? candidateCount : candidatePaths.length,
@@ -471,7 +520,7 @@ function buildEvent(args, hookInput, config, taskId, envelope = null, allowedSki
   if (paths.length > 0) {
     event.changed_file_summary = {
       count: paths.length,
-      paths: referenceList(paths, "path", config.capture.max_paths_per_event ?? 50),
+      paths: referenceList(paths, "path", maxPaths),
     };
   }
 

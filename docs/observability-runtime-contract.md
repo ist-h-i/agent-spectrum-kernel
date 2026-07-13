@@ -81,7 +81,7 @@ capture.allow_session_id_task_boundary: true
 capture.task_boundary_source: session_id
 ```
 
-File-change and command events use the current session segment, and the next valid Stop event uses and closes that same segment. A later hook event starts the next segment. Duplicate project/plugin execution of the same Stop reuses the just-closed segment. The candidate's descriptive task ID does not split the runtime aggregation identity from preceding hook events. If neither an explicit hook/CLI task ID nor an allowed session boundary is available, missing task boundary is handled as `skip`.
+File-change and command events use the current session segment, and the next valid Stop event uses and closes that same segment. Duplicate project/plugin execution reuses the just-closed segment only when the canonical result and Claude transcript append position both match. A later transcript turn starts a new segment even if it emits the same result. The stored identity is hashed. When no transcript is available, duplicate reuse is limited to a five-second claim so persisted state cannot join a later process indefinitely. The candidate's descriptive task ID does not split the runtime aggregation identity from preceding hook events. If neither an explicit hook/CLI task ID nor an allowed session boundary is available, missing task boundary is handled as `skip`.
 
 ## Event Shape
 
