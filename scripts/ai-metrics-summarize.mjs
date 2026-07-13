@@ -701,7 +701,10 @@ function gateDecisionDrilldown(tasks) {
 }
 
 function hasSkipReason(decision) {
-  return typeof decision.judgment === "string" && decision.judgment.trim().length > 0;
+  return (
+    (typeof decision.judgment === "string" && decision.judgment.trim().length > 0) ||
+    (typeof decision.reason_category === "string" && decision.reason_category.trim().length > 0)
+  );
 }
 
 function skipReasonCategory(decision) {

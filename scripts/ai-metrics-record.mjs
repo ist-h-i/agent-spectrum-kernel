@@ -203,6 +203,89 @@ function resolveTaskId(args, hookInput, config) {
   return "";
 }
 
+function taskBoundaryStatePath(args, eventStore = null) {
+  return resolveObservabilityPath(resolveProjectRoot(args, eventStore), "ask-runtime/task-boundaries.json");
+}
+
+function readTaskBoundaryState(path) {
+  if (!existsSync(path)) return { schema_version: "1.0.0", sessions: {} };
+  const state = JSON.parse(readFileSync(path, "utf8"));
+  if (!isPlainObject(state) || state.schema_version !== "1.0.0" || !isPlainObject(state.sessions)) {
+    throw new Error("task boundary state is invalid");
+  }
+  return state;
+}
+
+function writeTaskBoundaryState(path, state) {
+  const temporaryPath = `${path}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    writeFileSync(temporaryPath, `${JSON.stringify(state)}\n`);
+    renameSync(temporaryPath, path);
+  } catch (error) {
+    try { rmSync(temporaryPath, { force: true }); } catch { /* preserve original error */ }
+    throw error;
+  }
+}
+
+function stopBoundaryDigest(envelope) {
+  const candidateEventId = envelope?.metrics_event_candidate?.event_id;
+  const identity = typeof candidateEventId === "string" && candidateEventId
+    ? { candidate_event_id: candidateEventId }
+    : envelope;
+  return createHash("sha256").update(stableCanonicalJson(identity)).digest("hex");
+}
+
+function resolveSessionTaskBoundary(args, hookInput, eventStore, envelope) {
+  const statePath = taskBoundaryStatePath(args, eventStore);
+  const persist = !args.dryRun;
+  if (persist) mkdirSync(dirname(statePath), { recursive: true });
+  const resolveBoundary = () => {
+    const state = readTaskBoundaryState(statePath);
+    const sessionKey = createHash("sha256").update(String(hookInput.session_id)).digest("hex");
+    const current = isPlainObject(state.sessions[sessionKey]) ? state.sessions[sessionKey] : { next_segment: 0 };
+    const nextSegment = Number.isInteger(current.next_segment) && current.next_segment >= 0 ? current.next_segment : 0;
+
+    if (args.eventKind === "task_stop") {
+      const stopDigest = stopBoundaryDigest(envelope);
+      if (current.duplicate_open === true && current.last_stop_digest === stopDigest && typeof current.last_stop_task_id === "string") {
+        return current.last_stop_task_id;
+      }
+      const taskId = `session-boundary:${sessionKey}:${nextSegment}`;
+      state.sessions[sessionKey] = {
+        next_segment: nextSegment + 1,
+        last_stop_digest: stopDigest,
+        last_stop_task_id: taskId,
+        duplicate_open: true,
+      };
+      if (persist) writeTaskBoundaryState(statePath, state);
+      return taskId;
+    }
+
+    const taskId = `session-boundary:${sessionKey}:${nextSegment}`;
+    if (current.duplicate_open === true) {
+      state.sessions[sessionKey] = { ...current, duplicate_open: false };
+      if (persist) writeTaskBoundaryState(statePath, state);
+    }
+    return taskId;
+  };
+
+  if (!persist) return resolveBoundary();
+  return withRuntimeFileLock(statePath, resolveBoundary);
+}
+
+function resolveRuntimeTaskId(args, hookInput, config, eventStore, envelope, fallbackTaskId) {
+  if (args.taskId || (typeof hookInput.task_id === "string" && hookInput.task_id)) return fallbackTaskId;
+  if (
+    config.capture.task_boundary_source === "session_id" &&
+    config.capture.allow_session_id_task_boundary &&
+    typeof hookInput.session_id === "string" &&
+    hookInput.session_id
+  ) {
+    return resolveSessionTaskBoundary(args, hookInput, eventStore, envelope);
+  }
+  return fallbackTaskId;
+}
+
 function shouldRecord(args, hookInput, config) {
   if (!config.enabled) {
     return { ok: false, reason: "disabled" };
@@ -291,10 +374,11 @@ function commandHash(command) {
   return createHash("sha256").update(String(command)).digest("hex");
 }
 
-function buildEvent(args, hookInput, config, taskId, envelope = null, allowedSkillIds = new Set()) {
+function buildEvent(args, hookInput, config, taskId, envelope = null, allowedSkillIds = new Set(), allowedSignalIds = new Set()) {
   const now = new Date().toISOString();
   const paths = changedPaths(hookInput, config.capture.max_paths_per_event ?? 50);
   const command = hookInput.tool_input?.command ?? "";
+  const hookReference = ALLOWED_HOOK_EVENTS.has(args.hookEvent) ? `claude_hook:${args.hookEvent}` : "";
   const candidate = isPlainObject(envelope?.metrics_event_candidate)
     ? structuredClone(envelope.metrics_event_candidate)
     : null;
@@ -317,7 +401,7 @@ function buildEvent(args, hookInput, config, taskId, envelope = null, allowedSki
     ...envelopeRoutingResult,
     ...(hookInput.routing_result ?? {}),
     ...parseJsonOption(args.routingResultJson),
-  }, allowedSkillIds);
+  }, allowedSkillIds, allowedSignalIds);
   const reviewResult = sanitizeReviewResult({
     ...(candidate?.review_result ?? {}),
     ...(hookInput.review_result ?? {}),
@@ -328,12 +412,12 @@ function buildEvent(args, hookInput, config, taskId, envelope = null, allowedSki
     ...(Array.isArray(candidate?.gate_decisions) ? candidate.gate_decisions : []),
     ...(Array.isArray(hookInput.gate_decisions) ? hookInput.gate_decisions : []),
     ...(Array.isArray(gateDecisionOption) ? gateDecisionOption : []),
-  ], allowedSkillIds);
+  ], allowedSkillIds, allowedSignalIds);
 
   const event = {
     schema_version: "1.0.0",
     event_id: candidate?.event_id ? hashedIdentifier("evt:candidate", candidate.event_id) : eventIdFor(args.eventKind, taskId, now, envelope),
-    task_id: hashedIdentifier("task", candidate?.task_id ?? taskId),
+    task_id: hashedIdentifier("task", taskId),
     task_type: ALLOWED_TASK_TYPES.has(candidate?.task_type) ? candidate.task_type : taskTypeFromEnvelope(envelope, args.taskType),
     occurred_at: candidate?.occurred_at ?? now,
     skills_used: skills,
@@ -345,7 +429,7 @@ function buildEvent(args, hookInput, config, taskId, envelope = null, allowedSki
     evidence_references: referenceList([
       ...(candidate?.evidence_references ?? []),
       ...(envelope?.evidence_status?.checked ?? []),
-    ], "ref", 50),
+    ], "ref", hookReference ? 49 : 50),
     privacy_note: {
       raw_prompts_stored: false,
       secrets_stored: false,
@@ -380,8 +464,8 @@ function buildEvent(args, hookInput, config, taskId, envelope = null, allowedSki
     event.gate_decisions = gateDecisions;
   }
 
-  if (ALLOWED_HOOK_EVENTS.has(args.hookEvent)) {
-    event.evidence_references.push(`claude_hook:${args.hookEvent}`);
+  if (hookReference) {
+    event.evidence_references = unique([...event.evidence_references, hookReference]).slice(0, 50);
   }
 
   if (paths.length > 0) {
@@ -461,7 +545,7 @@ function taskTypeFromEnvelope(envelope, fallback) {
   }[envelope?.route?.work_mode] ?? "other";
 }
 
-function sanitizeRoutingResult(source, allowedSkillIds) {
+function sanitizeRoutingResult(source, allowedSkillIds, allowedSignalIds) {
   const result = {};
   const operatingMode = ALLOWED_OPERATING_MODES.has(source.operating_mode) ? source.operating_mode : "";
   if (operatingMode) result.operating_mode = operatingMode;
@@ -472,7 +556,7 @@ function sanitizeRoutingResult(source, allowedSkillIds) {
   }
   if (Array.isArray(source.change_signals)) {
     result.change_signals = source.change_signals
-      .map((item) => sanitizeChangeSignal(item))
+      .map((item) => sanitizeChangeSignal(item, allowedSignalIds))
       .filter(Boolean)
       .slice(0, 50);
   }
@@ -483,7 +567,7 @@ function sanitizeRoutingResult(source, allowedSkillIds) {
   }
   if (Array.isArray(source.required_gate_routes)) {
     result.required_gate_routes = source.required_gate_routes
-      .map((item) => sanitizeRequiredGateRoute(item, allowedSkillIds))
+      .map((item) => sanitizeRequiredGateRoute(item, allowedSkillIds, allowedSignalIds))
       .filter(Boolean)
       .slice(0, 50);
   }
@@ -508,29 +592,29 @@ function sanitizeRoutingResult(source, allowedSkillIds) {
   }
   if (Array.isArray(source.gate_applicability)) {
     result.gate_applicability = source.gate_applicability
-      .map((item) => sanitizeGateApplicability(item, allowedSkillIds))
+      .map((item) => sanitizeGateApplicability(item, allowedSkillIds, allowedSignalIds))
       .filter(Boolean)
       .slice(0, 50);
   }
   return result;
 }
 
-function sanitizeChangeSignal(item) {
+function sanitizeChangeSignal(item, allowedSignalIds) {
   if (!item || typeof item.signal !== "string" || typeof item.evidence !== "string") {
     return null;
   }
-  const signal = hashedReference("signal", item.signal);
+  const signal = controlledSignalId(item.signal, allowedSignalIds);
   const evidence = hashedReference("ref", item.evidence);
   return signal && evidence ? { signal, evidence } : null;
 }
 
-function sanitizeRequiredGateRoute(item, allowedSkillIds) {
+function sanitizeRequiredGateRoute(item, allowedSkillIds, allowedSignalIds) {
   if (!item || typeof item.gate !== "string" || typeof item.reason !== "string" || !Array.isArray(item.trigger_signals)) {
     return null;
   }
   const gate = controlledSkillId(item.gate, allowedSkillIds);
   const reason = hashedReference("ref", item.reason);
-  const triggerSignals = referenceList(item.trigger_signals, "signal", 20);
+  const triggerSignals = controlledSignalList(item.trigger_signals, allowedSignalIds, 20);
   return gate && reason && triggerSignals.length > 0 ? { gate, reason, trigger_signals: triggerSignals } : null;
 }
 
@@ -561,7 +645,7 @@ function sanitizeMissingEvidence(item) {
   return input && reason ? { input, reason } : null;
 }
 
-function sanitizeGateApplicability(item, allowedSkillIds) {
+function sanitizeGateApplicability(item, allowedSkillIds, allowedSignalIds) {
   const allowedStatuses = new Set(["required", "skipped", "insufficient_evidence"]);
   if (!item || typeof item.layer !== "string" || !allowedStatuses.has(item.status) || typeof item.reason !== "string" || typeof item.evidence !== "string") {
     return null;
@@ -585,7 +669,7 @@ function sanitizeGateApplicability(item, allowedSkillIds) {
     }
   }
   if (Array.isArray(item.trigger_signals)) {
-    row.trigger_signals = referenceList(item.trigger_signals, "signal", 20);
+    row.trigger_signals = controlledSignalList(item.trigger_signals, allowedSignalIds, 20);
   }
   if (Array.isArray(item.inputs_still_needed)) {
     row.inputs_still_needed = referenceList(item.inputs_still_needed, "ref", 20);
@@ -608,7 +692,7 @@ function sanitizeReviewResult(source) {
   return result;
 }
 
-function sanitizeGateDecisions(source, allowedSkillIds) {
+function sanitizeGateDecisions(source, allowedSkillIds, allowedSignalIds) {
   const allowedStatuses = new Set(["required", "executed", "skipped", "insufficient_evidence"]);
   const allowedConfidence = new Set(["high", "medium", "low"]);
   const allowedCategories = new Set(["no_trigger_signal", "not_applicable", "covered_by_other_gate", "missing_context", "missing_evidence", "other"]);
@@ -633,7 +717,7 @@ function sanitizeGateDecisions(source, allowedSkillIds) {
         decision.layer = hashedReference("ref", item.layer);
       }
       if (Array.isArray(item.evidence_checked)) decision.evidence_checked = referenceList(item.evidence_checked, "ref", 20);
-      if (Array.isArray(item.triggering_signals)) decision.triggering_signals = referenceList(item.triggering_signals, "signal", 20);
+      if (Array.isArray(item.triggering_signals)) decision.triggering_signals = controlledSignalList(item.triggering_signals, allowedSignalIds, 20);
       if (Array.isArray(item.missing_inputs)) decision.missing_inputs = referenceList(item.missing_inputs, "ref", 20);
       if (allowedConfidence.has(item.confidence)) {
         decision.confidence = item.confidence;
@@ -675,6 +759,14 @@ function controlledSkillList(values, allowedSkillIds, maxItems) {
   return unique((Array.isArray(values) ? values : []).map((value) => controlledSkillId(value, allowedSkillIds)).filter(Boolean)).slice(0, maxItems);
 }
 
+function controlledSignalId(value, allowedSignalIds) {
+  return typeof value === "string" && allowedSignalIds.has(value) ? value : "";
+}
+
+function controlledSignalList(values, allowedSignalIds, maxItems) {
+  return unique((Array.isArray(values) ? values : []).map((value) => controlledSignalId(value, allowedSignalIds)).filter(Boolean)).slice(0, maxItems);
+}
+
 function loadAllowedSkillIds(projectRoot) {
   const allowed = new Set();
   const sources = [
@@ -691,6 +783,25 @@ function loadAllowedSkillIds(projectRoot) {
       }
     } catch {
       // An unavailable control allowlist drops uncontrolled identifiers; collection remains fail-open.
+    }
+  }
+  return allowed;
+}
+
+function loadAllowedSignalIds(projectRoot) {
+  const allowed = new Set();
+  const sources = [
+    resolve(projectRoot, "schemas/review-signal-gate-map.json"),
+    resolve(RUNTIME_ROOT, "../schemas/review-signal-gate-map.json"),
+  ];
+  for (const path of unique(sources)) {
+    if (!existsSync(path)) continue;
+    try {
+      const value = JSON.parse(readFileSync(path, "utf8"));
+      if (!isPlainObject(value.signal_to_gates)) continue;
+      for (const signal of Object.keys(value.signal_to_gates)) allowed.add(signal);
+    } catch {
+      // An unavailable registry drops uncontrolled signals; collection remains fail-open.
     }
   }
   return allowed;
@@ -904,6 +1015,10 @@ function runtimeHealthPath(args, eventStore = null) {
   return resolveObservabilityPath(resolveProjectRoot(args, eventStore), "ask-runtime/runtime-health.jsonl");
 }
 
+function legacyRuntimeHealthPath(args, eventStore = null) {
+  return resolve(resolveProjectRoot(args, eventStore), ".agent-spectrum-kernel/runtime-health.jsonl");
+}
+
 function runtimeHealthEntry(status, errorCode = "non_blocking_metrics_record_failure") {
   return {
     schema_version: "1.0.0",
@@ -927,7 +1042,10 @@ function recordRuntimeHealthRecovery(args, config, eventStore) {
   try {
     const path = runtimeHealthPath(args, eventStore);
     const unresolved = new Map();
-    for (const entry of readRuntimeHealth(path).entries) {
+    const entries = unique([path, legacyRuntimeHealthPath(args, eventStore)])
+      .flatMap((healthPath) => readRuntimeHealth(healthPath).entries)
+      .sort((left, right) => runtimeHealthTimestamp(left) - runtimeHealthTimestamp(right));
+    for (const entry of entries) {
       if (entry.component !== "ai-metrics-record") continue;
       if (entry.status === "error") unresolved.set(entry.error_code, entry);
       if (entry.status === "recovered") unresolved.delete(entry.error_code);
@@ -940,6 +1058,14 @@ function recordRuntimeHealthRecovery(args, config, eventStore) {
   }
 }
 
+function runtimeHealthTimestamp(entry) {
+  for (const field of ["last_seen_at", "occurred_at", "first_seen_at"]) {
+    const timestamp = Date.parse(entry?.[field]);
+    if (Number.isFinite(timestamp)) return timestamp;
+  }
+  return 0;
+}
+
 function main(args) {
   const hookInput = readStdinJson();
   const config = readConfig(args.config);
@@ -950,7 +1076,6 @@ function main(args) {
   const eventStore = resolveEventStore(args, config);
   const taskResult = collectCanonicalTaskResult(args, hookInput);
   if (taskResult.status === "parsed" && taskResult.envelope?.metrics_event_candidate) {
-    args.taskId ||= taskResult.envelope.metrics_event_candidate.task_id;
     if (args.taskType === "other") args.taskType = taskResult.envelope.metrics_event_candidate.task_type;
   }
   if (args.eventKind === "task_stop" && taskResult.status !== "parsed") {
@@ -973,8 +1098,11 @@ function main(args) {
     if (args.printResult) console.log(JSON.stringify(skipResult(decision.reason)));
     return;
   }
-  const allowedSkillIds = loadAllowedSkillIds(resolveProjectRoot(args, eventStore));
-  const event = buildEvent(args, hookInput, config, decision.taskId, taskResult.envelope, allowedSkillIds);
+  const projectRoot = resolveProjectRoot(args, eventStore);
+  const taskId = resolveRuntimeTaskId(args, hookInput, config, eventStore, taskResult.envelope, decision.taskId);
+  const allowedSkillIds = loadAllowedSkillIds(projectRoot);
+  const allowedSignalIds = loadAllowedSignalIds(projectRoot);
+  const event = buildEvent(args, hookInput, config, taskId, taskResult.envelope, allowedSkillIds, allowedSignalIds);
   let status = "dry-run";
   if (!args.dryRun) {
     status = upsertEvent(eventStore, event);

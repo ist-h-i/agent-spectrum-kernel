@@ -73,7 +73,7 @@ Events are recorded at meaningful boundaries:
 - improvement ledger candidate created or ledger refreshed,
 - weekly or monthly report generated.
 
-Explicit task IDs are preferred. Claude hook adapters may use `session_id` as the default local task boundary when configured:
+Explicit hook/CLI task IDs are preferred. Claude hook adapters may use a runtime-owned segment within `session_id` as the default local task boundary when configured:
 
 ```text
 capture.task_boundary_required: true
@@ -81,7 +81,7 @@ capture.allow_session_id_task_boundary: true
 capture.task_boundary_source: session_id
 ```
 
-File-change and verification events are then recorded under the session-scoped task ID, and the Stop event marks the task boundary complete. If neither an explicit task ID nor an allowed session boundary is available, missing task boundary is handled as `skip`.
+File-change and command events use the current session segment, and the next valid Stop event uses and closes that same segment. A later hook event starts the next segment. Duplicate project/plugin execution of the same Stop reuses the just-closed segment. The candidate's descriptive task ID does not split the runtime aggregation identity from preceding hook events. If neither an explicit hook/CLI task ID nor an allowed session boundary is available, missing task boundary is handled as `skip`.
 
 ## Event Shape
 

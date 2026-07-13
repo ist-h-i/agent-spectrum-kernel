@@ -128,7 +128,7 @@ ask-runtime/metrics/events.jsonl
 
 `ask-runtime/` is a logical path. In a Git repository it resolves under `.git/agent-spectrum-kernel/`; outside Git it resolves under `.agent-spectrum-kernel/runtime/`. Each line is one JSON object. Keeping runtime events outside versioned documentation means a read-only Claude workflow does not dirty the engineering working tree. The generic repository includes schemas and templates only; adopting projects own their project-specific event store.
 
-Adapters must prefer explicit task IDs when available. For Claude hooks, the default fallback boundary is `session_id`:
+Adapters must prefer explicit hook/CLI task IDs when available. For Claude hooks without one, the default fallback boundary is a runtime-owned segment within `session_id`:
 
 ```text
 capture.task_boundary_required: true
@@ -136,7 +136,7 @@ capture.allow_session_id_task_boundary: true
 capture.task_boundary_source: session_id
 ```
 
-This means file-change and verification events are recorded under a session-scoped task ID such as `session:<id>`, then the Stop event marks that task boundary complete. If neither an explicit task ID nor an allowed session boundary is available, adapters must `skip` rather than create noisy unbounded events.
+The collector stores the current segment in `ask-runtime/task-boundaries.json`. File-change and command events use that segment; the next valid Stop event uses and closes the same segment. A later event in the session starts the next segment. Concurrent project/plugin copies of the same Stop reuse the just-closed segment and converge through event-ID upsert. A candidate's descriptive `task_id` does not replace this runtime identity, so earlier hook events and the Stop result cannot split into different report groups. If neither an explicit hook/CLI task ID nor an allowed session boundary is available, adapters must `skip` rather than create noisy unbounded events.
 
 Command text is not recorded by default. Verification events record `command_kind` only. `command_hash` and `redacted_command_preview` require explicit opt-in and must not include secrets.
 
@@ -158,7 +158,7 @@ Claude implementation, review, investigation, verification, and handoff instruct
 
 Missing, malformed, or schema-invalid canonical results are skipped. The collector records a sanitized runtime-health code for malformed or invalid input, but does not persist the assistant response or upgrade evidence, safety, readiness, review, or mergeability claims. Persistence failures are fail-open and cannot change the task result. Fallback Stop event IDs include the canonicalized Execution Envelope digest: project/plugin execution of the same result converges to one row, while distinct results in the same Claude session remain separate rows.
 
-If the envelope contains the canonical optional `metrics_event_candidate`, the runtime consumes that candidate. Otherwise it derives the bounded task type, route, missing-evidence state, and completion state from the envelope. Before persistence, the runtime projects the event to enums, booleans, counts, controlled identifiers, and hashes. Skill and gate IDs are accepted only from the canonical manifest or active Claude install state. Task/candidate IDs, evidence references, paths, layers, reasons, and other descriptive references are hashed; PR/issue and ledger IDs require explicit formats. Arbitrary descriptions, command previews, names, source fragments, and output fragments are not persisted. The projected event is revalidated against `metrics-event.schema.json`; validation failure is a fail-open collector failure. Raw prompts, full review text, full command output, full file contents, secrets, customer data, sensitive personal data, and personnel-scoring data are never copied from the assistant response.
+If the envelope contains the canonical optional `metrics_event_candidate`, the runtime consumes that candidate. Otherwise it derives the bounded task type, route, missing-evidence state, and completion state from the envelope. Before persistence, the runtime projects the event to enums, booleans, counts, controlled identifiers, and hashes. Skill and gate IDs are accepted only from the canonical manifest or active Claude install state. Review signal IDs are retained only when present in `schemas/review-signal-gate-map.json`; unknown signals are dropped, while their explanatory evidence remains hash-only. Runtime task/candidate IDs, evidence references, paths, layers, reasons, and other descriptive references are hashed; PR/issue and ledger IDs require explicit formats. Arbitrary descriptions, command previews, names, source fragments, and output fragments are not persisted. Controlled `reason_category` is sufficient evidence that a skipped gate supplied a reason even when `judgment` prose is omitted. The projected event is revalidated against `metrics-event.schema.json`; validation failure is a fail-open collector failure. Raw prompts, full review text, full command output, full file contents, secrets, customer data, sensitive personal data, and personnel-scoring data are never copied from the assistant response.
 
 ## When To Emit
 

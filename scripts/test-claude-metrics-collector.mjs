@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const recorder = resolve(repoRoot, "scripts/ai-metrics-record.mjs");
+const summarizer = resolve(repoRoot, "scripts/ai-metrics-summarize.mjs");
+const doctor = resolve(repoRoot, "scripts/ask-doctor.mjs");
 const fixtureRoot = mkdtempSync(resolve(tmpdir(), "claude-metrics-collector-"));
 
 function envelope(overrides = {}) {
@@ -122,6 +124,20 @@ function readEvents(path) {
   return readFileSync(path, "utf8").split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
 }
 
+function summarizeStore(root, eventStore, name) {
+  const output = resolve(root, `${name}.json`);
+  const result = spawnSync(process.execPath, [
+    summarizer,
+    "--event-store", eventStore,
+    "--out", output,
+    "--period-start", "2000-01-01",
+    "--period-end", "2999-12-31",
+    "--format", "json",
+  ], { cwd: root, encoding: "utf8" });
+  assertPass(`summarize ${name}`, result);
+  return JSON.parse(readFileSync(output, "utf8"));
+}
+
 function assertRuntimeEvidence(label, result, expectedLevel) {
   if (
     result.capability?.capability_id !== "local_event_emission" ||
@@ -178,9 +194,14 @@ async function main() {
   if (
     distinctEnvelopeResult.status !== "recorded" ||
     distinctEnvelopeEvents.length !== 2 ||
-    new Set(distinctEnvelopeEvents.map((event) => event.event_id)).size !== 2
+    new Set(distinctEnvelopeEvents.map((event) => event.event_id)).size !== 2 ||
+    new Set(distinctEnvelopeEvents.map((event) => event.task_id)).size !== 2
   ) {
-    throw new Error(`same session with distinct canonical envelopes must retain two event rows\n${JSON.stringify({ distinctEnvelopeResult, distinctEnvelopeEvents }, null, 2)}`);
+    throw new Error(`same session with distinct canonical envelopes must retain two task boundaries\n${JSON.stringify({ distinctEnvelopeResult, distinctEnvelopeEvents }, null, 2)}`);
+  }
+  const distinctEnvelopeReport = summarizeStore(writeRoot, eventStore, "same-session-distinct-tasks");
+  if (distinctEnvelopeReport.summary.tasks_reviewed !== 2) {
+    throw new Error(`same-session Stop boundaries must remain two tasks in the summarizer\n${JSON.stringify(distinctEnvelopeReport.summary, null, 2)}`);
   }
 
   const candidateRoot = resolve(fixtureRoot, "candidate");
@@ -246,6 +267,129 @@ async function main() {
     candidateEvents[0].outcome_metrics?.rework_count !== 1
   ) {
     throw new Error(`same normalized event_id should update one JSONL row\n${JSON.stringify({ updateResult, candidateEvents }, null, 2)}`);
+  }
+
+  const boundaryRoot = resolve(fixtureRoot, "task-boundary");
+  const boundaryStore = resolve(boundaryRoot, "events.jsonl");
+  mkdirSync(boundaryRoot, { recursive: true });
+  const postToolResult = resultJson(
+    "task boundary PostToolUse",
+    runRecorder(boundaryRoot, ["--event-kind", "command_attempt", "--hook-event", "PostToolUse", "--event-store", boundaryStore, "--print-result"], {
+      session_id: "S-BOUNDARY",
+      hook_event_name: "PostToolUse",
+      tool_input: { command: "npm test" },
+    }),
+  );
+  const boundaryCandidate = normalizedCandidate({
+    event_id: "task-result:boundary-fixture",
+    task_id: "TASK-BOUNDARY-CANDIDATE",
+  });
+  const boundaryStopInput = {
+    session_id: "S-BOUNDARY",
+    hook_event_name: "Stop",
+    last_assistant_message: envelope({ metrics_event_candidate: boundaryCandidate }),
+  };
+  const concurrentBoundaryStops = await Promise.all([
+    runRecorderAsync(boundaryRoot, ["--event-kind", "task_stop", "--hook-event", "Stop", "--event-store", boundaryStore, "--print-result"], boundaryStopInput),
+    runRecorderAsync(boundaryRoot, ["--event-kind", "task_stop", "--hook-event", "Stop", "--event-store", boundaryStore, "--print-result"], boundaryStopInput),
+  ]);
+  const boundaryStopResults = concurrentBoundaryStops.map((result, index) => resultJson(`task boundary concurrent candidate Stop ${index}`, result));
+  const boundaryEvents = readEvents(boundaryStore);
+  const boundaryReport = summarizeStore(boundaryRoot, boundaryStore, "post-tool-candidate-stop");
+  if (
+    postToolResult.status !== "recorded" ||
+    boundaryStopResults.filter((result) => result.status === "recorded").length !== 1 ||
+    boundaryStopResults.some((result) => !["recorded", "updated", "unchanged"].includes(result.status)) ||
+    boundaryEvents.length !== 2 ||
+    new Set(boundaryEvents.map((event) => event.task_id)).size !== 1 ||
+    boundaryReport.summary.tasks_reviewed !== 1
+  ) {
+    throw new Error(`PostToolUse and candidate Stop must share one task while duplicate Stops converge\n${JSON.stringify({ boundaryEvents, summary: boundaryReport.summary }, null, 2)}`);
+  }
+
+  const signalRoot = resolve(fixtureRoot, "controlled-signals");
+  const signalStore = resolve(signalRoot, "events.jsonl");
+  mkdirSync(signalRoot, { recursive: true });
+  const signalCandidate = normalizedCandidate({
+    event_id: "task-result:controlled-signal",
+    task_id: "TASK-CONTROLLED-SIGNAL",
+    skills_used: ["review-router", "review-architecture-impact", "review-domain-impact"],
+    routing_result: {
+      operating_mode: "delivery_quality",
+      primary_skill: "review-router",
+      change_signals: [
+        { signal: "public_api_change", evidence: "public API changed" },
+        { signal: "customer-4821", evidence: "uncontrolled customer identifier" },
+      ],
+      required_gates: ["review-architecture-impact"],
+      executed_gates: ["review-architecture-impact"],
+      required_gate_routes: [{ gate: "review-architecture-impact", reason: "public API changed", trigger_signals: ["public_api_change", "customer-4821"] }],
+    },
+    gate_decisions: [
+      {
+        gate: "review-architecture-impact",
+        status: "executed",
+        judgment: "Architecture gate executed for the public API change.",
+        triggering_signals: ["public_api_change", "customer-4821"],
+      },
+      {
+        gate: "review-domain-impact",
+        status: "skipped",
+        judgment: "No domain behavior signal.",
+        reason_category: "no_trigger_signal",
+      },
+    ],
+  });
+  const signalResult = resultJson(
+    "controlled signal collection",
+    runRecorder(signalRoot, ["--event-kind", "task_stop", "--hook-event", "Stop", "--event-store", signalStore, "--print-result"], {
+      session_id: "S-CONTROLLED-SIGNAL",
+      hook_event_name: "Stop",
+      last_assistant_message: envelope({ metrics_event_candidate: signalCandidate }),
+    }),
+  );
+  const [signalEvent] = readEvents(signalStore);
+  const signalReport = summarizeStore(signalRoot, signalStore, "controlled-signal-summary");
+  if (
+    signalResult.status !== "recorded" ||
+    signalEvent.routing_result.change_signals?.map((item) => item.signal).join(",") !== "public_api_change" ||
+    signalEvent.routing_result.required_gate_routes?.[0]?.trigger_signals?.join(",") !== "public_api_change" ||
+    signalEvent.gate_decisions?.[0]?.triggering_signals?.join(",") !== "public_api_change" ||
+    JSON.stringify(signalEvent).includes("customer-4821") ||
+    signalReport.skill_usage.over_processing_count !== 0 ||
+    signalReport.gate_decision_summary.missing_skip_reason_count !== 0
+  ) {
+    throw new Error(`collector and summarizer must preserve controlled signal meaning and controlled skip reasons\n${JSON.stringify({ signalEvent, summary: signalReport.gate_decision_summary, skillUsage: signalReport.skill_usage }, null, 2)}`);
+  }
+
+  for (const referenceCount of [49, 50]) {
+    const referenceRoot = resolve(fixtureRoot, `reference-boundary-${referenceCount}`);
+    const referenceStore = resolve(referenceRoot, "events.jsonl");
+    mkdirSync(referenceRoot, { recursive: true });
+    const referenceCandidate = normalizedCandidate({
+      event_id: `task-result:reference-boundary-${referenceCount}`,
+      task_id: `TASK-REFERENCE-${referenceCount}`,
+      evidence_references: Array.from({ length: referenceCount }, (_, index) => `reference-${index}`),
+    });
+    const referenceResult = resultJson(
+      `${referenceCount} evidence references plus hook reference`,
+      runRecorder(referenceRoot, ["--event-kind", "task_stop", "--hook-event", "Stop", "--event-store", referenceStore, "--print-result"], {
+        session_id: `S-REFERENCE-${referenceCount}`,
+        hook_event_name: "Stop",
+        last_assistant_message: envelope({
+          evidence_status: { checked: [], missing: [] },
+          metrics_event_candidate: referenceCandidate,
+        }),
+      }),
+    );
+    const [referenceEvent] = readEvents(referenceStore);
+    if (
+      referenceResult.status !== "recorded" ||
+      referenceEvent.evidence_references.length !== 50 ||
+      !referenceEvent.evidence_references.includes("claude_hook:Stop")
+    ) {
+      throw new Error(`${referenceCount} candidate references plus the controlled hook reference must remain schema-valid\n${JSON.stringify(referenceEvent, null, 2)}`);
+    }
   }
 
   const skipRoot = resolve(fixtureRoot, "skip");
@@ -326,6 +470,32 @@ async function main() {
   const failureHealth = resolve(failureRoot, ".agent-spectrum-kernel/runtime/runtime-health.jsonl");
   if (!existsSync(failureHealth) || !readFileSync(failureHealth, "utf8").includes("non_blocking_metrics_record_failure")) {
     throw new Error("persistence failure should write sanitized runtime health");
+  }
+
+  const legacyRecoveryRoot = resolve(fixtureRoot, "legacy-health-recovery");
+  const legacyRecoveryPath = resolve(legacyRecoveryRoot, ".agent-spectrum-kernel/runtime-health.jsonl");
+  mkdirSync(dirname(legacyRecoveryPath), { recursive: true });
+  const legacyErrorCode = "legacy-only-error";
+  writeFileSync(legacyRecoveryPath, `${JSON.stringify({
+    schema_version: "1.0.0",
+    occurred_at: new Date().toISOString(),
+    component: "ai-metrics-record",
+    status: "error",
+    error_code: legacyErrorCode,
+  })}\n`);
+  const doctorBeforeRecovery = spawnSync(process.execPath, [doctor, "--target", legacyRecoveryRoot], { encoding: "utf8" });
+  if (!doctorBeforeRecovery.stdout.includes(`adapter runtime health issue: ai-metrics-record ${legacyErrorCode}`)) {
+    throw new Error(`doctor should expose the unresolved legacy-only health error before recovery\n${doctorBeforeRecovery.stdout}`);
+  }
+  const legacyRecoveryResult = runRecorder(
+    legacyRecoveryRoot,
+    ["--event-kind", "task_stop", "--non-blocking"],
+    { session_id: "S-LEGACY-RECOVERY", hook_event_name: "Stop", last_assistant_message: envelope() },
+  );
+  assertPass("successful collector recovers legacy health", legacyRecoveryResult);
+  const doctorAfterRecovery = spawnSync(process.execPath, [doctor, "--target", legacyRecoveryRoot], { encoding: "utf8" });
+  if (doctorAfterRecovery.stdout.includes(`adapter runtime health issue: ai-metrics-record ${legacyErrorCode}`)) {
+    throw new Error(`a successful collector run must close a legacy-only health error through the runtime-owned log\n${doctorAfterRecovery.stdout}`);
   }
 
   const concurrentRoot = resolve(fixtureRoot, "concurrent-health");

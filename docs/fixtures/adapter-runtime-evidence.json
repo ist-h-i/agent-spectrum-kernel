@@ -22,11 +22,11 @@
         "adapters/claude-code/project/.claude/hooks/hooks.json",
         "scripts/install-claude-adapter.mjs"
       ],
-      "subject_digest": "sha256:c92334322b5ce5a8fb4ce01dfbabd98ac025ec036fe25a733da6e3695f6e3cd7",
+      "subject_digest": "sha256:0b1179eca512e9c11c47fd2168c1e8f6344560f35ac1895cc2b9c2813fcc2835",
       "scope": "profile_projection",
       "profile_id": "claude-code-local-observed-v1",
       "renderer_profile": "observability",
-      "profile_fingerprint": "sha256:0ce23513a39237432c4de78d3dcfa65ca951f5cee0fde0da5782ce90bc810634"
+      "profile_fingerprint": "sha256:9158d11726c8b5d79cf407265ff312034897e206cd6cc24a2d3bdaef3efd1dd6"
     },
     {
       "record_id": "codex-projection-manifest",
@@ -54,7 +54,7 @@
       "scope": "profile_projection",
       "profile_id": "codex-local-projection-v1",
       "renderer_profile": "implementation",
-      "profile_fingerprint": "sha256:4de5e289051e2b179c7a5f40fb00b6fe31e5dc59f068ce85ab49cc60720484bd"
+      "profile_fingerprint": "sha256:e1da803d88f47b2daf72ed7f2876ff1e7c019171a0180a2c8e8b3cf34964d94c"
     },
     {
       "record_id": "claude-canonical-metrics-collector",
@@ -75,12 +75,15 @@
         "adapters/claude-code/project/.claude/hooks/hooks.json",
         "schemas/execution-envelope.schema.json",
         "schemas/metrics-event.schema.json",
+        "schemas/review-signal-gate-map.json",
         "scripts/ai-metrics-record.mjs",
+        "scripts/ai-metrics-summarize.mjs",
+        "scripts/ask-doctor.mjs",
         "scripts/execution-envelope.mjs",
         "scripts/observability-paths.mjs",
         "scripts/test-claude-metrics-collector.mjs"
       ],
-      "subject_digest": "sha256:d1473c8a1300067266dc0fa61ae57472e0c0a6d6dd870fb9186681cee22c212d",
+      "subject_digest": "sha256:862cd631db7aeca99bc6145737cea006b5bf2f3126ac80672f3c627058997ee3",
       "verification": {
         "verifier_path": "scripts/test-claude-metrics-collector.mjs",
         "fixture_id": "claude-canonical-metrics-collector",
@@ -91,7 +94,10 @@
           "adapters/claude-code/project/.claude/commands/skill-review.md",
           "adapters/claude-code/project/.claude/commands/skill-verify.md",
           "adapters/claude-code/project/.claude/hooks/hooks.json",
-          "scripts/ai-metrics-record.mjs"
+          "schemas/review-signal-gate-map.json",
+          "scripts/ai-metrics-record.mjs",
+          "scripts/ai-metrics-summarize.mjs",
+          "scripts/ask-doctor.mjs"
         ],
         "expected_result": "pass",
         "actual_result": "pass",

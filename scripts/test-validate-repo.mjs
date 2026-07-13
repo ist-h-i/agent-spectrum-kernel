@@ -1354,7 +1354,7 @@ function assertRuntimeScripts() {
   const recordedRouting = routingRecordedEvent.routing_result;
   if (
     recordedRouting.change_signals?.length !== 2 ||
-    !/^signal:sha256:[a-f0-9]{64}$/.test(recordedRouting.required_gate_routes?.[0]?.trigger_signals?.[0]) ||
+    recordedRouting.required_gate_routes?.[0]?.trigger_signals?.[0] !== "public_api_change" ||
     recordedRouting.skipped_heavy_gates?.[0]?.gate !== "review-adversarial-risk" ||
     !/^ref:sha256:[a-f0-9]{64}$/.test(recordedRouting.missing_evidence?.[0]?.input) ||
     JSON.stringify(routingRecordedEvent).includes("schema file changed") ||
@@ -1786,13 +1786,13 @@ function assertRuntimeScripts() {
     gateDecisionReport.gate_decision_summary.total_decisions !== 8 ||
     gateDecisionReport.skill_usage.over_processing_count !== 2 ||
     gateDecisionReport.skill_usage.under_processing_count !== 1 ||
-    gateDecisionReport.gate_decision_summary.missing_skip_reason_count !== 2 ||
+    gateDecisionReport.gate_decision_summary.missing_skip_reason_count !== 1 ||
     !gateDecisionReport.gate_decision_summary.skipped_by_reason_category.some((entry) => entry.category === "no_trigger_signal" && entry.count === 2) ||
     !gateDecisionReport.gate_decision_summary.insufficient_evidence.some((entry) => entry.gate === "review-output-quality" && entry.layer === "Output quality") ||
     !gateDecisionReport.gate_decision_summary.under_processing_warnings.some((entry) => entry.gate === "review-architecture-impact" && entry.count === 1) ||
     !gateDecisionReport.gate_decision_summary.over_processing_warnings.some((entry) => entry.gate === "review-adversarial-risk" && entry.count === 2) ||
     !gateDecisionReport.gate_decision_summary.top_gate_deviation_patterns.some((entry) => entry.deviation_type === "over_processing" && entry.gate === "review-adversarial-risk" && entry.count === 2) ||
-    !gateDecisionReport.gate_decision_summary.top_gate_deviation_patterns.some((entry) => entry.deviation_type === "missing_skip_reason" && entry.gate === "review-domain-impact" && entry.count === 1) ||
+    gateDecisionReport.gate_decision_summary.top_gate_deviation_patterns.some((entry) => entry.deviation_type === "missing_skip_reason" && entry.gate === "review-domain-impact") ||
     !gateDecisionReport.gate_decision_summary.top_gate_deviation_patterns.some((entry) => entry.deviation_type === "missing_skip_reason" && entry.gate === "review-code-health" && entry.count === 1) ||
     !gateDecisionReport.gate_decision_drilldown.some((entry) => entry.judgment === "Detailed architecture judgment should stay in JSON only.")
   ) {
