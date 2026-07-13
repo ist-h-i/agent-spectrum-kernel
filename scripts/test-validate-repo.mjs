@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
+import { CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
 import { REQUIRED_TRACEABILITY_SCENARIOS, computeAdapterAppliedProvenanceFingerprint, computeAdapterProfileFingerprint, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
@@ -2761,6 +2762,28 @@ function assertInstallerScripts() {
     }
   }
 
+  for (const option of ["--skip-hooks", "--skip-runtime"]) {
+    const label = option.slice(2);
+    const pruneTarget = resolve(fixtureRoot, `install-claude-${label}-prune-idempotent`);
+    assertRuntimePass(`Claude ${label} prune core setup`, runRepoScript([coreInstaller, "--target", pruneTarget]));
+    assertRuntimePass(`Claude ${label} prune initial install`, runRepoScript([installer, "--target", pruneTarget, "--profile", "implementation"]));
+    assertRuntimePass(`Claude ${label} prune removal`, runRepoScript([installer, "--target", pruneTarget, "--profile", "implementation", option, "--prune"]));
+    assertRuntimePass(`Claude ${label} prune rerun`, runRepoScript([installer, "--target", pruneTarget, "--profile", "implementation", option, "--prune"]));
+    const pruneState = JSON.parse(readFileSync(resolve(pruneTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+    if (pruneState.managed_partial_files?.[".claude/settings.json"] || (pruneState.actual_installed_inventory ?? []).some((asset) => asset.path === ".claude/settings.json")) {
+      throw new Error(`Claude ${label} prune must remove continuing partial ownership\n${JSON.stringify(pruneState, null, 2)}`);
+    }
+    const retainedTarget = resolve(fixtureRoot, `install-claude-${label}-retained-partial-idempotent`);
+    assertRuntimePass(`Claude ${label} retained core setup`, runRepoScript([coreInstaller, "--target", retainedTarget]));
+    assertRuntimePass(`Claude ${label} retained initial install`, runRepoScript([installer, "--target", retainedTarget, "--profile", "implementation"]));
+    assertRuntimePass(`Claude ${label} retained removal`, runRepoScript([installer, "--target", retainedTarget, "--profile", "implementation", option]));
+    assertRuntimePass(`Claude ${label} retained rerun`, runRepoScript([installer, "--target", retainedTarget, "--profile", "implementation", option]));
+    const retainedState = JSON.parse(readFileSync(resolve(retainedTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+    if (!retainedState.managed_partial_files?.[".claude/settings.json"] || !(retainedState.actual_installed_inventory ?? []).some((asset) => asset.path === ".claude/settings.json" && asset.retained_stale === true)) {
+      throw new Error(`Claude ${label} no-prune must retain partial ownership idempotently\n${JSON.stringify(retainedState, null, 2)}`);
+    }
+  }
+
   const claudeInventoryTransitionTarget = resolve(fixtureRoot, "install-claude-full-to-review-no-prune");
   assertRuntimePass("Claude inventory transition core setup", runRepoScript([coreInstaller, "--target", claudeInventoryTransitionTarget]));
   assertRuntimePass("Claude inventory transition full setup", runRepoScript([installer, "--target", claudeInventoryTransitionTarget, "--profile", "full"]));
@@ -2773,6 +2796,12 @@ function assertInstallerScripts() {
   }
   if (claudeReviewState.projection_plan?.fingerprint === claudeFullState.projection_plan?.fingerprint) {
     throw new Error("Claude profile transition must change pure projection fingerprint");
+  }
+  if (
+    claudeReviewState.last_changed_provenance?.fingerprint === claudeFullState.last_changed_provenance?.fingerprint ||
+    claudeReviewState.last_changed_provenance?.fingerprint !== claudeReviewState.last_applied_provenance?.fingerprint
+  ) {
+    throw new Error("Claude full to review subset transition must advance last-changed provenance");
   }
 
   const claudeDefaultProjectionTarget = resolve(fixtureRoot, "install-claude-default-projection");
@@ -3309,6 +3338,19 @@ function assertCodexInstallerScripts() {
     throw new Error("Codex profile transition must change pure projection fingerprint");
   }
 
+  const codexSubsetTransitionTarget = resolve(fixtureRoot, "codex-install-full-to-review-subset");
+  assertRuntimePass("Codex subset transition core setup", runRepoScript([coreInstaller, "--target", codexSubsetTransitionTarget]));
+  assertRuntimePass("Codex subset transition full setup", runRepoScript([installer, "--target", codexSubsetTransitionTarget, "--profile", "full"]));
+  const codexFullProjectionState = readCodexInstallState(codexSubsetTransitionTarget);
+  assertRuntimePass("Codex subset transition review", runRepoScript([installer, "--target", codexSubsetTransitionTarget, "--profile", "review"]));
+  const codexReviewSubsetState = readCodexInstallState(codexSubsetTransitionTarget);
+  if (
+    codexReviewSubsetState.last_changed_provenance?.fingerprint === codexFullProjectionState.last_changed_provenance?.fingerprint ||
+    codexReviewSubsetState.last_changed_provenance?.fingerprint !== codexReviewSubsetState.last_applied_provenance?.fingerprint
+  ) {
+    throw new Error("Codex full to review subset transition must advance last-changed provenance");
+  }
+
   const codexOptionTarget = resolve(fixtureRoot, "codex-install-option-provenance");
   assertRuntimePass("Codex option provenance core setup", runRepoScript([coreInstaller, "--target", codexOptionTarget]));
   assertRuntimePass("Codex option provenance default", runRepoScript([installer, "--target", codexOptionTarget, "--profile", "implementation"]));
@@ -3321,6 +3363,17 @@ function assertCodexInstallerScripts() {
     (codexSkipPromptState.projection_plan?.projected_managed_assets ?? []).some((asset) => asset.asset_kind === "prompts")
   ) {
     throw new Error("Codex --skip-prompts must change projection identity, input closure, and projected inventory");
+  }
+  assertRuntimePass("Codex option provenance skip command", runRepoScript([installer, "--target", codexOptionTarget, "--profile", "implementation", "--skip-command"]));
+  const codexSkipCommandState = readCodexInstallState(codexOptionTarget);
+  const skipCommandInputs = [...(codexSkipCommandState.projection_plan?.renderer_inputs?.canonical ?? []), ...(codexSkipCommandState.projection_plan?.renderer_inputs?.adapter_owned ?? [])];
+  const runtimeSourcePaths = new Set(CODEX_RUNTIME_FILES.map((file) => file.source));
+  if (
+    skipCommandInputs.some((input) => input.role === "command_template") ||
+    skipCommandInputs.some((input) => runtimeSourcePaths.has(input.path)) ||
+    (codexSkipCommandState.projection_plan?.projected_managed_assets ?? []).some((asset) => asset.asset_kind === "commands" || asset.asset_kind === "runner" || asset.asset_kind === "schemas")
+  ) {
+    throw new Error("Codex --skip-command must exclude command and runtime input/output closure");
   }
 
   for (const sourceProfile of ["organizational", "full"]) {

@@ -701,6 +701,8 @@ function buildState({
   previousState,
   rollback,
   hasMutations,
+  managedSubsetChanged,
+  managedSubsetFingerprint,
   customSelection,
   appliedProvenance,
   projectionPlan,
@@ -748,7 +750,8 @@ function buildState({
       required_assets: requiredAssets,
       applied_provenance: appliedProvenance,
       last_applied_provenance: appliedProvenance,
-      last_changed_provenance: hasMutations ? appliedProvenance : previousState?.last_changed_provenance ?? previousState?.applied_provenance ?? null,
+      last_changed_provenance: hasMutations || managedSubsetChanged ? appliedProvenance : previousState?.last_changed_provenance ?? previousState?.applied_provenance ?? null,
+      managed_subset_fingerprint: managedSubsetFingerprint,
       projection_plan: {
         fingerprint: projectionPlan.fingerprint,
         renderer_id: projectionPlan.renderer_id,
@@ -886,6 +889,7 @@ function resolveCodexProjectionSelection({ profileName, skills = null, skipPromp
 }
 
 function codexRendererInputsForSelection({ prompts, commands, skills, requiredAssets }) {
+  const runtimeFiles = commands.includes("codex-exec.md") ? CODEX_RUNTIME_FILES : [];
   const canonical = [
     { path: "AGENTS.md", role: "kernel" },
     { path: "manifest.json", role: "manifest" },
@@ -895,7 +899,7 @@ function codexRendererInputsForSelection({ prompts, commands, skills, requiredAs
     { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
     ...skills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
     ...requiredAssets.map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : "contract" })),
-    ...CODEX_RUNTIME_FILES.filter((file) => file.assetKind === "schemas").map((file) => ({ path: file.source, role: "schema" })),
+    ...runtimeFiles.filter((file) => file.assetKind === "schemas").map((file) => ({ path: file.source, role: "schema" })),
   ];
   const adapterOwned = [
     { path: "scripts/install-codex-adapter.mjs", role: "renderer" },
@@ -903,7 +907,7 @@ function codexRendererInputsForSelection({ prompts, commands, skills, requiredAs
     { path: "scripts/adapter-runtime-inventory.mjs", role: "inventory" },
     ...prompts.map((prompt) => ({ path: `adapters/codex/prompts/${prompt}`, role: "prompt_template" })),
     ...commands.map((command) => ({ path: `adapters/codex/commands/${command}`, role: "command_template" })),
-    ...CODEX_RUNTIME_FILES.filter((file) => file.assetKind !== "schemas").map((file) => ({ path: file.source, role: "runtime_source" })),
+    ...runtimeFiles.filter((file) => file.assetKind !== "schemas").map((file) => ({ path: file.source, role: "runtime_source" })),
   ];
   const dedupe = (items) => [...new Map(items.map((item) => [item.path, item])).values()].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
   return { canonical: dedupe(canonical), adapter_owned: dedupe(adapterOwned) };
@@ -1417,6 +1421,27 @@ function buildPlan(args) {
   if (JSON.stringify(plannedInventoryPaths) !== JSON.stringify(stateInventoryPaths)) {
     throw new Error(`pure projection plan inventory does not match Codex lifecycle state: planned=${plannedInventoryPaths.join(",")} actual=${stateInventoryPaths.join(",")}`);
   }
+  const managedSubset = {
+    projected_managed_assets: projectionPlan.projectedManagedAssets,
+    actual_installed_inventory: projectionPlan.actualInstalledInventory,
+    selected_skills: skills,
+    selected_prompts: selectedPromptTemplates,
+    selected_commands: selectedCommandTemplates,
+    selected_runtime_scripts: selectedRuntimeScripts,
+    managed_partial_paths: Object.keys(managedBlocks).sort(),
+  };
+  const previousManagedSubset = previousState ? {
+    projected_managed_assets: previousState.projection_plan?.projected_managed_assets ?? [],
+    actual_installed_inventory: previousState.actual_installed_inventory ?? [],
+    selected_skills: previousState.selected_skills ?? [],
+    selected_prompts: previousState.selected_prompts ?? [],
+    selected_commands: previousState.selected_commands ?? [],
+    selected_runtime_scripts: previousState.selected_runtime_scripts ?? [],
+    managed_partial_paths: Object.keys(previousState.managed_blocks ?? {}).sort(),
+  } : null;
+  const managedSubsetFingerprint = lifecycle.canonicalValueDigest(managedSubset);
+  const managedSubsetChanged = !previousManagedSubset || managedSubsetFingerprint !== lifecycle.canonicalValueDigest(previousManagedSubset);
+  const hasMutations = operations.some((operation) => !operation.unchanged);
   const state = buildState({
     manifest,
     profileName: args.profile,
@@ -1442,7 +1467,9 @@ function buildPlan(args) {
     managedBlocks,
     previousState,
     rollback,
-    hasMutations: operations.some((operation) => !operation.unchanged),
+    hasMutations,
+    managedSubsetChanged,
+    managedSubsetFingerprint,
     customSelection: args.skills !== null,
     appliedProvenance,
     projectionPlan,

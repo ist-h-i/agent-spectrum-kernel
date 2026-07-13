@@ -697,6 +697,11 @@ function removeManagedHooks(args, writes) {
     }
   }
   removeLegacyHooksFile(args, writes);
+  if (args.prune) {
+    delete args.managedPartialFiles[".claude/settings.json"];
+  } else if (!args.managedPartialFiles[".claude/settings.json"] && args.previousState?.managed_partial_files?.[".claude/settings.json"]) {
+    args.managedPartialFiles[".claude/settings.json"] = args.previousState.managed_partial_files[".claude/settings.json"];
+  }
 }
 
 function prepareManagedHookMutation(settings, args) {
@@ -1004,7 +1009,7 @@ export function buildClaudeProjectionPlan({ profileName, skills = null, skipHook
       }
     }
   }
-  if (!actualByPath.has(".claude/settings.json") && previousState?.managed_partial_files?.[".claude/settings.json"]) {
+  if (!prune && !actualByPath.has(".claude/settings.json") && previousState?.managed_partial_files?.[".claude/settings.json"]) {
     actualByPath.set(".claude/settings.json", { path: ".claude/settings.json", asset_kind: "hooks", ownership_mode: "partial_file", inventory_source_ref: "scripts/install-claude-adapter.mjs", retained_stale: true });
   }
   const provenance = lifecycle.buildProjectionPlanProvenance({
@@ -1167,7 +1172,26 @@ function buildState(args, manifest) {
     managedPartialFiles: args.managedPartialFiles,
     targetPartialFileState,
   });
-  const lastChangedProvenance = args.operations.some((operation) => !operation.unchanged)
+  const selectedRuntimeScripts = args.skipRuntime ? [] : CLAUDE_RUNTIME_FILES.map((file) => file.name).sort();
+  const managedSubset = {
+    projected_managed_assets: args.projectionPlan.projectedManagedAssets,
+    actual_installed_inventory: args.projectionPlan.actualInstalledInventory,
+    selected_skills: selectedSkills,
+    selected_commands: args.selectedCommands,
+    selected_runtime_scripts: selectedRuntimeScripts,
+    managed_partial_paths: Object.keys(args.managedPartialFiles).sort(),
+  };
+  const previousManagedSubset = args.previousState ? {
+    projected_managed_assets: args.previousState.projection_plan?.projected_managed_assets ?? [],
+    actual_installed_inventory: args.previousState.actual_installed_inventory ?? [],
+    selected_skills: args.previousState.selected_skills ?? [],
+    selected_commands: args.previousState.selected_commands ?? [],
+    selected_runtime_scripts: args.previousState.selected_runtime_scripts ?? [],
+    managed_partial_paths: Object.keys(args.previousState.managed_partial_files ?? {}).sort(),
+  } : null;
+  const managedSubsetFingerprint = lifecycle.canonicalValueDigest(managedSubset);
+  const managedSubsetChanged = !previousManagedSubset || managedSubsetFingerprint !== lifecycle.canonicalValueDigest(previousManagedSubset);
+  const lastChangedProvenance = args.operations.some((operation) => !operation.unchanged) || managedSubsetChanged
     ? appliedProvenance
     : args.previousState?.last_changed_provenance ?? args.previousState?.applied_provenance ?? null;
   return lifecycle.buildLifecycleState({
@@ -1203,6 +1227,8 @@ function buildState(args, manifest) {
       required_assets: args.requiredAssets,
       initial_project_state_assets: args.initialProjectStateAssets,
       runtime_directories: args.projectionPlan.actualInstalledInventory.filter((asset) => asset.ownership_mode === "runtime_directory").map((asset) => asset.path),
+      selected_runtime_scripts: selectedRuntimeScripts,
+      managed_subset_fingerprint: managedSubsetFingerprint,
       applied_provenance: appliedProvenance,
       last_applied_provenance: appliedProvenance,
       last_changed_provenance: lastChangedProvenance,
