@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -145,15 +145,57 @@ export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {
       if (!managedBlock || hashText(managedBlock) !== blockRecord?.sha256) findings.push({ path: input.path, status: "managed_block_drift" });
       continue;
     }
-    const candidates = [resolve(target, input.path)];
-    if (input.path.startsWith("skills/")) candidates.push(resolve(target, ".agents/skills", input.path.slice("skills/".length)));
-    const sourcePath = candidates.find((candidate) => existsSync(candidate));
-    if (!sourcePath) {
+    const sourcePath = resolve(target, input.path);
+    if (!existsSync(sourcePath)) {
+      if (input.path.startsWith("skills/")) findings.push({ path: input.path, status: "missing" });
       continue;
     }
     const actualSha256 = `sha256:${hashText(readFileSync(sourcePath))}`;
     if (actualSha256 !== input.digest) {
       findings.push({ path: input.path, status: "drift", expected_sha256: input.digest, actual_sha256: actualSha256 });
+    }
+  }
+  return findings;
+}
+
+export function inspectCodexDiscoverySkillAssets(target, state = {}) {
+  if (!Array.isArray(state?.selected_skills)) return [{ path: "selected_skills", status: "invalid_state" }];
+  const findings = [];
+  for (const skill of state.selected_skills) {
+    if (typeof skill !== "string" || !/^[a-z0-9][a-z0-9-]*$/u.test(skill)) {
+      findings.push({ path: `.agents/skills/${String(skill)}/SKILL.md`, status: "invalid_skill_id" });
+      continue;
+    }
+    const path = `.agents/skills/${skill}/SKILL.md`;
+    const absolutePath = resolve(target, path);
+    let fileStatus = null;
+    try {
+      fileStatus = lstatSync(absolutePath);
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        findings.push({ path, status: "missing" });
+        continue;
+      }
+      findings.push({ path, status: "unreadable" });
+      continue;
+    }
+    if (fileStatus.isSymbolicLink()) {
+      findings.push({ path, status: "symbolic_link" });
+      continue;
+    }
+    if (!fileStatus.isFile()) {
+      findings.push({ path, status: "not_regular_file" });
+      continue;
+    }
+    const record = state.managed_files?.[path];
+    if (record?.kind !== "codex_skill" || record?.skill !== skill || !/^[a-f0-9]{64}$/u.test(record?.sha256 ?? "")) {
+      findings.push({ path, status: "invalid_managed_record" });
+      continue;
+    }
+    try {
+      if (hashText(readFileSync(absolutePath, "utf8")) !== record.sha256) findings.push({ path, status: "hash_mismatch" });
+    } catch {
+      findings.push({ path, status: "unreadable" });
     }
   }
   return findings;

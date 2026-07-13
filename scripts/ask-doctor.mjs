@@ -8,6 +8,7 @@ import {
   findUnsupportedCapabilityClaims,
   hashFile,
   hashText,
+  inspectCodexDiscoverySkillAssets,
   inspectCodexProjectionCanonicalInputs,
   parseCodexCompactProfileHeader,
   readJsonIfExists,
@@ -691,11 +692,9 @@ function checkCodexRuntimeState(target, state, probe) {
     probe.failures.push(`Codex adapter runtime state shape is invalid: ${CODEX_STATE_PATH}`);
     return;
   }
-  for (const skill of state.selected_skills ?? []) {
-    const skillPath = resolve(target, ".agents/skills", skill, "SKILL.md");
-    if (!existsSync(skillPath)) {
-      probe.failures.push(`Codex runtime selected skill is not readable: .agents/skills/${skill}/SKILL.md`);
-    }
+  const discoveryFindings = inspectCodexDiscoverySkillAssets(target, state);
+  for (const finding of discoveryFindings) {
+    probe.failures.push(`Codex discovery skill ${finding.status}: ${finding.path}`);
   }
   for (const prompt of state.prompt_templates ?? []) {
     const promptPath = resolve(target, ".agents/prompts", prompt);
@@ -737,6 +736,7 @@ function checkCodexRuntimeState(target, state, probe) {
       }
       continue;
     }
+    if (discoveryFindings.length > 0) continue;
     probe.codex_evidence.requested_contracts.push({ prompt, profile_id: compact.profile_id, contracts: compact.requested_contracts });
     probe.codex_evidence.projected_contracts.push({ prompt: `.agents/prompts/${prompt}`, profile_id: compact.profile_id, canonical_revision: compact.canonical_revision, evidence_level: "projected" });
   }

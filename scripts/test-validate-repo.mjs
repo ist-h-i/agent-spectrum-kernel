@@ -3909,6 +3909,7 @@ function assertCodexRunnerScript() {
   writeFileSync(
     fakeCodex,
     `#!/bin/sh
+printf 'invoked\n' >> "$0.invocations"
 while [ "$#" -gt 0 ]; do
   if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
   shift
@@ -4015,6 +4016,139 @@ EOF
   const canonicalDriftDoctorResult = runRepoScript([doctorScript, "--target", target, "--runtime-probe", "--json"]);
   assertRuntimeFail("Codex doctor rejects canonical-only compact profile drift", canonicalDriftDoctorResult, "Codex compact-profile canonical source drift: skills/controlled-implementation/SKILL.md");
   writeFileSync(canonicalSkillPath, canonicalSkillContent);
+
+  const invocationMarker = `${fakeCodex}.invocations`;
+  function assertSkillProjectionPreflightFailure(name, skill, mutate, restore, expectedFailure) {
+    rmSync(invocationMarker, { force: true });
+    const projectedSkillPath = resolve(target, ".agents/skills", skill, "SKILL.md");
+    try {
+      mutate(projectedSkillPath);
+      const result = runRepoScript([
+        targetRunnerScript,
+        "--target",
+        target,
+        "--prompt",
+        "skill-implement.md",
+        "--mode",
+        "implementation",
+        "--codex-bin",
+        fakeCodex,
+        "--output",
+        `.agents/runs/${skill}-projection-failure.md`,
+        "--json",
+      ]);
+      assertRuntimeFail(name, result, expectedFailure);
+      const report = JSON.parse(result.stdout);
+      if (
+        report.command !== null ||
+        report.execution_evidence?.projected_contracts?.evidence_level !== "none" ||
+        report.execution_evidence?.runtime_detected_profile?.evidence_level !== "none"
+      ) {
+        throw new Error(`${name} must downgrade projection and runtime detection evidence\n${result.stdout}`);
+      }
+      if (existsSync(invocationMarker)) throw new Error(`${name} must fail before invoking Codex`);
+    } finally {
+      restore(projectedSkillPath);
+      rmSync(invocationMarker, { force: true });
+    }
+  }
+
+  const selectedSkill = "controlled-implementation";
+  const selectedSkillPath = resolve(target, ".agents/skills", selectedSkill, "SKILL.md");
+  const selectedSkillContent = readFileSync(selectedSkillPath, "utf8");
+  assertSkillProjectionPreflightFailure(
+    "codex runner rejects a deleted selected Skill projection",
+    selectedSkill,
+    (path) => rmSync(path),
+    (path) => writeFileSync(path, selectedSkillContent),
+    `Codex discovery skill missing: .agents/skills/${selectedSkill}/SKILL.md`,
+  );
+
+  const modifiedSkill = "evidence-ledger";
+  const modifiedSkillPath = resolve(target, ".agents/skills", modifiedSkill, "SKILL.md");
+  const modifiedSkillContent = readFileSync(modifiedSkillPath, "utf8");
+  assertSkillProjectionPreflightFailure(
+    "codex runner rejects a modified selected Skill projection",
+    modifiedSkill,
+    (path) => writeFileSync(path, `${modifiedSkillContent}\nProjected drift fixture.\n`),
+    (path) => writeFileSync(path, modifiedSkillContent),
+    `Codex discovery skill hash_mismatch: .agents/skills/${modifiedSkill}/SKILL.md`,
+  );
+
+  const directTriggerSkill = "repository-orientation";
+  const directTriggerSkillPath = resolve(target, ".agents/skills", directTriggerSkill, "SKILL.md");
+  const directTriggerSkillContent = readFileSync(directTriggerSkillPath, "utf8");
+  assertSkillProjectionPreflightFailure(
+    "codex runner rejects a deleted direct-trigger Skill projection",
+    directTriggerSkill,
+    (path) => rmSync(path),
+    (path) => writeFileSync(path, directTriggerSkillContent),
+    `Codex discovery skill missing: .agents/skills/${directTriggerSkill}/SKILL.md`,
+  );
+
+  const rootOnlyMaskSkill = "scope-control";
+  const rootOnlyCanonicalPath = resolve(target, "skills", rootOnlyMaskSkill, "SKILL.md");
+  const rootOnlyCanonicalContent = readFileSync(rootOnlyCanonicalPath, "utf8");
+  const rootOnlyProjectedPath = resolve(target, ".agents/skills", rootOnlyMaskSkill, "SKILL.md");
+  const rootOnlyProjectedContent = readFileSync(rootOnlyProjectedPath, "utf8");
+  assertSkillProjectionPreflightFailure(
+    "codex runner does not let a correct root canonical Skill mask projected Skill drift",
+    rootOnlyMaskSkill,
+    (path) => writeFileSync(path, `${rootOnlyProjectedContent}\nOnly the Codex discovery asset drifted.\n`),
+    (path) => writeFileSync(path, rootOnlyProjectedContent),
+    `Codex discovery skill hash_mismatch: .agents/skills/${rootOnlyMaskSkill}/SKILL.md`,
+  );
+  if (readFileSync(rootOnlyCanonicalPath, "utf8") !== rootOnlyCanonicalContent) throw new Error("root canonical Skill must remain unchanged in the projected-only drift fixture");
+
+  const symlinkSkill = "test-first-verification";
+  const symlinkSkillPath = resolve(target, ".agents/skills", symlinkSkill, "SKILL.md");
+  const symlinkSkillContent = readFileSync(symlinkSkillPath, "utf8");
+  const symlinkCanonicalPath = resolve(target, "skills", symlinkSkill, "SKILL.md");
+  assertSkillProjectionPreflightFailure(
+    "codex runner rejects a symlink selected Skill projection",
+    symlinkSkill,
+    (path) => {
+      rmSync(path);
+      symlinkSync(symlinkCanonicalPath, path);
+    },
+    (path) => {
+      rmSync(path);
+      writeFileSync(path, symlinkSkillContent);
+    },
+    `Codex discovery skill symbolic_link: .agents/skills/${symlinkSkill}/SKILL.md`,
+  );
+
+  const directorySkill = "risk-gate";
+  const directorySkillPath = resolve(target, ".agents/skills", directorySkill, "SKILL.md");
+  const directorySkillContent = readFileSync(directorySkillPath, "utf8");
+  assertSkillProjectionPreflightFailure(
+    "codex runner rejects a non-regular selected Skill projection",
+    directorySkill,
+    (path) => {
+      rmSync(path);
+      mkdirSync(path);
+    },
+    (path) => {
+      rmSync(path, { recursive: true });
+      writeFileSync(path, directorySkillContent);
+    },
+    `Codex discovery skill not_regular_file: .agents/skills/${directorySkill}/SKILL.md`,
+  );
+
+  const invalidRecordSkill = "controlled-implementation";
+  const invalidRecordStatePath = resolve(target, ".agent-spectrum-kernel/codex-install-state.json");
+  const validRecordState = readFileSync(invalidRecordStatePath, "utf8");
+  assertSkillProjectionPreflightFailure(
+    "codex runner rejects a selected Skill without a codex_skill managed record",
+    invalidRecordSkill,
+    () => {
+      const invalidRecordState = JSON.parse(validRecordState);
+      invalidRecordState.managed_files[`.agents/skills/${invalidRecordSkill}/SKILL.md`].kind = "codex_asset";
+      writeFileSync(invalidRecordStatePath, `${JSON.stringify(invalidRecordState, null, 2)}\n`);
+    },
+    () => writeFileSync(invalidRecordStatePath, validRecordState),
+    `Codex discovery skill invalid_managed_record: .agents/skills/${invalidRecordSkill}/SKILL.md`,
+  );
 
   const sourceRunnerResult = runRepoScript([codexRunnerScript, "--target", target, "--dry-run"]);
   assertRuntimeFail("codex runner rejects a runner from another checkout", sourceRunnerResult, "running runner is not the target managed runner");

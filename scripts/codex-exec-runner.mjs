@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSy
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, inspectCodexProjectionCanonicalInputs, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
+import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
 
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const DEFAULT_OUTPUT = ".agents/runs/codex-last-output.md";
@@ -130,6 +130,11 @@ function preflight(args) {
   }
   if (state?.install_status !== "installed") {
     failures.push(`Codex install status must be installed, received ${state?.install_status ?? "missing"}`);
+  }
+  if (state) {
+    for (const finding of inspectCodexDiscoverySkillAssets(args.target, state)) {
+      failures.push(`Codex discovery skill ${finding.status}: ${finding.path}`);
+    }
   }
   if (args.prompt !== args.prompt.split(/[\\/]/).at(-1)) failures.push("prompt must be an installed prompt basename");
   let promptPath = null;
