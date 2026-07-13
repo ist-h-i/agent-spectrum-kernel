@@ -99,7 +99,12 @@ const ADAPTER_RUNTIME_VERIFIER_FIXTURES = new Map([
           encoding: "utf8",
           timeout: 30_000,
         });
-        const verdict = result.status === 0 || `exit=${result.status ?? "unknown"}`;
+        const verdict = result.status === 0 || [
+          `exit=${result.status ?? "unknown"}`,
+          result.error?.message,
+          result.stderr?.trim(),
+          result.stdout?.trim(),
+        ].filter(Boolean).join("\n");
         ADAPTER_RUNTIME_VERIFIER_RESULT_CACHE.set(cacheKey, verdict);
         return verdict;
       },
