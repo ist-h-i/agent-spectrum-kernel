@@ -158,6 +158,21 @@ export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {
   return findings;
 }
 
+function inspectCodexDiscoveryPathSegments(target, path) {
+  let current = resolve(target);
+  let leafStatus = null;
+  for (const segment of path.split("/")) {
+    current = resolve(current, segment);
+    try {
+      leafStatus = lstatSync(current);
+    } catch (error) {
+      return { status: error?.code === "ENOENT" ? "missing" : "unreadable", leafStatus: null };
+    }
+    if (leafStatus.isSymbolicLink()) return { status: "symbolic_link", leafStatus: null };
+  }
+  return { status: "ok", leafStatus };
+}
+
 export function inspectCodexDiscoverySkillAssets(target, state = {}) {
   if (!Array.isArray(state?.selected_skills)) return [{ path: "selected_skills", status: "invalid_state" }];
   const findings = [];
@@ -168,22 +183,12 @@ export function inspectCodexDiscoverySkillAssets(target, state = {}) {
     }
     const path = `.agents/skills/${skill}/SKILL.md`;
     const absolutePath = resolve(target, path);
-    let fileStatus = null;
-    try {
-      fileStatus = lstatSync(absolutePath);
-    } catch (error) {
-      if (error?.code === "ENOENT") {
-        findings.push({ path, status: "missing" });
-        continue;
-      }
-      findings.push({ path, status: "unreadable" });
+    const pathInspection = inspectCodexDiscoveryPathSegments(target, path);
+    if (pathInspection.status !== "ok") {
+      findings.push({ path, status: pathInspection.status });
       continue;
     }
-    if (fileStatus.isSymbolicLink()) {
-      findings.push({ path, status: "symbolic_link" });
-      continue;
-    }
-    if (!fileStatus.isFile()) {
+    if (!pathInspection.leafStatus.isFile()) {
       findings.push({ path, status: "not_regular_file" });
       continue;
     }

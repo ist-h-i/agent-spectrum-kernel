@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { chmodSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, readdirSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -4018,7 +4018,7 @@ EOF
   writeFileSync(canonicalSkillPath, canonicalSkillContent);
 
   const invocationMarker = `${fakeCodex}.invocations`;
-  function assertSkillProjectionPreflightFailure(name, skill, mutate, restore, expectedFailure) {
+  function assertSkillProjectionPreflightFailure(name, skill, mutate, restore, expectedFailure, { checkDoctor = false } = {}) {
     rmSync(invocationMarker, { force: true });
     const projectedSkillPath = resolve(target, ".agents/skills", skill, "SKILL.md");
     try {
@@ -4047,6 +4047,18 @@ EOF
         throw new Error(`${name} must downgrade projection and runtime detection evidence\n${result.stdout}`);
       }
       if (existsSync(invocationMarker)) throw new Error(`${name} must fail before invoking Codex`);
+      if (checkDoctor) {
+        const doctorResult = runRepoScript([doctorScript, "--target", target, "--runtime-probe", "--json"]);
+        if (doctorResult.error || ![0, 1].includes(doctorResult.status)) throw new Error(`${name} doctor did not produce a report\n${doctorResult.stdout}\n${doctorResult.stderr}`);
+        const doctorReport = JSON.parse(doctorResult.stdout);
+        if (
+          !doctorReport.runtimeProbe?.failures?.includes(expectedFailure) ||
+          doctorReport.runtimeProbe?.codex_evidence?.projected_contracts?.length !== 0 ||
+          doctorReport.runtimeProbe?.codex_evidence?.runtime_detected_profile?.evidence_level !== "none"
+        ) {
+          throw new Error(`${name} doctor must record the projection failure and retain no projected or runtime-detected evidence\n${doctorResult.stdout}`);
+        }
+      }
     } finally {
       restore(projectedSkillPath);
       rmSync(invocationMarker, { force: true });
@@ -4116,6 +4128,46 @@ EOF
       writeFileSync(path, symlinkSkillContent);
     },
     `Codex discovery skill symbolic_link: .agents/skills/${symlinkSkill}/SKILL.md`,
+  );
+
+  const symlinkDirectorySkill = "repository-orientation";
+  const symlinkDirectorySkillPath = resolve(target, ".agents/skills", symlinkDirectorySkill, "SKILL.md");
+  const symlinkDirectorySkillContent = readFileSync(symlinkDirectorySkillPath, "utf8");
+  const symlinkDirectoryPath = dirname(symlinkDirectorySkillPath);
+  const symlinkDirectoryCanonicalPath = resolve(target, "skills", symlinkDirectorySkill);
+  assertSkillProjectionPreflightFailure(
+    "codex runner rejects a selected Skill under a symlink directory",
+    symlinkDirectorySkill,
+    () => {
+      rmSync(symlinkDirectoryPath, { recursive: true });
+      symlinkSync(symlinkDirectoryCanonicalPath, symlinkDirectoryPath);
+    },
+    () => {
+      rmSync(symlinkDirectoryPath);
+      mkdirSync(symlinkDirectoryPath);
+      writeFileSync(symlinkDirectorySkillPath, symlinkDirectorySkillContent);
+    },
+    `Codex discovery skill symbolic_link: .agents/skills/${symlinkDirectorySkill}/SKILL.md`,
+    { checkDoctor: true },
+  );
+
+  const symlinkSkillsRootSkill = "controlled-implementation";
+  const projectedSkillsRoot = resolve(target, ".agents/skills");
+  const projectedSkillsRootBackup = resolve(target, ".agents/skills-parent-symlink-fixture");
+  const canonicalSkillsRoot = resolve(target, "skills");
+  assertSkillProjectionPreflightFailure(
+    "codex runner rejects a selected Skill under a symlink skills root",
+    symlinkSkillsRootSkill,
+    () => {
+      renameSync(projectedSkillsRoot, projectedSkillsRootBackup);
+      symlinkSync(canonicalSkillsRoot, projectedSkillsRoot);
+    },
+    () => {
+      rmSync(projectedSkillsRoot);
+      renameSync(projectedSkillsRootBackup, projectedSkillsRoot);
+    },
+    `Codex discovery skill symbolic_link: .agents/skills/${symlinkSkillsRootSkill}/SKILL.md`,
+    { checkDoctor: true },
   );
 
   const directorySkill = "risk-gate";
