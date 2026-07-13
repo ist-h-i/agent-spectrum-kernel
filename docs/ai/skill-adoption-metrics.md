@@ -15,7 +15,7 @@ Every project-specific metrics program should state its purpose, access boundary
 
 Machine-readable metrics events should conform to `schemas/metrics-event.schema.json`. Period summaries and generated reports should conform to `schemas/adoption-report.schema.json` when emitted as JSON.
 
-Skill command sidecars are transient input to the event store, not durable metrics records. They should be written silently only when structured summaries such as `routing_result`, `review_result`, or `gate_decisions` are already available, and sidecar failures should not change the task output.
+Claude commands do not write metrics. The runtime-owned Stop collector validates the canonical Execution Envelope and normalizes only bounded structured summaries; collector failures cannot change the task output.
 
 ## Measurement Scope
 
@@ -28,8 +28,7 @@ Period:
 
 Evidence sources:
 - Metrics event candidates
-- Project-local `.claude/metrics/current-task.json` sidecar summaries, after Stop hook ingestion
-- Project-local `docs/ai/metrics/events.jsonl`
+- Runtime-owned `ask-runtime/metrics/events.jsonl`
 - PRs / reviews / validation reports
 - Improvement ledger entries
 - Handoffs or adoption pack outputs

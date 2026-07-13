@@ -21,7 +21,7 @@ Levels:
 | Evidence-ledger output support | projected | projected | unknown | unknown | unknown | unknown |
 | Adapter runtime smoke | behavior_verified | projected | unknown | unknown | unknown | unknown |
 | Bounded adapter execution runner | unsupported | behavior_verified | unknown | unknown | unknown | unknown |
-| Local metrics event recording | runtime_detected | unsupported | unknown | unknown | unknown | unknown |
+| Local metrics event recording | behavior_verified | unsupported | unknown | unknown | unknown | unknown |
 | Hidden telemetry disabled by default | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
 | External publication disabled by default | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
 | Upgrade/idempotent project install | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
@@ -39,6 +39,7 @@ Adapter install state reports `selected_skills` / `selected_planes` separately f
 Claude Code:
 
 - Evidence: `scripts/install-claude-adapter.mjs`, `adapters/claude-code/project/.claude/commands/`, local hooks, runtime scripts, and Pattern B workflow template.
+- Behaviorally evidenced: `scripts/test-claude-metrics-collector.mjs` verifies canonical-result collection, write/update, malformed and missing-result skips, duplicate-hook idempotency, persistence failure isolation, privacy exclusions, and a clean read-only Git working tree. This verifies the bounded repository fixture, not invocation by an externally installed Claude runtime.
 - Projected-only areas: human setup is still required for copied GitHub Actions, authentication, repository policy, and interpreting review evidence.
 
 Codex:

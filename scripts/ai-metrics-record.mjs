@@ -1,12 +1,15 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { inspectExecutionEnvelope, validateMetricsEvent } from "./execution-envelope.mjs";
+import { DEFAULT_RUNTIME_EVENT_STORE, resolveObservabilityPath } from "./observability-paths.mjs";
 
 const DEFAULT_CONFIG = {
   enabled: true,
   storage: {
-    event_store: "docs/ai/metrics/events.jsonl",
+    event_store: DEFAULT_RUNTIME_EVENT_STORE,
   },
   capture: {
     task_boundary_required: true,
@@ -38,8 +41,16 @@ const DEFAULT_CONFIG = {
 };
 
 const VERIFICATION_COMMAND_PATTERN = /\b(test|lint|typecheck|tsc|build|validate|check|pytest|vitest|jest|mocha|cargo test|go test|mvn test|gradle test)\b/i;
-const UNSAFE_COMMAND_PREVIEW_PATTERN = /\b(api[_-]?key|token|secret|password|passwd|authorization|bearer|_authToken|npm publish|curl\s+-H)\b|sk-[A-Za-z0-9_-]+/i;
 const ALLOWED_TASK_TYPES = new Set(["implementation", "review", "refactor", "investigation", "adoption", "documentation", "handoff", "validation", "report", "ledger_refresh", "other"]);
+const ALLOWED_OPERATING_MODES = new Set(["delivery_quality", "adoption_bootstrap", "observability_metrics", "operation_automation"]);
+const ALLOWED_HOOK_EVENTS = new Set(["PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop", "SubagentStop"]);
+const MAX_CHANGED_PATHS = 50;
+const STOP_DUPLICATE_CLAIM_TTL_MS = 5_000;
+const TASK_BOUNDARY_ACTIVE_SESSION_TTL_MS = 60 * 60 * 1_000;
+const TASK_BOUNDARY_SESSION_RETENTION_MS = 7 * 24 * 60 * 60 * 1_000;
+const MAX_TASK_BOUNDARY_SESSIONS = 128;
+const MAX_TASK_BOUNDARY_STATE_BYTES = 128 * 1_024;
+const RUNTIME_ROOT = dirname(fileURLToPath(import.meta.url));
 
 function parseArgs(argv) {
   const args = {
@@ -54,7 +65,6 @@ function parseArgs(argv) {
     routingResultJson: process.env.AI_ROUTING_RESULT_JSON || "",
     reviewResultJson: process.env.AI_REVIEW_RESULT_JSON || "",
     gateDecisionsJson: process.env.AI_GATE_DECISIONS_JSON || "",
-    sidecar: process.env.AI_METRICS_SIDECAR || ".claude/metrics/current-task.json",
     nonBlocking: false,
     dryRun: false,
     printResult: false,
@@ -84,8 +94,6 @@ function parseArgs(argv) {
       args.reviewResultJson = argv[++i];
     } else if (arg === "--gate-decisions-json") {
       args.gateDecisionsJson = argv[++i];
-    } else if (arg === "--sidecar") {
-      args.sidecar = argv[++i];
     } else if (arg === "--non-blocking") {
       args.nonBlocking = true;
     } else if (arg === "--dry-run") {
@@ -119,8 +127,7 @@ Options:
                             Optional review decision summary without raw review text.
   --gate-decisions-json <json>
                             Optional structured gate decisions without raw review text.
-  --sidecar <path>          Optional project-local task sidecar. Defaults to .claude/metrics/current-task.json.
-  --event-store <path>      JSONL event store path.
+  --event-store <path>      JSONL event store path. Defaults to runtime-owned local storage.
   --config <path>           Observability config. Defaults to docs/ai/observability-config.yml.
   --project-root <path>     Adopting project root for runtime-health; CLAUDE_PROJECT_DIR takes precedence.
   --non-blocking            Exit successfully and stay silent if metrics recording fails.
@@ -202,6 +209,206 @@ function resolveTaskId(args, hookInput, config) {
   return "";
 }
 
+function taskBoundaryStatePath(args, eventStore = null) {
+  return resolveObservabilityPath(resolveProjectRoot(args, eventStore), "ask-runtime/task-boundaries.json");
+}
+
+function readTaskBoundaryState(path) {
+  if (!existsSync(path)) return { schema_version: "1.0.0", sessions: {} };
+  const state = JSON.parse(readFileSync(path, "utf8"));
+  if (!isPlainObject(state) || state.schema_version !== "1.0.0" || !isPlainObject(state.sessions)) {
+    throw new Error("task boundary state is invalid");
+  }
+  return state;
+}
+
+function writeTaskBoundaryState(path, state) {
+  const temporaryPath = `${path}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    writeFileSync(temporaryPath, `${JSON.stringify(state)}\n`);
+    renameSync(temporaryPath, path);
+  } catch (error) {
+    try { rmSync(temporaryPath, { force: true }); } catch { /* preserve original error */ }
+    throw error;
+  }
+}
+
+function stopBoundaryDigest(envelope) {
+  const candidateEventId = envelope?.metrics_event_candidate?.event_id;
+  const identity = typeof candidateEventId === "string" && candidateEventId
+    ? { candidate_event_id: candidateEventId }
+    : envelope;
+  return createHash("sha256").update(stableCanonicalJson(identity)).digest("hex");
+}
+
+function stopBoundaryClaim(hookInput, envelope) {
+  if (typeof hookInput.transcript_path === "string" && hookInput.transcript_path) {
+    try {
+      const transcriptPath = resolve(hookInput.transcript_path);
+      const transcript = statSync(transcriptPath);
+      if (transcript.isFile()) {
+        return {
+          identity: createHash("sha256").update(stableCanonicalJson({
+            transcript_path: transcriptPath,
+            size: transcript.size,
+            stop_digest: stopBoundaryDigest(envelope),
+          })).digest("hex"),
+          source: "transcript_snapshot",
+        };
+      }
+    } catch {
+      // Fall back to a short-lived claim when the transcript is unavailable.
+    }
+  }
+  return { identity: stopBoundaryDigest(envelope), source: "envelope_ttl" };
+}
+
+function activeDuplicateStopClaim(current, claim, now) {
+  if (
+    current.duplicate_open !== true ||
+    current.last_stop_claim_identity !== claim.identity ||
+    current.last_stop_claim_source !== claim.source ||
+    typeof current.last_stop_task_id !== "string"
+  ) {
+    return false;
+  }
+  const claimedAt = Number(current.last_stop_claimed_at_ms);
+  const age = now - claimedAt;
+  return Number.isFinite(claimedAt) && age >= 0 && age <= STOP_DUPLICATE_CLAIM_TTL_MS;
+}
+
+function taskBoundaryGeneration(current, fresh = false) {
+  if (typeof current?.generation === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(current.generation)) {
+    return current.generation;
+  }
+  if (!fresh) return "legacy";
+  return randomUUID().replaceAll("-", "");
+}
+
+function taskBoundaryTaskId(sessionKey, current, segment) {
+  const generation = taskBoundaryGeneration(current);
+  if (generation === "legacy") return `session-boundary:${sessionKey}:${segment}`;
+  return `session-boundary:${sessionKey}:${generation}:${segment}`;
+}
+
+function taskBoundaryStateBytes(state) {
+  return Buffer.byteLength(`${JSON.stringify(state)}\n`);
+}
+
+function taskBoundaryLastTouched(current) {
+  const touchedAt = Number(current?.last_touched_at_ms);
+  return Number.isFinite(touchedAt) && touchedAt >= 0 ? touchedAt : 0;
+}
+
+function taskBoundarySessionProtected(sessionKey, current, activeSessionKey, now) {
+  if (sessionKey === activeSessionKey) return true;
+  const age = now - taskBoundaryLastTouched(current);
+  if (current?.segment_open === true && age >= 0 && age <= TASK_BOUNDARY_ACTIVE_SESSION_TTL_MS) return true;
+  if (current?.duplicate_open !== true) return false;
+  const claimedAt = Number(current.last_stop_claimed_at_ms);
+  const claimAge = now - claimedAt;
+  return Number.isFinite(claimedAt) && claimAge >= 0 && claimAge <= STOP_DUPLICATE_CLAIM_TTL_MS;
+}
+
+function pruneTaskBoundarySessions(state, activeSessionKey, now) {
+  const entries = Object.entries(state.sessions);
+  for (const [sessionKey, current] of entries) {
+    if (taskBoundarySessionProtected(sessionKey, current, activeSessionKey, now)) continue;
+    if (now - taskBoundaryLastTouched(current) > TASK_BOUNDARY_SESSION_RETENTION_MS) {
+      delete state.sessions[sessionKey];
+    }
+  }
+
+  const evictionCandidates = Object.entries(state.sessions)
+    .filter(([sessionKey, current]) => !taskBoundarySessionProtected(sessionKey, current, activeSessionKey, now))
+    .sort((left, right) => taskBoundaryLastTouched(left[1]) - taskBoundaryLastTouched(right[1]));
+  let evictionIndex = 0;
+  let sessionCount = Object.keys(state.sessions).length;
+  while (sessionCount > MAX_TASK_BOUNDARY_SESSIONS && evictionIndex < evictionCandidates.length) {
+    const [sessionKey] = evictionCandidates[evictionIndex++];
+    delete state.sessions[sessionKey];
+    sessionCount -= 1;
+  }
+  while (taskBoundaryStateBytes(state) > MAX_TASK_BOUNDARY_STATE_BYTES && evictionIndex < evictionCandidates.length) {
+    const [sessionKey] = evictionCandidates[evictionIndex++];
+    delete state.sessions[sessionKey];
+    sessionCount -= 1;
+  }
+
+  if (sessionCount > MAX_TASK_BOUNDARY_SESSIONS || taskBoundaryStateBytes(state) > MAX_TASK_BOUNDARY_STATE_BYTES) {
+    throw new Error("task boundary state capacity exhausted by active sessions");
+  }
+}
+
+function resolveSessionTaskBoundary(args, hookInput, eventStore, envelope) {
+  const statePath = taskBoundaryStatePath(args, eventStore);
+  const persist = !args.dryRun;
+  if (persist) mkdirSync(dirname(statePath), { recursive: true });
+  const resolveBoundary = () => {
+    const state = readTaskBoundaryState(statePath);
+    const sessionKey = createHash("sha256").update(String(hookInput.session_id)).digest("hex");
+    const existing = isPlainObject(state.sessions[sessionKey]);
+    const current = existing
+      ? state.sessions[sessionKey]
+      : { generation: taskBoundaryGeneration(null, true), next_segment: 0 };
+    const nextSegment = Number.isInteger(current.next_segment) && current.next_segment >= 0 ? current.next_segment : 0;
+    const now = Date.now();
+
+    if (args.eventKind === "task_stop") {
+      const claim = stopBoundaryClaim(hookInput, envelope);
+      if (activeDuplicateStopClaim(current, claim, now)) {
+        state.sessions[sessionKey] = { ...current, last_touched_at_ms: now };
+        pruneTaskBoundarySessions(state, sessionKey, now);
+        if (persist) writeTaskBoundaryState(statePath, state);
+        return current.last_stop_task_id;
+      }
+      const taskId = taskBoundaryTaskId(sessionKey, current, nextSegment);
+      state.sessions[sessionKey] = {
+        generation: taskBoundaryGeneration(current, !existing),
+        next_segment: nextSegment + 1,
+        segment_open: false,
+        last_touched_at_ms: now,
+        last_stop_claim_identity: claim.identity,
+        last_stop_claim_source: claim.source,
+        last_stop_claimed_at_ms: now,
+        last_stop_task_id: taskId,
+        duplicate_open: true,
+      };
+      pruneTaskBoundarySessions(state, sessionKey, now);
+      if (persist) writeTaskBoundaryState(statePath, state);
+      return taskId;
+    }
+
+    const taskId = taskBoundaryTaskId(sessionKey, current, nextSegment);
+    state.sessions[sessionKey] = {
+      generation: taskBoundaryGeneration(current, !existing),
+      next_segment: nextSegment,
+      segment_open: true,
+      last_touched_at_ms: now,
+      duplicate_open: false,
+    };
+    pruneTaskBoundarySessions(state, sessionKey, now);
+    if (persist) writeTaskBoundaryState(statePath, state);
+    return taskId;
+  };
+
+  if (!persist) return resolveBoundary();
+  return withRuntimeFileLock(statePath, resolveBoundary);
+}
+
+function resolveRuntimeTaskId(args, hookInput, config, eventStore, envelope, fallbackTaskId) {
+  if (args.taskId || (typeof hookInput.task_id === "string" && hookInput.task_id)) return fallbackTaskId;
+  if (
+    config.capture.task_boundary_source === "session_id" &&
+    config.capture.allow_session_id_task_boundary &&
+    typeof hookInput.session_id === "string" &&
+    hookInput.session_id
+  ) {
+    return resolveSessionTaskBoundary(args, hookInput, eventStore, envelope);
+  }
+  return fallbackTaskId;
+}
+
 function shouldRecord(args, hookInput, config) {
   if (!config.enabled) {
     return { ok: false, reason: "disabled" };
@@ -256,56 +463,23 @@ function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function readSidecar(args) {
-  if (args.eventKind !== "task_stop" || !args.sidecar) {
-    return {};
-  }
-  const sidecarPath = resolve(args.sidecar);
-  if (!existsSync(sidecarPath)) {
-    return {};
-  }
-
-  try {
-    const input = readFileSync(sidecarPath, "utf8").trim();
-    if (!input) {
-      return {};
-    }
-    const parsed = JSON.parse(input);
-    return isPlainObject(parsed) ? parsed : {};
-  } catch {
-    return {};
-  } finally {
-    try {
-      rmSync(sidecarPath, { force: true });
-    } catch {
-      // Metrics sidecars are best-effort and must not affect the developer task.
-    }
-  }
+function collectCanonicalTaskResult(args, hookInput) {
+  if (args.eventKind !== "task_stop") return { status: "not_applicable", envelope: null };
+  const result = inspectExecutionEnvelope(String(hookInput.last_assistant_message ?? ""));
+  if (result.status === "parsed") return { status: "parsed", envelope: result.value };
+  return {
+    status: result.status,
+    envelope: null,
+    reason: `canonical_task_result_${result.status}`,
+  };
 }
 
-function applySidecar(args, sidecar) {
-  if (!isPlainObject(sidecar)) {
-    return;
-  }
-  if (!args.taskId && typeof sidecar.task_id === "string" && sidecar.task_id) {
-    args.taskId = sidecar.task_id;
-  }
-  if (args.taskType === "other" && ALLOWED_TASK_TYPES.has(sidecar.task_type)) {
-    args.taskType = sidecar.task_type;
-  }
-  const sidecarSkills = Array.isArray(sidecar.skills_used) ? sidecar.skills_used : Array.isArray(sidecar.skills) ? sidecar.skills : [];
-  if (args.skills.length === 0 && sidecarSkills.length > 0) {
-    args.skills = sidecarSkills.filter((value) => typeof value === "string" && value);
-  }
-  if (!args.routingResultJson && isPlainObject(sidecar.routing_result)) {
-    args.routingResultJson = JSON.stringify(sidecar.routing_result);
-  }
-  if (!args.reviewResultJson && isPlainObject(sidecar.review_result)) {
-    args.reviewResultJson = JSON.stringify(sidecar.review_result);
-  }
-  if (!args.gateDecisionsJson && Array.isArray(sidecar.gate_decisions)) {
-    args.gateDecisionsJson = JSON.stringify(sidecar.gate_decisions);
-  }
+function taskBoundaryResultIdentity(taskResult) {
+  if (taskResult.status === "parsed") return taskResult.envelope;
+  return {
+    canonical_task_result_status: taskResult.status,
+    reason: taskResult.reason,
+  };
 }
 
 function changedPaths(hookInput, maxPaths) {
@@ -315,6 +489,12 @@ function changedPaths(hookInput, maxPaths) {
     input.path,
     ...(Array.isArray(input.edits) ? input.edits.map((edit) => edit.file_path || edit.path) : []),
   ]).slice(0, maxPaths);
+}
+
+function normalizedMaxPaths(configuredValue) {
+  const parsed = Number(configuredValue);
+  if (!Number.isFinite(parsed) || parsed < 1) return MAX_CHANGED_PATHS;
+  return Math.min(Math.floor(parsed), MAX_CHANGED_PATHS);
 }
 
 function commandKind(command) {
@@ -331,48 +511,63 @@ function commandHash(command) {
   return createHash("sha256").update(String(command)).digest("hex");
 }
 
-function safeCommandPreview(command) {
-  const value = String(command).trim().replace(/\s+/g, " ");
-  if (!value || value.length > 120 || UNSAFE_COMMAND_PREVIEW_PATTERN.test(value)) {
-    return "";
-  }
-  if (!/^(npm|pnpm|yarn|bun|node|npx|pytest|vitest|jest|go|cargo|mvn|gradle|make)\b/.test(value)) {
-    return "";
-  }
-  return value;
-}
-
-function buildEvent(args, hookInput, config, taskId) {
+function buildEvent(args, hookInput, config, taskId, envelope = null, allowedSkillIds = new Set(), allowedSignalIds = new Set()) {
   const now = new Date().toISOString();
-  const paths = changedPaths(hookInput, config.capture.max_paths_per_event ?? 50);
+  const maxPaths = normalizedMaxPaths(config.capture.max_paths_per_event);
+  const paths = changedPaths(hookInput, maxPaths);
   const command = hookInput.tool_input?.command ?? "";
-  const skills = unique(args.skills);
+  const hookReference = ALLOWED_HOOK_EVENTS.has(args.hookEvent) ? `claude_hook:${args.hookEvent}` : "";
+  const candidate = isPlainObject(envelope?.metrics_event_candidate)
+    ? structuredClone(envelope.metrics_event_candidate)
+    : null;
+  const envelopeSkills = [
+    envelope?.route?.internal?.primary,
+    ...(Array.isArray(envelope?.route?.internal?.secondary) ? envelope.route.internal.secondary : []),
+  ];
+  const skills = controlledSkillList([...(candidate?.skills_used ?? []), ...args.skills, ...envelopeSkills], allowedSkillIds, 100);
+  const envelopeRoutingResult = envelope ? {
+    operating_mode: envelope.route?.operating_mode,
+    primary_skill: envelope.route?.internal?.primary,
+    secondary_skills: envelope.route?.internal?.secondary,
+    missing_evidence: (envelope.evidence_status?.missing ?? []).map((input) => ({
+      input,
+      reason: "Canonical task result reported missing evidence.",
+    })),
+  } : {};
   const routingResult = sanitizeRoutingResult({
+    ...(candidate?.routing_result ?? {}),
+    ...envelopeRoutingResult,
     ...(hookInput.routing_result ?? {}),
     ...parseJsonOption(args.routingResultJson),
-  });
+  }, allowedSkillIds, allowedSignalIds);
   const reviewResult = sanitizeReviewResult({
+    ...(candidate?.review_result ?? {}),
     ...(hookInput.review_result ?? {}),
     ...parseJsonOption(args.reviewResultJson),
   });
   const gateDecisionOption = parseJsonOption(args.gateDecisionsJson, []);
   const gateDecisions = sanitizeGateDecisions([
+    ...(Array.isArray(candidate?.gate_decisions) ? candidate.gate_decisions : []),
     ...(Array.isArray(hookInput.gate_decisions) ? hookInput.gate_decisions : []),
     ...(Array.isArray(gateDecisionOption) ? gateDecisionOption : []),
-  ]);
+  ], allowedSkillIds, allowedSignalIds);
 
   const event = {
     schema_version: "1.0.0",
-    event_id: `evt:${now}:${randomUUID()}`,
-    task_id: taskId,
-    task_type: args.taskType,
-    occurred_at: now,
+    event_id: candidate?.event_id ? hashedIdentifier("evt:candidate", `${taskId}\0${candidate.event_id}`) : eventIdFor(args.eventKind, taskId, now, envelope),
+    task_id: hashedIdentifier("task", taskId),
+    task_type: ALLOWED_TASK_TYPES.has(candidate?.task_type) ? candidate.task_type : taskTypeFromEnvelope(envelope, args.taskType),
+    occurred_at: candidate?.occurred_at ?? now,
     skills_used: skills,
     routing_result: routingResult,
-    outcome_metrics: {},
-    verification_metrics: {},
-    debt_movement_metrics: {},
-    evidence_references: [],
+    instruction_quality_metrics: sanitizeInstructionQualityMetrics(candidate?.instruction_quality_metrics),
+    outcome_metrics: sanitizeOutcomeMetrics(candidate?.outcome_metrics),
+    verification_metrics: sanitizeVerificationMetrics(candidate?.verification_metrics, config),
+    debt_movement_metrics: sanitizeNonNegativeIntegerMetrics(candidate?.debt_movement_metrics, DEBT_MOVEMENT_FIELDS),
+    evidence_references: referenceList([
+      ...(candidate?.evidence_references ?? []),
+      ...(envelope?.evidence_status?.checked ?? []),
+    ], "ref", hookReference ? 49 : 50),
     privacy_note: {
       raw_prompts_stored: false,
       secrets_stored: false,
@@ -383,6 +578,23 @@ function buildEvent(args, hookInput, config, taskId) {
     },
   };
 
+  if (candidate?.period) {
+    const period = sanitizePeriod(candidate.period);
+    if (Object.keys(period).length > 0) event.period = period;
+  }
+  if (candidate?.related_ids) event.related_ids = sanitizeRelatedIds(candidate.related_ids);
+  if (candidate?.debt_inventory_snapshot) {
+    event.debt_inventory_snapshot = sanitizeNonNegativeIntegerMetrics(candidate.debt_inventory_snapshot, DEBT_INVENTORY_FIELDS);
+  }
+  if (candidate?.changed_file_summary) {
+    const candidatePaths = referenceList(candidate.changed_file_summary.paths ?? [], "path", maxPaths);
+    const candidateCount = candidate.changed_file_summary.count;
+    event.changed_file_summary = {
+      count: Number.isInteger(candidateCount) && candidateCount >= 0 ? candidateCount : candidatePaths.length,
+      paths: candidatePaths,
+    };
+  }
+
   if (Object.keys(reviewResult).length > 0) {
     event.review_result = reviewResult;
   }
@@ -390,14 +602,14 @@ function buildEvent(args, hookInput, config, taskId) {
     event.gate_decisions = gateDecisions;
   }
 
-  if (args.hookEvent) {
-    event.evidence_references.push(`claude_hook:${args.hookEvent}`);
+  if (hookReference) {
+    event.evidence_references = unique([...event.evidence_references, hookReference]).slice(0, 50);
   }
 
   if (paths.length > 0) {
     event.changed_file_summary = {
       count: paths.length,
-      paths,
+      paths: referenceList(paths, "path", maxPaths),
     };
   }
 
@@ -407,12 +619,6 @@ function buildEvent(args, hookInput, config, taskId) {
     };
     if (config.capture.record_command_hash) {
       commandRecord.command_hash = commandHash(command);
-    }
-    if (config.capture.record_command_preview) {
-      const preview = safeCommandPreview(command);
-      if (preview) {
-        commandRecord.redacted_command_preview = preview;
-      }
     }
     event.verification_metrics.commands_run = [commandRecord];
     event.verification_result_summary = "Verification command attempted; command text and full command output omitted by default.";
@@ -426,8 +632,16 @@ function buildEvent(args, hookInput, config, taskId) {
     event.command_attempt_summary = "Command attempted; command text and full command output omitted by default. This is not counted as verified work.";
   }
 
-  if (args.eventKind === "task_stop") {
+  if (args.eventKind === "task_stop" && !candidate && envelope?.stop_reason?.status === "completed") {
     event.outcome_metrics.task_completed = true;
+  }
+
+  if (
+    args.eventKind === "task_stop" &&
+    !candidate &&
+    ((envelope?.evidence_status?.missing?.length ?? 0) > 0 || envelope?.stop_reason?.status === "insufficient_evidence")
+  ) {
+    event.verification_metrics.insufficient_evidence_reported = true;
   }
 
   if (args.eventKind === "ledger_refresh") {
@@ -438,40 +652,66 @@ function buildEvent(args, hookInput, config, taskId) {
     event.task_type = "report";
   }
 
+  const schemaErrors = validateMetricsEvent(event);
+  if (schemaErrors.length > 0) {
+    throw new Error(`privacy-projected metrics event failed schema validation: ${schemaErrors.join("; ")}`);
+  }
   return event;
 }
 
-function sanitizeRoutingResult(source) {
+function eventIdFor(eventKind, taskId, now, envelope = null) {
+  if (eventKind !== "task_stop") return `evt:${now}:${randomUUID()}`;
+  const envelopeDigest = createHash("sha256").update(stableCanonicalJson(envelope)).digest("hex");
+  const digest = createHash("sha256").update(`${taskId}\0task_stop\0${envelopeDigest}`).digest("hex").slice(0, 32);
+  return `evt:task-stop:${digest}`;
+}
+
+function taskTypeFromEnvelope(envelope, fallback) {
+  if (ALLOWED_TASK_TYPES.has(fallback) && fallback !== "other") return fallback;
+  const primary = envelope?.route?.internal?.primary ?? "";
+  if (primary === "handoff-generation") return "handoff";
+  if (primary === "test-first-verification") return "validation";
+  if (primary === "skill-adoption-metrics") return "report";
+  if (primary === "improvement-ledger") return "ledger_refresh";
+  return {
+    "実装": "implementation",
+    "レビュー": "review",
+    "調査": "investigation",
+    "ドキュメント整理": "documentation",
+    "知識蓄積": "documentation",
+    "運用整理": "report",
+  }[envelope?.route?.work_mode] ?? "other";
+}
+
+function sanitizeRoutingResult(source, allowedSkillIds, allowedSignalIds) {
   const result = {};
-  if (typeof source.operating_mode === "string" && source.operating_mode) {
-    result.operating_mode = source.operating_mode;
-  }
-  if (typeof source.primary_skill === "string" && source.primary_skill) {
-    result.primary_skill = source.primary_skill;
-  }
+  const operatingMode = ALLOWED_OPERATING_MODES.has(source.operating_mode) ? source.operating_mode : "";
+  if (operatingMode) result.operating_mode = operatingMode;
+  const primarySkill = controlledSkillId(source.primary_skill, allowedSkillIds);
+  if (primarySkill) result.primary_skill = primarySkill;
   if (typeof source.correct_routing === "boolean") {
     result.correct_routing = source.correct_routing;
   }
   if (Array.isArray(source.change_signals)) {
     result.change_signals = source.change_signals
-      .map((item) => sanitizeChangeSignal(item))
+      .map((item) => sanitizeChangeSignal(item, allowedSignalIds))
       .filter(Boolean)
       .slice(0, 50);
   }
   for (const field of ["secondary_skills", "required_gates", "executed_gates"]) {
     if (Array.isArray(source[field])) {
-      result[field] = unique(source[field].filter((value) => typeof value === "string"));
+      result[field] = controlledSkillList(source[field], allowedSkillIds, 100);
     }
   }
   if (Array.isArray(source.required_gate_routes)) {
     result.required_gate_routes = source.required_gate_routes
-      .map((item) => sanitizeRequiredGateRoute(item))
+      .map((item) => sanitizeRequiredGateRoute(item, allowedSkillIds, allowedSignalIds))
       .filter(Boolean)
       .slice(0, 50);
   }
   if (Array.isArray(source.skipped_heavy_gates)) {
     result.skipped_heavy_gates = source.skipped_heavy_gates
-      .map((item) => sanitizeSkippedHeavyGate(item))
+      .map((item) => sanitizeSkippedHeavyGate(item, allowedSkillIds))
       .filter(Boolean)
       .slice(0, 50);
   }
@@ -484,50 +724,51 @@ function sanitizeRoutingResult(source) {
   if (Array.isArray(source.skipped_gates)) {
     result.skipped_gates = source.skipped_gates
       .filter((item) => item && typeof item.gate === "string" && typeof item.reason === "string")
-      .map((item) => ({ gate: item.gate, reason: item.reason.slice(0, 500) }))
+      .map((item) => ({ gate: controlledSkillId(item.gate, allowedSkillIds), reason: hashedReference("ref", item.reason) }))
+      .filter((item) => item.gate)
       .slice(0, 50);
   }
   if (Array.isArray(source.gate_applicability)) {
     result.gate_applicability = source.gate_applicability
-      .map((item) => sanitizeGateApplicability(item))
+      .map((item) => sanitizeGateApplicability(item, allowedSkillIds, allowedSignalIds))
       .filter(Boolean)
       .slice(0, 50);
   }
   return result;
 }
 
-function sanitizeChangeSignal(item) {
+function sanitizeChangeSignal(item, allowedSignalIds) {
   if (!item || typeof item.signal !== "string" || typeof item.evidence !== "string") {
     return null;
   }
-  const signal = sanitizeText(item.signal, 120);
-  const evidence = sanitizeText(item.evidence, 500);
+  const signal = controlledSignalId(item.signal, allowedSignalIds);
+  const evidence = hashedReference("ref", item.evidence);
   return signal && evidence ? { signal, evidence } : null;
 }
 
-function sanitizeRequiredGateRoute(item) {
+function sanitizeRequiredGateRoute(item, allowedSkillIds, allowedSignalIds) {
   if (!item || typeof item.gate !== "string" || typeof item.reason !== "string" || !Array.isArray(item.trigger_signals)) {
     return null;
   }
-  const gate = sanitizeText(item.gate, 120);
-  const reason = sanitizeText(item.reason, 500);
-  const triggerSignals = unique(item.trigger_signals.filter((value) => typeof value === "string").map((value) => sanitizeText(value, 120))).filter(Boolean).slice(0, 20);
+  const gate = controlledSkillId(item.gate, allowedSkillIds);
+  const reason = hashedReference("ref", item.reason);
+  const triggerSignals = controlledSignalList(item.trigger_signals, allowedSignalIds, 20);
   return gate && reason && triggerSignals.length > 0 ? { gate, reason, trigger_signals: triggerSignals } : null;
 }
 
-function sanitizeSkippedHeavyGate(item) {
+function sanitizeSkippedHeavyGate(item, allowedSkillIds) {
   if (!item || typeof item.gate !== "string" || typeof item.reason !== "string" || typeof item.observed_evidence !== "string") {
     return null;
   }
-  const gate = sanitizeText(item.gate, 120);
-  const reason = sanitizeText(item.reason, 500);
-  const observedEvidence = sanitizeText(item.observed_evidence, 500);
+  const gate = controlledSkillId(item.gate, allowedSkillIds);
+  const reason = hashedReference("ref", item.reason);
+  const observedEvidence = hashedReference("ref", item.observed_evidence);
   if (!gate || !reason || !observedEvidence) {
     return null;
   }
   const result = { gate, reason, observed_evidence: observedEvidence };
   if (typeof item.layer === "string") {
-    const layer = sanitizeText(item.layer, 120);
+    const layer = hashedReference("ref", item.layer);
     if (layer) result.layer = layer;
   }
   return result;
@@ -537,19 +778,19 @@ function sanitizeMissingEvidence(item) {
   if (!item || typeof item.input !== "string" || typeof item.reason !== "string") {
     return null;
   }
-  const input = sanitizeText(item.input, 120);
-  const reason = sanitizeText(item.reason, 500);
+  const input = hashedReference("ref", item.input);
+  const reason = hashedReference("ref", item.reason);
   return input && reason ? { input, reason } : null;
 }
 
-function sanitizeGateApplicability(item) {
+function sanitizeGateApplicability(item, allowedSkillIds, allowedSignalIds) {
   const allowedStatuses = new Set(["required", "skipped", "insufficient_evidence"]);
   if (!item || typeof item.layer !== "string" || !allowedStatuses.has(item.status) || typeof item.reason !== "string" || typeof item.evidence !== "string") {
     return null;
   }
-  const layer = sanitizeText(item.layer, 120);
-  const reason = sanitizeText(item.reason, 1000);
-  const evidence = sanitizeText(item.evidence, 1000);
+  const layer = hashedReference("ref", item.layer);
+  const reason = hashedReference("ref", item.reason);
+  const evidence = hashedReference("ref", item.evidence);
   if (!layer || !reason || !evidence) {
     return null;
   }
@@ -560,16 +801,16 @@ function sanitizeGateApplicability(item) {
     evidence,
   };
   if (typeof item.gate === "string") {
-    const gate = sanitizeText(item.gate, 120);
+    const gate = controlledSkillId(item.gate, allowedSkillIds);
     if (gate) {
       row.gate = gate;
     }
   }
   if (Array.isArray(item.trigger_signals)) {
-    row.trigger_signals = unique(item.trigger_signals.filter((value) => typeof value === "string").map((value) => sanitizeText(value, 120))).slice(0, 20);
+    row.trigger_signals = controlledSignalList(item.trigger_signals, allowedSignalIds, 20);
   }
   if (Array.isArray(item.inputs_still_needed)) {
-    row.inputs_still_needed = unique(item.inputs_still_needed.filter((value) => typeof value === "string").map((value) => sanitizeText(value, 120))).slice(0, 20);
+    row.inputs_still_needed = referenceList(item.inputs_still_needed, "ref", 20);
   }
   return row;
 }
@@ -584,12 +825,12 @@ function sanitizeReviewResult(source) {
     result.required_fixes_count = source.required_fixes_count;
   }
   if (Array.isArray(source.insufficient_evidence_layers)) {
-    result.insufficient_evidence_layers = unique(source.insufficient_evidence_layers.filter((value) => typeof value === "string")).slice(0, 20);
+    result.insufficient_evidence_layers = referenceList(source.insufficient_evidence_layers, "ref", 20);
   }
   return result;
 }
 
-function sanitizeGateDecisions(source) {
+function sanitizeGateDecisions(source, allowedSkillIds, allowedSignalIds) {
   const allowedStatuses = new Set(["required", "executed", "skipped", "insufficient_evidence"]);
   const allowedConfidence = new Set(["high", "medium", "low"]);
   const allowedCategories = new Set(["no_trigger_signal", "not_applicable", "covered_by_other_gate", "missing_context", "missing_evidence", "other"]);
@@ -602,7 +843,7 @@ function sanitizeGateDecisions(source) {
       if (!item || typeof item.gate !== "string" || !allowedStatuses.has(item.status)) {
         return null;
       }
-      const gate = sanitizeText(item.gate, 120);
+      const gate = controlledSkillId(item.gate, allowedSkillIds);
       if (!gate) {
         return null;
       }
@@ -611,16 +852,11 @@ function sanitizeGateDecisions(source) {
         status: item.status,
       };
       if (typeof item.layer === "string" && item.layer) {
-        decision.layer = sanitizeText(item.layer, 120);
+        decision.layer = hashedReference("ref", item.layer);
       }
-      if (typeof item.judgment === "string") {
-        decision.judgment = sanitizeText(item.judgment, 500);
-      }
-      for (const field of ["evidence_checked", "triggering_signals", "missing_inputs"]) {
-        if (Array.isArray(item[field])) {
-          decision[field] = unique(item[field].filter((value) => typeof value === "string").map((value) => sanitizeText(value, 120))).slice(0, 20);
-        }
-      }
+      if (Array.isArray(item.evidence_checked)) decision.evidence_checked = referenceList(item.evidence_checked, "ref", 20);
+      if (Array.isArray(item.triggering_signals)) decision.triggering_signals = controlledSignalList(item.triggering_signals, allowedSignalIds, 20);
+      if (Array.isArray(item.missing_inputs)) decision.missing_inputs = referenceList(item.missing_inputs, "ref", 20);
       if (allowedConfidence.has(item.confidence)) {
         decision.confidence = item.confidence;
       }
@@ -633,13 +869,212 @@ function sanitizeGateDecisions(source) {
     .slice(0, 100);
 }
 
-function sanitizeText(value, maxLength) {
-  return String(value).replace(/\s+/g, " ").trim().slice(0, maxLength);
+function stableCanonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableCanonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableCanonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
-function appendEvent(eventStore, event) {
+function hashedIdentifier(prefix, value) {
+  return `${prefix}:sha256:${createHash("sha256").update(String(value)).digest("hex")}`;
+}
+
+function hashedReference(prefix, value) {
+  return `${prefix}:sha256:${createHash("sha256").update(String(value)).digest("hex")}`;
+}
+
+function referenceList(values, prefix, maxItems) {
+  return unique((Array.isArray(values) ? values : []).filter((value) => typeof value === "string" && value).map((value) => hashedReference(prefix, value))).slice(0, maxItems);
+}
+
+function controlledSkillId(value, allowedSkillIds) {
+  return typeof value === "string" && allowedSkillIds.has(value) ? value : "";
+}
+
+function controlledSkillList(values, allowedSkillIds, maxItems) {
+  return unique((Array.isArray(values) ? values : []).map((value) => controlledSkillId(value, allowedSkillIds)).filter(Boolean)).slice(0, maxItems);
+}
+
+function controlledSignalId(value, allowedSignalIds) {
+  return typeof value === "string" && allowedSignalIds.has(value) ? value : "";
+}
+
+function controlledSignalList(values, allowedSignalIds, maxItems) {
+  return unique((Array.isArray(values) ? values : []).map((value) => controlledSignalId(value, allowedSignalIds)).filter(Boolean)).slice(0, maxItems);
+}
+
+function loadAllowedSkillIds(projectRoot) {
+  const allowed = new Set();
+  const sources = [
+    resolve(projectRoot, ".agent-spectrum-kernel/claude-install-state.json"),
+    resolve(RUNTIME_ROOT, "../manifest.json"),
+  ];
+  for (const path of sources) {
+    if (!existsSync(path)) continue;
+    try {
+      const value = JSON.parse(readFileSync(path, "utf8"));
+      const skills = value.name === "agent-spectrum-kernel" ? value.skills : value.selected_skills;
+      for (const skill of Array.isArray(skills) ? skills : []) {
+        if (typeof skill === "string" && /^[a-z0-9][a-z0-9-]{0,119}$/.test(skill)) allowed.add(skill);
+      }
+    } catch {
+      // An unavailable control allowlist drops uncontrolled identifiers; collection remains fail-open.
+    }
+  }
+  return allowed;
+}
+
+function loadAllowedSignalIds(projectRoot) {
+  const allowed = new Set();
+  const sources = [
+    resolve(projectRoot, "schemas/review-signal-gate-map.json"),
+    resolve(RUNTIME_ROOT, "../schemas/review-signal-gate-map.json"),
+  ];
+  for (const path of unique(sources)) {
+    if (!existsSync(path)) continue;
+    try {
+      const value = JSON.parse(readFileSync(path, "utf8"));
+      if (!isPlainObject(value.signal_to_gates)) continue;
+      for (const signal of Object.keys(value.signal_to_gates)) allowed.add(signal);
+    } catch {
+      // An unavailable registry drops uncontrolled signals; collection remains fail-open.
+    }
+  }
+  return allowed;
+}
+
+function sanitizePeriod(source) {
+  if (!isPlainObject(source)) return {};
+  const result = {};
+  for (const field of ["start", "end"]) {
+    if (typeof source[field] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(source[field])) result[field] = source[field];
+  }
+  return result;
+}
+
+function sanitizeInstructionQualityMetrics(source) {
+  if (!isPlainObject(source)) return {};
+  const result = {};
+  for (const field of ["goal_clarity", "scope_clarity", "context_sufficiency"]) {
+    if (Number.isInteger(source[field]) && source[field] >= 1 && source[field] <= 5) result[field] = source[field];
+  }
+  const presence = new Set(["present", "partial", "missing", "not_applicable", "unknown"]);
+  for (const field of ["verification_instruction", "risk_awareness", "stop_condition_clarity"]) {
+    if (presence.has(source[field])) result[field] = source[field];
+  }
+  return result;
+}
+
+function sanitizeOutcomeMetrics(source) {
+  if (!isPlainObject(source)) return {};
+  const result = {};
+  for (const field of ["task_completed", "pr_created", "pr_merged", "validation_passed"]) {
+    if (typeof source[field] === "boolean") result[field] = source[field];
+  }
+  if (Number.isInteger(source.rework_count) && source.rework_count >= 0) result.rework_count = source.rework_count;
+  return result;
+}
+
+const DEBT_MOVEMENT_FIELDS = new Set([
+  "debt_items_detected", "debt_items_recorded", "debt_items_planned", "debt_items_in_progress", "debt_items_resolved",
+  "debt_items_converted_to_rule", "debt_items_converted_to_check", "debt_items_accepted", "debt_items_wont_fix",
+  "stale_debt_items", "refactor_candidates_created", "refactor_candidates_implemented",
+]);
+const DEBT_INVENTORY_FIELDS = new Set([
+  "detected", "recorded", "open", "triaged", "accepted", "planned", "in_progress", "resolved", "converted_to_rule",
+  "converted_to_check", "wont_fix", "stale",
+]);
+
+function sanitizeNonNegativeIntegerMetrics(source, allowedFields) {
+  if (!isPlainObject(source)) return {};
+  const result = {};
+  for (const field of allowedFields) {
+    if (Number.isInteger(source[field]) && source[field] >= 0) result[field] = source[field];
+  }
+  return result;
+}
+
+function sanitizeVerificationMetrics(source, config) {
+  if (!isPlainObject(source)) return {};
+  const result = {};
+  for (const field of ["verification_contract_defined", "tests_added_or_updated", "insufficient_evidence_reported"]) {
+    if (typeof source[field] === "boolean") result[field] = source[field];
+  }
+  if (!Array.isArray(source.commands_run)) return result;
+  result.commands_run = source.commands_run.slice(0, 20).map((command) => {
+    const record = { command_kind: command.command_kind };
+    if (config.capture.record_command_hash && typeof command.command_hash === "string") record.command_hash = command.command_hash;
+    return record;
+  });
+  return result;
+}
+
+function sanitizeRelatedIds(source) {
+  const result = {};
+  for (const field of ["prs", "issues"]) {
+    if (Array.isArray(source[field])) result[field] = unique(source[field].map((value) => String(value)).filter((value) => /^#[0-9]+$/.test(value))).slice(0, 50);
+  }
+  if (Array.isArray(source.improvement_ids)) result.improvement_ids = unique(source.improvement_ids.filter((value) => /^IMP-[0-9]{4}$/.test(value))).slice(0, 50);
+  if (Array.isArray(source.skill_adoption_metric_ids)) result.skill_adoption_metric_ids = unique(source.skill_adoption_metric_ids.filter((value) => /^SAM-[0-9]{4}$/.test(value))).slice(0, 50);
+  return result;
+}
+
+function upsertEvent(eventStore, event) {
   mkdirSync(dirname(eventStore), { recursive: true });
-  appendFileSync(eventStore, `${JSON.stringify(event)}\n`);
+  return withRuntimeFileLock(eventStore, () => {
+    const lines = existsSync(eventStore) ? readFileSync(eventStore, "utf8").split(/\r?\n/).filter(Boolean) : [];
+    let matchIndex = -1;
+    for (const [index, line] of lines.entries()) {
+      try {
+        if (JSON.parse(line)?.event_id === event.event_id) {
+          matchIndex = index;
+          break;
+        }
+      } catch {
+        // Preserve malformed historical lines; summary readers report them separately.
+      }
+    }
+    const serialized = JSON.stringify(event);
+    if (matchIndex >= 0 && lines[matchIndex] === serialized) return "unchanged";
+    if (matchIndex >= 0) lines[matchIndex] = serialized;
+    else lines.push(serialized);
+    const temporaryPath = `${eventStore}.tmp-${process.pid}-${Date.now()}`;
+    try {
+      writeFileSync(temporaryPath, `${lines.join("\n")}\n`);
+      renameSync(temporaryPath, eventStore);
+    } catch (error) {
+      try { rmSync(temporaryPath, { force: true }); } catch { /* preserve original error */ }
+      throw error;
+    }
+    return matchIndex >= 0 ? "updated" : "recorded";
+  });
+}
+
+function withRuntimeFileLock(path, operation) {
+  const lockPath = `${path}.lock`;
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    let descriptor = null;
+    try {
+      descriptor = openSync(lockPath, "wx");
+      return operation();
+    } catch (error) {
+      if (descriptor !== null || error?.code !== "EEXIST") throw error;
+      try {
+        if (Date.now() - statSync(lockPath).mtimeMs > 30_000) unlinkSync(lockPath);
+      } catch {
+        // Another collector may have released the lock between checks.
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    } finally {
+      if (descriptor !== null) {
+        closeSync(descriptor);
+        try { unlinkSync(lockPath); } catch { /* lock cleanup is best-effort */ }
+      }
+    }
+  }
+  throw new Error("runtime data file lock timed out");
 }
 
 function resolveProjectRoot(args, eventStore = null) {
@@ -649,6 +1084,11 @@ function resolveProjectRoot(args, eventStore = null) {
   if (configPath.endsWith("/docs/ai/observability-config.yml")) return resolve(dirname(configPath), "../..");
   if (eventStore && eventStore.includes("/docs/ai/")) return resolve(eventStore.slice(0, eventStore.indexOf("/docs/ai/")));
   return process.cwd();
+}
+
+function resolveEventStore(args, config) {
+  const projectRoot = resolveProjectRoot(args);
+  return resolveObservabilityPath(projectRoot, args.eventStore || config.storage.event_store || DEFAULT_CONFIG.storage.event_store);
 }
 
 function readRuntimeHealth(path) {
@@ -673,52 +1113,58 @@ function healthKey(entry) {
 }
 
 function appendRuntimeHealth(path, entry, maxEntries) {
-  const { entries } = readRuntimeHealth(path);
-  const latest = [...entries].reverse().find((candidate) => healthKey(candidate) === healthKey(entry));
-  const now = entry.occurred_at;
-  if (latest?.status === entry.status) {
-    const index = entries.lastIndexOf(latest);
-    const updated = {
-      ...latest,
-      first_seen_at: latest.first_seen_at || latest.occurred_at || now,
-      last_seen_at: now,
-      occurrence_count: Math.max(1, Number(latest.occurrence_count) || 1) + 1,
-      occurred_at: now,
-    };
-    entries.splice(index, 1);
-    entries.push(updated);
-  } else {
-    entries.push({
-      ...entry,
-      first_seen_at: entry.first_seen_at || now,
-      last_seen_at: entry.last_seen_at || now,
-      occurrence_count: Math.max(1, Number(entry.occurrence_count) || 1),
-    });
-  }
   mkdirSync(dirname(path), { recursive: true });
-  const bounded = entries.slice(-Math.max(1, Number(maxEntries) || 100));
-  const temporaryPath = `${path}.tmp-${process.pid}-${Date.now()}`;
-  try {
-    writeFileSync(temporaryPath, `${bounded.map((candidate) => JSON.stringify(candidate)).join("\n")}\n`);
-    renameSync(temporaryPath, path);
-  } catch (error) {
-    try { rmSync(temporaryPath, { force: true }); } catch { /* fail-open health path */ }
-    throw error;
-  }
+  return withRuntimeFileLock(path, () => {
+    const { entries } = readRuntimeHealth(path);
+    const latest = [...entries].reverse().find((candidate) => healthKey(candidate) === healthKey(entry));
+    const now = entry.occurred_at;
+    if (latest?.status === entry.status) {
+      const index = entries.lastIndexOf(latest);
+      const updated = {
+        ...latest,
+        first_seen_at: latest.first_seen_at || latest.occurred_at || now,
+        last_seen_at: now,
+        occurrence_count: Math.max(1, Number(latest.occurrence_count) || 1) + 1,
+        occurred_at: now,
+      };
+      entries.splice(index, 1);
+      entries.push(updated);
+    } else {
+      entries.push({
+        ...entry,
+        first_seen_at: entry.first_seen_at || now,
+        last_seen_at: entry.last_seen_at || now,
+        occurrence_count: Math.max(1, Number(entry.occurrence_count) || 1),
+      });
+    }
+    const bounded = entries.slice(-Math.max(1, Number(maxEntries) || 100));
+    const temporaryPath = `${path}.tmp-${process.pid}-${Date.now()}`;
+    try {
+      writeFileSync(temporaryPath, `${bounded.map((candidate) => JSON.stringify(candidate)).join("\n")}\n`);
+      renameSync(temporaryPath, path);
+    } catch (error) {
+      try { rmSync(temporaryPath, { force: true }); } catch { /* fail-open health path */ }
+      throw error;
+    }
+  });
 }
 
 function runtimeHealthPath(args, eventStore = null) {
+  return resolveObservabilityPath(resolveProjectRoot(args, eventStore), "ask-runtime/runtime-health.jsonl");
+}
+
+function legacyRuntimeHealthPath(args, eventStore = null) {
   return resolve(resolveProjectRoot(args, eventStore), ".agent-spectrum-kernel/runtime-health.jsonl");
 }
 
-function runtimeHealthEntry(status) {
+function runtimeHealthEntry(status, errorCode = "non_blocking_metrics_record_failure") {
   return {
     schema_version: "1.0.0",
     occurred_at: new Date().toISOString(),
     component: "ai-metrics-record",
     status,
-    error_code: "non_blocking_metrics_record_failure",
-    message: status === "recovered" ? "Metrics recorder recovered; raw error details omitted by default." : "Non-blocking metrics recorder failed; raw error details omitted by default.",
+    error_code: errorCode,
+    message: status === "recovered" ? "Metrics collector recovered; raw details omitted by default." : "Metrics collector degraded; raw details omitted by default.",
     privacy_note: {
       raw_prompts_stored: false,
       secrets_stored: false,
@@ -733,33 +1179,104 @@ function runtimeHealthEntry(status) {
 function recordRuntimeHealthRecovery(args, config, eventStore) {
   try {
     const path = runtimeHealthPath(args, eventStore);
-    const latest = [...readRuntimeHealth(path).entries].reverse().find((entry) => healthKey(entry) === "ai-metrics-record:non_blocking_metrics_record_failure");
-    if (latest?.status === "error") appendRuntimeHealth(path, runtimeHealthEntry("recovered"), config.runtime_health?.max_entries);
+    const unresolved = new Map();
+    const entries = unique([path, legacyRuntimeHealthPath(args, eventStore)])
+      .flatMap((healthPath) => readRuntimeHealth(healthPath).entries)
+      .sort((left, right) => runtimeHealthTimestamp(left) - runtimeHealthTimestamp(right));
+    for (const entry of entries) {
+      if (entry.component !== "ai-metrics-record") continue;
+      if (entry.status === "error") unresolved.set(entry.error_code, entry);
+      if (entry.status === "recovered") unresolved.delete(entry.error_code);
+    }
+    for (const errorCode of unresolved.keys()) {
+      appendRuntimeHealth(path, runtimeHealthEntry("recovered", errorCode), config.runtime_health?.max_entries);
+    }
   } catch {
     // Health recording remains fail-open for hooks.
   }
 }
 
+function runtimeHealthTimestamp(entry) {
+  for (const field of ["last_seen_at", "occurred_at", "first_seen_at"]) {
+    const timestamp = Date.parse(entry?.[field]);
+    if (Number.isFinite(timestamp)) return timestamp;
+  }
+  return 0;
+}
+
 function main(args) {
   const hookInput = readStdinJson();
-  applySidecar(args, readSidecar(args));
   const config = readConfig(args.config);
-  const decision = shouldRecord(args, hookInput, config);
-  if (!decision.ok) {
-    if (args.printResult) {
-      console.log(JSON.stringify({ status: "skip", reason: decision.reason }));
-    }
+  if (!config.enabled) {
+    if (args.printResult) console.log(JSON.stringify(skipResult("observability_disabled")));
     return;
   }
-  const event = buildEvent(args, hookInput, config, decision.taskId);
-  const eventStore = resolve(args.eventStore || config.storage.event_store || DEFAULT_CONFIG.storage.event_store);
+  const eventStore = resolveEventStore(args, config);
+  const taskResult = collectCanonicalTaskResult(args, hookInput);
+  const fallbackTaskId = resolveTaskId(args, hookInput, config);
+  const stopTaskId = args.eventKind === "task_stop"
+    ? resolveRuntimeTaskId(args, hookInput, config, eventStore, taskBoundaryResultIdentity(taskResult), fallbackTaskId)
+    : "";
+  if (taskResult.status === "parsed" && taskResult.envelope?.metrics_event_candidate) {
+    if (args.taskType === "other") args.taskType = taskResult.envelope.metrics_event_candidate.task_type;
+  }
+  if (args.eventKind === "task_stop" && taskResult.status !== "parsed") {
+    if (args.nonBlocking && ["malformed", "invalid"].includes(taskResult.status)) {
+      try {
+        appendRuntimeHealth(
+          runtimeHealthPath(args, eventStore),
+          runtimeHealthEntry("error", taskResult.reason),
+          config.runtime_health?.max_entries,
+        );
+      } catch {
+        // A collector degradation must not change the engineering decision.
+      }
+    }
+    if (args.printResult) console.log(JSON.stringify(skipResult(taskResult.reason)));
+    return;
+  }
+  const decision = shouldRecord(args, hookInput, config);
+  if (!decision.ok) {
+    if (args.printResult) console.log(JSON.stringify(skipResult(decision.reason)));
+    return;
+  }
+  const projectRoot = resolveProjectRoot(args, eventStore);
+  const taskId = args.eventKind === "task_stop"
+    ? stopTaskId
+    : resolveRuntimeTaskId(args, hookInput, config, eventStore, taskResult.envelope, decision.taskId);
+  const allowedSkillIds = loadAllowedSkillIds(projectRoot);
+  const allowedSignalIds = loadAllowedSignalIds(projectRoot);
+  const event = buildEvent(args, hookInput, config, taskId, taskResult.envelope, allowedSkillIds, allowedSignalIds);
+  let status = "dry-run";
   if (!args.dryRun) {
-    appendEvent(eventStore, event);
+    status = upsertEvent(eventStore, event);
     if (args.nonBlocking) recordRuntimeHealthRecovery(args, config, eventStore);
   }
   if (args.printResult) {
-    console.log(JSON.stringify({ status: args.dryRun ? "dry-run" : "recorded", event }, null, 2));
+    console.log(JSON.stringify({ status, event, capability: capabilityEvidence(args.dryRun ? "runtime_detected" : "executed") }, null, 2));
   }
+}
+
+function skipResult(reason) {
+  return {
+    status: "skip",
+    reason,
+    capability: {
+      capability_id: "local_event_emission",
+      support: "unknown",
+      evidence_level: "none",
+      downgrade_behavior: "unknown",
+    },
+  };
+}
+
+function capabilityEvidence(evidenceLevel) {
+  return {
+    capability_id: "local_event_emission",
+    support: "supported",
+    evidence_level: evidenceLevel,
+    downgrade_behavior: evidenceLevel === "executed" ? "claim_execution_only" : "claim_runtime_detection_only",
+  };
 }
 
 let runtimeArgs = null;
@@ -778,7 +1295,7 @@ try {
 function recordRuntimeHealthFailure(error, args) {
   try {
     const config = readConfig(args.config);
-    const eventStore = resolve(args.eventStore || config.storage.event_store || DEFAULT_CONFIG.storage.event_store);
+    const eventStore = resolveEventStore(args, config);
     appendRuntimeHealth(runtimeHealthPath(args, eventStore), runtimeHealthEntry("error"), config.runtime_health?.max_entries);
   } catch {
     // Non-blocking hook failures must not interrupt the developer task.

@@ -67,7 +67,7 @@ Weekly and monthly reports are reporting modes over project-local evidence. They
 
 The report generator may consume:
 
-- `docs/ai/metrics/events.jsonl`,
+- runtime-owned `ask-runtime/metrics/events.jsonl`,
 - `docs/ai/improvement-ledger.md`,
 - validation reports,
 - explicit review outputs or task summaries.

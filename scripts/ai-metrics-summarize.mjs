@@ -2,6 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_RUNTIME_EVENT_STORE, resolveObservabilityPath } from "./observability-paths.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SIGNAL_REGISTRY_PATH = resolve(REPO_ROOT, "schemas/review-signal-gate-map.json");
@@ -28,7 +29,7 @@ const SIGNAL_TO_GATES = new Map(Object.entries(SIGNAL_REGISTRY.signal_to_gates))
 
 function parseArgs(argv) {
   const args = {
-    eventStore: "docs/ai/metrics/events.jsonl",
+    eventStore: DEFAULT_RUNTIME_EVENT_STORE,
     reportDir: "docs/ai/reports",
     out: "",
     reportType: "weekly",
@@ -74,7 +75,7 @@ function printHelp() {
   console.log(`Usage: node scripts/ai-metrics-summarize.mjs [options]
 
 Options:
-  --event-store <path>      JSONL event store. Defaults to docs/ai/metrics/events.jsonl.
+  --event-store <path>      JSONL event store. Defaults to runtime-owned local storage.
   --report-dir <path>       Report directory. Defaults to docs/ai/reports.
   --out <path>              Output file. Defaults to report-dir/adoption-report-<end>.<md|json>.
   --report-type <type>      weekly | monthly | custom.
@@ -700,7 +701,10 @@ function gateDecisionDrilldown(tasks) {
 }
 
 function hasSkipReason(decision) {
-  return typeof decision.judgment === "string" && decision.judgment.trim().length > 0;
+  return (
+    (typeof decision.judgment === "string" && decision.judgment.trim().length > 0) ||
+    (typeof decision.reason_category === "string" && decision.reason_category.trim().length > 0)
+  );
 }
 
 function skipReasonCategory(decision) {
@@ -1046,7 +1050,8 @@ function writeOutput(args, content) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  const { events, invalidLines } = readEvents(args.eventStore);
+  const configuredEventStore = args.eventStore;
+  const { events, invalidLines } = readEvents(resolveObservabilityPath(process.cwd(), configuredEventStore));
   const report = summarize(events, invalidLines, args);
   const content = args.format === "json" ? `${JSON.stringify(report, null, 2)}\n` : renderMarkdown(report);
   const outputPath = writeOutput(args, content);

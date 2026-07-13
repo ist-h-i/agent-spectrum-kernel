@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -84,7 +85,32 @@ const ADAPTER_RUNTIME_EVIDENCE_KIND_BY_LEVEL = {
 };
 const SHA256_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const ADAPTER_RUNTIME_EVIDENCE_LEVEL_BY_KIND = Object.fromEntries(Object.entries(ADAPTER_RUNTIME_EVIDENCE_KIND_BY_LEVEL).map(([level, kind]) => [kind, level]));
-const ADAPTER_RUNTIME_VERIFIER_FIXTURES = new Map();
+const ADAPTER_RUNTIME_VERIFIER_RESULT_CACHE = new Map();
+const ADAPTER_RUNTIME_VERIFIER_FIXTURES = new Map([
+  [
+    "claude-canonical-metrics-collector",
+    {
+      verifierPath: "scripts/test-claude-metrics-collector.mjs",
+      check: ({ root, record }) => {
+        const cacheKey = `${root}\0${record.subject_digest}`;
+        if (ADAPTER_RUNTIME_VERIFIER_RESULT_CACHE.has(cacheKey)) return ADAPTER_RUNTIME_VERIFIER_RESULT_CACHE.get(cacheKey);
+        const result = spawnSync(process.execPath, [resolve(root, "scripts/test-claude-metrics-collector.mjs")], {
+          cwd: root,
+          encoding: "utf8",
+          timeout: 30_000,
+        });
+        const verdict = result.status === 0 || [
+          `exit=${result.status ?? "unknown"}`,
+          result.error?.message,
+          result.stderr?.trim(),
+          result.stdout?.trim(),
+        ].filter(Boolean).join("\n");
+        ADAPTER_RUNTIME_VERIFIER_RESULT_CACHE.set(cacheKey, verdict);
+        return verdict;
+      },
+    },
+  ],
+]);
 const ADAPTER_RUNTIME_RENDERER_REGISTRY = Object.freeze({
   claude_code: Object.freeze({ ...ADAPTER_RENDERER_METADATA.claude_code, resolvePlan: (profile) => buildClaudeProjectionPlan({ profileName: profile }) }),
   codex: Object.freeze({ ...ADAPTER_RENDERER_METADATA.codex, resolvePlan: (profile) => buildCodexProjectionPlan({ profileName: profile }) }),
@@ -3240,7 +3266,7 @@ function validateObservabilityConfig(root, checks, errors) {
   const config = parseSimpleYaml(text);
   const eventStore = readObjectPath(config, "storage.event_store");
   const reportDir = readObjectPath(config, "storage.report_dir");
-  checks.localObservability.eventStoreLocal = typeof eventStore === "string" && eventStore.startsWith("docs/ai/") && !/^https?:\/\//i.test(eventStore);
+  checks.localObservability.eventStoreLocal = typeof eventStore === "string" && (eventStore.startsWith("docs/ai/") || eventStore.startsWith("ask-runtime/")) && !/^https?:\/\//i.test(eventStore);
   checks.localObservability.reportDirLocal = typeof reportDir === "string" && reportDir.startsWith("docs/ai/") && !/^https?:\/\//i.test(reportDir);
   checks.localObservability.sessionBoundaryFallbackEnabled = readObjectPath(config, "capture.allow_session_id_task_boundary") === true;
   checks.localObservability.sessionBoundarySource = readObjectPath(config, "capture.task_boundary_source") === "session_id";
@@ -3254,7 +3280,7 @@ function validateObservabilityConfig(root, checks, errors) {
   checks.localObservability.httpHooksDisabled = readObjectPath(config, "safety.http_hooks_enabled") === false;
   checks.localObservability.webhookHooksDisabled = readObjectPath(config, "safety.webhook_hooks_enabled") === false;
   checks.localObservability.commitEventsDisabled = readObjectPath(config, "lifecycle.commit_events_to_git") === false;
-  checks.localObservability.lifecyclePolicyOnly = readObjectPath(config, "lifecycle.enforcement") === "policy_only";
+  checks.localObservability.lifecyclePolicyOnly = ["policy_only", "runtime_deduplication_plus_policy"].includes(readObjectPath(config, "lifecycle.enforcement"));
   checks.localObservability.retentionConfigured = Number(readObjectPath(config, "lifecycle.retention_days")) > 0 && Number(readObjectPath(config, "lifecycle.report_retention_days")) > 0;
   checks.localObservability.rotationConfigured = Number(readObjectPath(config, "lifecycle.rotate_when_bytes")) > 0;
   checks.localObservability.schemaMismatchQuarantines = readObjectPath(config, "lifecycle.schema_mismatch_action") === "quarantine" && typeof readObjectPath(config, "lifecycle.quarantine_dir") === "string";
@@ -3395,7 +3421,7 @@ function validateMetricsRuntime(root, checks, errors) {
       text.includes("classified_as_verification") &&
       text.includes("verification_metrics.commands_run");
     checks.localObservability.metricsRecorderRuntimeHealthSurface =
-      text.includes(".agent-spectrum-kernel/runtime-health.jsonl") &&
+      text.includes("ask-runtime/runtime-health.jsonl") &&
       text.includes("non_blocking_metrics_record_failure") &&
       text.includes("full_error_message_stored");
   }

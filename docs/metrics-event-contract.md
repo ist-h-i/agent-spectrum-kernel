@@ -120,15 +120,15 @@ Metrics event candidate:
 
 ## Runtime Storage
 
-Default runtime storage is project-local:
+Default runtime storage is runtime-owned and local to the repository:
 
 ```text
-docs/ai/metrics/events.jsonl
+ask-runtime/metrics/events.jsonl
 ```
 
-Each line is one JSON object. The generic repository includes schemas and templates only; adopting projects own their project-specific event store.
+`ask-runtime/` is a logical path. In a Git repository it resolves under `.git/agent-spectrum-kernel/`; outside Git it resolves under `.agent-spectrum-kernel/runtime/`. Each line is one JSON object. Keeping runtime events outside versioned documentation means a read-only Claude workflow does not dirty the engineering working tree. The generic repository includes schemas and templates only; adopting projects own their project-specific event store.
 
-Adapters must prefer explicit task IDs when available. For Claude hooks, the default fallback boundary is `session_id`:
+Adapters must prefer explicit hook/CLI task IDs when available. For Claude hooks without one, the default fallback boundary is a runtime-owned segment within `session_id`:
 
 ```text
 capture.task_boundary_required: true
@@ -136,7 +136,9 @@ capture.allow_session_id_task_boundary: true
 capture.task_boundary_source: session_id
 ```
 
-This means file-change and verification events are recorded under a session-scoped task ID such as `session:<id>`, then the Stop event marks that task boundary complete. If neither an explicit task ID nor an allowed session boundary is available, adapters must `skip` rather than create noisy unbounded events.
+The collector stores the current segment in `ask-runtime/task-boundaries.json`. File-change and command events use that segment; the next Stop event uses and closes the same segment. Missing, malformed, and invalid canonical results remain skipped as metrics events, but their Stop still closes the boundary so a failed collection cannot attach prior tool events to the next task. Stop deduplication requires both the same canonical-result identity and the same append position in Claude's session transcript within a five-second claim. Only the resulting digest is persisted. Concurrent project/plugin copies of that Stop reuse the just-closed segment and converge through event-ID upsert, while a later transcript turn starts a new segment even when it emits the same Execution Envelope. An expired persisted claim cannot join a later process to the old task. A candidate's descriptive `task_id` does not replace this runtime identity, so earlier hook events and the Stop result cannot split into different report groups. If neither an explicit hook/CLI task ID nor an allowed session boundary is available, adapters must `skip` rather than create noisy unbounded events.
+
+Boundary state is capped at 128 sessions and 128 KiB. Inactive entries expire after seven days, then least-recently-used inactive entries are evicted as needed. The session being updated, segments opened within the last hour, and unexpired duplicate claims are retained. Pruning runs under the same process lock as the state update. A session that resumes after eviction starts with a new generation identity; if protected active sessions alone fill the capacity, the collector fails open without growing the file or evicting an active boundary.
 
 Command text is not recorded by default. Verification events record `command_kind` only. `command_hash` and `redacted_command_preview` require explicit opt-in and must not include secrets.
 
@@ -144,38 +146,21 @@ Command text is not recorded by default. Verification events record `command_kin
 
 `verification_attempt` is reserved for commands that match the verification classifier or have explicit evidence linkage. A generic Bash hook must not classify every command as verification.
 
-Non-blocking recorder failures append a sanitized local health entry under `CLAUDE_PROJECT_DIR` when available, then an explicit recorder project root, then the resolved project config/event-store root:
+Non-blocking recorder failures append a sanitized runtime-owned local health entry for `CLAUDE_PROJECT_DIR` when available, then an explicit recorder project root, then the resolved project config/event-store root:
 
 ```text
-.agent-spectrum-kernel/runtime-health.jsonl
+ask-runtime/runtime-health.jsonl
 ```
 
-An `error` entry opens a component/error-code health issue. Repeated identical failures update `last_seen_at` and `occurrence_count` while preserving `first_seen_at`; a later `recovered` entry closes it. `ask-doctor` uses `last_seen_at` for freshness, warns only for unresolved entries inside the configured freshness window, and reports older unresolved entries as historical. Health history is capped by `runtime_health.max_entries` and updated atomically. Runtime-health entries must omit raw prompts, secrets, customer data, personal data, full command output, and full error messages.
+Like the event store, this logical path resolves under Git metadata and therefore does not dirty a read-only workflow's engineering working tree. An `error` entry opens a component/error-code health issue. Repeated identical failures update `last_seen_at` and `occurrence_count` while preserving `first_seen_at`; a later `recovered` entry closes it. `ask-doctor` uses `last_seen_at` for freshness, warns only for unresolved entries inside the configured freshness window, and reports older unresolved entries as historical. Health history is capped by `runtime_health.max_entries` and updated atomically. Runtime-health entries must omit raw prompts, secrets, customer data, personal data, full command output, and full error messages.
 
-## Skill Command Sidecar
+## Claude Stop Collector
 
-Project-level Claude skill commands may write one transient project-local sidecar:
+Claude implementation, review, investigation, verification, and handoff instructions must not write metrics files. The runtime-owned Stop hook reads `last_assistant_message`, locates the canonical fenced `execution-envelope` result, validates it through `scripts/execution-envelope.mjs`, and only then normalizes a `task_stop` event.
 
-```text
-.claude/metrics/current-task.json
-```
+Missing, malformed, or schema-invalid canonical results are skipped. The collector records a sanitized runtime-health code for malformed or invalid input, but does not persist the assistant response or upgrade evidence, safety, readiness, review, or mergeability claims. Persistence failures are fail-open and cannot change the task result. Fallback Stop event IDs include the runtime task identity and canonicalized Execution Envelope digest. Candidate event IDs are also scoped to the runtime task identity. Project/plugin execution of the same task result therefore converges to one row, while a later task remains separate even if it emits an identical candidate.
 
-The Stop hook reads this sidecar silently and folds the available structured summaries into the normal `task_stop` event. If the sidecar is missing, empty, invalid JSON, or contains unsupported fields, the Stop event still records normally from hook data. Sidecar ingestion is best-effort: metrics failures must not fail or interrupt the developer task, and adapters must not print routine "metrics recorded" status.
-
-Allowed sidecar fields:
-
-```json
-{
-  "task_id": "optional explicit task boundary",
-  "task_type": "implementation | review | investigation | validation | handoff | other",
-  "skills_used": ["skill-router"],
-  "routing_result": {},
-  "review_result": {},
-  "gate_decisions": []
-}
-```
-
-The sidecar must contain summarized structured data only. It must not include raw prompts, full review text, full command output, full file contents, secrets, customer data, sensitive personal data, or personnel-scoring data. Adapters may consume and remove the current-task sidecar after reading it to avoid stale data reuse.
+If the envelope contains the canonical optional `metrics_event_candidate`, the runtime consumes that candidate. Otherwise it derives the bounded task type, route, missing-evidence state, and completion state from the envelope. Before persistence, the runtime projects the event to enums, booleans, counts, controlled identifiers, and hashes. Skill and gate IDs are accepted only from the canonical manifest or active Claude install state. Review signal IDs are retained only when present in `schemas/review-signal-gate-map.json`; unknown signals are dropped, while their explanatory evidence remains hash-only. Runtime task/candidate IDs, evidence references, paths, layers, reasons, and other descriptive references are hashed; PR/issue and ledger IDs require explicit formats. `capture.max_paths_per_event` is bounded to the schema maximum of 50; values above 50 are clamped, while negative, zero, or non-numeric values fall back to 50. Arbitrary descriptions, command previews, names, source fragments, and output fragments are not persisted. Controlled `reason_category` is sufficient evidence that a skipped gate supplied a reason even when `judgment` prose is omitted. The projected event is revalidated against `metrics-event.schema.json`; validation failure is a fail-open collector failure. Raw prompts, full review text, full command output, full file contents, secrets, customer data, sensitive personal data, and personnel-scoring data are never copied from the assistant response.
 
 ## When To Emit
 

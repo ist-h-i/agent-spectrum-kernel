@@ -162,7 +162,7 @@ Capability evaluation:
 evidence-backed ledger/context/review/verification/adoption evidence -> engineering-capability-evaluation -> docs/ai/engineering-capability-ledger.md
 
 Claude local observability:
-Claude project adapter or plugin -> local hooks -> docs/ai/metrics/events.jsonl -> ai-metrics-summarize -> docs/ai/reports/
+Claude project adapter or plugin -> local hooks -> ask-runtime/metrics/events.jsonl -> ai-metrics-summarize -> docs/ai/reports/
 
 Pattern B PR review:
 @claude review comment -> optional GitHub Actions adapter -> review-router -> observed change signals -> required gates -> review-final-merge-gate

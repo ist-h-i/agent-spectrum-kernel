@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { DEFAULT_RUNTIME_EVENT_STORE, resolveGitDirectory, resolveObservabilityPath } from "./observability-paths.mjs";
 
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const CLAUDE_STATE_PATH = ".agent-spectrum-kernel/claude-install-state.json";
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
-const DEFAULT_EVENT_STORE = "docs/ai/metrics/events.jsonl";
 
 function parseArgs(argv) {
   const args = {
@@ -99,6 +99,19 @@ function resolveWithinTarget(target, value, label) {
   return path;
 }
 
+function validateRuntimeOwnedPath(target, path, label) {
+  const allowedRoot = resolveGitDirectory(target) ?? target;
+  if (path !== allowedRoot && !path.startsWith(`${allowedRoot}/`)) throw new Error(`${label} escapes runtime-owned storage`);
+  let existingParent = path;
+  while (!existsSync(existingParent)) existingParent = dirname(existingParent);
+  const canonicalRoot = realpathSync(allowedRoot);
+  const canonicalParent = realpathSync(existingParent);
+  if (canonicalParent !== canonicalRoot && !canonicalParent.startsWith(`${canonicalRoot}/`)) {
+    throw new Error(`${label} escapes target through a symbolic link`);
+  }
+  return path;
+}
+
 function readConfigValue(target, pathParts, fallback) {
   const configPath = resolve(target, "docs/ai/observability-config.yml");
   if (!existsSync(configPath)) {
@@ -183,16 +196,32 @@ function runClaudeSmoke(target, { dryRun }) {
     }
   }
 
-  const configuredEventStore = readConfigValue(target, ["storage", "event_store"], DEFAULT_EVENT_STORE);
+  const configuredEventStore = readConfigValue(target, ["storage", "event_store"], DEFAULT_RUNTIME_EVENT_STORE);
   let configuredEventStorePath = null;
   try {
-    configuredEventStorePath = resolveWithinTarget(target, configuredEventStore, "configured event store");
+    configuredEventStorePath = configuredEventStore.startsWith("ask-runtime/")
+      ? validateRuntimeOwnedPath(target, resolveObservabilityPath(target, configuredEventStore), "configured event store")
+      : resolveWithinTarget(target, configuredEventStore, "configured event store");
   } catch (error) {
     checks.push(check("fail", "configured_event_store", error.message));
   }
   if (configuredEventStorePath) {
     const configuredEventDir = dirname(configuredEventStorePath);
-    if (!pathIsDirectory(configuredEventDir)) {
+    if (!pathIsDirectory(configuredEventDir) && configuredEventStore.startsWith("ask-runtime/")) {
+      let writableParent = configuredEventDir;
+      while (!existsSync(writableParent)) writableParent = dirname(writableParent);
+      const probePath = resolve(writableParent, `.ask-runtime-smoke-probe-${process.pid}-${Date.now()}`);
+      try {
+        if (!dryRun) {
+          writeFileSync(probePath, "probe\n", { flag: "wx" });
+          unlinkSync(probePath);
+        }
+        checks.push(check("pass", "configured_event_store", `runtime-owned event-store location planned: ${configuredEventStore}`));
+      } catch (error) {
+        if (existsSync(probePath)) unlinkSync(probePath);
+        checks.push(check("fail", "configured_event_store", `configured event-store parent is not writable: ${configuredEventStore}: ${error.message}`));
+      }
+    } else if (!pathIsDirectory(configuredEventDir)) {
       checks.push(check("fail", "configured_event_store", `configured event-store directory is missing or invalid: ${configuredEventStore}`));
     } else if (existsSync(configuredEventStorePath) && !pathIsFile(configuredEventStorePath)) {
       checks.push(check("fail", "configured_event_store", `configured event-store must be a regular file: ${configuredEventStore}`));

@@ -36,11 +36,4 @@ Missing evidence:
 
 Do not emit a fixed layer-by-layer applicability table unless validation or debugging explicitly requests the diagnostic artifact.
 
-Silent metrics sidecar:
-
-- If structured routing, review, or gate-decision summaries are available, create `.claude/metrics/` if needed and write `.claude/metrics/current-task.json` before the final response.
-- Use only bounded JSON fields: `task_type: "review"`, `skills_used`, `routing_result`, `review_result`, and `gate_decisions`.
-- Do not store raw prompts, full review text, secrets, full command output, or full file contents.
-- Do not mention metrics recording in the final response. If the sidecar cannot be written, continue the review normally.
-
 $ARGUMENTS

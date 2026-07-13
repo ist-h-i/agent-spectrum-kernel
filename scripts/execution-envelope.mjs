@@ -7,6 +7,9 @@ const RUNTIME_ROOT = dirname(fileURLToPath(import.meta.url));
 const ENVELOPE_SCHEMA_PATH = existsSync(resolve(RUNTIME_ROOT, "execution-envelope.schema.json"))
   ? resolve(RUNTIME_ROOT, "execution-envelope.schema.json")
   : resolve(RUNTIME_ROOT, "../schemas/execution-envelope.schema.json");
+const METRICS_SCHEMA_PATH = existsSync(resolve(RUNTIME_ROOT, "metrics-event.schema.json"))
+  ? resolve(RUNTIME_ROOT, "metrics-event.schema.json")
+  : resolve(RUNTIME_ROOT, "../schemas/metrics-event.schema.json");
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -140,6 +143,17 @@ export function validateExecutionEnvelope(value, { schemaPath = ENVELOPE_SCHEMA_
   if (status === "human_decision" && humanDecision.length === 0) errors.push("$.stop_reason.human_decision_required: required for human_decision status");
   if (["insufficient_evidence", "capability_missing", "risk_gate", "blocked"].includes(status) && details.length === 0) errors.push("$.stop_reason.details: required for the stopping status");
   return errors;
+}
+
+export function validateMetricsEvent(value, { schemaPath = METRICS_SCHEMA_PATH } = {}) {
+  if (!existsSync(schemaPath)) return ["metrics-event.schema.json is unavailable"];
+  let schema;
+  try {
+    schema = readJson(schemaPath);
+  } catch (error) {
+    return [`metrics-event.schema.json is invalid: ${error.message}`];
+  }
+  return validateSchemaValue(value, schema, { baseDir: dirname(schemaPath), rootSchema: schema });
 }
 
 export function inspectExecutionEnvelope(text, options = {}) {

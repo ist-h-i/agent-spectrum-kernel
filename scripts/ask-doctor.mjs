@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { relative, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import {
   REPO_ROOT,
   collectTextFiles,
@@ -10,11 +10,13 @@ import {
   hashText,
   readJsonIfExists,
 } from "./ask-shared.mjs";
+import { DEFAULT_RUNTIME_EVENT_STORE, resolveObservabilityPath } from "./observability-paths.mjs";
 
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const CLAUDE_STATE_PATH = ".agent-spectrum-kernel/claude-install-state.json";
-const RUNTIME_HEALTH_PATH = ".agent-spectrum-kernel/runtime-health.jsonl";
+const RUNTIME_HEALTH_PATH = "ask-runtime/runtime-health.jsonl";
+const LEGACY_RUNTIME_HEALTH_PATH = ".agent-spectrum-kernel/runtime-health.jsonl";
 
 function parseArgs(argv) {
   const args = {
@@ -380,23 +382,32 @@ function checkPrivacyDefaults(target, report) {
 }
 
 function checkRuntimeHealth(target, report) {
-  const healthPath = resolve(target, RUNTIME_HEALTH_PATH);
-  if (!existsSync(healthPath)) {
+  const runtimeOwnedPath = resolveObservabilityPath(target, RUNTIME_HEALTH_PATH);
+  const legacyPath = resolve(target, LEGACY_RUNTIME_HEALTH_PATH);
+  const healthLogs = [
+    [runtimeOwnedPath, RUNTIME_HEALTH_PATH],
+    [legacyPath, LEGACY_RUNTIME_HEALTH_PATH],
+  ].filter(([path], index, entries) => existsSync(path) && entries.findIndex(([candidate]) => candidate === path) === index);
+  if (healthLogs.length === 0) {
     return;
   }
   const entries = [];
   let malformed = 0;
-  for (const line of readFileSync(healthPath, "utf8").split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    try {
-      const entry = JSON.parse(line);
-      if (entry && typeof entry === "object") entries.push(entry);
-      else malformed += 1;
-    } catch {
-      malformed += 1;
+  for (const [path] of healthLogs) {
+    for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        if (entry && typeof entry === "object") entries.push(entry);
+        else malformed += 1;
+      } catch {
+        malformed += 1;
+      }
     }
   }
-  if (malformed > 0) report.warnings.push(`adapter runtime health log contains ${malformed} malformed entry/entries: ${RUNTIME_HEALTH_PATH}`);
+  entries.sort((left, right) => runtimeHealthTimestamp(left) - runtimeHealthTimestamp(right));
+  const reportedPath = healthLogs.map(([, label]) => label).join(", ");
+  if (malformed > 0) report.warnings.push(`adapter runtime health log contains ${malformed} malformed entry/entries: ${reportedPath}`);
   const unresolved = new Map();
   for (const entry of entries) {
     const component = typeof entry.component === "string" && entry.component ? entry.component : "unknown-component";
@@ -415,11 +426,19 @@ function checkRuntimeHealth(target, report) {
       : typeof entry.occurred_at === "string" && entry.occurred_at ? entry.occurred_at : "unknown-time";
     const occurredMs = Date.parse(occurredAt);
     if (!Number.isFinite(occurredMs) || Date.now() - occurredMs > freshnessMs) {
-      report.installed.push(`historical adapter runtime health issue: ${component} ${code} at ${occurredAt} (${RUNTIME_HEALTH_PATH})`);
+      report.installed.push(`historical adapter runtime health issue: ${component} ${code} at ${occurredAt} (${reportedPath})`);
     } else {
-      report.warnings.push(`adapter runtime health issue: ${component} ${code} at ${occurredAt} (${RUNTIME_HEALTH_PATH})`);
+      report.warnings.push(`adapter runtime health issue: ${component} ${code} at ${occurredAt} (${reportedPath})`);
     }
   }
+}
+
+function runtimeHealthTimestamp(entry) {
+  for (const field of ["last_seen_at", "occurred_at", "first_seen_at"]) {
+    const timestamp = Date.parse(entry?.[field]);
+    if (Number.isFinite(timestamp)) return timestamp;
+  }
+  return 0;
 }
 
 function checkRuntimeConformanceProbe(target, report) {
@@ -760,8 +779,16 @@ function readObservabilityValue(target, pathParts, fallback) {
 }
 
 function checkRuntimeEventStore(target, probe) {
-  const eventStore = readObservabilityValue(target, ["storage", "event_store"], "docs/ai/metrics/events.jsonl");
-  const eventDir = resolve(target, eventStore.split("/").slice(0, -1).join("/") || ".");
+  const eventStore = readObservabilityValue(target, ["storage", "event_store"], DEFAULT_RUNTIME_EVENT_STORE);
+  const eventDir = dirname(resolveObservabilityPath(target, eventStore));
+  if (!existsSync(eventDir) && eventStore.startsWith("ask-runtime/")) {
+    let existingParent = eventDir;
+    while (!existsSync(existingParent)) existingParent = dirname(existingParent);
+    if (statSync(existingParent).isDirectory()) {
+      probe.checked.push(`runtime-owned event-store location is planned: ${eventStore}`);
+      return;
+    }
+  }
   if (!existsSync(eventDir) || !statSync(eventDir).isDirectory()) {
     probe.failures.push(`runtime event-store directory is missing: ${eventStore}`);
     return;

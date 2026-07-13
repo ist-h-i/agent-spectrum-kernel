@@ -150,11 +150,11 @@ Default local paths:
 
 ```text
 docs/ai/observability-config.yml
-docs/ai/metrics/events.jsonl
+ask-runtime/metrics/events.jsonl
 docs/ai/reports/
 ```
 
-The runtime omits raw prompts, secrets, customer data, personal data, full file contents, and full command output by default.
+The logical `ask-runtime/` store resolves under Git metadata (or `.agent-spectrum-kernel/runtime/` outside Git), so read-only workflows do not dirty the engineering working tree. The Stop hook validates the canonical Execution Envelope from `last_assistant_message`; command templates never write metrics directly. Missing, malformed, or invalid results are skipped without changing the engineering decision, while their Stop still closes the current segment so the next task cannot inherit earlier tool events. Runtime-owned session segments keep preceding PostToolUse events and their Stop result in one task. Concurrent same-result project/plugin hooks reuse the just-closed segment only when Claude's transcript append position also matches within a five-second claim; later read-only or conversation-only turns therefore remain separate even when their Envelopes are identical. Boundary state is capped at 128 sessions and 128 KiB, pruned under its process lock, and uses a new generation identity when an evicted session resumes. Before schema revalidation and persistence, free-text references and paths are removed or hashed, path counts are capped at 50 regardless of invalid or oversized config values, canonical review signal IDs are allowlisted from the core registry, and unknown signals are dropped. The runtime omits raw prompts, secrets, customer data, personal data, full file contents, and full command output by default.
 
 Runtime and hook flags:
 
@@ -171,7 +171,7 @@ Operational boundary:
 - Project adapter: owns `.claude/skills/`, `.claude/commands/`, `.claude/settings.json` managed hooks, local runtime scripts, and project-local metrics files.
 - Plugin: owns plugin-packaged commands/hooks and resolves its metrics wrapper through `CLAUDE_PLUGIN_ROOT`.
 - Local metrics recording requires the project runtime. Plugin hooks no-op when the project runtime is not present.
-- Avoid enabling two independent metrics paths for the same task unless duplicate local events are acceptable.
+- Project and plugin Stop hooks may coexist: the runtime-owned collector uses deterministic event IDs and idempotent upsert to prevent duplicate local rows.
 
 ## GitHub Actions
 

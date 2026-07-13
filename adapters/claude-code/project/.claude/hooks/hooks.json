@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "test -f \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" && node \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" --hook-event Stop --event-kind task_stop --sidecar \"${CLAUDE_PROJECT_DIR}/.claude/metrics/current-task.json\" --non-blocking >/dev/null 2>&1 || true # agent-spectrum-kernel:claude-adapter-hook"
+            "command": "test -f \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" && node \"${CLAUDE_PROJECT_DIR}/scripts/ai-metrics-record.mjs\" --hook-event Stop --event-kind task_stop --non-blocking >/dev/null 2>&1 || true # agent-spectrum-kernel:claude-adapter-hook"
           }
         ]
       }

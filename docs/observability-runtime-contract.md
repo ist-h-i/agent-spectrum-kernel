@@ -37,17 +37,19 @@ Forbidden by default:
 
 ## Storage
 
-Default storage is project-local.
+Default event storage is repository-local but runtime-owned. It is not a versioned engineering artifact.
 
 Recommended locations for adopting projects:
 
 ```text
 docs/ai/observability-config.yml
-docs/ai/metrics/events.jsonl
+ask-runtime/metrics/events.jsonl
 docs/ai/reports/
 docs/ai/improvement-ledger.md
 docs/ai/skill-adoption-metrics.md
 ```
+
+`ask-runtime/` resolves to `.git/agent-spectrum-kernel/` in Git repositories and `.agent-spectrum-kernel/runtime/` otherwise. This keeps read-only adapter workflows from modifying the engineering working tree. A project may opt into another path explicitly.
 
 Adapters may choose equivalent paths, but they must document:
 
@@ -71,7 +73,7 @@ Events are recorded at meaningful boundaries:
 - improvement ledger candidate created or ledger refreshed,
 - weekly or monthly report generated.
 
-Explicit task IDs are preferred. Claude hook adapters may use `session_id` as the default local task boundary when configured:
+Explicit hook/CLI task IDs are preferred. Claude hook adapters may use a runtime-owned segment within `session_id` as the default local task boundary when configured:
 
 ```text
 capture.task_boundary_required: true
@@ -79,7 +81,9 @@ capture.allow_session_id_task_boundary: true
 capture.task_boundary_source: session_id
 ```
 
-File-change and verification events are then recorded under the session-scoped task ID, and the Stop event marks the task boundary complete. If neither an explicit task ID nor an allowed session boundary is available, missing task boundary is handled as `skip`.
+File-change and command events use the current session segment, and the next Stop event closes that segment. A missing, malformed, or invalid canonical result is still skipped as an event, but Stop advances the boundary so its preceding tool events cannot be joined to the next task. Duplicate project/plugin execution reuses the just-closed segment only when the canonical-result identity and Claude transcript append position both match within a five-second claim. A later transcript turn starts a new segment even if it emits the same result. The stored identity is hashed. The candidate's descriptive task ID does not split the runtime aggregation identity from preceding hook events. If neither an explicit hook/CLI task ID nor an allowed session boundary is available, missing task boundary is handled as `skip`.
+
+Session boundary state is bounded to 128 sessions and 128 KiB. Inactive entries expire after seven days and least-recently-used inactive entries are evicted when either limit is reached. The session currently being processed, segments opened within the last hour, and live duplicate claims are protected from eviction. A session resumed after eviction receives a new bounded generation identity and therefore cannot rejoin an old task. Pruning is part of the boundary state's locked read-modify-write operation. If protected active state alone exhausts capacity, the non-blocking collector fails open and records runtime health rather than evicting an active boundary or exceeding the limit.
 
 ## Event Shape
 

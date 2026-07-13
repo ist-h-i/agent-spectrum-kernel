@@ -7,7 +7,7 @@
       "adapter_id": "claude_code",
       "canonical_contract": {
         "revision": "ask-3.0.0",
-        "source_digest": "sha256:e9602d5911a5615bca990332447e631f85d2acb7501fa08f96a099ad31262b12",
+        "source_digest": "sha256:84732d965fbe41f632b2470144a13193dd4773a2fc9212f1e76c0b1c5815a0cc",
         "source_paths": [
           "AGENTS.md",
           "docs/adapter-runtime-boundary-contract.md",
@@ -48,7 +48,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -67,7 +67,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -86,7 +86,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -105,7 +105,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -124,7 +124,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -153,7 +153,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -164,21 +164,21 @@
         {
           "capability_id": "local_event_emission",
           "support": "supported",
-          "evidence_level": "projected",
+          "evidence_level": "behavior_verified",
           "evidence_refs": [
             {
-              "record_id": "claude-projection-manifest",
-              "evidence_kind": "projection_manifest",
+              "record_id": "claude-canonical-metrics-collector",
+              "evidence_kind": "capability_fixture_result",
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
-              "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "evidence_level": "behavior_verified",
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
-            "Local smoke detection does not prove per-task hook execution."
+            "The fixture verifies the runtime collector contract; invocation inside an external Claude installation remains deployment evidence."
           ],
-          "downgrade_behavior": "claim_projection_only"
+          "downgrade_behavior": "claim_behavior_verified"
         },
         {
           "capability_id": "shared_pr_execution",
@@ -191,7 +191,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -202,7 +202,7 @@
       ],
       "rendering": {
         "renderer_id": "install-claude-adapter",
-        "renderer_version": "3",
+        "renderer_version": "4",
         "plan_shaping_options": {
           "skills": null,
           "skip_hooks": false,
@@ -215,6 +215,7 @@
           "hooks",
           "runner",
           "runtime_data",
+          "schemas",
           "skills"
         ],
         "deterministic_input_refs": [
@@ -265,12 +266,12 @@
             {
               "path": "docs/metrics-event-contract.md",
               "role": "contract",
-              "digest": "sha256:cd5238d37314952c99fa300e8142e353f8c37e568e5f0c5e78b295639ee619ef"
+              "digest": "sha256:68502e1cf351cfd3f5d79edba53e5eda70e79017904808d18ed608c8606d2d9d"
             },
             {
               "path": "docs/observability-runtime-contract.md",
               "role": "contract",
-              "digest": "sha256:5142b97dfb83ea0684db140f045c062366910a2aa559bda4132339f5e55d4175"
+              "digest": "sha256:96330ffe00ac9e4e088aa2017f70a15d1b548f0aba9ea58d7a30be714c5dfb01"
             },
             {
               "path": "docs/stack-implementation-overlay-contract.md",
@@ -357,7 +358,7 @@
             {
               "path": "adapters/claude-code/project/.claude/commands/skill-handoff.md",
               "role": "command_template",
-              "digest": "sha256:f95bd5e38729bad6b10f7c40e9596e5b321783215eba9fd20bc1f85f6be7e498"
+              "digest": "sha256:59ff0b8b57b7ddbe3b59feb3d0241072318fbfc42fb8d11122ebd90884580c83"
             },
             {
               "path": "adapters/claude-code/project/.claude/commands/skill-ledger-refresh.md",
@@ -372,12 +373,12 @@
             {
               "path": "adapters/claude-code/project/.claude/commands/skill-verify.md",
               "role": "command_template",
-              "digest": "sha256:43061b3e98f3892810199238d9cdca5661d5abf0c417e6a6e7f118be59262685"
+              "digest": "sha256:7bf48653bca94bdc6bdb7c334dc9bff966df7482ad82c8517bf90beeacbb41a3"
             },
             {
               "path": "adapters/claude-code/project/.claude/hooks/hooks.json",
               "role": "hook_template",
-              "digest": "sha256:22648e0fa92e7a4c19dc8989c9f44b86f77728c8e701a04230d789e29fcee8ff"
+              "digest": "sha256:3100b30cc5b4341efebba4543ae6fb43f9e0ed8764e6bd69a6745af4303968f5"
             },
             {
               "path": "docs/ai/adoption-report-template.md",
@@ -392,12 +393,12 @@
             {
               "path": "docs/ai/metrics/README.md",
               "role": "config_source",
-              "digest": "sha256:2dcedeb804bd8437489741ab4d34a38ee4800e5d832de5b2d4917644cc69311d"
+              "digest": "sha256:9790a8b12a9ff210ceae1e138f1300167070bfecd1994d63a5580a31e2de371e"
             },
             {
               "path": "docs/ai/observability-config.yml",
               "role": "config_source",
-              "digest": "sha256:264b5d8d04327222aa4392818b6f8bcac46ec560c60db16a472a9b1b3d71c56b"
+              "digest": "sha256:9e5dc7e108896aae006211c739d77191ce99b07bba814065d9e0fd9490bf328e"
             },
             {
               "path": "docs/ai/reports/README.md",
@@ -407,12 +408,22 @@
             {
               "path": "docs/ai/skill-adoption-metrics.md",
               "role": "config_source",
-              "digest": "sha256:9111f1ca99cad1294a619cbdb219b46b8a8cf3db46baa98cd65d162e4f159396"
+              "digest": "sha256:98eaf0f94f45f4b145340bee39e790311ffbbe9a43953e4ef7bd3f440e1a009c"
+            },
+            {
+              "path": "schemas/execution-envelope.schema.json",
+              "role": "runtime_schema",
+              "digest": "sha256:7eee67a2ce018ded1cdf47c8525a627aeaacae5dd39c2c3e1cb23beac218e251"
+            },
+            {
+              "path": "schemas/metrics-event.schema.json",
+              "role": "runtime_schema",
+              "digest": "sha256:765fa0116c94d29fe298b575554a41173755fbcf36106144c7174cffe6f3da4d"
             },
             {
               "path": "scripts/adapter-runtime-inventory.mjs",
               "role": "inventory",
-              "digest": "sha256:36567ab4066f1734c90b266578486dc013baa40875350fce852d730037bcb7e2"
+              "digest": "sha256:002ce32ebf7e9730804689aa0a14119fa96c3199be3d2b3928f5ea23830ff5f3"
             },
             {
               "path": "scripts/ai-ledger-refresh.mjs",
@@ -422,22 +433,32 @@
             {
               "path": "scripts/ai-metrics-record.mjs",
               "role": "runtime_source",
-              "digest": "sha256:991bd7dcd027f981541b205098f46940cacf5658ce0c21483c8095ca2a90b9b8"
+              "digest": "sha256:017b4c392e5d2836d74d669cbea572ad13b38b50ff943e20767ce3a900d25220"
             },
             {
               "path": "scripts/ai-metrics-summarize.mjs",
               "role": "runtime_source",
-              "digest": "sha256:badba7b07a79a000bb18e47a5f1ec222d8c2f90deeccddfb7aa4ce0a3a7b2959"
+              "digest": "sha256:2da80c0609a6ee6e53b0ea683db1c4b2f17616b632143156abed66cd04bf5c54"
+            },
+            {
+              "path": "scripts/execution-envelope.mjs",
+              "role": "runtime_source",
+              "digest": "sha256:8f670300504290ff93ab60fb0a07fc1c2ff6bb9a0f9072ccb9608ce8770d8d04"
             },
             {
               "path": "scripts/install-claude-adapter.mjs",
               "role": "renderer",
-              "digest": "sha256:8ec579f747519979b9c08fe95d4608ef288fbb44f1f047f8fa45b715996a0e28"
+              "digest": "sha256:66a621cf7a8dd2a2189e07b0f779f695bf51907a20f0ac86a9a72b2156381046"
             },
             {
               "path": "scripts/installer-lifecycle.mjs",
               "role": "runtime_source",
               "digest": "sha256:1c9b0e8b529f1777a9d60c02b0003b7d3fc818b2c185e1861101fde8d23eb78b"
+            },
+            {
+              "path": "scripts/observability-paths.mjs",
+              "role": "runtime_source",
+              "digest": "sha256:fad81f5fd713a18c48c9890955a11d6345c337586344c50d9712858717d9790f"
             }
           ]
         },
@@ -599,6 +620,30 @@
             "asset_kind": "runner",
             "ownership_mode": "full_file",
             "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": "scripts/execution-envelope.mjs",
+            "asset_kind": "runner",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": "scripts/execution-envelope.schema.json",
+            "asset_kind": "schemas",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": "scripts/metrics-event.schema.json",
+            "asset_kind": "schemas",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
+          },
+          {
+            "path": "scripts/observability-paths.mjs",
+            "asset_kind": "runner",
+            "ownership_mode": "full_file",
+            "inventory_source_ref": "scripts/install-claude-adapter.mjs"
           }
         ],
         "lifecycle_operations": [
@@ -618,7 +663,7 @@
       "normalized_event_schema_refs": [
         "schemas/metrics-event.schema.json"
       ],
-      "profile_fingerprint": "sha256:2dd4d83581a683baa32f5df1574a1f53d1ae5bc2428b036e197ead222bb51c20"
+      "profile_fingerprint": "sha256:5315774b3e6cca418b8b8ade3245bb04952d9e9f62134f1f97f169357c31fdeb"
     },
     {
       "schema_version": "1.0.0",
@@ -626,7 +671,7 @@
       "adapter_id": "codex",
       "canonical_contract": {
         "revision": "ask-3.0.0",
-        "source_digest": "sha256:8eb4818e13439eae47903568d6c174d79c68eb8ed7d90b23861fc74f891b587c",
+        "source_digest": "sha256:0af453ade80e84c97038e016cdb85fbf437f40ac15882455a1cb07dbb67335f7",
         "source_paths": [
           "AGENTS.md",
           "docs/adapter-runtime-boundary-contract.md",
@@ -672,7 +717,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -691,7 +736,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -710,7 +755,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -729,7 +774,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -748,7 +793,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -767,7 +812,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -786,7 +831,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -805,7 +850,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -824,7 +869,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:1b7b63a36c7971ea5383d891eaa8bfb69e8ad733e414d66097b41c3ff7dcea96"
+              "artifact_digest": "sha256:437da6b977eb48395a68678f85c80e5cb2313cbb49a038b2186b0c44f81ae8c3"
             }
           ],
           "limitations": [
@@ -892,7 +937,7 @@
             {
               "path": "docs/metrics-event-contract.md",
               "role": "contract",
-              "digest": "sha256:cd5238d37314952c99fa300e8142e353f8c37e568e5f0c5e78b295639ee619ef"
+              "digest": "sha256:68502e1cf351cfd3f5d79edba53e5eda70e79017904808d18ed608c8606d2d9d"
             },
             {
               "path": "docs/stack-implementation-overlay-contract.md",
@@ -1034,7 +1079,7 @@
             {
               "path": "scripts/adapter-runtime-inventory.mjs",
               "role": "inventory",
-              "digest": "sha256:36567ab4066f1734c90b266578486dc013baa40875350fce852d730037bcb7e2"
+              "digest": "sha256:002ce32ebf7e9730804689aa0a14119fa96c3199be3d2b3928f5ea23830ff5f3"
             },
             {
               "path": "scripts/ask-sensors.mjs",
@@ -1054,7 +1099,7 @@
             {
               "path": "scripts/execution-envelope.mjs",
               "role": "runtime_source",
-              "digest": "sha256:4068c17e05bc63478ce0cf54aabb20a3399652d7ca91688ac0ef82bc51697007"
+              "digest": "sha256:8f670300504290ff93ab60fb0a07fc1c2ff6bb9a0f9072ccb9608ce8770d8d04"
             },
             {
               "path": "scripts/install-codex-adapter.mjs",
@@ -1255,7 +1300,7 @@
         "sensitive_payload_storage": "prohibited"
       },
       "normalized_event_schema_refs": [],
-      "profile_fingerprint": "sha256:8ce4510a1ce24ef2d9365c77d581f1e62ee3d7a0c1fb174679872747d7a0176e"
+      "profile_fingerprint": "sha256:2cb9075408ed9a926123585f88da43e2274b33f50dfcd2b4832c4ea1a3414046"
     }
   ]
 }
