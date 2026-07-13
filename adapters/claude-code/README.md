@@ -154,7 +154,7 @@ ask-runtime/metrics/events.jsonl
 docs/ai/reports/
 ```
 
-The logical `ask-runtime/` store resolves under Git metadata (or `.agent-spectrum-kernel/runtime/` outside Git), so read-only workflows do not dirty the engineering working tree. The Stop hook validates the canonical Execution Envelope from `last_assistant_message`; command templates never write metrics directly. Missing or malformed results are skipped without changing the engineering decision, and duplicate project/plugin hooks converge through event-ID upsert. The runtime omits raw prompts, secrets, customer data, personal data, full file contents, and full command output by default.
+The logical `ask-runtime/` store resolves under Git metadata (or `.agent-spectrum-kernel/runtime/` outside Git), so read-only workflows do not dirty the engineering working tree. The Stop hook validates the canonical Execution Envelope from `last_assistant_message`; command templates never write metrics directly. Missing or malformed results are skipped without changing the engineering decision. Same-result project/plugin hooks converge through an Envelope-digest event ID, while distinct results in one session remain separate. Before schema revalidation and persistence, free-text references and paths are removed or hashed so the runtime stores bounded structural metrics rather than assistant prose or identifiers. The runtime omits raw prompts, secrets, customer data, personal data, full file contents, and full command output by default.
 
 Runtime and hook flags:
 

@@ -384,23 +384,29 @@ function checkPrivacyDefaults(target, report) {
 function checkRuntimeHealth(target, report) {
   const runtimeOwnedPath = resolveObservabilityPath(target, RUNTIME_HEALTH_PATH);
   const legacyPath = resolve(target, LEGACY_RUNTIME_HEALTH_PATH);
-  const healthPath = existsSync(runtimeOwnedPath) ? runtimeOwnedPath : legacyPath;
-  const reportedPath = healthPath === runtimeOwnedPath ? RUNTIME_HEALTH_PATH : LEGACY_RUNTIME_HEALTH_PATH;
-  if (!existsSync(healthPath)) {
+  const healthLogs = [
+    [runtimeOwnedPath, RUNTIME_HEALTH_PATH],
+    [legacyPath, LEGACY_RUNTIME_HEALTH_PATH],
+  ].filter(([path], index, entries) => existsSync(path) && entries.findIndex(([candidate]) => candidate === path) === index);
+  if (healthLogs.length === 0) {
     return;
   }
   const entries = [];
   let malformed = 0;
-  for (const line of readFileSync(healthPath, "utf8").split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    try {
-      const entry = JSON.parse(line);
-      if (entry && typeof entry === "object") entries.push(entry);
-      else malformed += 1;
-    } catch {
-      malformed += 1;
+  for (const [path] of healthLogs) {
+    for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        if (entry && typeof entry === "object") entries.push(entry);
+        else malformed += 1;
+      } catch {
+        malformed += 1;
+      }
     }
   }
+  entries.sort((left, right) => runtimeHealthTimestamp(left) - runtimeHealthTimestamp(right));
+  const reportedPath = healthLogs.map(([, label]) => label).join(", ");
   if (malformed > 0) report.warnings.push(`adapter runtime health log contains ${malformed} malformed entry/entries: ${reportedPath}`);
   const unresolved = new Map();
   for (const entry of entries) {
@@ -425,6 +431,14 @@ function checkRuntimeHealth(target, report) {
       report.warnings.push(`adapter runtime health issue: ${component} ${code} at ${occurredAt} (${reportedPath})`);
     }
   }
+}
+
+function runtimeHealthTimestamp(entry) {
+  for (const field of ["last_seen_at", "occurred_at", "first_seen_at"]) {
+    const timestamp = Date.parse(entry?.[field]);
+    if (Number.isFinite(timestamp)) return timestamp;
+  }
+  return 0;
 }
 
 function checkRuntimeConformanceProbe(target, report) {

@@ -2,7 +2,7 @@
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -79,6 +79,22 @@ function runRecorder(root, args, input, env = {}) {
   });
 }
 
+function runRecorderAsync(root, args, input, env = {}) {
+  return new Promise((resolveResult) => {
+    const child = spawn(process.execPath, [recorder, ...args], {
+      cwd: root,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root, ...env },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => { stdout += chunk; });
+    child.stderr.setEncoding("utf8").on("data", (chunk) => { stderr += chunk; });
+    child.on("close", (status) => resolveResult({ status, stdout, stderr }));
+    child.stdin.end(JSON.stringify(input));
+  });
+}
+
 function assertPass(label, result) {
   if (result.status !== 0) {
     throw new Error(`${label} should pass\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
@@ -108,7 +124,7 @@ function assertRuntimeEvidence(label, result, expectedLevel) {
   }
 }
 
-function main() {
+async function main() {
   const writeRoot = resolve(fixtureRoot, "write");
   const eventStore = resolve(writeRoot, "events.jsonl");
   mkdirSync(writeRoot, { recursive: true });
@@ -127,7 +143,7 @@ function main() {
   assertRuntimeEvidence("canonical task-result write", writeResult, "executed");
   const [written] = readEvents(eventStore);
   if (
-    written.task_id !== "session:S-COLLECTOR-1" ||
+    !/^task:sha256:[a-f0-9]{64}$/.test(written.task_id) ||
     written.task_type !== "review" ||
     written.routing_result?.primary_skill !== "review-router" ||
     written.verification_metrics?.insufficient_evidence_reported !== true ||
@@ -144,11 +160,43 @@ function main() {
   if (!["updated", "unchanged"].includes(duplicateResult.status) || readEvents(eventStore).length !== 1) {
     throw new Error(`duplicate Stop hooks must be idempotent\n${JSON.stringify(duplicateResult, null, 2)}`);
   }
+  const distinctEnvelopeResult = resultJson(
+    "same-session distinct task result",
+    runRecorder(writeRoot, ["--event-kind", "task_stop", "--event-store", eventStore, "--print-result"], {
+      ...hookInput,
+      last_assistant_message: envelope({ next_action: "a different task follows" }),
+    }),
+  );
+  const distinctEnvelopeEvents = readEvents(eventStore);
+  if (
+    distinctEnvelopeResult.status !== "recorded" ||
+    distinctEnvelopeEvents.length !== 2 ||
+    new Set(distinctEnvelopeEvents.map((event) => event.event_id)).size !== 2
+  ) {
+    throw new Error(`same session with distinct canonical envelopes must retain two event rows\n${JSON.stringify({ distinctEnvelopeResult, distinctEnvelopeEvents }, null, 2)}`);
+  }
 
   const candidateRoot = resolve(fixtureRoot, "candidate");
   const candidateStore = resolve(candidateRoot, "events.jsonl");
   mkdirSync(candidateRoot, { recursive: true });
   const firstCandidate = normalizedCandidate();
+  const sensitiveValues = [
+    "alice@example.com",
+    "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.signature",
+    "AKIAIOSFODNN7EXAMPLE",
+    "-----BEGIN PRIVATE KEY----- private material -----END PRIVATE KEY-----",
+    "const customerName = 'Acme Corporation';",
+    "Acme Corporation customer-4821",
+  ];
+  firstCandidate.task_id = sensitiveValues[5];
+  firstCandidate.skills_used.push("acme-corporation");
+  firstCandidate.evidence_references.push(...sensitiveValues);
+  firstCandidate.verification_result_summary = sensitiveValues[4];
+  firstCandidate.changed_file_summary = { count: 1, paths: [`customers/${sensitiveValues[5]}/source.ts`] };
+  firstCandidate.related_ids.issues.push(sensitiveValues[5]);
+  firstCandidate.routing_result.change_signals = [{ signal: "privacy_change", evidence: sensitiveValues[0] }];
+  firstCandidate.routing_result.required_gate_routes = [{ gate: "risk-gate", reason: sensitiveValues[5], trigger_signals: ["privacy_change"] }];
+  firstCandidate.gate_decisions = [{ gate: "risk-gate", status: "executed", judgment: sensitiveValues[4], evidence_checked: [sensitiveValues[2]] }];
   const firstCandidateResult = resultJson(
     "normalized candidate write",
     runRecorder(candidateRoot, ["--event-kind", "task_stop", "--event-store", candidateStore, "--print-result"], {
@@ -162,10 +210,11 @@ function main() {
   }
   const [sanitizedCandidate] = readEvents(candidateStore);
   if (
-    JSON.stringify(sanitizedCandidate).includes("sk-test-secret") ||
+    ["sk-test-secret", "acme-corporation", ...sensitiveValues].some((value) => JSON.stringify(sanitizedCandidate).includes(value)) ||
     sanitizedCandidate.verification_metrics?.commands_run?.[0]?.redacted_command_preview ||
-    sanitizedCandidate.evidence_references.length !== 1 ||
-    sanitizedCandidate.related_ids?.issues?.length !== 1
+    sanitizedCandidate.evidence_references.some((reference) => !/^ref:sha256:[a-f0-9]{64}$/.test(reference)) ||
+    sanitizedCandidate.changed_file_summary?.paths?.some((path) => !/^path:sha256:[a-f0-9]{64}$/.test(path)) ||
+    sanitizedCandidate.related_ids?.issues?.some((issue) => !/^#[0-9]+$/.test(issue))
   ) {
     throw new Error(`normalized candidate privacy exclusions must be enforced by the runtime\n${JSON.stringify(sanitizedCandidate, null, 2)}`);
   }
@@ -185,7 +234,8 @@ function main() {
   if (
     updateResult.status !== "updated" ||
     candidateEvents.length !== 1 ||
-    candidateEvents[0].event_id !== firstCandidate.event_id ||
+    candidateEvents[0].event_id !== sanitizedCandidate.event_id ||
+    !/^evt:candidate:sha256:[a-f0-9]{64}$/.test(candidateEvents[0].event_id) ||
     candidateEvents[0].outcome_metrics?.rework_count !== 1
   ) {
     throw new Error(`same normalized event_id should update one JSONL row\n${JSON.stringify({ updateResult, candidateEvents }, null, 2)}`);
@@ -271,6 +321,35 @@ function main() {
     throw new Error("persistence failure should write sanitized runtime health");
   }
 
+  const concurrentRoot = resolve(fixtureRoot, "concurrent-health");
+  mkdirSync(concurrentRoot, { recursive: true });
+  const malformedCount = 12;
+  const invalidCount = 8;
+  const concurrentResults = await Promise.all([
+    ...Array.from({ length: malformedCount }, (_, index) => runRecorderAsync(
+      concurrentRoot,
+      ["--event-kind", "task_stop", "--non-blocking"],
+      { session_id: `S-CONCURRENT-MALFORMED-${index}`, last_assistant_message: "Execution Envelope:\n```json\n{not-json}\n```" },
+    )),
+    ...Array.from({ length: invalidCount }, (_, index) => runRecorderAsync(
+      concurrentRoot,
+      ["--event-kind", "task_stop", "--non-blocking"],
+      { session_id: `S-CONCURRENT-INVALID-${index}`, last_assistant_message: envelope({ route: {} }) },
+    )),
+  ]);
+  for (const [index, result] of concurrentResults.entries()) assertPass(`concurrent health writer ${index}`, result);
+  const concurrentHealthPath = resolve(concurrentRoot, ".agent-spectrum-kernel/runtime/runtime-health.jsonl");
+  const concurrentHealth = readEvents(concurrentHealthPath);
+  const malformedHealth = concurrentHealth.find((entry) => entry.error_code === "canonical_task_result_malformed");
+  const invalidHealth = concurrentHealth.find((entry) => entry.error_code === "canonical_task_result_invalid");
+  if (
+    malformedHealth?.occurrence_count !== malformedCount ||
+    invalidHealth?.occurrence_count !== invalidCount ||
+    concurrentHealth.filter((entry) => entry.status === "error").length !== 2
+  ) {
+    throw new Error(`concurrent health writers must preserve every code and occurrence\n${JSON.stringify(concurrentHealth, null, 2)}`);
+  }
+
   const cleanRoot = resolve(fixtureRoot, "read-only-clean");
   mkdirSync(cleanRoot, { recursive: true });
   const init = spawnSync("git", ["init", "-q"], { cwd: cleanRoot, encoding: "utf8" });
@@ -305,7 +384,7 @@ function main() {
 }
 
 try {
-  main();
+  await main();
   console.log("claude metrics collector fixture tests passed");
 } finally {
   rmSync(fixtureRoot, { recursive: true, force: true });

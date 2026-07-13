@@ -2,7 +2,8 @@
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
+import { fileURLToPath } from "node:url";
+import { inspectExecutionEnvelope, validateMetricsEvent } from "./execution-envelope.mjs";
 import { DEFAULT_RUNTIME_EVENT_STORE, resolveObservabilityPath } from "./observability-paths.mjs";
 
 const DEFAULT_CONFIG = {
@@ -40,8 +41,10 @@ const DEFAULT_CONFIG = {
 };
 
 const VERIFICATION_COMMAND_PATTERN = /\b(test|lint|typecheck|tsc|build|validate|check|pytest|vitest|jest|mocha|cargo test|go test|mvn test|gradle test)\b/i;
-const UNSAFE_COMMAND_PREVIEW_PATTERN = /\b(api[_-]?key|token|secret|password|passwd|authorization|bearer|_authToken|npm publish|curl\s+-H)\b|(?:^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]+/i;
 const ALLOWED_TASK_TYPES = new Set(["implementation", "review", "refactor", "investigation", "adoption", "documentation", "handoff", "validation", "report", "ledger_refresh", "other"]);
+const ALLOWED_OPERATING_MODES = new Set(["delivery_quality", "adoption_bootstrap", "observability_metrics", "operation_automation"]);
+const ALLOWED_HOOK_EVENTS = new Set(["PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop", "SubagentStop"]);
+const RUNTIME_ROOT = dirname(fileURLToPath(import.meta.url));
 
 function parseArgs(argv) {
   const args = {
@@ -288,18 +291,7 @@ function commandHash(command) {
   return createHash("sha256").update(String(command)).digest("hex");
 }
 
-function safeCommandPreview(command) {
-  const value = String(command).trim().replace(/\s+/g, " ");
-  if (!value || value.length > 120 || UNSAFE_COMMAND_PREVIEW_PATTERN.test(value)) {
-    return "";
-  }
-  if (!/^(npm|pnpm|yarn|bun|node|npx|pytest|vitest|jest|go|cargo|mvn|gradle|make)\b/.test(value)) {
-    return "";
-  }
-  return value;
-}
-
-function buildEvent(args, hookInput, config, taskId, envelope = null) {
+function buildEvent(args, hookInput, config, taskId, envelope = null, allowedSkillIds = new Set()) {
   const now = new Date().toISOString();
   const paths = changedPaths(hookInput, config.capture.max_paths_per_event ?? 50);
   const command = hookInput.tool_input?.command ?? "";
@@ -310,7 +302,7 @@ function buildEvent(args, hookInput, config, taskId, envelope = null) {
     envelope?.route?.internal?.primary,
     ...(Array.isArray(envelope?.route?.internal?.secondary) ? envelope.route.internal.secondary : []),
   ];
-  const skills = safeTextList([...(candidate?.skills_used ?? []), ...args.skills, ...envelopeSkills], 100, 120);
+  const skills = controlledSkillList([...(candidate?.skills_used ?? []), ...args.skills, ...envelopeSkills], allowedSkillIds, 100);
   const envelopeRoutingResult = envelope ? {
     operating_mode: envelope.route?.operating_mode,
     primary_skill: envelope.route?.internal?.primary,
@@ -325,7 +317,7 @@ function buildEvent(args, hookInput, config, taskId, envelope = null) {
     ...envelopeRoutingResult,
     ...(hookInput.routing_result ?? {}),
     ...parseJsonOption(args.routingResultJson),
-  });
+  }, allowedSkillIds);
   const reviewResult = sanitizeReviewResult({
     ...(candidate?.review_result ?? {}),
     ...(hookInput.review_result ?? {}),
@@ -336,24 +328,24 @@ function buildEvent(args, hookInput, config, taskId, envelope = null) {
     ...(Array.isArray(candidate?.gate_decisions) ? candidate.gate_decisions : []),
     ...(Array.isArray(hookInput.gate_decisions) ? hookInput.gate_decisions : []),
     ...(Array.isArray(gateDecisionOption) ? gateDecisionOption : []),
-  ]);
+  ], allowedSkillIds);
 
   const event = {
     schema_version: "1.0.0",
-    event_id: privacySafeText(candidate?.event_id, 200) || eventIdFor(args.eventKind, taskId, now),
-    task_id: privacySafeText(candidate?.task_id, 200) || taskId,
-    task_type: candidate?.task_type ?? taskTypeFromEnvelope(envelope, args.taskType),
+    event_id: candidate?.event_id ? hashedIdentifier("evt:candidate", candidate.event_id) : eventIdFor(args.eventKind, taskId, now, envelope),
+    task_id: hashedIdentifier("task", candidate?.task_id ?? taskId),
+    task_type: ALLOWED_TASK_TYPES.has(candidate?.task_type) ? candidate.task_type : taskTypeFromEnvelope(envelope, args.taskType),
     occurred_at: candidate?.occurred_at ?? now,
     skills_used: skills,
     routing_result: routingResult,
-    instruction_quality_metrics: { ...(candidate?.instruction_quality_metrics ?? {}) },
-    outcome_metrics: { ...(candidate?.outcome_metrics ?? {}) },
+    instruction_quality_metrics: sanitizeInstructionQualityMetrics(candidate?.instruction_quality_metrics),
+    outcome_metrics: sanitizeOutcomeMetrics(candidate?.outcome_metrics),
     verification_metrics: sanitizeVerificationMetrics(candidate?.verification_metrics, config),
-    debt_movement_metrics: { ...(candidate?.debt_movement_metrics ?? {}) },
-    evidence_references: safeTextList([
+    debt_movement_metrics: sanitizeNonNegativeIntegerMetrics(candidate?.debt_movement_metrics, DEBT_MOVEMENT_FIELDS),
+    evidence_references: referenceList([
       ...(candidate?.evidence_references ?? []),
       ...(envelope?.evidence_status?.checked ?? []),
-    ], 50, 500),
+    ], "ref", 50),
     privacy_note: {
       raw_prompts_stored: false,
       secrets_stored: false,
@@ -364,14 +356,21 @@ function buildEvent(args, hookInput, config, taskId, envelope = null) {
     },
   };
 
+  if (candidate?.period) {
+    const period = sanitizePeriod(candidate.period);
+    if (Object.keys(period).length > 0) event.period = period;
+  }
   if (candidate?.related_ids) event.related_ids = sanitizeRelatedIds(candidate.related_ids);
-  if (candidate?.debt_inventory_snapshot) event.debt_inventory_snapshot = { ...candidate.debt_inventory_snapshot };
-  if (typeof candidate?.verification_result_summary === "string") {
-    event.verification_result_summary = sanitizeText(candidate.verification_result_summary, 2000);
+  if (candidate?.debt_inventory_snapshot) {
+    event.debt_inventory_snapshot = sanitizeNonNegativeIntegerMetrics(candidate.debt_inventory_snapshot, DEBT_INVENTORY_FIELDS);
   }
   if (candidate?.changed_file_summary) {
-    const candidatePaths = safeTextList(candidate.changed_file_summary.paths ?? [], config.capture.max_paths_per_event ?? 50, 500);
-    event.changed_file_summary = { count: candidatePaths.length, paths: candidatePaths };
+    const candidatePaths = referenceList(candidate.changed_file_summary.paths ?? [], "path", config.capture.max_paths_per_event ?? 50);
+    const candidateCount = candidate.changed_file_summary.count;
+    event.changed_file_summary = {
+      count: Number.isInteger(candidateCount) && candidateCount >= 0 ? candidateCount : candidatePaths.length,
+      paths: candidatePaths,
+    };
   }
 
   if (Object.keys(reviewResult).length > 0) {
@@ -381,14 +380,14 @@ function buildEvent(args, hookInput, config, taskId, envelope = null) {
     event.gate_decisions = gateDecisions;
   }
 
-  if (args.hookEvent) {
+  if (ALLOWED_HOOK_EVENTS.has(args.hookEvent)) {
     event.evidence_references.push(`claude_hook:${args.hookEvent}`);
   }
 
   if (paths.length > 0) {
     event.changed_file_summary = {
       count: paths.length,
-      paths,
+      paths: referenceList(paths, "path", config.capture.max_paths_per_event ?? 50),
     };
   }
 
@@ -398,12 +397,6 @@ function buildEvent(args, hookInput, config, taskId, envelope = null) {
     };
     if (config.capture.record_command_hash) {
       commandRecord.command_hash = commandHash(command);
-    }
-    if (config.capture.record_command_preview) {
-      const preview = safeCommandPreview(command);
-      if (preview) {
-        commandRecord.redacted_command_preview = preview;
-      }
     }
     event.verification_metrics.commands_run = [commandRecord];
     event.verification_result_summary = "Verification command attempted; command text and full command output omitted by default.";
@@ -437,12 +430,17 @@ function buildEvent(args, hookInput, config, taskId, envelope = null) {
     event.task_type = "report";
   }
 
+  const schemaErrors = validateMetricsEvent(event);
+  if (schemaErrors.length > 0) {
+    throw new Error(`privacy-projected metrics event failed schema validation: ${schemaErrors.join("; ")}`);
+  }
   return event;
 }
 
-function eventIdFor(eventKind, taskId, now) {
+function eventIdFor(eventKind, taskId, now, envelope = null) {
   if (eventKind !== "task_stop") return `evt:${now}:${randomUUID()}`;
-  const digest = createHash("sha256").update(`${taskId}\0task_stop`).digest("hex").slice(0, 24);
+  const envelopeDigest = createHash("sha256").update(stableCanonicalJson(envelope)).digest("hex");
+  const digest = createHash("sha256").update(`${taskId}\0task_stop\0${envelopeDigest}`).digest("hex").slice(0, 32);
   return `evt:task-stop:${digest}`;
 }
 
@@ -463,14 +461,12 @@ function taskTypeFromEnvelope(envelope, fallback) {
   }[envelope?.route?.work_mode] ?? "other";
 }
 
-function sanitizeRoutingResult(source) {
+function sanitizeRoutingResult(source, allowedSkillIds) {
   const result = {};
-  if (typeof source.operating_mode === "string" && source.operating_mode) {
-    result.operating_mode = source.operating_mode;
-  }
-  if (typeof source.primary_skill === "string" && source.primary_skill) {
-    result.primary_skill = source.primary_skill;
-  }
+  const operatingMode = ALLOWED_OPERATING_MODES.has(source.operating_mode) ? source.operating_mode : "";
+  if (operatingMode) result.operating_mode = operatingMode;
+  const primarySkill = controlledSkillId(source.primary_skill, allowedSkillIds);
+  if (primarySkill) result.primary_skill = primarySkill;
   if (typeof source.correct_routing === "boolean") {
     result.correct_routing = source.correct_routing;
   }
@@ -482,18 +478,18 @@ function sanitizeRoutingResult(source) {
   }
   for (const field of ["secondary_skills", "required_gates", "executed_gates"]) {
     if (Array.isArray(source[field])) {
-      result[field] = unique(source[field].filter((value) => typeof value === "string"));
+      result[field] = controlledSkillList(source[field], allowedSkillIds, 100);
     }
   }
   if (Array.isArray(source.required_gate_routes)) {
     result.required_gate_routes = source.required_gate_routes
-      .map((item) => sanitizeRequiredGateRoute(item))
+      .map((item) => sanitizeRequiredGateRoute(item, allowedSkillIds))
       .filter(Boolean)
       .slice(0, 50);
   }
   if (Array.isArray(source.skipped_heavy_gates)) {
     result.skipped_heavy_gates = source.skipped_heavy_gates
-      .map((item) => sanitizeSkippedHeavyGate(item))
+      .map((item) => sanitizeSkippedHeavyGate(item, allowedSkillIds))
       .filter(Boolean)
       .slice(0, 50);
   }
@@ -506,12 +502,13 @@ function sanitizeRoutingResult(source) {
   if (Array.isArray(source.skipped_gates)) {
     result.skipped_gates = source.skipped_gates
       .filter((item) => item && typeof item.gate === "string" && typeof item.reason === "string")
-      .map((item) => ({ gate: item.gate, reason: item.reason.slice(0, 500) }))
+      .map((item) => ({ gate: controlledSkillId(item.gate, allowedSkillIds), reason: hashedReference("ref", item.reason) }))
+      .filter((item) => item.gate)
       .slice(0, 50);
   }
   if (Array.isArray(source.gate_applicability)) {
     result.gate_applicability = source.gate_applicability
-      .map((item) => sanitizeGateApplicability(item))
+      .map((item) => sanitizeGateApplicability(item, allowedSkillIds))
       .filter(Boolean)
       .slice(0, 50);
   }
@@ -522,34 +519,34 @@ function sanitizeChangeSignal(item) {
   if (!item || typeof item.signal !== "string" || typeof item.evidence !== "string") {
     return null;
   }
-  const signal = sanitizeText(item.signal, 120);
-  const evidence = sanitizeText(item.evidence, 500);
+  const signal = hashedReference("signal", item.signal);
+  const evidence = hashedReference("ref", item.evidence);
   return signal && evidence ? { signal, evidence } : null;
 }
 
-function sanitizeRequiredGateRoute(item) {
+function sanitizeRequiredGateRoute(item, allowedSkillIds) {
   if (!item || typeof item.gate !== "string" || typeof item.reason !== "string" || !Array.isArray(item.trigger_signals)) {
     return null;
   }
-  const gate = sanitizeText(item.gate, 120);
-  const reason = sanitizeText(item.reason, 500);
-  const triggerSignals = unique(item.trigger_signals.filter((value) => typeof value === "string").map((value) => sanitizeText(value, 120))).filter(Boolean).slice(0, 20);
+  const gate = controlledSkillId(item.gate, allowedSkillIds);
+  const reason = hashedReference("ref", item.reason);
+  const triggerSignals = referenceList(item.trigger_signals, "signal", 20);
   return gate && reason && triggerSignals.length > 0 ? { gate, reason, trigger_signals: triggerSignals } : null;
 }
 
-function sanitizeSkippedHeavyGate(item) {
+function sanitizeSkippedHeavyGate(item, allowedSkillIds) {
   if (!item || typeof item.gate !== "string" || typeof item.reason !== "string" || typeof item.observed_evidence !== "string") {
     return null;
   }
-  const gate = sanitizeText(item.gate, 120);
-  const reason = sanitizeText(item.reason, 500);
-  const observedEvidence = sanitizeText(item.observed_evidence, 500);
+  const gate = controlledSkillId(item.gate, allowedSkillIds);
+  const reason = hashedReference("ref", item.reason);
+  const observedEvidence = hashedReference("ref", item.observed_evidence);
   if (!gate || !reason || !observedEvidence) {
     return null;
   }
   const result = { gate, reason, observed_evidence: observedEvidence };
   if (typeof item.layer === "string") {
-    const layer = sanitizeText(item.layer, 120);
+    const layer = hashedReference("ref", item.layer);
     if (layer) result.layer = layer;
   }
   return result;
@@ -559,19 +556,19 @@ function sanitizeMissingEvidence(item) {
   if (!item || typeof item.input !== "string" || typeof item.reason !== "string") {
     return null;
   }
-  const input = sanitizeText(item.input, 120);
-  const reason = sanitizeText(item.reason, 500);
+  const input = hashedReference("ref", item.input);
+  const reason = hashedReference("ref", item.reason);
   return input && reason ? { input, reason } : null;
 }
 
-function sanitizeGateApplicability(item) {
+function sanitizeGateApplicability(item, allowedSkillIds) {
   const allowedStatuses = new Set(["required", "skipped", "insufficient_evidence"]);
   if (!item || typeof item.layer !== "string" || !allowedStatuses.has(item.status) || typeof item.reason !== "string" || typeof item.evidence !== "string") {
     return null;
   }
-  const layer = sanitizeText(item.layer, 120);
-  const reason = sanitizeText(item.reason, 1000);
-  const evidence = sanitizeText(item.evidence, 1000);
+  const layer = hashedReference("ref", item.layer);
+  const reason = hashedReference("ref", item.reason);
+  const evidence = hashedReference("ref", item.evidence);
   if (!layer || !reason || !evidence) {
     return null;
   }
@@ -582,16 +579,16 @@ function sanitizeGateApplicability(item) {
     evidence,
   };
   if (typeof item.gate === "string") {
-    const gate = sanitizeText(item.gate, 120);
+    const gate = controlledSkillId(item.gate, allowedSkillIds);
     if (gate) {
       row.gate = gate;
     }
   }
   if (Array.isArray(item.trigger_signals)) {
-    row.trigger_signals = unique(item.trigger_signals.filter((value) => typeof value === "string").map((value) => sanitizeText(value, 120))).slice(0, 20);
+    row.trigger_signals = referenceList(item.trigger_signals, "signal", 20);
   }
   if (Array.isArray(item.inputs_still_needed)) {
-    row.inputs_still_needed = unique(item.inputs_still_needed.filter((value) => typeof value === "string").map((value) => sanitizeText(value, 120))).slice(0, 20);
+    row.inputs_still_needed = referenceList(item.inputs_still_needed, "ref", 20);
   }
   return row;
 }
@@ -606,12 +603,12 @@ function sanitizeReviewResult(source) {
     result.required_fixes_count = source.required_fixes_count;
   }
   if (Array.isArray(source.insufficient_evidence_layers)) {
-    result.insufficient_evidence_layers = unique(source.insufficient_evidence_layers.filter((value) => typeof value === "string")).slice(0, 20);
+    result.insufficient_evidence_layers = referenceList(source.insufficient_evidence_layers, "ref", 20);
   }
   return result;
 }
 
-function sanitizeGateDecisions(source) {
+function sanitizeGateDecisions(source, allowedSkillIds) {
   const allowedStatuses = new Set(["required", "executed", "skipped", "insufficient_evidence"]);
   const allowedConfidence = new Set(["high", "medium", "low"]);
   const allowedCategories = new Set(["no_trigger_signal", "not_applicable", "covered_by_other_gate", "missing_context", "missing_evidence", "other"]);
@@ -624,7 +621,7 @@ function sanitizeGateDecisions(source) {
       if (!item || typeof item.gate !== "string" || !allowedStatuses.has(item.status)) {
         return null;
       }
-      const gate = sanitizeText(item.gate, 120);
+      const gate = controlledSkillId(item.gate, allowedSkillIds);
       if (!gate) {
         return null;
       }
@@ -633,16 +630,11 @@ function sanitizeGateDecisions(source) {
         status: item.status,
       };
       if (typeof item.layer === "string" && item.layer) {
-        decision.layer = sanitizeText(item.layer, 120);
+        decision.layer = hashedReference("ref", item.layer);
       }
-      if (typeof item.judgment === "string") {
-        decision.judgment = sanitizeText(item.judgment, 500);
-      }
-      for (const field of ["evidence_checked", "triggering_signals", "missing_inputs"]) {
-        if (Array.isArray(item[field])) {
-          decision[field] = unique(item[field].filter((value) => typeof value === "string").map((value) => sanitizeText(value, 120))).slice(0, 20);
-        }
-      }
+      if (Array.isArray(item.evidence_checked)) decision.evidence_checked = referenceList(item.evidence_checked, "ref", 20);
+      if (Array.isArray(item.triggering_signals)) decision.triggering_signals = referenceList(item.triggering_signals, "signal", 20);
+      if (Array.isArray(item.missing_inputs)) decision.missing_inputs = referenceList(item.missing_inputs, "ref", 20);
       if (allowedConfidence.has(item.confidence)) {
         decision.confidence = item.confidence;
       }
@@ -655,32 +647,116 @@ function sanitizeGateDecisions(source) {
     .slice(0, 100);
 }
 
-function sanitizeText(value, maxLength) {
-  const sanitized = String(value).replace(/\s+/g, " ").trim().slice(0, maxLength);
-  return UNSAFE_COMMAND_PREVIEW_PATTERN.test(sanitized) ? "[redacted]" : sanitized;
+function stableCanonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableCanonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableCanonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
-function privacySafeText(value, maxLength) {
-  if (typeof value !== "string") return "";
-  const sanitized = value.replace(/\s+/g, " ").trim().slice(0, maxLength);
-  return UNSAFE_COMMAND_PREVIEW_PATTERN.test(sanitized) ? "" : sanitized;
+function hashedIdentifier(prefix, value) {
+  return `${prefix}:sha256:${createHash("sha256").update(String(value)).digest("hex")}`;
 }
 
-function safeTextList(values, maxItems, maxLength) {
-  return unique((Array.isArray(values) ? values : []).map((value) => privacySafeText(value, maxLength)).filter(Boolean)).slice(0, maxItems);
+function hashedReference(prefix, value) {
+  return `${prefix}:sha256:${createHash("sha256").update(String(value)).digest("hex")}`;
+}
+
+function referenceList(values, prefix, maxItems) {
+  return unique((Array.isArray(values) ? values : []).filter((value) => typeof value === "string" && value).map((value) => hashedReference(prefix, value))).slice(0, maxItems);
+}
+
+function controlledSkillId(value, allowedSkillIds) {
+  return typeof value === "string" && allowedSkillIds.has(value) ? value : "";
+}
+
+function controlledSkillList(values, allowedSkillIds, maxItems) {
+  return unique((Array.isArray(values) ? values : []).map((value) => controlledSkillId(value, allowedSkillIds)).filter(Boolean)).slice(0, maxItems);
+}
+
+function loadAllowedSkillIds(projectRoot) {
+  const allowed = new Set();
+  const sources = [
+    resolve(projectRoot, ".agent-spectrum-kernel/claude-install-state.json"),
+    resolve(RUNTIME_ROOT, "../manifest.json"),
+  ];
+  for (const path of sources) {
+    if (!existsSync(path)) continue;
+    try {
+      const value = JSON.parse(readFileSync(path, "utf8"));
+      const skills = value.name === "agent-spectrum-kernel" ? value.skills : value.selected_skills;
+      for (const skill of Array.isArray(skills) ? skills : []) {
+        if (typeof skill === "string" && /^[a-z0-9][a-z0-9-]{0,119}$/.test(skill)) allowed.add(skill);
+      }
+    } catch {
+      // An unavailable control allowlist drops uncontrolled identifiers; collection remains fail-open.
+    }
+  }
+  return allowed;
+}
+
+function sanitizePeriod(source) {
+  if (!isPlainObject(source)) return {};
+  const result = {};
+  for (const field of ["start", "end"]) {
+    if (typeof source[field] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(source[field])) result[field] = source[field];
+  }
+  return result;
+}
+
+function sanitizeInstructionQualityMetrics(source) {
+  if (!isPlainObject(source)) return {};
+  const result = {};
+  for (const field of ["goal_clarity", "scope_clarity", "context_sufficiency"]) {
+    if (Number.isInteger(source[field]) && source[field] >= 1 && source[field] <= 5) result[field] = source[field];
+  }
+  const presence = new Set(["present", "partial", "missing", "not_applicable", "unknown"]);
+  for (const field of ["verification_instruction", "risk_awareness", "stop_condition_clarity"]) {
+    if (presence.has(source[field])) result[field] = source[field];
+  }
+  return result;
+}
+
+function sanitizeOutcomeMetrics(source) {
+  if (!isPlainObject(source)) return {};
+  const result = {};
+  for (const field of ["task_completed", "pr_created", "pr_merged", "validation_passed"]) {
+    if (typeof source[field] === "boolean") result[field] = source[field];
+  }
+  if (Number.isInteger(source.rework_count) && source.rework_count >= 0) result.rework_count = source.rework_count;
+  return result;
+}
+
+const DEBT_MOVEMENT_FIELDS = new Set([
+  "debt_items_detected", "debt_items_recorded", "debt_items_planned", "debt_items_in_progress", "debt_items_resolved",
+  "debt_items_converted_to_rule", "debt_items_converted_to_check", "debt_items_accepted", "debt_items_wont_fix",
+  "stale_debt_items", "refactor_candidates_created", "refactor_candidates_implemented",
+]);
+const DEBT_INVENTORY_FIELDS = new Set([
+  "detected", "recorded", "open", "triaged", "accepted", "planned", "in_progress", "resolved", "converted_to_rule",
+  "converted_to_check", "wont_fix", "stale",
+]);
+
+function sanitizeNonNegativeIntegerMetrics(source, allowedFields) {
+  if (!isPlainObject(source)) return {};
+  const result = {};
+  for (const field of allowedFields) {
+    if (Number.isInteger(source[field]) && source[field] >= 0) result[field] = source[field];
+  }
+  return result;
 }
 
 function sanitizeVerificationMetrics(source, config) {
   if (!isPlainObject(source)) return {};
-  const result = { ...source };
+  const result = {};
+  for (const field of ["verification_contract_defined", "tests_added_or_updated", "insufficient_evidence_reported"]) {
+    if (typeof source[field] === "boolean") result[field] = source[field];
+  }
   if (!Array.isArray(source.commands_run)) return result;
   result.commands_run = source.commands_run.slice(0, 20).map((command) => {
     const record = { command_kind: command.command_kind };
     if (config.capture.record_command_hash && typeof command.command_hash === "string") record.command_hash = command.command_hash;
-    if (config.capture.record_command_preview && typeof command.redacted_command_preview === "string") {
-      const preview = safeCommandPreview(command.redacted_command_preview);
-      if (preview) record.redacted_command_preview = preview;
-    }
     return record;
   });
   return result;
@@ -688,15 +764,17 @@ function sanitizeVerificationMetrics(source, config) {
 
 function sanitizeRelatedIds(source) {
   const result = {};
-  for (const field of ["prs", "issues", "improvement_ids", "skill_adoption_metric_ids"]) {
-    if (Array.isArray(source[field])) result[field] = safeTextList(source[field], 50, 120);
+  for (const field of ["prs", "issues"]) {
+    if (Array.isArray(source[field])) result[field] = unique(source[field].map((value) => String(value)).filter((value) => /^#[0-9]+$/.test(value))).slice(0, 50);
   }
+  if (Array.isArray(source.improvement_ids)) result.improvement_ids = unique(source.improvement_ids.filter((value) => /^IMP-[0-9]{4}$/.test(value))).slice(0, 50);
+  if (Array.isArray(source.skill_adoption_metric_ids)) result.skill_adoption_metric_ids = unique(source.skill_adoption_metric_ids.filter((value) => /^SAM-[0-9]{4}$/.test(value))).slice(0, 50);
   return result;
 }
 
 function upsertEvent(eventStore, event) {
   mkdirSync(dirname(eventStore), { recursive: true });
-  return withEventStoreLock(eventStore, () => {
+  return withRuntimeFileLock(eventStore, () => {
     const lines = existsSync(eventStore) ? readFileSync(eventStore, "utf8").split(/\r?\n/).filter(Boolean) : [];
     let matchIndex = -1;
     for (const [index, line] of lines.entries()) {
@@ -725,9 +803,9 @@ function upsertEvent(eventStore, event) {
   });
 }
 
-function withEventStoreLock(eventStore, operation) {
-  const lockPath = `${eventStore}.lock`;
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+function withRuntimeFileLock(path, operation) {
+  const lockPath = `${path}.lock`;
+  for (let attempt = 0; attempt < 200; attempt += 1) {
     let descriptor = null;
     try {
       descriptor = openSync(lockPath, "wx");
@@ -747,7 +825,7 @@ function withEventStoreLock(eventStore, operation) {
       }
     }
   }
-  throw new Error("metrics event store lock timed out");
+  throw new Error("runtime data file lock timed out");
 }
 
 function resolveProjectRoot(args, eventStore = null) {
@@ -786,38 +864,40 @@ function healthKey(entry) {
 }
 
 function appendRuntimeHealth(path, entry, maxEntries) {
-  const { entries } = readRuntimeHealth(path);
-  const latest = [...entries].reverse().find((candidate) => healthKey(candidate) === healthKey(entry));
-  const now = entry.occurred_at;
-  if (latest?.status === entry.status) {
-    const index = entries.lastIndexOf(latest);
-    const updated = {
-      ...latest,
-      first_seen_at: latest.first_seen_at || latest.occurred_at || now,
-      last_seen_at: now,
-      occurrence_count: Math.max(1, Number(latest.occurrence_count) || 1) + 1,
-      occurred_at: now,
-    };
-    entries.splice(index, 1);
-    entries.push(updated);
-  } else {
-    entries.push({
-      ...entry,
-      first_seen_at: entry.first_seen_at || now,
-      last_seen_at: entry.last_seen_at || now,
-      occurrence_count: Math.max(1, Number(entry.occurrence_count) || 1),
-    });
-  }
   mkdirSync(dirname(path), { recursive: true });
-  const bounded = entries.slice(-Math.max(1, Number(maxEntries) || 100));
-  const temporaryPath = `${path}.tmp-${process.pid}-${Date.now()}`;
-  try {
-    writeFileSync(temporaryPath, `${bounded.map((candidate) => JSON.stringify(candidate)).join("\n")}\n`);
-    renameSync(temporaryPath, path);
-  } catch (error) {
-    try { rmSync(temporaryPath, { force: true }); } catch { /* fail-open health path */ }
-    throw error;
-  }
+  return withRuntimeFileLock(path, () => {
+    const { entries } = readRuntimeHealth(path);
+    const latest = [...entries].reverse().find((candidate) => healthKey(candidate) === healthKey(entry));
+    const now = entry.occurred_at;
+    if (latest?.status === entry.status) {
+      const index = entries.lastIndexOf(latest);
+      const updated = {
+        ...latest,
+        first_seen_at: latest.first_seen_at || latest.occurred_at || now,
+        last_seen_at: now,
+        occurrence_count: Math.max(1, Number(latest.occurrence_count) || 1) + 1,
+        occurred_at: now,
+      };
+      entries.splice(index, 1);
+      entries.push(updated);
+    } else {
+      entries.push({
+        ...entry,
+        first_seen_at: entry.first_seen_at || now,
+        last_seen_at: entry.last_seen_at || now,
+        occurrence_count: Math.max(1, Number(entry.occurrence_count) || 1),
+      });
+    }
+    const bounded = entries.slice(-Math.max(1, Number(maxEntries) || 100));
+    const temporaryPath = `${path}.tmp-${process.pid}-${Date.now()}`;
+    try {
+      writeFileSync(temporaryPath, `${bounded.map((candidate) => JSON.stringify(candidate)).join("\n")}\n`);
+      renameSync(temporaryPath, path);
+    } catch (error) {
+      try { rmSync(temporaryPath, { force: true }); } catch { /* fail-open health path */ }
+      throw error;
+    }
+  });
 }
 
 function runtimeHealthPath(args, eventStore = null) {
@@ -893,7 +973,8 @@ function main(args) {
     if (args.printResult) console.log(JSON.stringify(skipResult(decision.reason)));
     return;
   }
-  const event = buildEvent(args, hookInput, config, decision.taskId, taskResult.envelope);
+  const allowedSkillIds = loadAllowedSkillIds(resolveProjectRoot(args, eventStore));
+  const event = buildEvent(args, hookInput, config, decision.taskId, taskResult.envelope, allowedSkillIds);
   let status = "dry-run";
   if (!args.dryRun) {
     status = upsertEvent(eventStore, event);

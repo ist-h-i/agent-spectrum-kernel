@@ -1092,7 +1092,7 @@ function assertRuntimeScripts() {
   );
   assertRuntimePass("metrics recorder session-boundary smoke", recordResult);
   const recordedEvent = JSON.parse(readFileSync(resolve(root, "docs/ai/metrics/events.jsonl"), "utf8"));
-  if (recordedEvent.task_id !== "session:S1") {
+  if (!/^task:sha256:[a-f0-9]{64}$/.test(recordedEvent.task_id)) {
     throw new Error(`metrics recorder should fall back to session boundary\n${JSON.stringify(recordedEvent, null, 2)}`);
   }
   const commandRecord = recordedEvent.verification_metrics.commands_run[0];
@@ -1171,6 +1171,8 @@ function assertRuntimeScripts() {
   if (
     gateDecisionRecordedEvent.gate_decisions.length !== 1 ||
     gateDecisionRecordedEvent.gate_decisions[0].gate !== "review-architecture-impact" ||
+    Object.hasOwn(gateDecisionRecordedEvent.gate_decisions[0], "judgment") ||
+    gateDecisionRecordedEvent.gate_decisions[0].evidence_checked.some((reference) => !/^ref:sha256:[a-f0-9]{64}$/.test(reference)) ||
     Object.hasOwn(gateDecisionRecordedEvent.gate_decisions[0], "raw_prompt") ||
     JSON.stringify(gateDecisionRecordedEvent.gate_decisions).includes("must not be stored")
   ) {
@@ -1343,7 +1345,7 @@ function assertRuntimeScripts() {
     recordedApplicability.length !== 2 ||
     recordedApplicability[0].gate !== "review-architecture-impact" ||
     recordedApplicability[0].trigger_signals.length !== 1 ||
-    recordedApplicability[1].layer !== "Output quality" ||
+    !/^ref:sha256:[a-f0-9]{64}$/.test(recordedApplicability[1].layer) ||
     Object.hasOwn(recordedApplicability[1], "gate") ||
     JSON.stringify(routingRecordedEvent).includes("must not be stored")
   ) {
@@ -1352,9 +1354,11 @@ function assertRuntimeScripts() {
   const recordedRouting = routingRecordedEvent.routing_result;
   if (
     recordedRouting.change_signals?.length !== 2 ||
-    recordedRouting.required_gate_routes?.[0]?.trigger_signals?.[0] !== "public_api_change" ||
+    !/^signal:sha256:[a-f0-9]{64}$/.test(recordedRouting.required_gate_routes?.[0]?.trigger_signals?.[0]) ||
     recordedRouting.skipped_heavy_gates?.[0]?.gate !== "review-adversarial-risk" ||
-    recordedRouting.missing_evidence?.[0]?.input !== "verification"
+    !/^ref:sha256:[a-f0-9]{64}$/.test(recordedRouting.missing_evidence?.[0]?.input) ||
+    JSON.stringify(routingRecordedEvent).includes("schema file changed") ||
+    JSON.stringify(routingRecordedEvent).includes("docs output path changed")
   ) {
     throw new Error(`metrics recorder should preserve the compact signal-first routing summary\n${JSON.stringify(routingRecordedEvent, null, 2)}`);
   }
@@ -3645,6 +3649,27 @@ function assertDoctorScript() {
     throw new Error(`doctor should close a runtime-health issue after recovery\n${recoveredHealthResult.stdout}`);
   }
 
+  const legacyHealthPath = resolve(runtimeHealthTarget, ".agent-spectrum-kernel/runtime-health.jsonl");
+  const runtimeOwnedHealthPath = resolve(runtimeHealthTarget, ".agent-spectrum-kernel/runtime/runtime-health.jsonl");
+  mkdirSync(dirname(runtimeOwnedHealthPath), { recursive: true });
+  writeFileSync(
+    legacyHealthPath,
+    `${readFileSync(legacyHealthPath, "utf8")}{"schema_version":"1.0.0","occurred_at":"2999-01-01T00:02:00.000Z","component":"legacy-component","status":"error","error_code":"legacy-unresolved"}\n{"schema_version":"1.0.0","occurred_at":"2999-01-01T00:05:00.000Z","component":"ai-metrics-record","status":"recovered","error_code":"cross-path-recovery"}\n`,
+  );
+  writeFileSync(
+    runtimeOwnedHealthPath,
+    '{"schema_version":"1.0.0","occurred_at":"2999-01-01T00:03:00.000Z","component":"new-component","status":"error","error_code":"new-unresolved"}\n{"schema_version":"1.0.0","occurred_at":"2999-01-01T00:04:00.000Z","component":"ai-metrics-record","status":"error","error_code":"cross-path-recovery"}\n',
+  );
+  const mergedHealthResult = runRepoScript([doctorScript, "--target", runtimeHealthTarget]);
+  assertRuntimePass("doctor merges legacy and runtime-owned health", mergedHealthResult);
+  if (
+    !mergedHealthResult.stdout.includes("legacy-component legacy-unresolved") ||
+    !mergedHealthResult.stdout.includes("new-component new-unresolved") ||
+    mergedHealthResult.stdout.includes("ai-metrics-record cross-path-recovery")
+  ) {
+    throw new Error(`doctor should merge both health logs in event-time order\n${mergedHealthResult.stdout}`);
+  }
+
   const staleHealthTarget = resolve(fixtureRoot, "doctor-stale-runtime-health");
   assertRuntimePass("doctor setup stale runtime health install", runRepoScript([installer, "--target", staleHealthTarget, "--skills", "operating-mode-router"]));
   mkdirSync(resolve(staleHealthTarget, ".agent-spectrum-kernel"), { recursive: true });
@@ -3727,7 +3752,8 @@ function assertAdapterRuntimeSmokeScript() {
   );
   assertRuntimePass("installed Claude canonical collector", installedCollectorResult);
   const installedEventStore = resolve(target, ".agent-spectrum-kernel/runtime/metrics/events.jsonl");
-  if (!existsSync(installedEventStore) || !readFileSync(installedEventStore, "utf8").includes("session:S-INSTALLED-COLLECTOR")) {
+  const installedEvent = existsSync(installedEventStore) ? JSON.parse(readFileSync(installedEventStore, "utf8")) : null;
+  if (!installedEvent || !/^task:sha256:[a-f0-9]{64}$/.test(installedEvent.task_id)) {
     throw new Error("installed Claude runtime should collect a canonical task result through its copied runtime dependencies");
   }
 
@@ -3735,6 +3761,23 @@ function assertAdapterRuntimeSmokeScript() {
   assertRuntimePass("adapter runtime smoke Claude pass", smokeResult);
   if (!smokeResult.stdout.includes("ASK adapter runtime smoke: pass") || !readFileSync(resolve(target, ".agent-spectrum-kernel/runtime-smoke/events.jsonl"), "utf8").includes("adapter-runtime-smoke")) {
     throw new Error(`adapter runtime smoke should append an isolated non-sensitive event\n${smokeResult.stdout}\n${smokeResult.stderr}`);
+  }
+
+  const installedMetricsSchemaPath = resolve(target, "scripts/metrics-event.schema.json");
+  const restrictiveMetricsSchema = JSON.parse(readFileSync(installedMetricsSchemaPath, "utf8"));
+  restrictiveMetricsSchema.properties.task_id.const = "fixture-impossible-task-id";
+  writeFileSync(installedMetricsSchemaPath, `${JSON.stringify(restrictiveMetricsSchema, null, 2)}\n`);
+  const eventStoreBeforeSchemaRejection = readFileSync(installedEventStore, "utf8");
+  const schemaRejectionResult = runRepoScript(
+    [resolve(target, "scripts/ai-metrics-record.mjs"), "--event-kind", "task_stop", "--non-blocking"],
+    { cwd: target, input: JSON.stringify({ session_id: "S-SCHEMA-REJECTION", last_assistant_message: validEnvelopeBlock }) },
+  );
+  assertRuntimePass("installed Claude collector final schema rejection is fail-open", schemaRejectionResult);
+  if (
+    readFileSync(installedEventStore, "utf8") !== eventStoreBeforeSchemaRejection ||
+    !readFileSync(resolve(target, ".agent-spectrum-kernel/runtime/runtime-health.jsonl"), "utf8").includes("non_blocking_metrics_record_failure")
+  ) {
+    throw new Error("installed Claude collector must schema-validate the privacy-projected event before persistence");
   }
 
   const missingRuntimeTarget = resolve(fixtureRoot, "adapter-runtime-smoke-missing-runtime");
