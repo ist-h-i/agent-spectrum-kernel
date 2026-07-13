@@ -3,7 +3,7 @@ import { closeSync, existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -566,6 +566,170 @@ async function main() {
   }
   if (!readFileSync(healthPath, "utf8").includes("canonical_task_result_invalid")) {
     throw new Error("schema-invalid canonical result should be visible in sanitized runtime health");
+  }
+
+  const invalidBoundaryCases = [
+    {
+      label: "missing",
+      reason: "canonical_task_result_missing",
+      message: "No structured task result.",
+    },
+    {
+      label: "malformed",
+      reason: "canonical_task_result_malformed",
+      message: "Execution Envelope:\n```json\n{not-json}\n```",
+    },
+    {
+      label: "invalid",
+      reason: "canonical_task_result_invalid",
+      message: envelope({ route: {} }),
+    },
+  ];
+  for (const boundaryCase of invalidBoundaryCases) {
+    const invalidBoundaryRoot = resolve(fixtureRoot, `invalid-boundary-${boundaryCase.label}`);
+    const invalidBoundaryStore = resolve(invalidBoundaryRoot, "events.jsonl");
+    const invalidBoundaryTranscript = resolve(invalidBoundaryRoot, "transcript.jsonl");
+    mkdirSync(invalidBoundaryRoot, { recursive: true });
+    writeFileSync(invalidBoundaryTranscript, `${JSON.stringify({ type: "assistant", uuid: `${boundaryCase.label}-turn-a` })}\n`);
+    const sessionId = `S-INVALID-BOUNDARY-${boundaryCase.label}`;
+    const taskAResult = resultJson(
+      `${boundaryCase.label} boundary task A command`,
+      runRecorder(invalidBoundaryRoot, ["--event-kind", "command_attempt", "--hook-event", "PostToolUse", "--event-store", invalidBoundaryStore, "--print-result"], {
+        session_id: sessionId,
+        transcript_path: invalidBoundaryTranscript,
+        hook_event_name: "PostToolUse",
+        tool_input: { command: "echo task-a" },
+      }),
+    );
+    const invalidStopInput = {
+      session_id: sessionId,
+      transcript_path: invalidBoundaryTranscript,
+      hook_event_name: "Stop",
+      last_assistant_message: boundaryCase.message,
+    };
+    const duplicateInvalidStops = await Promise.all([
+      runRecorderAsync(invalidBoundaryRoot, ["--event-kind", "task_stop", "--hook-event", "Stop", "--event-store", invalidBoundaryStore, "--print-result", "--non-blocking"], invalidStopInput),
+      runRecorderAsync(invalidBoundaryRoot, ["--event-kind", "task_stop", "--hook-event", "Stop", "--event-store", invalidBoundaryStore, "--print-result", "--non-blocking"], invalidStopInput),
+    ]);
+    const invalidStopResults = duplicateInvalidStops.map((result, index) => resultJson(`${boundaryCase.label} duplicate invalid Stop ${index}`, result));
+    writeFileSync(invalidBoundaryTranscript, `${JSON.stringify({ type: "assistant", uuid: `${boundaryCase.label}-turn-b` })}\n`, { flag: "a" });
+    const taskBCommandResult = resultJson(
+      `${boundaryCase.label} boundary task B command`,
+      runRecorder(invalidBoundaryRoot, ["--event-kind", "command_attempt", "--hook-event", "PostToolUse", "--event-store", invalidBoundaryStore, "--print-result"], {
+        session_id: sessionId,
+        transcript_path: invalidBoundaryTranscript,
+        hook_event_name: "PostToolUse",
+        tool_input: { command: "echo task-b" },
+      }),
+    );
+    const taskBStopResult = resultJson(
+      `${boundaryCase.label} boundary task B Stop`,
+      runRecorder(invalidBoundaryRoot, ["--event-kind", "task_stop", "--hook-event", "Stop", "--event-store", invalidBoundaryStore, "--print-result"], {
+        session_id: sessionId,
+        transcript_path: invalidBoundaryTranscript,
+        hook_event_name: "Stop",
+        last_assistant_message: envelope(),
+      }),
+    );
+    const invalidBoundaryEvents = readEvents(invalidBoundaryStore);
+    const invalidBoundaryReport = summarizeStore(invalidBoundaryRoot, invalidBoundaryStore, `${boundaryCase.label}-invalid-stop-boundary`);
+    const [taskAEvent, taskBCommandEvent, taskBStopEvent] = invalidBoundaryEvents;
+    const invalidBoundaryState = JSON.parse(readFileSync(resolve(invalidBoundaryRoot, ".agent-spectrum-kernel/runtime/task-boundaries.json"), "utf8"));
+    const [invalidBoundarySession] = Object.values(invalidBoundaryState.sessions);
+    if (
+      taskAResult.status !== "recorded" ||
+      invalidStopResults.some((result) => result.status !== "skip" || result.reason !== boundaryCase.reason) ||
+      taskBCommandResult.status !== "recorded" ||
+      taskBStopResult.status !== "recorded" ||
+      invalidBoundaryEvents.length !== 3 ||
+      taskAEvent.task_id === taskBCommandEvent.task_id ||
+      taskBCommandEvent.task_id !== taskBStopEvent.task_id ||
+      invalidBoundaryReport.summary.tasks_reviewed !== 2 ||
+      invalidBoundaryReport.summary.command_attempts !== 2 ||
+      invalidBoundarySession.next_segment !== 2
+    ) {
+      throw new Error(`${boundaryCase.label} Stop must skip its event, close task A exactly once, and keep task B separate\n${JSON.stringify({ invalidStopResults, invalidBoundaryEvents, summary: invalidBoundaryReport.summary, invalidBoundarySession }, null, 2)}`);
+    }
+  }
+
+  const boundedStateRoot = resolve(fixtureRoot, "bounded-task-boundary-state");
+  const boundedStateStore = resolve(boundedStateRoot, "events.jsonl");
+  const boundedStatePath = resolve(boundedStateRoot, ".agent-spectrum-kernel/runtime/task-boundaries.json");
+  mkdirSync(dirname(boundedStatePath), { recursive: true });
+  const seededSessions = {};
+  for (let index = 0; index < 160; index += 1) {
+    const sessionId = `S-EVICT-${index}`;
+    const sessionKey = createHash("sha256").update(sessionId).digest("hex");
+    seededSessions[sessionKey] = {
+      generation: `seed-generation-${index}`,
+      next_segment: 3,
+      segment_open: false,
+      last_touched_at_ms: 0,
+      duplicate_open: false,
+    };
+  }
+  const openSessionId = "S-BOUNDED-OPEN";
+  const openSessionKey = createHash("sha256").update(openSessionId).digest("hex");
+  seededSessions[openSessionKey] = {
+    generation: "active-open-generation",
+    next_segment: 1,
+    segment_open: true,
+    last_touched_at_ms: Date.now(),
+    duplicate_open: false,
+  };
+  writeFileSync(boundedStatePath, `${JSON.stringify({ schema_version: "1.0.0", sessions: seededSessions })}\n`);
+  const concurrentSessionIds = Array.from({ length: 20 }, (_, index) => `S-BOUNDED-CONCURRENT-${index}`);
+  const concurrentBoundaryResults = await Promise.all(concurrentSessionIds.map((sessionId) => runRecorderAsync(
+    boundedStateRoot,
+    ["--event-kind", "task_stop", "--hook-event", "Stop", "--event-store", boundedStateStore, "--print-result", "--non-blocking"],
+    { session_id: sessionId, hook_event_name: "Stop", last_assistant_message: envelope() },
+  )));
+  const boundedOutputs = concurrentBoundaryResults.map((result, index) => resultJson(`bounded state concurrent session ${index}`, result));
+  const prunedBoundaryState = JSON.parse(readFileSync(boundedStatePath, "utf8"));
+  const activeSessionKeys = concurrentSessionIds.map((sessionId) => createHash("sha256").update(sessionId).digest("hex"));
+  const evictedSessionId = "S-EVICT-0";
+  const evictedSessionKey = createHash("sha256").update(evictedSessionId).digest("hex");
+  if (
+    boundedOutputs.some((output) => output.status !== "recorded") ||
+    Object.keys(prunedBoundaryState.sessions).length > 128 ||
+    readFileSync(boundedStatePath).length > 131_072 ||
+    !prunedBoundaryState.sessions[openSessionKey] ||
+    activeSessionKeys.some((sessionKey) => !prunedBoundaryState.sessions[sessionKey]) ||
+    prunedBoundaryState.sessions[evictedSessionKey]
+  ) {
+    throw new Error(`concurrent boundary pruning must preserve open sessions and active claims inside the bounded state limits\n${JSON.stringify({ outputs: boundedOutputs, sessionCount: Object.keys(prunedBoundaryState.sessions).length, stateBytes: readFileSync(boundedStatePath).length }, null, 2)}`);
+  }
+  const resumedCommandResult = resultJson(
+    "evicted session resumes with a command",
+    runRecorder(boundedStateRoot, ["--event-kind", "command_attempt", "--hook-event", "PostToolUse", "--event-store", boundedStateStore, "--print-result"], {
+      session_id: evictedSessionId,
+      hook_event_name: "PostToolUse",
+      tool_input: { command: "echo resumed-session" },
+    }),
+  );
+  const resumedStopResult = resultJson(
+    "evicted session resumes with a Stop",
+    runRecorder(boundedStateRoot, ["--event-kind", "task_stop", "--hook-event", "Stop", "--event-store", boundedStateStore, "--print-result"], {
+      session_id: evictedSessionId,
+      hook_event_name: "Stop",
+      last_assistant_message: envelope(),
+    }),
+  );
+  const resumedEvents = readEvents(boundedStateStore).slice(-2);
+  const resumedBoundaryState = JSON.parse(readFileSync(boundedStatePath, "utf8"));
+  const oldRawTaskId = `session-boundary:${evictedSessionKey}:seed-generation-0:3`;
+  const oldHashedTaskId = `task:sha256:${createHash("sha256").update(oldRawTaskId).digest("hex")}`;
+  if (
+    resumedCommandResult.status !== "recorded" ||
+    resumedStopResult.status !== "recorded" ||
+    resumedEvents.length !== 2 ||
+    resumedEvents[0].task_id !== resumedEvents[1].task_id ||
+    resumedEvents[0].task_id === oldHashedTaskId ||
+    resumedBoundaryState.sessions[evictedSessionKey]?.generation === "seed-generation-0" ||
+    Object.keys(resumedBoundaryState.sessions).length > 128 ||
+    readFileSync(boundedStatePath).length > 131_072
+  ) {
+    throw new Error(`an evicted session must resume in a fresh generation without exceeding state bounds\n${JSON.stringify({ resumedCommandResult, resumedStopResult, resumedEvents, resumedSession: resumedBoundaryState.sessions[evictedSessionKey] }, null, 2)}`);
   }
 
   const disabledRoot = resolve(fixtureRoot, "disabled");

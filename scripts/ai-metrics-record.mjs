@@ -46,6 +46,10 @@ const ALLOWED_OPERATING_MODES = new Set(["delivery_quality", "adoption_bootstrap
 const ALLOWED_HOOK_EVENTS = new Set(["PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop", "SubagentStop"]);
 const MAX_CHANGED_PATHS = 50;
 const STOP_DUPLICATE_CLAIM_TTL_MS = 5_000;
+const TASK_BOUNDARY_ACTIVE_SESSION_TTL_MS = 60 * 60 * 1_000;
+const TASK_BOUNDARY_SESSION_RETENTION_MS = 7 * 24 * 60 * 60 * 1_000;
+const MAX_TASK_BOUNDARY_SESSIONS = 128;
+const MAX_TASK_BOUNDARY_STATE_BYTES = 128 * 1_024;
 const RUNTIME_ROOT = dirname(fileURLToPath(import.meta.url));
 
 function parseArgs(argv) {
@@ -268,10 +272,72 @@ function activeDuplicateStopClaim(current, claim, now) {
   ) {
     return false;
   }
-  if (claim.source === "transcript_snapshot") return true;
   const claimedAt = Number(current.last_stop_claimed_at_ms);
   const age = now - claimedAt;
   return Number.isFinite(claimedAt) && age >= 0 && age <= STOP_DUPLICATE_CLAIM_TTL_MS;
+}
+
+function taskBoundaryGeneration(current, fresh = false) {
+  if (typeof current?.generation === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(current.generation)) {
+    return current.generation;
+  }
+  if (!fresh) return "legacy";
+  return randomUUID().replaceAll("-", "");
+}
+
+function taskBoundaryTaskId(sessionKey, current, segment) {
+  const generation = taskBoundaryGeneration(current);
+  if (generation === "legacy") return `session-boundary:${sessionKey}:${segment}`;
+  return `session-boundary:${sessionKey}:${generation}:${segment}`;
+}
+
+function taskBoundaryStateBytes(state) {
+  return Buffer.byteLength(`${JSON.stringify(state)}\n`);
+}
+
+function taskBoundaryLastTouched(current) {
+  const touchedAt = Number(current?.last_touched_at_ms);
+  return Number.isFinite(touchedAt) && touchedAt >= 0 ? touchedAt : 0;
+}
+
+function taskBoundarySessionProtected(sessionKey, current, activeSessionKey, now) {
+  if (sessionKey === activeSessionKey) return true;
+  const age = now - taskBoundaryLastTouched(current);
+  if (current?.segment_open === true && age >= 0 && age <= TASK_BOUNDARY_ACTIVE_SESSION_TTL_MS) return true;
+  if (current?.duplicate_open !== true) return false;
+  const claimedAt = Number(current.last_stop_claimed_at_ms);
+  const claimAge = now - claimedAt;
+  return Number.isFinite(claimedAt) && claimAge >= 0 && claimAge <= STOP_DUPLICATE_CLAIM_TTL_MS;
+}
+
+function pruneTaskBoundarySessions(state, activeSessionKey, now) {
+  const entries = Object.entries(state.sessions);
+  for (const [sessionKey, current] of entries) {
+    if (taskBoundarySessionProtected(sessionKey, current, activeSessionKey, now)) continue;
+    if (now - taskBoundaryLastTouched(current) > TASK_BOUNDARY_SESSION_RETENTION_MS) {
+      delete state.sessions[sessionKey];
+    }
+  }
+
+  const evictionCandidates = Object.entries(state.sessions)
+    .filter(([sessionKey, current]) => !taskBoundarySessionProtected(sessionKey, current, activeSessionKey, now))
+    .sort((left, right) => taskBoundaryLastTouched(left[1]) - taskBoundaryLastTouched(right[1]));
+  let evictionIndex = 0;
+  let sessionCount = Object.keys(state.sessions).length;
+  while (sessionCount > MAX_TASK_BOUNDARY_SESSIONS && evictionIndex < evictionCandidates.length) {
+    const [sessionKey] = evictionCandidates[evictionIndex++];
+    delete state.sessions[sessionKey];
+    sessionCount -= 1;
+  }
+  while (taskBoundaryStateBytes(state) > MAX_TASK_BOUNDARY_STATE_BYTES && evictionIndex < evictionCandidates.length) {
+    const [sessionKey] = evictionCandidates[evictionIndex++];
+    delete state.sessions[sessionKey];
+    sessionCount -= 1;
+  }
+
+  if (sessionCount > MAX_TASK_BOUNDARY_SESSIONS || taskBoundaryStateBytes(state) > MAX_TASK_BOUNDARY_STATE_BYTES) {
+    throw new Error("task boundary state capacity exhausted by active sessions");
+  }
 }
 
 function resolveSessionTaskBoundary(args, hookInput, eventStore, envelope) {
@@ -281,33 +347,48 @@ function resolveSessionTaskBoundary(args, hookInput, eventStore, envelope) {
   const resolveBoundary = () => {
     const state = readTaskBoundaryState(statePath);
     const sessionKey = createHash("sha256").update(String(hookInput.session_id)).digest("hex");
-    const current = isPlainObject(state.sessions[sessionKey]) ? state.sessions[sessionKey] : { next_segment: 0 };
+    const existing = isPlainObject(state.sessions[sessionKey]);
+    const current = existing
+      ? state.sessions[sessionKey]
+      : { generation: taskBoundaryGeneration(null, true), next_segment: 0 };
     const nextSegment = Number.isInteger(current.next_segment) && current.next_segment >= 0 ? current.next_segment : 0;
+    const now = Date.now();
 
     if (args.eventKind === "task_stop") {
-      const now = Date.now();
       const claim = stopBoundaryClaim(hookInput, envelope);
       if (activeDuplicateStopClaim(current, claim, now)) {
+        state.sessions[sessionKey] = { ...current, last_touched_at_ms: now };
+        pruneTaskBoundarySessions(state, sessionKey, now);
+        if (persist) writeTaskBoundaryState(statePath, state);
         return current.last_stop_task_id;
       }
-      const taskId = `session-boundary:${sessionKey}:${nextSegment}`;
+      const taskId = taskBoundaryTaskId(sessionKey, current, nextSegment);
       state.sessions[sessionKey] = {
+        generation: taskBoundaryGeneration(current, !existing),
         next_segment: nextSegment + 1,
+        segment_open: false,
+        last_touched_at_ms: now,
         last_stop_claim_identity: claim.identity,
         last_stop_claim_source: claim.source,
         last_stop_claimed_at_ms: now,
         last_stop_task_id: taskId,
         duplicate_open: true,
       };
+      pruneTaskBoundarySessions(state, sessionKey, now);
       if (persist) writeTaskBoundaryState(statePath, state);
       return taskId;
     }
 
-    const taskId = `session-boundary:${sessionKey}:${nextSegment}`;
-    if (current.duplicate_open === true) {
-      state.sessions[sessionKey] = { ...current, duplicate_open: false };
-      if (persist) writeTaskBoundaryState(statePath, state);
-    }
+    const taskId = taskBoundaryTaskId(sessionKey, current, nextSegment);
+    state.sessions[sessionKey] = {
+      generation: taskBoundaryGeneration(current, !existing),
+      next_segment: nextSegment,
+      segment_open: true,
+      last_touched_at_ms: now,
+      duplicate_open: false,
+    };
+    pruneTaskBoundarySessions(state, sessionKey, now);
+    if (persist) writeTaskBoundaryState(statePath, state);
     return taskId;
   };
 
@@ -390,6 +471,14 @@ function collectCanonicalTaskResult(args, hookInput) {
     status: result.status,
     envelope: null,
     reason: `canonical_task_result_${result.status}`,
+  };
+}
+
+function taskBoundaryResultIdentity(taskResult) {
+  if (taskResult.status === "parsed") return taskResult.envelope;
+  return {
+    canonical_task_result_status: taskResult.status,
+    reason: taskResult.reason,
   };
 }
 
@@ -1124,6 +1213,10 @@ function main(args) {
   }
   const eventStore = resolveEventStore(args, config);
   const taskResult = collectCanonicalTaskResult(args, hookInput);
+  const fallbackTaskId = resolveTaskId(args, hookInput, config);
+  const stopTaskId = args.eventKind === "task_stop"
+    ? resolveRuntimeTaskId(args, hookInput, config, eventStore, taskBoundaryResultIdentity(taskResult), fallbackTaskId)
+    : "";
   if (taskResult.status === "parsed" && taskResult.envelope?.metrics_event_candidate) {
     if (args.taskType === "other") args.taskType = taskResult.envelope.metrics_event_candidate.task_type;
   }
@@ -1148,7 +1241,9 @@ function main(args) {
     return;
   }
   const projectRoot = resolveProjectRoot(args, eventStore);
-  const taskId = resolveRuntimeTaskId(args, hookInput, config, eventStore, taskResult.envelope, decision.taskId);
+  const taskId = args.eventKind === "task_stop"
+    ? stopTaskId
+    : resolveRuntimeTaskId(args, hookInput, config, eventStore, taskResult.envelope, decision.taskId);
   const allowedSkillIds = loadAllowedSkillIds(projectRoot);
   const allowedSignalIds = loadAllowedSignalIds(projectRoot);
   const event = buildEvent(args, hookInput, config, taskId, taskResult.envelope, allowedSkillIds, allowedSignalIds);
