@@ -4,14 +4,9 @@ description: Investigate an unknown cause with a compact ASK profile.
 
 Entry mode: investigation. Primary contract: `doubt-driven-development`. Start read-only and apply the header contracts directly.
 
-Critical fallback controls:
+{{ASK_COMPACT_CONTROLS}}
 
-- [scope] Inspect relevant code/tests/docs/logs and narrow the cause before editing; exclude cleanup.
-- [verification] Reproduce, falsify, or narrow the report and define regression proof before or alongside a fix.
-- [risk_approval] Stop before destructive, external, production, auth, secret, dependency, migration, billing, email, telemetry, infra, deploy, publish, or release action without explicit approval.
-- [evidence] Label important claims Verified, Supported, Hypothesis, Unknown, or Falsified; do not upgrade a hypothesis.
-- [missing_evidence] Report missing workspace, logs, tests, runtime/load, or verification evidence as insufficient, never inferred.
-- [output] Record findings, cause, changes, verification, unknowns, and one Execution Envelope.
+{{ASK_COMPACT_DIRECT_TRIGGERS}}
 
 Findings:
 - ...

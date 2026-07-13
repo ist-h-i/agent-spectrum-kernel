@@ -4,14 +4,9 @@ description: Review a diff or output with the Codex compact ASK profile.
 
 Entry mode is fixed to review. Primary contract: `review-router`. Read `schemas/review-signal-gate-map.json`, emit exact signal IDs, and run only gates triggered by observed signals.
 
-Critical fallback controls:
+{{ASK_COMPACT_CONTROLS}}
 
-- [scope] Stay read-only unless fixes were explicitly requested; inspect the workspace, diff/output, nearby contracts, and relevant tests.
-- [verification] Treat missing diff, context, output, tests, or lifecycle refs as insufficient evidence, not a skipped gate.
-- [risk_approval] Stop before any external comment, label, check, metric, notification, deploy, release, production, secret, auth, or destructive action without explicit approval.
-- [evidence] Put actionable blockers first with gate/file:line evidence and keep improvement candidates non-blocking.
-- [missing_evidence] Do not infer runtime Skill loading, executed checks, mergeability, correctness, or no regression.
-- [output] Record signal-to-gate mapping, required gate evidence, final decision, residual risk, and one shared Execution Envelope.
+{{ASK_COMPACT_DIRECT_TRIGGERS}}
 
 Change signals:
 - signal: observed evidence

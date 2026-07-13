@@ -138,16 +138,18 @@ Renderer output may contain tool-native prompts, commands, hooks, permissions, o
 
 ### Codex compact runtime profiles
 
-Codex explicit entry prompts are adapter-rendered compact profiles. When the command already fixes implementation, investigation, review, verification, or handoff mode, the rendered profile invokes its primary canonical contract directly and skips `operating-mode-router` and `skill-router`. Review still uses `review-router` because changed-file signals determine its required gates. Skipping an upper router does not remove scope, verification, risk, approval, evidence, stop, or output constraints.
+Codex explicit entry prompts are adapter-rendered compact profiles. When the command already fixes implementation, investigation, review, verification, or handoff mode, the rendered profile invokes its primary canonical contract directly and skips `operating-mode-router` and `skill-router`. Review still uses `review-router` because changed-file signals determine its required gates. Decisive signals that remain unknown after task-class selection map directly to their canonical contracts through `schemas/compact-profile-control-map.json`; they are not removed with the upper routers. Skipping an upper router does not remove scope, verification, risk, approval, evidence, stop, or output constraints.
 
-Each generated prompt embeds a bounded profile header and the install state records the full renderer metadata: requested canonical contracts, canonical revision, normalized canonical source text digests, required fallback controls, rendered digest, and route-depth measurement. The prompt body remains self-contained for critical controls because Codex-controlled Skill loading is not guaranteed to be observable. The renderer validates those controls and required output sections against the named canonical inputs before projection; it does not create independent workflow semantics. Runner preflight and the static doctor probe mechanically compare every recorded canonical source digest with the current projected canonical source, so a canonical-only change requires regeneration. Renderer fixtures also reject a hand-edited prompt that conflicts with canonical risk, approval, verification, or evidence controls.
+Shared adapter runtime profile schema revision `1.1.0` defines `rendering.compact_profiles`. The Codex plan derives prompt metadata and install-state copies from that shared profile field; those copies are generated provenance, not an independent schema or source of truth. The header references the shared `canonical_contract.revision`, byte-preserving `canonical_contract.source_digest`, and `profile_fingerprint`; it defines no second canonical digest.
+
+The prompt body remains self-contained for critical controls because Codex-controlled Skill loading is not guaranteed to be observable. Scope, verification, risk/approval, evidence, missing-evidence, and output fallback text is generated from the typed attributes in `schemas/compact-profile-control-map.json`, not hand-maintained in prompt templates. Risk attributes require exact action, risk classification, impact, reversibility, external visibility, safer alternative, preconditions, specific-action approval, and approved-action-only execution. Unknown controls, changed required attributes, general approval, and hand-maintained control text fail rendering. Runner preflight and the static doctor probe compare the shared projection's raw renderer-input digests with current canonical projections, so trailing-byte drift is retained.
 
 Codex diagnostics keep projection, load, output, and application claims separate:
 
-1. `requested`: the compact profile names the contracts requested for the entry mode;
-2. `projected`: installer state and managed prompt bytes match the generated profile;
-3. `runtime_detected`: the managed runner loaded the compact prompt/profile into the invocation context; Codex-controlled Skill loading remains `unavailable` unless separately observable;
-4. `applied_output_contracts: evidenced`: `ask-sensors` found the required sections in captured output. This is evidence for that bounded output shape only. Workflow-contract, risk/approval-contract, and verification-contract application remain `unavailable` unless separately observed; the runner's overall `executed` status does not upgrade them.
+1. `requested_contracts` lists intent and does not create an evidence level;
+2. matching installer state and managed prompt bytes use canonical `evidence_level: projected`;
+3. runner-observed prompt/profile detection uses `evidence_level: runtime_detected`; Codex-controlled contract loading remains `evidence_level: none` with missing evidence;
+4. a bounded output accepted by `ask-sensors` uses `evidence_level: executed` only for the inspected output contract. Workflow-contract, risk/approval-contract, and verification-contract application remain `evidence_level: none` unless separately observed; the runner's overall `executed` status does not upgrade them.
 
 `ask-doctor --runtime-probe` validates requested metadata, projected bytes, canonical source digests, prompt references, and state consistency only. It reports runtime load, applied-output, workflow, risk/approval, and verification application evidence as unavailable because it does not execute Codex.
 
@@ -167,7 +169,7 @@ Profiles declare whether event collection is disabled, local opt-in, or locally 
 
 Projection evidence is profile-scoped. It records `profile_id`, `renderer_profile`, and a profile fingerprint derived from canonical digest, renderer ID/version/profile, plan-shaping options, renderer input digest, and static projected inventory digest. The repository fixtures provide evidence only for their declared default options; a non-default plan must use its own projection fingerprint and cannot reuse that static Profile evidence. Adapter-global evidence must declare a different scope and cannot satisfy a profile projection claim. Registered verifier fixtures bind both their declared verifier path and executable check callback.
 
-Child runtime work in #163 and #164 consumes this contract and schema. Adapter-owned compact prompt metadata and collector records may differ, but they must not add independent canonical workflow, risk, evidence, lifecycle, traceability, or normalized-event definitions.
+Child runtime work in #163 and #164 must consume this contract and schema. Those implementations may add adapter-owned renderer or collector fields only through a schema revision; they must not add independent canonical workflow, risk, evidence, lifecycle, traceability, or normalized-event definitions.
 
 ## Compatibility rule
 

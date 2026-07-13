@@ -128,30 +128,32 @@ export function codexPromptContractForMode(mode) {
   return Object.values(CODEX_PROMPT_CONTRACTS).find((contract) => contract.mode === mode) ?? null;
 }
 
-export function inspectCodexCompactCanonicalSources(target, sources = []) {
+export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {}) {
   const findings = [];
-  for (const source of sources) {
-    const candidates = [resolve(target, source.path)];
-    if (source.path.startsWith("skills/")) {
-      candidates.push(resolve(target, ".agents/skills", source.path.slice("skills/".length)));
-    }
-    const sourcePath = candidates.find((candidate) => existsSync(candidate));
-    if (!sourcePath) {
-      findings.push({ path: source.path, status: "missing", expected_sha256: source.sha256 });
+  for (const input of projectionPlan.renderer_inputs?.canonical ?? []) {
+    if (typeof input?.path !== "string" || input.path.startsWith("/") || input.path.split(/[\\/]/).includes("..") || !/^sha256:[a-f0-9]{64}$/.test(input.digest ?? "")) {
+      findings.push({ path: String(input?.path), status: "invalid_projection_input" });
       continue;
     }
-    let canonicalText = readFileSync(sourcePath, "utf8");
-    if (source.path === "AGENTS.md") {
-      const managedBlock = canonicalText.match(/<!-- agent-spectrum-kernel:start -->\r?\n<!-- Source:[^\n]* -->\r?\n([\s\S]*?)\r?\n<!-- agent-spectrum-kernel:end -->/u);
-      if (!managedBlock) {
-        findings.push({ path: source.path, status: "missing_managed_block", expected_sha256: source.sha256 });
-        continue;
-      }
-      canonicalText = managedBlock[1];
+    if (input.path === "AGENTS.md") {
+      const coreStatePath = resolve(target, ".agent-spectrum-kernel/install-state.json");
+      const coreState = existsSync(coreStatePath) ? JSON.parse(readFileSync(coreStatePath, "utf8")) : null;
+      const blockRecord = coreState?.managed_blocks?.["AGENTS.md#agent-spectrum-kernel"];
+      if (`sha256:${blockRecord?.source_sha256 ?? ""}` !== input.digest) findings.push({ path: input.path, status: "drift", expected_sha256: input.digest, actual_sha256: blockRecord?.source_sha256 ? `sha256:${blockRecord.source_sha256}` : "unavailable" });
+      const agentsPath = resolve(target, "AGENTS.md");
+      const managedBlock = existsSync(agentsPath) ? readFileSync(agentsPath, "utf8").match(/<!-- agent-spectrum-kernel:start -->[\s\S]*?<!-- agent-spectrum-kernel:end -->/u)?.[0] : null;
+      if (!managedBlock || hashText(managedBlock) !== blockRecord?.sha256) findings.push({ path: input.path, status: "managed_block_drift" });
+      continue;
     }
-    const actualSha256 = `sha256:${hashText(canonicalText.trimEnd())}`;
-    if (actualSha256 !== source.sha256) {
-      findings.push({ path: source.path, status: "drift", expected_sha256: source.sha256, actual_sha256: actualSha256 });
+    const candidates = [resolve(target, input.path)];
+    if (input.path.startsWith("skills/")) candidates.push(resolve(target, ".agents/skills", input.path.slice("skills/".length)));
+    const sourcePath = candidates.find((candidate) => existsSync(candidate));
+    if (!sourcePath) {
+      continue;
+    }
+    const actualSha256 = `sha256:${hashText(readFileSync(sourcePath))}`;
+    if (actualSha256 !== input.digest) {
+      findings.push({ path: input.path, status: "drift", expected_sha256: input.digest, actual_sha256: actualSha256 });
     }
   }
   return findings;

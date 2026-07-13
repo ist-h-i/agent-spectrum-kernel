@@ -8,7 +8,7 @@ import {
   findUnsupportedCapabilityClaims,
   hashFile,
   hashText,
-  inspectCodexCompactCanonicalSources,
+  inspectCodexProjectionCanonicalInputs,
   parseCodexCompactProfileHeader,
   readJsonIfExists,
 } from "./ask-shared.mjs";
@@ -72,12 +72,12 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
       codex_evidence: {
         requested_contracts: [],
         projected_contracts: [],
-        runtime_detected_profile: "unavailable",
-        runtime_loaded_contracts: "unavailable",
-        applied_output_contracts: "unavailable",
-        workflow_contract_application: "unavailable",
-        risk_approval_contract_application: "unavailable",
-        verification_contract_application: "unavailable",
+        runtime_detected_profile: { evidence_level: "none", missing_evidence: ["external_runtime"] },
+        runtime_loaded_contracts: { evidence_level: "none", missing_evidence: ["runtime_contract_load"] },
+        applied_output_contracts: { evidence_level: "none", missing_evidence: ["bounded_run"] },
+        workflow_contract_application: { evidence_level: "none", missing_evidence: ["workflow_contract_application"] },
+        risk_approval_contract_application: { evidence_level: "none", missing_evidence: ["risk_approval_contract_application"] },
+        verification_contract_application: { evidence_level: "none", missing_evidence: ["verification_contract_application"] },
       },
     },
   };
@@ -713,7 +713,7 @@ function checkCodexRuntimeState(target, state, probe) {
     const content = readFileSync(promptPath, "utf8");
     const header = parseCodexCompactProfileHeader(content);
     const compact = record.compact_profile;
-    if (!header || header.id !== compact.profile_id || header.revision !== compact.canonical_revision || header.digest !== compact.canonical_digest) {
+    if (!header || header.id !== compact.profile_id || header.revision !== compact.canonical_revision || header.source_digest !== compact.canonical_source_digest || header.profile_fingerprint !== compact.profile_fingerprint) {
       probe.failures.push(`Codex compact runtime profile provenance mismatch: .agents/prompts/${prompt}`);
       continue;
     }
@@ -726,7 +726,11 @@ function checkCodexRuntimeState(target, state, probe) {
       probe.failures.push(`Codex compact runtime profile is not selected in state: ${compact.profile_id}`);
       continue;
     }
-    const canonicalFindings = inspectCodexCompactCanonicalSources(target, compact.canonical_sources);
+    if (compact.canonical_source_digest !== state.projection_plan?.canonical_source_digest || compact.profile_fingerprint !== state.projection_plan?.fingerprint) {
+      probe.failures.push(`Codex compact runtime profile does not derive from shared projection state: ${compact.profile_id}`);
+      continue;
+    }
+    const canonicalFindings = inspectCodexProjectionCanonicalInputs(target, state.projection_plan);
     if (canonicalFindings.length > 0) {
       for (const finding of canonicalFindings) {
         probe.failures.push(`Codex compact-profile canonical source ${finding.status}: ${finding.path}`);
@@ -734,7 +738,7 @@ function checkCodexRuntimeState(target, state, probe) {
       continue;
     }
     probe.codex_evidence.requested_contracts.push({ prompt, profile_id: compact.profile_id, contracts: compact.requested_contracts });
-    probe.codex_evidence.projected_contracts.push({ prompt: `.agents/prompts/${prompt}`, profile_id: compact.profile_id, canonical_revision: compact.canonical_revision, status: "projected" });
+    probe.codex_evidence.projected_contracts.push({ prompt: `.agents/prompts/${prompt}`, profile_id: compact.profile_id, canonical_revision: compact.canonical_revision, evidence_level: "projected" });
   }
   if ((state.selected_prompts ?? []).length > 0) {
     probe.checked.push("Codex compact profiles contain requested-contract, projected-contract, and canonical-source evidence");
@@ -941,12 +945,12 @@ function printReport(target, report, { json = false } = {}) {
     console.log("Codex evidence stages:");
     console.log(`- requested contracts: ${report.runtimeProbe.codex_evidence.requested_contracts.length}`);
     console.log(`- projected contracts: ${report.runtimeProbe.codex_evidence.projected_contracts.length}`);
-    console.log(`- runtime-detected profile: ${report.runtimeProbe.codex_evidence.runtime_detected_profile}`);
-    console.log(`- runtime-loaded contracts: ${report.runtimeProbe.codex_evidence.runtime_loaded_contracts}`);
-    console.log(`- applied output contracts: ${report.runtimeProbe.codex_evidence.applied_output_contracts}`);
-    console.log(`- workflow contract application: ${report.runtimeProbe.codex_evidence.workflow_contract_application}`);
-    console.log(`- risk/approval contract application: ${report.runtimeProbe.codex_evidence.risk_approval_contract_application}`);
-    console.log(`- verification contract application: ${report.runtimeProbe.codex_evidence.verification_contract_application}`);
+    console.log(`- runtime-detected profile evidence: ${report.runtimeProbe.codex_evidence.runtime_detected_profile.evidence_level}`);
+    console.log(`- runtime-loaded contracts evidence: ${report.runtimeProbe.codex_evidence.runtime_loaded_contracts.evidence_level}`);
+    console.log(`- applied output contracts evidence: ${report.runtimeProbe.codex_evidence.applied_output_contracts.evidence_level}`);
+    console.log(`- workflow contract application evidence: ${report.runtimeProbe.codex_evidence.workflow_contract_application.evidence_level}`);
+    console.log(`- risk/approval contract application evidence: ${report.runtimeProbe.codex_evidence.risk_approval_contract_application.evidence_level}`);
+    console.log(`- verification contract application evidence: ${report.runtimeProbe.codex_evidence.verification_contract_application.evidence_level}`);
     console.log("Runtime boundary:");
     console.log("- Runtime probe is local/static/dry-run only and does not prove external adapter execution or product readiness.");
     console.log("- Runtime probe findings downgrade runtime conformance/readiness claims only.");

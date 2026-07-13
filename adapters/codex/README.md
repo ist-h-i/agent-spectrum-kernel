@@ -84,7 +84,7 @@ The source files below are adapter renderer inputs. After installation, use the 
 - `prompts/skill-verify.md`
 - `prompts/skill-handoff.md`
 
-The installer validates each source template against canonical Skill/contract inputs, embeds canonical revision/digest provenance, and writes the generated compact profile to `.agents/prompts`. The generated profile invokes its fixed primary contract directly and remains self-contained for scope, verification, risk/approval, evidence downgrade, insufficient-evidence, and output controls. It does not store raw prompts, secrets, customer data, personal data, full command output, or full file contents.
+The installer validates each source template against canonical Skill/contract inputs, generates critical controls and direct conditional contracts from `schemas/compact-profile-control-map.json`, embeds the shared adapter profile revision/digest provenance, and writes the generated compact profile to `.agents/prompts`. The generated profile invokes its fixed primary contract directly while preserving direct triggers for repository orientation, scope, boundary, design, docs/ADR, and long-running work where applicable. It does not store raw prompts, secrets, customer data, personal data, full command output, or full file contents.
 
 Prompt templates define entry intent, mutation level, evidence requirements, and output contract. They use `docs/lifecycle-artifact-contract.md` for lifecycle artifacts and the shared `docs/execution-envelope-contract.md` for one boundary-level control record. Implementation and verification outputs use one Contract plus Evidence record and keep `next_action` only in the Envelope.
 
@@ -125,4 +125,4 @@ node scripts/test-codex-runtime-profile.mjs
 node scripts/validate-repo.mjs
 ```
 
-The representative compact fixture uses UTF-8 prompt bytes as a deterministic token-size proxy. Route depth counts sequential workflow contracts before the entry artifact and excludes risk/evidence overlays that do not add a sequential stage. The current five-entry set reduces the byte proxy from 11,371 to 10,517 and aggregate route depth from 14 to 9. The implementation and investigation entries reduce route depth; review, verification, and handoff retain their required direct stages. No required fallback control is dropped.
+The representative compact fixture calculates raw prompt bytes from immutable pre-compact assets under `docs/fixtures/codex-pre-compact-prompts/`. Route depth is calculated from `docs/fixtures/codex-compact-route-baseline.json` and counts sequential canonical stages; parallel risk/evidence overlays and signal-selected direct branches are checked separately. The five-entry set reduces the byte proxy from 11,371 to 11,275 and aggregate route depth from 15 to 11. Direct-trigger equivalence and all six required controls are fixture-checked.

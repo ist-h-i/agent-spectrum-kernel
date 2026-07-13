@@ -34,6 +34,10 @@ for (const profile of profileArtifact.profiles) {
   profile.rendering.renderer_id = registration.metadata.rendererId;
   profile.rendering.renderer_version = registration.metadata.rendererVersion;
   profile.rendering.renderer_inputs = plan.renderer_inputs;
+  if (profile.adapter_id === "codex") {
+    profile.schema_version = "1.1.0";
+    profile.rendering.compact_profiles = plan.compactProfiles;
+  }
   profile.rendering.asset_kinds = [...new Set(plan.projectedManagedAssets.map((asset) => asset.asset_kind))].sort();
   profile.generated_assets.managed_assets = plan.projectedManagedAssets;
   profile.profile_fingerprint = computeAdapterProfileFingerprint(profile);

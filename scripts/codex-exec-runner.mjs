@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSy
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, inspectCodexCompactCanonicalSources, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
+import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, inspectCodexProjectionCanonicalInputs, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
 
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const DEFAULT_OUTPUT = ".agents/runs/codex-last-output.md";
@@ -156,17 +156,17 @@ function preflight(args) {
       v: compactProfile.schema_version,
       id: compactProfile.profile_id,
       revision: compactProfile.canonical_revision,
-      digest: compactProfile.canonical_digest,
-      contracts: compactProfile.requested_contracts,
-      controls: compactProfile.controls,
-      route_depth: compactProfile.route_depth,
+      source_digest: compactProfile.canonical_source_digest,
+      profile_fingerprint: compactProfile.profile_fingerprint,
     };
     if (JSON.stringify(compactHeader) !== JSON.stringify(expectedHeader)) failures.push(`compact-profile header does not match Codex install state: ${args.prompt}`);
     if (compactProfile.mode !== args.mode) failures.push(`compact-profile mode mismatch: ${args.prompt} requires ${compactProfile.mode}`);
     if (compactProfile.rendered_sha256 !== `sha256:${hashText(promptContent)}`) failures.push(`compact-profile rendered digest mismatch: ${args.prompt}`);
+    if (compactProfile.canonical_source_digest !== state?.projection_plan?.canonical_source_digest) failures.push(`compact-profile canonical source digest does not match shared projection plan: ${args.prompt}`);
+    if (compactProfile.profile_fingerprint !== state?.projection_plan?.fingerprint) failures.push(`compact-profile fingerprint does not match shared projection plan: ${args.prompt}`);
     const selectedProfile = (state?.compact_runtime_profiles ?? []).find((profile) => profile.profile_id === compactProfile.profile_id);
     if (!selectedProfile || selectedProfile.rendered_sha256 !== compactProfile.rendered_sha256) failures.push(`compact profile is not selected in Codex install state: ${compactProfile.profile_id}`);
-    for (const finding of inspectCodexCompactCanonicalSources(args.target, compactProfile.canonical_sources)) {
+    for (const finding of inspectCodexProjectionCanonicalInputs(args.target, state?.projection_plan)) {
       failures.push(`compact-profile canonical source ${finding.status}: ${finding.path}`);
     }
   }
@@ -328,14 +328,14 @@ function printResult(report, json) {
   console.log(`Evidence level: ${report.evidence_level}`);
   console.log(`Output: ${report.output_path ?? "not written"}`);
   console.log(`Sensor status: ${report.sensor_status ?? "not run"}`);
-  console.log(`Requested contracts: ${report.execution_evidence.requested_contracts.status}`);
-  console.log(`Projected contracts: ${report.execution_evidence.projected_contracts.status}`);
-  console.log(`Runtime-detected compact output profile: ${report.execution_evidence.runtime_detected_profile.status}`);
-  console.log(`Runtime-loaded contracts: ${report.execution_evidence.runtime_loaded_contracts.status}`);
-  console.log(`Applied output contracts: ${report.execution_evidence.applied_output_contracts.status}`);
-  console.log(`Workflow contract application: ${report.execution_evidence.workflow_contract_application.status}`);
-  console.log(`Risk/approval contract application: ${report.execution_evidence.risk_approval_contract_application.status}`);
-  console.log(`Verification contract application: ${report.execution_evidence.verification_contract_application.status}`);
+  console.log(`Requested contracts: ${report.execution_evidence.requested_contracts.contracts.length}`);
+  console.log(`Projected contracts evidence: ${report.execution_evidence.projected_contracts.evidence_level}`);
+  console.log(`Runtime-detected compact output profile evidence: ${report.execution_evidence.runtime_detected_profile.evidence_level}`);
+  console.log(`Runtime-loaded contracts evidence: ${report.execution_evidence.runtime_loaded_contracts.evidence_level}`);
+  console.log(`Applied output contracts evidence: ${report.execution_evidence.applied_output_contracts.evidence_level}`);
+  console.log(`Workflow contract application evidence: ${report.execution_evidence.workflow_contract_application.evidence_level}`);
+  console.log(`Risk/approval contract application evidence: ${report.execution_evidence.risk_approval_contract_application.evidence_level}`);
+  console.log(`Verification contract application evidence: ${report.execution_evidence.verification_contract_application.evidence_level}`);
   console.log("Boundary: ask-sensors is report-only and does not prove business correctness.");
   if (report.failures.length > 0) {
     console.log("Failures:");
@@ -379,43 +379,46 @@ try {
     sensor_status: sensorResult?.status ?? null,
     execution_evidence: {
       requested_contracts: {
-        status: preflightResult.compactProfile ? "requested" : "unavailable",
         profile_id: preflightResult.compactProfile?.profile_id ?? null,
         contracts: preflightResult.compactProfile?.requested_contracts ?? [],
       },
       projected_contracts: {
-        status: preflightPassed ? "projected" : "unavailable",
+        evidence_level: preflightPassed ? "projected" : "none",
         prompt: `.agents/prompts/${args.prompt}`,
         canonical_revision: preflightResult.compactProfile?.canonical_revision ?? null,
       },
       runtime_detected_profile: {
-        status: preflightPassed ? "runtime_detected" : "unavailable",
+        evidence_level: preflightPassed ? "runtime_detected" : "none",
         detail: preflightPassed
           ? "The managed runner loaded the generated prompt/profile into the invocation context."
           : "The managed compact profile was not loaded because preflight failed.",
       },
       runtime_loaded_contracts: {
-        status: "unavailable",
+        evidence_level: "none",
         contracts: [],
+        missing_evidence: ["runtime_contract_load"],
         detail: "Codex-controlled canonical Skill and contract loading is not observable.",
       },
       applied_output_contracts: {
-        status: sensorResult?.exitCode === 0 && sensorResult?.status === "pass" ? "evidenced" : "insufficient_evidence",
+        evidence_level: sensorResult?.exitCode === 0 && sensorResult?.status === "pass" ? "executed" : "none",
         evidence_scope: "Required output sections inspected by ask-sensors only.",
         detail: sensorResult
           ? `ask-sensors status=${sensorResult.status}, exit=${sensorResult.exitCode}`
           : "No Codex output was evaluated against the requested output contract.",
       },
       workflow_contract_application: {
-        status: "unavailable",
+        evidence_level: "none",
+        missing_evidence: ["workflow_contract_application"],
         detail: "Output inspection does not expose whether Codex applied the requested workflow contract.",
       },
       risk_approval_contract_application: {
-        status: "unavailable",
+        evidence_level: "none",
+        missing_evidence: ["risk_approval_contract_application"],
         detail: "Output inspection does not expose whether Codex applied the risk and approval contract.",
       },
       verification_contract_application: {
-        status: "unavailable",
+        evidence_level: "none",
+        missing_evidence: ["verification_contract_application"],
         detail: "Output inspection distinguishes reported evidence but does not prove that the verification workflow was applied.",
       },
     },

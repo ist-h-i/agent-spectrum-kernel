@@ -1511,7 +1511,7 @@ export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
   const add = (message) => issues.push(message);
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) return ["profile must be an object"];
   if (!root) return ["validation root is required"];
-  if (profile.schema_version !== "1.0.0") add("schema_version must be 1.0.0");
+  if (!["1.0.0", "1.1.0"].includes(profile.schema_version)) add("schema_version must be 1.0.0 or 1.1.0");
   for (const field of ["profile_id", "adapter_id"]) {
     if (typeof profile[field] !== "string" || profile[field].trim() === "") add(`${field} must be a non-empty string`);
   }
@@ -1593,16 +1593,23 @@ export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
     if (!Array.isArray(rendering.asset_kinds) || rendering.asset_kinds.length === 0) add("rendering.asset_kinds must be non-empty");
     if (!normalizedRelativeProfilePath(rendering.output_root, { allowDot: true })) add("rendering.output_root is unsafe or non-normalized");
     const rendererRegistration = ADAPTER_RUNTIME_RENDERER_REGISTRY[profile.adapter_id];
+    let resolvedPlan = null;
     if (!rendererRegistration) add(`adapter has no renderer registration: ${profile.adapter_id}`);
     else {
       if (rendering.renderer_id !== rendererRegistration.rendererId) add(`renderer_id must match adapter registry: ${rendererRegistration.rendererId}`);
       if (rendering.renderer_version !== rendererRegistration.rendererVersion) add(`renderer_version must match adapter registry: ${rendererRegistration.rendererVersion}`);
       try {
-        const defaultPlan = rendererRegistration.resolvePlan(rendering.renderer_profile);
-        if (stableCanonicalJson(rendering.plan_shaping_options ?? null) !== stableCanonicalJson(defaultPlan.plan_shaping_options)) add("plan_shaping_options must match the static profile evidence projection");
+        resolvedPlan = rendererRegistration.resolvePlan(rendering.renderer_profile);
+        if (stableCanonicalJson(rendering.plan_shaping_options ?? null) !== stableCanonicalJson(resolvedPlan.plan_shaping_options)) add("plan_shaping_options must match the static profile evidence projection");
       } catch (error) {
         add(`renderer_profile cannot resolve plan-shaping options: ${error.message}`);
       }
+    }
+    if (profile.schema_version === "1.1.0") {
+      if (!Array.isArray(rendering.compact_profiles) || rendering.compact_profiles.length === 0) add("schema_version 1.1.0 requires rendering.compact_profiles");
+      else if (stableCanonicalJson(rendering.compact_profiles) !== stableCanonicalJson(resolvedPlan?.compactProfiles ?? [])) add("rendering.compact_profiles must exactly match the shared Codex projection plan");
+    } else if (Object.hasOwn(rendering, "compact_profiles")) {
+      add("schema_version 1.0.0 must not contain rendering.compact_profiles");
     }
     for (const ref of ["canonical_contract.revision", "canonical_contract.source_digest", "profile_id", "rendering.plan_shaping_options", "rendering.renderer_inputs"]) {
       if (!Array.isArray(rendering.deterministic_input_refs) || !rendering.deterministic_input_refs.includes(ref)) add(`rendering.deterministic_input_refs must include ${ref}`);

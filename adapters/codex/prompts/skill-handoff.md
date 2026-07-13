@@ -4,14 +4,9 @@ description: Produce a bounded handoff with the Codex compact ASK profile.
 
 Entry mode: handoff. Primary contract: `handoff-generation`. Stay read-only unless a handoff file was requested.
 
-Critical fallback controls:
+{{ASK_COMPACT_CONTROLS}}
 
-- [scope] Read the task, workspace/diff, issue state, and evidence needed for the next task.
-- [verification] Preserve commands/results and name the next check for each unproved claim.
-- [risk_approval] Do not perform destructive, external, production, secret, auth, deploy, publish, release, or notification actions without explicit approval.
-- [evidence] Separate facts, support, assumptions, unknowns, risks, and unresolved decisions.
-- [missing_evidence] Report unavailable workspace, diff, tests, runtime/load, or verification evidence as insufficient; never infer it.
-- [output] Include allowed/forbidden scope, output, verification, stop condition, and one Execution Envelope.
+{{ASK_COMPACT_DIRECT_TRIGGERS}}
 
 Task:
 Context:
@@ -19,6 +14,7 @@ Allowed scope:
 Forbidden scope:
 Expected output:
 Verification:
+Unverified evidence:
 Stop condition:
 
 Execution Envelope:

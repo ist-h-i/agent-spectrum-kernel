@@ -4,14 +4,9 @@ description: Implement a scoped change with the Codex compact ASK profile.
 
 Entry mode is fixed to implementation. Primary contract: `controlled-implementation`. Apply the requested contracts named in the generated profile header directly; do not add an upper routing stage.
 
-Critical fallback controls (apply even when runtime Skill loading is unavailable):
+{{ASK_COMPACT_CONTROLS}}
 
-- [scope] Read the workspace, nearby implementation/tests/docs, and public contract; make the smallest task-required diff and keep cleanup separate.
-- [verification] Define or reuse one Verification Contract before behavior changes, run focused checks, and attach exact results to the same ID.
-- [risk_approval] Stop before destructive, external, production, auth, secret, dependency, migration, billing, email, telemetry, infrastructure, deploy, publish, or release action unless explicit approval exists.
-- [evidence] Separate observed facts from assumptions; do not claim correct, ready, safe, reliable, faster, or no regression beyond recorded evidence.
-- [missing_evidence] Report unavailable workspace, tests, runtime/load, or verification evidence as insufficient; never infer it.
-- [output] Emit the minimal Implementation Contract, Evidence record, and one shared Execution Envelope. Keep `next_action` only in the Envelope.
+{{ASK_COMPACT_DIRECT_TRIGGERS}}
 
 Implementation Contract:
 - Artifact ID:

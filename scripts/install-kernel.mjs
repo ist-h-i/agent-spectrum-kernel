@@ -200,11 +200,14 @@ function buildPlan(args) {
   } else {
     agentsContent = agentsBlock;
   }
-  managedBlocks["AGENTS.md#agent-spectrum-kernel"] = createManagedBlockRecord({
+  managedBlocks["AGENTS.md#agent-spectrum-kernel"] = {
+    ...createManagedBlockRecord({
     path: "AGENTS.md",
     marker: "agent-spectrum-kernel",
     content: agentsBlock.trimEnd(),
-  });
+    }),
+    source_sha256: hashText(readFileSync(agentsSource)),
+  };
   planWriteManagedBlock(operations, {
     target: args.target,
     relativePath: "AGENTS.md",

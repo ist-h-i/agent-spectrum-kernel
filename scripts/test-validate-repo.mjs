@@ -956,11 +956,11 @@ function assertCodexCompactProfiles(name, target) {
     const record = state.managed_files?.[path];
     const content = readFileSync(resolve(target, path), "utf8");
     const header = parseCodexCompactProfileHeader(content);
-    if (!record?.compact_profile || !header || header.id !== record.compact_profile.profile_id || header.digest !== record.compact_profile.canonical_digest) {
+    if (!record?.compact_profile || !header || header.id !== record.compact_profile.profile_id || header.source_digest !== record.compact_profile.canonical_source_digest) {
       throw new Error(`${name} has invalid compact profile provenance for ${prompt}`);
     }
-    if ((record.compact_profile.skipped_routers ?? []).join(",") !== "operating-mode-router,skill-router") {
-      throw new Error(`${name} must record skipped upper routers for ${prompt}`);
+    if (record.compact_profile.schema_version !== "1.1.0" || record.compact_profile.profile_fingerprint !== state.projection_plan?.fingerprint) {
+      throw new Error(`${name} compact metadata must derive from shared adapter profile revision 1.1.0 for ${prompt}`);
     }
   }
 }
@@ -3103,9 +3103,8 @@ function assertCodexInstallerScripts() {
     throw new Error("Codex installer should project the canonical signal registry");
   }
   assertCodexInstallClosed("codex installer fresh profile", freshTarget);
-  if ((freshState.skill_closure?.routing_fixtures ?? []).length !== 0 || freshState.selected_skills.includes("operating-mode-router") || freshState.selected_skills.includes("skill-router")) {
-    throw new Error("codex explicit implementation profile must skip upper-router closure");
-  }
+  if (freshState.selected_skills.includes("operating-mode-router") || freshState.selected_skills.includes("skill-router")) throw new Error("codex explicit implementation profile must skip upper-router closure");
+  assertCodexRoutingFixtures("codex installer fresh direct trigger equivalence", freshTarget, ["unfamiliar_repository", "unclear_scope", "boundary_decision", "design_grill", "docs_or_adr_constraints", "long_running_or_multi_agent"]);
   assertCodexCompactProfiles("codex installer fresh implementation profiles", freshTarget);
 
   const skillOnlyTarget = resolve(fixtureRoot, "codex-install-skill-only-contract");
@@ -3243,9 +3242,9 @@ function assertCodexInstallerScripts() {
     assertCodexInstallClosed(`codex installer ${profile} profile`, profileTarget);
     assertCodexCompactProfiles(`codex installer ${profile} compact profiles`, profileTarget);
     if (profile === "implementation") {
-      if ((profileState.skill_closure?.routing_fixtures ?? []).length !== 0) throw new Error("implementation compact profile must not retain upper-router fixtures");
+      assertCodexRoutingFixtures(`codex installer ${profile} direct trigger equivalence`, profileTarget, ["unfamiliar_repository", "unclear_scope", "boundary_decision", "design_grill", "docs_or_adr_constraints", "long_running_or_multi_agent"]);
     } else if (profile === "investigation") {
-      if ((profileState.skill_closure?.routing_fixtures ?? []).length !== 0) throw new Error("investigation compact profile must not retain upper-router fixtures");
+      assertCodexRoutingFixtures(`codex installer ${profile} direct trigger equivalence`, profileTarget, ["unfamiliar_repository", "unclear_scope", "boundary_decision"]);
     } else if (profile === "review") {
       assertCodexRoutingFixtures(`codex installer ${profile} routing fixtures`, profileTarget, ["review"]);
     } else if (profile === "daily") {
@@ -3950,14 +3949,14 @@ EOF
     throw new Error(`codex runner should capture output and report executed evidence\n${passResult.stdout}\n${passResult.stderr}`);
   }
   for (const expected of [
-    "Requested contracts: requested",
-    "Projected contracts: projected",
-    "Runtime-detected compact output profile: runtime_detected",
-    "Runtime-loaded contracts: unavailable",
-    "Applied output contracts: evidenced",
-    "Workflow contract application: unavailable",
-    "Risk/approval contract application: unavailable",
-    "Verification contract application: unavailable",
+    "Requested contracts: 4",
+    "Projected contracts evidence: projected",
+    "Runtime-detected compact output profile evidence: runtime_detected",
+    "Runtime-loaded contracts evidence: none",
+    "Applied output contracts evidence: executed",
+    "Workflow contract application evidence: none",
+    "Risk/approval contract application evidence: none",
+    "Verification contract application evidence: none",
   ]) {
     if (!passResult.stdout.includes(expected)) throw new Error(`codex runner must distinguish execution evidence stage: ${expected}\n${passResult.stdout}`);
   }
@@ -3977,15 +3976,15 @@ EOF
   assertRuntimePass("codex runner emits structured execution evidence", jsonResult);
   const jsonReport = JSON.parse(jsonResult.stdout);
   if (
-    jsonReport.execution_evidence?.requested_contracts?.status !== "requested" ||
-    jsonReport.execution_evidence?.projected_contracts?.status !== "projected" ||
-    jsonReport.execution_evidence?.runtime_detected_profile?.status !== "runtime_detected" ||
-    jsonReport.execution_evidence?.runtime_loaded_contracts?.status !== "unavailable" ||
+    jsonReport.execution_evidence?.requested_contracts?.contracts?.length !== 4 ||
+    jsonReport.execution_evidence?.projected_contracts?.evidence_level !== "projected" ||
+    jsonReport.execution_evidence?.runtime_detected_profile?.evidence_level !== "runtime_detected" ||
+    jsonReport.execution_evidence?.runtime_loaded_contracts?.evidence_level !== "none" ||
     jsonReport.execution_evidence?.runtime_loaded_contracts?.contracts?.length !== 0 ||
-    jsonReport.execution_evidence?.applied_output_contracts?.status !== "evidenced" ||
-    jsonReport.execution_evidence?.workflow_contract_application?.status !== "unavailable" ||
-    jsonReport.execution_evidence?.risk_approval_contract_application?.status !== "unavailable" ||
-    jsonReport.execution_evidence?.verification_contract_application?.status !== "unavailable" ||
+    jsonReport.execution_evidence?.applied_output_contracts?.evidence_level !== "executed" ||
+    jsonReport.execution_evidence?.workflow_contract_application?.evidence_level !== "none" ||
+    jsonReport.execution_evidence?.risk_approval_contract_application?.evidence_level !== "none" ||
+    jsonReport.execution_evidence?.verification_contract_application?.evidence_level !== "none" ||
     Object.hasOwn(jsonReport.execution_evidence ?? {}, "applied")
   ) {
     throw new Error(`codex runner structured evidence stages are invalid\n${jsonResult.stdout}`);
@@ -3997,12 +3996,12 @@ EOF
   if (
     doctorReport.runtimeProbe?.codex_evidence?.requested_contracts?.length !== 3 ||
     doctorReport.runtimeProbe?.codex_evidence?.projected_contracts?.length !== 3 ||
-    doctorReport.runtimeProbe?.codex_evidence?.runtime_detected_profile !== "unavailable" ||
-    doctorReport.runtimeProbe?.codex_evidence?.runtime_loaded_contracts !== "unavailable" ||
-    doctorReport.runtimeProbe?.codex_evidence?.applied_output_contracts !== "unavailable" ||
-    doctorReport.runtimeProbe?.codex_evidence?.workflow_contract_application !== "unavailable" ||
-    doctorReport.runtimeProbe?.codex_evidence?.risk_approval_contract_application !== "unavailable" ||
-    doctorReport.runtimeProbe?.codex_evidence?.verification_contract_application !== "unavailable" ||
+    doctorReport.runtimeProbe?.codex_evidence?.runtime_detected_profile?.evidence_level !== "none" ||
+    doctorReport.runtimeProbe?.codex_evidence?.runtime_loaded_contracts?.evidence_level !== "none" ||
+    doctorReport.runtimeProbe?.codex_evidence?.applied_output_contracts?.evidence_level !== "none" ||
+    doctorReport.runtimeProbe?.codex_evidence?.workflow_contract_application?.evidence_level !== "none" ||
+    doctorReport.runtimeProbe?.codex_evidence?.risk_approval_contract_application?.evidence_level !== "none" ||
+    doctorReport.runtimeProbe?.codex_evidence?.verification_contract_application?.evidence_level !== "none" ||
     doctorReport.layerStatuses?.runtime_readiness?.status !== "insufficient_evidence"
   ) {
     throw new Error(`Codex doctor must not upgrade static projection to runtime/applied evidence\n${doctorResult.stdout}`);
@@ -4808,6 +4807,28 @@ try {
     assertSchemaPass(`adapter profile schema ${profile.profile_id}`, adapterProfileSchema, profile);
     const issues = inspectAdapterRuntimeProfile(profile, { root: repoRoot });
     if (issues.length > 0) throw new Error(`${profile.profile_id} should pass semantic profile validation\n${issues.join("\n")}`);
+  }
+  const codexCompactProfile = adapterProfileFixture.profiles.find((profile) => profile.adapter_id === "codex");
+  if (!codexCompactProfile || codexCompactProfile.schema_version !== "1.1.0" || !Array.isArray(codexCompactProfile.rendering.compact_profiles)) {
+    throw new Error("Codex compact metadata must be represented by shared adapter runtime profile schema revision 1.1.0");
+  }
+  const legacySchemaWithCompactMetadata = JSON.parse(JSON.stringify(codexCompactProfile));
+  legacySchemaWithCompactMetadata.schema_version = "1.0.0";
+  const legacySchemaWithCompactMetadataIssues = inspectAdapterRuntimeProfile(legacySchemaWithCompactMetadata, { root: repoRoot });
+  if (!legacySchemaWithCompactMetadataIssues.includes("schema_version 1.0.0 must not contain rendering.compact_profiles")) {
+    throw new Error(`legacy schema must reject compact metadata\n${legacySchemaWithCompactMetadataIssues.join("\n")}`);
+  }
+  const revisedSchemaWithoutCompactMetadata = JSON.parse(JSON.stringify(codexCompactProfile));
+  delete revisedSchemaWithoutCompactMetadata.rendering.compact_profiles;
+  const revisedSchemaWithoutCompactMetadataIssues = inspectAdapterRuntimeProfile(revisedSchemaWithoutCompactMetadata, { root: repoRoot });
+  if (!revisedSchemaWithoutCompactMetadataIssues.includes("schema_version 1.1.0 requires rendering.compact_profiles")) {
+    throw new Error(`schema revision 1.1.0 must require compact metadata\n${revisedSchemaWithoutCompactMetadataIssues.join("\n")}`);
+  }
+  const driftedCompactMetadata = JSON.parse(JSON.stringify(codexCompactProfile));
+  driftedCompactMetadata.rendering.compact_profiles[0].requested_contracts.push("unsupported-child-contract");
+  const driftedCompactMetadataIssues = inspectAdapterRuntimeProfile(driftedCompactMetadata, { root: repoRoot });
+  if (!driftedCompactMetadataIssues.includes("rendering.compact_profiles must exactly match the shared Codex projection plan")) {
+    throw new Error(`compact metadata must remain derived from the shared Codex projection plan\n${driftedCompactMetadataIssues.join("\n")}`);
   }
   const invalidDowngradeProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
   invalidDowngradeProfile.capabilities.find((capability) => capability.capability_id === "lifecycle_hooks").downgrade_behavior = "none";

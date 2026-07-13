@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import * as lifecycle from "./installer-lifecycle.mjs";
 import { CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
 import { ADAPTER_RENDERER_METADATA, CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
-import { renderCodexCompactProfile } from "./codex-runtime-profile.mjs";
+import { codexCompactCanonicalContractForPaths, codexCompactProfileCanonicalPaths, codexDirectTriggersForPrompt, renderCodexCompactProfile } from "./codex-runtime-profile.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
@@ -240,92 +240,20 @@ const PROFILE_ROUTING_FIXTURES = {
   ],
   minimal: [],
   implementation: [
-    {
-      id: "delivery_quality_mode",
-      signal: "Implementation request is classified as delivery_quality",
-      router: "operating-mode-router",
-      selected_route: "skill-router",
-      requiredSkills: ["skill-router"],
-    },
-    {
-      id: "unfamiliar_repository",
-      signal: "Unfamiliar repository before implementation",
-      router: "skill-router",
-      selected_route: "repository-orientation",
-      requiredSkills: ["repository-orientation"],
-    },
-    {
-      id: "unclear_scope",
-      signal: "Scope or refactor boundary is unclear",
-      router: "skill-router",
-      selected_route: "scope-control",
-      requiredSkills: ["scope-control"],
-    },
-    {
-      id: "boundary_decision",
-      signal: "Application boundary decision is needed before implementation",
-      router: "skill-router",
-      selected_route: "application-boundary-architecture",
-      requiredSkills: ["application-boundary-architecture"],
-    },
-    {
-      id: "design_grill",
-      signal: "Ambiguous implementation design needs stress testing",
-      router: "skill-router",
-      selected_route: "grill-design",
-      requiredSkills: ["grill-design"],
-    },
-    {
-      id: "docs_or_adr_constraints",
-      signal: "Existing docs, domain rules, or ADR terms constrain the implementation",
-      router: "skill-router",
-      selected_route: "grill-with-docs",
-      requiredSkills: ["grill-with-docs"],
-    },
-    {
-      id: "long_running_or_multi_agent",
-      signal: "Implementation spans sessions or agents",
-      router: "skill-router",
-      selected_route: "planning-with-files",
-      requiredSkills: ["planning-with-files"],
-    },
+    { id: "delivery_quality_mode", signal: "Implementation request is classified as delivery_quality", router: "operating-mode-router", selected_route: "skill-router", requiredSkills: ["skill-router"] },
+    { id: "unfamiliar_repository", signal: "Unfamiliar repository before implementation", router: "skill-router", selected_route: "repository-orientation", requiredSkills: ["repository-orientation"] },
+    { id: "unclear_scope", signal: "Scope or refactor boundary is unclear", router: "skill-router", selected_route: "scope-control", requiredSkills: ["scope-control"] },
+    { id: "boundary_decision", signal: "Application boundary decision is needed before implementation", router: "skill-router", selected_route: "application-boundary-architecture", requiredSkills: ["application-boundary-architecture"] },
+    { id: "design_grill", signal: "Ambiguous implementation design needs stress testing", router: "skill-router", selected_route: "grill-design", requiredSkills: ["grill-design"] },
+    { id: "docs_or_adr_constraints", signal: "Existing docs, domain rules, or ADR terms constrain the implementation", router: "skill-router", selected_route: "grill-with-docs", requiredSkills: ["grill-with-docs"] },
+    { id: "long_running_or_multi_agent", signal: "Implementation spans sessions or agents", router: "skill-router", selected_route: "planning-with-files", requiredSkills: ["planning-with-files"] },
   ],
   investigation: [
-    {
-      id: "delivery_quality_mode",
-      signal: "Investigation request is classified as delivery_quality",
-      router: "operating-mode-router",
-      selected_route: "skill-router",
-      requiredSkills: ["skill-router"],
-    },
-    {
-      id: "bug_investigation",
-      signal: "Bug, regression, or unknown root cause",
-      router: "skill-router",
-      selected_route: "doubt-driven-development",
-      requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger"],
-    },
-    {
-      id: "unfamiliar_repository",
-      signal: "Unfamiliar repository before investigation",
-      router: "skill-router",
-      selected_route: "repository-orientation",
-      requiredSkills: ["repository-orientation"],
-    },
-    {
-      id: "unclear_scope",
-      signal: "Investigation scope or blast radius is unclear",
-      router: "skill-router",
-      selected_route: "scope-control",
-      requiredSkills: ["scope-control"],
-    },
-    {
-      id: "boundary_decision",
-      signal: "Root cause or fix path needs an application boundary decision",
-      router: "skill-router",
-      selected_route: "application-boundary-architecture",
-      requiredSkills: ["application-boundary-architecture"],
-    },
+    { id: "delivery_quality_mode", signal: "Investigation request is classified as delivery_quality", router: "operating-mode-router", selected_route: "skill-router", requiredSkills: ["skill-router"] },
+    { id: "bug_investigation", signal: "Bug, regression, or unknown root cause", router: "skill-router", selected_route: "doubt-driven-development", requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger"] },
+    { id: "unfamiliar_repository", signal: "Unfamiliar repository before investigation", router: "skill-router", selected_route: "repository-orientation", requiredSkills: ["repository-orientation"] },
+    { id: "unclear_scope", signal: "Investigation scope or blast radius is unclear", router: "skill-router", selected_route: "scope-control", requiredSkills: ["scope-control"] },
+    { id: "boundary_decision", signal: "Root cause or fix path needs an application boundary decision", router: "skill-router", selected_route: "application-boundary-architecture", requiredSkills: ["application-boundary-architecture"] },
   ],
   review: [
     {
@@ -884,7 +812,7 @@ function resolveCodexProjectionSelection({ profileName, skills = null, skipPromp
   return { manifest, resolvedProfile, prompts, commands, skills: selectedSkills, requiredSkills, requiredAssets, routingFixtures, routerReachableSkills: skillsForRoutingFixtures(routingFixtures) };
 }
 
-function codexRendererInputsForSelection({ prompts, commands, skills, requiredAssets, compactProfiles }) {
+function codexRendererInputsForSelection({ prompts, commands, skills, requiredAssets }) {
   const runtimeFiles = commands.includes("codex-exec.md") ? CODEX_RUNTIME_FILES : [];
   const canonical = [
     { path: "AGENTS.md", role: "kernel" },
@@ -893,7 +821,7 @@ function codexRendererInputsForSelection({ prompts, commands, skills, requiredAs
     { path: "schemas/adapter-runtime-profile.schema.json", role: "schema" },
     { path: "schemas/adapter-runtime-evidence.schema.json", role: "schema" },
     { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
-    ...compactProfiles.flatMap((profile) => profile.canonical_sources.map((source) => ({ path: source.path, role: source.path.startsWith("skills/") ? "skill" : source.path.startsWith("schemas/") ? "schema" : source.path === "AGENTS.md" ? "kernel" : "contract" }))),
+    ...prompts.flatMap((prompt) => codexCompactProfileCanonicalPaths(prompt).map((path) => ({ path, role: path.startsWith("skills/") ? "skill" : path.startsWith("schemas/") ? "schema" : path === "AGENTS.md" ? "kernel" : "contract" }))),
     ...skills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
     ...requiredAssets.map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : "contract" })),
     ...runtimeFiles.filter((file) => file.assetKind === "schemas").map((file) => ({ path: file.source, role: "schema" })),
@@ -935,9 +863,8 @@ function codexAssetKindForRecord(path, record) {
 
 export function buildCodexProjectionPlan({ profileName, skills = null, skipPrompts = false, skipCommand = false, previousState = null, prune = false } = {}) {
   const selection = resolveCodexProjectionSelection({ profileName, skills, skipPrompts, skipCommand });
-  const compactProfiles = selection.prompts.map((prompt) => renderCodexCompactProfile(prompt).metadata);
   const planShapingOptions = { skills: skills ? [...new Set(skills)].sort() : null, skip_prompts: skipPrompts, skip_command: skipCommand };
-  const rendererInputs = codexRendererInputsForSelection({ ...selection, compactProfiles });
+  const rendererInputs = codexRendererInputsForSelection(selection);
   const projectedManagedAssets = codexProjectedManagedAssets(selection);
   const actualByPath = new Map(projectedManagedAssets.map((asset) => [asset.path, { ...asset, retained_stale: false }]));
   if (!prune) {
@@ -956,7 +883,16 @@ export function buildCodexProjectionPlan({ profileName, skills = null, skipPromp
     rendererInputs,
     projectedManagedAssets,
   });
-  return { ...selection, ...provenance, compactProfiles, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };
+  const canonicalContract = {
+    ...codexCompactCanonicalContractForPaths(rendererInputs.canonical.map((input) => input.path)),
+    source_digest: provenance.canonical_source_digest,
+  };
+  const compactProfileArtifacts = selection.prompts.map((prompt) => renderCodexCompactProfile(prompt, {
+    canonicalContract,
+    profileFingerprint: provenance.fingerprint,
+  }));
+  const compactProfiles = compactProfileArtifacts.map((artifact) => artifact.metadata);
+  return { ...selection, ...provenance, compactProfiles, compactProfileArtifacts, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };
 }
 
 export function codexRendererInputPathsForProfile(profileName) {
@@ -973,7 +909,7 @@ function recommendedSkillsForPrompts(prompts) {
 
 function routingFixturesForProfile(profileName, seedSkills, promptTemplates) {
   const selectedRouters = new Set([...seedSkills, ...requiredSkillsForPrompts(promptTemplates)]);
-  return (PROFILE_ROUTING_FIXTURES[profileName] ?? [])
+  const routedFixtures = (PROFILE_ROUTING_FIXTURES[profileName] ?? [])
     .filter((fixture) => selectedRouters.has(fixture.router))
     .map((fixture) => ({
       id: fixture.id,
@@ -984,6 +920,16 @@ function routingFixturesForProfile(profileName, seedSkills, promptTemplates) {
       recommended_profile: fixture.recommendedProfile ?? null,
       required_skills: [...(fixture.requiredSkills ?? [])].sort(),
     }));
+  const directFixtures = promptTemplates.flatMap((prompt) => codexDirectTriggersForPrompt(prompt).map((trigger) => ({
+    id: trigger.id,
+    signal: trigger.signal,
+    router: "compact-profile-direct-trigger",
+    selected_route: trigger.contract,
+    outcome: "available",
+    recommended_profile: null,
+    required_skills: [trigger.contract],
+  })));
+  return [...new Map([...routedFixtures, ...directFixtures].map((fixture) => [fixture.id, fixture])).values()];
 }
 
 function skillsForRoutingFixtures(routingFixtures) {
@@ -1159,6 +1105,7 @@ function buildPlan(args) {
     requiredSkills,
     requiredAssets,
     compactProfiles,
+    compactProfileArtifacts,
   } = projectionPlan;
   const coreStatePath = resolve(args.target, ".agent-spectrum-kernel/install-state.json");
   validateCoreInstalled(args.target, coreStatePath, requiredAssets);
@@ -1240,13 +1187,14 @@ function buildPlan(args) {
   for (const prompt of selectedPromptTemplates) {
     const source = resolve(REPO_ROOT, "adapters/codex/prompts", prompt);
     ensureSource(source, `adapters/codex/prompts/${prompt}`);
-    const renderedProfile = renderCodexCompactProfile(prompt, readText(source));
+    const renderedProfile = compactProfileArtifacts.find((artifact) => artifact.metadata.prompt_name === prompt);
+    if (!renderedProfile) throw new Error(`Codex compact profile artifact is missing: ${prompt}`);
     const content = renderedProfile.content;
     const relativePath = `.agents/prompts/${prompt}`;
     managedFiles[relativePath] = {
       ...lifecycle.createManagedFileRecord({ kind: "codex_prompt", prompt, content }),
       prompt,
-      required_skills: [...(PROMPT_METADATA[prompt]?.requiredSkills ?? [])].sort(),
+      required_skills: [...new Set([...(PROMPT_METADATA[prompt]?.requiredSkills ?? []), ...codexDirectTriggersForPrompt(prompt).map((trigger) => trigger.contract)])].sort(),
       recommended_skills: [...(PROMPT_METADATA[prompt]?.recommendedSkills ?? [])].sort(),
       compact_profile: renderedProfile.metadata,
       content,
