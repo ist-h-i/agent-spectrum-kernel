@@ -80,7 +80,7 @@
         "scripts/observability-paths.mjs",
         "scripts/test-claude-metrics-collector.mjs"
       ],
-      "subject_digest": "sha256:d02acc3450bffcf8f6d1e27b9df2d3dc59c966e2d92a0753ad1a14e2389fe8f6",
+      "subject_digest": "sha256:d1473c8a1300067266dc0fa61ae57472e0c0a6d6dd870fb9186681cee22c212d",
       "verification": {
         "verifier_path": "scripts/test-claude-metrics-collector.mjs",
         "fixture_id": "claude-canonical-metrics-collector",

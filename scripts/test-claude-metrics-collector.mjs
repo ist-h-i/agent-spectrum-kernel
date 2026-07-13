@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -81,17 +82,23 @@ function runRecorder(root, args, input, env = {}) {
 
 function runRecorderAsync(root, args, input, env = {}) {
   return new Promise((resolveResult) => {
+    const stdinPath = resolve(fixtureRoot, `concurrent-stdin-${randomUUID()}.json`);
+    writeFileSync(stdinPath, JSON.stringify(input));
+    const stdinDescriptor = openSync(stdinPath, "r");
     const child = spawn(process.execPath, [recorder, ...args], {
       cwd: root,
       env: { ...process.env, CLAUDE_PROJECT_DIR: root, ...env },
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: [stdinDescriptor, "pipe", "pipe"],
     });
+    closeSync(stdinDescriptor);
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf8").on("data", (chunk) => { stdout += chunk; });
     child.stderr.setEncoding("utf8").on("data", (chunk) => { stderr += chunk; });
-    child.on("close", (status) => resolveResult({ status, stdout, stderr }));
-    child.stdin.end(JSON.stringify(input));
+    child.on("close", (status) => {
+      try { unlinkSync(stdinPath); } catch { /* fixture cleanup removes any remainder */ }
+      resolveResult({ status, stdout, stderr });
+    });
   });
 }
 
@@ -328,16 +335,22 @@ async function main() {
   const concurrentResults = await Promise.all([
     ...Array.from({ length: malformedCount }, (_, index) => runRecorderAsync(
       concurrentRoot,
-      ["--event-kind", "task_stop", "--non-blocking"],
+      ["--event-kind", "task_stop", "--non-blocking", "--print-result"],
       { session_id: `S-CONCURRENT-MALFORMED-${index}`, last_assistant_message: "Execution Envelope:\n```json\n{not-json}\n```" },
     )),
     ...Array.from({ length: invalidCount }, (_, index) => runRecorderAsync(
       concurrentRoot,
-      ["--event-kind", "task_stop", "--non-blocking"],
+      ["--event-kind", "task_stop", "--non-blocking", "--print-result"],
       { session_id: `S-CONCURRENT-INVALID-${index}`, last_assistant_message: envelope({ route: {} }) },
     )),
   ]);
-  for (const [index, result] of concurrentResults.entries()) assertPass(`concurrent health writer ${index}`, result);
+  for (const [index, result] of concurrentResults.entries()) {
+    const output = resultJson(`concurrent health writer ${index}`, result);
+    const expectedReason = index < malformedCount ? "canonical_task_result_malformed" : "canonical_task_result_invalid";
+    if (output.status !== "skip" || output.reason !== expectedReason) {
+      throw new Error(`concurrent health writer ${index} should report ${expectedReason}\n${JSON.stringify(output, null, 2)}`);
+    }
+  }
   const concurrentHealthPath = resolve(concurrentRoot, ".agent-spectrum-kernel/runtime/runtime-health.jsonl");
   const concurrentHealth = readEvents(concurrentHealthPath);
   const malformedHealth = concurrentHealth.find((entry) => entry.error_code === "canonical_task_result_malformed");
