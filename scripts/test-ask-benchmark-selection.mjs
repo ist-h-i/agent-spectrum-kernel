@@ -244,7 +244,7 @@ try {
   const originalTask = readFileSync(taskPath);
   try {
     writeFileSync(taskPath, Buffer.concat([originalTask, Buffer.from("mutation\n")]));
-    expectFailure("actual case file mutation", sealArgs(spareCase, spareInputPath, resolve(work, "state-mutated-file")), /actual case files|digest mismatch/u);
+    expectFailure("actual case file mutation", sealArgs(spareCase, spareInputPath, resolve(work, "state-mutated-file")), /actual case files|digest mismatch|frozen input.*fixture manifest/u);
   } finally {
     writeFileSync(taskPath, originalTask);
   }
