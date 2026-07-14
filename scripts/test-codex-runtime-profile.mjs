@@ -120,7 +120,7 @@ if (!rejected) throw new Error("a new canonical required control must fail until
 const schema = JSON.parse(readFileSync(resolve(root, "schemas/adapter-runtime-profile.schema.json"), "utf8"));
 if (!schema.properties.schema_version.enum.includes("1.1.0") || !schema.properties.rendering.properties.compact_profiles) throw new Error("shared adapter runtime profile schema must define compact profile metadata revision 1.1.0");
 const runtimeBoundaryContract = readFileSync(resolve(root, "docs/adapter-runtime-boundary-contract.md"), "utf8");
-if (!runtimeBoundaryContract.includes("Child runtime work in #163 and #164 must consume this contract and schema. Those implementations may add adapter-owned renderer or collector fields only through a schema revision")) {
+if (!runtimeBoundaryContract.includes("The #163 and #164 runtime implementations consume this contract and schema. Adapter-owned renderer or collector fields may be added only through a schema revision")) {
   throw new Error("the parent adapter runtime boundary must continue to require a shared schema revision for child adapter fields");
 }
 

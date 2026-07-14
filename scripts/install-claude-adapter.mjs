@@ -951,6 +951,7 @@ function claudeRendererInputsForSelection(args, { skipHooks, skipRuntime }) {
     { path: "docs/adapter-runtime-boundary-contract.md", role: "contract" },
     { path: "schemas/adapter-runtime-profile.schema.json", role: "schema" },
     { path: "schemas/adapter-runtime-evidence.schema.json", role: "schema" },
+    { path: "schemas/adapter-runtime-event.schema.json", role: "schema" },
     { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
     { path: "schemas/metrics-event.schema.json", role: "schema" },
     ...args.selectedSkills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),

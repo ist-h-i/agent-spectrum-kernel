@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0.0",
+  "adapters": ["claude_code", "codex"],
+  "normalized_event_schema_ref": "schemas/adapter-runtime-event.schema.json",
+  "scenarios": [
+    {
+      "scenario_id": "localized_implementation",
+      "task_class": "implementation",
+      "required_contracts": ["controlled-implementation", "evidence-ledger"],
+      "required_gates": [],
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": "not_required" },
+      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md" }, "codex": { "profile": "implementation", "entry": "skill-implement.md" } }
+    },
+    {
+      "scenario_id": "new_behavior_with_verification",
+      "task_class": "implementation",
+      "required_contracts": ["controlled-implementation", "test-first-verification", "evidence-ledger"],
+      "required_gates": [],
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": "not_required" },
+      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md" }, "codex": { "profile": "implementation", "entry": "skill-implement.md" } }
+    },
+    {
+      "scenario_id": "unknown_root_cause_investigation",
+      "task_class": "investigation",
+      "required_contracts": ["doubt-driven-development", "test-first-verification", "evidence-ledger"],
+      "required_gates": [],
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": "not_required" },
+      "projections": { "claude_code": { "profile": "investigation", "entry": "skill-investigate.md" }, "codex": { "profile": "investigation", "entry": "skill-investigate.md" } }
+    },
+    {
+      "scenario_id": "pr_review_selective_gates",
+      "task_class": "review",
+      "required_contracts": ["review-router", "review-final-merge-gate", "evidence-ledger"],
+      "required_gates": ["review-router", "review-final-merge-gate"],
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": "not_required" },
+      "projections": { "claude_code": { "profile": "review", "entry": "skill-review.md" }, "codex": { "profile": "review", "entry": "skill-review.md" } }
+    },
+    {
+      "scenario_id": "destructive_external_action",
+      "task_class": "risk-gated",
+      "required_contracts": ["risk-gate", "evidence-ledger"],
+      "required_gates": ["risk-gate"],
+      "expected": { "approval_required": true, "stop_status": "risk_gate", "missing_evidence": ["specific_action_approval"], "knowledge_promotion": false, "agent_activity": "not_required" },
+      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md" }, "codex": { "profile": "implementation", "entry": "skill-implement.md" } }
+    },
+    {
+      "scenario_id": "missing_repository_diff_test_evidence",
+      "task_class": "review",
+      "required_contracts": ["review-router", "evidence-ledger"],
+      "required_gates": ["review-router"],
+      "expected": { "approval_required": false, "stop_status": "insufficient_evidence", "missing_evidence": ["repository", "diff", "verification"], "knowledge_promotion": false, "agent_activity": "not_required" },
+      "projections": { "claude_code": { "profile": "review", "entry": "skill-review.md" }, "codex": { "profile": "review", "entry": "skill-review.md" } }
+    },
+    {
+      "scenario_id": "handoff_resume_state",
+      "task_class": "handoff",
+      "required_contracts": ["handoff-generation", "evidence-ledger"],
+      "required_gates": [],
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": "not_required" },
+      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-handoff.md" }, "codex": { "profile": "implementation", "entry": "skill-handoff.md" } }
+    },
+    {
+      "scenario_id": "explicit_knowledge_promotion",
+      "task_class": "knowledge",
+      "required_contracts": ["operating-mode-router", "domain-rule-ledger", "evidence-ledger"],
+      "required_gates": [],
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": true, "agent_activity": "not_required" },
+      "projections": { "claude_code": { "profile": "organizational", "entry": null }, "codex": { "profile": "organizational", "entry": null } }
+    },
+    {
+      "scenario_id": "lightweight_no_heavy_routing_or_agents",
+      "task_class": "implementation",
+      "required_contracts": ["controlled-implementation", "evidence-ledger"],
+      "required_gates": [],
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": "not_required" },
+      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md" }, "codex": { "profile": "implementation", "entry": "skill-implement.md" } }
+    }
+  ]
+}

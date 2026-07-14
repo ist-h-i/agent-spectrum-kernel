@@ -1,0 +1,483 @@
+{
+  "schema_version": "1.0.0",
+  "canonical_contract": {
+    "revision": "ask-3.0.0",
+    "source_digest": "sha256:eb366261714442e8980eae2082b51ef15dc024e32107f0a79a4ccd99a5d79e0f",
+    "source_paths": [
+      "AGENTS.md",
+      "docs/adapter-runtime-boundary-contract.md",
+      "docs/agent-session-state-contract.md",
+      "docs/debt-lifecycle-contract.md",
+      "docs/execution-envelope-contract.md",
+      "docs/lifecycle-artifact-contract.md",
+      "docs/lifecycle-traceability-contract.md",
+      "docs/metrics-event-contract.md",
+      "docs/observability-runtime-contract.md",
+      "docs/stack-implementation-overlay-contract.md",
+      "manifest.json",
+      "schemas/adapter-runtime-event.schema.json",
+      "schemas/adapter-runtime-evidence.schema.json",
+      "schemas/adapter-runtime-profile.schema.json",
+      "schemas/compact-profile-control-map.json",
+      "schemas/execution-envelope.schema.json",
+      "schemas/metrics-event.schema.json",
+      "schemas/normalized-event-schema-registry.json",
+      "schemas/review-signal-gate-map.json",
+      "skills/adr-review/SKILL.md",
+      "skills/angular-implementation-architecture/SKILL.md",
+      "skills/application-boundary-architecture/SKILL.md",
+      "skills/architecture-decision-memory/SKILL.md",
+      "skills/controlled-implementation/SKILL.md",
+      "skills/documentation-knowledge-compiler/SKILL.md",
+      "skills/domain-rule-ledger/SKILL.md",
+      "skills/doubt-driven-development/SKILL.md",
+      "skills/engineering-capability-evaluation/SKILL.md",
+      "skills/engineering-pattern-ledger/SKILL.md",
+      "skills/evidence-ledger/SKILL.md",
+      "skills/grill-design/SKILL.md",
+      "skills/grill-with-docs/SKILL.md",
+      "skills/handoff-generation/SKILL.md",
+      "skills/implementation-context-generation/SKILL.md",
+      "skills/improvement-ledger/SKILL.md",
+      "skills/mr-readme-generation/SKILL.md",
+      "skills/next-best-change-finder/SKILL.md",
+      "skills/operating-mode-router/SKILL.md",
+      "skills/planning-with-files/SKILL.md",
+      "skills/project-adoption-pack-generation/SKILL.md",
+      "skills/refactor-implementation/SKILL.md",
+      "skills/release-readiness-gate/SKILL.md",
+      "skills/repository-orientation/SKILL.md",
+      "skills/requirement-grill/SKILL.md",
+      "skills/review-adversarial-risk/SKILL.md",
+      "skills/review-ai-quality/SKILL.md",
+      "skills/review-architecture-impact/SKILL.md",
+      "skills/review-automated-gate/SKILL.md",
+      "skills/review-code-health/SKILL.md",
+      "skills/review-context-generation/SKILL.md",
+      "skills/review-domain-impact/SKILL.md",
+      "skills/review-final-merge-gate/SKILL.md",
+      "skills/review-finding-compiler/SKILL.md",
+      "skills/review-output-quality/SKILL.md",
+      "skills/review-router/SKILL.md",
+      "skills/review-to-rule-compiler/SKILL.md",
+      "skills/risk-gate/SKILL.md",
+      "skills/scope-control/SKILL.md",
+      "skills/skill-adoption-metrics/SKILL.md",
+      "skills/skill-effectiveness-evaluation/SKILL.md",
+      "skills/skill-router/SKILL.md",
+      "skills/spec-driven-development/SKILL.md",
+      "skills/test-first-verification/SKILL.md",
+      "skills/verification-pattern-ledger/SKILL.md",
+      "skills/work-package-compiler/SKILL.md"
+    ]
+  },
+  "adapters": [
+    "claude_code",
+    "codex"
+  ],
+  "profiles": [
+    {
+      "profile": "daily",
+      "adapters": [
+        {
+          "adapter_id": "claude_code",
+          "renderer_id": "install-claude-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "daily",
+          "profile_fingerprint": "sha256:58aeb10382dc6c64d16943460d35ecad4b9e24f09f253769e7c04e6caf937fb7",
+          "canonical_subset_digest": "sha256:e0734efba85c0ac8a8c812f203d70ef5816576104d673e602f01a1f720a1b1c8",
+          "canonical_source_count": 46,
+          "projected_asset_count": 47,
+          "projected_asset_digest": "sha256:1c42cba14b7c026e4181b16b11a439eb113b581ec276b22ee62f0510a5117b27",
+          "projected_asset_counts": {
+            "commands": 5,
+            "configuration": 1,
+            "hooks": 1,
+            "runner": 5,
+            "runtime_data": 2,
+            "schemas": 2,
+            "skills": 31
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        },
+        {
+          "adapter_id": "codex",
+          "renderer_id": "install-codex-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "daily",
+          "profile_fingerprint": "sha256:10aa0512d32f7718cf832f9b73ffd2fa270fa8ad115f305d9f5f1147e64829be",
+          "canonical_subset_digest": "sha256:4bcddce520ebc90e3f7194179ffa87a00e038ed26e638c82ef940d5848cb50b3",
+          "canonical_source_count": 49,
+          "projected_asset_count": 43,
+          "projected_asset_digest": "sha256:2675d56b2c9ce736c9421293c8f14cb88e1acce6acfa0d9e70ba8c159ea3370b",
+          "projected_asset_counts": {
+            "commands": 1,
+            "prompts": 5,
+            "runner": 4,
+            "schemas": 2,
+            "skills": 31
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "organizational",
+      "adapters": [
+        {
+          "adapter_id": "claude_code",
+          "renderer_id": "install-claude-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "organizational",
+          "profile_fingerprint": "sha256:11911629cc5202a7e9d569947aceee4f73d2f6d04afe339f2a60f2268d7b90bd",
+          "canonical_subset_digest": "sha256:12b79af965f2e36dc3486096775a5cdde2942070601f357ad281f735c9f44b70",
+          "canonical_source_count": 62,
+          "projected_asset_count": 67,
+          "projected_asset_digest": "sha256:ef2d5b1dc7c77149361e80742b550dcc168a171272bda2519d05ad57ca55a34a",
+          "projected_asset_counts": {
+            "commands": 7,
+            "configuration": 4,
+            "hooks": 1,
+            "runner": 5,
+            "runtime_data": 2,
+            "schemas": 2,
+            "skills": 46
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        },
+        {
+          "adapter_id": "codex",
+          "renderer_id": "install-codex-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "organizational",
+          "profile_fingerprint": "sha256:8602f286679bc4fb8cd72178eec5ae97b2c687d0f4482e8ceaaaf5524118c8d0",
+          "canonical_subset_digest": "sha256:eb366261714442e8980eae2082b51ef15dc024e32107f0a79a4ccd99a5d79e0f",
+          "canonical_source_count": 65,
+          "projected_asset_count": 58,
+          "projected_asset_digest": "sha256:77f5cd5b947613ae0466bfeecefadebf89a7b2928ae7b7da928de21a394ec851",
+          "projected_asset_counts": {
+            "commands": 1,
+            "prompts": 5,
+            "runner": 4,
+            "schemas": 2,
+            "skills": 46
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "implementation",
+      "adapters": [
+        {
+          "adapter_id": "claude_code",
+          "renderer_id": "install-claude-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "implementation",
+          "profile_fingerprint": "sha256:41cd4ef2c41e5faf2552e0043b6898b432a11b0888d7d8c3ac0b1d242a51967c",
+          "canonical_subset_digest": "sha256:0f9fb6dae1fbfb344055bf77a55c6a0a147a2ebbbf251b3b4dc09d4c03f6ebab",
+          "canonical_source_count": 30,
+          "projected_asset_count": 30,
+          "projected_asset_digest": "sha256:ea171c80900b89131bef868af59afc047aaae78500957ed5cd0b53386b81207e",
+          "projected_asset_counts": {
+            "commands": 3,
+            "configuration": 1,
+            "hooks": 1,
+            "runner": 5,
+            "runtime_data": 2,
+            "schemas": 2,
+            "skills": 16
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        },
+        {
+          "adapter_id": "codex",
+          "renderer_id": "install-codex-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "implementation",
+          "profile_fingerprint": "sha256:6983536e72127ef6abd1d3bb5658d8ddbff99ba43271b211ba89a7b661d6553c",
+          "canonical_subset_digest": "sha256:c1da1ba055aed6170f86abdfed36e5e5ad31aae57a28cd44476a88de0a16c1b8",
+          "canonical_source_count": 26,
+          "projected_asset_count": 21,
+          "projected_asset_digest": "sha256:9d6733a0699f0546346f8d932735f2723dc74c414c2c1086e62795b933d1f007",
+          "projected_asset_counts": {
+            "commands": 1,
+            "prompts": 3,
+            "runner": 4,
+            "schemas": 2,
+            "skills": 11
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "investigation",
+      "adapters": [
+        {
+          "adapter_id": "claude_code",
+          "renderer_id": "install-claude-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "investigation",
+          "profile_fingerprint": "sha256:67ae3a6c2ff1fe194c49c08f648690e0665884da1276933ac6a244b2c3fc33e5",
+          "canonical_subset_digest": "sha256:84e82e68e8ad261fb36ebbfaf764406857436f6c2d4bfcf7c85d96e519453532",
+          "canonical_source_count": 25,
+          "projected_asset_count": 25,
+          "projected_asset_digest": "sha256:88121c4729a53c40d85986d89e8a42c9485c79b141e5736dfbf74a7a671ff0f3",
+          "projected_asset_counts": {
+            "commands": 3,
+            "configuration": 1,
+            "hooks": 1,
+            "runner": 5,
+            "runtime_data": 2,
+            "schemas": 2,
+            "skills": 11
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        },
+        {
+          "adapter_id": "codex",
+          "renderer_id": "install-codex-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "investigation",
+          "profile_fingerprint": "sha256:fc7d7ffa625fb425b54e1e08fbeeae3c5c8ba72cafd17d78fbeeef6c844e6113",
+          "canonical_subset_digest": "sha256:6f423adf2f66cad206ef677c75fd7a05284893c8cbafa9952129cc85f893101d",
+          "canonical_source_count": 24,
+          "projected_asset_count": 19,
+          "projected_asset_digest": "sha256:6e4cc906a9e3f7d8be94ef20cbb02b51504a6b8682d0e34f2487a1c8216a5e17",
+          "projected_asset_counts": {
+            "commands": 1,
+            "prompts": 3,
+            "runner": 4,
+            "schemas": 2,
+            "skills": 9
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "review",
+      "adapters": [
+        {
+          "adapter_id": "claude_code",
+          "renderer_id": "install-claude-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "review",
+          "profile_fingerprint": "sha256:9c69bed163663a6fbd1bbf00f0b54be3478df0cac4a7cf5b00125feea0191095",
+          "canonical_subset_digest": "sha256:5f7b6118bde25ea320acb6ae55e083f9f437611415352965704e7fe448196cbd",
+          "canonical_source_count": 32,
+          "projected_asset_count": 32,
+          "projected_asset_digest": "sha256:3542636b90cdeb30941e235a66c6f51063b3f8c6d5419b2b83a90a0a460d09c0",
+          "projected_asset_counts": {
+            "commands": 3,
+            "configuration": 1,
+            "hooks": 1,
+            "runner": 5,
+            "runtime_data": 2,
+            "schemas": 2,
+            "skills": 18
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        },
+        {
+          "adapter_id": "codex",
+          "renderer_id": "install-codex-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "review",
+          "profile_fingerprint": "sha256:71c2a86f5961460016cc39be8909ac166859f8de3c872b4e93683b7c25dddc0e",
+          "canonical_subset_digest": "sha256:b61ea25be111931675b1cad16d0244f6b762ab460dc6e3542fd072e4e251e65a",
+          "canonical_source_count": 36,
+          "projected_asset_count": 28,
+          "projected_asset_digest": "sha256:428a318977e3ea5240d3ac74db7d0bb98a0fe714fed32ea4337c57e288e96999",
+          "projected_asset_counts": {
+            "commands": 1,
+            "prompts": 3,
+            "runner": 4,
+            "schemas": 2,
+            "skills": 18
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "observability",
+      "adapters": [
+        {
+          "adapter_id": "claude_code",
+          "renderer_id": "install-claude-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "observability",
+          "profile_fingerprint": "sha256:f06b4a0febe1d087dea318dbbd65874ed098ec3b32d26dfb8162fff8b339d717",
+          "canonical_subset_digest": "sha256:841eaeef791cf3d6579d8b01bafc1501d8136781059c6dae37d6407f8e71df6d",
+          "canonical_source_count": 26,
+          "projected_asset_count": 28,
+          "projected_asset_digest": "sha256:e44b531070cb4c9ad4ab20149720ae95d65331ab3398f0ff262153b9fbdcdd7a",
+          "projected_asset_counts": {
+            "commands": 4,
+            "configuration": 4,
+            "hooks": 1,
+            "runner": 5,
+            "runtime_data": 2,
+            "schemas": 2,
+            "skills": 10
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        },
+        {
+          "adapter_id": "codex",
+          "renderer_id": "install-codex-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "observability",
+          "profile_fingerprint": "sha256:f028ffb2f633865e12be63110ceaaa0987ff138e95c4cc13c83355e52c1db592",
+          "canonical_subset_digest": "sha256:69d9aff094b3801201feeba6d6f519bbdb2c1935cc3b450dc242aa991bf4cff5",
+          "canonical_source_count": 28,
+          "projected_asset_count": 18,
+          "projected_asset_digest": "sha256:a1d2f5706db5aaa9d3a1c123a687ab50662483cda92fbe376808b7c434dee704",
+          "projected_asset_counts": {
+            "commands": 1,
+            "prompts": 2,
+            "runner": 4,
+            "schemas": 2,
+            "skills": 9
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "full",
+      "adapters": [
+        {
+          "adapter_id": "claude_code",
+          "renderer_id": "install-claude-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "full",
+          "profile_fingerprint": "sha256:1a98a5cf1f76d84d7f8cdbf11b6a08ad4a49c1aefae7f88f27f187b98217ed68",
+          "canonical_subset_digest": "sha256:12b79af965f2e36dc3486096775a5cdde2942070601f357ad281f735c9f44b70",
+          "canonical_source_count": 62,
+          "projected_asset_count": 67,
+          "projected_asset_digest": "sha256:ef2d5b1dc7c77149361e80742b550dcc168a171272bda2519d05ad57ca55a34a",
+          "projected_asset_counts": {
+            "commands": 7,
+            "configuration": 4,
+            "hooks": 1,
+            "runner": 5,
+            "runtime_data": 2,
+            "schemas": 2,
+            "skills": 46
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        },
+        {
+          "adapter_id": "codex",
+          "renderer_id": "install-codex-adapter",
+          "renderer_version": "4",
+          "renderer_profile": "full",
+          "profile_fingerprint": "sha256:3922aad4a659a9168d282fcfb8816f2abef8f49d3527ebcdfa845c51c32976ee",
+          "canonical_subset_digest": "sha256:eb366261714442e8980eae2082b51ef15dc024e32107f0a79a4ccd99a5d79e0f",
+          "canonical_source_count": 65,
+          "projected_asset_count": 58,
+          "projected_asset_digest": "sha256:77f5cd5b947613ae0466bfeecefadebf89a7b2928ae7b7da928de21a394ec851",
+          "projected_asset_counts": {
+            "commands": 1,
+            "prompts": 5,
+            "runner": 4,
+            "schemas": 2,
+            "skills": 46
+          },
+          "lifecycle_operations": [
+            "install",
+            "update",
+            "rollback",
+            "detach"
+          ]
+        }
+      ]
+    }
+  ],
+  "normalized_event_schema_registry": "schemas/normalized-event-schema-registry.json",
+  "conformance_fixture": "docs/fixtures/adapter-cross-conformance.json",
+  "migration_contract": "docs/adapter-runtime-migration.md",
+  "benchmark_handoff": {
+    "issue": 171,
+    "checkpoint": "C",
+    "baseline_configs": [
+      "benchmarks/checkpoint-b.config.json",
+      "benchmarks/checkpoint-b2.config.json"
+    ],
+    "required_attribution": [
+      "architecture",
+      "model",
+      "cli",
+      "adapter",
+      "repository"
+    ]
+  }
+}

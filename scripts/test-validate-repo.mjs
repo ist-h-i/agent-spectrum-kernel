@@ -17,11 +17,21 @@ const sensorsScript = resolve(repoRoot, "scripts/ask-sensors.mjs");
 const runtimeSmokeScript = resolve(repoRoot, "scripts/adapter-runtime-smoke.mjs");
 const codexRunnerScript = resolve(repoRoot, "scripts/codex-exec-runner.mjs");
 const codexCompactProfileTestScript = resolve(repoRoot, "scripts/test-codex-runtime-profile.mjs");
+const crossAdapterConformanceTestScript = resolve(repoRoot, "scripts/test-adapter-cross-conformance.mjs");
+const adapterMigrationTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-migration.mjs");
 const fixtureRoot = mkdtempSync(resolve(tmpdir(), "validate-repo-"));
 
 const compactProfileResult = spawnSync(process.execPath, [codexCompactProfileTestScript], { cwd: repoRoot, encoding: "utf8" });
 if (compactProfileResult.status !== 0) {
   throw new Error(`Codex compact profile tests failed\n${compactProfileResult.stdout}\n${compactProfileResult.stderr}`);
+}
+
+for (const [label, script] of [
+  ["Cross-adapter conformance", crossAdapterConformanceTestScript],
+  ["Dual-runtime migration", adapterMigrationTestScript],
+]) {
+  const result = spawnSync(process.execPath, [script], { cwd: repoRoot, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
+  if (result.status !== 0) throw new Error(`${label} tests failed\n${result.stdout}\n${result.stderr}`);
 }
 
 function envelopeBlock(overrides = {}) {
@@ -269,6 +279,7 @@ function writeAdapterFixture(root) {
     "schemas/execution-envelope.schema.json",
     "schemas/adapter-runtime-profile.schema.json",
     "schemas/adapter-runtime-evidence.schema.json",
+    "schemas/adapter-runtime-event.schema.json",
     "schemas/normalized-event-schema-registry.json",
     "schemas/review-signal-gate-map.json",
     "schemas/adoption-report.schema.json",
@@ -538,6 +549,10 @@ function install(manifest, options) {
 `,
   );
   writeFileSync(resolve(root, "scripts/adapter-runtime-smoke.mjs"), "console.log('adapter runtime smoke');\n");
+  writeFileSync(resolve(root, "scripts/adapter-runtime-bundle.mjs"), "console.log('adapter runtime bundle');\n");
+  writeFileSync(resolve(root, "scripts/adapter-cross-conformance.mjs"), "console.log('adapter cross conformance');\n");
+  writeFileSync(resolve(root, "scripts/test-adapter-cross-conformance.mjs"), "console.log('adapter cross conformance tests');\n");
+  writeFileSync(resolve(root, "scripts/test-adapter-runtime-migration.mjs"), "console.log('adapter runtime migration tests');\n");
   writeFileSync(resolve(root, "scripts/adapter-runtime-inventory.mjs"), "export const CODEX_RUNTIME_FILES = [{ name: 'codex-exec-runner.mjs' }];\n");
   writeFileSync(resolve(root, "scripts/codex-runtime-profile.mjs"), "console.log('codex compact profile');\n");
   writeFileSync(resolve(root, "scripts/codex-exec-runner.mjs"), "console.log('codex runner');\n");

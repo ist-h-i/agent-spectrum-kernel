@@ -22,6 +22,7 @@ Levels:
 | Adapter runtime smoke | behavior_verified | projected | unknown | unknown | unknown | unknown |
 | Bounded adapter execution runner | unsupported | behavior_verified | unknown | unknown | unknown | unknown |
 | Compact explicit-entry profile rendering | unsupported | behavior_verified | unknown | unknown | unknown | unknown |
+| Same-fixture projection conformance | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
 | Local metrics event recording | behavior_verified | unsupported | unknown | unknown | unknown | unknown |
 | Hidden telemetry disabled by default | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
 | External publication disabled by default | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
@@ -50,6 +51,12 @@ Codex:
 - Behaviorally evidenced boundary: repository fixtures verify deterministic compact rendering, canonical provenance, required fallback controls, upper-router removal for fixed entries, and byte/route-depth reduction. They do not prove an external Codex process loaded a Skill or applied the contract correctly.
 - Projected/runtime boundary: risk gates, verification, and evidence outputs remain projected until a run occurs. The runner separately reports requested, projected, compact-profile load, unavailable Skill-load evidence, and applied output-contract evidence; a passing sensor result is not business correctness.
 - Unsupported areas: local metrics event recording, shared PR workflow, and fork/comment-trigger guardrails are not implemented by this adapter. Do not claim them for Codex from this repository evidence.
+
+Cross-adapter boundary:
+
+- `scripts/adapter-cross-conformance.mjs` behaviorally verifies the projection checker itself and confirms required contract/entry coverage for the same nine fixtures.
+- The resulting adapter evidence level is still `projected`; no checked-in fixture proves that an external Claude or Codex process loaded or applied those contracts.
+- Cost, latency, token usage, senior correction effort, and subagent overuse remain `unknown` here and belong to the post-#179 Checkpoint C run in #171.
 
 Cursor, Cline, Devin, Kiro:
 

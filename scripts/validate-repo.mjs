@@ -46,6 +46,7 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/execution-envelope.schema.json",
   "schemas/adapter-runtime-profile.schema.json",
   "schemas/adapter-runtime-evidence.schema.json",
+  "schemas/adapter-runtime-event.schema.json",
   "schemas/review-signal-gate-map.json",
   "schemas/adoption-report.schema.json",
   "schemas/improvement-ledger-entry.schema.json",
@@ -323,7 +324,11 @@ const REQUIRED_CODEX_ADAPTER_PATHS = [
   "adapters/codex/prompts/skill-handoff.md",
 ];
 const REQUIRED_ADAPTER_RUNTIME_PATHS = [
+  "scripts/adapter-runtime-bundle.mjs",
+  "scripts/adapter-cross-conformance.mjs",
   "scripts/adapter-runtime-smoke.mjs",
+  "scripts/test-adapter-cross-conformance.mjs",
+  "scripts/test-adapter-runtime-migration.mjs",
   "scripts/codex-runtime-profile.mjs",
   "scripts/codex-exec-runner.mjs",
   "scripts/execution-envelope.mjs",

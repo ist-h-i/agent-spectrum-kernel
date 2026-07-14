@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ADAPTER_RENDERER_METADATA } from "./adapter-runtime-inventory.mjs";
+import { buildAdapterRuntimeBundle } from "./adapter-runtime-bundle.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { computeAdapterProfileFingerprint, computeProfilePathSetDigest } from "./validate-repo.mjs";
@@ -11,6 +12,7 @@ import { computeAdapterProfileFingerprint, computeProfilePathSetDigest } from ".
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const profilePath = resolve(root, "docs/fixtures/adapter-runtime-profiles.json");
 const evidencePath = resolve(root, "docs/fixtures/adapter-runtime-evidence.json");
+const bundlePath = resolve(root, "docs/fixtures/adapter-runtime-bundle.json");
 const profileArtifact = JSON.parse(readFileSync(profilePath, "utf8"));
 const evidenceArtifact = JSON.parse(readFileSync(evidencePath, "utf8"));
 
@@ -38,6 +40,9 @@ for (const profile of profileArtifact.profiles) {
     profile.schema_version = "1.1.0";
     profile.rendering.compact_profiles = plan.compactProfiles;
   }
+  profile.normalized_event_schema_refs = profile.adapter_id === "claude_code"
+    ? ["schemas/adapter-runtime-event.schema.json", "schemas/metrics-event.schema.json"]
+    : ["schemas/adapter-runtime-event.schema.json"];
   profile.rendering.asset_kinds = [...new Set(plan.projectedManagedAssets.map((asset) => asset.asset_kind))].sort();
   profile.generated_assets.managed_assets = plan.projectedManagedAssets;
   profile.profile_fingerprint = computeAdapterProfileFingerprint(profile);
@@ -62,5 +67,6 @@ for (const profile of profileArtifact.profiles) {
   }
 }
 writeFileSync(profilePath, `${JSON.stringify(profileArtifact, null, 2)}\n`);
+writeFileSync(bundlePath, `${JSON.stringify(buildAdapterRuntimeBundle(), null, 2)}\n`);
 
 console.log("Adapter runtime fixtures updated");

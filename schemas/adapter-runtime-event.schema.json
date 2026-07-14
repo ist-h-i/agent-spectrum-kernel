@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/adapter-runtime-event.schema.json",
+  "title": "Agent Spectrum Kernel Normalized Adapter Runtime Event",
+  "description": "Adapter-neutral event meaning for selected/applied contracts, gates, approval, evidence, agent activity, verification, stop classification, and capability downgrade. An event records evidence; it does not upgrade an engineering claim.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "task_id", "adapter_id", "event_type", "occurred_at", "contracts", "gates", "approval", "evidence", "verification", "outcome", "capability_downgrades", "privacy"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "event_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "task_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "adapter_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "event_type": {
+      "type": "string",
+      "enum": ["workflow_selection", "gate_execution", "approval_required", "evidence_status", "agent_activity", "verification_attempt", "task_stop", "capability_downgrade"]
+    },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected", "applied", "application_evidence_level", "missing_evidence"],
+      "properties": {
+        "selected": { "$ref": "#/$defs/identifiers" },
+        "applied": { "$ref": "#/$defs/identifiers" },
+        "application_evidence_level": { "$ref": "#/$defs/evidence_level" },
+        "missing_evidence": { "$ref": "#/$defs/identifiers" }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "executed"],
+      "properties": {
+        "required": { "$ref": "#/$defs/identifiers" },
+        "executed": { "$ref": "#/$defs/identifiers" }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "status", "action_categories"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["not_required", "missing", "approved", "rejected", "unknown"] },
+        "action_categories": { "$ref": "#/$defs/identifiers" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checked", "missing"],
+      "properties": {
+        "checked": { "$ref": "#/$defs/identifiers" },
+        "missing": { "$ref": "#/$defs/identifiers" }
+      }
+    },
+    "agent_activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["started", "completed", "failed"],
+      "properties": {
+        "started": { "type": "integer", "minimum": 0 },
+        "completed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempted", "passed", "failed", "unavailable"],
+      "properties": {
+        "attempted": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "unavailable": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "claim_effect"],
+      "properties": {
+        "classification": { "type": "string", "enum": ["in_progress", "completed", "blocked", "insufficient_evidence", "risk_gate", "failed", "unknown"] },
+        "claim_effect": { "type": "string", "enum": ["none", "support_within_scope", "downgrade", "block"] }
+      }
+    },
+    "capability_downgrades": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capability_id", "from_level", "to_level", "reason"],
+        "properties": {
+          "capability_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "from_level": { "$ref": "#/$defs/evidence_level" },
+          "to_level": { "$ref": "#/$defs/evidence_level" },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_prompts_stored", "sensitive_payloads_stored", "external_publication"],
+      "properties": {
+        "raw_prompts_stored": { "type": "boolean", "const": false },
+        "sensitive_payloads_stored": { "type": "boolean", "const": false },
+        "external_publication": { "type": "boolean", "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "identifiers": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 100,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
+    "evidence_level": {
+      "type": "string",
+      "enum": ["none", "projected", "runtime_detected", "executed", "behavior_verified"]
+    }
+  }
+}
