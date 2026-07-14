@@ -350,6 +350,8 @@ node ./scripts/codex-exec-runner.mjs --prompt skill-implement.md --mode implemen
 
 The Codex runner can report `executed` after capturing output and running `ask-sensors`; this evidences only the inspected output contract. It does not prove workflow, risk/approval, or verification-contract application, business correctness, product readiness, or no regression.
 
+After classifying the task, pass `--gates-observed` when no task-specific gate applies, or `--required-gate <id>` for each required gate. Review runs include `review-final-merge-gate` from the managed prompt contract. Missing gate observation is recorded as missing evidence; an explicitly required `risk-gate` without specific-action approval stops before Codex invocation.
+
 Use `ask-sensors` to classify control risks in an implementation or review output:
 
 ```bash

@@ -64,6 +64,7 @@ assert.deepEqual(codexNormalized.verification, { obligation_required: false, att
 assert.equal(codexNormalized.stop.status, "insufficient_evidence");
 assert.equal(codexNormalized.outcome.classification, "insufficient_evidence");
 assert.notEqual(codexNormalized.outcome.claim_effect, "support_within_scope");
+assert.ok(codexNormalized.evidence.missing.includes("required_gate_observation"));
 
 const missingStop = structuredClone(codexNormalized);
 delete missingStop.stop;
@@ -101,6 +102,26 @@ const supportWithoutAppliedContract = structuredClone(semanticBase);
 supportWithoutAppliedContract.contracts.applied = [];
 supportWithoutAppliedContract.outcome.claim_effect = "support_within_scope";
 assert.ok(validateAdapterRuntimeEvent(supportWithoutAppliedContract).some((error) => error.includes("support claim requires an applied contract")));
+
+const appliedWithoutApplicationEvidence = structuredClone(semanticBase);
+appliedWithoutApplicationEvidence.contracts.applied = ["controlled-implementation"];
+assert.ok(validateAdapterRuntimeEvent(appliedWithoutApplicationEvidence).some((error) => error.includes("application evidence none cannot have applied contracts")));
+
+const supportWithoutApplicationEvidence = structuredClone(appliedWithoutApplicationEvidence);
+supportWithoutApplicationEvidence.outcome.claim_effect = "support_within_scope";
+assert.ok(validateAdapterRuntimeEvent(supportWithoutApplicationEvidence).some((error) => error.includes("application evidence none cannot support a claim")));
+
+const supportWithMissingApplication = structuredClone(appliedWithoutApplicationEvidence);
+supportWithMissingApplication.contracts.application_evidence_level = "executed";
+supportWithMissingApplication.contracts.missing_evidence = ["workflow_contract_application"];
+supportWithMissingApplication.evidence.missing = ["workflow_contract_application"];
+supportWithMissingApplication.outcome.claim_effect = "support_within_scope";
+assert.ok(validateAdapterRuntimeEvent(supportWithMissingApplication).some((error) => error.includes("missing application evidence cannot support a claim")));
+
+const appliedOutsideSelection = structuredClone(semanticBase);
+appliedOutsideSelection.contracts.application_evidence_level = "executed";
+appliedOutsideSelection.contracts.applied = ["not-selected-contract"];
+assert.ok(validateAdapterRuntimeEvent(appliedOutsideSelection).some((error) => error.includes("applied contracts must be selected")));
 
 const completedWithMissingApplication = structuredClone(semanticBase);
 completedWithMissingApplication.contracts.missing_evidence = ["workflow_contract_application"];

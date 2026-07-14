@@ -98,26 +98,31 @@ export const CODEX_PROMPT_CONTRACTS = {
   "skill-implement.md": {
     mode: "implementation",
     sandbox: "workspace-write",
+    requiredGates: [],
     requiredSections: ["Implementation Contract:", "Evidence:", "Execution Envelope:"],
   },
   "skill-investigate.md": {
     mode: "investigation",
     sandbox: "workspace-write",
+    requiredGates: [],
     requiredSections: ["Findings:", "Cause:", "Changed:", "Verified:", "Unknown / not verified:", "Next:", "Execution Envelope:"],
   },
   "skill-review.md": {
     mode: "review",
     sandbox: "read-only",
+    requiredGates: ["review-final-merge-gate"],
     requiredSections: ["Change signals:", "Required gates:", "Skipped heavy gates:", "Missing evidence:", "Decision:", "Blocking evidence:", "Passed required gates:", "Insufficient evidence:", "Non-blocking follow-ups:", "Residual risk:", "Execution Envelope:"],
   },
   "skill-verify.md": {
     mode: "verification",
     sandbox: "workspace-write",
+    requiredGates: [],
     requiredSections: ["Verification Contract:", "Evidence:", "Execution Envelope:"],
   },
   "skill-handoff.md": {
     mode: "handoff",
     sandbox: "read-only",
+    requiredGates: [],
     requiredSections: ["Task:", "Context:", "Allowed scope:", "Forbidden scope:", "Expected output:", "Verification:", "Stop condition:", "Execution Envelope:"],
   },
 };

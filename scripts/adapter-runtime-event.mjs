@@ -111,15 +111,24 @@ function codexMissingEvidence(report) {
 
 export function mapCodexRunnerResult(report, { eventId = null, taskId = null, occurredAt = null, schemaPath = DEFAULT_SCHEMA_PATH } = {}) {
   const selectedContracts = unique(report.execution_evidence?.requested_contracts?.contracts ?? []);
-  const requiredGates = unique(report.execution_evidence?.required_gates?.gates ?? []);
-  const missingEvidence = codexMissingEvidence(report);
+  const requiredGateEvidence = report.execution_evidence?.required_gates;
+  const requiredGates = unique(requiredGateEvidence?.gates ?? []);
+  const gateObservationMissing = evidenceLevel(requiredGateEvidence?.evidence_level) === "none";
+  const missingEvidence = unique([
+    ...codexMissingEvidence(report),
+    ...(gateObservationMissing ? ["required_gate_observation"] : []),
+  ]);
   const appliedLevel = evidenceLevel(report.execution_evidence?.workflow_contract_application?.evidence_level);
   const appliedContracts = appliedLevel === "none" ? [] : selectedContracts;
   const verificationAttempted = report.sensor_status === null || report.sensor_status === undefined ? 0 : 1;
   const verificationPassed = report.sensor_status === "pass" ? 1 : 0;
   const verificationFailed = verificationAttempted - verificationPassed;
   const applicationEvidenceMissing = missingEvidence.some((item) => /(?:contract_load|contract_application)$/u.test(item));
-  const stopStatus = report.status === "executed"
+  const approvalRequired = requiredGates.includes("risk-gate");
+  const approvalMissing = approvalRequired && missingEvidence.includes("specific_action_approval");
+  const stopStatus = approvalMissing
+    ? "risk_gate"
+    : report.status === "executed"
     ? applicationEvidenceMissing || appliedContracts.length === 0 ? "insufficient_evidence" : "completed"
     : report.status === "insufficient_evidence"
       ? "insufficient_evidence"
@@ -141,9 +150,9 @@ export function mapCodexRunnerResult(report, { eventId = null, taskId = null, oc
     },
     gates: { required: requiredGates, executed: [] },
     approval: {
-      required: requiredGates.includes("risk-gate"),
-      status: requiredGates.includes("risk-gate") ? missingEvidence.includes("specific_action_approval") ? "missing" : "unknown" : "not_required",
-      action_categories: requiredGates.includes("risk-gate") ? ["risk_gated_action"] : [],
+      required: approvalRequired,
+      status: approvalRequired ? approvalMissing ? "missing" : "unknown" : "not_required",
+      action_categories: approvalRequired ? ["risk_gated_action"] : [],
     },
     evidence: {
       checked: unique(Object.entries(report.execution_evidence ?? {}).filter(([, record]) => evidenceLevel(record?.evidence_level) !== "none").map(([name]) => name)),
@@ -168,9 +177,16 @@ export function validateAdapterRuntimeEvent(event, { schemaPath = DEFAULT_SCHEMA
   const requiredGates = new Set(event?.gates?.required ?? []);
   const missingEvidence = new Set([...(event?.contracts?.missing_evidence ?? []), ...(event?.evidence?.missing ?? [])]);
   const applicationEvidenceMissing = [...missingEvidence].some((item) => /(?:contract_load|contract_application)$/u.test(item));
+  const selectedContracts = new Set(event?.contracts?.selected ?? []);
+  const appliedContracts = event?.contracts?.applied ?? [];
+  const applicationEvidenceLevel = event?.contracts?.application_evidence_level;
   if (requiredGates.has("risk-gate") && event?.approval?.required !== true) errors.push("$.approval.required: risk-gate requires approval.required");
   if (event?.approval?.required === true && event?.approval?.status !== "approved" && (event?.stop?.status === "completed" || event?.outcome?.classification === "completed" || event?.outcome?.claim_effect === "support_within_scope")) errors.push("$.approval.status: incomplete approval cannot produce completed or support claim");
   if (event?.outcome?.claim_effect === "support_within_scope" && (event?.contracts?.applied?.length ?? 0) === 0) errors.push("$.outcome.claim_effect: support claim requires an applied contract");
+  if (applicationEvidenceLevel === "none" && appliedContracts.length > 0) errors.push("$.contracts.applied: application evidence none cannot have applied contracts");
+  if (applicationEvidenceLevel === "none" && event?.outcome?.claim_effect === "support_within_scope") errors.push("$.outcome.claim_effect: application evidence none cannot support a claim");
+  if (applicationEvidenceMissing && event?.outcome?.claim_effect === "support_within_scope") errors.push("$.outcome.claim_effect: missing application evidence cannot support a claim");
+  if (appliedContracts.some((contract) => !selectedContracts.has(contract))) errors.push("$.contracts.applied: applied contracts must be selected");
   if (applicationEvidenceMissing && (event?.stop?.status === "completed" || event?.outcome?.classification === "completed")) errors.push("$.outcome.classification: missing application evidence cannot produce completed");
   if (missingEvidence.has("specific_action_approval") && event?.approval?.status === "approved") errors.push("$.approval.status: missing approval evidence cannot produce approved");
   if ((event?.gates?.executed ?? []).some((gate) => !requiredGates.has(gate))) errors.push("$.gates.executed: executed gates must be a subset of required gates");

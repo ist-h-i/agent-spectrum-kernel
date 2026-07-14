@@ -4005,7 +4005,11 @@ EOF
     jsonReport.execution_evidence?.workflow_contract_application?.evidence_level !== "none" ||
     jsonReport.execution_evidence?.risk_approval_contract_application?.evidence_level !== "none" ||
     jsonReport.execution_evidence?.verification_contract_application?.evidence_level !== "none" ||
+    jsonReport.execution_evidence?.required_gates?.evidence_level !== "none" ||
+    jsonReport.execution_evidence?.required_gates?.gates?.length !== 0 ||
+    !jsonReport.execution_evidence?.required_gates?.missing_evidence?.includes("required_gate_observation") ||
     jsonReport.normalized_adapter_event?.adapter_id !== "codex" ||
+    !jsonReport.normalized_adapter_event?.evidence?.missing?.includes("required_gate_observation") ||
     jsonReport.normalized_adapter_event?.stop?.status !== "insufficient_evidence" ||
     jsonReport.normalized_adapter_event?.outcome?.claim_effect !== "downgrade" ||
     jsonReport.normalized_adapter_event?.contracts?.applied?.length !== 0 ||
@@ -4013,6 +4017,98 @@ EOF
     Object.hasOwn(jsonReport.execution_evidence ?? {}, "applied")
   ) {
     throw new Error(`codex runner structured evidence stages are invalid\n${jsonResult.stdout}`);
+  }
+
+  const reviewTarget = resolve(fixtureRoot, "codex-runner-review-target");
+  assertRuntimePass("codex review runner core setup", runRepoScript([coreInstaller, "--target", reviewTarget]));
+  assertRuntimePass("codex review runner install setup", runRepoScript([installer, "--target", reviewTarget, "--profile", "review"]));
+  const reviewRunnerScript = resolve(reviewTarget, "scripts/codex-exec-runner.mjs");
+  const fakeReviewCodex = resolve(reviewTarget, "fake-review-codex");
+  writeFileSync(
+    fakeReviewCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
+Change signals:
+- signal: fixture
+Required gates:
+- review-final-merge-gate: fixture
+Skipped heavy gates:
+- none
+Missing evidence:
+- none
+Decision:
+- approve
+Blocking evidence:
+- none
+Passed required gates:
+- review-final-merge-gate: fixture
+Insufficient evidence:
+- none
+Non-blocking follow-ups:
+- none
+Residual risk:
+- none
+${validEnvelopeBlock}
+EOF
+`,
+  );
+  chmodSync(fakeReviewCodex, 0o755);
+  const reviewResult = runRepoScript([
+    reviewRunnerScript,
+    "--target",
+    reviewTarget,
+    "--prompt",
+    "skill-review.md",
+    "--mode",
+    "review",
+    "--codex-bin",
+    fakeReviewCodex,
+    "--output",
+    "codex-review-output.md",
+    "--json",
+  ]);
+  assertRuntimePass("codex review runner emits required gate evidence", reviewResult);
+  const reviewReport = JSON.parse(reviewResult.stdout);
+  if (
+    JSON.stringify(reviewReport.execution_evidence?.required_gates?.gates) !== JSON.stringify(["review-final-merge-gate"]) ||
+    JSON.stringify(reviewReport.normalized_adapter_event?.gates?.required) !== JSON.stringify(["review-final-merge-gate"]) ||
+    reviewReport.normalized_adapter_event?.review?.final_gate_required !== true
+  ) {
+    throw new Error(`codex review runner must connect review-final-merge-gate to the normalized event\n${reviewResult.stdout}`);
+  }
+
+  const riskInvocationMarker = `${fakeCodex}.invocations`;
+  const invocationsBeforeRisk = existsSync(riskInvocationMarker) ? readFileSync(riskInvocationMarker, "utf8") : "";
+  const riskResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--required-gate",
+    "risk-gate",
+    "--codex-bin",
+    fakeCodex,
+    "--output",
+    "codex-risk-output.md",
+    "--json",
+  ]);
+  if (riskResult.status === 0) throw new Error(`codex risk runner must stop without specific-action approval\n${riskResult.stdout}`);
+  const riskReport = JSON.parse(riskResult.stdout);
+  const invocationsAfterRisk = existsSync(riskInvocationMarker) ? readFileSync(riskInvocationMarker, "utf8") : "";
+  if (
+    JSON.stringify(riskReport.execution_evidence?.required_gates?.gates) !== JSON.stringify(["risk-gate"]) ||
+    JSON.stringify(riskReport.normalized_adapter_event?.gates?.required) !== JSON.stringify(["risk-gate"]) ||
+    riskReport.normalized_adapter_event?.approval?.required !== true ||
+    riskReport.normalized_adapter_event?.approval?.status !== "missing" ||
+    riskReport.normalized_adapter_event?.stop?.status !== "risk_gate" ||
+    invocationsAfterRisk !== invocationsBeforeRisk
+  ) {
+    throw new Error(`codex risk runner must emit approval-required state and stop before execution\n${riskResult.stdout}`);
   }
 
   const doctorResult = runRepoScript([doctorScript, "--target", target, "--runtime-probe", "--json"]);
