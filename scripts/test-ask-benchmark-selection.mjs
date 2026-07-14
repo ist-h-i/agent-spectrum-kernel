@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { computeSelectionDigest } from "./ask-benchmark-selection.mjs";
+import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
@@ -259,9 +261,18 @@ try {
   const resultArtifact = resolve(spareRoot, ".benchmark-run.json");
   try {
     writeFileSync(resultArtifact, "{}\n");
+    const resultManifest = JSON.parse(originalManifestBytes);
+    const resultCase = resultManifest.cases.find((entry) => entry.case_id === spareCase.case_id);
+    const resultBytes = readFileSync(resultArtifact);
+    resultCase.projected_asset_inventory.push({ path: ".benchmark-run.json", sha256: createHash("sha256").update(resultBytes).digest("hex"), bytes: resultBytes.length, mode: "0644" });
+    resultCase.projected_asset_inventory.sort((left, right) => left.path.localeCompare(right.path));
+    resultCase.condition_projection_digest = canonicalDigest(resultCase.projected_asset_inventory);
+    resultCase.projection_evidence.projection_fingerprint = canonicalDigest({ adapter: resultCase.adapter, condition: resultCase.condition, inventory: resultCase.projected_asset_inventory });
+    writeJson(manifestPath, resultManifest);
     expectFailure("result artifact before seal", sealArgs(spareCase, spareInputPath, resolve(work, "state-result")), /result-like artifact/u);
   } finally {
     rmSync(resultArtifact, { force: true });
+    writeFileSync(manifestPath, originalManifestBytes);
   }
   expectFailure("invalid lightweight bypass", sealArgs(spareCase, inputFile("invalid-bypass", selectionInput(spareCase, { lightweight_bypass: { used: true, reason: "invalid" } })), resolve(work, "state-invalid-bypass")), /must not claim selected mechanisms/u);
   expectFailure("empty selection without bypass", sealArgs(spareCase, inputFile("empty-selection", selectionInput(spareCase, { selected_mechanisms: [] })), resolve(work, "state-empty-selection")), /not a valid lightweight bypass/u);
