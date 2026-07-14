@@ -94,6 +94,17 @@ function git(cwd, args, options = {}) {
   return result.stdout.trim();
 }
 
+function repositoryFileDigestMatches(revision, path, expectedHash) {
+  if (!/^[a-f0-9]{40}$/.test(revision ?? "")) return false;
+  const repositoryPath = relative(ROOT, path);
+  const result = spawnSync("git", ["show", `${revision}:${repositoryPath}`], {
+    cwd: ROOT,
+    encoding: null,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  return result.status === 0 && sha256(result.stdout) === expectedHash;
+}
+
 function equalOrderedValues(actual, expected) {
   return JSON.stringify(actual) === JSON.stringify(expected);
 }
@@ -201,10 +212,10 @@ function validateProtocol(configPath = DEFAULT_CONFIG_PATH) {
       if (attribution.model?.current !== config.runtime.model) errors.push("Checkpoint C model attribution must match runtime.model");
       if (attribution.cli?.current !== config.runtime.agent_version) errors.push("Checkpoint C CLI attribution must match runtime.agent_version");
       if (attribution.repository?.fixture_inputs_changed !== false) errors.push("Checkpoint C must explicitly preserve frozen fixture inputs");
-      for (const [pathValue, expectedHash, label] of [
-        [attribution.baseline_result_path, null, "baseline result"],
-        [attribution.fixture_manifest_path, attribution.fixture_manifest_sha256, "fixture manifest"],
-        [attribution.adapter?.runtime_bundle_path, attribution.adapter?.runtime_bundle_sha256, "adapter runtime bundle"],
+      for (const [pathValue, expectedHash, label, frozenRevision] of [
+        [attribution.baseline_result_path, null, "baseline result", null],
+        [attribution.fixture_manifest_path, attribution.fixture_manifest_sha256, "fixture manifest", null],
+        [attribution.adapter?.runtime_bundle_path, attribution.adapter?.runtime_bundle_sha256, "adapter runtime bundle", attribution.architecture?.merge_revision],
       ]) {
         if (!pathValue) {
           errors.push(`Checkpoint C ${label} path is required`);
@@ -212,7 +223,7 @@ function validateProtocol(configPath = DEFAULT_CONFIG_PATH) {
         }
         const path = resolveRepoPath(pathValue, label);
         if (!existsSync(path)) errors.push(`Checkpoint C ${label} is missing: ${pathValue}`);
-        else if (expectedHash && sha256(readFileSync(path)) !== expectedHash) errors.push(`Checkpoint C ${label} digest does not match: ${pathValue}`);
+        else if (expectedHash && sha256(readFileSync(path)) !== expectedHash && !repositoryFileDigestMatches(frozenRevision, path, expectedHash)) errors.push(`Checkpoint C ${label} digest does not match: ${pathValue}`);
       }
     }
   }

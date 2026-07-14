@@ -37,8 +37,26 @@ function groupBy(values, keyFor) {
 
 run(["validate"]);
 run(["validate", "--config", advancedConfig]);
+const frozenCheckpointC = JSON.parse(readFileSync(checkpointCConfig, "utf8"));
+const currentRuntimeBundle = resolve(root, frozenCheckpointC.attribution.adapter.runtime_bundle_path);
+assert.notEqual(
+  createHash("sha256").update(readFileSync(currentRuntimeBundle)).digest("hex"),
+  frozenCheckpointC.attribution.adapter.runtime_bundle_sha256,
+  "Checkpoint C compatibility test requires the current bundle to differ from its frozen attribution",
+);
 run(["validate", "--config", checkpointCConfig]);
 run(["validate", "--config", portfolioConfig]);
+
+const invalidCheckpointCConfigPath = resolve(root, "benchmarks", `.checkpoint-c-invalid-${process.pid}.json`);
+try {
+  const invalidCheckpointC = structuredClone(frozenCheckpointC);
+  invalidCheckpointC.attribution.adapter.runtime_bundle_sha256 = "f".repeat(64);
+  writeFileSync(invalidCheckpointCConfigPath, `${JSON.stringify(invalidCheckpointC, null, 2)}\n`);
+  const result = run(["validate", "--config", invalidCheckpointCConfigPath], 1);
+  assert.match(`${result.stderr}\n${result.stdout}`, /Checkpoint C adapter runtime bundle digest does not match/);
+} finally {
+  rmSync(invalidCheckpointCConfigPath, { force: true });
+}
 
 const portfolioWork = mkdtempSync(resolve(tmpdir(), "ask-benchmark-portfolio-test-"));
 const invalidPortfolioConfigPath = resolve(root, "benchmarks", `.adaptive-portfolio-invalid-${process.pid}.json`);
