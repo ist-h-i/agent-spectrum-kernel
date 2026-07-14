@@ -44,7 +44,17 @@ Their agent-visible bytes remain pinned by `benchmarks/fixtures/checkpoint-b2/in
 
 `plan` creates one four-condition block for each adapter, fixture, and repetition. A seed-derived base permutation is rotated once per repetition. This gives every condition a unique position in each block and keeps position-count imbalance at no more than one for the registered three- and five-repetition schedules.
 
-The durable plan stores only the seed digest, never the raw seed. Case and block identifiers include the adapter track and are deterministic for the same repository revision, config, and seed.
+The operator supplies a non-sensitive canonical seed. The durable plan stores its `seed_id`, public value, and SHA-256 digest so another operator can regenerate the plan from the artifact alone. Automatic seed generation is not supported by this foundation slice.
+
+Every plan has a namespace:
+
+```text
+plan_id = SHA-256(config digest, protocol digest, repository revision, canonical seed)
+```
+
+The plan digest is embedded in every case and block identifier. A config, protocol, repository, or seed change therefore creates a different resume namespace instead of reusing prior case identities.
+
+The portfolio config and emitted plan are validated as complete instances against their declared JSON Schemas through the repository's shared validator. Validation happens before a plan is written. Adaptive selection records use the same shared validator entrypoint.
 
 ## Adaptive pre-result selection
 
@@ -64,4 +74,4 @@ The selection record has no result, score, correctness, recommendation, or compl
 
 ## Privacy and stop boundary
 
-Raw prompts, full outputs, full event streams, full source, secrets, customer data, and personal data remain outside durable plans and results. Stop before measured execution until fixture manifests, evaluator digests, thresholds, weights, runtime variables, randomization seeds, and human-evaluation instructions are frozen under #198.
+Raw prompts, full outputs, full event streams, full source, secrets, customer data, and personal data remain outside durable plans and results. Canonical randomization seeds are public preregistration inputs and must not contain sensitive data. Stop before measured execution until fixture manifests, evaluator digests, thresholds, weights, runtime variables, randomization seeds, and human-evaluation instructions are frozen under #198.

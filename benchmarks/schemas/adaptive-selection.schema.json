@@ -21,7 +21,7 @@
   ],
   "properties": {
     "schema_version": { "const": "1.0.0" },
-    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}$" },
+    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
     "task_class": { "type": "string", "minLength": 1 },
     "observed_signals": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
     "selected_mechanisms": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
@@ -55,14 +55,8 @@
       "required": ["used", "reason"],
       "properties": {
         "used": { "type": "boolean" },
-        "reason": { "type": ["string", "null"] }
-      },
-      "allOf": [
-        {
-          "if": { "properties": { "used": { "const": true } }, "required": ["used"] },
-          "then": { "properties": { "reason": { "type": "string", "minLength": 1 } } }
-        }
-      ]
+        "reason": { "type": "string", "minLength": 1 }
+      }
     },
     "projection": {
       "type": "object",

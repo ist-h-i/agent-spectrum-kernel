@@ -62,6 +62,6 @@ node scripts/ask-benchmark.mjs validate --config benchmarks/adaptive-portfolio.c
 node scripts/ask-benchmark.mjs plan --config benchmarks/adaptive-portfolio.config.json --output /tmp/adaptive-ask-plan.json --seed local-plan-check
 ```
 
-The `plan` command does not materialize workspaces, invoke an adapter, inspect condition outcomes, or score results. It records only a SHA-256 digest of the seed. Measured execution remains blocked until #193–#197 artifacts are validated and #198 freezes manifests, evaluator digests, thresholds, weights, runtime variables, and seeds.
+The `plan` command does not materialize workspaces, invoke an adapter, inspect condition outcomes, or score results. It records the non-sensitive canonical seed with its ID and SHA-256 digest so the artifact can be independently regenerated. Its `plan_id` binds the config digest, protocol digest, repository revision, and seed into every case/block namespace. Measured execution remains blocked until #193–#197 artifacts are validated and #198 freezes manifests, evaluator digests, thresholds, weights, runtime variables, and seeds.
 
 See [protocol-adaptive.md](protocol-adaptive.md) for the condition, adapter-separation, balanced-ordering, repetition, privacy, and pre-result Adaptive selection contracts.

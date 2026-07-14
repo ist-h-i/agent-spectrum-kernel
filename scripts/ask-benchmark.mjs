@@ -19,6 +19,7 @@ import { tmpdir } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { assertBenchmarkSchemaInstance, computePortfolioPlanId } from "./ask-benchmark-schema.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_CONFIG_PATH = resolve(ROOT, "benchmarks/checkpoint-b.config.json");
@@ -96,8 +97,8 @@ function equalOrderedValues(actual, expected) {
 
 function validatePortfolioFoundation(config, canonicalConfigPath) {
   const errors = [];
-  const configSchemaPath = resolve(dirname(canonicalConfigPath), config.$schema ?? "");
-  if (config.$schema !== "./schemas/portfolio-config.schema.json" || !existsSync(configSchemaPath)) errors.push("portfolio config schema must resolve to benchmarks/schemas/portfolio-config.schema.json");
+  const configSchemaPath = resolve(ROOT, "benchmarks/schemas/portfolio-config.schema.json");
+  assertBenchmarkSchemaInstance(config, { schemaPath: configSchemaPath, label: "portfolio config" });
   if (config.program !== "adaptive_ask_portfolio") errors.push("portfolio program must be adaptive_ask_portfolio");
   if (!["foundation", "frozen"].includes(config.protocol_status)) errors.push("portfolio protocol_status must be foundation or frozen");
 
@@ -286,14 +287,21 @@ function planPortfolio(args) {
   const config = validateProtocol(args.configPath);
   if (config._kind !== "portfolio") throw new Error("plan requires an Adaptive portfolio config");
   if (!args.output || !args.seed) throw new Error("plan requires --output and --seed");
+  if (existsSync(args.output)) throw new Error(`plan output must not already exist: ${args.output}`);
+  const configSha256 = sha256(readFileSync(config._configPath));
+  const protocolSha256 = sha256(readFileSync(config._protocolPath));
+  const repositoryRevision = git(ROOT, ["rev-parse", "HEAD"]);
+  const seedSha256 = sha256(args.seed);
+  const planId = computePortfolioPlanId({ configSha256, protocolSha256, repositoryRevision, seed: args.seed });
+  const planDigest = planId.slice("plan-".length);
   const blocks = [];
   for (const adapter of config.adapter_tracks) {
     for (const fixture of config.fixtures) {
       for (let repetition = 1; repetition <= fixture.repetitions; repetition += 1) {
-        const blockId = `block-${sha256(`${args.seed}:${adapter.id}:${fixture.id}:${repetition}`).slice(0, 12)}`;
+        const blockId = `block-${planDigest.slice(0, 16)}-${sha256(`${planId}:${adapter.id}:${fixture.id}:${repetition}`).slice(0, 12)}`;
         const orderedConditions = balancedConditionOrder(args.seed, adapter.id, fixture.id, repetition);
         const cases = orderedConditions.map((condition, index) => ({
-          case_id: `case-${sha256(`${args.seed}:${adapter.id}:${fixture.id}:${repetition}:${condition}`).slice(0, 16)}`,
+          case_id: `case-${planDigest.slice(0, 16)}-${sha256(`${planId}:${adapter.id}:${fixture.id}:${repetition}:${condition}`).slice(0, 16)}`,
           block_id: blockId,
           adapter_track: adapter.id,
           fixture_id: fixture.id,
@@ -314,21 +322,28 @@ function planPortfolio(args) {
   }
   blocks.sort((left, right) => left.order_key.localeCompare(right.order_key));
   const plan = {
-    schema_version: "1.0.0",
+    schema_version: config.execution_plan.schema_version,
     schema_path: config.execution_plan.schema_path,
     program: config.program,
+    plan_id: planId,
     protocol_path: relative(ROOT, config._protocolPath),
-    protocol_sha256: sha256(readFileSync(config._protocolPath)),
+    protocol_sha256: protocolSha256,
     config_path: relative(ROOT, config._configPath),
-    config_sha256: sha256(readFileSync(config._configPath)),
-    repository_revision: git(ROOT, ["rev-parse", "HEAD"]),
-    seed_sha256: sha256(args.seed),
+    config_sha256: configSha256,
+    repository_revision: repositoryRevision,
+    randomization_seed: {
+      seed_id: `seed-${seedSha256.slice(0, 16)}`,
+      value: args.seed,
+      sha256: seedSha256,
+    },
     ordering_strategy: config.ordering.strategy,
     conditions: config.conditions.map((entry) => entry.id),
     adapter_tracks: config.adapter_tracks.map((entry) => ({ id: entry.id, runtime_status: entry.runtime_status })),
     pool_adapter_results: config.pool_adapter_results,
     cases: blocks.flatMap((block) => block.cases),
   };
+  const planSchemaPath = resolveRepoPath(config.execution_plan.schema_path, "execution plan schema");
+  assertBenchmarkSchemaInstance(plan, { schemaPath: planSchemaPath, label: "execution plan" });
   writeJson(args.output, plan);
   console.log(`Wrote deterministic portfolio plan with ${plan.cases.length} cases to ${args.output}`);
 }
