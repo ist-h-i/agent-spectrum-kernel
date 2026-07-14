@@ -37,3 +37,18 @@ node scripts/ask-benchmark.mjs score --config benchmarks/checkpoint-b2.config.js
 See [protocol-b2.md](protocol-b2.md) for frozen quality-gain thresholds. B2 can establish value only for its fixtures and controlled runtime; replication remains required before architecture-wide conclusions.
 
 The measured B2 summary is [results/checkpoint-b2-report.md](results/checkpoint-b2-report.md); the reproducible automated score is `results/checkpoint-b2-2026-07-12.json`.
+
+## Post-architecture Checkpoint C
+
+Checkpoint C reuses the four frozen B2 fixtures after #179/PR #190 and pins architecture, model, CLI, adapter, repository, fixture-manifest, and runtime-bundle attribution before execution:
+
+```bash
+node scripts/ask-benchmark.mjs validate --config benchmarks/checkpoint-c.config.json
+node scripts/ask-benchmark.mjs prepare --config benchmarks/checkpoint-c.config.json --output /tmp/ask-benchmark-checkpoint-c --seed checkpoint-c-2026-07-14
+node scripts/ask-benchmark.mjs run --config benchmarks/checkpoint-c.config.json --run-dir /tmp/ask-benchmark-checkpoint-c --agent-bin /absolute/path/to/codex
+node scripts/ask-benchmark.mjs score --config benchmarks/checkpoint-c.config.json --run-dir /tmp/ask-benchmark-checkpoint-c --output benchmarks/results/checkpoint-c-2026-07-14.json
+```
+
+The frozen rules are in [protocol-c.md](protocol-c.md). Keep temporary prompts, full outputs, event streams, and workspaces outside the repository. The normalized result explicitly reports that the CLI, repository, and adapter evidence changed alongside the architecture, so Checkpoint C is a bounded remeasurement rather than an isolated causal test.
+
+The measured result is in [results/checkpoint-c-report.md](results/checkpoint-c-report.md), with normalized machine-readable evidence in `results/checkpoint-c-2026-07-14.json`. Full ASK improved one review score but exceeded the quality-gain token allowance; the other three fixtures showed no incremental quality and exceeded the normal token-overhead guardrail.

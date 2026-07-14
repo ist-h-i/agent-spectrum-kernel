@@ -1,0 +1,120 @@
+{
+  "schema_version": "2.0.0",
+  "checkpoint": "C",
+  "protocol_path": "benchmarks/protocol-c.md",
+  "fixture_root": "benchmarks/fixtures/checkpoint-b2",
+  "protocol_status": "frozen",
+  "protocol_frozen_at": "2026-07-14T14:00:00+09:00",
+  "conditions": ["plain", "kernel_only", "full_ask"],
+  "repetitions": 1,
+  "fixtures": [
+    {
+      "id": "pr-session-refresh-medium-hard",
+      "task_class": "review",
+      "difficulty": "medium-hard",
+      "sandbox": "read-only",
+      "layout": "nested",
+      "review_source": "embedded_diff",
+      "expected_path": "evaluator/expected.json"
+    },
+    {
+      "id": "pr-export-lease-hard",
+      "task_class": "review",
+      "difficulty": "hard",
+      "sandbox": "read-only",
+      "layout": "nested",
+      "review_source": "embedded_diff",
+      "expected_path": "evaluator/expected.json"
+    },
+    {
+      "id": "impl-rule-batch-medium-hard",
+      "task_class": "implementation",
+      "difficulty": "medium-hard",
+      "sandbox": "workspace-write",
+      "layout": "nested",
+      "expected_path": "evaluator/expected.json",
+      "hidden_tests_path": "evaluator/hidden-tests.mjs"
+    },
+    {
+      "id": "impl-transfer-hard",
+      "task_class": "implementation",
+      "difficulty": "hard",
+      "sandbox": "workspace-write",
+      "layout": "nested",
+      "expected_path": "evaluator/expected.json",
+      "hidden_tests_path": "evaluator/hidden-tests.mjs"
+    }
+  ],
+  "runtime": {
+    "agent": "codex-cli",
+    "agent_version": "0.144.2",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "sequential": true,
+    "case_timeout_ms": 900000,
+    "network_required_by_fixtures": false
+  },
+  "thresholds": {
+    "senior_correction_reduction_percent": 25,
+    "rework_reduction_percent": 20,
+    "minimum_review_valid_finding_gain": 1,
+    "minimum_implementation_requirement_rate_gain": 0.1,
+    "maximum_false_positive_increase": 0,
+    "maximum_scope_deviation_increase": 0,
+    "maximum_unverified_claim_increase": 0,
+    "maximum_duration_overhead_percent": 50,
+    "maximum_token_overhead_percent": 50,
+    "maximum_duration_overhead_with_quality_gain_percent": 100,
+    "maximum_token_overhead_with_quality_gain_percent": 150,
+    "require_non_inferior_quality": true,
+    "allow_expand_with_primary_metrics_unknown": false,
+    "allow_expand_with_material_quality_gain": true
+  },
+  "attribution": {
+    "baseline_checkpoint": "B2",
+    "baseline_result_path": "benchmarks/results/checkpoint-b2-2026-07-12.json",
+    "baseline_repository_revision": "57866e2ad42d7c1db91488528b0879a87776d4e0",
+    "fixture_manifest_path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
+    "fixture_manifest_sha256": "e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
+    "architecture": {
+      "baseline": "pre-issue-179",
+      "current": "canonical-dual-runtime",
+      "issue": 179,
+      "merge_revision": "6f0fd437e6cdad3c1188c92d3740a5a531a5757f",
+      "canonical_contract_revision": "ask-3.0.0",
+      "canonical_source_digest": "sha256:aa011ebb4f1c98ccc293870b70764e502f5a1c4bcecb226b0738cd3a9eef4e5b"
+    },
+    "model": {
+      "baseline": "gpt-5.6-sol",
+      "current": "gpt-5.6-sol",
+      "changed": false
+    },
+    "cli": {
+      "baseline": "0.144.1",
+      "current": "0.144.2",
+      "changed": true
+    },
+    "adapter": {
+      "id": "codex",
+      "baseline_projection_digest": null,
+      "baseline_evidence": "unknown",
+      "current_profile": "full",
+      "renderer_version": "4",
+      "runtime_bundle_path": "docs/fixtures/adapter-runtime-bundle.json",
+      "runtime_bundle_sha256": "b943562be43d3b38d8d32f6603a121cbc50149ede1e8dcc62c8bef881019bcf7",
+      "profile_fingerprint": "sha256:6805acf2eb4ee57ca9e3ccdb0fc4c50b47d753664620a7016ca3e677b2291223",
+      "projected_asset_digest": "sha256:c23fde39066da6c695a708ea6aa96d6bb04704eaf1f38454136d2100cdeed73f"
+    },
+    "repository": {
+      "baseline_revision": "57866e2ad42d7c1db91488528b0879a87776d4e0",
+      "current_revision_source": "protocol.repository_revision",
+      "fixture_inputs_changed": false
+    }
+  },
+  "privacy": {
+    "store_raw_prompts": false,
+    "store_full_outputs": false,
+    "store_full_source": false,
+    "store_secrets_customer_or_personal_data": false
+  }
+}

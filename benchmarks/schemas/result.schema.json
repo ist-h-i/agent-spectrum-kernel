@@ -4,6 +4,12 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "checkpoint", "protocol", "runtime", "runs", "comparison", "limitations", "privacy"],
+  "allOf": [
+    {
+      "if": { "properties": { "checkpoint": { "const": "C" } }, "required": ["checkpoint"] },
+      "then": { "required": ["attribution"] }
+    }
+  ],
   "$defs": {
     "nullableNonNegative": { "type": ["number", "null"], "minimum": 0 },
     "condition": { "enum": ["plain", "kernel_only", "full_ask"] },
@@ -69,6 +75,77 @@
         "sequential": { "type": "boolean" },
         "case_timeout_ms": { "type": "integer", "minimum": 1 },
         "network_required_by_fixtures": { "type": "boolean" }
+      }
+    },
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline_checkpoint", "baseline_result_path", "baseline_repository_revision", "fixture_manifest_path", "fixture_manifest_sha256", "architecture", "model", "cli", "adapter", "repository"],
+      "properties": {
+        "baseline_checkpoint": { "const": "B2" },
+        "baseline_result_path": { "type": "string" },
+        "baseline_repository_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "fixture_manifest_path": { "type": "string" },
+        "fixture_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "architecture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseline", "current", "issue", "merge_revision", "canonical_contract_revision", "canonical_source_digest"],
+          "properties": {
+            "baseline": { "type": "string" },
+            "current": { "type": "string" },
+            "issue": { "const": 179 },
+            "merge_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+            "canonical_contract_revision": { "type": "string" },
+            "canonical_source_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+          }
+        },
+        "model": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseline", "current", "changed"],
+          "properties": {
+            "baseline": { "type": "string" },
+            "current": { "type": "string" },
+            "changed": { "type": "boolean" }
+          }
+        },
+        "cli": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseline", "current", "changed"],
+          "properties": {
+            "baseline": { "type": "string" },
+            "current": { "type": "string" },
+            "changed": { "type": "boolean" }
+          }
+        },
+        "adapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "baseline_projection_digest", "baseline_evidence", "current_profile", "renderer_version", "runtime_bundle_path", "runtime_bundle_sha256", "profile_fingerprint", "projected_asset_digest"],
+          "properties": {
+            "id": { "const": "codex" },
+            "baseline_projection_digest": { "type": ["string", "null"] },
+            "baseline_evidence": { "enum": ["unknown", "available"] },
+            "current_profile": { "type": "string" },
+            "renderer_version": { "type": "string" },
+            "runtime_bundle_path": { "type": "string" },
+            "runtime_bundle_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "profile_fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            "projected_asset_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+          }
+        },
+        "repository": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseline_revision", "current_revision_source", "fixture_inputs_changed"],
+          "properties": {
+            "baseline_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+            "current_revision_source": { "const": "protocol.repository_revision" },
+            "fixture_inputs_changed": { "const": false }
+          }
+        }
       }
     },
     "runs": {
