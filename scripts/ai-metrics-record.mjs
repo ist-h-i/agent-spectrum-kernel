@@ -5,6 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { inspectExecutionEnvelope, validateMetricsEvent } from "./execution-envelope.mjs";
 import { DEFAULT_RUNTIME_EVENT_STORE, resolveObservabilityPath } from "./observability-paths.mjs";
+import { mapClaudeMetricsEvent } from "./adapter-runtime-event.mjs";
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -1247,13 +1248,17 @@ function main(args) {
   const allowedSkillIds = loadAllowedSkillIds(projectRoot);
   const allowedSignalIds = loadAllowedSignalIds(projectRoot);
   const event = buildEvent(args, hookInput, config, taskId, taskResult.envelope, allowedSkillIds, allowedSignalIds);
+  const normalizedAdapterEvent = mapClaudeMetricsEvent(event, {
+    eventKind: args.eventKind,
+    hookEvent: args.hookEvent ?? hookInput.hook_event_name ?? null,
+  });
   let status = "dry-run";
   if (!args.dryRun) {
     status = upsertEvent(eventStore, event);
     if (args.nonBlocking) recordRuntimeHealthRecovery(args, config, eventStore);
   }
   if (args.printResult) {
-    console.log(JSON.stringify({ status, event, capability: capabilityEvidence(args.dryRun ? "runtime_detected" : "executed") }, null, 2));
+    console.log(JSON.stringify({ status, event, normalized_adapter_event: normalizedAdapterEvent, capability: capabilityEvidence(args.dryRun ? "runtime_detected" : "executed") }, null, 2));
   }
 }
 

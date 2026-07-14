@@ -34,7 +34,7 @@ Codex-compatible projection uses these surfaces:
 | Reusable workflows | Repo-scoped `.agents/skills/<skill>/SKILL.md` projections of canonical `skills/<name>/SKILL.md` | `behavior_verified` for projection; runtime skill loading remains Codex-controlled |
 | Task commands | Prompt templates passed to Codex through `scripts/codex-exec-runner.mjs` | `executed` only after the runner captures output; business correctness remains unproven |
 | Explicit entry routing | Direct primary contract selected by the compact profile; review retains `review-router` for signal-to-gate selection | `projected`; upper routers are skipped only because mode/task class is already fixed |
-| Risk and evidence gates | `risk-gate`, `test-first-verification`, `evidence-ledger` | `projected`; preserved in prompts, not mechanically enforced by this adapter |
+| Risk and evidence gates | `risk-gate`, `test-first-verification`, `evidence-ledger` | Prompt controls are `projected`; an explicitly required `risk-gate` stops the bounded runner before execution when specific-action approval is unavailable |
 | Metrics / observability | Project-local metrics contract only when separately enabled | unsupported in this adapter; no Codex hook or telemetry integration is shipped |
 | Shared PR automation | Codex GitHub Action or workflow defined by an adopting project | unsupported in this adapter; no workflow is provided here |
 
@@ -102,12 +102,12 @@ When a later install no longer selects a previously managed file, the installer 
 
 This adapter is intentionally narrower than the Claude Code adapter.
 
-- No hooks: do not claim automatic local metrics sidecar recording or mechanical risk-gate enforcement.
+- No hooks: do not claim automatic local metrics sidecar recording or automatic risk classification; the bounded runner only blocks a risk gate that was explicitly classified as required.
 - No GitHub Actions workflow: do not claim shared PR review, fork guardrails, or comment-trigger support from this adapter.
 - No hidden telemetry: the adapter ships prompt files and documentation only; any telemetry must be a separate, explicit project decision.
 - No external publication: the adapter does not publish, comment, deploy, release, or notify externally.
 - Runtime behavior: `codex-exec-runner.mjs` can report `executed` after `codex exec` returns output and `ask-sensors` passes. It must still report `insufficient_evidence` when the workspace, diff, PR head, tests, or required command results are unavailable.
-- Evidence stages: runner preflight separately checks root canonical source integrity and every selected `.agents/skills` Codex discovery asset/managed record/hash, including `lstat` rejection of a symlink in any path segment, before reporting projected profile bytes or runner-observed compact-profile load. It then reports requested contracts, unavailable Codex Skill-load evidence, and sensor-evidenced output-contract shape separately. Workflow, risk/approval, and verification application remain unavailable unless separately observed. Doctor remains static and never upgrades projection to runtime execution.
+- Evidence stages: runner preflight separately checks root canonical source integrity and every selected `.agents/skills` Codex discovery asset/managed record/hash, including `lstat` rejection of a symlink in any path segment, before reporting projected profile bytes or runner-observed compact-profile load. It reports fixed review gates and explicitly classified task gates separately; absent gate classification becomes missing `required_gate_observation`, never evidence that no gate is required. An explicitly required `risk-gate` emits approval-required state and stops before Codex execution while specific-action approval is unavailable. Requested contracts, unavailable Codex Skill-load evidence, and sensor-evidenced output-contract shape remain separate. Workflow, risk/approval, and verification application remain unavailable unless separately observed. Doctor remains static and never upgrades projection to runtime execution.
 
 ## Migration From Pre-Compact Prompts
 

@@ -8,6 +8,8 @@ Entry mode is fixed to implementation. Primary contract: `controlled-implementat
 
 {{ASK_COMPACT_DIRECT_TRIGGERS}}
 
+[agent_activity] opt-in; S/C/F counts.
+
 Implementation Contract:
 - Artifact ID:
 - Artifact type: implementation

@@ -1,0 +1,107 @@
+#!/usr/bin/env node
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { canonicalPathSetDigest } from "./installer-lifecycle.mjs";
+import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
+import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
+
+const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const defaultOutput = resolve(root, "docs/fixtures/adapter-runtime-bundle.json");
+const commonProfiles = ["daily", "organizational", "implementation", "investigation", "review", "observability", "full"];
+
+function parseArgs(argv) {
+  const args = { check: false, write: false, output: defaultOutput };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--check") args.check = true;
+    else if (arg === "--write") args.write = true;
+    else if (arg === "--output") args.output = resolve(argv[++index]);
+    else if (arg === "--help" || arg === "-h") {
+      console.log("Usage: node scripts/adapter-runtime-bundle.mjs [--check | --write] [--output <path>]");
+      process.exit(0);
+    } else throw new Error(`Unknown argument: ${arg}`);
+  }
+  if (args.check && args.write) throw new Error("--check and --write are mutually exclusive");
+  return args;
+}
+
+function projectionRecord(adapterId, plan) {
+  const assetCounts = {};
+  for (const asset of plan.projectedManagedAssets) assetCounts[asset.asset_kind] = (assetCounts[asset.asset_kind] ?? 0) + 1;
+  return {
+    adapter_id: adapterId,
+    renderer_id: plan.renderer_id,
+    renderer_version: plan.renderer_version,
+    renderer_profile: plan.renderer_profile,
+    profile_fingerprint: plan.fingerprint,
+    canonical_subset_digest: plan.canonical_source_digest,
+    canonical_source_count: plan.renderer_inputs.canonical.length,
+    projected_asset_count: plan.projectedManagedAssets.length,
+    projected_asset_digest: plan.managed_inventory_digest,
+    projected_asset_counts: Object.fromEntries(Object.entries(assetCounts).sort(([left], [right]) => left.localeCompare(right))),
+    lifecycle_operations: ["install", "update", "rollback", "detach"],
+  };
+}
+
+export function buildAdapterRuntimeBundle() {
+  const manifest = JSON.parse(readFileSync(resolve(root, "manifest.json"), "utf8"));
+  const profiles = [];
+  const canonicalPaths = new Set(["AGENTS.md", "manifest.json"]);
+  for (const profile of commonProfiles) {
+    const claude = buildClaudeProjectionPlan({ profileName: profile });
+    const codex = buildCodexProjectionPlan({ profileName: profile });
+    for (const input of [...claude.renderer_inputs.canonical, ...codex.renderer_inputs.canonical]) canonicalPaths.add(input.path);
+    profiles.push({
+      profile,
+      adapters: [projectionRecord("claude_code", claude), projectionRecord("codex", codex)],
+    });
+  }
+  const sourcePaths = [...canonicalPaths].sort();
+  return {
+    schema_version: "1.0.0",
+    canonical_contract: {
+      revision: `ask-${manifest.version}`,
+      source_digest: canonicalPathSetDigest(root, sourcePaths),
+      source_paths: sourcePaths,
+    },
+    adapters: ["claude_code", "codex"],
+    profiles,
+    normalized_event_schema_registry: "schemas/normalized-event-schema-registry.json",
+    conformance_fixture: "docs/fixtures/adapter-cross-conformance.json",
+    migration_contract: "docs/adapter-runtime-migration.md",
+    benchmark_handoff: {
+      issue: 171,
+      checkpoint: "C",
+      baseline_configs: ["benchmarks/checkpoint-b.config.json", "benchmarks/checkpoint-b2.config.json"],
+      required_attribution: ["architecture", "model", "cli", "adapter", "repository"],
+    },
+  };
+}
+
+function serializedBundle() {
+  return `${JSON.stringify(buildAdapterRuntimeBundle(), null, 2)}\n`;
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    const args = parseArgs(process.argv.slice(2));
+    const content = serializedBundle();
+    if (args.check) {
+      if (!existsSync(args.output) || readFileSync(args.output, "utf8") !== content) {
+        console.error(`Adapter runtime bundle is missing or stale: ${args.output}`);
+        process.exitCode = 1;
+      } else {
+        console.log("Adapter runtime bundle is current");
+      }
+    } else if (args.write) {
+      writeFileSync(args.output, content);
+      console.log(`Adapter runtime bundle written: ${args.output}`);
+    } else {
+      process.stdout.write(content);
+    }
+  } catch (error) {
+    console.error(`adapter-runtime-bundle failed: ${error.message}`);
+    process.exitCode = 1;
+  }
+}

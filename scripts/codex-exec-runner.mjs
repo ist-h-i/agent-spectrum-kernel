@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
+import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
 
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const DEFAULT_OUTPUT = ".agents/runs/codex-last-output.md";
@@ -15,8 +16,10 @@ const MANAGED_CODEX_RUNTIME_FILES = [
   "ask-sensors.mjs",
   "ask-shared.mjs",
   "execution-envelope.mjs",
+  "adapter-runtime-event.mjs",
   "execution-envelope.schema.json",
   "metrics-event.schema.json",
+  "adapter-runtime-event.schema.json",
 ];
 
 function hashText(value) { return createHash("sha256").update(value).digest("hex"); }
@@ -45,6 +48,8 @@ function parseArgs(argv) {
     output: DEFAULT_OUTPUT,
     codexBin: "codex",
     diffBase: "",
+    explicitRequiredGates: [],
+    gatesObserved: false,
     dryRun: false,
     json: false,
   };
@@ -64,6 +69,10 @@ function parseArgs(argv) {
       args.codexBin = argv[++index];
     } else if (arg === "--diff-base") {
       args.diffBase = argv[++index];
+    } else if (arg === "--required-gate") {
+      args.explicitRequiredGates.push(argv[++index]);
+    } else if (arg === "--gates-observed") {
+      args.gatesObserved = true;
     } else if (arg === "--dry-run") {
       args.dryRun = true;
     } else if (arg === "--json") {
@@ -79,8 +88,17 @@ function parseArgs(argv) {
   if (!profile) throw new Error(`prompt has no validated execution profile: ${args.prompt}`);
   if (args.mode && args.mode !== profile.mode) throw new Error(`prompt/mode mismatch: ${args.prompt} requires ${profile.mode}`);
   if (args.sandbox && args.sandbox !== profile.sandbox) throw new Error(`prompt/sandbox mismatch: ${args.prompt} requires ${profile.sandbox}`);
+  if (args.explicitRequiredGates.some((gate) => typeof gate !== "string" || !/^[a-z0-9][a-z0-9-]*$/u.test(gate))) throw new Error("--required-gate must be a controlled identifier");
   args.mode = profile.mode;
   args.sandbox = profile.sandbox;
+  args.explicitRequiredGates = [...new Set(args.explicitRequiredGates)].sort();
+  args.requiredGates = [...new Set([...(profile.requiredGates ?? []), ...args.explicitRequiredGates])].sort();
+  args.gateEvidenceLevel = args.explicitRequiredGates.length > 0 || args.gatesObserved
+    ? "runtime_detected"
+    : (profile.requiredGates ?? []).length > 0
+      ? "projected"
+      : "none";
+  args.gatesObserved = args.gatesObserved || args.requiredGates.length > 0;
   return args;
 }
 
@@ -95,6 +113,8 @@ Options:
   --output <path>       Output file inside target. Defaults to .agents/runs/codex-last-output.md.
   --codex-bin <path>    Codex executable. Defaults to codex.
   --diff-base <rev>     Optional git diff range for review context, for example origin/main...HEAD.
+  --required-gate <id>  Task-specific required gate. Repeat for multiple gates.
+  --gates-observed      Record that task gate classification ran and found no additional gate.
   --dry-run             Run preflight and print the codex command without invoking Codex.
   --json                Print machine-readable result JSON.
 
@@ -163,12 +183,15 @@ function preflight(args) {
       revision: compactProfile.canonical_revision,
       source_digest: compactProfile.canonical_source_digest,
       profile_fingerprint: compactProfile.profile_fingerprint,
+      requested_contracts: compactProfile.requested_contracts,
+      control_ids: compactProfile.control_ids,
     };
     if (JSON.stringify(compactHeader) !== JSON.stringify(expectedHeader)) failures.push(`compact-profile header does not match Codex install state: ${args.prompt}`);
     if (compactProfile.mode !== args.mode) failures.push(`compact-profile mode mismatch: ${args.prompt} requires ${compactProfile.mode}`);
     if (compactProfile.rendered_sha256 !== `sha256:${hashText(promptContent)}`) failures.push(`compact-profile rendered digest mismatch: ${args.prompt}`);
     if (compactProfile.canonical_source_digest !== state?.projection_plan?.canonical_source_digest) failures.push(`compact-profile canonical source digest does not match shared projection plan: ${args.prompt}`);
     if (compactProfile.profile_fingerprint !== state?.projection_plan?.fingerprint) failures.push(`compact-profile fingerprint does not match shared projection plan: ${args.prompt}`);
+    for (const gate of args.requiredGates) if (!(state?.selected_skills ?? []).includes(gate)) failures.push(`required gate is not installed in the selected profile: ${gate}`);
     const selectedProfile = (state?.compact_runtime_profiles ?? []).find((profile) => profile.profile_id === compactProfile.profile_id);
     if (!selectedProfile || selectedProfile.rendered_sha256 !== compactProfile.rendered_sha256) failures.push(`compact profile is not selected in Codex install state: ${compactProfile.profile_id}`);
     for (const finding of inspectCodexProjectionCanonicalInputs(args.target, state?.projection_plan)) {
@@ -252,6 +275,7 @@ function buildPrompt(args, state, promptPath, compactProfile) {
     `- Selected skills: ${(state?.selected_skills ?? []).join(", ") || "unknown"}`,
     `- Runner mode: ${args.mode}`,
     `- Sandbox: ${args.sandbox}`,
+    `- Required gates: ${args.gatesObserved ? args.requiredGates.join(", ") || "none" : "unobserved"}`,
     "Evidence boundary: file projection and sensors do not prove business correctness.",
   ];
   const diff = gitDiffContext(args);
@@ -302,9 +326,12 @@ function runSensors(args, outputPath) {
   };
 }
 
-function resultStatus({ preflightResult, codexResult, sensorResult, dryRun }) {
+function resultStatus({ preflightResult, codexResult, sensorResult, dryRun, approvalBlocked }) {
   if (preflightResult.failures.length > 0) {
     return { status: "insufficient_evidence", evidenceLevel: "unknown" };
+  }
+  if (approvalBlocked) {
+    return { status: "insufficient_evidence", evidenceLevel: "runtime_detected" };
   }
   if (dryRun) {
     return { status: "ready_to_execute", evidenceLevel: "projected" };
@@ -334,6 +361,7 @@ function printResult(report, json) {
   console.log(`Output: ${report.output_path ?? "not written"}`);
   console.log(`Sensor status: ${report.sensor_status ?? "not run"}`);
   console.log(`Requested contracts: ${report.execution_evidence.requested_contracts.contracts.length}`);
+  console.log(`Required gates evidence: ${report.execution_evidence.required_gates.evidence_level}`);
   console.log(`Projected contracts evidence: ${report.execution_evidence.projected_contracts.evidence_level}`);
   console.log(`Runtime-detected compact output profile evidence: ${report.execution_evidence.runtime_detected_profile.evidence_level}`);
   console.log(`Runtime-loaded contracts evidence: ${report.execution_evidence.runtime_loaded_contracts.evidence_level}`);
@@ -362,17 +390,18 @@ try {
   let codexResult = null;
   let sensorResult = null;
   let command = null;
+  const approvalBlocked = args.requiredGates.includes("risk-gate");
   if (preflightResult.failures.length === 0) {
     const prompt = buildPrompt(args, preflightResult.state, preflightResult.promptPath, preflightResult.compactProfile);
     command = `${args.codexBin} exec --sandbox ${args.sandbox} --output-last-message ${args.output} <stdin-prompt>`;
-    if (!args.dryRun) {
+    if (!args.dryRun && !approvalBlocked) {
       codexResult = runCodex(args, prompt);
       if (codexResult.exitCode === 0 && codexResult.finalOutput.trim()) {
         sensorResult = runSensors(args, args.outputPath);
       }
     }
   }
-  const normalized = resultStatus({ preflightResult, codexResult, sensorResult, dryRun: args.dryRun });
+  const normalized = resultStatus({ preflightResult, codexResult, sensorResult, dryRun: args.dryRun, approvalBlocked });
   const preflightPassed = preflightResult.failures.length === 0;
   const report = {
     status: normalized.status,
@@ -386,6 +415,19 @@ try {
       requested_contracts: {
         profile_id: preflightResult.compactProfile?.profile_id ?? null,
         contracts: preflightResult.compactProfile?.requested_contracts ?? [],
+      },
+      required_gates: {
+        evidence_level: preflightPassed ? args.gateEvidenceLevel : "none",
+        gates: args.requiredGates,
+        missing_evidence: [
+          ...(!preflightPassed || !args.gatesObserved ? ["required_gate_observation"] : []),
+          ...(approvalBlocked ? ["specific_action_approval"] : []),
+        ],
+        detail: !args.gatesObserved
+          ? "Task-specific required-gate classification was not observed."
+          : approvalBlocked
+            ? "risk-gate is required and specific-action approval is not available."
+            : "Required gates were derived from the managed prompt contract or explicit task classification.",
       },
       projected_contracts: {
         evidence_level: preflightPassed ? "projected" : "none",
@@ -431,6 +473,10 @@ try {
     warnings: preflightResult.warnings,
     boundary: "File projection and ask-sensors output checks do not prove business correctness, product readiness, or no regression.",
   };
+  const normalizedEventSchemaPath = resolve(args.target, "scripts/adapter-runtime-event.schema.json");
+  report.normalized_adapter_event = existsSync(normalizedEventSchemaPath)
+    ? mapCodexRunnerResult(report, { schemaPath: normalizedEventSchemaPath })
+    : null;
   printResult(report, args.json);
   process.exit(normalized.status === "executed" ? 0 : normalized.status === "execution_failed" ? 1 : 2);
 } catch (error) {

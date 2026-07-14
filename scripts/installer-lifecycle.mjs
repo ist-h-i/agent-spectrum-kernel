@@ -16,7 +16,9 @@ export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "docs/observability-runtime-contract.md",
   "docs/operation-automation-contract.md",
   "docs/stack-implementation-overlay-contract.md",
+  "schemas/adapter-runtime-event.schema.json",
   "schemas/compact-profile-control-map.json",
+  "schemas/normalized-event-schema-registry.json",
 ]);
 
 export function hashText(text) {

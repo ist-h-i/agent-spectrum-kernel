@@ -820,6 +820,7 @@ function codexRendererInputsForSelection({ prompts, commands, skills, requiredAs
     { path: "docs/adapter-runtime-boundary-contract.md", role: "contract" },
     { path: "schemas/adapter-runtime-profile.schema.json", role: "schema" },
     { path: "schemas/adapter-runtime-evidence.schema.json", role: "schema" },
+    { path: "schemas/adapter-runtime-event.schema.json", role: "schema" },
     { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
     ...prompts.flatMap((prompt) => codexCompactProfileCanonicalPaths(prompt).map((path) => ({ path, role: path.startsWith("skills/") ? "skill" : path.startsWith("schemas/") ? "schema" : path === "AGENTS.md" ? "kernel" : "contract" }))),
     ...skills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
@@ -890,6 +891,10 @@ export function buildCodexProjectionPlan({ profileName, skills = null, skipPromp
   const compactProfileArtifacts = selection.prompts.map((prompt) => renderCodexCompactProfile(prompt, {
     canonicalContract,
     profileFingerprint: provenance.fingerprint,
+    additionalRequestedContracts: profileName === "organizational" && prompt === "skill-implement.md"
+      ? ["operating-mode-router", "domain-rule-ledger"]
+      : [],
+    knowledgePromotion: profileName === "organizational" && prompt === "skill-implement.md",
   }));
   const compactProfiles = compactProfileArtifacts.map((artifact) => artifact.metadata);
   return { ...selection, ...provenance, compactProfiles, compactProfileArtifacts, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };

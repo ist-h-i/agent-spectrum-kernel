@@ -8,6 +8,9 @@ Start with `/skill-router` unless the user already named a more specific skill. 
 
 Keep the change boundary narrow:
 
+- require approval for the specific action and stop without that approval before any risk-gated action
+- when required evidence is missing, report `insufficient_evidence` and stop; do not infer the missing result
+- do not start or delegate agents unless the request explicitly requires agent activity; report started, completed, and failed counts
 - classify the task and risk before editing
 - follow `docs/lifecycle-artifact-contract.md`; reference upstream Requirement, Spec, Work Package, and Verification artifacts instead of copying unchanged fields
 - read nearby repository patterns first

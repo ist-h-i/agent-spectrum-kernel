@@ -22,11 +22,11 @@
         "adapters/claude-code/project/.claude/hooks/hooks.json",
         "scripts/install-claude-adapter.mjs"
       ],
-      "subject_digest": "sha256:c57acfe91006d0d7ab9972de74d2f9478d0c38e3f95d5bf5058b98f349925abd",
+      "subject_digest": "sha256:3e2eae69989186331e5c3e03ea05be28441aea02ae7e7c16cc42c922bcce57d5",
       "scope": "profile_projection",
       "profile_id": "claude-code-local-observed-v1",
       "renderer_profile": "observability",
-      "profile_fingerprint": "sha256:010927193305a2d22c4e048cc39a9ad680bf22db5d66c6c486a454c633755c37"
+      "profile_fingerprint": "sha256:6789289515959833c33c7c71136fd0c69f8242501e564f16f42d2170dae598eb"
     },
     {
       "record_id": "codex-projection-manifest",
@@ -50,11 +50,11 @@
         "adapters/codex/commands/codex-exec.md",
         "scripts/install-codex-adapter.mjs"
       ],
-      "subject_digest": "sha256:9af6c97d101dabf5643b11a1cfdb1a51d8cb4f80fcee9f760edd570e7a3b3638",
+      "subject_digest": "sha256:6921260c818e7e3f6e7a5a694c8d6b655f2360358bb68761e6e2e3f2606e8b0a",
       "scope": "profile_projection",
       "profile_id": "codex-local-projection-v1",
       "renderer_profile": "implementation",
-      "profile_fingerprint": "sha256:51de960737a49572113de4d55c6c47f0d24a0feef8795c42eb9e5f5925b60fc9"
+      "profile_fingerprint": "sha256:5e1a5fa16a46ab4aa1f3af23b638d784b0601f723e3f5a07ab1314d3f2867c23"
     },
     {
       "record_id": "claude-canonical-metrics-collector",
@@ -73,17 +73,20 @@
         "adapters/claude-code/project/.claude/commands/skill-review.md",
         "adapters/claude-code/project/.claude/commands/skill-verify.md",
         "adapters/claude-code/project/.claude/hooks/hooks.json",
+        "schemas/adapter-runtime-event.schema.json",
         "schemas/execution-envelope.schema.json",
         "schemas/metrics-event.schema.json",
         "schemas/review-signal-gate-map.json",
+        "scripts/adapter-runtime-event.mjs",
         "scripts/ai-metrics-record.mjs",
         "scripts/ai-metrics-summarize.mjs",
         "scripts/ask-doctor.mjs",
         "scripts/execution-envelope.mjs",
         "scripts/observability-paths.mjs",
+        "scripts/test-adapter-runtime-event.mjs",
         "scripts/test-claude-metrics-collector.mjs"
       ],
-      "subject_digest": "sha256:d9d8723c6ec3e1a69456bda6273ce9fb196df6fc6a0848957ee6abc9d8733b41",
+      "subject_digest": "sha256:9622252d8fb6d74e3a4b4d61bba3acafa78727166db94e1d10462c7e3767188e",
       "verification": {
         "verifier_path": "scripts/test-claude-metrics-collector.mjs",
         "fixture_id": "claude-canonical-metrics-collector",

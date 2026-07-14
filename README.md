@@ -62,6 +62,10 @@ docs/
   adapter-conformance-contract.md
   adapter-capability-matrix.md
   adapter-runtime-boundary-contract.md
+  adapter-runtime-migration.md
+  adapter-cross-conformance-report.md
+  fixtures/adapter-runtime-bundle.json
+  fixtures/adapter-cross-conformance.json
   fixtures/adapter-runtime-profiles.json
   fixtures/adapter-runtime-evidence.json
   claude-github-review-setup.md
@@ -110,6 +114,7 @@ schemas/
   metrics-event.schema.json
   adapter-runtime-profile.schema.json
   adapter-runtime-evidence.schema.json
+  adapter-runtime-event.schema.json
   normalized-event-schema-registry.json
   adoption-report.schema.json
   improvement-ledger-entry.schema.json
@@ -133,7 +138,10 @@ scripts/
   ask-doctor.mjs
   ask-sensors.mjs
   execution-envelope.mjs
+  adapter-runtime-event.mjs
   adapter-runtime-smoke.mjs
+  adapter-runtime-bundle.mjs
+  adapter-cross-conformance.mjs
   codex-exec-runner.mjs
   install-kernel.mjs
   install-codex-adapter.mjs
@@ -298,6 +306,22 @@ Implementation, investigation, review, verification, and handoff prompt profiles
 
 The Codex adapter is intentionally smaller than the Claude Code adapter: no hooks, no local metrics sidecar, no shared PR workflow, and no external publication path are provided. Capability claims are downgraded in `docs/adapter-capability-matrix.md`.
 
+## Dual-runtime generation and conformance
+
+The canonical source can generate one deterministic bundle covering the common Claude/Codex profiles without treating either adapter projection as a second workflow truth:
+
+```bash
+node scripts/adapter-runtime-bundle.mjs --check
+node scripts/adapter-runtime-bundle.mjs --write
+node scripts/adapter-cross-conformance.mjs
+node scripts/test-adapter-runtime-event.mjs
+node scripts/test-adapter-runtime-migration.mjs
+```
+
+`docs/fixtures/adapter-runtime-bundle.json` binds the common profile projections to one canonical union digest while retaining each adapter's own subset digest, renderer fingerprint, and managed inventory. The nine same-fixture checks independently derive normalized contract meaning from each renderer's generated command or prompt bytes before comparing the results. Mutation fixtures remove approval/stop, verification, final-review, executable-handoff, and knowledge-promotion bytes and must fail closed. Claude metrics events and Codex runner reports are mapped through `scripts/adapter-runtime-event.mjs` and validated against `schemas/adapter-runtime-event.schema.json`. Their current conformance evidence level is `projected`; external runtime loading and behavioral conformance remain unavailable until bounded Claude/Codex runs are captured.
+
+Upgrade, rollback, profile shrink, coexistence, and detach guidance is in `docs/adapter-runtime-migration.md`. The post-architecture Checkpoint C handoff preserves the B/B2 baselines and requires architecture, model, CLI, adapter, and repository changes to be attributed separately.
+
 ## Doctor and sensors
 
 Use `ask-doctor` after first adoption, kernel updates, adapter installation, skill projection refresh, or suspected installation drift:
@@ -326,6 +350,8 @@ node ./scripts/codex-exec-runner.mjs --prompt skill-implement.md --mode implemen
 
 The Codex runner can report `executed` after capturing output and running `ask-sensors`; this evidences only the inspected output contract. It does not prove workflow, risk/approval, or verification-contract application, business correctness, product readiness, or no regression.
 
+After classifying the task, pass `--gates-observed` when no task-specific gate applies, or `--required-gate <id>` for each required gate. Review runs include `review-final-merge-gate` from the managed prompt contract. Missing gate observation is recorded as missing evidence; an explicitly required `risk-gate` without specific-action approval stops before Codex invocation.
+
 Use `ask-sensors` to classify control risks in an implementation or review output:
 
 ```bash
@@ -346,7 +372,7 @@ First-time users should start with `docs/quickstart-ja.md`.
 - `docs/execution-envelope-contract.md`: shared Execution Envelope source of truth for routing, evidence, stop reasons, and next actions.
 - `docs/usage-ja.md`: representative usage guide for common operating patterns.
 - `docs/skill-matrix.md`: reference matrix for workflow selection.
-- `docs/adapter-conformance-contract.md`, `docs/adapter-capability-matrix.md`, and `docs/adapter-deployment-governance.md`: adapter portability, capability evidence, supported deployment profiles, and operational governance.
+- `docs/adapter-conformance-contract.md`, `docs/adapter-capability-matrix.md`, `docs/adapter-deployment-governance.md`, and `docs/adapter-runtime-migration.md`: adapter portability, capability evidence, supported deployment profiles, migration, rollback, and operational governance.
 - Full-layer intelligence ledger templates: `docs/ai/engineering-pattern-ledger.md`, `docs/ai/verification-pattern-ledger.md`, `docs/ai/review-rule-ledger.md`, `docs/ai/documentation-knowledge-ledger.md`, `docs/ai/architecture-decision-memory.md`, and `docs/ai/engineering-capability-ledger.md`.
 - `docs/ai/stakeholder-readiness-report-template.md`: stakeholder-specific readiness reports that separate internal quality, release readiness, and client-value readiness.
 - `docs/ai/reports/examples/`: fixture-backed stakeholder-readiness samples for senior engineering, development management, business unit, and AI promotion views.

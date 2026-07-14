@@ -3,9 +3,11 @@ export const CLAUDE_RUNTIME_FILES = Object.freeze([
   { name: "ai-metrics-summarize.mjs", source: "scripts/ai-metrics-summarize.mjs", target: "scripts/ai-metrics-summarize.mjs", assetKind: "runner" },
   { name: "ai-ledger-refresh.mjs", source: "scripts/ai-ledger-refresh.mjs", target: "scripts/ai-ledger-refresh.mjs", assetKind: "runner" },
   { name: "execution-envelope.mjs", source: "scripts/execution-envelope.mjs", target: "scripts/execution-envelope.mjs", assetKind: "runner" },
+  { name: "adapter-runtime-event.mjs", source: "scripts/adapter-runtime-event.mjs", target: "scripts/adapter-runtime-event.mjs", assetKind: "runner" },
   { name: "observability-paths.mjs", source: "scripts/observability-paths.mjs", target: "scripts/observability-paths.mjs", assetKind: "runner" },
   { name: "execution-envelope.schema.json", source: "schemas/execution-envelope.schema.json", target: "scripts/execution-envelope.schema.json", assetKind: "schemas" },
   { name: "metrics-event.schema.json", source: "schemas/metrics-event.schema.json", target: "scripts/metrics-event.schema.json", assetKind: "schemas" },
+  { name: "adapter-runtime-event.schema.json", source: "schemas/adapter-runtime-event.schema.json", target: "scripts/adapter-runtime-event.schema.json", assetKind: "schemas" },
 ]);
 
 export const CODEX_RUNTIME_FILES = Object.freeze([
@@ -13,8 +15,10 @@ export const CODEX_RUNTIME_FILES = Object.freeze([
   { name: "ask-sensors.mjs", source: "scripts/ask-sensors.mjs", target: "scripts/ask-sensors.mjs", assetKind: "runner" },
   { name: "ask-shared.mjs", source: "scripts/ask-shared.mjs", target: "scripts/ask-shared.mjs", assetKind: "runner" },
   { name: "execution-envelope.mjs", source: "scripts/execution-envelope.mjs", target: "scripts/execution-envelope.mjs", assetKind: "runner" },
+  { name: "adapter-runtime-event.mjs", source: "scripts/adapter-runtime-event.mjs", target: "scripts/adapter-runtime-event.mjs", assetKind: "runner" },
   { name: "execution-envelope.schema.json", source: "schemas/execution-envelope.schema.json", target: "scripts/execution-envelope.schema.json", assetKind: "schemas" },
   { name: "metrics-event.schema.json", source: "schemas/metrics-event.schema.json", target: "scripts/metrics-event.schema.json", assetKind: "schemas" },
+  { name: "adapter-runtime-event.schema.json", source: "schemas/adapter-runtime-event.schema.json", target: "scripts/adapter-runtime-event.schema.json", assetKind: "schemas" },
 ]);
 
 export const ADAPTER_RENDERER_METADATA = Object.freeze({

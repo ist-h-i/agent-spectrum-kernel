@@ -8,6 +8,8 @@ Entry mode: investigation. Primary contract: `doubt-driven-development`. Start r
 
 {{ASK_COMPACT_DIRECT_TRIGGERS}}
 
+[agent_activity] opt-in; S/C/F counts.
+
 Findings:
 - ...
 

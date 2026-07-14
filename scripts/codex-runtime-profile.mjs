@@ -134,18 +134,18 @@ export function validateCodexCompactControlMap(controlMap = readControlMap()) {
 }
 
 function renderControl(controlId, control) {
-  if (controlId === "scope") return "[scope] Read workspace/code/tests/docs/public contract; missing required input => stop/insufficient_evidence; smallest diff; cleanup separate.";
-  if (controlId === "verification") return "[verification] Contract before behavior change; focused first; broader by risk; exact results.";
-  if (controlId === "risk_approval") return "[risk_approval] Name exact action/risk type/impact/reversibility/external visibility, safer alternative, and preconditions. Stop without approval for that specific action; execute only it.";
-  if (controlId === "evidence") return `[evidence] ${control.truth_statuses.join("/")}; claims need evidence; otherwise downgrade.`;
-  if (controlId === "missing_evidence") return "[missing_evidence] unavailable/insufficient_evidence; no inference; stop if required.";
-  if (controlId === "output") return "[output] Required sections + one Execution Envelope; next_action only there.";
+  if (controlId === "scope") return "[scope] Repo/code/tests/docs/API; missing => stop/insufficient_evidence; smallest diff; no cleanup.";
+  if (controlId === "verification") return "[verification] Before behavior change: contract; focused then risk-based checks; exact results.";
+  if (controlId === "risk_approval") return "[risk_approval] Exact action/risk/impact/reversibility/visibility; alternative/preconditions. Stop without approval for that specific action; execute only it.";
+  if (controlId === "evidence") return `[evidence] ${control.truth_statuses.join("/")}; claims need evidence else downgrade.`;
+  if (controlId === "missing_evidence") return "[missing_evidence] unavailable/insufficient_evidence; no inference; required => stop.";
+  if (controlId === "output") return "[output] Required sections; one Execution Envelope; next_action only there.";
   throw new Error(`compact control has no renderer: ${controlId}`);
 }
 
 function renderControls(controlMap) {
   return [
-    "Generated critical controls (apply if Skill load is unavailable):",
+    "Fallback controls:",
     "",
     ...controlMap.required_control_ids.map((controlId) => `- ${renderControl(controlId, controlMap.controls[controlId])}`),
   ].join("\n");
@@ -199,6 +199,8 @@ export function renderCodexCompactProfile(promptName, {
   canonicalContract,
   profileFingerprint,
   controlMap = readControlMap(),
+  additionalRequestedContracts = [],
+  knowledgePromotion = false,
 } = {}) {
   const definition = CODEX_COMPACT_PROFILE_DEFINITIONS[promptName];
   if (!definition) throw new Error(`Unknown Codex compact profile prompt: ${promptName}`);
@@ -209,7 +211,10 @@ export function renderCodexCompactProfile(promptName, {
   const triggers = validatedControlMap.direct_triggers[definition.taskClass];
   const renderedBody = body
     .replace(CONTROL_PLACEHOLDER, renderControls(validatedControlMap))
-    .replace(DIRECT_TRIGGER_PLACEHOLDER, renderDirectTriggers(triggers));
+    .replace(DIRECT_TRIGGER_PLACEHOLDER, [
+      renderDirectTriggers(triggers),
+      knowledgePromotion ? "[knowledge_promotion] Explicit request => operating-mode-router then domain-rule-ledger." : "",
+    ].filter(Boolean).join("\n\n"));
   validateRenderedCodexCompactControls(renderedBody, validatedControlMap);
   const metadata = {
     schema_version: "1.1.0",
@@ -218,7 +223,7 @@ export function renderCodexCompactProfile(promptName, {
     mode: CODEX_PROMPT_CONTRACTS[promptName].mode,
     task_class: definition.taskClass,
     primary_contract: definition.primarySkill,
-    requested_contracts: definition.requestedContracts,
+    requested_contracts: [...new Set([...definition.requestedContracts, ...additionalRequestedContracts])],
     control_ids: validatedControlMap.required_control_ids,
     direct_trigger_ids: triggers.map((trigger) => trigger.id),
     canonical_revision: canonicalContract.revision,
@@ -228,9 +233,11 @@ export function renderCodexCompactProfile(promptName, {
   const header = `<!-- ASK_CODEX_COMPACT_PROFILE ${JSON.stringify({
     v: metadata.schema_version,
     id: metadata.profile_id,
-    revision: metadata.canonical_revision,
-    source_digest: metadata.canonical_source_digest,
-    profile_fingerprint: metadata.profile_fingerprint,
+    r: metadata.canonical_revision,
+    s: metadata.canonical_source_digest.replace(/^sha256:/u, ""),
+    p: metadata.profile_fingerprint.replace(/^sha256:/u, ""),
+    rc: metadata.requested_contracts.join(","),
+    ci: metadata.control_ids.join(","),
   })} -->`;
   const content = `${header}\n${renderedBody.trim()}\n`;
   return {

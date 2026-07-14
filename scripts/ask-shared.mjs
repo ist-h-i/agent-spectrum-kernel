@@ -98,26 +98,31 @@ export const CODEX_PROMPT_CONTRACTS = {
   "skill-implement.md": {
     mode: "implementation",
     sandbox: "workspace-write",
+    requiredGates: [],
     requiredSections: ["Implementation Contract:", "Evidence:", "Execution Envelope:"],
   },
   "skill-investigate.md": {
     mode: "investigation",
     sandbox: "workspace-write",
+    requiredGates: [],
     requiredSections: ["Findings:", "Cause:", "Changed:", "Verified:", "Unknown / not verified:", "Next:", "Execution Envelope:"],
   },
   "skill-review.md": {
     mode: "review",
     sandbox: "read-only",
+    requiredGates: ["review-final-merge-gate"],
     requiredSections: ["Change signals:", "Required gates:", "Skipped heavy gates:", "Missing evidence:", "Decision:", "Blocking evidence:", "Passed required gates:", "Insufficient evidence:", "Non-blocking follow-ups:", "Residual risk:", "Execution Envelope:"],
   },
   "skill-verify.md": {
     mode: "verification",
     sandbox: "workspace-write",
+    requiredGates: [],
     requiredSections: ["Verification Contract:", "Evidence:", "Execution Envelope:"],
   },
   "skill-handoff.md": {
     mode: "handoff",
     sandbox: "read-only",
+    requiredGates: [],
     requiredSections: ["Task:", "Context:", "Allowed scope:", "Forbidden scope:", "Expected output:", "Verification:", "Stop condition:", "Execution Envelope:"],
   },
 };
@@ -210,7 +215,16 @@ export function parseCodexCompactProfileHeader(content) {
   const match = content.match(/^<!-- ASK_CODEX_COMPACT_PROFILE (\{[^\n]+\}) -->/u);
   if (!match) return null;
   try {
-    return JSON.parse(match[1]);
+    const parsed = JSON.parse(match[1]);
+    return {
+      v: parsed.v,
+      id: parsed.id,
+      revision: parsed.r,
+      source_digest: typeof parsed.s === "string" ? `sha256:${parsed.s}` : null,
+      profile_fingerprint: typeof parsed.p === "string" ? `sha256:${parsed.p}` : null,
+      requested_contracts: typeof parsed.rc === "string" ? parsed.rc.split(",").filter(Boolean) : [],
+      control_ids: typeof parsed.ci === "string" ? parsed.ci.split(",").filter(Boolean) : [],
+    };
   } catch {
     return null;
   }

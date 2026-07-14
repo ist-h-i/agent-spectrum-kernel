@@ -4,7 +4,13 @@ description: Produce a precise next-task handoff for another agent or human.
 
 Use the installed project skills from this repository projection.
 
+Use `/evidence-ledger` to separate verified resume evidence from unresolved risk.
+
 Use `/handoff-generation` after reading the relevant repository context and current diff or issue state. The handoff must be executable, not a generic summary.
+
+- require approval for the specific action and stop without that approval before any risk-gated action
+- when required evidence is missing, report `insufficient_evidence` and stop; do not infer the missing result
+- do not start or delegate agents unless the request explicitly requires agent activity; report started, completed, and failed counts
 
 Output the next task in this shape:
 

@@ -6,6 +6,8 @@ The installer generates a profile-limited `.agents/commands/codex-exec.md` in ad
 
 Run these commands from the adopting repository so that `scripts/codex-exec-runner.mjs` is the installed, managed runner for that repository.
 
+After task classification, add `--gates-observed` when no task-specific gate is required, or repeat `--required-gate <id>` for each required gate. Without either evidence, the normalized event records `required_gate_observation` as missing. The review entry always records `review-final-merge-gate`; `--required-gate risk-gate` records missing specific-action approval and stops before invoking Codex.
+
 ## Implementation
 
 ```bash
@@ -46,7 +48,7 @@ node scripts/codex-exec-runner.mjs --prompt skill-handoff.md --mode handoff --sa
 
 The runner performs local preflight, loads the generated compact prompt/profile,
 invokes `codex exec`, captures final output, runs `ask-sensors`, and reports
-requested contracts, projected contracts, runtime-loaded contracts, and applied
+requested contracts, required gates, projected contracts, runtime-loaded contracts, and applied
 output-contract evidence separately. Workflow, risk/approval, and verification
 application remain unavailable unless separately observed.
 Codex-controlled Skill loading remains unavailable unless separately observed.
