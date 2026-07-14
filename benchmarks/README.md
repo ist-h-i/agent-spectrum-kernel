@@ -53,15 +53,28 @@ The frozen rules are in [protocol-c.md](protocol-c.md). Keep temporary prompts, 
 
 The measured result is in [results/checkpoint-c-report.md](results/checkpoint-c-report.md), with normalized machine-readable evidence in `results/checkpoint-c-2026-07-14.json`. Full ASK improved one review score but exceeded the quality-gain token allowance; the other three fixtures showed no incremental quality and exceeded the normal token-overhead guardrail.
 
-## Adaptive portfolio foundation
+## Adaptive portfolio foundation and workspace materialization
 
 Issue #197 adds a separate versioned foundation for the redesigned portfolio. The first slice registers the four B2/C fixtures as calibration-only and creates a deterministic plan for separate Codex and Claude tracks across Plain, Kernel-only, Adaptive ASK, and Full ASK:
 
 ```bash
 node scripts/ask-benchmark.mjs validate --config benchmarks/adaptive-portfolio.config.json
 node scripts/ask-benchmark.mjs plan --config benchmarks/adaptive-portfolio.config.json --output /tmp/adaptive-ask-plan.json --seed local-plan-check
+node scripts/ask-benchmark.mjs materialize --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --output /tmp/adaptive-ask-materialized
 ```
 
-The `plan` command does not materialize workspaces, invoke an adapter, inspect condition outcomes, or score results. It records the non-sensitive canonical seed with its ID and SHA-256 digest so the artifact can be independently regenerated. Its `plan_id` binds the config digest, protocol digest, repository revision, and seed into every case/block namespace. Measured execution remains blocked until #193–#197 artifacts are validated and #198 freezes manifests, evaluator digests, thresholds, weights, runtime variables, and seeds.
+The `plan` command records the non-sensitive canonical seed with its ID and SHA-256 digest so the artifact can be independently regenerated. Its `plan_id` binds the config digest, protocol digest, repository revision, and seed into every case/block namespace.
+
+The `materialize` command consumes that existing plan; it never creates or replaces a seed. Before writing a case it re-derives the complete plan identity, validates every manifest-pinned agent-visible input, and rejects evaluator leakage, path escape, symlink traversal, a non-empty output, or adapter/condition projection mixing. It builds through a sibling staging directory and publishes `materialization-manifest.json` only after every case passes Schema and boundary validation.
+
+Each case contains `BENCHMARK_TASK.md`, the frozen `workspace/`, and only its condition projection. Plain has no ASK projection, Kernel-only has canonical `AGENTS.md`, Adaptive has Kernel plus an adapter-owned pre-selection boundary, and Full ASK uses the existing Codex or Claude installer contract independently. The manifest records fixture and projection inventories separately, so all four conditions in a block can prove identical starting inputs without treating generated ASK assets as fixture bytes.
+
+Neither command invokes Claude or Codex, selects Adaptive mechanisms, seals a selection, resumes a partial run, inspects outcomes, or scores results. Measured execution remains blocked until #193–#197 artifacts are validated and #198 freezes manifests, evaluator digests, thresholds, weights, runtime variables, and seeds.
+
+Materialization-specific regression coverage is run with:
+
+```bash
+node scripts/test-ask-benchmark-materialize.mjs
+```
 
 See [protocol-adaptive.md](protocol-adaptive.md) for the condition, adapter-separation, balanced-ordering, repetition, privacy, and pre-result Adaptive selection contracts.
