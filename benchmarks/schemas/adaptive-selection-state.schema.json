@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK selection state index",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "plan_digest",
+    "materialization_manifest_digest",
+    "materialization_output_root_identity",
+    "materializer",
+    "sealed_cases"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
+    "plan_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "materialization_manifest_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "materialization_output_root_identity": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "materializer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "source_revision"],
+      "properties": {
+        "version": { "const": "1.0.0" },
+        "source_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+      }
+    },
+    "sealed_cases": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_id", "selection_digest", "selection_path"],
+        "properties": {
+          "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+          "selection_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "selection_path": { "type": "string", "pattern": "^selections/case-[a-f0-9]{16}-[a-f0-9]{16}\\.json$" }
+        }
+      }
+    }
+  }
+}

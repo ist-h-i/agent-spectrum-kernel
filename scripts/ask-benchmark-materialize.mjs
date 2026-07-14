@@ -34,13 +34,13 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function stableCanonicalJson(value) {
+export function stableCanonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableCanonicalJson).join(",")}]`;
   if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableCanonicalJson(value[key])}`).join(",")}}`;
   return JSON.stringify(value);
 }
 
-function canonicalDigest(value) {
+export function canonicalDigest(value) {
   return `sha256:${sha256(stableCanonicalJson(value))}`;
 }
 
@@ -161,7 +161,16 @@ function validateFixtureInputs({ root, config, plan }) {
   return validated;
 }
 
-function assertExactPlanIdentity({ root, config, plan, repositoryRevision }) {
+function frozenFixtureInventory(records) {
+  return records.map((record) => ({
+    path: record.path === "task.md" ? "BENCHMARK_TASK.md" : record.path,
+    sha256: record.sha256,
+    bytes: record.bytes,
+    mode: `0${record.mode.toString(8).padStart(3, "0")}`,
+  }));
+}
+
+export function assertExactPlanIdentity({ root, config, plan, repositoryRevision }) {
   const schemaPath = assertInside(root, resolve(root, config.execution_plan.schema_path), "execution plan schema");
   assertNoSymlinkSegments(config._configPath, "portfolio config");
   assertNoSymlinkSegments(config._protocolPath, "portfolio protocol");
@@ -345,6 +354,126 @@ function assertBlockInputEquality(cases) {
   for (const [blockId, block] of byBlock) {
     if (block.length !== 4 || new Set(block.map((entry) => entry.frozen_input_digest)).size !== 1) throw new Error(`${blockId} conditions do not share byte-identical frozen inputs`);
   }
+}
+
+function sameInventory(actual, expected) {
+  const sort = (inventory) => [...inventory].sort((left, right) => left.path.localeCompare(right.path));
+  return stableCanonicalJson(sort(actual)) === stableCanonicalJson(sort(expected));
+}
+
+function assertMaterializedAgentVisibleInventory(record) {
+  const paths = new Set();
+  if (!Array.isArray(record.agent_visible_files) || record.agent_visible_files.length === 0) throw new Error(`${record.case_id} agent-visible inventory is missing`);
+  for (const file of record.agent_visible_files) {
+    const path = assertPortableRelativePath(file?.path, `${record.case_id} agent-visible inventory path`);
+    if (path !== "BENCHMARK_TASK.md" && !path.startsWith("workspace/")) throw new Error(`${record.case_id} agent-visible inventory contains an undeclared path`);
+    if (paths.has(path)) throw new Error(`${record.case_id} agent-visible inventory contains duplicate path: ${path}`);
+    paths.add(path);
+    const lowerSegments = path.toLowerCase().split("/");
+    const lowerBase = lowerSegments.at(-1);
+    if (lowerSegments.some((segment) => PROHIBITED_SEGMENTS.has(segment) || /(?:^|[._-])hidden[-_]?tests?(?:[._-]|$)/u.test(segment)) || PROHIBITED_BASENAMES.has(lowerBase)) {
+      throw new Error(`${record.case_id} agent-visible inventory reintroduces evaluator material`);
+    }
+  }
+  if (!paths.has("BENCHMARK_TASK.md") || ![...paths].some((path) => path.startsWith("workspace/"))) throw new Error(`${record.case_id} agent-visible inventory must contain task and workspace files`);
+}
+
+function assertAdaptiveProjectionBoundary({ caseRoot, record, projectedInventory }) {
+  if (record.condition !== "adaptive_ask") return;
+  const expectedFingerprint = canonicalDigest({ adapter: record.adapter, condition: record.condition, inventory: projectedInventory });
+  if (record.projection_evidence?.projection_fingerprint !== expectedFingerprint) throw new Error(`${record.case_id} Adaptive projection fingerprint mismatch`);
+  const boundaryRelativePath = record.adapter === "codex" ? ".agents/adaptive/projection-boundary.json" : ".claude/adaptive/projection-boundary.json";
+  const boundaryPath = assertInside(caseRoot, resolve(caseRoot, boundaryRelativePath), `${record.case_id} Adaptive projection boundary`);
+  if (!existsSync(boundaryPath) || !lstatSync(boundaryPath).isFile()) throw new Error(`${record.case_id} Adaptive projection boundary is missing`);
+  if (stableCanonicalJson(readJson(boundaryPath)) !== stableCanonicalJson(adaptiveBoundary(record.adapter))) throw new Error(`${record.case_id} Adaptive projection boundary drifted`);
+  const adaptive = record.projection_evidence.adaptive_projection;
+  if (adaptive?.boundary_status !== "available_pre_selection" || adaptive.mechanisms_selected !== false || adaptive.selection_seal_produced !== false || adaptive.runtime_execution_attempted !== false) {
+    throw new Error(`${record.case_id} Adaptive projection is no longer at the pre-selection boundary`);
+  }
+}
+
+export function validateMaterializedPortfolio({ root, config, plan, materializedRoot, repositoryRevision }) {
+  const materialized = resolve(materializedRoot);
+  if (!existsSync(materialized) || !lstatSync(materialized).isDirectory()) throw new Error(`materialized root must be an existing directory: ${materialized}`);
+  assertNoSymlinkSegments(materialized, "materialized root");
+  assertExactPlanIdentity({ root, config, plan, repositoryRevision });
+  const fixtureInputs = validateFixtureInputs({ root, config, plan });
+
+  const manifestPath = assertInside(materialized, resolve(materialized, MATERIALIZATION_MANIFEST_NAME), "materialization manifest");
+  assertNoSymlinkSegments(manifestPath, "materialization manifest");
+  if (!existsSync(manifestPath) || !lstatSync(manifestPath).isFile()) throw new Error("materialization manifest is missing or not a regular file");
+  const manifestBytes = readFileSync(manifestPath);
+  const manifest = JSON.parse(manifestBytes);
+  assertBenchmarkSchemaInstance(manifest, { schemaPath: resolve(root, MATERIALIZATION_SCHEMA_PATH), label: "materialization manifest" });
+  const manifestDigest = `sha256:${sha256(manifestBytes)}`;
+  if (manifest.case_count !== manifest.cases.length) throw new Error("materialization manifest case_count does not match cases length");
+  if (manifest.plan.plan_id !== plan.plan_id || manifest.plan.digest !== canonicalDigest(plan)) throw new Error("materialization manifest plan identity mismatch");
+  if (manifest.materializer.version !== MATERIALIZER_VERSION || manifest.materializer.source_revision !== repositoryRevision) throw new Error("materialization manifest materializer identity mismatch");
+  if (manifest.source_identity.config_path !== relative(root, config._configPath).split(sep).join("/") || manifest.source_identity.config_sha256 !== plan.config_sha256 || manifest.source_identity.protocol_path !== relative(root, config._protocolPath).split(sep).join("/") || manifest.source_identity.protocol_sha256 !== plan.protocol_sha256 || manifest.source_identity.repository_revision !== repositoryRevision) {
+    throw new Error("materialization manifest source identity mismatch");
+  }
+  if (manifest.output_root_identity !== canonicalDigest({ plan_id: plan.plan_id, materializer_version: MATERIALIZER_VERSION })) throw new Error("materialization manifest output root identity mismatch");
+
+  const plannedCases = new Map(plan.cases.map((entry) => [entry.case_id, entry]));
+  const manifestCaseIds = new Set();
+  const conditionIdentities = new Set();
+  const blockCases = new Map();
+  for (const record of manifest.cases) {
+    if (manifestCaseIds.has(record.case_id)) throw new Error(`materialization manifest contains duplicate case id: ${record.case_id}`);
+    manifestCaseIds.add(record.case_id);
+    const planned = plannedCases.get(record.case_id);
+    if (!planned) throw new Error(`materialization manifest case is absent from the execution plan: ${record.case_id}`);
+    const bindingFields = [
+      ["block_id", record.block_id, planned.block_id],
+      ["adapter", record.adapter, planned.adapter_track],
+      ["condition", record.condition, planned.condition],
+      ["fixture", record.fixture, planned.fixture_id],
+      ["repetition", record.repetition, planned.repetition],
+      ["registered_repetitions", record.registered_repetitions, planned.registered_repetitions],
+      ["condition_order_position", record.condition_order_position, planned.condition_order_position],
+    ];
+    for (const [field, actual, expected] of bindingFields) {
+      if (actual !== expected) throw new Error(`${record.case_id} materialization ${field} does not match execution plan`);
+    }
+    const conditionIdentity = `${record.adapter}\u0000${record.fixture}\u0000${record.repetition}\u0000${record.condition}`;
+    if (conditionIdentities.has(conditionIdentity)) throw new Error(`materialization manifest contains duplicate adapter/fixture/repetition/condition identity: ${record.case_id}`);
+    conditionIdentities.add(conditionIdentity);
+    if (record.projection_evidence?.adapter_id !== record.adapter) throw new Error(`${record.case_id} projection adapter does not match case adapter`);
+    const expectedProfile = { plain: "plain", kernel_only: "kernel", adaptive_ask: "adaptive-boundary", full_ask: "full" }[record.condition];
+    if (record.projection_evidence?.selected_profile !== expectedProfile) throw new Error(`${record.case_id} condition does not map to the expected projection profile`);
+    assertMaterializedAgentVisibleInventory(record);
+
+    const caseRoot = assertInside(materialized, resolve(materialized, record.case_id), `${record.case_id} root`);
+    assertNoSymlinkSegments(caseRoot, `${record.case_id} root`);
+    if (!existsSync(caseRoot) || !lstatSync(caseRoot).isDirectory()) throw new Error(`${record.case_id} root is missing or not a directory`);
+    const actualInventory = fileInventory(caseRoot);
+    if (actualInventory.some((entry) => {
+      const segments = entry.path.toLowerCase().split("/");
+      const base = segments.at(-1);
+      return segments.some((segment) => PROHIBITED_SEGMENTS.has(segment) || /(?:^|[._-])hidden[-_]?tests?(?:[._-]|$)/u.test(segment)) || PROHIBITED_BASENAMES.has(base);
+    })) throw new Error(`${record.case_id} actual case bytes reintroduce evaluator material`);
+    const projectedInventory = actualInventory.filter((entry) => entry.path !== "BENCHMARK_TASK.md" && !entry.path.startsWith("workspace/"));
+    const frozenInventory = actualInventory.filter((entry) => entry.path === "BENCHMARK_TASK.md" || entry.path.startsWith("workspace/"));
+    const fixture = fixtureInputs.get(record.fixture);
+    if (!fixture || !sameInventory(frozenInventory, frozenFixtureInventory(fixture.records))) throw new Error(`${record.case_id} frozen input does not match the fixture manifest`);
+    if (!sameInventory(actualInventory, [...record.agent_visible_files, ...record.projected_asset_inventory])) throw new Error(`${record.case_id} actual case files do not match the declared inventory`);
+    if (!sameInventory(frozenInventory, record.agent_visible_files) || !sameInventory(projectedInventory, record.projected_asset_inventory)) throw new Error(`${record.case_id} case inventory partition drifted`);
+    validateMaterializationProjectionInventory({ adapter: record.adapter, condition: record.condition, inventory: projectedInventory });
+    const task = frozenInventory.find((entry) => entry.path === "BENCHMARK_TASK.md");
+    const workspaceInventory = frozenInventory.filter((entry) => entry.path.startsWith("workspace/"));
+    if (!task || record.frozen_input_digest !== digestInventory(frozenInventory) || record.task_digest !== `sha256:${task.sha256}` || record.workspace_digest !== digestInventory(workspaceInventory) || record.condition_projection_digest !== digestInventory(projectedInventory)) {
+      throw new Error(`${record.case_id} actual case digest mismatch`);
+    }
+    assertAdaptiveProjectionBoundary({ caseRoot, record, projectedInventory });
+    blockCases.set(record.block_id, [...(blockCases.get(record.block_id) ?? []), record]);
+  }
+  if (manifestCaseIds.size !== plannedCases.size || [...plannedCases.keys()].some((caseId) => !manifestCaseIds.has(caseId))) throw new Error("materialization manifest case ids do not exactly match execution plan cases");
+  for (const [blockId, cases] of blockCases) {
+    if (cases.length !== 4 || new Set(cases.map((entry) => entry.condition)).size !== 4 || new Set(cases.map((entry) => entry.frozen_input_digest)).size !== 1 || new Set(cases.map((entry) => entry.task_digest)).size !== 1 || new Set(cases.map((entry) => entry.workspace_digest)).size !== 1) {
+      throw new Error(`${blockId} does not contain one byte-identical case for every condition`);
+    }
+  }
+  return { manifest, manifestDigest, manifestPath, casesById: new Map(manifest.cases.map((entry) => [entry.case_id, entry])) };
 }
 
 export function materializePortfolio({ root, config, planPath, outputPath, repositoryRevision }) {

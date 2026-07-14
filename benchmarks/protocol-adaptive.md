@@ -1,7 +1,7 @@
 # Adaptive ASK Portfolio Foundation and Materialization Protocol
 
-Protocol version: `3.1.0-materialization`
-Protocol status: foundation and materialization contract; not frozen for measured execution
+Protocol version: `3.2.0-selection-seal`
+Protocol status: foundation, materialization, and selection-seal contract; not frozen for measured execution
 Parent issue: #197
 Portfolio parent: #192
 Dependencies: #179, merged PR #191, and merged PR #199
@@ -75,22 +75,39 @@ The plan digest is embedded in every case and block identifier. A config, protoc
 
 The portfolio config and emitted plan are validated as complete instances against their declared JSON Schemas through the repository's shared validator. Validation happens before a plan is written. Adaptive selection records use the same shared validator entrypoint.
 
-## Adaptive pre-result selection
+## Adaptive pre-result selection and seal
 
-Every Adaptive run must eventually produce a separate record conforming to `benchmarks/schemas/adaptive-selection.schema.json` before task outcome scoring. It records:
+Only an existing Adaptive case may be sealed. `seal-selection` consumes a previously validated plan and materialization; it never creates a plan, rematerializes a case, invokes an adapter, or writes into an agent-visible case directory.
 
-- task class and observed signals;
-- selected and skipped mechanisms;
-- required gates;
-- agents requested and omitted;
-- expected evidence;
-- capability downgrades;
-- lightweight-bypass use and rationale;
-- adapter/profile/renderer/projection fingerprint;
-- selection timestamp and SHA-256 digest.
+```bash
+node scripts/ask-benchmark.mjs seal-selection \
+  --config benchmarks/adaptive-portfolio.config.json \
+  --plan /path/to/execution-plan.json \
+  --materialized /path/to/materialized-root \
+  --state-dir /path/to/non-agent-visible-state \
+  --case-id case-... \
+  --input /path/to/selection-input.json
 
-The selection record has no result, score, correctness, recommendation, or completion fields. A later runner slice must seal its digest before outcome generation and reject post-result mutation.
+node scripts/ask-benchmark.mjs verify-selection \
+  --config benchmarks/adaptive-portfolio.config.json \
+  --plan /path/to/execution-plan.json \
+  --materialized /path/to/materialized-root \
+  --state-dir /path/to/non-agent-visible-state \
+  --case-id case-...
+```
+
+Before accepting a seal, the consumer revalidates the plan and manifest Schema plus plan/config/protocol/repository/materializer identities, case count and namespaces, all plan-to-case fields, four-condition block equality, projection adapter/profile/fingerprint, actual inventories, SHA-256 digests, modes, path/symlink gates, and evaluator exclusion. It re-anchors every frozen inventory to the plan-pinned fixture input manifest, mapping fixture `task.md` to materialized `BENCHMARK_TASK.md`, so a matching rewritten materialization manifest cannot replace fixture bytes. It does not trust manifest status strings without checking the current case bytes.
+
+The normalized selection input records task class and at least one non-blank observed signal; selected and skipped mechanisms; required gates; requested and omitted agents; expected evidence; capability downgrades; lightweight-bypass use and rationale; and the exact adapter/profile/renderer/projection fingerprint. The sealed record additionally binds `plan_id`, canonical plan digest, materialization-manifest digest, output-root identity, materializer version/revision, case/block/adapter/condition/fixture/repetition identity, frozen-input digest, condition-projection digest, and projection fingerprint. It has no result, score, correctness, recommendation, completion, hidden-test, oracle, or evaluator fields.
+
+The selection timestamp is RFC 3339 and is included in the sealed content. The CLI always creates it from its clock; the command surface has no timestamp override. Focused tests inject a clock only through the module boundary. A caller-supplied digest is rejected. `selection_digest` is SHA-256 of the exact canonical JSON record with only `selection_digest` omitted: object keys sort lexicographically at every nesting level, JSON primitive spelling is preserved, and array order remains semantic. Schema-declared unique arrays reject duplicates. This prevents self-hashing and makes property insertion order irrelevant; changing any bound field changes the digest.
+
+State is outside every case root at `<state-dir>/selections/<case-id>.json`. A versioned `<state-dir>/selection-state.json` binds the state root to one plan and materialization and records prior seals, so deleting a selection file cannot permit recreation. State-root and selection paths reject regular-file roots and symlink traversal; unknown state entries, state under a case, overwrites, and foreign plan/materialization identities fail closed. Publication stages files under the state root, creates the seal without replacement, updates the index atomically, removes staging on failure, and makes sealed files read-only where supported. This is deterministic tamper evidence and workflow control, not cryptographic protection against an administrator rewriting the entire filesystem.
+
+Lightweight bypass is valid only with a non-empty reason, no selected mechanisms, and an explicit non-empty skipped set; an empty ordinary selection is not a bypass. Capability downgrades explicitly preserve capability and reason, cannot also be listed as a selected mechanism, and do not substitute the other adapter or score an unavailable runtime as zero. The selection boundary records a decision; it does not claim that any mechanism or runtime was executed.
+
+Selection rejects Plain, Kernel-only, Full ASK, missing/stale/foreign cases, an already sealed case, and any benchmark artifact at every case path, including `workspace/**/.benchmark-*`. Generic result/output/score/telemetry names remain workspace-exempt so ordinary fixture source is not rejected merely by its filename. The same result-artifact helper is the required integration point for a later runtime slice. Both selection commands require tracked working-tree and index bytes to match `HEAD` before reading config, schemas, plan, or state. `verify-selection` performs no writes and exits nonzero for missing or invalid state.
 
 ## Privacy and stop boundary
 
-Raw prompts, full outputs, full event streams, full source, secrets, customer data, and personal data remain outside durable plans and results. Canonical randomization seeds are public preregistration inputs and must not contain sensitive data. Stop before measured execution until fixture manifests, evaluator digests, thresholds, weights, runtime variables, randomization seeds, and human-evaluation instructions are frozen under #198.
+Raw prompts, full outputs, full event streams, full source, secrets, customer data, and personal data remain outside durable plans, selections, and results. Selection state is non-agent-visible and must not be copied into `workspace/` or exposed through `BENCHMARK_TASK.md`. Canonical randomization seeds are public preregistration inputs and must not contain sensitive data. No measured execution is authorized: stop before Codex/Claude invocation, output collection, scoring, telemetry, or result inspection until fixture manifests, evaluator digests, thresholds, weights, runtime variables, randomization seeds, and human-evaluation instructions are frozen under #198.
