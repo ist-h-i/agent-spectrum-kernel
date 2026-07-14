@@ -278,6 +278,7 @@ function publishReplacement(stagedPath, destination) {
 }
 
 function assertSealedRecord(record, context) {
+  assertObservedSignals(record);
   assertBenchmarkSchemaInstance(record, { schemaPath: resolve(context.root, ADAPTIVE_SELECTION_SCHEMA_PATH), label: "sealed Adaptive selection" });
   const expectedBinding = bindingFor(context);
   for (const [field, expected] of Object.entries(expectedBinding)) {
