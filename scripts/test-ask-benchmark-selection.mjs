@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, sy
 import { dirname, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { computeSelectionDigest, sealAdaptiveSelection } from "./ask-benchmark-selection.mjs";
+import { computeSelectionDigest, findResultArtifacts, sealAdaptiveSelection } from "./ask-benchmark-selection.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -386,7 +386,8 @@ try {
         resultCase.workspace_digest = canonicalDigest(resultCase.agent_visible_files.filter((entry) => entry.path.startsWith("workspace/")));
       }
       writeJson(manifestPath, resultManifest);
-      expectFailure(`workspace benchmark artifact ${relativePath}`, sealArgs(spareCase, spareInputPath, resolve(work, `state-${relativePath.replaceAll(/[^a-z0-9]+/giu, "-")}`)), /result-like artifact/u);
+      assert.ok(findResultArtifacts(resolve(materialized, spareCase.case_id)).includes(relativePath), `${relativePath} must be detected as a result artifact`);
+      expectFailure(`workspace benchmark artifact ${relativePath}`, sealArgs(spareCase, spareInputPath, resolve(work, `state-${relativePath.replaceAll(/[^a-z0-9]+/giu, "-")}`)), /result-like artifact|frozen input.*fixture manifest/u);
     } finally {
       for (const artifactPath of artifactPaths) rmSync(artifactPath, { force: true });
       writeFileSync(manifestPath, originalManifestBytes);
