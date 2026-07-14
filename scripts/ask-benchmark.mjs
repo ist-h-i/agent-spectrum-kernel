@@ -98,6 +98,28 @@ function validateProtocol(configPath = DEFAULT_CONFIG_PATH) {
   if (config.privacy.store_raw_prompts || config.privacy.store_full_outputs || config.privacy.store_full_source || config.privacy.store_secrets_customer_or_personal_data) errors.push("durable raw or sensitive capture must be disabled");
   if (!outputSchema.required?.includes("route") || !outputSchema.required?.includes("verification_commands")) errors.push("agent output schema must require route and verification evidence fields");
   if (JSON.stringify(outputSchema).includes('"oneOf"')) errors.push("agent output schema must avoid response-format-unsupported oneOf");
+  if (config.checkpoint === "C") {
+    const attribution = config.attribution;
+    if (!attribution) errors.push("Checkpoint C requires attribution metadata");
+    else {
+      if (attribution.model?.current !== config.runtime.model) errors.push("Checkpoint C model attribution must match runtime.model");
+      if (attribution.cli?.current !== config.runtime.agent_version) errors.push("Checkpoint C CLI attribution must match runtime.agent_version");
+      if (attribution.repository?.fixture_inputs_changed !== false) errors.push("Checkpoint C must explicitly preserve frozen fixture inputs");
+      for (const [pathValue, expectedHash, label] of [
+        [attribution.baseline_result_path, null, "baseline result"],
+        [attribution.fixture_manifest_path, attribution.fixture_manifest_sha256, "fixture manifest"],
+        [attribution.adapter?.runtime_bundle_path, attribution.adapter?.runtime_bundle_sha256, "adapter runtime bundle"],
+      ]) {
+        if (!pathValue) {
+          errors.push(`Checkpoint C ${label} path is required`);
+          continue;
+        }
+        const path = resolveRepoPath(pathValue, label);
+        if (!existsSync(path)) errors.push(`Checkpoint C ${label} is missing: ${pathValue}`);
+        else if (expectedHash && sha256(readFileSync(path)) !== expectedHash) errors.push(`Checkpoint C ${label} digest does not match: ${pathValue}`);
+      }
+    }
+  }
   const protocolPath = resolveRepoPath(config.protocol_path ?? "benchmarks/protocol.md", "protocol_path");
   if (!existsSync(protocolPath)) errors.push(`protocol is missing: ${relative(ROOT, protocolPath)}`);
   for (const fixture of config.fixtures) {
@@ -557,6 +579,7 @@ function score(args) {
       repository_revision: manifest.repository_revision,
     },
     runtime: { ...config.runtime, observed_agent_version: manifest.runtime_observation?.agent_version ?? null },
+    ...(config.attribution ? { attribution: config.attribution } : {}),
     runs,
     comparison: {
       primary_comparator: "kernel_only",
@@ -569,7 +592,9 @@ function score(args) {
       "Senior correction time, additional investigation time, unresolved human decisions, rework, and usage cost are unknown until a blinded human evaluator records them.",
       "Review finding matching is a frozen semantic heuristic and may undercount or overcount paraphrases.",
       "Automated correction units are a bounded quality proxy, not human effort or rework.",
-      "Checkpoint C remains pending until #179 and must separate architecture changes from model, CLI, repository, and adapter changes."
+      config.checkpoint === "C"
+        ? "Checkpoint C does not isolate architecture causally because CLI, repository, and adapter projection evidence changed from B2; model and fixture inputs were controlled."
+        : "Checkpoint C remains pending until #179 and must separate architecture changes from model, CLI, repository, and adapter changes."
     ],
     privacy: {
       raw_prompts_stored_in_result: false,

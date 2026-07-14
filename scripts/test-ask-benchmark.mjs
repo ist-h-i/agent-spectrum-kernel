@@ -11,6 +11,7 @@ const runner = resolve(root, "scripts/ask-benchmark.mjs");
 const work = mkdtempSync(resolve(tmpdir(), "ask-benchmark-test-"));
 const advancedWork = mkdtempSync(resolve(tmpdir(), "ask-benchmark-b2-test-"));
 const advancedConfig = resolve(root, "benchmarks/checkpoint-b2.config.json");
+const checkpointCConfig = resolve(root, "benchmarks/checkpoint-c.config.json");
 const advancedFixtureRoot = resolve(root, "benchmarks/fixtures/checkpoint-b2");
 
 function run(args, expectedStatus = 0) {
@@ -25,6 +26,7 @@ function run(args, expectedStatus = 0) {
 
 run(["validate"]);
 run(["validate", "--config", advancedConfig]);
+run(["validate", "--config", checkpointCConfig]);
 run(["prepare", "--output", work, "--seed", "fixture-seed"]);
 run(["prepare", "--config", advancedConfig, "--output", advancedWork, "--seed", "advanced-fixture-seed"]);
 
@@ -105,6 +107,25 @@ const advancedNormalized = JSON.parse(readFileSync(advancedResultPath, "utf8"));
 assert.equal(advancedNormalized.runs.length, 12);
 assert.ok(advancedNormalized.runs.every((entry) => entry.outcome_quality.automated_correction_units === 0));
 assert.ok(advancedNormalized.runs.filter((entry) => entry.task_class === "implementation").every((entry) => entry.outcome_quality.requirement_satisfaction_rate === 1));
+
+const checkpointC = JSON.parse(readFileSync(checkpointCConfig, "utf8"));
+assert.equal(checkpointC.checkpoint, "C");
+assert.equal(checkpointC.attribution.model.changed, false);
+assert.equal(checkpointC.attribution.cli.changed, true);
+assert.match(checkpointC.attribution.adapter.runtime_bundle_sha256, /^[a-f0-9]{64}$/);
+
+const checkpointCProtocol = resolve(root, checkpointC.protocol_path);
+advancedManifest.checkpoint = "C";
+advancedManifest.config_path = "benchmarks/checkpoint-c.config.json";
+advancedManifest.config_sha256 = createHash("sha256").update(readFileSync(checkpointCConfig)).digest("hex");
+advancedManifest.protocol_path = checkpointC.protocol_path;
+advancedManifest.protocol_sha256 = createHash("sha256").update(readFileSync(checkpointCProtocol)).digest("hex");
+writeFileSync(resolve(advancedWork, "run.json"), `${JSON.stringify(advancedManifest, null, 2)}\n`);
+const checkpointCResultPath = resolve(advancedWork, "checkpoint-c-normalized.json");
+run(["score", "--config", checkpointCConfig, "--run-dir", advancedWork, "--output", checkpointCResultPath]);
+const checkpointCNormalized = JSON.parse(readFileSync(checkpointCResultPath, "utf8"));
+assert.deepEqual(checkpointCNormalized.attribution, checkpointC.attribution);
+assert.ok(checkpointCNormalized.limitations.every((entry) => !entry.includes("Checkpoint C remains pending")));
 
 for (const entry of manifest.cases) {
   const caseRoot = resolve(work, entry.case_id);
