@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio execution case state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "case_id", "adapter", "condition", "status", "attempt_count", "terminal_attempt", "selection_digest"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "adapter": { "enum": ["codex", "claude"] },
+    "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+    "status": { "enum": ["pending", "active", "completed", "failed", "unavailable", "interrupted", "invalid"] },
+    "attempt_count": { "type": "integer", "minimum": 0 },
+    "terminal_attempt": { "type": ["string", "null"], "pattern": "^[0-9]{4}$" },
+    "selection_digest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+  }
+}

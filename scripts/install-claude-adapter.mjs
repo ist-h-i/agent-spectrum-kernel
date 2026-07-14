@@ -909,7 +909,7 @@ function resolveSelection(args) {
   if (!Array.isArray(profileSkills)) {
     throw new Error(`Profile '${args.profile}' references missing projection pack '${profile.projectionPack}'`);
   }
-  const selectedCommands = [...profile.commands];
+  const selectedCommands = args.skipCommands ? [] : [...profile.commands];
   const skillSeed = args.skills ?? profileSkills;
   const routingFixtures = routingFixturesForProfile(args.profile, skillSeed, selectedCommands);
   const requiredSkills = computeRequiredClosure(skillSeed, selectedCommands, routingFixtures);
@@ -995,10 +995,10 @@ function claudeAssetKindForRecord(path, record) {
   return "configuration";
 }
 
-export function buildClaudeProjectionPlan({ profileName, skills = null, skipHooks = false, skipRuntime = false, previousState = null, prune = false } = {}) {
-  const args = { profile: profileName, skills };
+export function buildClaudeProjectionPlan({ profileName, skills = null, skipHooks = false, skipRuntime = false, skipCommands = false, previousState = null, prune = false } = {}) {
+  const args = { profile: profileName, skills, skipCommands };
   resolveSelection(args);
-  const planShapingOptions = { skills: skills ? [...new Set(skills)].sort() : null, skip_hooks: skipHooks, skip_runtime: skipRuntime };
+  const planShapingOptions = { skills: skills ? [...new Set(skills)].sort() : null, skip_hooks: skipHooks, skip_runtime: skipRuntime, ...(skipCommands ? { skip_commands: true } : {}) };
   const rendererInputs = claudeRendererInputsForSelection(args, { skipHooks, skipRuntime });
   const projectedManagedAssets = claudeProjectedManagedAssets(args, { skipHooks, skipRuntime });
   const actualByPath = new Map(projectedManagedAssets.map((asset) => [asset.path, { ...asset, retained_stale: false }]));
@@ -1022,6 +1022,14 @@ export function buildClaudeProjectionPlan({ profileName, skills = null, skipHook
     projectedManagedAssets,
   });
   return { ...args, ...provenance, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };
+}
+
+export function resolveClaudeSkillClosure(skills) {
+  const manifest = readManifest();
+  const seed = [...new Set(skills ?? [])].sort();
+  const unknown = seed.filter((skill) => !manifest.skills.includes(skill));
+  if (unknown.length > 0) throw new Error(`Unknown skill(s): ${unknown.join(", ")}`);
+  return computeRequiredClosure(seed, [], []);
 }
 
 export function claudeRendererInputPathsForProfile(profileName) {

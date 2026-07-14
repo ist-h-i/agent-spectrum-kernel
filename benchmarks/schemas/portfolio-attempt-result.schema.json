@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio execution attempt result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "case_id", "attempt", "status", "exit_code", "duration_ms", "failure_kind", "final_output", "stdout", "stderr", "event_counts"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "kind": { "const": "result" },
+    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "status": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] },
+    "exit_code": { "type": ["integer", "null"] },
+    "duration_ms": { "type": ["integer", "null"], "minimum": 0 },
+    "failure_kind": { "type": ["string", "null"] },
+    "final_output": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": { "const": "final.json" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "stdout": { "$ref": "#/$defs/stream" },
+    "stderr": { "$ref": "#/$defs/stream" },
+    "event_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["json_lines"],
+      "properties": { "json_lines": { "type": "integer", "minimum": 0 } }
+    }
+  },
+  "$defs": {
+    "stream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bytes", "sha256"],
+      "properties": {
+        "bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

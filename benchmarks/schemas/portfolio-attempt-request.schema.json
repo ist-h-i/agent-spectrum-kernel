@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio execution attempt request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "case_id", "attempt", "adapter", "condition", "input_identity", "selection", "projection", "agent"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "kind": { "const": "request" },
+    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "adapter": { "enum": ["codex", "claude"] },
+    "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+    "input_identity": { "type": "object" },
+    "selection": { "type": ["object", "null"] },
+    "projection": { "type": "object" },
+    "agent": { "type": "object" }
+  }
+}
