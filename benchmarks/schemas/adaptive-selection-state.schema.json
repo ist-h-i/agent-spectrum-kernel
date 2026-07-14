@@ -28,17 +28,16 @@
       }
     },
     "sealed_cases": {
-      "type": "object",
-      "additionalProperties": false,
-      "patternProperties": {
-        "^case-[a-f0-9]{16}-[a-f0-9]{16}$": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["selection_digest", "selection_path"],
-          "properties": {
-            "selection_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-            "selection_path": { "type": "string", "pattern": "^selections/case-[a-f0-9]{16}-[a-f0-9]{16}\\.json$" }
-          }
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_id", "selection_digest", "selection_path"],
+        "properties": {
+          "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+          "selection_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "selection_path": { "type": "string", "pattern": "^selections/case-[a-f0-9]{16}-[a-f0-9]{16}\\.json$" }
         }
       }
     }

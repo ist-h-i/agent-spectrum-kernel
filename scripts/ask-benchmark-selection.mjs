@@ -217,16 +217,17 @@ function stateIdentityFor(context) {
     materialization_manifest_digest: binding.materialization_manifest_digest,
     materialization_output_root_identity: binding.materialization_output_root_identity,
     materializer: binding.materializer,
-    sealed_cases: {},
+    sealed_cases: [],
   };
 }
 
 function stableStateIndex(index) {
-  return { ...index, sealed_cases: Object.fromEntries(Object.entries(index.sealed_cases).sort(([left], [right]) => left.localeCompare(right))) };
+  return { ...index, sealed_cases: [...index.sealed_cases].sort((left, right) => left.case_id.localeCompare(right.case_id)) };
 }
 
 function assertStateIdentity(index, context) {
   assertBenchmarkSchemaInstance(index, { schemaPath: resolve(context.root, ADAPTIVE_SELECTION_STATE_SCHEMA_PATH), label: "Adaptive selection state index" });
+  if (new Set(index.sealed_cases.map((entry) => entry.case_id)).size !== index.sealed_cases.length) throw new Error("selection state index contains duplicate case ids");
   const expected = stateIdentityFor(context);
   for (const field of ["plan_id", "plan_digest", "materialization_manifest_digest", "materialization_output_root_identity", "materializer"]) {
     if (stableCanonicalJson(index[field]) !== stableCanonicalJson(expected[field])) throw new Error(`selection state belongs to a different materialization identity: ${field}`);
@@ -289,7 +290,7 @@ function assertSealedRecord(record, context) {
 
 function loadSealedRecord(paths, context) {
   const index = loadStateIndex(paths, context, { allowInitialize: false });
-  const stateEntry = index.sealed_cases[context.materializedCase.case_id];
+  const stateEntry = index.sealed_cases.find((entry) => entry.case_id === context.materializedCase.case_id);
   if (!stateEntry) throw new Error(`Adaptive selection is missing for ${context.materializedCase.case_id}`);
   const expectedPath = `${ADAPTIVE_SELECTION_DIRECTORY_NAME}/${context.materializedCase.case_id}.json`;
   if (stateEntry.selection_path !== expectedPath) throw new Error("selection state index has an invalid selection path");
@@ -311,7 +312,7 @@ export function sealAdaptiveSelection({ root, config, planPath, materializedPath
   let index = loadStateIndex(paths, context, { allowInitialize: true });
   const target = selectionPath(paths.stateRoot, caseId);
   assertNoSymlinkSegments(target, "sealed selection path");
-  if (index?.sealed_cases[caseId]) {
+  if (index?.sealed_cases.some((entry) => entry.case_id === caseId)) {
     if (!existsSync(target)) throw new Error(`selection state index records a prior seal but its file is missing: ${caseId}`);
     throw new Error(`Adaptive selection is already sealed for ${caseId}`);
   }
@@ -338,10 +339,7 @@ export function sealAdaptiveSelection({ root, config, planPath, materializedPath
   assertSealedRecord(record, context);
   const nextIndex = stableStateIndex({
     ...index,
-    sealed_cases: {
-      ...index.sealed_cases,
-      [caseId]: { selection_digest: record.selection_digest.value, selection_path: `${ADAPTIVE_SELECTION_DIRECTORY_NAME}/${caseId}.json` },
-    },
+    sealed_cases: [...index.sealed_cases, { case_id: caseId, selection_digest: record.selection_digest.value, selection_path: `${ADAPTIVE_SELECTION_DIRECTORY_NAME}/${caseId}.json` }],
   });
   assertStateIdentity(nextIndex, context);
 

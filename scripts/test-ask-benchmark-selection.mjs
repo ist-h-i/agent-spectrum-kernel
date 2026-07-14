@@ -209,7 +209,7 @@ try {
     writeFileSync(reusedPath, readFileSync(codexSelectionPath));
     chmodSync(indexPath, 0o644);
     const index = JSON.parse(originalIndexBytes);
-    index.sealed_cases[caseRecord.case_id] = { selection_digest: codexRecord.selection_digest.value, selection_path: `selections/${caseRecord.case_id}.json` };
+    index.sealed_cases.push({ case_id: caseRecord.case_id, selection_digest: codexRecord.selection_digest.value, selection_path: `selections/${caseRecord.case_id}.json` });
     writeJson(indexPath, index);
     chmodSync(indexPath, 0o444);
     return reusedPath;
