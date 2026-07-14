@@ -10,11 +10,10 @@ import {
   readdirSync,
   renameSync,
   rmSync,
-  statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, parse, relative, resolve, sep } from "node:path";
+import { parse, relative, resolve, sep } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { canonicalDigest, stableCanonicalJson, validateMaterializedPortfolio } from "./ask-benchmark-materialize.mjs";
 
@@ -254,9 +253,16 @@ function writeStage(staging, name, value) {
 }
 
 function publishNewFile(stagedPath, destination) {
-  linkSync(stagedPath, destination);
-  unlinkSync(stagedPath);
-  chmodSync(destination, 0o444);
+  let linked = false;
+  try {
+    linkSync(stagedPath, destination);
+    linked = true;
+    unlinkSync(stagedPath);
+    chmodSync(destination, 0o444);
+  } catch (error) {
+    if (linked) rmSync(destination, { force: true });
+    throw error;
+  }
 }
 
 function publishReplacement(stagedPath, destination) {

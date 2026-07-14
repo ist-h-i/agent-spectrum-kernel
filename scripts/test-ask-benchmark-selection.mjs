@@ -153,6 +153,7 @@ try {
   }
 
   mutateManifest("wrong materialization manifest", (value) => { value.plan.digest = differentHex(value.plan.digest); }, /plan identity mismatch/u);
+  mutateManifest("materializer revision mismatch", (value) => { value.materializer.source_revision = differentHex(value.materializer.source_revision); }, /materializer identity mismatch/u);
   mutateManifest("duplicate case IDs", (value) => { value.cases[1].case_id = value.cases[0].case_id; }, /duplicate case id/u);
   mutateManifest("case count mismatch", (value) => { value.case_count -= 1; }, /case_count/u);
   mutateManifest("adapter mismatch", (value) => { value.cases.find((entry) => entry.case_id === spareCase.case_id).adapter = spareCase.adapter === "codex" ? "claude" : "codex"; }, /does not match execution plan/u);
@@ -200,6 +201,9 @@ try {
   mkdirSync(realState);
   symlinkSync(realState, linkedState, "dir");
   expectFailure("state through symlink", sealArgs(spareCase, spareInputPath, linkedState), /traverses a symlink/u);
+  const regularState = resolve(work, "regular-state");
+  writeFileSync(regularState, "not a directory\n");
+  expectFailure("state regular file", sealArgs(spareCase, spareInputPath, regularState), /absent or a directory/u);
   expectFailure("state inside case", sealArgs(spareCase, spareInputPath, resolve(spareRoot, "selection-state")), /outside all materialized case roots/u);
 
   const suppliedDigest = selectionInput(spareCase);
