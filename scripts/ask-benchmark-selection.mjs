@@ -143,7 +143,7 @@ function bindingFor(context) {
 }
 
 function assertObservedSignals(input) {
-  if (!Array.isArray(input.observed_signals) || input.observed_signals.length === 0 || input.observed_signals.some((value) => typeof value !== "string" || value.trim() === "")) {
+  if (!input || typeof input !== "object" || !Array.isArray(input.observed_signals) || input.observed_signals.length === 0 || input.observed_signals.some((value) => typeof value !== "string" || value.trim() === "")) {
     throw new Error("Adaptive selection must preserve at least one non-blank observed signal");
   }
 }
