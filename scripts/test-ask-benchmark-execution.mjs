@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -32,6 +33,20 @@ function recursivePaths(path) {
     else paths.push(absolute);
   }
   return paths;
+}
+
+function terminalInventory(runDir, caseId, attempt) {
+  return readdirSync(resolve(runDir, "cases", caseId, "attempts", attempt)).sort();
+}
+
+function assertCaseStatus(common, caseId, status, message) {
+  const verified = run(["verify-execution", ...common]);
+  assert.match(verified.stdout, new RegExp(`"case_id": "${caseId}"[\\s\\S]*?"status": "${status}"`, "u"), message);
+}
+
+function ephemeralInventory() {
+  const root = resolve(tmpdir(), "ask-portfolio-workspaces");
+  return existsSync(root) ? readdirSync(root).sort() : [];
 }
 
 function selectionInput(caseRecord, plan, bypass = false) {
@@ -67,12 +82,17 @@ function runtimeConfig(adapter, availability = "available") {
     reasoning_effort: "low",
     case_timeout_ms: 5_000,
     sandbox_policy: "workspace-write",
-    permission_policy: "fixture-isolated",
+    permission_policy: adapter === "codex" ? "never" : "strict",
     executor: { id: `fixture-${adapter}`, version: "1.0.0" },
     environment_allowlist: ["PATH", "FAKE_EXEC_LOG", "FAKE_FAIL", "FAKE_DELAY"],
     thermal_state: "cold",
     claude_cli: adapter === "claude" && availability === "available"
-      ? { help_marker: "ASK_PORTFOLIO_FAKE_CLAUDE_V1", command: ["--benchmark-output", "{output}", "--benchmark-task", "{task}"] }
+      ? {
+        help_marker: "ASK_PORTFOLIO_FAKE_CLAUDE_V1",
+        sandbox_argument: "--sandbox",
+        permission_argument: "--permission-policy",
+        command: ["--benchmark-output", "{output}", "--benchmark-task", "{task}", "--sandbox", "{sandbox_policy}", "--permission-policy", "{permission_policy}"],
+      }
       : null,
   };
 }
@@ -81,7 +101,7 @@ function fakeExecutable(adapter) {
   const path = resolve(work, `fake-${adapter}`);
   writeFileSync(path, `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "fake-${adapter} 1.0.0"; exit 0; fi
-if [ "$1" = "--help" ]; then echo "ASK_PORTFOLIO_FAKE_CLAUDE_V1"; exit 0; fi
+if [ "$1" = "--help" ]; then echo "ASK_PORTFOLIO_FAKE_CLAUDE_V1 --benchmark-output --benchmark-task --sandbox --permission-policy"; exit 0; fi
 output=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -90,8 +110,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 if [ -n "\${FAKE_DELAY:-}" ]; then sleep "$FAKE_DELAY"; fi
-case_id=$(basename "$(dirname "$(dirname "$(dirname "$PWD")")")")
-printf '${adapter}:%s\\n' "$case_id" >> "$FAKE_EXEC_LOG"
+printf '${adapter}\\n' >> "$FAKE_EXEC_LOG"
 if [ "\${FAKE_FAIL:-}" = "1" ]; then exit 12; fi
 printf '%s\\n' '{"task_type":"implementation","decision":"not_applicable","findings":[],"requirement_status":[],"verification_commands":[],"completion_claim":"not_applicable","route":null,"summary":"fixture final"}' > "$output"
 `);
@@ -113,9 +132,13 @@ try {
   const codexRuntime = resolve(work, "codex-runtime.json");
   const claudeRuntime = resolve(work, "claude-runtime.json");
   const unavailableRuntime = resolve(work, "unavailable-runtime.json");
+  const claimRuntime = resolve(work, "claim-runtime.json");
   writeJson(codexRuntime, runtimeConfig("codex"));
   writeJson(claudeRuntime, runtimeConfig("claude"));
   writeJson(unavailableRuntime, runtimeConfig("claude", "unavailable"));
+  const claimRuntimeConfig = runtimeConfig("codex");
+  claimRuntimeConfig.case_timeout_ms = 60_000;
+  writeJson(claimRuntime, claimRuntimeConfig);
 
   run(["plan", "--config", configPath, "--output", planPath, "--seed", "execution-focused-regression"]);
   run(["materialize", "--config", configPath, "--plan", planPath, "--output", materialized]);
@@ -134,18 +157,23 @@ try {
   const env = { FAKE_EXEC_LOG: logPath };
   run(["execute-portfolio", ...common, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--max-cases", "1"], { env });
   const codexCases = plan.cases.filter((entry) => entry.adapter_track === "codex");
-  assert.equal(readFileSync(logPath, "utf8").trim(), `codex:${codexCases[0].case_id}`, "plan order and max-cases must choose the first pending Codex case");
+  assert.equal(readFileSync(logPath, "utf8").trim(), "codex", "max-cases must execute exactly one Codex case");
+  assert.equal(JSON.parse(readFileSync(resolve(runDir, "cases", codexCases[0].case_id, "state.json"), "utf8")).status, "completed", "plan order must choose the first pending Codex case");
   const verifyBefore = run(["verify-execution", ...common]);
   const verifyAfter = run(["verify-execution", ...common]);
   assert.equal(verifyBefore.stdout, verifyAfter.stdout, "verification must be deterministic and read-only");
   run(["execute-portfolio", ...common, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin], { env });
-  assert.equal(readFileSync(logPath, "utf8").trim().split("\n").filter((line) => line.startsWith("codex:")).length, codexCases.length, "resume must execute only pending Codex cases");
+  assert.equal(readFileSync(logPath, "utf8").trim().split("\n").filter((line) => line === "codex").length, codexCases.length, "resume must execute only pending Codex cases");
   assert.deepEqual(readFileSync(resolve(materialized, "materialization-manifest.json")), materializedManifestBefore, "execution must not mutate the materialized root");
   assert.equal(recursivePaths(runDir).some((path) => /(?:stdout|stderr|events)\.(?:txt|jsonl)$/u.test(path)), false, "raw stdout, stderr, and event streams must not be durable artifacts");
+  for (const entry of codexCases) {
+    const state = JSON.parse(readFileSync(resolve(runDir, "cases", entry.case_id, "state.json"), "utf8"));
+    assert.deepEqual(terminalInventory(runDir, entry.case_id, state.terminal_attempt), ["commit.json", "final.json", "request.json", "result.json"], "completed attempts must contain only approved durable artifacts");
+  }
 
   const claudeCase = plan.cases.find((entry) => entry.adapter_track === "claude");
   run(["execute-portfolio", ...common, "--adapter", "claude", "--runtime-config", claudeRuntime, "--agent-bin", claudeBin, "--case-id", claudeCase.case_id], { env });
-  assert.ok(readFileSync(logPath, "utf8").includes(`claude:${claudeCase.case_id}`), "Claude must use its separate executor track");
+  assert.ok(readFileSync(logPath, "utf8").includes("claude"), "Claude must use its separate executor track");
 
   const retryRun = resolve(work, "retry-run");
   const retryCase = codexCases[1];
@@ -171,38 +199,216 @@ try {
   run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", unavailableRun, "--adapter", "claude", "--runtime-config", unavailableRuntime, "--agent-bin", resolve(work, "missing-claude"), "--case-id", unavailableCase.case_id], { env });
   assert.equal(readFileSync(logPath, "utf8"), beforeUnavailable, "unavailable runtimes must not spawn an executable");
   assert.equal(JSON.parse(readFileSync(resolve(unavailableRun, "cases", unavailableCase.case_id, "state.json"), "utf8")).status, "unavailable");
+  const unavailableState = JSON.parse(readFileSync(resolve(unavailableRun, "cases", unavailableCase.case_id, "state.json"), "utf8"));
+  const unavailableRequest = JSON.parse(readFileSync(resolve(unavailableRun, "cases", unavailableCase.case_id, "attempts", unavailableState.terminal_attempt, "request.json"), "utf8"));
+  const unavailablePlanCase = plan.cases.find((entry) => entry.case_id === unavailableCase.case_id);
+  assert.notEqual(unavailableRequest.input_identity.frozen_input_digest, null, "unavailable requests must retain frozen input identity");
+  assert.equal(unavailableRequest.selection === null, unavailablePlanCase.condition !== "adaptive_ask", "unavailable Adaptive requests must retain selection identity");
+  assert.deepEqual(terminalInventory(unavailableRun, unavailableCase.case_id, unavailableState.terminal_attempt), ["commit.json", "request.json", "result.json"], "unavailable attempts must contain only approved durable artifacts");
 
   const claimRun = resolve(work, "claim-run");
   const claimCase = codexCases[2];
-  const claimArgs = [runner, "execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", claimRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", claimCase.case_id];
-  const child = spawn(process.execPath, claimArgs, { cwd: root, env: { ...process.env, ...env, FAKE_DELAY: "10" } });
+  const claimArgs = [runner, "execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", claimRun, "--adapter", "codex", "--runtime-config", claimRuntime, "--agent-bin", codexBin, "--case-id", claimCase.case_id];
+  const child = spawn(process.execPath, claimArgs, { cwd: root, env: { ...process.env, ...env, FAKE_DELAY: "20" } });
   const claimFile = resolve(claimRun, "cases", claimCase.case_id, "claim", "claim.json");
-  for (let index = 0; index < 100 && !existsSync(claimFile); index += 1) await wait(20);
+  for (let index = 0; index < 500 && !existsSync(claimFile); index += 1) await wait(20);
   assert.ok(existsSync(claimFile), "first process must acquire a case claim");
-  const duplicate = run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", claimRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", claimCase.case_id], { env });
+  const duplicate = run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", claimRun, "--adapter", "codex", "--runtime-config", claimRuntime, "--agent-bin", codexBin, "--case-id", claimCase.case_id], { env });
   assert.match(duplicate.stdout, /active/u, "second process must observe the active claim instead of spawning");
   assert.equal(await new Promise((resolveExit) => child.on("exit", resolveExit)), 0, "claim owner must complete");
 
+  const stagingRun = resolve(work, "staging-run");
+  const stagingCase = codexCases[4];
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", stagingRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", stagingCase.case_id], { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_claim_staged", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const stagingCaseRoot = resolve(stagingRun, "cases", stagingCase.case_id);
+  const stagingName = readdirSync(stagingCaseRoot).find((name) => /^\.claim-.+\.staging$/u.test(name));
+  assert.ok(stagingName, "claim staging must be retained for bounded recovery after a hard stop");
+  assert.equal(existsSync(resolve(stagingCaseRoot, "claim")), false, "incomplete claim staging must never be published as the active claim");
+  const stagedClaimPath = resolve(stagingCaseRoot, stagingName, "claim.json");
+  const stagedClaim = JSON.parse(readFileSync(stagedClaimPath, "utf8"));
+  run(["recover-case", "--run-dir", stagingRun, "--case-id", stagingCase.case_id, "--claim-id", stagedClaim.claim_id, "--reason", "staging fault"]);
+  assert.equal(existsSync(resolve(stagingCaseRoot, stagingName)), false, "expired claim staging must be removable by exact claim ID");
+  assert.equal(readdirSync(resolve(stagingCaseRoot, "attempts")).length, 0, "staging recovery must not allocate an attempt");
+
   const recoveryRun = resolve(work, "recovery-run");
-  const recoveryCase = codexCases[4];
-  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", recoveryRun, "--adapter", "claude", "--runtime-config", unavailableRuntime, "--agent-bin", resolve(work, "missing-claude"), "--case-id", unavailableCase.case_id], { env });
-  const recoveryClaim = {
-    schema_version: "1.0.0",
-    claim_id: "fixture-stale-claim",
-    case_id: recoveryCase.case_id,
-    worker_id: "fixture-worker",
-    pid: 1,
-    acquired_at: "2026-07-01T00:00:00.000Z",
-    lease_expires_at: "2026-07-01T00:00:01.000Z",
-    attempt: "0001",
-    selection_digest: null,
-  };
-  const recoveryClaimDir = resolve(recoveryRun, "cases", recoveryCase.case_id, "claim");
-  mkdirSync(recoveryClaimDir);
-  writeJson(resolve(recoveryClaimDir, "claim.json"), recoveryClaim);
+  const recoveryCase = codexCases[5];
+  const recoveryExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", recoveryRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", recoveryCase.case_id];
+  run(recoveryExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_workspace_created", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const recoveryClaimPath = resolve(recoveryRun, "cases", recoveryCase.case_id, "claim", "claim.json");
+  const recoveryClaim = JSON.parse(readFileSync(recoveryClaimPath, "utf8"));
+  const abandonedWorkspace = resolve(tmpdir(), "ask-portfolio-workspaces", recoveryClaim.workspace_token);
+  assert.ok(existsSync(abandonedWorkspace), "hard interruption fixture must leave an ephemeral workspace for recovery");
   run(["recover-case", "--run-dir", recoveryRun, "--case-id", recoveryCase.case_id, "--claim-id", "wrong-claim", "--reason", "fixture"], { expectedStatus: 1 });
   run(["recover-case", "--run-dir", recoveryRun, "--case-id", recoveryCase.case_id, "--claim-id", recoveryClaim.claim_id, "--reason", "fixture worker exited"]);
-  assert.equal(JSON.parse(readFileSync(resolve(recoveryRun, "cases", recoveryCase.case_id, "state.json"), "utf8")).status, "interrupted", "only explicit matching stale-claim recovery may release a case");
+  run(["recover-case", "--run-dir", recoveryRun, "--case-id", recoveryCase.case_id, "--claim-id", recoveryClaim.claim_id, "--reason", "idempotency check"]);
+  const recoveryState = JSON.parse(readFileSync(resolve(recoveryRun, "cases", recoveryCase.case_id, "state.json"), "utf8"));
+  assert.equal(recoveryState.status, "interrupted", "only explicit matching stale-claim recovery may release a case");
+  assert.equal(recoveryState.attempt_count, 1, "recovery replay must not append attempts");
+  assert.equal(existsSync(abandonedWorkspace), false, "stale recovery must delete the abandoned ephemeral workspace");
+  assert.deepEqual(terminalInventory(recoveryRun, recoveryCase.case_id, recoveryState.terminal_attempt), ["commit.json", "request.json", "result.json"], "interrupted recovery must retain only approved durable artifacts");
+  run(recoveryExecute, { env });
+  const resumedState = JSON.parse(readFileSync(resolve(recoveryRun, "cases", recoveryCase.case_id, "state.json"), "utf8"));
+  assert.equal(resumedState.status, "completed", "interrupted recovery must resume with a new attempt");
+  assert.equal(resumedState.attempt_count, 2, "interrupted recovery resume must append exactly one attempt");
+
+  const resultFaultRun = resolve(work, "result-fault-run");
+  const resultFaultCase = codexCases[6];
+  const resultFaultExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", resultFaultRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", resultFaultCase.case_id];
+  run(resultFaultExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_result_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const resultFaultClaim = JSON.parse(readFileSync(resolve(resultFaultRun, "cases", resultFaultCase.case_id, "claim", "claim.json"), "utf8"));
+  const resultFaultPath = resolve(resultFaultRun, "cases", resultFaultCase.case_id, "attempts", resultFaultClaim.attempt, "result.json");
+  const resultFaultBytes = readFileSync(resultFaultPath);
+  run(["recover-case", "--run-dir", resultFaultRun, "--case-id", resultFaultCase.case_id, "--claim-id", resultFaultClaim.claim_id, "--reason", "result boundary fault"]);
+  run(["recover-case", "--run-dir", resultFaultRun, "--case-id", resultFaultCase.case_id, "--claim-id", resultFaultClaim.claim_id, "--reason", "idempotency check"]);
+  assert.deepEqual(readFileSync(resultFaultPath), resultFaultBytes, "recovery must not overwrite a valid terminal result");
+  assertCaseStatus(["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", resultFaultRun], resultFaultCase.case_id, "completed", "result-before-state recovery must reconcile to completed");
+
+  const finalFaultRun = resolve(work, "final-fault-run");
+  const finalFaultCase = codexCases[11];
+  const finalFaultExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", finalFaultRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", finalFaultCase.case_id];
+  run(finalFaultExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_final_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const finalFaultClaim = JSON.parse(readFileSync(resolve(finalFaultRun, "cases", finalFaultCase.case_id, "claim", "claim.json"), "utf8"));
+  assert.ok(existsSync(resolve(finalFaultRun, "cases", finalFaultCase.case_id, "attempts", finalFaultClaim.attempt, "final.json")), "final boundary fixture must publish approved final before stopping");
+  run(["recover-case", "--run-dir", finalFaultRun, "--case-id", finalFaultCase.case_id, "--claim-id", finalFaultClaim.claim_id, "--reason", "final boundary fault"]);
+  assertCaseStatus(["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", finalFaultRun], finalFaultCase.case_id, "completed", "final-before-commit recovery must reconcile to completed");
+
+  const stateFaultRun = resolve(work, "state-fault-run");
+  const stateFaultCase = codexCases[7];
+  const stateFaultExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", stateFaultRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", stateFaultCase.case_id];
+  run(stateFaultExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_state_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const stateFaultClaim = JSON.parse(readFileSync(resolve(stateFaultRun, "cases", stateFaultCase.case_id, "claim", "claim.json"), "utf8"));
+  assert.equal(JSON.parse(readFileSync(resolve(stateFaultRun, "cases", stateFaultCase.case_id, "state.json"), "utf8")).status, "completed", "state boundary fixture must publish state before stopping");
+  run(["recover-case", "--run-dir", stateFaultRun, "--case-id", stateFaultCase.case_id, "--claim-id", stateFaultClaim.claim_id, "--reason", "state boundary fault"]);
+  assert.equal(existsSync(resolve(stateFaultRun, "cases", stateFaultCase.case_id, "claim")), false, "state-before-release recovery must remove the exact stale claim");
+
+  const cleanupBaseline = ephemeralInventory();
+  const failureRun = resolve(work, "failure-cleanup-run");
+  const failureCase = codexCases[8];
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", failureRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", failureCase.case_id], { env: { ...env, FAKE_FAIL: "1" } });
+  assert.deepEqual(ephemeralInventory(), cleanupBaseline, "agent failure must clean its ephemeral workspace");
+  const failureState = JSON.parse(readFileSync(resolve(failureRun, "cases", failureCase.case_id, "state.json"), "utf8"));
+  assert.deepEqual(terminalInventory(failureRun, failureCase.case_id, failureState.terminal_attempt), ["commit.json", "request.json", "result.json"], "failed attempts must retain only approved durable artifacts");
+
+  const timeoutRuntime = resolve(work, "timeout-runtime.json");
+  const timeoutConfig = runtimeConfig("codex");
+  timeoutConfig.case_timeout_ms = 20;
+  writeJson(timeoutRuntime, timeoutConfig);
+  const timeoutRun = resolve(work, "timeout-cleanup-run");
+  const timeoutCase = codexCases[9];
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", timeoutRun, "--adapter", "codex", "--runtime-config", timeoutRuntime, "--agent-bin", codexBin, "--case-id", timeoutCase.case_id], { env: { ...env, FAKE_DELAY: "1" } });
+  assert.deepEqual(ephemeralInventory(), cleanupBaseline, "timeout must clean its ephemeral workspace");
+  const timeoutState = JSON.parse(readFileSync(resolve(timeoutRun, "cases", timeoutCase.case_id, "state.json"), "utf8"));
+  assert.equal(JSON.parse(readFileSync(resolve(timeoutRun, "cases", timeoutCase.case_id, "attempts", timeoutState.terminal_attempt, "result.json"), "utf8")).failure_kind, "timeout", "timeout must be a closed failed terminal result");
+
+  function cloneRun(source, name) {
+    const target = resolve(work, name);
+    cpSync(source, target, { recursive: true });
+    return { target, common: ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", target] };
+  }
+
+  const requestDeleted = cloneRun(runDir, "request-deleted-run");
+  rmSync(resolve(requestDeleted.target, "cases", codexCases[0].case_id, "attempts", "0001", "request.json"));
+  assertCaseStatus(requestDeleted.common, codexCases[0].case_id, "invalid", "deleted request must invalidate terminal evidence");
+
+  const requestReplaced = cloneRun(runDir, "request-replaced-run");
+  cpSync(resolve(requestReplaced.target, "cases", codexCases[1].case_id, "attempts", "0001", "request.json"), resolve(requestReplaced.target, "cases", codexCases[0].case_id, "attempts", "0001", "request.json"));
+  assertCaseStatus(requestReplaced.common, codexCases[0].case_id, "invalid", "cross-case request replacement must invalidate terminal evidence");
+
+  const resultDeleted = cloneRun(runDir, "result-deleted-run");
+  rmSync(resolve(resultDeleted.target, "cases", codexCases[0].case_id, "attempts", "0001", "result.json"));
+  assertCaseStatus(resultDeleted.common, codexCases[0].case_id, "invalid", "deleted completed result must invalidate terminal evidence");
+
+  const resultReplaced = cloneRun(runDir, "result-replaced-run");
+  cpSync(resolve(resultReplaced.target, "cases", codexCases[1].case_id, "attempts", "0001", "result.json"), resolve(resultReplaced.target, "cases", codexCases[0].case_id, "attempts", "0001", "result.json"));
+  assertCaseStatus(resultReplaced.common, codexCases[0].case_id, "invalid", "cross-case result replacement must invalidate terminal evidence");
+
+  const crossAdapter = cloneRun(runDir, "cross-adapter-result-run");
+  cpSync(resolve(crossAdapter.target, "cases", claudeCase.case_id, "attempts", "0001", "result.json"), resolve(crossAdapter.target, "cases", codexCases[0].case_id, "attempts", "0001", "result.json"));
+  assertCaseStatus(crossAdapter.common, codexCases[0].case_id, "invalid", "cross-adapter result replacement must invalidate terminal evidence");
+
+  const adaptiveCodexCase = codexCases.find((entry) => entry.condition === "adaptive_ask");
+  const stateSelectionChanged = cloneRun(runDir, "state-selection-changed-run");
+  const changedStatePath = resolve(stateSelectionChanged.target, "cases", adaptiveCodexCase.case_id, "state.json");
+  const changedState = JSON.parse(readFileSync(changedStatePath, "utf8"));
+  changedState.selection_digest = "0".repeat(64);
+  writeJson(changedStatePath, changedState);
+  assertCaseStatus(stateSelectionChanged.common, adaptiveCodexCase.case_id, "invalid", "state selection digest changes must invalidate terminal evidence");
+
+  const requestSelectionChanged = cloneRun(runDir, "request-selection-changed-run");
+  const changedRequestPath = resolve(requestSelectionChanged.target, "cases", adaptiveCodexCase.case_id, "attempts", "0001", "request.json");
+  const changedRequest = JSON.parse(readFileSync(changedRequestPath, "utf8"));
+  changedRequest.selection.digest = "0".repeat(64);
+  writeJson(changedRequestPath, changedRequest);
+  assertCaseStatus(requestSelectionChanged.common, adaptiveCodexCase.case_id, "invalid", "request selection digest changes must invalidate terminal evidence");
+
+  const terminalAttemptChanged = cloneRun(runDir, "terminal-attempt-changed-run");
+  const terminalStatePath = resolve(terminalAttemptChanged.target, "cases", codexCases[0].case_id, "state.json");
+  const terminalState = JSON.parse(readFileSync(terminalStatePath, "utf8"));
+  terminalState.terminal_attempt = "0002";
+  writeJson(terminalStatePath, terminalState);
+  assertCaseStatus(terminalAttemptChanged.common, codexCases[0].case_id, "invalid", "terminal attempt substitution must invalidate terminal evidence");
+
+  const failedResultDeleted = cloneRun(failureRun, "failed-result-deleted-run");
+  rmSync(resolve(failedResultDeleted.target, "cases", failureCase.case_id, "attempts", "0001", "result.json"));
+  assertCaseStatus(failedResultDeleted.common, failureCase.case_id, "invalid", "missing failed result must invalidate terminal evidence");
+
+  const unavailableResultDeleted = cloneRun(unavailableRun, "unavailable-result-deleted-run");
+  rmSync(resolve(unavailableResultDeleted.target, "cases", unavailableCase.case_id, "attempts", "0001", "result.json"));
+  assertCaseStatus(unavailableResultDeleted.common, unavailableCase.case_id, "invalid", "missing unavailable result must invalidate terminal evidence");
+
+  const identityDeleted = cloneRun(runDir, "identity-deleted-run");
+  rmSync(resolve(identityDeleted.target, "adapters", "codex.json"));
+  assertCaseStatus(identityDeleted.common, codexCases[0].case_id, "invalid", "missing adapter identity must invalidate terminal evidence");
+
+  const identityReplaced = cloneRun(runDir, "identity-replaced-run");
+  const identityPath = resolve(identityReplaced.target, "adapters", "codex.json");
+  const replacedIdentity = JSON.parse(readFileSync(identityPath, "utf8"));
+  replacedIdentity.model = "replacement-model";
+  writeJson(identityPath, replacedIdentity);
+  assertCaseStatus(identityReplaced.common, codexCases[0].case_id, "invalid", "replaced adapter identity must invalidate terminal evidence");
+
+  const alternateCodexRuntime = resolve(work, "alternate-codex-runtime.json");
+  const alternateCodexConfig = runtimeConfig("codex");
+  alternateCodexConfig.model = "alternate-model";
+  writeJson(alternateCodexRuntime, alternateCodexConfig);
+  const identityRecreate = cloneRun(failureRun, "identity-recreate-run");
+  rmSync(resolve(identityRecreate.target, "adapters", "codex.json"));
+  const beforeIdentityRecreate = readFileSync(logPath, "utf8");
+  run(["execute-portfolio", ...identityRecreate.common, "--adapter", "codex", "--runtime-config", alternateCodexRuntime, "--agent-bin", codexBin, "--case-id", failureCase.case_id, "--retry-failed"], { expectedStatus: 1, env });
+  assert.equal(existsSync(resolve(identityRecreate.target, "adapters", "codex.json")), false, "deleted adapter identity must not be replaced after attempts exist");
+  assert.equal(readFileSync(logPath, "utf8"), beforeIdentityRecreate, "identity replacement refusal must happen before spawn");
+
+  const conflictRun = resolve(work, "identity-conflict-run");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", conflictRun, "--adapter", "claude", "--runtime-config", unavailableRuntime, "--agent-bin", resolve(work, "missing-claude"), "--case-id", unavailableCase.case_id], { env });
+  const conflictRuntimeA = resolve(work, "conflict-runtime-a.json");
+  const conflictRuntimeB = resolve(work, "conflict-runtime-b.json");
+  const conflictConfigA = runtimeConfig("codex");
+  const conflictConfigB = runtimeConfig("codex");
+  conflictConfigA.model = "conflict-model-a";
+  conflictConfigB.model = "conflict-model-b";
+  writeJson(conflictRuntimeA, conflictConfigA);
+  writeJson(conflictRuntimeB, conflictConfigB);
+  const conflictCase = codexCases[10];
+  const conflictBase = [runner, "execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", conflictRun, "--adapter", "codex", "--agent-bin", codexBin, "--case-id", conflictCase.case_id];
+  const beforeConflictCount = readFileSync(logPath, "utf8").trim().split("\n").filter((line) => line === "codex").length;
+  const conflictA = spawn(process.execPath, [...conflictBase, "--runtime-config", conflictRuntimeA], { cwd: root, env: { ...process.env, ...env, FAKE_DELAY: "1" } });
+  const conflictB = spawn(process.execPath, [...conflictBase, "--runtime-config", conflictRuntimeB], { cwd: root, env: { ...process.env, ...env, FAKE_DELAY: "1" } });
+  const conflictStatuses = await Promise.all([conflictA, conflictB].map((childProcess) => new Promise((resolveExit) => childProcess.on("exit", resolveExit))));
+  assert.deepEqual(conflictStatuses.sort(), [0, 1], "conflicting adapter identities must have exactly one atomic first writer");
+  const afterConflictCount = readFileSync(logPath, "utf8").trim().split("\n").filter((line) => line === "codex").length;
+  assert.equal(afterConflictCount - beforeConflictCount, 1, "conflicting identity loser must be rejected before spawn");
+
+  const badPolicyRuntime = resolve(work, "bad-policy-runtime.json");
+  const badPolicyConfig = runtimeConfig("claude");
+  badPolicyConfig.claude_cli.command = [...badPolicyConfig.claude_cli.command, "--arbitrary-command"];
+  writeJson(badPolicyRuntime, badPolicyConfig);
+  const beforeBadPolicy = readFileSync(logPath, "utf8");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", resolve(work, "bad-policy-run"), "--adapter", "claude", "--runtime-config", badPolicyRuntime, "--agent-bin", claudeBin, "--case-id", claudeCase.case_id], { expectedStatus: 1, env });
+  assert.equal(readFileSync(logPath, "utf8"), beforeBadPolicy, "unconfirmed effective command flags must be rejected before spawn");
+
+  const codexIdentity = JSON.parse(readFileSync(resolve(runDir, "adapters", "codex.json"), "utf8"));
+  assert.equal(codexIdentity.effective_command.argv[codexIdentity.effective_command.argv.indexOf("--ask-for-approval") + 1], "never", "Codex permission policy must be part of the effective command identity");
+  assert.match(readFileSync(resolve(root, ".github/workflows/validate.yml"), "utf8"), /node scripts\/test-ask-benchmark-execution\.mjs/u, "GitHub Actions must execute the focused state-machine test");
 
   const sealPath = resolve(selectionState, "selections", `${adaptiveCases[0].case_id}.json`);
   const sealedBytes = readFileSync(sealPath);

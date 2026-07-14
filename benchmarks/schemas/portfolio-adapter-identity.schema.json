@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio effective adapter runtime identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "adapter", "runtime_config_sha256", "availability", "unavailable_reason", "executor", "model", "reasoning_effort", "sandbox_policy", "permission_policy", "case_timeout_ms", "thermal_state", "environment_allowlist", "executable", "effective_command", "effective_command_digest", "policy_enforcement", "availability_evidence"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "adapter": { "enum": ["codex", "claude"] },
+    "runtime_config_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "availability": { "enum": ["available", "unavailable"] },
+    "unavailable_reason": { "type": ["string", "null"] },
+    "executor": { "type": "object", "additionalProperties": false, "required": ["id", "version"], "properties": { "id": { "type": "string", "minLength": 1 }, "version": { "type": "string", "minLength": 1 } } },
+    "model": { "type": "string", "minLength": 1 },
+    "reasoning_effort": { "type": "string", "minLength": 1 },
+    "sandbox_policy": { "type": "string", "minLength": 1 },
+    "permission_policy": { "type": "string", "minLength": 1 },
+    "case_timeout_ms": { "type": "integer", "minimum": 1 },
+    "thermal_state": { "enum": ["cold", "warm"] },
+    "environment_allowlist": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" } },
+    "executable": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["executable_basename", "executable_sha256", "observed_version"],
+      "properties": {
+        "executable_basename": { "type": "string", "minLength": 1 },
+        "executable_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "observed_version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "effective_command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv", "task_transport", "output_transport", "output_schema_digest"],
+      "properties": {
+        "argv": { "type": "array", "items": { "type": "string" } },
+        "task_transport": { "enum": ["stdin", "file", "none"] },
+        "output_transport": { "enum": ["file", "none"] },
+        "output_schema_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "effective_command_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "policy_enforcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sandbox_policy", "permission_policy", "ephemeral", "user_config_isolated", "rules_isolated"],
+      "properties": {
+        "sandbox_policy": { "type": "string", "minLength": 1 },
+        "permission_policy": { "type": "string", "minLength": 1 },
+        "ephemeral": { "type": "boolean" },
+        "user_config_isolated": { "type": "boolean" },
+        "rules_isolated": { "type": "boolean" }
+      }
+    },
+    "availability_evidence": { "enum": ["local_version_and_contract_probe", "declared_unavailable"] }
+  }
+}

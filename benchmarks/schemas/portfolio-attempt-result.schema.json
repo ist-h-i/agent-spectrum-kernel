@@ -3,12 +3,17 @@
   "title": "Adaptive ASK portfolio execution attempt result",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "kind", "case_id", "attempt", "status", "exit_code", "duration_ms", "failure_kind", "final_output", "stdout", "stderr", "event_counts"],
+  "required": ["schema_version", "kind", "case_id", "attempt", "adapter", "condition", "runtime_identity_digest", "effective_command_digest", "request_sha256", "status", "exit_code", "duration_ms", "failure_kind", "final_output", "stdout", "stderr", "event_counts"],
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "kind": { "const": "result" },
     "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
     "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "adapter": { "enum": ["codex", "claude"] },
+    "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+    "runtime_identity_digest": { "$ref": "#/$defs/digest" },
+    "effective_command_digest": { "$ref": "#/$defs/digest" },
+    "request_sha256": { "$ref": "#/$defs/digest" },
     "status": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] },
     "exit_code": { "type": ["integer", "null"] },
     "duration_ms": { "type": ["integer", "null"], "minimum": 0 },
@@ -32,7 +37,36 @@
       "properties": { "json_lines": { "type": "integer", "minimum": 0 } }
     }
   },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "completed" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "exit_code": { "const": 0 },
+          "failure_kind": { "type": "null" },
+          "final_output": { "$ref": "#/$defs/finalOutput" }
+        }
+      },
+      "else": {
+        "properties": {
+          "failure_kind": { "type": "string", "minLength": 1 },
+          "final_output": { "type": "null" }
+        }
+      }
+    }
+  ],
   "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "finalOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": { "const": "final.json" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
     "stream": {
       "type": "object",
       "additionalProperties": false,

@@ -21,6 +21,9 @@ jobs:
       - name: Run repository validation tests
         run: node scripts/test-validate-repo.mjs
 
+      - name: Run adaptive portfolio execution tests
+        run: node scripts/test-ask-benchmark-execution.mjs
+
       - name: Validate repository consistency
         run: node scripts/validate-repo.mjs
 

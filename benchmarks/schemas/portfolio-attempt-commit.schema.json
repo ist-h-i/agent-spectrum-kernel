@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio terminal attempt commit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "claim_id", "claim_lease_expires_at", "case_id", "attempt", "adapter", "condition", "status", "runtime_identity_digest", "effective_command_digest", "request_sha256", "result_sha256"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "kind": { "const": "terminal_commit" },
+    "claim_id": { "type": "string", "format": "uuid" },
+    "claim_lease_expires_at": { "type": "string", "format": "date-time" },
+    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "adapter": { "enum": ["codex", "claude"] },
+    "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+    "status": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] },
+    "runtime_identity_digest": { "$ref": "#/$defs/digest" },
+    "effective_command_digest": { "$ref": "#/$defs/digest" },
+    "request_sha256": { "$ref": "#/$defs/digest" },
+    "result_sha256": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": { "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" } }
+}

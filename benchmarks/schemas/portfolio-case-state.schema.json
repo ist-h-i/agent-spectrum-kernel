@@ -13,5 +13,24 @@
     "attempt_count": { "type": "integer", "minimum": 0 },
     "terminal_attempt": { "type": ["string", "null"], "pattern": "^[0-9]{4}$" },
     "selection_digest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
-  }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "pending" } }, "required": ["status"] },
+      "then": { "properties": { "attempt_count": { "const": 0 }, "terminal_attempt": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "status": { "const": "active" } }, "required": ["status"] },
+      "then": { "properties": { "attempt_count": { "minimum": 1 }, "terminal_attempt": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "status": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] } }, "required": ["status"] },
+      "then": { "properties": { "attempt_count": { "minimum": 1 }, "terminal_attempt": { "type": "string", "pattern": "^[0-9]{4}$" } } }
+    },
+    {
+      "if": { "properties": { "condition": { "const": "adaptive_ask" } }, "required": ["condition"] },
+      "then": { "properties": { "selection_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } },
+      "else": { "properties": { "selection_digest": { "type": "null" } } }
+    }
+  ]
 }

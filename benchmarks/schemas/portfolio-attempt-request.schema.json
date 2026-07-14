@@ -7,13 +7,107 @@
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "kind": { "const": "request" },
-    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "case_id": { "$ref": "#/$defs/caseId" },
+    "attempt": { "$ref": "#/$defs/attempt" },
+    "adapter": { "$ref": "#/$defs/adapter" },
+    "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+    "input_identity": { "$ref": "#/$defs/inputIdentity" },
+    "selection": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["digest", "selected_mechanisms", "required_gates"],
+      "properties": {
+        "digest": { "$ref": "#/$defs/rawDigest" },
+        "selected_mechanisms": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "required_gates": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "projection": { "$ref": "#/$defs/projection" },
+    "agent": { "$ref": "#/$defs/agent" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "condition": { "const": "adaptive_ask" } }, "required": ["condition"] },
+      "then": { "properties": { "selection": { "$ref": "#/$defs/selection" } } },
+      "else": { "properties": { "selection": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "caseId": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
     "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
     "adapter": { "enum": ["codex", "claude"] },
-    "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
-    "input_identity": { "type": "object" },
-    "selection": { "type": ["object", "null"] },
-    "projection": { "type": "object" },
-    "agent": { "type": "object" }
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "rawDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "inputIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_id", "plan_digest", "materialization_manifest_digest", "frozen_input_digest"],
+      "properties": {
+        "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "materialization_manifest_digest": { "$ref": "#/$defs/digest" },
+        "frozen_input_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest", "selected_mechanisms", "required_gates"],
+      "properties": {
+        "digest": { "$ref": "#/$defs/rawDigest" },
+        "selected_mechanisms": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "required_gates": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "inventoryItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes", "mode"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/rawDigest" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "mode": { "type": "string", "pattern": "^0[0-7]{3}$" }
+      }
+    },
+    "sourceDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": { "path": { "type": "string", "minLength": 1 }, "sha256": { "$ref": "#/$defs/digest" } }
+    },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "selected_skills", "inventory", "source_digests", "projection_fingerprint", "capability_downgrades"],
+      "properties": {
+        "status": { "enum": ["materialized", "lightweight_bypass", "projected", "capability_downgraded", "runtime_unavailable", "attempt_setup_failed", "recovered_interruption"] },
+        "selected_skills": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "inventory": { "type": "array", "items": { "$ref": "#/$defs/inventoryItem" } },
+        "source_digests": { "type": "array", "items": { "$ref": "#/$defs/sourceDigest" } },
+        "projection_fingerprint": { "type": ["string", "null"], "pattern": "^(?:sha256:)?[a-f0-9]{64}$" },
+        "capability_downgrades": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["capability", "reason"],
+            "properties": { "capability": { "type": "string", "minLength": 1 }, "reason": { "type": "string", "minLength": 1 } }
+          }
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "runtime_identity_digest", "effective_command_digest", "autonomous_agents_started"],
+      "properties": {
+        "adapter": { "$ref": "#/$defs/adapter" },
+        "runtime_identity_digest": { "$ref": "#/$defs/digest" },
+        "effective_command_digest": { "$ref": "#/$defs/digest" },
+        "autonomous_agents_started": { "const": 0 }
+      }
+    }
   }
 }

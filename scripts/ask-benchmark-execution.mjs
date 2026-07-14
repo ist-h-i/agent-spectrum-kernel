@@ -5,6 +5,7 @@ import {
   copyFileSync,
   existsSync,
   lstatSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -18,7 +19,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, parse, relative, resolve, sep } from "node:path";
+import { basename, dirname, parse, resolve, sep } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { assertTrackedRepositoryMatchesHead, canonicalDigest, stableCanonicalJson, validateMaterializedPortfolio } from "./ask-benchmark-materialize.mjs";
 import { verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
@@ -31,11 +32,16 @@ export const RUN_IDENTITY_SCHEMA_PATH = "benchmarks/schemas/portfolio-run-identi
 export const CASE_STATE_SCHEMA_PATH = "benchmarks/schemas/portfolio-case-state.schema.json";
 export const ATTEMPT_REQUEST_SCHEMA_PATH = "benchmarks/schemas/portfolio-attempt-request.schema.json";
 export const ATTEMPT_RESULT_SCHEMA_PATH = "benchmarks/schemas/portfolio-attempt-result.schema.json";
+export const ATTEMPT_COMMIT_SCHEMA_PATH = "benchmarks/schemas/portfolio-attempt-commit.schema.json";
+export const CLAIM_SCHEMA_PATH = "benchmarks/schemas/portfolio-claim.schema.json";
+export const ADAPTER_IDENTITY_SCHEMA_PATH = "benchmarks/schemas/portfolio-adapter-identity.schema.json";
 export const OUTPUT_SCHEMA_PATH = "benchmarks/schemas/agent-output.schema.json";
 
 const CLAIM_GRACE_MS = 30_000;
 const MAX_PROCESS_OUTPUT_BYTES = 20 * 1024 * 1024;
 const RUN_IDENTITY_FILE = "run-identity.json";
+const TERMINAL_STATUSES = new Set(["completed", "failed", "unavailable", "interrupted", "invalid"]);
+const EPHEMERAL_WORKSPACE_ROOT = resolve(tmpdir(), "ask-portfolio-workspaces");
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -51,6 +57,40 @@ function writeJsonAtomic(path, value) {
   const temporary = resolve(parent, `.${basename(path)}.${randomUUID()}.staging`);
   writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx" });
   renameSync(temporary, path);
+}
+
+function writeJsonIdempotent(path, value, label) {
+  if (existsSync(path)) {
+    const existing = readJson(path);
+    if (stableCanonicalJson(existing) !== stableCanonicalJson(value)) throw new Error(`${label} already exists with different content`);
+    return false;
+  }
+  writeJsonAtomic(path, value);
+  return true;
+}
+
+function publishJsonExclusive(path, value) {
+  const parent = dirname(path);
+  mkdirSync(parent, { recursive: true });
+  const temporary = resolve(parent, `.${basename(path)}.${randomUUID()}.staging`);
+  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx" });
+  try {
+    linkSync(temporary, path);
+    return true;
+  } catch (error) {
+    if (error?.code === "EEXIST") return false;
+    throw error;
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+}
+
+function prefixedFileDigest(path) {
+  return `sha256:${fileDigest(path)}`;
+}
+
+function fault(name) {
+  if (process.env.ASK_BENCHMARK_FAULT === name) process.exit(86);
 }
 
 function assertNoSymlinkSegments(path, label) {
@@ -131,7 +171,27 @@ function readRuntimeConfig(root, path, adapter) {
     throw new Error("unavailable runtime config requires unavailable_reason");
   }
   if (adapter === "codex" && value.claude_cli !== null) throw new Error("Codex runtime config must not provide a Claude CLI contract");
+  if (adapter === "claude" && value.availability === "available") validateClaudeCommandTemplate(value);
   return { value, digest: sha256(bytes) };
+}
+
+function placeholderCount(command, placeholder) {
+  return command.reduce((count, part) => count + part.split(placeholder).length - 1, 0);
+}
+
+function validateClaudeCommandTemplate(runtime) {
+  const contract = runtime.claude_cli;
+  if (!contract) throw new Error("available Claude runtime requires a CLI contract");
+  for (const placeholder of ["{task}", "{output}", "{sandbox_policy}", "{permission_policy}"]) {
+    if (placeholderCount(contract.command, placeholder) !== 1) throw new Error(`Claude CLI contract requires exactly one ${placeholder} placeholder`);
+  }
+  for (const part of contract.command) {
+    if (!/^(?:[^{}]|\{output\}|\{task\}|\{sandbox_policy\}|\{permission_policy\})+$/u.test(part)) throw new Error("Claude CLI contract uses an unsupported placeholder");
+  }
+  const sandboxIndex = contract.command.indexOf(contract.sandbox_argument);
+  const permissionIndex = contract.command.indexOf(contract.permission_argument);
+  if (sandboxIndex < 0 || contract.command[sandboxIndex + 1] !== "{sandbox_policy}") throw new Error("Claude CLI contract does not apply the declared sandbox policy");
+  if (permissionIndex < 0 || contract.command[permissionIndex + 1] !== "{permission_policy}") throw new Error("Claude CLI contract does not apply the declared permission policy");
 }
 
 function environmentFor(runtime, extra = {}) {
@@ -142,7 +202,40 @@ function environmentFor(runtime, extra = {}) {
   return { ...environment, ...extra };
 }
 
-function validateAvailableRuntime(runtime, agentBin) {
+function effectiveCommand(root, runtime) {
+  if (runtime.availability === "unavailable") {
+    return { argv: [], task_transport: "none", output_transport: "none", output_schema_digest: null };
+  }
+  if (runtime.adapter === "codex") {
+    return {
+      argv: [
+        "exec",
+        "--ephemeral",
+        "--ignore-user-config",
+        "--ignore-rules",
+        "--model", runtime.model,
+        "-c", `model_reasoning_effort=\"${runtime.reasoning_effort}\"`,
+        "--sandbox", runtime.sandbox_policy,
+        "--ask-for-approval", runtime.permission_policy,
+        "--output-schema", resolve(root, OUTPUT_SCHEMA_PATH),
+        "--output-last-message", "{output}",
+        "-",
+      ],
+      task_transport: "stdin",
+      output_transport: "file",
+      output_schema_digest: `sha256:${fileDigest(schema(root, OUTPUT_SCHEMA_PATH))}`,
+    };
+  }
+  validateClaudeCommandTemplate(runtime);
+  return {
+    argv: runtime.claude_cli.command,
+    task_transport: "file",
+    output_transport: "file",
+    output_schema_digest: null,
+  };
+}
+
+function validateAvailableRuntime(root, runtime, agentBin, command) {
   if (!agentBin || !existsSync(agentBin) || !lstatSync(agentBin).isFile()) throw new Error("available runtime requires a regular --agent-bin");
   assertNoSymlinkSegments(agentBin, "agent executable");
   const executable = realpathSync(agentBin);
@@ -154,11 +247,9 @@ function validateAvailableRuntime(runtime, agentBin) {
   if (runtime.adapter === "claude") {
     const help = spawnSync(executable, ["--help"], { encoding: "utf8", env: environmentFor(runtime), maxBuffer: 1024 * 1024 });
     const helpOutput = `${help.stdout ?? ""}${help.stderr ?? ""}`;
-    if (help.status !== 0 || !helpOutput.includes(runtime.claude_cli.help_marker)) {
+    const requiredFlags = command.argv.filter((part) => part.startsWith("-") && part !== "-");
+    if (help.status !== 0 || !helpOutput.includes(runtime.claude_cli.help_marker) || !requiredFlags.every((flag) => helpOutput.includes(flag))) {
       throw new Error("Claude CLI contract is not confirmed by local --help output");
-    }
-    for (const value of runtime.claude_cli.command) {
-      if (!/^(?:[^{}]|\{output\}|\{task\})+$/u.test(value)) throw new Error("Claude CLI contract uses an unsupported placeholder");
     }
   }
   return {
@@ -168,7 +259,7 @@ function validateAvailableRuntime(runtime, agentBin) {
   };
 }
 
-function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable }) {
+function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable, command }) {
   return {
     schema_version: "1.0.0",
     adapter,
@@ -184,6 +275,15 @@ function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable }) 
     thermal_state: runtime.thermal_state,
     environment_allowlist: runtime.environment_allowlist,
     executable,
+    effective_command: command,
+    effective_command_digest: canonicalDigest(command),
+    policy_enforcement: {
+      sandbox_policy: runtime.sandbox_policy,
+      permission_policy: runtime.permission_policy,
+      ephemeral: adapter === "codex",
+      user_config_isolated: adapter === "codex",
+      rules_isolated: adapter === "codex",
+    },
     availability_evidence: runtime.availability === "available" ? "local_version_and_contract_probe" : "declared_unavailable",
   };
 }
@@ -263,6 +363,10 @@ function readCaseState(root, runDir, entry) {
   const state = readJson(path);
   validate(root, state, CASE_STATE_SCHEMA_PATH, `${entry.case_id} state`);
   if (state.case_id !== entry.case_id || state.adapter !== entry.adapter_track || state.condition !== entry.condition) throw new Error(`${entry.case_id} state identity mismatch`);
+  if (state.status === "pending" && (state.attempt_count !== 0 || state.terminal_attempt !== null)) throw new Error(`${entry.case_id} pending state is inconsistent`);
+  if (state.status === "active" && (state.attempt_count < 1 || state.terminal_attempt !== null)) throw new Error(`${entry.case_id} active state is inconsistent`);
+  if (TERMINAL_STATUSES.has(state.status) && (state.attempt_count < 1 || state.terminal_attempt === null)) throw new Error(`${entry.case_id} terminal state is inconsistent`);
+  if ((entry.condition === "adaptive_ask") !== (typeof state.selection_digest === "string")) throw new Error(`${entry.case_id} state selection identity is inconsistent`);
   return state;
 }
 
@@ -319,63 +423,136 @@ function loadExecutionContext({ root, config, planPath, materializedPath, select
   return { repositoryRevision, plan, materialized, selections, identity, runDir: safeRunDir, initialized };
 }
 
-function ensureAdapterIdentity({ root, runDir, adapter, runtimeConfig, agentBin }) {
-  const executable = runtimeConfig.value.availability === "available" ? validateAvailableRuntime(runtimeConfig.value, agentBin) : null;
-  const identity = adapterIdentity({ adapter, runtime: runtimeConfig.value, runtimeConfigDigest: runtimeConfig.digest, executable });
+function adapterHasAttempts(runDir, plan, adapter) {
+  return plan.cases.some((entry) => entry.adapter_track === adapter && readdirSync(resolve(runDir, "cases", entry.case_id, "attempts")).length > 0);
+}
+
+function readAdapterIdentity(root, runDir, adapter) {
   const path = resolve(runDir, "adapters", `${adapter}.json`);
-  if (existsSync(path)) {
-    const existing = readJson(path);
-    if (stableCanonicalJson(existing) !== stableCanonicalJson(identity)) throw new Error(`${adapter} runtime identity changed; refusing resume`);
-  } else writeJsonAtomic(path, identity);
+  if (!existsSync(path) || !lstatSync(path).isFile()) throw new Error(`${adapter} runtime identity is missing`);
+  const identity = readJson(path);
+  validate(root, identity, ADAPTER_IDENTITY_SCHEMA_PATH, `${adapter} runtime identity`);
+  if (identity.adapter !== adapter || identity.effective_command_digest !== canonicalDigest(identity.effective_command)) throw new Error(`${adapter} runtime identity is invalid`);
+  if (identity.policy_enforcement.sandbox_policy !== identity.sandbox_policy || identity.policy_enforcement.permission_policy !== identity.permission_policy) throw new Error(`${adapter} runtime policy identity is inconsistent`);
+  if (identity.availability === "available" && adapter === "codex") {
+    const argv = identity.effective_command.argv;
+    if (!argv.includes("--ephemeral") || !argv.includes("--ignore-user-config") || !argv.includes("--ignore-rules") || argv[argv.indexOf("--sandbox") + 1] !== identity.sandbox_policy || argv[argv.indexOf("--ask-for-approval") + 1] !== identity.permission_policy) throw new Error("Codex effective command does not enforce its runtime policy");
+  }
+  if (identity.availability === "available" && adapter === "claude") {
+    const argv = identity.effective_command.argv;
+    if (placeholderCount(argv, "{task}") !== 1 || placeholderCount(argv, "{output}") !== 1 || placeholderCount(argv, "{sandbox_policy}") !== 1 || placeholderCount(argv, "{permission_policy}") !== 1) throw new Error("Claude effective command contract is incomplete");
+  }
   return identity;
+}
+
+function ensureAdapterIdentity({ root, runDir, plan, adapter, runtimeConfig, agentBin }) {
+  const command = effectiveCommand(root, runtimeConfig.value);
+  const executable = runtimeConfig.value.availability === "available" ? validateAvailableRuntime(root, runtimeConfig.value, agentBin, command) : null;
+  const identity = adapterIdentity({ adapter, runtime: runtimeConfig.value, runtimeConfigDigest: runtimeConfig.digest, executable, command });
+  const path = resolve(runDir, "adapters", `${adapter}.json`);
+  if (!existsSync(path) && adapterHasAttempts(runDir, plan, adapter)) throw new Error(`${adapter} runtime identity is missing after attempts were created; refusing replacement`);
+  const published = publishJsonExclusive(path, identity);
+  const existing = published ? identity : readAdapterIdentity(root, runDir, adapter);
+  if (stableCanonicalJson(existing) !== stableCanonicalJson(identity)) throw new Error(`${adapter} runtime identity changed; refusing resume`);
+  return { identity: existing, digest: canonicalDigest(existing) };
 }
 
 function claimPath(runDir, caseId) {
   return resolve(runDir, "cases", caseId, "claim");
 }
 
-function readClaim(runDir, caseId) {
-  const root = claimPath(runDir, caseId);
-  if (!existsSync(root)) return null;
-  if (!lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) throw new Error(`${caseId} claim is invalid`);
-  const path = resolve(root, "claim.json");
+function claimStagingPath(runDir, caseId, claimId) {
+  return resolve(runDir, "cases", caseId, `.claim-${claimId}.staging`);
+}
+
+function readClaim(root, runDir, caseId) {
+  const directory = claimPath(runDir, caseId);
+  if (!existsSync(directory)) return null;
+  if (!lstatSync(directory).isDirectory() || lstatSync(directory).isSymbolicLink()) throw new Error(`${caseId} claim is invalid`);
+  const path = resolve(directory, "claim.json");
   if (!existsSync(path) || !lstatSync(path).isFile()) throw new Error(`${caseId} claim is incomplete; explicit recovery is required`);
   const claim = readJson(path);
-  if (!claim?.claim_id || claim.case_id !== caseId || !claim.lease_expires_at || !claim.attempt) throw new Error(`${caseId} claim is invalid`);
+  validate(root, claim, CLAIM_SCHEMA_PATH, `${caseId} claim`);
+  if (claim.case_id !== caseId) throw new Error(`${caseId} claim identity mismatch`);
+  if ((claim.condition === "adaptive_ask") !== (claim.selection !== null)) throw new Error(`${caseId} claim selection identity is inconsistent`);
   return claim;
+}
+
+function readStagedClaim(root, runDir, caseId, claimId) {
+  const directory = claimStagingPath(runDir, caseId, claimId);
+  const path = resolve(directory, "claim.json");
+  if (!existsSync(path) || !lstatSync(path).isFile()) return null;
+  const claim = readJson(path);
+  validate(root, claim, CLAIM_SCHEMA_PATH, `${caseId} staged claim`);
+  if (claim.case_id !== caseId || claim.claim_id !== claimId) throw new Error("staged claim identity mismatch");
+  if ((claim.condition === "adaptive_ask") !== (claim.selection !== null)) throw new Error("staged claim selection identity is inconsistent");
+  return { claim, directory };
 }
 
 function claimIsExpired(claim, now = Date.now()) {
   return Number.isFinite(Date.parse(claim.lease_expires_at)) && Date.parse(claim.lease_expires_at) < now;
 }
 
-function acquireClaim({ runDir, entry, attempt, runtime }) {
-  const directory = claimPath(runDir, entry.case_id);
-  try {
-    mkdirSync(directory, { recursive: false });
-  } catch (error) {
-    if (error?.code === "EEXIST") return null;
-    throw error;
-  }
+function inputIdentityFor(context, entry) {
+  return {
+    plan_id: context.identity.plan.id,
+    plan_digest: context.identity.plan.digest,
+    materialization_manifest_digest: context.materialized.manifestDigest,
+    frozen_input_digest: context.materialized.casesById.get(entry.case_id).frozen_input_digest,
+  };
+}
+
+function selectionIdentityFor(context, entry) {
+  const selection = context.selections.selections.get(entry.case_id);
+  return selection ? { digest: selection.selection_digest.value, selected_mechanisms: selection.selected_mechanisms, required_gates: selection.required_gates } : null;
+}
+
+function acquireClaim({ root, context, entry, attempt, runtime, adapter }) {
+  const claimId = randomUUID();
+  const directory = claimPath(context.runDir, entry.case_id);
+  const staging = claimStagingPath(context.runDir, entry.case_id, claimId);
+  const workspaceToken = randomUUID();
+  mkdirSync(staging, { recursive: false });
   const acquiredAt = new Date().toISOString();
+  const injectedLeaseMs = process.env.ASK_BENCHMARK_FAULT ? Number(process.env.ASK_BENCHMARK_FAULT_LEASE_MS) : Number.NaN;
+  const leaseMs = Number.isFinite(injectedLeaseMs) ? injectedLeaseMs : runtime.case_timeout_ms + CLAIM_GRACE_MS;
   const claim = {
     schema_version: "1.0.0",
-    claim_id: randomUUID(),
+    claim_id: claimId,
     case_id: entry.case_id,
+    attempt,
+    adapter: entry.adapter_track,
+    condition: entry.condition,
     worker_id: `${process.pid}`,
     pid: process.pid,
     acquired_at: acquiredAt,
-    lease_expires_at: new Date(Date.now() + runtime.case_timeout_ms + CLAIM_GRACE_MS).toISOString(),
-    attempt,
-    selection_digest: null,
+    lease_expires_at: new Date(Date.now() + leaseMs).toISOString(),
+    workspace_token: workspaceToken,
+    input_identity: inputIdentityFor(context, entry),
+    selection: selectionIdentityFor(context, entry),
+    runtime_identity_digest: adapter.digest,
+    effective_command_digest: adapter.identity.effective_command_digest,
   };
-  writeJsonAtomic(resolve(directory, "claim.json"), claim);
+  validate(root, claim, CLAIM_SCHEMA_PATH, `${entry.case_id} claim`);
+  writeJsonAtomic(resolve(staging, "claim.json"), claim);
+  fault("after_claim_staged");
+  try {
+    renameSync(staging, directory);
+  } catch (error) {
+    rmSync(staging, { recursive: true, force: true });
+    if (["EEXIST", "ENOTEMPTY"].includes(error?.code)) return null;
+    throw error;
+  }
   return claim;
 }
 
-function releaseClaim(runDir, caseId) {
+function releaseClaim(root, runDir, caseId, claimId) {
   const path = claimPath(runDir, caseId);
-  if (existsSync(path)) rmSync(path, { recursive: true, force: true });
+  if (!existsSync(path)) return false;
+  const claim = readClaim(root, runDir, caseId);
+  if (claim.claim_id !== claimId) throw new Error("claim ID changed before release");
+  rmSync(path, { recursive: true, force: true });
+  return true;
 }
 
 function nextAttempt(runDir, entry) {
@@ -386,10 +563,18 @@ function nextAttempt(runDir, entry) {
   return String((Math.max(0, ...existing) + 1)).padStart(4, "0");
 }
 
-function copyWorkspace({ materializedRoot, record, attemptRoot }) {
+function ephemeralWorkspacePath(token) {
+  if (!/^[a-f0-9-]{36}$/u.test(token)) throw new Error("claim workspace token is invalid");
+  return resolve(EPHEMERAL_WORKSPACE_ROOT, token);
+}
+
+function copyWorkspace({ materializedRoot, record, token }) {
   const sourceRoot = resolve(materializedRoot, record.case_id);
-  const workspace = resolve(attemptRoot, "workspace");
-  mkdirSync(workspace, { recursive: true });
+  const ephemeralRoot = ephemeralWorkspacePath(token);
+  mkdirSync(EPHEMERAL_WORKSPACE_ROOT, { recursive: true, mode: 0o700 });
+  mkdirSync(ephemeralRoot, { recursive: false, mode: 0o700 });
+  const workspace = resolve(ephemeralRoot, "workspace");
+  mkdirSync(workspace, { mode: 0o700 });
   const inventory = [...record.agent_visible_files, ...record.projected_asset_inventory];
   for (const file of inventory) {
     const relativePath = assertPortableRelativePath(file.path, `${record.case_id} materialized path`);
@@ -401,7 +586,7 @@ function copyWorkspace({ materializedRoot, record, attemptRoot }) {
     copyFileSync(source, destination, 0);
     chmodSync(destination, Number.parseInt(file.mode, 8));
   }
-  return workspace;
+  return { ephemeralRoot, workspace };
 }
 
 function sourceForProjectedSkill(root, adapter, path) {
@@ -451,23 +636,20 @@ function isolatedCodexHome() {
   return home;
 }
 
-function executeAgent({ root, runtime, executable, workspace, outputTemporary }) {
+function materializeCommand(command, runtime, outputTemporary) {
+  return command.argv.map((part) => part
+    .replaceAll("{output}", outputTemporary)
+    .replaceAll("{task}", "BENCHMARK_TASK.md")
+    .replaceAll("{sandbox_policy}", runtime.sandbox_policy)
+    .replaceAll("{permission_policy}", runtime.permission_policy));
+}
+
+function executeAgent({ runtime, executable, workspace, outputTemporary, command }) {
   const task = readFileSync(resolve(workspace, "BENCHMARK_TASK.md"), "utf8");
   if (runtime.adapter === "codex") {
     const codexHome = isolatedCodexHome();
     try {
-      return spawnSync(executable, [
-        "exec",
-        "--ephemeral",
-        "--ignore-user-config",
-        "--ignore-rules",
-        "--model", runtime.model,
-        "-c", `model_reasoning_effort=\"${runtime.reasoning_effort}\"`,
-        "--sandbox", runtime.sandbox_policy,
-        "--output-schema", resolve(root, OUTPUT_SCHEMA_PATH),
-        "--output-last-message", outputTemporary,
-        "-",
-      ], {
+      return spawnSync(executable, materializeCommand(command, runtime, outputTemporary), {
         cwd: workspace,
         encoding: "utf8",
         input: task,
@@ -479,7 +661,7 @@ function executeAgent({ root, runtime, executable, workspace, outputTemporary })
       rmSync(codexHome, { recursive: true, force: true });
     }
   }
-  const args = runtime.claude_cli.command.map((part) => part.replaceAll("{output}", outputTemporary).replaceAll("{task}", "BENCHMARK_TASK.md"));
+  const args = materializeCommand(command, runtime, outputTemporary);
   return spawnSync(executable, args, {
     cwd: workspace,
     encoding: "utf8",
@@ -489,18 +671,40 @@ function executeAgent({ root, runtime, executable, workspace, outputTemporary })
   });
 }
 
-function publishFinal(root, attemptRoot, outputTemporary) {
+function inspectFinal(root, outputTemporary) {
   if (!existsSync(outputTemporary) || !lstatSync(outputTemporary).isFile()) throw new Error("agent final structured output is missing");
   const bytes = readFileSync(outputTemporary);
   const final = JSON.parse(bytes);
   validate(root, final, OUTPUT_SCHEMA_PATH, "agent final structured output");
-  const destination = resolve(attemptRoot, "final.json");
-  if (existsSync(destination)) throw new Error("attempt final output already exists");
-  renameSync(outputTemporary, destination);
-  return { path: "final.json", sha256: sha256(bytes), bytes: bytes.length };
+  return { record: { path: "final.json", sha256: sha256(bytes), bytes: bytes.length }, bytes };
 }
 
-function requestRecord({ entry, attempt, materialized, selection, projection, identity }) {
+function publishFinal(root, attemptRoot, source, record) {
+  const inspected = inspectFinal(root, source);
+  if (stableCanonicalJson(inspected.record) !== stableCanonicalJson(record)) throw new Error("agent final structured output identity changed");
+  const destination = resolve(attemptRoot, "final.json");
+  if (existsSync(destination)) {
+    if (fileDigest(destination) !== record.sha256 || statSync(destination).size !== record.bytes) throw new Error("attempt final output already exists with different content");
+    return false;
+  }
+  const staging = resolve(attemptRoot, `.final.${randomUUID()}.staging`);
+  writeFileSync(staging, inspected.bytes, { flag: "wx" });
+  renameSync(staging, destination);
+  return true;
+}
+
+function normalizedProjection(projection) {
+  return {
+    status: projection.status,
+    selected_skills: projection.selected_skills ?? [],
+    inventory: projection.inventory ?? [],
+    source_digests: projection.source_digests ?? [],
+    projection_fingerprint: projection.projection_fingerprint ?? null,
+    capability_downgrades: projection.capability_downgrades ?? [],
+  };
+}
+
+function requestRecord({ entry, attempt, claim, projection }) {
   return {
     schema_version: "1.0.0",
     kind: "request",
@@ -508,18 +712,19 @@ function requestRecord({ entry, attempt, materialized, selection, projection, id
     attempt,
     adapter: entry.adapter_track,
     condition: entry.condition,
-    input_identity: {
-      plan_digest: identity.plan.digest,
-      materialization_manifest_digest: materialized.manifestDigest,
-      frozen_input_digest: materialized.casesById.get(entry.case_id).frozen_input_digest,
+    input_identity: claim.input_identity,
+    selection: claim.selection,
+    projection: normalizedProjection(projection),
+    agent: {
+      adapter: entry.adapter_track,
+      runtime_identity_digest: claim.runtime_identity_digest,
+      effective_command_digest: claim.effective_command_digest,
+      autonomous_agents_started: 0,
     },
-    selection: selection ? { digest: selection.selection_digest.value, selected_mechanisms: selection.selected_mechanisms, required_gates: selection.required_gates } : null,
-    projection,
-    agent: { adapter: entry.adapter_track, autonomous_agents_started: 0 },
   };
 }
 
-function resultRecord({ entry, attempt, status, processResult = null, finalOutput = null, failureKind = null }) {
+function resultRecord({ entry, attempt, claim, requestPath, status, processResult = null, finalOutput = null, failureKind = null }) {
   const stdout = streamEvidence(processResult?.stdout ?? "");
   const stderr = streamEvidence(processResult?.stderr ?? "");
   return {
@@ -527,6 +732,11 @@ function resultRecord({ entry, attempt, status, processResult = null, finalOutpu
     kind: "result",
     case_id: entry.case_id,
     attempt,
+    adapter: entry.adapter_track,
+    condition: entry.condition,
+    runtime_identity_digest: claim.runtime_identity_digest,
+    effective_command_digest: claim.effective_command_digest,
+    request_sha256: prefixedFileDigest(requestPath),
     status,
     exit_code: processResult?.status ?? null,
     duration_ms: processResult?.duration_ms ?? null,
@@ -538,116 +748,207 @@ function resultRecord({ entry, attempt, status, processResult = null, finalOutpu
   };
 }
 
-function completeCase({ root, runDir, entry, state, claim, attempt, attemptRoot, result }) {
+function commitRecord({ claim, result, requestPath, resultPath }) {
+  return {
+    schema_version: "1.0.0",
+    kind: "terminal_commit",
+    claim_id: claim.claim_id,
+    claim_lease_expires_at: claim.lease_expires_at,
+    case_id: claim.case_id,
+    attempt: claim.attempt,
+    adapter: claim.adapter,
+    condition: claim.condition,
+    status: result.status,
+    runtime_identity_digest: claim.runtime_identity_digest,
+    effective_command_digest: claim.effective_command_digest,
+    request_sha256: prefixedFileDigest(requestPath),
+    result_sha256: prefixedFileDigest(resultPath),
+  };
+}
+
+function completeCase({ root, runDir, entry, state, claim, attempt, attemptRoot, result, finalSource = null }) {
+  const requestPath = resolve(attemptRoot, "request.json");
+  if (!existsSync(requestPath)) throw new Error("terminal attempt request is missing");
   validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${entry.case_id} attempt result`);
-  writeJsonAtomic(resolve(attemptRoot, "result.json"), result);
-  writeCaseState(runDir, entry, {
+  const resultPath = resolve(attemptRoot, "result.json");
+  writeJsonIdempotent(resultPath, result, `${entry.case_id} attempt result`);
+  fault("after_result_published");
+  if (result.status === "completed") {
+    const source = finalSource ?? resolve(ephemeralWorkspacePath(claim.workspace_token), "agent-final.json");
+    publishFinal(root, attemptRoot, source, result.final_output);
+    fault("after_final_published");
+  }
+  const commit = commitRecord({ claim, result, requestPath, resultPath });
+  validate(root, commit, ATTEMPT_COMMIT_SCHEMA_PATH, `${entry.case_id} terminal commit`);
+  writeJsonIdempotent(resolve(attemptRoot, "commit.json"), commit, `${entry.case_id} terminal commit`);
+  const terminalState = {
     ...state,
     status: result.status,
-    attempt_count: Number(attempt),
+    attempt_count: Math.max(state.attempt_count, Number(attempt)),
     terminal_attempt: attempt,
-    selection_digest: claim.selection_digest,
-  });
-  releaseClaim(runDir, entry.case_id);
+    selection_digest: claim.selection?.digest ?? null,
+  };
+  validate(root, terminalState, CASE_STATE_SCHEMA_PATH, `${entry.case_id} terminal state`);
+  writeCaseState(runDir, entry, terminalState);
+  fault("after_state_published");
+  releaseClaim(root, runDir, entry.case_id, claim.claim_id);
+  return terminalState;
 }
 
-function completedArtifactValid({ root, runDir, entry, state }) {
-  if (!state.terminal_attempt) return false;
-  const attemptRoot = resolve(runDir, "cases", entry.case_id, "attempts", state.terminal_attempt);
+function assertCanonicalEqual(actual, expected, label) {
+  if (stableCanonicalJson(actual) !== stableCanonicalJson(expected)) throw new Error(`${label} mismatch`);
+}
+
+function validateTerminalAttempt({ root, context, entry, attempt }) {
+  const attemptRoot = resolve(context.runDir, "cases", entry.case_id, "attempts", attempt);
+  const requestPath = resolve(attemptRoot, "request.json");
   const resultPath = resolve(attemptRoot, "result.json");
-  if (!existsSync(resultPath) || !lstatSync(resultPath).isFile()) return false;
-  try {
-    const result = readJson(resultPath);
-    validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${entry.case_id} completed result`);
-    if (result.status !== "completed" || !result.final_output) return false;
+  const commitPath = resolve(attemptRoot, "commit.json");
+  for (const [path, label] of [[requestPath, "request"], [resultPath, "result"], [commitPath, "terminal commit"]]) {
+    if (!existsSync(path) || !lstatSync(path).isFile()) throw new Error(`${entry.case_id} ${label} is missing`);
+  }
+  const request = readJson(requestPath);
+  const result = readJson(resultPath);
+  const commit = readJson(commitPath);
+  validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${entry.case_id} request`);
+  validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${entry.case_id} result`);
+  validate(root, commit, ATTEMPT_COMMIT_SCHEMA_PATH, `${entry.case_id} terminal commit`);
+  const adapterIdentity = readAdapterIdentity(root, context.runDir, entry.adapter_track);
+  const runtimeIdentityDigest = canonicalDigest(adapterIdentity);
+  const expectedInput = inputIdentityFor(context, entry);
+  const expectedSelection = selectionIdentityFor(context, entry);
+  if (request.case_id !== entry.case_id || request.attempt !== attempt || request.adapter !== entry.adapter_track || request.condition !== entry.condition) throw new Error(`${entry.case_id} request identity mismatch`);
+  if ((entry.condition === "adaptive_ask") !== (request.selection !== null)) throw new Error(`${entry.case_id} request selection shape mismatch`);
+  assertCanonicalEqual(request.input_identity, expectedInput, `${entry.case_id} request input identity`);
+  assertCanonicalEqual(request.selection, expectedSelection, `${entry.case_id} request selection`);
+  if (request.agent.adapter !== entry.adapter_track || request.agent.runtime_identity_digest !== runtimeIdentityDigest || request.agent.effective_command_digest !== adapterIdentity.effective_command_digest) throw new Error(`${entry.case_id} request runtime identity mismatch`);
+  if (result.case_id !== entry.case_id || result.attempt !== attempt || result.adapter !== entry.adapter_track || result.condition !== entry.condition) throw new Error(`${entry.case_id} result identity mismatch`);
+  if (result.status === "completed") {
+    if (result.exit_code !== 0 || result.failure_kind !== null || result.final_output === null) throw new Error(`${entry.case_id} completed result semantics mismatch`);
+  } else if (result.failure_kind === null || result.final_output !== null) throw new Error(`${entry.case_id} terminal failure result semantics mismatch`);
+  if (result.runtime_identity_digest !== runtimeIdentityDigest || result.effective_command_digest !== adapterIdentity.effective_command_digest || result.request_sha256 !== prefixedFileDigest(requestPath)) throw new Error(`${entry.case_id} result evidence mismatch`);
+  if (commit.case_id !== entry.case_id || commit.attempt !== attempt || commit.adapter !== entry.adapter_track || commit.condition !== entry.condition || commit.status !== result.status) throw new Error(`${entry.case_id} terminal commit identity mismatch`);
+  if (commit.runtime_identity_digest !== runtimeIdentityDigest || commit.effective_command_digest !== adapterIdentity.effective_command_digest || commit.request_sha256 !== prefixedFileDigest(requestPath) || commit.result_sha256 !== prefixedFileDigest(resultPath)) throw new Error(`${entry.case_id} terminal commit evidence mismatch`);
+  const expectedInventory = result.status === "completed" ? ["commit.json", "final.json", "request.json", "result.json"] : ["commit.json", "request.json", "result.json"];
+  const inventory = readdirSync(attemptRoot).sort();
+  assertCanonicalEqual(inventory, expectedInventory, `${entry.case_id} terminal attempt inventory`);
+  if (result.status === "completed") {
     const finalPath = resolve(attemptRoot, result.final_output.path);
-    if (!existsSync(finalPath) || !lstatSync(finalPath).isFile()) return false;
-    if (fileDigest(finalPath) !== result.final_output.sha256 || statSync(finalPath).size !== result.final_output.bytes) return false;
+    if (fileDigest(finalPath) !== result.final_output.sha256 || statSync(finalPath).size !== result.final_output.bytes) throw new Error(`${entry.case_id} final output digest mismatch`);
     validate(root, readJson(finalPath), OUTPUT_SCHEMA_PATH, `${entry.case_id} completed output`);
-    return true;
-  } catch {
-    return false;
   }
+  return { request, result, commit };
 }
 
-function markUnavailable({ root, runDir, entry, state, identity }) {
+function validateTerminalCase({ root, context, entry, state }) {
+  if (!TERMINAL_STATUSES.has(state.status) || !state.terminal_attempt) throw new Error(`${entry.case_id} terminal state is invalid`);
+  if (Number(state.terminal_attempt) < 1 || Number(state.terminal_attempt) > state.attempt_count) throw new Error(`${entry.case_id} terminal attempt is outside the attempt count`);
+  for (let number = 1; number <= state.attempt_count; number += 1) {
+    const attempt = String(number).padStart(4, "0");
+    const artifacts = validateTerminalAttempt({ root, context, entry, attempt });
+    if (attempt === state.terminal_attempt && artifacts.result.status !== state.status) throw new Error(`${entry.case_id} terminal status mismatch`);
+  }
+  const expectedSelection = selectionIdentityFor(context, entry)?.digest ?? null;
+  if (state.selection_digest !== expectedSelection) throw new Error(`${entry.case_id} state selection digest mismatch`);
+  return true;
+}
+
+function markUnavailable({ root, context, entry, state, runtime, adapter }) {
   if (["completed", "unavailable"].includes(state.status)) return;
-  const attempt = nextAttempt(runDir, entry);
-  const attemptRoot = resolve(runDir, "cases", entry.case_id, "attempts", attempt);
+  const attempt = nextAttempt(context.runDir, entry);
+  const claim = acquireClaim({ root, context, entry, attempt, runtime, adapter });
+  if (!claim) return "active";
+  const activeState = { ...state, status: "active", attempt_count: Number(attempt), terminal_attempt: null };
+  writeCaseState(context.runDir, entry, activeState);
+  const attemptRoot = resolve(context.runDir, "cases", entry.case_id, "attempts", attempt);
   mkdirSync(attemptRoot, { recursive: false });
-  const request = requestRecord({ entry, attempt, materialized: { manifestDigest: identity.materialization.manifest_digest, casesById: new Map([[entry.case_id, { frozen_input_digest: null }]]) }, selection: null, projection: { status: "runtime_unavailable", inventory: [] }, identity });
+  const request = requestRecord({ entry, attempt, claim, projection: { status: "runtime_unavailable" } });
   validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${entry.case_id} unavailable request`);
-  writeJsonAtomic(resolve(attemptRoot, "request.json"), request);
-  completeCase({ root, runDir, entry, state, claim: { selection_digest: state.selection_digest }, attempt, attemptRoot, result: resultRecord({ entry, attempt, status: "unavailable", failureKind: "runtime_unavailable" }) });
+  const requestPath = resolve(attemptRoot, "request.json");
+  writeJsonAtomic(requestPath, request);
+  completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, status: "unavailable", failureKind: "runtime_unavailable" }) });
+  return "unavailable";
 }
 
-function executeCase({ root, config, context, entry, runtime, executable }) {
+function executeCase({ root, config, context, entry, runtime, executable, adapter }) {
   const state = readCaseState(root, context.runDir, entry);
-  if (state.status === "completed") {
-    if (!completedArtifactValid({ root, runDir: context.runDir, entry, state })) throw new Error(`${entry.case_id} completed artifact is corrupt; refusing re-execution`);
-    return "completed";
+  if (TERMINAL_STATUSES.has(state.status)) {
+    validateTerminalCase({ root, context, entry, state });
+    if (["completed", "unavailable", "invalid"].includes(state.status) || (state.status === "failed" && !context.retryFailed)) return state.status;
   }
-  if (state.status === "failed" && !context.retryFailed) return "failed";
-  if (state.status === "unavailable" || state.status === "invalid") return state.status;
-  const existingClaim = readClaim(context.runDir, entry.case_id);
+  const existingClaim = readClaim(root, context.runDir, entry.case_id);
   if (existingClaim) {
     if (claimIsExpired(existingClaim)) throw new Error(`${entry.case_id} has an expired claim; run recover-case with claim ID ${existingClaim.claim_id}`);
     return "active";
   }
   const attempt = nextAttempt(context.runDir, entry);
-  const claim = acquireClaim({ runDir: context.runDir, entry, attempt, runtime });
+  const claim = acquireClaim({ root, context, entry, attempt, runtime, adapter });
   if (!claim) return "active";
   const activeState = { ...state, status: "active", attempt_count: Number(attempt), terminal_attempt: null };
   writeCaseState(context.runDir, entry, activeState);
   const attemptRoot = resolve(context.runDir, "cases", entry.case_id, "attempts", attempt);
   let processResult = null;
+  let ephemeralRoot = null;
+  let projection = { status: "attempt_setup_failed" };
   try {
     mkdirSync(attemptRoot, { recursive: false });
-    let selection = null;
+    let selection = context.selections.selections.get(entry.case_id) ?? null;
     if (entry.condition === "adaptive_ask") {
-      selection = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision });
+      const observed = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision });
       const expected = context.selections.selections.get(entry.case_id)?.selection_digest.value;
-      if (selection.selection_digest.value !== expected) throw new Error("Adaptive selection changed before execution");
-      claim.selection_digest = selection.selection_digest.value;
-      writeJsonAtomic(resolve(claimPath(context.runDir, entry.case_id), "claim.json"), claim);
+      if (observed.selection_digest.value !== expected) throw new Error("Adaptive selection changed before execution");
     }
-    const workspace = copyWorkspace({ materializedRoot: context.materializedPath, record: context.materialized.casesById.get(entry.case_id), attemptRoot });
-    const projection = selection ? applyAdaptiveSelection({ root, adapter: entry.adapter_track, selection, workspace }) : { status: "materialized", inventory: [], selected_skills: [] };
+    const copied = copyWorkspace({ materializedRoot: context.materializedPath, record: context.materialized.casesById.get(entry.case_id), token: claim.workspace_token });
+    ephemeralRoot = copied.ephemeralRoot;
+    const workspace = copied.workspace;
+    fault("after_workspace_created");
+    projection = selection ? applyAdaptiveSelection({ root, adapter: entry.adapter_track, selection, workspace }) : { status: "materialized" };
     if (selection) {
       const beforeSpawn = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision });
-      if (beforeSpawn.selection_digest.value !== claim.selection_digest) throw new Error("Adaptive selection changed before process spawn");
+      if (beforeSpawn.selection_digest.value !== claim.selection.digest) throw new Error("Adaptive selection changed before process spawn");
     }
-    const request = requestRecord({ entry, attempt, materialized: context.materialized, selection, projection, identity: context.identity });
+    const request = requestRecord({ entry, attempt, claim, projection });
     validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${entry.case_id} attempt request`);
-    writeJsonAtomic(resolve(attemptRoot, "request.json"), request);
-    const temporaryOutput = resolve(attemptRoot, ".agent-final.staging.json");
+    const requestPath = resolve(attemptRoot, "request.json");
+    writeJsonAtomic(requestPath, request);
+    const temporaryOutput = resolve(ephemeralRoot, "agent-final.json");
     const started = process.hrtime.bigint();
-    const raw = executeAgent({ root, runtime, executable, workspace, outputTemporary: temporaryOutput });
+    const raw = executeAgent({ runtime, executable, workspace, outputTemporary: temporaryOutput, command: adapter.identity.effective_command });
     processResult = { ...raw, duration_ms: Math.round(Number(process.hrtime.bigint() - started) / 1_000_000) };
     if (selection) {
       const afterSpawn = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision });
-      if (afterSpawn.selection_digest.value !== claim.selection_digest) throw new Error("Adaptive selection changed during process execution");
+      if (afterSpawn.selection_digest.value !== claim.selection.digest) throw new Error("Adaptive selection changed during process execution");
     }
     if (processResult.error?.code === "ETIMEDOUT") throw new Error("case timeout");
     if (processResult.status !== 0) throw new Error(`agent exited ${processResult.status}`);
-    const finalOutput = publishFinal(root, attemptRoot, temporaryOutput);
-    completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, status: "completed", processResult, finalOutput }) });
+    const finalOutput = inspectFinal(root, temporaryOutput).record;
+    completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, status: "completed", processResult, finalOutput }), finalSource: temporaryOutput });
     return "completed";
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const invalid = /Adaptive selection|projection|materialized source|selection changed/u.test(message);
-    const temporaryOutput = resolve(attemptRoot, ".agent-final.staging.json");
-    if (existsSync(temporaryOutput)) rmSync(temporaryOutput, { force: true });
+    const temporaryOutput = ephemeralRoot ? resolve(ephemeralRoot, "agent-final.json") : null;
+    if (temporaryOutput && existsSync(temporaryOutput)) rmSync(temporaryOutput, { force: true });
+    const requestPath = resolve(attemptRoot, "request.json");
+    if (existsSync(attemptRoot) && !existsSync(requestPath)) {
+      const request = requestRecord({ entry, attempt, claim, projection });
+      validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${entry.case_id} failed attempt request`);
+      writeJsonAtomic(requestPath, request);
+    }
     const result = resultRecord({
       entry,
       attempt,
+      claim,
+      requestPath,
       status: invalid ? "invalid" : "failed",
       processResult,
       failureKind: /timeout/u.test(message) ? "timeout" : invalid ? "invalid_input_or_selection" : "agent_failure",
     });
     if (existsSync(attemptRoot)) completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result });
-    else releaseClaim(context.runDir, entry.case_id);
+    else releaseClaim(root, context.runDir, entry.case_id, claim.claim_id);
     return result.status;
+  } finally {
+    if (ephemeralRoot) rmSync(ephemeralRoot, { recursive: true, force: true });
   }
 }
 
@@ -660,7 +961,7 @@ export function executePortfolio({ root, config, planPath, materializedPath, sel
   context.selectionState = selectionState;
   context.retryFailed = retryFailed;
   const runtimeConfig = readRuntimeConfig(root, runtimeConfigPath, adapter);
-  const identity = ensureAdapterIdentity({ root, runDir: context.runDir, adapter, runtimeConfig, agentBin });
+  const runtimeIdentity = ensureAdapterIdentity({ root, runDir: context.runDir, plan: context.plan, adapter, runtimeConfig, agentBin });
   const cases = context.plan.cases.filter((entry) => entry.adapter_track === adapter && (!caseId || entry.case_id === caseId));
   if (caseId && cases.length === 0) throw new Error(`case ${caseId} does not belong to adapter ${adapter}`);
   const outcomes = [];
@@ -669,13 +970,14 @@ export function executePortfolio({ root, config, planPath, materializedPath, sel
     for (const entry of cases) {
       const state = readCaseState(root, context.runDir, entry);
       if (["completed", "unavailable", "invalid"].includes(state.status)) {
+        validateTerminalCase({ root, context, entry, state });
         outcomes.push({ case_id: entry.case_id, status: state.status });
         continue;
       }
       if (maxCases !== null && executed >= maxCases) break;
-      markUnavailable({ root, runDir: context.runDir, entry, state, identity: context.identity });
-      outcomes.push({ case_id: entry.case_id, status: "unavailable" });
-      executed += 1;
+      const status = markUnavailable({ root, context, entry, state, runtime: runtimeConfig.value, adapter: runtimeIdentity });
+      outcomes.push({ case_id: entry.case_id, status });
+      if (status !== "active") executed += 1;
     }
   } else {
     const executable = realpathSync(agentBin);
@@ -683,7 +985,7 @@ export function executePortfolio({ root, config, planPath, materializedPath, sel
       const state = readCaseState(root, context.runDir, entry);
       const actionable = state.status === "pending" || state.status === "interrupted" || (state.status === "failed" && retryFailed);
       if (actionable && maxCases !== null && executed >= maxCases) break;
-      const status = executeCase({ root, config, context, entry, runtime: runtimeConfig.value, executable });
+      const status = executeCase({ root, config, context, entry, runtime: runtimeConfig.value, executable, adapter: runtimeIdentity });
       outcomes.push({ case_id: entry.case_id, status });
       if (actionable && status !== "active") executed += 1;
     }
@@ -691,12 +993,23 @@ export function executePortfolio({ root, config, planPath, materializedPath, sel
   return { adapter, initialized: context.initialized, outcomes };
 }
 
-function classificationForCase({ root, runDir, entry }) {
+function validateClaimAgainstContext({ root, context, entry, claim }) {
+  const identity = readAdapterIdentity(root, context.runDir, entry.adapter_track);
+  if (claim.adapter !== entry.adapter_track || claim.condition !== entry.condition || claim.runtime_identity_digest !== canonicalDigest(identity) || claim.effective_command_digest !== identity.effective_command_digest) throw new Error(`${entry.case_id} claim runtime identity mismatch`);
+  assertCanonicalEqual(claim.input_identity, inputIdentityFor(context, entry), `${entry.case_id} claim input identity`);
+  assertCanonicalEqual(claim.selection, selectionIdentityFor(context, entry), `${entry.case_id} claim selection`);
+}
+
+function classificationForCase({ root, context, entry }) {
   try {
-    const state = readCaseState(root, runDir, entry);
-    const claim = readClaim(runDir, entry.case_id);
-    if (claim) return { case_id: entry.case_id, status: "active", stale_claim: claimIsExpired(claim) };
-    if (state.status === "completed" && !completedArtifactValid({ root, runDir, entry, state })) return { case_id: entry.case_id, status: "invalid" };
+    const state = readCaseState(root, context.runDir, entry);
+    const claim = readClaim(root, context.runDir, entry.case_id);
+    if (claim) {
+      validateClaimAgainstContext({ root, context, entry, claim });
+      return { case_id: entry.case_id, status: "active", stale_claim: claimIsExpired(claim) };
+    }
+    if (TERMINAL_STATUSES.has(state.status)) validateTerminalCase({ root, context, entry, state });
+    else if (state.status === "active") throw new Error(`${entry.case_id} active state is missing its claim`);
     return { case_id: entry.case_id, status: state.status };
   } catch (error) {
     return { case_id: entry.case_id, status: "invalid", reason: error instanceof Error ? error.message : String(error) };
@@ -706,8 +1019,44 @@ function classificationForCase({ root, runDir, entry }) {
 export function verifyPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir }) {
   const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, initialize: false });
   return {
-    cases: context.plan.cases.map((entry) => classificationForCase({ root, runDir: context.runDir, entry })),
+    cases: context.plan.cases.map((entry) => classificationForCase({ root, context, entry })),
   };
+}
+
+function assertRecoveryEvidence({ root, run, state, claim, request, result }) {
+  validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${claim.case_id} recovery request`);
+  validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${claim.case_id} recovery result`);
+  const identity = readAdapterIdentity(root, run, claim.adapter);
+  if (claim.runtime_identity_digest !== canonicalDigest(identity) || claim.effective_command_digest !== identity.effective_command_digest) throw new Error("recovery runtime identity mismatch");
+  if (request.case_id !== claim.case_id || request.attempt !== claim.attempt || request.adapter !== claim.adapter || request.condition !== claim.condition) throw new Error("recovery request identity mismatch");
+  assertCanonicalEqual(request.input_identity, claim.input_identity, "recovery request input identity");
+  assertCanonicalEqual(request.selection, claim.selection, "recovery request selection");
+  if (request.agent.runtime_identity_digest !== claim.runtime_identity_digest || request.agent.effective_command_digest !== claim.effective_command_digest) throw new Error("recovery request runtime identity mismatch");
+  if (result.case_id !== claim.case_id || result.attempt !== claim.attempt || result.adapter !== claim.adapter || result.condition !== claim.condition || result.runtime_identity_digest !== claim.runtime_identity_digest || result.effective_command_digest !== claim.effective_command_digest) throw new Error("recovery result identity mismatch");
+  if (state.case_id !== claim.case_id || state.adapter !== claim.adapter || state.condition !== claim.condition) throw new Error("recovery state identity mismatch");
+}
+
+function assertCommittedRecoveryEvidence({ root, run, state, commit }) {
+  const attemptRoot = resolve(run, "cases", state.case_id, "attempts", state.terminal_attempt);
+  const requestPath = resolve(attemptRoot, "request.json");
+  const resultPath = resolve(attemptRoot, "result.json");
+  const request = readJson(requestPath);
+  const result = readJson(resultPath);
+  validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${state.case_id} committed request`);
+  validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${state.case_id} committed result`);
+  const identity = readAdapterIdentity(root, run, state.adapter);
+  const identityDigest = canonicalDigest(identity);
+  if (commit.case_id !== state.case_id || commit.attempt !== state.terminal_attempt || commit.adapter !== state.adapter || commit.condition !== state.condition || commit.status !== state.status) throw new Error("terminal commit does not match state");
+  if (commit.runtime_identity_digest !== identityDigest || commit.effective_command_digest !== identity.effective_command_digest || commit.request_sha256 !== prefixedFileDigest(requestPath) || commit.result_sha256 !== prefixedFileDigest(resultPath)) throw new Error("terminal commit evidence mismatch");
+  if (request.case_id !== commit.case_id || request.attempt !== commit.attempt || request.adapter !== commit.adapter || request.condition !== commit.condition || request.agent.runtime_identity_digest !== identityDigest) throw new Error("committed request identity mismatch");
+  if (result.case_id !== commit.case_id || result.attempt !== commit.attempt || result.adapter !== commit.adapter || result.condition !== commit.condition || result.status !== commit.status || result.request_sha256 !== commit.request_sha256 || result.runtime_identity_digest !== identityDigest) throw new Error("committed result identity mismatch");
+  const expectedInventory = result.status === "completed" ? ["commit.json", "final.json", "request.json", "result.json"] : ["commit.json", "request.json", "result.json"];
+  assertCanonicalEqual(readdirSync(attemptRoot).sort(), expectedInventory, "committed attempt inventory");
+  if (result.status === "completed") {
+    const finalPath = resolve(attemptRoot, result.final_output.path);
+    if (fileDigest(finalPath) !== result.final_output.sha256 || statSync(finalPath).size !== result.final_output.bytes) throw new Error("committed final output mismatch");
+    validate(root, readJson(finalPath), OUTPUT_SCHEMA_PATH, `${state.case_id} committed final output`);
+  }
 }
 
 export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) {
@@ -720,17 +1069,42 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
   if (!existsSync(stateFile)) throw new Error(`case state is missing: ${caseId}`);
   const state = readJson(stateFile);
   validate(root, state, CASE_STATE_SCHEMA_PATH, `${caseId} state`);
-  const claim = readClaim(run, caseId);
-  if (!claim || claim.claim_id !== claimId) throw new Error("claim ID does not match the active claim");
+  const claim = readClaim(root, run, caseId);
+  if (!claim) {
+    const staged = readStagedClaim(root, run, caseId, claimId);
+    if (staged) {
+      if (!claimIsExpired(staged.claim)) throw new Error("staged claim lease has not expired");
+      rmSync(ephemeralWorkspacePath(staged.claim.workspace_token), { recursive: true, force: true });
+      rmSync(staged.directory, { recursive: true, force: true });
+      return { case_id: caseId, status: state.status };
+    }
+    if (TERMINAL_STATUSES.has(state.status) && state.terminal_attempt) {
+      const commit = readJson(resolve(run, "cases", caseId, "attempts", state.terminal_attempt, "commit.json"));
+      validate(root, commit, ATTEMPT_COMMIT_SCHEMA_PATH, `${caseId} terminal commit`);
+      if (commit.claim_id !== claimId) throw new Error("claim ID does not match the terminal commit");
+      assertCommittedRecoveryEvidence({ root, run, state, commit });
+      return { case_id: caseId, status: state.status };
+    }
+    throw new Error("claim ID does not match the active claim");
+  }
+  if (claim.claim_id !== claimId) throw new Error("claim ID does not match the active claim");
   if (!claimIsExpired(claim)) throw new Error("claim lease has not expired");
   const attemptRoot = resolve(run, "cases", caseId, "attempts", claim.attempt);
+  mkdirSync(attemptRoot, { recursive: true });
+  const requestPath = resolve(attemptRoot, "request.json");
+  if (!existsSync(requestPath)) {
+    const recoveryRequest = requestRecord({ entry: { case_id: caseId, adapter_track: claim.adapter, condition: claim.condition }, attempt: claim.attempt, claim, projection: { status: "recovered_interruption" } });
+    validate(root, recoveryRequest, ATTEMPT_REQUEST_SCHEMA_PATH, `${caseId} recovered request`);
+    writeJsonAtomic(requestPath, recoveryRequest);
+  }
   const resultPath = resolve(attemptRoot, "result.json");
-  if (existsSync(resultPath)) throw new Error("claimed attempt already has a terminal result; refusing recovery");
   const entry = { case_id: caseId, adapter_track: state.adapter, condition: state.condition };
-  const result = resultRecord({ entry, attempt: claim.attempt, status: "interrupted", failureKind: `stale_claim_recovered:${reason.trim()}` });
-  validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${caseId} interrupted result`);
-  writeJsonAtomic(resultPath, result);
-  writeJsonAtomic(stateFile, { ...state, status: "interrupted", terminal_attempt: claim.attempt, attempt_count: Math.max(state.attempt_count, Number(claim.attempt)) });
-  releaseClaim(run, caseId);
-  return { case_id: caseId, status: "interrupted" };
+  const result = existsSync(resultPath)
+    ? readJson(resultPath)
+    : resultRecord({ entry, attempt: claim.attempt, claim, requestPath, status: "interrupted", failureKind: `stale_claim_recovered:${reason.trim()}` });
+  const request = readJson(requestPath);
+  assertRecoveryEvidence({ root, run, state, claim, request, result });
+  const terminalState = completeCase({ root, runDir: run, entry, state, claim, attempt: claim.attempt, attemptRoot, result });
+  rmSync(ephemeralWorkspacePath(claim.workspace_token), { recursive: true, force: true });
+  return { case_id: caseId, status: terminalState.status };
 }
