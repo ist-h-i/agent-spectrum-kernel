@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -10,7 +9,7 @@ import { computeSelectionDigest } from "./ask-benchmark-selection.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
 const config = resolve(root, "benchmarks/adaptive-portfolio.config.json");
-const work = mkdtempSync(resolve(tmpdir(), "ask-benchmark-selection-test-"));
+const work = mkdtempSync(resolve(root, ".ask-benchmark-selection-test-"));
 
 function run(args, expectedStatus = 0) {
   const result = spawnSync(process.execPath, [runner, ...args], { cwd: root, encoding: "utf8", maxBuffer: 40 * 1024 * 1024 });
