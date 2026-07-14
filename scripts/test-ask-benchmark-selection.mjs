@@ -45,9 +45,11 @@ try {
   const adaptive = manifest.cases.filter((entry) => entry.condition === "adaptive_ask");
   const codexCase = adaptive.find((entry) => entry.adapter === "codex");
   const claudeCase = adaptive.find((entry) => entry.adapter === "claude");
-  const spareCase = adaptive.find((entry) => entry.case_id !== codexCase.case_id && entry.case_id !== claudeCase.case_id);
-  const crossAdapterCase = adaptive.find((entry) => entry.adapter !== codexCase.adapter && entry.case_id !== claudeCase.case_id);
-  assert.ok(codexCase && claudeCase && spareCase && crossAdapterCase);
+  const downgradeCase = adaptive.find((entry) => entry.case_id !== codexCase.case_id && entry.case_id !== claudeCase.case_id);
+  const sealedCaseIds = new Set([codexCase.case_id, claudeCase.case_id, downgradeCase.case_id]);
+  const spareCase = adaptive.find((entry) => !sealedCaseIds.has(entry.case_id));
+  const crossAdapterCase = adaptive.find((entry) => entry.adapter !== codexCase.adapter && !sealedCaseIds.has(entry.case_id));
+  assert.ok(codexCase && claudeCase && downgradeCase && spareCase && crossAdapterCase);
   const planCases = new Map(plan.cases.map((entry) => [entry.case_id, entry]));
 
   function selectionInput(caseRecord, overrides = {}) {
@@ -95,7 +97,6 @@ try {
     lightweight_bypass: { used: true, reason: "The observed task is localized and needs no additional mechanism." },
   }));
   run(sealArgs(claudeCase, claudeInputPath, stateDir, "2026-07-14T16:00:01+09:00"));
-  const downgradeCase = adaptive.find((entry) => entry.case_id !== codexCase.case_id && entry.case_id !== claudeCase.case_id);
   const downgradeInputPath = inputFile("capability-downgrade-selection", selectionInput(downgradeCase, {
     capability_downgrades: [{ capability: "remote-runtime-probe", reason: "Runtime capability is not evidenced in this selection-only slice." }],
   }));
@@ -214,7 +215,7 @@ try {
     chmodSync(indexPath, 0o444);
     return reusedPath;
   }
-  const crossCase = adaptive.find((entry) => entry.adapter === codexCase.adapter && entry.case_id !== codexCase.case_id && entry.case_id !== downgradeCase.case_id);
+  const crossCase = adaptive.find((entry) => entry.adapter === codexCase.adapter && !sealedCaseIds.has(entry.case_id));
   let reusedPath = injectReusedSelection(crossCase);
   expectFailure("cross-case reuse", verifyArgs(crossCase), /sealed selection binding mismatch: case_id/u);
   rmSync(reusedPath, { force: true });
