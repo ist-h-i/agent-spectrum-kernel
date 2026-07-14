@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK selection input before sealing",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_class",
+    "observed_signals",
+    "selected_mechanisms",
+    "skipped_mechanisms",
+    "required_gates",
+    "agents",
+    "expected_evidence",
+    "capability_downgrades",
+    "lightweight_bypass",
+    "projection"
+  ],
+  "properties": {
+    "task_class": { "type": "string", "minLength": 1 },
+    "observed_signals": { "$ref": "#/$defs/nonEmptyStringArray" },
+    "selected_mechanisms": { "$ref": "#/$defs/nonEmptyStringArray" },
+    "skipped_mechanisms": { "$ref": "#/$defs/nonEmptyStringArray" },
+    "required_gates": { "$ref": "#/$defs/nonEmptyStringArray" },
+    "agents": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requested", "omitted"],
+      "properties": {
+        "requested": { "$ref": "#/$defs/nonEmptyStringArray" },
+        "omitted": { "$ref": "#/$defs/nonEmptyStringArray" }
+      }
+    },
+    "expected_evidence": { "$ref": "#/$defs/nonEmptyStringArray" },
+    "capability_downgrades": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capability", "reason"],
+        "properties": {
+          "capability": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "lightweight_bypass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["used", "reason"],
+      "properties": {
+        "used": { "type": "boolean" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter_track", "profile", "renderer_id", "renderer_version", "projection_fingerprint"],
+      "properties": {
+        "adapter_track": { "enum": ["codex", "claude"] },
+        "profile": { "type": "string", "minLength": 1 },
+        "renderer_id": { "type": "string", "minLength": 1 },
+        "renderer_version": { "type": "string", "minLength": 1 },
+        "projection_fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyStringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

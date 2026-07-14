@@ -1,11 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Adaptive ASK pre-result mechanism selection",
+  "title": "Adaptive ASK sealed pre-result mechanism selection",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema_version",
+    "plan_id",
+    "plan_digest",
+    "materialization_manifest_digest",
+    "materialization_output_root_identity",
+    "materializer",
     "case_id",
+    "block_id",
+    "adapter",
+    "condition",
+    "fixture",
+    "repetition",
+    "registered_repetitions",
+    "frozen_input_digest",
+    "condition_projection_digest",
+    "projection_fingerprint",
     "task_class",
     "observed_signals",
     "selected_mechanisms",
@@ -20,25 +34,48 @@
     "selection_digest"
   ],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
-    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "schema_version": { "const": "2.0.0" },
+    "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
+    "plan_digest": { "$ref": "#/$defs/prefixedDigest" },
+    "materialization_manifest_digest": { "$ref": "#/$defs/prefixedDigest" },
+    "materialization_output_root_identity": { "$ref": "#/$defs/prefixedDigest" },
+    "materializer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "source_revision"],
+      "properties": {
+        "version": { "const": "1.0.0" },
+        "source_revision": { "$ref": "#/$defs/revision" }
+      }
+    },
+    "case_id": { "$ref": "#/$defs/caseId" },
+    "block_id": { "type": "string", "pattern": "^block-[a-f0-9]{16}-[a-f0-9]{12}$" },
+    "adapter": { "enum": ["codex", "claude"] },
+    "condition": { "const": "adaptive_ask" },
+    "fixture": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "registered_repetitions": { "enum": [3, 5] },
+    "frozen_input_digest": { "$ref": "#/$defs/prefixedDigest" },
+    "condition_projection_digest": { "$ref": "#/$defs/prefixedDigest" },
+    "projection_fingerprint": { "$ref": "#/$defs/prefixedDigest" },
     "task_class": { "type": "string", "minLength": 1 },
-    "observed_signals": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
-    "selected_mechanisms": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
-    "skipped_mechanisms": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
-    "required_gates": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "observed_signals": { "$ref": "#/$defs/nonEmptyStringArray" },
+    "selected_mechanisms": { "$ref": "#/$defs/nonEmptyStringArray" },
+    "skipped_mechanisms": { "$ref": "#/$defs/nonEmptyStringArray" },
+    "required_gates": { "$ref": "#/$defs/nonEmptyStringArray" },
     "agents": {
       "type": "object",
       "additionalProperties": false,
       "required": ["requested", "omitted"],
       "properties": {
-        "requested": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
-        "omitted": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+        "requested": { "$ref": "#/$defs/nonEmptyStringArray" },
+        "omitted": { "$ref": "#/$defs/nonEmptyStringArray" }
       }
     },
-    "expected_evidence": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "expected_evidence": { "$ref": "#/$defs/nonEmptyStringArray" },
     "capability_downgrades": {
       "type": "array",
+      "uniqueItems": true,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -61,12 +98,13 @@
     "projection": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["adapter_track", "profile", "renderer_version", "projection_fingerprint"],
+      "required": ["adapter_track", "profile", "renderer_id", "renderer_version", "projection_fingerprint"],
       "properties": {
         "adapter_track": { "enum": ["codex", "claude"] },
         "profile": { "type": "string", "minLength": 1 },
+        "renderer_id": { "type": "string", "minLength": 1 },
         "renderer_version": { "type": "string", "minLength": 1 },
-        "projection_fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+        "projection_fingerprint": { "$ref": "#/$defs/prefixedDigest" }
       }
     },
     "selected_at": { "type": "string", "format": "date-time" },
@@ -78,6 +116,16 @@
         "algorithm": { "const": "sha256" },
         "value": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
       }
+    }
+  },
+  "$defs": {
+    "caseId": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "prefixedDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "nonEmptyStringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
     }
   }
 }

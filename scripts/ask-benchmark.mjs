@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { buildPortfolioPlan, PORTFOLIO_CONDITIONS } from "./ask-benchmark-plan.mjs";
 import { materializePortfolio } from "./ask-benchmark-materialize.mjs";
+import { sealAdaptiveSelection, verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_CONFIG_PATH = resolve(ROOT, "benchmarks/checkpoint-b.config.json");
@@ -46,11 +47,16 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, plan: null, runDir: null, seed: null, agentBin: "codex", configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, testSelectedAt: null, runDir: null, seed: null, agentBin: "codex", configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
     else if (flag === "--plan") args.plan = resolve(argv.shift());
+    else if (flag === "--materialized") args.materialized = resolve(argv.shift());
+    else if (flag === "--state-dir") args.stateDir = resolve(argv.shift());
+    else if (flag === "--case-id") args.caseId = argv.shift();
+    else if (flag === "--input") args.input = resolve(argv.shift());
+    else if (flag === "--test-selected-at") args.testSelectedAt = argv.shift();
     else if (flag === "--run-dir") args.runDir = resolve(argv.shift());
     else if (flag === "--seed") args.seed = argv.shift();
     else if (flag === "--agent-bin") args.agentBin = resolve(argv.shift());
@@ -68,6 +74,8 @@ Commands:
   validate [--config <config.json>]
   plan --config <portfolio-config.json> --output <execution-plan.json> --seed <value>
   materialize --config <portfolio-config.json> --plan <execution-plan.json> --output <absent-or-empty-directory>
+  seal-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id> --input <selection-input.json> [--test-selected-at <RFC-3339>]
+  verify-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
   score [--config <config.json>] --run-dir <completed-directory> --output <normalized-result.json>
@@ -171,7 +179,7 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
     if (!existsSync(selectionPath)) errors.push(`Adaptive selection schema is missing: ${config.adaptive_selection.schema_path}`);
     else {
       const selectionSchema = readJson(selectionPath);
-      const required = ["task_class", "observed_signals", "selected_mechanisms", "skipped_mechanisms", "required_gates", "agents", "expected_evidence", "capability_downgrades", "lightweight_bypass", "projection", "selected_at", "selection_digest"];
+      const required = ["plan_id", "plan_digest", "materialization_manifest_digest", "materialization_output_root_identity", "materializer", "case_id", "block_id", "adapter", "condition", "fixture", "repetition", "registered_repetitions", "frozen_input_digest", "condition_projection_digest", "projection_fingerprint", "task_class", "observed_signals", "selected_mechanisms", "skipped_mechanisms", "required_gates", "agents", "expected_evidence", "capability_downgrades", "lightweight_bypass", "projection", "selected_at", "selection_digest"];
       if (selectionSchema.additionalProperties !== false || required.some((field) => !selectionSchema.required?.includes(field))) errors.push("Adaptive selection schema is missing required pre-result fields or permits undeclared fields");
       if (["result", "score", "correctness", "recommendation", "completion_claim"].some((field) => Object.hasOwn(selectionSchema.properties ?? {}, field))) errors.push("Adaptive selection schema must not contain outcome fields");
     }
@@ -315,6 +323,40 @@ function materialize(args) {
     repositoryRevision: git(ROOT, ["rev-parse", "HEAD"]),
   });
   console.log(`Materialized ${manifest.case_count} deterministic portfolio cases to ${args.output}`);
+}
+
+function sealSelection(args) {
+  const config = validateProtocol(args.configPath);
+  if (config._kind !== "portfolio") throw new Error("seal-selection requires an Adaptive portfolio config");
+  if (!args.input) throw new Error("seal-selection requires --input");
+  if (!existsSync(args.input) || !lstatSync(args.input).isFile()) throw new Error(`selection input is missing or not a regular file: ${args.input}`);
+  const record = sealAdaptiveSelection({
+    root: ROOT,
+    config,
+    planPath: args.plan,
+    materializedPath: args.materialized,
+    stateDir: args.stateDir,
+    caseId: args.caseId,
+    input: readJson(args.input),
+    repositoryRevision: git(ROOT, ["rev-parse", "HEAD"]),
+    testSelectedAt: args.testSelectedAt,
+  });
+  console.log(`Sealed Adaptive selection for ${record.case_id}: sha256:${record.selection_digest.value}`);
+}
+
+function verifySelection(args) {
+  const config = validateProtocol(args.configPath);
+  if (config._kind !== "portfolio") throw new Error("verify-selection requires an Adaptive portfolio config");
+  const record = verifyAdaptiveSelection({
+    root: ROOT,
+    config,
+    planPath: args.plan,
+    materializedPath: args.materialized,
+    stateDir: args.stateDir,
+    caseId: args.caseId,
+    repositoryRevision: git(ROOT, ["rev-parse", "HEAD"]),
+  });
+  console.log(`Adaptive selection verified for ${record.case_id}: sha256:${record.selection_digest.value}`);
 }
 
 function prepare(args) {
@@ -755,6 +797,8 @@ try {
     console.log("ASK benchmark protocol validation passed");
   } else if (args.command === "plan") planPortfolio(args);
   else if (args.command === "materialize") materialize(args);
+  else if (args.command === "seal-selection") sealSelection(args);
+  else if (args.command === "verify-selection") verifySelection(args);
   else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);
   else if (args.command === "score") score(args);

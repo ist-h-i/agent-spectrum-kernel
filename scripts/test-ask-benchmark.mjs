@@ -146,7 +146,7 @@ assert.ok(configSchema.required.includes("execution_plan"));
 for (const field of ["case_id", "block_id", "adapter_track", "fixture_id", "suite", "repetition", "registered_repetitions", "condition", "condition_order_position", "input_manifest_sha256"]) {
   assert.ok(planSchema.properties.cases.items.required.includes(field));
 }
-for (const field of ["task_class", "observed_signals", "selected_mechanisms", "skipped_mechanisms", "required_gates", "agents", "expected_evidence", "capability_downgrades", "lightweight_bypass", "projection", "selected_at", "selection_digest"]) {
+for (const field of ["plan_id", "plan_digest", "materialization_manifest_digest", "materialization_output_root_identity", "materializer", "case_id", "block_id", "adapter", "condition", "fixture", "repetition", "registered_repetitions", "frozen_input_digest", "condition_projection_digest", "projection_fingerprint", "task_class", "observed_signals", "selected_mechanisms", "skipped_mechanisms", "required_gates", "agents", "expected_evidence", "capability_downgrades", "lightweight_bypass", "projection", "selected_at", "selection_digest"]) {
   assert.ok(selectionSchema.required.includes(field));
 }
 for (const prohibited of ["result", "score", "correctness", "recommendation", "completion_claim"]) {
@@ -167,8 +167,22 @@ for (const [name, mutate] of [
 
 const adaptiveCase = portfolioPlan.cases.find((entry) => entry.condition === "adaptive_ask");
 const validAdaptiveSelection = {
-  schema_version: "1.0.0",
+  schema_version: "2.0.0",
+  plan_id: portfolioPlan.plan_id,
+  plan_digest: `sha256:${"c".repeat(64)}`,
+  materialization_manifest_digest: `sha256:${"d".repeat(64)}`,
+  materialization_output_root_identity: `sha256:${"e".repeat(64)}`,
+  materializer: { version: "1.0.0", source_revision: portfolioPlan.repository_revision },
   case_id: adaptiveCase.case_id,
+  block_id: adaptiveCase.block_id,
+  adapter: adaptiveCase.adapter_track,
+  condition: "adaptive_ask",
+  fixture: adaptiveCase.fixture_id,
+  repetition: adaptiveCase.repetition,
+  registered_repetitions: adaptiveCase.registered_repetitions,
+  frozen_input_digest: `sha256:${"f".repeat(64)}`,
+  condition_projection_digest: `sha256:${"a".repeat(64)}`,
+  projection_fingerprint: `sha256:${"a".repeat(64)}`,
   task_class: adaptiveCase.task_class,
   observed_signals: ["cross-file contract"],
   selected_mechanisms: ["repository-orientation"],
@@ -180,7 +194,8 @@ const validAdaptiveSelection = {
   lightweight_bypass: { used: false, reason: "Observed signals justify one focused mechanism." },
   projection: {
     adapter_track: adaptiveCase.adapter_track,
-    profile: "adaptive",
+    profile: "adaptive-boundary",
+    renderer_id: "ask-benchmark-materializer",
     renderer_version: "foundation",
     projection_fingerprint: `sha256:${"a".repeat(64)}`,
   },
