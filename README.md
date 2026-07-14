@@ -281,7 +281,7 @@ Deployment readiness is stateful. File projection only proves `Installed`; `Acti
 
 For Codex, use the prompt-driven adapter in `adapters/codex/`.
 
-The Codex adapter documents how to project the core `AGENTS.md` and selected canonical skills into Codex-compatible repository surfaces, including `.agents/skills`, prompt templates, and `codex exec` command patterns.
+The Codex adapter projects the core `AGENTS.md`, selected canonical skills, and generated compact explicit-entry profiles into Codex-compatible repository surfaces, including `.agents/skills`, `.agents/prompts`, and `codex exec` command patterns.
 
 ```bash
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
@@ -293,6 +293,8 @@ The core installer owns `AGENTS.md`; the Codex installer updates profile-selecte
 Use `--profile <name>` for normal installs. Use `--skills <csv>` only as an advanced override; the installer fails before writing files when the override is not closed over required skills for the selected prompts, commands, router-reachable routes, and dependencies of the specified skills.
 
 The Codex installer uses the shared lifecycle semantics: `--check`, `--dry-run`, `--prune`, `--force`, `--rollback`, and `--detach` are available, and locally modified managed files are not overwritten without `--force`.
+
+Implementation, investigation, review, verification, and handoff prompt profiles bind canonical revision/source digests and critical fallback controls. A fixed entry skips unnecessary upper routers; the runner reports requested, projected, compact-profile load, unavailable Codex Skill-load evidence, and applied output-contract evidence separately.
 
 The Codex adapter is intentionally smaller than the Claude Code adapter: no hooks, no local metrics sidecar, no shared PR workflow, and no external publication path are provided. Capability claims are downgraded in `docs/adapter-capability-matrix.md`.
 
@@ -322,7 +324,7 @@ cd /path/to/adopting-repo
 node ./scripts/codex-exec-runner.mjs --prompt skill-implement.md --mode implementation
 ```
 
-The Codex runner can report `executed` after capturing output and running `ask-sensors`; that still does not prove business correctness, product readiness, or no regression.
+The Codex runner can report `executed` after capturing output and running `ask-sensors`; this evidences only the inspected output contract. It does not prove workflow, risk/approval, or verification-contract application, business correctness, product readiness, or no regression.
 
 Use `ask-sensors` to classify control risks in an implementation or review output:
 

@@ -25,7 +25,7 @@ export const ADAPTER_RENDERER_METADATA = Object.freeze({
   }),
   codex: Object.freeze({
     rendererId: "install-codex-adapter",
-    rendererVersion: "3",
+    rendererVersion: "4",
     installerPath: "scripts/install-codex-adapter.mjs",
   }),
 });

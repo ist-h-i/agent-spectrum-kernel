@@ -8,6 +8,9 @@ import {
   findUnsupportedCapabilityClaims,
   hashFile,
   hashText,
+  inspectCodexDiscoverySkillAssets,
+  inspectCodexProjectionCanonicalInputs,
+  parseCodexCompactProfileHeader,
   readJsonIfExists,
 } from "./ask-shared.mjs";
 import { DEFAULT_RUNTIME_EVENT_STORE, resolveObservabilityPath } from "./observability-paths.mjs";
@@ -67,6 +70,16 @@ function buildDoctorReport(target, { runtimeProbe = false } = {}) {
       checked: [],
       warnings: [],
       failures: [],
+      codex_evidence: {
+        requested_contracts: [],
+        projected_contracts: [],
+        runtime_detected_profile: { evidence_level: "none", missing_evidence: ["external_runtime"] },
+        runtime_loaded_contracts: { evidence_level: "none", missing_evidence: ["runtime_contract_load"] },
+        applied_output_contracts: { evidence_level: "none", missing_evidence: ["bounded_run"] },
+        workflow_contract_application: { evidence_level: "none", missing_evidence: ["workflow_contract_application"] },
+        risk_approval_contract_application: { evidence_level: "none", missing_evidence: ["risk_approval_contract_application"] },
+        verification_contract_application: { evidence_level: "none", missing_evidence: ["verification_contract_application"] },
+      },
     },
   };
 
@@ -540,15 +553,25 @@ function buildLayerStatuses(target, report, { runtimeProbe }) {
         projectionFailures.push(`missing selected skill: ${skillsRoot}/${skill}/SKILL.md`);
       }
     }
+    if (installerName === "agent-spectrum-codex-adapter") {
+      for (const finding of inspectCodexDiscoverySkillAssets(target, state)) {
+        projectionFailures.push(`Codex discovery skill ${finding.status}: ${finding.path}`);
+      }
+    }
   }
 
   if (report.warnings.length > 0) {
     projectionWarnings.push(...report.warnings.filter((warning) => warning.includes("managed file is stale relative to this ASK checkout")));
   }
 
+  const codexInstalled = readJsonIfExists(resolve(target, CODEX_STATE_PATH)).value?.install_status === "installed";
   const runtimeStatus = !runtimeProbe
     ? { status: "unknown", detail: "runtime probe was not requested" }
-    : statusEntry(report.runtimeProbe.failures, report.runtimeProbe.warnings, "runtime probe completed");
+    : report.runtimeProbe.failures.length > 0 || report.runtimeProbe.warnings.length > 0
+      ? statusEntry(report.runtimeProbe.failures, report.runtimeProbe.warnings, "local/static runtime-surface probe completed")
+      : codexInstalled
+        ? { status: "insufficient_evidence", detail: "Codex projection passed static checks; external execution, contract load, applied output, workflow, risk/approval, and verification application evidence remain unavailable" }
+        : { status: "pass", detail: "local/static runtime-surface probe completed; external execution evidence is outside this check" };
   const behavioralFailures = [];
   const behavioralWarnings = [...report.unsupportedClaims];
   const behavioralStatus = behavioralFailures.length > 0
@@ -674,17 +697,57 @@ function checkCodexRuntimeState(target, state, probe) {
     probe.failures.push(`Codex adapter runtime state shape is invalid: ${CODEX_STATE_PATH}`);
     return;
   }
-  for (const skill of state.selected_skills ?? []) {
-    const skillPath = resolve(target, ".agents/skills", skill, "SKILL.md");
-    if (!existsSync(skillPath)) {
-      probe.failures.push(`Codex runtime selected skill is not readable: .agents/skills/${skill}/SKILL.md`);
-    }
+  const discoveryFindings = inspectCodexDiscoverySkillAssets(target, state);
+  for (const finding of discoveryFindings) {
+    probe.failures.push(`Codex discovery skill ${finding.status}: ${finding.path}`);
   }
   for (const prompt of state.prompt_templates ?? []) {
     const promptPath = resolve(target, ".agents/prompts", prompt);
     if (!existsSync(promptPath)) {
       probe.failures.push(`Codex runtime prompt template is missing: .agents/prompts/${prompt}`);
     }
+  }
+  for (const prompt of state.selected_prompts ?? []) {
+    const promptPath = resolve(target, ".agents/prompts", prompt);
+    const record = state.managed_files?.[`.agents/prompts/${prompt}`];
+    if (!existsSync(promptPath) || !record?.compact_profile) {
+      probe.failures.push(`Codex compact runtime profile is missing: .agents/prompts/${prompt}`);
+      continue;
+    }
+    const content = readFileSync(promptPath, "utf8");
+    const header = parseCodexCompactProfileHeader(content);
+    const compact = record.compact_profile;
+    if (!header || header.id !== compact.profile_id || header.revision !== compact.canonical_revision || header.source_digest !== compact.canonical_source_digest || header.profile_fingerprint !== compact.profile_fingerprint) {
+      probe.failures.push(`Codex compact runtime profile provenance mismatch: .agents/prompts/${prompt}`);
+      continue;
+    }
+    if (compact.rendered_sha256 !== `sha256:${hashText(content)}`) {
+      probe.failures.push(`Codex compact runtime profile digest mismatch: .agents/prompts/${prompt}`);
+      continue;
+    }
+    const selectedProfile = (state.compact_runtime_profiles ?? []).find((profile) => profile.profile_id === compact.profile_id);
+    if (!selectedProfile || selectedProfile.rendered_sha256 !== compact.rendered_sha256) {
+      probe.failures.push(`Codex compact runtime profile is not selected in state: ${compact.profile_id}`);
+      continue;
+    }
+    if (compact.canonical_source_digest !== state.projection_plan?.canonical_source_digest || compact.profile_fingerprint !== state.projection_plan?.fingerprint) {
+      probe.failures.push(`Codex compact runtime profile does not derive from shared projection state: ${compact.profile_id}`);
+      continue;
+    }
+    const canonicalFindings = inspectCodexProjectionCanonicalInputs(target, state.projection_plan);
+    if (canonicalFindings.length > 0) {
+      for (const finding of canonicalFindings) {
+        probe.failures.push(`Codex compact-profile canonical source ${finding.status}: ${finding.path}`);
+      }
+      continue;
+    }
+    if (discoveryFindings.length > 0) continue;
+    probe.codex_evidence.requested_contracts.push({ prompt, profile_id: compact.profile_id, contracts: compact.requested_contracts });
+    probe.codex_evidence.projected_contracts.push({ prompt: `.agents/prompts/${prompt}`, profile_id: compact.profile_id, canonical_revision: compact.canonical_revision, evidence_level: "projected" });
+  }
+  if ((state.selected_prompts ?? []).length > 0) {
+    probe.checked.push("Codex compact profiles contain requested-contract, projected-contract, and canonical-source evidence");
+    probe.checked.push("Codex runtime Skill-load, applied-output, workflow, risk/approval, and verification application evidence are unavailable to the static doctor probe");
   }
   for (const command of state.command_templates ?? []) {
     const commandPath = resolve(target, ".agents/commands", command);
@@ -884,6 +947,15 @@ function printReport(target, report, { json = false } = {}) {
     printList(report.runtimeProbe.warnings);
     console.log("Runtime failures:");
     printList(report.runtimeProbe.failures);
+    console.log("Codex evidence stages:");
+    console.log(`- requested contracts: ${report.runtimeProbe.codex_evidence.requested_contracts.length}`);
+    console.log(`- projected contracts: ${report.runtimeProbe.codex_evidence.projected_contracts.length}`);
+    console.log(`- runtime-detected profile evidence: ${report.runtimeProbe.codex_evidence.runtime_detected_profile.evidence_level}`);
+    console.log(`- runtime-loaded contracts evidence: ${report.runtimeProbe.codex_evidence.runtime_loaded_contracts.evidence_level}`);
+    console.log(`- applied output contracts evidence: ${report.runtimeProbe.codex_evidence.applied_output_contracts.evidence_level}`);
+    console.log(`- workflow contract application evidence: ${report.runtimeProbe.codex_evidence.workflow_contract_application.evidence_level}`);
+    console.log(`- risk/approval contract application evidence: ${report.runtimeProbe.codex_evidence.risk_approval_contract_application.evidence_level}`);
+    console.log(`- verification contract application evidence: ${report.runtimeProbe.codex_evidence.verification_contract_application.evidence_level}`);
     console.log("Runtime boundary:");
     console.log("- Runtime probe is local/static/dry-run only and does not prove external adapter execution or product readiness.");
     console.log("- Runtime probe findings downgrade runtime conformance/readiness claims only.");
@@ -920,7 +992,7 @@ try {
   }
   const report = buildDoctorReport(args.target, { runtimeProbe: args.runtimeProbe });
   printReport(args.target, report, { json: args.json });
-  process.exit(report.status === "fail" ? 1 : 0);
+  process.exitCode = report.status === "fail" ? 1 : 0;
 } catch (error) {
   console.error(`ASK doctor failed: ${error.message}`);
   process.exit(1);

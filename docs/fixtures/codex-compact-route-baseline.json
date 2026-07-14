@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0.0",
+  "source_revision": "df52c02",
+  "stage_count_definition": "Count sequential canonical contract stages on the explicit entry route; parallel risk/evidence overlays and signal-selected direct-trigger branches are measured separately.",
+  "profiles": [
+    {
+      "prompt_name": "skill-implement.md",
+      "pre_compact_sha256": "sha256:8af01267df59f874517c24a0f203f40ee13017d0392905491593bddbec83456a",
+      "pre_compact_stages": ["operating-mode-router", "skill-router", "controlled-implementation", "test-first-verification", "evidence-ledger"],
+      "compact_stages": ["controlled-implementation", "test-first-verification", "evidence-ledger"],
+      "direct_trigger_ids": ["unfamiliar_repository", "unclear_scope", "boundary_decision", "design_grill", "docs_or_adr_constraints", "long_running_or_multi_agent"]
+    },
+    {
+      "prompt_name": "skill-investigate.md",
+      "pre_compact_sha256": "sha256:8b69bfa66a6ad35414c48206511d1757191bd4a35e84c8161b30409f2f924c59",
+      "pre_compact_stages": ["operating-mode-router", "skill-router", "doubt-driven-development", "test-first-verification", "evidence-ledger"],
+      "compact_stages": ["doubt-driven-development", "test-first-verification", "evidence-ledger"],
+      "direct_trigger_ids": ["unfamiliar_repository", "unclear_scope", "boundary_decision"]
+    },
+    {
+      "prompt_name": "skill-review.md",
+      "pre_compact_sha256": "sha256:8f0a4cac6cde7aca44300fce3404d8d36fe0882272ba94554a4754d63906b571",
+      "pre_compact_stages": ["review-router", "review-final-merge-gate"],
+      "compact_stages": ["review-router", "review-final-merge-gate"],
+      "direct_trigger_ids": []
+    },
+    {
+      "prompt_name": "skill-verify.md",
+      "pre_compact_sha256": "sha256:c3922ad683bb5e5b356803a8d94f3a868cd6c88be663b12dc5c58b8096e71573",
+      "pre_compact_stages": ["test-first-verification", "evidence-ledger"],
+      "compact_stages": ["test-first-verification", "evidence-ledger"],
+      "direct_trigger_ids": []
+    },
+    {
+      "prompt_name": "skill-handoff.md",
+      "pre_compact_sha256": "sha256:b06b05e210f470f8c0306d805d6073095c535b54deccd3c3e7609145fca4cd5a",
+      "pre_compact_stages": ["handoff-generation"],
+      "compact_stages": ["handoff-generation"],
+      "direct_trigger_ids": []
+    }
+  ]
+}

@@ -10,7 +10,7 @@ skills/<skill-name>/SKILL.md -> .agents/skills/<skill-name>/SKILL.md
 
 Do not rewrite the workflow logic into a Codex-only model. If a local project needs extra rules, add them as project-specific `AGENTS.md` guidance or a separate project overlay skill.
 
-Minimum common projections:
+Broad/ambiguous entry profiles commonly project:
 
 - `operating-mode-router`
 - `skill-router`
@@ -19,6 +19,8 @@ Minimum common projections:
 - `evidence-ledger`
 - `risk-gate`
 - `handoff-generation`
+
+Generated implementation, investigation, verification, and handoff compact profiles skip the two upper routers because their entry mode/task class is already fixed. They still project the named primary Skill plus required verification, evidence, risk, and handoff contracts. Review keeps `review-router` because observed change signals determine its required gates.
 
 Review projections should also include the review router and required gates listed in `adapters/codex/README.md`.
 

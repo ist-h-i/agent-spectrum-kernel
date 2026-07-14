@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/blob/main/schemas/compact-profile-control-map.json",
+  "title": "Canonical compact-profile control and direct-trigger map",
+  "registry_version": 1,
+  "required_control_ids": [
+    "scope",
+    "verification",
+    "risk_approval",
+    "evidence",
+    "missing_evidence",
+    "output"
+  ],
+  "controls": {
+    "scope": {
+      "source_refs": ["AGENTS.md", "skills/scope-control/SKILL.md"],
+      "required_inputs": ["workspace", "nearby_implementation", "tests", "docs", "public_contract"],
+      "missing_input_behavior": "stop_or_insufficient_evidence",
+      "change_boundary": "smallest_task_required",
+      "cleanup_boundary": "separate"
+    },
+    "verification": {
+      "source_refs": ["AGENTS.md", "skills/test-first-verification/SKILL.md"],
+      "verification_contract_before_behavior_change": true,
+      "focused_check_first": true,
+      "broader_checks_proportional_to_risk": true,
+      "exact_results_required": true
+    },
+    "risk_approval": {
+      "source_refs": ["AGENTS.md", "skills/risk-gate/SKILL.md"],
+      "exact_action_required": true,
+      "risk_type_required": true,
+      "potential_impact_required": true,
+      "reversibility_required": true,
+      "external_visibility_required": true,
+      "safer_alternative_required": true,
+      "preconditions_required": true,
+      "approval_scope": "specific_action",
+      "execution_scope": "approved_action_only",
+      "stop_without_approval": true
+    },
+    "evidence": {
+      "source_refs": ["AGENTS.md", "skills/evidence-ledger/SKILL.md"],
+      "truth_statuses": ["Verified", "Supported", "Hypothesis", "Unknown", "Falsified"],
+      "claims_require_evidence": true,
+      "unsupported_claim_behavior": "downgrade"
+    },
+    "missing_evidence": {
+      "source_refs": ["docs/execution-envelope-contract.md", "skills/evidence-ledger/SKILL.md"],
+      "allowed_statuses": ["unavailable", "insufficient_evidence"],
+      "inference": "prohibited",
+      "stop_when_required": true
+    },
+    "output": {
+      "source_refs": ["docs/execution-envelope-contract.md"],
+      "required_sections_from_prompt_contract": true,
+      "execution_envelope_count": 1,
+      "next_action_location": "execution_envelope_only"
+    }
+  },
+  "direct_triggers": {
+    "implementation": [
+      {
+        "id": "unfamiliar_repository",
+        "signal": "the repository is unfamiliar",
+        "contract": "repository-orientation",
+        "action": "apply_before_primary",
+        "missing_contract_behavior": "capability_missing"
+      },
+      {
+        "id": "unclear_scope",
+        "signal": "scope or refactor boundary is unclear",
+        "contract": "scope-control",
+        "action": "apply_before_primary",
+        "missing_contract_behavior": "capability_missing"
+      },
+      {
+        "id": "boundary_decision",
+        "signal": "an application boundary decision is required",
+        "contract": "application-boundary-architecture",
+        "action": "apply_before_primary",
+        "missing_contract_behavior": "capability_missing"
+      },
+      {
+        "id": "design_grill",
+        "signal": "the design is ambiguous",
+        "contract": "grill-design",
+        "action": "apply_before_primary",
+        "missing_contract_behavior": "capability_missing"
+      },
+      {
+        "id": "docs_or_adr_constraints",
+        "signal": "docs, domain rules, or ADRs constrain the change",
+        "contract": "grill-with-docs",
+        "action": "apply_before_primary",
+        "missing_contract_behavior": "capability_missing"
+      },
+      {
+        "id": "long_running_or_multi_agent",
+        "signal": "work spans sessions or agents",
+        "contract": "planning-with-files",
+        "action": "apply_before_primary",
+        "missing_contract_behavior": "capability_missing"
+      }
+    ],
+    "investigation": [
+      {
+        "id": "unfamiliar_repository",
+        "signal": "the repository is unfamiliar",
+        "contract": "repository-orientation",
+        "action": "apply_before_primary",
+        "missing_contract_behavior": "capability_missing"
+      },
+      {
+        "id": "unclear_scope",
+        "signal": "scope or blast radius is unclear",
+        "contract": "scope-control",
+        "action": "apply_before_primary",
+        "missing_contract_behavior": "capability_missing"
+      },
+      {
+        "id": "boundary_decision",
+        "signal": "the cause or fix needs an application boundary decision",
+        "contract": "application-boundary-architecture",
+        "action": "apply_before_primary",
+        "missing_contract_behavior": "capability_missing"
+      }
+    ],
+    "review": [],
+    "verification": [],
+    "handoff": []
+  }
+}

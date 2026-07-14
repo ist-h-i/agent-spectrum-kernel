@@ -21,6 +21,7 @@ Levels:
 | Evidence-ledger output support | projected | projected | unknown | unknown | unknown | unknown |
 | Adapter runtime smoke | behavior_verified | projected | unknown | unknown | unknown | unknown |
 | Bounded adapter execution runner | unsupported | behavior_verified | unknown | unknown | unknown | unknown |
+| Compact explicit-entry profile rendering | unsupported | behavior_verified | unknown | unknown | unknown | unknown |
 | Local metrics event recording | behavior_verified | unsupported | unknown | unknown | unknown | unknown |
 | Hidden telemetry disabled by default | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
 | External publication disabled by default | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
@@ -44,9 +45,10 @@ Claude Code:
 
 Codex:
 
-- Evidence: `scripts/install-codex-adapter.mjs`, `adapters/codex/README.md`, `adapters/codex/project/.agents/skills/README.md`, `adapters/codex/prompts/`, `adapters/codex/commands/codex-exec.md`, `manifest.json`, and validation coverage in `scripts/validate-repo.mjs` / `scripts/test-validate-repo.mjs`.
+- Evidence: `scripts/install-codex-adapter.mjs`, `scripts/codex-runtime-profile.mjs`, `scripts/test-codex-runtime-profile.mjs`, `adapters/codex/README.md`, `adapters/codex/prompts/`, `adapters/codex/commands/codex-exec.md`, `manifest.json`, and repository validation.
 - Supported areas: the adapter ships no hidden telemetry, webhook, publication, deploy, release, or external notification path by default.
-- Projected-only areas: workflow routing, risk gates, verification, and evidence outputs are preserved in projected skills and prompts, but runtime execution remains user-controlled. A per-run Codex runner result may reach `executed`; this matrix records only repository-level fixture evidence.
+- Behaviorally evidenced boundary: repository fixtures verify deterministic compact rendering, canonical provenance, required fallback controls, upper-router removal for fixed entries, and byte/route-depth reduction. They do not prove an external Codex process loaded a Skill or applied the contract correctly.
+- Projected/runtime boundary: risk gates, verification, and evidence outputs remain projected until a run occurs. The runner separately reports requested, projected, compact-profile load, unavailable Skill-load evidence, and applied output-contract evidence; a passing sensor result is not business correctness.
 - Unsupported areas: local metrics event recording, shared PR workflow, and fork/comment-trigger guardrails are not implemented by this adapter. Do not claim them for Codex from this repository evidence.
 
 Cursor, Cline, Devin, Kiro:

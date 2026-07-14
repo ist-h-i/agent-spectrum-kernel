@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "profile_id", "profile_fingerprint", "adapter_id", "canonical_contract", "capabilities", "rendering", "generated_assets", "privacy", "normalized_event_schema_refs"],
   "properties": {
-    "schema_version": { "type": "string", "const": "1.0.0" },
+    "schema_version": { "type": "string", "enum": ["1.0.0", "1.1.0"] },
     "profile_id": { "type": "string", "minLength": 1 },
     "profile_fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "adapter_id": { "type": "string", "minLength": 1 },
@@ -138,6 +138,32 @@
             }
           }
         },
+        "compact_profiles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["schema_version", "profile_id", "prompt_name", "mode", "task_class", "primary_contract", "requested_contracts", "control_ids", "direct_trigger_ids", "canonical_revision", "canonical_source_digest", "profile_fingerprint", "rendered_sha256", "rendered_bytes"],
+            "properties": {
+              "schema_version": { "type": "string", "const": "1.1.0" },
+              "profile_id": { "type": "string", "minLength": 1 },
+              "prompt_name": { "type": "string", "enum": ["skill-implement.md", "skill-investigate.md", "skill-review.md", "skill-verify.md", "skill-handoff.md"] },
+              "mode": { "type": "string", "enum": ["implementation", "investigation", "review", "verification", "handoff"] },
+              "task_class": { "type": "string", "enum": ["implementation", "investigation", "review", "verification", "handoff"] },
+              "primary_contract": { "type": "string", "minLength": 1 },
+              "requested_contracts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+              "control_ids": { "type": "array", "minItems": 6, "uniqueItems": true, "items": { "type": "string", "enum": ["scope", "verification", "risk_approval", "evidence", "missing_evidence", "output"] } },
+              "direct_trigger_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+              "canonical_revision": { "type": "string", "minLength": 1 },
+              "canonical_source_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+              "profile_fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+              "rendered_sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+              "rendered_bytes": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
         "lifecycle_apply_contract": {
           "type": "object",
           "additionalProperties": false,
@@ -195,6 +221,11 @@
     "normalized_event_schema_refs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
   },
   "allOf": [
+    {
+      "if": { "properties": { "schema_version": { "const": "1.1.0" } }, "required": ["schema_version"] },
+      "then": { "properties": { "rendering": { "required": ["compact_profiles"] } } },
+      "else": { "properties": { "rendering": { "not": { "required": ["compact_profiles"] } } } }
+    },
     {
       "if": {
         "properties": {

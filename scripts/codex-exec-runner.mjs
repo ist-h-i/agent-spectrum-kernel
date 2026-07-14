@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSy
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS } from "./ask-shared.mjs";
+import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
 
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const DEFAULT_OUTPUT = ".agents/runs/codex-last-output.md";
@@ -114,7 +114,7 @@ function preflight(args) {
   const warnings = [];
   if (!existsSync(args.target)) {
     failures.push(`target is missing: ${args.target}`);
-    return { failures, warnings, state: null, promptPath: null };
+    return { failures, warnings, state: null, promptPath: null, compactProfile: null };
   }
   args.target = realpathSync(args.target);
   const statePath = resolve(args.target, CODEX_STATE_PATH);
@@ -131,6 +131,11 @@ function preflight(args) {
   if (state?.install_status !== "installed") {
     failures.push(`Codex install status must be installed, received ${state?.install_status ?? "missing"}`);
   }
+  if (state) {
+    for (const finding of inspectCodexDiscoverySkillAssets(args.target, state)) {
+      failures.push(`Codex discovery skill ${finding.status}: ${finding.path}`);
+    }
+  }
   if (args.prompt !== args.prompt.split(/[\\/]/).at(-1)) failures.push("prompt must be an installed prompt basename");
   let promptPath = null;
   try { promptPath = resolveWithinTarget(args.target, `.agents/prompts/${args.prompt}`, "prompt"); } catch (error) { failures.push(error.message); }
@@ -145,6 +150,30 @@ function preflight(args) {
     failures.push(`selected prompt has no managed Codex prompt record: ${args.prompt}`);
   } else if (promptPath && existsSync(promptPath) && hashText(readFileSync(promptPath, "utf8")) !== promptRecord.sha256) {
     failures.push(`prompt hash does not match Codex install state: ${args.prompt}`);
+  }
+  const promptContent = promptPath && existsSync(promptPath) ? readFileSync(promptPath, "utf8") : "";
+  const compactHeader = parseCodexCompactProfileHeader(promptContent);
+  const compactProfile = promptRecord?.compact_profile ?? null;
+  if (!compactProfile || !compactHeader) {
+    failures.push(`selected prompt has no generated Codex compact-profile evidence: ${args.prompt}`);
+  } else {
+    const expectedHeader = {
+      v: compactProfile.schema_version,
+      id: compactProfile.profile_id,
+      revision: compactProfile.canonical_revision,
+      source_digest: compactProfile.canonical_source_digest,
+      profile_fingerprint: compactProfile.profile_fingerprint,
+    };
+    if (JSON.stringify(compactHeader) !== JSON.stringify(expectedHeader)) failures.push(`compact-profile header does not match Codex install state: ${args.prompt}`);
+    if (compactProfile.mode !== args.mode) failures.push(`compact-profile mode mismatch: ${args.prompt} requires ${compactProfile.mode}`);
+    if (compactProfile.rendered_sha256 !== `sha256:${hashText(promptContent)}`) failures.push(`compact-profile rendered digest mismatch: ${args.prompt}`);
+    if (compactProfile.canonical_source_digest !== state?.projection_plan?.canonical_source_digest) failures.push(`compact-profile canonical source digest does not match shared projection plan: ${args.prompt}`);
+    if (compactProfile.profile_fingerprint !== state?.projection_plan?.fingerprint) failures.push(`compact-profile fingerprint does not match shared projection plan: ${args.prompt}`);
+    const selectedProfile = (state?.compact_runtime_profiles ?? []).find((profile) => profile.profile_id === compactProfile.profile_id);
+    if (!selectedProfile || selectedProfile.rendered_sha256 !== compactProfile.rendered_sha256) failures.push(`compact profile is not selected in Codex install state: ${compactProfile.profile_id}`);
+    for (const finding of inspectCodexProjectionCanonicalInputs(args.target, state?.projection_plan)) {
+      failures.push(`compact-profile canonical source ${finding.status}: ${finding.path}`);
+    }
   }
   try { args.outputPath = resolveWithinTarget(args.target, args.output, "output"); } catch (error) { failures.push(error.message); }
   try {
@@ -182,7 +211,7 @@ function preflight(args) {
       failures.push(`invalid --diff-base: ${error.message}`);
     }
   }
-  return { failures, warnings, state, promptPath };
+  return { failures, warnings, state, promptPath, compactProfile };
 }
 
 function resolveDiffRange(target, value) {
@@ -213,11 +242,13 @@ function gitDiffContext(args) {
   return result.stdout.trim() ? `Git diff context (${args.diffBase}):\n${result.stdout}` : `Git diff context (${args.diffBase}): empty diff.`;
 }
 
-function buildPrompt(args, state, promptPath) {
+function buildPrompt(args, state, promptPath, compactProfile) {
   const prompt = readFileSync(promptPath, "utf8");
   const context = [
     "Repository context:",
     `- Codex profile: ${state?.selected_profile ?? "unknown"}`,
+    `- Compact runtime profile: ${compactProfile?.profile_id ?? "unavailable"}`,
+    `- Requested contracts: ${(compactProfile?.requested_contracts ?? []).join(", ") || "unavailable"}`,
     `- Selected skills: ${(state?.selected_skills ?? []).join(", ") || "unknown"}`,
     `- Runner mode: ${args.mode}`,
     `- Sandbox: ${args.sandbox}`,
@@ -302,6 +333,14 @@ function printResult(report, json) {
   console.log(`Evidence level: ${report.evidence_level}`);
   console.log(`Output: ${report.output_path ?? "not written"}`);
   console.log(`Sensor status: ${report.sensor_status ?? "not run"}`);
+  console.log(`Requested contracts: ${report.execution_evidence.requested_contracts.contracts.length}`);
+  console.log(`Projected contracts evidence: ${report.execution_evidence.projected_contracts.evidence_level}`);
+  console.log(`Runtime-detected compact output profile evidence: ${report.execution_evidence.runtime_detected_profile.evidence_level}`);
+  console.log(`Runtime-loaded contracts evidence: ${report.execution_evidence.runtime_loaded_contracts.evidence_level}`);
+  console.log(`Applied output contracts evidence: ${report.execution_evidence.applied_output_contracts.evidence_level}`);
+  console.log(`Workflow contract application evidence: ${report.execution_evidence.workflow_contract_application.evidence_level}`);
+  console.log(`Risk/approval contract application evidence: ${report.execution_evidence.risk_approval_contract_application.evidence_level}`);
+  console.log(`Verification contract application evidence: ${report.execution_evidence.verification_contract_application.evidence_level}`);
   console.log("Boundary: ask-sensors is report-only and does not prove business correctness.");
   if (report.failures.length > 0) {
     console.log("Failures:");
@@ -324,7 +363,7 @@ try {
   let sensorResult = null;
   let command = null;
   if (preflightResult.failures.length === 0) {
-    const prompt = buildPrompt(args, preflightResult.state, preflightResult.promptPath);
+    const prompt = buildPrompt(args, preflightResult.state, preflightResult.promptPath, preflightResult.compactProfile);
     command = `${args.codexBin} exec --sandbox ${args.sandbox} --output-last-message ${args.output} <stdin-prompt>`;
     if (!args.dryRun) {
       codexResult = runCodex(args, prompt);
@@ -334,6 +373,7 @@ try {
     }
   }
   const normalized = resultStatus({ preflightResult, codexResult, sensorResult, dryRun: args.dryRun });
+  const preflightPassed = preflightResult.failures.length === 0;
   const report = {
     status: normalized.status,
     evidence_level: normalized.evidenceLevel,
@@ -342,6 +382,51 @@ try {
     command,
     output_path: codexResult?.outputPath ?? args.output,
     sensor_status: sensorResult?.status ?? null,
+    execution_evidence: {
+      requested_contracts: {
+        profile_id: preflightResult.compactProfile?.profile_id ?? null,
+        contracts: preflightResult.compactProfile?.requested_contracts ?? [],
+      },
+      projected_contracts: {
+        evidence_level: preflightPassed ? "projected" : "none",
+        prompt: `.agents/prompts/${args.prompt}`,
+        canonical_revision: preflightResult.compactProfile?.canonical_revision ?? null,
+      },
+      runtime_detected_profile: {
+        evidence_level: preflightPassed ? "runtime_detected" : "none",
+        detail: preflightPassed
+          ? "The managed runner loaded the generated prompt/profile into the invocation context."
+          : "The managed compact profile was not loaded because preflight failed.",
+      },
+      runtime_loaded_contracts: {
+        evidence_level: "none",
+        contracts: [],
+        missing_evidence: ["runtime_contract_load"],
+        detail: "Codex-controlled canonical Skill and contract loading is not observable.",
+      },
+      applied_output_contracts: {
+        evidence_level: sensorResult?.exitCode === 0 && sensorResult?.status === "pass" ? "executed" : "none",
+        evidence_scope: "Required output sections inspected by ask-sensors only.",
+        detail: sensorResult
+          ? `ask-sensors status=${sensorResult.status}, exit=${sensorResult.exitCode}`
+          : "No Codex output was evaluated against the requested output contract.",
+      },
+      workflow_contract_application: {
+        evidence_level: "none",
+        missing_evidence: ["workflow_contract_application"],
+        detail: "Output inspection does not expose whether Codex applied the requested workflow contract.",
+      },
+      risk_approval_contract_application: {
+        evidence_level: "none",
+        missing_evidence: ["risk_approval_contract_application"],
+        detail: "Output inspection does not expose whether Codex applied the risk and approval contract.",
+      },
+      verification_contract_application: {
+        evidence_level: "none",
+        missing_evidence: ["verification_contract_application"],
+        detail: "Output inspection distinguishes reported evidence but does not prove that the verification workflow was applied.",
+      },
+    },
     failures: [...preflightResult.failures, ...(codexResult?.error ? [`codex exec could not start: ${codexResult.error}`] : []), ...(codexResult && codexResult.exitCode !== null && codexResult.exitCode !== 0 ? [`codex exec exited ${codexResult.exitCode}`] : []), ...(sensorResult && (sensorResult.exitCode !== 0 || sensorResult.status !== "pass") ? [`ask-sensors rejected output: status=${sensorResult.status}, exit=${sensorResult.exitCode}`] : [])],
     warnings: preflightResult.warnings,
     boundary: "File projection and ask-sensors output checks do not prove business correctness, product readiness, or no regression.",

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -126,6 +126,94 @@ export const CODEX_PROMPT_MODES = new Set(Object.values(CODEX_PROMPT_CONTRACTS).
 
 export function codexPromptContractForMode(mode) {
   return Object.values(CODEX_PROMPT_CONTRACTS).find((contract) => contract.mode === mode) ?? null;
+}
+
+export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {}) {
+  const findings = [];
+  for (const input of projectionPlan.renderer_inputs?.canonical ?? []) {
+    if (typeof input?.path !== "string" || input.path.startsWith("/") || input.path.split(/[\\/]/).includes("..") || !/^sha256:[a-f0-9]{64}$/.test(input.digest ?? "")) {
+      findings.push({ path: String(input?.path), status: "invalid_projection_input" });
+      continue;
+    }
+    if (input.path === "AGENTS.md") {
+      const coreStatePath = resolve(target, ".agent-spectrum-kernel/install-state.json");
+      const coreState = existsSync(coreStatePath) ? JSON.parse(readFileSync(coreStatePath, "utf8")) : null;
+      const blockRecord = coreState?.managed_blocks?.["AGENTS.md#agent-spectrum-kernel"];
+      if (`sha256:${blockRecord?.source_sha256 ?? ""}` !== input.digest) findings.push({ path: input.path, status: "drift", expected_sha256: input.digest, actual_sha256: blockRecord?.source_sha256 ? `sha256:${blockRecord.source_sha256}` : "unavailable" });
+      const agentsPath = resolve(target, "AGENTS.md");
+      const managedBlock = existsSync(agentsPath) ? readFileSync(agentsPath, "utf8").match(/<!-- agent-spectrum-kernel:start -->[\s\S]*?<!-- agent-spectrum-kernel:end -->/u)?.[0] : null;
+      if (!managedBlock || hashText(managedBlock) !== blockRecord?.sha256) findings.push({ path: input.path, status: "managed_block_drift" });
+      continue;
+    }
+    const sourcePath = resolve(target, input.path);
+    if (!existsSync(sourcePath)) {
+      if (input.path.startsWith("skills/")) findings.push({ path: input.path, status: "missing" });
+      continue;
+    }
+    const actualSha256 = `sha256:${hashText(readFileSync(sourcePath))}`;
+    if (actualSha256 !== input.digest) {
+      findings.push({ path: input.path, status: "drift", expected_sha256: input.digest, actual_sha256: actualSha256 });
+    }
+  }
+  return findings;
+}
+
+function inspectCodexDiscoveryPathSegments(target, path) {
+  let current = resolve(target);
+  let leafStatus = null;
+  for (const segment of path.split("/")) {
+    current = resolve(current, segment);
+    try {
+      leafStatus = lstatSync(current);
+    } catch (error) {
+      return { status: error?.code === "ENOENT" ? "missing" : "unreadable", leafStatus: null };
+    }
+    if (leafStatus.isSymbolicLink()) return { status: "symbolic_link", leafStatus: null };
+  }
+  return { status: "ok", leafStatus };
+}
+
+export function inspectCodexDiscoverySkillAssets(target, state = {}) {
+  if (!Array.isArray(state?.selected_skills)) return [{ path: "selected_skills", status: "invalid_state" }];
+  const findings = [];
+  for (const skill of state.selected_skills) {
+    if (typeof skill !== "string" || !/^[a-z0-9][a-z0-9-]*$/u.test(skill)) {
+      findings.push({ path: `.agents/skills/${String(skill)}/SKILL.md`, status: "invalid_skill_id" });
+      continue;
+    }
+    const path = `.agents/skills/${skill}/SKILL.md`;
+    const absolutePath = resolve(target, path);
+    const pathInspection = inspectCodexDiscoveryPathSegments(target, path);
+    if (pathInspection.status !== "ok") {
+      findings.push({ path, status: pathInspection.status });
+      continue;
+    }
+    if (!pathInspection.leafStatus.isFile()) {
+      findings.push({ path, status: "not_regular_file" });
+      continue;
+    }
+    const record = state.managed_files?.[path];
+    if (record?.kind !== "codex_skill" || record?.skill !== skill || !/^[a-f0-9]{64}$/u.test(record?.sha256 ?? "")) {
+      findings.push({ path, status: "invalid_managed_record" });
+      continue;
+    }
+    try {
+      if (hashText(readFileSync(absolutePath, "utf8")) !== record.sha256) findings.push({ path, status: "hash_mismatch" });
+    } catch {
+      findings.push({ path, status: "unreadable" });
+    }
+  }
+  return findings;
+}
+
+export function parseCodexCompactProfileHeader(content) {
+  const match = content.match(/^<!-- ASK_CODEX_COMPACT_PROFILE (\{[^\n]+\}) -->/u);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
 }
 
 export function hashText(text) {
