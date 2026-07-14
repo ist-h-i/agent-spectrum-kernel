@@ -12,6 +12,7 @@ const work = mkdtempSync(resolve(tmpdir(), "ask-benchmark-test-"));
 const advancedWork = mkdtempSync(resolve(tmpdir(), "ask-benchmark-b2-test-"));
 const advancedConfig = resolve(root, "benchmarks/checkpoint-b2.config.json");
 const checkpointCConfig = resolve(root, "benchmarks/checkpoint-c.config.json");
+const portfolioConfig = resolve(root, "benchmarks/adaptive-portfolio.config.json");
 const advancedFixtureRoot = resolve(root, "benchmarks/fixtures/checkpoint-b2");
 
 function run(args, expectedStatus = 0) {
@@ -24,9 +25,74 @@ function run(args, expectedStatus = 0) {
   return result;
 }
 
+function groupBy(values, keyFor) {
+  const groups = new Map();
+  for (const value of values) {
+    const key = keyFor(value);
+    groups.set(key, [...(groups.get(key) ?? []), value]);
+  }
+  return groups;
+}
+
 run(["validate"]);
 run(["validate", "--config", advancedConfig]);
 run(["validate", "--config", checkpointCConfig]);
+run(["validate", "--config", portfolioConfig]);
+
+const portfolioWork = mkdtempSync(resolve(tmpdir(), "ask-benchmark-portfolio-test-"));
+const portfolioPlanPath = resolve(portfolioWork, "plan.json");
+const portfolioPlanRepeatPath = resolve(portfolioWork, "plan-repeat.json");
+const portfolioPlanAlternatePath = resolve(portfolioWork, "plan-alternate.json");
+run(["plan", "--config", portfolioConfig, "--output", portfolioPlanPath, "--seed", "portfolio-seed"]);
+run(["plan", "--config", portfolioConfig, "--output", portfolioPlanRepeatPath, "--seed", "portfolio-seed"]);
+run(["plan", "--config", portfolioConfig, "--output", portfolioPlanAlternatePath, "--seed", "alternate-portfolio-seed"]);
+
+const portfolioPlan = JSON.parse(readFileSync(portfolioPlanPath, "utf8"));
+const repeatedPortfolioPlan = JSON.parse(readFileSync(portfolioPlanRepeatPath, "utf8"));
+const alternatePortfolioPlan = JSON.parse(readFileSync(portfolioPlanAlternatePath, "utf8"));
+assert.deepEqual(repeatedPortfolioPlan, portfolioPlan);
+assert.equal(portfolioPlan.cases.length, 112);
+assert.deepEqual(new Set(portfolioPlan.adapter_tracks.map((entry) => entry.id)), new Set(["codex", "claude"]));
+assert.ok(portfolioPlan.adapter_tracks.every((entry) => entry.runtime_status === "unverified"));
+assert.equal(portfolioPlan.pool_adapter_results, false);
+assert.deepEqual(new Set(portfolioPlan.conditions), new Set(["plain", "kernel_only", "adaptive_ask", "full_ask"]));
+assert.equal(portfolioPlan.schema_path, "benchmarks/schemas/execution-plan.schema.json");
+assert.equal(Object.hasOwn(portfolioPlan, "seed"), false);
+assert.ok(portfolioPlan.cases.every((entry) => entry.suite === "calibration" && entry.aggregate_eligible === false));
+assert.equal(new Set(portfolioPlan.cases.map((entry) => entry.case_id)).size, portfolioPlan.cases.length);
+
+const casesByBlock = groupBy(portfolioPlan.cases, (entry) => entry.block_id);
+for (const block of casesByBlock.values()) {
+  assert.equal(block.length, 4);
+  assert.deepEqual(block.map((entry) => entry.condition_order_position).sort(), [1, 2, 3, 4]);
+  assert.deepEqual(new Set(block.map((entry) => entry.condition)), new Set(portfolioPlan.conditions));
+}
+
+const positionGroups = groupBy(portfolioPlan.cases, (entry) => `${entry.adapter_track}:${entry.fixture_id}:${entry.condition}`);
+for (const group of positionGroups.values()) {
+  const counts = [1, 2, 3, 4].map((position) => group.filter((entry) => entry.condition_order_position === position).length);
+  assert.ok(Math.max(...counts) - Math.min(...counts) <= 1);
+}
+
+const orderSignature = (plan) => [...groupBy(plan.cases, (entry) => entry.block_id).values()]
+  .map((block) => block.sort((left, right) => left.condition_order_position - right.condition_order_position).map((entry) => entry.condition).join(","))
+  .join("|");
+assert.notEqual(orderSignature(alternatePortfolioPlan), orderSignature(portfolioPlan));
+
+const selectionSchema = JSON.parse(readFileSync(resolve(root, "benchmarks/schemas/adaptive-selection.schema.json"), "utf8"));
+const planSchema = JSON.parse(readFileSync(resolve(root, "benchmarks/schemas/execution-plan.schema.json"), "utf8"));
+const configSchema = JSON.parse(readFileSync(resolve(root, "benchmarks/schemas/portfolio-config.schema.json"), "utf8"));
+assert.ok(configSchema.required.includes("execution_plan"));
+for (const field of ["case_id", "block_id", "adapter_track", "fixture_id", "suite", "repetition", "registered_repetitions", "condition", "condition_order_position", "input_manifest_sha256"]) {
+  assert.ok(planSchema.properties.cases.items.required.includes(field));
+}
+for (const field of ["task_class", "observed_signals", "selected_mechanisms", "skipped_mechanisms", "required_gates", "agents", "expected_evidence", "capability_downgrades", "lightweight_bypass", "projection", "selected_at", "selection_digest"]) {
+  assert.ok(selectionSchema.required.includes(field));
+}
+for (const prohibited of ["result", "score", "correctness", "recommendation", "completion_claim"]) {
+  assert.equal(Object.hasOwn(selectionSchema.properties, prohibited), false);
+}
+
 run(["prepare", "--output", work, "--seed", "fixture-seed"]);
 run(["prepare", "--config", advancedConfig, "--output", advancedWork, "--seed", "advanced-fixture-seed"]);
 

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK pre-result mechanism selection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "task_class",
+    "observed_signals",
+    "selected_mechanisms",
+    "skipped_mechanisms",
+    "required_gates",
+    "agents",
+    "expected_evidence",
+    "capability_downgrades",
+    "lightweight_bypass",
+    "projection",
+    "selected_at",
+    "selection_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}$" },
+    "task_class": { "type": "string", "minLength": 1 },
+    "observed_signals": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "selected_mechanisms": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "skipped_mechanisms": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "required_gates": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "agents": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requested", "omitted"],
+      "properties": {
+        "requested": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "omitted": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    },
+    "expected_evidence": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "capability_downgrades": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capability", "reason"],
+        "properties": {
+          "capability": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "lightweight_bypass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["used", "reason"],
+      "properties": {
+        "used": { "type": "boolean" },
+        "reason": { "type": ["string", "null"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "used": { "const": true } }, "required": ["used"] },
+          "then": { "properties": { "reason": { "type": "string", "minLength": 1 } } }
+        }
+      ]
+    },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter_track", "profile", "renderer_version", "projection_fingerprint"],
+      "properties": {
+        "adapter_track": { "enum": ["codex", "claude"] },
+        "profile": { "type": "string", "minLength": 1 },
+        "renderer_version": { "type": "string", "minLength": 1 },
+        "projection_fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "selected_at": { "type": "string", "format": "date-time" },
+    "selection_digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "value"],
+      "properties": {
+        "algorithm": { "const": "sha256" },
+        "value": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

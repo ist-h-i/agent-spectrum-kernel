@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK deterministic execution plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "protocol_path",
+    "protocol_sha256",
+    "config_path",
+    "config_sha256",
+    "repository_revision",
+    "seed_sha256",
+    "ordering_strategy",
+    "conditions",
+    "adapter_tracks",
+    "pool_adapter_results",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/execution-plan.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio" },
+    "protocol_path": { "type": "string", "minLength": 1 },
+    "protocol_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "config_path": { "type": "string", "minLength": 1 },
+    "config_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "repository_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "seed_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "ordering_strategy": { "const": "seeded_balanced_rotation" },
+    "conditions": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] }
+    },
+    "adapter_tracks": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "runtime_status"],
+        "properties": {
+          "id": { "enum": ["codex", "claude"] },
+          "runtime_status": { "enum": ["unverified", "available", "unavailable"] }
+        }
+      }
+    },
+    "pool_adapter_results": { "const": false },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "block_id",
+          "adapter_track",
+          "fixture_id",
+          "suite",
+          "task_class",
+          "difficulty",
+          "aggregate_eligible",
+          "repetition",
+          "registered_repetitions",
+          "condition",
+          "condition_order_position",
+          "input_manifest_path",
+          "input_manifest_sha256"
+        ],
+        "properties": {
+          "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}$" },
+          "block_id": { "type": "string", "pattern": "^block-[a-f0-9]{12}$" },
+          "adapter_track": { "enum": ["codex", "claude"] },
+          "fixture_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "suite": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"] },
+          "task_class": { "type": "string", "minLength": 1 },
+          "difficulty": { "type": "string", "minLength": 1 },
+          "aggregate_eligible": { "type": "boolean" },
+          "repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "registered_repetitions": { "enum": [3, 5] },
+          "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+          "condition_order_position": { "type": "integer", "minimum": 1, "maximum": 4 },
+          "input_manifest_path": { "type": "string", "minLength": 1 },
+          "input_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    }
+  }
+}
