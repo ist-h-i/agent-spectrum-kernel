@@ -19,11 +19,16 @@ import { tmpdir } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { assertBenchmarkSchemaInstance, computePortfolioPlanId } from "./ask-benchmark-schema.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_CONFIG_PATH = resolve(ROOT, "benchmarks/checkpoint-b.config.json");
 const OUTPUT_SCHEMA_PATH = resolve(ROOT, "benchmarks/schemas/agent-output.schema.json");
 const CONDITIONS = ["plain", "kernel_only", "full_ask"];
+const PORTFOLIO_SCHEMA_VERSION = "3.0.0";
+const PORTFOLIO_CONDITIONS = ["plain", "kernel_only", "adaptive_ask", "full_ask"];
+const PORTFOLIO_CONDITION_ROLES = ["context_baseline", "default_product", "primary_product", "diagnostic_maximum"];
+const PORTFOLIO_ADAPTER_TRACKS = ["codex", "claude"];
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -59,6 +64,7 @@ function help() {
 
 Commands:
   validate [--config <config.json>]
+  plan --config <portfolio-config.json> --output <execution-plan.json> --seed <value>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
   score [--config <config.json>] --run-dir <completed-directory> --output <normalized-result.json>
@@ -85,9 +91,96 @@ function git(cwd, args, options = {}) {
   return result.stdout.trim();
 }
 
+function equalOrderedValues(actual, expected) {
+  return JSON.stringify(actual) === JSON.stringify(expected);
+}
+
+function validatePortfolioFoundation(config, canonicalConfigPath) {
+  const errors = [];
+  const configSchemaPath = resolve(ROOT, "benchmarks/schemas/portfolio-config.schema.json");
+  assertBenchmarkSchemaInstance(config, { schemaPath: configSchemaPath, label: "portfolio config" });
+  if (config.program !== "adaptive_ask_portfolio") errors.push("portfolio program must be adaptive_ask_portfolio");
+  if (!["foundation", "frozen"].includes(config.protocol_status)) errors.push("portfolio protocol_status must be foundation or frozen");
+
+  const conditionIds = Array.isArray(config.conditions) ? config.conditions.map((entry) => entry.id) : [];
+  const conditionRoles = Array.isArray(config.conditions) ? config.conditions.map((entry) => entry.role) : [];
+  if (!equalOrderedValues(conditionIds, PORTFOLIO_CONDITIONS)) errors.push("portfolio conditions must be plain, kernel_only, adaptive_ask, full_ask");
+  if (!equalOrderedValues(conditionRoles, PORTFOLIO_CONDITION_ROLES)) errors.push("portfolio condition roles must preserve baseline, default, primary, and diagnostic semantics");
+  if (!Array.isArray(config.conditions) || config.conditions.some((entry) => typeof entry.instruction_surface !== "string" || entry.instruction_surface.trim() === "")) errors.push("portfolio conditions require non-empty instruction_surface values");
+
+  const adapterTracks = Array.isArray(config.adapter_tracks) ? config.adapter_tracks.map((entry) => entry.id) : [];
+  if (!equalOrderedValues(adapterTracks, PORTFOLIO_ADAPTER_TRACKS)) errors.push("portfolio adapter tracks must be codex and claude in separate tracks");
+  if (config.pool_adapter_results !== false) errors.push("portfolio adapter results must not be pooled");
+  if (!Array.isArray(config.adapter_tracks) || config.adapter_tracks.some((entry) => !["unverified", "available", "unavailable"].includes(entry.runtime_status))) errors.push("portfolio adapter runtime_status must be explicit");
+
+  if (!Array.isArray(config.fixtures) || config.fixtures.length === 0) errors.push("portfolio fixtures are required");
+  const fixtureIds = (config.fixtures ?? []).map((fixture) => fixture.id);
+  if (new Set(fixtureIds).size !== fixtureIds.length) errors.push("portfolio fixture ids must be unique");
+  const inputManifests = new Map();
+  for (const fixture of config.fixtures ?? []) {
+    if (![3, 5].includes(fixture.repetitions)) errors.push(`${fixture.id} repetitions must be 3 or 5`);
+    if (fixture.aggregate_eligible !== (fixture.suite !== "calibration")) errors.push(`${fixture.id} aggregate eligibility must exclude calibration only`);
+    if (fixture.id === "impl-transfer-hard" && fixture.suite === "calibration" && fixture.repetitions !== 5) errors.push("concurrent transfer calibration requires 5 repetitions");
+    const root = resolve(fixtureRoot(config), fixture.id);
+    for (const path of ["task.md", "workspace/package.json", "evaluator/expected.json"]) {
+      if (!existsSync(resolve(root, path))) errors.push(`${fixture.id}/${path} is missing`);
+    }
+    if (!fixture.input_manifest_path) {
+      errors.push(`${fixture.id} input_manifest_path is required`);
+      continue;
+    }
+    const manifestPath = resolveRepoPath(fixture.input_manifest_path, `${fixture.id} input manifest`);
+    if (!existsSync(manifestPath)) {
+      errors.push(`${fixture.id} input manifest is missing: ${fixture.input_manifest_path}`);
+      continue;
+    }
+    const actualDigest = sha256(readFileSync(manifestPath));
+    if (actualDigest !== fixture.input_manifest_sha256) errors.push(`${fixture.id} input manifest digest does not match`);
+    if (!inputManifests.has(manifestPath)) inputManifests.set(manifestPath, readJson(manifestPath));
+    if (!inputManifests.get(manifestPath).fixtures?.[fixture.id]) errors.push(`${fixture.id} is absent from its input manifest`);
+  }
+
+  if (config.ordering?.strategy !== "seeded_balanced_rotation" || config.ordering?.condition_count !== PORTFOLIO_CONDITIONS.length) errors.push("portfolio ordering must use four-condition seeded_balanced_rotation");
+  if (config.execution_plan?.schema_version !== "1.0.0" || !config.execution_plan?.schema_path) errors.push("portfolio execution plan schema version and path are required");
+  else {
+    const planSchemaPath = resolveRepoPath(config.execution_plan.schema_path, "execution plan schema");
+    if (!existsSync(planSchemaPath)) errors.push(`execution plan schema is missing: ${config.execution_plan.schema_path}`);
+    else {
+      const planSchema = readJson(planSchemaPath);
+      const requiredCaseFields = ["case_id", "block_id", "adapter_track", "fixture_id", "suite", "repetition", "registered_repetitions", "condition", "condition_order_position", "input_manifest_sha256"];
+      if (planSchema.properties?.schema_version?.const !== config.execution_plan.schema_version || requiredCaseFields.some((field) => !planSchema.properties?.cases?.items?.required?.includes(field))) errors.push("execution plan schema does not match the configured case contract");
+    }
+  }
+  if (config.adaptive_selection?.must_precede_result !== true || config.adaptive_selection?.digest_algorithm !== "sha256") errors.push("Adaptive selection must be sealed with SHA-256 before the result");
+  if (config.adaptive_selection?.schema_path) {
+    const selectionPath = resolveRepoPath(config.adaptive_selection.schema_path, "adaptive selection schema");
+    if (!existsSync(selectionPath)) errors.push(`Adaptive selection schema is missing: ${config.adaptive_selection.schema_path}`);
+    else {
+      const selectionSchema = readJson(selectionPath);
+      const required = ["task_class", "observed_signals", "selected_mechanisms", "skipped_mechanisms", "required_gates", "agents", "expected_evidence", "capability_downgrades", "lightweight_bypass", "projection", "selected_at", "selection_digest"];
+      if (selectionSchema.additionalProperties !== false || required.some((field) => !selectionSchema.required?.includes(field))) errors.push("Adaptive selection schema is missing required pre-result fields or permits undeclared fields");
+      if (["result", "score", "correctness", "recommendation", "completion_claim"].some((field) => Object.hasOwn(selectionSchema.properties ?? {}, field))) errors.push("Adaptive selection schema must not contain outcome fields");
+    }
+  } else errors.push("Adaptive selection schema_path is required");
+
+  const privacy = config.privacy ?? {};
+  if (["store_raw_prompts", "store_full_outputs", "store_full_event_streams", "store_full_source", "store_secrets_customer_or_personal_data"].some((field) => privacy[field] !== false)) errors.push("portfolio durable raw or sensitive capture must be explicitly disabled");
+  if (typeof config.protocol_path !== "string" || config.protocol_path.trim() === "") errors.push("portfolio protocol_path is required");
+  const protocolPath = resolveRepoPath(config.protocol_path ?? "", "protocol_path");
+  if (!existsSync(protocolPath) || protocolPath === ROOT) errors.push(`protocol is missing: ${relative(ROOT, protocolPath)}`);
+  const inputVerifier = resolve(fixtureRoot(config), "verify-inputs.mjs");
+  if (existsSync(inputVerifier)) {
+    const verified = spawnSync(process.execPath, [inputVerifier], { cwd: fixtureRoot(config), encoding: "utf8" });
+    if (verified.status !== 0) errors.push(`agent-visible input verification failed: ${verified.stderr || verified.stdout}`);
+  }
+  if (errors.length > 0) throw new Error(errors.join("\n"));
+  return { ...config, _kind: "portfolio", _configPath: canonicalConfigPath, _protocolPath: protocolPath };
+}
+
 function validateProtocol(configPath = DEFAULT_CONFIG_PATH) {
   const canonicalConfigPath = resolveRepoPath(relative(ROOT, configPath), "config");
   const config = readJson(canonicalConfigPath);
+  if (config.schema_version === PORTFOLIO_SCHEMA_VERSION) return validatePortfolioFoundation(config, canonicalConfigPath);
   const outputSchema = readJson(OUTPUT_SCHEMA_PATH);
   const errors = [];
   if (config.protocol_status !== "frozen") errors.push("protocol_status must be frozen before execution");
@@ -152,7 +245,7 @@ function validateProtocol(configPath = DEFAULT_CONFIG_PATH) {
     if (verified.status !== 0) errors.push(`agent-visible input verification failed: ${verified.stderr || verified.stdout}`);
   }
   if (errors.length > 0) throw new Error(errors.join("\n"));
-  return { ...config, _configPath: canonicalConfigPath, _protocolPath: protocolPath };
+  return { ...config, _kind: "legacy", _configPath: canonicalConfigPath, _protocolPath: protocolPath };
 }
 
 function ensureEmptyDirectory(path) {
@@ -180,8 +273,84 @@ function projectCondition(target, condition) {
   if (adapter.status !== 0) throw new Error(`Full ASK Codex projection failed: ${adapter.stderr || adapter.stdout}`);
 }
 
+function requireLegacyConfig(config, command) {
+  if (config._kind !== "legacy") throw new Error(`${command} does not yet execute portfolio configs; use plan until the materialization slice is implemented`);
+}
+
+function balancedConditionOrder(seed, adapterTrack, fixtureId, repetition) {
+  const base = [...PORTFOLIO_CONDITIONS].sort((left, right) => sha256(`${seed}:condition-base:${adapterTrack}:${fixtureId}:${left}`).localeCompare(sha256(`${seed}:condition-base:${adapterTrack}:${fixtureId}:${right}`)));
+  const shift = (repetition - 1) % base.length;
+  return [...base.slice(shift), ...base.slice(0, shift)];
+}
+
+function planPortfolio(args) {
+  const config = validateProtocol(args.configPath);
+  if (config._kind !== "portfolio") throw new Error("plan requires an Adaptive portfolio config");
+  if (!args.output || !args.seed) throw new Error("plan requires --output and --seed");
+  if (existsSync(args.output)) throw new Error(`plan output must not already exist: ${args.output}`);
+  const configSha256 = sha256(readFileSync(config._configPath));
+  const protocolSha256 = sha256(readFileSync(config._protocolPath));
+  const repositoryRevision = git(ROOT, ["rev-parse", "HEAD"]);
+  const seedSha256 = sha256(args.seed);
+  const planId = computePortfolioPlanId({ configSha256, protocolSha256, repositoryRevision, seed: args.seed });
+  const planDigest = planId.slice("plan-".length);
+  const blocks = [];
+  for (const adapter of config.adapter_tracks) {
+    for (const fixture of config.fixtures) {
+      for (let repetition = 1; repetition <= fixture.repetitions; repetition += 1) {
+        const blockId = `block-${planDigest.slice(0, 16)}-${sha256(`${planId}:${adapter.id}:${fixture.id}:${repetition}`).slice(0, 12)}`;
+        const orderedConditions = balancedConditionOrder(args.seed, adapter.id, fixture.id, repetition);
+        const cases = orderedConditions.map((condition, index) => ({
+          case_id: `case-${planDigest.slice(0, 16)}-${sha256(`${planId}:${adapter.id}:${fixture.id}:${repetition}:${condition}`).slice(0, 16)}`,
+          block_id: blockId,
+          adapter_track: adapter.id,
+          fixture_id: fixture.id,
+          suite: fixture.suite,
+          task_class: fixture.task_class,
+          difficulty: fixture.difficulty,
+          aggregate_eligible: fixture.aggregate_eligible,
+          repetition,
+          registered_repetitions: fixture.repetitions,
+          condition,
+          condition_order_position: index + 1,
+          input_manifest_path: fixture.input_manifest_path,
+          input_manifest_sha256: fixture.input_manifest_sha256,
+        }));
+        blocks.push({ order_key: sha256(`${args.seed}:block-order:${adapter.id}:${fixture.id}:${repetition}`), cases });
+      }
+    }
+  }
+  blocks.sort((left, right) => left.order_key.localeCompare(right.order_key));
+  const plan = {
+    schema_version: config.execution_plan.schema_version,
+    schema_path: config.execution_plan.schema_path,
+    program: config.program,
+    plan_id: planId,
+    protocol_path: relative(ROOT, config._protocolPath),
+    protocol_sha256: protocolSha256,
+    config_path: relative(ROOT, config._configPath),
+    config_sha256: configSha256,
+    repository_revision: repositoryRevision,
+    randomization_seed: {
+      seed_id: `seed-${seedSha256.slice(0, 16)}`,
+      value: args.seed,
+      sha256: seedSha256,
+    },
+    ordering_strategy: config.ordering.strategy,
+    conditions: config.conditions.map((entry) => entry.id),
+    adapter_tracks: config.adapter_tracks.map((entry) => ({ id: entry.id, runtime_status: entry.runtime_status })),
+    pool_adapter_results: config.pool_adapter_results,
+    cases: blocks.flatMap((block) => block.cases),
+  };
+  const planSchemaPath = resolveRepoPath(config.execution_plan.schema_path, "execution plan schema");
+  assertBenchmarkSchemaInstance(plan, { schemaPath: planSchemaPath, label: "execution plan" });
+  writeJson(args.output, plan);
+  console.log(`Wrote deterministic portfolio plan with ${plan.cases.length} cases to ${args.output}`);
+}
+
 function prepare(args) {
   const config = validateProtocol(args.configPath);
+  requireLegacyConfig(config, "prepare");
   if (!args.output || !args.seed) throw new Error("prepare requires --output and --seed");
   ensureEmptyDirectory(args.output);
   const cases = [];
@@ -266,6 +435,7 @@ function tokenUsageFromJsonl(text) {
 
 function executeCases(args) {
   const config = validateProtocol(args.configPath);
+  requireLegacyConfig(config, "run");
   if (!args.runDir || !existsSync(resolve(args.runDir, "run.json"))) throw new Error("run requires a prepared --run-dir");
   if (!existsSync(args.agentBin) || !lstatSync(args.agentBin).isFile()) throw new Error(`agent binary is unavailable: ${args.agentBin}`);
   const manifest = readJson(resolve(args.runDir, "run.json"));
@@ -522,6 +692,7 @@ function comparisonFor(runs, fixture) {
 
 function score(args) {
   const config = validateProtocol(args.configPath);
+  requireLegacyConfig(config, "score");
   if (!args.runDir || !args.output) throw new Error("score requires --run-dir and --output");
   const manifest = readJson(resolve(args.runDir, "run.json"));
   if (manifest.checkpoint !== config.checkpoint || manifest.config_sha256 !== sha256(readFileSync(config._configPath))) throw new Error("run manifest does not match the selected frozen config");
@@ -613,7 +784,8 @@ try {
   if (args.command === "validate") {
     validateProtocol(args.configPath);
     console.log("ASK benchmark protocol validation passed");
-  } else if (args.command === "prepare") prepare(args);
+  } else if (args.command === "plan") planPortfolio(args);
+  else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);
   else if (args.command === "score") score(args);
   else if (args.command === "help" || !args.command) help();

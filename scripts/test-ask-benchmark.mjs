@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { computePortfolioPlanId, validateAdaptiveSelectionRecord, validateBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
@@ -12,6 +13,7 @@ const work = mkdtempSync(resolve(tmpdir(), "ask-benchmark-test-"));
 const advancedWork = mkdtempSync(resolve(tmpdir(), "ask-benchmark-b2-test-"));
 const advancedConfig = resolve(root, "benchmarks/checkpoint-b2.config.json");
 const checkpointCConfig = resolve(root, "benchmarks/checkpoint-c.config.json");
+const portfolioConfig = resolve(root, "benchmarks/adaptive-portfolio.config.json");
 const advancedFixtureRoot = resolve(root, "benchmarks/fixtures/checkpoint-b2");
 
 function run(args, expectedStatus = 0) {
@@ -24,9 +26,189 @@ function run(args, expectedStatus = 0) {
   return result;
 }
 
+function groupBy(values, keyFor) {
+  const groups = new Map();
+  for (const value of values) {
+    const key = keyFor(value);
+    groups.set(key, [...(groups.get(key) ?? []), value]);
+  }
+  return groups;
+}
+
 run(["validate"]);
 run(["validate", "--config", advancedConfig]);
 run(["validate", "--config", checkpointCConfig]);
+run(["validate", "--config", portfolioConfig]);
+
+const portfolioWork = mkdtempSync(resolve(tmpdir(), "ask-benchmark-portfolio-test-"));
+const invalidPortfolioConfigPath = resolve(root, "benchmarks", `.adaptive-portfolio-invalid-${process.pid}.json`);
+const invalidPortfolioPlanPath = resolve(portfolioWork, "invalid-plan.json");
+const basePortfolioConfig = JSON.parse(readFileSync(portfolioConfig, "utf8"));
+const invalidPortfolioConfigs = [
+  ["unknown property", (config) => { config.unknown_property = true; }],
+  ["invalid suite", (config) => { config.fixtures[0].suite = "invalid_suite"; config.fixtures[0].aggregate_eligible = true; }],
+  ["empty task class", (config) => { config.fixtures[0].task_class = ""; }],
+  ["empty difficulty", (config) => { config.fixtures[0].difficulty = ""; }],
+  ["invalid adapter track", (config) => { config.adapter_tracks[0].id = "invalid"; }],
+  ["missing required field", (config) => { delete config.ordering; }],
+  ["plan emitter/schema version drift", (config) => { config.execution_plan.schema_version = "2.0.0"; }],
+];
+try {
+  for (const [name, mutate] of invalidPortfolioConfigs) {
+    const invalidConfig = structuredClone(basePortfolioConfig);
+    mutate(invalidConfig);
+    writeFileSync(invalidPortfolioConfigPath, `${JSON.stringify(invalidConfig, null, 2)}\n`);
+    const result = run(["validate", "--config", invalidPortfolioConfigPath], 1);
+    assert.match(`${result.stderr}\n${result.stdout}`, /portfolio config failed JSON Schema validation/, name);
+  }
+  const invalidConfig = structuredClone(basePortfolioConfig);
+  invalidConfig.unknown_property = true;
+  writeFileSync(invalidPortfolioConfigPath, `${JSON.stringify(invalidConfig, null, 2)}\n`);
+  run(["plan", "--config", invalidPortfolioConfigPath, "--output", invalidPortfolioPlanPath, "--seed", "invalid-plan-seed-2026"], 1);
+  assert.equal(existsSync(invalidPortfolioPlanPath), false);
+} finally {
+  rmSync(invalidPortfolioConfigPath, { force: true });
+}
+
+const portfolioPlanPath = resolve(portfolioWork, "plan.json");
+const portfolioPlanRepeatPath = resolve(portfolioWork, "plan-repeat.json");
+const portfolioPlanAlternatePath = resolve(portfolioWork, "plan-alternate.json");
+const portfolioPlanFromRecordedSeedPath = resolve(portfolioWork, "plan-from-recorded-seed.json");
+const invalidEmittedPlanPath = resolve(portfolioWork, "invalid-emitted-plan.json");
+run(["plan", "--config", portfolioConfig, "--output", portfolioPlanPath, "--seed", "portfolio-seed-2026"]);
+run(["plan", "--config", portfolioConfig, "--output", portfolioPlanRepeatPath, "--seed", "portfolio-seed-2026"]);
+run(["plan", "--config", portfolioConfig, "--output", portfolioPlanAlternatePath, "--seed", "alternate-portfolio-seed-2026"]);
+const invalidEmittedPlan = run(["plan", "--config", portfolioConfig, "--output", invalidEmittedPlanPath, "--seed", "s".repeat(257)], 1);
+assert.match(`${invalidEmittedPlan.stderr}\n${invalidEmittedPlan.stdout}`, /execution plan failed JSON Schema validation/);
+assert.equal(existsSync(invalidEmittedPlanPath), false);
+
+const portfolioPlan = JSON.parse(readFileSync(portfolioPlanPath, "utf8"));
+const repeatedPortfolioPlan = JSON.parse(readFileSync(portfolioPlanRepeatPath, "utf8"));
+const alternatePortfolioPlan = JSON.parse(readFileSync(portfolioPlanAlternatePath, "utf8"));
+assert.deepEqual(repeatedPortfolioPlan, portfolioPlan);
+assert.match(portfolioPlan.randomization_seed.seed_id, /^seed-[a-f0-9]{16}$/);
+assert.equal(portfolioPlan.randomization_seed.value, "portfolio-seed-2026");
+assert.match(portfolioPlan.randomization_seed.sha256, /^[a-f0-9]{64}$/);
+assert.equal(portfolioPlan.randomization_seed.sha256, createHash("sha256").update(portfolioPlan.randomization_seed.value).digest("hex"));
+assert.match(portfolioPlan.plan_id, /^plan-[a-f0-9]{64}$/);
+run(["plan", "--config", portfolioConfig, "--output", portfolioPlanFromRecordedSeedPath, "--seed", portfolioPlan.randomization_seed.value]);
+assert.deepEqual(JSON.parse(readFileSync(portfolioPlanFromRecordedSeedPath, "utf8")), portfolioPlan);
+assert.equal(portfolioPlan.cases.length, 112);
+assert.deepEqual(new Set(portfolioPlan.adapter_tracks.map((entry) => entry.id)), new Set(["codex", "claude"]));
+assert.ok(portfolioPlan.adapter_tracks.every((entry) => entry.runtime_status === "unverified"));
+assert.equal(portfolioPlan.pool_adapter_results, false);
+assert.deepEqual(new Set(portfolioPlan.conditions), new Set(["plain", "kernel_only", "adaptive_ask", "full_ask"]));
+assert.equal(portfolioPlan.schema_path, "benchmarks/schemas/execution-plan.schema.json");
+assert.ok(portfolioPlan.cases.every((entry) => entry.suite === "calibration" && entry.aggregate_eligible === false));
+assert.equal(new Set(portfolioPlan.cases.map((entry) => entry.case_id)).size, portfolioPlan.cases.length);
+
+const casesByBlock = groupBy(portfolioPlan.cases, (entry) => entry.block_id);
+for (const block of casesByBlock.values()) {
+  assert.equal(block.length, 4);
+  assert.deepEqual(block.map((entry) => entry.condition_order_position).sort(), [1, 2, 3, 4]);
+  assert.deepEqual(new Set(block.map((entry) => entry.condition)), new Set(portfolioPlan.conditions));
+}
+
+const positionGroups = groupBy(portfolioPlan.cases, (entry) => `${entry.adapter_track}:${entry.fixture_id}:${entry.condition}`);
+for (const group of positionGroups.values()) {
+  const counts = [1, 2, 3, 4].map((position) => group.filter((entry) => entry.condition_order_position === position).length);
+  assert.ok(Math.max(...counts) - Math.min(...counts) <= 1);
+}
+
+const orderSignature = (plan) => [...groupBy(plan.cases, (entry) => entry.block_id).values()]
+  .map((block) => block.sort((left, right) => left.condition_order_position - right.condition_order_position).map((entry) => entry.condition).join(","))
+  .join("|");
+assert.notEqual(orderSignature(alternatePortfolioPlan), orderSignature(portfolioPlan));
+
+const selectionSchema = JSON.parse(readFileSync(resolve(root, "benchmarks/schemas/adaptive-selection.schema.json"), "utf8"));
+const planSchemaPath = resolve(root, "benchmarks/schemas/execution-plan.schema.json");
+const planSchema = JSON.parse(readFileSync(planSchemaPath, "utf8"));
+const configSchema = JSON.parse(readFileSync(resolve(root, "benchmarks/schemas/portfolio-config.schema.json"), "utf8"));
+assert.ok(configSchema.required.includes("execution_plan"));
+for (const field of ["case_id", "block_id", "adapter_track", "fixture_id", "suite", "repetition", "registered_repetitions", "condition", "condition_order_position", "input_manifest_sha256"]) {
+  assert.ok(planSchema.properties.cases.items.required.includes(field));
+}
+for (const field of ["task_class", "observed_signals", "selected_mechanisms", "skipped_mechanisms", "required_gates", "agents", "expected_evidence", "capability_downgrades", "lightweight_bypass", "projection", "selected_at", "selection_digest"]) {
+  assert.ok(selectionSchema.required.includes(field));
+}
+for (const prohibited of ["result", "score", "correctness", "recommendation", "completion_claim"]) {
+  assert.equal(Object.hasOwn(selectionSchema.properties, prohibited), false);
+}
+
+assert.deepEqual(validateBenchmarkSchemaInstance(portfolioPlan, { schemaPath: planSchemaPath }), []);
+for (const [name, mutate] of [
+  ["invalid case id", (plan) => { plan.cases[0].case_id = "case-invalid"; }],
+  ["invalid position", (plan) => { plan.cases[0].condition_order_position = 5; }],
+  ["missing required plan field", (plan) => { delete plan.plan_id; }],
+  ["plan schema version drift", (plan) => { plan.schema_version = "2.0.0"; }],
+]) {
+  const invalidPlan = structuredClone(portfolioPlan);
+  mutate(invalidPlan);
+  assert.ok(validateBenchmarkSchemaInstance(invalidPlan, { schemaPath: planSchemaPath }).length > 0, name);
+}
+
+const adaptiveCase = portfolioPlan.cases.find((entry) => entry.condition === "adaptive_ask");
+const validAdaptiveSelection = {
+  schema_version: "1.0.0",
+  case_id: adaptiveCase.case_id,
+  task_class: adaptiveCase.task_class,
+  observed_signals: ["cross-file contract"],
+  selected_mechanisms: ["repository-orientation"],
+  skipped_mechanisms: ["risk-gate"],
+  required_gates: ["test-first-verification"],
+  agents: { requested: [], omitted: ["subagent"] },
+  expected_evidence: ["focused test"],
+  capability_downgrades: [],
+  lightweight_bypass: { used: false, reason: "Observed signals justify one focused mechanism." },
+  projection: {
+    adapter_track: adaptiveCase.adapter_track,
+    profile: "adaptive",
+    renderer_version: "foundation",
+    projection_fingerprint: `sha256:${"a".repeat(64)}`,
+  },
+  selected_at: "2026-07-14T16:00:00+09:00",
+  selection_digest: { algorithm: "sha256", value: "b".repeat(64) },
+};
+assert.deepEqual(validateAdaptiveSelectionRecord(validAdaptiveSelection), []);
+const invalidAdaptiveSelection = structuredClone(validAdaptiveSelection);
+invalidAdaptiveSelection.projection.adapter_track = "invalid";
+assert.ok(validateAdaptiveSelectionRecord(invalidAdaptiveSelection).length > 0);
+const missingAdaptiveSelectionField = structuredClone(validAdaptiveSelection);
+delete missingAdaptiveSelectionField.selected_mechanisms;
+assert.ok(validateAdaptiveSelectionRecord(missingAdaptiveSelectionField).length > 0);
+
+const planIdentityInputs = {
+  configSha256: portfolioPlan.config_sha256,
+  protocolSha256: portfolioPlan.protocol_sha256,
+  repositoryRevision: portfolioPlan.repository_revision,
+  seed: portfolioPlan.randomization_seed.value,
+};
+assert.equal(computePortfolioPlanId(planIdentityInputs), portfolioPlan.plan_id);
+const differentHex = (value) => `${value[0] === "a" ? "b" : "a"}${value.slice(1)}`;
+for (const changed of [
+  { ...planIdentityInputs, configSha256: differentHex(planIdentityInputs.configSha256) },
+  { ...planIdentityInputs, protocolSha256: differentHex(planIdentityInputs.protocolSha256) },
+  { ...planIdentityInputs, repositoryRevision: differentHex(planIdentityInputs.repositoryRevision) },
+  { ...planIdentityInputs, seed: `${planIdentityInputs.seed}-changed` },
+]) {
+  assert.notEqual(computePortfolioPlanId(changed), portfolioPlan.plan_id);
+}
+
+const validVariantConfigPath = resolve(root, "benchmarks", `.adaptive-portfolio-variant-${process.pid}.json`);
+const validVariantPlanPath = resolve(portfolioWork, "variant-plan.json");
+try {
+  const variantConfig = structuredClone(basePortfolioConfig);
+  variantConfig.adapter_tracks[0].runtime_status = "unavailable";
+  writeFileSync(validVariantConfigPath, `${JSON.stringify(variantConfig, null, 2)}\n`);
+  run(["plan", "--config", validVariantConfigPath, "--output", validVariantPlanPath, "--seed", portfolioPlan.randomization_seed.value]);
+  const variantPlan = JSON.parse(readFileSync(validVariantPlanPath, "utf8"));
+  assert.notEqual(variantPlan.plan_id, portfolioPlan.plan_id);
+  const originalCaseIds = new Set(portfolioPlan.cases.map((entry) => entry.case_id));
+  assert.ok(variantPlan.cases.every((entry) => !originalCaseIds.has(entry.case_id)));
+} finally {
+  rmSync(validVariantConfigPath, { force: true });
+}
+
 run(["prepare", "--output", work, "--seed", "fixture-seed"]);
 run(["prepare", "--config", advancedConfig, "--output", advancedWork, "--seed", "advanced-fixture-seed"]);
 

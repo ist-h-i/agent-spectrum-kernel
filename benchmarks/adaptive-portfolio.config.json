@@ -1,0 +1,103 @@
+{
+  "$schema": "./schemas/portfolio-config.schema.json",
+  "schema_version": "3.0.0",
+  "program": "adaptive_ask_portfolio",
+  "protocol_path": "benchmarks/protocol-adaptive.md",
+  "protocol_status": "foundation",
+  "conditions": [
+    {
+      "id": "plain",
+      "role": "context_baseline",
+      "instruction_surface": "fixture context without ASK"
+    },
+    {
+      "id": "kernel_only",
+      "role": "default_product",
+      "instruction_surface": "canonical Kernel only"
+    },
+    {
+      "id": "adaptive_ask",
+      "role": "primary_product",
+      "instruction_surface": "Kernel plus pre-result evidence-selected mechanisms"
+    },
+    {
+      "id": "full_ask",
+      "role": "diagnostic_maximum",
+      "instruction_surface": "full selected adapter profile"
+    }
+  ],
+  "adapter_tracks": [
+    {
+      "id": "codex",
+      "runtime_status": "unverified"
+    },
+    {
+      "id": "claude",
+      "runtime_status": "unverified"
+    }
+  ],
+  "pool_adapter_results": false,
+  "fixture_root": "benchmarks/fixtures/checkpoint-b2",
+  "fixtures": [
+    {
+      "id": "pr-session-refresh-medium-hard",
+      "suite": "calibration",
+      "task_class": "review",
+      "difficulty": "medium-hard",
+      "repetitions": 3,
+      "aggregate_eligible": false,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
+      "input_manifest_sha256": "e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d"
+    },
+    {
+      "id": "pr-export-lease-hard",
+      "suite": "calibration",
+      "task_class": "review",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "aggregate_eligible": false,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
+      "input_manifest_sha256": "e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d"
+    },
+    {
+      "id": "impl-rule-batch-medium-hard",
+      "suite": "calibration",
+      "task_class": "implementation",
+      "difficulty": "medium-hard",
+      "repetitions": 3,
+      "aggregate_eligible": false,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
+      "input_manifest_sha256": "e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d"
+    },
+    {
+      "id": "impl-transfer-hard",
+      "suite": "calibration",
+      "task_class": "implementation",
+      "difficulty": "hard",
+      "repetitions": 5,
+      "aggregate_eligible": false,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
+      "input_manifest_sha256": "e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d"
+    }
+  ],
+  "ordering": {
+    "strategy": "seeded_balanced_rotation",
+    "condition_count": 4
+  },
+  "execution_plan": {
+    "schema_path": "benchmarks/schemas/execution-plan.schema.json",
+    "schema_version": "1.0.0"
+  },
+  "adaptive_selection": {
+    "schema_path": "benchmarks/schemas/adaptive-selection.schema.json",
+    "must_precede_result": true,
+    "digest_algorithm": "sha256"
+  },
+  "privacy": {
+    "store_raw_prompts": false,
+    "store_full_outputs": false,
+    "store_full_event_streams": false,
+    "store_full_source": false,
+    "store_secrets_customer_or_personal_data": false
+  }
+}
