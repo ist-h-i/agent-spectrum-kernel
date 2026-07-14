@@ -891,6 +891,10 @@ export function buildCodexProjectionPlan({ profileName, skills = null, skipPromp
   const compactProfileArtifacts = selection.prompts.map((prompt) => renderCodexCompactProfile(prompt, {
     canonicalContract,
     profileFingerprint: provenance.fingerprint,
+    additionalRequestedContracts: profileName === "organizational" && prompt === "skill-implement.md"
+      ? ["operating-mode-router", "domain-rule-ledger"]
+      : [],
+    knowledgePromotion: profileName === "organizational" && prompt === "skill-implement.md",
   }));
   const compactProfiles = compactProfileArtifacts.map((artifact) => artifact.metadata);
   return { ...selection, ...provenance, compactProfiles, compactProfileArtifacts, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };

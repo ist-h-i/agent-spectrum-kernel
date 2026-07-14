@@ -4,6 +4,8 @@ description: Run the Agent Spectrum Kernel review flow for the current PR or dif
 
 Use the installed project skills from this repository projection.
 
+Use `/evidence-ledger` for every correctness, readiness, or merge claim.
+
 Start with `/review-router` to extract observed change signals and map them to required gates. Run only the required gates. End with `/review-final-merge-gate` style output:
 
 - require approval for the specific action and stop without that approval before any risk-gated action

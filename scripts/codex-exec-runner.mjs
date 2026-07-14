@@ -166,6 +166,8 @@ function preflight(args) {
       revision: compactProfile.canonical_revision,
       source_digest: compactProfile.canonical_source_digest,
       profile_fingerprint: compactProfile.profile_fingerprint,
+      requested_contracts: compactProfile.requested_contracts,
+      control_ids: compactProfile.control_ids,
     };
     if (JSON.stringify(compactHeader) !== JSON.stringify(expectedHeader)) failures.push(`compact-profile header does not match Codex install state: ${args.prompt}`);
     if (compactProfile.mode !== args.mode) failures.push(`compact-profile mode mismatch: ${args.prompt} requires ${compactProfile.mode}`);

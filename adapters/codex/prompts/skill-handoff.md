@@ -10,6 +10,8 @@ Entry mode: handoff. Primary contract: `handoff-generation`. Stay read-only unle
 
 [agent_activity] opt-in; S/C/F counts.
 
+[handoff] executable state; include bounded resume evidence and stop conditions.
+
 Task:
 Context:
 Allowed scope:

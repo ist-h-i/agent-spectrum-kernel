@@ -41,6 +41,7 @@ for (const profile of summary.profiles) {
   const artifact = fullPlan.compactProfileArtifacts.find((candidate) => candidate.metadata.prompt_name === profile.prompt_name);
   const header = parseCodexCompactProfileHeader(artifact.content);
   if (!header || header.id !== profile.profile_id || header.source_digest !== fullPlan.canonical_source_digest || header.profile_fingerprint !== fullPlan.fingerprint) throw new Error(`${profile.prompt_name} rendered header is invalid`);
+  if (JSON.stringify(header.requested_contracts) !== JSON.stringify(profile.requested_contracts) || JSON.stringify(header.control_ids) !== JSON.stringify(profile.control_ids)) throw new Error(`${profile.prompt_name} header omits requested contracts or control IDs`);
   if (artifact.content.includes("{{ASK_COMPACT_")) throw new Error(`${profile.prompt_name} retained an unresolved generated-content placeholder`);
   for (const controlId of requiredControls) if (!artifact.content.includes(`[${controlId}]`)) throw new Error(`${profile.prompt_name} rendered output is missing ${controlId}`);
   for (const triggerId of route.direct_trigger_ids) if (!artifact.content.includes(`\`${triggerId}\``)) throw new Error(`${profile.prompt_name} rendered output is missing direct trigger ${triggerId}`);

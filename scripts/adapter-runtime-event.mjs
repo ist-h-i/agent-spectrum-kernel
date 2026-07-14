@@ -22,8 +22,8 @@ function privacy() {
   return { raw_prompts_stored: false, sensitive_payloads_stored: false, external_publication: false };
 }
 
-function verificationCounts({ attempted = 0, passed = 0, failed = 0, unavailable = 0 } = {}) {
-  return { attempted, passed, failed, unavailable };
+function verificationCounts({ obligationRequired = false, attempted = 0, passed = 0, failed = 0, unavailable = 0 } = {}) {
+  return { obligation_required: obligationRequired, attempted, passed, failed, unavailable };
 }
 
 function outcomeForStop(status) {
@@ -49,14 +49,15 @@ export function mapClaudeMetricsEvent(event, { eventKind = "task_stop", hookEven
   const missingEvidence = missingEvidenceFromClaude(event);
   const requiredGates = unique([
     ...(event.routing_result?.required_gates ?? []),
-    ...(event.gate_decisions ?? []).filter((item) => item?.status === "required").map((item) => item.gate),
+    ...(event.gate_decisions ?? []).filter((item) => ["required", "executed"].includes(item?.status)).map((item) => item.gate),
   ]);
   const executedGates = unique((event.gate_decisions ?? []).filter((item) => item?.status === "executed").map((item) => item.gate));
-  const approvalRequired = missingEvidence.includes("specific_action_approval") || requiredGates.includes("risk-gate");
-  const stopStatus = event.outcome_metrics?.task_completed === true
-    ? "completed"
-    : approvalRequired && !executedGates.includes("risk-gate")
-      ? "risk_gate"
+  const approvalMissing = missingEvidence.includes("specific_action_approval");
+  const approvalRequired = approvalMissing || requiredGates.includes("risk-gate");
+  const stopStatus = approvalRequired
+    ? "risk_gate"
+    : event.outcome_metrics?.task_completed === true
+      ? "completed"
       : missingEvidence.length > 0 || event.verification_metrics?.insufficient_evidence_reported === true
         ? "insufficient_evidence"
         : "none";
@@ -82,7 +83,7 @@ export function mapClaudeMetricsEvent(event, { eventKind = "task_stop", hookEven
     gates: { required: requiredGates, executed: executedGates },
     approval: {
       required: approvalRequired,
-      status: approvalRequired ? executedGates.includes("risk-gate") ? "approved" : "missing" : "not_required",
+      status: approvalRequired ? approvalMissing ? "missing" : "unknown" : "not_required",
       action_categories: approvalRequired ? ["risk_gated_action"] : [],
     },
     evidence: { checked: unique(event.evidence_references ?? []), missing: missingEvidence },
@@ -91,7 +92,9 @@ export function mapClaudeMetricsEvent(event, { eventKind = "task_stop", hookEven
       completed: hookEvent === "SubagentStop" ? 1 : 0,
       failed: 0,
     },
-    verification: verificationCounts({ attempted, unavailable: attempted }),
+    verification: verificationCounts({ obligationRequired: selectedContracts.includes("test-first-verification"), attempted, unavailable: attempted }),
+    review: { final_gate_required: requiredGates.includes("review-final-merge-gate") },
+    handoff: { executable_state_required: selectedContracts.includes("handoff-generation") },
     stop: { status: stopStatus },
     knowledge: { promotion_requested: event.task_type === "ledger_refresh" },
     outcome: { classification: outcomeForStop(stopStatus), claim_effect: claimEffectForStop(stopStatus) },
@@ -108,15 +111,16 @@ function codexMissingEvidence(report) {
 
 export function mapCodexRunnerResult(report, { eventId = null, taskId = null, occurredAt = null, schemaPath = DEFAULT_SCHEMA_PATH } = {}) {
   const selectedContracts = unique(report.execution_evidence?.requested_contracts?.contracts ?? []);
-  const requiredGates = selectedContracts.filter((contract) => contract.endsWith("-gate"));
+  const requiredGates = unique(report.execution_evidence?.required_gates?.gates ?? []);
   const missingEvidence = codexMissingEvidence(report);
   const appliedLevel = evidenceLevel(report.execution_evidence?.workflow_contract_application?.evidence_level);
   const appliedContracts = appliedLevel === "none" ? [] : selectedContracts;
   const verificationAttempted = report.sensor_status === null || report.sensor_status === undefined ? 0 : 1;
   const verificationPassed = report.sensor_status === "pass" ? 1 : 0;
   const verificationFailed = verificationAttempted - verificationPassed;
+  const applicationEvidenceMissing = missingEvidence.some((item) => /(?:contract_load|contract_application)$/u.test(item));
   const stopStatus = report.status === "executed"
-    ? "completed"
+    ? applicationEvidenceMissing || appliedContracts.length === 0 ? "insufficient_evidence" : "completed"
     : report.status === "insufficient_evidence"
       ? "insufficient_evidence"
       : report.status === "execution_failed"
@@ -136,13 +140,19 @@ export function mapCodexRunnerResult(report, { eventId = null, taskId = null, oc
       missing_evidence: missingEvidence,
     },
     gates: { required: requiredGates, executed: [] },
-    approval: { required: false, status: "unknown", action_categories: [] },
+    approval: {
+      required: requiredGates.includes("risk-gate"),
+      status: requiredGates.includes("risk-gate") ? missingEvidence.includes("specific_action_approval") ? "missing" : "unknown" : "not_required",
+      action_categories: requiredGates.includes("risk-gate") ? ["risk_gated_action"] : [],
+    },
     evidence: {
       checked: unique(Object.entries(report.execution_evidence ?? {}).filter(([, record]) => evidenceLevel(record?.evidence_level) !== "none").map(([name]) => name)),
       missing: missingEvidence,
     },
     agent_activity: { started: 0, completed: 0, failed: 0 },
-    verification: verificationCounts({ attempted: verificationAttempted, passed: verificationPassed, failed: verificationFailed }),
+    verification: verificationCounts({ obligationRequired: selectedContracts.includes("test-first-verification"), attempted: verificationAttempted, passed: verificationPassed, failed: verificationFailed }),
+    review: { final_gate_required: requiredGates.includes("review-final-merge-gate") },
+    handoff: { executable_state_required: selectedContracts.includes("handoff-generation") },
     stop: { status: stopStatus },
     knowledge: { promotion_requested: false },
     outcome: { classification: outcomeForStop(stopStatus), claim_effect: claimEffectForStop(stopStatus) },
@@ -155,6 +165,15 @@ export function mapCodexRunnerResult(report, { eventId = null, taskId = null, oc
 
 export function validateAdapterRuntimeEvent(event, { schemaPath = DEFAULT_SCHEMA_PATH } = {}) {
   const errors = validateJsonSchema(event, { schemaPath });
+  const requiredGates = new Set(event?.gates?.required ?? []);
+  const missingEvidence = new Set([...(event?.contracts?.missing_evidence ?? []), ...(event?.evidence?.missing ?? [])]);
+  const applicationEvidenceMissing = [...missingEvidence].some((item) => /(?:contract_load|contract_application)$/u.test(item));
+  if (requiredGates.has("risk-gate") && event?.approval?.required !== true) errors.push("$.approval.required: risk-gate requires approval.required");
+  if (event?.approval?.required === true && event?.approval?.status !== "approved" && (event?.stop?.status === "completed" || event?.outcome?.classification === "completed" || event?.outcome?.claim_effect === "support_within_scope")) errors.push("$.approval.status: incomplete approval cannot produce completed or support claim");
+  if (event?.outcome?.claim_effect === "support_within_scope" && (event?.contracts?.applied?.length ?? 0) === 0) errors.push("$.outcome.claim_effect: support claim requires an applied contract");
+  if (applicationEvidenceMissing && (event?.stop?.status === "completed" || event?.outcome?.classification === "completed")) errors.push("$.outcome.classification: missing application evidence cannot produce completed");
+  if (missingEvidence.has("specific_action_approval") && event?.approval?.status === "approved") errors.push("$.approval.status: missing approval evidence cannot produce approved");
+  if ((event?.gates?.executed ?? []).some((gate) => !requiredGates.has(gate))) errors.push("$.gates.executed: executed gates must be a subset of required gates");
   for (const [index, downgrade] of (event?.capability_downgrades ?? []).entries()) {
     const fromSupport = SUPPORT_LEVELS.indexOf(downgrade?.from?.support);
     const toSupport = SUPPORT_LEVELS.indexOf(downgrade?.to?.support);

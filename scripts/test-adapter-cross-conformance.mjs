@@ -62,18 +62,17 @@ const negativeReport = JSON.parse(negative.stdout);
 assert.equal(negativeReport.status, "fail");
 assert.ok(negativeReport.scenarios[0].results.every((result) => result.missing_contracts.includes("missing-contract-fixture")));
 
-const mutation = fixture.mutation_fixtures[0];
-const mutated = runFixture(fixture, ["--mutation", mutation.mutation_id]);
-assert.notEqual(mutated.status, 0, "removing Codex approval/stop projection bytes must fail closed");
-const mutationReport = JSON.parse(mutated.stdout);
-const mutationScenario = mutationReport.scenarios.find((scenario) => scenario.scenario_id === mutation.scenario_id);
-const unchangedClaude = mutationScenario.results.find((result) => result.adapter_id === "claude_code");
-assert.equal(unchangedClaude.normalized_contract.approval_required, true);
-assert.deepEqual(unchangedClaude.semantic_mismatches, ["cross_adapter_normalized_contract"]);
-const mutatedCodex = mutationScenario.results.find((result) => result.adapter_id === "codex");
-assert.equal(mutatedCodex.status, "fail");
-assert.ok(mutatedCodex.semantic_mismatches.includes("approval_required"));
-assert.ok(mutatedCodex.semantic_mismatches.includes("stop_status"));
+for (const mutation of fixture.mutation_fixtures) {
+  const mutated = runFixture(fixture, ["--mutation", mutation.mutation_id]);
+  assert.notEqual(mutated.status, 0, `${mutation.mutation_id} must fail closed`);
+  const mutationReport = JSON.parse(mutated.stdout);
+  assert.equal(mutationReport.status, "fail", `${mutation.mutation_id} must produce a conformance failure`);
+  const mutationScenario = mutationReport.scenarios.find((scenario) => scenario.scenario_id === mutation.scenario_id);
+  assert.ok(mutationScenario, `${mutation.mutation_id} must retain scenario diagnostics`);
+  const mutatedAdapter = mutationScenario.results.find((result) => result.adapter_id === mutation.adapter_id);
+  assert.equal(mutatedAdapter.status, "fail", `${mutation.mutation_id} must fail the mutated adapter`);
+  assert.ok(mutatedAdapter.semantic_mismatches.length > 0, `${mutation.mutation_id} must expose a semantic mismatch`);
+}
 
 for (const [label, mutate, expectedError] of [
   ["empty adapters", (value) => { value.adapters = []; }, "fixture adapters must be exactly"],

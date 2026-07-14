@@ -8,8 +8,8 @@
       "task_class": "implementation",
       "required_contracts": ["controlled-implementation", "evidence-ledger"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 } },
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": false, "handoff_executable": false },
       "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md" }, "codex": { "profile": "implementation", "entry": "skill-implement.md" } }
     },
     {
@@ -17,8 +17,8 @@
       "task_class": "implementation",
       "required_contracts": ["controlled-implementation", "test-first-verification", "evidence-ledger"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 } },
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": true, "review_final_gate_required": false, "handoff_required": false },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": true, "review_final_gate": false, "handoff_executable": false },
       "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md" }, "codex": { "profile": "implementation", "entry": "skill-implement.md" } }
     },
     {
@@ -26,8 +26,8 @@
       "task_class": "investigation",
       "required_contracts": ["doubt-driven-development", "test-first-verification", "evidence-ledger"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 } },
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": true, "review_final_gate_required": false, "handoff_required": false },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": true, "review_final_gate": false, "handoff_executable": false },
       "projections": { "claude_code": { "profile": "investigation", "entry": "skill-investigate.md" }, "codex": { "profile": "investigation", "entry": "skill-investigate.md" } }
     },
     {
@@ -35,8 +35,8 @@
       "task_class": "review",
       "required_contracts": ["review-router", "review-final-merge-gate", "evidence-ledger"],
       "required_gates": ["review-router", "review-final-merge-gate"],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 } },
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": true, "handoff_required": false },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": true, "handoff_executable": false },
       "projections": { "claude_code": { "profile": "review", "entry": "skill-review.md" }, "codex": { "profile": "review", "entry": "skill-review.md" } }
     },
     {
@@ -44,8 +44,8 @@
       "task_class": "risk-gated",
       "required_contracts": ["risk-gate", "evidence-ledger"],
       "required_gates": ["risk-gate"],
-      "input": { "risk_action": true, "missing_evidence": ["specific_action_approval"], "knowledge_promotion_requested": false, "agent_activity_required": false },
-      "expected": { "approval_required": true, "stop_status": "risk_gate", "missing_evidence": ["specific_action_approval"], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 } },
+      "input": { "risk_action": true, "missing_evidence": ["specific_action_approval"], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false },
+      "expected": { "approval_required": true, "stop_status": "risk_gate", "missing_evidence": ["specific_action_approval"], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": false, "handoff_executable": false },
       "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md" }, "codex": { "profile": "implementation", "entry": "skill-implement.md" } }
     },
     {
@@ -53,8 +53,8 @@
       "task_class": "review",
       "required_contracts": ["review-router", "evidence-ledger"],
       "required_gates": ["review-router"],
-      "input": { "risk_action": false, "missing_evidence": ["repository", "diff", "verification"], "knowledge_promotion_requested": false, "agent_activity_required": false },
-      "expected": { "approval_required": false, "stop_status": "insufficient_evidence", "missing_evidence": ["diff", "repository", "verification"], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 } },
+      "input": { "risk_action": false, "missing_evidence": ["repository", "diff", "verification"], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false },
+      "expected": { "approval_required": false, "stop_status": "insufficient_evidence", "missing_evidence": ["diff", "repository", "verification"], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": false, "handoff_executable": false },
       "projections": { "claude_code": { "profile": "review", "entry": "skill-review.md" }, "codex": { "profile": "review", "entry": "skill-review.md" } }
     },
     {
@@ -62,8 +62,8 @@
       "task_class": "handoff",
       "required_contracts": ["handoff-generation", "evidence-ledger"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 } },
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": true },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": false, "handoff_executable": true },
       "projections": { "claude_code": { "profile": "implementation", "entry": "skill-handoff.md" }, "codex": { "profile": "implementation", "entry": "skill-handoff.md" } }
     },
     {
@@ -71,17 +71,17 @@
       "task_class": "knowledge",
       "required_contracts": ["operating-mode-router", "domain-rule-ledger", "evidence-ledger"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": true, "agent_activity_required": false },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": true, "agent_activity": { "started": 0, "completed": 0, "failed": 0 } },
-      "projections": { "claude_code": { "profile": "organizational", "entry": "skill-implement.md" }, "codex": { "profile": "organizational", "entry": "skill-implement.md" } }
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": true, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": true, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": false, "handoff_executable": false },
+      "projections": { "claude_code": { "profile": "organizational", "entry": "skill-ledger-refresh.md" }, "codex": { "profile": "organizational", "entry": "skill-implement.md" } }
     },
     {
       "scenario_id": "lightweight_no_heavy_routing_or_agents",
       "task_class": "implementation",
       "required_contracts": ["controlled-implementation", "evidence-ledger"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 } },
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": false, "handoff_executable": false },
       "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md" }, "codex": { "profile": "implementation", "entry": "skill-implement.md" } }
     }
   ],
@@ -91,6 +91,34 @@
       "scenario_id": "destructive_external_action",
       "adapter_id": "codex",
       "remove": ["Stop without approval for that specific action; execute only it."],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "codex_remove_verification_obligation",
+      "scenario_id": "new_behavior_with_verification",
+      "adapter_id": "codex",
+      "remove": ["- [verification] Before behavior change: contract; focused then risk-based checks; exact results."],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "claude_remove_review_final_gate",
+      "scenario_id": "pr_review_selective_gates",
+      "adapter_id": "claude_code",
+      "remove": ["/review-final-merge-gate"],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "claude_remove_executable_handoff",
+      "scenario_id": "handoff_resume_state",
+      "adapter_id": "claude_code",
+      "remove": ["The handoff must be executable, not a generic summary."],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "codex_remove_knowledge_promotion",
+      "scenario_id": "explicit_knowledge_promotion",
+      "adapter_id": "codex",
+      "remove": ["[knowledge_promotion] Explicit request => operating-mode-router then domain-rule-ledger."],
       "expected_status": "fail"
     }
   ]

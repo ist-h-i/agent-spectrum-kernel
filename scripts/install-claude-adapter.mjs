@@ -118,7 +118,7 @@ const COMMAND_METADATA = {
     ],
   },
   "skill-ledger-refresh.md": {
-    requiredSkills: ["improvement-ledger", "evidence-ledger"],
+    requiredSkills: ["operating-mode-router", "domain-rule-ledger", "improvement-ledger", "evidence-ledger"],
     requiredAssets: [
       "docs/debt-lifecycle-contract.md",
       "docs/metrics-event-contract.md",

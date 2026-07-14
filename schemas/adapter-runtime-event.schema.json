@@ -5,7 +5,7 @@
   "description": "Adapter-neutral event meaning for selected/applied contracts, gates, approval, evidence, agent activity, verification, stop classification, and capability downgrade. An event records evidence; it does not upgrade an engineering claim.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "event_id", "task_id", "adapter_id", "event_type", "occurred_at", "contracts", "gates", "approval", "evidence", "agent_activity", "verification", "stop", "knowledge", "outcome", "capability_downgrades", "privacy"],
+  "required": ["schema_version", "event_id", "task_id", "adapter_id", "event_type", "occurred_at", "contracts", "gates", "approval", "evidence", "agent_activity", "verification", "review", "handoff", "stop", "knowledge", "outcome", "capability_downgrades", "privacy"],
   "properties": {
     "schema_version": { "type": "string", "const": "1.0.0" },
     "event_id": { "type": "string", "minLength": 1, "maxLength": 200 },
@@ -68,12 +68,29 @@
     "verification": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["attempted", "passed", "failed", "unavailable"],
+      "required": ["obligation_required", "attempted", "passed", "failed", "unavailable"],
       "properties": {
+        "obligation_required": { "type": "boolean" },
         "attempted": { "type": "integer", "minimum": 0 },
         "passed": { "type": "integer", "minimum": 0 },
         "failed": { "type": "integer", "minimum": 0 },
         "unavailable": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["final_gate_required"],
+      "properties": {
+        "final_gate_required": { "type": "boolean" }
+      }
+    },
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executable_state_required"],
+      "properties": {
+        "executable_state_required": { "type": "boolean" }
       }
     },
     "stop": {

@@ -4,6 +4,8 @@ description: Investigate a bug, regression, performance issue, or unknown root c
 
 Use the installed project skills from this repository projection.
 
+Use `/evidence-ledger` for every correctness, readiness, or causal claim.
+
 Start with `/skill-router`, then use `/doubt-driven-development` for root-cause work. Define a Verification Contract with `/test-first-verification` before or alongside the fix path.
 
 Investigation requirements:

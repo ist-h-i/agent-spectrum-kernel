@@ -4006,7 +4006,9 @@ EOF
     jsonReport.execution_evidence?.risk_approval_contract_application?.evidence_level !== "none" ||
     jsonReport.execution_evidence?.verification_contract_application?.evidence_level !== "none" ||
     jsonReport.normalized_adapter_event?.adapter_id !== "codex" ||
-    jsonReport.normalized_adapter_event?.stop?.status !== "completed" ||
+    jsonReport.normalized_adapter_event?.stop?.status !== "insufficient_evidence" ||
+    jsonReport.normalized_adapter_event?.outcome?.claim_effect !== "downgrade" ||
+    jsonReport.normalized_adapter_event?.contracts?.applied?.length !== 0 ||
     jsonReport.normalized_adapter_event?.verification?.passed !== 1 ||
     Object.hasOwn(jsonReport.execution_evidence ?? {}, "applied")
   ) {

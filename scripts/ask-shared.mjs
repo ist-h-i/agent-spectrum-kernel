@@ -210,7 +210,16 @@ export function parseCodexCompactProfileHeader(content) {
   const match = content.match(/^<!-- ASK_CODEX_COMPACT_PROFILE (\{[^\n]+\}) -->/u);
   if (!match) return null;
   try {
-    return JSON.parse(match[1]);
+    const parsed = JSON.parse(match[1]);
+    return {
+      v: parsed.v,
+      id: parsed.id,
+      revision: parsed.r,
+      source_digest: typeof parsed.s === "string" ? `sha256:${parsed.s}` : null,
+      profile_fingerprint: typeof parsed.p === "string" ? `sha256:${parsed.p}` : null,
+      requested_contracts: typeof parsed.rc === "string" ? parsed.rc.split(",").filter(Boolean) : [],
+      control_ids: typeof parsed.ci === "string" ? parsed.ci.split(",").filter(Boolean) : [],
+    };
   } catch {
     return null;
   }

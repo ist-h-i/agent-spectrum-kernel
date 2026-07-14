@@ -30,6 +30,12 @@ assert.equal(claudeNormalized.approval.status, "missing");
 assert.equal(claudeNormalized.stop.status, "risk_gate");
 assert.deepEqual(claudeNormalized.agent_activity, { started: 0, completed: 0, failed: 0 });
 
+const claudeExecutedGateEvent = structuredClone(claudeMetricsEvent);
+claudeExecutedGateEvent.gate_decisions = [{ gate: "risk-gate", status: "executed", missing_inputs: ["specific_action_approval"] }];
+const claudeExecutedGate = mapClaudeMetricsEvent(claudeExecutedGateEvent, { eventKind: "task_stop", hookEvent: "Stop" });
+assert.notEqual(claudeExecutedGate.approval.status, "approved", "gate execution is not explicit human approval evidence");
+assert.equal(claudeExecutedGate.stop.status, "risk_gate");
+
 const codexRunnerResult = {
   status: "executed",
   evidence_level: "executed",
@@ -54,8 +60,10 @@ const codexNormalized = mapCodexRunnerResult(codexRunnerResult, {
 });
 assert.deepEqual(validateAdapterRuntimeEvent(codexNormalized), []);
 assert.equal(codexNormalized.adapter_id, "codex");
-assert.deepEqual(codexNormalized.verification, { attempted: 1, passed: 1, failed: 0, unavailable: 0 });
-assert.equal(codexNormalized.stop.status, "completed");
+assert.deepEqual(codexNormalized.verification, { obligation_required: false, attempted: 1, passed: 1, failed: 0, unavailable: 0 });
+assert.equal(codexNormalized.stop.status, "insufficient_evidence");
+assert.equal(codexNormalized.outcome.classification, "insufficient_evidence");
+assert.notEqual(codexNormalized.outcome.claim_effect, "support_within_scope");
 
 const missingStop = structuredClone(codexNormalized);
 delete missingStop.stop;
@@ -79,5 +87,44 @@ invalidUpgrade.capability_downgrades[0] = {
 const upgradeErrors = validateAdapterRuntimeEvent(invalidUpgrade);
 assert.ok(upgradeErrors.some((error) => error.includes("cannot increase support")));
 assert.ok(upgradeErrors.some((error) => error.includes("cannot increase evidence")));
+
+const semanticBase = structuredClone(codexNormalized);
+semanticBase.contracts.missing_evidence = [];
+semanticBase.evidence.missing = [];
+
+const riskGateWithoutApproval = structuredClone(semanticBase);
+riskGateWithoutApproval.gates.required = ["risk-gate"];
+riskGateWithoutApproval.approval = { required: false, status: "not_required", action_categories: [] };
+assert.ok(validateAdapterRuntimeEvent(riskGateWithoutApproval).some((error) => error.includes("risk-gate requires approval.required")));
+
+const supportWithoutAppliedContract = structuredClone(semanticBase);
+supportWithoutAppliedContract.contracts.applied = [];
+supportWithoutAppliedContract.outcome.claim_effect = "support_within_scope";
+assert.ok(validateAdapterRuntimeEvent(supportWithoutAppliedContract).some((error) => error.includes("support claim requires an applied contract")));
+
+const completedWithMissingApplication = structuredClone(semanticBase);
+completedWithMissingApplication.contracts.missing_evidence = ["workflow_contract_application"];
+completedWithMissingApplication.evidence.missing = ["workflow_contract_application"];
+completedWithMissingApplication.stop.status = "completed";
+completedWithMissingApplication.outcome = { classification: "completed", claim_effect: "none" };
+assert.ok(validateAdapterRuntimeEvent(completedWithMissingApplication).some((error) => error.includes("missing application evidence cannot produce completed")));
+
+const approvedWithMissingApproval = structuredClone(semanticBase);
+approvedWithMissingApproval.contracts.missing_evidence = ["specific_action_approval"];
+approvedWithMissingApproval.evidence.missing = ["specific_action_approval"];
+approvedWithMissingApproval.approval = { required: true, status: "approved", action_categories: ["risk_gated_action"] };
+assert.ok(validateAdapterRuntimeEvent(approvedWithMissingApproval).some((error) => error.includes("missing approval evidence cannot produce approved")));
+
+const completedWithoutApproval = structuredClone(semanticBase);
+completedWithoutApproval.gates.required = ["risk-gate"];
+completedWithoutApproval.approval = { required: true, status: "unknown", action_categories: ["risk_gated_action"] };
+completedWithoutApproval.stop.status = "completed";
+completedWithoutApproval.outcome = { classification: "completed", claim_effect: "support_within_scope" };
+completedWithoutApproval.contracts.applied = ["risk-gate"];
+assert.ok(validateAdapterRuntimeEvent(completedWithoutApproval).some((error) => error.includes("incomplete approval cannot produce completed")));
+
+const unrequiredExecutedGate = structuredClone(semanticBase);
+unrequiredExecutedGate.gates = { required: [], executed: ["risk-gate"] };
+assert.ok(validateAdapterRuntimeEvent(unrequiredExecutedGate).some((error) => error.includes("executed gates must be a subset of required gates")));
 
 console.log("Normalized adapter runtime event tests passed");

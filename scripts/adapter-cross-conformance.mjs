@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { validateAdapterRuntimeEvent } from "./adapter-runtime-event.mjs";
+import { parseCodexCompactProfileHeader } from "./ask-shared.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const defaultFixture = resolve(root, "docs/fixtures/adapter-cross-conformance.json");
@@ -89,11 +90,12 @@ function validateFixture(fixture) {
     identifiers(scenario.required_gates, `${scenario.scenario_id}.required_gates`);
     if (!includesAll(scenario.required_contracts, requirement.contracts)) throw new Error(`${scenario.scenario_id} is missing required contract minimums`);
     if (!includesAll(scenario.required_gates, requirement.gates)) throw new Error(`${scenario.scenario_id} is missing required gate minimums`);
-    exactKeys(scenario.input, ["risk_action", "missing_evidence", "knowledge_promotion_requested", "agent_activity_required"], `${scenario.scenario_id}.input`);
-    if (typeof scenario.input.risk_action !== "boolean" || typeof scenario.input.knowledge_promotion_requested !== "boolean" || typeof scenario.input.agent_activity_required !== "boolean") throw new Error(`${scenario.scenario_id} input flags must be booleans`);
+    exactKeys(scenario.input, ["risk_action", "missing_evidence", "knowledge_promotion_requested", "agent_activity_required", "verification_required", "review_final_gate_required", "handoff_required"], `${scenario.scenario_id}.input`);
+    for (const flag of ["risk_action", "knowledge_promotion_requested", "agent_activity_required", "verification_required", "review_final_gate_required", "handoff_required"]) if (typeof scenario.input[flag] !== "boolean") throw new Error(`${scenario.scenario_id}.${flag} must be boolean`);
     identifiers(scenario.input.missing_evidence, `${scenario.scenario_id}.input.missing_evidence`);
-    exactKeys(scenario.expected, ["approval_required", "stop_status", "missing_evidence", "knowledge_promotion", "agent_activity"], `${scenario.scenario_id}.expected`);
-    if (typeof scenario.expected.approval_required !== "boolean" || typeof scenario.expected.knowledge_promotion !== "boolean" || !STOP_STATUSES.has(scenario.expected.stop_status)) throw new Error(`${scenario.scenario_id} expected values have invalid types or enums`);
+    exactKeys(scenario.expected, ["approval_required", "stop_status", "missing_evidence", "knowledge_promotion", "agent_activity", "verification_obligation", "review_final_gate", "handoff_executable"], `${scenario.scenario_id}.expected`);
+    for (const flag of ["approval_required", "knowledge_promotion", "verification_obligation", "review_final_gate", "handoff_executable"]) if (typeof scenario.expected[flag] !== "boolean") throw new Error(`${scenario.scenario_id}.${flag} must be boolean`);
+    if (!STOP_STATUSES.has(scenario.expected.stop_status)) throw new Error(`${scenario.scenario_id}.stop_status has an invalid enum`);
     identifiers(scenario.expected.missing_evidence, `${scenario.scenario_id}.expected.missing_evidence`);
     nonNegativeCounters(scenario.expected.agent_activity, `${scenario.scenario_id}.expected.agent_activity`);
     exactKeys(scenario.projections, ADAPTERS, `${scenario.scenario_id}.projections`);
@@ -132,13 +134,26 @@ function mutateBytes(content, mutation, adapterId, scenarioId) {
   return mutated;
 }
 
-function projectionSemantics(content) {
+function projectionSemantics(adapterId, content) {
   const lines = content.split(/\r?\n/);
+  const header = adapterId === "codex" ? parseCodexCompactProfileHeader(content) : null;
+  const canonicalReferences = adapterId === "codex"
+    ? header?.requested_contracts ?? []
+    : [...content.matchAll(/(?:^|[\s`])\/([a-z][a-z0-9-]*)/gmu)].map((match) => match[1]);
+  const contracts = [...new Set(canonicalReferences)].sort();
+  const controlIds = adapterId === "codex" ? header?.control_ids ?? [] : [];
   return {
+    contracts,
+    controlIds,
     approvalSpecificAction: /approval for (?:that|the) specific action|specific-action approval/iu.test(content),
     stopWithoutApproval: /stop without (?:that )?approval|stop without approval for that specific action/iu.test(content),
-    missingEvidenceStop: lines.some((line) => /required evidence is missing.*insufficient_evidence.*stop/iu.test(line) || /\[missing_evidence\].*stop if required/iu.test(line)),
+    missingEvidenceStop: lines.some((line) => /required evidence is missing.*insufficient_evidence.*stop/iu.test(line) || /\[missing_evidence\].*(?:stop if required|required => stop)/iu.test(line)),
     noImplicitAgentActivity: /do not start or delegate agents unless the request explicitly requires agent activity|\[agent_activity\] opt-in; S\/C\/F counts/iu.test(content),
+    verificationObligation: contracts.includes("test-first-verification")
+      && (adapterId === "claude_code" ? /Verification Contract|verify the observable behavior/iu.test(content) : controlIds.includes("verification") && /\[verification\].*behavior change.*exact results/iu.test(content)),
+    reviewFinalGate: contracts.includes("review-final-merge-gate") && /final.merge.gate|Decision:/iu.test(content),
+    handoffExecutable: contracts.includes("handoff-generation") && /handoff must be executable|\[handoff\] executable state/iu.test(content),
+    knowledgePromotion: contracts.includes("operating-mode-router") && contracts.includes("domain-rule-ledger") && /explicit knowledge.promotion|\[knowledge_promotion\]/iu.test(content),
   };
 }
 
@@ -150,6 +165,9 @@ function expectedContract(scenario) {
     stop_status: scenario.expected.stop_status,
     missing_evidence: [...scenario.expected.missing_evidence].sort(),
     knowledge_promotion: scenario.expected.knowledge_promotion,
+    verification_obligation: scenario.expected.verification_obligation,
+    review_final_gate: scenario.expected.review_final_gate,
+    handoff_executable: scenario.expected.handoff_executable,
     agent_activity: scenario.expected.agent_activity,
   };
 }
@@ -162,6 +180,9 @@ function normalizedContract(event) {
     stop_status: event.stop.status,
     missing_evidence: event.evidence.missing,
     knowledge_promotion: event.knowledge.promotion_requested,
+    verification_obligation: event.verification.obligation_required,
+    review_final_gate: event.review.final_gate_required,
+    handoff_executable: event.handoff.executable_state_required,
     agent_activity: event.agent_activity,
   };
 }
@@ -170,10 +191,10 @@ function mismatchFields(actual, expected) {
   return Object.keys(expected).filter((key) => JSON.stringify(actual[key]) !== JSON.stringify(expected[key]));
 }
 
-function deriveProjectedEvent({ adapterId, scenario, availableContracts, content }) {
-  const semantics = projectionSemantics(content);
-  const selectedContracts = scenario.required_contracts.filter((contract) => availableContracts.has(contract)).sort();
-  const requiredGates = scenario.required_gates.filter((gate) => availableContracts.has(gate)).sort();
+function deriveProjectedEvent({ adapterId, scenario, content }) {
+  const semantics = projectionSemantics(adapterId, content);
+  const selectedContracts = scenario.required_contracts.filter((contract) => semantics.contracts.includes(contract)).sort();
+  const requiredGates = scenario.required_gates.filter((gate) => semantics.contracts.includes(gate)).sort();
   const approvalRequired = scenario.input.risk_action && semantics.approvalSpecificAction && semantics.stopWithoutApproval;
   const missingEvidence = scenario.input.risk_action
     ? approvalRequired ? [...scenario.input.missing_evidence].sort() : []
@@ -184,8 +205,7 @@ function deriveProjectedEvent({ adapterId, scenario, availableContracts, content
     ? approvalRequired ? "risk_gate" : "none"
     : missingEvidence.length > 0 ? "insufficient_evidence" : "none";
   const knowledgePromotion = scenario.input.knowledge_promotion_requested
-    && availableContracts.has("operating-mode-router")
-    && availableContracts.has("domain-rule-ledger");
+    && semantics.knowledgePromotion;
   const agentActivity = scenario.input.agent_activity_required
     ? { started: 1, completed: 1, failed: 0 }
     : semantics.noImplicitAgentActivity
@@ -204,7 +224,9 @@ function deriveProjectedEvent({ adapterId, scenario, availableContracts, content
     approval: { required: approvalRequired, status: approvalRequired ? "missing" : "not_required", action_categories: approvalRequired ? ["risk_gated_action"] : [] },
     evidence: { checked: [`projection_bytes:sha256:${digest}`], missing: missingEvidence },
     agent_activity: agentActivity,
-    verification: { attempted: 0, passed: 0, failed: 0, unavailable: 0 },
+    verification: { obligation_required: scenario.input.verification_required && semantics.verificationObligation, attempted: 0, passed: 0, failed: 0, unavailable: 0 },
+    review: { final_gate_required: scenario.input.review_final_gate_required && semantics.reviewFinalGate },
+    handoff: { executable_state_required: scenario.input.handoff_required && semantics.handoffExecutable },
     stop: { status: stopStatus },
     knowledge: { promotion_requested: knowledgePromotion },
     outcome: { classification: stopStatus === "none" ? "in_progress" : stopStatus, claim_effect: stopStatus === "none" ? "none" : stopStatus === "insufficient_evidence" ? "downgrade" : "block" },
@@ -225,7 +247,7 @@ export function evaluateAdapterCrossConformance(fixture, { mutation = null } = {
       const entries = selectedEntries(adapterId, plan);
       const missingEntry = !entries.includes(projection.entry) ? projection.entry : null;
       const content = mutateBytes(projectionBytes(adapterId, plan, projection.entry), mutation, adapterId, scenario.scenario_id);
-      const normalizedEvent = deriveProjectedEvent({ adapterId, scenario, availableContracts, content });
+      const normalizedEvent = deriveProjectedEvent({ adapterId, scenario, content });
       const schemaErrors = validateAdapterRuntimeEvent(normalizedEvent);
       const contract = normalizedContract(normalizedEvent);
       const semanticMismatches = mismatchFields(contract, expected);
