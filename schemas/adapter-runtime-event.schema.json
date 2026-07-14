@@ -5,12 +5,12 @@
   "description": "Adapter-neutral event meaning for selected/applied contracts, gates, approval, evidence, agent activity, verification, stop classification, and capability downgrade. An event records evidence; it does not upgrade an engineering claim.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "event_id", "task_id", "adapter_id", "event_type", "occurred_at", "contracts", "gates", "approval", "evidence", "verification", "outcome", "capability_downgrades", "privacy"],
+  "required": ["schema_version", "event_id", "task_id", "adapter_id", "event_type", "occurred_at", "contracts", "gates", "approval", "evidence", "agent_activity", "verification", "stop", "knowledge", "outcome", "capability_downgrades", "privacy"],
   "properties": {
     "schema_version": { "type": "string", "const": "1.0.0" },
     "event_id": { "type": "string", "minLength": 1, "maxLength": 200 },
     "task_id": { "type": "string", "minLength": 1, "maxLength": 200 },
-    "adapter_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "adapter_id": { "type": "string", "enum": ["claude_code", "codex"] },
     "event_type": {
       "type": "string",
       "enum": ["workflow_selection", "gate_execution", "approval_required", "evidence_status", "agent_activity", "verification_attempt", "task_stop", "capability_downgrade"]
@@ -76,6 +76,22 @@
         "unavailable": { "type": "integer", "minimum": 0 }
       }
     },
+    "stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "type": "string", "enum": ["none", "completed", "risk_gate", "insufficient_evidence", "capability_missing", "blocked", "failed", "unknown"] }
+      }
+    },
+    "knowledge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["promotion_requested"],
+      "properties": {
+        "promotion_requested": { "type": "boolean" }
+      }
+    },
     "outcome": {
       "type": "object",
       "additionalProperties": false,
@@ -92,11 +108,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["capability_id", "from_level", "to_level", "reason"],
+        "required": ["capability_id", "from", "to", "reason"],
         "properties": {
           "capability_id": { "type": "string", "minLength": 1, "maxLength": 120 },
-          "from_level": { "$ref": "#/$defs/evidence_level" },
-          "to_level": { "$ref": "#/$defs/evidence_level" },
+          "from": { "$ref": "#/$defs/capability_state" },
+          "to": { "$ref": "#/$defs/capability_state" },
           "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
         }
       }
@@ -122,6 +138,15 @@
     "evidence_level": {
       "type": "string",
       "enum": ["none", "projected", "runtime_detected", "executed", "behavior_verified"]
+    },
+    "capability_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["support", "evidence_level"],
+      "properties": {
+        "support": { "type": "string", "enum": ["supported", "partial", "unsupported", "unknown"] },
+        "evidence_level": { "$ref": "#/$defs/evidence_level" }
+      }
     }
   }
 }

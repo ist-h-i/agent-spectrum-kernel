@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
+import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
 
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const DEFAULT_OUTPUT = ".agents/runs/codex-last-output.md";
@@ -15,8 +16,10 @@ const MANAGED_CODEX_RUNTIME_FILES = [
   "ask-sensors.mjs",
   "ask-shared.mjs",
   "execution-envelope.mjs",
+  "adapter-runtime-event.mjs",
   "execution-envelope.schema.json",
   "metrics-event.schema.json",
+  "adapter-runtime-event.schema.json",
 ];
 
 function hashText(value) { return createHash("sha256").update(value).digest("hex"); }
@@ -431,6 +434,10 @@ try {
     warnings: preflightResult.warnings,
     boundary: "File projection and ask-sensors output checks do not prove business correctness, product readiness, or no regression.",
   };
+  const normalizedEventSchemaPath = resolve(args.target, "scripts/adapter-runtime-event.schema.json");
+  report.normalized_adapter_event = existsSync(normalizedEventSchemaPath)
+    ? mapCodexRunnerResult(report, { schemaPath: normalizedEventSchemaPath })
+    : null;
   printResult(report, args.json);
   process.exit(normalized.status === "executed" ? 0 : normalized.status === "execution_failed" ? 1 : 2);
 } catch (error) {

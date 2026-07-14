@@ -8,6 +8,9 @@ Start with `/skill-router`, then use `/doubt-driven-development` for root-cause 
 
 Investigation requirements:
 
+- require approval for the specific action and stop without that approval before any risk-gated action
+- when required evidence is missing, report `insufficient_evidence` and stop; do not infer the missing result
+- do not start or delegate agents unless the request explicitly requires agent activity; report started, completed, and failed counts
 - reproduce or falsify the reported behavior when feasible
 - separate verified facts, supported evidence, hypotheses, unknowns, and falsified ideas
 - inspect the relevant repo code, tests, docs, scripts, and logs before changing behavior

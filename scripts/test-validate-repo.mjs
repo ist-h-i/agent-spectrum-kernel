@@ -19,6 +19,7 @@ const codexRunnerScript = resolve(repoRoot, "scripts/codex-exec-runner.mjs");
 const codexCompactProfileTestScript = resolve(repoRoot, "scripts/test-codex-runtime-profile.mjs");
 const crossAdapterConformanceTestScript = resolve(repoRoot, "scripts/test-adapter-cross-conformance.mjs");
 const adapterMigrationTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-migration.mjs");
+const adapterRuntimeEventTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-event.mjs");
 const fixtureRoot = mkdtempSync(resolve(tmpdir(), "validate-repo-"));
 
 const compactProfileResult = spawnSync(process.execPath, [codexCompactProfileTestScript], { cwd: repoRoot, encoding: "utf8" });
@@ -27,6 +28,7 @@ if (compactProfileResult.status !== 0) {
 }
 
 for (const [label, script] of [
+  ["Normalized adapter runtime event", adapterRuntimeEventTestScript],
   ["Cross-adapter conformance", crossAdapterConformanceTestScript],
   ["Dual-runtime migration", adapterMigrationTestScript],
 ]) {
@@ -508,7 +510,7 @@ const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const DEFAULT_PROFILE = "implementation";
 const PROMPT_TEMPLATES = ["skill-implement.md"];
 const COMMAND_TEMPLATES = ["codex-exec.md"];
-const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs", "execution-envelope.mjs", "execution-envelope.schema.json", "metrics-event.schema.json"];
+const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs", "execution-envelope.mjs", "adapter-runtime-event.mjs", "execution-envelope.schema.json", "metrics-event.schema.json", "adapter-runtime-event.schema.json"];
 const CODEX_PROFILES = { implementation: { skills: ["operating-mode-router"], prompts: PROMPT_TEMPLATES, commands: COMMAND_TEMPLATES } };
 const PROFILE_ROUTING_FIXTURES = { implementation: [{ id: "unfamiliar_repository", selected_route: "repository-orientation", required_skills: ["repository-orientation"] }] };
 const SKILL_RELATIONSHIPS = { "controlled-implementation": { requires: ["test-first-verification"], recommends: ["evidence-ledger"], incompatibleWith: [] } };
@@ -550,9 +552,11 @@ function install(manifest, options) {
   );
   writeFileSync(resolve(root, "scripts/adapter-runtime-smoke.mjs"), "console.log('adapter runtime smoke');\n");
   writeFileSync(resolve(root, "scripts/adapter-runtime-bundle.mjs"), "console.log('adapter runtime bundle');\n");
+  writeFileSync(resolve(root, "scripts/adapter-runtime-event.mjs"), "console.log('adapter runtime event mapper');\n");
   writeFileSync(resolve(root, "scripts/adapter-cross-conformance.mjs"), "console.log('adapter cross conformance');\n");
   writeFileSync(resolve(root, "scripts/test-adapter-cross-conformance.mjs"), "console.log('adapter cross conformance tests');\n");
   writeFileSync(resolve(root, "scripts/test-adapter-runtime-migration.mjs"), "console.log('adapter runtime migration tests');\n");
+  writeFileSync(resolve(root, "scripts/test-adapter-runtime-event.mjs"), "console.log('adapter runtime event tests');\n");
   writeFileSync(resolve(root, "scripts/adapter-runtime-inventory.mjs"), "export const CODEX_RUNTIME_FILES = [{ name: 'codex-exec-runner.mjs' }];\n");
   writeFileSync(resolve(root, "scripts/codex-runtime-profile.mjs"), "console.log('codex compact profile');\n");
   writeFileSync(resolve(root, "scripts/codex-exec-runner.mjs"), "console.log('codex runner');\n");
@@ -3325,7 +3329,7 @@ function assertCodexInstallerScripts() {
   assertRuntimePass("Codex option provenance skip command", runRepoScript([installer, "--target", codexOptionTarget, "--profile", "implementation", "--skip-command"]));
   const codexSkipCommandState = readCodexInstallState(codexOptionTarget);
   const skipCommandInputs = [...(codexSkipCommandState.projection_plan?.renderer_inputs?.canonical ?? []), ...(codexSkipCommandState.projection_plan?.renderer_inputs?.adapter_owned ?? [])];
-  const runtimeSourcePaths = new Set(CODEX_RUNTIME_FILES.map((file) => file.source));
+  const runtimeSourcePaths = new Set(CODEX_RUNTIME_FILES.filter((file) => file.assetKind !== "schemas").map((file) => file.source));
   if (
     skipCommandInputs.some((input) => input.role === "command_template") ||
     skipCommandInputs.some((input) => runtimeSourcePaths.has(input.path)) ||
@@ -4001,6 +4005,9 @@ EOF
     jsonReport.execution_evidence?.workflow_contract_application?.evidence_level !== "none" ||
     jsonReport.execution_evidence?.risk_approval_contract_application?.evidence_level !== "none" ||
     jsonReport.execution_evidence?.verification_contract_application?.evidence_level !== "none" ||
+    jsonReport.normalized_adapter_event?.adapter_id !== "codex" ||
+    jsonReport.normalized_adapter_event?.stop?.status !== "completed" ||
+    jsonReport.normalized_adapter_event?.verification?.passed !== 1 ||
     Object.hasOwn(jsonReport.execution_evidence ?? {}, "applied")
   ) {
     throw new Error(`codex runner structured evidence stages are invalid\n${jsonResult.stdout}`);
@@ -4222,11 +4229,15 @@ EOF
 
   const originalRunnerRuntime = readFileSync(targetRunnerScript, "utf8");
   const originalSharedRuntime = readFileSync(resolve(target, "scripts/ask-shared.mjs"), "utf8");
+  const originalAdapterEventRuntime = readFileSync(resolve(target, "scripts/adapter-runtime-event.mjs"), "utf8");
+  const originalEnvelopeRuntime = readFileSync(resolve(target, "scripts/execution-envelope.mjs"), "utf8");
   const outsideRuntimeDir = resolve(fixtureRoot, "outside-codex-runtime", "scripts");
   mkdirSync(outsideRuntimeDir, { recursive: true });
   const outsideRunnerPath = resolve(outsideRuntimeDir, "codex-exec-runner.mjs");
   writeFileSync(outsideRunnerPath, originalRunnerRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "ask-shared.mjs"), originalSharedRuntime);
+  writeFileSync(resolve(outsideRuntimeDir, "adapter-runtime-event.mjs"), originalAdapterEventRuntime);
+  writeFileSync(resolve(outsideRuntimeDir, "execution-envelope.mjs"), originalEnvelopeRuntime);
   rmSync(targetRunnerScript);
   symlinkSync(outsideRunnerPath, targetRunnerScript);
   const symlinkRunnerResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
@@ -5241,6 +5252,14 @@ try {
   const missingSchemaRoot = cloneFixture("missing-schema");
   rmSync(resolve(missingSchemaRoot, "schemas/metrics-event.schema.json"));
   assertFail("missing required schema", missingSchemaRoot, "required schema is missing");
+
+  const missingAdapterEventSchemaRoot = cloneFixture("missing-adapter-event-schema");
+  rmSync(resolve(missingAdapterEventSchemaRoot, "schemas/adapter-runtime-event.schema.json"));
+  assertFail("missing normalized adapter event schema", missingAdapterEventSchemaRoot, "required schema is missing");
+
+  const missingAdapterEventMapperRoot = cloneFixture("missing-adapter-event-mapper");
+  rmSync(resolve(missingAdapterEventMapperRoot, "scripts/adapter-runtime-event.mjs"));
+  assertFail("missing normalized adapter event mapper", missingAdapterEventMapperRoot, "required adapter runtime path is missing");
 
   const operationSkillRoot = cloneFixture("operation-skill");
   mkdirSync(resolve(operationSkillRoot, "skills/operation-automation"), { recursive: true });

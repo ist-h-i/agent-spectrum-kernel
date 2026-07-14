@@ -8,6 +8,8 @@ Entry mode: handoff. Primary contract: `handoff-generation`. Stay read-only unle
 
 {{ASK_COMPACT_DIRECT_TRIGGERS}}
 
+[agent_activity] opt-in; S/C/F counts.
+
 Task:
 Context:
 Allowed scope:

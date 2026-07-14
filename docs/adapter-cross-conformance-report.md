@@ -4,7 +4,7 @@ Evidence date: 2026-07-14 JST
 
 ## Decision
 
-Claude Code and Codex pass the same nine fixtures at the `projected` evidence level. The fixtures confirm deterministic entry and required-contract coverage with the same normalized risk, evidence, approval, verification, stop, handoff, and knowledge-promotion meaning. They do not establish external runtime loading or behavioral conformance.
+Claude Code and Codex pass the same nine fixtures at the `projected` evidence level. Each result is derived independently from that Adapter's generated command or prompt bytes and is validated against `schemas/adapter-runtime-event.schema.json` before comparison. The fixtures confirm deterministic entry and required-contract coverage with the same normalized risk, evidence, approval, verification, stop, handoff, knowledge-promotion, and projected agent-activity meaning. They do not establish external runtime loading or behavioral conformance.
 
 ## Fixture result
 
@@ -22,6 +22,8 @@ Claude Code and Codex pass the same nine fixtures at the `projected` evidence le
 
 Command: `node scripts/test-adapter-cross-conformance.mjs`
 
+The same command also runs fail-closed cases for empty Adapter sets, substituted scenario IDs, missing expected values, schema-reference drift, missing contract minimums, and a mutation that removes the Codex specific-action approval/stop control.
+
 ## Cost and over-processing
 
 | Measure | Evidence |
@@ -30,7 +32,7 @@ Command: `node scripts/test-adapter-cross-conformance.mjs`
 | Codex compact prompt bytes / route depth | Behaviorally verified by `scripts/test-codex-runtime-profile.mjs`; this is a proxy, not token or latency evidence. |
 | Claude/Codex latency | Unknown; no paired external runtime run is captured. |
 | Token/cost difference | Unknown; no paired external runtime run is captured. |
-| Agent/subagent overuse | Unknown at runtime. Fixtures encode no-agent expectations where no material trigger exists. |
+| Agent/subagent overuse | Unknown at runtime. Generated projection bytes explicitly prohibit implicit agent activity and the fixtures verify zero projected counters where no trigger exists. |
 | Senior correction effort | Unknown; requires Checkpoint C human/automated evaluation. |
 
 ## Residual evidence gap

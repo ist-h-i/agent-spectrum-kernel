@@ -166,6 +166,13 @@ async function main() {
   if (writeResult.status !== "recorded") {
     throw new Error(`first canonical task result should be recorded\n${JSON.stringify(writeResult, null, 2)}`);
   }
+  if (
+    writeResult.normalized_adapter_event?.adapter_id !== "claude_code" ||
+    writeResult.normalized_adapter_event?.event_type !== "task_stop" ||
+    writeResult.normalized_adapter_event?.stop?.status !== "insufficient_evidence"
+  ) {
+    throw new Error(`collector should map its metrics event to the normalized adapter event schema\n${JSON.stringify(writeResult, null, 2)}`);
+  }
   assertRuntimeEvidence("canonical task-result write", writeResult, "executed");
   const [written] = readEvents(eventStore);
   if (

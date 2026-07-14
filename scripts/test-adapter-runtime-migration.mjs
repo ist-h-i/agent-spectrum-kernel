@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -44,6 +44,10 @@ function assertInstalledProfile(name, profile) {
 try {
   writeFileSync(resolve(target, "README.md"), "# Adopting project\n");
   writeFileSync(resolve(target, "AGENTS.md"), "# Project-owned instructions\n\nKeep this text.\n");
+  mkdirSync(resolve(target, ".claude"), { recursive: true });
+  mkdirSync(resolve(target, ".agents"), { recursive: true });
+  writeFileSync(resolve(target, ".claude/project-owned-note.md"), "Keep Claude-adjacent project content.\n");
+  writeFileSync(resolve(target, ".agents/project-owned-note.md"), "Keep Codex-adjacent project content.\n");
 
   run(coreInstaller, ["--merge-agents"]);
   assert.ok(existsSync(resolve(target, "schemas/adapter-runtime-event.schema.json")), "core projection omitted the normalized runtime event schema");
@@ -89,6 +93,8 @@ try {
   run(claudeInstaller, ["--detach"]);
   assert.equal(state("claude").install_status, "detached");
   assert.ok(readFileSync(resolve(target, "AGENTS.md"), "utf8").includes("Keep this text."), "adapter detach removed project-owned AGENTS content");
+  assert.ok(readFileSync(resolve(target, ".claude/project-owned-note.md"), "utf8").includes("Keep Claude-adjacent"), "Claude lifecycle removed a non-managed nested project file");
+  assert.ok(readFileSync(resolve(target, ".agents/project-owned-note.md"), "utf8").includes("Keep Codex-adjacent"), "Codex lifecycle removed a non-managed nested project file");
   assert.ok(existsSync(resolve(target, ".agent-spectrum-kernel/install-state.json")), "adapter detach removed core ownership state");
 
   console.log("Dual-runtime migration tests passed");

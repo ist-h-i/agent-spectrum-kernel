@@ -108,6 +108,17 @@ function validateSchemaValue(value, schema, context, path = "$") {
   return errors;
 }
 
+export function validateJsonSchema(value, { schemaPath } = {}) {
+  if (!schemaPath || !existsSync(schemaPath)) return ["JSON Schema is unavailable"];
+  let schema;
+  try {
+    schema = readJson(schemaPath);
+  } catch (error) {
+    return [`JSON Schema is invalid: ${error.message}`];
+  }
+  return validateSchemaValue(value, schema, { baseDir: dirname(schemaPath), rootSchema: schema });
+}
+
 export function extractExecutionEnvelope(text) {
   const marker = /(?:^|\n)Execution Envelope:\s*/g;
   const markers = [...text.matchAll(marker)];

@@ -134,7 +134,7 @@ export function validateCodexCompactControlMap(controlMap = readControlMap()) {
 }
 
 function renderControl(controlId, control) {
-  if (controlId === "scope") return "[scope] Read workspace/code/tests/docs/public contract; missing required input => stop/insufficient_evidence; smallest diff; cleanup separate.";
+  if (controlId === "scope") return "[scope] Read repo/code/tests/docs/API; missing input => stop/insufficient_evidence; smallest diff; cleanup separate.";
   if (controlId === "verification") return "[verification] Contract before behavior change; focused first; broader by risk; exact results.";
   if (controlId === "risk_approval") return "[risk_approval] Name exact action/risk type/impact/reversibility/external visibility, safer alternative, and preconditions. Stop without approval for that specific action; execute only it.";
   if (controlId === "evidence") return `[evidence] ${control.truth_statuses.join("/")}; claims need evidence; otherwise downgrade.`;

@@ -8,6 +8,8 @@ Entry mode is fixed to review. Primary contract: `review-router`. Read `schemas/
 
 {{ASK_COMPACT_DIRECT_TRIGGERS}}
 
+[agent_activity] opt-in; S/C/F counts.
+
 Change signals:
 - signal: observed evidence
 

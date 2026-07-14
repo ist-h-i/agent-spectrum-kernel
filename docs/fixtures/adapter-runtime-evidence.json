@@ -26,7 +26,7 @@
       "scope": "profile_projection",
       "profile_id": "claude-code-local-observed-v1",
       "renderer_profile": "observability",
-      "profile_fingerprint": "sha256:f06b4a0febe1d087dea318dbbd65874ed098ec3b32d26dfb8162fff8b339d717"
+      "profile_fingerprint": "sha256:eee58699167fc63e6b71c3e5d8f2df2c9b59b856274f436c67d45062e0230414"
     },
     {
       "record_id": "codex-projection-manifest",
@@ -54,7 +54,7 @@
       "scope": "profile_projection",
       "profile_id": "codex-local-projection-v1",
       "renderer_profile": "implementation",
-      "profile_fingerprint": "sha256:6983536e72127ef6abd1d3bb5658d8ddbff99ba43271b211ba89a7b661d6553c"
+      "profile_fingerprint": "sha256:c2a211621d960a7fe084a341665d51174d6870c2921b23f8ef7910a546bb16fc"
     },
     {
       "record_id": "claude-canonical-metrics-collector",
@@ -73,17 +73,20 @@
         "adapters/claude-code/project/.claude/commands/skill-review.md",
         "adapters/claude-code/project/.claude/commands/skill-verify.md",
         "adapters/claude-code/project/.claude/hooks/hooks.json",
+        "schemas/adapter-runtime-event.schema.json",
         "schemas/execution-envelope.schema.json",
         "schemas/metrics-event.schema.json",
         "schemas/review-signal-gate-map.json",
+        "scripts/adapter-runtime-event.mjs",
         "scripts/ai-metrics-record.mjs",
         "scripts/ai-metrics-summarize.mjs",
         "scripts/ask-doctor.mjs",
         "scripts/execution-envelope.mjs",
         "scripts/observability-paths.mjs",
+        "scripts/test-adapter-runtime-event.mjs",
         "scripts/test-claude-metrics-collector.mjs"
       ],
-      "subject_digest": "sha256:d9d8723c6ec3e1a69456bda6273ce9fb196df6fc6a0848957ee6abc9d8733b41",
+      "subject_digest": "sha256:f7324f62cc2f4fc59ccfe94770919ca5742b12fc0ca298f8c21cac76fabf745c",
       "verification": {
         "verifier_path": "scripts/test-claude-metrics-collector.mjs",
         "fixture_id": "claude-canonical-metrics-collector",

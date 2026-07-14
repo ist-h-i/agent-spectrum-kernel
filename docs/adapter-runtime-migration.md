@@ -17,7 +17,7 @@ node scripts/install-codex-adapter.mjs --target /path/to/project --profile imple
 node scripts/ask-doctor.mjs --target /path/to/project --runtime-probe
 ```
 
-The adapters may coexist. Claude owns `.claude/**`, its managed `.claude/settings.json` hook subset, and its runtime files. Codex owns `.agents/**` and its runner files. The core installer remains the owner of the root Kernel and canonical Skills.
+The adapters may coexist. Claude owns only the paths registered in its managed inventory under `.claude/`, the managed hook subset of `.claude/settings.json`, and its inventoried runtime files. Codex likewise owns only its managed inventory paths under `.agents/` and its inventoried runner files. Neither adapter owns either tree as a whole; non-managed project files nested below `.claude/` or `.agents/` must be preserved. The core installer remains the owner of the root Kernel and canonical Skills.
 
 ## Compatibility matrix
 

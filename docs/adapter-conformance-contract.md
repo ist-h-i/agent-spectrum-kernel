@@ -47,7 +47,7 @@ Future adapters should add validation or fixture coverage for:
 - documentation of unsupported or unknown capabilities,
 - upgrade/idempotence behavior when the adapter modifies project-local settings.
 
-Claude and Codex additionally share `docs/fixtures/adapter-cross-conformance.json`. The runner evaluates the required nine scenarios against both generated projection plans, compares normalized contract meaning, and permits different internal traces. A projected pass proves required assets and canonical contract coverage only; runtime loading, application, and behavioral conformance remain unavailable until separately captured.
+Claude and Codex additionally share `docs/fixtures/adapter-cross-conformance.json`. The runner evaluates the exact required nine scenarios and exact Adapter set against both generated projection plans. It derives normalized meaning independently from the Claude command bytes and generated Codex prompt bytes, validates each derived event against the shared schema, compares the results, and permits different internal traces. Empty Adapter sets, substituted scenario IDs, missing expectations, schema-reference drift, missing contract minimums, and approval/stop byte mutations fail closed. A projected pass proves these projection controls only; runtime loading, application, and behavioral conformance remain unavailable until separately captured.
 
 ## Runtime Probe Boundary
 

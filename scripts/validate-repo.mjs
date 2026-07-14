@@ -324,11 +324,13 @@ const REQUIRED_CODEX_ADAPTER_PATHS = [
   "adapters/codex/prompts/skill-handoff.md",
 ];
 const REQUIRED_ADAPTER_RUNTIME_PATHS = [
+  "scripts/adapter-runtime-event.mjs",
   "scripts/adapter-runtime-bundle.mjs",
   "scripts/adapter-cross-conformance.mjs",
   "scripts/adapter-runtime-smoke.mjs",
   "scripts/test-adapter-cross-conformance.mjs",
   "scripts/test-adapter-runtime-migration.mjs",
+  "scripts/test-adapter-runtime-event.mjs",
   "scripts/codex-runtime-profile.mjs",
   "scripts/codex-exec-runner.mjs",
   "scripts/execution-envelope.mjs",

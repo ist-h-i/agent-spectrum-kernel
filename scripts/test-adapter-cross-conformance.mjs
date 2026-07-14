@@ -40,20 +40,55 @@ for (const scenario of report.scenarios) {
     `${scenario.scenario_id} must preserve normalized meaning across adapters`,
   );
   assert.ok(scenario.results.every((result) => result.runtime_application_evidence === "unavailable"));
+  assert.ok(scenario.results.every((result) => result.projection_sha256.startsWith("sha256:")));
+  assert.ok(scenario.results.every((result) => result.schema_errors.length === 0));
 }
 
 const fixture = JSON.parse(readFileSync(conformanceFixture, "utf8"));
+function runFixture(value, extraArgs = []) {
+  return spawnSync(process.execPath, [conformanceScript, "--fixture", "-", "--json", ...extraArgs], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024,
+    input: JSON.stringify(value),
+  });
+}
+
 const weakened = structuredClone(fixture);
 weakened.scenarios[0].required_contracts.push("missing-contract-fixture");
-const negative = spawnSync(process.execPath, [conformanceScript, "--fixture", "-", "--json"], {
-  cwd: root,
-  encoding: "utf8",
-  maxBuffer: 1024 * 1024,
-  input: JSON.stringify(weakened),
-});
+const negative = runFixture(weakened);
 assert.notEqual(negative.status, 0, "missing adapter contract coverage must fail closed");
 const negativeReport = JSON.parse(negative.stdout);
 assert.equal(negativeReport.status, "fail");
 assert.ok(negativeReport.scenarios[0].results.every((result) => result.missing_contracts.includes("missing-contract-fixture")));
+
+const mutation = fixture.mutation_fixtures[0];
+const mutated = runFixture(fixture, ["--mutation", mutation.mutation_id]);
+assert.notEqual(mutated.status, 0, "removing Codex approval/stop projection bytes must fail closed");
+const mutationReport = JSON.parse(mutated.stdout);
+const mutationScenario = mutationReport.scenarios.find((scenario) => scenario.scenario_id === mutation.scenario_id);
+const unchangedClaude = mutationScenario.results.find((result) => result.adapter_id === "claude_code");
+assert.equal(unchangedClaude.normalized_contract.approval_required, true);
+assert.deepEqual(unchangedClaude.semantic_mismatches, ["cross_adapter_normalized_contract"]);
+const mutatedCodex = mutationScenario.results.find((result) => result.adapter_id === "codex");
+assert.equal(mutatedCodex.status, "fail");
+assert.ok(mutatedCodex.semantic_mismatches.includes("approval_required"));
+assert.ok(mutatedCodex.semantic_mismatches.includes("stop_status"));
+
+for (const [label, mutate, expectedError] of [
+  ["empty adapters", (value) => { value.adapters = []; }, "fixture adapters must be exactly"],
+  ["scenario replacement", (value) => { value.scenarios[0].scenario_id = "replacement_scenario"; }, "exact #179 set"],
+  ["missing expected value", (value) => { delete value.scenarios[0].expected.stop_status; }, "expected fields must be exactly"],
+  ["schema ref change", (value) => { value.normalized_event_schema_ref = "schemas/metrics-event.schema.json"; }, "canonical adapter runtime event schema"],
+  ["empty contract minimum", (value) => { value.scenarios[0].required_contracts = []; }, "missing required contract minimums"],
+]) {
+  const invalid = structuredClone(fixture);
+  mutate(invalid);
+  const result = runFixture(invalid);
+  assert.notEqual(result.status, 0, `${label} must fail closed`);
+  const invalidReport = JSON.parse(result.stdout);
+  assert.equal(invalidReport.status, "fail");
+  assert.match(invalidReport.error, new RegExp(expectedError));
+}
 
 console.log("Cross-adapter conformance tests passed");
