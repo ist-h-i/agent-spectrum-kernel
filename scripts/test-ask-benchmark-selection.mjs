@@ -46,7 +46,7 @@ try {
   const codexCase = adaptive.find((entry) => entry.adapter === "codex");
   const claudeCase = adaptive.find((entry) => entry.adapter === "claude");
   const spareCase = adaptive.find((entry) => entry.case_id !== codexCase.case_id && entry.case_id !== claudeCase.case_id);
-  const crossAdapterCase = adaptive.find((entry) => entry.adapter !== codexCase.adapter);
+  const crossAdapterCase = adaptive.find((entry) => entry.adapter !== codexCase.adapter && entry.case_id !== claudeCase.case_id);
   assert.ok(codexCase && claudeCase && spareCase && crossAdapterCase);
   const planCases = new Map(plan.cases.map((entry) => [entry.case_id, entry]));
 
