@@ -319,18 +319,31 @@ try {
   writeFileSync(codexSelectionPath, sealedBackup);
   chmodSync(codexSelectionPath, 0o444);
 
-  function mutateSealedRecord(name, mutate, pattern) {
+  function mutateSealedRecord(name, mutate, pattern, { synchronizeIndexDigest = false } = {}) {
+    const indexBackup = readFileSync(indexPath);
     try {
       chmodSync(codexSelectionPath, 0o644);
       const record = JSON.parse(sealedBackup);
       mutate(record);
       writeJson(codexSelectionPath, record);
       chmodSync(codexSelectionPath, 0o444);
+      if (synchronizeIndexDigest) {
+        chmodSync(indexPath, 0o644);
+        const index = JSON.parse(indexBackup);
+        index.sealed_cases.find((entry) => entry.case_id === codexCase.case_id).selection_digest = record.selection_digest.value;
+        writeJson(indexPath, index);
+        chmodSync(indexPath, 0o444);
+      }
       expectFailure(name, verifyArgs(codexCase), pattern);
     } finally {
       chmodSync(codexSelectionPath, 0o644);
       writeFileSync(codexSelectionPath, sealedBackup);
       chmodSync(codexSelectionPath, 0o444);
+      if (synchronizeIndexDigest) {
+        chmodSync(indexPath, 0o644);
+        writeFileSync(indexPath, indexBackup);
+        chmodSync(indexPath, 0o444);
+      }
     }
   }
   mutateSealedRecord("modified sealed payload", (value) => { value.observed_signals = ["tampered signal"]; }, /sealed selection digest mismatch/u);
@@ -338,7 +351,7 @@ try {
   mutateSealedRecord("blank sealed observed signal", (value) => {
     value.observed_signals = ["   "];
     value.selection_digest.value = computeSelectionDigest(value);
-  }, /observed signal/u);
+  }, /observed signal/u, { synchronizeIndexDigest: true });
   mutateSealedRecord("result field in selection record", (value) => { value.result = "forbidden"; }, /failed JSON Schema validation/u);
 
   const resultArtifact = resolve(spareRoot, ".benchmark-run.json");
