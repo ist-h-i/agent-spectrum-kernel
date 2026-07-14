@@ -50,3 +50,5 @@ node scripts/ask-benchmark.mjs score --config benchmarks/checkpoint-c.config.jso
 ```
 
 The frozen rules are in [protocol-c.md](protocol-c.md). Keep temporary prompts, full outputs, event streams, and workspaces outside the repository. The normalized result explicitly reports that the CLI, repository, and adapter evidence changed alongside the architecture, so Checkpoint C is a bounded remeasurement rather than an isolated causal test.
+
+The measured result is in [results/checkpoint-c-report.md](results/checkpoint-c-report.md), with normalized machine-readable evidence in `results/checkpoint-c-2026-07-14.json`. Full ASK improved one review score but exceeded the quality-gain token allowance; the other three fixtures showed no incremental quality and exceeded the normal token-overhead guardrail.

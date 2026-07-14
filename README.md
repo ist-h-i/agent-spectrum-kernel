@@ -237,6 +237,8 @@ node scripts/ask-benchmark.mjs validate --config benchmarks/checkpoint-c.config.
 
 See `benchmarks/protocol-c.md` and `benchmarks/checkpoint-c.config.json` for the frozen post-architecture comparison contract.
 
+The measured Checkpoint C result is in `benchmarks/results/checkpoint-c-report.md`. Full ASK received one `retain` and three `simplify` decisions; no tested fixture met the frozen `expand` threshold.
+
 ## Minimum setup
 
 1. Put `AGENTS.md` at the repository root or project instruction location.

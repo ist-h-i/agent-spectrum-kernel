@@ -1,0 +1,849 @@
+{
+  "schema_version": "1.0.0",
+  "checkpoint": "C",
+  "protocol": {
+    "status": "frozen",
+    "frozen_at": "2026-07-14T14:00:00+09:00",
+    "protocol_sha256": "c90f4e6b937908818229a0088c337482a428e3cc919ff7c2a2ba8a438d2a96ef",
+    "config_sha256": "c09574e3a69081f10ddd7eaef318465c573458f341ecdc5a2d4dcd4c38b03ea0",
+    "repository_revision": "b16f14436e28ad57d232d35007d61426958eb340"
+  },
+  "runtime": {
+    "agent": "codex-cli",
+    "agent_version": "0.144.2",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "sequential": true,
+    "case_timeout_ms": 900000,
+    "network_required_by_fixtures": false,
+    "observed_agent_version": "codex-cli 0.144.2"
+  },
+  "attribution": {
+    "baseline_checkpoint": "B2",
+    "baseline_result_path": "benchmarks/results/checkpoint-b2-2026-07-12.json",
+    "baseline_repository_revision": "57866e2ad42d7c1db91488528b0879a87776d4e0",
+    "fixture_manifest_path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
+    "fixture_manifest_sha256": "e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d",
+    "architecture": {
+      "baseline": "pre-issue-179",
+      "current": "canonical-dual-runtime",
+      "issue": 179,
+      "merge_revision": "6f0fd437e6cdad3c1188c92d3740a5a531a5757f",
+      "canonical_contract_revision": "ask-3.0.0",
+      "canonical_source_digest": "sha256:aa011ebb4f1c98ccc293870b70764e502f5a1c4bcecb226b0738cd3a9eef4e5b"
+    },
+    "model": {
+      "baseline": "gpt-5.6-sol",
+      "current": "gpt-5.6-sol",
+      "changed": false
+    },
+    "cli": {
+      "baseline": "0.144.1",
+      "current": "0.144.2",
+      "changed": true
+    },
+    "adapter": {
+      "id": "codex",
+      "baseline_projection_digest": null,
+      "baseline_evidence": "unknown",
+      "current_profile": "full",
+      "renderer_version": "4",
+      "runtime_bundle_path": "docs/fixtures/adapter-runtime-bundle.json",
+      "runtime_bundle_sha256": "b943562be43d3b38d8d32f6603a121cbc50149ede1e8dcc62c8bef881019bcf7",
+      "profile_fingerprint": "sha256:6805acf2eb4ee57ca9e3ccdb0fc4c50b47d753664620a7016ca3e677b2291223",
+      "projected_asset_digest": "sha256:c23fde39066da6c695a708ea6aa96d6bb04704eaf1f38454136d2100cdeed73f"
+    },
+    "repository": {
+      "baseline_revision": "57866e2ad42d7c1db91488528b0879a87776d4e0",
+      "current_revision_source": "protocol.repository_revision",
+      "fixture_inputs_changed": false
+    }
+  },
+  "runs": [
+    {
+      "case_id": "case-676ce9ed9b55",
+      "fixture_id": "impl-rule-batch-medium-hard",
+      "task_class": "implementation",
+      "difficulty": "medium-hard",
+      "repetition": 1,
+      "condition": "kernel_only",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": null,
+        "major_findings_missed": null,
+        "unsupported_or_false_positive_findings": null,
+        "merge_decision_correct": null,
+        "requirement_satisfaction_rate": 1,
+        "requirements_total": 11,
+        "requirements_satisfied": 11,
+        "requirement_failures": [],
+        "hidden_tests": {
+          "total": 7,
+          "passed": 7,
+          "failed": 0,
+          "passed_names": [
+            "normal batch, lexical receipt order, and one version increment",
+            "boundary sizes and strict scalar/shape validation",
+            "validation and version failures preserve all state",
+            "idempotent replay precedes version checking and collisions preserve state",
+            "inputs and receipts do not alias internal state",
+            "legacy APIs remain compatible",
+            "scope-protected files and source-module set are unchanged"
+          ],
+          "failed_names": [],
+          "exit_code": 0
+        },
+        "scope_deviations": 0,
+        "changed_file_count": 6,
+        "automated_correction_units": 0,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 613721,
+        "ai_tool_execution_ms": 613721,
+        "input_tokens": 269250,
+        "output_tokens": 9881,
+        "usage_cost": null,
+        "final_output_bytes": 2376
+      },
+      "adoption_behavior": {
+        "correct_route": false,
+        "under_processing": true,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "present",
+        "full_skill_projection_available": null,
+        "execution_status": "executed",
+        "output_sha256": "f0cd55d8ca3343c504b735bf146ecfb58ac1b5f64f0fa3fa3b1e96d507b831d0",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-b4ec135c509b",
+      "fixture_id": "impl-transfer-hard",
+      "task_class": "implementation",
+      "difficulty": "hard",
+      "repetition": 1,
+      "condition": "plain",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": null,
+        "major_findings_missed": null,
+        "unsupported_or_false_positive_findings": null,
+        "merge_decision_correct": null,
+        "requirement_satisfaction_rate": 1,
+        "requirements_total": 13,
+        "requirements_satisfied": 13,
+        "requirement_failures": [],
+        "hidden_tests": {
+          "total": 9,
+          "passed": 9,
+          "failed": 0,
+          "passed_names": [
+            "normal transfer updates both accounts, receipt, and history exactly once",
+            "floor boundary succeeds and one unit below the floor fails without mutation",
+            "audit rejection rolls back accounts, sequence, history, and idempotency",
+            "version and idempotency conflicts preserve state; replay precedes version checks",
+            "concurrent transfers cannot overspend",
+            "concurrent duplicate requests commit once and return the same receipt",
+            "input, receipt, history, and audit objects are detached",
+            "legacy APIs remain compatible",
+            "scope-protected files and source-module set are unchanged"
+          ],
+          "failed_names": [],
+          "exit_code": 0
+        },
+        "scope_deviations": 0,
+        "changed_file_count": 6,
+        "automated_correction_units": 0,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 378646,
+        "ai_tool_execution_ms": 378646,
+        "input_tokens": 289401,
+        "output_tokens": 11813,
+        "usage_cost": null,
+        "final_output_bytes": 2406
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "not_applicable",
+        "full_skill_projection_available": null,
+        "execution_status": "executed",
+        "output_sha256": "008995016ea7e43e93a23266ca9bfdebf52622ac5dabd343b898ffc5819414b1",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-2430028f50d9",
+      "fixture_id": "pr-session-refresh-medium-hard",
+      "task_class": "review",
+      "difficulty": "medium-hard",
+      "repetition": 1,
+      "condition": "kernel_only",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": 3,
+        "major_findings_missed": 1,
+        "unsupported_or_false_positive_findings": 0,
+        "merge_decision_correct": true,
+        "requirement_satisfaction_rate": null,
+        "scope_deviations": 0,
+        "automated_correction_units": 1,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 141596,
+        "ai_tool_execution_ms": 141596,
+        "input_tokens": 143910,
+        "output_tokens": 5961,
+        "usage_cost": null,
+        "final_output_bytes": 3952
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "present",
+        "full_skill_projection_available": null,
+        "execution_status": "executed",
+        "output_sha256": "d07f9c546b36d633dd6c37907641784712e8f40ff0abd619dc34c9b99799afaa",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-8fdb3629a477",
+      "fixture_id": "impl-rule-batch-medium-hard",
+      "task_class": "implementation",
+      "difficulty": "medium-hard",
+      "repetition": 1,
+      "condition": "plain",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": null,
+        "major_findings_missed": null,
+        "unsupported_or_false_positive_findings": null,
+        "merge_decision_correct": null,
+        "requirement_satisfaction_rate": 1,
+        "requirements_total": 11,
+        "requirements_satisfied": 11,
+        "requirement_failures": [],
+        "hidden_tests": {
+          "total": 7,
+          "passed": 7,
+          "failed": 0,
+          "passed_names": [
+            "normal batch, lexical receipt order, and one version increment",
+            "boundary sizes and strict scalar/shape validation",
+            "validation and version failures preserve all state",
+            "idempotent replay precedes version checking and collisions preserve state",
+            "inputs and receipts do not alias internal state",
+            "legacy APIs remain compatible",
+            "scope-protected files and source-module set are unchanged"
+          ],
+          "failed_names": [],
+          "exit_code": 0
+        },
+        "scope_deviations": 0,
+        "changed_file_count": 6,
+        "automated_correction_units": 0,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 244232,
+        "ai_tool_execution_ms": 244232,
+        "input_tokens": 203814,
+        "output_tokens": 9679,
+        "usage_cost": null,
+        "final_output_bytes": 2090
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "not_applicable",
+        "full_skill_projection_available": null,
+        "execution_status": "executed",
+        "output_sha256": "6c68654fa859876c2385335973d8dc659f16efecc6dc9acb1e6899d1e1af93b1",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-26708ba1977c",
+      "fixture_id": "pr-export-lease-hard",
+      "task_class": "review",
+      "difficulty": "hard",
+      "repetition": 1,
+      "condition": "kernel_only",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": 5,
+        "major_findings_missed": 0,
+        "unsupported_or_false_positive_findings": 1,
+        "merge_decision_correct": true,
+        "requirement_satisfaction_rate": null,
+        "scope_deviations": 0,
+        "automated_correction_units": 1,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 444773,
+        "ai_tool_execution_ms": 444773,
+        "input_tokens": 130231,
+        "output_tokens": 6133,
+        "usage_cost": null,
+        "final_output_bytes": 4361
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "present",
+        "full_skill_projection_available": null,
+        "execution_status": "executed",
+        "output_sha256": "13a5c89c739359f6cce56a718aedc2f865275883a3658c5f99ac2b7b3feb3316",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-cc321472e5de",
+      "fixture_id": "impl-transfer-hard",
+      "task_class": "implementation",
+      "difficulty": "hard",
+      "repetition": 1,
+      "condition": "kernel_only",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": null,
+        "major_findings_missed": null,
+        "unsupported_or_false_positive_findings": null,
+        "merge_decision_correct": null,
+        "requirement_satisfaction_rate": 0.7692307692307693,
+        "requirements_total": 13,
+        "requirements_satisfied": 10,
+        "requirement_failures": [
+          "TRANSFER-REQ-01",
+          "TRANSFER-REQ-07",
+          "TRANSFER-REQ-09"
+        ],
+        "hidden_tests": {
+          "total": 9,
+          "passed": 8,
+          "failed": 1,
+          "passed_names": [
+            "floor boundary succeeds and one unit below the floor fails without mutation",
+            "audit rejection rolls back accounts, sequence, history, and idempotency",
+            "version and idempotency conflicts preserve state; replay precedes version checks",
+            "concurrent transfers cannot overspend",
+            "concurrent duplicate requests commit once and return the same receipt",
+            "input, receipt, history, and audit objects are detached",
+            "legacy APIs remain compatible",
+            "scope-protected files and source-module set are unchanged"
+          ],
+          "failed_names": [
+            "normal transfer updates both accounts, receipt, and history exactly once"
+          ],
+          "exit_code": 1
+        },
+        "scope_deviations": 0,
+        "changed_file_count": 6,
+        "automated_correction_units": 4,
+        "unverified_completion_or_readiness_claims": 1,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 341178,
+        "ai_tool_execution_ms": 341178,
+        "input_tokens": 267120,
+        "output_tokens": 10693,
+        "usage_cost": null,
+        "final_output_bytes": 2789
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "present",
+        "full_skill_projection_available": null,
+        "execution_status": "executed",
+        "output_sha256": "74f3685f42b89ff1f724e862128f772d89e00b37c68df58f84c1b09badb2c4ff",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-06ef47d9a129",
+      "fixture_id": "pr-session-refresh-medium-hard",
+      "task_class": "review",
+      "difficulty": "medium-hard",
+      "repetition": 1,
+      "condition": "plain",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": 3,
+        "major_findings_missed": 1,
+        "unsupported_or_false_positive_findings": 0,
+        "merge_decision_correct": true,
+        "requirement_satisfaction_rate": null,
+        "scope_deviations": 0,
+        "automated_correction_units": 1,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 201776,
+        "ai_tool_execution_ms": 201776,
+        "input_tokens": 131582,
+        "output_tokens": 6787,
+        "usage_cost": null,
+        "final_output_bytes": 4366
+      },
+      "adoption_behavior": {
+        "correct_route": null,
+        "under_processing": null,
+        "over_processing": null,
+        "contracts_reported": false
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "not_applicable",
+        "full_skill_projection_available": null,
+        "execution_status": "executed",
+        "output_sha256": "09597e35efafc502e55ddde044b441a7baca471e2e43104b4d2ba95987f90770",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-eb73d7354f27",
+      "fixture_id": "pr-session-refresh-medium-hard",
+      "task_class": "review",
+      "difficulty": "medium-hard",
+      "repetition": 1,
+      "condition": "full_ask",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": 4,
+        "major_findings_missed": 0,
+        "unsupported_or_false_positive_findings": 0,
+        "merge_decision_correct": true,
+        "requirement_satisfaction_rate": null,
+        "scope_deviations": 0,
+        "automated_correction_units": 0,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 260232,
+        "ai_tool_execution_ms": 260232,
+        "input_tokens": 545007,
+        "output_tokens": 11483,
+        "usage_cost": null,
+        "final_output_bytes": 4888
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "present",
+        "full_skill_projection_available": true,
+        "execution_status": "executed",
+        "output_sha256": "e412f7aff8c6ec3063e3801f462f77376b03aae868af32f6e92d5be70b0f5d8b",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-e1ef0ff9844b",
+      "fixture_id": "pr-export-lease-hard",
+      "task_class": "review",
+      "difficulty": "hard",
+      "repetition": 1,
+      "condition": "full_ask",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": 5,
+        "major_findings_missed": 0,
+        "unsupported_or_false_positive_findings": 1,
+        "merge_decision_correct": true,
+        "requirement_satisfaction_rate": null,
+        "scope_deviations": 0,
+        "automated_correction_units": 1,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 273462,
+        "ai_tool_execution_ms": 273462,
+        "input_tokens": 324276,
+        "output_tokens": 9123,
+        "usage_cost": null,
+        "final_output_bytes": 4241
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "present",
+        "full_skill_projection_available": true,
+        "execution_status": "executed",
+        "output_sha256": "9aeec8e00f76454b3fd6999b7d09d437e3c551daeee2be1db928d911e80eca9d",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-83d8996d2353",
+      "fixture_id": "impl-transfer-hard",
+      "task_class": "implementation",
+      "difficulty": "hard",
+      "repetition": 1,
+      "condition": "full_ask",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": null,
+        "major_findings_missed": null,
+        "unsupported_or_false_positive_findings": null,
+        "merge_decision_correct": null,
+        "requirement_satisfaction_rate": 0.7692307692307693,
+        "requirements_total": 13,
+        "requirements_satisfied": 10,
+        "requirement_failures": [
+          "TRANSFER-REQ-01",
+          "TRANSFER-REQ-07",
+          "TRANSFER-REQ-09"
+        ],
+        "hidden_tests": {
+          "total": 9,
+          "passed": 8,
+          "failed": 1,
+          "passed_names": [
+            "floor boundary succeeds and one unit below the floor fails without mutation",
+            "audit rejection rolls back accounts, sequence, history, and idempotency",
+            "version and idempotency conflicts preserve state; replay precedes version checks",
+            "concurrent transfers cannot overspend",
+            "concurrent duplicate requests commit once and return the same receipt",
+            "input, receipt, history, and audit objects are detached",
+            "legacy APIs remain compatible",
+            "scope-protected files and source-module set are unchanged"
+          ],
+          "failed_names": [
+            "normal transfer updates both accounts, receipt, and history exactly once"
+          ],
+          "exit_code": 1
+        },
+        "scope_deviations": 0,
+        "changed_file_count": 6,
+        "automated_correction_units": 4,
+        "unverified_completion_or_readiness_claims": 1,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 460081,
+        "ai_tool_execution_ms": 460081,
+        "input_tokens": 963559,
+        "output_tokens": 16214,
+        "usage_cost": null,
+        "final_output_bytes": 3276
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "present",
+        "full_skill_projection_available": true,
+        "execution_status": "executed",
+        "output_sha256": "53d640d3058a136d29f4208df270f9e58fbec105f0bb820d67f70c18bd7d2811",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-654a95eba3a4",
+      "fixture_id": "impl-rule-batch-medium-hard",
+      "task_class": "implementation",
+      "difficulty": "medium-hard",
+      "repetition": 1,
+      "condition": "full_ask",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": null,
+        "major_findings_missed": null,
+        "unsupported_or_false_positive_findings": null,
+        "merge_decision_correct": null,
+        "requirement_satisfaction_rate": 1,
+        "requirements_total": 11,
+        "requirements_satisfied": 11,
+        "requirement_failures": [],
+        "hidden_tests": {
+          "total": 7,
+          "passed": 7,
+          "failed": 0,
+          "passed_names": [
+            "normal batch, lexical receipt order, and one version increment",
+            "boundary sizes and strict scalar/shape validation",
+            "validation and version failures preserve all state",
+            "idempotent replay precedes version checking and collisions preserve state",
+            "inputs and receipts do not alias internal state",
+            "legacy APIs remain compatible",
+            "scope-protected files and source-module set are unchanged"
+          ],
+          "failed_names": [],
+          "exit_code": 0
+        },
+        "scope_deviations": 0,
+        "changed_file_count": 6,
+        "automated_correction_units": 0,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 628517,
+        "ai_tool_execution_ms": 628517,
+        "input_tokens": 791471,
+        "output_tokens": 13539,
+        "usage_cost": null,
+        "final_output_bytes": 2310
+      },
+      "adoption_behavior": {
+        "correct_route": true,
+        "under_processing": false,
+        "over_processing": null,
+        "contracts_reported": true
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "present",
+        "full_skill_projection_available": true,
+        "execution_status": "executed",
+        "output_sha256": "77b2538bbe86021ac5b99b59d2013e9f798a63942a94ba25e959b898b7c3cbb3",
+        "capability_downgrade": null
+      }
+    },
+    {
+      "case_id": "case-6ee01a897a05",
+      "fixture_id": "pr-export-lease-hard",
+      "task_class": "review",
+      "difficulty": "hard",
+      "repetition": 1,
+      "condition": "plain",
+      "outcome_quality": {
+        "valid_blocking_or_major_findings": 5,
+        "major_findings_missed": 0,
+        "unsupported_or_false_positive_findings": 1,
+        "merge_decision_correct": true,
+        "requirement_satisfaction_rate": null,
+        "scope_deviations": 0,
+        "automated_correction_units": 1,
+        "unverified_completion_or_readiness_claims": 0,
+        "rework_count": null
+      },
+      "human_effort": {
+        "senior_review_minutes": null,
+        "additional_investigation_minutes": null,
+        "unresolved_human_decisions": null
+      },
+      "cost_latency": {
+        "total_duration_ms": 192571,
+        "ai_tool_execution_ms": 192571,
+        "input_tokens": 139708,
+        "output_tokens": 7071,
+        "usage_cost": null,
+        "final_output_bytes": 3445
+      },
+      "adoption_behavior": {
+        "correct_route": null,
+        "under_processing": null,
+        "over_processing": null,
+        "contracts_reported": false
+      },
+      "runtime_evidence": {
+        "projected_assets_available": "not_applicable",
+        "full_skill_projection_available": null,
+        "execution_status": "executed",
+        "output_sha256": "d6ae70d8354b164d218da81f4d10107348c1b9a95df5262863b8ce6ae1412351",
+        "capability_downgrade": null
+      }
+    }
+  ],
+  "comparison": {
+    "primary_comparator": "kernel_only",
+    "workflow_comparisons": [
+      {
+        "fixture_id": "pr-session-refresh-medium-hard",
+        "task_class": "review",
+        "quality_metric": "valid_blocking_or_major_findings",
+        "kernel_only_quality": 3,
+        "full_ask_quality": 4,
+        "quality_gain": 1,
+        "automated_correction_units_delta": -1,
+        "duration_overhead_percent": 83.78485267945422,
+        "token_overhead_percent": 271.31266222284495,
+        "senior_correction_reduction_percent": null,
+        "rework_reduction_percent": null
+      },
+      {
+        "fixture_id": "pr-export-lease-hard",
+        "task_class": "review",
+        "quality_metric": "valid_blocking_or_major_findings",
+        "kernel_only_quality": 5,
+        "full_ask_quality": 5,
+        "quality_gain": 0,
+        "automated_correction_units_delta": 0,
+        "duration_overhead_percent": -38.51650167613592,
+        "token_overhead_percent": 144.49194802147193,
+        "senior_correction_reduction_percent": null,
+        "rework_reduction_percent": null
+      },
+      {
+        "fixture_id": "impl-rule-batch-medium-hard",
+        "task_class": "implementation",
+        "quality_metric": "requirement_satisfaction_rate",
+        "kernel_only_quality": 1,
+        "full_ask_quality": 1,
+        "quality_gain": 0,
+        "automated_correction_units_delta": 0,
+        "duration_overhead_percent": 2.410867478870692,
+        "token_overhead_percent": 188.39863719902127,
+        "senior_correction_reduction_percent": null,
+        "rework_reduction_percent": null
+      },
+      {
+        "fixture_id": "impl-transfer-hard",
+        "task_class": "implementation",
+        "quality_metric": "requirement_satisfaction_rate",
+        "kernel_only_quality": 0.7692307692307693,
+        "full_ask_quality": 0.7692307692307693,
+        "quality_gain": 0,
+        "automated_correction_units_delta": 0,
+        "duration_overhead_percent": 34.85072308296549,
+        "token_overhead_percent": 252.67356099246615,
+        "senior_correction_reduction_percent": null,
+        "rework_reduction_percent": null
+      }
+    ],
+    "workflow_recommendations": [
+      {
+        "fixture_id": "pr-session-refresh-medium-hard",
+        "recommendation": "retain",
+        "reason": "Full ASK improved quality, but exceeded the frozen quality-gain overhead allowance."
+      },
+      {
+        "fixture_id": "pr-export-lease-hard",
+        "recommendation": "simplify",
+        "reason": "Material improvement was unproven and Full ASK exceeded a fixed overhead guardrail."
+      },
+      {
+        "fixture_id": "impl-rule-batch-medium-hard",
+        "recommendation": "simplify",
+        "reason": "Material improvement was unproven and Full ASK exceeded a fixed overhead guardrail."
+      },
+      {
+        "fixture_id": "impl-transfer-hard",
+        "recommendation": "simplify",
+        "reason": "Material improvement was unproven and Full ASK exceeded a fixed overhead guardrail."
+      }
+    ],
+    "thresholds": {
+      "senior_correction_reduction_percent": 25,
+      "rework_reduction_percent": 20,
+      "minimum_review_valid_finding_gain": 1,
+      "minimum_implementation_requirement_rate_gain": 0.1,
+      "maximum_false_positive_increase": 0,
+      "maximum_scope_deviation_increase": 0,
+      "maximum_unverified_claim_increase": 0,
+      "maximum_duration_overhead_percent": 50,
+      "maximum_token_overhead_percent": 50,
+      "maximum_duration_overhead_with_quality_gain_percent": 100,
+      "maximum_token_overhead_with_quality_gain_percent": 150,
+      "require_non_inferior_quality": true,
+      "allow_expand_with_primary_metrics_unknown": false,
+      "allow_expand_with_material_quality_gain": true
+    }
+  },
+  "limitations": [
+    "4 synthetic fixtures with 1 repetition(s) do not establish universal or causal value.",
+    "Senior correction time, additional investigation time, unresolved human decisions, rework, and usage cost are unknown until a blinded human evaluator records them.",
+    "Review finding matching is a frozen semantic heuristic and may undercount or overcount paraphrases.",
+    "Automated correction units are a bounded quality proxy, not human effort or rework.",
+    "Checkpoint C does not isolate architecture causally because CLI, repository, and adapter projection evidence changed from B2; model and fixture inputs were controlled."
+  ],
+  "privacy": {
+    "raw_prompts_stored_in_result": false,
+    "full_outputs_stored_in_result": false,
+    "full_source_stored_in_result": false,
+    "secrets_customer_or_personal_data_stored": false,
+    "temporary_run_directory": "operator-managed and not committed"
+  }
+}
