@@ -199,6 +199,17 @@ function validateOutputBoundary(outputPath) {
   return { existed: true };
 }
 
+export function assertTrackedRepositoryMatchesHead(root) {
+  for (const args of [
+    ["diff", "--quiet", "HEAD", "--"],
+    ["diff", "--cached", "--quiet", "HEAD", "--"],
+  ]) {
+    const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+    if (result.status === 1) throw new Error("tracked working tree and index must match HEAD before materialization");
+    if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed before materialization: ${result.stderr || result.stdout}`);
+  }
+}
+
 function runInstaller(root, args, label) {
   const result = spawnSync(process.execPath, args, { cwd: root, encoding: "utf8", maxBuffer: 30 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`${label} failed: ${result.stderr || result.stdout}`);
@@ -338,6 +349,7 @@ function assertBlockInputEquality(cases) {
 
 export function materializePortfolio({ root, config, planPath, outputPath, repositoryRevision }) {
   if (!planPath || !outputPath) throw new Error("materialize requires --plan and --output");
+  assertTrackedRepositoryMatchesHead(root);
   const plan = readJson(planPath);
   assertExactPlanIdentity({ root, config, plan, repositoryRevision });
   const fixtures = validateFixtureInputs({ root, config, plan });

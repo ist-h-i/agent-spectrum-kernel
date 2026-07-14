@@ -55,6 +55,16 @@ function manifestRecord(fixtureRoot, path, extra = {}) {
   return { path, sha256: sha256(bytes), bytes: bytes.length, ...extra };
 }
 
+function withTemporaryTrackedChange(path, suffix, callback) {
+  const original = readFileSync(path);
+  try {
+    writeFileSync(path, Buffer.concat([original, Buffer.from(suffix)]));
+    callback();
+  } finally {
+    writeFileSync(path, original);
+  }
+}
+
 function createSyntheticPortfolio(name, configure) {
   const scenario = resolve(work, name);
   const fixtureRoot = resolve(scenario, "fixtures");
@@ -168,6 +178,18 @@ try {
   expectFailure({ name: "failed materialization cleanup", planPath: invalidPlanPath, outputPath: incompleteOutput, pattern: /seed digest mismatch/u });
   assert.deepEqual(readdirSync(incompleteOutput), []);
 
+  const firstOutput = resolve(work, "materialized-a");
+  run(["materialize", "--config", portfolioConfig, "--plan", planPath, "--output", firstOutput]);
+  for (const [name, path, suffix] of [
+    ["dirty kernel source", resolve(root, "AGENTS.md"), "\n<!-- materialization dirty-source regression -->\n"],
+    ["dirty Skill source", resolve(root, "skills/evidence-ledger/SKILL.md"), "\n<!-- materialization dirty-source regression -->\n"],
+    ["dirty materializer source", resolve(root, "scripts/ask-benchmark-materialize.mjs"), "\n// materialization dirty-source regression\n"],
+  ]) {
+    withTemporaryTrackedChange(path, suffix, () => {
+      expectFailure({ name, planPath, outputPath: resolve(work, `fail-${name.replaceAll(" ", "-")}`), pattern: /tracked working tree and index must match HEAD/u });
+    });
+  }
+
   const directEvaluator = createSyntheticPortfolio("direct_evaluator", ({ fixture }) => ({ records: [manifestRecord(fixture, "evaluator/expected.json")] }));
   expectFailure({ name: "direct evaluator leakage", configPath: directEvaluator.configPath, planPath: directEvaluator.planPath, pattern: /outside the agent-visible.*allowlist/u });
 
@@ -218,9 +240,7 @@ try {
   });
   expectFailure({ name: "manifest absolute path escape", configPath: absoluteEscape.configPath, planPath: absoluteEscape.planPath, pattern: /normalized relative path/u });
 
-  const firstOutput = resolve(work, "materialized-a");
   const secondOutput = resolve(work, "materialized-b");
-  run(["materialize", "--config", portfolioConfig, "--plan", planPath, "--output", firstOutput]);
   run(["materialize", "--config", portfolioConfig, "--plan", planPath, "--output", secondOutput]);
   const firstManifestBytes = readFileSync(resolve(firstOutput, MATERIALIZATION_MANIFEST_NAME));
   const secondManifestBytes = readFileSync(resolve(secondOutput, MATERIALIZATION_MANIFEST_NAME));
@@ -263,6 +283,30 @@ try {
   const invalidManifest = structuredClone(manifest);
   delete invalidManifest.cases[0].condition_projection_digest;
   assert.ok(validateBenchmarkSchemaInstance(invalidManifest, { schemaPath: materializationSchema }).length > 0, "materialization manifest schema failure must be observable");
+
+  for (const [field, invalidValues] of [
+    ["capability_downgrade", [{ invalid: true }, 1, []]],
+    ["unavailable_reason", [true, { invalid: true }]],
+  ]) {
+    for (const invalidValue of invalidValues) {
+      const invalidNullable = structuredClone(manifest);
+      invalidNullable.cases[0].projection_evidence[field] = invalidValue;
+      assert.ok(validateBenchmarkSchemaInstance(invalidNullable, { schemaPath: materializationSchema }).length > 0, `${field} must reject ${JSON.stringify(invalidValue)}`);
+    }
+  }
+  for (const value of [null, "bounded evidence"]) {
+    const validNullable = structuredClone(manifest);
+    validNullable.cases[0].projection_evidence.capability_downgrade = value;
+    validNullable.cases[0].projection_evidence.unavailable_reason = value;
+    assert.deepEqual(validateBenchmarkSchemaInstance(validNullable, { schemaPath: materializationSchema }), [], `nullable projection evidence must accept ${JSON.stringify(value)}`);
+  }
+
+  const adapterProfileSchema = resolve(root, "schemas/adapter-runtime-profile.schema.json");
+  const adapterProfiles = JSON.parse(readFileSync(resolve(root, "docs/fixtures/adapter-runtime-profiles.json"), "utf8"));
+  const codexProfile = structuredClone(adapterProfiles.profiles.find((entry) => entry.adapter_id === "codex"));
+  assert.deepEqual(validateBenchmarkSchemaInstance(codexProfile, { schemaPath: adapterProfileSchema }), [], "existing nullable adapter profile field must accept null");
+  codexProfile.rendering.plan_shaping_options.skills = ["evidence-ledger"];
+  assert.deepEqual(validateBenchmarkSchemaInstance(codexProfile, { schemaPath: adapterProfileSchema }), [], "existing nullable adapter profile field must accept arrays");
 
   assert.throws(() => validateMaterializationProjectionInventory({ adapter: "codex", condition: "full_ask", inventory: [{ path: "AGENTS.md" }, { path: ".claude/skills/x/SKILL.md" }] }), /other adapter/u);
   assert.throws(() => validateMaterializationProjectionInventory({ adapter: "claude", condition: "full_ask", inventory: [{ path: "AGENTS.md" }, { path: ".agents/skills/x/SKILL.md" }] }), /other adapter/u);
