@@ -17,7 +17,7 @@ import { dirname, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { validateBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
-import { MATERIALIZATION_MANIFEST_NAME, validateMaterializationProjectionInventory } from "./ask-benchmark-materialize.mjs";
+import { MATERIALIZATION_MANIFEST_NAME, assertTrackedRepositoryMatchesHead, validateMaterializationProjectionInventory } from "./ask-benchmark-materialize.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
@@ -63,6 +63,11 @@ function withTemporaryTrackedChange(path, suffix, callback) {
   } finally {
     writeFileSync(path, original);
   }
+}
+
+function runGit(cwd, args) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 }
 
 function createSyntheticPortfolio(name, configure) {
@@ -189,6 +194,20 @@ try {
       expectFailure({ name, planPath, outputPath: resolve(work, `fail-${name.replaceAll(" ", "-")}`), pattern: /tracked working tree and index must match HEAD/u });
     });
   }
+
+  const indexDirtyRepository = resolve(work, "index-dirty-repository");
+  mkdirSync(indexDirtyRepository);
+  runGit(indexDirtyRepository, ["init"]);
+  runGit(indexDirtyRepository, ["config", "user.email", "benchmark@example.invalid"]);
+  runGit(indexDirtyRepository, ["config", "user.name", "ASK benchmark test"]);
+  const indexDirtySource = resolve(indexDirtyRepository, "source.txt");
+  writeFileSync(indexDirtySource, "clean\n");
+  runGit(indexDirtyRepository, ["add", "source.txt"]);
+  runGit(indexDirtyRepository, ["commit", "-m", "Initial source"]);
+  assert.doesNotThrow(() => assertTrackedRepositoryMatchesHead(indexDirtyRepository));
+  writeFileSync(indexDirtySource, "staged change\n");
+  runGit(indexDirtyRepository, ["add", "source.txt"]);
+  assert.throws(() => assertTrackedRepositoryMatchesHead(indexDirtyRepository), /tracked working tree and index must match HEAD/u);
 
   const directEvaluator = createSyntheticPortfolio("direct_evaluator", ({ fixture }) => ({ records: [manifestRecord(fixture, "evaluator/expected.json")] }));
   expectFailure({ name: "direct evaluator leakage", configPath: directEvaluator.configPath, planPath: directEvaluator.planPath, pattern: /outside the agent-visible.*allowlist/u });
