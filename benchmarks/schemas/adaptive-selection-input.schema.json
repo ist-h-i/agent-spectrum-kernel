@@ -17,7 +17,7 @@
   ],
   "properties": {
     "task_class": { "type": "string", "minLength": 1 },
-    "observed_signals": { "$ref": "#/$defs/nonEmptyStringArray" },
+    "observed_signals": { "$ref": "#/$defs/observedSignalArray" },
     "selected_mechanisms": { "$ref": "#/$defs/nonEmptyStringArray" },
     "skipped_mechanisms": { "$ref": "#/$defs/nonEmptyStringArray" },
     "required_gates": { "$ref": "#/$defs/nonEmptyStringArray" },
@@ -67,6 +67,12 @@
     }
   },
   "$defs": {
+    "observedSignalArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": ".*\\S.*" }
+    },
     "nonEmptyStringArray": {
       "type": "array",
       "uniqueItems": true,

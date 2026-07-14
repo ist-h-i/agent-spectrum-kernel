@@ -161,6 +161,15 @@ function validateFixtureInputs({ root, config, plan }) {
   return validated;
 }
 
+function frozenFixtureInventory(records) {
+  return records.map((record) => ({
+    path: record.path === "task.md" ? "BENCHMARK_TASK.md" : record.path,
+    sha256: record.sha256,
+    bytes: record.bytes,
+    mode: `0${record.mode.toString(8).padStart(3, "0")}`,
+  }));
+}
+
 export function assertExactPlanIdentity({ root, config, plan, repositoryRevision }) {
   const schemaPath = assertInside(root, resolve(root, config.execution_plan.schema_path), "execution plan schema");
   assertNoSymlinkSegments(config._configPath, "portfolio config");
@@ -388,6 +397,7 @@ export function validateMaterializedPortfolio({ root, config, plan, materialized
   if (!existsSync(materialized) || !lstatSync(materialized).isDirectory()) throw new Error(`materialized root must be an existing directory: ${materialized}`);
   assertNoSymlinkSegments(materialized, "materialized root");
   assertExactPlanIdentity({ root, config, plan, repositoryRevision });
+  const fixtureInputs = validateFixtureInputs({ root, config, plan });
 
   const manifestPath = assertInside(materialized, resolve(materialized, MATERIALIZATION_MANIFEST_NAME), "materialization manifest");
   assertNoSymlinkSegments(manifestPath, "materialization manifest");
@@ -444,6 +454,8 @@ export function validateMaterializedPortfolio({ root, config, plan, materialized
     })) throw new Error(`${record.case_id} actual case bytes reintroduce evaluator material`);
     const projectedInventory = actualInventory.filter((entry) => entry.path !== "BENCHMARK_TASK.md" && !entry.path.startsWith("workspace/"));
     const frozenInventory = actualInventory.filter((entry) => entry.path === "BENCHMARK_TASK.md" || entry.path.startsWith("workspace/"));
+    const fixture = fixtureInputs.get(record.fixture);
+    if (!fixture || !sameInventory(frozenInventory, frozenFixtureInventory(fixture.records))) throw new Error(`${record.case_id} frozen input does not match the fixture manifest`);
     if (!sameInventory(actualInventory, [...record.agent_visible_files, ...record.projected_asset_inventory])) throw new Error(`${record.case_id} actual case files do not match the declared inventory`);
     if (!sameInventory(frozenInventory, record.agent_visible_files) || !sameInventory(projectedInventory, record.projected_asset_inventory)) throw new Error(`${record.case_id} case inventory partition drifted`);
     validateMaterializationProjectionInventory({ adapter: record.adapter, condition: record.condition, inventory: projectedInventory });

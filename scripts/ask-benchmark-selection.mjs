@@ -142,7 +142,14 @@ function bindingFor(context) {
   };
 }
 
+function assertObservedSignals(input) {
+  if (!Array.isArray(input.observed_signals) || input.observed_signals.length === 0 || input.observed_signals.some((value) => typeof value !== "string" || value.trim() === "")) {
+    throw new Error("Adaptive selection must preserve at least one non-blank observed signal");
+  }
+}
+
 function assertSelectionInputSemantics(input, context) {
+  assertObservedSignals(input);
   assertBenchmarkSchemaInstance(input, { schemaPath: resolve(context.root, ADAPTIVE_SELECTION_INPUT_SCHEMA_PATH), label: "Adaptive selection input" });
   const { materializedCase, planCase } = context;
   if (input.task_class !== planCase.task_class) throw new Error(`${materializedCase.case_id} selection task_class does not match the execution plan`);

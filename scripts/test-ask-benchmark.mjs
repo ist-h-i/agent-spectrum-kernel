@@ -139,6 +139,7 @@ const orderSignature = (plan) => [...groupBy(plan.cases, (entry) => entry.block_
 assert.notEqual(orderSignature(alternatePortfolioPlan), orderSignature(portfolioPlan));
 
 const selectionSchema = JSON.parse(readFileSync(resolve(root, "benchmarks/schemas/adaptive-selection.schema.json"), "utf8"));
+const selectionInputSchema = JSON.parse(readFileSync(resolve(root, "benchmarks/schemas/adaptive-selection-input.schema.json"), "utf8"));
 const planSchemaPath = resolve(root, "benchmarks/schemas/execution-plan.schema.json");
 const planSchema = JSON.parse(readFileSync(planSchemaPath, "utf8"));
 const configSchema = JSON.parse(readFileSync(resolve(root, "benchmarks/schemas/portfolio-config.schema.json"), "utf8"));
@@ -151,6 +152,11 @@ for (const field of ["plan_id", "plan_digest", "materialization_manifest_digest"
 }
 for (const prohibited of ["result", "score", "correctness", "recommendation", "completion_claim"]) {
   assert.equal(Object.hasOwn(selectionSchema.properties, prohibited), false);
+}
+for (const schema of [selectionInputSchema, selectionSchema]) {
+  assert.equal(schema.properties.observed_signals.$ref, "#/$defs/observedSignalArray");
+  assert.equal(schema.$defs.observedSignalArray.minItems, 1);
+  assert.equal(schema.$defs.observedSignalArray.items.pattern, ".*\\S.*");
 }
 
 assert.deepEqual(validateBenchmarkSchemaInstance(portfolioPlan, { schemaPath: planSchemaPath }), []);
