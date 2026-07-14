@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK deterministic materialization manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "materializer",
+    "plan",
+    "source_identity",
+    "output_root_identity",
+    "creation_status",
+    "case_count",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/materialization-manifest.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio_materialization" },
+    "materializer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "source_revision"],
+      "properties": {
+        "version": { "const": "1.0.0" },
+        "source_revision": { "$ref": "#/$defs/revision" }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_id", "digest"],
+      "properties": {
+        "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
+        "digest": { "$ref": "#/$defs/prefixedDigest" }
+      }
+    },
+    "source_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config_path", "config_sha256", "protocol_path", "protocol_sha256", "repository_revision"],
+      "properties": {
+        "config_path": { "$ref": "#/$defs/relativePath" },
+        "config_sha256": { "$ref": "#/$defs/digest" },
+        "protocol_path": { "$ref": "#/$defs/relativePath" },
+        "protocol_sha256": { "$ref": "#/$defs/digest" },
+        "repository_revision": { "$ref": "#/$defs/revision" }
+      }
+    },
+    "output_root_identity": { "$ref": "#/$defs/prefixedDigest" },
+    "creation_status": { "const": "complete" },
+    "case_count": { "type": "integer", "minimum": 1 },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "prefixedDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes", "mode"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/digest" },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "mode": { "type": "string", "pattern": "^0[0-7]{3}$" }
+      }
+    },
+    "canonicalSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/prefixedDigest" }
+      }
+    },
+    "projectionEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter_id",
+        "selected_profile",
+        "renderer_id",
+        "renderer_version",
+        "projection_fingerprint",
+        "canonical_source_digests",
+        "evidence_level",
+        "capability_status",
+        "capability_downgrade",
+        "unavailable_reason",
+        "adaptive_projection"
+      ],
+      "properties": {
+        "adapter_id": { "enum": ["codex", "claude"] },
+        "selected_profile": { "enum": ["plain", "kernel", "adaptive-boundary", "full"] },
+        "renderer_id": { "type": "string", "minLength": 1 },
+        "renderer_version": { "type": "string", "minLength": 1 },
+        "projection_fingerprint": { "$ref": "#/$defs/prefixedDigest" },
+        "canonical_source_digests": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/canonicalSource" }
+        },
+        "evidence_level": { "enum": ["fixture_only", "repository_projection", "projection_boundary"] },
+        "capability_status": { "enum": ["available", "boundary_only", "unavailable"] },
+        "capability_downgrade": { "type": ["string", "null"] },
+        "unavailable_reason": { "type": ["string", "null"] },
+        "adaptive_projection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["boundary_status", "mechanisms_selected", "selection_seal_produced", "runtime_execution_attempted"],
+          "properties": {
+            "boundary_status": { "enum": ["not_applicable", "available_pre_selection"] },
+            "mechanisms_selected": { "const": false },
+            "selection_seal_produced": { "const": false },
+            "runtime_execution_attempted": { "const": false }
+          }
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "block_id",
+        "adapter",
+        "condition",
+        "fixture",
+        "repetition",
+        "registered_repetitions",
+        "condition_order_position",
+        "frozen_input_digest",
+        "task_digest",
+        "workspace_digest",
+        "condition_projection_digest",
+        "agent_visible_files",
+        "projected_asset_inventory",
+        "projection_evidence",
+        "evaluator_leakage_status",
+        "path_validation_status",
+        "symlink_validation_status",
+        "materialization_status"
+      ],
+      "properties": {
+        "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+        "block_id": { "type": "string", "pattern": "^block-[a-f0-9]{16}-[a-f0-9]{12}$" },
+        "adapter": { "enum": ["codex", "claude"] },
+        "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+        "fixture": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "registered_repetitions": { "enum": [3, 5] },
+        "condition_order_position": { "type": "integer", "minimum": 1, "maximum": 4 },
+        "frozen_input_digest": { "$ref": "#/$defs/prefixedDigest" },
+        "task_digest": { "$ref": "#/$defs/prefixedDigest" },
+        "workspace_digest": { "$ref": "#/$defs/prefixedDigest" },
+        "condition_projection_digest": { "$ref": "#/$defs/prefixedDigest" },
+        "agent_visible_files": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/file" }
+        },
+        "projected_asset_inventory": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/file" }
+        },
+        "projection_evidence": { "$ref": "#/$defs/projectionEvidence" },
+        "evaluator_leakage_status": { "const": "passed" },
+        "path_validation_status": { "const": "passed" },
+        "symlink_validation_status": { "const": "passed" },
+        "materialization_status": { "const": "complete" }
+      }
+    }
+  }
+}

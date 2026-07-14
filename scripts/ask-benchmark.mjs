@@ -19,14 +19,15 @@ import { tmpdir } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { assertBenchmarkSchemaInstance, computePortfolioPlanId } from "./ask-benchmark-schema.mjs";
+import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { buildPortfolioPlan, PORTFOLIO_CONDITIONS } from "./ask-benchmark-plan.mjs";
+import { materializePortfolio } from "./ask-benchmark-materialize.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_CONFIG_PATH = resolve(ROOT, "benchmarks/checkpoint-b.config.json");
 const OUTPUT_SCHEMA_PATH = resolve(ROOT, "benchmarks/schemas/agent-output.schema.json");
 const CONDITIONS = ["plain", "kernel_only", "full_ask"];
 const PORTFOLIO_SCHEMA_VERSION = "3.0.0";
-const PORTFOLIO_CONDITIONS = ["plain", "kernel_only", "adaptive_ask", "full_ask"];
 const PORTFOLIO_CONDITION_ROLES = ["context_baseline", "default_product", "primary_product", "diagnostic_maximum"];
 const PORTFOLIO_ADAPTER_TRACKS = ["codex", "claude"];
 
@@ -45,10 +46,11 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, runDir: null, seed: null, agentBin: "codex", configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, plan: null, runDir: null, seed: null, agentBin: "codex", configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
+    else if (flag === "--plan") args.plan = resolve(argv.shift());
     else if (flag === "--run-dir") args.runDir = resolve(argv.shift());
     else if (flag === "--seed") args.seed = argv.shift();
     else if (flag === "--agent-bin") args.agentBin = resolve(argv.shift());
@@ -65,6 +67,7 @@ function help() {
 Commands:
   validate [--config <config.json>]
   plan --config <portfolio-config.json> --output <execution-plan.json> --seed <value>
+  materialize --config <portfolio-config.json> --plan <execution-plan.json> --output <absent-or-empty-directory>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
   score [--config <config.json>] --run-dir <completed-directory> --output <normalized-result.json>
@@ -89,6 +92,17 @@ function git(cwd, args, options = {}) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 10 * 1024 * 1024, ...options });
   if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed in ${cwd}: ${result.stderr || result.stdout}`);
   return result.stdout.trim();
+}
+
+function repositoryFileDigestMatches(revision, path, expectedHash) {
+  if (!/^[a-f0-9]{40}$/.test(revision ?? "")) return false;
+  const repositoryPath = relative(ROOT, path);
+  const result = spawnSync("git", ["show", `${revision}:${repositoryPath}`], {
+    cwd: ROOT,
+    encoding: null,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  return result.status === 0 && sha256(result.stdout) === expectedHash;
 }
 
 function equalOrderedValues(actual, expected) {
@@ -198,10 +212,10 @@ function validateProtocol(configPath = DEFAULT_CONFIG_PATH) {
       if (attribution.model?.current !== config.runtime.model) errors.push("Checkpoint C model attribution must match runtime.model");
       if (attribution.cli?.current !== config.runtime.agent_version) errors.push("Checkpoint C CLI attribution must match runtime.agent_version");
       if (attribution.repository?.fixture_inputs_changed !== false) errors.push("Checkpoint C must explicitly preserve frozen fixture inputs");
-      for (const [pathValue, expectedHash, label] of [
-        [attribution.baseline_result_path, null, "baseline result"],
-        [attribution.fixture_manifest_path, attribution.fixture_manifest_sha256, "fixture manifest"],
-        [attribution.adapter?.runtime_bundle_path, attribution.adapter?.runtime_bundle_sha256, "adapter runtime bundle"],
+      for (const [pathValue, expectedHash, label, frozenRevision] of [
+        [attribution.baseline_result_path, null, "baseline result", null],
+        [attribution.fixture_manifest_path, attribution.fixture_manifest_sha256, "fixture manifest", null],
+        [attribution.adapter?.runtime_bundle_path, attribution.adapter?.runtime_bundle_sha256, "adapter runtime bundle", attribution.architecture?.merge_revision],
       ]) {
         if (!pathValue) {
           errors.push(`Checkpoint C ${label} path is required`);
@@ -209,7 +223,7 @@ function validateProtocol(configPath = DEFAULT_CONFIG_PATH) {
         }
         const path = resolveRepoPath(pathValue, label);
         if (!existsSync(path)) errors.push(`Checkpoint C ${label} is missing: ${pathValue}`);
-        else if (expectedHash && sha256(readFileSync(path)) !== expectedHash) errors.push(`Checkpoint C ${label} digest does not match: ${pathValue}`);
+        else if (expectedHash && sha256(readFileSync(path)) !== expectedHash && !repositoryFileDigestMatches(frozenRevision, path, expectedHash)) errors.push(`Checkpoint C ${label} digest does not match: ${pathValue}`);
       }
     }
   }
@@ -274,13 +288,7 @@ function projectCondition(target, condition) {
 }
 
 function requireLegacyConfig(config, command) {
-  if (config._kind !== "legacy") throw new Error(`${command} does not yet execute portfolio configs; use plan until the materialization slice is implemented`);
-}
-
-function balancedConditionOrder(seed, adapterTrack, fixtureId, repetition) {
-  const base = [...PORTFOLIO_CONDITIONS].sort((left, right) => sha256(`${seed}:condition-base:${adapterTrack}:${fixtureId}:${left}`).localeCompare(sha256(`${seed}:condition-base:${adapterTrack}:${fixtureId}:${right}`)));
-  const shift = (repetition - 1) % base.length;
-  return [...base.slice(shift), ...base.slice(0, shift)];
+  if (config._kind !== "legacy") throw new Error(`${command} does not execute portfolio configs; use plan/materialize because portfolio runtime execution and scoring remain out of scope`);
 }
 
 function planPortfolio(args) {
@@ -288,64 +296,25 @@ function planPortfolio(args) {
   if (config._kind !== "portfolio") throw new Error("plan requires an Adaptive portfolio config");
   if (!args.output || !args.seed) throw new Error("plan requires --output and --seed");
   if (existsSync(args.output)) throw new Error(`plan output must not already exist: ${args.output}`);
-  const configSha256 = sha256(readFileSync(config._configPath));
-  const protocolSha256 = sha256(readFileSync(config._protocolPath));
   const repositoryRevision = git(ROOT, ["rev-parse", "HEAD"]);
-  const seedSha256 = sha256(args.seed);
-  const planId = computePortfolioPlanId({ configSha256, protocolSha256, repositoryRevision, seed: args.seed });
-  const planDigest = planId.slice("plan-".length);
-  const blocks = [];
-  for (const adapter of config.adapter_tracks) {
-    for (const fixture of config.fixtures) {
-      for (let repetition = 1; repetition <= fixture.repetitions; repetition += 1) {
-        const blockId = `block-${planDigest.slice(0, 16)}-${sha256(`${planId}:${adapter.id}:${fixture.id}:${repetition}`).slice(0, 12)}`;
-        const orderedConditions = balancedConditionOrder(args.seed, adapter.id, fixture.id, repetition);
-        const cases = orderedConditions.map((condition, index) => ({
-          case_id: `case-${planDigest.slice(0, 16)}-${sha256(`${planId}:${adapter.id}:${fixture.id}:${repetition}:${condition}`).slice(0, 16)}`,
-          block_id: blockId,
-          adapter_track: adapter.id,
-          fixture_id: fixture.id,
-          suite: fixture.suite,
-          task_class: fixture.task_class,
-          difficulty: fixture.difficulty,
-          aggregate_eligible: fixture.aggregate_eligible,
-          repetition,
-          registered_repetitions: fixture.repetitions,
-          condition,
-          condition_order_position: index + 1,
-          input_manifest_path: fixture.input_manifest_path,
-          input_manifest_sha256: fixture.input_manifest_sha256,
-        }));
-        blocks.push({ order_key: sha256(`${args.seed}:block-order:${adapter.id}:${fixture.id}:${repetition}`), cases });
-      }
-    }
-  }
-  blocks.sort((left, right) => left.order_key.localeCompare(right.order_key));
-  const plan = {
-    schema_version: config.execution_plan.schema_version,
-    schema_path: config.execution_plan.schema_path,
-    program: config.program,
-    plan_id: planId,
-    protocol_path: relative(ROOT, config._protocolPath),
-    protocol_sha256: protocolSha256,
-    config_path: relative(ROOT, config._configPath),
-    config_sha256: configSha256,
-    repository_revision: repositoryRevision,
-    randomization_seed: {
-      seed_id: `seed-${seedSha256.slice(0, 16)}`,
-      value: args.seed,
-      sha256: seedSha256,
-    },
-    ordering_strategy: config.ordering.strategy,
-    conditions: config.conditions.map((entry) => entry.id),
-    adapter_tracks: config.adapter_tracks.map((entry) => ({ id: entry.id, runtime_status: entry.runtime_status })),
-    pool_adapter_results: config.pool_adapter_results,
-    cases: blocks.flatMap((block) => block.cases),
-  };
+  const plan = buildPortfolioPlan({ root: ROOT, config, repositoryRevision, seed: args.seed });
   const planSchemaPath = resolveRepoPath(config.execution_plan.schema_path, "execution plan schema");
   assertBenchmarkSchemaInstance(plan, { schemaPath: planSchemaPath, label: "execution plan" });
   writeJson(args.output, plan);
   console.log(`Wrote deterministic portfolio plan with ${plan.cases.length} cases to ${args.output}`);
+}
+
+function materialize(args) {
+  const config = validateProtocol(args.configPath);
+  if (config._kind !== "portfolio") throw new Error("materialize requires an Adaptive portfolio config");
+  const manifest = materializePortfolio({
+    root: ROOT,
+    config,
+    planPath: args.plan,
+    outputPath: args.output,
+    repositoryRevision: git(ROOT, ["rev-parse", "HEAD"]),
+  });
+  console.log(`Materialized ${manifest.case_count} deterministic portfolio cases to ${args.output}`);
 }
 
 function prepare(args) {
@@ -785,6 +754,7 @@ try {
     validateProtocol(args.configPath);
     console.log("ASK benchmark protocol validation passed");
   } else if (args.command === "plan") planPortfolio(args);
+  else if (args.command === "materialize") materialize(args);
   else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);
   else if (args.command === "score") score(args);
