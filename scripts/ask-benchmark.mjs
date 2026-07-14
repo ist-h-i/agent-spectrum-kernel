@@ -21,7 +21,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { buildPortfolioPlan, PORTFOLIO_CONDITIONS } from "./ask-benchmark-plan.mjs";
-import { materializePortfolio } from "./ask-benchmark-materialize.mjs";
+import { assertTrackedRepositoryMatchesHead, materializePortfolio } from "./ask-benchmark-materialize.mjs";
 import { sealAdaptiveSelection, verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -47,7 +47,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, testSelectedAt: null, runDir: null, seed: null, agentBin: "codex", configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -56,7 +56,6 @@ function parseArgs(argv) {
     else if (flag === "--state-dir") args.stateDir = resolve(argv.shift());
     else if (flag === "--case-id") args.caseId = argv.shift();
     else if (flag === "--input") args.input = resolve(argv.shift());
-    else if (flag === "--test-selected-at") args.testSelectedAt = argv.shift();
     else if (flag === "--run-dir") args.runDir = resolve(argv.shift());
     else if (flag === "--seed") args.seed = argv.shift();
     else if (flag === "--agent-bin") args.agentBin = resolve(argv.shift());
@@ -74,7 +73,7 @@ Commands:
   validate [--config <config.json>]
   plan --config <portfolio-config.json> --output <execution-plan.json> --seed <value>
   materialize --config <portfolio-config.json> --plan <execution-plan.json> --output <absent-or-empty-directory>
-  seal-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id> --input <selection-input.json> [--test-selected-at <RFC-3339>]
+  seal-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id> --input <selection-input.json>
   verify-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
@@ -326,6 +325,7 @@ function materialize(args) {
 }
 
 function sealSelection(args) {
+  assertTrackedRepositoryMatchesHead(ROOT);
   const config = validateProtocol(args.configPath);
   if (config._kind !== "portfolio") throw new Error("seal-selection requires an Adaptive portfolio config");
   if (!args.input) throw new Error("seal-selection requires --input");
@@ -339,12 +339,12 @@ function sealSelection(args) {
     caseId: args.caseId,
     input: readJson(args.input),
     repositoryRevision: git(ROOT, ["rev-parse", "HEAD"]),
-    testSelectedAt: args.testSelectedAt,
   });
   console.log(`Sealed Adaptive selection for ${record.case_id}: sha256:${record.selection_digest.value}`);
 }
 
 function verifySelection(args) {
+  assertTrackedRepositoryMatchesHead(ROOT);
   const config = validateProtocol(args.configPath);
   if (config._kind !== "portfolio") throw new Error("verify-selection requires an Adaptive portfolio config");
   const record = verifyAdaptiveSelection({

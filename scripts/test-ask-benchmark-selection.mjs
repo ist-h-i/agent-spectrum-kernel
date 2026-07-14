@@ -2,10 +2,10 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { computeSelectionDigest } from "./ask-benchmark-selection.mjs";
+import { computeSelectionDigest, sealAdaptiveSelection } from "./ask-benchmark-selection.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -34,6 +34,47 @@ function differentHex(value) {
   return value.startsWith("sha256:") ? `sha256:${changed}` : changed;
 }
 
+function repositoryRevision() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return result.stdout.trim();
+}
+
+function portfolioConfigForSelection() {
+  const value = JSON.parse(readFileSync(config, "utf8"));
+  return {
+    ...value,
+    _kind: "portfolio",
+    _configPath: config,
+    _protocolPath: resolve(root, value.protocol_path),
+  };
+}
+
+function withTemporaryTrackedChange(path, suffix, callback) {
+  const original = readFileSync(path);
+  try {
+    writeFileSync(path, Buffer.concat([original, Buffer.from(suffix)]));
+    callback();
+  } finally {
+    writeFileSync(path, original);
+  }
+}
+
+function withTemporaryIndexChange(path, suffix, callback) {
+  const original = readFileSync(path);
+  const repositoryPath = relative(root, path);
+  try {
+    writeFileSync(path, Buffer.concat([original, Buffer.from(suffix)]));
+    const staged = spawnSync("git", ["add", repositoryPath], { cwd: root, encoding: "utf8" });
+    assert.equal(staged.status, 0, staged.stderr || staged.stdout);
+    callback();
+  } finally {
+    writeFileSync(path, original);
+    const restored = spawnSync("git", ["add", repositoryPath], { cwd: root, encoding: "utf8" });
+    assert.equal(restored.status, 0, restored.stderr || restored.stdout);
+  }
+}
+
 try {
   const planPath = resolve(work, "plan.json");
   const materialized = resolve(work, "materialized");
@@ -49,9 +90,10 @@ try {
   const claudeCase = adaptive.find((entry) => entry.adapter === "claude");
   const downgradeCase = adaptive.find((entry) => entry.case_id !== codexCase.case_id && entry.case_id !== claudeCase.case_id);
   const sealedCaseIds = new Set([codexCase.case_id, claudeCase.case_id, downgradeCase.case_id]);
-  const spareCase = adaptive.find((entry) => !sealedCaseIds.has(entry.case_id));
-  const crossAdapterCase = adaptive.find((entry) => entry.adapter !== codexCase.adapter && !sealedCaseIds.has(entry.case_id));
-  assert.ok(codexCase && claudeCase && downgradeCase && spareCase && crossAdapterCase);
+  const dirtyCase = adaptive.find((entry) => !sealedCaseIds.has(entry.case_id));
+  const spareCase = adaptive.find((entry) => !sealedCaseIds.has(entry.case_id) && entry.case_id !== dirtyCase.case_id);
+  const crossAdapterCase = adaptive.find((entry) => entry.adapter !== codexCase.adapter && !sealedCaseIds.has(entry.case_id) && entry.case_id !== dirtyCase.case_id);
+  assert.ok(codexCase && claudeCase && downgradeCase && dirtyCase && spareCase && crossAdapterCase);
   const planCases = new Map(plan.cases.map((entry) => [entry.case_id, entry]));
 
   function selectionInput(caseRecord, overrides = {}) {
@@ -77,8 +119,8 @@ try {
     };
   }
 
-  function sealArgs(caseRecord, inputPath, state = stateDir, timestamp = "2026-07-14T16:00:00+09:00") {
-    return ["seal-selection", "--config", config, "--plan", planPath, "--materialized", materialized, "--state-dir", state, "--case-id", caseRecord.case_id, "--input", inputPath, "--test-selected-at", timestamp];
+  function sealArgs(caseRecord, inputPath, state = stateDir) {
+    return ["seal-selection", "--config", config, "--plan", planPath, "--materialized", materialized, "--state-dir", state, "--case-id", caseRecord.case_id, "--input", inputPath];
   }
 
   function verifyArgs(caseRecord, state = stateDir, selectedPlan = planPath) {
@@ -91,18 +133,36 @@ try {
     return path;
   }
 
-  const codexInputPath = inputFile("codex-selection", selectionInput(codexCase));
-  run(sealArgs(codexCase, codexInputPath));
-  const claudeInputPath = inputFile("claude-bypass-selection", selectionInput(claudeCase, {
+  function sealWithClock(caseRecord, input, state, selectedAt) {
+    return sealAdaptiveSelection({
+      root,
+      config: portfolioConfigForSelection(),
+      planPath,
+      materializedPath: materialized,
+      stateDir: state,
+      caseId: caseRecord.case_id,
+      input,
+      repositoryRevision: repositoryRevision(),
+      now: () => selectedAt,
+    });
+  }
+
+  const codexInput = selectionInput(codexCase);
+  const codexInputPath = inputFile("codex-selection", codexInput);
+  const codexSealed = sealWithClock(codexCase, codexInput, stateDir, "2026-07-14T16:00:00+09:00");
+  assert.equal(codexSealed.selected_at, "2026-07-14T16:00:00+09:00");
+  const claudeInput = selectionInput(claudeCase, {
     selected_mechanisms: [],
     skipped_mechanisms: ["repository-orientation", "agent-orchestration"],
     lightweight_bypass: { used: true, reason: "The observed task is localized and needs no additional mechanism." },
-  }));
-  run(sealArgs(claudeCase, claudeInputPath, stateDir, "2026-07-14T16:00:01+09:00"));
-  const downgradeInputPath = inputFile("capability-downgrade-selection", selectionInput(downgradeCase, {
+  });
+  const claudeInputPath = inputFile("claude-bypass-selection", claudeInput);
+  sealWithClock(claudeCase, claudeInput, stateDir, "2026-07-14T16:00:01+09:00");
+  const downgradeInput = selectionInput(downgradeCase, {
     capability_downgrades: [{ capability: "remote-runtime-probe", reason: "Runtime capability is not evidenced in this selection-only slice." }],
-  }));
-  run(sealArgs(downgradeCase, downgradeInputPath, stateDir, "2026-07-14T16:00:02+09:00"));
+  });
+  const downgradeInputPath = inputFile("capability-downgrade-selection", downgradeInput);
+  sealWithClock(downgradeCase, downgradeInput, stateDir, "2026-07-14T16:00:02+09:00");
 
   const selectionsDir = resolve(stateDir, "selections");
   const codexSelectionPath = resolve(selectionsDir, `${codexCase.case_id}.json`);
@@ -133,6 +193,21 @@ try {
   assert.deepEqual(readFileSync(indexPath), indexBytesBeforeVerify, "verification must not rewrite state identity");
 
   const spareInputPath = inputFile("spare-selection", selectionInput(spareCase));
+  const dirtyInputPath = inputFile("dirty-selection", selectionInput(dirtyCase));
+  withTemporaryTrackedChange(resolve(root, "benchmarks/schemas/adaptive-selection-input.schema.json"), "\n", () => {
+    expectFailure("dirty selection input schema", sealArgs(dirtyCase, dirtyInputPath), /tracked working tree and index must match HEAD/u);
+  });
+  withTemporaryTrackedChange(resolve(root, "scripts/ask-benchmark-selection.mjs"), "\n// selection dirty-source regression\n", () => {
+    expectFailure("dirty selection sealer source", verifyArgs(codexCase), /tracked working tree and index must match HEAD/u);
+  });
+  withTemporaryIndexChange(resolve(root, "benchmarks/schemas/adaptive-selection-state.schema.json"), "\n", () => {
+    expectFailure("index-only dirty selection state schema", verifyArgs(codexCase), /tracked working tree and index must match HEAD/u);
+  });
+  run(sealArgs(dirtyCase, dirtyInputPath));
+  run(verifyArgs(dirtyCase));
+  sealedCaseIds.add(dirtyCase.case_id);
+  expectFailure("public timestamp override", [...sealArgs(spareCase, spareInputPath), "--test-selected-at", "2026-07-14T16:00:03+09:00"], /Unknown argument: --test-selected-at/u);
+
   const nonAdaptive = manifest.cases.find((entry) => entry.condition === "plain");
   expectFailure("non-Adaptive case", sealArgs(nonAdaptive, inputFile("plain-selection", selectionInput(codexCase))), /not an Adaptive ASK case/u);
   expectFailure("missing case", sealArgs({ case_id: "case-0000000000000000-0000000000000000" }, spareInputPath), /does not exist/u);
@@ -236,8 +311,8 @@ try {
   chmodSync(indexPath, 0o444);
   expectFailure("cross-plan reuse", verifyArgs(codexCase, stateDir, wrongPlanPath), /plan identity mismatch/u);
 
-  expectFailure("second seal", sealArgs(codexCase, codexInputPath, stateDir, "2026-07-14T16:00:03+09:00"), /already sealed/u);
-  expectFailure("timestamp-only reseal", sealArgs(codexCase, codexInputPath, stateDir, "2026-07-14T16:00:04+09:00"), /already sealed/u);
+  expectFailure("second seal", sealArgs(codexCase, codexInputPath), /already sealed/u);
+  assert.throws(() => sealWithClock(codexCase, codexInput, stateDir, "2026-07-14T16:00:04+09:00"), /already sealed/u, "a test-injected clock must not permit a reseal");
   const sealedBackup = readFileSync(codexSelectionPath);
   unlinkSync(codexSelectionPath);
   expectFailure("missing sealed selection after index record", sealArgs(codexCase, codexInputPath), /prior seal but its file is missing/u);
@@ -278,6 +353,31 @@ try {
     rmSync(resultArtifact, { force: true });
     writeFileSync(manifestPath, originalManifestBytes);
   }
+  function expectWorkspaceBenchmarkArtifact(relativePath) {
+    const artifactPaths = [];
+    try {
+      const resultManifest = JSON.parse(originalManifestBytes);
+      for (const resultCase of resultManifest.cases.filter((entry) => entry.block_id === spareCase.block_id)) {
+        const artifactPath = resolve(materialized, resultCase.case_id, relativePath);
+        mkdirSync(dirname(artifactPath), { recursive: true });
+        writeFileSync(artifactPath, "{}\n");
+        artifactPaths.push(artifactPath);
+        const artifactBytes = readFileSync(artifactPath);
+        resultCase.agent_visible_files.push({ path: relativePath, sha256: createHash("sha256").update(artifactBytes).digest("hex"), bytes: artifactBytes.length, mode: "0644" });
+        resultCase.agent_visible_files.sort((left, right) => left.path.localeCompare(right.path));
+        resultCase.frozen_input_digest = canonicalDigest(resultCase.agent_visible_files);
+        resultCase.workspace_digest = canonicalDigest(resultCase.agent_visible_files.filter((entry) => entry.path.startsWith("workspace/")));
+      }
+      writeJson(manifestPath, resultManifest);
+      expectFailure(`workspace benchmark artifact ${relativePath}`, sealArgs(spareCase, spareInputPath, resolve(work, `state-${relativePath.replaceAll(/[^a-z0-9]+/giu, "-")}`)), /result-like artifact/u);
+    } finally {
+      for (const artifactPath of artifactPaths) rmSync(artifactPath, { force: true });
+      writeFileSync(manifestPath, originalManifestBytes);
+    }
+  }
+  expectWorkspaceBenchmarkArtifact("workspace/.benchmark-final.json");
+  expectWorkspaceBenchmarkArtifact("workspace/.benchmark-run.json");
+  expectWorkspaceBenchmarkArtifact("workspace/nested/.benchmark-events.jsonl");
   expectFailure("invalid lightweight bypass", sealArgs(spareCase, inputFile("invalid-bypass", selectionInput(spareCase, { lightweight_bypass: { used: true, reason: "invalid" } })), resolve(work, "state-invalid-bypass")), /must not claim selected mechanisms/u);
   expectFailure("empty selection without bypass", sealArgs(spareCase, inputFile("empty-selection", selectionInput(spareCase, { selected_mechanisms: [] })), resolve(work, "state-empty-selection")), /not a valid lightweight bypass/u);
   expectFailure("unsupported capability selected", sealArgs(spareCase, inputFile("unsupported-capability", selectionInput(spareCase, { selected_mechanisms: ["remote-runtime-probe"], capability_downgrades: [{ capability: "remote-runtime-probe", reason: "unavailable" }] })), resolve(work, "state-unsupported-capability")), /unavailable capability/u);

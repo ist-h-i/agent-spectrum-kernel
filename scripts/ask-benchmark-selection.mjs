@@ -15,7 +15,7 @@ import {
 } from "node:fs";
 import { parse, relative, resolve, sep } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
-import { canonicalDigest, stableCanonicalJson, validateMaterializedPortfolio } from "./ask-benchmark-materialize.mjs";
+import { assertTrackedRepositoryMatchesHead, canonicalDigest, stableCanonicalJson, validateMaterializedPortfolio } from "./ask-benchmark-materialize.mjs";
 
 export const ADAPTIVE_SELECTION_SCHEMA_PATH = "benchmarks/schemas/adaptive-selection.schema.json";
 export const ADAPTIVE_SELECTION_INPUT_SCHEMA_PATH = "benchmarks/schemas/adaptive-selection-input.schema.json";
@@ -59,10 +59,10 @@ function selectionPath(stateRoot, caseId) {
 
 function resultArtifactName(path) {
   const lower = path.toLowerCase();
-  if (lower.startsWith("workspace/")) return false;
   const base = lower.split("/").at(-1);
   if ([".benchmark-run.json", ".benchmark-final.json", ".benchmark-events.jsonl", ".benchmark-stderr.txt"].includes(base)) return true;
   if (base.startsWith(".benchmark-")) return true;
+  if (lower.startsWith("workspace/")) return false;
   return /(?:^|[-_.])(normalized[-_.]?)?(?:output|outputs|result|results|score|scores|telemetry)(?:[-_.]|$)/u.test(base);
 }
 
@@ -310,8 +310,9 @@ function loadSealedRecord(paths, context) {
   return { index, record, path };
 }
 
-export function sealAdaptiveSelection({ root, config, planPath, materializedPath, stateDir, caseId, input, repositoryRevision, now = () => new Date().toISOString(), testSelectedAt = null }) {
+export function sealAdaptiveSelection({ root, config, planPath, materializedPath, stateDir, caseId, input, repositoryRevision, now = () => new Date().toISOString() }) {
   if (!stateDir) throw new Error("seal-selection requires --state-dir");
+  assertTrackedRepositoryMatchesHead(root);
   const context = { ...selectionContext({ root, config, planPath, materializedPath, repositoryRevision, caseId }), root };
   assertSelectionInputSemantics(input, context);
   const paths = initializeStateRoot(stateDir, context.materializedRoot, { create: true });
@@ -333,7 +334,7 @@ export function sealAdaptiveSelection({ root, config, planPath, materializedPath
       rmSync(initialStaging, { recursive: true, force: true });
     }
   }
-  const selectedAt = assertRfc3339Timestamp(testSelectedAt ?? now());
+  const selectedAt = assertRfc3339Timestamp(now());
   const record = {
     schema_version: "2.0.0",
     ...bindingFor(context),
@@ -368,6 +369,7 @@ export function sealAdaptiveSelection({ root, config, planPath, materializedPath
 
 export function verifyAdaptiveSelection({ root, config, planPath, materializedPath, stateDir, caseId, repositoryRevision }) {
   if (!stateDir) throw new Error("verify-selection requires --state-dir");
+  assertTrackedRepositoryMatchesHead(root);
   const context = { ...selectionContext({ root, config, planPath, materializedPath, repositoryRevision, caseId }), root };
   const paths = initializeStateRoot(stateDir, context.materializedRoot, { create: false });
   const sealed = loadSealedRecord(paths, context);
