@@ -335,6 +335,10 @@ try {
   }
   mutateSealedRecord("modified sealed payload", (value) => { value.observed_signals = ["tampered signal"]; }, /sealed selection digest mismatch/u);
   mutateSealedRecord("modified seal digest", (value) => { value.selection_digest.value = differentHex(value.selection_digest.value); }, /sealed selection digest mismatch/u);
+  mutateSealedRecord("blank sealed observed signal", (value) => {
+    value.observed_signals = ["   "];
+    value.selection_digest.value = computeSelectionDigest(value);
+  }, /observed signal/u);
   mutateSealedRecord("result field in selection record", (value) => { value.result = "forbidden"; }, /failed JSON Schema validation/u);
 
   const resultArtifact = resolve(spareRoot, ".benchmark-run.json");
@@ -378,8 +382,40 @@ try {
   expectWorkspaceBenchmarkArtifact("workspace/.benchmark-final.json");
   expectWorkspaceBenchmarkArtifact("workspace/.benchmark-run.json");
   expectWorkspaceBenchmarkArtifact("workspace/nested/.benchmark-events.jsonl");
+  function expectFrozenFixtureAnchorFailure(relativePath) {
+    const originals = new Map();
+    try {
+      const resultManifest = JSON.parse(originalManifestBytes);
+      for (const resultCase of resultManifest.cases.filter((entry) => entry.block_id === spareCase.block_id)) {
+        const path = resolve(materialized, resultCase.case_id, relativePath);
+        const original = readFileSync(path);
+        originals.set(path, original);
+        writeFileSync(path, "rewritten frozen fixture bytes\n");
+        const bytes = readFileSync(path);
+        const inventory = resultCase.agent_visible_files.find((entry) => entry.path === relativePath);
+        assert.ok(inventory, `${resultCase.case_id} must declare ${relativePath} as a frozen input`);
+        inventory.sha256 = createHash("sha256").update(bytes).digest("hex");
+        inventory.bytes = bytes.length;
+        resultCase.frozen_input_digest = canonicalDigest(resultCase.agent_visible_files);
+        if (relativePath === "BENCHMARK_TASK.md") resultCase.task_digest = `sha256:${inventory.sha256}`;
+        else resultCase.workspace_digest = canonicalDigest(resultCase.agent_visible_files.filter((entry) => entry.path.startsWith("workspace/")));
+      }
+      writeJson(manifestPath, resultManifest);
+      expectFailure(`fixture anchor mutation ${relativePath}`, sealArgs(spareCase, spareInputPath, resolve(work, `state-fixture-${relativePath.replaceAll(/[^a-z0-9]+/giu, "-")}`)), /frozen input.*fixture manifest/u);
+    } finally {
+      for (const [path, original] of originals) writeFileSync(path, original);
+      writeFileSync(manifestPath, originalManifestBytes);
+    }
+  }
+  expectFrozenFixtureAnchorFailure("BENCHMARK_TASK.md");
+  const workspaceFixturePath = spareCase.agent_visible_files.find((entry) => entry.path.startsWith("workspace/") && entry.mode === "0644")?.path;
+  assert.ok(workspaceFixturePath, "a non-executable workspace fixture input is required for fixture-anchor coverage");
+  expectFrozenFixtureAnchorFailure(workspaceFixturePath);
   expectFailure("invalid lightweight bypass", sealArgs(spareCase, inputFile("invalid-bypass", selectionInput(spareCase, { lightweight_bypass: { used: true, reason: "invalid" } })), resolve(work, "state-invalid-bypass")), /must not claim selected mechanisms/u);
   expectFailure("empty selection without bypass", sealArgs(spareCase, inputFile("empty-selection", selectionInput(spareCase, { selected_mechanisms: [] })), resolve(work, "state-empty-selection")), /not a valid lightweight bypass/u);
+  expectFailure("empty observed signals", sealArgs(spareCase, inputFile("empty-observed-signals", selectionInput(spareCase, { observed_signals: [] })), resolve(work, "state-empty-observed-signals")), /observed signal/u);
+  expectFailure("empty observed signal", sealArgs(spareCase, inputFile("empty-observed-signal", selectionInput(spareCase, { observed_signals: [""] })), resolve(work, "state-empty-observed-signal")), /observed signal/u);
+  expectFailure("blank observed signal", sealArgs(spareCase, inputFile("blank-observed-signal", selectionInput(spareCase, { observed_signals: ["   "] })), resolve(work, "state-blank-observed-signal")), /observed signal/u);
   expectFailure("unsupported capability selected", sealArgs(spareCase, inputFile("unsupported-capability", selectionInput(spareCase, { selected_mechanisms: ["remote-runtime-probe"], capability_downgrades: [{ capability: "remote-runtime-probe", reason: "unavailable" }] })), resolve(work, "state-unsupported-capability")), /unavailable capability/u);
   const unknownField = selectionInput(spareCase);
   unknownField.unknown = true;
