@@ -512,6 +512,41 @@ exit 64
   assert.equal(readFileSync(logPath, "utf8"), beforeDeletedClaim, "an active state with a deleted claim must fail closed before spawn");
   assert.deepEqual(readdirSync(resolve(deletedClaimRun, "cases", recoveryCase.case_id, "attempts")), ["0001"], "deleted active claims must not allocate a new attempt");
 
+  const durableRequestLostClaimRun = resolve(work, "durable-request-lost-claim-run");
+  const durableRequestLostClaimExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", durableRequestLostClaimRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", recoveryCase.case_id];
+  run(durableRequestLostClaimExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_request_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const durableRequestLostClaimRoot = resolve(durableRequestLostClaimRun, "cases", recoveryCase.case_id);
+  const durableRequestLostClaimPath = resolve(durableRequestLostClaimRoot, "claim", "claim.json");
+  const durableRequestLostClaim = JSON.parse(readFileSync(durableRequestLostClaimPath, "utf8"));
+  const durableRequestLostClaimWorkspaceParent = resolve(tmpdir(), durableRequestLostClaim.workspace_parent);
+  rmSync(resolve(durableRequestLostClaimRoot, "claim"), { recursive: true, force: true });
+  run(["recover-case", "--run-dir", durableRequestLostClaimRun, "--case-id", recoveryCase.case_id, "--claim-id", durableRequestLostClaim.claim_id, "--reason", "durable request lost claim"]);
+  const durableRequestLostClaimState = JSON.parse(readFileSync(resolve(durableRequestLostClaimRoot, "state.json"), "utf8"));
+  assert.equal(durableRequestLostClaimState.status, "interrupted", "durable request evidence must recover an active case whose claim directory disappeared");
+  assert.deepEqual(terminalInventory(durableRequestLostClaimRun, recoveryCase.case_id, "0001"), ["commit.json", "request.json", "result.json"], "lost-claim recovery must publish closed interrupted evidence");
+  assert.equal(existsSync(durableRequestLostClaimWorkspaceParent), false, "lost-claim recovery must remove the owned ephemeral workspace");
+
+  const tamperedDurableRequestRun = resolve(work, "tampered-durable-request-run");
+  const tamperedDurableRequestExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", tamperedDurableRequestRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", recoveryCase.case_id];
+  run(tamperedDurableRequestExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_request_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const tamperedDurableRequestCaseRoot = resolve(tamperedDurableRequestRun, "cases", recoveryCase.case_id);
+  const tamperedDurableRequestClaimPath = resolve(tamperedDurableRequestCaseRoot, "claim", "claim.json");
+  const tamperedDurableRequestClaim = JSON.parse(readFileSync(tamperedDurableRequestClaimPath, "utf8"));
+  const tamperedDurableRequestPath = resolve(tamperedDurableRequestCaseRoot, "attempts", "0001", "request.json");
+  const originalDurableRequest = JSON.parse(readFileSync(tamperedDurableRequestPath, "utf8"));
+  rmSync(resolve(tamperedDurableRequestCaseRoot, "claim"), { recursive: true, force: true });
+  writeJson(tamperedDurableRequestPath, { ...originalDurableRequest, claim: { ...originalDurableRequest.claim, worker_id: `${originalDurableRequest.claim.worker_id}-tampered` } });
+  const tamperedWorkspaceParent = resolve(tmpdir(), tamperedDurableRequestClaim.workspace_parent);
+  const tamperedStateBefore = readFileSync(resolve(tamperedDurableRequestCaseRoot, "state.json"));
+  const tamperedRequestBefore = readFileSync(tamperedDurableRequestPath);
+  const tamperedWorkspaceBefore = directorySnapshot(tamperedWorkspaceParent);
+  run(["recover-case", "--run-dir", tamperedDurableRequestRun, "--case-id", recoveryCase.case_id, "--claim-id", tamperedDurableRequestClaim.claim_id, "--reason", "tampered durable request"], { expectedStatus: 1 });
+  assert.deepEqual(readFileSync(resolve(tamperedDurableRequestCaseRoot, "state.json")), tamperedStateBefore, "rejected lost-claim recovery must not change case state");
+  assert.deepEqual(readFileSync(tamperedDurableRequestPath), tamperedRequestBefore, "rejected lost-claim recovery must not change durable request evidence");
+  assert.deepEqual(directorySnapshot(tamperedWorkspaceParent), tamperedWorkspaceBefore, "rejected lost-claim recovery must not change the ephemeral workspace");
+  writeJson(tamperedDurableRequestPath, originalDurableRequest);
+  run(["recover-case", "--run-dir", tamperedDurableRequestRun, "--case-id", recoveryCase.case_id, "--claim-id", tamperedDurableRequestClaim.claim_id, "--reason", "restored durable request"]);
+
   const replacedClaimRun = resolve(work, "active-claim-replaced-run");
   cpSync(recoveryRun, replacedClaimRun, { recursive: true });
   const replacedClaimPath = resolve(replacedClaimRun, "cases", recoveryCase.case_id, "claim", "claim.json");

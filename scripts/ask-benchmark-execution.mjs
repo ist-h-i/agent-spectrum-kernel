@@ -963,6 +963,18 @@ function normalizedProjection(projection) {
   };
 }
 
+function requestClaimRecord(claim) {
+  return {
+    id: claim.claim_id,
+    worker_id: claim.worker_id,
+    pid: claim.pid,
+    acquired_at: claim.acquired_at,
+    lease_expires_at: claim.lease_expires_at,
+    workspace_parent: claim.workspace_parent,
+    workspace_token: claim.workspace_token,
+  };
+}
+
 function requestRecord({ entry, attempt, claim, projection }) {
   return {
     schema_version: "1.0.0",
@@ -972,12 +984,7 @@ function requestRecord({ entry, attempt, claim, projection }) {
     attempt,
     adapter: entry.adapter_track,
     condition: entry.condition,
-    claim: {
-      id: claim.claim_id,
-      lease_expires_at: claim.lease_expires_at,
-      workspace_parent: claim.workspace_parent,
-      workspace_token: claim.workspace_token,
-    },
+    claim: requestClaimRecord(claim),
     input_identity: claim.input_identity,
     selection: claim.selection,
     projection: normalizedProjection(projection),
@@ -1120,7 +1127,7 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
     if (claim.input_identity.plan_id !== runIdentity.plan.id || claim.input_identity.plan_digest !== runIdentity.plan.digest || claim.input_identity.materialization_manifest_digest !== runIdentity.materialization.manifest_digest) throw new Error(`${entry.case_id} recovery claim run input mismatch`);
     assertCanonicalEqual(request.input_identity, claim.input_identity, `${entry.case_id} recovery claim input identity`);
     assertCanonicalEqual(request.selection, claim.selection, `${entry.case_id} recovery claim selection`);
-    if (claim.attempt === attempt && (request.claim.id !== claim.claim_id || request.claim.lease_expires_at !== claim.lease_expires_at || request.claim.workspace_parent !== claim.workspace_parent || request.claim.workspace_token !== claim.workspace_token)) throw new Error(`${entry.case_id} recovery request claim mismatch`);
+    if (claim.attempt === attempt) assertCanonicalEqual(request.claim, requestClaimRecord(claim), `${entry.case_id} recovery request claim`);
   }
   const expectedInventory = result.status === "completed" ? ["commit.json", "final.json", "request.json", "result.json"] : ["commit.json", "request.json", "result.json"];
   const inventory = readdirSync(attemptRoot).sort();
@@ -1238,6 +1245,7 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${entry.case_id} attempt request`);
     const requestPath = resolve(attemptRoot, "request.json");
     writeJsonAtomic(requestPath, request, { stagingOwner: claim.claim_id, faultName: "after_request_staged" });
+    fault("after_request_published");
     const temporaryOutput = resolve(ephemeralRoot, "agent-final.json");
     const started = process.hrtime.bigint();
     const raw = executeVerifiedAgent({ root, runtime, verifiedExecutable, workspace, outputTemporary: temporaryOutput, command: adapter.identity.effective_command, environmentSnapshot });
@@ -1362,7 +1370,7 @@ function assertRecoveryEvidence({ root, run, state, claim, request, result }) {
   const identity = readAdapterIdentity(root, run, claim.adapter);
   if (claim.run_instance_id !== runIdentity.run_instance_id || claim.runtime_identity_digest !== canonicalDigest(identity) || claim.effective_command_digest !== identity.effective_command_digest || claim.environment_snapshot_digest !== identity.environment_snapshot.digest) throw new Error("recovery runtime identity mismatch");
   if (request.run_instance_id !== runIdentity.run_instance_id || request.case_id !== claim.case_id || request.attempt !== claim.attempt || request.adapter !== claim.adapter || request.condition !== claim.condition) throw new Error("recovery request identity mismatch");
-  if (request.claim.id !== claim.claim_id || request.claim.lease_expires_at !== claim.lease_expires_at || request.claim.workspace_parent !== claim.workspace_parent || request.claim.workspace_token !== claim.workspace_token) throw new Error("recovery request claim identity mismatch");
+  assertCanonicalEqual(request.claim, requestClaimRecord(claim), "recovery request claim identity");
   assertCanonicalEqual(request.input_identity, claim.input_identity, "recovery request input identity");
   assertCanonicalEqual(request.selection, claim.selection, "recovery request selection");
   if (request.agent.runtime_identity_digest !== claim.runtime_identity_digest || request.agent.effective_command_digest !== claim.effective_command_digest || request.agent.environment_snapshot_digest !== claim.environment_snapshot_digest) throw new Error("recovery request runtime identity mismatch");
@@ -1478,9 +1486,9 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
       attempt: request.attempt,
       adapter: request.adapter,
       condition: request.condition,
-      worker_id: "durable-request-recovery",
-      pid: 1,
-      acquired_at: request.claim.lease_expires_at,
+      worker_id: request.claim.worker_id,
+      pid: request.claim.pid,
+      acquired_at: request.claim.acquired_at,
       lease_expires_at: request.claim.lease_expires_at,
       workspace_parent: request.claim.workspace_parent,
       workspace_token: request.claim.workspace_token,

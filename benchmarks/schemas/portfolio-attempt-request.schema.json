@@ -43,9 +43,12 @@
     "claim": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "lease_expires_at", "workspace_parent", "workspace_token"],
+      "required": ["id", "worker_id", "pid", "acquired_at", "lease_expires_at", "workspace_parent", "workspace_token"],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
+        "worker_id": { "type": "string", "minLength": 1 },
+        "pid": { "type": "integer", "minimum": 1 },
+        "acquired_at": { "type": "string", "format": "date-time" },
         "lease_expires_at": { "type": "string", "format": "date-time" },
         "workspace_parent": { "type": "string", "pattern": "^ask-portfolio-workspaces-[A-Za-z0-9_-]{6,}$" },
         "workspace_token": { "type": "string", "format": "uuid" }
