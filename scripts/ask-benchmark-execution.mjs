@@ -48,6 +48,7 @@ const ATTEMPT_PATTERN = /^[0-9]{4}$/u;
 const WORKSPACE_PARENT_PATTERN = /^ask-portfolio-workspaces-[A-Za-z0-9_-]{6,}$/u;
 const DURABLE_SCALAR_MAX_LENGTH = 160;
 const WORKSPACE_OWNERSHIP_FILE = "ownership.json";
+const PRE_CLAIM_FILE = "pre-claim.json";
 const RESULT_STAGING_FILE = "result.pending.json";
 const TEMP_ROOT = realpathSync(tmpdir());
 
@@ -657,8 +658,14 @@ function readClaim(root, runDir, caseId) {
 
 function readStagedClaim(root, runDir, caseId, claimId) {
   const directory = claimStagingPath(runDir, caseId, claimId);
-  const path = resolve(directory, "claim.json");
-  if (!existsSync(path) || !lstatSync(path).isFile()) return null;
+  if (!existsSync(directory)) return null;
+  if (!lstatSync(directory).isDirectory() || lstatSync(directory).isSymbolicLink()) throw new Error("staged claim directory is invalid");
+  const claimPath = resolve(directory, "claim.json");
+  const preClaimPath = resolve(directory, PRE_CLAIM_FILE);
+  const path = existsSync(claimPath) ? claimPath : preClaimPath;
+  assertNoSymlinkSegments(path, `${caseId} staged claim evidence`);
+  if (!existsSync(path)) return null;
+  if (!lstatSync(path).isFile()) throw new Error("staged claim evidence must be a regular file");
   const claim = readJson(path);
   validate(root, claim, CLAIM_SCHEMA_PATH, `${caseId} staged claim`);
   if (claim.case_id !== caseId || claim.claim_id !== claimId) throw new Error("staged claim identity mismatch");
@@ -691,6 +698,8 @@ function workspaceOwnership(claim, runIdentity) {
     claim_id: assertClaimId(claim.claim_id),
     case_id: assertCaseId(claim.case_id),
     run_instance_id: assertClaimId(claim.run_instance_id),
+    attempt: assertAttempt(claim.attempt),
+    lease_expires_at: claim.lease_expires_at,
     workspace_parent: claim.workspace_parent,
     workspace_token: assertClaimId(claim.workspace_token),
   };
@@ -743,8 +752,12 @@ function acquireClaim({ root, context, entry, attempt, runtime, adapter }) {
   };
   validate(root, claim, CLAIM_SCHEMA_PATH, `${entry.case_id} claim`);
   try {
+    const preClaimPath = resolve(staging, PRE_CLAIM_FILE);
+    writeJsonExclusive(preClaimPath, claim);
     writeJsonExclusive(resolve(workspaceParentPath, WORKSPACE_OWNERSHIP_FILE), workspaceOwnership(claim, context.identity));
+    fault("after_workspace_ownership_published");
     writeJsonExclusive(resolve(staging, "claim.json"), claim);
+    rmSync(preClaimPath, { force: true });
     fault("after_claim_record_written");
     fault("after_claim_staged");
     renameSync(staging, directory);
@@ -1070,8 +1083,9 @@ function assertCanonicalEqual(actual, expected, label) {
   if (stableCanonicalJson(actual) !== stableCanonicalJson(expected)) throw new Error(`${label} mismatch`);
 }
 
-function validateTerminalAttempt({ root, context, entry, attempt }) {
-  const attemptRoot = attemptRootPath(context.runDir, entry.case_id, attempt);
+function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, attempt, expectedInput, expectedSelection, claim = null }) {
+  const runInstanceId = runIdentity.run_instance_id;
+  const attemptRoot = attemptRootPath(runDir, entry.case_id, attempt);
   const requestPath = resolve(attemptRoot, "request.json");
   const resultPath = resolve(attemptRoot, "result.json");
   const commitPath = resolve(attemptRoot, "commit.json");
@@ -1085,23 +1099,28 @@ function validateTerminalAttempt({ root, context, entry, attempt }) {
   validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${entry.case_id} request`);
   validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${entry.case_id} result`);
   validate(root, commit, ATTEMPT_COMMIT_SCHEMA_PATH, `${entry.case_id} terminal commit`);
-  const adapterIdentity = readAdapterIdentity(root, context.runDir, entry.adapter_track);
+  const adapterIdentity = readAdapterIdentity(root, runDir, entry.adapter_track);
   const runtimeIdentityDigest = canonicalDigest(adapterIdentity);
-  const expectedInput = inputIdentityFor(context, entry);
-  const expectedSelection = selectionIdentityFor(context, entry);
-  if (request.run_instance_id !== context.identity.run_instance_id || request.case_id !== entry.case_id || request.attempt !== attempt || request.adapter !== entry.adapter_track || request.condition !== entry.condition) throw new Error(`${entry.case_id} request identity mismatch`);
+  if (request.run_instance_id !== runInstanceId || request.case_id !== entry.case_id || request.attempt !== attempt || request.adapter !== entry.adapter_track || request.condition !== entry.condition) throw new Error(`${entry.case_id} request identity mismatch`);
   if (request.claim.id !== commit.claim_id || request.claim.lease_expires_at !== commit.claim_lease_expires_at) throw new Error(`${entry.case_id} request claim evidence mismatch`);
   if ((entry.condition === "adaptive_ask") !== (request.selection !== null)) throw new Error(`${entry.case_id} request selection shape mismatch`);
-  assertCanonicalEqual(request.input_identity, expectedInput, `${entry.case_id} request input identity`);
-  assertCanonicalEqual(request.selection, expectedSelection, `${entry.case_id} request selection`);
+  if (expectedInput !== undefined) assertCanonicalEqual(request.input_identity, expectedInput, `${entry.case_id} request input identity`);
+  if (expectedSelection !== undefined) assertCanonicalEqual(request.selection, expectedSelection, `${entry.case_id} request selection`);
   if (request.agent.adapter !== entry.adapter_track || request.agent.runtime_identity_digest !== runtimeIdentityDigest || request.agent.effective_command_digest !== adapterIdentity.effective_command_digest || request.agent.environment_snapshot_digest !== adapterIdentity.environment_snapshot.digest) throw new Error(`${entry.case_id} request runtime identity mismatch`);
-  if (result.run_instance_id !== context.identity.run_instance_id || result.case_id !== entry.case_id || result.attempt !== attempt || result.adapter !== entry.adapter_track || result.condition !== entry.condition) throw new Error(`${entry.case_id} result identity mismatch`);
+  if (result.run_instance_id !== runInstanceId || result.case_id !== entry.case_id || result.attempt !== attempt || result.adapter !== entry.adapter_track || result.condition !== entry.condition) throw new Error(`${entry.case_id} result identity mismatch`);
   if (result.status === "completed") {
     if (result.exit_code !== 0 || result.failure_kind !== null || result.recovery_reason !== null || result.final_output === null) throw new Error(`${entry.case_id} completed result semantics mismatch`);
   } else if (result.failure_kind === null || result.final_output !== null || (result.failure_kind === "stale_claim_recovered") !== (result.recovery_reason !== null)) throw new Error(`${entry.case_id} terminal failure result semantics mismatch`);
   if (result.runtime_identity_digest !== runtimeIdentityDigest || result.effective_command_digest !== adapterIdentity.effective_command_digest || result.request_sha256 !== prefixedFileDigest(requestPath)) throw new Error(`${entry.case_id} result evidence mismatch`);
-  if (commit.run_instance_id !== context.identity.run_instance_id || commit.case_id !== entry.case_id || commit.attempt !== attempt || commit.adapter !== entry.adapter_track || commit.condition !== entry.condition || commit.status !== result.status) throw new Error(`${entry.case_id} terminal commit identity mismatch`);
+  if (commit.run_instance_id !== runInstanceId || commit.case_id !== entry.case_id || commit.attempt !== attempt || commit.adapter !== entry.adapter_track || commit.condition !== entry.condition || commit.status !== result.status) throw new Error(`${entry.case_id} terminal commit identity mismatch`);
   if (commit.runtime_identity_digest !== runtimeIdentityDigest || commit.effective_command_digest !== adapterIdentity.effective_command_digest || commit.request_sha256 !== prefixedFileDigest(requestPath) || commit.result_sha256 !== prefixedFileDigest(resultPath)) throw new Error(`${entry.case_id} terminal commit evidence mismatch`);
+  if (claim) {
+    if (claim.run_instance_id !== runInstanceId || claim.case_id !== entry.case_id || claim.adapter !== entry.adapter_track || claim.condition !== entry.condition || claim.runtime_identity_digest !== runtimeIdentityDigest || claim.effective_command_digest !== adapterIdentity.effective_command_digest || claim.environment_snapshot_digest !== adapterIdentity.environment_snapshot.digest) throw new Error(`${entry.case_id} recovery claim identity mismatch`);
+    if (claim.input_identity.plan_id !== runIdentity.plan.id || claim.input_identity.plan_digest !== runIdentity.plan.digest || claim.input_identity.materialization_manifest_digest !== runIdentity.materialization.manifest_digest) throw new Error(`${entry.case_id} recovery claim run input mismatch`);
+    assertCanonicalEqual(request.input_identity, claim.input_identity, `${entry.case_id} recovery claim input identity`);
+    assertCanonicalEqual(request.selection, claim.selection, `${entry.case_id} recovery claim selection`);
+    if (claim.attempt === attempt && (request.claim.id !== claim.claim_id || request.claim.lease_expires_at !== claim.lease_expires_at || request.claim.workspace_parent !== claim.workspace_parent || request.claim.workspace_token !== claim.workspace_token)) throw new Error(`${entry.case_id} recovery request claim mismatch`);
+  }
   const expectedInventory = result.status === "completed" ? ["commit.json", "final.json", "request.json", "result.json"] : ["commit.json", "request.json", "result.json"];
   const inventory = readdirSync(attemptRoot).sort();
   assertCanonicalEqual(inventory, expectedInventory, `${entry.case_id} terminal attempt inventory`);
@@ -1114,6 +1133,18 @@ function validateTerminalAttempt({ root, context, entry, attempt }) {
     validate(root, readJson(finalPath), OUTPUT_SCHEMA_PATH, `${entry.case_id} completed output`);
   }
   return { request, result, commit };
+}
+
+function validateTerminalAttempt({ root, context, entry, attempt }) {
+  return validateTerminalAttemptEvidence({
+    root,
+    runDir: context.runDir,
+    runIdentity: context.identity,
+    entry,
+    attempt,
+    expectedInput: inputIdentityFor(context, entry),
+    expectedSelection: selectionIdentityFor(context, entry),
+  });
 }
 
 function validateTerminalCase({ root, context, entry, state }) {
@@ -1380,35 +1411,24 @@ function reconcileAttemptStaging(attemptRoot, claimId) {
   }
 }
 
-function assertCommittedRecoveryEvidence({ root, run, state, commit }) {
-  const attemptRoot = attemptRootPath(run, state.case_id, state.terminal_attempt);
-  const requestPath = resolve(attemptRoot, "request.json");
-  const resultPath = resolve(attemptRoot, "result.json");
-  assertNoSymlinkSegments(requestPath, `${state.case_id} committed request`);
-  assertNoSymlinkSegments(resultPath, `${state.case_id} committed result`);
-  const request = readJson(requestPath);
-  const result = readJson(resultPath);
-  validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${state.case_id} committed request`);
-  validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${state.case_id} committed result`);
+function assertCommittedRecoveryEvidence({ root, run, state, commit, claim = null }) {
   const runIdentity = readJson(runIdentityPath(run));
   validate(root, runIdentity, RUN_IDENTITY_SCHEMA_PATH, "committed run identity");
-  const identity = readAdapterIdentity(root, run, state.adapter);
-  const identityDigest = canonicalDigest(identity);
-  if (commit.run_instance_id !== runIdentity.run_instance_id || commit.case_id !== state.case_id || commit.attempt !== state.terminal_attempt || commit.adapter !== state.adapter || commit.condition !== state.condition || commit.status !== state.status) throw new Error("terminal commit does not match state");
-  if (commit.runtime_identity_digest !== identityDigest || commit.effective_command_digest !== identity.effective_command_digest || commit.request_sha256 !== prefixedFileDigest(requestPath) || commit.result_sha256 !== prefixedFileDigest(resultPath)) throw new Error("terminal commit evidence mismatch");
-  if (request.run_instance_id !== runIdentity.run_instance_id || request.case_id !== commit.case_id || request.attempt !== commit.attempt || request.adapter !== commit.adapter || request.condition !== commit.condition || request.agent.runtime_identity_digest !== identityDigest || request.agent.environment_snapshot_digest !== identity.environment_snapshot.digest) throw new Error("committed request identity mismatch");
-  if (request.claim.id !== commit.claim_id || request.claim.lease_expires_at !== commit.claim_lease_expires_at) throw new Error("committed request claim evidence mismatch");
-  if (result.run_instance_id !== runIdentity.run_instance_id || result.case_id !== commit.case_id || result.attempt !== commit.attempt || result.adapter !== commit.adapter || result.condition !== commit.condition || result.status !== commit.status || result.request_sha256 !== commit.request_sha256 || result.runtime_identity_digest !== identityDigest) throw new Error("committed result identity mismatch");
-  const expectedInventory = result.status === "completed" ? ["commit.json", "final.json", "request.json", "result.json"] : ["commit.json", "request.json", "result.json"];
-  assertCanonicalEqual(readdirSync(attemptRoot).sort(), expectedInventory, "committed attempt inventory");
-  if (result.status === "completed") {
-    const finalPath = resolve(attemptRoot, result.final_output.path);
-    assertInside(attemptRoot, finalPath, `${state.case_id} committed final output`);
-    assertNoSymlinkSegments(finalPath, `${state.case_id} committed final output`);
-    const size = statSync(finalPath).size;
-    if (size > MAX_FINAL_OUTPUT_BYTES || size !== result.final_output.bytes || fileDigest(finalPath) !== result.final_output.sha256) throw new Error("committed final output mismatch");
-    validate(root, readJson(finalPath), OUTPUT_SCHEMA_PATH, `${state.case_id} committed final output`);
-  }
+  if (!TERMINAL_STATUSES.has(state.status) || !state.terminal_attempt || state.terminal_attempt !== String(state.attempt_count).padStart(4, "0")) throw new Error("terminal state is invalid for committed recovery");
+  const entry = { case_id: state.case_id, adapter_track: state.adapter, condition: state.condition };
+  const artifacts = validateTerminalAttemptEvidence({
+    root,
+    runDir: run,
+    runIdentity,
+    entry,
+    attempt: state.terminal_attempt,
+    expectedInput: claim?.input_identity,
+    expectedSelection: claim?.selection,
+    claim,
+  });
+  assertCanonicalEqual(artifacts.commit, commit, "committed recovery terminal commit");
+  if (artifacts.result.status !== state.status || state.selection_digest !== (artifacts.request.selection?.digest ?? null)) throw new Error("committed recovery state evidence mismatch");
+  return artifacts;
 }
 
 export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) {
@@ -1486,7 +1506,7 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     const commit = readJson(commitPath);
     validate(root, commit, ATTEMPT_COMMIT_SCHEMA_PATH, `${caseId} terminal commit`);
     if (commit.claim_id !== claimId) throw new Error("claim ID does not match the terminal commit");
-    assertCommittedRecoveryEvidence({ root, run, state, commit });
+    assertCommittedRecoveryEvidence({ root, run, state, commit, claim });
     releaseClaim(root, run, caseId, claimId);
     removeEphemeralWorkspace(claim, identity);
     return { case_id: caseId, status: state.status };
@@ -1498,7 +1518,7 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
       assertNoSymlinkSegments(previousCommitPath, `${caseId} previous terminal commit`);
       const previousCommit = readJson(previousCommitPath);
       validate(root, previousCommit, ATTEMPT_COMMIT_SCHEMA_PATH, `${caseId} previous terminal commit`);
-      assertCommittedRecoveryEvidence({ root, run, state, commit: previousCommit });
+      assertCommittedRecoveryEvidence({ root, run, state, commit: previousCommit, claim });
     }
     if (claim.adapter !== state.adapter || claim.condition !== state.condition || (claim.selection?.digest ?? null) !== state.selection_digest) throw new Error("published claim does not match prior state identity");
     if (!claimIsExpired(claim)) throw new Error("claim lease has not expired");

@@ -24,6 +24,10 @@ function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+function prefixedFileDigest(path) {
+  return `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`;
+}
+
 function wait(milliseconds) {
   return new Promise((resolveWait) => setTimeout(resolveWait, milliseconds));
 }
@@ -36,6 +40,13 @@ function recursivePaths(path) {
     else paths.push(absolute);
   }
   return paths;
+}
+
+function directorySnapshot(path) {
+  return recursivePaths(path).map((absolute) => ({
+    path: absolute.slice(path.length + 1),
+    bytes: readFileSync(absolute).toString("base64"),
+  })).sort((left, right) => left.path.localeCompare(right.path));
 }
 
 function terminalInventory(runDir, caseId, attempt) {
@@ -387,6 +398,48 @@ exit 64
   assert.match(duplicate.stdout, /active/u, "second process must observe the active claim instead of spawning");
   assert.equal(await new Promise((resolveExit) => child.on("exit", resolveExit)), 0, "claim owner must complete");
 
+  const preClaimCase = codexCases[4];
+  const preClaimExecute = (runPath) => ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", runPath, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", preClaimCase.case_id];
+  function preClaimFixture(name) {
+    const runPath = resolve(work, name);
+    run(preClaimExecute(runPath), { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_workspace_ownership_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+    const caseRoot = resolve(runPath, "cases", preClaimCase.case_id);
+    const stagingName = readdirSync(caseRoot).find((entry) => /^\.claim-.+\.staging$/u.test(entry));
+    assert.ok(stagingName, "ownership publication fault must retain exact pre-claim staging evidence");
+    const staging = resolve(caseRoot, stagingName);
+    assert.deepEqual(readdirSync(staging), ["pre-claim.json"], "ownership publication fault must stop before canonical claim creation");
+    const preClaim = JSON.parse(readFileSync(resolve(staging, "pre-claim.json"), "utf8"));
+    const workspaceParent = resolve(tmpdir(), preClaim.workspace_parent);
+    const markerPath = resolve(workspaceParent, "ownership.json");
+    assert.ok(existsSync(markerPath), "ownership publication fault must leave its private ownership marker");
+    const marker = JSON.parse(readFileSync(markerPath, "utf8"));
+    assert.equal(marker.claim_id, preClaim.claim_id, "pre-claim marker must bind the exact claim ID");
+    assert.equal(marker.run_instance_id, preClaim.run_instance_id, "pre-claim marker must bind the run instance ID");
+    assert.equal(marker.case_id, preClaim.case_id, "pre-claim marker must bind the case ID");
+    assert.equal(marker.lease_expires_at, preClaim.lease_expires_at, "pre-claim marker must bind the lease");
+    return { runPath, staging, preClaim, workspaceParent, markerPath, marker };
+  }
+
+  const preClaimRecovery = preClaimFixture("pre-claim-recovery-run");
+  run(["recover-case", "--run-dir", preClaimRecovery.runPath, "--case-id", preClaimCase.case_id, "--claim-id", preClaimRecovery.preClaim.claim_id, "--reason", "ownership published before claim record"]);
+  assert.equal(existsSync(preClaimRecovery.staging), false, "pre-claim recovery must remove durable staging evidence");
+  assert.equal(existsSync(preClaimRecovery.workspaceParent), false, "pre-claim recovery must remove its private temporary root");
+
+  for (const markerFault of ["missing", "partial"]) {
+    const fixture = preClaimFixture(`pre-claim-marker-${markerFault}-run`);
+    if (markerFault === "missing") rmSync(fixture.markerPath);
+    else writeFileSync(fixture.markerPath, "{\n");
+    const statePath = resolve(fixture.runPath, "cases", preClaimCase.case_id, "state.json");
+    const stateBefore = readFileSync(statePath);
+    const stagingBefore = directorySnapshot(fixture.staging);
+    run(["recover-case", "--run-dir", fixture.runPath, "--case-id", preClaimCase.case_id, "--claim-id", fixture.preClaim.claim_id, "--reason", `${markerFault} ownership marker`], { expectedStatus: 1 });
+    assert.deepEqual(readFileSync(statePath), stateBefore, `${markerFault} ownership marker must not mutate case state`);
+    assert.deepEqual(directorySnapshot(fixture.staging), stagingBefore, `${markerFault} ownership marker must preserve pre-claim evidence`);
+    assert.ok(existsSync(fixture.workspaceParent), `${markerFault} ownership marker must not authorize private root deletion`);
+    writeJson(fixture.markerPath, fixture.marker);
+    run(["recover-case", "--run-dir", fixture.runPath, "--case-id", preClaimCase.case_id, "--claim-id", fixture.preClaim.claim_id, "--reason", `restored ${markerFault} ownership marker`]);
+  }
+
   const stagingRun = resolve(work, "staging-run");
   const stagingCase = codexCases[4];
   run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", stagingRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", stagingCase.case_id], { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_claim_record_written", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
@@ -584,6 +637,41 @@ exit 64
   run(stateFaultExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_state_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
   const stateFaultClaim = JSON.parse(readFileSync(resolve(stateFaultRun, "cases", stateFaultCase.case_id, "claim", "claim.json"), "utf8"));
   assert.equal(JSON.parse(readFileSync(resolve(stateFaultRun, "cases", stateFaultCase.case_id, "state.json"), "utf8")).status, "completed", "state boundary fixture must publish state before stopping");
+  function assertTamperedCommittedRecoveryRejected(name, mutate) {
+    const tamperedRun = resolve(work, name);
+    cpSync(stateFaultRun, tamperedRun, { recursive: true });
+    const caseRoot = resolve(tamperedRun, "cases", stateFaultCase.case_id);
+    const attemptRoot = resolve(caseRoot, "attempts", stateFaultClaim.attempt);
+    const requestPath = resolve(attemptRoot, "request.json");
+    const resultPath = resolve(attemptRoot, "result.json");
+    const commitPath = resolve(attemptRoot, "commit.json");
+    const claimPath = resolve(caseRoot, "claim", "claim.json");
+    const statePath = resolve(caseRoot, "state.json");
+    const request = JSON.parse(readFileSync(requestPath, "utf8"));
+    const result = JSON.parse(readFileSync(resultPath, "utf8"));
+    const commit = JSON.parse(readFileSync(commitPath, "utf8"));
+    mutate({ request, result });
+    writeJson(requestPath, request);
+    result.request_sha256 = prefixedFileDigest(requestPath);
+    writeJson(resultPath, result);
+    commit.request_sha256 = prefixedFileDigest(requestPath);
+    commit.result_sha256 = prefixedFileDigest(resultPath);
+    writeJson(commitPath, commit);
+    const workspaceParent = resolve(tmpdir(), stateFaultClaim.workspace_parent);
+    const stateBefore = readFileSync(statePath);
+    const claimBefore = readFileSync(claimPath);
+    const workspaceBefore = directorySnapshot(workspaceParent);
+    run(["recover-case", "--run-dir", tamperedRun, "--case-id", stateFaultCase.case_id, "--claim-id", stateFaultClaim.claim_id, "--reason", "tampered committed evidence"], { expectedStatus: 1 });
+    assert.deepEqual(readFileSync(statePath), stateBefore, "rejected committed recovery must not mutate state");
+    assert.deepEqual(readFileSync(claimPath), claimBefore, "rejected committed recovery must not release the claim");
+    assert.deepEqual(directorySnapshot(workspaceParent), workspaceBefore, "rejected committed recovery must not clean the private workspace");
+  }
+  assertTamperedCommittedRecoveryRejected("state-fault-request-effective-digest-run", ({ request }) => {
+    request.agent.effective_command_digest = `sha256:${"0".repeat(64)}`;
+  });
+  assertTamperedCommittedRecoveryRejected("state-fault-result-effective-digest-run", ({ result }) => {
+    result.effective_command_digest = `sha256:${"0".repeat(64)}`;
+  });
   run(["recover-case", "--run-dir", stateFaultRun, "--case-id", stateFaultCase.case_id, "--claim-id", stateFaultClaim.claim_id, "--reason", "state boundary fault"]);
   assert.equal(existsSync(resolve(stateFaultRun, "cases", stateFaultCase.case_id, "claim")), false, "state-before-release recovery must remove the exact stale claim");
 
