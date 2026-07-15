@@ -700,6 +700,7 @@ function workspaceOwnership(claim, runIdentity) {
     run_instance_id: assertClaimId(claim.run_instance_id),
     attempt: assertAttempt(claim.attempt),
     lease_expires_at: claim.lease_expires_at,
+    claim_digest: canonicalDigest(claim),
     workspace_parent: claim.workspace_parent,
     workspace_token: assertClaimId(claim.workspace_token),
   };
