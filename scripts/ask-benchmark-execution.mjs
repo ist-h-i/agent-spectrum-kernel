@@ -1362,7 +1362,7 @@ export function verifyPortfolioExecution({ root, config, planPath, materializedP
   };
 }
 
-function assertRecoveryEvidence({ root, run, state, claim, request, result }) {
+function assertRecoveryEvidence({ root, run, state, claim, request, result, requestPath }) {
   validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${claim.case_id} recovery request`);
   validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${claim.case_id} recovery result`);
   const runIdentity = readJson(runIdentityPath(run));
@@ -1375,6 +1375,7 @@ function assertRecoveryEvidence({ root, run, state, claim, request, result }) {
   assertCanonicalEqual(request.selection, claim.selection, "recovery request selection");
   if (request.agent.runtime_identity_digest !== claim.runtime_identity_digest || request.agent.effective_command_digest !== claim.effective_command_digest || request.agent.environment_snapshot_digest !== claim.environment_snapshot_digest) throw new Error("recovery request runtime identity mismatch");
   if (result.run_instance_id !== runIdentity.run_instance_id || result.case_id !== claim.case_id || result.attempt !== claim.attempt || result.adapter !== claim.adapter || result.condition !== claim.condition || result.runtime_identity_digest !== claim.runtime_identity_digest || result.effective_command_digest !== claim.effective_command_digest) throw new Error("recovery result identity mismatch");
+  if (result.request_sha256 !== prefixedFileDigest(requestPath)) throw new Error("recovery result request digest mismatch");
   if (state.case_id !== claim.case_id || state.adapter !== claim.adapter || state.condition !== claim.condition || state.status !== "active" || state.active_claim_id !== claim.claim_id) throw new Error("recovery state identity mismatch");
 }
 
@@ -1501,7 +1502,7 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     assertEphemeralWorkspaceOwnership(recoveredClaim, identity);
     const entry = { case_id: caseId, adapter_track: state.adapter, condition: state.condition };
     const result = recoveryResult({ root, attemptRoot, entry, claim: recoveredClaim, requestPath, reason });
-    assertRecoveryEvidence({ root, run, state, claim: recoveredClaim, request, result });
+    assertRecoveryEvidence({ root, run, state, claim: recoveredClaim, request, result, requestPath });
     const terminalState = completeCase({ root, runDir: run, entry, state, claim: recoveredClaim, attempt, attemptRoot, result });
     removeEphemeralWorkspace(recoveredClaim, identity);
     return { case_id: caseId, status: terminalState.status };
@@ -1552,7 +1553,7 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
   const entry = { case_id: caseId, adapter_track: state.adapter, condition: state.condition };
   const result = recoveryResult({ root, attemptRoot, entry, claim, requestPath, reason });
   const request = readJson(requestPath);
-  assertRecoveryEvidence({ root, run, state, claim, request, result });
+  assertRecoveryEvidence({ root, run, state, claim, request, result, requestPath });
   const terminalState = completeCase({ root, runDir: run, entry, state, claim, attempt: claim.attempt, attemptRoot, result });
   removeEphemeralWorkspace(claim, identity);
   return { case_id: caseId, status: terminalState.status };

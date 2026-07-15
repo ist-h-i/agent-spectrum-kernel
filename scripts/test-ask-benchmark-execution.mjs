@@ -618,6 +618,44 @@ exit 64
   run(["recover-case", "--run-dir", ownershipRunA, "--case-id", ownershipCase.case_id, "--claim-id", ownershipClaimA.claim_id, "--reason", "restore owner a"]);
   run(["recover-case", "--run-dir", ownershipRunB, "--case-id", ownershipCase.case_id, "--claim-id", ownershipClaimB.claim_id, "--reason", "restore owner b"]);
 
+  function assertTamperedPreCommitResultRejected({ name, faultName, resultName }) {
+    const runPath = resolve(work, name);
+    const caseRecord = codexCases[6];
+    const execute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", runPath, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", caseRecord.case_id];
+    run(execute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: faultName, ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+    const caseRoot = resolve(runPath, "cases", caseRecord.case_id);
+    const claimPath = resolve(caseRoot, "claim", "claim.json");
+    const claim = JSON.parse(readFileSync(claimPath, "utf8"));
+    const statePath = resolve(caseRoot, "state.json");
+    const attemptRoot = resolve(caseRoot, "attempts", claim.attempt);
+    const requestPath = resolve(attemptRoot, "request.json");
+    const resultPath = resolve(attemptRoot, resultName);
+    const originalResult = readFileSync(resultPath);
+    const result = JSON.parse(originalResult);
+    result.request_sha256 = `sha256:${"0".repeat(64)}`;
+    writeJson(resultPath, result);
+    const workspaceParent = resolve(tmpdir(), claim.workspace_parent);
+    const stateBefore = readFileSync(statePath);
+    const claimBefore = readFileSync(claimPath);
+    const requestBefore = readFileSync(requestPath);
+    const resultBefore = readFileSync(resultPath);
+    const workspaceBefore = directorySnapshot(workspaceParent);
+    run(["recover-case", "--run-dir", runPath, "--case-id", caseRecord.case_id, "--claim-id", claim.claim_id, "--reason", "tampered pre-commit result"], { expectedStatus: 1 });
+    assert.deepEqual(readFileSync(statePath), stateBefore, `${resultName} digest rejection must not mutate state`);
+    assert.deepEqual(readFileSync(claimPath), claimBefore, `${resultName} digest rejection must not release the claim`);
+    assert.deepEqual(readFileSync(requestPath), requestBefore, `${resultName} digest rejection must not mutate the request`);
+    assert.deepEqual(readFileSync(resultPath), resultBefore, `${resultName} digest rejection must not mutate result evidence`);
+    assert.deepEqual(directorySnapshot(workspaceParent), workspaceBefore, `${resultName} digest rejection must not clean the private workspace`);
+    writeFileSync(resultPath, originalResult);
+    run(["recover-case", "--run-dir", runPath, "--case-id", caseRecord.case_id, "--claim-id", claim.claim_id, "--reason", "restored pre-commit result"]);
+    assert.equal(JSON.parse(readFileSync(statePath, "utf8")).status, "completed", `${resultName} must recover after restoring its request digest evidence`);
+    assert.equal(existsSync(claimPath), false, `${resultName} successful recovery must release the claim`);
+    assert.equal(existsSync(workspaceParent), false, `${resultName} successful recovery must remove the private workspace`);
+  }
+
+  assertTamperedPreCommitResultRejected({ name: "tampered-published-result-run", faultName: "after_result_published", resultName: "result.json" });
+  assertTamperedPreCommitResultRejected({ name: "tampered-pending-result-run", faultName: "after_final_published", resultName: "result.pending.json" });
+
   const resultFaultRun = resolve(work, "result-fault-run");
   const resultFaultCase = codexCases[6];
   const resultFaultExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", resultFaultRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", resultFaultCase.case_id];
