@@ -240,6 +240,47 @@ exit 64
   const probeIdentity = JSON.parse(readFileSync(resolve(probeRun, "adapters", "codex.json"), "utf8"));
   assert.equal(probeIdentity.availability_evidence, "contract_probe_failed");
 
+  const executableSymlink = resolve(work, "codex-symlink");
+  symlinkSync(codexBin, executableSymlink);
+  const executableSymlinkRun = resolve(work, "executable-symlink-run");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", executableSymlinkRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", executableSymlink, "--case-id", codexCases[3].case_id], { expectedStatus: 1, env });
+  assert.equal(existsSync(executableSymlinkRun), false, "agent executable symlink violations must hard fail before run artifacts are created");
+  const nonRegularExecutableRun = resolve(work, "nonregular-executable-run");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", nonRegularExecutableRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", work, "--case-id", codexCases[3].case_id], { expectedStatus: 1, env });
+  assert.equal(existsSync(nonRegularExecutableRun), false, "non-regular agent executables must hard fail before run artifacts are created");
+
+  const adapterFirstWriteRun = resolve(work, "adapter-first-write-run");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", adapterFirstWriteRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", codexCases[3].case_id], { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_run_initialized" } });
+  const externalAdapters = mkdtempSync(resolve(work, "external-adapters-"));
+  rmSync(resolve(adapterFirstWriteRun, "adapters"), { recursive: true, force: true });
+  symlinkSync(externalAdapters, resolve(adapterFirstWriteRun, "adapters"));
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", adapterFirstWriteRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", codexCases[3].case_id], { expectedStatus: 1, env });
+  assert.equal(existsSync(resolve(externalAdapters, "codex.json")), false, "adapter identity first-write must not traverse a replaced adapter directory");
+
+  const unavailableClaimRun = resolve(work, "unavailable-claim-run");
+  const unavailableClaimExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", unavailableClaimRun, "--adapter", "claude", "--runtime-config", unavailableRuntime, "--agent-bin", resolve(work, "missing-claude"), "--case-id", unavailableCase.case_id];
+  run(unavailableClaimExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_request_staged", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const unavailableClaimPath = resolve(unavailableClaimRun, "cases", unavailableCase.case_id, "claim", "claim.json");
+  const unavailableClaim = JSON.parse(readFileSync(unavailableClaimPath, "utf8"));
+
+  const unavailableDeletedClaimRun = resolve(work, "unavailable-deleted-claim-run");
+  cpSync(unavailableClaimRun, unavailableDeletedClaimRun, { recursive: true });
+  rmSync(resolve(unavailableDeletedClaimRun, "cases", unavailableCase.case_id, "claim"), { recursive: true, force: true });
+  const unavailableAttemptRoot = resolve(unavailableDeletedClaimRun, "cases", unavailableCase.case_id, "attempts");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", unavailableDeletedClaimRun, "--adapter", "claude", "--runtime-config", unavailableRuntime, "--agent-bin", resolve(work, "missing-claude"), "--case-id", unavailableCase.case_id], { expectedStatus: 1, env });
+  assert.deepEqual(readdirSync(unavailableAttemptRoot), ["0001"], "unavailable resume must not append an attempt after claim deletion");
+
+  const unavailableReplacedClaimRun = resolve(work, "unavailable-replaced-claim-run");
+  cpSync(unavailableClaimRun, unavailableReplacedClaimRun, { recursive: true });
+  const unavailableReplacedClaimPath = resolve(unavailableReplacedClaimRun, "cases", unavailableCase.case_id, "claim", "claim.json");
+  const unavailableReplacedClaim = JSON.parse(readFileSync(unavailableReplacedClaimPath, "utf8"));
+  unavailableReplacedClaim.claim_id = "00000000-0000-4000-8000-000000000002";
+  writeJson(unavailableReplacedClaimPath, unavailableReplacedClaim);
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", unavailableReplacedClaimRun, "--adapter", "claude", "--runtime-config", unavailableRuntime, "--agent-bin", resolve(work, "missing-claude"), "--case-id", unavailableCase.case_id], { expectedStatus: 1, env });
+  assert.deepEqual(readdirSync(resolve(unavailableReplacedClaimRun, "cases", unavailableCase.case_id, "attempts")), ["0001"], "unavailable resume must not append an attempt after claim replacement");
+  run(["recover-case", "--run-dir", unavailableClaimRun, "--case-id", unavailableCase.case_id, "--claim-id", unavailableClaim.claim_id, "--reason", "unavailable request staging fault"]);
+  assert.deepEqual(terminalInventory(unavailableClaimRun, unavailableCase.case_id, "0001"), ["commit.json", "request.json", "result.json"], "unavailable recovery must remove request staging residue");
+
   const claimRun = resolve(work, "claim-run");
   const claimCase = codexCases[2];
   const claimArgs = [runner, "execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", claimRun, "--adapter", "codex", "--runtime-config", claimRuntime, "--agent-bin", codexBin, "--case-id", claimCase.case_id];
@@ -263,6 +304,19 @@ exit 64
   run(["recover-case", "--run-dir", stagingRun, "--case-id", stagingCase.case_id, "--claim-id", stagedClaim.claim_id, "--reason", "staging fault"]);
   assert.equal(existsSync(resolve(stagingCaseRoot, stagingName)), false, "expired claim staging must be removable by exact claim ID");
   assert.equal(readdirSync(resolve(stagingCaseRoot, "attempts")).length, 0, "staging recovery must not allocate an attempt");
+
+  const publishedClaimRun = resolve(work, "published-claim-run");
+  const publishedClaimCase = codexCases[4];
+  const publishedClaimExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", publishedClaimRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", publishedClaimCase.case_id];
+  run(publishedClaimExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_claim_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const publishedClaim = JSON.parse(readFileSync(resolve(publishedClaimRun, "cases", publishedClaimCase.case_id, "claim", "claim.json"), "utf8"));
+  const publishedClaimState = JSON.parse(readFileSync(resolve(publishedClaimRun, "cases", publishedClaimCase.case_id, "state.json"), "utf8"));
+  assert.equal(publishedClaimState.status, "pending", "claim publication fault must precede active state publication");
+  run(publishedClaimExecute, { expectedStatus: 1, env });
+  run(["recover-case", "--run-dir", publishedClaimRun, "--case-id", publishedClaimCase.case_id, "--claim-id", publishedClaim.claim_id, "--reason", "claim published before state"]);
+  const reconciledPublishedState = JSON.parse(readFileSync(resolve(publishedClaimRun, "cases", publishedClaimCase.case_id, "state.json"), "utf8"));
+  assert.equal(reconciledPublishedState.status, "interrupted", "published claim plus pending state must be explicitly recoverable");
+  assert.deepEqual(terminalInventory(publishedClaimRun, publishedClaimCase.case_id, "0001"), ["commit.json", "request.json", "result.json"], "published-claim recovery must close the first attempt without staging residue");
 
   const recoveryRun = resolve(work, "recovery-run");
   const recoveryCase = codexCases[5];
@@ -343,6 +397,22 @@ exit 64
   rmSync(resolve(finalFaultRun, "cases", finalFaultCase.case_id, "claim"), { recursive: true, force: true });
   run(["recover-case", "--run-dir", finalFaultRun, "--case-id", finalFaultCase.case_id, "--claim-id", finalFaultClaim.claim_id, "--reason", "final boundary fault"]);
   assertCaseStatus(["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", finalFaultRun], finalFaultCase.case_id, "completed", "final-before-commit recovery must reconcile to completed");
+
+  for (const [faultName, expectedStatus] of [["after_request_staged", "interrupted"], ["after_pending_result_staged", "interrupted"], ["after_commit_staged", "completed"]]) {
+    const atomicRun = resolve(work, `${faultName}-run`);
+    const atomicCase = codexCases[10];
+    const atomicExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", atomicRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", atomicCase.case_id];
+    run(atomicExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: faultName, ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+    const atomicClaim = JSON.parse(readFileSync(resolve(atomicRun, "cases", atomicCase.case_id, "claim", "claim.json"), "utf8"));
+    const atomicAttemptRoot = resolve(atomicRun, "cases", atomicCase.case_id, "attempts", atomicClaim.attempt);
+    assert.ok(readdirSync(atomicAttemptRoot).some((name) => name.endsWith(".staging")), `${faultName} must reproduce an orphan atomic staging artifact`);
+    rmSync(resolve(tmpdir(), atomicClaim.workspace_parent), { recursive: true, force: true });
+    run(["recover-case", "--run-dir", atomicRun, "--case-id", atomicCase.case_id, "--claim-id", atomicClaim.claim_id, "--reason", `${faultName} recovery`]);
+    const atomicState = JSON.parse(readFileSync(resolve(atomicRun, "cases", atomicCase.case_id, "state.json"), "utf8"));
+    assert.equal(atomicState.status, expectedStatus, `${faultName} recovery must publish the expected terminal state`);
+    const expectedInventory = expectedStatus === "completed" ? ["commit.json", "final.json", "request.json", "result.json"] : ["commit.json", "request.json", "result.json"];
+    assert.deepEqual(terminalInventory(atomicRun, atomicCase.case_id, atomicClaim.attempt), expectedInventory, `${faultName} recovery must remove all atomic staging residue`);
+  }
 
   const stateFaultRun = resolve(work, "state-fault-run");
   const stateFaultCase = codexCases[7];
