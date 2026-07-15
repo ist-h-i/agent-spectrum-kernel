@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK normalized execution generation collection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "artifact_role",
+    "normalizer",
+    "source",
+    "output_collection_identity",
+    "generations_directory"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/normalized-portfolio-root.schema.json" },
+    "program": { "const": "adaptive_ask_normalized_execution_collection" },
+    "artifact_role": { "const": "immutable_snapshot_collection" },
+    "normalizer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "source_revision"],
+      "properties": {
+        "version": { "const": "1.0.0" },
+        "source_revision": { "$ref": "#/$defs/revision" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_instance_id", "run_identity_digest", "plan_id", "plan_digest", "repository_revision"],
+      "properties": {
+        "run_instance_id": { "type": "string", "format": "uuid" },
+        "run_identity_digest": { "$ref": "#/$defs/digest" },
+        "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "repository_revision": { "$ref": "#/$defs/revision" }
+      }
+    },
+    "output_collection_identity": { "$ref": "#/$defs/digest" },
+    "generations_directory": { "const": "generations" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+  }
+}

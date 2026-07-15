@@ -11,7 +11,7 @@ import {
   rmdirSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, isAbsolute, parse, relative, resolve, sep } from "node:path";
+import { basename, dirname, parse, posix, relative, resolve, sep, win32 } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
@@ -19,7 +19,10 @@ import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materializ
 export const NORMALIZER_VERSION = "1.0.0";
 export const NORMALIZED_RESULT_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-result.schema.json";
 export const NORMALIZED_RUN_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-run.schema.json";
+export const NORMALIZED_ROOT_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-root.schema.json";
 export const NORMALIZED_RUN_MANIFEST_NAME = "normalized-run.json";
+export const NORMALIZED_ROOT_MANIFEST_NAME = "normalized-results-root.json";
+export const NORMALIZED_GENERATIONS_DIRECTORY = "generations";
 
 const ADAPTERS = ["codex", "claude"];
 const CONDITIONS = ["plain", "kernel_only", "adaptive_ask", "full_ask"];
@@ -34,7 +37,8 @@ const TELEMETRY_FIELDS = [
   "stderr_bytes",
   "stderr_digest",
   "json_event_line_count",
-  "autonomous_agent_count",
+  "harness_spawned_secondary_agent_count",
+  "runtime_agent_count",
   "failure_kind",
   "capability_downgrade_count",
   "capability_downgrade_digest",
@@ -120,7 +124,7 @@ function typedObserved(value, outcome) {
 
 function portableTelemetryScalar(value, label) {
   const text = String(value);
-  if (isAbsolute(text) || /^[A-Za-z]:[\\/]/u.test(text) || /^file:\/\//iu.test(text)) throw new Error(`${label} contains an absolute private path and cannot be normalized`);
+  if (posix.isAbsolute(text) || win32.isAbsolute(text) || /^file:\/\//iu.test(text)) throw new Error(`${label} contains an absolute private path and cannot be normalized`);
   return text;
 }
 
@@ -156,7 +160,8 @@ function telemetryFor(attempt, adapterIdentity) {
     stderr_bytes: known(result.stderr.bytes),
     stderr_digest: known(`sha256:${result.stderr.sha256}`),
     json_event_line_count: known(result.event_counts.json_lines),
-    autonomous_agent_count: known(request.agent.autonomous_agents_started),
+    harness_spawned_secondary_agent_count: known(request.agent.autonomous_agents_started),
+    runtime_agent_count: missing("unknown", "runtime_agent_count_not_observed"),
     failure_kind: result.failure_kind === null ? missing("not_applicable", "completed_outcome_has_no_failure") : known(portableTelemetryScalar(result.failure_kind, "failure kind")),
     capability_downgrade_count: known(downgrades.length),
     capability_downgrade_digest: known(canonicalDigest(downgrades)),
@@ -176,7 +181,7 @@ function telemetryFor(attempt, adapterIdentity) {
     file_read_count: unavailableMissing(),
     human_effort: missing("unknown", "human_measurement_not_collected"),
     unsafe_attempted_actions: unavailableMissing(),
-    subagent_activity: unavailableMissing(),
+    subagent_activity: missing("unknown", "runtime_subagent_activity_not_observed"),
     evaluator_quality_metrics: missing("not_applicable", "normalized_result_is_pre_evaluation"),
   };
 }
@@ -271,11 +276,11 @@ function groupedCoverage(cases, values, keyName, selector) {
     return {
       [keyName]: value,
       expected: selected.length,
-      normalized: countCases(selected, (entry) => TERMINAL_STATUSES.has(entry.state.status)),
-      terminal: countCases(selected, (entry) => TERMINAL_STATUSES.has(entry.state.status)),
-      pending: countCases(selected, (entry) => entry.state.status === "pending"),
-      active: countCases(selected, (entry) => entry.state.status === "active"),
-      invalid: countCases(selected, (entry) => entry.state.status === "invalid"),
+      normalized: countCases(selected, (entry) => entry.normalized_attempts.length > 0),
+      terminal: countCases(selected, (entry) => TERMINAL_STATUSES.has(entry.status)),
+      pending: countCases(selected, (entry) => entry.status === "pending"),
+      active: countCases(selected, (entry) => entry.status === "active"),
+      invalid: countCases(selected, (entry) => entry.status === "invalid"),
     };
   });
 }
@@ -294,6 +299,80 @@ function telemetryCoverage(records) {
   });
 }
 
+function completenessForCases(cases) {
+  const terminalCases = cases.filter((entry) => TERMINAL_STATUSES.has(entry.status));
+  const missingCaseIds = cases.filter((entry) => ["pending", "active"].includes(entry.status)).map((entry) => entry.case_id).sort();
+  const invalidCaseIds = cases.filter((entry) => entry.status === "invalid").map((entry) => entry.case_id).sort();
+  return {
+    partial: terminalCases.length !== cases.length,
+    expected_cases: cases.length,
+    normalized_cases: countCases(cases, (entry) => entry.normalized_attempts.length > 0),
+    terminal_cases: terminalCases.length,
+    pending_cases: countCases(cases, (entry) => entry.status === "pending"),
+    active_cases: countCases(cases, (entry) => entry.status === "active"),
+    invalid_cases: invalidCaseIds.length,
+    by_adapter: groupedCoverage(cases, ADAPTERS, "adapter", (entry) => entry.adapter_track),
+    by_condition: groupedCoverage(cases, CONDITIONS, "condition", (entry) => entry.condition),
+    by_status: STATUSES.map((status) => ({ status, count: countCases(cases, (entry) => entry.status === status) })),
+    missing_case_ids: missingCaseIds,
+    invalid_case_ids: invalidCaseIds,
+  };
+}
+
+function sourceSnapshotFor(inspection, cases) {
+  return {
+    adapter_identities: [...inspection.adapter_identities.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([adapter, identity]) => ({ adapter, runtime_identity_digest: canonicalDigest(identity) })),
+    cases: cases.map((inspectedCase) => ({
+      case_id: inspectedCase.entry.case_id,
+      status: inspectedCase.state.status,
+      attempt_count: inspectedCase.state.attempt_count,
+      terminal_attempt: inspectedCase.state.terminal_attempt,
+      state_digest: canonicalDigest(inspectedCase.state),
+      committed_attempts: inspectedCase.attempts.map((attempt) => ({
+        attempt: attempt.attempt,
+        request_digest: attempt.evidence.request_digest,
+        raw_result_digest: attempt.evidence.result_digest,
+        terminal_commit_digest: attempt.evidence.commit_digest,
+        final_output_digest: attempt.evidence.final_output_digest,
+        final_output_bytes: attempt.evidence.final_output_bytes,
+      })),
+    })),
+  };
+}
+
+function normalizedRunDigest(manifest) {
+  const { normalized_run_digest: _digest, ...withoutDigest } = manifest;
+  return canonicalDigest(withoutDigest);
+}
+
+function buildRootManifest({ root, source }) {
+  const base = {
+    schema_version: "1.0.0",
+    schema_path: NORMALIZED_ROOT_SCHEMA_PATH,
+    program: "adaptive_ask_normalized_execution_collection",
+    artifact_role: "immutable_snapshot_collection",
+    normalizer: { version: NORMALIZER_VERSION, source_revision: source.repository_revision },
+    source: {
+      run_instance_id: source.run_instance_id,
+      run_identity_digest: source.run_identity_digest,
+      plan_id: source.plan_id,
+      plan_digest: source.plan_digest,
+      repository_revision: source.repository_revision,
+    },
+    generations_directory: NORMALIZED_GENERATIONS_DIRECTORY,
+  };
+  const manifest = { ...base, output_collection_identity: canonicalDigest(base) };
+  assertBenchmarkSchemaInstance(manifest, { schemaPath: resolve(root, NORMALIZED_ROOT_SCHEMA_PATH), label: "normalized result collection manifest" });
+  return manifest;
+}
+
+function generationName(sourceSnapshotDigest) {
+  if (!/^sha256:[a-f0-9]{64}$/u.test(sourceSnapshotDigest ?? "")) throw new Error("source snapshot digest is invalid");
+  return `snapshot-${sourceSnapshotDigest.slice("sha256:".length)}`;
+}
+
 function buildNormalizedArtifacts({ root, inspection }) {
   const files = new Map();
   const records = [];
@@ -303,9 +382,9 @@ function buildNormalizedArtifacts({ root, inspection }) {
   });
   const caseRecords = cases.map((inspectedCase) => {
     const refs = [];
-    if (TERMINAL_STATUSES.has(inspectedCase.state.status)) {
+    if (inspectedCase.attempts.length > 0) {
       const adapterIdentity = inspection.adapter_identities.get(inspectedCase.entry.adapter_track);
-      if (!adapterIdentity) throw new Error(`${inspectedCase.entry.adapter_track} runtime identity is missing for normalized terminal evidence`);
+      if (!adapterIdentity) throw new Error(`${inspectedCase.entry.adapter_track} runtime identity is missing for committed normalized evidence`);
       for (const attempt of inspectedCase.attempts) {
         const record = buildNormalizedResult({ inspection, inspectedCase, attempt, adapterIdentity });
         assertNormalizedResult(root, record);
@@ -335,10 +414,9 @@ function buildNormalizedArtifacts({ root, inspection }) {
       normalized_attempts: refs,
     };
   });
-  const inventory = [...files.entries()].map(([path, bytes]) => ({ path, sha256: `sha256:${sha256(bytes)}`, bytes: bytes.length }));
-  const terminalCases = cases.filter((entry) => TERMINAL_STATUSES.has(entry.state.status));
-  const missingCaseIds = cases.filter((entry) => ["pending", "active"].includes(entry.state.status)).map((entry) => entry.entry.case_id).sort();
-  const invalidCaseIds = cases.filter((entry) => entry.state.status === "invalid").map((entry) => entry.entry.case_id).sort();
+  const inventory = [...files.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([path, bytes]) => ({ path, sha256: `sha256:${sha256(bytes)}`, bytes: bytes.length }));
   const source = {
     run_instance_id: inspection.identity.run_instance_id,
     run_identity_digest: canonicalDigest(inspection.identity),
@@ -348,33 +426,24 @@ function buildNormalizedArtifacts({ root, inspection }) {
     materialization_manifest_digest: inspection.materialization.manifestDigest,
     selection_state_digest: inspection.selections.stateDigest,
   };
-  const manifest = {
+  const sourceSnapshot = sourceSnapshotFor(inspection, cases);
+  const sourceSnapshotDigest = canonicalDigest(sourceSnapshot);
+  const manifestWithoutDigest = {
     schema_version: "1.0.0",
     schema_path: NORMALIZED_RUN_SCHEMA_PATH,
     program: "adaptive_ask_normalized_execution_run",
     artifact_role: "derived_execution_evidence",
     normalizer: { version: NORMALIZER_VERSION, source_revision: inspection.identity.repository_revision },
     source,
-    output_root_identity: canonicalDigest({ run_instance_id: source.run_instance_id, plan_id: source.plan_id, normalizer_version: NORMALIZER_VERSION }),
+    source_snapshot: sourceSnapshot,
+    source_snapshot_digest: sourceSnapshotDigest,
+    output_root_identity: canonicalDigest({ run_instance_id: source.run_instance_id, plan_id: source.plan_id, normalizer_version: NORMALIZER_VERSION, source_snapshot_digest: sourceSnapshotDigest }),
     pool_adapter_results: false,
-    completeness: {
-      partial: terminalCases.length !== cases.length,
-      expected_cases: cases.length,
-      normalized_cases: terminalCases.length,
-      terminal_cases: terminalCases.length,
-      pending_cases: countCases(cases, (entry) => entry.state.status === "pending"),
-      active_cases: countCases(cases, (entry) => entry.state.status === "active"),
-      invalid_cases: invalidCaseIds.length,
-      by_adapter: groupedCoverage(cases, ADAPTERS, "adapter", (entry) => entry.entry.adapter_track),
-      by_condition: groupedCoverage(cases, CONDITIONS, "condition", (entry) => entry.entry.condition),
-      by_status: STATUSES.map((status) => ({ status, count: countCases(cases, (entry) => entry.state.status === status) })),
-      missing_case_ids: missingCaseIds,
-      invalid_case_ids: invalidCaseIds,
-    },
+    completeness: completenessForCases(caseRecords),
     telemetry_coverage: telemetryCoverage(records),
     cases: caseRecords,
     inventory,
-    publication_digest: canonicalDigest(inventory),
+    publication_digest: canonicalDigest({ source_snapshot_digest: sourceSnapshotDigest, inventory }),
     boundaries: {
       evaluator_result: false,
       score: false,
@@ -384,9 +453,16 @@ function buildNormalizedArtifacts({ root, inspection }) {
       issue_198_stage_0_authorized: false,
     },
   };
+  const manifest = { ...manifestWithoutDigest, normalized_run_digest: canonicalDigest(manifestWithoutDigest) };
   assertBenchmarkSchemaInstance(manifest, { schemaPath: resolve(root, NORMALIZED_RUN_SCHEMA_PATH), label: "normalized run manifest" });
   files.set(NORMALIZED_RUN_MANIFEST_NAME, jsonBytes(manifest));
-  return { manifest, files };
+  return {
+    manifest,
+    rootManifest: buildRootManifest({ root, source }),
+    files,
+    sourceSnapshotDigest,
+    generationName: generationName(sourceSnapshotDigest),
+  };
 }
 
 function treeFiles(root) {
@@ -464,36 +540,36 @@ function writeStaging(staging, files) {
   }
 }
 
-function existingPublication(output, expected) {
+function existingGeneration(output, expected) {
   if (!existsSync(output)) return "missing";
-  assertNoSymlinkSegments(output, "normalized output root");
-  if (!lstatSync(output).isDirectory()) throw new Error("normalized output root must be a directory");
+  assertNoSymlinkSegments(output, "normalized generation root");
+  if (!lstatSync(output).isDirectory()) throw new Error("normalized generation root must be a directory");
   if (readdirSync(output).length === 0) return "empty";
-  if (!existsSync(resolve(output, NORMALIZED_RUN_MANIFEST_NAME))) throw new Error("non-empty unmanaged normalized output root is not owned by this normalizer");
+  if (!existsSync(resolve(output, NORMALIZED_RUN_MANIFEST_NAME))) throw new Error("non-empty unmanaged normalized generation is not owned by this normalizer");
   try {
-    assertExactFiles(treeFiles(output), expected, "existing normalized publication");
+    assertExactFiles(treeFiles(output), expected, "existing normalized generation");
     return "identical";
   } catch (error) {
-    throw new Error(`duplicate normalized publication conflicts with existing content: ${error.message}`);
+    throw new Error(`duplicate normalized generation conflicts with existing content: ${error.message}`);
   }
 }
 
-function publishArtifacts({ output, artifacts }) {
+function publishDirectory({ output, files }) {
   const parent = dirname(output);
   mkdirSync(parent, { recursive: true });
   const prefix = `.${basename(output)}.normalized-staging-`;
   assertNoAbandonedStaging(parent, prefix);
-  const existing = existingPublication(output, artifacts.files);
-  if (existing === "identical") return { ...artifacts, idempotent: true };
+  const existing = existingGeneration(output, files);
+  if (existing === "identical") return true;
   const staging = mkdtempSync(resolve(parent, prefix));
   writeFileSync(resolve(staging, ".owner.json"), `${JSON.stringify({ pid: process.pid, token: randomUUID() })}\n`, { flag: "wx" });
   fault("after_normalized_staging_created");
   try {
-    writeStaging(staging, artifacts.files);
+    writeStaging(staging, files);
     fault("after_normalized_staging_complete");
     const staged = treeFiles(staging);
     staged.delete(".owner.json");
-    assertExactFiles(staged, artifacts.files, "normalized staging publication");
+    assertExactFiles(staged, files, "normalized staging publication");
     rmSync(resolve(staging, ".owner.json"));
     if (existing === "empty" && existsSync(output) && readdirSync(output).length === 0) {
       try {
@@ -504,19 +580,208 @@ function publishArtifacts({ output, artifacts }) {
     }
     try {
       renameSync(staging, output);
-      return { ...artifacts, idempotent: false };
+      return false;
     } catch (error) {
       if (!["EEXIST", "ENOTEMPTY", "EISDIR"].includes(error?.code)) throw error;
-      const raced = existingPublication(output, artifacts.files);
+      const raced = existingGeneration(output, files);
       if (raced !== "identical") throw error;
       rmSync(staging, { recursive: true, force: true });
-      return { ...artifacts, idempotent: true };
+      return true;
     }
   } catch (error) {
     if (process.env.ASK_BENCHMARK_NORMALIZE_FAULT) throw error;
     rmSync(staging, { recursive: true, force: true });
     throw error;
   }
+}
+
+function assertManagedCollection({ root, output, expectedRootManifest = null }) {
+  assertNoSymlinkSegments(output, "normalized output root");
+  if (!existsSync(output) || !lstatSync(output).isDirectory()) throw new Error("normalized output root is missing or not a directory");
+  const expectedRootInventory = [NORMALIZED_GENERATIONS_DIRECTORY, NORMALIZED_ROOT_MANIFEST_NAME].sort();
+  const actualRootInventory = readdirSync(output).sort();
+  if (stableCanonicalJson(actualRootInventory) !== stableCanonicalJson(expectedRootInventory)) {
+    if (!actualRootInventory.includes(NORMALIZED_ROOT_MANIFEST_NAME)) throw new Error("non-empty unmanaged normalized output root is not owned by this normalizer");
+    throw new Error("normalized output root inventory mismatch");
+  }
+  const generations = resolve(output, NORMALIZED_GENERATIONS_DIRECTORY);
+  assertNoSymlinkSegments(generations, "normalized generations root");
+  if (!lstatSync(generations).isDirectory() || lstatSync(generations).isSymbolicLink()) throw new Error("normalized generations root must be a real directory");
+  for (const name of readdirSync(generations).sort()) {
+    if (!/^snapshot-[a-f0-9]{64}$/u.test(name)) throw new Error(`normalized generations root contains an unmanaged entry: ${name}`);
+    const generation = resolve(generations, name);
+    assertNoSymlinkSegments(generation, `normalized generation ${name}`);
+    if (!lstatSync(generation).isDirectory() || lstatSync(generation).isSymbolicLink()) throw new Error(`normalized generation ${name} must be a real directory`);
+  }
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(resolve(output, NORMALIZED_ROOT_MANIFEST_NAME), "utf8"));
+  } catch {
+    throw new Error("normalized result collection manifest is invalid JSON");
+  }
+  assertBenchmarkSchemaInstance(manifest, { schemaPath: resolve(root, NORMALIZED_ROOT_SCHEMA_PATH), label: "normalized result collection manifest" });
+  const { output_collection_identity: identity, ...base } = manifest;
+  if (identity !== canonicalDigest(base)) throw new Error("normalized result collection identity is invalid");
+  if (expectedRootManifest && stableCanonicalJson(manifest) !== stableCanonicalJson(expectedRootManifest)) throw new Error("normalized output collection conflicts with the source run identity");
+  return manifest;
+}
+
+function existingCollection({ root, output, expectedRootManifest }) {
+  if (!existsSync(output)) return "missing";
+  if (lstatSync(output).isSymbolicLink()) throw new Error("normalized output root must not be a symlink");
+  if (!lstatSync(output).isDirectory()) throw new Error("normalized output root must be a directory");
+  if (readdirSync(output).length === 0) return "empty";
+  assertManagedCollection({ root, output, expectedRootManifest });
+  return "managed";
+}
+
+function generationPath(output, sourceSnapshotDigest) {
+  return resolve(output, NORMALIZED_GENERATIONS_DIRECTORY, generationName(sourceSnapshotDigest));
+}
+
+function initialCollectionFiles(artifacts) {
+  const files = new Map([[NORMALIZED_ROOT_MANIFEST_NAME, jsonBytes(artifacts.rootManifest)]]);
+  for (const [path, bytes] of artifacts.files) files.set(`${NORMALIZED_GENERATIONS_DIRECTORY}/${artifacts.generationName}/${path}`, bytes);
+  return files;
+}
+
+function publishGeneration({ root, output, artifacts }) {
+  assertManagedCollection({ root, output, expectedRootManifest: artifacts.rootManifest });
+  const target = generationPath(output, artifacts.sourceSnapshotDigest);
+  const idempotent = publishDirectory({ output: target, files: artifacts.files });
+  return { ...artifacts, idempotent, generationPath: target };
+}
+
+function publishArtifacts({ root, output, artifacts }) {
+  const parent = dirname(output);
+  mkdirSync(parent, { recursive: true });
+  const prefix = `.${basename(output)}.normalized-staging-`;
+  assertNoAbandonedStaging(parent, prefix);
+  const existing = existingCollection({ root, output, expectedRootManifest: artifacts.rootManifest });
+  if (existing === "managed") return publishGeneration({ root, output, artifacts });
+
+  const staging = mkdtempSync(resolve(parent, prefix));
+  writeFileSync(resolve(staging, ".owner.json"), `${JSON.stringify({ pid: process.pid, token: randomUUID() })}\n`, { flag: "wx" });
+  fault("after_normalized_staging_created");
+  try {
+    const files = initialCollectionFiles(artifacts);
+    writeStaging(staging, files);
+    fault("after_normalized_staging_complete");
+    const staged = treeFiles(staging);
+    staged.delete(".owner.json");
+    assertExactFiles(staged, files, "normalized collection staging publication");
+    rmSync(resolve(staging, ".owner.json"));
+    if (existing === "empty" && existsSync(output) && readdirSync(output).length === 0) {
+      try {
+        rmdirSync(output);
+      } catch (error) {
+        if (!["ENOENT", "ENOTEMPTY"].includes(error?.code)) throw error;
+      }
+    }
+    try {
+      renameSync(staging, output);
+      return { ...artifacts, idempotent: false, generationPath: generationPath(output, artifacts.sourceSnapshotDigest) };
+    } catch (error) {
+      if (!["EEXIST", "ENOTEMPTY", "EISDIR"].includes(error?.code)) throw error;
+      assertManagedCollection({ root, output, expectedRootManifest: artifacts.rootManifest });
+      rmSync(staging, { recursive: true, force: true });
+      return publishGeneration({ root, output, artifacts });
+    }
+  } catch (error) {
+    if (process.env.ASK_BENCHMARK_NORMALIZE_FAULT) throw error;
+    rmSync(staging, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function assertNormalizedManifestIdentity(manifest) {
+  if (manifest.source_snapshot_digest !== canonicalDigest(manifest.source_snapshot)) throw new Error("normalized source snapshot digest is invalid");
+  const expectedOutputIdentity = canonicalDigest({
+    run_instance_id: manifest.source.run_instance_id,
+    plan_id: manifest.source.plan_id,
+    normalizer_version: manifest.normalizer.version,
+    source_snapshot_digest: manifest.source_snapshot_digest,
+  });
+  if (manifest.output_root_identity !== expectedOutputIdentity) throw new Error("normalized output root identity is invalid");
+  if (manifest.publication_digest !== canonicalDigest({ source_snapshot_digest: manifest.source_snapshot_digest, inventory: manifest.inventory })) throw new Error("normalized publication digest is invalid");
+  if (manifest.normalized_run_digest !== normalizedRunDigest(manifest)) throw new Error("normalized run digest is invalid");
+}
+
+function assertSelfContainedGeneration({ root, collection, generation, requestedSnapshotDigest }) {
+  const files = treeFiles(generation);
+  const manifestBytes = files.get(NORMALIZED_RUN_MANIFEST_NAME);
+  if (!manifestBytes) throw new Error("normalized generation manifest is missing");
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestBytes.toString("utf8"));
+  } catch {
+    throw new Error("normalized generation manifest is invalid JSON");
+  }
+  assertBenchmarkSchemaInstance(manifest, { schemaPath: resolve(root, NORMALIZED_RUN_SCHEMA_PATH), label: "normalized run manifest" });
+  if (manifest.source_snapshot_digest !== requestedSnapshotDigest) throw new Error("normalized generation does not match the requested source snapshot digest");
+  assertNormalizedManifestIdentity(manifest);
+  if (collection.normalizer.version !== manifest.normalizer.version || collection.normalizer.source_revision !== manifest.normalizer.source_revision || collection.source.run_instance_id !== manifest.source.run_instance_id || collection.source.run_identity_digest !== manifest.source.run_identity_digest || collection.source.plan_id !== manifest.source.plan_id || collection.source.plan_digest !== manifest.source.plan_digest || collection.source.repository_revision !== manifest.source.repository_revision) throw new Error("normalized generation source does not match its collection");
+
+  const expectedPaths = [NORMALIZED_RUN_MANIFEST_NAME, ...manifest.inventory.map((entry) => entry.path)].sort();
+  if (stableCanonicalJson([...files.keys()].sort()) !== stableCanonicalJson(expectedPaths)) throw new Error("normalized generation inventory mismatch");
+  const records = [];
+  const recordsByPath = new Map();
+  for (const item of manifest.inventory) {
+    const bytes = files.get(item.path);
+    if (!bytes || item.sha256 !== `sha256:${sha256(bytes)}` || item.bytes !== bytes.length) throw new Error(`normalized generation inventory evidence mismatch at ${item.path}`);
+    let record;
+    try {
+      record = JSON.parse(bytes.toString("utf8"));
+    } catch {
+      throw new Error(`normalized result is invalid JSON at ${item.path}`);
+    }
+    assertNormalizedResult(root, record);
+    records.push(record);
+    recordsByPath.set(item.path, record);
+  }
+
+  const expectedCaseOrder = [...manifest.cases].sort((left, right) => {
+    const adapterOrder = ADAPTERS.indexOf(left.adapter_track) - ADAPTERS.indexOf(right.adapter_track);
+    return adapterOrder || left.case_id.localeCompare(right.case_id);
+  });
+  if (stableCanonicalJson(manifest.cases) !== stableCanonicalJson(expectedCaseOrder)) throw new Error("normalized manifest case order is invalid");
+  if (stableCanonicalJson(manifest.completeness) !== stableCanonicalJson(completenessForCases(manifest.cases))) throw new Error("normalized completeness is invalid");
+  if (stableCanonicalJson(manifest.telemetry_coverage) !== stableCanonicalJson(telemetryCoverage(records))) throw new Error("normalized telemetry coverage is invalid");
+
+  const snapshotCases = new Map(manifest.source_snapshot.cases.map((entry) => [entry.case_id, entry]));
+  if (snapshotCases.size !== manifest.cases.length) throw new Error("normalized source snapshot case inventory is invalid");
+  const adapterIdentities = new Map(manifest.source_snapshot.adapter_identities.map((entry) => [entry.adapter, entry.runtime_identity_digest]));
+  if (adapterIdentities.size !== manifest.source_snapshot.adapter_identities.length) throw new Error("normalized source snapshot adapter inventory is invalid");
+  if (stableCanonicalJson(manifest.source_snapshot.cases.map((entry) => entry.case_id)) !== stableCanonicalJson(manifest.cases.map((entry) => entry.case_id))) throw new Error("normalized source snapshot case order is invalid");
+  const expectedAdapterOrder = [...manifest.source_snapshot.adapter_identities].sort((left, right) => left.adapter.localeCompare(right.adapter));
+  if (stableCanonicalJson(manifest.source_snapshot.adapter_identities) !== stableCanonicalJson(expectedAdapterOrder)) throw new Error("normalized source snapshot adapter order is invalid");
+  const referencedPaths = [];
+  for (const caseRecord of manifest.cases) {
+    const snapshotCase = snapshotCases.get(caseRecord.case_id);
+    if (!snapshotCase || snapshotCase.status !== caseRecord.status || snapshotCase.attempt_count !== caseRecord.attempt_count || snapshotCase.terminal_attempt !== caseRecord.terminal_attempt) throw new Error(`${caseRecord.case_id} source snapshot state is inconsistent`);
+    if (snapshotCase.committed_attempts.length !== caseRecord.normalized_attempts.length) throw new Error(`${caseRecord.case_id} committed attempt inventory is inconsistent`);
+    for (let index = 0; index < caseRecord.normalized_attempts.length; index += 1) {
+      const reference = caseRecord.normalized_attempts[index];
+      const snapshotAttempt = snapshotCase.committed_attempts[index];
+      const record = recordsByPath.get(reference.path);
+      if (!record || reference.attempt !== snapshotAttempt.attempt || reference.normalized_result_id !== record.normalized_result_id || reference.normalized_result_digest !== record.normalized_result_digest) throw new Error(`${caseRecord.case_id}/${reference.attempt} normalized attempt reference is invalid`);
+      if (record.lineage.run_instance_id !== manifest.source.run_instance_id || record.lineage.plan_id !== manifest.source.plan_id || record.lineage.plan_digest !== manifest.source.plan_digest || record.lineage.repository_revision !== manifest.source.repository_revision || record.lineage.materialization_manifest_digest !== manifest.source.materialization_manifest_digest || record.lineage.case_id !== caseRecord.case_id || record.lineage.attempt !== reference.attempt || record.lineage.adapter_track !== caseRecord.adapter_track || record.lineage.condition !== caseRecord.condition || record.lineage.fixture_id !== caseRecord.fixture_id || record.lineage.repetition !== caseRecord.repetition || record.lineage.condition_order_position !== caseRecord.condition_order_position || record.lineage.block_id !== caseRecord.block_id) throw new Error(`${caseRecord.case_id}/${reference.attempt} normalized lineage is inconsistent`);
+      if (record.lineage.runtime_identity_digest !== adapterIdentities.get(caseRecord.adapter_track)) throw new Error(`${caseRecord.case_id}/${reference.attempt} runtime identity is inconsistent`);
+      if (record.lineage.request_digest !== snapshotAttempt.request_digest || record.lineage.raw_result_digest !== snapshotAttempt.raw_result_digest || record.lineage.terminal_commit_digest !== snapshotAttempt.terminal_commit_digest || record.lineage.final_output_digest !== snapshotAttempt.final_output_digest || record.lineage.final_output_bytes !== snapshotAttempt.final_output_bytes) throw new Error(`${caseRecord.case_id}/${reference.attempt} source attempt evidence is inconsistent`);
+      referencedPaths.push(reference.path);
+    }
+  }
+  if (stableCanonicalJson(referencedPaths.sort()) !== stableCanonicalJson(manifest.inventory.map((entry) => entry.path).sort())) throw new Error("normalized attempt references do not close over the generation inventory");
+  return manifest;
+}
+
+function verifyGeneration({ root, output, sourceSnapshotDigest, expectedRootManifest = null, expectedFiles = null }) {
+  const collection = assertManagedCollection({ root, output, expectedRootManifest });
+  const generation = generationPath(output, sourceSnapshotDigest);
+  if (!existsSync(generation) || !lstatSync(generation).isDirectory()) throw new Error(`normalized snapshot generation is missing: ${sourceSnapshotDigest}`);
+  const manifest = assertSelfContainedGeneration({ root, collection, generation, requestedSnapshotDigest: sourceSnapshotDigest });
+  if (expectedFiles) assertExactFiles(treeFiles(generation), expectedFiles, "normalized current snapshot verification");
+  return { manifest, generationPath: generation };
 }
 
 function inspectAndBuild({ root, config, planPath, materializedPath, selectionState, runDir }) {
@@ -528,13 +793,16 @@ function inspectAndBuild({ root, config, planPath, materializedPath, selectionSt
 export function normalizePortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir, outputPath }) {
   const output = outputBoundary({ outputPath, runDir, materializedPath, selectionState });
   const artifacts = inspectAndBuild({ root, config, planPath, materializedPath, selectionState, runDir });
-  return publishArtifacts({ output, artifacts });
+  return publishArtifacts({ root, output, artifacts });
 }
 
-export function verifyNormalizedPortfolioResults({ root, config, planPath, materializedPath, selectionState, runDir, outputPath }) {
+export function verifyNormalizedPortfolioResults({ root, config = null, planPath = null, materializedPath = null, selectionState = null, runDir = null, outputPath, sourceSnapshotDigest = null }) {
   const output = outputBoundary({ outputPath, runDir, materializedPath, selectionState });
+  if (sourceSnapshotDigest) {
+    const verified = verifyGeneration({ root, output, sourceSnapshotDigest });
+    return { ...verified, freshness: "not_checked" };
+  }
   const artifacts = inspectAndBuild({ root, config, planPath, materializedPath, selectionState, runDir });
-  if (!existsSync(output) || !lstatSync(output).isDirectory()) throw new Error("normalized output root is missing or not a directory");
-  assertExactFiles(treeFiles(output), artifacts.files, "normalized output verification");
-  return artifacts.manifest;
+  const verified = verifyGeneration({ root, output, sourceSnapshotDigest: artifacts.sourceSnapshotDigest, expectedRootManifest: artifacts.rootManifest, expectedFiles: artifacts.files });
+  return { ...verified, freshness: "current" };
 }

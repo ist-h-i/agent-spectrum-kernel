@@ -38,6 +38,16 @@ function snapshot(path) {
   return records;
 }
 
+function readGeneration(output, sourceSnapshotDigest = null) {
+  const generations = resolve(output, "generations");
+  const names = readdirSync(generations).sort();
+  if (!sourceSnapshotDigest) assert.equal(names.length, 1, "a source snapshot digest is required when a collection contains multiple generations");
+  const name = sourceSnapshotDigest ? `snapshot-${sourceSnapshotDigest.slice("sha256:".length)}` : names[0];
+  assert.ok(name && names.includes(name), `normalized generation ${sourceSnapshotDigest ?? "latest"} must exist`);
+  const path = resolve(generations, name);
+  return { path, manifest: JSON.parse(readFileSync(resolve(path, "normalized-run.json"), "utf8")) };
+}
+
 function runtimeConfig(adapter, availability = "available") {
   return {
     schema_version: "1.0.0",
@@ -143,6 +153,27 @@ try {
   const execute = (runDir, entry, runtime, bin, env = {}, extra = [], expectedStatus = 0) => run(["execute-portfolio", ...common(runDir), "--adapter", entry.adapter_track, "--runtime-config", runtime, "--agent-bin", bin, "--case-id", entry.case_id, ...extra], { expectedStatus, env });
   const normalize = (runDir, output, selections = selectionState, options = {}) => run(["normalize-execution", ...common(runDir, selections), "--output", output], options);
 
+  const progressionRun = resolve(work, "snapshot-progression-run");
+  const progressionCase = caseFor("codex", "full_ask");
+  execute(progressionRun, progressionCase, codexRuntime, codexBin, { ASK_BENCHMARK_FAULT: "after_run_initialized" }, [], 86);
+  const progressionOutput = resolve(work, "normalized-snapshot-progression");
+  normalize(progressionRun, progressionOutput);
+  const pendingGeneration = readGeneration(progressionOutput);
+  const pendingGenerationBytes = snapshot(pendingGeneration.path);
+  execute(progressionRun, progressionCase, codexRuntime, codexBin, { FAKE_MODE: "complete", ASK_BENCHMARK_FAULT: "after_request_published" }, [], 86);
+  normalize(progressionRun, progressionOutput);
+  assert.equal(readdirSync(resolve(progressionOutput, "generations")).length, 2, "run progression must publish a distinct immutable generation");
+  const activeGeneration = [...readdirSync(resolve(progressionOutput, "generations"))]
+    .map((name) => ({ name, manifest: JSON.parse(readFileSync(resolve(progressionOutput, "generations", name, "normalized-run.json"), "utf8")) }))
+    .find((entry) => entry.manifest.source_snapshot_digest !== pendingGeneration.manifest.source_snapshot_digest);
+  assert.ok(activeGeneration, "active source snapshot generation must be addressable");
+  assert.notEqual(activeGeneration.manifest.output_root_identity, pendingGeneration.manifest.output_root_identity, "output identity must bind the source snapshot");
+  assert.notEqual(activeGeneration.manifest.publication_digest, pendingGeneration.manifest.publication_digest, "publication identity must distinguish state-only progression");
+  assert.notEqual(activeGeneration.manifest.normalized_run_digest, pendingGeneration.manifest.normalized_run_digest, "the manifest digest must distinguish state-only progression");
+  assert.deepEqual(snapshot(pendingGeneration.path), pendingGenerationBytes, "publishing a later snapshot must not mutate the earlier generation");
+  run(["verify-normalized-results", "--output", progressionOutput, "--snapshot-digest", pendingGeneration.manifest.source_snapshot_digest]);
+  run(["verify-normalized-results", ...common(progressionRun), "--output", progressionOutput]);
+
   const completedRun = resolve(work, "completed-partial-run");
   const completedPlain = caseFor("codex", "plain");
   const completedAdaptive = caseFor("codex", "adaptive_ask");
@@ -158,7 +189,8 @@ try {
   const firstPublication = snapshot(normalized);
   normalize(completedRun, normalized);
   assert.deepEqual(snapshot(normalized), firstPublication, "repeated normalization must be byte-identical and idempotent");
-  const normalizedManifest = JSON.parse(readFileSync(resolve(normalized, "normalized-run.json"), "utf8"));
+  const normalizedGeneration = readGeneration(normalized);
+  const normalizedManifest = normalizedGeneration.manifest;
   assert.equal(normalizedManifest.completeness.partial, true, "a partially executed plan must be explicit");
   assert.equal(normalizedManifest.completeness.normalized_cases, 3, "all three terminal cases must be normalized");
   assert.equal(normalizedManifest.completeness.missing_case_ids.length, plan.cases.length - 3, "pending cases must remain visible as missing normalized cases");
@@ -167,13 +199,16 @@ try {
   for (const marker of ["PRIVATE_STDOUT_MARKER", "PRIVATE_STDERR_MARKER", "PRIVATE_FINAL_MARKER", "PRIVATE_DOWNGRADE_REASON"]) assert.equal(normalizedText.includes(marker), false, `${marker} must not enter normalized output`);
   const adaptiveRef = normalizedManifest.cases.find((entry) => entry.case_id === completedAdaptive.case_id).normalized_attempts[0];
   const plainRef = normalizedManifest.cases.find((entry) => entry.case_id === completedPlain.case_id).normalized_attempts[0];
-  const adaptiveRecord = JSON.parse(readFileSync(resolve(normalized, adaptiveRef.path), "utf8"));
-  const plainRecord = JSON.parse(readFileSync(resolve(normalized, plainRef.path), "utf8"));
+  const adaptiveRecord = JSON.parse(readFileSync(resolve(normalizedGeneration.path, adaptiveRef.path), "utf8"));
+  const plainRecord = JSON.parse(readFileSync(resolve(normalizedGeneration.path, plainRef.path), "utf8"));
   assert.ok(adaptiveRecord.lineage.adaptive_selection_digest, "Adaptive attempts must retain the sealed selection digest");
   assert.equal(plainRecord.lineage.adaptive_selection_digest, null, "non-Adaptive attempts must not invent a selection digest");
   assert.equal(plainRecord.telemetry.input_tokens.status, "unknown", "unreported token telemetry must be typed unknown");
   assert.equal(plainRecord.telemetry.evaluator_quality_metrics.status, "not_applicable", "pre-evaluation quality telemetry must be typed not_applicable");
   assert.equal(plainRecord.telemetry.stdout_bytes.status, "known", "committed stream evidence must be typed known");
+  assert.equal(plainRecord.telemetry.harness_spawned_secondary_agent_count.value, 0, "the harness-owned secondary-agent count must retain the observed zero");
+  assert.equal(plainRecord.telemetry.runtime_agent_count.status, "unknown", "unobserved runtime agent activity must not be normalized as known zero");
+  assert.equal(plainRecord.telemetry.subagent_activity.status, "unknown", "unobserved subagent activity must remain unknown");
   assert.equal(plainRecord.lineage.suite, "calibration", "normalized lineage must retain the plan-owned suite without evaluator data");
 
   const failedRun = resolve(work, "failed-run");
@@ -181,8 +216,9 @@ try {
   execute(failedRun, failedCase, codexRuntime, codexBin, { FAKE_MODE: "fail" });
   const failedOutput = resolve(work, "normalized-failed");
   normalize(failedRun, failedOutput);
-  const failedManifest = JSON.parse(readFileSync(resolve(failedOutput, "normalized-run.json"), "utf8"));
-  const failedRecord = JSON.parse(readFileSync(resolve(failedOutput, failedManifest.cases.find((entry) => entry.case_id === failedCase.case_id).normalized_attempts[0].path), "utf8"));
+  const failedGeneration = readGeneration(failedOutput);
+  const failedManifest = failedGeneration.manifest;
+  const failedRecord = JSON.parse(readFileSync(resolve(failedGeneration.path, failedManifest.cases.find((entry) => entry.case_id === failedCase.case_id).normalized_attempts[0].path), "utf8"));
   assert.equal(failedRecord.outcome, "failed");
   assert.equal(failedRecord.telemetry.final_output_bytes.status, "not_applicable");
 
@@ -191,8 +227,9 @@ try {
   execute(unavailableRun, unavailableCase, unavailableRuntime, resolve(work, "missing-claude"), { FAKE_MODE: "complete" });
   const unavailableOutput = resolve(work, "normalized-unavailable");
   normalize(unavailableRun, unavailableOutput);
-  const unavailableManifest = JSON.parse(readFileSync(resolve(unavailableOutput, "normalized-run.json"), "utf8"));
-  const unavailableRecord = JSON.parse(readFileSync(resolve(unavailableOutput, unavailableManifest.cases.find((entry) => entry.case_id === unavailableCase.case_id).normalized_attempts[0].path), "utf8"));
+  const unavailableGeneration = readGeneration(unavailableOutput);
+  const unavailableManifest = unavailableGeneration.manifest;
+  const unavailableRecord = JSON.parse(readFileSync(resolve(unavailableGeneration.path, unavailableManifest.cases.find((entry) => entry.case_id === unavailableCase.case_id).normalized_attempts[0].path), "utf8"));
   assert.equal(unavailableRecord.outcome, "unavailable");
   assert.equal(unavailableRecord.telemetry.input_tokens.status, "unavailable", "runtime absence must differ from unknown telemetry");
   assert.equal(unavailableRecord.telemetry.runtime_unavailable_reason_digest.status, "known", "unavailable reason evidence must retain digest/bytes without raw text");
@@ -204,8 +241,9 @@ try {
   run(["recover-case", "--run-dir", interruptedRun, "--case-id", interruptedCase.case_id, "--claim-id", interruptedClaim.claim_id, "--reason", "fixture interruption recovery"]);
   const interruptedOutput = resolve(work, "normalized-interrupted");
   normalize(interruptedRun, interruptedOutput);
-  const interruptedManifest = JSON.parse(readFileSync(resolve(interruptedOutput, "normalized-run.json"), "utf8"));
-  const interruptedRecord = JSON.parse(readFileSync(resolve(interruptedOutput, interruptedManifest.cases.find((entry) => entry.case_id === interruptedCase.case_id).normalized_attempts[0].path), "utf8"));
+  const interruptedGeneration = readGeneration(interruptedOutput);
+  const interruptedManifest = interruptedGeneration.manifest;
+  const interruptedRecord = JSON.parse(readFileSync(resolve(interruptedGeneration.path, interruptedManifest.cases.find((entry) => entry.case_id === interruptedCase.case_id).normalized_attempts[0].path), "utf8"));
   assert.equal(interruptedRecord.outcome, "interrupted");
 
   const retryRun = resolve(work, "retry-run");
@@ -216,8 +254,18 @@ try {
   execute(retryRun, retryCase, codexRuntime, codexBin, retryEnv, ["--retry-failed"]);
   const retryOutput = resolve(work, "normalized-retry");
   normalize(retryRun, retryOutput);
-  const retryManifest = JSON.parse(readFileSync(resolve(retryOutput, "normalized-run.json"), "utf8"));
+  const retryManifest = readGeneration(retryOutput).manifest;
   assert.deepEqual(retryManifest.cases.find((entry) => entry.case_id === retryCase.case_id).normalized_attempts.map((entry) => entry.attempt), ["0001", "0002"], "all retry attempts must retain lineage");
+
+  const activeRetryRun = resolve(work, "active-retry-run");
+  const activeRetryCase = caseFor("codex", "plain", 2);
+  execute(activeRetryRun, activeRetryCase, codexRuntime, codexBin, { FAKE_MODE: "fail" });
+  execute(activeRetryRun, activeRetryCase, codexRuntime, codexBin, { FAKE_MODE: "complete", ASK_BENCHMARK_FAULT: "after_request_published" }, ["--retry-failed"], 86);
+  const activeRetryOutput = resolve(work, "normalized-active-retry");
+  normalize(activeRetryRun, activeRetryOutput);
+  const activeRetryManifest = readGeneration(activeRetryOutput).manifest;
+  assert.deepEqual(activeRetryManifest.cases.find((entry) => entry.case_id === activeRetryCase.case_id).normalized_attempts.map((entry) => entry.attempt), ["0001"], "an active retry must retain every previously committed attempt without publishing the active attempt");
+  assert.equal(activeRetryManifest.telemetry_coverage.find((entry) => entry.field === "duration_ms").total, 1, "active retry history must contribute to telemetry coverage");
 
   const invalidRun = resolve(work, "invalid-run");
   cpSync(failedRun, invalidRun, { recursive: true });
@@ -237,7 +285,7 @@ try {
   writeJson(invalidStatePath, { ...invalidState, status: "invalid" });
   const invalidOutput = resolve(work, "normalized-invalid");
   normalize(invalidRun, invalidOutput);
-  const invalidManifest = JSON.parse(readFileSync(resolve(invalidOutput, "normalized-run.json"), "utf8"));
+  const invalidManifest = readGeneration(invalidOutput).manifest;
   assert.deepEqual(invalidManifest.completeness.invalid_case_ids, [failedCase.case_id], "valid terminal invalid evidence must be normalized without treating corruption as a score");
 
   const privatePathRuntime = resolve(work, "private-path-runtime.json");
@@ -248,6 +296,15 @@ try {
   const privatePathCase = caseFor("codex", "kernel_only", 2);
   execute(privatePathRun, privatePathCase, privatePathRuntime, codexBin, { FAKE_MODE: "complete" });
   assert.match(normalize(privatePathRun, resolve(work, "private-path-output"), selectionState, { expectedStatus: 1 }).stderr, /absolute private path/u, "absolute private telemetry paths must fail closed before publication");
+  for (const [name, privateModel] of [["unc", "\\\\server\\share\\private-model"], ["device", "\\\\?\\C:\\Users\\name\\secret"]]) {
+    const runtime = resolve(work, `${name}-private-path-runtime.json`);
+    const config = runtimeConfig("codex");
+    config.model = privateModel;
+    writeJson(runtime, config);
+    const runDir = resolve(work, `${name}-private-path-run`);
+    execute(runDir, privatePathCase, runtime, codexBin, { FAKE_MODE: "complete" });
+    assert.match(normalize(runDir, resolve(work, `${name}-private-path-output`), selectionState, { expectedStatus: 1 }).stderr, /absolute private path/u, `${name} private telemetry paths must fail closed before publication`);
+  }
 
   function clonedRun(source, name) {
     const target = resolve(work, name);

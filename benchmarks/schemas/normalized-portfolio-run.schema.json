@@ -10,6 +10,8 @@
     "artifact_role",
     "normalizer",
     "source",
+    "source_snapshot",
+    "source_snapshot_digest",
     "output_root_identity",
     "pool_adapter_results",
     "completeness",
@@ -17,6 +19,7 @@
     "cases",
     "inventory",
     "publication_digest",
+    "normalized_run_digest",
     "boundaries"
   ],
   "properties": {
@@ -55,6 +58,8 @@
         "selection_state_digest": { "$ref": "#/$defs/digest" }
       }
     },
+    "source_snapshot": { "$ref": "#/$defs/sourceSnapshot" },
+    "source_snapshot_digest": { "$ref": "#/$defs/digest" },
     "output_root_identity": { "$ref": "#/$defs/digest" },
     "pool_adapter_results": { "const": false },
     "completeness": {
@@ -165,6 +170,7 @@
       }
     },
     "publication_digest": { "$ref": "#/$defs/digest" },
+    "normalized_run_digest": { "$ref": "#/$defs/digest" },
     "boundaries": {
       "type": "object",
       "additionalProperties": false,
@@ -185,6 +191,57 @@
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
     "path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$" },
+    "sourceSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter_identities", "cases"],
+      "properties": {
+        "adapter_identities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["adapter", "runtime_identity_digest"],
+            "properties": {
+              "adapter": { "enum": ["codex", "claude"] },
+              "runtime_identity_digest": { "$ref": "#/$defs/digest" }
+            }
+          }
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["case_id", "status", "attempt_count", "terminal_attempt", "state_digest", "committed_attempts"],
+            "properties": {
+              "case_id": { "$ref": "#/$defs/caseId" },
+              "status": { "enum": ["pending", "active", "completed", "failed", "unavailable", "interrupted", "invalid"] },
+              "attempt_count": { "type": "integer", "minimum": 0 },
+              "terminal_attempt": { "type": ["string", "null"], "pattern": "^[0-9]{4}$" },
+              "state_digest": { "$ref": "#/$defs/digest" },
+              "committed_attempts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["attempt", "request_digest", "raw_result_digest", "terminal_commit_digest", "final_output_digest", "final_output_bytes"],
+                  "properties": {
+                    "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+                    "request_digest": { "$ref": "#/$defs/digest" },
+                    "raw_result_digest": { "$ref": "#/$defs/digest" },
+                    "terminal_commit_digest": { "$ref": "#/$defs/digest" },
+                    "final_output_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" },
+                    "final_output_bytes": { "type": ["integer", "null"], "minimum": 1 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "adapterCount": {
       "type": "object",
       "additionalProperties": false,
