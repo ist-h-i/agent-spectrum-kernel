@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { chmodSync, cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -89,7 +90,7 @@ function runtimeConfig(adapter, availability = "available") {
     sandbox_policy: "workspace-write",
     permission_policy: adapter === "codex" ? "never" : "strict",
     executor: { id: `fixture-${adapter}`, version: "1.0.0" },
-    environment_allowlist: ["PATH", "FAKE_EXEC_LOG", "FAKE_FAIL", "FAKE_DELAY"],
+    environment_allowlist: ["PATH", "FAKE_EXEC_LOG", "FAKE_FAIL", "FAKE_DELAY", "FAKE_MUTATE_EXECUTABLE"],
     thermal_state: "cold",
     claude_cli: adapter === "claude" && availability === "available"
       ? {
@@ -107,21 +108,29 @@ function fakeExecutable(adapter) {
   writeFileSync(path, `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "fake-${adapter} 1.0.0"; exit 0; fi
 if [ "$1" = "--help" ]; then echo "ASK_PORTFOLIO_FAKE_CLAUDE_V1 --benchmark-output --benchmark-task --sandbox --permission-policy"; exit 0; fi
-if [ "$1" = "exec" ] && [ "$2" = "--help" ]; then echo "--ephemeral --ignore-user-config --ignore-rules --model --config --sandbox --output-schema --output-last-message"; exit 0; fi
+if [ "$1" = "exec" ] && [ "$2" = "--help" ]; then echo "--ephemeral --ignore-user-config --ignore-rules --skip-git-repo-check --model --config --sandbox --output-schema --output-last-message"; exit 0; fi
 output=""
+skip_git_repo_check="0"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     exec|--ephemeral|--ignore-user-config|--ignore-rules|-) shift ;;
+    --skip-git-repo-check) skip_git_repo_check="1"; shift ;;
     --model|-c|--sandbox|--output-schema|--benchmark-task|--permission-policy) shift 2 ;;
     --output-last-message|--benchmark-output) output="$2"; shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 64 ;;
   esac
 done
 if [ -z "$output" ]; then echo "missing output argument" >&2; exit 64; fi
+if [ "${adapter}" = "codex" ] && [ "$skip_git_repo_check" != "1" ] && [ ! -d .git ]; then echo "not inside a trusted git repository" >&2; exit 65; fi
 if [ -n "\${FAKE_DELAY:-}" ]; then sleep "$FAKE_DELAY"; fi
 printf '${adapter}\\n' >> "$FAKE_EXEC_LOG"
 if [ "\${FAKE_FAIL:-}" = "1" ]; then exit 12; fi
 printf '%s\\n' '{"task_type":"implementation","decision":"not_applicable","findings":[],"requirement_status":[],"verification_commands":[],"completion_claim":"not_applicable","route":null,"summary":"fixture final"}' > "$output"
+if [ "\${FAKE_MUTATE_EXECUTABLE:-}" = "1" ]; then
+  printf '%s\\n' '#!/bin/sh' 'exit 99' > "$0.replacement"
+  chmod 755 "$0.replacement"
+  mv "$0.replacement" "$0"
+fi
 `);
   chmodSync(path, 0o755);
   return path;
@@ -155,6 +164,7 @@ try {
   const portableAtLink = effectiveCommand(checkoutLink, runtimeConfig("codex"));
   assert.deepEqual(portableAtLink, portableAtRoot, "effective command identity must be independent of checkout location");
   assert.equal(JSON.stringify(portableAtRoot).includes(root), false, "effective command identity must not contain an absolute checkout path");
+  assert.ok(portableAtRoot.argv.includes("--skip-git-repo-check"), "Codex synthetic workspaces must explicitly bypass the repository check");
 
   run(["plan", "--config", configPath, "--output", planPath, "--seed", "execution-focused-regression"]);
   run(["materialize", "--config", configPath, "--plan", planPath, "--output", materialized]);
@@ -200,6 +210,15 @@ try {
   assert.equal(readFileSync(logPath, "utf8").trim().split("\n").length, failedLogCount, "failed cases must not retry implicitly");
   run(["execute-portfolio", ...retryCommon, "--retry-failed"], { env });
   assert.ok(existsSync(resolve(retryRun, "cases", retryCase.case_id, "attempts", "0002", "result.json")), "explicit retry must append a new attempt");
+  const retryStatePath = resolve(retryRun, "cases", retryCase.case_id, "state.json");
+  const retryState = JSON.parse(readFileSync(retryStatePath, "utf8"));
+  writeJson(retryStatePath, { ...retryState, status: "failed", terminal_attempt: "0001" });
+  assertCaseStatus(["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", retryRun], retryCase.case_id, "invalid", "terminal state must not roll back behind the latest attempt");
+  const beforeRolledBackRetry = readFileSync(logPath, "utf8");
+  run(["execute-portfolio", ...retryCommon, "--retry-failed"], { expectedStatus: 1, env });
+  assert.equal(readFileSync(logPath, "utf8"), beforeRolledBackRetry, "rolled-back terminal state must fail before spawning attempt 3");
+  assert.deepEqual(readdirSync(resolve(retryRun, "cases", retryCase.case_id, "attempts")).sort(), ["0001", "0002"], "rolled-back terminal state must not allocate attempt 3");
+  writeJson(retryStatePath, retryState);
 
   const completedState = JSON.parse(readFileSync(resolve(runDir, "cases", codexCases[0].case_id, "state.json"), "utf8"));
   const completedFinal = resolve(runDir, "cases", codexCases[0].case_id, "attempts", completedState.terminal_attempt, "final.json");
@@ -240,6 +259,33 @@ exit 64
   const probeIdentity = JSON.parse(readFileSync(resolve(probeRun, "adapters", "codex.json"), "utf8"));
   assert.equal(probeIdentity.availability_evidence, "contract_probe_failed");
 
+  const versionMismatchBin = resolve(work, "version-mismatch-codex");
+  const versionMismatchOutput = "wrong-version\nPRIVATE_MISMATCH_DETAIL\n";
+  writeFileSync(versionMismatchBin, readFileSync(codexBin, "utf8").replace('echo "fake-codex 1.0.0"', `printf '${versionMismatchOutput.replaceAll("\n", "\\n")}'`));
+  chmodSync(versionMismatchBin, 0o755);
+  const versionMismatchRun = resolve(work, "version-mismatch-run");
+  const beforeVersionMismatch = readFileSync(logPath, "utf8");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", versionMismatchRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", versionMismatchBin, "--case-id", codexCases[3].case_id], { env });
+  assert.equal(readFileSync(logPath, "utf8"), beforeVersionMismatch, "version mismatch must not spawn an agent attempt");
+  const versionMismatchIdentity = JSON.parse(readFileSync(resolve(versionMismatchRun, "adapters", "codex.json"), "utf8"));
+  assert.equal(versionMismatchIdentity.unavailable_reason, "runtime_contract_unconfirmed:version_mismatch", "version mismatch reason must be a stable bounded code");
+  assert.equal(versionMismatchIdentity.executable.observed_version, "unconfirmed", "version mismatch must not retain raw version text");
+  assert.equal(versionMismatchIdentity.executable.observed_version_bytes, Buffer.byteLength(versionMismatchOutput), "version mismatch must retain raw byte count");
+  assert.equal(versionMismatchIdentity.executable.observed_version_digest, `sha256:${createHash("sha256").update(versionMismatchOutput).digest("hex")}`, "version mismatch must retain raw output digest");
+  assert.equal(JSON.stringify(versionMismatchIdentity).includes("PRIVATE_MISMATCH_DETAIL"), false, "version mismatch identity must not retain private raw output");
+
+  const noisyVersionBin = resolve(work, "noisy-version-codex");
+  const noisyVersionOutput = "fake-codex 1.0.0\nPRIVATE_VERSION_DETAIL\tWITH_CONTROL\n";
+  writeFileSync(noisyVersionBin, readFileSync(codexBin, "utf8").replace('echo "fake-codex 1.0.0"', `printf '${noisyVersionOutput.replaceAll("\n", "\\n").replaceAll("\t", "\\t")}'`));
+  chmodSync(noisyVersionBin, 0o755);
+  const noisyVersionRun = resolve(work, "noisy-version-run");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", noisyVersionRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", noisyVersionBin, "--case-id", codexCases[3].case_id], { env });
+  const noisyIdentity = JSON.parse(readFileSync(resolve(noisyVersionRun, "adapters", "codex.json"), "utf8"));
+  assert.equal(noisyIdentity.executable.observed_version, "fake-codex 1.0.0", "durable version metadata must retain only the confirmed normalized version");
+  assert.equal(noisyIdentity.executable.observed_version_bytes, Buffer.byteLength(noisyVersionOutput), "version evidence must retain raw byte count without raw text");
+  assert.equal(noisyIdentity.executable.observed_version_digest, `sha256:${createHash("sha256").update(noisyVersionOutput).digest("hex")}`, "version evidence must retain the raw output digest");
+  assert.equal(JSON.stringify(noisyIdentity).includes("PRIVATE_VERSION_DETAIL"), false, "runtime identity must not retain raw version output");
+
   const executableSymlink = resolve(work, "codex-symlink");
   symlinkSync(codexBin, executableSymlink);
   const executableSymlinkRun = resolve(work, "executable-symlink-run");
@@ -248,6 +294,15 @@ exit 64
   const nonRegularExecutableRun = resolve(work, "nonregular-executable-run");
   run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", nonRegularExecutableRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", work, "--case-id", codexCases[3].case_id], { expectedStatus: 1, env });
   assert.equal(existsSync(nonRegularExecutableRun), false, "non-regular agent executables must hard fail before run artifacts are created");
+
+  const mutatingExecutable = resolve(work, "mutating-codex");
+  writeFileSync(mutatingExecutable, readFileSync(codexBin));
+  chmodSync(mutatingExecutable, 0o755);
+  const mutatingExecutableRun = resolve(work, "mutating-executable-run");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", mutatingExecutableRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", mutatingExecutable, "--case-id", codexCases[4].case_id], { expectedStatus: 1, env: { ...env, FAKE_MUTATE_EXECUTABLE: "1" } });
+  const mutatingState = JSON.parse(readFileSync(resolve(mutatingExecutableRun, "cases", codexCases[4].case_id, "state.json"), "utf8"));
+  assert.equal(mutatingState.status, "active", "post-spawn executable drift must hard fail instead of recording agent_failure");
+  assert.deepEqual(readdirSync(resolve(mutatingExecutableRun, "cases", codexCases[4].case_id, "attempts", "0001")).sort(), ["request.json"], "post-spawn executable drift must not publish terminal result evidence");
 
   const adapterFirstWriteRun = resolve(work, "adapter-first-write-run");
   run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", adapterFirstWriteRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", codexCases[3].case_id], { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_run_initialized" } });
@@ -384,9 +439,16 @@ exit 64
   assert.deepEqual(readdirSync(resolve(replacedClaimRun, "cases", recoveryCase.case_id, "attempts")), ["0001"], "replaced active claims must not allocate a new attempt");
 
   run(["recover-case", "--run-dir", recoveryRun, "--case-id", recoveryCase.case_id, "--claim-id", "wrong-claim", "--reason", "fixture"], { expectedStatus: 1 });
-  run(["recover-case", "--run-dir", recoveryRun, "--case-id", recoveryCase.case_id, "--claim-id", recoveryClaim.claim_id, "--reason", "fixture worker exited"]);
+  const rawRecoveryReason = `fixture\nworker\texited ${"x".repeat(240)}`;
+  run(["recover-case", "--run-dir", recoveryRun, "--case-id", recoveryCase.case_id, "--claim-id", recoveryClaim.claim_id, "--reason", rawRecoveryReason]);
   run(["recover-case", "--run-dir", recoveryRun, "--case-id", recoveryCase.case_id, "--claim-id", recoveryClaim.claim_id, "--reason", "idempotency check"]);
   const recoveryState = JSON.parse(readFileSync(resolve(recoveryRun, "cases", recoveryCase.case_id, "state.json"), "utf8"));
+  const recoveryResult = JSON.parse(readFileSync(resolve(recoveryRun, "cases", recoveryCase.case_id, "attempts", "0001", "result.json"), "utf8"));
+  assert.equal(recoveryResult.failure_kind, "stale_claim_recovered", "recovery failure kind must not embed operator text");
+  assert.ok(recoveryResult.recovery_reason.value.length <= 160 && !/[\u0000-\u001f\u007f-\u009f]/u.test(recoveryResult.recovery_reason.value), "durable recovery reason must be bounded and control-free");
+  assert.equal(recoveryResult.recovery_reason.bytes, Buffer.byteLength(rawRecoveryReason), "recovery reason evidence must retain raw byte count");
+  assert.equal(recoveryResult.recovery_reason.digest, `sha256:${createHash("sha256").update(rawRecoveryReason).digest("hex")}`, "recovery reason evidence must retain the raw digest");
+  assert.equal(JSON.stringify(recoveryResult).includes(rawRecoveryReason), false, "recovery result must not retain the raw operator reason");
   assert.equal(recoveryState.status, "interrupted", "only explicit matching stale-claim recovery may release a case");
   assert.equal(recoveryState.attempt_count, 1, "recovery replay must not append attempts");
   assert.equal(existsSync(abandonedWorkspace), false, "stale recovery must delete the abandoned ephemeral workspace");
@@ -411,6 +473,30 @@ exit 64
   assert.equal(readFileSync(sentinelFile, "utf8"), "keep\n", "ephemeral symlink recovery must not delete the symlink target");
   rmSync(symlinkWorkspace, { force: true });
   run(["recover-case", "--run-dir", symlinkWorkspaceRun, "--case-id", recoveryCase.case_id, "--claim-id", symlinkClaim.claim_id, "--reason", "symlink removed"]);
+
+  const ownershipCase = codexCases[6];
+  const ownershipRunA = resolve(work, "workspace-ownership-a-run");
+  const ownershipRunB = resolve(work, "workspace-ownership-b-run");
+  const ownershipExecute = (runPath) => ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", runPath, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", ownershipCase.case_id];
+  run(ownershipExecute(ownershipRunA), { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_workspace_created", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  run(ownershipExecute(ownershipRunB), { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_workspace_created", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const ownershipClaimPathA = resolve(ownershipRunA, "cases", ownershipCase.case_id, "claim", "claim.json");
+  const ownershipClaimA = JSON.parse(readFileSync(ownershipClaimPathA, "utf8"));
+  const ownershipClaimB = JSON.parse(readFileSync(resolve(ownershipRunB, "cases", ownershipCase.case_id, "claim", "claim.json"), "utf8"));
+  const ownershipIdentityA = JSON.parse(readFileSync(resolve(ownershipRunA, "run-identity.json"), "utf8"));
+  const ownershipIdentityB = JSON.parse(readFileSync(resolve(ownershipRunB, "run-identity.json"), "utf8"));
+  assert.notEqual(ownershipIdentityA.run_instance_id, ownershipIdentityB.run_instance_id, "independent runs must have distinct workspace ownership identities");
+  assert.ok(existsSync(resolve(tmpdir(), ownershipClaimA.workspace_parent, "ownership.json")), "claim acquisition must publish a private workspace ownership marker");
+  assert.ok(existsSync(resolve(tmpdir(), ownershipClaimB.workspace_parent, "ownership.json")), "each private workspace must have its own ownership marker");
+  const ownershipSentinelB = resolve(tmpdir(), ownershipClaimB.workspace_parent, ownershipClaimB.workspace_token, "keep.txt");
+  writeFileSync(ownershipSentinelB, "keep\n");
+  writeJson(ownershipClaimPathA, { ...ownershipClaimA, workspace_parent: ownershipClaimB.workspace_parent, workspace_token: ownershipClaimB.workspace_token });
+  run(["recover-case", "--run-dir", ownershipRunA, "--case-id", ownershipCase.case_id, "--claim-id", ownershipClaimA.claim_id, "--reason", "cross run tamper"], { expectedStatus: 1 });
+  assert.equal(readFileSync(ownershipSentinelB, "utf8"), "keep\n", "tampered claim cleanup must not delete another run's workspace");
+  assert.equal(JSON.parse(readFileSync(resolve(ownershipRunA, "cases", ownershipCase.case_id, "state.json"), "utf8")).status, "active", "workspace ownership mismatch must fail before recovery state changes");
+  writeJson(ownershipClaimPathA, ownershipClaimA);
+  run(["recover-case", "--run-dir", ownershipRunA, "--case-id", ownershipCase.case_id, "--claim-id", ownershipClaimA.claim_id, "--reason", "restore owner a"]);
+  run(["recover-case", "--run-dir", ownershipRunB, "--case-id", ownershipCase.case_id, "--claim-id", ownershipClaimB.claim_id, "--reason", "restore owner b"]);
 
   const resultFaultRun = resolve(work, "result-fault-run");
   const resultFaultCase = codexCases[6];
@@ -611,8 +697,15 @@ exit 64
 
   const codexIdentity = JSON.parse(readFileSync(resolve(runDir, "adapters", "codex.json"), "utf8"));
   assert.ok(codexIdentity.effective_command.argv.includes('approval_policy="never"'), "Codex permission policy must be part of the effective command identity");
+  assert.ok(codexIdentity.effective_command.argv.includes("--skip-git-repo-check"), "Codex runtime identity must record the synthetic-workspace repository bypass");
   assert.equal(codexIdentity.effective_command.argv[codexIdentity.effective_command.argv.indexOf("--output-schema") + 1], "{output_schema}", "Codex identity must retain a portable output schema reference");
   assert.equal(JSON.stringify(codexIdentity).includes(root), false, "runtime identity must not disclose the checkout path");
+  assertSchemaInvalid({ ...codexIdentity, executable: { ...codexIdentity.executable, observed_version: "fake-codex 1.0.0\nprivate" } }, "portfolio-adapter-identity.schema.json", "adapter identity must reject control characters in durable version metadata");
+  assertSchemaInvalid({ ...codexIdentity, unavailable_reason: "x".repeat(161) }, "portfolio-adapter-identity.schema.json", "adapter identity must bound unavailable reasons");
+
+  const invalidRuntimeScalar = runtimeConfig("codex");
+  invalidRuntimeScalar.expected_executable_version = "x".repeat(161);
+  assertSchemaInvalid(invalidRuntimeScalar, "portfolio-runtime-config.schema.json", "runtime config must bound expected executable versions");
 
   const validTerminalState = JSON.parse(readFileSync(resolve(runDir, "cases", codexCases[0].case_id, "state.json"), "utf8"));
   assertSchemaInvalid({ ...validTerminalState, status: "pending", attempt_count: 1, active_claim_id: null, terminal_attempt: null }, "portfolio-case-state.schema.json", "pending state conditionals must reject nonzero attempts");
@@ -628,6 +721,8 @@ exit 64
   const completedResult = JSON.parse(readFileSync(resolve(runDir, "cases", codexCases[0].case_id, "attempts", "0001", "result.json"), "utf8"));
   assertSchemaInvalid({ ...completedResult, final_output: null }, "portfolio-attempt-result.schema.json", "completed results must require final output evidence");
   assertSchemaInvalid({ ...completedResult, status: "failed", failure_kind: "fixture", final_output: completedResult.final_output }, "portfolio-attempt-result.schema.json", "non-completed results must reject final output evidence");
+  assertSchemaInvalid({ ...completedResult, status: "failed", failure_kind: "agent_failure\nprivate", final_output: null }, "portfolio-attempt-result.schema.json", "attempt results must reject control characters in failure metadata");
+  assertSchemaInvalid({ ...recoveryResult, recovery_reason: { ...recoveryResult.recovery_reason, value: "x".repeat(161) } }, "portfolio-attempt-result.schema.json", "attempt results must bound normalized recovery reasons");
   assert.match(readFileSync(resolve(root, ".github/workflows/validate.yml"), "utf8"), /node scripts\/test-ask-benchmark-execution\.mjs/u, "GitHub Actions must execute the focused state-machine test");
 
   const sealPath = resolve(selectionState, "selections", `${adaptiveCases[0].case_id}.json`);

@@ -9,7 +9,7 @@
     "adapter": { "enum": ["codex", "claude"] },
     "runtime_config_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "availability": { "enum": ["available", "unavailable"] },
-    "unavailable_reason": { "type": ["string", "null"] },
+    "unavailable_reason": { "type": ["string", "null"], "minLength": 1, "maxLength": 160, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u2028\\u2029]+$" },
     "executor": { "type": "object", "additionalProperties": false, "required": ["id", "version"], "properties": { "id": { "type": "string", "minLength": 1 }, "version": { "type": "string", "minLength": 1 } } },
     "model": { "type": "string", "minLength": 1 },
     "reasoning_effort": { "type": "string", "minLength": 1 },
@@ -21,11 +21,13 @@
     "executable": {
       "type": ["object", "null"],
       "additionalProperties": false,
-      "required": ["executable_basename", "executable_sha256", "observed_version"],
+      "required": ["executable_basename", "executable_sha256", "observed_version", "observed_version_digest", "observed_version_bytes"],
       "properties": {
         "executable_basename": { "type": "string", "minLength": 1 },
         "executable_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-        "observed_version": { "type": "string", "minLength": 1 }
+        "observed_version": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u2028\\u2029]+$" },
+        "observed_version_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "observed_version_bytes": { "type": "integer", "minimum": 0 }
       }
     },
     "effective_command": {

@@ -3,9 +3,10 @@
   "title": "Adaptive ASK portfolio execution run identity",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "program", "plan", "materialization", "repository_revision", "runner", "config", "case_namespace", "selection_state_digest", "output_schema_digest"],
+  "required": ["schema_version", "run_instance_id", "program", "plan", "materialization", "repository_revision", "runner", "config", "case_namespace", "selection_state_digest", "output_schema_digest"],
   "properties": {
     "schema_version": { "const": "1.0.0" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
     "program": { "const": "adaptive_ask_portfolio_execution" },
     "plan": {
       "type": "object",
