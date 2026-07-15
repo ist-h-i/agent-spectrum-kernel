@@ -67,6 +67,11 @@ function writeJsonAtomic(path, value, { stagingOwner = null, faultName = null } 
   renameSync(temporary, path);
 }
 
+function writeJsonExclusive(path, value) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx" });
+}
+
 function writeJsonIdempotent(path, value, label, options = {}) {
   if (existsSync(path)) {
     const existing = readJson(path);
@@ -628,7 +633,8 @@ function acquireClaim({ root, context, entry, attempt, runtime, adapter }) {
     effective_command_digest: adapter.identity.effective_command_digest,
   };
   validate(root, claim, CLAIM_SCHEMA_PATH, `${entry.case_id} claim`);
-  writeJsonAtomic(resolve(staging, "claim.json"), claim);
+  writeJsonExclusive(resolve(staging, "claim.json"), claim);
+  fault("after_claim_record_written");
   fault("after_claim_staged");
   try {
     renameSync(staging, directory);
@@ -790,7 +796,8 @@ function inspectFinal(root, outputTemporary) {
   return { record: { path: "final.json", sha256: sha256(bytes), bytes: bytes.length }, bytes };
 }
 
-function publishFinal(root, attemptRoot, source, record) {
+function publishFinal(root, attemptRoot, source, record, claimId) {
+  assertClaimId(claimId);
   const destination = resolve(attemptRoot, "final.json");
   assertInside(attemptRoot, destination, "attempt final output");
   assertNoSymlinkSegments(destination, "attempt final output");
@@ -801,8 +808,9 @@ function publishFinal(root, attemptRoot, source, record) {
   }
   const inspected = inspectFinal(root, source);
   if (stableCanonicalJson(inspected.record) !== stableCanonicalJson(record)) throw new Error("agent final structured output identity changed");
-  const staging = resolve(attemptRoot, `.final.${randomUUID()}.staging`);
+  const staging = resolve(attemptRoot, `.final.json.${claimId}.${randomUUID()}.staging`);
   writeFileSync(staging, inspected.bytes, { flag: "wx" });
+  fault("after_final_staged");
   renameSync(staging, destination);
   return true;
 }
@@ -898,7 +906,7 @@ function completeCase({ root, runDir, entry, state, claim, attempt, attemptRoot,
     assertNoSymlinkSegments(pendingResultPath, `${entry.case_id} pending attempt result`);
     writeJsonIdempotent(pendingResultPath, result, `${entry.case_id} pending attempt result`, { stagingOwner: claim.claim_id, faultName: "after_pending_result_staged" });
     const source = finalSource ?? resolve(ephemeralWorkspacePath(claim), "agent-final.json");
-    publishFinal(root, attemptRoot, source, result.final_output);
+    publishFinal(root, attemptRoot, source, result.final_output, claim.claim_id);
     fault("after_final_published");
     if (existsSync(resultPath)) {
       writeJsonIdempotent(resultPath, result, `${entry.case_id} attempt result`, { stagingOwner: claim.claim_id });
@@ -992,6 +1000,11 @@ function validateTerminalCase({ root, context, entry, state }) {
   return true;
 }
 
+function claimPublishedBeforeState(state, claim) {
+  if (!["pending", "failed", "interrupted"].includes(state.status)) return false;
+  return Number(claim.attempt) === state.attempt_count + 1;
+}
+
 function preflightCaseClaim({ root, context, entry, state }) {
   const claim = readClaim(root, context.runDir, entry.case_id);
   if (!claim) {
@@ -1000,9 +1013,7 @@ function preflightCaseClaim({ root, context, entry, state }) {
   }
   validateClaimAgainstContext({ root, context, entry, claim });
   const claimAttempt = Number(claim.attempt);
-  const publishedBeforeState = state.status === "pending"
-    && state.attempt_count === 0
-    && claimAttempt === 1;
+  const publishedBeforeState = claimPublishedBeforeState(state, claim);
   const boundActive = state.status === "active"
     && state.active_claim_id === claim.claim_id
     && state.attempt_count === claimAttempt;
@@ -1032,11 +1043,9 @@ function markUnavailable({ root, context, entry, state, runtime, adapter }) {
 
 function executeCase({ root, config, context, entry, runtime, executable, adapter }) {
   const state = readCaseState(root, context.runDir, entry);
-  if (TERMINAL_STATUSES.has(state.status)) {
-    validateTerminalCase({ root, context, entry, state });
-    if (["completed", "unavailable", "invalid"].includes(state.status) || (state.status === "failed" && !context.retryFailed)) return state.status;
-  }
+  if (TERMINAL_STATUSES.has(state.status)) validateTerminalCase({ root, context, entry, state });
   if (preflightCaseClaim({ root, context, entry, state })) return "active";
+  if (TERMINAL_STATUSES.has(state.status) && (["completed", "unavailable", "invalid"].includes(state.status) || (state.status === "failed" && !context.retryFailed))) return state.status;
   const attempt = nextAttempt(context.runDir, entry);
   const claim = acquireClaim({ root, context, entry, attempt, runtime, adapter });
   if (!claim) return "active";
@@ -1127,8 +1136,8 @@ export function executePortfolio({ root, config, planPath, materializedPath, sel
   if (runtimeIdentity.identity.availability === "unavailable") {
     for (const entry of cases) {
       const state = readCaseState(root, context.runDir, entry);
+      if (TERMINAL_STATUSES.has(state.status)) validateTerminalCase({ root, context, entry, state });
       if (["completed", "unavailable", "invalid"].includes(state.status)) {
-        validateTerminalCase({ root, context, entry, state });
         outcomes.push({ case_id: entry.case_id, status: state.status });
         continue;
       }
@@ -1216,7 +1225,7 @@ function recoveryResult({ root, attemptRoot, entry, claim, requestPath, reason }
 function reconcileAttemptStaging(attemptRoot, claimId) {
   assertClaimId(claimId);
   if (!existsSync(attemptRoot)) return;
-  const targets = ["request.json", RESULT_STAGING_FILE, "result.json", "commit.json"];
+  const targets = ["request.json", RESULT_STAGING_FILE, "result.json", "final.json", "commit.json"];
   for (const name of readdirSync(attemptRoot)) {
     if (!name.endsWith(".staging")) continue;
     const target = targets.find((candidate) => name.startsWith(`.${candidate}.${claimId}.`));
@@ -1322,7 +1331,8 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     return { case_id: caseId, status: terminalState.status };
   }
   if (claim.claim_id !== claimId) throw new Error("claim ID does not match the active claim");
-  if (TERMINAL_STATUSES.has(state.status) && state.terminal_attempt) {
+  const publishedBeforeState = claimPublishedBeforeState(state, claim);
+  if (TERMINAL_STATUSES.has(state.status) && state.terminal_attempt && !publishedBeforeState) {
     const commitPath = resolve(attemptRootPath(run, caseId, state.terminal_attempt), "commit.json");
     assertNoSymlinkSegments(commitPath, `${caseId} terminal commit`);
     const commit = readJson(commitPath);
@@ -1333,12 +1343,20 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     removeEphemeralWorkspace(claim);
     return { case_id: caseId, status: state.status };
   }
-  if (state.status === "pending") {
-    if (state.attempt_count !== 0 || state.active_claim_id !== null || claim.attempt !== "0001" || claim.adapter !== state.adapter || claim.condition !== state.condition) throw new Error("published claim does not match pending state");
+  if (publishedBeforeState) {
+    if (state.status === "pending" && (state.attempt_count !== 0 || state.active_claim_id !== null)) throw new Error("published claim does not match pending state");
+    if (TERMINAL_STATUSES.has(state.status)) {
+      const previousCommitPath = resolve(attemptRootPath(run, caseId, state.terminal_attempt), "commit.json");
+      assertNoSymlinkSegments(previousCommitPath, `${caseId} previous terminal commit`);
+      const previousCommit = readJson(previousCommitPath);
+      validate(root, previousCommit, ATTEMPT_COMMIT_SCHEMA_PATH, `${caseId} previous terminal commit`);
+      assertCommittedRecoveryEvidence({ root, run, state, commit: previousCommit });
+    }
+    if (claim.adapter !== state.adapter || claim.condition !== state.condition || (claim.selection?.digest ?? null) !== state.selection_digest) throw new Error("published claim does not match prior state identity");
     if (!claimIsExpired(claim)) throw new Error("claim lease has not expired");
     const identity = readAdapterIdentity(root, run, claim.adapter);
     if (claim.runtime_identity_digest !== canonicalDigest(identity) || claim.effective_command_digest !== identity.effective_command_digest) throw new Error("published claim runtime identity mismatch");
-    state = { ...state, status: "active", attempt_count: 1, active_claim_id: claimId, terminal_attempt: null };
+    state = { ...state, status: "active", attempt_count: Number(claim.attempt), active_claim_id: claimId, terminal_attempt: null };
     validate(root, state, CASE_STATE_SCHEMA_PATH, `${caseId} reconciled active state`);
     writeCaseState(run, { case_id: caseId }, state);
   } else if (state.status !== "active" || state.active_claim_id !== claimId) {

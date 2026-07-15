@@ -280,6 +280,14 @@ exit 64
   assert.deepEqual(readdirSync(resolve(unavailableReplacedClaimRun, "cases", unavailableCase.case_id, "attempts")), ["0001"], "unavailable resume must not append an attempt after claim replacement");
   run(["recover-case", "--run-dir", unavailableClaimRun, "--case-id", unavailableCase.case_id, "--claim-id", unavailableClaim.claim_id, "--reason", "unavailable request staging fault"]);
   assert.deepEqual(terminalInventory(unavailableClaimRun, unavailableCase.case_id, "0001"), ["commit.json", "request.json", "result.json"], "unavailable recovery must remove request staging residue");
+  const unavailablePreviousCommitPath = resolve(unavailableClaimRun, "cases", unavailableCase.case_id, "attempts", "0001", "commit.json");
+  const unavailablePreviousCommit = readFileSync(unavailablePreviousCommitPath);
+  run(unavailableClaimExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_claim_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const unavailableRetryClaim = JSON.parse(readFileSync(unavailableClaimPath, "utf8"));
+  assert.equal(unavailableRetryClaim.attempt, "0002", "unavailable resume must publish the next attempt claim");
+  run(["recover-case", "--run-dir", unavailableClaimRun, "--case-id", unavailableCase.case_id, "--claim-id", unavailableRetryClaim.claim_id, "--reason", "unavailable attempt 2 claim gap"]);
+  assert.deepEqual(readFileSync(unavailablePreviousCommitPath), unavailablePreviousCommit, "unavailable attempt 2 recovery must preserve attempt 1 evidence");
+  assert.deepEqual(terminalInventory(unavailableClaimRun, unavailableCase.case_id, "0002"), ["commit.json", "request.json", "result.json"], "unavailable attempt 2 recovery must close only the new attempt");
 
   const claimRun = resolve(work, "claim-run");
   const claimCase = codexCases[2];
@@ -294,15 +302,17 @@ exit 64
 
   const stagingRun = resolve(work, "staging-run");
   const stagingCase = codexCases[4];
-  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", stagingRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", stagingCase.case_id], { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_claim_staged", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", stagingRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", stagingCase.case_id], { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_claim_record_written", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
   const stagingCaseRoot = resolve(stagingRun, "cases", stagingCase.case_id);
   const stagingName = readdirSync(stagingCaseRoot).find((name) => /^\.claim-.+\.staging$/u.test(name));
   assert.ok(stagingName, "claim staging must be retained for bounded recovery after a hard stop");
   assert.equal(existsSync(resolve(stagingCaseRoot, "claim")), false, "incomplete claim staging must never be published as the active claim");
   const stagedClaimPath = resolve(stagingCaseRoot, stagingName, "claim.json");
+  assert.deepEqual(readdirSync(resolve(stagingCaseRoot, stagingName)), ["claim.json"], "unpublished claim staging must contain a direct exclusive claim record without inner staging");
   const stagedClaim = JSON.parse(readFileSync(stagedClaimPath, "utf8"));
   run(["recover-case", "--run-dir", stagingRun, "--case-id", stagingCase.case_id, "--claim-id", stagedClaim.claim_id, "--reason", "staging fault"]);
   assert.equal(existsSync(resolve(stagingCaseRoot, stagingName)), false, "expired claim staging must be removable by exact claim ID");
+  assert.equal(existsSync(resolve(tmpdir(), stagedClaim.workspace_parent)), false, "staged claim recovery must remove its private temporary root");
   assert.equal(readdirSync(resolve(stagingCaseRoot, "attempts")).length, 0, "staging recovery must not allocate an attempt");
 
   const publishedClaimRun = resolve(work, "published-claim-run");
@@ -317,6 +327,34 @@ exit 64
   const reconciledPublishedState = JSON.parse(readFileSync(resolve(publishedClaimRun, "cases", publishedClaimCase.case_id, "state.json"), "utf8"));
   assert.equal(reconciledPublishedState.status, "interrupted", "published claim plus pending state must be explicitly recoverable");
   assert.deepEqual(terminalInventory(publishedClaimRun, publishedClaimCase.case_id, "0001"), ["commit.json", "request.json", "result.json"], "published-claim recovery must close the first attempt without staging residue");
+
+  const failedGapRun = resolve(work, "failed-attempt-gap-run");
+  const failedGapCase = codexCases[4];
+  const failedGapExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", failedGapRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", failedGapCase.case_id];
+  run(failedGapExecute, { env: { ...env, FAKE_FAIL: "1" } });
+  const failedPreviousCommitPath = resolve(failedGapRun, "cases", failedGapCase.case_id, "attempts", "0001", "commit.json");
+  const failedPreviousCommit = readFileSync(failedPreviousCommitPath);
+  run([...failedGapExecute, "--retry-failed"], { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_claim_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const failedRetryClaim = JSON.parse(readFileSync(resolve(failedGapRun, "cases", failedGapCase.case_id, "claim", "claim.json"), "utf8"));
+  assert.equal(failedRetryClaim.attempt, "0002", "failed retry must publish an attempt 2 claim");
+  run(["recover-case", "--run-dir", failedGapRun, "--case-id", failedGapCase.case_id, "--claim-id", failedRetryClaim.claim_id, "--reason", "failed retry claim gap"]);
+  assert.deepEqual(readFileSync(failedPreviousCommitPath), failedPreviousCommit, "failed retry recovery must preserve attempt 1 evidence");
+  assert.deepEqual(terminalInventory(failedGapRun, failedGapCase.case_id, "0002"), ["commit.json", "request.json", "result.json"], "failed retry recovery must close only attempt 2");
+
+  const interruptedGapRun = resolve(work, "interrupted-attempt-gap-run");
+  const interruptedGapCase = codexCases[5];
+  const interruptedGapExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", interruptedGapRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", interruptedGapCase.case_id];
+  run(interruptedGapExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_workspace_created", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const interruptedInitialClaim = JSON.parse(readFileSync(resolve(interruptedGapRun, "cases", interruptedGapCase.case_id, "claim", "claim.json"), "utf8"));
+  run(["recover-case", "--run-dir", interruptedGapRun, "--case-id", interruptedGapCase.case_id, "--claim-id", interruptedInitialClaim.claim_id, "--reason", "initial interruption"]);
+  const interruptedPreviousCommitPath = resolve(interruptedGapRun, "cases", interruptedGapCase.case_id, "attempts", "0001", "commit.json");
+  const interruptedPreviousCommit = readFileSync(interruptedPreviousCommitPath);
+  run(interruptedGapExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_claim_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  const interruptedRetryClaim = JSON.parse(readFileSync(resolve(interruptedGapRun, "cases", interruptedGapCase.case_id, "claim", "claim.json"), "utf8"));
+  assert.equal(interruptedRetryClaim.attempt, "0002", "interrupted resume must publish an attempt 2 claim");
+  run(["recover-case", "--run-dir", interruptedGapRun, "--case-id", interruptedGapCase.case_id, "--claim-id", interruptedRetryClaim.claim_id, "--reason", "interrupted resume claim gap"]);
+  assert.deepEqual(readFileSync(interruptedPreviousCommitPath), interruptedPreviousCommit, "interrupted resume recovery must preserve attempt 1 evidence");
+  assert.deepEqual(terminalInventory(interruptedGapRun, interruptedGapCase.case_id, "0002"), ["commit.json", "request.json", "result.json"], "interrupted resume recovery must close only attempt 2");
 
   const recoveryRun = resolve(work, "recovery-run");
   const recoveryCase = codexCases[5];
@@ -398,16 +436,24 @@ exit 64
   run(["recover-case", "--run-dir", finalFaultRun, "--case-id", finalFaultCase.case_id, "--claim-id", finalFaultClaim.claim_id, "--reason", "final boundary fault"]);
   assertCaseStatus(["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", finalFaultRun], finalFaultCase.case_id, "completed", "final-before-commit recovery must reconcile to completed");
 
-  for (const [faultName, expectedStatus] of [["after_request_staged", "interrupted"], ["after_pending_result_staged", "interrupted"], ["after_commit_staged", "completed"]]) {
-    const atomicRun = resolve(work, `${faultName}-run`);
+  const atomicFaults = [
+    { faultName: "after_request_staged", expectedStatus: "interrupted", removeTemp: true, suffix: "lost-temp" },
+    { faultName: "after_pending_result_staged", expectedStatus: "interrupted", removeTemp: true, suffix: "lost-temp" },
+    { faultName: "after_final_staged", expectedStatus: "interrupted", removeTemp: false, suffix: "retained-temp" },
+    { faultName: "after_final_staged", expectedStatus: "interrupted", removeTemp: true, suffix: "lost-temp" },
+    { faultName: "after_commit_staged", expectedStatus: "completed", removeTemp: true, suffix: "lost-temp" },
+  ];
+  for (const { faultName, expectedStatus, removeTemp, suffix } of atomicFaults) {
+    const atomicRun = resolve(work, `${faultName}-${suffix}-run`);
     const atomicCase = codexCases[10];
     const atomicExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", atomicRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", atomicCase.case_id];
     run(atomicExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: faultName, ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
     const atomicClaim = JSON.parse(readFileSync(resolve(atomicRun, "cases", atomicCase.case_id, "claim", "claim.json"), "utf8"));
     const atomicAttemptRoot = resolve(atomicRun, "cases", atomicCase.case_id, "attempts", atomicClaim.attempt);
     assert.ok(readdirSync(atomicAttemptRoot).some((name) => name.endsWith(".staging")), `${faultName} must reproduce an orphan atomic staging artifact`);
-    rmSync(resolve(tmpdir(), atomicClaim.workspace_parent), { recursive: true, force: true });
+    if (removeTemp) rmSync(resolve(tmpdir(), atomicClaim.workspace_parent), { recursive: true, force: true });
     run(["recover-case", "--run-dir", atomicRun, "--case-id", atomicCase.case_id, "--claim-id", atomicClaim.claim_id, "--reason", `${faultName} recovery`]);
+    assert.equal(existsSync(resolve(tmpdir(), atomicClaim.workspace_parent)), false, `${faultName} recovery must remove its private temporary root`);
     const atomicState = JSON.parse(readFileSync(resolve(atomicRun, "cases", atomicCase.case_id, "state.json"), "utf8"));
     assert.equal(atomicState.status, expectedStatus, `${faultName} recovery must publish the expected terminal state`);
     const expectedInventory = expectedStatus === "completed" ? ["commit.json", "final.json", "request.json", "result.json"] : ["commit.json", "request.json", "result.json"];
