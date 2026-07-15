@@ -167,6 +167,9 @@ try {
     .map((name) => ({ name, manifest: JSON.parse(readFileSync(resolve(progressionOutput, "generations", name, "normalized-run.json"), "utf8")) }))
     .find((entry) => entry.manifest.source_snapshot_digest !== pendingGeneration.manifest.source_snapshot_digest);
   assert.ok(activeGeneration, "active source snapshot generation must be addressable");
+  assert.equal(pendingGeneration.manifest.inventory.length, 0, "the pending snapshot must not fabricate attempt evidence");
+  assert.equal(activeGeneration.manifest.inventory.length, 0, "the request-only active snapshot must not publish an uncommitted attempt");
+  assert.equal(activeGeneration.manifest.completeness.active_cases, 1, "the progressed snapshot must record the active case state");
   assert.notEqual(activeGeneration.manifest.output_root_identity, pendingGeneration.manifest.output_root_identity, "output identity must bind the source snapshot");
   assert.notEqual(activeGeneration.manifest.publication_digest, pendingGeneration.manifest.publication_digest, "publication identity must distinguish state-only progression");
   assert.notEqual(activeGeneration.manifest.normalized_run_digest, pendingGeneration.manifest.normalized_run_digest, "the manifest digest must distinguish state-only progression");
