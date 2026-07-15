@@ -260,7 +260,7 @@ try {
   const activeRetryRun = resolve(work, "active-retry-run");
   const activeRetryCase = caseFor("codex", "plain", 2);
   execute(activeRetryRun, activeRetryCase, codexRuntime, codexBin, { FAKE_MODE: "fail" });
-  execute(activeRetryRun, activeRetryCase, codexRuntime, codexBin, { FAKE_MODE: "complete", ASK_BENCHMARK_FAULT: "after_request_published" }, ["--retry-failed"], 86);
+  execute(activeRetryRun, activeRetryCase, codexRuntime, codexBin, { FAKE_MODE: "fail", ASK_BENCHMARK_FAULT: "after_request_published" }, ["--retry-failed"], 86);
   const activeRetryOutput = resolve(work, "normalized-active-retry");
   normalize(activeRetryRun, activeRetryOutput);
   const activeRetryManifest = readGeneration(activeRetryOutput).manifest;
