@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK normalized execution coverage manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "artifact_role",
+    "normalizer",
+    "source",
+    "output_root_identity",
+    "pool_adapter_results",
+    "completeness",
+    "telemetry_coverage",
+    "cases",
+    "inventory",
+    "publication_digest",
+    "boundaries"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/normalized-portfolio-run.schema.json" },
+    "program": { "const": "adaptive_ask_normalized_execution_run" },
+    "artifact_role": { "const": "derived_execution_evidence" },
+    "normalizer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "source_revision"],
+      "properties": {
+        "version": { "const": "1.0.0" },
+        "source_revision": { "$ref": "#/$defs/revision" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_instance_id",
+        "run_identity_digest",
+        "plan_id",
+        "plan_digest",
+        "repository_revision",
+        "materialization_manifest_digest",
+        "selection_state_digest"
+      ],
+      "properties": {
+        "run_instance_id": { "type": "string", "format": "uuid" },
+        "run_identity_digest": { "$ref": "#/$defs/digest" },
+        "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "repository_revision": { "$ref": "#/$defs/revision" },
+        "materialization_manifest_digest": { "$ref": "#/$defs/digest" },
+        "selection_state_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "output_root_identity": { "$ref": "#/$defs/digest" },
+    "pool_adapter_results": { "const": false },
+    "completeness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "partial",
+        "expected_cases",
+        "normalized_cases",
+        "terminal_cases",
+        "pending_cases",
+        "active_cases",
+        "invalid_cases",
+        "by_adapter",
+        "by_condition",
+        "by_status",
+        "missing_case_ids",
+        "invalid_case_ids"
+      ],
+      "properties": {
+        "partial": { "type": "boolean" },
+        "expected_cases": { "$ref": "#/$defs/count" },
+        "normalized_cases": { "$ref": "#/$defs/count" },
+        "terminal_cases": { "$ref": "#/$defs/count" },
+        "pending_cases": { "$ref": "#/$defs/count" },
+        "active_cases": { "$ref": "#/$defs/count" },
+        "invalid_cases": { "$ref": "#/$defs/count" },
+        "by_adapter": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/adapterCount" } },
+        "by_condition": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "$ref": "#/$defs/conditionCount" } },
+        "by_status": { "type": "array", "minItems": 7, "maxItems": 7, "items": { "$ref": "#/$defs/statusCount" } },
+        "missing_case_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/caseId" } },
+        "invalid_case_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/caseId" } }
+      }
+    },
+    "telemetry_coverage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "known", "unknown", "unavailable", "not_applicable", "total"],
+        "properties": {
+          "field": { "type": "string", "minLength": 1 },
+          "known": { "$ref": "#/$defs/count" },
+          "unknown": { "$ref": "#/$defs/count" },
+          "unavailable": { "$ref": "#/$defs/count" },
+          "not_applicable": { "$ref": "#/$defs/count" },
+          "total": { "$ref": "#/$defs/count" }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "adapter_track",
+          "condition",
+          "fixture_id",
+          "repetition",
+          "condition_order_position",
+          "block_id",
+          "status",
+          "attempt_count",
+          "terminal_attempt",
+          "normalized_attempts"
+        ],
+        "properties": {
+          "case_id": { "$ref": "#/$defs/caseId" },
+          "adapter_track": { "enum": ["codex", "claude"] },
+          "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+          "fixture_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "condition_order_position": { "type": "integer", "minimum": 1, "maximum": 4 },
+          "block_id": { "type": "string", "pattern": "^block-[a-f0-9]{16}-[a-f0-9]{12}$" },
+          "status": { "enum": ["pending", "active", "completed", "failed", "unavailable", "interrupted", "invalid"] },
+          "attempt_count": { "type": "integer", "minimum": 0 },
+          "terminal_attempt": { "type": ["string", "null"], "pattern": "^[0-9]{4}$" },
+          "normalized_attempts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["attempt", "normalized_result_id", "normalized_result_digest", "path"],
+              "properties": {
+                "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+                "normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },
+                "normalized_result_digest": { "$ref": "#/$defs/digest" },
+                "path": { "$ref": "#/$defs/path" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "inventory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "bytes"],
+        "properties": {
+          "path": { "$ref": "#/$defs/path" },
+          "sha256": { "$ref": "#/$defs/digest" },
+          "bytes": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "publication_digest": { "$ref": "#/$defs/digest" },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evaluator_result", "score", "product_value_claim", "raw_execution_artifacts_are_authoritative", "measured_execution_authorized", "issue_198_stage_0_authorized"],
+      "properties": {
+        "evaluator_result": { "const": false },
+        "score": { "const": false },
+        "product_value_claim": { "const": false },
+        "raw_execution_artifacts_are_authoritative": { "const": true },
+        "measured_execution_authorized": { "const": false },
+        "issue_198_stage_0_authorized": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "caseId": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "count": { "type": "integer", "minimum": 0 },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$" },
+    "adapterCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "expected", "normalized", "terminal", "pending", "active", "invalid"],
+      "properties": {
+        "adapter": { "enum": ["codex", "claude"] },
+        "expected": { "$ref": "#/$defs/count" },
+        "normalized": { "$ref": "#/$defs/count" },
+        "terminal": { "$ref": "#/$defs/count" },
+        "pending": { "$ref": "#/$defs/count" },
+        "active": { "$ref": "#/$defs/count" },
+        "invalid": { "$ref": "#/$defs/count" }
+      }
+    },
+    "conditionCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition", "expected", "normalized", "terminal", "pending", "active", "invalid"],
+      "properties": {
+        "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+        "expected": { "$ref": "#/$defs/count" },
+        "normalized": { "$ref": "#/$defs/count" },
+        "terminal": { "$ref": "#/$defs/count" },
+        "pending": { "$ref": "#/$defs/count" },
+        "active": { "$ref": "#/$defs/count" },
+        "invalid": { "$ref": "#/$defs/count" }
+      }
+    },
+    "statusCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "count"],
+      "properties": {
+        "status": { "enum": ["pending", "active", "completed", "failed", "unavailable", "interrupted", "invalid"] },
+        "count": { "$ref": "#/$defs/count" }
+      }
+    }
+  }
+}

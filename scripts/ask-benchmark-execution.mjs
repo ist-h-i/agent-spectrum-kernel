@@ -1140,7 +1140,18 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
     if (size > MAX_FINAL_OUTPUT_BYTES || size !== result.final_output.bytes || fileDigest(finalPath) !== result.final_output.sha256) throw new Error(`${entry.case_id} final output digest mismatch`);
     validate(root, readJson(finalPath), OUTPUT_SCHEMA_PATH, `${entry.case_id} completed output`);
   }
-  return { request, result, commit };
+  return {
+    request,
+    result,
+    commit,
+    evidence: {
+      request_digest: prefixedFileDigest(requestPath),
+      result_digest: prefixedFileDigest(resultPath),
+      commit_digest: prefixedFileDigest(commitPath),
+      final_output_digest: result.final_output ? `sha256:${result.final_output.sha256}` : null,
+      final_output_bytes: result.final_output?.bytes ?? null,
+    },
+  };
 }
 
 function validateTerminalAttempt({ root, context, entry, attempt }) {
@@ -1167,6 +1178,60 @@ function validateTerminalCase({ root, context, entry, state }) {
   const expectedSelection = selectionIdentityFor(context, entry)?.digest ?? null;
   if (state.selection_digest !== expectedSelection) throw new Error(`${entry.case_id} state selection digest mismatch`);
   return true;
+}
+
+function assertDirectoryInventory(directory, expected, label) {
+  assertNoSymlinkSegments(directory, label);
+  if (!existsSync(directory) || !lstatSync(directory).isDirectory() || lstatSync(directory).isSymbolicLink()) throw new Error(`${label} must be a real directory`);
+  const actual = readdirSync(directory).sort();
+  assertCanonicalEqual(actual, [...expected].sort(), `${label} inventory`);
+}
+
+function inspectExecutionCase({ root, context, entry }) {
+  const caseRoot = caseRootPath(context.runDir, entry.case_id);
+  const attemptsRoot = resolve(caseRoot, "attempts");
+  const state = readCaseState(root, context.runDir, entry);
+  const claim = readClaim(root, context.runDir, entry.case_id);
+  const expectedCaseInventory = claim ? ["attempts", "claim", "state.json"] : ["attempts", "state.json"];
+  assertDirectoryInventory(caseRoot, expectedCaseInventory, `${entry.case_id} case root`);
+
+  assertNoSymlinkSegments(attemptsRoot, `${entry.case_id} attempts root`);
+  if (!existsSync(attemptsRoot) || !lstatSync(attemptsRoot).isDirectory() || lstatSync(attemptsRoot).isSymbolicLink()) throw new Error(`${entry.case_id} attempts root must be a real directory`);
+
+  const attemptNames = readdirSync(attemptsRoot).sort();
+  if (attemptNames.some((name) => !ATTEMPT_PATTERN.test(name))) throw new Error(`${entry.case_id} attempts contain unexpected or incomplete staging evidence`);
+  for (const name of attemptNames) {
+    const path = resolve(attemptsRoot, name);
+    assertNoSymlinkSegments(path, `${entry.case_id} attempt ${name}`);
+    if (!lstatSync(path).isDirectory() || lstatSync(path).isSymbolicLink()) throw new Error(`${entry.case_id} attempt ${name} must be a real directory`);
+  }
+
+  if (claim) {
+    validateClaimAgainstContext({ root, context, entry, claim });
+    if (state.status !== "active" || state.active_claim_id !== claim.claim_id || Number(claim.attempt) !== state.attempt_count) throw new Error(`${entry.case_id} claim does not match active state`);
+    const completedAttemptNames = Array.from({ length: Math.max(0, state.attempt_count - 1) }, (_, index) => String(index + 1).padStart(4, "0"));
+    const allowedAttemptInventories = [completedAttemptNames, [...completedAttemptNames, claim.attempt]];
+    if (!allowedAttemptInventories.some((expected) => stableCanonicalJson(expected) === stableCanonicalJson(attemptNames))) throw new Error(`${entry.case_id} active attempt inventory is not contiguous`);
+    const attempts = completedAttemptNames.map((attempt) => ({ attempt, ...validateTerminalAttempt({ root, context, entry, attempt }) }));
+    if (attemptNames.includes(claim.attempt)) {
+      const activeInventory = readdirSync(attemptRootPath(context.runDir, entry.case_id, claim.attempt)).sort();
+      if (![[], ["request.json"]].some((expected) => stableCanonicalJson(expected) === stableCanonicalJson(activeInventory))) throw new Error(`${entry.case_id} active attempt contains incomplete atomic staging evidence`);
+    }
+    return { entry, state, attempts, stale_claim: claimIsExpired(claim) };
+  }
+
+  if (TERMINAL_STATUSES.has(state.status)) {
+    validateTerminalCase({ root, context, entry, state });
+    const expectedAttempts = Array.from({ length: state.attempt_count }, (_, index) => String(index + 1).padStart(4, "0"));
+    assertCanonicalEqual(attemptNames, expectedAttempts, `${entry.case_id} attempts`);
+    const attempts = expectedAttempts.map((attempt) => ({ attempt, ...validateTerminalAttempt({ root, context, entry, attempt }) }));
+    return { entry, state, attempts, stale_claim: false };
+  }
+
+  if (state.status === "active") throw new Error(`${entry.case_id} active state is missing its claim`);
+  if (state.status !== "pending" || state.attempt_count !== 0) throw new Error(`${entry.case_id} non-terminal state is invalid`);
+  assertCanonicalEqual(attemptNames, [], `${entry.case_id} pending attempts`);
+  return { entry, state, attempts: [], stale_claim: false };
 }
 
 function claimPublishedBeforeState(state, claim) {
@@ -1340,19 +1405,32 @@ function validateClaimAgainstContext({ root, context, entry, claim }) {
 
 function classificationForCase({ root, context, entry }) {
   try {
-    const state = readCaseState(root, context.runDir, entry);
-    const claim = readClaim(root, context.runDir, entry.case_id);
-    if (claim) {
-      validateClaimAgainstContext({ root, context, entry, claim });
-      if (state.status !== "active" || state.active_claim_id !== claim.claim_id) throw new Error(`${entry.case_id} claim does not match active state`);
-      return { case_id: entry.case_id, status: "active", stale_claim: claimIsExpired(claim) };
-    }
-    if (TERMINAL_STATUSES.has(state.status)) validateTerminalCase({ root, context, entry, state });
-    else if (state.status === "active") throw new Error(`${entry.case_id} active state is missing its claim`);
-    return { case_id: entry.case_id, status: state.status };
+    const inspected = inspectExecutionCase({ root, context, entry });
+    return { case_id: entry.case_id, status: inspected.state.status, ...(inspected.state.status === "active" ? { stale_claim: inspected.stale_claim } : {}) };
   } catch (error) {
     return { case_id: entry.case_id, status: "invalid", reason: error instanceof Error ? error.message : String(error) };
   }
+}
+
+export function inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir }) {
+  const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, initialize: false });
+  assertDirectoryInventory(context.runDir, ["adapters", "cases", RUN_IDENTITY_FILE], "run root");
+  const adaptersRoot = resolve(context.runDir, "adapters");
+  const adapterInventory = readdirSync(adaptersRoot).sort();
+  if (adapterInventory.some((name) => !/^(?:codex|claude)\.json$/u.test(name))) throw new Error("adapter identity root contains unmanaged evidence");
+  assertDirectoryInventory(resolve(context.runDir, "cases"), context.plan.cases.map((entry) => entry.case_id), "run cases root");
+  const cases = context.plan.cases.map((entry) => inspectExecutionCase({ root, context, entry }));
+  return {
+    identity: context.identity,
+    plan: context.plan,
+    materialization: context.materialized,
+    selections: context.selections,
+    cases,
+    adapter_identities: new Map(adapterInventory.map((name) => {
+      const adapter = name.slice(0, -".json".length);
+      return [adapter, readAdapterIdentity(root, context.runDir, adapter)];
+    })),
+  };
 }
 
 export function verifyPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir }) {
