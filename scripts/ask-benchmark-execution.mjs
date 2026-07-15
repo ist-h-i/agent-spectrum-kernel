@@ -39,6 +39,7 @@ export const OUTPUT_SCHEMA_PATH = "benchmarks/schemas/agent-output.schema.json";
 
 const CLAIM_GRACE_MS = 30_000;
 const MAX_PROCESS_OUTPUT_BYTES = 20 * 1024 * 1024;
+const MAX_FINAL_OUTPUT_BYTES = 1024 * 1024;
 const RUN_IDENTITY_FILE = "run-identity.json";
 const TERMINAL_STATUSES = new Set(["completed", "failed", "unavailable", "interrupted", "invalid"]);
 const CASE_ID_PATTERN = /^case-[a-f0-9]{16}-[a-f0-9]{16}$/u;
@@ -243,6 +244,7 @@ function readRuntimeConfig(root, path, adapter) {
   }
   if (adapter === "codex" && value.claude_cli !== null) throw new Error("Codex runtime config must not provide a Claude CLI contract");
   if (adapter === "claude" && value.availability === "available") validateClaudeCommandTemplate(value);
+  if (value.environment_value_allowlist.some((key) => !value.environment_allowlist.includes(key))) throw new Error("environment value allowlist must be a subset of environment allowlist");
   return { value, digest: sha256(bytes) };
 }
 
@@ -267,12 +269,28 @@ function validateClaudeCommandTemplate(runtime) {
   if (stableCanonicalJson(contract.command) !== stableCanonicalJson(expected)) throw new Error("Claude CLI contract contains unsupported or conflicting arguments");
 }
 
-function environmentFor(runtime, extra = {}) {
-  const environment = {};
+function environmentSnapshotRecord(runtime, values) {
+  const valueKeys = new Set(runtime.environment_value_allowlist);
+  const entries = [...runtime.environment_allowlist].sort().map((name) => {
+    const present = Object.hasOwn(values, name);
+    if (!present) return { name, present: false, value: null, digest: null, bytes: 0 };
+    const evidence = durableScalarEvidence(values[name], values[name], "present");
+    return { name, present: true, value: valueKeys.has(name) ? evidence.value : null, digest: evidence.digest, bytes: evidence.bytes };
+  });
+  return { digest: canonicalDigest(entries), entries };
+}
+
+function captureEnvironment(runtime) {
+  const values = {};
   for (const key of runtime.environment_allowlist) {
-    if (Object.hasOwn(process.env, key)) environment[key] = process.env[key];
+    if (Object.hasOwn(process.env, key)) values[key] = process.env[key];
   }
-  return { ...environment, ...extra };
+  return { runtime, values, record: environmentSnapshotRecord(runtime, values) };
+}
+
+function environmentFor(snapshot, extra = {}) {
+  if (stableCanonicalJson(environmentSnapshotRecord(snapshot.runtime, snapshot.values)) !== stableCanonicalJson(snapshot.record)) throw new RuntimeIntegrityError("captured environment snapshot changed in memory");
+  return { ...snapshot.values, ...extra };
 }
 
 export function effectiveCommand(root, runtime) {
@@ -334,9 +352,9 @@ function assertExecutableIdentity(verifiedExecutable) {
   return executable;
 }
 
-function probeAvailableRuntime(runtime, verifiedExecutable, command) {
+function probeAvailableRuntime(runtime, verifiedExecutable, command, environmentSnapshot) {
   const executable = assertExecutableIdentity(verifiedExecutable);
-  const version = spawnSync(executable, ["--version"], { encoding: "utf8", env: environmentFor(runtime), maxBuffer: 1024 * 1024 });
+  const version = spawnSync(executable, ["--version"], { encoding: "utf8", env: environmentFor(environmentSnapshot), maxBuffer: 1024 * 1024 });
   assertExecutableIdentity(verifiedExecutable);
   const observedVersionOutput = `${version.stdout ?? ""}${version.stderr ?? ""}`;
   const versionConfirmed = version.status === 0 && observedVersionOutput.includes(runtime.expected_executable_version);
@@ -351,7 +369,7 @@ function probeAvailableRuntime(runtime, verifiedExecutable, command) {
   {
     const helpArgs = runtime.adapter === "codex" ? ["exec", "--help"] : ["--help"];
     assertExecutableIdentity(verifiedExecutable);
-    const help = spawnSync(executable, helpArgs, { encoding: "utf8", env: environmentFor(runtime), maxBuffer: 1024 * 1024 });
+    const help = spawnSync(executable, helpArgs, { encoding: "utf8", env: environmentFor(environmentSnapshot), maxBuffer: 1024 * 1024 });
     assertExecutableIdentity(verifiedExecutable);
     const helpOutput = `${help.stdout ?? ""}${help.stderr ?? ""}`;
     const requiredFlags = runtime.adapter === "codex"
@@ -365,7 +383,7 @@ function probeAvailableRuntime(runtime, verifiedExecutable, command) {
   return executableEvidence;
 }
 
-function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable, command, availabilityEvidence = null }) {
+function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable, command, environmentSnapshot, availabilityEvidence = null }) {
   return {
     schema_version: "1.0.0",
     adapter,
@@ -380,6 +398,8 @@ function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable, co
     case_timeout_ms: runtime.case_timeout_ms,
     thermal_state: runtime.thermal_state,
     environment_allowlist: runtime.environment_allowlist,
+    environment_value_allowlist: runtime.environment_value_allowlist,
+    environment_snapshot: environmentSnapshot.record,
     executable,
     effective_command: command,
     effective_command_digest: canonicalDigest(command),
@@ -560,6 +580,14 @@ function readAdapterIdentity(root, runDir, adapter) {
   const identity = readJson(path);
   validate(root, identity, ADAPTER_IDENTITY_SCHEMA_PATH, `${adapter} runtime identity`);
   if (identity.adapter !== adapter || identity.effective_command_digest !== canonicalDigest(identity.effective_command)) throw new Error(`${adapter} runtime identity is invalid`);
+  if (identity.environment_snapshot.digest !== canonicalDigest(identity.environment_snapshot.entries)) throw new Error(`${adapter} environment snapshot digest is invalid`);
+  assertCanonicalEqual(identity.environment_snapshot.entries.map((entry) => entry.name).sort(), [...identity.environment_allowlist].sort(), `${adapter} environment snapshot names`);
+  if (identity.environment_value_allowlist.some((name) => !identity.environment_allowlist.includes(name))) throw new Error(`${adapter} environment value allowlist is invalid`);
+  for (const entry of identity.environment_snapshot.entries) {
+    if (!entry.present && (entry.value !== null || entry.digest !== null || entry.bytes !== 0)) throw new Error(`${adapter} absent environment entry has evidence`);
+    if (entry.present && entry.digest === null) throw new Error(`${adapter} present environment entry is missing its digest`);
+    if (entry.value !== null && !identity.environment_value_allowlist.includes(entry.name)) throw new Error(`${adapter} environment snapshot exposes a non-declared value`);
+  }
   if (identity.policy_enforcement.sandbox_policy !== identity.sandbox_policy || identity.policy_enforcement.permission_policy !== identity.permission_policy) throw new Error(`${adapter} runtime policy identity is inconsistent`);
   if (identity.availability === "available" && adapter === "codex") {
     const argv = identity.effective_command.argv;
@@ -572,14 +600,14 @@ function readAdapterIdentity(root, runDir, adapter) {
   return identity;
 }
 
-function ensureAdapterIdentity({ root, runDir, plan, adapter, runtimeConfig, verifiedExecutable }) {
+function ensureAdapterIdentity({ root, runDir, plan, adapter, runtimeConfig, verifiedExecutable, environmentSnapshot }) {
   let effectiveRuntime = runtimeConfig.value;
   let command = effectiveCommand(root, effectiveRuntime);
   let executable = null;
   let availabilityEvidence = null;
   if (effectiveRuntime.availability === "available") {
     try {
-      executable = probeAvailableRuntime(effectiveRuntime, verifiedExecutable, command);
+      executable = probeAvailableRuntime(effectiveRuntime, verifiedExecutable, command, environmentSnapshot);
     } catch (error) {
       if (error instanceof RuntimeIntegrityError) throw error;
       effectiveRuntime = {
@@ -592,7 +620,7 @@ function ensureAdapterIdentity({ root, runDir, plan, adapter, runtimeConfig, ver
       availabilityEvidence = "contract_probe_failed";
     }
   }
-  const identity = adapterIdentity({ adapter, runtime: effectiveRuntime, runtimeConfigDigest: runtimeConfig.digest, executable, command, availabilityEvidence });
+  const identity = adapterIdentity({ adapter, runtime: effectiveRuntime, runtimeConfigDigest: runtimeConfig.digest, executable, command, environmentSnapshot, availabilityEvidence });
   const path = adapterIdentityPath(runDir, adapter);
   if (!existsSync(path) && adapterHasAttempts(runDir, plan, adapter)) throw new Error(`${adapter} runtime identity is missing after attempts were created; refusing replacement`);
   const published = publishJsonExclusive(path, identity);
@@ -657,11 +685,12 @@ function selectionIdentityFor(context, entry) {
 }
 
 function workspaceOwnership(claim, runIdentity) {
+  if (claim.run_instance_id !== runIdentity.run_instance_id) throw new Error("claim run instance does not match workspace owner");
   return {
     schema_version: "1.0.0",
     claim_id: assertClaimId(claim.claim_id),
     case_id: assertCaseId(claim.case_id),
-    run_instance_id: assertClaimId(runIdentity.run_instance_id),
+    run_instance_id: assertClaimId(claim.run_instance_id),
     workspace_parent: claim.workspace_parent,
     workspace_token: assertClaimId(claim.workspace_token),
   };
@@ -694,6 +723,7 @@ function acquireClaim({ root, context, entry, attempt, runtime, adapter }) {
   const leaseMs = Number.isFinite(injectedLeaseMs) ? injectedLeaseMs : runtime.case_timeout_ms + CLAIM_GRACE_MS;
   const claim = {
     schema_version: "1.0.0",
+    run_instance_id: context.identity.run_instance_id,
     claim_id: claimId,
     case_id: entry.case_id,
     attempt,
@@ -709,6 +739,7 @@ function acquireClaim({ root, context, entry, attempt, runtime, adapter }) {
     selection: selectionIdentityFor(context, entry),
     runtime_identity_digest: adapter.digest,
     effective_command_digest: adapter.identity.effective_command_digest,
+    environment_snapshot_digest: adapter.identity.environment_snapshot.digest,
   };
   validate(root, claim, CLAIM_SCHEMA_PATH, `${entry.case_id} claim`);
   try {
@@ -825,8 +856,8 @@ function applyAdaptiveSelection({ root, adapter, selection, workspace }) {
   };
 }
 
-function isolatedCodexHome() {
-  const sourceHome = process.env.CODEX_HOME ? resolve(process.env.CODEX_HOME) : process.env.HOME ? resolve(process.env.HOME, ".codex") : null;
+function isolatedCodexHome(environment) {
+  const sourceHome = environment.CODEX_HOME ? resolve(environment.CODEX_HOME) : environment.HOME ? resolve(environment.HOME, ".codex") : null;
   const home = mkdtempSync(resolve(tmpdir(), "ask-portfolio-codex-home-"));
   chmodSync(home, 0o700);
   const auth = sourceHome ? resolve(sourceHome, "auth.json") : null;
@@ -843,16 +874,17 @@ function materializeCommand(root, command, runtime, outputTemporary) {
     .replaceAll("{permission_policy}", runtime.permission_policy));
 }
 
-function executeAgent({ root, runtime, executable, workspace, outputTemporary, command }) {
+function executeAgent({ root, runtime, executable, workspace, outputTemporary, command, environmentSnapshot }) {
   const task = readFileSync(resolve(workspace, "BENCHMARK_TASK.md"), "utf8");
+  const environment = environmentFor(environmentSnapshot);
   if (runtime.adapter === "codex") {
-    const codexHome = isolatedCodexHome();
+    const codexHome = isolatedCodexHome(environment);
     try {
       return spawnSync(executable, materializeCommand(root, command, runtime, outputTemporary), {
         cwd: workspace,
         encoding: "utf8",
         input: task,
-        env: environmentFor(runtime, { CODEX_HOME: codexHome }),
+        env: { ...environment, CODEX_HOME: codexHome },
         timeout: runtime.case_timeout_ms,
         maxBuffer: MAX_PROCESS_OUTPUT_BYTES,
       });
@@ -864,7 +896,7 @@ function executeAgent({ root, runtime, executable, workspace, outputTemporary, c
   return spawnSync(executable, args, {
     cwd: workspace,
     encoding: "utf8",
-    env: environmentFor(runtime),
+    env: environment,
     timeout: runtime.case_timeout_ms,
     maxBuffer: MAX_PROCESS_OUTPUT_BYTES,
   });
@@ -879,6 +911,7 @@ function executeVerifiedAgent({ verifiedExecutable, ...options }) {
 
 function inspectFinal(root, outputTemporary) {
   if (!existsSync(outputTemporary) || !lstatSync(outputTemporary).isFile()) throw new Error("agent final structured output is missing");
+  if (statSync(outputTemporary).size > MAX_FINAL_OUTPUT_BYTES) throw new Error("agent final structured output exceeds the maximum byte size");
   const bytes = readFileSync(outputTemporary);
   const final = JSON.parse(bytes);
   validate(root, final, OUTPUT_SCHEMA_PATH, "agent final structured output");
@@ -891,7 +924,8 @@ function publishFinal(root, attemptRoot, source, record, claimId) {
   assertInside(attemptRoot, destination, "attempt final output");
   assertNoSymlinkSegments(destination, "attempt final output");
   if (existsSync(destination)) {
-    if (fileDigest(destination) !== record.sha256 || statSync(destination).size !== record.bytes) throw new Error("attempt final output already exists with different content");
+    const size = statSync(destination).size;
+    if (size > MAX_FINAL_OUTPUT_BYTES || size !== record.bytes || fileDigest(destination) !== record.sha256) throw new Error("attempt final output already exists with different content");
     validate(root, readJson(destination), OUTPUT_SCHEMA_PATH, "durable agent final structured output");
     return false;
   }
@@ -919,6 +953,7 @@ function requestRecord({ entry, attempt, claim, projection }) {
   return {
     schema_version: "1.0.0",
     kind: "request",
+    run_instance_id: claim.run_instance_id,
     case_id: entry.case_id,
     attempt,
     adapter: entry.adapter_track,
@@ -936,6 +971,7 @@ function requestRecord({ entry, attempt, claim, projection }) {
       adapter: entry.adapter_track,
       runtime_identity_digest: claim.runtime_identity_digest,
       effective_command_digest: claim.effective_command_digest,
+      environment_snapshot_digest: claim.environment_snapshot_digest,
       autonomous_agents_started: 0,
     },
   };
@@ -947,6 +983,7 @@ function resultRecord({ entry, attempt, claim, requestPath, status, processResul
   return {
     schema_version: "1.0.0",
     kind: "result",
+    run_instance_id: claim.run_instance_id,
     case_id: entry.case_id,
     attempt,
     adapter: entry.adapter_track,
@@ -970,6 +1007,7 @@ function commitRecord({ claim, result, requestPath, resultPath }) {
   return {
     schema_version: "1.0.0",
     kind: "terminal_commit",
+    run_instance_id: claim.run_instance_id,
     claim_id: claim.claim_id,
     claim_lease_expires_at: claim.lease_expires_at,
     case_id: claim.case_id,
@@ -1051,18 +1089,18 @@ function validateTerminalAttempt({ root, context, entry, attempt }) {
   const runtimeIdentityDigest = canonicalDigest(adapterIdentity);
   const expectedInput = inputIdentityFor(context, entry);
   const expectedSelection = selectionIdentityFor(context, entry);
-  if (request.case_id !== entry.case_id || request.attempt !== attempt || request.adapter !== entry.adapter_track || request.condition !== entry.condition) throw new Error(`${entry.case_id} request identity mismatch`);
+  if (request.run_instance_id !== context.identity.run_instance_id || request.case_id !== entry.case_id || request.attempt !== attempt || request.adapter !== entry.adapter_track || request.condition !== entry.condition) throw new Error(`${entry.case_id} request identity mismatch`);
   if (request.claim.id !== commit.claim_id || request.claim.lease_expires_at !== commit.claim_lease_expires_at) throw new Error(`${entry.case_id} request claim evidence mismatch`);
   if ((entry.condition === "adaptive_ask") !== (request.selection !== null)) throw new Error(`${entry.case_id} request selection shape mismatch`);
   assertCanonicalEqual(request.input_identity, expectedInput, `${entry.case_id} request input identity`);
   assertCanonicalEqual(request.selection, expectedSelection, `${entry.case_id} request selection`);
-  if (request.agent.adapter !== entry.adapter_track || request.agent.runtime_identity_digest !== runtimeIdentityDigest || request.agent.effective_command_digest !== adapterIdentity.effective_command_digest) throw new Error(`${entry.case_id} request runtime identity mismatch`);
-  if (result.case_id !== entry.case_id || result.attempt !== attempt || result.adapter !== entry.adapter_track || result.condition !== entry.condition) throw new Error(`${entry.case_id} result identity mismatch`);
+  if (request.agent.adapter !== entry.adapter_track || request.agent.runtime_identity_digest !== runtimeIdentityDigest || request.agent.effective_command_digest !== adapterIdentity.effective_command_digest || request.agent.environment_snapshot_digest !== adapterIdentity.environment_snapshot.digest) throw new Error(`${entry.case_id} request runtime identity mismatch`);
+  if (result.run_instance_id !== context.identity.run_instance_id || result.case_id !== entry.case_id || result.attempt !== attempt || result.adapter !== entry.adapter_track || result.condition !== entry.condition) throw new Error(`${entry.case_id} result identity mismatch`);
   if (result.status === "completed") {
     if (result.exit_code !== 0 || result.failure_kind !== null || result.recovery_reason !== null || result.final_output === null) throw new Error(`${entry.case_id} completed result semantics mismatch`);
   } else if (result.failure_kind === null || result.final_output !== null || (result.failure_kind === "stale_claim_recovered") !== (result.recovery_reason !== null)) throw new Error(`${entry.case_id} terminal failure result semantics mismatch`);
   if (result.runtime_identity_digest !== runtimeIdentityDigest || result.effective_command_digest !== adapterIdentity.effective_command_digest || result.request_sha256 !== prefixedFileDigest(requestPath)) throw new Error(`${entry.case_id} result evidence mismatch`);
-  if (commit.case_id !== entry.case_id || commit.attempt !== attempt || commit.adapter !== entry.adapter_track || commit.condition !== entry.condition || commit.status !== result.status) throw new Error(`${entry.case_id} terminal commit identity mismatch`);
+  if (commit.run_instance_id !== context.identity.run_instance_id || commit.case_id !== entry.case_id || commit.attempt !== attempt || commit.adapter !== entry.adapter_track || commit.condition !== entry.condition || commit.status !== result.status) throw new Error(`${entry.case_id} terminal commit identity mismatch`);
   if (commit.runtime_identity_digest !== runtimeIdentityDigest || commit.effective_command_digest !== adapterIdentity.effective_command_digest || commit.request_sha256 !== prefixedFileDigest(requestPath) || commit.result_sha256 !== prefixedFileDigest(resultPath)) throw new Error(`${entry.case_id} terminal commit evidence mismatch`);
   const expectedInventory = result.status === "completed" ? ["commit.json", "final.json", "request.json", "result.json"] : ["commit.json", "request.json", "result.json"];
   const inventory = readdirSync(attemptRoot).sort();
@@ -1071,7 +1109,8 @@ function validateTerminalAttempt({ root, context, entry, attempt }) {
     const finalPath = resolve(attemptRoot, result.final_output.path);
     assertInside(attemptRoot, finalPath, `${entry.case_id} final output`);
     assertNoSymlinkSegments(finalPath, `${entry.case_id} final output`);
-    if (fileDigest(finalPath) !== result.final_output.sha256 || statSync(finalPath).size !== result.final_output.bytes) throw new Error(`${entry.case_id} final output digest mismatch`);
+    const size = statSync(finalPath).size;
+    if (size > MAX_FINAL_OUTPUT_BYTES || size !== result.final_output.bytes || fileDigest(finalPath) !== result.final_output.sha256) throw new Error(`${entry.case_id} final output digest mismatch`);
     validate(root, readJson(finalPath), OUTPUT_SCHEMA_PATH, `${entry.case_id} completed output`);
   }
   return { request, result, commit };
@@ -1132,7 +1171,7 @@ function markUnavailable({ root, context, entry, state, runtime, adapter }) {
   return "unavailable";
 }
 
-function executeCase({ root, config, context, entry, runtime, verifiedExecutable, adapter }) {
+function executeCase({ root, config, context, entry, runtime, verifiedExecutable, adapter, environmentSnapshot }) {
   const state = readCaseState(root, context.runDir, entry);
   if (TERMINAL_STATUSES.has(state.status)) validateTerminalCase({ root, context, entry, state });
   if (preflightCaseClaim({ root, context, entry, state })) return "active";
@@ -1169,7 +1208,7 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     writeJsonAtomic(requestPath, request, { stagingOwner: claim.claim_id, faultName: "after_request_staged" });
     const temporaryOutput = resolve(ephemeralRoot, "agent-final.json");
     const started = process.hrtime.bigint();
-    const raw = executeVerifiedAgent({ root, runtime, verifiedExecutable, workspace, outputTemporary: temporaryOutput, command: adapter.identity.effective_command });
+    const raw = executeVerifiedAgent({ root, runtime, verifiedExecutable, workspace, outputTemporary: temporaryOutput, command: adapter.identity.effective_command, environmentSnapshot });
     processResult = { ...raw, duration_ms: Math.round(Number(process.hrtime.bigint() - started) / 1_000_000) };
     if (selection) {
       const afterSpawn = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision });
@@ -1213,6 +1252,7 @@ export function executePortfolio({ root, config, planPath, materializedPath, sel
   if (!adapter || !["codex", "claude"].includes(adapter)) throw new Error("execute-portfolio requires --adapter codex or claude");
   if (maxCases !== null && (!Number.isInteger(maxCases) || maxCases < 1)) throw new Error("--max-cases must be a positive integer");
   const runtimeConfig = readRuntimeConfig(root, runtimeConfigPath, adapter);
+  const environmentSnapshot = captureEnvironment(runtimeConfig.value);
   const verifiedExecutable = runtimeConfig.value.availability === "available" ? validateAgentExecutable(agentBin) : null;
   const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir });
   fault("after_run_initialized");
@@ -1220,7 +1260,7 @@ export function executePortfolio({ root, config, planPath, materializedPath, sel
   context.materializedPath = materializedPath;
   context.selectionState = selectionState;
   context.retryFailed = retryFailed;
-  const runtimeIdentity = ensureAdapterIdentity({ root, runDir: context.runDir, plan: context.plan, adapter, runtimeConfig, verifiedExecutable });
+  const runtimeIdentity = ensureAdapterIdentity({ root, runDir: context.runDir, plan: context.plan, adapter, runtimeConfig, verifiedExecutable, environmentSnapshot });
   const cases = context.plan.cases.filter((entry) => entry.adapter_track === adapter && (!caseId || entry.case_id === caseId));
   if (caseId && cases.length === 0) throw new Error(`case ${caseId} does not belong to adapter ${adapter}`);
   const outcomes = [];
@@ -1243,7 +1283,7 @@ export function executePortfolio({ root, config, planPath, materializedPath, sel
       const state = readCaseState(root, context.runDir, entry);
       const actionable = state.status === "pending" || state.status === "interrupted" || (state.status === "failed" && retryFailed);
       if (actionable && maxCases !== null && executed >= maxCases) break;
-      const status = executeCase({ root, config, context, entry, runtime: runtimeConfig.value, verifiedExecutable, adapter: runtimeIdentity });
+      const status = executeCase({ root, config, context, entry, runtime: runtimeConfig.value, verifiedExecutable, adapter: runtimeIdentity, environmentSnapshot });
       outcomes.push({ case_id: entry.case_id, status });
       if (actionable && status !== "active") executed += 1;
     }
@@ -1253,7 +1293,7 @@ export function executePortfolio({ root, config, planPath, materializedPath, sel
 
 function validateClaimAgainstContext({ root, context, entry, claim }) {
   const identity = readAdapterIdentity(root, context.runDir, entry.adapter_track);
-  if (claim.adapter !== entry.adapter_track || claim.condition !== entry.condition || claim.runtime_identity_digest !== canonicalDigest(identity) || claim.effective_command_digest !== identity.effective_command_digest) throw new Error(`${entry.case_id} claim runtime identity mismatch`);
+  if (claim.run_instance_id !== context.identity.run_instance_id || claim.adapter !== entry.adapter_track || claim.condition !== entry.condition || claim.runtime_identity_digest !== canonicalDigest(identity) || claim.effective_command_digest !== identity.effective_command_digest || claim.environment_snapshot_digest !== identity.environment_snapshot.digest) throw new Error(`${entry.case_id} claim runtime identity mismatch`);
   assertCanonicalEqual(claim.input_identity, inputIdentityFor(context, entry), `${entry.case_id} claim input identity`);
   assertCanonicalEqual(claim.selection, selectionIdentityFor(context, entry), `${entry.case_id} claim selection`);
 }
@@ -1285,14 +1325,16 @@ export function verifyPortfolioExecution({ root, config, planPath, materializedP
 function assertRecoveryEvidence({ root, run, state, claim, request, result }) {
   validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${claim.case_id} recovery request`);
   validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${claim.case_id} recovery result`);
+  const runIdentity = readJson(runIdentityPath(run));
+  validate(root, runIdentity, RUN_IDENTITY_SCHEMA_PATH, "recovery run identity");
   const identity = readAdapterIdentity(root, run, claim.adapter);
-  if (claim.runtime_identity_digest !== canonicalDigest(identity) || claim.effective_command_digest !== identity.effective_command_digest) throw new Error("recovery runtime identity mismatch");
-  if (request.case_id !== claim.case_id || request.attempt !== claim.attempt || request.adapter !== claim.adapter || request.condition !== claim.condition) throw new Error("recovery request identity mismatch");
+  if (claim.run_instance_id !== runIdentity.run_instance_id || claim.runtime_identity_digest !== canonicalDigest(identity) || claim.effective_command_digest !== identity.effective_command_digest || claim.environment_snapshot_digest !== identity.environment_snapshot.digest) throw new Error("recovery runtime identity mismatch");
+  if (request.run_instance_id !== runIdentity.run_instance_id || request.case_id !== claim.case_id || request.attempt !== claim.attempt || request.adapter !== claim.adapter || request.condition !== claim.condition) throw new Error("recovery request identity mismatch");
   if (request.claim.id !== claim.claim_id || request.claim.lease_expires_at !== claim.lease_expires_at || request.claim.workspace_parent !== claim.workspace_parent || request.claim.workspace_token !== claim.workspace_token) throw new Error("recovery request claim identity mismatch");
   assertCanonicalEqual(request.input_identity, claim.input_identity, "recovery request input identity");
   assertCanonicalEqual(request.selection, claim.selection, "recovery request selection");
-  if (request.agent.runtime_identity_digest !== claim.runtime_identity_digest || request.agent.effective_command_digest !== claim.effective_command_digest) throw new Error("recovery request runtime identity mismatch");
-  if (result.case_id !== claim.case_id || result.attempt !== claim.attempt || result.adapter !== claim.adapter || result.condition !== claim.condition || result.runtime_identity_digest !== claim.runtime_identity_digest || result.effective_command_digest !== claim.effective_command_digest) throw new Error("recovery result identity mismatch");
+  if (request.agent.runtime_identity_digest !== claim.runtime_identity_digest || request.agent.effective_command_digest !== claim.effective_command_digest || request.agent.environment_snapshot_digest !== claim.environment_snapshot_digest) throw new Error("recovery request runtime identity mismatch");
+  if (result.run_instance_id !== runIdentity.run_instance_id || result.case_id !== claim.case_id || result.attempt !== claim.attempt || result.adapter !== claim.adapter || result.condition !== claim.condition || result.runtime_identity_digest !== claim.runtime_identity_digest || result.effective_command_digest !== claim.effective_command_digest) throw new Error("recovery result identity mismatch");
   if (state.case_id !== claim.case_id || state.adapter !== claim.adapter || state.condition !== claim.condition || state.status !== "active" || state.active_claim_id !== claim.claim_id) throw new Error("recovery state identity mismatch");
 }
 
@@ -1348,20 +1390,23 @@ function assertCommittedRecoveryEvidence({ root, run, state, commit }) {
   const result = readJson(resultPath);
   validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${state.case_id} committed request`);
   validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${state.case_id} committed result`);
+  const runIdentity = readJson(runIdentityPath(run));
+  validate(root, runIdentity, RUN_IDENTITY_SCHEMA_PATH, "committed run identity");
   const identity = readAdapterIdentity(root, run, state.adapter);
   const identityDigest = canonicalDigest(identity);
-  if (commit.case_id !== state.case_id || commit.attempt !== state.terminal_attempt || commit.adapter !== state.adapter || commit.condition !== state.condition || commit.status !== state.status) throw new Error("terminal commit does not match state");
+  if (commit.run_instance_id !== runIdentity.run_instance_id || commit.case_id !== state.case_id || commit.attempt !== state.terminal_attempt || commit.adapter !== state.adapter || commit.condition !== state.condition || commit.status !== state.status) throw new Error("terminal commit does not match state");
   if (commit.runtime_identity_digest !== identityDigest || commit.effective_command_digest !== identity.effective_command_digest || commit.request_sha256 !== prefixedFileDigest(requestPath) || commit.result_sha256 !== prefixedFileDigest(resultPath)) throw new Error("terminal commit evidence mismatch");
-  if (request.case_id !== commit.case_id || request.attempt !== commit.attempt || request.adapter !== commit.adapter || request.condition !== commit.condition || request.agent.runtime_identity_digest !== identityDigest) throw new Error("committed request identity mismatch");
+  if (request.run_instance_id !== runIdentity.run_instance_id || request.case_id !== commit.case_id || request.attempt !== commit.attempt || request.adapter !== commit.adapter || request.condition !== commit.condition || request.agent.runtime_identity_digest !== identityDigest || request.agent.environment_snapshot_digest !== identity.environment_snapshot.digest) throw new Error("committed request identity mismatch");
   if (request.claim.id !== commit.claim_id || request.claim.lease_expires_at !== commit.claim_lease_expires_at) throw new Error("committed request claim evidence mismatch");
-  if (result.case_id !== commit.case_id || result.attempt !== commit.attempt || result.adapter !== commit.adapter || result.condition !== commit.condition || result.status !== commit.status || result.request_sha256 !== commit.request_sha256 || result.runtime_identity_digest !== identityDigest) throw new Error("committed result identity mismatch");
+  if (result.run_instance_id !== runIdentity.run_instance_id || result.case_id !== commit.case_id || result.attempt !== commit.attempt || result.adapter !== commit.adapter || result.condition !== commit.condition || result.status !== commit.status || result.request_sha256 !== commit.request_sha256 || result.runtime_identity_digest !== identityDigest) throw new Error("committed result identity mismatch");
   const expectedInventory = result.status === "completed" ? ["commit.json", "final.json", "request.json", "result.json"] : ["commit.json", "request.json", "result.json"];
   assertCanonicalEqual(readdirSync(attemptRoot).sort(), expectedInventory, "committed attempt inventory");
   if (result.status === "completed") {
     const finalPath = resolve(attemptRoot, result.final_output.path);
     assertInside(attemptRoot, finalPath, `${state.case_id} committed final output`);
     assertNoSymlinkSegments(finalPath, `${state.case_id} committed final output`);
-    if (fileDigest(finalPath) !== result.final_output.sha256 || statSync(finalPath).size !== result.final_output.bytes) throw new Error("committed final output mismatch");
+    const size = statSync(finalPath).size;
+    if (size > MAX_FINAL_OUTPUT_BYTES || size !== result.final_output.bytes || fileDigest(finalPath) !== result.final_output.sha256) throw new Error("committed final output mismatch");
     validate(root, readJson(finalPath), OUTPUT_SCHEMA_PATH, `${state.case_id} committed final output`);
   }
 }
@@ -1406,6 +1451,7 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     if (request.claim.id !== claimId || !claimIsExpired({ lease_expires_at: request.claim.lease_expires_at })) throw new Error("lost claim evidence is not expired or does not match");
     const recoveredClaim = {
       schema_version: "1.0.0",
+      run_instance_id: request.run_instance_id,
       claim_id: request.claim.id,
       case_id: request.case_id,
       attempt: request.attempt,
@@ -1421,6 +1467,7 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
       selection: request.selection,
       runtime_identity_digest: request.agent.runtime_identity_digest,
       effective_command_digest: request.agent.effective_command_digest,
+      environment_snapshot_digest: request.agent.environment_snapshot_digest,
     };
     assertEphemeralWorkspaceOwnership(recoveredClaim, identity);
     const entry = { case_id: caseId, adapter_track: state.adapter, condition: state.condition };
@@ -1456,7 +1503,7 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     if (claim.adapter !== state.adapter || claim.condition !== state.condition || (claim.selection?.digest ?? null) !== state.selection_digest) throw new Error("published claim does not match prior state identity");
     if (!claimIsExpired(claim)) throw new Error("claim lease has not expired");
     const identity = readAdapterIdentity(root, run, claim.adapter);
-    if (claim.runtime_identity_digest !== canonicalDigest(identity) || claim.effective_command_digest !== identity.effective_command_digest) throw new Error("published claim runtime identity mismatch");
+    if (claim.runtime_identity_digest !== canonicalDigest(identity) || claim.effective_command_digest !== identity.effective_command_digest || claim.environment_snapshot_digest !== identity.environment_snapshot.digest) throw new Error("published claim runtime identity mismatch");
     state = { ...state, status: "active", attempt_count: Number(claim.attempt), active_claim_id: claimId, terminal_attempt: null };
     validate(root, state, CASE_STATE_SCHEMA_PATH, `${caseId} reconciled active state`);
     writeCaseState(run, { case_id: caseId }, state);

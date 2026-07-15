@@ -3,7 +3,7 @@
   "title": "Adaptive ASK portfolio effective adapter runtime identity",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "adapter", "runtime_config_sha256", "availability", "unavailable_reason", "executor", "model", "reasoning_effort", "sandbox_policy", "permission_policy", "case_timeout_ms", "thermal_state", "environment_allowlist", "executable", "effective_command", "effective_command_digest", "policy_enforcement", "availability_evidence"],
+  "required": ["schema_version", "adapter", "runtime_config_sha256", "availability", "unavailable_reason", "executor", "model", "reasoning_effort", "sandbox_policy", "permission_policy", "case_timeout_ms", "thermal_state", "environment_allowlist", "environment_value_allowlist", "environment_snapshot", "executable", "effective_command", "effective_command_digest", "policy_enforcement", "availability_evidence"],
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "adapter": { "enum": ["codex", "claude"] },
@@ -17,7 +17,32 @@
     "permission_policy": { "type": "string", "minLength": 1 },
     "case_timeout_ms": { "type": "integer", "minimum": 1 },
     "thermal_state": { "enum": ["cold", "warm"] },
-    "environment_allowlist": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" } },
+    "environment_allowlist": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" } },
+    "environment_value_allowlist": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" } },
+    "environment_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest", "entries"],
+      "properties": {
+        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "entries": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "present", "value", "digest", "bytes"],
+            "properties": {
+              "name": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" },
+              "present": { "type": "boolean" },
+              "value": { "type": ["string", "null"], "minLength": 1, "maxLength": 160, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u2028\\u2029]+$" },
+              "digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" },
+              "bytes": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
     "executable": {
       "type": ["object", "null"],
       "additionalProperties": false,

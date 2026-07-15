@@ -90,7 +90,8 @@ function runtimeConfig(adapter, availability = "available") {
     sandbox_policy: "workspace-write",
     permission_policy: adapter === "codex" ? "never" : "strict",
     executor: { id: `fixture-${adapter}`, version: "1.0.0" },
-    environment_allowlist: ["PATH", "FAKE_EXEC_LOG", "FAKE_FAIL", "FAKE_DELAY", "FAKE_MUTATE_EXECUTABLE"],
+    environment_allowlist: ["PATH", "FAKE_EXEC_LOG", "FAKE_FAIL", "FAKE_FAIL_ONCE", "FAKE_DELAY", "FAKE_MUTATE_EXECUTABLE", "FAKE_OVERSIZED_FINAL", "FAKE_PUBLIC_MODE"],
+    environment_value_allowlist: ["FAKE_PUBLIC_MODE"],
     thermal_state: "cold",
     claude_cli: adapter === "claude" && availability === "available"
       ? {
@@ -125,6 +126,8 @@ if [ "${adapter}" = "codex" ] && [ "$skip_git_repo_check" != "1" ] && [ ! -d .gi
 if [ -n "\${FAKE_DELAY:-}" ]; then sleep "$FAKE_DELAY"; fi
 printf '${adapter}\\n' >> "$FAKE_EXEC_LOG"
 if [ "\${FAKE_FAIL:-}" = "1" ]; then exit 12; fi
+if [ -n "\${FAKE_FAIL_ONCE:-}" ] && [ ! -e "$FAKE_FAIL_ONCE" ]; then : > "$FAKE_FAIL_ONCE"; exit 12; fi
+if [ "\${FAKE_OVERSIZED_FINAL:-}" = "1" ]; then dd if=/dev/zero of="$output" bs=1048577 count=1 2>/dev/null; exit 0; fi
 printf '%s\\n' '{"task_type":"implementation","decision":"not_applicable","findings":[],"requirement_status":[],"verification_commands":[],"completion_claim":"not_applicable","route":null,"summary":"fixture final"}' > "$output"
 if [ "\${FAKE_MUTATE_EXECUTABLE:-}" = "1" ]; then
   printf '%s\\n' '#!/bin/sh' 'exit 99' > "$0.replacement"
@@ -180,7 +183,7 @@ try {
 
   const runDir = resolve(work, "run");
   const common = ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", runDir];
-  const env = { FAKE_EXEC_LOG: logPath };
+  const env = { FAKE_EXEC_LOG: logPath, FAKE_PUBLIC_MODE: "fixture" };
   run(["execute-portfolio", ...common, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--max-cases", "1"], { env });
   const codexCases = plan.cases.filter((entry) => entry.adapter_track === "codex");
   assert.equal(readFileSync(logPath, "utf8").trim(), "codex", "max-cases must execute exactly one Codex case");
@@ -204,21 +207,50 @@ try {
   const retryRun = resolve(work, "retry-run");
   const retryCase = codexCases[1];
   const retryCommon = ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", retryRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", retryCase.case_id];
-  run(["execute-portfolio", ...retryCommon], { env: { ...env, FAKE_FAIL: "1" } });
+  const retryEnvironment = { ...env, FAKE_FAIL_ONCE: resolve(work, "retry-failed-once") };
+  run(["execute-portfolio", ...retryCommon], { env: retryEnvironment });
   const failedLogCount = readFileSync(logPath, "utf8").trim().split("\n").length;
-  run(["execute-portfolio", ...retryCommon], { env });
+  run(["execute-portfolio", ...retryCommon], { env: retryEnvironment });
   assert.equal(readFileSync(logPath, "utf8").trim().split("\n").length, failedLogCount, "failed cases must not retry implicitly");
-  run(["execute-portfolio", ...retryCommon, "--retry-failed"], { env });
+  run(["execute-portfolio", ...retryCommon, "--retry-failed"], { env: retryEnvironment });
   assert.ok(existsSync(resolve(retryRun, "cases", retryCase.case_id, "attempts", "0002", "result.json")), "explicit retry must append a new attempt");
   const retryStatePath = resolve(retryRun, "cases", retryCase.case_id, "state.json");
   const retryState = JSON.parse(readFileSync(retryStatePath, "utf8"));
   writeJson(retryStatePath, { ...retryState, status: "failed", terminal_attempt: "0001" });
   assertCaseStatus(["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", retryRun], retryCase.case_id, "invalid", "terminal state must not roll back behind the latest attempt");
   const beforeRolledBackRetry = readFileSync(logPath, "utf8");
-  run(["execute-portfolio", ...retryCommon, "--retry-failed"], { expectedStatus: 1, env });
+  run(["execute-portfolio", ...retryCommon, "--retry-failed"], { expectedStatus: 1, env: retryEnvironment });
   assert.equal(readFileSync(logPath, "utf8"), beforeRolledBackRetry, "rolled-back terminal state must fail before spawning attempt 3");
   assert.deepEqual(readdirSync(resolve(retryRun, "cases", retryCase.case_id, "attempts")).sort(), ["0001", "0002"], "rolled-back terminal state must not allocate attempt 3");
   writeJson(retryStatePath, retryState);
+
+  const environmentRun = resolve(work, "environment-snapshot-run");
+  const environmentCommon = ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", environmentRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin];
+  run(["execute-portfolio", ...environmentCommon, "--max-cases", "1"], { env: { ...env, FAKE_DELAY: "0" } });
+  const beforeEnvironmentDrift = readFileSync(logPath, "utf8");
+  run(["execute-portfolio", ...environmentCommon], { expectedStatus: 1, env });
+  assert.equal(readFileSync(logPath, "utf8"), beforeEnvironmentDrift, "environment changes must be rejected before another attempt spawns");
+  const environmentIdentity = JSON.parse(readFileSync(resolve(environmentRun, "adapters", "codex.json"), "utf8"));
+  const publicEnvironmentEntry = environmentIdentity.environment_snapshot.entries.find((entry) => entry.name === "FAKE_PUBLIC_MODE");
+  const privateEnvironmentEntry = environmentIdentity.environment_snapshot.entries.find((entry) => entry.name === "FAKE_EXEC_LOG");
+  assert.equal(publicEnvironmentEntry.value, "fixture", "explicitly non-secret environment values may retain a bounded value");
+  assert.equal(privateEnvironmentEntry.value, null, "environment values must be secret by default");
+  assert.ok(privateEnvironmentEntry.present && privateEnvironmentEntry.digest && privateEnvironmentEntry.bytes > 0, "secret environment evidence must retain presence, digest, and bytes");
+  assert.equal(JSON.stringify(environmentIdentity).includes(logPath), false, "runtime identity must not retain secret environment values");
+  const environmentState = JSON.parse(readFileSync(resolve(environmentRun, "cases", codexCases[0].case_id, "state.json"), "utf8"));
+  const environmentRequest = JSON.parse(readFileSync(resolve(environmentRun, "cases", codexCases[0].case_id, "attempts", environmentState.terminal_attempt, "request.json"), "utf8"));
+  assert.equal(environmentRequest.agent.environment_snapshot_digest, environmentIdentity.environment_snapshot.digest, "attempt request must bind the fixed environment snapshot");
+
+  const transplantedRun = resolve(work, "cross-run-transplant-run");
+  const transplantedCase = codexCases[2];
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", transplantedRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", transplantedCase.case_id], { env });
+  const sourceRunIdentity = JSON.parse(readFileSync(resolve(runDir, "run-identity.json"), "utf8"));
+  const targetRunIdentity = JSON.parse(readFileSync(resolve(transplantedRun, "run-identity.json"), "utf8"));
+  assert.notEqual(sourceRunIdentity.run_instance_id, targetRunIdentity.run_instance_id, "independent runs must retain distinct run instance IDs");
+  const transplantedCaseRoot = resolve(transplantedRun, "cases", transplantedCase.case_id);
+  rmSync(transplantedCaseRoot, { recursive: true, force: true });
+  cpSync(resolve(runDir, "cases", transplantedCase.case_id), transplantedCaseRoot, { recursive: true });
+  assertCaseStatus(["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", transplantedRun], transplantedCase.case_id, "invalid", "a case chain transplanted from another run must be rejected");
 
   const completedState = JSON.parse(readFileSync(resolve(runDir, "cases", codexCases[0].case_id, "state.json"), "utf8"));
   const completedFinal = resolve(runDir, "cases", codexCases[0].case_id, "attempts", completedState.terminal_attempt, "final.json");
@@ -351,7 +383,7 @@ exit 64
   const claimFile = resolve(claimRun, "cases", claimCase.case_id, "claim", "claim.json");
   for (let index = 0; index < 500 && !existsSync(claimFile); index += 1) await wait(20);
   assert.ok(existsSync(claimFile), "first process must acquire a case claim");
-  const duplicate = run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", claimRun, "--adapter", "codex", "--runtime-config", claimRuntime, "--agent-bin", codexBin, "--case-id", claimCase.case_id], { env });
+  const duplicate = run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", claimRun, "--adapter", "codex", "--runtime-config", claimRuntime, "--agent-bin", codexBin, "--case-id", claimCase.case_id], { env: { ...env, FAKE_DELAY: "20" } });
   assert.match(duplicate.stdout, /active/u, "second process must observe the active claim instead of spawning");
   assert.equal(await new Promise((resolveExit) => child.on("exit", resolveExit)), 0, "claim owner must complete");
 
@@ -389,7 +421,7 @@ exit 64
   run(failedGapExecute, { env: { ...env, FAKE_FAIL: "1" } });
   const failedPreviousCommitPath = resolve(failedGapRun, "cases", failedGapCase.case_id, "attempts", "0001", "commit.json");
   const failedPreviousCommit = readFileSync(failedPreviousCommitPath);
-  run([...failedGapExecute, "--retry-failed"], { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: "after_claim_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+  run([...failedGapExecute, "--retry-failed"], { expectedStatus: 86, env: { ...env, FAKE_FAIL: "1", ASK_BENCHMARK_FAULT: "after_claim_published", ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
   const failedRetryClaim = JSON.parse(readFileSync(resolve(failedGapRun, "cases", failedGapCase.case_id, "claim", "claim.json"), "utf8"));
   assert.equal(failedRetryClaim.attempt, "0002", "failed retry must publish an attempt 2 claim");
   run(["recover-case", "--run-dir", failedGapRun, "--case-id", failedGapCase.case_id, "--claim-id", failedRetryClaim.claim_id, "--reason", "failed retry claim gap"]);
@@ -563,6 +595,17 @@ exit 64
   const failureState = JSON.parse(readFileSync(resolve(failureRun, "cases", failureCase.case_id, "state.json"), "utf8"));
   assert.deepEqual(terminalInventory(failureRun, failureCase.case_id, failureState.terminal_attempt), ["commit.json", "request.json", "result.json"], "failed attempts must retain only approved durable artifacts");
 
+  const oversizedRun = resolve(work, "oversized-final-run");
+  const oversizedCase = codexCases[9];
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", oversizedRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", oversizedCase.case_id], { env: { ...env, FAKE_OVERSIZED_FINAL: "1" } });
+  assert.deepEqual(ephemeralInventory(), cleanupBaseline, "oversized final failure must clean its private temporary workspace");
+  const oversizedState = JSON.parse(readFileSync(resolve(oversizedRun, "cases", oversizedCase.case_id, "state.json"), "utf8"));
+  const oversizedAttemptRoot = resolve(oversizedRun, "cases", oversizedCase.case_id, "attempts", oversizedState.terminal_attempt);
+  const oversizedResult = JSON.parse(readFileSync(resolve(oversizedAttemptRoot, "result.json"), "utf8"));
+  assert.equal(oversizedState.status, "failed", "oversized final output must not be completed");
+  assert.equal(oversizedResult.failure_kind, "agent_failure", "oversized final output must close as an agent failure");
+  assert.deepEqual(readdirSync(oversizedAttemptRoot).sort(), ["commit.json", "request.json", "result.json"], "oversized final failure must leave no final or staging artifact");
+
   const timeoutRuntime = resolve(work, "timeout-runtime.json");
   const timeoutConfig = runtimeConfig("codex");
   timeoutConfig.case_timeout_ms = 20;
@@ -579,6 +622,13 @@ exit 64
     cpSync(source, target, { recursive: true });
     return { target, common: ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", target] };
   }
+
+  const runIdentityChanged = cloneRun(runDir, "run-identity-changed-run");
+  const changedRunIdentityPath = resolve(runIdentityChanged.target, "run-identity.json");
+  const changedRunIdentity = JSON.parse(readFileSync(changedRunIdentityPath, "utf8"));
+  changedRunIdentity.run_instance_id = "00000000-0000-4000-8000-000000000001";
+  writeJson(changedRunIdentityPath, changedRunIdentity);
+  assertCaseStatus(runIdentityChanged.common, codexCases[0].case_id, "invalid", "changing a valid run instance UUID must invalidate existing attempt evidence");
 
   const requestDeleted = cloneRun(runDir, "request-deleted-run");
   rmSync(resolve(requestDeleted.target, "cases", codexCases[0].case_id, "attempts", "0001", "request.json"));
@@ -711,6 +761,7 @@ exit 64
   assertSchemaInvalid({ ...validTerminalState, status: "pending", attempt_count: 1, active_claim_id: null, terminal_attempt: null }, "portfolio-case-state.schema.json", "pending state conditionals must reject nonzero attempts");
   assertSchemaInvalid({ ...validTerminalState, status: "active", active_claim_id: null, terminal_attempt: null }, "portfolio-case-state.schema.json", "active state conditionals must require a bound claim");
   assertSchemaInvalid({ ...validTerminalState, terminal_attempt: null }, "portfolio-case-state.schema.json", "terminal state conditionals must require a terminal attempt");
+  assertSchemaInvalid({ ...sourceRunIdentity, run_instance_id: "not-a-uuid" }, "portfolio-run-identity.schema.json", "run identity schema must enforce UUID format");
   assertSchemaInvalid({ ...recoveryClaim, claim_id: "not-a-uuid" }, "portfolio-claim.schema.json", "claim schema must enforce UUID format");
 
   const adaptiveRequest = JSON.parse(readFileSync(resolve(runDir, "cases", adaptiveCodexCase.case_id, "attempts", "0001", "request.json"), "utf8"));
@@ -718,11 +769,20 @@ exit 64
   const nonAdaptiveCase = codexCases.find((entry) => entry.condition !== "adaptive_ask");
   const nonAdaptiveRequest = JSON.parse(readFileSync(resolve(runDir, "cases", nonAdaptiveCase.case_id, "attempts", "0001", "request.json"), "utf8"));
   assertSchemaInvalid({ ...nonAdaptiveRequest, selection: adaptiveRequest.selection }, "portfolio-attempt-request.schema.json", "non-adaptive requests must reject selection evidence");
-  const completedResult = JSON.parse(readFileSync(resolve(runDir, "cases", codexCases[0].case_id, "attempts", "0001", "result.json"), "utf8"));
+  const completedAttemptRoot = resolve(runDir, "cases", codexCases[0].case_id, "attempts", "0001");
+  const completedRequest = JSON.parse(readFileSync(resolve(completedAttemptRoot, "request.json"), "utf8"));
+  const completedResult = JSON.parse(readFileSync(resolve(completedAttemptRoot, "result.json"), "utf8"));
+  const completedCommit = JSON.parse(readFileSync(resolve(completedAttemptRoot, "commit.json"), "utf8"));
+  assert.equal(completedRequest.run_instance_id, sourceRunIdentity.run_instance_id, "request must bind the run instance ID");
+  assert.equal(completedResult.run_instance_id, sourceRunIdentity.run_instance_id, "result must bind the run instance ID");
+  assert.equal(completedCommit.run_instance_id, sourceRunIdentity.run_instance_id, "commit must bind the run instance ID");
   assertSchemaInvalid({ ...completedResult, final_output: null }, "portfolio-attempt-result.schema.json", "completed results must require final output evidence");
   assertSchemaInvalid({ ...completedResult, status: "failed", failure_kind: "fixture", final_output: completedResult.final_output }, "portfolio-attempt-result.schema.json", "non-completed results must reject final output evidence");
   assertSchemaInvalid({ ...completedResult, status: "failed", failure_kind: "agent_failure\nprivate", final_output: null }, "portfolio-attempt-result.schema.json", "attempt results must reject control characters in failure metadata");
   assertSchemaInvalid({ ...recoveryResult, recovery_reason: { ...recoveryResult.recovery_reason, value: "x".repeat(161) } }, "portfolio-attempt-result.schema.json", "attempt results must bound normalized recovery reasons");
+  const completedAgentOutput = JSON.parse(readFileSync(resolve(completedAttemptRoot, "final.json"), "utf8"));
+  assertSchemaInvalid({ ...completedAgentOutput, summary: "x".repeat(4097) }, "agent-output.schema.json", "agent output schema must bound string metadata");
+  assertSchemaInvalid({ ...completedAgentOutput, findings: Array.from({ length: 101 }, () => ({ severity: "note", file: "fixture", line: 1, summary: "fixture", evidence: "fixture" })) }, "agent-output.schema.json", "agent output schema must bound collection sizes");
   assert.match(readFileSync(resolve(root, ".github/workflows/validate.yml"), "utf8"), /node scripts\/test-ask-benchmark-execution\.mjs/u, "GitHub Actions must execute the focused state-machine test");
 
   const sealPath = resolve(selectionState, "selections", `${adaptiveCases[0].case_id}.json`);

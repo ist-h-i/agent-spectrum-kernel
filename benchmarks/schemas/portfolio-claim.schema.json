@@ -3,9 +3,10 @@
   "title": "Adaptive ASK portfolio execution claim",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "claim_id", "case_id", "attempt", "adapter", "condition", "worker_id", "pid", "acquired_at", "lease_expires_at", "workspace_parent", "workspace_token", "input_identity", "selection", "runtime_identity_digest", "effective_command_digest"],
+  "required": ["schema_version", "run_instance_id", "claim_id", "case_id", "attempt", "adapter", "condition", "worker_id", "pid", "acquired_at", "lease_expires_at", "workspace_parent", "workspace_token", "input_identity", "selection", "runtime_identity_digest", "effective_command_digest", "environment_snapshot_digest"],
   "properties": {
     "schema_version": { "const": "1.0.0" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
     "claim_id": { "type": "string", "format": "uuid" },
     "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
     "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
@@ -29,7 +30,8 @@
       }
     },
     "runtime_identity_digest": { "$ref": "#/$defs/digest" },
-    "effective_command_digest": { "$ref": "#/$defs/digest" }
+    "effective_command_digest": { "$ref": "#/$defs/digest" },
+    "environment_snapshot_digest": { "$ref": "#/$defs/digest" }
   },
   "allOf": [
     {

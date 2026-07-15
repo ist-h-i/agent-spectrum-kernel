@@ -3,10 +3,11 @@
   "title": "Adaptive ASK portfolio execution attempt result",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "kind", "case_id", "attempt", "adapter", "condition", "runtime_identity_digest", "effective_command_digest", "request_sha256", "status", "exit_code", "duration_ms", "failure_kind", "recovery_reason", "final_output", "stdout", "stderr", "event_counts"],
+  "required": ["schema_version", "kind", "run_instance_id", "case_id", "attempt", "adapter", "condition", "runtime_identity_digest", "effective_command_digest", "request_sha256", "status", "exit_code", "duration_ms", "failure_kind", "recovery_reason", "final_output", "stdout", "stderr", "event_counts"],
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "kind": { "const": "result" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
     "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
     "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
     "adapter": { "enum": ["codex", "claude"] },
@@ -26,7 +27,7 @@
       "properties": {
         "path": { "const": "final.json" },
         "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-        "bytes": { "type": "integer", "minimum": 1 }
+        "bytes": { "type": "integer", "minimum": 1, "maximum": 1048576 }
       }
     },
     "stdout": { "$ref": "#/$defs/stream" },
@@ -91,7 +92,7 @@
       "properties": {
         "path": { "const": "final.json" },
         "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-        "bytes": { "type": "integer", "minimum": 1 }
+        "bytes": { "type": "integer", "minimum": 1, "maximum": 1048576 }
       }
     },
     "stream": {

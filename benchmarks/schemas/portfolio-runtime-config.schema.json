@@ -16,6 +16,7 @@
     "permission_policy",
     "executor",
     "environment_allowlist",
+    "environment_value_allowlist",
     "thermal_state",
     "claude_cli"
   ],
@@ -41,6 +42,13 @@
     },
     "environment_allowlist": {
       "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" }
+    },
+    "environment_value_allowlist": {
+      "type": "array",
+      "maxItems": 64,
       "uniqueItems": true,
       "items": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" }
     },

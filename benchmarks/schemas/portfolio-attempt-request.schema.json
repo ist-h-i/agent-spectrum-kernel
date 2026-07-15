@@ -3,10 +3,11 @@
   "title": "Adaptive ASK portfolio execution attempt request",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "kind", "case_id", "attempt", "adapter", "condition", "claim", "input_identity", "selection", "projection", "agent"],
+  "required": ["schema_version", "kind", "run_instance_id", "case_id", "attempt", "adapter", "condition", "claim", "input_identity", "selection", "projection", "agent"],
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "kind": { "const": "request" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
     "case_id": { "$ref": "#/$defs/caseId" },
     "attempt": { "$ref": "#/$defs/attempt" },
     "adapter": { "$ref": "#/$defs/adapter" },
@@ -113,11 +114,12 @@
     "agent": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["adapter", "runtime_identity_digest", "effective_command_digest", "autonomous_agents_started"],
+      "required": ["adapter", "runtime_identity_digest", "effective_command_digest", "environment_snapshot_digest", "autonomous_agents_started"],
       "properties": {
         "adapter": { "$ref": "#/$defs/adapter" },
         "runtime_identity_digest": { "$ref": "#/$defs/digest" },
         "effective_command_digest": { "$ref": "#/$defs/digest" },
+        "environment_snapshot_digest": { "$ref": "#/$defs/digest" },
         "autonomous_agents_started": { "const": 0 }
       }
     }

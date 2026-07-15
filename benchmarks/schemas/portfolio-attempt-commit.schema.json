@@ -3,10 +3,11 @@
   "title": "Adaptive ASK portfolio terminal attempt commit",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "kind", "claim_id", "claim_lease_expires_at", "case_id", "attempt", "adapter", "condition", "status", "runtime_identity_digest", "effective_command_digest", "request_sha256", "result_sha256"],
+  "required": ["schema_version", "kind", "run_instance_id", "claim_id", "claim_lease_expires_at", "case_id", "attempt", "adapter", "condition", "status", "runtime_identity_digest", "effective_command_digest", "request_sha256", "result_sha256"],
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "kind": { "const": "terminal_commit" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
     "claim_id": { "type": "string", "format": "uuid" },
     "claim_lease_expires_at": { "type": "string", "format": "date-time" },
     "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
