@@ -52,6 +52,6 @@
         "rules_isolated": { "type": "boolean" }
       }
     },
-    "availability_evidence": { "enum": ["local_version_and_contract_probe", "declared_unavailable"] }
+    "availability_evidence": { "enum": ["local_version_and_contract_probe", "declared_unavailable", "contract_probe_failed"] }
   }
 }

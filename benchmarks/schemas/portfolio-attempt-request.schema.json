@@ -3,7 +3,7 @@
   "title": "Adaptive ASK portfolio execution attempt request",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "kind", "case_id", "attempt", "adapter", "condition", "input_identity", "selection", "projection", "agent"],
+  "required": ["schema_version", "kind", "case_id", "attempt", "adapter", "condition", "claim", "input_identity", "selection", "projection", "agent"],
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "kind": { "const": "request" },
@@ -11,6 +11,7 @@
     "attempt": { "$ref": "#/$defs/attempt" },
     "adapter": { "$ref": "#/$defs/adapter" },
     "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+    "claim": { "$ref": "#/$defs/claim" },
     "input_identity": { "$ref": "#/$defs/inputIdentity" },
     "selection": {
       "type": ["object", "null"],
@@ -38,6 +39,17 @@
     "adapter": { "enum": ["codex", "claude"] },
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "rawDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "lease_expires_at", "workspace_parent", "workspace_token"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "lease_expires_at": { "type": "string", "format": "date-time" },
+        "workspace_parent": { "type": "string", "pattern": "^ask-portfolio-workspaces-[A-Za-z0-9_-]{6,}$" },
+        "workspace_token": { "type": "string", "format": "uuid" }
+      }
+    },
     "inputIdentity": {
       "type": "object",
       "additionalProperties": false,

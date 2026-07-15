@@ -53,6 +53,9 @@ function validFormat(value, format) {
     const [, , hour, minute, second, , timezone] = match;
     return Number(hour) <= 23 && Number(minute) <= 59 && Number(second) <= 59 && (timezone === "Z" || (Number(timezone.slice(1, 3)) <= 23 && Number(timezone.slice(4, 6)) <= 59));
   }
+  if (format === "uuid") {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
+  }
   return true;
 }
 
@@ -66,6 +69,18 @@ function validateSchemaValue(value, schema, context, path = "$") {
       baseDir: schema.$ref.startsWith("#") ? context.baseDir : dirname(resolve(context.baseDir, schema.$ref)),
       rootSchema: schema.$ref.startsWith("#") ? context.rootSchema : referenced,
     }, path);
+  }
+  for (const subschema of schema.allOf ?? []) {
+    errors.push(...validateSchemaValue(value, subschema, context, path));
+  }
+  if (schema.if) {
+    const conditionMatches = validateSchemaValue(value, schema.if, context, path).length === 0;
+    const conditionalSchema = conditionMatches ? schema.then : schema.else;
+    if (conditionalSchema) errors.push(...validateSchemaValue(value, conditionalSchema, context, path));
+  }
+  if (Array.isArray(schema.oneOf)) {
+    const matches = schema.oneOf.filter((candidate) => validateSchemaValue(value, candidate, context, path).length === 0).length;
+    if (matches !== 1) errors.push(`${path}: must match exactly one oneOf branch`);
   }
   if (Object.hasOwn(schema, "const") && JSON.stringify(value) !== JSON.stringify(schema.const)) {
     errors.push(`${path}: must equal ${JSON.stringify(schema.const)}`);

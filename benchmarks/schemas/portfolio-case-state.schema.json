@@ -3,7 +3,7 @@
   "title": "Adaptive ASK portfolio execution case state",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "case_id", "adapter", "condition", "status", "attempt_count", "terminal_attempt", "selection_digest"],
+  "required": ["schema_version", "case_id", "adapter", "condition", "status", "attempt_count", "active_claim_id", "terminal_attempt", "selection_digest"],
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
@@ -11,21 +11,22 @@
     "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
     "status": { "enum": ["pending", "active", "completed", "failed", "unavailable", "interrupted", "invalid"] },
     "attempt_count": { "type": "integer", "minimum": 0 },
+    "active_claim_id": { "type": ["string", "null"], "format": "uuid" },
     "terminal_attempt": { "type": ["string", "null"], "pattern": "^[0-9]{4}$" },
     "selection_digest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
   },
   "allOf": [
     {
       "if": { "properties": { "status": { "const": "pending" } }, "required": ["status"] },
-      "then": { "properties": { "attempt_count": { "const": 0 }, "terminal_attempt": { "type": "null" } } }
+      "then": { "properties": { "attempt_count": { "const": 0 }, "active_claim_id": { "type": "null" }, "terminal_attempt": { "type": "null" } } }
     },
     {
       "if": { "properties": { "status": { "const": "active" } }, "required": ["status"] },
-      "then": { "properties": { "attempt_count": { "minimum": 1 }, "terminal_attempt": { "type": "null" } } }
+      "then": { "properties": { "attempt_count": { "minimum": 1 }, "active_claim_id": { "type": "string", "format": "uuid" }, "terminal_attempt": { "type": "null" } } }
     },
     {
       "if": { "properties": { "status": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] } }, "required": ["status"] },
-      "then": { "properties": { "attempt_count": { "minimum": 1 }, "terminal_attempt": { "type": "string", "pattern": "^[0-9]{4}$" } } }
+      "then": { "properties": { "attempt_count": { "minimum": 1 }, "active_claim_id": { "type": "null" }, "terminal_attempt": { "type": "string", "pattern": "^[0-9]{4}$" } } }
     },
     {
       "if": { "properties": { "condition": { "const": "adaptive_ask" } }, "required": ["condition"] },

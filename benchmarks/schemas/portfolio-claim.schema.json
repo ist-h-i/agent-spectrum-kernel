@@ -3,7 +3,7 @@
   "title": "Adaptive ASK portfolio execution claim",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "claim_id", "case_id", "attempt", "adapter", "condition", "worker_id", "pid", "acquired_at", "lease_expires_at", "workspace_token", "input_identity", "selection", "runtime_identity_digest", "effective_command_digest"],
+  "required": ["schema_version", "claim_id", "case_id", "attempt", "adapter", "condition", "worker_id", "pid", "acquired_at", "lease_expires_at", "workspace_parent", "workspace_token", "input_identity", "selection", "runtime_identity_digest", "effective_command_digest"],
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "claim_id": { "type": "string", "format": "uuid" },
@@ -15,6 +15,7 @@
     "pid": { "type": "integer", "minimum": 1 },
     "acquired_at": { "type": "string", "format": "date-time" },
     "lease_expires_at": { "type": "string", "format": "date-time" },
+    "workspace_parent": { "type": "string", "pattern": "^ask-portfolio-workspaces-[A-Za-z0-9_-]{6,}$" },
     "workspace_token": { "type": "string", "format": "uuid" },
     "input_identity": { "$ref": "#/$defs/inputIdentity" },
     "selection": {
