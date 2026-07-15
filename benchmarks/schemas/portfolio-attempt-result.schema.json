@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio execution attempt result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "run_instance_id", "case_id", "attempt", "adapter", "condition", "runtime_identity_digest", "effective_command_digest", "request_sha256", "status", "exit_code", "duration_ms", "failure_kind", "recovery_reason", "final_output", "stdout", "stderr", "event_counts"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "kind": { "const": "result" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
+    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "adapter": { "enum": ["codex", "claude"] },
+    "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+    "runtime_identity_digest": { "$ref": "#/$defs/digest" },
+    "effective_command_digest": { "$ref": "#/$defs/digest" },
+    "request_sha256": { "$ref": "#/$defs/digest" },
+    "status": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] },
+    "exit_code": { "type": ["integer", "null"] },
+    "duration_ms": { "type": ["integer", "null"], "minimum": 0 },
+    "failure_kind": { "type": ["string", "null"], "minLength": 1, "maxLength": 160, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u2028\\u2029]+$" },
+    "recovery_reason": { "$ref": "#/$defs/recoveryReason" },
+    "final_output": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": { "const": "final.json" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1, "maximum": 1048576 }
+      }
+    },
+    "stdout": { "$ref": "#/$defs/stream" },
+    "stderr": { "$ref": "#/$defs/stream" },
+    "event_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["json_lines"],
+      "properties": { "json_lines": { "type": "integer", "minimum": 0 } }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "completed" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "exit_code": { "const": 0 },
+          "failure_kind": { "type": "null" },
+          "recovery_reason": { "type": "null" },
+          "final_output": { "$ref": "#/$defs/finalOutput" }
+        }
+      },
+      "else": {
+        "properties": {
+          "failure_kind": { "type": "string", "minLength": 1 },
+          "final_output": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "failure_kind": { "const": "stale_claim_recovered" } }, "required": ["failure_kind"] },
+      "then": { "properties": { "recovery_reason": { "$ref": "#/$defs/recoveryReasonEvidence" } } },
+      "else": { "properties": { "recovery_reason": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "recoveryReason": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["value", "digest", "bytes"],
+      "properties": {
+        "value": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u2028\\u2029]+$" },
+        "digest": { "$ref": "#/$defs/digest" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "recoveryReasonEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "digest", "bytes"],
+      "properties": {
+        "value": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u2028\\u2029]+$" },
+        "digest": { "$ref": "#/$defs/digest" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "finalOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": { "const": "final.json" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1, "maximum": 1048576 }
+      }
+    },
+    "stream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bytes", "sha256"],
+      "properties": {
+        "bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

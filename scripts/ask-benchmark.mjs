@@ -23,6 +23,7 @@ import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { buildPortfolioPlan, PORTFOLIO_CONDITIONS } from "./ask-benchmark-plan.mjs";
 import { assertTrackedRepositoryMatchesHead, materializePortfolio } from "./ask-benchmark-materialize.mjs";
 import { sealAdaptiveSelection, verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
+import { executePortfolio, recoverPortfolioCase, verifyPortfolioExecution } from "./ask-benchmark-execution.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_CONFIG_PATH = resolve(ROOT, "benchmarks/checkpoint-b.config.json");
@@ -47,18 +48,25 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
     else if (flag === "--plan") args.plan = resolve(argv.shift());
     else if (flag === "--materialized") args.materialized = resolve(argv.shift());
     else if (flag === "--state-dir") args.stateDir = resolve(argv.shift());
+    else if (flag === "--selection-state") args.stateDir = resolve(argv.shift());
     else if (flag === "--case-id") args.caseId = argv.shift();
     else if (flag === "--input") args.input = resolve(argv.shift());
     else if (flag === "--run-dir") args.runDir = resolve(argv.shift());
     else if (flag === "--seed") args.seed = argv.shift();
     else if (flag === "--agent-bin") args.agentBin = resolve(argv.shift());
+    else if (flag === "--adapter") args.adapter = argv.shift();
+    else if (flag === "--runtime-config") args.runtimeConfig = resolve(argv.shift());
+    else if (flag === "--max-cases") args.maxCases = Number(argv.shift());
+    else if (flag === "--retry-failed") args.retryFailed = true;
+    else if (flag === "--claim-id") args.claimId = argv.shift();
+    else if (flag === "--reason") args.reason = argv.shift();
     else if (flag === "--config") args.configPath = resolve(argv.shift());
     else if (flag === "--help" || flag === "-h") args.command = "help";
     else throw new Error(`Unknown argument: ${flag}`);
@@ -75,6 +83,9 @@ Commands:
   materialize --config <portfolio-config.json> --plan <execution-plan.json> --output <absent-or-empty-directory>
   seal-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id> --input <selection-input.json>
   verify-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id>
+  execute-portfolio --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --adapter <codex|claude> --runtime-config <runtime-config.json> --agent-bin <executable> [--case-id <case-id>] [--max-cases <count>] [--retry-failed]
+  verify-execution --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory>
+  recover-case --run-dir <run-directory> --case-id <case-id> --claim-id <claim-id> --reason <reason>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
   score [--config <config.json>] --run-dir <completed-directory> --output <normalized-result.json>
@@ -357,6 +368,41 @@ function verifySelection(args) {
     repositoryRevision: git(ROOT, ["rev-parse", "HEAD"]),
   });
   console.log(`Adaptive selection verified for ${record.case_id}: sha256:${record.selection_digest.value}`);
+}
+
+function executePortfolioCommand(args) {
+  const config = validateProtocol(args.configPath);
+  if (config._kind !== "portfolio") throw new Error("execute-portfolio requires an Adaptive portfolio config");
+  if (!args.plan || !args.materialized || !args.stateDir || !args.runDir || !args.runtimeConfig) throw new Error("execute-portfolio requires --plan, --materialized, --selection-state, --run-dir, and --runtime-config");
+  const result = executePortfolio({
+    root: ROOT,
+    config,
+    planPath: args.plan,
+    materializedPath: args.materialized,
+    selectionState: args.stateDir,
+    runDir: args.runDir,
+    adapter: args.adapter,
+    runtimeConfigPath: args.runtimeConfig,
+    agentBin: args.agentBin,
+    caseId: args.caseId,
+    maxCases: args.maxCases,
+    retryFailed: args.retryFailed,
+  });
+  for (const outcome of result.outcomes) console.log(`${outcome.case_id}: ${outcome.status}`);
+}
+
+function verifyExecution(args) {
+  const config = validateProtocol(args.configPath);
+  if (config._kind !== "portfolio") throw new Error("verify-execution requires an Adaptive portfolio config");
+  if (!args.plan || !args.materialized || !args.stateDir || !args.runDir) throw new Error("verify-execution requires --plan, --materialized, --selection-state, and --run-dir");
+  const result = verifyPortfolioExecution({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+function recoverCase(args) {
+  if (!args.runDir) throw new Error("recover-case requires --run-dir");
+  const result = recoverPortfolioCase({ root: ROOT, runDir: args.runDir, caseId: args.caseId, claimId: args.claimId, reason: args.reason });
+  console.log(`${result.case_id}: ${result.status}`);
 }
 
 function prepare(args) {
@@ -799,6 +845,9 @@ try {
   else if (args.command === "materialize") materialize(args);
   else if (args.command === "seal-selection") sealSelection(args);
   else if (args.command === "verify-selection") verifySelection(args);
+  else if (args.command === "execute-portfolio") executePortfolioCommand(args);
+  else if (args.command === "verify-execution") verifyExecution(args);
+  else if (args.command === "recover-case") recoverCase(args);
   else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);
   else if (args.command === "score") score(args);

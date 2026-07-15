@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio execution run identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_instance_id", "program", "plan", "materialization", "repository_revision", "runner", "config", "case_namespace", "selection_state_digest", "output_schema_digest"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
+    "program": { "const": "adaptive_ask_portfolio_execution" },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "digest"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
+        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "materialization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest_digest", "output_root_identity"],
+      "properties": {
+        "manifest_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "output_root_identity": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "repository_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "source_revision"],
+      "properties": {
+        "version": { "const": "1.0.0" },
+        "source_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "protocol_sha256"],
+      "properties": {
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "protocol_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "case_namespace": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "selection_state_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "output_schema_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

@@ -9,40 +9,43 @@
     "decision": { "enum": ["approve", "approve_with_comments", "request_changes", "block", "insufficient_evidence", "not_applicable"] },
     "findings": {
       "type": "array",
+      "maxItems": 100,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["severity", "file", "line", "summary", "evidence"],
         "properties": {
           "severity": { "enum": ["blocking", "major", "minor", "note"] },
-          "file": { "type": "string" },
+          "file": { "type": "string", "maxLength": 512 },
           "line": { "type": ["integer", "null"], "minimum": 1 },
-          "summary": { "type": "string" },
-          "evidence": { "type": "string" }
+          "summary": { "type": "string", "maxLength": 1024 },
+          "evidence": { "type": "string", "maxLength": 4096 }
         }
       }
     },
     "requirement_status": {
       "type": "array",
+      "maxItems": 100,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["requirement_id", "status", "evidence"],
         "properties": {
-          "requirement_id": { "type": "string" },
+          "requirement_id": { "type": "string", "maxLength": 128 },
           "status": { "enum": ["satisfied", "not_satisfied", "unknown"] },
-          "evidence": { "type": "string" }
+          "evidence": { "type": "string", "maxLength": 4096 }
         }
       }
     },
     "verification_commands": {
       "type": "array",
+      "maxItems": 100,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["command", "result"],
         "properties": {
-          "command": { "type": "string" },
+          "command": { "type": "string", "maxLength": 2048 },
           "result": { "enum": ["passed", "failed", "not_run", "unknown"] }
         }
       }
@@ -53,11 +56,11 @@
       "additionalProperties": false,
       "required": ["operating_mode", "primary_workflow", "evidence"],
       "properties": {
-        "operating_mode": { "type": "string" },
-        "primary_workflow": { "type": "string" },
-        "evidence": { "type": "string" }
+        "operating_mode": { "type": "string", "maxLength": 128 },
+        "primary_workflow": { "type": "string", "maxLength": 128 },
+        "evidence": { "type": "string", "maxLength": 4096 }
       }
     },
-    "summary": { "type": "string" }
+    "summary": { "type": "string", "maxLength": 4096 }
   }
 }

@@ -900,6 +900,13 @@ export function buildCodexProjectionPlan({ profileName, skills = null, skipPromp
   return { ...selection, ...provenance, compactProfiles, compactProfileArtifacts, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };
 }
 
+export function resolveCodexSkillClosure(skills) {
+  const manifest = readManifest();
+  const seed = [...new Set(skills ?? [])].sort();
+  validateSkillNames(seed, [...manifest.skills].sort());
+  return computeRequiredClosure(seed, [], []);
+}
+
 export function codexRendererInputPathsForProfile(profileName) {
   return buildCodexProjectionPlan({ profileName }).renderer_inputs;
 }

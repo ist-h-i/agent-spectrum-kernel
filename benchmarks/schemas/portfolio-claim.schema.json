@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio execution claim",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_instance_id", "claim_id", "case_id", "attempt", "adapter", "condition", "worker_id", "pid", "acquired_at", "lease_expires_at", "workspace_parent", "workspace_token", "input_identity", "selection", "runtime_identity_digest", "effective_command_digest", "environment_snapshot_digest"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
+    "claim_id": { "type": "string", "format": "uuid" },
+    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "adapter": { "enum": ["codex", "claude"] },
+    "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+    "worker_id": { "type": "string", "minLength": 1 },
+    "pid": { "type": "integer", "minimum": 1 },
+    "acquired_at": { "type": "string", "format": "date-time" },
+    "lease_expires_at": { "type": "string", "format": "date-time" },
+    "workspace_parent": { "type": "string", "pattern": "^ask-portfolio-workspaces-[A-Za-z0-9_-]{6,}$" },
+    "workspace_token": { "type": "string", "format": "uuid" },
+    "input_identity": { "$ref": "#/$defs/inputIdentity" },
+    "selection": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["digest", "selected_mechanisms", "required_gates"],
+      "properties": {
+        "digest": { "$ref": "#/$defs/rawDigest" },
+        "selected_mechanisms": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "required_gates": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "runtime_identity_digest": { "$ref": "#/$defs/digest" },
+    "effective_command_digest": { "$ref": "#/$defs/digest" },
+    "environment_snapshot_digest": { "$ref": "#/$defs/digest" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "condition": { "const": "adaptive_ask" } }, "required": ["condition"] },
+      "then": { "properties": { "selection": { "$ref": "#/$defs/selection" } } },
+      "else": { "properties": { "selection": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "rawDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "inputIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_id", "plan_digest", "materialization_manifest_digest", "frozen_input_digest"],
+      "properties": {
+        "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "materialization_manifest_digest": { "$ref": "#/$defs/digest" },
+        "frozen_input_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest", "selected_mechanisms", "required_gates"],
+      "properties": {
+        "digest": { "$ref": "#/$defs/rawDigest" },
+        "selected_mechanisms": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "required_gates": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  }
+}

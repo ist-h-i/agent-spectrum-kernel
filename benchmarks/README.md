@@ -53,7 +53,7 @@ The frozen rules are in [protocol-c.md](protocol-c.md). Keep temporary prompts, 
 
 The measured result is in [results/checkpoint-c-report.md](results/checkpoint-c-report.md), with normalized machine-readable evidence in `results/checkpoint-c-2026-07-14.json`. Full ASK improved one review score but exceeded the quality-gain token allowance; the other three fixtures showed no incremental quality and exceeded the normal token-overhead guardrail.
 
-## Adaptive portfolio foundation, workspace materialization, and selection seal
+## Adaptive portfolio foundation, workspace materialization, selection seal, and runtime resume
 
 Issue #197 adds a separate versioned foundation for the redesigned portfolio. The first slice registers the four B2/C fixtures as calibration-only and creates a deterministic plan for separate Codex and Claude tracks across Plain, Kernel-only, Adaptive ASK, and Full ASK:
 
@@ -63,6 +63,8 @@ node scripts/ask-benchmark.mjs plan --config benchmarks/adaptive-portfolio.confi
 node scripts/ask-benchmark.mjs materialize --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --output /tmp/adaptive-ask-materialized
 node scripts/ask-benchmark.mjs seal-selection --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --materialized /tmp/adaptive-ask-materialized --state-dir /tmp/adaptive-ask-selection-state --case-id case-... --input /tmp/adaptive-selection-input.json
 node scripts/ask-benchmark.mjs verify-selection --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --materialized /tmp/adaptive-ask-materialized --state-dir /tmp/adaptive-ask-selection-state --case-id case-...
+node scripts/ask-benchmark.mjs execute-portfolio --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --materialized /tmp/adaptive-ask-materialized --selection-state /tmp/adaptive-ask-selection-state --run-dir /tmp/adaptive-ask-run-state --adapter codex --runtime-config /tmp/codex-runtime.json --agent-bin /path/to/fake-or-approved-executable
+node scripts/ask-benchmark.mjs verify-execution --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --materialized /tmp/adaptive-ask-materialized --selection-state /tmp/adaptive-ask-selection-state --run-dir /tmp/adaptive-ask-run-state
 ```
 
 The `plan` command records the non-sensitive canonical seed with its ID and SHA-256 digest so the artifact can be independently regenerated. Its `plan_id` binds the config digest, protocol digest, repository revision, and seed into every case/block namespace.
@@ -75,13 +77,16 @@ Each case contains `BENCHMARK_TASK.md`, the frozen `workspace/`, and only its co
 
 Selection inputs contain the task class, signals, selected/skipped mechanisms, gates, requested/omitted agents, expected evidence, capability downgrades, bypass state, and exact adapter/profile/renderer/projection fingerprint. They cannot include result, score, correctness, recommendation, completion, hidden-test, oracle, or evaluator fields. Lightweight bypass has an explicit reason and skipped mechanisms; capability downgrades are evidence of unavailable capability rather than a zero score or simulated execution.
 
-None of these commands invokes Claude or Codex, collects output, resumes a partial run, inspects outcomes, or scores results. Selection sealing records only the pre-result decision boundary. Measured execution remains unauthorized and blocked until #193–#197 artifacts are validated and #198 freezes manifests, evaluator digests, thresholds, weights, runtime variables, and seeds.
+`execute-portfolio` creates an immutable run identity plus independent case state, atomically published claims, terminal commit manifests, and attempts outside materialized/selection roots. It copies each case into a tokenized OS temporary workspace outside the durable run, removes that workspace on every normal terminal path, and lets exact stale-claim recovery clean hard-interruption residue. Durable attempts retain only a closed Schema/digest-bound request, result, commit, and approved structured final JSON when completed. It validates every Adaptive seal before projection, before spawn, and after output collection. Adapter identities are compare-and-set and bind every attempt to the effective command and policy; Codex and Claude remain separate tracks, and Claude is unavailable unless its placeholder, policy-argument, `--help`, and `--version` contract is confirmed. `verify-execution` is deterministic and read-only across completed, failed, unavailable, interrupted, and invalid terminal evidence; stale claims require the explicit `recover-case` command.
+
+The focused execution test uses only fake executables. Measured runtime execution, evaluator/oracle inspection, scoring, telemetry aggregation, and result interpretation remain unauthorized until #193–#197 artifacts are validated and #198 freezes manifests, evaluator digests, thresholds, weights, runtime variables, and seeds.
 
 Materialization-specific regression coverage is run with:
 
 ```bash
 node scripts/test-ask-benchmark-materialize.mjs
 node scripts/test-ask-benchmark-selection.mjs
+node scripts/test-ask-benchmark-execution.mjs
 ```
 
 See [protocol-adaptive.md](protocol-adaptive.md) for the condition, adapter-separation, balanced-ordering, repetition, privacy, and pre-result Adaptive selection contracts.
