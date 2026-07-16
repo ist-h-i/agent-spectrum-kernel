@@ -235,6 +235,8 @@ try {
   const unavailableRecord = JSON.parse(readFileSync(resolve(unavailableGeneration.path, unavailableManifest.cases.find((entry) => entry.case_id === unavailableCase.case_id).normalized_attempts[0].path), "utf8"));
   assert.equal(unavailableRecord.outcome, "unavailable");
   assert.equal(unavailableRecord.telemetry.input_tokens.status, "unavailable", "runtime absence must differ from unknown telemetry");
+  assert.equal(unavailableRecord.telemetry.runtime_agent_count.status, "unavailable", "runtime agent telemetry must be unavailable when the runtime was unavailable");
+  assert.equal(unavailableRecord.telemetry.subagent_activity.status, "unavailable", "subagent telemetry must be unavailable when the runtime was unavailable");
   assert.equal(unavailableRecord.telemetry.runtime_unavailable_reason_digest.status, "known", "unavailable reason evidence must retain digest/bytes without raw text");
 
   const interruptedRun = resolve(work, "interrupted-run");
@@ -412,6 +414,18 @@ try {
   symlinkSync(externalOutput, symlinkOutput);
   assert.match(normalize(completedRun, symlinkOutput, selectionState, { expectedStatus: 1 }).stderr, /must not be a symlink/u);
   assert.match(normalize(completedRun, resolve(completedRun, "normalized-results"), selectionState, { expectedStatus: 1 }).stderr, /must not overlap/u, "output path escape into an input root must fail closed");
+
+  const rootManifestSymlinkOutput = resolve(work, "root-manifest-symlink-output");
+  cpSync(normalized, rootManifestSymlinkOutput, { recursive: true });
+  const rootManifestPath = resolve(rootManifestSymlinkOutput, "normalized-results-root.json");
+  const externalRootManifest = resolve(work, "external-normalized-results-root.json");
+  cpSync(rootManifestPath, externalRootManifest);
+  rmSync(rootManifestPath);
+  symlinkSync(externalRootManifest, rootManifestPath);
+  const rootManifestSymlinkPattern = /normalized result collection manifest.*symlink/u;
+  assert.match(run(["verify-normalized-results", ...common(completedRun), "--output", rootManifestSymlinkOutput], { expectedStatus: 1 }).stderr, rootManifestSymlinkPattern, "current-source verification must reject a symlinked collection manifest");
+  assert.match(run(["verify-normalized-results", "--output", rootManifestSymlinkOutput, "--snapshot-digest", normalizedManifest.source_snapshot_digest], { expectedStatus: 1 }).stderr, rootManifestSymlinkPattern, "snapshot verification must reject a symlinked collection manifest");
+  assert.match(normalize(completedRun, rootManifestSymlinkOutput, selectionState, { expectedStatus: 1 }).stderr, rootManifestSymlinkPattern, "re-normalization must reject a symlinked collection manifest");
 
   const interruptedPublication = resolve(work, "interrupted-publication");
   normalize(completedRun, interruptedPublication, selectionState, { expectedStatus: 86, env: { ASK_BENCHMARK_NORMALIZE_FAULT: "after_normalized_staging_complete" } });

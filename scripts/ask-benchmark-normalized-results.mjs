@@ -161,7 +161,7 @@ function telemetryFor(attempt, adapterIdentity) {
     stderr_digest: known(`sha256:${result.stderr.sha256}`),
     json_event_line_count: known(result.event_counts.json_lines),
     harness_spawned_secondary_agent_count: known(request.agent.autonomous_agents_started),
-    runtime_agent_count: missing("unknown", "runtime_agent_count_not_observed"),
+    runtime_agent_count: unavailableOrUnknown(outcome, "runtime_agent_count_not_observed"),
     failure_kind: result.failure_kind === null ? missing("not_applicable", "completed_outcome_has_no_failure") : known(portableTelemetryScalar(result.failure_kind, "failure kind")),
     capability_downgrade_count: known(downgrades.length),
     capability_downgrade_digest: known(canonicalDigest(downgrades)),
@@ -181,7 +181,7 @@ function telemetryFor(attempt, adapterIdentity) {
     file_read_count: unavailableMissing(),
     human_effort: missing("unknown", "human_measurement_not_collected"),
     unsafe_attempted_actions: unavailableMissing(),
-    subagent_activity: missing("unknown", "runtime_subagent_activity_not_observed"),
+    subagent_activity: unavailableOrUnknown(outcome, "runtime_subagent_activity_not_observed"),
     evaluator_quality_metrics: missing("not_applicable", "normalized_result_is_pre_evaluation"),
   };
 }
@@ -613,9 +613,12 @@ function assertManagedCollection({ root, output, expectedRootManifest = null }) 
     assertNoSymlinkSegments(generation, `normalized generation ${name}`);
     if (!lstatSync(generation).isDirectory() || lstatSync(generation).isSymbolicLink()) throw new Error(`normalized generation ${name} must be a real directory`);
   }
+  const manifestPath = resolve(output, NORMALIZED_ROOT_MANIFEST_NAME);
+  assertNoSymlinkSegments(manifestPath, "normalized result collection manifest");
+  if (!existsSync(manifestPath) || !lstatSync(manifestPath).isFile() || lstatSync(manifestPath).isSymbolicLink()) throw new Error("normalized result collection manifest must be a real file");
   let manifest;
   try {
-    manifest = JSON.parse(readFileSync(resolve(output, NORMALIZED_ROOT_MANIFEST_NAME), "utf8"));
+    manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   } catch {
     throw new Error("normalized result collection manifest is invalid JSON");
   }
