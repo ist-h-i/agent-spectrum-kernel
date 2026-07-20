@@ -26,7 +26,7 @@
     "program": { "const": "adaptive_ask_portfolio" },
     "policy_schema_version": { "const": "1.0.0" },
     "policy_contract_version": { "const": "3.7.0-portfolio-policy" },
-    "policy_revision": { "const": "issue-205-checkpoint-b1-r1" },
+    "policy_revision": { "const": "issue-205-checkpoint-b1-r2" },
     "policy_status": { "const": "contracts_frozen_design_records_pending" },
     "catalog_schema_version": { "const": "1.0.0" },
     "catalog_revision": { "const": "issue-205-checkpoint-1" },

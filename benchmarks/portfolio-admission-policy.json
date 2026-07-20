@@ -4,7 +4,7 @@
   "program": "adaptive_ask_portfolio",
   "policy_schema_version": "1.0.0",
   "policy_contract_version": "3.7.0-portfolio-policy",
-  "policy_revision": "issue-205-checkpoint-b1-r1",
+  "policy_revision": "issue-205-checkpoint-b1-r2",
   "policy_status": "contracts_frozen_design_records_pending",
   "catalog_schema_version": "1.0.0",
   "catalog_revision": "issue-205-checkpoint-1",
@@ -52,6 +52,108 @@
     "rejected_reentry_requires_new_revision": true,
     "unknown_gate_result_counts_as_pass": false
   },
+  "selector_context_contract": {
+    "closed_artifact": true,
+    "required_fields": [
+      {
+        "field_id": "fixture_id",
+        "value_type": "identifier",
+        "derivation": "catalog_lookup_key"
+      },
+      {
+        "field_id": "catalog_digest",
+        "value_type": "sha256_digest",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "fixture_metadata_digest",
+        "value_type": "sha256_digest",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "fixture_role",
+        "value_type": "fixture_role",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "suite",
+        "value_type": "suite",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "task_class",
+        "value_type": "task_class",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "risk_boundary",
+        "value_type": "risk_boundary",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "capability_families",
+        "value_type": "identifier_array",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "fixture_predicates",
+        "value_type": "fixture_predicate_array",
+        "derivation": "predicate_evidence_derived"
+      },
+      {
+        "field_id": "predicate_evidence_digest",
+        "value_type": "sha256_digest",
+        "derivation": "predicate_evidence_digest"
+      },
+      {
+        "field_id": "selector_context_digest",
+        "value_type": "sha256_digest",
+        "derivation": "selector_context_digest"
+      }
+    ],
+    "catalog_lookup_key": "fixture_id",
+    "catalog_derived_fields": [
+      "catalog_digest",
+      "fixture_metadata_digest",
+      "fixture_role",
+      "suite",
+      "task_class",
+      "risk_boundary",
+      "capability_families"
+    ],
+    "unknown_fixture_id_result": "reject",
+    "caller_supplied_catalog_values_trusted": false,
+    "predicate_derivation": {
+      "caller_supplied_predicates_allowed": false,
+      "scored_primary_requirement": {
+        "all_of": [
+          "fixture_role_primary",
+          "frozen_blocker_or_weighted_requirement_present",
+          "requirement_record_policy_and_fixture_bound",
+          "scored_requirement_has_agent_visible_evidence_map",
+          "requirement_set_digest_verified"
+        ]
+      },
+      "finding_producing_task": {
+        "any_of": [
+          "frozen_review_task_class",
+          "answer_neutral_output_contract_declares_findings",
+          "evaluator_public_reference_bound_output_contract_digest_declares_findings"
+        ],
+        "frozen_review_task_classes": [
+          "implementation_review",
+          "pr_review",
+          "review",
+          "review_verification"
+        ]
+      }
+    },
+    "digest_contract": {
+      "predicate_evidence_digest_algorithm": "sha256_sorted_key_canonical_json",
+      "selector_context_digest_algorithm": "sha256_sorted_key_canonical_json",
+      "selector_context_digest_excluded_field": "selector_context_digest"
+    }
+  },
   "aggregate_classification_contract": {
     "lifecycle_phase": "post_pilot",
     "states": [
@@ -76,7 +178,114 @@
     "unavailable_adapter_value": "unavailable",
     "unavailable_adapter_treated_as_zero": false,
     "insufficient_supported_tracks_result": "insufficient_evidence",
-    "calibration_primary_eligible": false
+    "calibration_primary_eligible": false,
+    "state_transitions": [
+      {
+        "from": "pending_measurement",
+        "to": "calibration_only",
+        "trigger": "fixture_role_calibration",
+        "evidence_type": "validated_selector_context"
+      },
+      {
+        "from": "pending_measurement",
+        "to": "insufficient_evidence",
+        "trigger": "supported_tracks_or_required_inputs_insufficient",
+        "evidence_type": "pilot_result_record"
+      },
+      {
+        "from": "pending_measurement",
+        "to": "redesign_required",
+        "trigger": "ceiling_or_floor_candidate",
+        "evidence_type": "classification_result_artifact"
+      },
+      {
+        "from": "pending_measurement",
+        "to": "primary_eligible",
+        "trigger": "ceiling_and_floor_not_candidate",
+        "evidence_type": "classification_result_artifact"
+      },
+      {
+        "from": "pending_measurement",
+        "to": "rejected",
+        "trigger": "explicit_admission_rejection",
+        "evidence_type": "admission_rejection_record"
+      },
+      {
+        "from": "redesign_required",
+        "to": "calibration_only",
+        "trigger": "redesign_review",
+        "evidence_type": "redesign_review_record"
+      },
+      {
+        "from": "redesign_required",
+        "to": "rejected",
+        "trigger": "redesign_review",
+        "evidence_type": "redesign_review_record"
+      },
+      {
+        "from": "redesign_required",
+        "to": "pending_measurement",
+        "trigger": "remeasurement",
+        "evidence_type": "remeasurement_record"
+      }
+    ],
+    "decision_precedence": [
+      {
+        "precedence": 1,
+        "decision_id": "calibration_role",
+        "outcome": "calibration_only"
+      },
+      {
+        "precedence": 2,
+        "decision_id": "invalid_binding_or_pilot_digest",
+        "outcome": "invalid_artifact_no_classification"
+      },
+      {
+        "precedence": 3,
+        "decision_id": "insufficient_or_unknown_input",
+        "outcome": "insufficient_evidence"
+      },
+      {
+        "precedence": 4,
+        "decision_id": "ceiling_or_floor_candidate",
+        "outcome": "redesign_required"
+      },
+      {
+        "precedence": 5,
+        "decision_id": "ceiling_and_floor_not_candidate",
+        "outcome": "primary_eligible"
+      },
+      {
+        "precedence": 6,
+        "decision_id": "contradictory_combination",
+        "outcome": "invalid_classification_no_result"
+      }
+    ],
+    "automatic_threshold_rejection_allowed": false,
+    "rejected_transition_evidence_types": [
+      "redesign_review_record",
+      "admission_rejection_record"
+    ],
+    "redesign_transition_requires_new_fixture_revision": true,
+    "redesign_transition_requires_new_admission_revision": true,
+    "classification_result_artifact_contract": {
+      "closed_artifact": true,
+      "separate_from_policy_artifact": true,
+      "required_fields": [
+        "fixture_id",
+        "fixture_role",
+        "catalog_digest",
+        "policy_manifest_digest",
+        "pilot_result_digest",
+        "supported_adapter_tracks",
+        "ceiling_classification_result",
+        "floor_classification_result",
+        "classification_state",
+        "reason_codes",
+        "classification_revision",
+        "classification_digest"
+      ]
+    }
   },
   "final_admission_record_contract": {
     "required_fields": [
@@ -944,5 +1153,5 @@
     "llm_dependency": false,
     "embedding_dependency": false
   },
-  "policy_digest": "sha256:5ec4d5bd735b863572bf472b41f0065e4872596fd9a3bf0fbecc2087c5e53a12"
+  "policy_digest": "sha256:39dfd6dbe2ce5d57b3262f0a6183d554becca659529bc4d2176832bce75c4857"
 }

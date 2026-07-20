@@ -5,11 +5,11 @@ import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
-import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
+import { computeFixtureMetadataDigest, validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
 
 export const PORTFOLIO_POLICY_SCHEMA_VERSION = "1.0.0";
 export const PORTFOLIO_POLICY_CONTRACT_VERSION = "3.7.0-portfolio-policy";
-export const PORTFOLIO_POLICY_REVISION = "issue-205-checkpoint-b1-r1";
+export const PORTFOLIO_POLICY_REVISION = "issue-205-checkpoint-b1-r2";
 export const PORTFOLIO_POLICY_STATUS = "contracts_frozen_design_records_pending";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -207,6 +207,110 @@ function selectorCollectionMatches(expected, actual) {
   return expected.includes("*") || actual.some((value) => expected.includes(value));
 }
 
+function compareAscii(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function assertClosedKeys(value, allowedKeys, label, { requiredKeys = allowedKeys } = {}) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object`);
+  const keys = Object.keys(value);
+  const unknown = keys.filter((key) => !allowedKeys.includes(key));
+  const missing = requiredKeys.filter((key) => !keys.includes(key));
+  if (unknown.length > 0) throw new Error(`${label} has unknown fields: ${unknown.join(", ")}`);
+  if (missing.length > 0) throw new Error(`${label} is missing fields: ${missing.join(", ")}`);
+}
+
+function assertDigest(value, label) {
+  if (!/^sha256:[a-f0-9]{64}$/.test(value ?? "")) throw new Error(`${label} must be a sha256 digest`);
+}
+
+export function computeRequirementSetDigest(requirementRecord) {
+  return digest(withoutField(requirementRecord, "requirement_set_digest"));
+}
+
+export function computeOutputContractDigest(outputContract) {
+  return digest(withoutField(outputContract, "output_contract_digest"));
+}
+
+export function computePredicateEvidenceDigest(predicateEvidence) {
+  return digest(predicateEvidence);
+}
+
+export function computeSelectorContextDigest(selectorContext) {
+  return digest(withoutField(selectorContext, "selector_context_digest"));
+}
+
+function deriveFixturePredicates(admissionPolicy, scoringPolicy, fixture, predicateEvidence) {
+  assertClosedKeys(predicateEvidence, ["requirement_record", "output_contract"], "predicate evidence", { requiredKeys: ["requirement_record"] });
+  const requirementRecord = predicateEvidence.requirement_record;
+  assertClosedKeys(requirementRecord, ["fixture_id", "policy_digest", "requirements", "requirement_set_digest"], "requirement record");
+  if (requirementRecord.fixture_id !== fixture.fixture_id) throw new Error("requirement record fixture_id binding does not match selector fixture");
+  if (requirementRecord.policy_digest !== scoringPolicy.policy_digest) throw new Error("requirement record policy digest binding does not match scoring policy");
+  if (!Array.isArray(requirementRecord.requirements)) throw new Error("requirement record requirements must be an array");
+  if (requirementRecord.requirement_set_digest !== computeRequirementSetDigest(requirementRecord)) throw new Error("requirement set digest does not match");
+  for (const [index, requirement] of requirementRecord.requirements.entries()) {
+    assertClosedKeys(requirement, ["requirement_id", "requirement_kind", "agent_visible_evidence_map_ids"], `requirement record requirements[${index}]`);
+    if (!REQUIREMENT_KINDS.includes(requirement.requirement_kind)) throw new Error(`requirement record has unknown kind: ${requirement.requirement_kind}`);
+    if (!Array.isArray(requirement.agent_visible_evidence_map_ids)) throw new Error("requirement evidence-map IDs must be an array");
+  }
+  const scoredRequirements = requirementRecord.requirements.filter(({ requirement_kind }) => requirement_kind === "blocker" || requirement_kind === "weighted");
+  const scoredPrimaryRequirement = fixture.fixture_role === "primary"
+    && scoredRequirements.length > 0
+    && scoredRequirements.every(({ agent_visible_evidence_map_ids }) => agent_visible_evidence_map_ids.length >= scoringPolicy.requirement_contract.scored_requirement_minimum_agent_visible_evidence_map_ids);
+
+  let outputContractDeclaresFindings = false;
+  if (predicateEvidence.output_contract) {
+    const outputContract = predicateEvidence.output_contract;
+    assertClosedKeys(outputContract, ["fixture_id", "declares_findings", "evaluator_public_reference_digest", "output_contract_digest"], "output contract");
+    if (outputContract.fixture_id !== fixture.fixture_id) throw new Error("output contract fixture_id binding does not match selector fixture");
+    if (typeof outputContract.declares_findings !== "boolean") throw new Error("output contract declares_findings must be boolean");
+    assertDigest(outputContract.evaluator_public_reference_digest, "output contract evaluator public reference digest");
+    if (outputContract.output_contract_digest !== computeOutputContractDigest(outputContract)) throw new Error("output contract digest does not match evaluator public reference binding");
+    outputContractDeclaresFindings = outputContract.declares_findings;
+  }
+
+  const predicates = [];
+  if (scoredPrimaryRequirement) predicates.push("scored_primary_requirement");
+  if (REVIEW_TASK_CLASSES.includes(fixture.task_class) || outputContractDeclaresFindings) predicates.push("finding_producing_task");
+  return predicates.sort(compareAscii);
+}
+
+export function buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, catalog, fixtureId, predicateEvidence }) {
+  if (catalog.catalog_digest !== admissionPolicy.catalog_digest || catalog.catalog_digest !== scoringPolicy.catalog_digest) throw new Error("selector context catalog digest binding does not match policy");
+  const fixture = catalog.fixtures.find(({ fixture_id }) => fixture_id === fixtureId);
+  if (!fixture) throw new Error(`unknown fixture ID: ${fixtureId}`);
+  if (fixture.fixture_metadata_digest !== computeFixtureMetadataDigest(fixture)) throw new Error("catalog fixture metadata digest does not match recomputation");
+  const context = {
+    fixture_id: fixture.fixture_id,
+    catalog_digest: catalog.catalog_digest,
+    fixture_metadata_digest: fixture.fixture_metadata_digest,
+    fixture_role: fixture.fixture_role,
+    suite: fixture.suite,
+    task_class: fixture.task_class,
+    risk_boundary: fixture.risk_boundary,
+    capability_families: [...fixture.capability_families],
+    fixture_predicates: deriveFixturePredicates(admissionPolicy, scoringPolicy, fixture, predicateEvidence),
+    predicate_evidence_digest: computePredicateEvidenceDigest(predicateEvidence),
+  };
+  context.selector_context_digest = computeSelectorContextDigest(context);
+  return context;
+}
+
+export function validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, catalog, selectorContext, predicateEvidence }) {
+  const requiredFields = admissionPolicy.selector_context_contract.required_fields.map(({ field_id }) => field_id);
+  assertClosedKeys(selectorContext, requiredFields, "selector context");
+  if (selectorContext.selector_context_digest !== computeSelectorContextDigest(selectorContext)) throw new Error("selector context digest drift");
+  if (selectorContext.predicate_evidence_digest !== computePredicateEvidenceDigest(predicateEvidence)) throw new Error("predicate evidence digest drift");
+  const expected = buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, catalog, fixtureId: selectorContext.fixture_id, predicateEvidence });
+  for (const field of ["catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary"]) {
+    if (selectorContext[field] !== expected[field]) throw new Error(`selector context ${field} does not match catalog-derived value`);
+  }
+  if (!arraysEqual(selectorContext.capability_families, expected.capability_families)) throw new Error("selector context capability_families do not exactly match catalog-derived values");
+  if (!arraysEqual(selectorContext.fixture_predicates, expected.fixture_predicates)) throw new Error("selector context fixture_predicates do not exactly match derived predicate evidence");
+  if (stableCanonicalJson(selectorContext) !== stableCanonicalJson(expected)) throw new Error("selector context does not match deterministic reconstruction");
+  return expected;
+}
+
 export function admissionGateSelectorMatches(gate, fixtureContext) {
   return gate.selector.clauses.some((clause) => (
     selectorValueMatches(clause.fixture_roles, fixtureContext.fixture_role)
@@ -218,11 +322,14 @@ export function admissionGateSelectorMatches(gate, fixtureContext) {
   ));
 }
 
-export function validateAdmissionGateResult(policy, gateId, fixtureContext, result) {
-  const gate = policy.admission_gates.find((entry) => entry.gate_id === gateId);
+export function validateAdmissionGateResult(options) {
+  assertClosedKeys(options, ["admissionPolicy", "scoringPolicy", "catalog", "gateId", "selectorContext", "predicateEvidence", "result"], "admission gate validation input");
+  const { admissionPolicy, scoringPolicy, catalog, gateId, selectorContext, predicateEvidence, result } = options;
+  const gate = admissionPolicy.admission_gates.find((entry) => entry.gate_id === gateId);
   if (!gate) throw new Error(`unknown admission gate: ${gateId}`);
   if (!gate.allowed_results.includes(result)) throw new Error(`${gateId} result is not allowed: ${result}`);
-  const selectorMatches = admissionGateSelectorMatches(gate, fixtureContext);
+  const validatedContext = validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, catalog, selectorContext, predicateEvidence });
+  const selectorMatches = admissionGateSelectorMatches(gate, validatedContext);
   if (selectorMatches && result === "not_applicable") throw new Error(`${gateId} not_applicable is prohibited when selector matches`);
   if (!selectorMatches && result !== "not_applicable") throw new Error(`${gateId} must be not_applicable when selector does not match`);
   return true;
@@ -234,6 +341,151 @@ export function validateRequirementMaxPoints(scoringPolicy, requirement) {
   if (typeof requirement.max_points !== "number" || !Number.isFinite(requirement.max_points) || requirement.max_points < 0) throw new Error("max_points must be a non-negative finite number");
   if (kind.max_points_constraint === "positive" && requirement.max_points <= 0) throw new Error("weighted max_points must be positive");
   if (kind.max_points_constraint === "required_zero" && requirement.max_points !== 0) throw new Error("informational max_points must be zero");
+  return true;
+}
+
+export function determineAggregateClassification({
+  fixtureRole,
+  pilotResultDigestValid = true,
+  policyCatalogBindingValid = true,
+  supportedTracksSufficient = true,
+  requiredInputsKnown = true,
+  ceilingResult,
+  floorResult,
+}) {
+  if (fixtureRole === "calibration") return { state: "calibration_only", reason_codes: ["calibration_fixture"] };
+  if (!pilotResultDigestValid || !policyCatalogBindingValid) throw new Error("invalid pilot or policy/catalog binding; classification must not be generated");
+  if (!supportedTracksSufficient || !requiredInputsKnown || ceilingResult === "unknown" || floorResult === "unknown") {
+    return { state: "insufficient_evidence", reason_codes: [!supportedTracksSufficient ? "insufficient_supported_tracks" : "unknown_classification_input"] };
+  }
+  if (!["candidate", "not_candidate"].includes(ceilingResult) || !["candidate", "not_candidate"].includes(floorResult)) throw new Error("contradictory ceiling/floor classification combination");
+  if (ceilingResult === "candidate" || floorResult === "candidate") return { state: "redesign_required", reason_codes: [ceilingResult === "candidate" ? "ceiling_candidate" : "floor_candidate"] };
+  return { state: "primary_eligible", reason_codes: ["ceiling_and_floor_not_candidate"] };
+}
+
+export function validateAggregateClassificationTransition({
+  from,
+  to,
+  evidenceType,
+  previousFixtureRevision,
+  fixtureRevision,
+  previousAdmissionRevision,
+  admissionRevision,
+}) {
+  const permitted = new Map([
+    ["redesign_required->calibration_only", "redesign_review_record"],
+    ["redesign_required->rejected", "redesign_review_record"],
+    ["redesign_required->pending_measurement", "remeasurement_record"],
+  ]);
+  const expectedEvidence = permitted.get(`${from}->${to}`);
+  if (!expectedEvidence) throw new Error(`classification transition is not permitted: ${from}->${to}`);
+  if (evidenceType !== expectedEvidence) throw new Error(`classification transition requires ${expectedEvidence}`);
+  if (!(fixtureRevision > previousFixtureRevision) || !(admissionRevision > previousAdmissionRevision)) throw new Error("redesign transition requires new fixture and admission revisions");
+  return true;
+}
+
+export function computeAggregateResultDigest(result) {
+  return digest(withoutField(result, "aggregate_result_digest"));
+}
+
+function assertUniqueStrings(values, label) {
+  if (!Array.isArray(values) || values.some((value) => typeof value !== "string") || new Set(values).size !== values.length) throw new Error(`${label} must be a unique string array`);
+}
+
+function numbersClose(left, right) {
+  return typeof left === "number" && typeof right === "number" && Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) < 1e-12;
+}
+
+export function validateAggregationResult({ scoringPolicy, catalog, policyManifest, result }) {
+  const contract = scoringPolicy.aggregation_policy.aggregate_result_contract;
+  assertClosedKeys(result, contract.required_fields, "aggregate result");
+  if (result.aggregate_result_digest !== computeAggregateResultDigest(result)) throw new Error("aggregate result digest drift");
+  if (result.catalog_digest !== catalog.catalog_digest || result.catalog_digest !== scoringPolicy.catalog_digest) throw new Error("aggregate result catalog digest binding does not match");
+  if (result.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("aggregate result policy manifest digest binding does not match");
+  assertUniqueStrings(result.classification_digests, "classification digests");
+  for (const value of result.classification_digests) assertDigest(value, "classification digest");
+  for (const key of ["adapter_track", "comparison_view", "suite", "task_class"]) {
+    if (typeof result[key] !== "string" || result[key].length === 0) throw new Error(`aggregate grouping key ${key} must be one scalar value`);
+  }
+  if (!scoringPolicy.aggregation_policy.comparison_views.some(({ view_id }) => view_id === result.comparison_view)) throw new Error("aggregate comparison view is not registered");
+  assertUniqueStrings(result.expected_fixture_ids, "expected fixture IDs");
+  assertUniqueStrings(result.included_fixture_ids, "included fixture IDs");
+  if (!Array.isArray(result.excluded_fixtures)) throw new Error("excluded fixtures must be an array");
+  for (const [index, excluded] of result.excluded_fixtures.entries()) {
+    assertClosedKeys(excluded, ["fixture_id", "reason"], `excluded fixtures[${index}]`);
+    if (typeof excluded.reason !== "string" || excluded.reason.length === 0) throw new Error("excluded fixture reason is required");
+  }
+  const excludedIds = result.excluded_fixtures.map(({ fixture_id }) => fixture_id);
+  assertUniqueStrings(excludedIds, "excluded fixture IDs");
+  if (!Number.isInteger(result.excluded_fixture_count) || result.excluded_fixture_count !== excludedIds.length) throw new Error("excluded fixture count must match excluded fixture records");
+  const allResultIds = [...result.included_fixture_ids, ...excludedIds];
+  if (new Set(allResultIds).size !== allResultIds.length) throw new Error("included and excluded fixture IDs must be disjoint");
+  if (!arraysEqual([...allResultIds].sort(compareAscii), [...result.expected_fixture_ids].sort(compareAscii))) throw new Error("included and excluded fixture IDs must exactly cover expected fixture IDs");
+  for (const fixtureId of result.expected_fixture_ids) {
+    const fixture = catalog.fixtures.find(({ fixture_id }) => fixture_id === fixtureId);
+    if (!fixture) throw new Error(`aggregate result has unknown fixture ID: ${fixtureId}`);
+    if (fixture.suite !== result.suite || fixture.task_class !== result.task_class) throw new Error("aggregate result must not pool suite or task class groups");
+  }
+
+  if (!Array.isArray(result.lineage_records)) throw new Error("aggregate lineage records must be an array");
+  for (const [index, lineage] of result.lineage_records.entries()) assertClosedKeys(lineage, ["fixture_id", "frequency_weight", "impact_weight"], `lineage records[${index}]`);
+  const lineageIds = result.lineage_records.map(({ fixture_id }) => fixture_id);
+  assertUniqueStrings(lineageIds, "lineage fixture IDs");
+  if (!arraysEqual([...lineageIds].sort(compareAscii), [...result.expected_fixture_ids].sort(compareAscii))) throw new Error("partial lineage exclusion is prohibited; every expected fixture needs a lineage record");
+
+  if (!Array.isArray(result.fixture_contributions)) throw new Error("fixture contributions must be an array");
+  for (const [index, contribution] of result.fixture_contributions.entries()) {
+    assertClosedKeys(contribution, ["fixture_id", "normalized_quality_delta"], `fixture contributions[${index}]`);
+    if (typeof contribution.normalized_quality_delta !== "number" || !Number.isFinite(contribution.normalized_quality_delta)) throw new Error("normalized quality delta must be finite");
+  }
+  const contributionIds = result.fixture_contributions.map(({ fixture_id }) => fixture_id);
+  assertUniqueStrings(contributionIds, "fixture contribution IDs");
+  if (!arraysEqual([...contributionIds].sort(compareAscii), [...result.included_fixture_ids].sort(compareAscii))) throw new Error("fixture contributions must exactly match included fixture IDs");
+
+  assertClosedKeys(result.overhead_component_vector, ["token_count_delta", "latency_delta", "human_effort_delta", "false_positive_unit_delta", "unsafe_action_category_counts"], "overhead component vector");
+  assertClosedKeys(result.overhead_component_vector.unsafe_action_category_counts, scoringPolicy.aggregation_policy.unsafe_action_aggregation.categories, "unsafe action category count vector");
+  for (const count of Object.values(result.overhead_component_vector.unsafe_action_category_counts)) {
+    if (!Number.isInteger(count) || count < 0) throw new Error("unsafe action category counts must be non-negative integers");
+  }
+  assertClosedKeys(result.safety_blockers, scoringPolicy.aggregation_policy.unsafe_action_aggregation.safety_blocker_categories, "safety blockers");
+  for (const category of scoringPolicy.aggregation_policy.unsafe_action_aggregation.safety_blocker_categories) {
+    if (typeof result.safety_blockers[category] !== "boolean" || result.safety_blockers[category] !== (result.overhead_component_vector.unsafe_action_category_counts[category] > 0)) throw new Error("unsafe action safety blockers must remain separate and match category counts");
+  }
+  if (!contract.result_statuses.includes(result.result_status)) throw new Error("aggregate result status is not allowed");
+
+  const unweightedExpected = result.fixture_contributions.length === 0
+    ? null
+    : result.fixture_contributions.reduce((sum, { normalized_quality_delta }) => sum + normalized_quality_delta, 0) / result.fixture_contributions.length;
+  if (unweightedExpected === null ? result.unweighted_quality_delta !== null : !numbersClose(result.unweighted_quality_delta, unweightedExpected)) throw new Error("unweighted quality delta does not match included fixture contributions");
+
+  const weightedSuite = scoringPolicy.aggregation_policy.weighted_reduction.applicable_suites.includes(result.suite);
+  if (!weightedSuite) {
+    if (result.numerator !== null || result.denominator !== null || result.weighted_quality_delta !== null) throw new Error("weighted quality is allowed only for practice_frequency");
+    return true;
+  }
+  const unknownLineage = result.lineage_records.some(({ frequency_weight, impact_weight }) => frequency_weight === null || impact_weight === null);
+  if (unknownLineage) {
+    if (result.result_status !== "insufficient_evidence" || result.numerator !== null || result.denominator !== null || result.weighted_quality_delta !== null) throw new Error("unknown frequency or impact requires insufficient_evidence without a frozen weighted value");
+    return true;
+  }
+  if (result.included_fixture_ids.length === 0) {
+    if (result.result_status !== "insufficient_evidence" || result.numerator !== null || result.denominator !== null || result.weighted_quality_delta !== null) throw new Error("zero eligible fixtures requires insufficient_evidence without a frozen weighted value");
+    return true;
+  }
+  const lineageById = new Map(result.lineage_records.map((entry) => [entry.fixture_id, entry]));
+  const contributionById = new Map(result.fixture_contributions.map((entry) => [entry.fixture_id, entry]));
+  let expectedNumerator = 0;
+  let expectedDenominator = 0;
+  for (const fixtureId of result.included_fixture_ids) {
+    const lineage = lineageById.get(fixtureId);
+    if (typeof lineage.frequency_weight !== "number" || typeof lineage.impact_weight !== "number") throw new Error("weighted lineage values must be numeric or explicit unknown");
+    const weight = lineage.frequency_weight * lineage.impact_weight;
+    expectedNumerator += weight * contributionById.get(fixtureId).normalized_quality_delta;
+    expectedDenominator += weight;
+  }
+  if (expectedDenominator === 0 || result.denominator === 0) throw new Error("weighted aggregation denominator must be non-zero");
+  if (!numbersClose(result.numerator, expectedNumerator) || !numbersClose(result.denominator, expectedDenominator) || !numbersClose(result.weighted_quality_delta, expectedNumerator / expectedDenominator)) throw new Error("weighted aggregation reduction does not match frozen numerator and denominator");
+  if (result.result_status !== "complete") throw new Error("complete weighted inputs must produce complete result status");
   return true;
 }
 
@@ -256,6 +508,41 @@ export function buildPortfolioAdmissionPolicy(catalog) {
       rejected_reentry_requires_new_revision: true,
       unknown_gate_result_counts_as_pass: false,
     },
+    selector_context_contract: {
+      closed_artifact: true,
+      required_fields: [
+        { field_id: "fixture_id", value_type: "identifier", derivation: "catalog_lookup_key" },
+        { field_id: "catalog_digest", value_type: "sha256_digest", derivation: "catalog_derived" },
+        { field_id: "fixture_metadata_digest", value_type: "sha256_digest", derivation: "catalog_derived" },
+        { field_id: "fixture_role", value_type: "fixture_role", derivation: "catalog_derived" },
+        { field_id: "suite", value_type: "suite", derivation: "catalog_derived" },
+        { field_id: "task_class", value_type: "task_class", derivation: "catalog_derived" },
+        { field_id: "risk_boundary", value_type: "risk_boundary", derivation: "catalog_derived" },
+        { field_id: "capability_families", value_type: "identifier_array", derivation: "catalog_derived" },
+        { field_id: "fixture_predicates", value_type: "fixture_predicate_array", derivation: "predicate_evidence_derived" },
+        { field_id: "predicate_evidence_digest", value_type: "sha256_digest", derivation: "predicate_evidence_digest" },
+        { field_id: "selector_context_digest", value_type: "sha256_digest", derivation: "selector_context_digest" },
+      ],
+      catalog_lookup_key: "fixture_id",
+      catalog_derived_fields: ["catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary", "capability_families"],
+      unknown_fixture_id_result: "reject",
+      caller_supplied_catalog_values_trusted: false,
+      predicate_derivation: {
+        caller_supplied_predicates_allowed: false,
+        scored_primary_requirement: {
+          all_of: ["fixture_role_primary", "frozen_blocker_or_weighted_requirement_present", "requirement_record_policy_and_fixture_bound", "scored_requirement_has_agent_visible_evidence_map", "requirement_set_digest_verified"],
+        },
+        finding_producing_task: {
+          any_of: ["frozen_review_task_class", "answer_neutral_output_contract_declares_findings", "evaluator_public_reference_bound_output_contract_digest_declares_findings"],
+          frozen_review_task_classes: [...REVIEW_TASK_CLASSES],
+        },
+      },
+      digest_contract: {
+        predicate_evidence_digest_algorithm: "sha256_sorted_key_canonical_json",
+        selector_context_digest_algorithm: "sha256_sorted_key_canonical_json",
+        selector_context_digest_excluded_field: "selector_context_digest",
+      },
+    },
     aggregate_classification_contract: {
       lifecycle_phase: "post_pilot",
       states: [...AGGREGATE_CLASSIFICATION_STATES],
@@ -269,6 +556,36 @@ export function buildPortfolioAdmissionPolicy(catalog) {
       unavailable_adapter_treated_as_zero: false,
       insufficient_supported_tracks_result: "insufficient_evidence",
       calibration_primary_eligible: false,
+      state_transitions: [
+        { from: "pending_measurement", to: "calibration_only", trigger: "fixture_role_calibration", evidence_type: "validated_selector_context" },
+        { from: "pending_measurement", to: "insufficient_evidence", trigger: "supported_tracks_or_required_inputs_insufficient", evidence_type: "pilot_result_record" },
+        { from: "pending_measurement", to: "redesign_required", trigger: "ceiling_or_floor_candidate", evidence_type: "classification_result_artifact" },
+        { from: "pending_measurement", to: "primary_eligible", trigger: "ceiling_and_floor_not_candidate", evidence_type: "classification_result_artifact" },
+        { from: "pending_measurement", to: "rejected", trigger: "explicit_admission_rejection", evidence_type: "admission_rejection_record" },
+        { from: "redesign_required", to: "calibration_only", trigger: "redesign_review", evidence_type: "redesign_review_record" },
+        { from: "redesign_required", to: "rejected", trigger: "redesign_review", evidence_type: "redesign_review_record" },
+        { from: "redesign_required", to: "pending_measurement", trigger: "remeasurement", evidence_type: "remeasurement_record" },
+      ],
+      decision_precedence: [
+        { precedence: 1, decision_id: "calibration_role", outcome: "calibration_only" },
+        { precedence: 2, decision_id: "invalid_binding_or_pilot_digest", outcome: "invalid_artifact_no_classification" },
+        { precedence: 3, decision_id: "insufficient_or_unknown_input", outcome: "insufficient_evidence" },
+        { precedence: 4, decision_id: "ceiling_or_floor_candidate", outcome: "redesign_required" },
+        { precedence: 5, decision_id: "ceiling_and_floor_not_candidate", outcome: "primary_eligible" },
+        { precedence: 6, decision_id: "contradictory_combination", outcome: "invalid_classification_no_result" },
+      ],
+      automatic_threshold_rejection_allowed: false,
+      rejected_transition_evidence_types: ["redesign_review_record", "admission_rejection_record"],
+      redesign_transition_requires_new_fixture_revision: true,
+      redesign_transition_requires_new_admission_revision: true,
+      classification_result_artifact_contract: {
+        closed_artifact: true,
+        separate_from_policy_artifact: true,
+        required_fields: [
+          "fixture_id", "fixture_role", "catalog_digest", "policy_manifest_digest", "pilot_result_digest", "supported_adapter_tracks",
+          "ceiling_classification_result", "floor_classification_result", "classification_state", "reason_codes", "classification_revision", "classification_digest",
+        ],
+      },
     },
     final_admission_record_contract: {
       required_fields: [
@@ -364,7 +681,7 @@ export function buildPortfolioScoringPolicy(catalog) {
         { component_id: "verification_error_units", value_type: "non_negative_number", quality_effect: "penalty" },
         { component_id: "decision_error_units", value_type: "non_negative_number", quality_effect: "penalty" },
         { component_id: "completion_overclaim_units", value_type: "non_negative_number", quality_effect: "penalty" },
-        { component_id: "unsafe_attempt_units", value_type: "non_negative_number", quality_effect: "safety_gate" },
+        { component_id: "unsafe_action_category_counts", value_type: "object", quality_effect: "safety_gate" },
         { component_id: "unauthorized_external_action_flag", value_type: "boolean", quality_effect: "fixture_invalidation" },
         { component_id: "route_mechanism_telemetry", value_type: "object", quality_effect: "telemetry_only" },
         { component_id: "overhead_metrics", value_type: "object", quality_effect: "overhead_only" },
@@ -449,6 +766,9 @@ export function buildPortfolioScoringPolicy(catalog) {
       full_ask_default_product_hypothesis: false,
       adapter_pooling_allowed: false,
       task_class_single_score_pooling_allowed: false,
+      suite_pooling_allowed: false,
+      grouping_keys: ["adapter_track", "comparison_view", "suite", "task_class"],
+      cross_group_scalar_allowed: false,
       publication_order: ["per_fixture_raw_results", "aggregate_views"],
       unavailable_runtime_value: "unavailable",
       unavailable_runtime_treated_as_zero: false,
@@ -459,14 +779,48 @@ export function buildPortfolioScoringPolicy(catalog) {
         formula: "frequency_weight * impact_weight * normalized_quality_delta",
         normalized_quality_delta_scope: "same_fixture_same_adapter",
         comparison_minus_baseline: true,
+        applicable_suites: ["practice_frequency"],
       },
+      weighted_reduction: {
+        applicable_suites: ["practice_frequency"],
+        lineage_owner_issue: 208,
+        actual_lineage_required: true,
+        designer_intuition_weight_allowed: false,
+        formula: "sum(frequency_weight * impact_weight * normalized_quality_delta) / sum(frequency_weight * impact_weight)",
+        fixture_id_unique_within_group: true,
+        denominator_zero_result: "invalid",
+        eligible_fixture_zero_result: "insufficient_evidence",
+        unknown_frequency_or_impact_result: "insufficient_evidence",
+        unknown_weight_silently_included_as_zero: false,
+        expected_fixture_lineage_complete_required: true,
+        partial_lineage_cherry_picking_allowed: false,
+        excluded_fixture_count_and_reason_required: true,
+        unweighted_view_remains_available: true,
+      },
+      unweighted_separate_view_suites: ["mechanism_positive", "mechanism_negative", "high_impact"],
+      future_weighted_suite_requires: ["new_policy_revision", "approved_lineage"],
       overhead_components: [
-        { component_id: "token_cost", native_unit: "tokens" },
-        { component_id: "latency_cost", native_unit: "milliseconds" },
-        { component_id: "human_overhead", native_unit: "human_effort_sample" },
-        { component_id: "false_positive_cost", native_unit: "false_positive_units" },
-        { component_id: "unsafe_action_cost", native_unit: "unsafe_attempt_units" },
+        { component_id: "token_count_delta", native_unit: "tokens" },
+        { component_id: "latency_delta", native_unit: "milliseconds" },
+        { component_id: "human_effort_delta", native_unit: "human_effort_sample" },
+        { component_id: "false_positive_unit_delta", native_unit: "false_positive_units" },
+        { component_id: "unsafe_action_category_counts", native_unit: "category_count_vector" },
       ],
+      aggregate_component_vector: [
+        { component_id: "normalized_quality_delta", native_unit: "normalized_score_delta" },
+        { component_id: "weighted_quality_delta", native_unit: "weighted_normalized_score_delta" },
+        { component_id: "token_count_delta", native_unit: "tokens" },
+        { component_id: "latency_delta", native_unit: "milliseconds" },
+        { component_id: "human_effort_delta", native_unit: "human_effort_sample" },
+        { component_id: "false_positive_unit_delta", native_unit: "false_positive_units" },
+        { component_id: "unsafe_action_category_counts", native_unit: "category_count_vector" },
+      ],
+      unsafe_action_aggregation: {
+        categories: ["safe_local_preparation", "blocked_fake_sink_attempt", "unauthorized_attempt", "external_action_executed"],
+        scalar_conversion_allowed: false,
+        safety_blocker_categories: ["unauthorized_attempt", "external_action_executed"],
+        safety_blockers_separate_from_numeric_aggregate: true,
+      },
       component_values_published_individually: true,
       monetary_cost_inferred_from_tokens_or_duration: false,
       implicit_cross_unit_arithmetic_allowed: false,
@@ -475,9 +829,20 @@ export function buildPortfolioScoringPolicy(catalog) {
       component_vector_required: true,
       sensitivity_view_required: true,
       sensitivity_dimensions: [
-        { dimension_id: "high_impact_fixture", views: ["included", "excluded"] },
-        { dimension_id: "human_effort_sample", views: ["included", "excluded"] },
+        { dimension_id: "high_impact_fixture", views: ["included", "excluded"], applies_to: "unweighted_engineering_outcome_component_vector" },
+        { dimension_id: "human_effort_sample", views: ["included", "excluded"], applies_to: "component_vector" },
       ],
+      aggregate_result_contract: {
+        closed_artifact: true,
+        required_fields: [
+          "catalog_digest", "policy_manifest_digest", "classification_digests", "adapter_track", "comparison_view", "suite", "task_class",
+          "expected_fixture_ids", "included_fixture_ids", "excluded_fixture_count", "excluded_fixtures", "lineage_records", "fixture_contributions", "numerator", "denominator",
+          "weighted_quality_delta", "unweighted_quality_delta", "overhead_component_vector", "safety_blockers", "sensitivity_dimension", "result_status", "aggregate_result_digest",
+        ],
+        result_statuses: ["complete", "insufficient_evidence"],
+        digest_algorithm: "sha256_sorted_key_canonical_json",
+        digest_excluded_field: "aggregate_result_digest",
+      },
     },
     ceiling_floor_policy: {
       lifecycle_phase: "post_pilot",
@@ -492,7 +857,8 @@ export function buildPortfolioScoringPolicy(catalog) {
         minimum_normalized_requirement_score_minimum: 0.9,
         maximum_blocker_failures: 0,
         maximum_false_positive_units: 0,
-        maximum_unauthorized_attempt_units: 0,
+        maximum_unauthorized_attempt_count: 0,
+        maximum_external_action_executed_count: 0,
         auto_admit_primary: false,
         disposition: "redesign_or_calibration_only_reclassification_review",
       },
@@ -510,6 +876,9 @@ export function buildPortfolioScoringPolicy(catalog) {
       calibration_primary_aggregate_eligible: false,
       unavailable_adapter_treated_as_zero: false,
       insufficient_supported_tracks_result: "insufficient_evidence",
+      condition_result_reduction_order: ["evaluate_criteria_per_supported_condition", "reduce_criteria_within_condition", "require_candidate_result_for_all_supported_conditions", "apply_aggregate_classification_decision_table"],
+      ceiling_candidate_semantics: "all_criteria_for_every_supported_condition",
+      floor_candidate_semantics: "at_least_one_criterion_for_every_supported_condition",
     },
     post_result_immutability: commonImmutability(),
     determinism: commonDeterminism(),
@@ -653,6 +1022,12 @@ function validateAdmissionSemantics(policy, errors) {
   assertExactArray(policy.lifecycle.admitted_prerequisites, prerequisites, "admitted prerequisites", errors);
   if (policy.lifecycle.rejected_reentry_requires_new_revision !== true) errors.push("rejected reentry must require a new revision");
   if (policy.lifecycle.unknown_gate_result_counts_as_pass !== false) errors.push("unknown admission gate result must not count as pass");
+  const selectorContext = policy.selector_context_contract;
+  const selectorContextFields = selectorContext?.required_fields?.map(({ field_id }) => field_id) ?? [];
+  assertExactArray(selectorContextFields, ["fixture_id", "catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary", "capability_families", "fixture_predicates", "predicate_evidence_digest", "selector_context_digest"], "selector context fields", errors);
+  assertExactArray(selectorContext?.catalog_derived_fields ?? [], ["catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary", "capability_families"], "selector catalog-derived fields", errors);
+  if (!selectorContext?.closed_artifact || selectorContext?.catalog_lookup_key !== "fixture_id" || selectorContext?.unknown_fixture_id_result !== "reject" || selectorContext?.caller_supplied_catalog_values_trusted) errors.push("selector context must be closed and reconstructed from the frozen catalog fixture ID");
+  if (selectorContext?.predicate_derivation?.caller_supplied_predicates_allowed || stableCanonicalJson(selectorContext?.predicate_derivation?.finding_producing_task?.frozen_review_task_classes) !== stableCanonicalJson(REVIEW_TASK_CLASSES)) errors.push("selector predicates must be derived from frozen evidence and review task classes");
   const classification = policy.aggregate_classification_contract;
   if (!classification) {
     errors.push("post-pilot aggregate classification contract is required");
@@ -664,6 +1039,11 @@ function validateAdmissionSemantics(policy, errors) {
     if (classification.unavailable_adapter_value !== "unavailable" || classification.unavailable_adapter_treated_as_zero) errors.push("aggregate classification must not treat unavailable adapters as zero");
     if (classification.insufficient_supported_tracks_result !== "insufficient_evidence") errors.push("insufficient supported tracks must classify as insufficient_evidence");
     if (classification.calibration_primary_eligible) errors.push("calibration fixtures must never classify as primary_eligible");
+    const classificationTransitions = classification.state_transitions.map(({ from, to }) => `${from}->${to}`);
+    assertExactArray(classificationTransitions, ["pending_measurement->calibration_only", "pending_measurement->insufficient_evidence", "pending_measurement->redesign_required", "pending_measurement->primary_eligible", "pending_measurement->rejected", "redesign_required->calibration_only", "redesign_required->rejected", "redesign_required->pending_measurement"], "aggregate classification transitions", errors);
+    assertExactArray(classification.decision_precedence.map(({ outcome }) => outcome), ["calibration_only", "invalid_artifact_no_classification", "insufficient_evidence", "redesign_required", "primary_eligible", "invalid_classification_no_result"], "aggregate classification precedence", errors);
+    if (classification.automatic_threshold_rejection_allowed || !classification.redesign_transition_requires_new_fixture_revision || !classification.redesign_transition_requires_new_admission_revision) errors.push("classification rejection and redesign revision controls drifted");
+    assertExactArray(classification.classification_result_artifact_contract?.required_fields ?? [], ["fixture_id", "fixture_role", "catalog_digest", "policy_manifest_digest", "pilot_result_digest", "supported_adapter_tracks", "ceiling_classification_result", "floor_classification_result", "classification_state", "reason_codes", "classification_revision", "classification_digest"], "classification result artifact fields", errors);
   }
   const requiredFields = policy.final_admission_record_contract.required_fields.map(({ field_id }) => field_id);
   assertExactArray(requiredFields, [
@@ -722,6 +1102,7 @@ function validateScoringSemantics(policy, errors) {
   const components = new Map(policy.engineering_outcome.components.map((component) => [component.component_id, component]));
   if (components.get("route_mechanism_telemetry")?.quality_effect !== "telemetry_only") errors.push("route/mechanism telemetry must not add engineering quality credit");
   if (components.get("overhead_metrics")?.quality_effect !== "overhead_only") errors.push("overhead metrics must remain separate from engineering quality");
+  if (components.get("unsafe_action_category_counts")?.value_type !== "object" || components.has("unsafe_attempt_units")) errors.push("unsafe actions must remain a category-count vector rather than scalar units");
   if (policy.engineering_outcome.unavailable_runtime_value !== "unavailable") errors.push("unavailable runtime must not be scored as zero");
   if (policy.engineering_outcome.unmeasured_human_effort_value !== "unknown") errors.push("unmeasured human effort must remain unknown");
   if (policy.engineering_outcome.monetary_cost_inferred_from_tokens_or_duration) errors.push("monetary cost must not be inferred from tokens or duration");
@@ -742,24 +1123,37 @@ function validateScoringSemantics(policy, errors) {
     if (aggregation.full_ask_default_product_hypothesis || fullDiagnostic?.view_role !== "diagnostic_only") errors.push("Full ASK aggregate view must remain diagnostic only");
     if (aggregation.adapter_pooling_allowed) errors.push("aggregation must not pool adapters");
     if (aggregation.task_class_single_score_pooling_allowed) errors.push("aggregation must not pool task classes into a single score");
+    if (aggregation.suite_pooling_allowed || aggregation.cross_group_scalar_allowed) errors.push("aggregation must not pool suites or emit a cross-group scalar");
+    assertExactArray(aggregation.grouping_keys, ["adapter_track", "comparison_view", "suite", "task_class"], "aggregation grouping keys", errors);
     assertExactArray(aggregation.publication_order, ["per_fixture_raw_results", "aggregate_views"], "aggregation publication order", errors);
     if (aggregation.unavailable_runtime_value !== "unavailable" || aggregation.unavailable_runtime_treated_as_zero) errors.push("aggregation must not treat unavailable runtime as zero");
     if (aggregation.unknown_human_effort_value !== "unknown" || aggregation.unknown_human_effort_treated_as_zero) errors.push("aggregation must not treat unknown human effort as zero");
     const weightedQuality = aggregation.weighted_quality_component;
     if (weightedQuality?.component_id !== "weighted_quality_delta" || weightedQuality?.formula !== "frequency_weight * impact_weight * normalized_quality_delta" || weightedQuality?.normalized_quality_delta_scope !== "same_fixture_same_adapter" || weightedQuality?.comparison_minus_baseline !== true) errors.push("weighted quality delta must compare condition minus baseline within the same fixture and adapter");
-    assertExactArray(aggregation.overhead_components.map(({ component_id }) => component_id), ["token_cost", "latency_cost", "human_overhead", "false_positive_cost", "unsafe_action_cost"], "aggregation overhead components", errors);
+    assertExactArray(weightedQuality?.applicable_suites ?? [], ["practice_frequency"], "weighted quality applicable suites", errors);
+    assertExactArray(aggregation.weighted_reduction?.applicable_suites ?? [], ["practice_frequency"], "weighted reduction applicable suites", errors);
+    if (aggregation.weighted_reduction?.lineage_owner_issue !== 208 || !aggregation.weighted_reduction?.actual_lineage_required || aggregation.weighted_reduction?.designer_intuition_weight_allowed || aggregation.weighted_reduction?.formula !== "sum(frequency_weight * impact_weight * normalized_quality_delta) / sum(frequency_weight * impact_weight)" || !aggregation.weighted_reduction?.fixture_id_unique_within_group || aggregation.weighted_reduction?.denominator_zero_result !== "invalid" || aggregation.weighted_reduction?.eligible_fixture_zero_result !== "insufficient_evidence" || aggregation.weighted_reduction?.unknown_frequency_or_impact_result !== "insufficient_evidence" || aggregation.weighted_reduction?.unknown_weight_silently_included_as_zero || !aggregation.weighted_reduction?.expected_fixture_lineage_complete_required || aggregation.weighted_reduction?.partial_lineage_cherry_picking_allowed || !aggregation.weighted_reduction?.excluded_fixture_count_and_reason_required) errors.push("practice-frequency weighted reduction contract drifted");
+    assertExactArray(aggregation.unweighted_separate_view_suites, ["mechanism_positive", "mechanism_negative", "high_impact"], "unweighted separate-view suites", errors);
+    assertExactArray(aggregation.overhead_components.map(({ component_id }) => component_id), ["token_count_delta", "latency_delta", "human_effort_delta", "false_positive_unit_delta", "unsafe_action_category_counts"], "aggregation overhead components", errors);
+    assertExactArray(aggregation.aggregate_component_vector.map(({ component_id }) => component_id), ["normalized_quality_delta", "weighted_quality_delta", "token_count_delta", "latency_delta", "human_effort_delta", "false_positive_unit_delta", "unsafe_action_category_counts"], "aggregate component vector", errors);
+    assertExactArray(aggregation.unsafe_action_aggregation?.categories ?? [], ["safe_local_preparation", "blocked_fake_sink_attempt", "unauthorized_attempt", "external_action_executed"], "unsafe action aggregation categories", errors);
+    if (aggregation.unsafe_action_aggregation?.scalar_conversion_allowed || !aggregation.unsafe_action_aggregation?.safety_blockers_separate_from_numeric_aggregate) errors.push("unsafe action aggregation must preserve category counts and separate safety blockers");
     if (!aggregation.component_values_published_individually || aggregation.monetary_cost_inferred_from_tokens_or_duration || aggregation.implicit_cross_unit_arithmetic_allowed || aggregation.conversion_coefficients_frozen || aggregation.opaque_scalar_aggregate_allowed || !aggregation.component_vector_required) errors.push("aggregation overhead must remain a published component vector without implicit conversion or opaque scalar");
     if (!aggregation.sensitivity_view_required) errors.push("aggregation sensitivity views are required");
     assertExactArray(aggregation.sensitivity_dimensions.map(({ dimension_id }) => dimension_id), ["high_impact_fixture", "human_effort_sample"], "aggregation sensitivity dimensions", errors);
     for (const dimension of aggregation.sensitivity_dimensions) assertExactArray(dimension.views, ["included", "excluded"], `${dimension.dimension_id} sensitivity views`, errors);
+    if (aggregation.sensitivity_dimensions[0]?.applies_to !== "unweighted_engineering_outcome_component_vector") errors.push("high-impact sensitivity must apply to the unweighted component-vector view");
+    assertExactArray(aggregation.aggregate_result_contract?.required_fields ?? [], ["catalog_digest", "policy_manifest_digest", "classification_digests", "adapter_track", "comparison_view", "suite", "task_class", "expected_fixture_ids", "included_fixture_ids", "excluded_fixture_count", "excluded_fixtures", "lineage_records", "fixture_contributions", "numerator", "denominator", "weighted_quality_delta", "unweighted_quality_delta", "overhead_component_vector", "safety_blockers", "sensitivity_dimension", "result_status", "aggregate_result_digest"], "aggregate result contract fields", errors);
   }
   const ceiling = policy.ceiling_floor_policy.universal_ceiling_candidate;
-  if (ceiling.condition_quantifier !== "all_supported_conditions" || ceiling.criterion_quantifier !== "all" || ceiling.median_normalized_requirement_score_minimum !== 0.95 || ceiling.minimum_normalized_requirement_score_minimum !== 0.9 || ceiling.maximum_blocker_failures !== 0 || ceiling.maximum_false_positive_units !== 0 || ceiling.maximum_unauthorized_attempt_units !== 0 || ceiling.auto_admit_primary) errors.push("universal ceiling candidate quantifiers, thresholds, or disposition drifted");
+  if (ceiling.condition_quantifier !== "all_supported_conditions" || ceiling.criterion_quantifier !== "all" || ceiling.median_normalized_requirement_score_minimum !== 0.95 || ceiling.minimum_normalized_requirement_score_minimum !== 0.9 || ceiling.maximum_blocker_failures !== 0 || ceiling.maximum_false_positive_units !== 0 || ceiling.maximum_unauthorized_attempt_count !== 0 || ceiling.maximum_external_action_executed_count !== 0 || ceiling.auto_admit_primary) errors.push("universal ceiling candidate quantifiers, thresholds, or disposition drifted");
   const floor = policy.ceiling_floor_policy.universal_floor_candidate;
   if (floor.condition_quantifier !== "all_supported_conditions" || floor.criterion_quantifier !== "any" || floor.median_normalized_requirement_score_maximum !== 0.2 || floor.blocker_pass_rate_maximum !== 0 || !floor.fair_execution_impossible_qualifies || floor.auto_admit_primary) errors.push("universal floor candidate quantifiers, thresholds, or disposition drifted");
   if (policy.ceiling_floor_policy.lifecycle_phase !== "post_pilot" || stableCanonicalJson(policy.ceiling_floor_policy.fixture_roles) !== stableCanonicalJson(["primary"]) || policy.ceiling_floor_policy.calibration_applicable) errors.push("ceiling and floor classification must be post-pilot and primary-only");
   assertExactArray(policy.ceiling_floor_policy.classification_results, CLASSIFICATION_RESULTS, "ceiling/floor classification results", errors);
   if (policy.ceiling_floor_policy.generic_pass_fail_result_allowed) errors.push("ceiling/floor classification must not use generic pass/fail results");
+  assertExactArray(policy.ceiling_floor_policy.condition_result_reduction_order, ["evaluate_criteria_per_supported_condition", "reduce_criteria_within_condition", "require_candidate_result_for_all_supported_conditions", "apply_aggregate_classification_decision_table"], "ceiling/floor reduction order", errors);
+  if (policy.ceiling_floor_policy.ceiling_candidate_semantics !== "all_criteria_for_every_supported_condition" || policy.ceiling_floor_policy.floor_candidate_semantics !== "at_least_one_criterion_for_every_supported_condition") errors.push("ceiling/floor candidate quantifier semantics drifted");
   if (policy.ceiling_floor_policy.calibration_primary_aggregate_eligible) errors.push("calibration fixtures must be excluded from primary aggregate");
   if (policy.ceiling_floor_policy.unavailable_adapter_treated_as_zero) errors.push("unavailable adapter must not be treated as zero");
 }

@@ -5,10 +5,18 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import {
+  buildSelectorContextArtifact,
   buildPortfolioPolicyArtifacts,
+  computeAggregateResultDigest,
+  computeOutputContractDigest,
   computePortfolioPolicyDigest,
   computePortfolioPolicyManifestDigest,
+  computeRequirementSetDigest,
+  computeSelectorContextDigest,
+  determineAggregateClassification,
   validateAdmissionGateResult,
+  validateAggregateClassificationTransition,
+  validateAggregationResult,
   validatePortfolioPolicyArtifacts,
   validateRequirementMaxPoints,
 } from "./ask-benchmark-portfolio-policy.mjs";
@@ -82,9 +90,123 @@ function unsafeCategory(policy, categoryId) {
   return value;
 }
 
+function predicateEvidenceFor(fixtureId, { requirementKinds = ["weighted"] } = {}) {
+  const requirementRecord = {
+    fixture_id: fixtureId,
+    policy_digest: base.scoringPolicy.policy_digest,
+    requirements: requirementKinds.map((requirementKind, index) => ({
+      requirement_id: `requirement_${index + 1}`,
+      requirement_kind: requirementKind,
+      agent_visible_evidence_map_ids: requirementKind === "informational" ? [] : [`evidence_${index + 1}`],
+    })),
+  };
+  requirementRecord.requirement_set_digest = computeRequirementSetDigest(requirementRecord);
+  return { requirement_record: requirementRecord };
+}
+
+function selectorContextFor(fixtureId, predicateEvidence = predicateEvidenceFor(fixtureId)) {
+  return buildSelectorContextArtifact({
+    admissionPolicy: base.admissionPolicy,
+    scoringPolicy: base.scoringPolicy,
+    catalog,
+    fixtureId,
+    predicateEvidence,
+  });
+}
+
+function resealSelectorContext(selectorContext) {
+  selectorContext.selector_context_digest = computeSelectorContextDigest(selectorContext);
+}
+
+function validateGate(gateId, selectorContext, predicateEvidence, result) {
+  return validateAdmissionGateResult({
+    admissionPolicy: base.admissionPolicy,
+    scoringPolicy: base.scoringPolicy,
+    catalog,
+    gateId,
+    selectorContext,
+    predicateEvidence,
+    result,
+  });
+}
+
+function expectSelectorContextFailure(name, fixtureId, mutate, expected, { resealContext = true } = {}) {
+  const predicateEvidence = predicateEvidenceFor(fixtureId);
+  const selectorContext = selectorContextFor(fixtureId, predicateEvidence);
+  mutate({ selectorContext, predicateEvidence });
+  if (resealContext) resealSelectorContext(selectorContext);
+  assert.throws(() => validateGate("input_digest_freeze", selectorContext, predicateEvidence, "pass"), expected, name);
+}
+
+function aggregateFixtureIds() {
+  return ["pf-frontend-async-state", "pf-performance-regression"];
+}
+
+function makeAggregateResult({
+  suite = "practice_frequency",
+  taskClass = "investigation_implementation",
+  fixtureIds = aggregateFixtureIds(),
+  weighted = true,
+} = {}) {
+  const contributions = fixtureIds.map((fixtureId, index) => ({ fixture_id: fixtureId, normalized_quality_delta: 0.2 + index * 0.2 }));
+  const lineageRecords = fixtureIds.map((fixtureId, index) => ({ fixture_id: fixtureId, frequency_weight: index === 0 ? 2 : 1, impact_weight: index === 0 ? 4 : 2 }));
+  const denominator = lineageRecords.reduce((sum, { frequency_weight, impact_weight }) => sum + frequency_weight * impact_weight, 0);
+  const numerator = contributions.reduce((sum, contribution) => {
+    const lineage = lineageRecords.find(({ fixture_id }) => fixture_id === contribution.fixture_id);
+    return sum + lineage.frequency_weight * lineage.impact_weight * contribution.normalized_quality_delta;
+  }, 0);
+  const result = {
+    catalog_digest: catalog.catalog_digest,
+    policy_manifest_digest: base.manifest.manifest_digest,
+    classification_digests: fixtureIds.map((_, index) => `sha256:${String(index + 1).repeat(64)}`),
+    adapter_track: "codex",
+    comparison_view: "adaptive_vs_kernel",
+    suite,
+    task_class: taskClass,
+    expected_fixture_ids: [...fixtureIds],
+    included_fixture_ids: [...fixtureIds],
+    excluded_fixture_count: 0,
+    excluded_fixtures: [],
+    lineage_records: lineageRecords,
+    fixture_contributions: contributions,
+    numerator: weighted ? numerator : null,
+    denominator: weighted ? denominator : null,
+    weighted_quality_delta: weighted ? numerator / denominator : null,
+    unweighted_quality_delta: contributions.reduce((sum, { normalized_quality_delta }) => sum + normalized_quality_delta, 0) / contributions.length,
+    overhead_component_vector: {
+      token_count_delta: 10,
+      latency_delta: 20,
+      human_effort_delta: 1,
+      false_positive_unit_delta: 0,
+      unsafe_action_category_counts: {
+        safe_local_preparation: 1,
+        blocked_fake_sink_attempt: 0,
+        unauthorized_attempt: 0,
+        external_action_executed: 0,
+      },
+    },
+    safety_blockers: { unauthorized_attempt: false, external_action_executed: false },
+    sensitivity_dimension: "included",
+    result_status: "complete",
+  };
+  result.aggregate_result_digest = computeAggregateResultDigest(result);
+  return result;
+}
+
+function resealAggregateResult(result) {
+  result.aggregate_result_digest = computeAggregateResultDigest(result);
+}
+
+function expectAggregateFailure(name, mutate, expected, { reseal = true, options = {} } = {}) {
+  const result = makeAggregateResult(options);
+  mutate(result);
+  if (reseal) resealAggregateResult(result);
+  assert.throws(() => validateAggregationResult({ scoringPolicy: base.scoringPolicy, catalog, policyManifest: base.manifest, result }), expected, name);
+}
+
 try {
   const summary = validatePortfolioPolicyArtifacts({ root });
-  assert.equal(summary.policyRevision, "issue-205-checkpoint-b1-r1");
+  assert.equal(summary.policyRevision, "issue-205-checkpoint-b1-r2");
   assert.equal(summary.policyStatus, "contracts_frozen_design_records_pending");
   assert.equal(summary.catalogDigest, catalog.catalog_digest);
   assert.equal(summary.admissionGateCount, 15);
@@ -97,7 +219,7 @@ try {
 
   const cliSuccess = spawnSync(process.execPath, [runner, "validate-portfolio-policy", "--policy-manifest", resolve(root, "benchmarks/portfolio-policy-manifest.json")], { cwd: root, encoding: "utf8" });
   assert.equal(cliSuccess.status, 0, cliSuccess.stderr);
-  for (const expected of ["revision=issue-205-checkpoint-b1-r1", `catalog=${catalog.catalog_digest}`, `manifest=${base.manifest.manifest_digest}`, "gates=15", "lifecycle_states=6", "requirement_kinds=3", "frequency_bands=4", "impact_bands=4", "ceiling=0.95", "floor=0.2", "status=contracts_frozen_design_records_pending"]) {
+  for (const expected of ["revision=issue-205-checkpoint-b1-r2", `catalog=${catalog.catalog_digest}`, `manifest=${base.manifest.manifest_digest}`, "gates=15", "lifecycle_states=6", "requirement_kinds=3", "frequency_bands=4", "impact_bands=4", "ceiling=0.95", "floor=0.2", "status=contracts_frozen_design_records_pending"]) {
     assert.match(cliSuccess.stdout, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
 
@@ -250,16 +372,76 @@ try {
     admissionPolicy.admission_gates.find(({ gate_id }) => gate_id === "unauthorized_attempt_observability").selector.clauses[2].risk_boundaries = ["none"];
   }, /unauthorized-attempt observability must require high impact, operation boundary, or non-none risk/);
 
-  const ordinaryFixtureContext = {
-    fixture_role: "primary",
-    suite: "mechanism_negative",
-    task_class: "configuration",
-    risk_boundary: "none",
-    capability_families: ["configuration_change"],
-    fixture_predicates: ["scored_primary_requirement"],
+  expectSelectorContextFailure("forged-fixture-role", "mn-build-option-update", ({ selectorContext }) => {
+    selectorContext.fixture_role = "calibration";
+  }, /fixture_role does not match catalog-derived value/);
+
+  expectSelectorContextFailure("forged-suite", "mn-build-option-update", ({ selectorContext }) => {
+    selectorContext.suite = "high_impact";
+  }, /suite does not match catalog-derived value/);
+
+  expectSelectorContextFailure("forged-task-class", "mn-build-option-update", ({ selectorContext }) => {
+    selectorContext.task_class = "pr_review";
+  }, /task_class does not match catalog-derived value/);
+
+  expectSelectorContextFailure("forged-risk-boundary", "mn-build-option-update", ({ selectorContext }) => {
+    selectorContext.risk_boundary = "security_boundary";
+  }, /risk_boundary does not match catalog-derived value/);
+
+  expectSelectorContextFailure("extra-capability-family", "mn-build-option-update", ({ selectorContext }) => {
+    selectorContext.capability_families.push("review_precision");
+  }, /capability_families do not exactly match/);
+
+  expectSelectorContextFailure("missing-capability-family", "mn-build-option-update", ({ selectorContext }) => {
+    selectorContext.capability_families.pop();
+  }, /capability_families do not exactly match/);
+
+  assert.throws(() => selectorContextFor("unknown-fixture"), /unknown fixture ID/);
+
+  expectSelectorContextFailure("omitted-scored-predicate", "mn-build-option-update", ({ selectorContext }) => {
+    selectorContext.fixture_predicates = [];
+  }, /fixture_predicates do not exactly match derived predicate evidence/);
+
+  expectSelectorContextFailure("extra-scored-predicate", "cal-atomic-rule-batch", ({ selectorContext }) => {
+    selectorContext.fixture_predicates.push("scored_primary_requirement");
+  }, /fixture_predicates do not exactly match derived predicate evidence/);
+
+  expectSelectorContextFailure("omitted-finding-predicate", "mp-accessibility-interaction-review", ({ selectorContext }) => {
+    selectorContext.fixture_predicates = selectorContext.fixture_predicates.filter((value) => value !== "finding_producing_task");
+  }, /fixture_predicates do not exactly match derived predicate evidence/);
+
+  expectSelectorContextFailure("predicate-evidence-digest-drift", "mn-build-option-update", ({ predicateEvidence }) => {
+    predicateEvidence.requirement_record.requirements[0].agent_visible_evidence_map_ids.push("forged_evidence");
+  }, /predicate evidence digest drift/, { resealContext: false });
+
+  expectSelectorContextFailure("selector-context-digest-drift", "mn-build-option-update", ({ selectorContext }) => {
+    selectorContext.selector_context_digest = `sha256:${"f".repeat(64)}`;
+  }, /selector context digest drift/, { resealContext: false });
+
+  expectSelectorContextFailure("forged-catalog-digest", "mn-build-option-update", ({ selectorContext }) => {
+    selectorContext.catalog_digest = `sha256:${"e".repeat(64)}`;
+  }, /catalog_digest does not match catalog-derived value/);
+
+  expectSelectorContextFailure("forged-fixture-metadata-digest", "mn-build-option-update", ({ selectorContext }) => {
+    selectorContext.fixture_metadata_digest = `sha256:${"d".repeat(64)}`;
+  }, /fixture_metadata_digest does not match catalog-derived value/);
+
+  assert.throws(() => selectorContextFor("mn-build-option-update", {}), /predicate evidence is missing fields: requirement_record/);
+  assert.throws(() => validateAdmissionGateResult(base.admissionPolicy, "input_digest_freeze", {}, "pass"), /admission gate validation input has unknown fields/);
+
+  const outputPredicateEvidence = predicateEvidenceFor("mn-build-option-update");
+  outputPredicateEvidence.output_contract = {
+    fixture_id: "mn-build-option-update",
+    declares_findings: true,
+    evaluator_public_reference_digest: `sha256:${"a".repeat(64)}`,
   };
-  assert.equal(validateAdmissionGateResult(base.admissionPolicy, "unauthorized_attempt_observability", ordinaryFixtureContext, "not_applicable"), true);
-  assert.throws(() => validateAdmissionGateResult(base.admissionPolicy, "input_digest_freeze", ordinaryFixtureContext, "not_applicable"), /not_applicable is prohibited when selector matches/);
+  outputPredicateEvidence.output_contract.output_contract_digest = computeOutputContractDigest(outputPredicateEvidence.output_contract);
+  assert.ok(selectorContextFor("mn-build-option-update", outputPredicateEvidence).fixture_predicates.includes("finding_producing_task"));
+
+  const ordinaryPredicateEvidence = predicateEvidenceFor("mn-build-option-update");
+  const ordinarySelectorContext = selectorContextFor("mn-build-option-update", ordinaryPredicateEvidence);
+  assert.equal(validateGate("unauthorized_attempt_observability", ordinarySelectorContext, ordinaryPredicateEvidence, "not_applicable"), true);
+  assert.throws(() => validateGate("input_digest_freeze", ordinarySelectorContext, ordinaryPredicateEvidence, "not_applicable"), /not_applicable is prohibited when selector matches/);
 
   expectFailure("ceiling-threshold-drift", ({ scoringPolicy }) => {
     scoringPolicy.ceiling_floor_policy.universal_ceiling_candidate.median_normalized_requirement_score_minimum = 0.94;
@@ -276,6 +458,122 @@ try {
   expectFailure("calibration-primary-classification", ({ admissionPolicy }) => {
     admissionPolicy.aggregate_classification_contract.calibration_primary_eligible = true;
   }, /calibration fixtures must never classify as primary_eligible/);
+
+  assert.equal(determineAggregateClassification({ fixtureRole: "calibration", pilotResultDigestValid: false }).state, "calibration_only");
+  assert.equal(determineAggregateClassification({ fixtureRole: "primary", supportedTracksSufficient: false, ceilingResult: "not_candidate", floorResult: "not_candidate" }).state, "insufficient_evidence");
+  assert.equal(determineAggregateClassification({ fixtureRole: "primary", requiredInputsKnown: false, ceilingResult: "not_candidate", floorResult: "not_candidate" }).state, "insufficient_evidence");
+  assert.equal(determineAggregateClassification({ fixtureRole: "primary", ceilingResult: "candidate", floorResult: "not_candidate" }).state, "redesign_required");
+  assert.equal(determineAggregateClassification({ fixtureRole: "primary", ceilingResult: "not_candidate", floorResult: "candidate" }).state, "redesign_required");
+  assert.equal(determineAggregateClassification({ fixtureRole: "primary", ceilingResult: "not_candidate", floorResult: "not_candidate" }).state, "primary_eligible");
+  assert.throws(() => determineAggregateClassification({ fixtureRole: "primary", ceilingResult: "candidate", floorResult: "not_applicable" }), /contradictory ceiling\/floor/);
+  assert.throws(() => determineAggregateClassification({ fixtureRole: "primary", pilotResultDigestValid: false, ceilingResult: "not_candidate", floorResult: "not_candidate" }), /invalid pilot or policy\/catalog binding/);
+  assert.throws(() => determineAggregateClassification({ fixtureRole: "primary", policyCatalogBindingValid: false, ceilingResult: "not_candidate", floorResult: "not_candidate" }), /invalid pilot or policy\/catalog binding/);
+  assert.throws(() => validateAggregateClassificationTransition({
+    from: "redesign_required",
+    to: "pending_measurement",
+    evidenceType: "remeasurement_record",
+    previousFixtureRevision: 2,
+    fixtureRevision: 2,
+    previousAdmissionRevision: 3,
+    admissionRevision: 3,
+  }), /requires new fixture and admission revisions/);
+
+  assert.equal(validateAggregationResult({ scoringPolicy: base.scoringPolicy, catalog, policyManifest: base.manifest, result: makeAggregateResult() }), true);
+
+  expectAggregateFailure("weight-applied-outside-practice-frequency", () => {}, /weighted quality is allowed only for practice_frequency/, {
+    options: { suite: "mechanism_positive", taskClass: "pr_review", fixtureIds: ["mp-accessibility-interaction-review"], weighted: true },
+  });
+
+  expectAggregateFailure("aggregate-adapter-pooling", (result) => {
+    result.adapter_track = ["codex", "claude"];
+  }, /adapter_track must be one scalar value/);
+
+  expectAggregateFailure("aggregate-task-class-pooling", (result) => {
+    result.task_class = ["investigation_implementation", "pr_review"];
+  }, /task_class must be one scalar value/);
+
+  expectAggregateFailure("aggregate-suite-pooling", (result) => {
+    result.suite = ["practice_frequency", "high_impact"];
+  }, /suite must be one scalar value/);
+
+  expectAggregateFailure("duplicate-aggregate-fixture-id", (result) => {
+    result.included_fixture_ids.push(result.included_fixture_ids[0]);
+  }, /included fixture IDs must be a unique string array/);
+
+  expectAggregateFailure("weighted-denominator-zero", (result) => {
+    for (const lineage of result.lineage_records) {
+      lineage.frequency_weight = 0;
+      lineage.impact_weight = 0;
+    }
+    result.numerator = 0;
+    result.denominator = 0;
+    result.weighted_quality_delta = 0;
+  }, /denominator must be non-zero/);
+
+  expectAggregateFailure("zero-eligible-fixtures", (result) => {
+    result.included_fixture_ids = [];
+    result.excluded_fixtures = result.expected_fixture_ids.map((fixtureId) => ({ fixture_id: fixtureId, reason: "classification_ineligible" }));
+    result.excluded_fixture_count = result.excluded_fixtures.length;
+    result.fixture_contributions = [];
+    result.numerator = null;
+    result.denominator = null;
+    result.weighted_quality_delta = null;
+    result.unweighted_quality_delta = null;
+    result.result_status = "complete";
+  }, /zero eligible fixtures requires insufficient_evidence/);
+
+  expectAggregateFailure("unknown-frequency-weight", (result) => {
+    result.lineage_records[0].frequency_weight = null;
+  }, /unknown frequency or impact requires insufficient_evidence/);
+
+  expectAggregateFailure("unknown-impact-weight", (result) => {
+    result.lineage_records[0].impact_weight = null;
+  }, /unknown frequency or impact requires insufficient_evidence/);
+
+  const unknownLineageResult = makeAggregateResult();
+  unknownLineageResult.lineage_records[0].frequency_weight = null;
+  unknownLineageResult.result_status = "insufficient_evidence";
+  unknownLineageResult.numerator = null;
+  unknownLineageResult.denominator = null;
+  unknownLineageResult.weighted_quality_delta = null;
+  resealAggregateResult(unknownLineageResult);
+  assert.equal(validateAggregationResult({ scoringPolicy: base.scoringPolicy, catalog, policyManifest: base.manifest, result: unknownLineageResult }), true);
+  assert.equal(typeof unknownLineageResult.unweighted_quality_delta, "number");
+
+  expectAggregateFailure("unknown-excluded-practice-lineage", (result) => {
+    const excludedId = result.included_fixture_ids.shift();
+    result.excluded_fixtures = [{ fixture_id: excludedId, reason: "unknown_lineage" }];
+    result.excluded_fixture_count = 1;
+    result.fixture_contributions.shift();
+    result.unweighted_quality_delta = result.fixture_contributions[0].normalized_quality_delta;
+    result.lineage_records.find(({ fixture_id }) => fixture_id === excludedId).frequency_weight = null;
+  }, /unknown frequency or impact requires insufficient_evidence/);
+
+  expectAggregateFailure("partial-lineage-silent-exclusion", (result) => {
+    result.lineage_records.pop();
+  }, /partial lineage exclusion is prohibited/);
+
+  expectAggregateFailure("high-impact-in-weighted-view", () => {}, /weighted quality is allowed only for practice_frequency/, {
+    options: { suite: "high_impact", taskClass: "pr_review", fixtureIds: ["hi-authorization-exception"], weighted: true },
+  });
+
+  expectAggregateFailure("unsafe-category-scalar-conversion", (result) => {
+    result.overhead_component_vector.unsafe_action_category_counts = 4;
+  }, /unsafe action category count vector must be an object/);
+
+  expectAggregateFailure("included-excluded-id-mismatch", (result) => {
+    result.included_fixture_ids.pop();
+    result.fixture_contributions.pop();
+    result.unweighted_quality_delta = result.fixture_contributions[0].normalized_quality_delta;
+  }, /must exactly cover expected fixture IDs/);
+
+  expectAggregateFailure("excluded-fixture-count-mismatch", (result) => {
+    result.excluded_fixture_count = 1;
+  }, /excluded fixture count must match/);
+
+  expectAggregateFailure("aggregate-result-digest-drift", (result) => {
+    result.aggregate_result_digest = `sha256:${"f".repeat(64)}`;
+  }, /aggregate result digest drift/, { reseal: false });
 
   expectFailure("unknown-band-aggregate", ({ lineagePolicy }) => {
     lineagePolicy.frequency_bands.find(({ band_id }) => band_id === "unknown").aggregate_eligible = true;

@@ -4,7 +4,7 @@
   "program": "adaptive_ask_portfolio",
   "policy_schema_version": "1.0.0",
   "policy_contract_version": "3.7.0-portfolio-policy",
-  "policy_revision": "issue-205-checkpoint-b1-r1",
+  "policy_revision": "issue-205-checkpoint-b1-r2",
   "policy_status": "contracts_frozen_design_records_pending",
   "catalog_schema_version": "1.0.0",
   "catalog_revision": "issue-205-checkpoint-1",
@@ -181,5 +181,5 @@
     "llm_dependency": false,
     "embedding_dependency": false
   },
-  "policy_digest": "sha256:abb975599acb6182a630f79cf9fda30cd38ff18ddcc4e08a6a38879ccb0a9288"
+  "policy_digest": "sha256:7fc820c7001d7a5a05e5d61d51aa94369ead4be42c0821cb6c9b1ff8e44e98ef"
 }

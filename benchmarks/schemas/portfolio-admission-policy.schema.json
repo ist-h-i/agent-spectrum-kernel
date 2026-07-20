@@ -15,6 +15,7 @@
     "catalog_revision",
     "catalog_digest",
     "lifecycle",
+    "selector_context_contract",
     "aggregate_classification_contract",
     "final_admission_record_contract",
     "admission_gates",
@@ -28,12 +29,13 @@
     "program": { "const": "adaptive_ask_portfolio" },
     "policy_schema_version": { "const": "1.0.0" },
     "policy_contract_version": { "const": "3.7.0-portfolio-policy" },
-    "policy_revision": { "const": "issue-205-checkpoint-b1-r1" },
+    "policy_revision": { "const": "issue-205-checkpoint-b1-r2" },
     "policy_status": { "const": "contracts_frozen_design_records_pending" },
     "catalog_schema_version": { "const": "1.0.0" },
     "catalog_revision": { "const": "issue-205-checkpoint-1" },
     "catalog_digest": { "$ref": "#/$defs/digest" },
     "lifecycle": { "$ref": "#/$defs/lifecycle" },
+    "selector_context_contract": { "$ref": "#/$defs/selectorContextContract" },
     "aggregate_classification_contract": { "$ref": "#/$defs/aggregateClassificationContract" },
     "final_admission_record_contract": { "$ref": "#/$defs/finalAdmissionRecordContract" },
     "admission_gates": {
@@ -106,10 +108,103 @@
         "unknown_gate_result_counts_as_pass": { "const": false }
       }
     },
+    "selectorContextField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field_id", "value_type", "derivation"],
+      "properties": {
+        "field_id": { "enum": ["fixture_id", "catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary", "capability_families", "fixture_predicates", "predicate_evidence_digest", "selector_context_digest"] },
+        "value_type": { "enum": ["identifier", "sha256_digest", "fixture_role", "suite", "task_class", "risk_boundary", "identifier_array", "fixture_predicate_array"] },
+        "derivation": { "enum": ["catalog_lookup_key", "catalog_derived", "predicate_evidence_derived", "predicate_evidence_digest", "selector_context_digest"] }
+      }
+    },
+    "scoredPredicateDerivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["all_of"],
+      "properties": {
+        "all_of": { "type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true, "items": { "enum": ["fixture_role_primary", "frozen_blocker_or_weighted_requirement_present", "requirement_record_policy_and_fixture_bound", "scored_requirement_has_agent_visible_evidence_map", "requirement_set_digest_verified"] } }
+      }
+    },
+    "findingPredicateDerivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["any_of", "frozen_review_task_classes"],
+      "properties": {
+        "any_of": { "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true, "items": { "enum": ["frozen_review_task_class", "answer_neutral_output_contract_declares_findings", "evaluator_public_reference_bound_output_contract_digest_declares_findings"] } },
+        "frozen_review_task_classes": { "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": { "enum": ["implementation_review", "pr_review", "review", "review_verification"] } }
+      }
+    },
+    "predicateDerivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caller_supplied_predicates_allowed", "scored_primary_requirement", "finding_producing_task"],
+      "properties": {
+        "caller_supplied_predicates_allowed": { "const": false },
+        "scored_primary_requirement": { "$ref": "#/$defs/scoredPredicateDerivation" },
+        "finding_producing_task": { "$ref": "#/$defs/findingPredicateDerivation" }
+      }
+    },
+    "selectorDigestContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["predicate_evidence_digest_algorithm", "selector_context_digest_algorithm", "selector_context_digest_excluded_field"],
+      "properties": {
+        "predicate_evidence_digest_algorithm": { "const": "sha256_sorted_key_canonical_json" },
+        "selector_context_digest_algorithm": { "const": "sha256_sorted_key_canonical_json" },
+        "selector_context_digest_excluded_field": { "const": "selector_context_digest" }
+      }
+    },
+    "selectorContextContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["closed_artifact", "required_fields", "catalog_lookup_key", "catalog_derived_fields", "unknown_fixture_id_result", "caller_supplied_catalog_values_trusted", "predicate_derivation", "digest_contract"],
+      "properties": {
+        "closed_artifact": { "const": true },
+        "required_fields": { "type": "array", "minItems": 11, "maxItems": 11, "items": { "$ref": "#/$defs/selectorContextField" } },
+        "catalog_lookup_key": { "const": "fixture_id" },
+        "catalog_derived_fields": { "type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": { "enum": ["catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary", "capability_families"] } },
+        "unknown_fixture_id_result": { "const": "reject" },
+        "caller_supplied_catalog_values_trusted": { "const": false },
+        "predicate_derivation": { "$ref": "#/$defs/predicateDerivation" },
+        "digest_contract": { "$ref": "#/$defs/selectorDigestContract" }
+      }
+    },
+    "classificationTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "trigger", "evidence_type"],
+      "properties": {
+        "from": { "enum": ["pending_measurement", "redesign_required"] },
+        "to": { "enum": ["pending_measurement", "primary_eligible", "calibration_only", "redesign_required", "rejected", "insufficient_evidence"] },
+        "trigger": { "enum": ["fixture_role_calibration", "supported_tracks_or_required_inputs_insufficient", "ceiling_or_floor_candidate", "ceiling_and_floor_not_candidate", "explicit_admission_rejection", "redesign_review", "remeasurement"] },
+        "evidence_type": { "enum": ["validated_selector_context", "pilot_result_record", "classification_result_artifact", "admission_rejection_record", "redesign_review_record", "remeasurement_record"] }
+      }
+    },
+    "classificationDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["precedence", "decision_id", "outcome"],
+      "properties": {
+        "precedence": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "decision_id": { "enum": ["calibration_role", "invalid_binding_or_pilot_digest", "insufficient_or_unknown_input", "ceiling_or_floor_candidate", "ceiling_and_floor_not_candidate", "contradictory_combination"] },
+        "outcome": { "enum": ["calibration_only", "invalid_artifact_no_classification", "insufficient_evidence", "redesign_required", "primary_eligible", "invalid_classification_no_result"] }
+      }
+    },
+    "classificationResultArtifactContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["closed_artifact", "separate_from_policy_artifact", "required_fields"],
+      "properties": {
+        "closed_artifact": { "const": true },
+        "separate_from_policy_artifact": { "const": true },
+        "required_fields": { "type": "array", "minItems": 12, "maxItems": 12, "uniqueItems": true, "items": { "enum": ["fixture_id", "fixture_role", "catalog_digest", "policy_manifest_digest", "pilot_result_digest", "supported_adapter_tracks", "ceiling_classification_result", "floor_classification_result", "classification_state", "reason_codes", "classification_revision", "classification_digest"] } }
+      }
+    },
     "aggregateClassificationContract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["lifecycle_phase", "states", "input_artifact_type", "output_artifact_type", "output_separate_from_policy", "policy_mutation_after_result_read_allowed", "classification_results", "generic_pass_fail_result_allowed", "unavailable_adapter_value", "unavailable_adapter_treated_as_zero", "insufficient_supported_tracks_result", "calibration_primary_eligible"],
+      "required": ["lifecycle_phase", "states", "input_artifact_type", "output_artifact_type", "output_separate_from_policy", "policy_mutation_after_result_read_allowed", "classification_results", "generic_pass_fail_result_allowed", "unavailable_adapter_value", "unavailable_adapter_treated_as_zero", "insufficient_supported_tracks_result", "calibration_primary_eligible", "state_transitions", "decision_precedence", "automatic_threshold_rejection_allowed", "rejected_transition_evidence_types", "redesign_transition_requires_new_fixture_revision", "redesign_transition_requires_new_admission_revision", "classification_result_artifact_contract"],
       "properties": {
         "lifecycle_phase": { "const": "post_pilot" },
         "states": {
@@ -134,7 +229,14 @@
         "unavailable_adapter_value": { "const": "unavailable" },
         "unavailable_adapter_treated_as_zero": { "const": false },
         "insufficient_supported_tracks_result": { "const": "insufficient_evidence" },
-        "calibration_primary_eligible": { "const": false }
+        "calibration_primary_eligible": { "const": false },
+        "state_transitions": { "type": "array", "minItems": 8, "maxItems": 8, "items": { "$ref": "#/$defs/classificationTransition" } },
+        "decision_precedence": { "type": "array", "minItems": 6, "maxItems": 6, "items": { "$ref": "#/$defs/classificationDecision" } },
+        "automatic_threshold_rejection_allowed": { "const": false },
+        "rejected_transition_evidence_types": { "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": { "enum": ["redesign_review_record", "admission_rejection_record"] } },
+        "redesign_transition_requires_new_fixture_revision": { "const": true },
+        "redesign_transition_requires_new_admission_revision": { "const": true },
+        "classification_result_artifact_contract": { "$ref": "#/$defs/classificationResultArtifactContract" }
       }
     },
     "fieldDefinition": {
