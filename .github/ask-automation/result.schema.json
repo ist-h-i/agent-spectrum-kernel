@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ASK autonomous development result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "target_issue_number",
+    "target_pr_number",
+    "summary",
+    "rationale",
+    "pr_title",
+    "pr_body",
+    "issue_comment",
+    "review_verdict",
+    "review_comment",
+    "tests_run",
+    "risks",
+    "changed_files_expected"
+  ],
+  "properties": {
+    "action": {
+      "enum": ["create_pr", "update_pr", "review_only", "no_change", "blocked"]
+    },
+    "target_issue_number": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "target_pr_number": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "pr_title": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "pr_body": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 12000
+    },
+    "issue_comment": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 6000
+    },
+    "review_verdict": {
+      "enum": ["not_applicable", "approve", "request_changes", "comment"]
+    },
+    "review_comment": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 8000
+    },
+    "tests_run": {
+      "type": "array",
+      "maxItems": 40,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "risks": {
+      "type": "array",
+      "maxItems": 30,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1000
+      }
+    },
+    "changed_files_expected": {
+      "type": "array",
+      "maxItems": 60,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300,
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+      }
+    }
+  }
+}
