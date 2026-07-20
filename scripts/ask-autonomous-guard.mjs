@@ -25,6 +25,7 @@ const DISALLOWED_PREFIXES = [
 
 const SENSITIVE_PATH_PATTERN = /(?:^|\/)(?:\.env(?:\.|$)|[^/]+\.(?:pem|key|p12|pfx|jks|keystore|crt|cer))$/iu;
 const PRIVATE_EVALUATOR_PATTERN = /(?:^|\/)(?:private[-_]?evaluator|evaluator[-_]?private)(?:\/|$)/iu;
+const UNEXECUTED_TEST_PATTERN = /^\s*(?:not run|not executed|planned|pending|skipped)\b/iu;
 
 function runGit(repository, args, { allowFailure = false } = {}) {
   const result = spawnSync("git", ["-C", repository, ...args], { encoding: "utf8" });
@@ -38,6 +39,10 @@ function splitLines(value) {
   return value.split(/\r?\n/u).filter(Boolean);
 }
 
+function compareAscii(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 export function isDisallowedPath(path) {
   if (DISALLOWED_EXACT_PATHS.has(path)) return true;
   if (DISALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix))) return true;
@@ -48,7 +53,7 @@ export function isDisallowedPath(path) {
 
 export function validateChangedPaths(paths, { maximumFiles = MAX_CHANGED_FILES } = {}) {
   const errors = [];
-  const uniquePaths = [...new Set(paths)].sort();
+  const uniquePaths = [...new Set(paths)].sort(compareAscii);
   if (uniquePaths.length > maximumFiles) errors.push(`changed file count ${uniquePaths.length} exceeds limit ${maximumFiles}`);
   for (const path of uniquePaths) {
     if (path.startsWith("/") || path.split("/").includes("..") || path.includes("\\")) errors.push(`changed path is not a normalized repository-relative path: ${path}`);
@@ -84,6 +89,13 @@ export function validateCodexResult(result, context, changedPaths) {
   if (!hasChanges && ["create_pr", "update_pr"].includes(result.action)) errors.push("create_pr/update_pr requires repository changes");
   if (hasChanges && ["review_only", "no_change", "blocked"].includes(result.action)) errors.push(`${result.action} may not accompany repository changes`);
 
+  if (hasChanges && Array.isArray(result.tests_run)) {
+    if (result.tests_run.length === 0) errors.push("repository changes require at least one validation command actually run by Codex");
+    for (const test of result.tests_run) {
+      if (UNEXECUTED_TEST_PATTERN.test(test)) errors.push(`tests_run may not represent an unexecuted or deferred check: ${test}`);
+    }
+  }
+
   if (result.action === "create_pr") {
     requireString(result.pr_title, "pr_title", errors);
     requireString(result.pr_body, "pr_body", errors);
@@ -92,8 +104,10 @@ export function validateCodexResult(result, context, changedPaths) {
   if (result.review_verdict !== "not_applicable") requireString(result.review_comment, "review_comment", errors);
   if (result.issue_comment !== null) requireString(result.issue_comment, "issue_comment", errors, { nullable: true });
 
-  const expected = [...new Set(result.changed_files_expected ?? [])].sort();
-  const actual = [...new Set(changedPaths)].sort();
+  const expectedInput = Array.isArray(result.changed_files_expected) ? result.changed_files_expected : [];
+  const expected = [...new Set(expectedInput)].sort(compareAscii);
+  const actual = [...new Set(changedPaths)].sort(compareAscii);
+  if (JSON.stringify(expectedInput) !== JSON.stringify(expected)) errors.push("changed_files_expected must be unique and ordered by ASCII code point");
   if (hasChanges && JSON.stringify(expected) !== JSON.stringify(actual)) errors.push("changed_files_expected must exactly match the actual changed path set");
 
   return errors;
@@ -120,7 +134,7 @@ function collectChange(repository) {
   const symlinkPaths = splitLines(summary)
     .filter((line) => /mode 120000/u.test(line))
     .map((line) => line.trim());
-  return { paths: [...new Set(paths)].sort(), changedLines, binaryPaths, symlinkPaths };
+  return { paths: [...new Set(paths)].sort(compareAscii), changedLines, binaryPaths, symlinkPaths };
 }
 
 function sha256File(path) {
