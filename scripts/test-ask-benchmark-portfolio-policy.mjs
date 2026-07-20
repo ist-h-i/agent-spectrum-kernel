@@ -8,7 +8,9 @@ import {
   buildPortfolioPolicyArtifacts,
   computePortfolioPolicyDigest,
   computePortfolioPolicyManifestDigest,
+  validateAdmissionGateResult,
   validatePortfolioPolicyArtifacts,
+  validateRequirementMaxPoints,
 } from "./ask-benchmark-portfolio-policy.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -82,11 +84,11 @@ function unsafeCategory(policy, categoryId) {
 
 try {
   const summary = validatePortfolioPolicyArtifacts({ root });
-  assert.equal(summary.policyRevision, "issue-205-checkpoint-b1");
+  assert.equal(summary.policyRevision, "issue-205-checkpoint-b1-r1");
   assert.equal(summary.policyStatus, "contracts_frozen_design_records_pending");
   assert.equal(summary.catalogDigest, catalog.catalog_digest);
-  assert.equal(summary.admissionGateCount, 17);
-  assert.equal(summary.lifecycleStateCount, 7);
+  assert.equal(summary.admissionGateCount, 15);
+  assert.equal(summary.lifecycleStateCount, 6);
   assert.equal(summary.requirementKindCount, 3);
   assert.equal(summary.frequencyBandCount, 4);
   assert.equal(summary.impactBandCount, 4);
@@ -95,7 +97,7 @@ try {
 
   const cliSuccess = spawnSync(process.execPath, [runner, "validate-portfolio-policy", "--policy-manifest", resolve(root, "benchmarks/portfolio-policy-manifest.json")], { cwd: root, encoding: "utf8" });
   assert.equal(cliSuccess.status, 0, cliSuccess.stderr);
-  for (const expected of ["revision=issue-205-checkpoint-b1", `catalog=${catalog.catalog_digest}`, `manifest=${base.manifest.manifest_digest}`, "gates=17", "lifecycle_states=7", "requirement_kinds=3", "frequency_bands=4", "impact_bands=4", "ceiling=0.95", "floor=0.2", "status=contracts_frozen_design_records_pending"]) {
+  for (const expected of ["revision=issue-205-checkpoint-b1-r1", `catalog=${catalog.catalog_digest}`, `manifest=${base.manifest.manifest_digest}`, "gates=15", "lifecycle_states=6", "requirement_kinds=3", "frequency_bands=4", "impact_bands=4", "ceiling=0.95", "floor=0.2", "status=contracts_frozen_design_records_pending"]) {
     assert.match(cliSuccess.stdout, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
 
@@ -191,17 +193,89 @@ try {
     scoringPolicy.evidence_removal_mutation_contract.recoverable_after_removal_policy = "pass";
   }, /recoverable evidence-removal mutation must be treated as mutation failure/);
 
+  expectFailure("missing-aggregation-policy", ({ scoringPolicy }) => {
+    delete scoringPolicy.aggregation_policy;
+  }, /aggregation_policy|aggregation policy is required/);
+
+  expectFailure("opaque-scalar-aggregate", ({ scoringPolicy }) => {
+    scoringPolicy.aggregation_policy.opaque_scalar_aggregate_allowed = true;
+  }, /opaque_scalar_aggregate_allowed|opaque scalar/);
+
+  expectFailure("adapter-pooling", ({ scoringPolicy }) => {
+    scoringPolicy.aggregation_policy.adapter_pooling_allowed = true;
+  }, /adapter_pooling_allowed|must not pool adapters/);
+
+  expectFailure("task-class-pooling", ({ scoringPolicy }) => {
+    scoringPolicy.aggregation_policy.task_class_single_score_pooling_allowed = true;
+  }, /task_class_single_score_pooling_allowed|must not pool task classes/);
+
+  expectFailure("aggregate-unavailable-runtime-zero", ({ scoringPolicy }) => {
+    scoringPolicy.aggregation_policy.unavailable_runtime_treated_as_zero = true;
+  }, /unavailable_runtime_treated_as_zero|must not treat unavailable runtime as zero/);
+
+  expectFailure("aggregate-before-raw-result", ({ scoringPolicy }) => {
+    scoringPolicy.aggregation_policy.publication_order = ["aggregate_views", "per_fixture_raw_results"];
+  }, /publication_order|aggregation publication order/);
+
+  assert.equal(validateRequirementMaxPoints(base.scoringPolicy, { requirement_kind: "informational", max_points: 0 }), true);
+  assert.throws(() => validateRequirementMaxPoints(base.scoringPolicy, { requirement_kind: "informational", max_points: 1 }), /informational max_points must be zero/);
+  assert.throws(() => validateRequirementMaxPoints(base.scoringPolicy, { requirement_kind: "weighted", max_points: 0 }), /weighted max_points must be positive/);
+  assert.equal(validateRequirementMaxPoints(base.scoringPolicy, { requirement_kind: "blocker", max_points: 0 }), true);
+
+  expectFailure("requirement-kind-constraint-drift", ({ scoringPolicy }) => {
+    scoringPolicy.requirement_contract.requirement_kinds.find(({ requirement_kind }) => requirement_kind === "informational").max_points_constraint = "non_negative";
+  }, /requirement max_points constraints/);
+
+  expectFailure("ceiling-pre-run-admission-gate", ({ admissionPolicy }) => {
+    admissionPolicy.admission_gates.push({ ...structuredClone(admissionPolicy.admission_gates[0]), gate_id: "ceiling_candidate" });
+  }, /ceiling and floor classification must not be pre-run admission gates|too many items/);
+
+  expectFailure("floor-condition-quantifier-drift", ({ scoringPolicy }) => {
+    scoringPolicy.ceiling_floor_policy.universal_floor_candidate.condition_quantifier = "any_supported_condition";
+  }, /condition_quantifier|universal floor candidate quantifiers/);
+
+  expectFailure("ceiling-condition-quantifier-drift", ({ scoringPolicy }) => {
+    scoringPolicy.ceiling_floor_policy.universal_ceiling_candidate.condition_quantifier = "any_supported_condition";
+  }, /condition_quantifier|universal ceiling candidate quantifiers/);
+
+  expectFailure("generic-pass-fail-classification", ({ scoringPolicy }) => {
+    scoringPolicy.ceiling_floor_policy.classification_results[0] = "pass";
+  }, /classification_results|classification results/);
+
+  expectFailure("suspicious-control-outside-review", ({ admissionPolicy }) => {
+    admissionPolicy.admission_gates.find(({ gate_id }) => gate_id === "suspicious_but_correct_control").selector.clauses[0].task_classes = ["*"];
+  }, /suspicious-but-correct control must apply only to review task classes/);
+
+  expectFailure("unauthorized-gate-for-risk-none", ({ admissionPolicy }) => {
+    admissionPolicy.admission_gates.find(({ gate_id }) => gate_id === "unauthorized_attempt_observability").selector.clauses[2].risk_boundaries = ["none"];
+  }, /unauthorized-attempt observability must require high impact, operation boundary, or non-none risk/);
+
+  const ordinaryFixtureContext = {
+    fixture_role: "primary",
+    suite: "mechanism_negative",
+    task_class: "configuration",
+    risk_boundary: "none",
+    capability_families: ["configuration_change"],
+    fixture_predicates: ["scored_primary_requirement"],
+  };
+  assert.equal(validateAdmissionGateResult(base.admissionPolicy, "unauthorized_attempt_observability", ordinaryFixtureContext, "not_applicable"), true);
+  assert.throws(() => validateAdmissionGateResult(base.admissionPolicy, "input_digest_freeze", ordinaryFixtureContext, "not_applicable"), /not_applicable is prohibited when selector matches/);
+
   expectFailure("ceiling-threshold-drift", ({ scoringPolicy }) => {
     scoringPolicy.ceiling_floor_policy.universal_ceiling_candidate.median_normalized_requirement_score_minimum = 0.94;
-  }, /universal ceiling candidate thresholds/);
+  }, /universal ceiling candidate quantifiers, thresholds, or disposition drifted/);
 
   expectFailure("floor-threshold-drift", ({ scoringPolicy }) => {
     scoringPolicy.ceiling_floor_policy.universal_floor_candidate.median_normalized_requirement_score_maximum = 0.21;
-  }, /universal floor candidate thresholds/);
+  }, /universal floor candidate quantifiers, thresholds, or disposition drifted/);
 
   expectFailure("calibration-primary-aggregate", ({ scoringPolicy }) => {
     scoringPolicy.ceiling_floor_policy.calibration_primary_aggregate_eligible = true;
   }, /calibration fixtures must be excluded from primary aggregate/);
+
+  expectFailure("calibration-primary-classification", ({ admissionPolicy }) => {
+    admissionPolicy.aggregate_classification_contract.calibration_primary_eligible = true;
+  }, /calibration fixtures must never classify as primary_eligible/);
 
   expectFailure("unknown-band-aggregate", ({ lineagePolicy }) => {
     lineagePolicy.frequency_bands.find(({ band_id }) => band_id === "unknown").aggregate_eligible = true;

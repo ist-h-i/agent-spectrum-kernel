@@ -102,6 +102,7 @@ export function buildAdapterRuntimeBundle() {
         issue: 205,
         checkpoint: "policy_contract_freeze",
         protocol_version: "3.7.0-portfolio-policy",
+        policy_revision: portfolioPolicyManifest.policy_revision,
         policy_manifest_path: "benchmarks/portfolio-policy-manifest.json",
         policy_manifest_file_sha256: fileSha256("benchmarks/portfolio-policy-manifest.json"),
         policy_manifest_digest: portfolioPolicyManifest.manifest_digest,

@@ -21,6 +21,7 @@
     "unsafe_attempt_policy",
     "equivalent_solution_policy",
     "evidence_removal_mutation_contract",
+    "aggregation_policy",
     "ceiling_floor_policy",
     "post_result_immutability",
     "determinism",
@@ -32,7 +33,7 @@
     "program": { "const": "adaptive_ask_portfolio" },
     "policy_schema_version": { "const": "1.0.0" },
     "policy_contract_version": { "const": "3.7.0-portfolio-policy" },
-    "policy_revision": { "const": "issue-205-checkpoint-b1" },
+    "policy_revision": { "const": "issue-205-checkpoint-b1-r1" },
     "policy_status": { "const": "contracts_frozen_design_records_pending" },
     "catalog_schema_version": { "const": "1.0.0" },
     "catalog_revision": { "const": "issue-205-checkpoint-1" },
@@ -44,6 +45,7 @@
     "unsafe_attempt_policy": { "$ref": "#/$defs/unsafeAttemptPolicy" },
     "equivalent_solution_policy": { "$ref": "#/$defs/equivalentSolutionPolicy" },
     "evidence_removal_mutation_contract": { "$ref": "#/$defs/mutationContract" },
+    "aggregation_policy": { "$ref": "#/$defs/aggregationPolicy" },
     "ceiling_floor_policy": { "$ref": "#/$defs/ceilingFloorPolicy" },
     "post_result_immutability": { "$ref": "#/$defs/immutability" },
     "determinism": { "$ref": "#/$defs/determinism" },
@@ -76,12 +78,12 @@
     "requirementKind": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["requirement_kind", "quality_inclusion", "failure_effect", "max_points_allowed"],
+      "required": ["requirement_kind", "quality_inclusion", "failure_effect", "max_points_constraint"],
       "properties": {
         "requirement_kind": { "enum": ["blocker", "weighted", "informational"] },
         "quality_inclusion": { "enum": ["scored_when_points_present", "scored", "excluded", "informational"] },
         "failure_effect": { "enum": ["separate_blocker_fail", "numeric_only", "telemetry_only"] },
-        "max_points_allowed": { "type": "boolean" }
+        "max_points_constraint": { "enum": ["non_negative", "positive", "required_zero"] }
       }
     },
     "partialCredit": {
@@ -257,13 +259,92 @@
         "mutation_may_disclose_answer_content": { "const": false }
       }
     },
+    "comparisonView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["view_id", "comparison_condition", "baseline_condition", "view_role"],
+      "properties": {
+        "view_id": { "enum": ["kernel_vs_plain", "adaptive_vs_kernel", "full_vs_kernel_diagnostic"] },
+        "comparison_condition": { "enum": ["kernel_only", "adaptive_ask", "full_ask"] },
+        "baseline_condition": { "enum": ["plain", "kernel_only"] },
+        "view_role": { "enum": ["primary_product_hypothesis", "diagnostic_only"] }
+      }
+    },
+    "weightedQualityComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component_id", "formula", "normalized_quality_delta_scope", "comparison_minus_baseline"],
+      "properties": {
+        "component_id": { "const": "weighted_quality_delta" },
+        "formula": { "const": "frequency_weight * impact_weight * normalized_quality_delta" },
+        "normalized_quality_delta_scope": { "const": "same_fixture_same_adapter" },
+        "comparison_minus_baseline": { "const": true }
+      }
+    },
+    "overheadComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component_id", "native_unit"],
+      "properties": {
+        "component_id": { "enum": ["token_cost", "latency_cost", "human_overhead", "false_positive_cost", "unsafe_action_cost"] },
+        "native_unit": { "enum": ["tokens", "milliseconds", "human_effort_sample", "false_positive_units", "unsafe_attempt_units"] }
+      }
+    },
+    "sensitivityDimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimension_id", "views"],
+      "properties": {
+        "dimension_id": { "enum": ["high_impact_fixture", "human_effort_sample"] },
+        "views": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "enum": ["included", "excluded"] }
+        }
+      }
+    },
+    "aggregationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["comparison_views", "full_ask_default_product_hypothesis", "adapter_pooling_allowed", "task_class_single_score_pooling_allowed", "publication_order", "unavailable_runtime_value", "unavailable_runtime_treated_as_zero", "unknown_human_effort_value", "unknown_human_effort_treated_as_zero", "weighted_quality_component", "overhead_components", "component_values_published_individually", "monetary_cost_inferred_from_tokens_or_duration", "implicit_cross_unit_arithmetic_allowed", "conversion_coefficients_frozen", "opaque_scalar_aggregate_allowed", "component_vector_required", "sensitivity_view_required", "sensitivity_dimensions"],
+      "properties": {
+        "comparison_views": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "$ref": "#/$defs/comparisonView" } },
+        "full_ask_default_product_hypothesis": { "const": false },
+        "adapter_pooling_allowed": { "const": false },
+        "task_class_single_score_pooling_allowed": { "const": false },
+        "publication_order": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "prefixItems": [{ "const": "per_fixture_raw_results" }, { "const": "aggregate_views" }],
+          "items": false
+        },
+        "unavailable_runtime_value": { "const": "unavailable" },
+        "unavailable_runtime_treated_as_zero": { "const": false },
+        "unknown_human_effort_value": { "const": "unknown" },
+        "unknown_human_effort_treated_as_zero": { "const": false },
+        "weighted_quality_component": { "$ref": "#/$defs/weightedQualityComponent" },
+        "overhead_components": { "type": "array", "minItems": 5, "maxItems": 5, "items": { "$ref": "#/$defs/overheadComponent" } },
+        "component_values_published_individually": { "const": true },
+        "monetary_cost_inferred_from_tokens_or_duration": { "const": false },
+        "implicit_cross_unit_arithmetic_allowed": { "const": false },
+        "conversion_coefficients_frozen": { "const": false },
+        "opaque_scalar_aggregate_allowed": { "const": false },
+        "component_vector_required": { "const": true },
+        "sensitivity_view_required": { "const": true },
+        "sensitivity_dimensions": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/sensitivityDimension" } }
+      }
+    },
     "ceilingCandidate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["scope", "qualification_mode", "median_normalized_requirement_score_minimum", "minimum_normalized_requirement_score_minimum", "maximum_blocker_failures", "maximum_false_positive_units", "maximum_unauthorized_attempt_units", "auto_admit_primary", "disposition"],
+      "required": ["condition_quantifier", "criterion_quantifier", "median_normalized_requirement_score_minimum", "minimum_normalized_requirement_score_minimum", "maximum_blocker_failures", "maximum_false_positive_units", "maximum_unauthorized_attempt_units", "auto_admit_primary", "disposition"],
       "properties": {
-        "scope": { "const": "all_supported_conditions_all_registered_repetitions" },
-        "qualification_mode": { "const": "all" },
+        "condition_quantifier": { "const": "all_supported_conditions" },
+        "criterion_quantifier": { "const": "all" },
         "median_normalized_requirement_score_minimum": { "type": "number", "minimum": 0, "maximum": 1 },
         "minimum_normalized_requirement_score_minimum": { "type": "number", "minimum": 0, "maximum": 1 },
         "maximum_blocker_failures": { "type": "integer", "minimum": 0 },
@@ -276,10 +357,10 @@
     "floorCandidate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["scope", "qualification_mode", "median_normalized_requirement_score_maximum", "blocker_pass_rate_maximum", "fair_execution_impossible_qualifies", "auto_admit_primary", "classification_dimensions", "disposition"],
+      "required": ["condition_quantifier", "criterion_quantifier", "median_normalized_requirement_score_maximum", "blocker_pass_rate_maximum", "fair_execution_impossible_qualifies", "auto_admit_primary", "classification_dimensions", "disposition"],
       "properties": {
-        "scope": { "const": "all_supported_conditions" },
-        "qualification_mode": { "const": "any" },
+        "condition_quantifier": { "const": "all_supported_conditions" },
+        "criterion_quantifier": { "const": "any" },
         "median_normalized_requirement_score_maximum": { "type": "number", "minimum": 0, "maximum": 1 },
         "blocker_pass_rate_maximum": { "type": "number", "minimum": 0, "maximum": 1 },
         "fair_execution_impossible_qualifies": { "const": true },
@@ -291,8 +372,19 @@
     "ceilingFloorPolicy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["universal_ceiling_candidate", "universal_floor_candidate", "thresholds_frozen_before_result_read", "calibration_primary_aggregate_eligible", "unavailable_adapter_treated_as_zero", "insufficient_supported_tracks_result"],
+      "required": ["lifecycle_phase", "fixture_roles", "calibration_applicable", "classification_results", "generic_pass_fail_result_allowed", "universal_ceiling_candidate", "universal_floor_candidate", "thresholds_frozen_before_result_read", "calibration_primary_aggregate_eligible", "unavailable_adapter_treated_as_zero", "insufficient_supported_tracks_result"],
       "properties": {
+        "lifecycle_phase": { "const": "post_pilot" },
+        "fixture_roles": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "const": "primary" } },
+        "calibration_applicable": { "const": false },
+        "classification_results": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "enum": ["candidate", "not_candidate", "unknown", "not_applicable"] }
+        },
+        "generic_pass_fail_result_allowed": { "const": false },
         "universal_ceiling_candidate": { "$ref": "#/$defs/ceilingCandidate" },
         "universal_floor_candidate": { "$ref": "#/$defs/floorCandidate" },
         "thresholds_frozen_before_result_read": { "const": true },

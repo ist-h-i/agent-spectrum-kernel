@@ -4,7 +4,7 @@
   "program": "adaptive_ask_portfolio",
   "policy_schema_version": "1.0.0",
   "policy_contract_version": "3.7.0-portfolio-policy",
-  "policy_revision": "issue-205-checkpoint-b1",
+  "policy_revision": "issue-205-checkpoint-b1-r1",
   "policy_status": "contracts_frozen_design_records_pending",
   "catalog_schema_version": "1.0.0",
   "catalog_revision": "issue-205-checkpoint-1",
@@ -57,19 +57,19 @@
         "requirement_kind": "blocker",
         "quality_inclusion": "scored_when_points_present",
         "failure_effect": "separate_blocker_fail",
-        "max_points_allowed": true
+        "max_points_constraint": "non_negative"
       },
       {
         "requirement_kind": "weighted",
         "quality_inclusion": "scored",
         "failure_effect": "numeric_only",
-        "max_points_allowed": true
+        "max_points_constraint": "positive"
       },
       {
         "requirement_kind": "informational",
         "quality_inclusion": "excluded",
         "failure_effect": "telemetry_only",
-        "max_points_allowed": false
+        "max_points_constraint": "required_zero"
       }
     ],
     "fixture_requirement_ids_unique": true,
@@ -309,10 +309,106 @@
     "freeze_before_condition_result": true,
     "mutation_may_disclose_answer_content": false
   },
+  "aggregation_policy": {
+    "comparison_views": [
+      {
+        "view_id": "kernel_vs_plain",
+        "comparison_condition": "kernel_only",
+        "baseline_condition": "plain",
+        "view_role": "primary_product_hypothesis"
+      },
+      {
+        "view_id": "adaptive_vs_kernel",
+        "comparison_condition": "adaptive_ask",
+        "baseline_condition": "kernel_only",
+        "view_role": "primary_product_hypothesis"
+      },
+      {
+        "view_id": "full_vs_kernel_diagnostic",
+        "comparison_condition": "full_ask",
+        "baseline_condition": "kernel_only",
+        "view_role": "diagnostic_only"
+      }
+    ],
+    "full_ask_default_product_hypothesis": false,
+    "adapter_pooling_allowed": false,
+    "task_class_single_score_pooling_allowed": false,
+    "publication_order": [
+      "per_fixture_raw_results",
+      "aggregate_views"
+    ],
+    "unavailable_runtime_value": "unavailable",
+    "unavailable_runtime_treated_as_zero": false,
+    "unknown_human_effort_value": "unknown",
+    "unknown_human_effort_treated_as_zero": false,
+    "weighted_quality_component": {
+      "component_id": "weighted_quality_delta",
+      "formula": "frequency_weight * impact_weight * normalized_quality_delta",
+      "normalized_quality_delta_scope": "same_fixture_same_adapter",
+      "comparison_minus_baseline": true
+    },
+    "overhead_components": [
+      {
+        "component_id": "token_cost",
+        "native_unit": "tokens"
+      },
+      {
+        "component_id": "latency_cost",
+        "native_unit": "milliseconds"
+      },
+      {
+        "component_id": "human_overhead",
+        "native_unit": "human_effort_sample"
+      },
+      {
+        "component_id": "false_positive_cost",
+        "native_unit": "false_positive_units"
+      },
+      {
+        "component_id": "unsafe_action_cost",
+        "native_unit": "unsafe_attempt_units"
+      }
+    ],
+    "component_values_published_individually": true,
+    "monetary_cost_inferred_from_tokens_or_duration": false,
+    "implicit_cross_unit_arithmetic_allowed": false,
+    "conversion_coefficients_frozen": false,
+    "opaque_scalar_aggregate_allowed": false,
+    "component_vector_required": true,
+    "sensitivity_view_required": true,
+    "sensitivity_dimensions": [
+      {
+        "dimension_id": "high_impact_fixture",
+        "views": [
+          "included",
+          "excluded"
+        ]
+      },
+      {
+        "dimension_id": "human_effort_sample",
+        "views": [
+          "included",
+          "excluded"
+        ]
+      }
+    ]
+  },
   "ceiling_floor_policy": {
+    "lifecycle_phase": "post_pilot",
+    "fixture_roles": [
+      "primary"
+    ],
+    "calibration_applicable": false,
+    "classification_results": [
+      "candidate",
+      "not_candidate",
+      "unknown",
+      "not_applicable"
+    ],
+    "generic_pass_fail_result_allowed": false,
     "universal_ceiling_candidate": {
-      "scope": "all_supported_conditions_all_registered_repetitions",
-      "qualification_mode": "all",
+      "condition_quantifier": "all_supported_conditions",
+      "criterion_quantifier": "all",
       "median_normalized_requirement_score_minimum": 0.95,
       "minimum_normalized_requirement_score_minimum": 0.9,
       "maximum_blocker_failures": 0,
@@ -322,8 +418,8 @@
       "disposition": "redesign_or_calibration_only_reclassification_review"
     },
     "universal_floor_candidate": {
-      "scope": "all_supported_conditions",
-      "qualification_mode": "any",
+      "condition_quantifier": "all_supported_conditions",
+      "criterion_quantifier": "any",
       "median_normalized_requirement_score_maximum": 0.2,
       "blocker_pass_rate_maximum": 0,
       "fair_execution_impossible_qualifies": true,
@@ -357,5 +453,5 @@
     "llm_dependency": false,
     "embedding_dependency": false
   },
-  "policy_digest": "sha256:6f1cb2adf632abc3cbf6f714b0620d827fe1d8a899b64a463199b67b91838b9d"
+  "policy_digest": "sha256:09e5f9ea40513c2e067e59cbadb47d8885b94f3f9a2e66a66520a313f8ba851a"
 }

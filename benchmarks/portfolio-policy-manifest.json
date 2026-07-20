@@ -4,22 +4,22 @@
   "program": "adaptive_ask_portfolio",
   "policy_schema_version": "1.0.0",
   "policy_contract_version": "3.7.0-portfolio-policy",
-  "policy_revision": "issue-205-checkpoint-b1",
+  "policy_revision": "issue-205-checkpoint-b1-r1",
   "policy_status": "contracts_frozen_design_records_pending",
   "catalog_schema_version": "1.0.0",
   "catalog_revision": "issue-205-checkpoint-1",
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "admission_policy": {
     "path": "benchmarks/portfolio-admission-policy.json",
-    "digest": "sha256:305e3eb4f814177b2418263073009a2ecad25509e8d6a8d3bc495597746e3467"
+    "digest": "sha256:5ec4d5bd735b863572bf472b41f0065e4872596fd9a3bf0fbecc2087c5e53a12"
   },
   "scoring_policy": {
     "path": "benchmarks/portfolio-scoring-policy.json",
-    "digest": "sha256:6f1cb2adf632abc3cbf6f714b0620d827fe1d8a899b64a463199b67b91838b9d"
+    "digest": "sha256:09e5f9ea40513c2e067e59cbadb47d8885b94f3f9a2e66a66520a313f8ba851a"
   },
   "lineage_policy": {
     "path": "benchmarks/portfolio-lineage-policy.json",
-    "digest": "sha256:4825ea5f32d8c5935068a0fc8b26b7cfbd2fa88dde36eb3037bcbc27ac4aa9ad"
+    "digest": "sha256:abb975599acb6182a630f79cf9fda30cd38ff18ddcc4e08a6a38879ccb0a9288"
   },
   "digest_contract": {
     "algorithm": "sha256",
@@ -28,5 +28,5 @@
     "child_policy_digests_included": true,
     "timestamp_in_digest_identity": false
   },
-  "manifest_digest": "sha256:0cdac3c4f55814f0b9f82ef9f5ec5e596805636109d1a85c73ea67d16af99517"
+  "manifest_digest": "sha256:3b2e773d8ced465e902834543b6fa1d3fc140fbdd54a8585de21de5e417876a1"
 }

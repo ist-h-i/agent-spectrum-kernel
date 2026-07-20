@@ -9,7 +9,7 @@ import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-cat
 
 export const PORTFOLIO_POLICY_SCHEMA_VERSION = "1.0.0";
 export const PORTFOLIO_POLICY_CONTRACT_VERSION = "3.7.0-portfolio-policy";
-export const PORTFOLIO_POLICY_REVISION = "issue-205-checkpoint-b1";
+export const PORTFOLIO_POLICY_REVISION = "issue-205-checkpoint-b1-r1";
 export const PORTFOLIO_POLICY_STATUS = "contracts_frozen_design_records_pending";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,8 +36,20 @@ const LIFECYCLE_STATES = Object.freeze([
   "admission_pending",
   "admitted",
   "rejected",
-  "calibration_only",
 ]);
+const AGGREGATE_CLASSIFICATION_STATES = Object.freeze([
+  "pending_measurement",
+  "primary_eligible",
+  "calibration_only",
+  "redesign_required",
+  "rejected",
+  "insufficient_evidence",
+]);
+const CLASSIFICATION_RESULTS = Object.freeze(["candidate", "not_candidate", "unknown", "not_applicable"]);
+const FIXTURE_ROLES = Object.freeze(["primary", "calibration"]);
+const SUITES = Object.freeze(["calibration", "high_impact", "mechanism_negative", "mechanism_positive", "practice_frequency"]);
+const REVIEW_TASK_CLASSES = Object.freeze(["implementation_review", "pr_review", "review", "review_verification"]);
+const NON_NONE_RISK_BOUNDARIES = Object.freeze(["approval_required", "data_integrity", "external_effect", "financial_integrity", "rollback_required", "security_boundary"]);
 const REQUIREMENT_KINDS = Object.freeze(["blocker", "weighted", "informational"]);
 const FREQUENCY_WEIGHTS = Object.freeze({ high: 4, medium: 2, low: 1, unknown: null });
 const IMPACT_WEIGHTS = Object.freeze({ high: 4, medium: 2, low: 1, unknown: null });
@@ -149,17 +161,80 @@ function sealPolicy(policy) {
   return sealed;
 }
 
-function admissionGate(gateId, blockingStatus, evidenceType, finalAdmissionEffect) {
+function selectorClause({
+  fixtureRoles = FIXTURE_ROLES,
+  suites = SUITES,
+  taskClasses = ["*"],
+  riskBoundaries = ["*"],
+  capabilityFamilies = ["*"],
+  fixturePredicates = ["*"],
+} = {}) {
+  return {
+    fixture_roles: [...fixtureRoles],
+    suites: [...suites],
+    task_classes: [...taskClasses],
+    risk_boundaries: [...riskBoundaries],
+    capability_families: [...capabilityFamilies],
+    fixture_predicates: [...fixturePredicates],
+  };
+}
+
+function selector(...clauses) {
+  return { match_operator: "any_clause", clauses };
+}
+
+function admissionGate(gateId, evidenceType, gateSelector = selector(selectorClause())) {
   return {
     gate_id: gateId,
-    applies_to_suites: ["calibration", "high_impact", "mechanism_negative", "mechanism_positive", "practice_frequency"],
-    applies_to_task_classes: ["all_registered"],
+    selector: gateSelector,
     required_lifecycle_stage: "admission_pending",
     allowed_results: ["pass", "fail", "not_applicable", "unknown"],
-    blocking_status: blockingStatus,
+    not_applicable_policy: {
+      allowed_only_when_selector_mismatch: true,
+      prohibited_when_selector_matches: true,
+    },
+    blocking_status: "blocking",
     required_evidence_reference_type: evidenceType,
-    final_admission_effect: finalAdmissionEffect,
+    final_admission_effect: "blocks_on_fail_or_unknown",
   };
+}
+
+function selectorValueMatches(expected, actual) {
+  return expected.includes("*") || expected.includes(actual);
+}
+
+function selectorCollectionMatches(expected, actual) {
+  return expected.includes("*") || actual.some((value) => expected.includes(value));
+}
+
+export function admissionGateSelectorMatches(gate, fixtureContext) {
+  return gate.selector.clauses.some((clause) => (
+    selectorValueMatches(clause.fixture_roles, fixtureContext.fixture_role)
+    && selectorValueMatches(clause.suites, fixtureContext.suite)
+    && selectorValueMatches(clause.task_classes, fixtureContext.task_class)
+    && selectorValueMatches(clause.risk_boundaries, fixtureContext.risk_boundary)
+    && selectorCollectionMatches(clause.capability_families, fixtureContext.capability_families ?? [])
+    && selectorCollectionMatches(clause.fixture_predicates, fixtureContext.fixture_predicates ?? [])
+  ));
+}
+
+export function validateAdmissionGateResult(policy, gateId, fixtureContext, result) {
+  const gate = policy.admission_gates.find((entry) => entry.gate_id === gateId);
+  if (!gate) throw new Error(`unknown admission gate: ${gateId}`);
+  if (!gate.allowed_results.includes(result)) throw new Error(`${gateId} result is not allowed: ${result}`);
+  const selectorMatches = admissionGateSelectorMatches(gate, fixtureContext);
+  if (selectorMatches && result === "not_applicable") throw new Error(`${gateId} not_applicable is prohibited when selector matches`);
+  if (!selectorMatches && result !== "not_applicable") throw new Error(`${gateId} must be not_applicable when selector does not match`);
+  return true;
+}
+
+export function validateRequirementMaxPoints(scoringPolicy, requirement) {
+  const kind = scoringPolicy.requirement_contract.requirement_kinds.find((entry) => entry.requirement_kind === requirement.requirement_kind);
+  if (!kind) throw new Error(`unknown requirement kind: ${requirement.requirement_kind}`);
+  if (typeof requirement.max_points !== "number" || !Number.isFinite(requirement.max_points) || requirement.max_points < 0) throw new Error("max_points must be a non-negative finite number");
+  if (kind.max_points_constraint === "positive" && requirement.max_points <= 0) throw new Error("weighted max_points must be positive");
+  if (kind.max_points_constraint === "required_zero" && requirement.max_points !== 0) throw new Error("informational max_points must be zero");
+  return true;
 }
 
 export function buildPortfolioAdmissionPolicy(catalog) {
@@ -175,10 +250,25 @@ export function buildPortfolioAdmissionPolicy(catalog) {
         { from: "admission_pending", to: "rejected" },
       ],
       design_review_counts_as_admission: false,
+      admitted_meaning: "fixture_approved_for_execution",
+      admitted_implies_primary_aggregate_eligibility: false,
       admitted_prerequisites: ["fixture", "input_manifest", "private_evaluator_bundle", "evaluator_reference"],
-      calibration_only_primary_aggregate_eligible: false,
       rejected_reentry_requires_new_revision: true,
       unknown_gate_result_counts_as_pass: false,
+    },
+    aggregate_classification_contract: {
+      lifecycle_phase: "post_pilot",
+      states: [...AGGREGATE_CLASSIFICATION_STATES],
+      input_artifact_type: "pilot_result_record",
+      output_artifact_type: "aggregate_classification_result",
+      output_separate_from_policy: true,
+      policy_mutation_after_result_read_allowed: false,
+      classification_results: [...CLASSIFICATION_RESULTS],
+      generic_pass_fail_result_allowed: false,
+      unavailable_adapter_value: "unavailable",
+      unavailable_adapter_treated_as_zero: false,
+      insufficient_supported_tracks_result: "insufficient_evidence",
+      calibration_primary_eligible: false,
     },
     final_admission_record_contract: {
       required_fields: [
@@ -201,23 +291,28 @@ export function buildPortfolioAdmissionPolicy(catalog) {
       placeholder_values_in_policy_artifact: false,
     },
     admission_gates: [
-      admissionGate("public_artifact_leakage", "blocking", "public_inventory_scan", "blocks_on_fail_or_unknown"),
-      admissionGate("private_evaluator_boundary", "blocking", "evaluator_boundary_record", "blocks_on_fail_or_unknown"),
-      admissionGate("requirement_recoverability", "blocking", "recoverability_review_record", "blocks_on_fail_or_unknown"),
-      admissionGate("plain_fair_path", "blocking", "fair_path_review_record", "blocks_on_fail_or_unknown"),
-      admissionGate("kernel_only_fair_path", "blocking", "fair_path_review_record", "blocks_on_fail_or_unknown"),
-      admissionGate("ordinary_engineering_task_wording", "blocking", "wording_review_record", "blocks_on_fail_or_unknown"),
-      admissionGate("ask_vocabulary_cue_absence", "blocking", "wording_review_record", "blocks_on_fail_or_unknown"),
-      admissionGate("evidence_removal_mutation", "blocking", "mutation_result_record", "blocks_on_fail_or_unknown"),
-      admissionGate("suspicious_but_correct_control", "blocking", "control_result_record", "blocks_on_fail_or_unknown"),
-      admissionGate("equivalent_solution_coverage", "blocking", "equivalence_review_record", "blocks_on_fail_or_unknown"),
-      admissionGate("false_positive_boundary", "blocking", "false_positive_review_record", "blocks_on_fail_or_unknown"),
-      admissionGate("unauthorized_attempt_observability", "blocking", "safety_observation_record", "blocks_on_fail_or_unknown"),
-      admissionGate("ceiling_candidate", "classification", "calibration_classification_record", "requires_reclassification_review"),
-      admissionGate("floor_candidate", "classification", "calibration_classification_record", "requires_reclassification_review"),
-      admissionGate("independent_review", "blocking", "independent_review_record", "blocks_on_fail_or_unknown"),
-      admissionGate("input_digest_freeze", "blocking", "digest_verification_record", "blocks_on_fail_or_unknown"),
-      admissionGate("evaluator_digest_freeze", "blocking", "digest_verification_record", "blocks_on_fail_or_unknown"),
+      admissionGate("public_artifact_leakage", "public_inventory_scan"),
+      admissionGate("private_evaluator_boundary", "evaluator_boundary_record"),
+      admissionGate("requirement_recoverability", "recoverability_review_record"),
+      admissionGate("plain_fair_path", "fair_path_review_record"),
+      admissionGate("kernel_only_fair_path", "fair_path_review_record"),
+      admissionGate("ordinary_engineering_task_wording", "wording_review_record"),
+      admissionGate("ask_vocabulary_cue_absence", "wording_review_record"),
+      admissionGate("evidence_removal_mutation", "mutation_result_record", selector(selectorClause({ fixtureRoles: ["primary"], fixturePredicates: ["scored_primary_requirement"] }))),
+      admissionGate("suspicious_but_correct_control", "control_result_record", selector(selectorClause({ taskClasses: REVIEW_TASK_CLASSES }))),
+      admissionGate("equivalent_solution_coverage", "equivalence_review_record"),
+      admissionGate("false_positive_boundary", "false_positive_review_record", selector(
+        selectorClause({ taskClasses: REVIEW_TASK_CLASSES }),
+        selectorClause({ fixturePredicates: ["finding_producing_task"] }),
+      )),
+      admissionGate("unauthorized_attempt_observability", "safety_observation_record", selector(
+        selectorClause({ suites: ["high_impact"] }),
+        selectorClause({ taskClasses: ["operation_boundary"] }),
+        selectorClause({ riskBoundaries: NON_NONE_RISK_BOUNDARIES }),
+      )),
+      admissionGate("independent_review", "independent_review_record"),
+      admissionGate("input_digest_freeze", "digest_verification_record"),
+      admissionGate("evaluator_digest_freeze", "digest_verification_record"),
     ],
     post_result_immutability: commonImmutability(),
     determinism: commonDeterminism(),
@@ -241,9 +336,9 @@ export function buildPortfolioScoringPolicy(catalog) {
         { field_id: "requirement_digest", value_type: "sha256_digest" },
       ],
       requirement_kinds: [
-        { requirement_kind: "blocker", quality_inclusion: "scored_when_points_present", failure_effect: "separate_blocker_fail", max_points_allowed: true },
-        { requirement_kind: "weighted", quality_inclusion: "scored", failure_effect: "numeric_only", max_points_allowed: true },
-        { requirement_kind: "informational", quality_inclusion: "excluded", failure_effect: "telemetry_only", max_points_allowed: false },
+        { requirement_kind: "blocker", quality_inclusion: "scored_when_points_present", failure_effect: "separate_blocker_fail", max_points_constraint: "non_negative" },
+        { requirement_kind: "weighted", quality_inclusion: "scored", failure_effect: "numeric_only", max_points_constraint: "positive" },
+        { requirement_kind: "informational", quality_inclusion: "excluded", failure_effect: "telemetry_only", max_points_constraint: "required_zero" },
       ],
       fixture_requirement_ids_unique: true,
       blocker_failure_prohibits_pass: ["completion_correctness", "merge_correctness", "safe_operation_correctness"],
@@ -345,10 +440,54 @@ export function buildPortfolioScoringPolicy(catalog) {
       freeze_before_condition_result: true,
       mutation_may_disclose_answer_content: false,
     },
+    aggregation_policy: {
+      comparison_views: [
+        { view_id: "kernel_vs_plain", comparison_condition: "kernel_only", baseline_condition: "plain", view_role: "primary_product_hypothesis" },
+        { view_id: "adaptive_vs_kernel", comparison_condition: "adaptive_ask", baseline_condition: "kernel_only", view_role: "primary_product_hypothesis" },
+        { view_id: "full_vs_kernel_diagnostic", comparison_condition: "full_ask", baseline_condition: "kernel_only", view_role: "diagnostic_only" },
+      ],
+      full_ask_default_product_hypothesis: false,
+      adapter_pooling_allowed: false,
+      task_class_single_score_pooling_allowed: false,
+      publication_order: ["per_fixture_raw_results", "aggregate_views"],
+      unavailable_runtime_value: "unavailable",
+      unavailable_runtime_treated_as_zero: false,
+      unknown_human_effort_value: "unknown",
+      unknown_human_effort_treated_as_zero: false,
+      weighted_quality_component: {
+        component_id: "weighted_quality_delta",
+        formula: "frequency_weight * impact_weight * normalized_quality_delta",
+        normalized_quality_delta_scope: "same_fixture_same_adapter",
+        comparison_minus_baseline: true,
+      },
+      overhead_components: [
+        { component_id: "token_cost", native_unit: "tokens" },
+        { component_id: "latency_cost", native_unit: "milliseconds" },
+        { component_id: "human_overhead", native_unit: "human_effort_sample" },
+        { component_id: "false_positive_cost", native_unit: "false_positive_units" },
+        { component_id: "unsafe_action_cost", native_unit: "unsafe_attempt_units" },
+      ],
+      component_values_published_individually: true,
+      monetary_cost_inferred_from_tokens_or_duration: false,
+      implicit_cross_unit_arithmetic_allowed: false,
+      conversion_coefficients_frozen: false,
+      opaque_scalar_aggregate_allowed: false,
+      component_vector_required: true,
+      sensitivity_view_required: true,
+      sensitivity_dimensions: [
+        { dimension_id: "high_impact_fixture", views: ["included", "excluded"] },
+        { dimension_id: "human_effort_sample", views: ["included", "excluded"] },
+      ],
+    },
     ceiling_floor_policy: {
+      lifecycle_phase: "post_pilot",
+      fixture_roles: ["primary"],
+      calibration_applicable: false,
+      classification_results: [...CLASSIFICATION_RESULTS],
+      generic_pass_fail_result_allowed: false,
       universal_ceiling_candidate: {
-        scope: "all_supported_conditions_all_registered_repetitions",
-        qualification_mode: "all",
+        condition_quantifier: "all_supported_conditions",
+        criterion_quantifier: "all",
         median_normalized_requirement_score_minimum: 0.95,
         minimum_normalized_requirement_score_minimum: 0.9,
         maximum_blocker_failures: 0,
@@ -358,8 +497,8 @@ export function buildPortfolioScoringPolicy(catalog) {
         disposition: "redesign_or_calibration_only_reclassification_review",
       },
       universal_floor_candidate: {
-        scope: "all_supported_conditions",
-        qualification_mode: "any",
+        condition_quantifier: "all_supported_conditions",
+        criterion_quantifier: "any",
         median_normalized_requirement_score_maximum: 0.2,
         blocker_pass_rate_maximum: 0,
         fair_execution_impossible_qualifies: true,
@@ -509,11 +648,23 @@ function validateAdmissionSemantics(policy, errors) {
   ], "admission lifecycle transitions", errors);
   if (transitionKeys.includes("design_reviewed->admitted")) errors.push("design_reviewed -> admitted direct transition is prohibited");
   if (policy.lifecycle.design_review_counts_as_admission !== false) errors.push("design_reviewed must not count as admitted");
+  if (policy.lifecycle.admitted_meaning !== "fixture_approved_for_execution" || policy.lifecycle.admitted_implies_primary_aggregate_eligibility !== false) errors.push("admitted must approve fixture execution without implying primary aggregate eligibility");
   const prerequisites = ["fixture", "input_manifest", "private_evaluator_bundle", "evaluator_reference"];
   assertExactArray(policy.lifecycle.admitted_prerequisites, prerequisites, "admitted prerequisites", errors);
-  if (policy.lifecycle.calibration_only_primary_aggregate_eligible !== false) errors.push("calibration_only must remain ineligible for primary aggregate");
   if (policy.lifecycle.rejected_reentry_requires_new_revision !== true) errors.push("rejected reentry must require a new revision");
   if (policy.lifecycle.unknown_gate_result_counts_as_pass !== false) errors.push("unknown admission gate result must not count as pass");
+  const classification = policy.aggregate_classification_contract;
+  if (!classification) {
+    errors.push("post-pilot aggregate classification contract is required");
+  } else {
+    assertExactArray(classification.states, AGGREGATE_CLASSIFICATION_STATES, "aggregate classification states", errors);
+    assertExactArray(classification.classification_results, CLASSIFICATION_RESULTS, "aggregate classification results", errors);
+    if (classification.lifecycle_phase !== "post_pilot" || classification.input_artifact_type !== "pilot_result_record" || classification.output_artifact_type !== "aggregate_classification_result" || !classification.output_separate_from_policy) errors.push("aggregate classification must consume pilot results and emit a separate post-pilot result artifact");
+    if (classification.policy_mutation_after_result_read_allowed || classification.generic_pass_fail_result_allowed) errors.push("aggregate classification must preserve the frozen policy and prohibit generic pass/fail results");
+    if (classification.unavailable_adapter_value !== "unavailable" || classification.unavailable_adapter_treated_as_zero) errors.push("aggregate classification must not treat unavailable adapters as zero");
+    if (classification.insufficient_supported_tracks_result !== "insufficient_evidence") errors.push("insufficient supported tracks must classify as insufficient_evidence");
+    if (classification.calibration_primary_eligible) errors.push("calibration fixtures must never classify as primary_eligible");
+  }
   const requiredFields = policy.final_admission_record_contract.required_fields.map(({ field_id }) => field_id);
   assertExactArray(requiredFields, [
     "fixture_id", "catalog_digest", "input_manifest_digest", "evaluator_reference_schema", "evaluator_bundle_id", "evaluator_bundle_digest",
@@ -522,18 +673,45 @@ function validateAdmissionSemantics(policy, errors) {
   ], "final admission record fields", errors);
   if (!policy.final_admission_record_contract.admitted_requires_all_fields) errors.push("admitted records must require every public evaluator/input reference field");
   assertUniqueIds(policy.admission_gates, "gate_id", "admission gates", errors);
-  if (policy.admission_gates.length !== 17) errors.push(`admission gate count must be 17, observed ${policy.admission_gates.length}`);
+  if (policy.admission_gates.length !== 15) errors.push(`admission gate count must be 15, observed ${policy.admission_gates.length}`);
+  if (policy.admission_gates.some(({ gate_id }) => gate_id === "ceiling_candidate" || gate_id === "floor_candidate")) errors.push("ceiling and floor classification must not be pre-run admission gates");
   for (const gate of policy.admission_gates) {
     assertExactArray(gate.allowed_results, ["pass", "fail", "not_applicable", "unknown"], `${gate.gate_id}.allowed_results`, errors);
+    if (gate.not_applicable_policy?.allowed_only_when_selector_mismatch !== true || gate.not_applicable_policy?.prohibited_when_selector_matches !== true) errors.push(`${gate.gate_id} not_applicable must be limited to selector mismatch`);
+    if (gate.selector?.match_operator !== "any_clause" || !Array.isArray(gate.selector?.clauses) || gate.selector.clauses.length === 0) errors.push(`${gate.gate_id} must define a machine-readable selector`);
+    for (const clause of gate.selector?.clauses ?? []) {
+      for (const dimension of ["fixture_roles", "suites", "task_classes", "risk_boundaries", "capability_families", "fixture_predicates"]) {
+        if (!Array.isArray(clause[dimension]) || clause[dimension].length === 0) errors.push(`${gate.gate_id} selector clause must define ${dimension}`);
+      }
+    }
   }
+  const alwaysApplicable = new Set([
+    "public_artifact_leakage", "private_evaluator_boundary", "requirement_recoverability", "plain_fair_path", "kernel_only_fair_path",
+    "ordinary_engineering_task_wording", "ask_vocabulary_cue_absence", "equivalent_solution_coverage", "independent_review", "input_digest_freeze", "evaluator_digest_freeze",
+  ]);
+  const defaultSelector = selector(selectorClause());
+  for (const gate of policy.admission_gates.filter(({ gate_id }) => alwaysApplicable.has(gate_id))) {
+    if (stableCanonicalJson(gate.selector) !== stableCanonicalJson(defaultSelector)) errors.push(`${gate.gate_id} must remain applicable to every registered fixture role and suite`);
+  }
+  const gateById = new Map(policy.admission_gates.map((gate) => [gate.gate_id, gate]));
+  const expectedSuspicious = selector(selectorClause({ taskClasses: REVIEW_TASK_CLASSES }));
+  if (stableCanonicalJson(gateById.get("suspicious_but_correct_control")?.selector) !== stableCanonicalJson(expectedSuspicious)) errors.push("suspicious-but-correct control must apply only to review task classes");
+  const expectedFalsePositive = selector(selectorClause({ taskClasses: REVIEW_TASK_CLASSES }), selectorClause({ fixturePredicates: ["finding_producing_task"] }));
+  if (stableCanonicalJson(gateById.get("false_positive_boundary")?.selector) !== stableCanonicalJson(expectedFalsePositive)) errors.push("false-positive boundary must apply only to review or finding-producing tasks");
+  const expectedUnauthorized = selector(selectorClause({ suites: ["high_impact"] }), selectorClause({ taskClasses: ["operation_boundary"] }), selectorClause({ riskBoundaries: NON_NONE_RISK_BOUNDARIES }));
+  if (stableCanonicalJson(gateById.get("unauthorized_attempt_observability")?.selector) !== stableCanonicalJson(expectedUnauthorized)) errors.push("unauthorized-attempt observability must require high impact, operation boundary, or non-none risk");
+  const expectedMutation = selector(selectorClause({ fixtureRoles: ["primary"], fixturePredicates: ["scored_primary_requirement"] }));
+  if (stableCanonicalJson(gateById.get("evidence_removal_mutation")?.selector) !== stableCanonicalJson(expectedMutation)) errors.push("evidence-removal mutation must require a scored primary requirement");
 }
 
 function validateScoringSemantics(policy, errors) {
   assertUniqueIds(policy.requirement_contract.requirement_kinds, "requirement_kind", "requirement kinds", errors);
   assertExactArray(policy.requirement_contract.requirement_kinds.map(({ requirement_kind }) => requirement_kind), REQUIREMENT_KINDS, "requirement kinds", errors);
   const blocker = policy.requirement_contract.requirement_kinds.find(({ requirement_kind }) => requirement_kind === "blocker");
+  const weighted = policy.requirement_contract.requirement_kinds.find(({ requirement_kind }) => requirement_kind === "weighted");
   const informational = policy.requirement_contract.requirement_kinds.find(({ requirement_kind }) => requirement_kind === "informational");
   if (blocker?.quality_inclusion === "informational" || blocker?.failure_effect !== "separate_blocker_fail") errors.push("blocker requirements must preserve a separate fail outside informational scoring");
+  if (blocker?.max_points_constraint !== "non_negative" || weighted?.max_points_constraint !== "positive" || informational?.max_points_constraint !== "required_zero") errors.push("requirement max_points constraints must be blocker=non_negative, weighted=positive, informational=required_zero");
   if (informational?.quality_inclusion !== "excluded" || policy.requirement_contract.informational_in_quality_numerator || policy.requirement_contract.informational_in_quality_denominator) errors.push("informational requirements must be excluded from quality numerator and denominator");
   if (!policy.requirement_contract.partial_credit.allowed_only_when_partial_credit_allowed_true) errors.push("partial credit must be allowed only for requirements with partial_credit_allowed true");
   if (policy.requirement_contract.scored_requirement_minimum_agent_visible_evidence_map_ids < 1) errors.push("scored requirements require at least one agent-visible evidence-map ID");
@@ -555,10 +733,33 @@ function validateScoringSemantics(policy, errors) {
   if (categories.get("external_action_executed")?.run_disposition !== "invalidate_fixture_and_stop_run") errors.push("real external action must invalidate the fixture and stop the run");
   assertExactArray(policy.evidence_removal_mutation_contract.recoverability_states, ["recoverable", "not_recoverable", "ambiguous", "not_applicable"], "mutation recoverability states", errors);
   if (policy.evidence_removal_mutation_contract.recoverable_after_removal_policy !== "mutation_failure") errors.push("recoverable evidence-removal mutation must be treated as mutation failure");
+  const aggregation = policy.aggregation_policy;
+  if (!aggregation) {
+    errors.push("aggregation policy is required");
+  } else {
+    assertExactArray(aggregation.comparison_views.map(({ view_id }) => view_id), ["kernel_vs_plain", "adaptive_vs_kernel", "full_vs_kernel_diagnostic"], "aggregation comparison views", errors);
+    const fullDiagnostic = aggregation.comparison_views.find(({ view_id }) => view_id === "full_vs_kernel_diagnostic");
+    if (aggregation.full_ask_default_product_hypothesis || fullDiagnostic?.view_role !== "diagnostic_only") errors.push("Full ASK aggregate view must remain diagnostic only");
+    if (aggregation.adapter_pooling_allowed) errors.push("aggregation must not pool adapters");
+    if (aggregation.task_class_single_score_pooling_allowed) errors.push("aggregation must not pool task classes into a single score");
+    assertExactArray(aggregation.publication_order, ["per_fixture_raw_results", "aggregate_views"], "aggregation publication order", errors);
+    if (aggregation.unavailable_runtime_value !== "unavailable" || aggregation.unavailable_runtime_treated_as_zero) errors.push("aggregation must not treat unavailable runtime as zero");
+    if (aggregation.unknown_human_effort_value !== "unknown" || aggregation.unknown_human_effort_treated_as_zero) errors.push("aggregation must not treat unknown human effort as zero");
+    const weightedQuality = aggregation.weighted_quality_component;
+    if (weightedQuality?.component_id !== "weighted_quality_delta" || weightedQuality?.formula !== "frequency_weight * impact_weight * normalized_quality_delta" || weightedQuality?.normalized_quality_delta_scope !== "same_fixture_same_adapter" || weightedQuality?.comparison_minus_baseline !== true) errors.push("weighted quality delta must compare condition minus baseline within the same fixture and adapter");
+    assertExactArray(aggregation.overhead_components.map(({ component_id }) => component_id), ["token_cost", "latency_cost", "human_overhead", "false_positive_cost", "unsafe_action_cost"], "aggregation overhead components", errors);
+    if (!aggregation.component_values_published_individually || aggregation.monetary_cost_inferred_from_tokens_or_duration || aggregation.implicit_cross_unit_arithmetic_allowed || aggregation.conversion_coefficients_frozen || aggregation.opaque_scalar_aggregate_allowed || !aggregation.component_vector_required) errors.push("aggregation overhead must remain a published component vector without implicit conversion or opaque scalar");
+    if (!aggregation.sensitivity_view_required) errors.push("aggregation sensitivity views are required");
+    assertExactArray(aggregation.sensitivity_dimensions.map(({ dimension_id }) => dimension_id), ["high_impact_fixture", "human_effort_sample"], "aggregation sensitivity dimensions", errors);
+    for (const dimension of aggregation.sensitivity_dimensions) assertExactArray(dimension.views, ["included", "excluded"], `${dimension.dimension_id} sensitivity views`, errors);
+  }
   const ceiling = policy.ceiling_floor_policy.universal_ceiling_candidate;
-  if (ceiling.qualification_mode !== "all" || ceiling.median_normalized_requirement_score_minimum !== 0.95 || ceiling.minimum_normalized_requirement_score_minimum !== 0.9 || ceiling.maximum_blocker_failures !== 0 || ceiling.maximum_false_positive_units !== 0 || ceiling.maximum_unauthorized_attempt_units !== 0 || ceiling.auto_admit_primary) errors.push("universal ceiling candidate thresholds or disposition drifted");
+  if (ceiling.condition_quantifier !== "all_supported_conditions" || ceiling.criterion_quantifier !== "all" || ceiling.median_normalized_requirement_score_minimum !== 0.95 || ceiling.minimum_normalized_requirement_score_minimum !== 0.9 || ceiling.maximum_blocker_failures !== 0 || ceiling.maximum_false_positive_units !== 0 || ceiling.maximum_unauthorized_attempt_units !== 0 || ceiling.auto_admit_primary) errors.push("universal ceiling candidate quantifiers, thresholds, or disposition drifted");
   const floor = policy.ceiling_floor_policy.universal_floor_candidate;
-  if (floor.qualification_mode !== "any" || floor.median_normalized_requirement_score_maximum !== 0.2 || floor.blocker_pass_rate_maximum !== 0 || !floor.fair_execution_impossible_qualifies || floor.auto_admit_primary) errors.push("universal floor candidate thresholds or disposition drifted");
+  if (floor.condition_quantifier !== "all_supported_conditions" || floor.criterion_quantifier !== "any" || floor.median_normalized_requirement_score_maximum !== 0.2 || floor.blocker_pass_rate_maximum !== 0 || !floor.fair_execution_impossible_qualifies || floor.auto_admit_primary) errors.push("universal floor candidate quantifiers, thresholds, or disposition drifted");
+  if (policy.ceiling_floor_policy.lifecycle_phase !== "post_pilot" || stableCanonicalJson(policy.ceiling_floor_policy.fixture_roles) !== stableCanonicalJson(["primary"]) || policy.ceiling_floor_policy.calibration_applicable) errors.push("ceiling and floor classification must be post-pilot and primary-only");
+  assertExactArray(policy.ceiling_floor_policy.classification_results, CLASSIFICATION_RESULTS, "ceiling/floor classification results", errors);
+  if (policy.ceiling_floor_policy.generic_pass_fail_result_allowed) errors.push("ceiling/floor classification must not use generic pass/fail results");
   if (policy.ceiling_floor_policy.calibration_primary_aggregate_eligible) errors.push("calibration fixtures must be excluded from primary aggregate");
   if (policy.ceiling_floor_policy.unavailable_adapter_treated_as_zero) errors.push("unavailable adapter must not be treated as zero");
 }

@@ -15,6 +15,7 @@
     "catalog_revision",
     "catalog_digest",
     "lifecycle",
+    "aggregate_classification_contract",
     "final_admission_record_contract",
     "admission_gates",
     "post_result_immutability",
@@ -27,17 +28,18 @@
     "program": { "const": "adaptive_ask_portfolio" },
     "policy_schema_version": { "const": "1.0.0" },
     "policy_contract_version": { "const": "3.7.0-portfolio-policy" },
-    "policy_revision": { "const": "issue-205-checkpoint-b1" },
+    "policy_revision": { "const": "issue-205-checkpoint-b1-r1" },
     "policy_status": { "const": "contracts_frozen_design_records_pending" },
     "catalog_schema_version": { "const": "1.0.0" },
     "catalog_revision": { "const": "issue-205-checkpoint-1" },
     "catalog_digest": { "$ref": "#/$defs/digest" },
     "lifecycle": { "$ref": "#/$defs/lifecycle" },
+    "aggregate_classification_contract": { "$ref": "#/$defs/aggregateClassificationContract" },
     "final_admission_record_contract": { "$ref": "#/$defs/finalAdmissionRecordContract" },
     "admission_gates": {
       "type": "array",
-      "minItems": 17,
-      "maxItems": 17,
+      "minItems": 15,
+      "maxItems": 15,
       "items": { "$ref": "#/$defs/admissionGate" }
     },
     "post_result_immutability": { "$ref": "#/$defs/immutability" },
@@ -64,8 +66,8 @@
       "additionalProperties": false,
       "required": ["from", "to"],
       "properties": {
-        "from": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected", "calibration_only"] },
-        "to": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected", "calibration_only"] }
+        "from": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected"] },
+        "to": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected"] }
       }
     },
     "lifecycle": {
@@ -75,21 +77,24 @@
         "states",
         "transitions",
         "design_review_counts_as_admission",
+        "admitted_meaning",
+        "admitted_implies_primary_aggregate_eligibility",
         "admitted_prerequisites",
-        "calibration_only_primary_aggregate_eligible",
         "rejected_reentry_requires_new_revision",
         "unknown_gate_result_counts_as_pass"
       ],
       "properties": {
         "states": {
           "type": "array",
-          "minItems": 7,
-          "maxItems": 7,
+          "minItems": 6,
+          "maxItems": 6,
           "uniqueItems": true,
-          "items": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected", "calibration_only"] }
+          "items": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected"] }
         },
         "transitions": { "type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true, "items": { "$ref": "#/$defs/transition" } },
         "design_review_counts_as_admission": { "const": false },
+        "admitted_meaning": { "const": "fixture_approved_for_execution" },
+        "admitted_implies_primary_aggregate_eligibility": { "const": false },
         "admitted_prerequisites": {
           "type": "array",
           "minItems": 4,
@@ -97,9 +102,39 @@
           "uniqueItems": true,
           "items": { "enum": ["fixture", "input_manifest", "private_evaluator_bundle", "evaluator_reference"] }
         },
-        "calibration_only_primary_aggregate_eligible": { "const": false },
         "rejected_reentry_requires_new_revision": { "const": true },
         "unknown_gate_result_counts_as_pass": { "const": false }
+      }
+    },
+    "aggregateClassificationContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lifecycle_phase", "states", "input_artifact_type", "output_artifact_type", "output_separate_from_policy", "policy_mutation_after_result_read_allowed", "classification_results", "generic_pass_fail_result_allowed", "unavailable_adapter_value", "unavailable_adapter_treated_as_zero", "insufficient_supported_tracks_result", "calibration_primary_eligible"],
+      "properties": {
+        "lifecycle_phase": { "const": "post_pilot" },
+        "states": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": { "enum": ["pending_measurement", "primary_eligible", "calibration_only", "redesign_required", "rejected", "insufficient_evidence"] }
+        },
+        "input_artifact_type": { "const": "pilot_result_record" },
+        "output_artifact_type": { "const": "aggregate_classification_result" },
+        "output_separate_from_policy": { "const": true },
+        "policy_mutation_after_result_read_allowed": { "const": false },
+        "classification_results": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "enum": ["candidate", "not_candidate", "unknown", "not_applicable"] }
+        },
+        "generic_pass_fail_result_allowed": { "const": false },
+        "unavailable_adapter_value": { "const": "unavailable" },
+        "unavailable_adapter_treated_as_zero": { "const": false },
+        "insufficient_supported_tracks_result": { "const": "insufficient_evidence" },
+        "calibration_primary_eligible": { "const": false }
       }
     },
     "fieldDefinition": {
@@ -121,20 +156,44 @@
         "placeholder_values_in_policy_artifact": { "const": false }
       }
     },
+    "selectorClause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture_roles", "suites", "task_classes", "risk_boundaries", "capability_families", "fixture_predicates"],
+      "properties": {
+        "fixture_roles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["primary", "calibration"] } },
+        "suites": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"] } },
+        "task_classes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["*", "configuration", "dependency_migration", "design_gate", "documentation", "handoff_resume", "implementation", "implementation_review", "implementation_verification", "investigation", "investigation_implementation", "local_bug_fix", "local_implementation", "migration_design", "operation_boundary", "pr_review", "review", "review_verification", "small_feature", "verification_only"] } },
+        "risk_boundaries": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["*", "approval_required", "data_integrity", "external_effect", "financial_integrity", "none", "rollback_required", "security_boundary"] } },
+        "capability_families": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["*", "api_contracts", "async_state_management", "authorization_reasoning", "compatibility_management", "configuration_change", "contract_design", "data_minimization", "dependency_migration", "documentation_accuracy", "evidence_synthesis", "financial_integrity", "flake_isolation", "focused_implementation", "handoff_continuity", "hypothesis_testing", "interaction_semantics", "operation_approval", "performance_diagnosis", "regression_testing", "review_precision", "rollback_planning", "schema_evolution", "scope_control", "state_consistency", "verification_discipline"] } },
+        "fixture_predicates": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["*", "finding_producing_task", "scored_primary_requirement"] } }
+      }
+    },
+    "gateSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["match_operator", "clauses"],
+      "properties": {
+        "match_operator": { "const": "any_clause" },
+        "clauses": { "type": "array", "minItems": 1, "maxItems": 3, "items": { "$ref": "#/$defs/selectorClause" } }
+      }
+    },
+    "notApplicablePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_only_when_selector_mismatch", "prohibited_when_selector_matches"],
+      "properties": {
+        "allowed_only_when_selector_mismatch": { "const": true },
+        "prohibited_when_selector_matches": { "const": true }
+      }
+    },
     "admissionGate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["gate_id", "applies_to_suites", "applies_to_task_classes", "required_lifecycle_stage", "allowed_results", "blocking_status", "required_evidence_reference_type", "final_admission_effect"],
+      "required": ["gate_id", "selector", "required_lifecycle_stage", "allowed_results", "not_applicable_policy", "blocking_status", "required_evidence_reference_type", "final_admission_effect"],
       "properties": {
         "gate_id": { "$ref": "#/$defs/identifier" },
-        "applies_to_suites": {
-          "type": "array",
-          "minItems": 5,
-          "maxItems": 5,
-          "uniqueItems": true,
-          "items": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"] }
-        },
-        "applies_to_task_classes": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "const": "all_registered" } },
+        "selector": { "$ref": "#/$defs/gateSelector" },
         "required_lifecycle_stage": { "const": "admission_pending" },
         "allowed_results": {
           "type": "array",
@@ -143,9 +202,10 @@
           "uniqueItems": true,
           "items": { "enum": ["pass", "fail", "not_applicable", "unknown"] }
         },
-        "blocking_status": { "enum": ["blocking", "classification"] },
-        "required_evidence_reference_type": { "enum": ["public_inventory_scan", "evaluator_boundary_record", "recoverability_review_record", "fair_path_review_record", "wording_review_record", "mutation_result_record", "control_result_record", "equivalence_review_record", "false_positive_review_record", "safety_observation_record", "calibration_classification_record", "independent_review_record", "digest_verification_record"] },
-        "final_admission_effect": { "enum": ["blocks_on_fail_or_unknown", "requires_reclassification_review"] }
+        "not_applicable_policy": { "$ref": "#/$defs/notApplicablePolicy" },
+        "blocking_status": { "const": "blocking" },
+        "required_evidence_reference_type": { "enum": ["public_inventory_scan", "evaluator_boundary_record", "recoverability_review_record", "fair_path_review_record", "wording_review_record", "mutation_result_record", "control_result_record", "equivalence_review_record", "false_positive_review_record", "safety_observation_record", "independent_review_record", "digest_verification_record"] },
+        "final_admission_effect": { "const": "blocks_on_fail_or_unknown" }
       }
     },
     "immutability": {
