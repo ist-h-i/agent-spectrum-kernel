@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio policy manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "policy_schema_version",
+    "policy_contract_version",
+    "policy_revision",
+    "policy_status",
+    "catalog_schema_version",
+    "catalog_revision",
+    "catalog_digest",
+    "admission_policy",
+    "scoring_policy",
+    "lineage_policy",
+    "digest_contract",
+    "manifest_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-policy-manifest.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio" },
+    "policy_schema_version": { "const": "1.0.0" },
+    "policy_contract_version": { "const": "3.7.0-portfolio-policy" },
+    "policy_revision": { "const": "issue-205-checkpoint-b1" },
+    "policy_status": { "const": "contracts_frozen_design_records_pending" },
+    "catalog_schema_version": { "const": "1.0.0" },
+    "catalog_revision": { "const": "issue-205-checkpoint-1" },
+    "catalog_digest": { "$ref": "#/$defs/digest" },
+    "admission_policy": { "$ref": "#/$defs/admissionReference" },
+    "scoring_policy": { "$ref": "#/$defs/scoringReference" },
+    "lineage_policy": { "$ref": "#/$defs/lineageReference" },
+    "digest_contract": { "$ref": "#/$defs/digestContract" },
+    "manifest_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "admissionReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": { "const": "benchmarks/portfolio-admission-policy.json" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "scoringReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": { "const": "benchmarks/portfolio-scoring-policy.json" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "lineageReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": { "const": "benchmarks/portfolio-lineage-policy.json" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "digestContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "canonicalization", "excluded_digest_field", "child_policy_digests_included", "timestamp_in_digest_identity"],
+      "properties": {
+        "algorithm": { "const": "sha256" },
+        "canonicalization": { "const": "sorted_key_canonical_json" },
+        "excluded_digest_field": { "const": "manifest_digest" },
+        "child_policy_digests_included": { "const": true },
+        "timestamp_in_digest_identity": { "const": false }
+      }
+    }
+  }
+}

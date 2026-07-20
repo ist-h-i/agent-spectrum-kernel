@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio admission policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "policy_schema_version",
+    "policy_contract_version",
+    "policy_revision",
+    "policy_status",
+    "catalog_schema_version",
+    "catalog_revision",
+    "catalog_digest",
+    "lifecycle",
+    "final_admission_record_contract",
+    "admission_gates",
+    "post_result_immutability",
+    "determinism",
+    "policy_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-admission-policy.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio" },
+    "policy_schema_version": { "const": "1.0.0" },
+    "policy_contract_version": { "const": "3.7.0-portfolio-policy" },
+    "policy_revision": { "const": "issue-205-checkpoint-b1" },
+    "policy_status": { "const": "contracts_frozen_design_records_pending" },
+    "catalog_schema_version": { "const": "1.0.0" },
+    "catalog_revision": { "const": "issue-205-checkpoint-1" },
+    "catalog_digest": { "$ref": "#/$defs/digest" },
+    "lifecycle": { "$ref": "#/$defs/lifecycle" },
+    "final_admission_record_contract": { "$ref": "#/$defs/finalAdmissionRecordContract" },
+    "admission_gates": {
+      "type": "array",
+      "minItems": 17,
+      "maxItems": 17,
+      "items": { "$ref": "#/$defs/admissionGate" }
+    },
+    "post_result_immutability": { "$ref": "#/$defs/immutability" },
+    "determinism": { "$ref": "#/$defs/determinism" },
+    "policy_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "stringArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected", "calibration_only"] },
+        "to": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected", "calibration_only"] }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "states",
+        "transitions",
+        "design_review_counts_as_admission",
+        "admitted_prerequisites",
+        "calibration_only_primary_aggregate_eligible",
+        "rejected_reentry_requires_new_revision",
+        "unknown_gate_result_counts_as_pass"
+      ],
+      "properties": {
+        "states": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected", "calibration_only"] }
+        },
+        "transitions": { "type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true, "items": { "$ref": "#/$defs/transition" } },
+        "design_review_counts_as_admission": { "const": false },
+        "admitted_prerequisites": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "enum": ["fixture", "input_manifest", "private_evaluator_bundle", "evaluator_reference"] }
+        },
+        "calibration_only_primary_aggregate_eligible": { "const": false },
+        "rejected_reentry_requires_new_revision": { "const": true },
+        "unknown_gate_result_counts_as_pass": { "const": false }
+      }
+    },
+    "fieldDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field_id", "value_type"],
+      "properties": {
+        "field_id": { "$ref": "#/$defs/identifier" },
+        "value_type": { "enum": ["identifier", "sha256_digest", "repository_relative_schema_path", "non_negative_integer", "positive_integer", "identifier_array", "lifecycle_state"] }
+      }
+    },
+    "finalAdmissionRecordContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_fields", "admitted_requires_all_fields", "placeholder_values_in_policy_artifact"],
+      "properties": {
+        "required_fields": { "type": "array", "minItems": 14, "maxItems": 14, "items": { "$ref": "#/$defs/fieldDefinition" } },
+        "admitted_requires_all_fields": { "const": true },
+        "placeholder_values_in_policy_artifact": { "const": false }
+      }
+    },
+    "admissionGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "applies_to_suites", "applies_to_task_classes", "required_lifecycle_stage", "allowed_results", "blocking_status", "required_evidence_reference_type", "final_admission_effect"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/identifier" },
+        "applies_to_suites": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"] }
+        },
+        "applies_to_task_classes": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "const": "all_registered" } },
+        "required_lifecycle_stage": { "const": "admission_pending" },
+        "allowed_results": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "enum": ["pass", "fail", "not_applicable", "unknown"] }
+        },
+        "blocking_status": { "enum": ["blocking", "classification"] },
+        "required_evidence_reference_type": { "enum": ["public_inventory_scan", "evaluator_boundary_record", "recoverability_review_record", "fair_path_review_record", "wording_review_record", "mutation_result_record", "control_result_record", "equivalence_review_record", "false_positive_review_record", "safety_observation_record", "calibration_classification_record", "independent_review_record", "digest_verification_record"] },
+        "final_admission_effect": { "enum": ["blocks_on_fail_or_unknown", "requires_reclassification_review"] }
+      }
+    },
+    "immutability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition_results_read", "mutation_after_result_read", "change_requires_new_policy_revision", "retroactive_application_to_existing_run"],
+      "properties": {
+        "condition_results_read": { "const": false },
+        "mutation_after_result_read": { "const": "prohibited" },
+        "change_requires_new_policy_revision": { "const": true },
+        "retroactive_application_to_existing_run": { "const": false }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest_algorithm", "canonicalization", "excluded_digest_field", "array_order", "timestamp_in_digest_identity", "network_dependency", "llm_dependency", "embedding_dependency"],
+      "properties": {
+        "digest_algorithm": { "const": "sha256" },
+        "canonicalization": { "const": "sorted_key_canonical_json" },
+        "excluded_digest_field": { "const": "policy_digest" },
+        "array_order": { "const": "semantic" },
+        "timestamp_in_digest_identity": { "const": false },
+        "network_dependency": { "const": false },
+        "llm_dependency": { "const": false },
+        "embedding_dependency": { "const": false }
+      }
+    }
+  }
+}

@@ -1,0 +1,527 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-admission-policy.schema.json",
+  "program": "adaptive_ask_portfolio",
+  "policy_schema_version": "1.0.0",
+  "policy_contract_version": "3.7.0-portfolio-policy",
+  "policy_revision": "issue-205-checkpoint-b1",
+  "policy_status": "contracts_frozen_design_records_pending",
+  "catalog_schema_version": "1.0.0",
+  "catalog_revision": "issue-205-checkpoint-1",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "lifecycle": {
+    "states": [
+      "design_pending",
+      "design_reviewed",
+      "implementation_pending",
+      "admission_pending",
+      "admitted",
+      "rejected",
+      "calibration_only"
+    ],
+    "transitions": [
+      {
+        "from": "design_pending",
+        "to": "design_reviewed"
+      },
+      {
+        "from": "design_reviewed",
+        "to": "implementation_pending"
+      },
+      {
+        "from": "implementation_pending",
+        "to": "admission_pending"
+      },
+      {
+        "from": "admission_pending",
+        "to": "admitted"
+      },
+      {
+        "from": "admission_pending",
+        "to": "rejected"
+      }
+    ],
+    "design_review_counts_as_admission": false,
+    "admitted_prerequisites": [
+      "fixture",
+      "input_manifest",
+      "private_evaluator_bundle",
+      "evaluator_reference"
+    ],
+    "calibration_only_primary_aggregate_eligible": false,
+    "rejected_reentry_requires_new_revision": true,
+    "unknown_gate_result_counts_as_pass": false
+  },
+  "final_admission_record_contract": {
+    "required_fields": [
+      {
+        "field_id": "fixture_id",
+        "value_type": "identifier"
+      },
+      {
+        "field_id": "catalog_digest",
+        "value_type": "sha256_digest"
+      },
+      {
+        "field_id": "input_manifest_digest",
+        "value_type": "sha256_digest"
+      },
+      {
+        "field_id": "evaluator_reference_schema",
+        "value_type": "repository_relative_schema_path"
+      },
+      {
+        "field_id": "evaluator_bundle_id",
+        "value_type": "identifier"
+      },
+      {
+        "field_id": "evaluator_bundle_digest",
+        "value_type": "sha256_digest"
+      },
+      {
+        "field_id": "evaluator_byte_count",
+        "value_type": "non_negative_integer"
+      },
+      {
+        "field_id": "evaluator_requirement_count",
+        "value_type": "positive_integer"
+      },
+      {
+        "field_id": "evidence_map_ids",
+        "value_type": "identifier_array"
+      },
+      {
+        "field_id": "mutation_set_ids",
+        "value_type": "identifier_array"
+      },
+      {
+        "field_id": "reviewer_record_id",
+        "value_type": "identifier"
+      },
+      {
+        "field_id": "admission_revision",
+        "value_type": "positive_integer"
+      },
+      {
+        "field_id": "admission_status",
+        "value_type": "lifecycle_state"
+      },
+      {
+        "field_id": "admission_digest",
+        "value_type": "sha256_digest"
+      }
+    ],
+    "admitted_requires_all_fields": true,
+    "placeholder_values_in_policy_artifact": false
+  },
+  "admission_gates": [
+    {
+      "gate_id": "public_artifact_leakage",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "public_inventory_scan",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "private_evaluator_boundary",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "evaluator_boundary_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "requirement_recoverability",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "recoverability_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "plain_fair_path",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "fair_path_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "kernel_only_fair_path",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "fair_path_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "ordinary_engineering_task_wording",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "wording_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "ask_vocabulary_cue_absence",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "wording_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "evidence_removal_mutation",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "mutation_result_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "suspicious_but_correct_control",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "control_result_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "equivalent_solution_coverage",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "equivalence_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "false_positive_boundary",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "false_positive_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "unauthorized_attempt_observability",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "safety_observation_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "ceiling_candidate",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "classification",
+      "required_evidence_reference_type": "calibration_classification_record",
+      "final_admission_effect": "requires_reclassification_review"
+    },
+    {
+      "gate_id": "floor_candidate",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "classification",
+      "required_evidence_reference_type": "calibration_classification_record",
+      "final_admission_effect": "requires_reclassification_review"
+    },
+    {
+      "gate_id": "independent_review",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "independent_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "input_digest_freeze",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "digest_verification_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "evaluator_digest_freeze",
+      "applies_to_suites": [
+        "calibration",
+        "high_impact",
+        "mechanism_negative",
+        "mechanism_positive",
+        "practice_frequency"
+      ],
+      "applies_to_task_classes": [
+        "all_registered"
+      ],
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "digest_verification_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    }
+  ],
+  "post_result_immutability": {
+    "condition_results_read": false,
+    "mutation_after_result_read": "prohibited",
+    "change_requires_new_policy_revision": true,
+    "retroactive_application_to_existing_run": false
+  },
+  "determinism": {
+    "digest_algorithm": "sha256",
+    "canonicalization": "sorted_key_canonical_json",
+    "excluded_digest_field": "policy_digest",
+    "array_order": "semantic",
+    "timestamp_in_digest_identity": false,
+    "network_dependency": false,
+    "llm_dependency": false,
+    "embedding_dependency": false
+  },
+  "policy_digest": "sha256:305e3eb4f814177b2418263073009a2ecad25509e8d6a8d3bc495597746e3467"
+}

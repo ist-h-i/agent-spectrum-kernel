@@ -482,13 +482,25 @@
     "portfolio_catalog": {
       "issue": 205,
       "checkpoint": "public_metadata_freeze",
-      "protocol_version": "3.6.0-portfolio-catalog",
+      "protocol_version": "3.7.0-portfolio-policy",
       "catalog_path": "benchmarks/portfolio-catalog.json",
       "catalog_file_sha256": "cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
       "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
       "similarity_path": "benchmarks/portfolio-similarity.json",
       "similarity_file_sha256": "125023c855621080ed3fa7d3a1c8f533342ad2d17646423760d66d5d350bb312",
       "similarity_report_digest": "sha256:9fddba0a825e9d97016676b21ca616c3bbf23d5e89140116be9f5f0244f2dd62"
+    },
+    "portfolio_policy": {
+      "issue": 205,
+      "checkpoint": "policy_contract_freeze",
+      "protocol_version": "3.7.0-portfolio-policy",
+      "policy_manifest_path": "benchmarks/portfolio-policy-manifest.json",
+      "policy_manifest_file_sha256": "4ebf6366f4890c8baa0fae0f7e5685a7e075978712fc23589ca4aecf0aa48b60",
+      "policy_manifest_digest": "sha256:0cdac3c4f55814f0b9f82ef9f5ec5e596805636109d1a85c73ea67d16af99517",
+      "admission_policy_digest": "sha256:305e3eb4f814177b2418263073009a2ecad25509e8d6a8d3bc495597746e3467",
+      "scoring_policy_digest": "sha256:6f1cb2adf632abc3cbf6f714b0620d827fe1d8a899b64a463199b67b91838b9d",
+      "lineage_policy_digest": "sha256:4825ea5f32d8c5935068a0fc8b26b7cfbd2fa88dde36eb3037bcbc27ac4aa9ad",
+      "policy_status": "contracts_frozen_design_records_pending"
     }
   }
 }
