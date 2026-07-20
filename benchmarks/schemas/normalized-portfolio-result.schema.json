@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK normalized execution attempt result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "normalized_result_id",
+    "normalized_result_digest",
+    "lineage",
+    "outcome",
+    "telemetry",
+    "privacy"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/normalized-portfolio-result.schema.json" },
+    "program": { "const": "adaptive_ask_normalized_execution_result" },
+    "normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },
+    "normalized_result_digest": { "$ref": "#/$defs/digest" },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_instance_id",
+        "plan_id",
+        "plan_digest",
+        "repository_revision",
+        "materialization_manifest_digest",
+        "fixture_id",
+        "fixture_input_digest",
+        "suite",
+        "task_class",
+        "difficulty",
+        "registered_repetitions",
+        "aggregate_eligible",
+        "case_id",
+        "attempt",
+        "adapter_track",
+        "condition",
+        "repetition",
+        "condition_order_position",
+        "block_id",
+        "runtime_identity_digest",
+        "effective_command_digest",
+        "environment_snapshot_digest",
+        "request_digest",
+        "raw_result_digest",
+        "terminal_commit_digest",
+        "final_output_digest",
+        "final_output_bytes",
+        "adaptive_selection_digest"
+      ],
+      "properties": {
+        "run_instance_id": { "type": "string", "format": "uuid" },
+        "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "repository_revision": { "$ref": "#/$defs/revision" },
+        "materialization_manifest_digest": { "$ref": "#/$defs/digest" },
+        "fixture_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "fixture_input_digest": { "$ref": "#/$defs/digest" },
+        "suite": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"] },
+        "task_class": { "type": "string", "minLength": 1 },
+        "difficulty": { "type": "string", "minLength": 1 },
+        "registered_repetitions": { "enum": [3, 5] },
+        "aggregate_eligible": { "type": "boolean" },
+        "case_id": { "$ref": "#/$defs/caseId" },
+        "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+        "adapter_track": { "enum": ["codex", "claude"] },
+        "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+        "repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "condition_order_position": { "type": "integer", "minimum": 1, "maximum": 4 },
+        "block_id": { "type": "string", "pattern": "^block-[a-f0-9]{16}-[a-f0-9]{12}$" },
+        "runtime_identity_digest": { "$ref": "#/$defs/digest" },
+        "effective_command_digest": { "$ref": "#/$defs/digest" },
+        "environment_snapshot_digest": { "$ref": "#/$defs/digest" },
+        "request_digest": { "$ref": "#/$defs/digest" },
+        "raw_result_digest": { "$ref": "#/$defs/digest" },
+        "terminal_commit_digest": { "$ref": "#/$defs/digest" },
+        "final_output_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" },
+        "final_output_bytes": { "type": ["integer", "null"], "minimum": 1 },
+        "adaptive_selection_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "outcome": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "duration_ms",
+        "exit_code",
+        "final_output_bytes",
+        "stdout_bytes",
+        "stdout_digest",
+        "stderr_bytes",
+        "stderr_digest",
+        "json_event_line_count",
+        "harness_spawned_secondary_agent_count",
+        "runtime_agent_count",
+        "failure_kind",
+        "capability_downgrade_count",
+        "capability_downgrade_digest",
+        "runtime_unavailable_reason_code",
+        "runtime_unavailable_reason_digest",
+        "runtime_unavailable_reason_bytes",
+        "thermal_state",
+        "model",
+        "reasoning_effort",
+        "sandbox_policy",
+        "permission_policy",
+        "input_tokens",
+        "output_tokens",
+        "cached_tokens",
+        "monetary_cost",
+        "tool_call_count",
+        "file_read_count",
+        "human_effort",
+        "unsafe_attempted_actions",
+        "subagent_activity",
+        "evaluator_quality_metrics"
+      ],
+      "properties": {
+        "duration_ms": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "exit_code": { "$ref": "#/$defs/integerMetric" },
+        "final_output_bytes": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "stdout_bytes": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "stdout_digest": { "$ref": "#/$defs/digestMetric" },
+        "stderr_bytes": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "stderr_digest": { "$ref": "#/$defs/digestMetric" },
+        "json_event_line_count": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "harness_spawned_secondary_agent_count": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "runtime_agent_count": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "failure_kind": { "$ref": "#/$defs/stringMetric" },
+        "capability_downgrade_count": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "capability_downgrade_digest": { "$ref": "#/$defs/digestMetric" },
+        "runtime_unavailable_reason_code": { "$ref": "#/$defs/stringMetric" },
+        "runtime_unavailable_reason_digest": { "$ref": "#/$defs/digestMetric" },
+        "runtime_unavailable_reason_bytes": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "thermal_state": { "$ref": "#/$defs/stringMetric" },
+        "model": { "$ref": "#/$defs/stringMetric" },
+        "reasoning_effort": { "$ref": "#/$defs/stringMetric" },
+        "sandbox_policy": { "$ref": "#/$defs/stringMetric" },
+        "permission_policy": { "$ref": "#/$defs/stringMetric" },
+        "input_tokens": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "output_tokens": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "cached_tokens": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "monetary_cost": { "$ref": "#/$defs/numberMetric" },
+        "tool_call_count": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "file_read_count": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "human_effort": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "unsafe_attempted_actions": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "subagent_activity": { "$ref": "#/$defs/nonNegativeIntegerMetric" },
+        "evaluator_quality_metrics": { "$ref": "#/$defs/numberMetric" }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_stdout_stored",
+        "raw_stderr_stored",
+        "final_output_content_stored",
+        "prompt_stored",
+        "transcript_stored",
+        "environment_values_stored",
+        "absolute_private_paths_stored"
+      ],
+      "properties": {
+        "raw_stdout_stored": { "const": false },
+        "raw_stderr_stored": { "const": false },
+        "final_output_content_stored": { "const": false },
+        "prompt_stored": { "const": false },
+        "transcript_stored": { "const": false },
+        "environment_values_stored": { "const": false },
+        "absolute_private_paths_stored": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "caseId": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "missingMetric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "value", "reason"],
+      "properties": {
+        "status": { "enum": ["unknown", "unavailable", "not_applicable"] },
+        "value": { "type": "null" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 160 }
+      }
+    },
+    "nonNegativeIntegerMetric": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "value", "reason"],
+          "properties": {
+            "status": { "const": "known" },
+            "value": { "type": "integer", "minimum": 0 },
+            "reason": { "const": "committed_runtime_evidence" }
+          }
+        },
+        { "$ref": "#/$defs/missingMetric" }
+      ]
+    },
+    "integerMetric": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "value", "reason"],
+          "properties": {
+            "status": { "const": "known" },
+            "value": { "type": "integer" },
+            "reason": { "const": "committed_runtime_evidence" }
+          }
+        },
+        { "$ref": "#/$defs/missingMetric" }
+      ]
+    },
+    "numberMetric": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "value", "reason"],
+          "properties": {
+            "status": { "const": "known" },
+            "value": { "type": "number" },
+            "reason": { "const": "committed_runtime_evidence" }
+          }
+        },
+        { "$ref": "#/$defs/missingMetric" }
+      ]
+    },
+    "stringMetric": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "value", "reason"],
+          "properties": {
+            "status": { "const": "known" },
+            "value": { "type": "string", "minLength": 1, "maxLength": 256 },
+            "reason": { "const": "committed_runtime_evidence" }
+          }
+        },
+        { "$ref": "#/$defs/missingMetric" }
+      ]
+    },
+    "digestMetric": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "value", "reason"],
+          "properties": {
+            "status": { "const": "known" },
+            "value": { "$ref": "#/$defs/digest" },
+            "reason": { "const": "committed_runtime_evidence" }
+          }
+        },
+        { "$ref": "#/$defs/missingMetric" }
+      ]
+    }
+  }
+}

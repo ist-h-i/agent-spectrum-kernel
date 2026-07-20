@@ -24,6 +24,7 @@ import { buildPortfolioPlan, PORTFOLIO_CONDITIONS } from "./ask-benchmark-plan.m
 import { assertTrackedRepositoryMatchesHead, materializePortfolio } from "./ask-benchmark-materialize.mjs";
 import { sealAdaptiveSelection, verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
 import { executePortfolio, recoverPortfolioCase, verifyPortfolioExecution } from "./ask-benchmark-execution.mjs";
+import { assertCurrentPortfolioRunInput, normalizePortfolioExecution, verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_CONFIG_PATH = resolve(ROOT, "benchmarks/checkpoint-b.config.json");
@@ -48,7 +49,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -67,6 +68,7 @@ function parseArgs(argv) {
     else if (flag === "--retry-failed") args.retryFailed = true;
     else if (flag === "--claim-id") args.claimId = argv.shift();
     else if (flag === "--reason") args.reason = argv.shift();
+    else if (flag === "--snapshot-digest") args.snapshotDigest = argv.shift();
     else if (flag === "--config") args.configPath = resolve(argv.shift());
     else if (flag === "--help" || flag === "-h") args.command = "help";
     else throw new Error(`Unknown argument: ${flag}`);
@@ -85,6 +87,9 @@ Commands:
   verify-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id>
   execute-portfolio --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --adapter <codex|claude> --runtime-config <runtime-config.json> --agent-bin <executable> [--case-id <case-id>] [--max-cases <count>] [--retry-failed]
   verify-execution --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory>
+  normalize-execution --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --output <normalized-results-directory>
+  verify-normalized-results --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --output <normalized-results-directory>
+  verify-normalized-results --output <normalized-results-directory> --snapshot-digest <sha256:digest>
   recover-case --run-dir <run-directory> --case-id <case-id> --claim-id <claim-id> --reason <reason>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
@@ -397,6 +402,30 @@ function verifyExecution(args) {
   if (!args.plan || !args.materialized || !args.stateDir || !args.runDir) throw new Error("verify-execution requires --plan, --materialized, --selection-state, and --run-dir");
   const result = verifyPortfolioExecution({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir });
   console.log(JSON.stringify(result, null, 2));
+}
+
+function normalizeExecution(args) {
+  assertCurrentPortfolioRunInput(args.runDir);
+  const config = validateProtocol(args.configPath);
+  if (config._kind !== "portfolio") throw new Error("normalize-execution requires an Adaptive portfolio config");
+  if (!args.plan || !args.materialized || !args.stateDir || !args.runDir || !args.output) throw new Error("normalize-execution requires --plan, --materialized, --selection-state, --run-dir, and --output");
+  const result = normalizePortfolioExecution({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir, outputPath: args.output });
+  console.log(`${result.idempotent ? "Verified existing" : "Published"} normalized execution snapshot ${result.sourceSnapshotDigest} with ${result.manifest.completeness.normalized_cases}/${result.manifest.completeness.expected_cases} cases containing committed attempts at ${result.generationPath}`);
+}
+
+function verifyNormalizedResults(args) {
+  if (!args.output) throw new Error("verify-normalized-results requires --output");
+  if (args.snapshotDigest) {
+    const result = verifyNormalizedPortfolioResults({ root: ROOT, outputPath: args.output, sourceSnapshotDigest: args.snapshotDigest });
+    console.log(`Normalized execution snapshot ${result.manifest.source_snapshot_digest} is self-consistent; freshness against the current execution source was not checked`);
+    return;
+  }
+  assertCurrentPortfolioRunInput(args.runDir);
+  const config = validateProtocol(args.configPath);
+  if (config._kind !== "portfolio") throw new Error("verify-normalized-results requires an Adaptive portfolio config");
+  if (!args.plan || !args.materialized || !args.stateDir || !args.runDir || !args.output) throw new Error("verify-normalized-results requires --plan, --materialized, --selection-state, --run-dir, and --output");
+  const result = verifyNormalizedPortfolioResults({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir, outputPath: args.output });
+  console.log(`Current normalized execution snapshot ${result.manifest.source_snapshot_digest} verified with ${result.manifest.completeness.normalized_cases}/${result.manifest.completeness.expected_cases} cases containing committed attempts`);
 }
 
 function recoverCase(args) {
@@ -847,6 +876,8 @@ try {
   else if (args.command === "verify-selection") verifySelection(args);
   else if (args.command === "execute-portfolio") executePortfolioCommand(args);
   else if (args.command === "verify-execution") verifyExecution(args);
+  else if (args.command === "normalize-execution") normalizeExecution(args);
+  else if (args.command === "verify-normalized-results") verifyNormalizedResults(args);
   else if (args.command === "recover-case") recoverCase(args);
   else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);

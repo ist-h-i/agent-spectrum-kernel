@@ -24,6 +24,9 @@ jobs:
       - name: Run adaptive portfolio execution tests
         run: node scripts/test-ask-benchmark-execution.mjs
 
+      - name: Run adaptive portfolio normalized result tests
+        run: node scripts/test-ask-benchmark-normalized-results.mjs
+
       - name: Validate repository consistency
         run: node scripts/validate-repo.mjs
 

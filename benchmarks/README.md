@@ -53,7 +53,7 @@ The frozen rules are in [protocol-c.md](protocol-c.md). Keep temporary prompts, 
 
 The measured result is in [results/checkpoint-c-report.md](results/checkpoint-c-report.md), with normalized machine-readable evidence in `results/checkpoint-c-2026-07-14.json`. Full ASK improved one review score but exceeded the quality-gain token allowance; the other three fixtures showed no incremental quality and exceeded the normal token-overhead guardrail.
 
-## Adaptive portfolio foundation, workspace materialization, selection seal, and runtime resume
+## Adaptive portfolio foundation, runtime resume, and normalized execution evidence
 
 Issue #197 adds a separate versioned foundation for the redesigned portfolio. The first slice registers the four B2/C fixtures as calibration-only and creates a deterministic plan for separate Codex and Claude tracks across Plain, Kernel-only, Adaptive ASK, and Full ASK:
 
@@ -65,6 +65,9 @@ node scripts/ask-benchmark.mjs seal-selection --config benchmarks/adaptive-portf
 node scripts/ask-benchmark.mjs verify-selection --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --materialized /tmp/adaptive-ask-materialized --state-dir /tmp/adaptive-ask-selection-state --case-id case-...
 node scripts/ask-benchmark.mjs execute-portfolio --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --materialized /tmp/adaptive-ask-materialized --selection-state /tmp/adaptive-ask-selection-state --run-dir /tmp/adaptive-ask-run-state --adapter codex --runtime-config /tmp/codex-runtime.json --agent-bin /path/to/fake-or-approved-executable
 node scripts/ask-benchmark.mjs verify-execution --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --materialized /tmp/adaptive-ask-materialized --selection-state /tmp/adaptive-ask-selection-state --run-dir /tmp/adaptive-ask-run-state
+node scripts/ask-benchmark.mjs normalize-execution --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --materialized /tmp/adaptive-ask-materialized --selection-state /tmp/adaptive-ask-selection-state --run-dir /tmp/adaptive-ask-run-state --output /tmp/adaptive-ask-normalized-results
+node scripts/ask-benchmark.mjs verify-normalized-results --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --materialized /tmp/adaptive-ask-materialized --selection-state /tmp/adaptive-ask-selection-state --run-dir /tmp/adaptive-ask-run-state --output /tmp/adaptive-ask-normalized-results
+node scripts/ask-benchmark.mjs verify-normalized-results --output /tmp/adaptive-ask-normalized-results --snapshot-digest sha256:...
 ```
 
 The `plan` command records the non-sensitive canonical seed with its ID and SHA-256 digest so the artifact can be independently regenerated. Its `plan_id` binds the config digest, protocol digest, repository revision, and seed into every case/block namespace.
@@ -79,7 +82,13 @@ Selection inputs contain the task class, signals, selected/skipped mechanisms, g
 
 `execute-portfolio` creates an immutable run identity plus independent case state, atomically published claims, terminal commit manifests, and attempts outside materialized/selection roots. It copies each case into a tokenized OS temporary workspace outside the durable run, removes that workspace on every normal terminal path, and lets exact stale-claim recovery clean hard-interruption residue. Durable attempts retain only a closed Schema/digest-bound request, result, commit, and approved structured final JSON when completed. It validates every Adaptive seal before projection, before spawn, and after output collection. Adapter identities are compare-and-set and bind every attempt to the effective command and policy; Codex and Claude remain separate tracks, and Claude is unavailable unless its placeholder, policy-argument, `--help`, and `--version` contract is confirmed. `verify-execution` is deterministic and read-only across completed, failed, unavailable, interrupted, and invalid terminal evidence; stale claims require the explicit `recover-case` command.
 
-The focused execution test uses only fake executables. Measured runtime execution, evaluator/oracle inspection, scoring, telemetry aggregation, and result interpretation remain unauthorized until #193–#197 artifacts are validated and #198 freezes manifests, evaluator digests, thresholds, weights, runtime variables, and seeds.
+`normalize-execution` first reuses the canonical execution, materialization, selection, Schema, path, symlink, inventory, and digest verification. It then derives versioned per-attempt records and publishes an immutable generation under `generations/snapshot-<source-snapshot-digest>/`, with `normalized-results-root.json` owning the run-specific collection and `normalized-run.json` owning the generation. The snapshot digest binds every case state, committed attempt, and present adapter identity; a retry that is currently active still publishes all earlier committed attempts but never its uncommitted active attempt. The manifest also carries a self-excluding `normalized_run_digest`. Run progression appends a distinct generation without mutating older snapshots, while repeating the same snapshot is byte-identical and idempotent. Normal verification re-derives the current generation from authoritative execution artifacts; `--snapshot-digest` verifies an older generation's self-consistency without claiming that it is current. Unmanaged or cross-run output, conflicting generation bytes, and abandoned staging fail closed.
+
+Normalized records contain only bounded committed telemetry and digests. Missing values retain `unknown`, `unavailable`, or `not_applicable` with a reason; they are never coerced to zero. `harness_spawned_secondary_agent_count` reports only the harness-owned observation. Runtime agent count and subagent activity are `unknown` when an available runtime did not report them and `unavailable` when the runtime itself could not run. Raw stdout/stderr, final content, prompts, transcripts, private environment values, and absolute private paths—including POSIX, Windows drive, UNC, and Windows device forms—are excluded. Runtime unavailable and capability-downgrade reasons are retained only as bounded codes or digest/byte evidence, not copied raw text.
+
+The checked-in Checkpoint B, B2, and C result schema is intentionally not reinterpreted as the new execution-evidence schema. Passing one of those historical result files as a run root is deterministically rejected with an explicit migration-required error. They remain readable through their existing `result.schema.json` and reports until a separately versioned migration is approved.
+
+The focused execution and normalization tests use only fake executables. Measured runtime execution, evaluator/oracle inspection, scoring, comparative telemetry interpretation, and product-value conclusions remain unauthorized until the clean fixture/evaluator work is complete and #198 freezes manifests, evaluator digests, thresholds, weights, runtime variables, and seeds.
 
 Materialization-specific regression coverage is run with:
 
@@ -87,6 +96,7 @@ Materialization-specific regression coverage is run with:
 node scripts/test-ask-benchmark-materialize.mjs
 node scripts/test-ask-benchmark-selection.mjs
 node scripts/test-ask-benchmark-execution.mjs
+node scripts/test-ask-benchmark-normalized-results.mjs
 ```
 
 See [protocol-adaptive.md](protocol-adaptive.md) for the condition, adapter-separation, balanced-ordering, repetition, privacy, and pre-result Adaptive selection contracts.
