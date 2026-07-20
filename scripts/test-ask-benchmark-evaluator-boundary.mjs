@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -219,15 +220,20 @@ function coverage(cases, values, keyName, selector) {
   });
 }
 
-function buildNormalizedCollection(path) {
+function buildNormalizedCollection(path, { materialized, selectionState, runDir }) {
+  const runInstanceId = "00000000-0000-4000-8000-000000000204";
+  writeJson(resolve(materialized, "materialization-manifest.json"), { program: "synthetic_materialization_boundary" });
+  writeJson(resolve(selectionState, "selection-state.json"), { program: "synthetic_selection_boundary" });
+  const runIdentity = { program: "synthetic_execution_boundary", run_instance_id: runInstanceId };
+  writeJson(resolve(runDir, "run-identity.json"), runIdentity);
   const source = {
-    run_instance_id: "00000000-0000-4000-8000-000000000204",
-    run_identity_digest: digest("synthetic-run-identity"),
+    run_instance_id: runInstanceId,
+    run_identity_digest: canonicalDigest(runIdentity),
     plan_id: `plan-${"2".repeat(64)}`,
     plan_digest: digest("synthetic-plan"),
     repository_revision: REVISION,
-    materialization_manifest_digest: digest("synthetic-materialization"),
-    selection_state_digest: digest("synthetic-selection-state"),
+    materialization_manifest_digest: `sha256:${sha256(readFileSync(resolve(materialized, "materialization-manifest.json")))}`,
+    selection_state_digest: `sha256:${sha256(readFileSync(resolve(selectionState, "selection-state.json")))}`,
   };
   const adapterDigests = { codex: digest("codex-runtime-identity"), claude: digest("claude-runtime-identity") };
   const definitions = [
@@ -513,7 +519,7 @@ try {
   const normalizedResults = resolve(work, "normalized-results");
   const publicArtifactRoot = resolve(work, "public-artifact");
   for (const path of [materialized, selectionState, runDir, publicArtifactRoot]) mkdirSync(path);
-  const normalized = buildNormalizedCollection(normalizedResults);
+  const normalized = buildNormalizedCollection(normalizedResults, { materialized, selectionState, runDir });
   const completedCodex = normalized.records.find((entry) => entry.outcome === "completed" && entry.lineage.adapter_track === "codex");
   const failedCodex = normalized.records.filter((entry) => entry.outcome === "failed").at(-1);
   const completedClaude = normalized.records.find((entry) => entry.outcome === "completed" && entry.lineage.adapter_track === "claude");
@@ -549,12 +555,14 @@ try {
   ];
   const beforePrivate = snapshot(privateRoot);
   const beforeNormalized = snapshot(normalizedResults);
+  const beforeRun = snapshot(runDir);
   const bundleVerification = run(["verify-evaluator-bundle", ...commonCli, "--public-artifact-root", publicArtifactRoot]);
   assert.equal(bundleVerification.stdout.includes(privateRoot), false, "public CLI output must not disclose the private evaluator root");
   for (const name of resultPaths.keys()) run(["verify-evaluator-result", ...commonCli, "--result", resultPaths.get(name)]);
   run(["verify-evaluator-boundary", ...commonCli, "--result", resultPaths.get("completed"), "--public-artifact-root", publicArtifactRoot]);
   assert.deepEqual(snapshot(privateRoot), beforePrivate, "evaluator verification must keep the private bundle byte-identical");
   assert.deepEqual(snapshot(normalizedResults), beforeNormalized, "evaluator verification must keep normalized results byte-identical");
+  assert.deepEqual(snapshot(runDir), beforeRun, "evaluator verification must keep execution run state byte-identical");
 
   const baseOptions = {
     root,
@@ -566,8 +574,81 @@ try {
     selectionState,
     runDir,
     normalizedResultsPath: normalizedResults,
+    publicArtifactRoot,
   };
-  const expectBoundaryFailure = (overrides, pattern, message) => assert.throws(() => verifyEvaluatorBoundary({ ...baseOptions, ...overrides }), pattern, message);
+  const readOnlyStateSnapshot = () => ({ private: snapshot(privateRoot), normalized: snapshot(normalizedResults), run: snapshot(runDir) });
+  const expectBoundaryFailure = (overrides, pattern, message) => {
+    const before = readOnlyStateSnapshot();
+    assert.throws(() => verifyEvaluatorBoundary({ ...baseOptions, ...overrides }), pattern, message);
+    assert.deepEqual(readOnlyStateSnapshot(), before, `${message}: failure must be read-only`);
+  };
+
+  const privateAssetPath = resolve(privateRoot, manifest.asset_inventory[0].path);
+  function clonedBoundaryRoot(name, source) {
+    const target = resolve(work, name);
+    cpSync(source, target, { recursive: true });
+    return target;
+  }
+  for (const [field, label, source] of [
+    ["materializedPath", "materialized", materialized],
+    ["selectionState", "selection-state", selectionState],
+    ["runDir", "execution run", runDir],
+    ["normalizedResultsPath", "normalized-results", normalizedResults],
+  ]) {
+    const leakedRoot = clonedBoundaryRoot(`private-copy-${label.replaceAll(" ", "-")}`, source);
+    cpSync(privateAssetPath, resolve(leakedRoot, "copied-private-asset.json"));
+    expectBoundaryFailure({ [field]: leakedRoot }, /byte-identical private evaluator material/u, `private assets copied into the ${label} root must be rejected`);
+  }
+
+  const hardLinkRoot = resolve(privateWork, "hard-link-materialized-root");
+  cpSync(materialized, hardLinkRoot, { recursive: true });
+  try {
+    linkSync(privateAssetPath, resolve(hardLinkRoot, "hard-linked-private-asset.json"));
+    expectBoundaryFailure({ materializedPath: hardLinkRoot }, /byte-identical private evaluator material/u, "hard-linked private assets in a boundary root must be rejected");
+  } catch (error) {
+    if (!["EACCES", "EPERM", "ENOTSUP", "EXDEV"].includes(error?.code)) throw error;
+    console.warn(`hard-link evaluator boundary test skipped: ${error.code}`);
+  }
+
+  for (const [field, label] of [
+    ["materializedPath", "materialized"],
+    ["selectionState", "selection-state"],
+    ["runDir", "execution run"],
+    ["normalizedResultsPath", "normalized-results"],
+    ["publicArtifactRoot", "public artifact"],
+  ]) {
+    const missingRoot = resolve(work, `missing-${label.replaceAll(" ", "-")}`);
+    expectBoundaryFailure({ [field]: missingRoot }, new RegExp(`${label} root is missing`, "u"), `missing ${label} roots must be rejected`);
+    const fileRoot = resolve(work, `file-${label.replaceAll(" ", "-")}`);
+    writeFileSync(fileRoot, "not a directory\n");
+    expectBoundaryFailure({ [field]: fileRoot }, new RegExp(`${label} root must be a directory`, "u"), `regular files must not stand in for ${label} roots`);
+    const symlinkRoot = resolve(work, `symlink-${label.replaceAll(" ", "-")}`);
+    symlinkSync(sourceFor(field), symlinkRoot);
+    expectBoundaryFailure({ [field]: symlinkRoot }, new RegExp(`${label} root must not be a symlink`, "u"), `symlinks must not stand in for ${label} roots`);
+  }
+
+  function sourceFor(field) {
+    return { materializedPath: materialized, selectionState, runDir, normalizedResultsPath: normalizedResults, publicArtifactRoot }[field];
+  }
+
+  for (const [field, label, source, marker] of [
+    ["materializedPath", "materialized", materialized, "materialization-manifest.json"],
+    ["selectionState", "selection-state", selectionState, "selection-state.json"],
+    ["runDir", "execution run", runDir, "run-identity.json"],
+  ]) {
+    const unrelated = clonedBoundaryRoot(`unrelated-${label.replaceAll(" ", "-")}`, source);
+    writeJson(resolve(unrelated, marker), { program: `unrelated_${label.replaceAll(" ", "_")}` });
+    expectBoundaryFailure({ [field]: unrelated }, /does not match normalized result lineage/u, `unrelated ${label} roots must not satisfy full boundary verification`);
+  }
+  const unrelatedNormalized = resolve(work, "unrelated-normalized-results");
+  mkdirSync(unrelatedNormalized);
+  cpSync(resolve(normalizedResults, "normalized-results-root.json"), resolve(unrelatedNormalized, "normalized-results-root.json"));
+  expectBoundaryFailure({ normalizedResultsPath: unrelatedNormalized }, /normalized output root inventory mismatch|normalized snapshot generation is missing/u, "an unrelated normalized-results root must not satisfy full boundary verification");
+
+  const beforeMissingPublicArtifact = readOnlyStateSnapshot();
+  const missingPublicArtifact = run(["verify-evaluator-boundary", ...commonCli, "--result", resultPaths.get("completed")], 1);
+  assert.match(missingPublicArtifact.stderr, /verify-evaluator-boundary requires --public-artifact-root/u, "full boundary CLI must reject an omitted public artifact root");
+  assert.deepEqual(readOnlyStateSnapshot(), beforeMissingPublicArtifact, "missing public artifact root failure must be read-only");
 
   const repositoryPrivateRoot = resolve(work, "private-inside-repository");
   cpSync(privateRoot, repositoryPrivateRoot, { recursive: true });
@@ -615,6 +696,19 @@ try {
     if (writeReference) writeJson(mutatedReferencePath, referenceFor(value));
     return { ...bundle, referencePath: writeReference ? mutatedReferencePath : referencePath };
   }
+
+  const repositoryMaterial = bundleMutation("managed-repository-material", (value, bundleRoot) => {
+    const asset = value.asset_inventory[0];
+    const bytes = readFileSync(resolve(root, "benchmarks/schemas/evaluator-reference.schema.json"));
+    writeFileSync(resolve(bundleRoot, asset.path), bytes);
+    asset.sha256 = `sha256:${sha256(bytes)}`;
+    asset.bytes = bytes.length;
+  }, { close: true, writeReference: true });
+  assert.throws(
+    () => verifyPrivateEvaluatorBundle({ ...baseOptions, ...repositoryMaterial }),
+    /managed repository contains byte-identical private evaluator material/u,
+    "byte-identical private material already present in the managed repository must be rejected",
+  );
 
   for (const [name, injectedPath] of [
     ["absolute-posix", "/private/oracle.json"],
@@ -731,6 +825,10 @@ try {
   mkdirSync(manifestPublication);
   cpSync(manifestPath, resolve(manifestPublication, "bundle.json"));
   expectBoundaryFailure({ publicArtifactRoot: manifestPublication }, /byte-identical private evaluator material|private evaluator bundle manifest/u, "public CI artifact publication of the private manifest must be rejected");
+
+  assert.deepEqual(snapshot(privateRoot), beforePrivate, "all evaluator failure paths must keep the private bundle byte-identical");
+  assert.deepEqual(snapshot(normalizedResults), beforeNormalized, "all evaluator failure paths must keep normalized results byte-identical");
+  assert.deepEqual(snapshot(runDir), beforeRun, "all evaluator failure paths must keep execution run state byte-identical");
 
   console.log("ASK benchmark evaluator boundary tests passed");
 } finally {

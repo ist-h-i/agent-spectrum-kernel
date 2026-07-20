@@ -1,8 +1,13 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import {
+  closeSync,
   existsSync,
+  fstatSync,
   lstatSync,
+  openSync,
   readFileSync,
+  readSync,
   readdirSync,
   realpathSync,
 } from "node:fs";
@@ -16,6 +21,17 @@ export const PRIVATE_EVALUATOR_BUNDLE_SCHEMA_PATH = "benchmarks/schemas/private-
 export const EVALUATOR_RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result-envelope.schema.json";
 
 const MAX_PUBLIC_ARTIFACT_BYTES = 1024 * 1024;
+const MAX_JSON_ARTIFACT_BYTES = 1024 * 1024;
+const MAX_BOUNDARY_FILE_BYTES = 256 * 1024 * 1024;
+const MAX_BOUNDARY_FILES = 100_000;
+const MAX_BOUNDARY_TOTAL_BYTES = 2 * 1024 * 1024 * 1024;
+const DIGEST_CHUNK_BYTES = 64 * 1024;
+const BOUNDARY_MARKERS = [
+  ["materializedPath", "materialized root", "materialization-manifest.json"],
+  ["selectionState", "selection-state root", "selection-state.json"],
+  ["runDir", "execution run root", "run-identity.json"],
+  ["normalizedResultsPath", "normalized-results root", "normalized-results-root.json"],
+];
 const PUBLIC_FORBIDDEN_FIELDS = new Set([
   "credential",
   "credentials",
@@ -41,8 +57,47 @@ const PUBLIC_FORBIDDEN_FIELDS = new Set([
   "secrets",
 ]);
 
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
+function createScanBudget(label) {
+  return { label, files: 0, bytes: 0 };
+}
+
+function accountForFile(status, budget, label) {
+  if (status.size > MAX_BOUNDARY_FILE_BYTES) throw new Error(`${label} exceeds the per-file boundary inspection limit`);
+  budget.files += 1;
+  budget.bytes += status.size;
+  if (budget.files > MAX_BOUNDARY_FILES) throw new Error(`${budget.label} exceeds the boundary inspection file-count limit`);
+  if (budget.bytes > MAX_BOUNDARY_TOTAL_BYTES) throw new Error(`${budget.label} exceeds the boundary inspection byte limit`);
+}
+
+function streamingFileDigest(path, label, budget = createScanBudget(label)) {
+  assertRegularFile(path, label);
+  const initialStatus = lstatSync(path);
+  accountForFile(initialStatus, budget, label);
+  const hash = createHash("sha256");
+  const chunk = Buffer.allocUnsafe(DIGEST_CHUNK_BYTES);
+  let descriptor;
+  let bytes = 0;
+  try {
+    descriptor = openSync(path, "r");
+    const openedStatus = fstatSync(descriptor);
+    if (!openedStatus.isFile() || openedStatus.dev !== initialStatus.dev || openedStatus.ino !== initialStatus.ino || openedStatus.size !== initialStatus.size) {
+      throw new Error(`${label} changed during boundary inspection`);
+    }
+    for (;;) {
+      const count = readSync(descriptor, chunk, 0, chunk.length, null);
+      if (count === 0) break;
+      hash.update(chunk.subarray(0, count));
+      bytes += count;
+    }
+    const finalStatus = fstatSync(descriptor);
+    if (finalStatus.size !== openedStatus.size || finalStatus.mtimeMs !== openedStatus.mtimeMs || finalStatus.ctimeMs !== openedStatus.ctimeMs) {
+      throw new Error(`${label} changed during boundary inspection`);
+    }
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+  if (bytes !== initialStatus.size) throw new Error(`${label} changed during boundary inspection`);
+  return { bytes, digest: `sha256:${hash.digest("hex")}` };
 }
 
 function isInside(root, path) {
@@ -122,13 +177,15 @@ function assertPathInsideRootWithoutSymlinks(root, path, label) {
 
 function readJsonArtifact(path, label, { publicArtifact = false } = {}) {
   assertRegularFile(path, label);
+  const byteLimit = publicArtifact ? MAX_PUBLIC_ARTIFACT_BYTES : MAX_JSON_ARTIFACT_BYTES;
+  if (lstatSync(path).size > byteLimit) throw new Error(`${label} exceeds the raw JSON size limit`);
   let bytes;
   try {
     bytes = readFileSync(path);
   } catch {
     throw new Error(`${label} could not be read`);
   }
-  if (publicArtifact && bytes.length > MAX_PUBLIC_ARTIFACT_BYTES) throw new Error(`${label} exceeds the public raw-text size limit`);
+  if (bytes.length > byteLimit) throw new Error(`${label} exceeds the raw JSON size limit`);
   let value;
   try {
     value = JSON.parse(bytes.toString("utf8"));
@@ -253,20 +310,55 @@ function assertPublicArtifactTree(value, label, path = "$", depth = 0) {
   }
 }
 
-function privateTreeFiles(root) {
+function directoryFileInventory(root, label) {
   const files = new Map();
   function walk(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
       const absolute = resolve(directory, entry.name);
       const path = relative(root, absolute).split(sep).join("/");
-      if (entry.isSymbolicLink()) throw new Error("private evaluator inventory contains a symlink");
+      if (entry.isSymbolicLink()) throw new Error(`${label} contains a symlink`);
       if (entry.isDirectory()) walk(absolute);
-      else if (entry.isFile()) files.set(path, readFileSync(absolute));
-      else throw new Error("private evaluator inventory contains a non-regular entry");
+      else if (entry.isFile()) files.set(path, absolute);
+      else throw new Error(`${label} contains a non-regular entry`);
+      if (files.size > MAX_BOUNDARY_FILES) throw new Error(`${label} exceeds the boundary inspection file-count limit`);
     }
   }
   walk(root);
   return files;
+}
+
+function managedRepositoryInventory(root) {
+  const canonicalRoot = assertRealDirectory(root, "repository root");
+  let repositoryTop;
+  let output;
+  try {
+    repositoryTop = realpathSync(execFileSync("git", ["-C", canonicalRoot, "rev-parse", "--show-toplevel"], { encoding: "utf8", maxBuffer: 1024 * 1024 }).trim());
+    output = execFileSync("git", ["-C", canonicalRoot, "ls-files", "-z"], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
+  } catch {
+    throw new Error("repository root must be a readable Git worktree root");
+  }
+  if (repositoryTop !== canonicalRoot) throw new Error("repository root must be the Git worktree root");
+  const paths = output.split("\0").filter(Boolean);
+  if (paths.length > MAX_BOUNDARY_FILES) throw new Error("managed repository exceeds the boundary inspection file-count limit");
+  const files = new Map();
+  for (const path of paths) {
+    assertPortableRelativePath(path, "managed repository path");
+    const absolute = resolve(canonicalRoot, path);
+    if (!isInside(canonicalRoot, absolute)) throw new Error("managed repository path escapes the repository root");
+    assertRegularFile(absolute, `managed repository file ${path}`);
+    files.set(path, absolute);
+  }
+  return files;
+}
+
+function assertNoPrivateMaterial(files, label, privateMaterialDigests) {
+  const budget = createScanBudget(label);
+  for (const [path, absolute] of files) {
+    const evidence = streamingFileDigest(absolute, `${label} file ${path}`, budget);
+    if (privateMaterialDigests.has(evidence.digest)) {
+      throw new Error(`${label} contains byte-identical private evaluator material: ${path}`);
+    }
+  }
 }
 
 function assertUniqueValues(values, label) {
@@ -312,18 +404,29 @@ export function computeEvaluationDigest(result) {
 function assertPrivateBoundary({ root, privateRoot, materializedPath, selectionState, runDir, normalizedResultsPath, publicArtifactRoot = null }) {
   const canonicalPrivateRoot = assertRealDirectory(privateRoot, "private evaluator root");
   const boundaries = [
-    [root, "repository"],
-    [materializedPath, "materialized root"],
-    [selectionState, "selection-state root"],
-    [runDir, "execution run root"],
-    [normalizedResultsPath, "normalized-results root"],
-    ...(publicArtifactRoot ? [[publicArtifactRoot, "public artifact root"]] : []),
+    ["root", root, "repository root", "repository"],
+    ["materializedPath", materializedPath, "materialized root", "materialized root"],
+    ["selectionState", selectionState, "selection-state root", "selection-state root"],
+    ["runDir", runDir, "execution run root", "execution run root"],
+    ["normalizedResultsPath", normalizedResultsPath, "normalized-results root", "normalized-results root"],
+    ...(publicArtifactRoot ? [["publicArtifactRoot", publicArtifactRoot, "public artifact root", "public artifact root"]] : []),
   ];
-  for (const [path, label] of boundaries) {
+  const canonicalRoots = {};
+  for (const [key, path, label, overlapLabel] of boundaries) {
     if (!path) throw new Error(`${label} is required to prove evaluator root isolation`);
-    if (pathsOverlap(canonicalPrivateRoot, path)) throw new Error(`private evaluator root must not overlap the ${label}`);
+    const canonical = assertRealDirectory(path, label);
+    if (isInside(canonicalPrivateRoot, canonical) || isInside(canonical, canonicalPrivateRoot)) {
+      throw new Error(`private evaluator root must not overlap the ${overlapLabel}`);
+    }
+    canonicalRoots[key] = canonical;
   }
-  return canonicalPrivateRoot;
+  const markerPaths = {};
+  for (const [key, label, marker] of BOUNDARY_MARKERS) {
+    const markerPath = resolve(canonicalRoots[key], marker);
+    assertRegularFile(markerPath, `${label} marker ${marker}`);
+    markerPaths[key] = markerPath;
+  }
+  return { canonicalPrivateRoot, canonicalRoots, markerPaths };
 }
 
 export function verifyPublicEvaluatorReference({ root, referencePath, privateRoot = null }) {
@@ -365,10 +468,11 @@ export function verifyPrivateEvaluatorBundle({
   normalizedResultsPath,
   publicArtifactRoot = null,
 }) {
-  const canonicalPrivateRoot = assertPrivateBoundary({ root, privateRoot, materializedPath, selectionState, runDir, normalizedResultsPath, publicArtifactRoot });
+  const boundary = assertPrivateBoundary({ root, privateRoot, materializedPath, selectionState, runDir, normalizedResultsPath, publicArtifactRoot });
+  const { canonicalPrivateRoot } = boundary;
   if (!manifestPath || !isInside(privateRoot, manifestPath)) throw new Error("private evaluator manifest must stay inside the private evaluator root");
   const manifestRelativePath = assertPathInsideRootWithoutSymlinks(privateRoot, manifestPath, "private evaluator manifest");
-  const { bytes: manifestBytes, value: manifest } = readJsonArtifact(manifestPath, "private evaluator manifest");
+  const { value: manifest } = readJsonArtifact(manifestPath, "private evaluator manifest");
   assertBenchmarkSchemaInstance(manifest, { schemaPath: resolve(root, PRIVATE_EVALUATOR_BUNDLE_SCHEMA_PATH), label: "private evaluator manifest" });
 
   const sortedAssets = [...manifest.asset_inventory].sort((left, right) => left.role.localeCompare(right.role) || left.path.localeCompare(right.path));
@@ -376,17 +480,22 @@ export function verifyPrivateEvaluatorBundle({
   assertUniqueValues(manifest.asset_inventory.map((asset) => asset.role), "private evaluator asset role inventory");
   assertUniqueValues(manifest.asset_inventory.map((asset) => asset.path), "private evaluator asset path inventory");
 
-  const files = privateTreeFiles(privateRoot);
+  const files = directoryFileInventory(privateRoot, "private evaluator inventory");
+  const privateBudget = createScanBudget("private evaluator bundle");
+  const manifestEvidence = streamingFileDigest(manifestPath, "private evaluator manifest", privateBudget);
+  const privateMaterialDigests = new Set([manifestEvidence.digest]);
   const expectedPaths = [manifestRelativePath];
   for (const asset of manifest.asset_inventory) {
     assertPortableRelativePath(asset.path, `private evaluator ${asset.role} asset path`);
     if (asset.path === manifestRelativePath) throw new Error("private evaluator manifest must not also be an asset");
     const assetPath = resolve(privateRoot, asset.path);
     assertPathInsideRootWithoutSymlinks(privateRoot, assetPath, `private evaluator ${asset.role} asset`);
-    const bytes = files.get(asset.path);
-    if (!bytes) throw new Error(`private evaluator required asset is missing for role ${asset.role}`);
-    if (asset.sha256 !== `sha256:${sha256(bytes)}`) throw new Error(`private evaluator asset digest is invalid for role ${asset.role}`);
-    if (asset.bytes !== bytes.length) throw new Error(`private evaluator asset byte count is invalid for role ${asset.role}`);
+    const assetFile = files.get(asset.path);
+    if (!assetFile) throw new Error(`private evaluator required asset is missing for role ${asset.role}`);
+    const evidence = streamingFileDigest(assetFile, `private evaluator ${asset.role} asset`, privateBudget);
+    if (asset.sha256 !== evidence.digest) throw new Error(`private evaluator asset digest is invalid for role ${asset.role}`);
+    if (asset.bytes !== evidence.bytes) throw new Error(`private evaluator asset byte count is invalid for role ${asset.role}`);
+    privateMaterialDigests.add(evidence.digest);
     expectedPaths.push(asset.path);
   }
   if (stableCanonicalJson([...files.keys()].sort()) !== stableCanonicalJson(expectedPaths.sort())) throw new Error("private evaluator root has an unexpected or unmanaged inventory entry");
@@ -395,7 +504,18 @@ export function verifyPrivateEvaluatorBundle({
 
   const reference = verifyPublicEvaluatorReference({ root, referencePath, privateRoot: canonicalPrivateRoot });
   assertReferenceMatchesBundle(reference, manifest);
-  return { canonicalPrivateRoot, files, manifest, manifestBytes, manifestRelativePath, reference };
+  const bundle = { ...boundary, files, manifest, manifestEvidence, manifestRelativePath, privateMaterialDigests, reference };
+  assertNoPrivateMaterial(managedRepositoryInventory(boundary.canonicalRoots.root), "managed repository", privateMaterialDigests);
+  for (const [key, label] of [
+    ["materializedPath", "materialized root"],
+    ["selectionState", "selection-state root"],
+    ["runDir", "execution run root"],
+    ["normalizedResultsPath", "normalized-results root"],
+    ...(publicArtifactRoot ? [["publicArtifactRoot", "public artifact root"]] : []),
+  ]) {
+    assertNoPrivateMaterial(directoryFileInventory(boundary.canonicalRoots[key], label), label, privateMaterialDigests);
+  }
+  return bundle;
 }
 
 function assertResultCollectionIdentity(result) {
@@ -433,6 +553,30 @@ function readNormalizedRecord({ verified, result }) {
   return record;
 }
 
+function assertBoundaryRootLineage(bundle, verified) {
+  const source = verified.manifest.source;
+  const materializedPath = bundle.markerPaths.materializedPath;
+  const selectionStatePath = bundle.markerPaths.selectionState;
+  const runIdentityPath = bundle.markerPaths.runDir;
+  readJsonArtifact(materializedPath, "materialized root manifest");
+  readJsonArtifact(selectionStatePath, "selection-state root index");
+  const materializedEvidence = streamingFileDigest(materializedPath, "materialized root manifest");
+  const selectionEvidence = streamingFileDigest(selectionStatePath, "selection-state root index");
+  if (materializedEvidence.digest !== source.materialization_manifest_digest) {
+    throw new Error("materialized root manifest does not match normalized result lineage");
+  }
+  if (selectionEvidence.digest !== source.selection_state_digest) {
+    throw new Error("selection-state root index does not match normalized result lineage");
+  }
+  const { value: runIdentity } = readJsonArtifact(runIdentityPath, "execution run identity");
+  if (canonicalDigest(runIdentity) !== source.run_identity_digest || runIdentity.run_instance_id !== source.run_instance_id) {
+    throw new Error("execution run root identity does not match normalized result lineage");
+  }
+  if (!isInside(bundle.canonicalRoots.normalizedResultsPath, verified.generationPath)) {
+    throw new Error("normalized generation escapes the normalized-results root");
+  }
+}
+
 export function verifyEvaluatorResult({
   root,
   referencePath,
@@ -458,6 +602,7 @@ export function verifyEvaluatorResult({
     sourceSnapshotDigest: result.source_snapshot_digest,
   });
   if (result.source_snapshot_digest !== verified.manifest.source_snapshot_digest) throw new Error("evaluator result source snapshot lineage is inconsistent");
+  assertBoundaryRootLineage(bundle, verified);
   const normalized = readNormalizedRecord({ verified, result });
   const lineage = normalized.lineage;
   const expectedLineage = {
@@ -486,29 +631,14 @@ export function verifyEvaluatorResult({
 }
 
 export function assertNoPrivateBundlePublication(publicArtifactRoot, bundle) {
-  assertRealDirectory(publicArtifactRoot, "public artifact root");
-  if (pathsOverlap(publicArtifactRoot, bundle.canonicalPrivateRoot)) throw new Error("public artifact root must not overlap the private evaluator root");
-  const privateDigests = new Set([
-    `sha256:${sha256(bundle.manifestBytes)}`,
-    ...bundle.manifest.asset_inventory.map((asset) => asset.sha256),
-  ]);
-  const publicFiles = privateTreeFiles(publicArtifactRoot);
-  for (const bytes of publicFiles.values()) {
-    if (privateDigests.has(`sha256:${sha256(bytes)}`)) throw new Error("public artifact contains byte-identical private evaluator material");
-    if (bytes.length > MAX_PUBLIC_ARTIFACT_BYTES) continue;
-    try {
-      const value = JSON.parse(bytes.toString("utf8"));
-      if (value?.program === "adaptive_ask_private_evaluator_bundle" || (value?.evaluator_bundle_id === bundle.manifest.evaluator_bundle_id && Array.isArray(value?.asset_inventory))) {
-        throw new Error("public artifact contains a private evaluator bundle manifest");
-      }
-    } catch (error) {
-      if (error?.message?.startsWith("public artifact contains")) throw error;
-    }
+  const canonicalPublicRoot = assertRealDirectory(publicArtifactRoot, "public artifact root");
+  if (isInside(canonicalPublicRoot, bundle.canonicalPrivateRoot) || isInside(bundle.canonicalPrivateRoot, canonicalPublicRoot)) {
+    throw new Error("public artifact root must not overlap the private evaluator root");
   }
+  assertNoPrivateMaterial(directoryFileInventory(canonicalPublicRoot, "public artifact root"), "public artifact root", bundle.privateMaterialDigests);
 }
 
 export function verifyEvaluatorBoundary(options) {
-  const verified = verifyEvaluatorResult(options);
-  if (options.publicArtifactRoot) assertNoPrivateBundlePublication(options.publicArtifactRoot, verified.bundle);
-  return verified;
+  if (!options.publicArtifactRoot) throw new Error("full evaluator boundary verification requires a public artifact root");
+  return verifyEvaluatorResult(options);
 }

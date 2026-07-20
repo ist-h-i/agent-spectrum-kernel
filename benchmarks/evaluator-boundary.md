@@ -6,9 +6,13 @@ This checkpoint defines the answer-free exchange boundary between normalized exe
 
 ## Storage boundary
 
-Private evaluator bundles must stay outside the public repository and outside every materialized, selection-state, execution-run, normalized-results, and staged public-artifact root. The private root, its manifest, and every asset must be real filesystem entries rather than symlinks. Asset paths are portable normalized relative paths; absolute POSIX paths, Windows drive paths, UNC paths, Windows device paths, backslashes, `.` segments, and `..` segments are rejected.
+Private evaluator bundles must stay outside the public repository and outside every materialized, selection-state, execution-run, normalized-results, and staged public-artifact root. The repository, private, materialized, selection-state, execution-run, normalized-results, and supplied public-artifact roots must exist as real directories; a missing root, regular file, or symlink root is rejected. Overlap is checked after canonicalizing the roots. The private manifest and every asset must also be regular non-symlink files. Asset paths are portable normalized relative paths; absolute POSIX paths, Windows drive paths, UNC paths, Windows device paths, backslashes, `.` segments, and `..` segments are rejected.
 
-Do not commit a private evaluator package. Do not upload one from public CI, including as a debug, cache, coverage, or failure artifact. The boundary scanner rejects a staged public artifact that overlaps the private root, contains a private bundle manifest, or contains a byte-identical private manifest or asset.
+The materialized, selection-state, execution-run, and normalized-results roots must contain their existing managed markers: `materialization-manifest.json`, `selection-state.json`, `run-identity.json`, and `normalized-results-root.json`. Evaluator-result verification first verifies the immutable normalized generation, then requires the materialization-manifest and selection-state file digests plus the canonical run identity and run instance to match that generation's normalized lineage. Supplying an arbitrary unrelated directory therefore cannot satisfy full boundary verification.
+
+Do not commit a private evaluator package. Do not upload one from public CI, including as a debug, cache, coverage, or failure artifact. After validating the private manifest's exact inventory, the scanner builds a digest set containing the private manifest and every declared asset. It rejects a byte-identical match, including a copied file or hard link, in every materialized, selection-state, execution-run, normalized-results, and supplied staged public-artifact root. It also checks the public repository working-tree files managed by `git ls-files`; untracked repository files are outside the meaning of “managed repository” and must instead be supplied through their applicable boundary root.
+
+This is an exact-byte guarantee only. It does not detect partial extraction, changed serialization or encoding, compression, transformed content, or semantic equivalence. Directory scans are bounded to 100,000 regular files, 2 GiB total, and 256 MiB per file and hash in 64 KiB chunks; JSON artifacts consumed directly by this validator are limited to 1 MiB. Exceeding a bound fails closed. The managed repository reuses the bounded Git tracked-file inventory rather than reading an unrestricted repository tree into memory.
 
 The measured agent must not be able to access evaluator material through its workspace, GitHub Issue or PR content, web access, connectors, selection state, execution state, normalized results, or public CI logs and artifacts. A measured environment therefore requires GitHub, web, and connector access to be disabled or isolated from contaminated Issue content before #198 can proceed.
 
@@ -29,9 +33,13 @@ The manifest is part of the bundle closure but is not listed as an evaluator ass
 
 `evaluation_id` is derived from the normalized result ID/digest plus evaluator bundle ID/digest and evaluator revision. `evaluation_digest` covers the complete result envelope with only `evaluation_digest` omitted. Findings retain only bounded public IDs, categories, severities, and digest/byte evidence references. Oracle, rubric, hidden-test, matcher, reference-answer, expected-patch, raw evaluator prompt, private path, credentials, secrets, customer data, and personal data fields are not part of the closed Schema.
 
-## Read-only verification
+## Read-only verification and guarantee levels
 
-All three evaluator commands are read-only:
+All three evaluator commands are read-only, but they do not make the same claim:
+
+- `verify-evaluator-bundle` verifies private bundle identity, real marker-bearing boundary roots, disjointness, and byte-identical material absence. `--public-artifact-root` is optional; omitting it explicitly leaves staged publication unverified. It does not claim the marker identities belong to the normalized lineage.
+- `verify-evaluator-result` additionally verifies normalized-result lineage and binds the supplied materialized, selection-state, run, and normalized roots to that lineage. Staged publication remains unverified unless `--public-artifact-root` is supplied.
+- `verify-evaluator-boundary` is the full boundary check. It requires `--public-artifact-root`; omission is an error and cannot report full verification success.
 
 ```bash
 node scripts/ask-benchmark.mjs verify-evaluator-bundle \
