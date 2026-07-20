@@ -1,0 +1,238 @@
+name: ASK autonomous development
+
+on:
+  schedule:
+    # Weekdays at 09:20 and 17:20 Asia/Tokyo (00:20 and 08:20 UTC).
+    - cron: "20 0 * * 1-5"
+    - cron: "20 8 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      run_kind:
+        description: Prefer PR review/maintenance, Issue advancement, or automatic selection.
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto
+          - review
+          - advance
+
+permissions: {}
+
+concurrency:
+  group: ask-autonomous-development
+  cancel-in-progress: false
+
+jobs:
+  context:
+    if: github.event_name == 'workflow_dispatch' || vars.ASK_AUTOMATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      should_run: ${{ steps.context.outputs.should_run }}
+      mode: ${{ steps.context.outputs.mode }}
+      target_ref: ${{ steps.context.outputs.target_ref }}
+      issue_number: ${{ steps.context.outputs.issue_number }}
+      pr_number: ${{ steps.context.outputs.pr_number }}
+    steps:
+      - name: Check out automation control plane
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build bounded GitHub context
+        id: context
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ASK_RUN_KIND: ${{ github.event_name == 'workflow_dispatch' && inputs.run_kind || (github.event.schedule == '20 8 * * 1-5' && 'review' || 'auto') }}
+        run: |
+          mkdir -p control/.ask-automation
+          node control/scripts/ask-autonomous-context.mjs control/.ask-automation/context.json
+
+      - name: Upload selected context
+        uses: actions/upload-artifact@v4
+        with:
+          name: ask-automation-context
+          path: control/.ask-automation/context.json
+          if-no-files-found: error
+          retention-days: 7
+
+  codex:
+    needs: context
+    if: needs.context.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - name: Check out automation control plane
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out selected development ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.context.outputs.target_ref }}
+          path: workspace
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download selected context
+        uses: actions/download-artifact@v4
+        with:
+          name: ask-automation-context
+          path: control/.ask-automation
+
+      - name: Build Codex prompt
+        run: |
+          cp control/.github/ask-automation/codex-prompt.md control/.ask-automation/prompt.md
+          {
+            printf '\n---\n\n## Selected GitHub context\n\n```json\n'
+            cat control/.ask-automation/context.json
+            printf '\n```\n'
+          } >> control/.ask-automation/prompt.md
+
+      - name: Require OpenAI credential
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "Repository secret OPENAI_API_KEY is required for openai/codex-action." >&2
+            exit 1
+          fi
+
+      - name: Run Codex in repository-only workspace
+        id: codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: control/.ask-automation/prompt.md
+          output-schema-file: control/.github/ask-automation/result.schema.json
+          output-file: control/.ask-automation/result.json
+          working-directory: workspace
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          allow-bots: true
+          effort: high
+
+      - name: Enforce automation change and result boundaries
+        run: |
+          node control/scripts/ask-autonomous-guard.mjs \
+            --repository workspace \
+            --context control/.ask-automation/context.json \
+            --result control/.ask-automation/result.json \
+            --output control/.ask-automation/guard.json
+
+      - name: Validate changed JavaScript syntax
+        shell: bash
+        run: |
+          mapfile -t files < <(git -C workspace diff --name-only -- '*.mjs')
+          for file in "${files[@]}"; do
+            node --check "workspace/$file"
+          done
+
+      - name: Run automation control tests
+        run: node control/scripts/test-ask-autonomous-development.mjs
+
+      - name: Run repository validation tests
+        working-directory: workspace
+        run: node scripts/test-validate-repo.mjs
+
+      - name: Validate repository consistency
+        working-directory: workspace
+        run: node scripts/validate-repo.mjs
+
+      - name: Check patch whitespace
+        working-directory: workspace
+        run: git diff --check
+
+      - name: Create guarded patch artifact
+        run: |
+          git -C workspace add -N -- .
+          git -C workspace diff --binary -- . > control/.ask-automation/change.patch
+
+      - name: Upload guarded automation result
+        uses: actions/upload-artifact@v4
+        with:
+          name: ask-automation-result
+          path: |
+            control/.ask-automation/context.json
+            control/.ask-automation/result.json
+            control/.ask-automation/guard.json
+            control/.ask-automation/change.patch
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs:
+      - context
+      - codex
+    if: needs.context.outputs.should_run == 'true' && needs.codex.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Check out automation control plane
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out publication workspace
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: workspace
+          fetch-depth: 0
+          token: ${{ secrets.ASK_AUTOMATION_GITHUB_TOKEN || github.token }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download guarded result
+        uses: actions/download-artifact@v4
+        with:
+          name: ask-automation-result
+          path: control/.ask-automation
+
+      - name: Publish bounded GitHub updates
+        env:
+          ASK_AUTOMATION_TOKEN: ${{ secrets.ASK_AUTOMATION_GITHUB_TOKEN || github.token }}
+        run: |
+          node control/scripts/ask-autonomous-publish.mjs \
+            --repository-path workspace \
+            --context control/.ask-automation/context.json \
+            --result control/.ask-automation/result.json \
+            --guard control/.ask-automation/guard.json \
+            --patch control/.ask-automation/change.patch
