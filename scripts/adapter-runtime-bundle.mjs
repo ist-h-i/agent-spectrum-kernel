@@ -1,14 +1,20 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalPathSetDigest } from "./installer-lifecycle.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
+import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const defaultOutput = resolve(root, "docs/fixtures/adapter-runtime-bundle.json");
 const commonProfiles = ["daily", "organizational", "implementation", "investigation", "review", "observability", "full"];
+
+function fileSha256(path) {
+  return createHash("sha256").update(readFileSync(resolve(root, path))).digest("hex");
+}
 
 function parseArgs(argv) {
   const args = { check: false, write: false, output: defaultOutput };
@@ -46,6 +52,9 @@ function projectionRecord(adapterId, plan) {
 
 export function buildAdapterRuntimeBundle() {
   const manifest = JSON.parse(readFileSync(resolve(root, "manifest.json"), "utf8"));
+  validatePortfolioCatalogArtifacts({ root });
+  const portfolioCatalog = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-catalog.json"), "utf8"));
+  const portfolioSimilarity = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-similarity.json"), "utf8"));
   const profiles = [];
   const canonicalPaths = new Set(["AGENTS.md", "manifest.json"]);
   for (const profile of commonProfiles) {
@@ -75,6 +84,17 @@ export function buildAdapterRuntimeBundle() {
       checkpoint: "C",
       baseline_configs: ["benchmarks/checkpoint-b.config.json", "benchmarks/checkpoint-b2.config.json"],
       required_attribution: ["architecture", "model", "cli", "adapter", "repository"],
+      portfolio_catalog: {
+        issue: 205,
+        checkpoint: "public_metadata_freeze",
+        protocol_version: "3.6.0-portfolio-catalog",
+        catalog_path: "benchmarks/portfolio-catalog.json",
+        catalog_file_sha256: fileSha256("benchmarks/portfolio-catalog.json"),
+        catalog_digest: portfolioCatalog.catalog_digest,
+        similarity_path: "benchmarks/portfolio-similarity.json",
+        similarity_file_sha256: fileSha256("benchmarks/portfolio-similarity.json"),
+        similarity_report_digest: portfolioSimilarity.report_digest,
+      },
     },
   };
 }

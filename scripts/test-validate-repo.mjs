@@ -248,6 +248,16 @@ function writeFixture(root, skills = ["alpha"]) {
   mkdirSync(resolve(root, "examples"), { recursive: true });
   writeAdapterFixture(root);
 
+  for (const path of [
+    "benchmarks/portfolio-catalog.json",
+    "benchmarks/portfolio-similarity.json",
+    "benchmarks/schemas/portfolio-catalog.schema.json",
+    "benchmarks/schemas/portfolio-similarity.schema.json",
+  ]) {
+    mkdirSync(dirname(resolve(root, path)), { recursive: true });
+    writeFileSync(resolve(root, path), readFileSync(resolve(repoRoot, path)));
+  }
+
   writeFileSync(resolve(root, "AGENTS.md"), "# Kernel\n");
   writeFileSync(resolve(root, "CUSTOM_INSTRUCTIONS.md"), "# Custom instructions\n");
   writeFileSync(resolve(root, "docs/ok.md"), "# OK\n");
@@ -5794,6 +5804,13 @@ jobs:
     writeFileSync(resolve(invalidHardStopRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   }
   assertFail("hard stop limited to approval-required surfaces", invalidHardStopRoot, "non-AGENTS approval-required surfaces");
+
+  const invalidPortfolioCatalogRoot = cloneFixture("invalid-portfolio-catalog");
+  const invalidPortfolioCatalogPath = resolve(invalidPortfolioCatalogRoot, "benchmarks/portfolio-catalog.json");
+  const invalidPortfolioCatalog = JSON.parse(readFileSync(invalidPortfolioCatalogPath, "utf8"));
+  invalidPortfolioCatalog.catalog_digest = `sha256:${"f".repeat(64)}`;
+  writeFileSync(invalidPortfolioCatalogPath, `${JSON.stringify(invalidPortfolioCatalog, null, 2)}\n`);
+  assertFail("invalid portfolio catalog", invalidPortfolioCatalogRoot, "catalog digest does not match");
 
   const stalePhraseRoot = cloneFixture("stale-phrase");
   writeFileSync(resolve(stalePhraseRoot, "docs/ok.md"), "# OK\n\nThis repository has 25 skills.\n");

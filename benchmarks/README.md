@@ -58,6 +58,7 @@ The measured result is in [results/checkpoint-c-report.md](results/checkpoint-c-
 Issue #197 adds a separate versioned foundation for the redesigned portfolio. The first slice registers the four B2/C fixtures as calibration-only and creates a deterministic plan for separate Codex and Claude tracks across Plain, Kernel-only, Adaptive ASK, and Full ASK:
 
 ```bash
+node scripts/ask-benchmark.mjs validate-portfolio-catalog --catalog benchmarks/portfolio-catalog.json --similarity benchmarks/portfolio-similarity.json
 node scripts/ask-benchmark.mjs validate --config benchmarks/adaptive-portfolio.config.json
 node scripts/ask-benchmark.mjs plan --config benchmarks/adaptive-portfolio.config.json --output /tmp/adaptive-ask-plan.json --seed local-plan-check
 node scripts/ask-benchmark.mjs materialize --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --output /tmp/adaptive-ask-materialized
@@ -69,6 +70,10 @@ node scripts/ask-benchmark.mjs normalize-execution --config benchmarks/adaptive-
 node scripts/ask-benchmark.mjs verify-normalized-results --config benchmarks/adaptive-portfolio.config.json --plan /tmp/adaptive-ask-plan.json --materialized /tmp/adaptive-ask-materialized --selection-state /tmp/adaptive-ask-selection-state --run-dir /tmp/adaptive-ask-run-state --output /tmp/adaptive-ask-normalized-results
 node scripts/ask-benchmark.mjs verify-normalized-results --output /tmp/adaptive-ask-normalized-results --snapshot-digest sha256:...
 ```
+
+Issue #205 Checkpoint 1 freezes the answer-neutral public catalog metadata only: 24 primary IDs, four calibration-only IDs, suite/class/domain/difficulty/repetition registration, capability/evidence/outcome/risk classification, admission state, and digest closure. Fixture bodies and private evaluator packages are not created here. The checked-in 276-pair similarity report is regenerated deterministically from metadata without an LLM, embedding, network, timestamp, or benchmark result; it diagnoses declared-metadata overlap but does not prove semantic identity.
+
+Issues #193 through #196 and their prior answer structures are prohibited as oracle sources. Actual admission, scoring semantics, practice-frequency lineage review, clean fixture work, and evaluator binding are later checkpoints. Issues #204 and #205 remain open, #198 Stage 0 remains blocked, and #206 through #209 have not started. Catalog generation and validation do not read measured results. Current primary aggregate eligibility is provisional to this catalog revision and may change only through a later versioned admission decision.
 
 The `plan` command records the non-sensitive canonical seed with its ID and SHA-256 digest so the artifact can be independently regenerated. Its `plan_id` binds the config digest, protocol digest, repository revision, and seed into every case/block namespace.
 

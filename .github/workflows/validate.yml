@@ -21,6 +21,12 @@ jobs:
       - name: Run repository validation tests
         run: node scripts/test-validate-repo.mjs
 
+      - name: Run portfolio catalog tests
+        run: node scripts/test-ask-benchmark-portfolio-catalog.mjs
+
+      - name: Run general benchmark tests
+        run: node scripts/test-ask-benchmark.mjs
+
       - name: Run adaptive portfolio execution tests
         run: node scripts/test-ask-benchmark-execution.mjs
 

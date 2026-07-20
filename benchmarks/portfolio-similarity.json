@@ -1,0 +1,2222 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-similarity.schema.json",
+  "program": "adaptive_ask_portfolio",
+  "similarity_contract_version": "1.0.0",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "primary_fixture_count": 24,
+  "pair_count": 276,
+  "threshold": "0.7500",
+  "maximum_similarity_score": "0.5000",
+  "pairs": [
+    {
+      "pair_id": "hi-authorization-exception::hi-external-action-approval",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "hi-external-action-approval",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::hi-financial-state-integrity",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "hi-financial-state-integrity",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::hi-versioned-migration-safety",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "hi-versioned-migration-safety",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::mn-build-option-update",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "mn-build-option-update",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::mn-client-compatibility-fix",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "mn-client-compatibility-fix",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::mn-doc-config-correction",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "mn-doc-config-correction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::mn-focused-regression-test",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "mn-focused-regression-test",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::mn-frontend-default-fix",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "mn-frontend-default-fix",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::mn-schema-field-alignment",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "mn-schema-field-alignment",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::mp-accessibility-interaction-review",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "mp-accessibility-interaction-review",
+      "score": "0.3667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::mp-ci-evidence-gap",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "mp-ci-evidence-gap",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::mp-data-migration-handoff",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "mp-data-migration-handoff",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::mp-frontend-state-review",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.3667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::mp-iac-rollback-design",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::mp-performance-investigation",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::pf-api-pagination-behavior",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::pf-ci-cache-flake",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::pf-data-schema-evolution",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::pf-frontend-async-state",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::pf-library-compat-upgrade",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::pf-observability-redaction",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.2500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::pf-performance-regression",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-authorization-exception::pf-review-error-contract",
+      "left_fixture_id": "hi-authorization-exception",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.5000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::hi-financial-state-integrity",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "hi-financial-state-integrity",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::hi-versioned-migration-safety",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "hi-versioned-migration-safety",
+      "score": "0.0500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::mn-build-option-update",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "mn-build-option-update",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::mn-client-compatibility-fix",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "mn-client-compatibility-fix",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::mn-doc-config-correction",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "mn-doc-config-correction",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::mn-focused-regression-test",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "mn-focused-regression-test",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::mn-frontend-default-fix",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "mn-frontend-default-fix",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::mn-schema-field-alignment",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "mn-schema-field-alignment",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::mp-accessibility-interaction-review",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "mp-accessibility-interaction-review",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::mp-ci-evidence-gap",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "mp-ci-evidence-gap",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::mp-data-migration-handoff",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "mp-data-migration-handoff",
+      "score": "0.0500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::mp-frontend-state-review",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::mp-iac-rollback-design",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.3292",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::mp-performance-investigation",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::pf-api-pagination-behavior",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::pf-ci-cache-flake",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::pf-data-schema-evolution",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::pf-frontend-async-state",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::pf-library-compat-upgrade",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::pf-observability-redaction",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::pf-performance-regression",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-external-action-approval::pf-review-error-contract",
+      "left_fixture_id": "hi-external-action-approval",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::hi-versioned-migration-safety",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "hi-versioned-migration-safety",
+      "score": "0.0625",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::mn-build-option-update",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "mn-build-option-update",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::mn-client-compatibility-fix",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "mn-client-compatibility-fix",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::mn-doc-config-correction",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "mn-doc-config-correction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::mn-focused-regression-test",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "mn-focused-regression-test",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::mn-frontend-default-fix",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "mn-frontend-default-fix",
+      "score": "0.1500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::mn-schema-field-alignment",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "mn-schema-field-alignment",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::mp-accessibility-interaction-review",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "mp-accessibility-interaction-review",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::mp-ci-evidence-gap",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "mp-ci-evidence-gap",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::mp-data-migration-handoff",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "mp-data-migration-handoff",
+      "score": "0.0625",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::mp-frontend-state-review",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.0833",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::mp-iac-rollback-design",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::mp-performance-investigation",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::pf-api-pagination-behavior",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::pf-ci-cache-flake",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::pf-data-schema-evolution",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::pf-frontend-async-state",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.2333",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::pf-library-compat-upgrade",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::pf-observability-redaction",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::pf-performance-regression",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.2167",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-financial-state-integrity::pf-review-error-contract",
+      "left_fixture_id": "hi-financial-state-integrity",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::mn-build-option-update",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "mn-build-option-update",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::mn-client-compatibility-fix",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "mn-client-compatibility-fix",
+      "score": "0.0500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::mn-doc-config-correction",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "mn-doc-config-correction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::mn-focused-regression-test",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "mn-focused-regression-test",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::mn-frontend-default-fix",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "mn-frontend-default-fix",
+      "score": "0.0625",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::mn-schema-field-alignment",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "mn-schema-field-alignment",
+      "score": "0.2125",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::mp-accessibility-interaction-review",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "mp-accessibility-interaction-review",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::mp-ci-evidence-gap",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "mp-ci-evidence-gap",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::mp-data-migration-handoff",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "mp-data-migration-handoff",
+      "score": "0.3917",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::mp-frontend-state-review",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.0625",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::mp-iac-rollback-design",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::mp-performance-investigation",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::pf-api-pagination-behavior",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::pf-ci-cache-flake",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::pf-data-schema-evolution",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.3625",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::pf-frontend-async-state",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.0625",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::pf-library-compat-upgrade",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.1167",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::pf-observability-redaction",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::pf-performance-regression",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "hi-versioned-migration-safety::pf-review-error-contract",
+      "left_fixture_id": "hi-versioned-migration-safety",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::mn-client-compatibility-fix",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "mn-client-compatibility-fix",
+      "score": "0.2500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::mn-doc-config-correction",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "mn-doc-config-correction",
+      "score": "0.4500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::mn-focused-regression-test",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "mn-focused-regression-test",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::mn-frontend-default-fix",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "mn-frontend-default-fix",
+      "score": "0.1833",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::mn-schema-field-alignment",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "mn-schema-field-alignment",
+      "score": "0.2500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::mp-accessibility-interaction-review",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "mp-accessibility-interaction-review",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::mp-ci-evidence-gap",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "mp-ci-evidence-gap",
+      "score": "0.2667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::mp-data-migration-handoff",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "mp-data-migration-handoff",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::mp-frontend-state-review",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::mp-iac-rollback-design",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::mp-performance-investigation",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::pf-api-pagination-behavior",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::pf-ci-cache-flake",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.2667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::pf-data-schema-evolution",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::pf-frontend-async-state",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::pf-library-compat-upgrade",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::pf-observability-redaction",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::pf-performance-regression",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-build-option-update::pf-review-error-contract",
+      "left_fixture_id": "mn-build-option-update",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::mn-doc-config-correction",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "mn-doc-config-correction",
+      "score": "0.2500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::mn-focused-regression-test",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "mn-focused-regression-test",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::mn-frontend-default-fix",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "mn-frontend-default-fix",
+      "score": "0.2500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::mn-schema-field-alignment",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "mn-schema-field-alignment",
+      "score": "0.2500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::mp-accessibility-interaction-review",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "mp-accessibility-interaction-review",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::mp-ci-evidence-gap",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "mp-ci-evidence-gap",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::mp-data-migration-handoff",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "mp-data-migration-handoff",
+      "score": "0.0500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::mp-frontend-state-review",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::mp-iac-rollback-design",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::mp-performance-investigation",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::pf-api-pagination-behavior",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::pf-ci-cache-flake",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::pf-data-schema-evolution",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::pf-frontend-async-state",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::pf-library-compat-upgrade",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.2167",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::pf-observability-redaction",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::pf-performance-regression",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-client-compatibility-fix::pf-review-error-contract",
+      "left_fixture_id": "mn-client-compatibility-fix",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::mn-focused-regression-test",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "mn-focused-regression-test",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::mn-frontend-default-fix",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "mn-frontend-default-fix",
+      "score": "0.2500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::mn-schema-field-alignment",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "mn-schema-field-alignment",
+      "score": "0.2500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::mp-accessibility-interaction-review",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "mp-accessibility-interaction-review",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::mp-ci-evidence-gap",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "mp-ci-evidence-gap",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::mp-data-migration-handoff",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "mp-data-migration-handoff",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::mp-frontend-state-review",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::mp-iac-rollback-design",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::mp-performance-investigation",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::pf-api-pagination-behavior",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::pf-ci-cache-flake",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::pf-data-schema-evolution",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::pf-frontend-async-state",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::pf-library-compat-upgrade",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::pf-observability-redaction",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::pf-performance-regression",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-doc-config-correction::pf-review-error-contract",
+      "left_fixture_id": "mn-doc-config-correction",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::mn-frontend-default-fix",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "mn-frontend-default-fix",
+      "score": "0.3667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::mn-schema-field-alignment",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "mn-schema-field-alignment",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::mp-accessibility-interaction-review",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "mp-accessibility-interaction-review",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::mp-ci-evidence-gap",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "mp-ci-evidence-gap",
+      "score": "0.3167",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::mp-data-migration-handoff",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "mp-data-migration-handoff",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::mp-frontend-state-review",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::mp-iac-rollback-design",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::mp-performance-investigation",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::pf-api-pagination-behavior",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.3167",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::pf-ci-cache-flake",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::pf-data-schema-evolution",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0833",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::pf-frontend-async-state",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::pf-library-compat-upgrade",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::pf-observability-redaction",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::pf-performance-regression",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.3167",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-focused-regression-test::pf-review-error-contract",
+      "left_fixture_id": "mn-focused-regression-test",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::mn-schema-field-alignment",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "mn-schema-field-alignment",
+      "score": "0.1833",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::mp-accessibility-interaction-review",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "mp-accessibility-interaction-review",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::mp-ci-evidence-gap",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "mp-ci-evidence-gap",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::mp-data-migration-handoff",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "mp-data-migration-handoff",
+      "score": "0.0625",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::mp-frontend-state-review",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.3500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::mp-iac-rollback-design",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::mp-performance-investigation",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::pf-api-pagination-behavior",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.3667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::pf-ci-cache-flake",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::pf-data-schema-evolution",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::pf-frontend-async-state",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.3500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::pf-library-compat-upgrade",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::pf-observability-redaction",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::pf-performance-regression",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.2333",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-frontend-default-fix::pf-review-error-contract",
+      "left_fixture_id": "mn-frontend-default-fix",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::mp-accessibility-interaction-review",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "mp-accessibility-interaction-review",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::mp-ci-evidence-gap",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "mp-ci-evidence-gap",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::mp-data-migration-handoff",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "mp-data-migration-handoff",
+      "score": "0.1500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::mp-frontend-state-review",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::mp-iac-rollback-design",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::mp-performance-investigation",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::pf-api-pagination-behavior",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::pf-ci-cache-flake",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::pf-data-schema-evolution",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.3167",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::pf-frontend-async-state",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::pf-library-compat-upgrade",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::pf-observability-redaction",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::pf-performance-regression",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mn-schema-field-alignment::pf-review-error-contract",
+      "left_fixture_id": "mn-schema-field-alignment",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.2333",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::mp-ci-evidence-gap",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "mp-ci-evidence-gap",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::mp-data-migration-handoff",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "mp-data-migration-handoff",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::mp-frontend-state-review",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.4667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::mp-iac-rollback-design",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::mp-performance-investigation",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::pf-api-pagination-behavior",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::pf-ci-cache-flake",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::pf-data-schema-evolution",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::pf-frontend-async-state",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::pf-library-compat-upgrade",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::pf-observability-redaction",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.1500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::pf-performance-regression",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-accessibility-interaction-review::pf-review-error-contract",
+      "left_fixture_id": "mp-accessibility-interaction-review",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.4667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-ci-evidence-gap::mp-data-migration-handoff",
+      "left_fixture_id": "mp-ci-evidence-gap",
+      "right_fixture_id": "mp-data-migration-handoff",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-ci-evidence-gap::mp-frontend-state-review",
+      "left_fixture_id": "mp-ci-evidence-gap",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-ci-evidence-gap::mp-iac-rollback-design",
+      "left_fixture_id": "mp-ci-evidence-gap",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-ci-evidence-gap::mp-performance-investigation",
+      "left_fixture_id": "mp-ci-evidence-gap",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-ci-evidence-gap::pf-api-pagination-behavior",
+      "left_fixture_id": "mp-ci-evidence-gap",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.2500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-ci-evidence-gap::pf-ci-cache-flake",
+      "left_fixture_id": "mp-ci-evidence-gap",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.2667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-ci-evidence-gap::pf-data-schema-evolution",
+      "left_fixture_id": "mp-ci-evidence-gap",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0833",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-ci-evidence-gap::pf-frontend-async-state",
+      "left_fixture_id": "mp-ci-evidence-gap",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-ci-evidence-gap::pf-library-compat-upgrade",
+      "left_fixture_id": "mp-ci-evidence-gap",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-ci-evidence-gap::pf-observability-redaction",
+      "left_fixture_id": "mp-ci-evidence-gap",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-ci-evidence-gap::pf-performance-regression",
+      "left_fixture_id": "mp-ci-evidence-gap",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-ci-evidence-gap::pf-review-error-contract",
+      "left_fixture_id": "mp-ci-evidence-gap",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-data-migration-handoff::mp-frontend-state-review",
+      "left_fixture_id": "mp-data-migration-handoff",
+      "right_fixture_id": "mp-frontend-state-review",
+      "score": "0.0625",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-data-migration-handoff::mp-iac-rollback-design",
+      "left_fixture_id": "mp-data-migration-handoff",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-data-migration-handoff::mp-performance-investigation",
+      "left_fixture_id": "mp-data-migration-handoff",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-data-migration-handoff::pf-api-pagination-behavior",
+      "left_fixture_id": "mp-data-migration-handoff",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-data-migration-handoff::pf-ci-cache-flake",
+      "left_fixture_id": "mp-data-migration-handoff",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-data-migration-handoff::pf-data-schema-evolution",
+      "left_fixture_id": "mp-data-migration-handoff",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.3333",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-data-migration-handoff::pf-frontend-async-state",
+      "left_fixture_id": "mp-data-migration-handoff",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.0625",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-data-migration-handoff::pf-library-compat-upgrade",
+      "left_fixture_id": "mp-data-migration-handoff",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.1500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-data-migration-handoff::pf-observability-redaction",
+      "left_fixture_id": "mp-data-migration-handoff",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-data-migration-handoff::pf-performance-regression",
+      "left_fixture_id": "mp-data-migration-handoff",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-data-migration-handoff::pf-review-error-contract",
+      "left_fixture_id": "mp-data-migration-handoff",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-frontend-state-review::mp-iac-rollback-design",
+      "left_fixture_id": "mp-frontend-state-review",
+      "right_fixture_id": "mp-iac-rollback-design",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-frontend-state-review::mp-performance-investigation",
+      "left_fixture_id": "mp-frontend-state-review",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-frontend-state-review::pf-api-pagination-behavior",
+      "left_fixture_id": "mp-frontend-state-review",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-frontend-state-review::pf-ci-cache-flake",
+      "left_fixture_id": "mp-frontend-state-review",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-frontend-state-review::pf-data-schema-evolution",
+      "left_fixture_id": "mp-frontend-state-review",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-frontend-state-review::pf-frontend-async-state",
+      "left_fixture_id": "mp-frontend-state-review",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.4167",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-frontend-state-review::pf-library-compat-upgrade",
+      "left_fixture_id": "mp-frontend-state-review",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-frontend-state-review::pf-observability-redaction",
+      "left_fixture_id": "mp-frontend-state-review",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.1500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-frontend-state-review::pf-performance-regression",
+      "left_fixture_id": "mp-frontend-state-review",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-frontend-state-review::pf-review-error-contract",
+      "left_fixture_id": "mp-frontend-state-review",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.4667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-iac-rollback-design::mp-performance-investigation",
+      "left_fixture_id": "mp-iac-rollback-design",
+      "right_fixture_id": "mp-performance-investigation",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-iac-rollback-design::pf-api-pagination-behavior",
+      "left_fixture_id": "mp-iac-rollback-design",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-iac-rollback-design::pf-ci-cache-flake",
+      "left_fixture_id": "mp-iac-rollback-design",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-iac-rollback-design::pf-data-schema-evolution",
+      "left_fixture_id": "mp-iac-rollback-design",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-iac-rollback-design::pf-frontend-async-state",
+      "left_fixture_id": "mp-iac-rollback-design",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-iac-rollback-design::pf-library-compat-upgrade",
+      "left_fixture_id": "mp-iac-rollback-design",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-iac-rollback-design::pf-observability-redaction",
+      "left_fixture_id": "mp-iac-rollback-design",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-iac-rollback-design::pf-performance-regression",
+      "left_fixture_id": "mp-iac-rollback-design",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-iac-rollback-design::pf-review-error-contract",
+      "left_fixture_id": "mp-iac-rollback-design",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-performance-investigation::pf-api-pagination-behavior",
+      "left_fixture_id": "mp-performance-investigation",
+      "right_fixture_id": "pf-api-pagination-behavior",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-performance-investigation::pf-ci-cache-flake",
+      "left_fixture_id": "mp-performance-investigation",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.4000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-performance-investigation::pf-data-schema-evolution",
+      "left_fixture_id": "mp-performance-investigation",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-performance-investigation::pf-frontend-async-state",
+      "left_fixture_id": "mp-performance-investigation",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-performance-investigation::pf-library-compat-upgrade",
+      "left_fixture_id": "mp-performance-investigation",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-performance-investigation::pf-observability-redaction",
+      "left_fixture_id": "mp-performance-investigation",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-performance-investigation::pf-performance-regression",
+      "left_fixture_id": "mp-performance-investigation",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.4167",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "mp-performance-investigation::pf-review-error-contract",
+      "left_fixture_id": "mp-performance-investigation",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-api-pagination-behavior::pf-ci-cache-flake",
+      "left_fixture_id": "pf-api-pagination-behavior",
+      "right_fixture_id": "pf-ci-cache-flake",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-api-pagination-behavior::pf-data-schema-evolution",
+      "left_fixture_id": "pf-api-pagination-behavior",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.2333",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-api-pagination-behavior::pf-frontend-async-state",
+      "left_fixture_id": "pf-api-pagination-behavior",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-api-pagination-behavior::pf-library-compat-upgrade",
+      "left_fixture_id": "pf-api-pagination-behavior",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-api-pagination-behavior::pf-observability-redaction",
+      "left_fixture_id": "pf-api-pagination-behavior",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-api-pagination-behavior::pf-performance-regression",
+      "left_fixture_id": "pf-api-pagination-behavior",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.2333",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-api-pagination-behavior::pf-review-error-contract",
+      "left_fixture_id": "pf-api-pagination-behavior",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.3500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-ci-cache-flake::pf-data-schema-evolution",
+      "left_fixture_id": "pf-ci-cache-flake",
+      "right_fixture_id": "pf-data-schema-evolution",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-ci-cache-flake::pf-frontend-async-state",
+      "left_fixture_id": "pf-ci-cache-flake",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.1667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-ci-cache-flake::pf-library-compat-upgrade",
+      "left_fixture_id": "pf-ci-cache-flake",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-ci-cache-flake::pf-observability-redaction",
+      "left_fixture_id": "pf-ci-cache-flake",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-ci-cache-flake::pf-performance-regression",
+      "left_fixture_id": "pf-ci-cache-flake",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-ci-cache-flake::pf-review-error-contract",
+      "left_fixture_id": "pf-ci-cache-flake",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-data-schema-evolution::pf-frontend-async-state",
+      "left_fixture_id": "pf-data-schema-evolution",
+      "right_fixture_id": "pf-frontend-async-state",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-data-schema-evolution::pf-library-compat-upgrade",
+      "left_fixture_id": "pf-data-schema-evolution",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.2333",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-data-schema-evolution::pf-observability-redaction",
+      "left_fixture_id": "pf-data-schema-evolution",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-data-schema-evolution::pf-performance-regression",
+      "left_fixture_id": "pf-data-schema-evolution",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-data-schema-evolution::pf-review-error-contract",
+      "left_fixture_id": "pf-data-schema-evolution",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.0667",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-frontend-async-state::pf-library-compat-upgrade",
+      "left_fixture_id": "pf-frontend-async-state",
+      "right_fixture_id": "pf-library-compat-upgrade",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-frontend-async-state::pf-observability-redaction",
+      "left_fixture_id": "pf-frontend-async-state",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-frontend-async-state::pf-performance-regression",
+      "left_fixture_id": "pf-frontend-async-state",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.2500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-frontend-async-state::pf-review-error-contract",
+      "left_fixture_id": "pf-frontend-async-state",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-library-compat-upgrade::pf-observability-redaction",
+      "left_fixture_id": "pf-library-compat-upgrade",
+      "right_fixture_id": "pf-observability-redaction",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-library-compat-upgrade::pf-performance-regression",
+      "left_fixture_id": "pf-library-compat-upgrade",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-library-compat-upgrade::pf-review-error-contract",
+      "left_fixture_id": "pf-library-compat-upgrade",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-observability-redaction::pf-performance-regression",
+      "left_fixture_id": "pf-observability-redaction",
+      "right_fixture_id": "pf-performance-regression",
+      "score": "0.0000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-observability-redaction::pf-review-error-contract",
+      "left_fixture_id": "pf-observability-redaction",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.1500",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    },
+    {
+      "pair_id": "pf-performance-regression::pf-review-error-contract",
+      "left_fixture_id": "pf-performance-regression",
+      "right_fixture_id": "pf-review-error-contract",
+      "score": "0.1000",
+      "near_duplicate_candidate": false,
+      "hard_duplicate": false
+    }
+  ],
+  "report_digest": "sha256:9fddba0a825e9d97016676b21ca616c3bbf23d5e89140116be9f5f0244f2dd62"
+}

@@ -26,6 +26,11 @@ import { sealAdaptiveSelection, verifyAdaptiveSelection } from "./ask-benchmark-
 import { executePortfolio, recoverPortfolioCase, verifyPortfolioExecution } from "./ask-benchmark-execution.mjs";
 import { assertCurrentPortfolioRunInput, normalizePortfolioExecution, verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { verifyEvaluatorBoundary, verifyEvaluatorResult, verifyPrivateEvaluatorBundle } from "./ask-benchmark-evaluator-boundary.mjs";
+import {
+  DEFAULT_PORTFOLIO_CATALOG_PATH,
+  DEFAULT_PORTFOLIO_SIMILARITY_PATH,
+  validatePortfolioCatalogArtifacts,
+} from "./ask-benchmark-portfolio-catalog.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_CONFIG_PATH = resolve(ROOT, "benchmarks/checkpoint-b.config.json");
@@ -50,7 +55,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, normalizedResults: null, publicArtifactRoot: null, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, normalizedResults: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -76,6 +81,8 @@ function parseArgs(argv) {
     else if (flag === "--result" || flag === "--evaluator-result") args.evaluatorResult = resolve(argv.shift());
     else if (flag === "--normalized-results") args.normalizedResults = resolve(argv.shift());
     else if (flag === "--public-artifact-root") args.publicArtifactRoot = resolve(argv.shift());
+    else if (flag === "--catalog") args.catalogPath = resolve(argv.shift());
+    else if (flag === "--similarity") args.similarityPath = resolve(argv.shift());
     else if (flag === "--config") args.configPath = resolve(argv.shift());
     else if (flag === "--help" || flag === "-h") args.command = "help";
     else throw new Error(`Unknown argument: ${flag}`);
@@ -88,6 +95,7 @@ function help() {
 
 Commands:
   validate [--config <config.json>]
+  validate-portfolio-catalog [--catalog <catalog.json>] [--similarity <similarity.json>]
   plan --config <portfolio-config.json> --output <execution-plan.json> --seed <value>
   materialize --config <portfolio-config.json> --plan <execution-plan.json> --output <absent-or-empty-directory>
   seal-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id> --input <selection-input.json>
@@ -918,6 +926,9 @@ try {
   if (args.command === "validate") {
     validateProtocol(args.configPath);
     console.log("ASK benchmark protocol validation passed");
+  } else if (args.command === "validate-portfolio-catalog") {
+    const summary = validatePortfolioCatalogArtifacts({ catalogPath: args.catalogPath, similarityPath: args.similarityPath });
+    console.log(`Adaptive ASK portfolio catalog validation passed: primary=${summary.primaryFixtureCount}, calibration=${summary.calibrationFixtureCount}, domains=${summary.domainCount}, backend_api_security=${summary.backendApiSecurityCount}, pairs=${summary.pairCount}, max_similarity=${summary.maximumSimilarityScore}`);
   } else if (args.command === "plan") planPortfolio(args);
   else if (args.command === "materialize") materialize(args);
   else if (args.command === "seal-selection") sealSelection(args);
