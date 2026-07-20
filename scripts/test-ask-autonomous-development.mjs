@@ -88,7 +88,10 @@ const validCreateResult = {
   changed_files_expected: ["scripts/example.mjs"],
 };
 assert.deepEqual(validateCodexResult(validCreateResult, issueContext, ["scripts/example.mjs"]), []);
-assert.match(validateCodexResult({ ...validCreateResult, action: "no_change" }, issueContext, ["scripts/example.mjs"])[0], /may not accompany repository changes/);
+assert.ok(
+  validateCodexResult({ ...validCreateResult, action: "no_change" }, issueContext, ["scripts/example.mjs"])
+    .some((message) => /may not accompany repository changes/.test(message)),
+);
 assert.match(validateCodexResult({ ...validCreateResult, target_issue_number: 197 }, issueContext, ["scripts/example.mjs"])[0], /does not match selected context/);
 
 const prContext = {
