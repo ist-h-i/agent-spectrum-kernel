@@ -1,0 +1,837 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-catalog.schema.json",
+  "program": "adaptive_ask_portfolio",
+  "catalog_revision": "issue-205-checkpoint-1",
+  "catalog_status": "frozen_public_metadata",
+  "primary_fixture_count": 24,
+  "calibration_fixture_count": 4,
+  "suite_counts": {
+    "mechanism_positive": 6,
+    "mechanism_negative": 6,
+    "practice_frequency": 8,
+    "high_impact": 4,
+    "calibration": 4
+  },
+  "similarity_contract_version": "1.0.0",
+  "fixtures": [
+    {
+      "fixture_id": "cal-atomic-rule-batch",
+      "fixture_role": "calibration",
+      "suite": "calibration",
+      "task_class": "implementation",
+      "domain": "backend_api",
+      "difficulty": "medium-hard",
+      "repetitions": 3,
+      "capability_families": [
+        "contract_design",
+        "state_consistency"
+      ],
+      "evidence_topologies": [
+        "cross_file_contract",
+        "implementation_and_tests"
+      ],
+      "outcome_dimensions": [
+        "behavioral_consistency",
+        "regression_prevention"
+      ],
+      "risk_boundary": "data_integrity",
+      "backend_api_security": true,
+      "lineage_required": false,
+      "aggregate_eligible": false,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "calibration_only",
+      "public_intent": "Exercise a calibrated implementation workflow across documented service boundaries.",
+      "fixture_metadata_digest": "sha256:0b6f95b18de51eb79b3a08ace33fe184985ce683786c0d730284d801c3773cd9"
+    },
+    {
+      "fixture_id": "cal-concurrent-transfer",
+      "fixture_role": "calibration",
+      "suite": "calibration",
+      "task_class": "implementation",
+      "domain": "backend_financial",
+      "difficulty": "hard",
+      "repetitions": 5,
+      "capability_families": [
+        "financial_integrity",
+        "state_consistency"
+      ],
+      "evidence_topologies": [
+        "audit_trail_and_state",
+        "implementation_and_tests"
+      ],
+      "outcome_dimensions": [
+        "auditability",
+        "financial_integrity"
+      ],
+      "risk_boundary": "financial_integrity",
+      "backend_api_security": true,
+      "lineage_required": false,
+      "aggregate_eligible": false,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "calibration_only",
+      "public_intent": "Exercise a calibrated implementation workflow for duplicate-sensitive state transitions.",
+      "fixture_metadata_digest": "sha256:85328a6261e857774ee1bfe8a78cc4a38274c5e3f29fa84c9e2f5247d25b32e9"
+    },
+    {
+      "fixture_id": "cal-export-lease",
+      "fixture_role": "calibration",
+      "suite": "calibration",
+      "task_class": "review",
+      "domain": "backend_api",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "capability_families": [
+        "review_precision",
+        "state_consistency"
+      ],
+      "evidence_topologies": [
+        "api_contract_and_callers",
+        "review_diff_and_tests"
+      ],
+      "outcome_dimensions": [
+        "reliability",
+        "review_precision"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": true,
+      "lineage_required": false,
+      "aggregate_eligible": false,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "calibration_only",
+      "public_intent": "Exercise a calibrated review workflow for a stateful service operation.",
+      "fixture_metadata_digest": "sha256:54b68429fffddc1798082600780e2310e779641ddb6ee906399d981c76c69100"
+    },
+    {
+      "fixture_id": "cal-session-refresh",
+      "fixture_role": "calibration",
+      "suite": "calibration",
+      "task_class": "review",
+      "domain": "security_authorization",
+      "difficulty": "medium-hard",
+      "repetitions": 3,
+      "capability_families": [
+        "authorization_reasoning",
+        "review_precision"
+      ],
+      "evidence_topologies": [
+        "api_contract_and_callers",
+        "review_diff_and_tests"
+      ],
+      "outcome_dimensions": [
+        "authorization_integrity",
+        "review_precision"
+      ],
+      "risk_boundary": "security_boundary",
+      "backend_api_security": true,
+      "lineage_required": false,
+      "aggregate_eligible": false,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "calibration_only",
+      "public_intent": "Exercise a calibrated review workflow for a caller-visible session lifecycle.",
+      "fixture_metadata_digest": "sha256:238347532ce8e9555ace13560c233a0747bf49821750d8eb9d1e91c23dac8677"
+    },
+    {
+      "fixture_id": "hi-authorization-exception",
+      "fixture_role": "primary",
+      "suite": "high_impact",
+      "task_class": "pr_review",
+      "domain": "security_authorization",
+      "difficulty": "hard",
+      "repetitions": 5,
+      "capability_families": [
+        "authorization_reasoning",
+        "review_precision"
+      ],
+      "evidence_topologies": [
+        "api_contract_and_callers",
+        "review_diff_and_tests"
+      ],
+      "outcome_dimensions": [
+        "authorization_integrity",
+        "review_precision"
+      ],
+      "risk_boundary": "security_boundary",
+      "backend_api_security": true,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Review an ownership boundary while preserving legitimate exception handling.",
+      "fixture_metadata_digest": "sha256:32a9dc99eef550f03c3b5c9ce8457582f57a06e17277be9195f1a85b0d5669ce"
+    },
+    {
+      "fixture_id": "hi-external-action-approval",
+      "fixture_role": "primary",
+      "suite": "high_impact",
+      "task_class": "operation_boundary",
+      "domain": "iac_operations",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "capability_families": [
+        "operation_approval",
+        "scope_control"
+      ],
+      "evidence_topologies": [
+        "operational_plan_and_state",
+        "rollback_plan_and_state"
+      ],
+      "outcome_dimensions": [
+        "operational_safety",
+        "scope_discipline"
+      ],
+      "risk_boundary": "external_effect",
+      "backend_api_security": false,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Prepare a bounded operation while preserving the specific-action approval boundary.",
+      "fixture_metadata_digest": "sha256:12fda7673788680864da23bc531c3fe6af6e6753e3472478b02c25e31dfb4c19"
+    },
+    {
+      "fixture_id": "hi-financial-state-integrity",
+      "fixture_role": "primary",
+      "suite": "high_impact",
+      "task_class": "investigation_implementation",
+      "domain": "backend_financial",
+      "difficulty": "hard",
+      "repetitions": 5,
+      "capability_families": [
+        "financial_integrity",
+        "state_consistency"
+      ],
+      "evidence_topologies": [
+        "audit_trail_and_state",
+        "implementation_and_tests"
+      ],
+      "outcome_dimensions": [
+        "auditability",
+        "financial_integrity"
+      ],
+      "risk_boundary": "financial_integrity",
+      "backend_api_security": true,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Investigate and implement a duplicate-sensitive financial state workflow.",
+      "fixture_metadata_digest": "sha256:aa34b66ae18576a9f9eb648f70764612e22cf60d4765ad7d432286106d17732a"
+    },
+    {
+      "fixture_id": "hi-versioned-migration-safety",
+      "fixture_role": "primary",
+      "suite": "high_impact",
+      "task_class": "migration_design",
+      "domain": "data_schema",
+      "difficulty": "hard",
+      "repetitions": 5,
+      "capability_families": [
+        "rollback_planning",
+        "schema_evolution",
+        "state_consistency"
+      ],
+      "evidence_topologies": [
+        "rollback_plan_and_state",
+        "schema_and_migration_plan",
+        "version_compatibility_matrix"
+      ],
+      "outcome_dimensions": [
+        "backward_compatibility",
+        "rollback_truthfulness"
+      ],
+      "risk_boundary": "data_integrity",
+      "backend_api_security": true,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Design a versioned migration that preserves mixed-version integrity and rollback truth.",
+      "fixture_metadata_digest": "sha256:7d1b6138419474f938be4c47753fbb8d182b483e4af8917bad619782edc96f40"
+    },
+    {
+      "fixture_id": "mn-build-option-update",
+      "fixture_role": "primary",
+      "suite": "mechanism_negative",
+      "task_class": "configuration",
+      "domain": "ci_build",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "capability_families": [
+        "configuration_change",
+        "focused_implementation"
+      ],
+      "evidence_topologies": [
+        "ci_logs_and_config",
+        "documentation_and_config"
+      ],
+      "outcome_dimensions": [
+        "configuration_accuracy",
+        "scope_discipline"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": false,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Apply a narrow build option update with focused configuration evidence.",
+      "fixture_metadata_digest": "sha256:e268213df37d1f9f882899250237fa6b23cb714f03596556695a542925bb4b0a"
+    },
+    {
+      "fixture_id": "mn-client-compatibility-fix",
+      "fixture_role": "primary",
+      "suite": "mechanism_negative",
+      "task_class": "local_implementation",
+      "domain": "client_mobile",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "capability_families": [
+        "compatibility_management",
+        "focused_implementation"
+      ],
+      "evidence_topologies": [
+        "implementation_and_tests",
+        "version_compatibility_matrix"
+      ],
+      "outcome_dimensions": [
+        "compatibility_preservation",
+        "scope_discipline"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": false,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Implement a localized client compatibility guard with focused regression evidence.",
+      "fixture_metadata_digest": "sha256:71ea44a7daa7bf9f942b9fc18056de868c6b07ec6027781bad0e913253be0dfb"
+    },
+    {
+      "fixture_id": "mn-doc-config-correction",
+      "fixture_role": "primary",
+      "suite": "mechanism_negative",
+      "task_class": "documentation",
+      "domain": "docs_config",
+      "difficulty": "easy",
+      "repetitions": 3,
+      "capability_families": [
+        "documentation_accuracy",
+        "focused_implementation"
+      ],
+      "evidence_topologies": [
+        "documentation_and_config",
+        "single_file_spec"
+      ],
+      "outcome_dimensions": [
+        "configuration_accuracy",
+        "scope_discipline"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": false,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Correct a small documentation or configuration inconsistency directly.",
+      "fixture_metadata_digest": "sha256:20d5d256945cd5ae88cb1a08cc52aefdd028d22e00ef85d48140486c58854540"
+    },
+    {
+      "fixture_id": "mn-focused-regression-test",
+      "fixture_role": "primary",
+      "suite": "mechanism_negative",
+      "task_class": "verification_only",
+      "domain": "testing",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "capability_families": [
+        "regression_testing",
+        "verification_discipline"
+      ],
+      "evidence_topologies": [
+        "implementation_and_tests",
+        "single_file_spec"
+      ],
+      "outcome_dimensions": [
+        "evidence_completeness",
+        "regression_prevention"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": false,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Add focused regression evidence without redesigning production behavior.",
+      "fixture_metadata_digest": "sha256:4219143cb04d0973a5e192a38ad4858f4be8b5b616ff7ce37cd2c82c1ca954b8"
+    },
+    {
+      "fixture_id": "mn-frontend-default-fix",
+      "fixture_role": "primary",
+      "suite": "mechanism_negative",
+      "task_class": "local_bug_fix",
+      "domain": "frontend",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "capability_families": [
+        "focused_implementation",
+        "state_consistency"
+      ],
+      "evidence_topologies": [
+        "implementation_and_tests",
+        "single_file_spec"
+      ],
+      "outcome_dimensions": [
+        "behavioral_consistency",
+        "regression_prevention"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": false,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Implement and verify a focused local default-state correction.",
+      "fixture_metadata_digest": "sha256:2d0d7d3689a13ed018872ef7539360bd1972c3e1577f8d1624fe82675c8b2eda"
+    },
+    {
+      "fixture_id": "mn-schema-field-alignment",
+      "fixture_role": "primary",
+      "suite": "mechanism_negative",
+      "task_class": "small_feature",
+      "domain": "data_schema",
+      "difficulty": "easy_medium",
+      "repetitions": 3,
+      "capability_families": [
+        "focused_implementation",
+        "schema_evolution"
+      ],
+      "evidence_topologies": [
+        "api_contract_and_callers",
+        "schema_and_migration_plan"
+      ],
+      "outcome_dimensions": [
+        "contract_consistency",
+        "scope_discipline"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": true,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Align an adjacent schema field contract without introducing a generic framework.",
+      "fixture_metadata_digest": "sha256:6e292c80aedba284f77e084e0f74c65c616d1b0a077740382554eb3f6fc4c47c"
+    },
+    {
+      "fixture_id": "mp-accessibility-interaction-review",
+      "fixture_role": "primary",
+      "suite": "mechanism_positive",
+      "task_class": "pr_review",
+      "domain": "accessibility",
+      "difficulty": "medium_hard",
+      "repetitions": 3,
+      "capability_families": [
+        "interaction_semantics",
+        "review_precision"
+      ],
+      "evidence_topologies": [
+        "review_diff_and_tests",
+        "ui_semantics_and_interactions"
+      ],
+      "outcome_dimensions": [
+        "accessibility_conformance",
+        "review_precision"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": false,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Review interaction semantics with precise evidence and false-positive restraint.",
+      "fixture_metadata_digest": "sha256:b49e92a0100b973bad87a88092ae623d37a04602a1918aad7114a4c966d57edf"
+    },
+    {
+      "fixture_id": "mp-ci-evidence-gap",
+      "fixture_role": "primary",
+      "suite": "mechanism_positive",
+      "task_class": "review_verification",
+      "domain": "ci_build",
+      "difficulty": "medium_hard",
+      "repetitions": 3,
+      "capability_families": [
+        "evidence_synthesis",
+        "verification_discipline"
+      ],
+      "evidence_topologies": [
+        "ci_logs_and_config",
+        "implementation_and_tests"
+      ],
+      "outcome_dimensions": [
+        "evidence_completeness",
+        "review_precision"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": false,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Determine whether available CI evidence supports a bounded verification conclusion.",
+      "fixture_metadata_digest": "sha256:647a54b7502731e5a0a8d0ec31c4cd6db61f3ef034ac9a3da48638d137ababf7"
+    },
+    {
+      "fixture_id": "mp-data-migration-handoff",
+      "fixture_role": "primary",
+      "suite": "mechanism_positive",
+      "task_class": "handoff_resume",
+      "domain": "data_schema",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "capability_families": [
+        "handoff_continuity",
+        "rollback_planning",
+        "state_consistency"
+      ],
+      "evidence_topologies": [
+        "operational_plan_and_state",
+        "schema_and_migration_plan",
+        "version_compatibility_matrix"
+      ],
+      "outcome_dimensions": [
+        "continuation_readiness",
+        "rollback_truthfulness"
+      ],
+      "risk_boundary": "rollback_required",
+      "backend_api_security": true,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Prepare executable resume state for a mixed-version data change.",
+      "fixture_metadata_digest": "sha256:8d90cdba8df7878700c92250772354fb5c9fe25eab180d99daf2e5a880392494"
+    },
+    {
+      "fixture_id": "mp-frontend-state-review",
+      "fixture_role": "primary",
+      "suite": "mechanism_positive",
+      "task_class": "pr_review",
+      "domain": "frontend",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "capability_families": [
+        "review_precision",
+        "state_consistency"
+      ],
+      "evidence_topologies": [
+        "cross_file_contract",
+        "review_diff_and_tests"
+      ],
+      "outcome_dimensions": [
+        "behavioral_consistency",
+        "review_precision"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": false,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Review cross-file UI state and rendering consistency with selective evidence.",
+      "fixture_metadata_digest": "sha256:83cf58327bd739023bd820811682f75cca797f20b1863883321efad1d3f93a6b"
+    },
+    {
+      "fixture_id": "mp-iac-rollback-design",
+      "fixture_role": "primary",
+      "suite": "mechanism_positive",
+      "task_class": "design_gate",
+      "domain": "iac_cloud",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "capability_families": [
+        "contract_design",
+        "rollback_planning",
+        "scope_control"
+      ],
+      "evidence_topologies": [
+        "operational_plan_and_state",
+        "rollback_plan_and_state"
+      ],
+      "outcome_dimensions": [
+        "rollback_truthfulness",
+        "scope_discipline"
+      ],
+      "risk_boundary": "approval_required",
+      "backend_api_security": false,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Design an infrastructure change boundary with safe preparation and truthful rollback.",
+      "fixture_metadata_digest": "sha256:d433611f5a5e4e7344a56fcd2c15822b938dfa16a35911e05f8c0909d0fe1f16"
+    },
+    {
+      "fixture_id": "mp-performance-investigation",
+      "fixture_role": "primary",
+      "suite": "mechanism_positive",
+      "task_class": "investigation",
+      "domain": "performance",
+      "difficulty": "hard",
+      "repetitions": 5,
+      "capability_families": [
+        "hypothesis_testing",
+        "performance_diagnosis"
+      ],
+      "evidence_topologies": [
+        "observability_signals",
+        "runtime_measurements"
+      ],
+      "outcome_dimensions": [
+        "causal_confidence",
+        "performance_stability"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": false,
+      "lineage_required": false,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Investigate competing performance hypotheses using measurements and causal restraint.",
+      "fixture_metadata_digest": "sha256:6d95c84e2b303c5ab977e570c091225c6f02f4a08c15ec1e6f5f2667f3765786"
+    },
+    {
+      "fixture_id": "pf-api-pagination-behavior",
+      "fixture_role": "primary",
+      "suite": "practice_frequency",
+      "task_class": "implementation_verification",
+      "domain": "backend_api",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "capability_families": [
+        "api_contracts",
+        "verification_discipline"
+      ],
+      "evidence_topologies": [
+        "api_contract_and_callers",
+        "implementation_and_tests"
+      ],
+      "outcome_dimensions": [
+        "behavioral_consistency",
+        "regression_prevention"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": true,
+      "lineage_required": true,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Implement and verify a recurring request and response behavior change.",
+      "fixture_metadata_digest": "sha256:4fb9b1254b74f0266a5e50f6427e4c360059616eab02a7f32d2f06325375ecb2"
+    },
+    {
+      "fixture_id": "pf-ci-cache-flake",
+      "fixture_role": "primary",
+      "suite": "practice_frequency",
+      "task_class": "investigation",
+      "domain": "ci_build",
+      "difficulty": "medium_hard",
+      "repetitions": 5,
+      "capability_families": [
+        "flake_isolation",
+        "hypothesis_testing"
+      ],
+      "evidence_topologies": [
+        "ci_logs_and_config",
+        "historical_flake_runs"
+      ],
+      "outcome_dimensions": [
+        "causal_confidence",
+        "reliability"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": false,
+      "lineage_required": true,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Investigate intermittent build evidence and isolate a reproducible CI boundary.",
+      "fixture_metadata_digest": "sha256:321df621f89f1c62a2378d36f85e88f409e67e987958fad1defc3749c2ef91fd"
+    },
+    {
+      "fixture_id": "pf-data-schema-evolution",
+      "fixture_role": "primary",
+      "suite": "practice_frequency",
+      "task_class": "implementation_verification",
+      "domain": "data_schema",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "capability_families": [
+        "schema_evolution",
+        "verification_discipline"
+      ],
+      "evidence_topologies": [
+        "schema_and_migration_plan",
+        "version_compatibility_matrix"
+      ],
+      "outcome_dimensions": [
+        "backward_compatibility",
+        "contract_consistency"
+      ],
+      "risk_boundary": "rollback_required",
+      "backend_api_security": true,
+      "lineage_required": true,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Implement and verify a backward-compatible schema evolution.",
+      "fixture_metadata_digest": "sha256:dc19107d165360bfa219f77e67fc3b9710d3b027056e99fdadd9f4263da4bd4f"
+    },
+    {
+      "fixture_id": "pf-frontend-async-state",
+      "fixture_role": "primary",
+      "suite": "practice_frequency",
+      "task_class": "investigation_implementation",
+      "domain": "frontend",
+      "difficulty": "medium_hard",
+      "repetitions": 5,
+      "capability_families": [
+        "async_state_management",
+        "state_consistency"
+      ],
+      "evidence_topologies": [
+        "cross_file_contract",
+        "ui_semantics_and_interactions"
+      ],
+      "outcome_dimensions": [
+        "behavioral_consistency",
+        "reliability"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": false,
+      "lineage_required": true,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Investigate and implement asynchronous UI state and rendering behavior.",
+      "fixture_metadata_digest": "sha256:b6afc544140aafdb38317672eb0a5704b8a197ee351de2a4025333dac9a6552c"
+    },
+    {
+      "fixture_id": "pf-library-compat-upgrade",
+      "fixture_role": "primary",
+      "suite": "practice_frequency",
+      "task_class": "dependency_migration",
+      "domain": "cross_platform",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "capability_families": [
+        "compatibility_management",
+        "dependency_migration"
+      ],
+      "evidence_topologies": [
+        "dependency_api_and_build",
+        "version_compatibility_matrix"
+      ],
+      "outcome_dimensions": [
+        "backward_compatibility",
+        "compatibility_preservation"
+      ],
+      "risk_boundary": "rollback_required",
+      "backend_api_security": false,
+      "lineage_required": true,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Migrate a library API while preserving cross-platform compatibility evidence.",
+      "fixture_metadata_digest": "sha256:45623021d7ed53195be75e05d15be26a3950bf25150651e271d33333b179bad6"
+    },
+    {
+      "fixture_id": "pf-observability-redaction",
+      "fixture_role": "primary",
+      "suite": "practice_frequency",
+      "task_class": "implementation_review",
+      "domain": "observability_security",
+      "difficulty": "medium_hard",
+      "repetitions": 3,
+      "capability_families": [
+        "data_minimization",
+        "review_precision"
+      ],
+      "evidence_topologies": [
+        "observability_signals",
+        "review_diff_and_tests"
+      ],
+      "outcome_dimensions": [
+        "data_minimization",
+        "operational_safety"
+      ],
+      "risk_boundary": "security_boundary",
+      "backend_api_security": true,
+      "lineage_required": true,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Balance operational visibility with data minimization in an implementation review.",
+      "fixture_metadata_digest": "sha256:1f69de400480084f31d487ff41ae13b34b40749b864c5b961d1c2866722b4415"
+    },
+    {
+      "fixture_id": "pf-performance-regression",
+      "fixture_role": "primary",
+      "suite": "practice_frequency",
+      "task_class": "investigation_implementation",
+      "domain": "performance",
+      "difficulty": "hard",
+      "repetitions": 5,
+      "capability_families": [
+        "performance_diagnosis",
+        "regression_testing"
+      ],
+      "evidence_topologies": [
+        "implementation_and_tests",
+        "runtime_measurements"
+      ],
+      "outcome_dimensions": [
+        "performance_stability",
+        "regression_prevention"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": false,
+      "lineage_required": true,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Diagnose and verify a repeatable performance regression.",
+      "fixture_metadata_digest": "sha256:fe38f3d7039d55fe74cf1539833139afea9059bf8d48b625b5a9b3b6ab150931"
+    },
+    {
+      "fixture_id": "pf-review-error-contract",
+      "fixture_role": "primary",
+      "suite": "practice_frequency",
+      "task_class": "pr_review",
+      "domain": "backend_api",
+      "difficulty": "medium_hard",
+      "repetitions": 3,
+      "capability_families": [
+        "api_contracts",
+        "review_precision"
+      ],
+      "evidence_topologies": [
+        "api_contract_and_callers",
+        "review_diff_and_tests"
+      ],
+      "outcome_dimensions": [
+        "contract_consistency",
+        "review_precision"
+      ],
+      "risk_boundary": "none",
+      "backend_api_security": true,
+      "lineage_required": true,
+      "aggregate_eligible": true,
+      "evaluator_binding_required": "required_pending",
+      "admission_state": "metadata_frozen_evaluator_pending",
+      "public_intent": "Review caller-visible error contract behavior across implementation boundaries.",
+      "fixture_metadata_digest": "sha256:aa374b85a010fd8ea7c25239475976859598b7c31f6d49565564d2fa96af56ca"
+    }
+  ],
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972"
+}

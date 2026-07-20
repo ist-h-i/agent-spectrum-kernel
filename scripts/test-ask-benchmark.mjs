@@ -37,6 +37,7 @@ function groupBy(values, keyFor) {
 
 run(["validate"]);
 run(["validate", "--config", advancedConfig]);
+run(["validate-portfolio-catalog", "--catalog", resolve(root, "benchmarks/portfolio-catalog.json"), "--similarity", resolve(root, "benchmarks/portfolio-similarity.json")]);
 const frozenCheckpointC = JSON.parse(readFileSync(checkpointCConfig, "utf8"));
 const currentRuntimeBundle = resolve(root, frozenCheckpointC.attribution.adapter.runtime_bundle_path);
 assert.notEqual(

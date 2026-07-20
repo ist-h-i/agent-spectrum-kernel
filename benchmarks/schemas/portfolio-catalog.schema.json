@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK public portfolio catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "catalog_revision",
+    "catalog_status",
+    "primary_fixture_count",
+    "calibration_fixture_count",
+    "suite_counts",
+    "similarity_contract_version",
+    "fixtures",
+    "catalog_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-catalog.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio" },
+    "catalog_revision": { "const": "issue-205-checkpoint-1" },
+    "catalog_status": { "const": "frozen_public_metadata" },
+    "primary_fixture_count": { "const": 24 },
+    "calibration_fixture_count": { "const": 4 },
+    "suite_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"],
+      "properties": {
+        "mechanism_positive": { "const": 6 },
+        "mechanism_negative": { "const": 6 },
+        "practice_frequency": { "const": 8 },
+        "high_impact": { "const": 4 },
+        "calibration": { "const": 4 }
+      }
+    },
+    "similarity_contract_version": { "const": "1.0.0" },
+    "fixtures": {
+      "type": "array",
+      "minItems": 28,
+      "maxItems": 28,
+      "items": { "$ref": "#/$defs/fixture" }
+    },
+    "catalog_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "identifierArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_id",
+        "fixture_role",
+        "suite",
+        "task_class",
+        "domain",
+        "difficulty",
+        "repetitions",
+        "capability_families",
+        "evidence_topologies",
+        "outcome_dimensions",
+        "risk_boundary",
+        "backend_api_security",
+        "lineage_required",
+        "aggregate_eligible",
+        "evaluator_binding_required",
+        "admission_state",
+        "public_intent",
+        "fixture_metadata_digest"
+      ],
+      "properties": {
+        "fixture_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "fixture_role": { "enum": ["primary", "calibration"] },
+        "suite": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"] },
+        "task_class": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "domain": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "difficulty": { "enum": ["easy", "easy_medium", "medium", "medium_hard", "medium-hard", "hard"] },
+        "repetitions": { "enum": [3, 5] },
+        "capability_families": { "$ref": "#/$defs/identifierArray" },
+        "evidence_topologies": { "$ref": "#/$defs/identifierArray" },
+        "outcome_dimensions": { "$ref": "#/$defs/identifierArray" },
+        "risk_boundary": { "enum": ["none", "approval_required", "data_integrity", "external_effect", "financial_integrity", "rollback_required", "security_boundary"] },
+        "backend_api_security": { "type": "boolean" },
+        "lineage_required": { "type": "boolean" },
+        "aggregate_eligible": { "type": "boolean" },
+        "evaluator_binding_required": { "const": "required_pending" },
+        "admission_state": { "enum": ["metadata_frozen_evaluator_pending", "calibration_only"] },
+        "public_intent": { "type": "string", "minLength": 20, "maxLength": 240 },
+        "fixture_metadata_digest": { "$ref": "#/$defs/digest" }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "fixture_role": { "const": "primary" },
+            "suite": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact"] },
+            "aggregate_eligible": { "const": true },
+            "admission_state": { "const": "metadata_frozen_evaluator_pending" }
+          }
+        },
+        {
+          "properties": {
+            "fixture_role": { "const": "calibration" },
+            "suite": { "const": "calibration" },
+            "aggregate_eligible": { "const": false },
+            "admission_state": { "const": "calibration_only" }
+          }
+        }
+      ]
+    }
+  }
+}

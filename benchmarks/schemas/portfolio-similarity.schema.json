@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK public portfolio similarity report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "similarity_contract_version",
+    "catalog_digest",
+    "primary_fixture_count",
+    "pair_count",
+    "threshold",
+    "maximum_similarity_score",
+    "pairs",
+    "report_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-similarity.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio" },
+    "similarity_contract_version": { "const": "1.0.0" },
+    "catalog_digest": { "$ref": "#/$defs/digest" },
+    "primary_fixture_count": { "const": 24 },
+    "pair_count": { "const": 276 },
+    "threshold": { "const": "0.7500" },
+    "maximum_similarity_score": { "$ref": "#/$defs/score" },
+    "pairs": {
+      "type": "array",
+      "minItems": 276,
+      "maxItems": 276,
+      "items": { "$ref": "#/$defs/pair" }
+    },
+    "report_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "fixtureId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "score": {
+      "type": "string",
+      "pattern": "^(0\\.[0-9]{4}|1\\.0000)$"
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pair_id", "left_fixture_id", "right_fixture_id", "score", "near_duplicate_candidate", "hard_duplicate"],
+      "properties": {
+        "pair_id": { "type": "string", "pattern": "^[a-z0-9-]+::[a-z0-9-]+$" },
+        "left_fixture_id": { "$ref": "#/$defs/fixtureId" },
+        "right_fixture_id": { "$ref": "#/$defs/fixtureId" },
+        "score": { "$ref": "#/$defs/score" },
+        "near_duplicate_candidate": { "const": false },
+        "hard_duplicate": { "const": false }
+      }
+    }
+  }
+}
