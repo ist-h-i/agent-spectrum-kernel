@@ -27,6 +27,9 @@ jobs:
       - name: Run adaptive portfolio normalized result tests
         run: node scripts/test-ask-benchmark-normalized-results.mjs
 
+      - name: Run evaluator isolation boundary tests
+        run: node scripts/test-ask-benchmark-evaluator-boundary.mjs
+
       - name: Validate repository consistency
         run: node scripts/validate-repo.mjs
 

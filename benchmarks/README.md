@@ -88,7 +88,13 @@ Normalized records contain only bounded committed telemetry and digests. Missing
 
 The checked-in Checkpoint B, B2, and C result schema is intentionally not reinterpreted as the new execution-evidence schema. Passing one of those historical result files as a run root is deterministically rejected with an explicit migration-required error. They remain readable through their existing `result.schema.json` and reports until a separately versioned migration is approved.
 
-The focused execution and normalization tests use only fake executables. Measured runtime execution, evaluator/oracle inspection, scoring, comparative telemetry interpretation, and product-value conclusions remain unauthorized until the clean fixture/evaluator work is complete and #198 freezes manifests, evaluator digests, thresholds, weights, runtime variables, and seeds.
+## Evaluator isolation boundary checkpoint
+
+Issue #204 now has a boundary checkpoint for a public evaluator reference, a private-root-only bundle manifest, and a public evaluator-result envelope. The validator binds bundle identity to fixture/input identity and exact asset inventory, requires real managed boundary roots, reuses the existing immutable normalized-results verifier to bind root identities and result lineage, and rejects canonical repository/private-root overlap, symlinks, path escape, inventory drift, cross-identity transplants, public-field leakage, and byte-identical private material in every boundary root or Git-managed repository file. Full `verify-evaluator-boundary` verification requires a staged public-artifact root; lower-level commands explicitly report the omitted publication guarantee. The exact-byte scanner covers copies and hard links but not partial, transformed, re-encoded, or semantically equivalent content. See [evaluator-boundary.md](evaluator-boundary.md) for digest definitions, inspection limits, storage rules, and the read-only CLI guarantee levels.
+
+This is not Issue #204 completion. No private evaluator package is committed or uploaded by public CI, and the 24 evaluator packages are not generated. Issue #205 still owns metric, threshold, weight, equivalent-solution, and false-positive semantics; Issue #197 owns the later deterministic scoring engine; #198 Stage 0 remains blocked. Public answer content from Issues #193 through #196 is prohibited as evaluator source.
+
+The focused execution, normalization, and evaluator-boundary tests use only fake executables or synthetic artifacts. Measured runtime execution, evaluator/oracle inspection, scoring, comparative telemetry interpretation, and product-value conclusions remain unauthorized until the clean fixture/evaluator work is complete and #198 freezes manifests, evaluator digests, thresholds, weights, runtime variables, and seeds.
 
 Materialization-specific regression coverage is run with:
 
@@ -97,6 +103,7 @@ node scripts/test-ask-benchmark-materialize.mjs
 node scripts/test-ask-benchmark-selection.mjs
 node scripts/test-ask-benchmark-execution.mjs
 node scripts/test-ask-benchmark-normalized-results.mjs
+node scripts/test-ask-benchmark-evaluator-boundary.mjs
 ```
 
-See [protocol-adaptive.md](protocol-adaptive.md) for the condition, adapter-separation, balanced-ordering, repetition, privacy, and pre-result Adaptive selection contracts.
+See [protocol-adaptive.md](protocol-adaptive.md) for the condition, adapter-separation, balanced-ordering, repetition, privacy, pre-result Adaptive selection, normalized evidence, and evaluator-boundary contracts.

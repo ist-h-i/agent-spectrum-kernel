@@ -25,6 +25,7 @@ import { assertTrackedRepositoryMatchesHead, materializePortfolio } from "./ask-
 import { sealAdaptiveSelection, verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
 import { executePortfolio, recoverPortfolioCase, verifyPortfolioExecution } from "./ask-benchmark-execution.mjs";
 import { assertCurrentPortfolioRunInput, normalizePortfolioExecution, verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
+import { verifyEvaluatorBoundary, verifyEvaluatorResult, verifyPrivateEvaluatorBundle } from "./ask-benchmark-evaluator-boundary.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_CONFIG_PATH = resolve(ROOT, "benchmarks/checkpoint-b.config.json");
@@ -49,7 +50,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, normalizedResults: null, publicArtifactRoot: null, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -69,6 +70,12 @@ function parseArgs(argv) {
     else if (flag === "--claim-id") args.claimId = argv.shift();
     else if (flag === "--reason") args.reason = argv.shift();
     else if (flag === "--snapshot-digest") args.snapshotDigest = argv.shift();
+    else if (flag === "--reference") args.reference = resolve(argv.shift());
+    else if (flag === "--private-root") args.privateRoot = resolve(argv.shift());
+    else if (flag === "--manifest" || flag === "--evaluator-manifest") args.evaluatorManifest = resolve(argv.shift());
+    else if (flag === "--result" || flag === "--evaluator-result") args.evaluatorResult = resolve(argv.shift());
+    else if (flag === "--normalized-results") args.normalizedResults = resolve(argv.shift());
+    else if (flag === "--public-artifact-root") args.publicArtifactRoot = resolve(argv.shift());
     else if (flag === "--config") args.configPath = resolve(argv.shift());
     else if (flag === "--help" || flag === "-h") args.command = "help";
     else throw new Error(`Unknown argument: ${flag}`);
@@ -90,6 +97,9 @@ Commands:
   normalize-execution --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --output <normalized-results-directory>
   verify-normalized-results --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --output <normalized-results-directory>
   verify-normalized-results --output <normalized-results-directory> --snapshot-digest <sha256:digest>
+  verify-evaluator-bundle --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> [--public-artifact-root <staged-public-artifact-directory>]
+  verify-evaluator-result --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> [--public-artifact-root <staged-public-artifact-directory>]
+  verify-evaluator-boundary --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> --public-artifact-root <staged-public-artifact-directory>
   recover-case --run-dir <run-directory> --case-id <case-id> --claim-id <claim-id> --reason <reason>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
@@ -426,6 +436,44 @@ function verifyNormalizedResults(args) {
   if (!args.plan || !args.materialized || !args.stateDir || !args.runDir || !args.output) throw new Error("verify-normalized-results requires --plan, --materialized, --selection-state, --run-dir, and --output");
   const result = verifyNormalizedPortfolioResults({ root: ROOT, config, planPath: args.plan, materializedPath: args.materialized, selectionState: args.stateDir, runDir: args.runDir, outputPath: args.output });
   console.log(`Current normalized execution snapshot ${result.manifest.source_snapshot_digest} verified with ${result.manifest.completeness.normalized_cases}/${result.manifest.completeness.expected_cases} cases containing committed attempts`);
+}
+
+function evaluatorBoundaryOptions(args) {
+  if (!args.reference || !args.privateRoot || !args.evaluatorManifest || !args.materialized || !args.stateDir || !args.runDir || !args.normalizedResults) {
+    throw new Error("evaluator boundary verification requires --reference, --private-root, --manifest, --materialized, --selection-state, --run-dir, and --normalized-results");
+  }
+  return {
+    root: ROOT,
+    referencePath: args.reference,
+    privateRoot: args.privateRoot,
+    manifestPath: args.evaluatorManifest,
+    resultPath: args.evaluatorResult,
+    materializedPath: args.materialized,
+    selectionState: args.stateDir,
+    runDir: args.runDir,
+    normalizedResultsPath: args.normalizedResults,
+    publicArtifactRoot: args.publicArtifactRoot,
+  };
+}
+
+function verifyEvaluatorBundleCommand(args) {
+  const result = verifyPrivateEvaluatorBundle(evaluatorBoundaryOptions(args));
+  if (args.publicArtifactRoot) console.log(`Evaluator bundle structural isolation and staged publication scan verified for ${result.reference.evaluator_bundle_id}`);
+  else console.log(`Evaluator bundle structural isolation verified for ${result.reference.evaluator_bundle_id}; staged public artifact publication was not verified`);
+}
+
+function verifyEvaluatorResultCommand(args) {
+  if (!args.evaluatorResult) throw new Error("verify-evaluator-result requires --result");
+  const result = verifyEvaluatorResult(evaluatorBoundaryOptions(args));
+  const publicationStatus = args.publicArtifactRoot ? "including the staged publication scan" : "without staged public artifact publication verification";
+  console.log(`Evaluator result lineage isolation ${result.result.evaluation_id} verified against normalized result ${result.result.normalized_result_id}, ${publicationStatus}`);
+}
+
+function verifyEvaluatorBoundaryCommand(args) {
+  if (!args.evaluatorResult) throw new Error("verify-evaluator-boundary requires --result");
+  if (!args.publicArtifactRoot) throw new Error("verify-evaluator-boundary requires --public-artifact-root for full boundary verification");
+  const result = verifyEvaluatorBoundary(evaluatorBoundaryOptions(args));
+  console.log(`Full evaluator isolation boundary verified for ${result.result.evaluation_id}`);
 }
 
 function recoverCase(args) {
@@ -878,6 +926,9 @@ try {
   else if (args.command === "verify-execution") verifyExecution(args);
   else if (args.command === "normalize-execution") normalizeExecution(args);
   else if (args.command === "verify-normalized-results") verifyNormalizedResults(args);
+  else if (args.command === "verify-evaluator-bundle") verifyEvaluatorBundleCommand(args);
+  else if (args.command === "verify-evaluator-result") verifyEvaluatorResultCommand(args);
+  else if (args.command === "verify-evaluator-boundary") verifyEvaluatorBoundaryCommand(args);
   else if (args.command === "recover-case") recoverCase(args);
   else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);
