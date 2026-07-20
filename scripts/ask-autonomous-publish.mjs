@@ -40,10 +40,15 @@ async function githubRequest(repository, path, token, { method = "GET", body = n
   return text.length === 0 ? { ok: true, status: response.status } : JSON.parse(text);
 }
 
+function statusCommentAuthorAllowed(repository, login) {
+  const owner = repository.split("/")[0];
+  return login === "github-actions[bot]" || login === owner;
+}
+
 async function upsertStatusComment(repository, issueNumber, token, content) {
   if (!issueNumber) return;
   const comments = await githubRequest(repository, `/issues/${issueNumber}/comments?per_page=100`, token);
-  const existing = comments.find((comment) => comment.user?.login === "github-actions[bot]" && (comment.body ?? "").includes(STATUS_MARKER));
+  const existing = comments.find((comment) => statusCommentAuthorAllowed(repository, comment.user?.login) && (comment.body ?? "").includes(STATUS_MARKER));
   const body = `${STATUS_MARKER}\n${content}`;
   if (existing) await githubRequest(repository, `/issues/comments/${existing.id}`, token, { method: "PATCH", body: { body } });
   else await githubRequest(repository, `/issues/${issueNumber}/comments`, token, { method: "POST", body: { body } });
@@ -63,7 +68,7 @@ function formatStatus({ context, result, guard, branch, commitSha, pullUrl, vali
   if (pullUrl) lines.push(`- Pull request: ${pullUrl}`);
   if (guard?.changed_files?.length) lines.push(`- Changed files: ${guard.changed_files.length}; changed lines: ${guard.changed_lines}`);
   if (result.review_verdict !== "not_applicable") lines.push(`- Review verdict: \`${result.review_verdict}\``);
-  if (validationDispatch) lines.push(`- Validate workflow dispatch: \`${validationDispatch}\``);
+  if (validationDispatch) lines.push(`- Validation follow-up: \`${validationDispatch}\``);
   if (result.tests_run.length > 0) {
     lines.push("", "### Validation reported by Codex", ...result.tests_run.map((test) => `- ${test}`));
   }
@@ -162,8 +167,10 @@ export async function publishAutomationRun({ repositoryPath, context, result, gu
       const pull = await createDraftPull(repository, branch, context, result, token);
       pullNumber = pull.number;
       pullUrl = pull.html_url;
+      validationDispatch = await dispatchValidation(repository, branch, token);
+    } else {
+      validationDispatch = "guarded validation completed; ordinary PR CI depends on the publication token";
     }
-    validationDispatch = await dispatchValidation(repository, branch, token);
   }
 
   const status = formatStatus({ context, result, guard, branch, commitSha, pullUrl, validationDispatch });
