@@ -229,9 +229,92 @@ jobs:
       - name: Publish bounded GitHub updates
         env:
           ASK_AUTOMATION_TOKEN: ${{ secrets.ASK_AUTOMATION_GITHUB_TOKEN || github.token }}
+          ASK_AUTOMATION_USES_DEDICATED_TOKEN: ${{ secrets.ASK_AUTOMATION_GITHUB_TOKEN != '' && 'true' || 'false' }}
         run: |
           node control/scripts/ask-autonomous-publish.mjs \
             --repository-path workspace \
+            --context control/.ask-automation/context.json \
+            --result control/.ask-automation/result.json \
+            --guard control/.ask-automation/guard.json \
+            --patch control/.ask-automation/change.patch
+
+  report_failure:
+    needs:
+      - context
+      - codex
+    if: always() && needs.context.outputs.should_run == 'true' && (needs.codex.result == 'failure' || needs.codex.result == 'cancelled')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Check out automation control plane
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download selected context
+        uses: actions/download-artifact@v4
+        with:
+          name: ask-automation-context
+          path: control/.ask-automation
+
+      - name: Build bounded failure status
+        env:
+          CODEX_JOB_RESULT: ${{ needs.codex.result }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+          const contextPath = "control/.ask-automation/context.json";
+          const context = JSON.parse(readFileSync(contextPath, "utf8"));
+          const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          const reviewingPull = context.target_pr_number !== null;
+          const result = {
+            action: "blocked",
+            target_issue_number: context.target_issue_number,
+            target_pr_number: context.target_pr_number,
+            summary: `Codex or bounded validation job ${process.env.CODEX_JOB_RESULT ?? "failed"}.`,
+            rationale: `No patch was published. Inspect the recorded workflow run: ${runUrl}`,
+            pr_title: null,
+            pr_body: null,
+            issue_comment: `Automation stopped without GitHub mutation. Workflow evidence: ${runUrl}`,
+            review_verdict: reviewingPull ? "comment" : "not_applicable",
+            review_comment: reviewingPull ? `Automation could not complete the requested review or fix. No branch update or merge occurred. Evidence: ${runUrl}` : null,
+            tests_run: [],
+            risks: ["The selected work remains incomplete until the workflow failure is diagnosed."],
+            changed_files_expected: [],
+          };
+          const guard = {
+            schema_version: "1.0.0",
+            mode: context.mode,
+            action: "blocked",
+            target_issue_number: context.target_issue_number,
+            target_pr_number: context.target_pr_number,
+            changed_files: [],
+            changed_lines: 0,
+          };
+          writeFileSync("control/.ask-automation/result.json", `${JSON.stringify(result, null, 2)}\n`);
+          writeFileSync("control/.ask-automation/guard.json", `${JSON.stringify(guard, null, 2)}\n`);
+          writeFileSync("control/.ask-automation/change.patch", "");
+          NODE
+
+      - name: Publish failure status only
+        env:
+          ASK_AUTOMATION_TOKEN: ${{ secrets.ASK_AUTOMATION_GITHUB_TOKEN || github.token }}
+          ASK_AUTOMATION_USES_DEDICATED_TOKEN: ${{ secrets.ASK_AUTOMATION_GITHUB_TOKEN != '' && 'true' || 'false' }}
+        run: |
+          node control/scripts/ask-autonomous-publish.mjs \
+            --repository-path control \
             --context control/.ask-automation/context.json \
             --result control/.ask-automation/result.json \
             --guard control/.ask-automation/guard.json \
