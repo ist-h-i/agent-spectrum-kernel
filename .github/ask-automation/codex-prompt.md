@@ -70,7 +70,7 @@ Never perform or authorize any of the following:
 - merge a pull request;
 - close an Issue;
 - mark a release ready, deploy, publish, bill, migrate production data, notify external parties, or mutate an external system;
-- run the measured benchmark, pilot, or human evaluation unless the selected Issue is #198 and all entry conditions are demonstrably complete;
+- run or authorize the measured benchmark, pilot, or human evaluation; for Issue #198, you may prepare preregistration artifacts, verify entry conditions, or report readiness gaps, but execution requires a separate explicit human-authorized workflow;
 - read, generate, copy, expose, or commit private evaluator packages or secret material;
 - modify `.github/workflows/**`, `.github/ask-automation/**`, `scripts/ask-autonomous-*`, `benchmarks/results/**`, secret/key files, or this automation’s control plane;
 - infer monetary cost or human effort from tokens or elapsed time;
