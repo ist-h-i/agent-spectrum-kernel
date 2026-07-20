@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK public evaluator reference",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "evaluator_bundle_id",
+    "evaluator_bundle_digest",
+    "evaluator_bundle_schema_version",
+    "fixture_id",
+    "fixture_input_digest",
+    "task_class",
+    "suite",
+    "evaluator_revision",
+    "generator_identity",
+    "independence_statement_digest",
+    "review_record_digest",
+    "storage_class",
+    "public_metadata_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/evaluator-reference.schema.json" },
+    "program": { "const": "adaptive_ask_evaluator_reference" },
+    "evaluator_bundle_id": { "$ref": "#/$defs/bundleId" },
+    "evaluator_bundle_digest": { "$ref": "#/$defs/digest" },
+    "evaluator_bundle_schema_version": { "const": "1.0.0" },
+    "fixture_id": { "$ref": "#/$defs/token" },
+    "fixture_input_digest": { "$ref": "#/$defs/digest" },
+    "task_class": { "$ref": "#/$defs/token" },
+    "suite": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"] },
+    "evaluator_revision": { "$ref": "#/$defs/revision" },
+    "generator_identity": { "$ref": "#/$defs/digest" },
+    "independence_statement_digest": { "$ref": "#/$defs/digest" },
+    "review_record_digest": { "$ref": "#/$defs/digest" },
+    "storage_class": { "const": "private_evaluator" },
+    "public_metadata_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "bundleId": { "type": "string", "pattern": "^evaluator-[a-f0-9]{64}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 96, "pattern": "^[a-z0-9][a-z0-9_-]*$" }
+  }
+}
