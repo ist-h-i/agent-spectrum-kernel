@@ -93,6 +93,23 @@ assert.ok(
     .some((message) => /may not accompany repository changes/.test(message)),
 );
 assert.match(validateCodexResult({ ...validCreateResult, target_issue_number: 197 }, issueContext, ["scripts/example.mjs"])[0], /does not match selected context/);
+assert.ok(
+  validateCodexResult({ ...validCreateResult, tests_run: [] }, issueContext, ["scripts/example.mjs"])
+    .some((message) => /require at least one validation command/.test(message)),
+);
+assert.ok(
+  validateCodexResult({ ...validCreateResult, tests_run: ["planned: node scripts/test-example.mjs"] }, issueContext, ["scripts/example.mjs"])
+    .some((message) => /unexecuted or deferred check/.test(message)),
+);
+const multiFileResult = {
+  ...validCreateResult,
+  changed_files_expected: ["scripts/a.mjs", "scripts/z.mjs"],
+};
+assert.deepEqual(validateCodexResult(multiFileResult, issueContext, ["scripts/a.mjs", "scripts/z.mjs"]), []);
+assert.ok(
+  validateCodexResult({ ...multiFileResult, changed_files_expected: ["scripts/z.mjs", "scripts/a.mjs"] }, issueContext, ["scripts/a.mjs", "scripts/z.mjs"])
+    .some((message) => /ordered by ASCII code point/.test(message)),
+);
 
 const prContext = {
   mode: "maintain_pr",
@@ -129,11 +146,19 @@ assert.match(workflow, /20 0 \* \* 1-5/);
 assert.match(workflow, /20 8 \* \* 1-5/);
 assert.match(workflow, /openai\/codex-action@v1/);
 assert.match(workflow, /ASK_AUTOMATION_ENABLED/);
+assert.match(workflow, /report_failure:/);
+assert.match(workflow, /ASK_AUTOMATION_USES_DEDICATED_TOKEN/);
 assert.doesNotMatch(workflow, /gh pr merge|merge_pull_request|auto-merge/iu);
 
 const prompt = readFileSync(resolve(root, ".github/ask-automation/codex-prompt.md"), "utf8");
-for (const required of ["Never perform", "merge a pull request", "close an Issue", "measured benchmark", "GitHub write token is deliberately unavailable"]) {
+for (const required of ["Never perform", "merge a pull request", "close an Issue", "measured benchmark", "GitHub write token is deliberately unavailable", "separate explicit human-authorized workflow"]) {
   assert.match(prompt, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "u"));
 }
+assert.doesNotMatch(prompt, /unless the selected Issue is #198/iu);
+
+const publisher = readFileSync(resolve(root, "scripts/ask-autonomous-publish.mjs"), "utf8");
+assert.match(publisher, /login\.endsWith\("\[bot\]"\)/);
+assert.match(publisher, /ordinary pull-request CI expected from dedicated publication token/);
+assert.doesNotMatch(publisher, /merge_pull_request|gh pr merge/iu);
 
 console.log("ASK autonomous development control tests passed");
