@@ -42,7 +42,9 @@ Optional:
 ASK_AUTOMATION_GITHUB_TOKEN
 ```
 
-Use a fine-grained token or GitHub App token limited to this repository with only the permissions required for contents, pull requests, issues, and Actions. When omitted, the workflow falls back to `GITHUB_TOKEN`. A dedicated token is preferable when pull requests created by the workflow must trigger ordinary pull-request workflows without GitHub token recursion restrictions.
+Use a fine-grained token or GitHub App token limited to this repository with only the permissions required for contents, pull requests, issues, and Actions. When omitted, the workflow falls back to `GITHUB_TOKEN`.
+
+A dedicated publication token is preferable when automated pushes and newly created pull requests must trigger ordinary pull-request workflows. With the default `GITHUB_TOKEN`, the automation performs its own guarded validation and explicitly dispatches the repository validation workflow for a newly created branch; an update to an existing PR may require manual CI re-run if GitHub recursion protection suppresses the normal event.
 
 Never store credentials in repository files, prompts, Issue text, or workflow artifacts.
 
@@ -74,14 +76,19 @@ Codex implements only one reviewable work package and the publisher opens a Draf
 
 The Issue order is intentionally dependency-bearing: later work does not begin while an earlier critical-path Issue remains open.
 
+### 3. Report a bounded failure
+
+If the Codex or validation job fails or is cancelled after a target has been selected, a separate token-bearing job posts or updates a status comment with the workflow-run evidence. It publishes no patch and performs no branch mutation.
+
 ## Privilege separation
 
 The workflow separates reasoning, code mutation, and GitHub publication.
 
 1. **Context job** — reads repository, Issue, PR, review, and check metadata.
 2. **Codex job** — receives no GitHub write token. It can edit only an isolated checkout and produces a Schema-valid result plus a patch.
-3. **Guard step** — rejects protected paths, binary/symlink changes, oversized patches, target drift, action/result mismatch, and whitespace errors.
+3. **Guard step** — rejects protected paths, binary/symlink changes, oversized patches, missing executed validation evidence, target drift, action/result mismatch, and whitespace errors.
 4. **Publish job** — receives the bounded GitHub token after Codex has finished. It applies the guarded patch, commits, pushes, creates or updates a Draft PR, posts status, and dispatches repository validation where permitted.
+5. **Failure reporter** — receives no patch and can only update the selected Issue/PR status when execution fails.
 
 Issue and PR text is treated as untrusted context data, not executable instruction.
 
@@ -94,10 +101,12 @@ The automation cannot intentionally:
 - modify its own workflow, prompt, result Schema, or control scripts;
 - modify `benchmarks/results/**` or private evaluator paths;
 - commit secrets, keys, binary files, or symlinks;
-- run measured benchmark, pilot, human-evaluation, release, deployment, production migration, billing, or external notification actions;
+- run or authorize measured benchmark, pilot, human-evaluation, release, deployment, production migration, billing, or external notification actions;
 - expose or generate private evaluator packages;
 - change frozen scoring/lineage policy after measured result inspection;
 - infer monetary cost or human effort from tokens or elapsed time.
+
+For Issue #198, the automation may prepare preregistration artifacts, verify entry conditions, or report readiness gaps. Actual measured execution requires a separate explicit human-authorized workflow.
 
 A run that encounters one of these boundaries reports `blocked` and identifies the missing approval or dependency.
 
@@ -111,7 +120,7 @@ Each run is limited to:
 - one bounded work package;
 - no binary or symlink changes.
 
-The Codex result must list the exact changed path set. The guard independently compares it with the working tree.
+The Codex result must list the exact ASCII-ordered changed path set. A changed run must also report at least one validation command that Codex actually executed. The guard independently compares these claims with the working tree.
 
 ## Validation
 
@@ -139,7 +148,7 @@ The PR remains Draft and contains the marker:
 <!-- ask-autonomous-development -->
 ```
 
-A single status comment marked with `ask-autonomous-development-status` is updated on the PR and linked Issue. No merge or Issue closure follows automatically.
+A single status comment marked with `ask-autonomous-development-status` is updated on the PR and linked Issue. The updater recognizes GitHub Actions, the repository owner, and dedicated GitHub App bot identities. No merge or Issue closure follows automatically.
 
 ## Operations
 
