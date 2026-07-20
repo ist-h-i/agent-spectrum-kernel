@@ -42,7 +42,7 @@ async function githubRequest(repository, path, token, { method = "GET", body = n
 
 function statusCommentAuthorAllowed(repository, login) {
   const owner = repository.split("/")[0];
-  return login === "github-actions[bot]" || login === owner;
+  return login === "github-actions[bot]" || login === owner || (typeof login === "string" && login.endsWith("[bot]"));
 }
 
 async function upsertStatusComment(repository, issueNumber, token, content) {
@@ -151,7 +151,7 @@ function parseArgs(argv) {
   return args;
 }
 
-export async function publishAutomationRun({ repositoryPath, context, result, guard, patchPath, repository, token, runId }) {
+export async function publishAutomationRun({ repositoryPath, context, result, guard, patchPath, repository, token, runId, dedicatedToken = false }) {
   let branch = null;
   let commitSha = null;
   let pullNumber = context.target_pr_number;
@@ -167,9 +167,13 @@ export async function publishAutomationRun({ repositoryPath, context, result, gu
       const pull = await createDraftPull(repository, branch, context, result, token);
       pullNumber = pull.number;
       pullUrl = pull.html_url;
-      validationDispatch = await dispatchValidation(repository, branch, token);
+      validationDispatch = dedicatedToken
+        ? "ordinary pull-request CI expected from dedicated publication token"
+        : await dispatchValidation(repository, branch, token);
     } else {
-      validationDispatch = "guarded validation completed; ordinary PR CI depends on the publication token";
+      validationDispatch = dedicatedToken
+        ? "ordinary pull-request CI expected from dedicated publication token"
+        : "guarded validation completed; GITHUB_TOKEN updates may not trigger pull-request CI";
     }
   }
 
@@ -186,12 +190,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const repository = process.env.GITHUB_REPOSITORY;
     const token = process.env.ASK_AUTOMATION_TOKEN ?? process.env.GITHUB_TOKEN;
     const runId = process.env.GITHUB_RUN_ID ?? "local";
+    const dedicatedToken = process.env.ASK_AUTOMATION_USES_DEDICATED_TOKEN === "true";
     if (!repository) throw new Error("GITHUB_REPOSITORY is required");
     if (!token) throw new Error("ASK_AUTOMATION_TOKEN or GITHUB_TOKEN is required");
     const context = JSON.parse(readFileSync(args.context, "utf8"));
     const result = JSON.parse(readFileSync(args.result, "utf8"));
     const guard = JSON.parse(readFileSync(args.guard, "utf8"));
-    const published = await publishAutomationRun({ repositoryPath: args.repositoryPath, context, result, guard, patchPath: args.patch, repository, token, runId });
+    const published = await publishAutomationRun({ repositoryPath: args.repositoryPath, context, result, guard, patchPath: args.patch, repository, token, runId, dedicatedToken });
     console.log(`ASK automation publication complete: action=${result.action}, pr=${published.pullNumber ?? "none"}, branch=${published.branch ?? "none"}`);
   } catch (error) {
     console.error(`ASK automation publication failed: ${error.message}`);
