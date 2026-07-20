@@ -21,6 +21,9 @@ jobs:
       - name: Run repository validation tests
         run: node scripts/test-validate-repo.mjs
 
+      - name: Run autonomous development control tests
+        run: node scripts/test-ask-autonomous-development.mjs
+
       - name: Run portfolio catalog tests
         run: node scripts/test-ask-benchmark-portfolio-catalog.mjs
 
