@@ -9,7 +9,7 @@ import { buildBlockedContext, CRITICAL_PATH_ISSUES, computeContextDigest, prepar
 import { buildFailureArtifacts } from "./ask-autonomous-failure.mjs";
 import { buildFinalGuard, createRawArtifact, digestObject, isDisallowedPath, sha256Bytes, validateAutomationRun, validateChangedPaths, validateCodexResult, verifyRawArtifact } from "./ask-autonomous-guard.mjs";
 import { buildValidationAttestation, verifyExecutionRecord, verifyValidationAttestation } from "./ask-autonomous-attest.mjs";
-import { branchNameForIssue, buildIssueLease, evaluateIssuePublicationState, formatStaleReviewStatus, linkedIssueNumbers, selectActiveLease, targetDrift } from "./ask-autonomous-publish.mjs";
+import { branchNameForIssue, buildIssueLease, evaluateIssuePublicationState, formatStaleReviewStatus, leaseOwnedByRun, linkedIssueNumbers, parseIssueLease, selectActiveLease, statusCommentAuthorAllowed, targetDrift, verifySealedLeaseComment } from "./ask-autonomous-publish.mjs";
 import { assertNoAutomationSecrets, scanContextSources } from "./ask-autonomous-secret-scan.mjs";
 import { commandDefinitionDigest, dockerArguments, executeValidationPlan, loadValidationPlan, VALIDATION_ENVIRONMENT, VALIDATION_IMAGE_DIGEST } from "./ask-autonomous-validate-execute.mjs";
 import { APPROVED_ASK_AUTOMATION_ACTION_PINS, validateAskAutomationActionPinsText } from "./validate-repo.mjs";
@@ -313,6 +313,12 @@ try {
   for (const field of ["schema_version", "control_sha", "workflow_sha", "target_branch", "target_commit_sha", "base_main_sha", "context_sha256", "result_sha256", "patch_sha256", "changed_files", "additions", "deletions", "changed_lines", "validation_run_id", "validation_run_attempt", "validation_status", "validation_attestation_digest", "validation_execution_digest", "validation_container_image_digest", "validation_command_plan_sha256", "guard_digest"]) {
     assert.ok(field in finalGuard, `final guard must bind ${field}`);
   }
+  const ownerRevalidation = { revalidation_digest: digestObject({ lease_digest: "lease", comment_id: 1, author: "ist-h-i", authority_class: "repository_owner" }) };
+  const botRevalidation = { revalidation_digest: digestObject({ lease_digest: "lease", comment_id: 1, author: "ask-publication[bot]", authority_class: "authenticated_publication" }) };
+  const ownerGuard = buildFinalGuard({ raw: appliedRaw, attestation, change: appliedChange, publicationRevalidation: ownerRevalidation });
+  const botGuard = buildFinalGuard({ raw: appliedRaw, attestation, change: appliedChange, publicationRevalidation: botRevalidation });
+  assert.notEqual(ownerGuard.publication_revalidation_digest, botGuard.publication_revalidation_digest);
+  assert.notEqual(ownerGuard.guard_digest, botGuard.guard_digest, "lease authority evidence drift must change the final guard digest");
 
   mkdirSync(resolve(validationWorkspace, "scripts"));
   writeFileSync(resolve(validationWorkspace, "scripts/validate-repo.mjs"), "// tampered after validation\n");
@@ -491,13 +497,135 @@ for (const stale of [
   evaluateIssuePublicationState({ ...publicationBase, pulls: [humanPull] }),
   evaluateIssuePublicationState({ ...publicationBase, branchExists: true }),
 ]) assert.deepEqual(stale.allowed_publication_actions, ["trusted_status"], "stale publication must not allow patch, branch, or PR actions");
+// F-214-08: a body digest is integrity evidence, not authority. Only authenticated
+// GitHub comment identity and tightly bound metadata can produce a verified lease.
 const leaseNow = new Date("2026-07-21T00:00:00.000Z");
-const activeLease = buildIssueLease({ issueNumber: 197, runId: "other", runAttempt: "1", targetSha: safeAdvanceContext.target_commit_sha, owner: "other", acquiredAt: "2026-07-20T23:59:00.000Z", expiresAt: "2026-07-21T00:10:00.000Z" });
-const expiredLease = buildIssueLease({ issueNumber: 197, runId: "old", runAttempt: "1", targetSha: safeAdvanceContext.target_commit_sha, owner: "old", acquiredAt: "2026-07-20T23:40:00.000Z", expiresAt: "2026-07-20T23:55:00.000Z" });
-const leaseComment = (id, lease) => ({ id, body: `<!-- ask-autonomous-development-lease -->\n${JSON.stringify(lease)}` });
-assert.equal(selectActiveLease([leaseComment(1, expiredLease)], leaseNow), null);
-assert.equal(selectActiveLease([leaseComment(1, expiredLease), leaseComment(2, activeLease)], leaseNow).lease_digest, activeLease.lease_digest);
-assert.equal(evaluateIssuePublicationState({ ...publicationBase, activeLease }).reason, "active_lease_exists");
+const dedicatedPublicationLogin = "ask-publication[bot]";
+const leaseBindings = {
+  repository: safeAdvanceContext.repository,
+  issueNumber: 197,
+  targetSha: safeAdvanceContext.target_commit_sha,
+  controlSha: safeAdvanceContext.control_sha,
+  workflowSha: safeAdvanceContext.workflow_sha,
+  publicationLogin: dedicatedPublicationLogin,
+};
+function leaseComment({
+  id = 101,
+  login = "ist-h-i",
+  association = "OWNER",
+  createdAt = "2026-07-20T23:59:00.000Z",
+  leaseOverrides = {},
+  recomputeDigest = true,
+} = {}) {
+  const lease = buildIssueLease({
+    commentId: id,
+    issueNumber: 197,
+    repository: safeAdvanceContext.repository,
+    runId: "other",
+    runAttempt: "1",
+    targetSha: safeAdvanceContext.target_commit_sha,
+    controlSha: safeAdvanceContext.control_sha,
+    workflowSha: safeAdvanceContext.workflow_sha,
+    owner: login,
+    acquiredAt: "2026-07-20T23:59:00.000Z",
+    expiresAt: "2026-07-21T00:10:00.000Z",
+  });
+  Object.assign(lease, leaseOverrides);
+  if (recomputeDigest) lease.lease_digest = digestObject(lease, "lease_digest");
+  return {
+    id,
+    user: login === null ? {} : { login },
+    author_association: association,
+    created_at: createdAt,
+    body: `<!-- ask-autonomous-development-lease -->\n${JSON.stringify(lease)}`,
+  };
+}
+
+const externalLeaseComment = leaseComment({ id: 102, login: "external-user", association: "NONE" });
+const arbitraryBotLeaseComment = leaseComment({ id: 103, login: "arbitrary[bot]", association: "NONE" });
+const unallowlistedAppLeaseComment = leaseComment({ id: 104, login: "other-app[bot]", association: "NONE" });
+assert.equal(parseIssueLease(externalLeaseComment, { ...leaseBindings, now: leaseNow }), null);
+assert.equal(parseIssueLease(arbitraryBotLeaseComment, { ...leaseBindings, now: leaseNow }), null);
+assert.equal(parseIssueLease(unallowlistedAppLeaseComment, { ...leaseBindings, now: leaseNow }), null);
+assert.equal(parseIssueLease(leaseComment({ id: 105, login: null, association: "NONE" }), { ...leaseBindings, now: leaseNow }), null);
+assert.equal(parseIssueLease(leaseComment({ id: 106, association: "INVALID" }), { ...leaseBindings, now: leaseNow }), null);
+
+const ownerLease = parseIssueLease(leaseComment({ id: 107 }), { ...leaseBindings, now: leaseNow });
+const actionsLease = parseIssueLease(leaseComment({ id: 108, login: "github-actions[bot]", association: "NONE" }), { ...leaseBindings, now: leaseNow });
+const dedicatedLease = parseIssueLease(leaseComment({ id: 109, login: dedicatedPublicationLogin, association: "NONE" }), { ...leaseBindings, now: leaseNow });
+assert.equal(ownerLease.authority_class, "repository_owner");
+assert.equal(actionsLease.authority_class, "github_actions");
+assert.equal(dedicatedLease.authority_class, "authenticated_publication");
+const sealedOwnerBody = JSON.parse(leaseComment({ id: 107 }).body.split("\n").slice(1).join("\n"));
+assert.deepEqual(Object.keys(sealedOwnerBody).sort(), ["schema_version", "comment_id", "issue_number", "repository", "run_id", "run_attempt", "target_sha", "control_sha", "workflow_sha", "lease_owner", "acquired_at", "expires_at", "lease_digest"].sort());
+for (const lease of [ownerLease, actionsLease, dedicatedLease]) {
+  for (const field of ["comment_id", "comment_author_login", "comment_author_association", "comment_created_at", "authority_class"]) assert.ok(field in lease);
+}
+
+const longLivedLease = leaseComment({ id: 110, leaseOverrides: { expires_at: "2100-01-01T00:00:00.000Z" } });
+const overLimitLease = leaseComment({ id: 111, leaseOverrides: { expires_at: "2026-07-21T00:14:01.000Z" } });
+const zeroDurationLease = leaseComment({ id: 112, leaseOverrides: { expires_at: "2026-07-20T23:59:00.000Z" } });
+const negativeDurationLease = leaseComment({ id: 113, leaseOverrides: { expires_at: "2026-07-20T23:58:59.000Z" } });
+const invalidTimestampLease = leaseComment({ id: 114, leaseOverrides: { acquired_at: "not-a-time" } });
+const invalidCalendarLease = leaseComment({ id: 132, leaseOverrides: { acquired_at: "2026-02-30T23:59:00.000Z" } });
+const createdAtDriftLease = leaseComment({ id: 115, createdAt: "2026-07-20T23:57:00.000Z" });
+const futureAcquiredLease = leaseComment({ id: 127, createdAt: "2026-07-21T00:02:00.000Z", leaseOverrides: { acquired_at: "2026-07-21T00:02:00.000Z", expires_at: "2026-07-21T00:10:00.000Z" } });
+const commentBoundLimitLease = leaseComment({ id: 128, createdAt: "2026-07-20T23:59:00.000Z", leaseOverrides: { acquired_at: "2026-07-21T00:00:00.000Z", expires_at: "2026-07-21T00:15:00.000Z" } });
+for (const comment of [longLivedLease, overLimitLease, zeroDurationLease, negativeDurationLease, invalidTimestampLease, invalidCalendarLease, createdAtDriftLease, futureAcquiredLease, commentBoundLimitLease]) {
+  assert.equal(parseIssueLease(comment, { ...leaseBindings, now: leaseNow }), null);
+}
+
+const wrongIssueLease = leaseComment({ id: 116, leaseOverrides: { issue_number: 205 } });
+const wrongRepositoryLease = leaseComment({ id: 117, leaseOverrides: { repository: "other/repository" } });
+const wrongTargetLease = leaseComment({ id: 118, leaseOverrides: { target_sha: "0".repeat(40) } });
+const wrongControlLease = leaseComment({ id: 119, leaseOverrides: { control_sha: "d".repeat(40), workflow_sha: "d".repeat(40) } });
+const mismatchedWorkflowLease = leaseComment({ id: 120, leaseOverrides: { workflow_sha: "d".repeat(40) } });
+const unknownPropertyLease = leaseComment({ id: 121, leaseOverrides: { injected_authority: true } });
+const digestDriftLease = leaseComment({ id: 122, leaseOverrides: { run_id: "changed-after-digest" }, recomputeDigest: false });
+const nonPositiveIssueLease = leaseComment({ id: 129, leaseOverrides: { issue_number: 0 } });
+const unnormalizedRunLease = leaseComment({ id: 130, leaseOverrides: { run_id: "contains space" } });
+const malformedJsonLease = { ...leaseComment({ id: 131 }), body: "<!-- ask-autonomous-development-lease -->\n{" };
+for (const comment of [wrongIssueLease, wrongRepositoryLease, wrongTargetLease, wrongControlLease, mismatchedWorkflowLease, unknownPropertyLease, digestDriftLease, nonPositiveIssueLease, unnormalizedRunLease, malformedJsonLease]) {
+  assert.equal(parseIssueLease(comment, { ...leaseBindings, now: leaseNow }), null);
+}
+
+assert.equal(selectActiveLease([externalLeaseComment, arbitraryBotLeaseComment], leaseBindings, leaseNow), null);
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, activeLease: selectActiveLease([externalLeaseComment], leaseBindings, leaseNow) }).can_publish, true);
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, activeLease: ownerLease }).reason, "active_lease_exists");
+const ownerLeaseDecision = evaluateIssuePublicationState({ ...publicationBase, activeLease: ownerLease });
+const transplantedAuthorityDecision = evaluateIssuePublicationState({ ...publicationBase, activeLease: { ...ownerLease, comment_author_login: dedicatedPublicationLogin, authority_class: "authenticated_publication" } });
+assert.notEqual(ownerLeaseDecision.revalidation_digest, transplantedAuthorityDecision.revalidation_digest, "publication revalidation must bind lease authority evidence");
+const sameRunLease = parseIssueLease(leaseComment({ id: 123, leaseOverrides: { run_id: "123456" } }), { ...leaseBindings, now: leaseNow });
+assert.equal(leaseOwnedByRun(sameRunLease, "123456", "1"), true);
+assert.equal(leaseOwnedByRun(sameRunLease, "123456", "2"), false);
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, activeLease: sameRunLease }).can_publish, true);
+const expiredLeaseComment = leaseComment({
+  id: 124,
+  createdAt: "2026-07-20T23:40:00.000Z",
+  leaseOverrides: { acquired_at: "2026-07-20T23:40:00.000Z", expires_at: "2026-07-20T23:55:00.000Z" },
+});
+assert.equal(selectActiveLease([expiredLeaseComment], leaseBindings, leaseNow), null);
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, activeLease: selectActiveLease([expiredLeaseComment], leaseBindings, leaseNow) }).can_publish, true);
+
+const originalComment = leaseComment({ id: 125 });
+const transplantedId = { ...originalComment, id: 126 };
+const transplantedAuthor = { ...originalComment, user: { login: "github-actions[bot]" }, author_association: "NONE" };
+assert.equal(parseIssueLease(transplantedId, { ...leaseBindings, now: leaseNow }), null);
+assert.equal(parseIssueLease(transplantedAuthor, { ...leaseBindings, now: leaseNow }), null);
+assert.equal(verifySealedLeaseComment({
+  createdComment: { id: 125, user: { login: "ist-h-i" }, author_association: "OWNER", created_at: "2026-07-20T23:59:00.000Z" },
+  patchedComment: { ok: false, status: 500 },
+  refetchedComment: originalComment,
+  bindings: leaseBindings,
+  now: leaseNow,
+}), null);
+
+const statusMarkerComment = (login, association) => ({ user: login === null ? {} : { login }, author_association: association });
+assert.equal(statusCommentAuthorAllowed(safeAdvanceContext.repository, statusMarkerComment("ist-h-i", "OWNER"), dedicatedPublicationLogin), true);
+assert.equal(statusCommentAuthorAllowed(safeAdvanceContext.repository, statusMarkerComment("github-actions[bot]", "NONE"), dedicatedPublicationLogin), true);
+assert.equal(statusCommentAuthorAllowed(safeAdvanceContext.repository, statusMarkerComment(dedicatedPublicationLogin, "NONE"), dedicatedPublicationLogin), true);
+assert.equal(statusCommentAuthorAllowed(safeAdvanceContext.repository, statusMarkerComment("other-app[bot]", "NONE"), dedicatedPublicationLogin), false);
+assert.equal(statusCommentAuthorAllowed(safeAdvanceContext.repository, statusMarkerComment("arbitrary[bot]", "NONE"), dedicatedPublicationLogin), false);
 
 const schema = JSON.parse(readFileSync(resolve(root, ".github/ask-automation/result.schema.json"), "utf8"));
 assert.equal(schema.additionalProperties, false);
@@ -567,7 +695,9 @@ for (const required of ["Never perform", "merge a pull request", "close an Issue
 assert.doesNotMatch(prompt, /unless the selected Issue is #198/iu);
 
 const publisher = readFileSync(resolve(root, "scripts/ask-autonomous-publish.mjs"), "utf8");
-assert.match(publisher, /login\.endsWith\("\[bot\]"\)/);
+assert.doesNotMatch(publisher, /login\.endsWith\("\[bot\]"\)/);
+assert.match(publisher, /authenticated_publication/);
+assert.match(publisher, /ask-autonomous-development-lease-pending/);
 assert.match(publisher, /ordinary pull-request CI expected from dedicated publication token/);
 assert.doesNotMatch(publisher, /merge_pull_request|gh pr merge/iu);
 

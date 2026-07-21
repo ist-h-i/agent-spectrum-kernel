@@ -108,7 +108,13 @@ Publication checks the remote target before applying and again immediately befor
 - an active lease owned by another run rejects publication; an expired lease can be reacquired;
 - a moved control branch does not change the control plane because every job remains pinned to the recorded workflow SHA.
 
-Linkage recognizes `Progresses #N`, `Closes #N`, `Fixes #N`, `Addresses #N`, and the automation marker. A stale or duplicate target receives only trusted run/Issue/target/current-state/existing-PR/reason metadata; generated text, patch push, remote branch, and Draft PR publication are suppressed. The Issue-comment lease binds Issue, run/attempt, target SHA, owner, acquisition/expiry timestamps, and a canonical digest. It coordinates cooperating automation runs; it cannot eliminate the final API race with unrelated human writes.
+Linkage recognizes `Progresses #N`, `Closes #N`, `Fixes #N`, `Addresses #N`, and the automation marker. A stale or duplicate target receives only trusted run/Issue/target/current-state/existing-PR/reason metadata; generated text, patch push, remote branch, and Draft PR publication are suppressed.
+
+The Issue-comment lease accepts authority only from a closed identity set: the repository owner, `github-actions[bot]`, or the actual publication identity authenticated from the current token. The publisher resolves that identity through the authenticated user or installation API where possible. Lease acquisition always uses a two-stage comment: it first creates a non-authoritative pending comment, then seals the same comment with its GitHub comment ID and a closed lease object, and finally re-fetches it to compare ID, author login, author association, and creation time. A failed PATCH or identity comparison leaves only a pending comment, which can never parse as a lease.
+
+The sealed lease binds comment ID, Issue, repository, run/attempt, target/control/workflow SHAs, authenticated owner, acquisition/expiry timestamps, and a canonical digest. The body digest detects drift but is not a signature and grants no authority by itself. A lease lasts more than zero and at most 15 minutes; its acquisition time must remain within 60 seconds of the GitHub comment creation time and cannot be materially in the future. Unknown fields, malformed values, binding drift, expired leases, and lease-like comments from any unrecognized user or bot are ignored. Selection and final publication revalidation bind the verified digest, comment metadata, authority class, expiry, Issue, and target SHA into the final guard.
+
+The lease only suppresses duplicate work among cooperating automation runs. It is not a general safety guarantee and cannot eliminate the final API race with unrelated human or other non-cooperating writes.
 
 The final guard binds Schema version, control/workflow/target/base SHAs, context/result/patch SHA-256 values, changed paths, additions, deletions, total changed lines, validation run ID/attempt/status, attestation/execution/container/plan digests, publication revalidation digest, and its own canonical digest.
 
@@ -198,7 +204,7 @@ The PR remains Draft and contains the marker:
 <!-- ask-autonomous-development -->
 ```
 
-A single status comment marked with `ask-autonomous-development-status` is updated on the PR and linked Issue. Issue advancement additionally creates a short-lived `ask-autonomous-development-lease` comment before publication. The updater recognizes GitHub Actions, the repository owner, and dedicated GitHub App bot identities. No merge or Issue closure follows automatically.
+A single status comment marked with `ask-autonomous-development-status` is updated on the PR and linked Issue. Issue advancement additionally creates a short-lived `ask-autonomous-development-lease` comment before publication. The updater uses the same closed authority set as the lease path: the repository owner, `github-actions[bot]`, or the authenticated dedicated publication identity. A marker posted by another user or an arbitrary `[bot]` account is never selected for update. No merge or Issue closure follows automatically.
 
 ## Operations
 
