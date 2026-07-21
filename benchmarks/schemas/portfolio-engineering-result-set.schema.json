@@ -16,6 +16,7 @@
     "plan_digest",
     "run_instance_id",
     "adapter_track",
+    "source_revision",
     "completeness",
     "structural_counts",
     "inventory",
@@ -37,6 +38,7 @@
     "plan_digest": { "$ref": "#/$defs/digest" },
     "run_instance_id": { "type": "string", "format": "uuid" },
     "adapter_track": { "enum": ["codex", "claude"] },
+    "source_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
     "completeness": { "$ref": "#/$defs/completeness" },
     "structural_counts": { "$ref": "#/$defs/structuralCounts" },
     "inventory": {

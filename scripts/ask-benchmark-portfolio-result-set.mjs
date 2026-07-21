@@ -136,10 +136,23 @@ function readStableFile(path, label, maximumBytes) {
   const bytes = Buffer.concat(chunks);
   if (bytes.length !== opened.size) throw new Error(`${label} changed during inspection`);
   return {
+    path: resolve(path),
+    canonicalPath: realpathSync(path),
     bytes,
     rawByteDigest: rawByteDigest(bytes),
     status: { dev: opened.dev, ino: opened.ino, size: opened.size, mtimeMs: opened.mtimeMs, ctimeMs: opened.ctimeMs },
   };
+}
+
+function assertStableFileEvidence(before, after, label) {
+  const statusFields = ["dev", "ino", "size", "mtimeMs", "ctimeMs"];
+  if (
+    before.path !== after.path
+    || before.canonicalPath !== after.canonicalPath
+    || statusFields.some((field) => before.status[field] !== after.status[field])
+    || before.rawByteDigest !== after.rawByteDigest
+    || Buffer.compare(before.bytes, after.bytes) !== 0
+  ) throw new Error(`${label} changed or was replaced during inspection`);
 }
 
 function parseJsonBytes(bytes, label) {
@@ -178,6 +191,7 @@ export function computeEngineeringResultSetId(value) {
     plan_digest: value.plan_digest,
     run_instance_id: value.run_instance_id,
     adapter_track: value.adapter_track,
+    source_revision: value.source_revision,
     inventory: value.inventory,
   };
   if (Object.values(identity).some((entry) => entry === undefined)) throw new Error("engineering result set identity inputs are incomplete");
@@ -257,7 +271,7 @@ function assertSameFileEvidence(before, after) {
   for (const path of beforePaths) {
     const left = before.files.get(path);
     const right = after.files.get(path);
-    if (left.rawByteDigest !== right.rawByteDigest || left.bytes.length !== right.bytes.length || left.status.dev !== right.status.dev || left.status.ino !== right.status.ino) throw new Error(`engineering result ${path} changed or was replaced during inspection`);
+    assertStableFileEvidence(left, right, `engineering result ${path}`);
   }
 }
 
@@ -477,13 +491,24 @@ export function validatePortfolioEngineeringResultSet(value, { root = DEFAULT_RO
 function assertInputBoundaries({ root, engineeringResultsPath, normalizedResultsPath, sourceManifestPath, outputPath = null, inputPath = null, materializedPath = null, selectionState = null, runDir = null }) {
   const engineeringRoot = assertRealDirectory(engineeringResultsPath, "engineering result root");
   const normalizedRoot = assertRealDirectory(normalizedResultsPath, "normalized results root");
+  const authorityRoots = [
+    [engineeringRoot, "engineering result root"],
+    [normalizedRoot, "normalized results root"],
+  ];
   if (pathsOverlap(engineeringRoot, normalizedRoot)) throw new Error("engineering result root must not overlap the normalized results root");
   for (const [path, label] of [[materializedPath, "materialized root"], [selectionState, "selection-state root"], [runDir, "execution run root"]]) {
-    if (path && pathsOverlap(engineeringRoot, path)) throw new Error(`engineering result root must not overlap the ${label}`);
+    if (!path) continue;
+    const authorityRoot = assertRealDirectory(path, label);
+    if (pathsOverlap(engineeringRoot, authorityRoot)) throw new Error(`engineering result root must not overlap the ${label}`);
+    authorityRoots.push([authorityRoot, label]);
   }
   if (pathsOverlap(engineeringRoot, sourceManifestPath)) throw new Error("engineering result source manifest must stay outside the engineering result root");
-  if (outputPath && pathsOverlap(engineeringRoot, outputPath)) throw new Error("engineering result-set output must not overlap the engineering result root");
-  if (inputPath && pathsOverlap(engineeringRoot, inputPath)) throw new Error("engineering result-set input must not overlap the engineering result root");
+  for (const [candidate, candidateLabel] of [[outputPath, "engineering result-set output"], [inputPath, "engineering result-set input"]]) {
+    if (!candidate) continue;
+    for (const [authorityRoot, authorityLabel] of authorityRoots) {
+      if (pathsOverlap(authorityRoot, candidate)) throw new Error(`${candidateLabel} must not overlap the ${authorityLabel}`);
+    }
+  }
   if (isInside(root, engineeringRoot)) {
     const repositoryRelative = relative(root, engineeringRoot).split(sep).join("/");
     if (PRIVATE_EVALUATOR_PATTERN.test(repositoryRelative)) throw new Error("engineering result root must not overlap a repository private evaluator root");
@@ -497,6 +522,8 @@ function deriveEngineeringResultSet(options) {
   const authority = readAnchoredSourceManifest({ root, sourceManifestPath: options.sourceManifestPath, sourceManifestSourceDigest: options.sourceManifestSourceDigest });
   const normalized = deriveExpectedNormalizedAttempts({ root, normalizedResultsPath: options.normalizedResultsPath, sourceSnapshotDigest: options.sourceSnapshotDigest, adapter: options.adapter });
   const { manifest: sourceManifest } = authority;
+  const sourceRevision = normalized.manifest.source.repository_revision;
+  if (normalized.manifest.normalizer.source_revision !== sourceRevision) throw new Error("normalized manifest normalizer source revision does not match source.repository_revision");
   const expectedAuthority = {
     plan_id: normalized.manifest.source.plan_id,
     plan_digest: normalized.manifest.source.plan_digest,
@@ -505,6 +532,7 @@ function deriveEngineeringResultSet(options) {
     adapter_track: options.adapter,
     normalized_generation_id: normalized.normalizedGenerationId,
     normalized_manifest_digest: normalized.manifest.normalized_run_digest,
+    source_revision: sourceRevision,
   };
   for (const [field, expected] of Object.entries(expectedAuthority)) {
     if (sourceManifest[field] !== expected) throw new Error(`engineering result source manifest ${field} does not match the verified normalized authority`);
@@ -541,7 +569,7 @@ function deriveEngineeringResultSet(options) {
   const secondScan = scanResultRoot(options.engineeringResultsPath);
   assertSameFileEvidence(firstScan, secondScan);
   const sourceManifestAfter = readStableFile(authority.path, "engineering result source manifest", MAX_SOURCE_MANIFEST_BYTES);
-  if (sourceManifestAfter.rawByteDigest !== authority.rawByteDigest || sourceManifestAfter.status.dev !== authority.evidence.status.dev || sourceManifestAfter.status.ino !== authority.evidence.status.ino) throw new Error("engineering result source manifest changed or was replaced during inspection");
+  assertStableFileEvidence(authority.evidence, sourceManifestAfter, "engineering result source manifest");
   const normalizedAfter = verifyNormalizedPortfolioResults({ root, outputPath: options.normalizedResultsPath, sourceSnapshotDigest: options.sourceSnapshotDigest });
   if (normalizedAfter.manifest.normalized_run_digest !== normalized.manifest.normalized_run_digest) throw new Error("normalized generation changed during engineering result inspection");
   const attempts = normalized.expected.map(normalizedAttemptId);
@@ -559,6 +587,7 @@ function deriveEngineeringResultSet(options) {
     plan_digest: normalized.manifest.source.plan_digest,
     run_instance_id: normalized.manifest.source.run_instance_id,
     adapter_track: options.adapter,
+    source_revision: sourceRevision,
     completeness: {
       expected_result_count: normalized.expected.length,
       collected_result_count: collectedInventory.length,
@@ -588,6 +617,7 @@ function deriveEngineeringResultSet(options) {
 }
 
 export function collectEngineeringResults(options) {
+  if (options.outputPath) assertInputBoundaries({ root: resolve(options.root ?? DEFAULT_ROOT), ...options });
   const output = assertAtomicOutputAbsent(options.outputPath, "engineering result-set output");
   const derived = deriveEngineeringResultSet({ ...options, outputPath: output });
   const publication = publishJsonAtomicNoReplace({ outputPath: output, artifact: derived.artifact, label: "engineering result-set output" });
@@ -600,5 +630,7 @@ export function verifyEngineeringResultSet(options) {
   const supplied = validatePortfolioEngineeringResultSet(parseJsonBytes(input.bytes, "engineering result-set input"), { root: options.root ?? DEFAULT_ROOT });
   const derived = deriveEngineeringResultSet(options);
   if (stableCanonicalJson(supplied) !== stableCanonicalJson(derived.artifact)) throw new Error("engineering result-set input does not match the re-derived authoritative complete inventory");
+  const inputAfter = readStableFile(options.inputPath, "engineering result-set input", MAX_SOURCE_MANIFEST_BYTES);
+  assertStableFileEvidence(input, inputAfter, "engineering result-set input");
   return { artifact: supplied, bytes: input.bytes, authority: derived.authority };
 }

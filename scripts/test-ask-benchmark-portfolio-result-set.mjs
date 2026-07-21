@@ -10,6 +10,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -435,14 +436,19 @@ function buildEngineeringRoot(target, normalized, adapter) {
 
 function snapshot(path) {
   const values = [];
+  const rootStatus = lstatSync(path);
+  values.push({ path: ".", kind: "directory", dev: rootStatus.dev, ino: rootStatus.ino, size: rootStatus.size, mtimeMs: rootStatus.mtimeMs, ctimeMs: rootStatus.ctimeMs });
   function walk(current, prefix = "") {
     for (const name of readdirSync(current).sort()) {
       const absolute = resolve(current, name);
       const relativePath = prefix ? `${prefix}/${name}` : name;
       const status = lstatSync(absolute);
-      if (status.isSymbolicLink()) values.push({ path: relativePath, kind: "symlink" });
-      else if (status.isDirectory()) walk(absolute, relativePath);
-      else if (status.isFile()) values.push({ path: relativePath, bytes: readFileSync(absolute).toString("base64") });
+      const identity = { path: relativePath, dev: status.dev, ino: status.ino, size: status.size, mtimeMs: status.mtimeMs, ctimeMs: status.ctimeMs };
+      if (status.isSymbolicLink()) values.push({ ...identity, kind: "symlink" });
+      else if (status.isDirectory()) {
+        values.push({ ...identity, kind: "directory" });
+        walk(absolute, relativePath);
+      } else if (status.isFile()) values.push({ ...identity, kind: "file", bytes: readFileSync(absolute).toString("base64") });
       else values.push({ path: relativePath, kind: "non-regular" });
     }
   }
@@ -524,6 +530,44 @@ function expectFailure(name, mutate, pattern, optionOverrides = {}) {
   covered.add(name);
 }
 
+function addOptionalInputRoots(fixture) {
+  for (const [field, name] of [["materializedPath", "materialized"], ["selectionState", "selection-state"], ["runDir", "run"]]) {
+    const path = resolve(fixture.target, name);
+    mkdirSync(path, { recursive: true });
+    writeFileSync(resolve(path, "sentinel.txt"), `${name}\n`);
+    fixture[field] = path;
+  }
+  return fixture;
+}
+
+function inputEvidence(fixture) {
+  const evidence = {
+    normalized: snapshot(fixture.normalizedRoot),
+    results: snapshot(fixture.resultRoot),
+    source: { bytes: readFileSync(fixture.sourcePath).toString("base64"), ...(() => {
+      const status = lstatSync(fixture.sourcePath);
+      return { dev: status.dev, ino: status.ino, size: status.size, mtimeMs: status.mtimeMs, ctimeMs: status.ctimeMs };
+    })() },
+  };
+  for (const field of ["materializedPath", "selectionState", "runDir"]) if (fixture[field]) evidence[field] = snapshot(fixture[field]);
+  return evidence;
+}
+
+function assertInputEvidenceUnchanged(fixture, before, name) {
+  assert.deepEqual(inputEvidence(fixture), before, `${name}: every input root and source manifest must remain byte-, inventory-, and inode-identical`);
+}
+
+function expectBoundaryFailure(name, fixtureMutator, optionOverrides, pattern) {
+  const fixture = addOptionalInputRoots(cloneFixture(`negative-${name}`));
+  fixtureMutator(fixture);
+  const before = inputEvidence(fixture);
+  const target = optionOverrides(fixture);
+  assert.throws(() => collectEngineeringResults(options(fixture, target)), pattern, name);
+  assertInputEvidenceUnchanged(fixture, before, name);
+  if (target.outputPath && !Object.values(fixture).includes(target.outputPath)) assert.equal(existsSync(target.outputPath), false, `${name}: failure must not publish output`);
+  covered.add(name);
+}
+
 function addDuplicateResult(fixture, mutate = null) {
   const source = readJson(fixture.sourcePath);
   const original = source.inventory[0];
@@ -564,6 +608,73 @@ async function concurrentCollect(fixture) {
   return Promise.all([launch(), launch()]);
 }
 
+async function waitForPath(path, child) {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    if (existsSync(path)) return;
+    if (child.exitCode !== null) throw new Error(`verification child exited before the synchronized replacement checkpoint: ${child.exitCode}`);
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 10));
+  }
+  throw new Error("verification child did not reach the synchronized replacement checkpoint");
+}
+
+async function concurrentVerifyReplacement(fixture, replacementPath) {
+  const markerPath = resolve(fixture.target, `verify-read-${hash(replacementPath).slice(0, 8)}.marker`);
+  const continuePath = `${markerPath}.continue`;
+  const preloadPath = `${markerPath}.preload.mjs`;
+  writeFileSync(preloadPath, `
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import { resolve, sep } from "node:path";
+const originalOpenSync = fs.openSync;
+const markerPath = process.env.ASK_RESULT_SET_TEST_MARKER;
+const continuePath = process.env.ASK_RESULT_SET_TEST_CONTINUE;
+const resultRoot = resolve(process.env.ASK_RESULT_SET_TEST_RESULT_ROOT);
+let synchronized = false;
+fs.openSync = function (path, ...args) {
+  const absolute = resolve(String(path));
+  if (!synchronized && (absolute === resultRoot || absolute.startsWith(resultRoot + sep))) {
+    synchronized = true;
+    fs.writeFileSync(markerPath, "initial input read completed\\n", { flag: "wx" });
+    const waitArray = new Int32Array(new SharedArrayBuffer(4));
+    while (!fs.existsSync(continuePath)) Atomics.wait(waitArray, 0, 0, 10);
+  }
+  return originalOpenSync.call(fs, path, ...args);
+};
+syncBuiltinESMExports();
+`);
+  const args = [
+    "--import", preloadPath,
+    runner,
+    "verify-engineering-result-set",
+    "--normalized-results", fixture.normalizedRoot,
+    "--snapshot-digest", fixture.sourceSnapshotDigest,
+    "--engineering-results", fixture.resultRoot,
+    "--engineering-result-source-manifest", fixture.sourcePath,
+    "--engineering-result-source-manifest-source-digest", fixture.sourceDigest,
+    "--adapter", "codex",
+    "--input", fixture.outputPath,
+  ];
+  const child = spawn(process.execPath, args, {
+    cwd: root,
+    env: {
+      ...process.env,
+      ASK_RESULT_SET_TEST_MARKER: markerPath,
+      ASK_RESULT_SET_TEST_CONTINUE: continuePath,
+      ASK_RESULT_SET_TEST_RESULT_ROOT: fixture.resultRoot,
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk) => { stdout += chunk; });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  await waitForPath(markerPath, child);
+  renameSync(replacementPath, fixture.outputPath);
+  writeFileSync(continuePath, "continue\n", { flag: "wx" });
+  const status = await new Promise((resolvePromise) => child.on("close", resolvePromise));
+  return { status, stdout, stderr };
+}
+
 try {
   const base = resolve(work, "base");
   const normalizedRoot = resolve(base, "normalized");
@@ -574,6 +685,7 @@ try {
   const positive = cloneFixture("positive");
   const collected = collectEngineeringResults(options(positive));
   assert.equal(collected.artifact.completeness.completeness_status, "complete");
+  assert.equal(collected.artifact.source_revision, SOURCE_REVISION);
   assert.equal(collected.artifact.completeness.expected_result_count, 32);
   assert.deepEqual(collected.artifact.structural_counts.by_condition.map(({ name }) => name), CONDITIONS);
   assert.deepEqual(collected.artifact.structural_counts.by_repetition.map(({ name }) => name), ["1", "2", "3", "4", "5"]);
@@ -587,7 +699,7 @@ try {
     "--engineering-result-source-manifest-source-digest", positive.sourceDigest, "--adapter", "codex", "--input", positive.outputPath,
   ]);
   assert.match(cliVerified.stdout, /Verified complete codex engineering result set/u);
-  for (const name of ["complete-one-adapter", "all-four-conditions", "plan-three-repetitions", "plan-five-repetitions", "complete-with-non-ready", "unknown-unavailable-not-zero"]) covered.add(name);
+  for (const name of ["complete-one-adapter", "all-four-conditions", "plan-three-repetitions", "plan-five-repetitions", "complete-with-non-ready", "unknown-unavailable-not-zero", "source-revision-matches-normalized-authority"]) covered.add(name);
 
   const checkedIn = cloneFixture("checked-in-authority");
   cpSync(resolve(root, "benchmarks/schemas"), resolve(checkedIn.target, "benchmarks/schemas"), { recursive: true });
@@ -598,6 +710,25 @@ try {
   const checkedInResult = collectEngineeringResults(options(checkedIn, { root: checkedIn.target, sourceManifestSourceDigest: null }));
   assert.equal(checkedInResult.authority.authority, "checked_in_head");
   covered.add("checked-in-source-authority");
+
+  const checkedInRevisionMismatch = cloneFixture("checked-in-revision-mismatch");
+  cpSync(resolve(root, "benchmarks/schemas"), resolve(checkedInRevisionMismatch.target, "benchmarks/schemas"), { recursive: true });
+  const checkedInMismatchSource = readJson(checkedInRevisionMismatch.sourcePath);
+  checkedInMismatchSource.source_revision = "2".repeat(40);
+  checkedInMismatchSource.manifest_digest = computeEngineeringResultSourceManifestDigest(checkedInMismatchSource);
+  writeJson(checkedInRevisionMismatch.sourcePath, checkedInMismatchSource);
+  for (const args of [["init", "-q"], ["config", "user.name", "ASK Result Set Test"], ["config", "user.email", "result-set-test@example.invalid"], ["add", "source-codex.json"], ["commit", "-q", "-m", "Anchor mismatched synthetic source manifest"]]) {
+    const result = spawnSync("git", args, { cwd: checkedInRevisionMismatch.target, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  }
+  const checkedInMismatchBefore = inputEvidence(checkedInRevisionMismatch);
+  assert.throws(
+    () => collectEngineeringResults(options(checkedInRevisionMismatch, { root: checkedInRevisionMismatch.target, sourceManifestSourceDigest: null })),
+    /source_revision does not match the verified normalized authority/u,
+  );
+  assertInputEvidenceUnchanged(checkedInRevisionMismatch, checkedInMismatchBefore, "checked-in-source-revision-mismatch");
+  assert.equal(existsSync(checkedInRevisionMismatch.outputPath), false);
+  covered.add("checked-in-source-revision-mismatch");
 
   const claudeFixture = cloneFixture("positive-claude");
   claudeFixture.resultRoot = resolve(claudeFixture.target, "engineering-claude");
@@ -615,6 +746,18 @@ try {
   const second = collectEngineeringResults(options(deterministic, { outputPath: secondOutput }));
   assert.deepEqual(first.bytes, second.bytes);
   covered.add("byte-identical-regeneration");
+
+  const immutableSuccess = addOptionalInputRoots(cloneFixture("successful-external-output-inputs-unchanged"));
+  immutableSuccess.outputPath = resolve(work, "external-publication", "result-set.json");
+  mkdirSync(dirname(immutableSuccess.outputPath), { recursive: true });
+  const immutableBefore = inputEvidence(immutableSuccess);
+  collectEngineeringResults(options(immutableSuccess, {
+    materializedPath: immutableSuccess.materializedPath,
+    selectionState: immutableSuccess.selectionState,
+    runDir: immutableSuccess.runDir,
+  }));
+  assertInputEvidenceUnchanged(immutableSuccess, immutableBefore, "successful-external-output-inputs-unchanged");
+  covered.add("successful-external-output-inputs-unchanged");
 
   expectFailure("missing-result", (fixture) => {
     const source = readJson(fixture.sourcePath);
@@ -656,6 +799,33 @@ try {
     writeJson(fixture.sourcePath, source);
     fixture.sourceDigest = fileDigest(fixture.sourcePath);
   }, /semantic digest/u);
+  expectFailure("source-revision-mismatch", (fixture) => {
+    const source = readJson(fixture.sourcePath);
+    source.source_revision = "2".repeat(40);
+    writeJson(fixture.sourcePath, source);
+    fixture.sourceDigest = fileDigest(fixture.sourcePath);
+  }, /semantic digest/u);
+  expectFailure("source-revision-resealed-approved-mismatch", (fixture) => {
+    const source = readJson(fixture.sourcePath);
+    source.source_revision = "2".repeat(40);
+    source.manifest_digest = computeEngineeringResultSourceManifestDigest(source);
+    writeJson(fixture.sourcePath, source);
+    fixture.sourceDigest = fileDigest(fixture.sourcePath);
+  }, /source_revision does not match the verified normalized authority/u);
+  expectFailure("source-revision-arbitrary-valid-hex", (fixture) => {
+    const source = readJson(fixture.sourcePath);
+    source.source_revision = "abcdef0123456789abcdef0123456789abcdef01";
+    source.manifest_digest = computeEngineeringResultSourceManifestDigest(source);
+    writeJson(fixture.sourcePath, source);
+    fixture.sourceDigest = fileDigest(fixture.sourcePath);
+  }, /source_revision does not match the verified normalized authority/u);
+  expectFailure("source-revision-missing", (fixture) => {
+    const source = readJson(fixture.sourcePath);
+    delete source.source_revision;
+    source.manifest_digest = computeEngineeringResultSourceManifestDigest(source);
+    writeJson(fixture.sourcePath, source);
+    fixture.sourceDigest = fileDigest(fixture.sourcePath);
+  }, /Schema validation/u);
   expectFailure("unapproved-resealed-source-manifest", (fixture) => {
     const oldDigest = fixture.sourceDigest;
     const source = readJson(fixture.sourcePath);
@@ -750,6 +920,59 @@ try {
   digestDrift.result_set_digest = digest("wrong-result-set-digest");
   assert.throws(() => validatePortfolioEngineeringResultSet(digestDrift, { root }), /digest is invalid/u);
   covered.add("result-set-digest-drift");
+  const revisionIdentityDrift = structuredClone(collected.artifact);
+  revisionIdentityDrift.source_revision = "2".repeat(40);
+  const changedRevisionId = computeEngineeringResultSetId(revisionIdentityDrift);
+  assert.notEqual(changedRevisionId, collected.artifact.result_set_id);
+  covered.add("result-set-id-binds-source-revision");
+
+  const fullAuthorityRevisionDrift = cloneFixture("result-set-revision-drift");
+  const authoritativeRevisionSet = collectEngineeringResults(options(fullAuthorityRevisionDrift));
+  const revisionDriftArtifact = structuredClone(authoritativeRevisionSet.artifact);
+  revisionDriftArtifact.source_revision = "2".repeat(40);
+  revisionDriftArtifact.result_set_id = computeEngineeringResultSetId(revisionDriftArtifact);
+  revisionDriftArtifact.result_set_digest = computeEngineeringResultSetDigest(revisionDriftArtifact);
+  validatePortfolioEngineeringResultSet(revisionDriftArtifact, { root });
+  const revisionDriftPath = resolve(fullAuthorityRevisionDrift.target, "self-consistent-revision-drift.json");
+  writeJson(revisionDriftPath, revisionDriftArtifact);
+  const revisionDriftBefore = inputEvidence(fullAuthorityRevisionDrift);
+  assert.throws(
+    () => verifyEngineeringResultSet(options(fullAuthorityRevisionDrift, { inputPath: revisionDriftPath, outputPath: undefined })),
+    /does not match the re-derived authoritative complete inventory/u,
+  );
+  assertInputEvidenceUnchanged(fullAuthorityRevisionDrift, revisionDriftBefore, "result-set-revision-drift");
+  covered.add("result-set-revision-drift");
+  covered.add("bare-validator-is-not-full-authority-verification");
+
+  const concurrentReplacement = cloneFixture("concurrent-verify-replacement");
+  const concurrentReplacementSet = collectEngineeringResults(options(concurrentReplacement));
+  const replacementArtifact = structuredClone(concurrentReplacementSet.artifact);
+  replacementArtifact.source_revision = "2".repeat(40);
+  replacementArtifact.result_set_id = computeEngineeringResultSetId(replacementArtifact);
+  replacementArtifact.result_set_digest = computeEngineeringResultSetDigest(replacementArtifact);
+  validatePortfolioEngineeringResultSet(replacementArtifact, { root });
+  const replacementPath = resolve(concurrentReplacement.target, "replacement-result-set.json");
+  writeJson(replacementPath, replacementArtifact);
+  const concurrentReplacementBefore = inputEvidence(concurrentReplacement);
+  const replacementOutcome = await concurrentVerifyReplacement(concurrentReplacement, replacementPath);
+  assert.notEqual(replacementOutcome.status, 0, "concurrent input replacement must make verification fail closed");
+  assert.doesNotMatch(replacementOutcome.stdout, /Verified complete/u);
+  assert.match(replacementOutcome.stderr, /changed|replaced|does not match/u);
+  assertInputEvidenceUnchanged(concurrentReplacement, concurrentReplacementBefore, "concurrent-verify-input-replacement");
+  covered.add("concurrent-verify-input-replacement");
+
+  const sameByteReplacement = cloneFixture("same-byte-inode-replacement");
+  collectEngineeringResults(options(sameByteReplacement));
+  const sameByteReplacementPath = resolve(sameByteReplacement.target, "same-byte-replacement.json");
+  cpSync(sameByteReplacement.outputPath, sameByteReplacementPath);
+  assert.notEqual(lstatSync(sameByteReplacement.outputPath).ino, lstatSync(sameByteReplacementPath).ino);
+  const sameByteBefore = inputEvidence(sameByteReplacement);
+  const sameByteOutcome = await concurrentVerifyReplacement(sameByteReplacement, sameByteReplacementPath);
+  assert.notEqual(sameByteOutcome.status, 0, "same-byte inode replacement must make verification fail closed");
+  assert.doesNotMatch(sameByteOutcome.stdout, /Verified complete/u);
+  assert.match(sameByteOutcome.stderr, /changed|replaced/u);
+  assertInputEvidenceUnchanged(sameByteReplacement, sameByteBefore, "same-byte-inode-replacement");
+  covered.add("same-byte-inode-replacement");
   const statistics = structuredClone(collected.artifact);
   statistics.mean = 0.5;
   assert.throws(() => validatePortfolioEngineeringResultSet(statistics, { root }), /Schema validation/u);
@@ -776,7 +999,48 @@ try {
 
   expectFailure("adapter-pooling-rejected", (fixture) => rewriteFirstResult(fixture, (value) => { value.adapter = "claude"; }), /different adapter/u);
   expectFailure("input-root-overlap", () => {}, /must not overlap the materialized root/u, { materializedPath: resolve(work, "negative-input-root-overlap", "engineering-codex") });
-  expectFailure("output-root-overlap", (fixture) => { fixture.outputPath = resolve(fixture.resultRoot, "result-set.json"); }, /must not overlap the engineering result root/u);
+  expectBoundaryFailure("output-inside-normalized-root", () => {}, (fixture) => ({
+    materializedPath: fixture.materializedPath, selectionState: fixture.selectionState, runDir: fixture.runDir,
+    outputPath: resolve(fixture.normalizedRoot, "result-set.json"),
+  }), /output must not overlap the normalized results root/u);
+  expectBoundaryFailure("output-equal-normalized-root", () => {}, (fixture) => ({
+    materializedPath: fixture.materializedPath, selectionState: fixture.selectionState, runDir: fixture.runDir,
+    outputPath: fixture.normalizedRoot,
+  }), /output must not overlap the normalized results root/u);
+  expectBoundaryFailure("output-inside-materialized-root", () => {}, (fixture) => ({
+    materializedPath: fixture.materializedPath, selectionState: fixture.selectionState, runDir: fixture.runDir,
+    outputPath: resolve(fixture.materializedPath, "result-set.json"),
+  }), /output must not overlap the materialized root/u);
+  expectBoundaryFailure("output-inside-selection-state-root", () => {}, (fixture) => ({
+    materializedPath: fixture.materializedPath, selectionState: fixture.selectionState, runDir: fixture.runDir,
+    outputPath: resolve(fixture.selectionState, "result-set.json"),
+  }), /output must not overlap the selection-state root/u);
+  expectBoundaryFailure("output-inside-run-root", () => {}, (fixture) => ({
+    materializedPath: fixture.materializedPath, selectionState: fixture.selectionState, runDir: fixture.runDir,
+    outputPath: resolve(fixture.runDir, "result-set.json"),
+  }), /output must not overlap the execution run root/u);
+  expectBoundaryFailure("output-inside-engineering-result-root", () => {}, (fixture) => ({
+    materializedPath: fixture.materializedPath, selectionState: fixture.selectionState, runDir: fixture.runDir,
+    outputPath: resolve(fixture.resultRoot, "result-set.json"),
+  }), /output must not overlap the engineering result root/u);
+  expectBoundaryFailure("output-ancestor-of-authority-roots", () => {}, (fixture) => ({
+    materializedPath: fixture.materializedPath, selectionState: fixture.selectionState, runDir: fixture.runDir,
+    outputPath: fixture.target,
+  }), /output must not overlap the engineering result root|output must not overlap the normalized results root/u);
+
+  for (const [name, inputRootField, expected] of [
+    ["verify-input-inside-normalized-root", "normalizedRoot", /input must not overlap the normalized results root/u],
+    ["verify-input-inside-engineering-result-root", "resultRoot", /input must not overlap the engineering result root/u],
+  ]) {
+    const fixture = cloneFixture(name);
+    collectEngineeringResults(options(fixture));
+    const contaminatedInput = resolve(fixture[inputRootField], "result-set-input.json");
+    cpSync(fixture.outputPath, contaminatedInput);
+    const before = inputEvidence(fixture);
+    assert.throws(() => verifyEngineeringResultSet(options(fixture, { inputPath: contaminatedInput, outputPath: undefined })), expected, name);
+    assertInputEvidenceUnchanged(fixture, before, name);
+    covered.add(name);
+  }
 
   const privateRepository = cloneFixture("repository-private-root");
   cpSync(resolve(root, "benchmarks/schemas"), resolve(privateRepository.target, "benchmarks/schemas"), { recursive: true });
@@ -791,12 +1055,19 @@ try {
     "duplicate-case-attempt", "duplicate-condition-repetition", "cross-adapter", "cross-plan", "cross-run", "cross-snapshot", "cross-condition",
     "cross-repetition", "cross-fixture", "normalized-digest-mismatch", "engineering-result-digest-drift", "engineering-result-id-drift",
     "source-manifest-raw-digest-drift", "source-manifest-semantic-digest-drift", "unapproved-resealed-source-manifest", "unanchored-source-manifest",
+    "source-revision-matches-normalized-authority", "source-revision-mismatch", "source-revision-resealed-approved-mismatch",
+    "source-revision-arbitrary-valid-hex", "source-revision-missing", "checked-in-source-revision-mismatch",
     "result-file-raw-byte-drift", "result-file-byte-count-drift", "source-manifest-subset-cherry-pick", "source-directory-inventory-mismatch",
     "unexpected-file", "missing-file", "source-root-symlink", "child-path-symlink", "path-escape", "windows-path", "non-regular-entry",
     "unordered-inventory", "count-drift", "result-set-id-drift", "result-set-digest-drift", "pre-existing-output", "output-symlink",
     "concurrent-output-publication", "failure-inputs-unchanged", "byte-identical-regeneration", "unknown-unavailable-not-zero",
+    "result-set-id-binds-source-revision", "result-set-revision-drift", "bare-validator-is-not-full-authority-verification",
+    "concurrent-verify-input-replacement", "same-byte-inode-replacement", "successful-external-output-inputs-unchanged",
     "statistics-aggregate-schema-rejected", "adapter-pooling-rejected", "adapter-separate-result-sets", "checked-in-source-authority",
-    "input-root-overlap", "output-root-overlap", "repository-private-root-overlap",
+    "input-root-overlap", "output-inside-normalized-root", "output-equal-normalized-root", "output-inside-materialized-root",
+    "output-inside-selection-state-root", "output-inside-run-root", "output-inside-engineering-result-root",
+    "output-ancestor-of-authority-roots", "verify-input-inside-normalized-root", "verify-input-inside-engineering-result-root",
+    "repository-private-root-overlap",
   ];
   assert.deepEqual([...covered].filter((name) => required.includes(name)).sort(), [...required].sort(), "focused result-set coverage inventory must remain closed");
   console.log(`ASK benchmark portfolio engineering result-set tests passed (${required.length} named closures)`);
