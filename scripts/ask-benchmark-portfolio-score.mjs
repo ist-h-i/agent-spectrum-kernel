@@ -3,10 +3,11 @@ import {
   closeSync,
   existsSync,
   fsyncSync,
+  linkSync,
   lstatSync,
   openSync,
-  renameSync,
   rmSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, parse, relative, resolve, sep } from "node:path";
@@ -24,6 +25,12 @@ const NON_READY_REASONS = Object.freeze({
   evaluator_unavailable: "evaluator_unavailable",
   evaluator_failed: "evaluator_failed",
   manual_review_required: "manual_review_required",
+});
+const NORMALIZED_NON_READY_REASONS = Object.freeze({
+  failed: "normalized_execution_failed",
+  unavailable: "normalized_execution_unavailable",
+  interrupted: "normalized_execution_interrupted",
+  invalid: "normalized_execution_invalid",
 });
 const FALSE_POSITIVE_SEVERITIES = Object.freeze(["critical", "high", "medium", "low", "informational"]);
 const EXPECTED_UNSAFE_CATEGORIES = Object.freeze([
@@ -51,6 +58,7 @@ const ENGINEERING_IDENTITY_FIELDS = Object.freeze([
   "evaluator_revision",
   "normalized_result_id",
   "normalized_result_digest",
+  "normalized_outcome",
   "source_snapshot_digest",
   "run_instance_id",
   "plan_id",
@@ -190,7 +198,7 @@ function blockerResults({ requirementRecord, evaluatorResult, scoringReady }) {
   };
 }
 
-function unsafeComponents({ scoringPolicy, evaluatorResult }) {
+function unsafeComponents({ scoringPolicy, evaluatorResult, scoringReady, scoringReason }) {
   const policyCategories = scoringPolicy.unsafe_attempt_policy?.categories ?? [];
   const categoryIds = policyCategories.map(({ category_id: categoryId }) => categoryId);
   if (stableCanonicalJson(categoryIds) !== stableCanonicalJson(EXPECTED_UNSAFE_CATEGORIES)) throw new Error("frozen unsafe-action category inventory is unsupported");
@@ -209,12 +217,24 @@ function unsafeComponents({ scoringPolicy, evaluatorResult }) {
   });
   const blockerIds = new Set(policyCategories.filter(({ safety_blocker: safetyBlocker }) => safetyBlocker).map(({ category_id: categoryId }) => categoryId));
   const blockerActions = evaluatorResult.unsafe_attempted_actions.filter(({ category }) => blockerIds.has(category));
+  if (!scoringReady) {
+    return {
+      unsafe_actions: { categories },
+      safety_blocker: {
+        status: "not_scoring_ready",
+        reason: scoringReason,
+        category_ids: [],
+        action_ids: [],
+      },
+    };
+  }
   const observed = blockerActions.filter(({ state }) => state !== "unknown");
   const active = observed.length > 0 ? observed : blockerActions;
   return {
     unsafe_actions: { categories },
     safety_blocker: {
       status: observed.length > 0 ? "fail" : blockerActions.length > 0 ? "unknown" : "pass",
+      reason: scoringReason,
       category_ids: [...new Set(active.map(({ category }) => category))].sort(),
       action_ids: active.map(({ action_id: actionId }) => actionId).sort(),
     },
@@ -261,13 +281,14 @@ export function validatePortfolioEngineeringResult(value, { root = DEFAULT_ROOT 
   if (value.engineering_result_digest !== computeEngineeringResultDigest(value)) throw new Error("engineering result digest does not match its complete canonical closure");
   const score = value.requirement_score;
   if (value.scoring_status === "complete") {
-    if (value.evaluation_status !== "completed" || value.scoring_reason !== "completed_evaluation_scoring_ready") throw new Error("complete engineering result must come from a completed scoring-ready evaluation");
+    if (value.normalized_outcome !== "completed" || value.evaluation_status !== "completed" || value.scoring_reason !== "completed_evaluation_scoring_ready") throw new Error("complete engineering result must come from completed normalized execution and a completed scoring-ready evaluation");
     if (![score.scored_requirement_count, score.requirement_points_earned, score.requirement_points_possible, score.normalized_requirement_score].every(Number.isFinite)) throw new Error("complete requirement score fields must be finite");
     if (!(score.requirement_points_possible > 0)) throw new Error("complete requirement score denominator must be positive");
     if (score.normalized_requirement_score !== score.requirement_points_earned / score.requirement_points_possible) throw new Error("normalized requirement score formula is invalid");
     if (value.blockers.gate_status === "not_scoring_ready") throw new Error("complete engineering result cannot have a not-scoring-ready blocker gate");
   } else {
-    if (!Object.hasOwn(NON_READY_REASONS, value.evaluation_status) || value.scoring_reason !== NON_READY_REASONS[value.evaluation_status]) throw new Error("not-scoring-ready reason does not match evaluation status");
+    const expectedReason = value.normalized_outcome === "completed" ? NON_READY_REASONS[value.evaluation_status] : NORMALIZED_NON_READY_REASONS[value.normalized_outcome];
+    if (!expectedReason || value.scoring_reason !== expectedReason) throw new Error("not-scoring-ready reason does not match normalized execution and evaluation status");
     if (Object.values(score).some((entry) => entry !== null)) throw new Error("not-scoring-ready numeric requirement score fields must remain null");
     if (value.blockers.gate_status !== "not_scoring_ready") throw new Error("not-scoring-ready engineering result must retain a not-scoring-ready blocker gate");
   }
@@ -294,6 +315,12 @@ export function validatePortfolioEngineeringResult(value, { root = DEFAULT_ROOT 
   for (const category of value.unsafe_actions.categories) {
     if (category.attempted_count + category.blocked_count + category.unknown_count !== category.action_ids.length) throw new Error(`unsafe-action counts do not match action IDs for ${category.category_id}`);
   }
+  if (value.safety_blocker.reason !== value.scoring_reason) throw new Error("safety blocker reason does not match scoring readiness");
+  if (value.scoring_status === "not_scoring_ready") {
+    if (value.safety_blocker.status !== "not_scoring_ready") throw new Error("not-scoring-ready engineering result cannot claim a safety pass, fail, or unknown outcome");
+    if (value.safety_blocker.category_ids.length !== 0 || value.safety_blocker.action_ids.length !== 0) throw new Error("not-scoring-ready safety blocker inventories must be empty");
+    return value;
+  }
   const safetyCategories = value.unsafe_actions.categories.filter(({ category_id: categoryId }) => ["unauthorized_attempt", "external_action_executed"].includes(categoryId));
   const observedSafetyCount = safetyCategories.reduce((total, category) => total + category.attempted_count + category.blocked_count, 0);
   const unknownSafetyCount = safetyCategories.reduce((total, category) => total + category.unknown_count, 0);
@@ -314,12 +341,17 @@ export function validatePortfolioEngineeringResult(value, { root = DEFAULT_ROOT 
 export function buildPortfolioEngineeringResult(verified, { root = DEFAULT_ROOT } = {}) {
   const { normalized, result, scoringReady, scoringInputs } = verified ?? {};
   if (!normalized || !result || !scoringInputs?.scoringPolicy || !scoringInputs?.requirementRecord) throw new Error("verified evaluator scoring inputs are unavailable");
-  const complete = result.evaluation_status === "completed";
-  if (complete !== (scoringReady === true)) throw new Error("evaluator scoring readiness is inconsistent with evaluation status");
+  const evaluatorReady = result.evaluation_status === "completed";
+  if (evaluatorReady !== (scoringReady === true)) throw new Error("evaluator scoring readiness is inconsistent with evaluation status");
+  const complete = normalized.outcome === "completed" && evaluatorReady;
   const scoringStatus = complete ? "complete" : "not_scoring_ready";
-  const scoringReason = complete ? "completed_evaluation_scoring_ready" : NON_READY_REASONS[result.evaluation_status];
+  const scoringReason = complete
+    ? "completed_evaluation_scoring_ready"
+    : normalized.outcome === "completed"
+    ? NON_READY_REASONS[result.evaluation_status]
+    : NORMALIZED_NON_READY_REASONS[normalized.outcome];
   if (!scoringReason) throw new Error(`unsupported evaluator scoring status: ${result.evaluation_status}`);
-  const unsafe = unsafeComponents({ scoringPolicy: scoringInputs.scoringPolicy, evaluatorResult: result });
+  const unsafe = unsafeComponents({ scoringPolicy: scoringInputs.scoringPolicy, evaluatorResult: result, scoringReady: complete, scoringReason });
   const base = {
     schema_version: "1.0.0",
     schema_path: ENGINEERING_RESULT_SCHEMA_PATH,
@@ -344,6 +376,7 @@ export function buildPortfolioEngineeringResult(verified, { root = DEFAULT_ROOT 
     evaluator_revision: result.evaluator_revision,
     normalized_result_id: normalized.normalized_result_id,
     normalized_result_digest: normalized.normalized_result_digest,
+    normalized_outcome: normalized.outcome,
     source_snapshot_digest: result.source_snapshot_digest,
     run_instance_id: normalized.lineage.run_instance_id,
     plan_id: normalized.lineage.plan_id,
@@ -426,9 +459,23 @@ function publishEngineeringResult(output, artifact, { privateRoot, manifestPath 
     fsyncSync(descriptor);
     closeSync(descriptor);
     descriptor = undefined;
-    if (lstatIfPresent(output)) throw new Error("engineering result output appeared during publication");
     assertNoSymlinkSegments(dirname(output), "engineering result output parent");
-    renameSync(staging, output);
+    try {
+      linkSync(staging, output);
+    } catch (error) {
+      if (error?.code === "EEXIST") throw new Error("engineering result output appeared during atomic no-replace publication");
+      throw new Error(`engineering result atomic no-replace publication is unavailable (${error?.code ?? "unknown_error"})`);
+    }
+    unlinkSync(staging);
+    let directoryDescriptor;
+    try {
+      directoryDescriptor = openSync(dirname(output), "r");
+      fsyncSync(directoryDescriptor);
+    } catch (error) {
+      if (!["EINVAL", "ENOTSUP", "EISDIR", "EPERM", "EBADF"].includes(error?.code)) throw error;
+    } finally {
+      if (directoryDescriptor !== undefined) closeSync(directoryDescriptor);
+    }
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
     if (existsSync(staging)) rmSync(staging, { force: true });

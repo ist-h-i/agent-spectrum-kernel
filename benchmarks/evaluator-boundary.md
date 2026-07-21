@@ -96,7 +96,7 @@ node scripts/test-ask-benchmark-evaluator-boundary.mjs
 node scripts/test-ask-benchmark-portfolio-score.mjs
 ```
 
-The second command exercises `score-evaluator-result`, which reuses `verifyEvaluatorResult()` and writes one Schema-valid raw engineering result. It does not re-read the evaluator or normalized JSON after verification. The derived artifact keeps blocker and safety gates separate from the normalized requirement score and retains false positives, correctness, scope, mechanism, and overhead observations in native typed form. It performs no aggregate, comparison, repetition, severity conversion, penalty, mechanism credit, or practice-frequency weighting.
+The second command exercises `score-evaluator-result`, which reuses `verifyEvaluatorResult()` and writes one Schema-valid raw engineering result. It does not re-read the evaluator or normalized JSON after verification. The artifact retains the verified normalized outcome; only normalized `completed` can progress an otherwise scoring-ready evaluator result to a numeric score. Non-completed normalized execution keeps null score fields, and every non-ready result uses a non-ready safety state rather than inferring pass from absent findings. The derived artifact keeps blocker and safety gates separate from the normalized requirement score and retains false positives, correctness, scope, mechanism, unsafe-action counts, and overhead observations in native typed form. Publication is atomic no-replace through same-directory hard-link creation and has no overwrite fallback. It performs no aggregate, comparison, repetition, severity conversion, penalty, mechanism credit, or practice-frequency weighting.
 
 ## Responsibility and stop boundary
 

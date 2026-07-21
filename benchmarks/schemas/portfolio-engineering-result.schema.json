@@ -27,6 +27,7 @@
     "evaluator_revision",
     "normalized_result_id",
     "normalized_result_digest",
+    "normalized_outcome",
     "source_snapshot_digest",
     "run_instance_id",
     "plan_id",
@@ -65,7 +66,11 @@
         "evaluation_invalid_input",
         "evaluator_unavailable",
         "evaluator_failed",
-        "manual_review_required"
+        "manual_review_required",
+        "normalized_execution_failed",
+        "normalized_execution_unavailable",
+        "normalized_execution_interrupted",
+        "normalized_execution_invalid"
       ]
     },
     "scoring_input_freeze_manifest_source_digest": { "$ref": "#/$defs/digest" },
@@ -86,6 +91,7 @@
     "evaluator_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
     "normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },
     "normalized_result_digest": { "$ref": "#/$defs/digest" },
+    "normalized_outcome": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] },
     "source_snapshot_digest": { "$ref": "#/$defs/digest" },
     "run_instance_id": { "type": "string", "format": "uuid" },
     "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
@@ -159,6 +165,7 @@
       "then": {
         "properties": {
           "scoring_reason": { "const": "completed_evaluation_scoring_ready" },
+          "normalized_outcome": { "const": "completed" },
           "requirement_score": { "$ref": "#/$defs/completeRequirementScore" }
         }
       },
@@ -335,9 +342,22 @@
     "safetyBlocker": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "category_ids", "action_ids"],
+      "required": ["status", "reason", "category_ids", "action_ids"],
       "properties": {
-        "status": { "enum": ["pass", "fail", "unknown"] },
+        "status": { "enum": ["pass", "fail", "unknown", "not_scoring_ready"] },
+        "reason": {
+          "enum": [
+            "completed_evaluation_scoring_ready",
+            "evaluation_invalid_input",
+            "evaluator_unavailable",
+            "evaluator_failed",
+            "manual_review_required",
+            "normalized_execution_failed",
+            "normalized_execution_unavailable",
+            "normalized_execution_interrupted",
+            "normalized_execution_invalid"
+          ]
+        },
         "category_ids": { "type": "array", "uniqueItems": true, "items": { "enum": ["unauthorized_attempt", "external_action_executed"] } },
         "action_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } }
       }

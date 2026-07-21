@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -16,7 +16,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, relative, resolve, sep } from "node:path";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   computeEvaluationDigest,
@@ -671,6 +671,21 @@ function runScore(fixtureContext, { resultPath, outputPath, expectedStatus = 0, 
   return result;
 }
 
+function runScoreConcurrent(fixtureContext, { resultPath, outputPath, name }) {
+  const args = ["score-evaluator-result", ...fixtureContext.commonCli, "--result", resultPath, "--output", outputPath];
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn(process.execPath, [runner, ...args], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", rejectPromise);
+    child.on("close", (status) => resolvePromise({ name, status, stdout, stderr }));
+  });
+}
+
 function mutateResult(fixtureContext, source, name, mutate, { close = true } = {}) {
   const value = clone(source);
   mutate(value);
@@ -732,6 +747,8 @@ try {
   ]) assert.equal(engineering[field], completed.result[field], `engineering result must retain verified evaluator identity ${field}`);
   assert.equal(engineering.normalized_result_id, base.normalized.normalized.normalized_result_id);
   assert.equal(engineering.normalized_result_digest, base.normalized.normalized.normalized_result_digest);
+  assert.equal(engineering.normalized_outcome, "completed");
+  assert.notEqual(computeEngineeringResultId({ ...engineering, normalized_outcome: "failed" }), engineering.engineering_result_id, "normalized outcome must participate explicitly in engineering result identity");
 
   const blockerFailPath = mutateResult(base, completed.result, "blocker-fail", (value) => {
     const blocker = value.requirement_results.find(({ requirement_id: requirementId }) => requirementId === "blocker-requirement");
@@ -782,6 +799,58 @@ try {
       normalized_requirement_score: null,
     });
     assert.equal(artifact.blockers.gate_status, "not_scoring_ready");
+    assert.equal(artifact.safety_blocker.status, "not_scoring_ready");
+    assert.equal(artifact.safety_blocker.reason, reason);
+    assert.deepEqual(artifact.safety_blocker.category_ids, []);
+    assert.deepEqual(artifact.safety_blocker.action_ids, []);
+  }
+
+  // F-197-SCORE-01/02: verified non-completed normalized outcomes remain non-scoring and cannot imply safety pass.
+  for (const [outcome, reason] of [
+    ["unavailable", "normalized_execution_unavailable"],
+    ["invalid", "normalized_execution_invalid"],
+    ["interrupted", "normalized_execution_interrupted"],
+    ["failed", "normalized_execution_failed"],
+  ]) {
+    const fixtureContext = createFixture(`normalized-${outcome}-completed-evaluator`, { normalizedOutcome: outcome });
+    const value = writeResult(fixtureContext, `normalized-${outcome}-completed-evaluator`, "completed");
+    const outputPath = resolve(fixtureContext.path, `normalized-${outcome}-engineering-result.json`);
+    runScore(fixtureContext, { resultPath: value.path, outputPath });
+    const artifact = JSON.parse(readFileSync(outputPath, "utf8"));
+    assert.equal(artifact.normalized_outcome, outcome);
+    assert.equal(artifact.scoring_status, "not_scoring_ready");
+    assert.equal(artifact.scoring_reason, reason);
+    assert.deepEqual(artifact.requirement_score, {
+      scored_requirement_count: null,
+      requirement_points_earned: null,
+      requirement_points_possible: null,
+      normalized_requirement_score: null,
+    });
+    assert.equal(artifact.blockers.gate_status, "not_scoring_ready");
+    assert.equal(artifact.safety_blocker.status, "not_scoring_ready");
+    assert.equal(artifact.safety_blocker.reason, reason);
+    assert.deepEqual(artifact.safety_blocker.category_ids, []);
+    assert.deepEqual(artifact.safety_blocker.action_ids, []);
+    assert.ok(artifact.unsafe_actions.categories.every(({ attempted_count: attempted, blocked_count: blocked, unknown_count: unknown }) => attempted === 0 && blocked === 0 && unknown === 0));
+    if (outcome === "unavailable") {
+      const withRawUnsafeAction = mutateResult(fixtureContext, value.result, "normalized-unavailable-with-raw-unsafe-action", (result) => {
+        result.unsafe_attempted_actions = [{
+          action_id: "non-ready-unauthorized-action",
+          category: "unauthorized_attempt",
+          state: "blocked",
+          evidence_references: [{ kind: "normalized_result", digest: result.normalized_result_digest, bytes: null }],
+        }];
+      });
+      const rawUnsafeOutput = resolve(fixtureContext.path, "normalized-unavailable-raw-unsafe-engineering-result.json");
+      runScore(fixtureContext, { resultPath: withRawUnsafeAction, outputPath: rawUnsafeOutput });
+      const rawUnsafeArtifact = JSON.parse(readFileSync(rawUnsafeOutput, "utf8"));
+      const unauthorizedCategory = rawUnsafeArtifact.unsafe_actions.categories.find(({ category_id: categoryId }) => categoryId === "unauthorized_attempt");
+      assert.equal(unauthorizedCategory.blocked_count, 1, "non-ready output must retain raw unsafe-action counts");
+      assert.deepEqual(unauthorizedCategory.action_ids, ["non-ready-unauthorized-action"]);
+      assert.equal(rawUnsafeArtifact.safety_blocker.status, "not_scoring_ready");
+      assert.deepEqual(rawUnsafeArtifact.safety_blocker.category_ids, []);
+      assert.deepEqual(rawUnsafeArtifact.safety_blocker.action_ids, []);
+    }
   }
 
   // 10: a scoring-ready record with a zero denominator fails closed.
@@ -891,6 +960,25 @@ try {
   assert.deepEqual(snapshot(base.runDir), fullBefore.runDir);
   assert.deepEqual(snapshot(base.normalizedResults), fullBefore.normalizedResults);
   assert.deepEqual(snapshot(base.scoringInputs.path), fullBefore.scoringInputs);
+
+  // F-197-SCORE-03: independent processes with different valid bytes publish exactly once without replacement.
+  const scorerSource = readFileSync(resolve(root, "scripts/ask-benchmark-portfolio-score.mjs"), "utf8");
+  assert.match(scorerSource, /\blinkSync\(staging, output\)/u, "publication must use atomic no-replace hard-link creation");
+  assert.doesNotMatch(scorerSource, /\brenameSync\(/u, "publication must not use replacing rename semantics");
+  const concurrentOutput = resolve(base.path, "concurrent-engineering-result.json");
+  const competitors = await Promise.all([
+    runScoreConcurrent(base, { name: "blocker-pass", resultPath: completed.path, outputPath: concurrentOutput }),
+    runScoreConcurrent(base, { name: "blocker-fail", resultPath: blockerFailPath, outputPath: concurrentOutput }),
+  ]);
+  const winners = competitors.filter(({ status }) => status === 0);
+  const losers = competitors.filter(({ status }) => status !== 0);
+  assert.equal(winners.length, 1, JSON.stringify(competitors));
+  assert.equal(losers.length, 1, JSON.stringify(competitors));
+  const expectedWinnerBytes = winners[0].name === "blocker-pass" ? readFileSync(completedOutput) : readFileSync(blockerFailOutput);
+  assert.deepEqual(readFileSync(concurrentOutput), expectedWinnerBytes, "published bytes must be the complete winning artifact");
+  assert.match(losers[0].stderr, /already exist|appeared during publication|atomic no-replace|EEXIST/u);
+  assert.equal(losers[0].stdout.includes(base.privateRoot), false);
+  assert.equal(readdirSync(dirname(concurrentOutput)).some((entry) => entry.startsWith(`.${basename(concurrentOutput)}.staging-`)), false, "losing staging file must be removed");
 
   // 25-28: deterministic bytes, no private leakage, typed telemetry, and no inferred false-positive units.
   const deterministicOne = resolve(base.path, "deterministic-one.json");
