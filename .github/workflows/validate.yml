@@ -27,6 +27,9 @@ jobs:
       - name: Run portfolio policy tests
         run: node scripts/test-ask-benchmark-portfolio-policy.mjs
 
+      - name: Run portfolio design pre-admission tests
+        run: node scripts/test-ask-benchmark-design-admission.mjs
+
       - name: Run general benchmark tests
         run: node scripts/test-ask-benchmark.mjs
 

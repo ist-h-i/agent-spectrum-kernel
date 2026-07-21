@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio design admission manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "manifest_revision",
+    "design_lifecycle_state",
+    "catalog_revision",
+    "catalog_digest",
+    "policy_revision",
+    "policy_manifest_digest",
+    "admission_policy_digest",
+    "scoring_policy_digest",
+    "lineage_policy_digest",
+    "primary_fixture_count",
+    "calibration_fixture_count",
+    "records",
+    "digest_contract",
+    "manifest_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-design-admission-manifest.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio" },
+    "manifest_revision": { "const": "issue-205-checkpoint-b2a-r1" },
+    "design_lifecycle_state": { "const": "design_pending" },
+    "catalog_revision": { "const": "issue-205-checkpoint-1" },
+    "catalog_digest": { "$ref": "#/$defs/digest" },
+    "policy_revision": { "const": "issue-205-checkpoint-b1-r3" },
+    "policy_manifest_digest": { "$ref": "#/$defs/digest" },
+    "admission_policy_digest": { "$ref": "#/$defs/digest" },
+    "scoring_policy_digest": { "$ref": "#/$defs/digest" },
+    "lineage_policy_digest": { "$ref": "#/$defs/digest" },
+    "primary_fixture_count": { "const": 24 },
+    "calibration_fixture_count": { "const": 0 },
+    "records": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "items": { "$ref": "#/$defs/recordReference" }
+    },
+    "digest_contract": { "$ref": "#/$defs/digestContract" },
+    "manifest_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "recordReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_id", "record_path", "record_digest", "fixture_id"],
+      "properties": {
+        "record_id": { "$ref": "#/$defs/id" },
+        "record_path": { "type": "string", "pattern": "^benchmarks/portfolio-design-admission-records/[a-z0-9-]+\\.json$" },
+        "record_digest": { "$ref": "#/$defs/digest" },
+        "fixture_id": { "$ref": "#/$defs/id" }
+      }
+    },
+    "digestContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "canonicalization", "excluded_digest_field", "record_digests_included", "timestamp_in_digest_identity"],
+      "properties": {
+        "algorithm": { "const": "sha256" },
+        "canonicalization": { "const": "sorted_key_canonical_json" },
+        "excluded_digest_field": { "const": "manifest_digest" },
+        "record_digests_included": { "const": true },
+        "timestamp_in_digest_identity": { "const": false }
+      }
+    }
+  }
+}

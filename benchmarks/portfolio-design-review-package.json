@@ -1,0 +1,249 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-design-review-package.schema.json",
+  "program": "adaptive_ask_portfolio",
+  "package_revision": "issue-205-checkpoint-b2a-r1",
+  "design_manifest": {
+    "path": "benchmarks/portfolio-design-admission-manifest.json",
+    "digest": "sha256:42a1d0be4363c55ee0b433e59591e415e4008b24d4f03dc6c2dae5642b4c2d16"
+  },
+  "required_review_dimensions": [
+    "ordinary_engineering_wording",
+    "plain_fair_path",
+    "kernel_only_fair_path",
+    "mechanism_diversity",
+    "domain_realism",
+    "difficulty_realism",
+    "ask_vocabulary_cue_absence",
+    "answer_leakage_absence",
+    "output_contract_appropriateness",
+    "admission_gate_applicability",
+    "child_issue_ownership"
+  ],
+  "review_status_constraint": {
+    "generated_status": "pending_independent_review",
+    "generator_may_set_approved_or_rejected": false,
+    "generation_or_validation_counts_as_independent_review": false,
+    "reviewer_identity_required_for_terminal_review": true,
+    "review_record_digest_required_for_terminal_review": true
+  },
+  "records": [
+    {
+      "record_id": "design-hi-authorization-exception",
+      "record_path": "benchmarks/portfolio-design-admission-records/hi-authorization-exception.json",
+      "record_digest": "sha256:b9658a762ec7ea2641c77c657a60d4b66969cf6746312c64871096a8edb56ba1",
+      "fixture_id": "hi-authorization-exception",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-hi-external-action-approval",
+      "record_path": "benchmarks/portfolio-design-admission-records/hi-external-action-approval.json",
+      "record_digest": "sha256:0018e2c1da1264de77f78cd60bc44f27d6eadcd06972a0fac4967c719d19b5d1",
+      "fixture_id": "hi-external-action-approval",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-hi-financial-state-integrity",
+      "record_path": "benchmarks/portfolio-design-admission-records/hi-financial-state-integrity.json",
+      "record_digest": "sha256:06e3936b00b761b39312732dce4cccb5584e0112b81104dd2a127b2dedf3e468",
+      "fixture_id": "hi-financial-state-integrity",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-hi-versioned-migration-safety",
+      "record_path": "benchmarks/portfolio-design-admission-records/hi-versioned-migration-safety.json",
+      "record_digest": "sha256:4229e278bb6901c0d3dbdc48cec0b04c17109793ff094a64476b6d8f3335f317",
+      "fixture_id": "hi-versioned-migration-safety",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-mn-build-option-update",
+      "record_path": "benchmarks/portfolio-design-admission-records/mn-build-option-update.json",
+      "record_digest": "sha256:cbc47fd81319d2e9804f011a6f0b8524c73d1e0c2b0033f38fbfc55b660d49ae",
+      "fixture_id": "mn-build-option-update",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-mn-client-compatibility-fix",
+      "record_path": "benchmarks/portfolio-design-admission-records/mn-client-compatibility-fix.json",
+      "record_digest": "sha256:a5f9e0fb4e522e203f02158b04b9bc73c28413d6f4a83191675cf3ac58bf475a",
+      "fixture_id": "mn-client-compatibility-fix",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-mn-doc-config-correction",
+      "record_path": "benchmarks/portfolio-design-admission-records/mn-doc-config-correction.json",
+      "record_digest": "sha256:e8d7e17b9753c1757e0f5f517e57e9205dd86e1303b2c6add2a420d01b008b97",
+      "fixture_id": "mn-doc-config-correction",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-mn-focused-regression-test",
+      "record_path": "benchmarks/portfolio-design-admission-records/mn-focused-regression-test.json",
+      "record_digest": "sha256:e2082867ad97e7580e24ff2bc646c4aea7764fcf4215bd5af502763e2c2f7b3a",
+      "fixture_id": "mn-focused-regression-test",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-mn-frontend-default-fix",
+      "record_path": "benchmarks/portfolio-design-admission-records/mn-frontend-default-fix.json",
+      "record_digest": "sha256:192a977e33570d752cae7367722f592a5b4334ccda0452276c244ca4bc0fa67a",
+      "fixture_id": "mn-frontend-default-fix",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-mn-schema-field-alignment",
+      "record_path": "benchmarks/portfolio-design-admission-records/mn-schema-field-alignment.json",
+      "record_digest": "sha256:7ed94543c331bb617280f9a31dee370c26e201390fb5a87d3abb8662825d0342",
+      "fixture_id": "mn-schema-field-alignment",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-mp-accessibility-interaction-review",
+      "record_path": "benchmarks/portfolio-design-admission-records/mp-accessibility-interaction-review.json",
+      "record_digest": "sha256:56efd076d229598c0fae3b5c67fb8e0df6f4afaf9bd05a36e89ffb13921239cb",
+      "fixture_id": "mp-accessibility-interaction-review",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-mp-ci-evidence-gap",
+      "record_path": "benchmarks/portfolio-design-admission-records/mp-ci-evidence-gap.json",
+      "record_digest": "sha256:fc5cef362d445cbc3be313bc73f2533855340c32a6a7f0abd20a3bd366c7dc1f",
+      "fixture_id": "mp-ci-evidence-gap",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-mp-data-migration-handoff",
+      "record_path": "benchmarks/portfolio-design-admission-records/mp-data-migration-handoff.json",
+      "record_digest": "sha256:4f301ec080246d69ac6bdfbc1dd6dcea4eb2952bf3a75013621241e5ea104f02",
+      "fixture_id": "mp-data-migration-handoff",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-mp-frontend-state-review",
+      "record_path": "benchmarks/portfolio-design-admission-records/mp-frontend-state-review.json",
+      "record_digest": "sha256:c1b2eaf7792948fe6b3751f74eeaa9f915a6ccc38ef2ffdf46582b524b94c031",
+      "fixture_id": "mp-frontend-state-review",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-mp-iac-rollback-design",
+      "record_path": "benchmarks/portfolio-design-admission-records/mp-iac-rollback-design.json",
+      "record_digest": "sha256:cf988b54c32e7c2dbb5f5c8af78b8d86f0fd4387b40b417be7cfcd3843a80dba",
+      "fixture_id": "mp-iac-rollback-design",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-mp-performance-investigation",
+      "record_path": "benchmarks/portfolio-design-admission-records/mp-performance-investigation.json",
+      "record_digest": "sha256:3e155c7c81a4cc8ca40363f89f7b2f32138216c11cb98a479846c2ac1b55e36f",
+      "fixture_id": "mp-performance-investigation",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-pf-api-pagination-behavior",
+      "record_path": "benchmarks/portfolio-design-admission-records/pf-api-pagination-behavior.json",
+      "record_digest": "sha256:5018b4cfc70e63f6842042bdab90b676cf32015160a0384449fefdaa80f62044",
+      "fixture_id": "pf-api-pagination-behavior",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-pf-ci-cache-flake",
+      "record_path": "benchmarks/portfolio-design-admission-records/pf-ci-cache-flake.json",
+      "record_digest": "sha256:bd19f0333ca00b7ab4e93814baabc1fb1b83e038369a50513cc3507deeb93b0c",
+      "fixture_id": "pf-ci-cache-flake",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-pf-data-schema-evolution",
+      "record_path": "benchmarks/portfolio-design-admission-records/pf-data-schema-evolution.json",
+      "record_digest": "sha256:272ef5548231d1d92f2ebabbe14011d05c26c022a490391b5309c80d9edfdd5c",
+      "fixture_id": "pf-data-schema-evolution",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-pf-frontend-async-state",
+      "record_path": "benchmarks/portfolio-design-admission-records/pf-frontend-async-state.json",
+      "record_digest": "sha256:bcc1a34d6cfb580ff8a2b69768320c54551ce0859d6163b581e45fa8bf58f242",
+      "fixture_id": "pf-frontend-async-state",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-pf-library-compat-upgrade",
+      "record_path": "benchmarks/portfolio-design-admission-records/pf-library-compat-upgrade.json",
+      "record_digest": "sha256:012774c4d2d9b0730eb92d1d5200d4ff117843e0d36f6b799a33a7833f7cd667",
+      "fixture_id": "pf-library-compat-upgrade",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-pf-observability-redaction",
+      "record_path": "benchmarks/portfolio-design-admission-records/pf-observability-redaction.json",
+      "record_digest": "sha256:26b48dead816b0e9dae0d43b1630d1634d50a48bc70326061c4b2742e5956f92",
+      "fixture_id": "pf-observability-redaction",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-pf-performance-regression",
+      "record_path": "benchmarks/portfolio-design-admission-records/pf-performance-regression.json",
+      "record_digest": "sha256:3b474c55f8f399da5c3d8fe013ed690c5ab1b6bb30c6d610c778f24853637a1a",
+      "fixture_id": "pf-performance-regression",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    },
+    {
+      "record_id": "design-pf-review-error-contract",
+      "record_path": "benchmarks/portfolio-design-admission-records/pf-review-error-contract.json",
+      "record_digest": "sha256:d80b8b390cd77a6f0fb1880c695b46a7a867a9155e19a6ba1ee08bbc32ebe042",
+      "fixture_id": "pf-review-error-contract",
+      "reviewer_status": "pending_independent_review",
+      "reviewer_identity": null,
+      "review_record_digest": null
+    }
+  ],
+  "package_digest": "sha256:964bc599530b730af7e9a2c5f5179ab7810f645518ce8b60cbbfc7d18c593ca4"
+}
