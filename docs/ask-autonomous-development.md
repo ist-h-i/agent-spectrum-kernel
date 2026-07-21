@@ -18,7 +18,7 @@ It does not presume that Full ASK should be the default. It preserves Kernel-onl
 - 09:20 Asia/Tokyo (`00:20 UTC`): automatic PR-first development loop;
 - 17:20 Asia/Tokyo (`08:20 UTC`): review-preferred loop.
 
-The workflow can also be started with `workflow_dispatch` using `auto`, `review`, or `advance` mode.
+The workflow can also be started with `workflow_dispatch` using `auto`, `review`, or `advance` mode. Manual dispatch uses the same generation, validation, final-guard, and publication boundaries as scheduled execution; it is not a privileged bypass.
 
 Scheduled runs are disabled until the repository variable below is set:
 
@@ -34,7 +34,7 @@ Configure this repository secret:
 OPENAI_API_KEY
 ```
 
-The official `openai/codex-action` requires an API key. The key is supplied only to the Codex job through the action's protected Responses API proxy.
+The official `openai/codex-action` requires an API key. The key is supplied only to `codex_generate` through the action's protected Responses API proxy. That proxy boundary protects delivery of the API key to the action. Separately, repository validation runs in a different job with no OpenAI key, publication token, write permission, deployment secret, or environment secret. These are two independent guarantees.
 
 Optional:
 
@@ -78,19 +78,32 @@ The Issue order is intentionally dependency-bearing: later work does not begin w
 
 ### 3. Report a bounded failure
 
-If the Codex or validation job fails or is cancelled after a target has been selected, a separate token-bearing job posts or updates a status comment with the workflow-run evidence. It publishes no patch and performs no branch mutation.
+If generation or validation fails or is cancelled after a target has been selected, a separate token-bearing job posts or updates a status comment with the workflow-run evidence. It publishes an empty patch and performs no branch mutation.
 
 ## Privilege separation
 
-The workflow separates reasoning, code mutation, and GitHub publication.
+The workflow separates reasoning, untrusted repository execution, and GitHub publication.
 
-1. **Context job** — reads repository, Issue, PR, review, and check metadata.
-2. **Codex job** — receives no GitHub write token. It can edit only an isolated checkout and produces a Schema-valid result plus a patch.
-3. **Guard step** — rejects protected paths, binary/symlink changes, oversized patches, missing executed validation evidence, target drift, action/result mismatch, and whitespace errors.
-4. **Publish job** — receives the bounded GitHub token after Codex has finished. It applies the guarded patch, commits, pushes, creates or updates a Draft PR, posts status, and dispatches repository validation where permitted.
-5. **Failure reporter** — receives no patch and can only update the selected Issue/PR status when execution fails.
+1. **`context`** — read-only. It resolves `github.workflow_sha` once and records the identical control/workflow SHA, target mode and branch, exact target commit, exact base `main` commit, selected PR/Issue identity, run identity, and a canonical context digest.
+2. **`codex_generate`** — `contents: read` only. It checks out the control and target by exact SHA, gives Codex no GitHub write token, runs Codex in `workspace-write`, validates the raw result against the protected Schema, creates the binary patch, secret-scans patch/result fields, hashes context/result/patch, and uploads one raw artifact. After the Codex action, this job executes only trusted control-plane code; it does not execute `workspace/scripts/**`, tests, builds, or validators.
+3. **`validate_patch`** — `contents: read` only. It has no OpenAI key, publication token, Issue/PR write permission, contents write permission, deployment secret, or environment secret. It downloads the original raw artifact, verifies all bindings, applies the original patch to the exact target SHA, performs protected-path/binary/symlink/size/secret preflight, and runs the repository validation suite. After repository code has run, it checks out the control plane again at the same immutable SHA, re-downloads the original artifact, rechecks the working tree against that patch, and records a run/attempt-bound validation result.
+4. **`publish`** — the only patch-bearing job with GitHub write permission. It checks out the same exact control and target SHAs, independently downloads the original raw artifact and validation record, directly checks the GitHub validation-job conclusion, checks remote drift, applies the original patch to a fresh checkout, and recomputes the final guard. It does not accept a downloaded `guard.json` as authority. After the final guard it executes no model-changed repository code; only trusted git/GitHub publication operations remain.
+5. **`report_failure`** — publishes only a bounded failure status derived from the immutable context. It carries an empty patch and cannot update a branch, open a PR, merge, or close an Issue.
 
 Issue and PR text is treated as untrusted context data, not executable instruction.
+
+## Immutable identity and stale targets
+
+Every job uses the same exact `github.workflow_sha` as its control checkout. Per-job `ref: main` resolution is prohibited. PR maintenance records both the publication branch name and exact PR HEAD SHA; Issue advancement records `main` as the destination and binds both target/base identity to the exact selected `main` SHA. Branch names are publication destinations, never checkout identities for generation or validation.
+
+Publication checks the remote target before applying and again immediately before mutation:
+
+- a moved PR HEAD rejects an update before push;
+- a moved review-only PR receives only a trusted stale-review status containing the reviewed and current HEADs, with no generated verdict/comment;
+- a moved Issue base rejects remote branch and PR creation;
+- a moved control branch does not change the control plane because every job remains pinned to the recorded workflow SHA.
+
+The final guard binds Schema version, control/workflow/target/base SHAs, context/result/patch SHA-256 values, changed paths, additions, deletions, total changed lines, validation run ID/attempt/status, and its own canonical digest.
 
 ## Hard boundaries
 
@@ -99,6 +112,7 @@ The automation cannot intentionally:
 - merge a PR or enable auto-merge;
 - close an Issue;
 - modify its own workflow, prompt, result Schema, or control scripts;
+- modify any directly executed repository validation entrypoint, including the autonomous, repository, portfolio, benchmark, evaluator-boundary, and adapter-bundle test/validation scripts;
 - modify `benchmarks/results/**` or private evaluator paths;
 - commit secrets, keys, binary files, or symlinks;
 - run or authorize measured benchmark, pilot, human-evaluation, release, deployment, production migration, billing, or external notification actions;
@@ -122,17 +136,40 @@ Each run is limited to:
 
 The Codex result must list the exact ASCII-ordered changed path set. A changed run must also report at least one validation command that Codex actually executed. The guard independently compares these claims with the working tree.
 
+## Secret scanning
+
+The protected scanner rejects secret-like material in the complete patch bytes and model-controlled outbound fields: summary, rationale, PR title/body, Issue/review comments, `tests_run`, `risks`, branch name, and commit message. It detects private-key headers, common GitHub/OpenAI/AWS credential forms, bearer/authorization credentials, explicit password/secret/token/API-key assignments, credential URLs, NUL/invalid control bytes, and abnormally large single lines.
+
+Findings contain only category, artifact/field, repository path when available, line, and byte range. The matched value and private evaluator text are never copied into scanner diagnostics. Source and outbound text are rejected; source code is never silently redacted.
+
+This is a bounded pattern scanner, not proof that arbitrary novel credential formats or semantically disguised secrets are absent. Credentials must still never be placed in prompts, Issues, PRs, artifacts, or repository files.
+
 ## Validation
 
-The automation runs:
+The secret-free `validate_patch` job runs:
 
 - syntax checks for changed `.mjs` files;
-- `node scripts/test-ask-autonomous-development.mjs` from the protected control checkout;
+- `node scripts/test-ask-autonomous-development.mjs` from the protected target checkout;
 - `node scripts/test-validate-repo.mjs` in the development checkout;
+- the catalog, policy, design-admission, independent-design-review, general benchmark, execution, normalized-result, and evaluator-boundary control tests;
+- `node scripts/adapter-runtime-bundle.mjs --check`;
 - `node scripts/validate-repo.mjs`;
 - `git diff --check`.
 
 Codex may run additional focused tests and must report only commands it actually executed.
+
+All directly executed control and repository validation entrypoints are protected from automation patches. Work that requires changing one of these trust anchors must return `blocked` for a human-managed PR.
+
+## Action pin maintenance
+
+Every external Action in the high-privilege automation workflow is pinned to an approved 40-character commit SHA and carries the resolved release tag as a version comment. `scripts/validate-repo.mjs` rejects mutable tags, short SHAs, unknown Actions, unreviewed commits, and missing/mismatched version comments.
+
+To update a pin:
+
+1. Read the upstream release notes and compatibility requirements, including the bundled Node runtime and minimum runner version.
+2. Resolve the release tag through the GitHub API (`/repos/{owner}/{repo}/git/ref/tags/{tag}`); if it is an annotated tag, dereference its tag object to the commit. Do not use a release asset/blob SHA or a guessed revision.
+3. Review the action diff and update both the workflow line (`uses: owner/action@<commit> # <tag>`) and `APPROVED_ASK_AUTOMATION_ACTION_PINS` in `scripts/validate-repo.mjs`.
+4. Run the autonomous control tests, repository validation tests, repository validator, and a manual dry-run while scheduled execution remains disabled.
 
 ## Publication semantics
 
@@ -156,9 +193,9 @@ A single status comment marked with `ask-autonomous-development-status` is updat
 
 1. Add `OPENAI_API_KEY`.
 2. Optionally add `ASK_AUTOMATION_GITHUB_TOKEN`.
-3. Set repository variable `ASK_AUTOMATION_ENABLED` to `true`.
-4. Run the workflow once with `workflow_dispatch` in `review` mode.
-5. Inspect the generated review/status before relying on the schedule.
+3. Keep `ASK_AUTOMATION_ENABLED` unset or false.
+4. Run one manual dry-run with `workflow_dispatch` in `review` mode and inspect target/control bindings, artifacts, validation, stale-target behavior, and the resulting bounded status.
+5. Only after the dry-run is reviewed, set `ASK_AUTOMATION_ENABLED` to `true` if scheduled operation is explicitly approved.
 
 ### Pause
 
