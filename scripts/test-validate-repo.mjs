@@ -267,6 +267,8 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/schemas/portfolio-scoring-policy.schema.json",
     "benchmarks/schemas/portfolio-lineage-policy.schema.json",
     "benchmarks/schemas/portfolio-requirement-record.schema.json",
+    "benchmarks/schemas/portfolio-final-admission-record.schema.json",
+    "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
     "benchmarks/schemas/portfolio-output-contract.schema.json",
     "benchmarks/schemas/portfolio-lineage-record.schema.json",
     "benchmarks/schemas/portfolio-classification-record.schema.json",

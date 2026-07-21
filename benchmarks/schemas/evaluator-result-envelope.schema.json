@@ -7,6 +7,8 @@
     "schema_version",
     "schema_path",
     "program",
+    "scoring_input_freeze_manifest_source_digest",
+    "scoring_input_freeze_manifest_digest",
     "catalog_digest",
     "policy_manifest_digest",
     "scoring_policy_digest",
@@ -57,6 +59,8 @@
     "schema_version": { "const": "1.0.0" },
     "schema_path": { "const": "benchmarks/schemas/evaluator-result-envelope.schema.json" },
     "program": { "const": "adaptive_ask_evaluator_result" },
+    "scoring_input_freeze_manifest_source_digest": { "$ref": "#/$defs/digest" },
+    "scoring_input_freeze_manifest_digest": { "$ref": "#/$defs/digest" },
     "catalog_digest": { "$ref": "#/$defs/digest" },
     "policy_manifest_digest": { "$ref": "#/$defs/digest" },
     "scoring_policy_digest": { "$ref": "#/$defs/digest" },
@@ -168,7 +172,13 @@
         "matched_equivalence_class_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
         "finding_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
         "evidence_references": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "outcome": { "enum": ["pass", "fail", "partial"] } }, "required": ["outcome"] },
+          "then": { "properties": { "evidence_references": { "minItems": 1 } } }
+        }
+      ]
     },
     "finding": {
       "type": "object",

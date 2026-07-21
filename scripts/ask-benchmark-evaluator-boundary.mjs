@@ -16,7 +16,18 @@ import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
+import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import {
+  computeFinalAdmissionRecordDigest,
+  computeOutputContractDigest,
+  computePolicyManifestDigest,
+  computeRequirementRecordDigest,
+  computeRequirementSetDigest,
+  computeScoringInputFreezeManifestDigest,
+  computeScoringPolicyDigest,
+  FINAL_ADMISSION_RECORD_SCHEMA_PATH,
+  SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH,
+  validateFinalAdmissionRecordContract,
   validateRequirementRecordContract,
   validateScoringContractSchemaParity,
   validateScoringInputBindings,
@@ -28,6 +39,8 @@ export const EVALUATOR_RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result
 const CATALOG_SCHEMA_PATH = "benchmarks/schemas/portfolio-catalog.schema.json";
 const POLICY_MANIFEST_SCHEMA_PATH = "benchmarks/schemas/portfolio-policy-manifest.schema.json";
 const SCORING_POLICY_SCHEMA_PATH = "benchmarks/schemas/portfolio-scoring-policy.schema.json";
+const ADMISSION_POLICY_SCHEMA_PATH = "benchmarks/schemas/portfolio-admission-policy.schema.json";
+const ADMISSION_POLICY_PATH = "benchmarks/portfolio-admission-policy.json";
 const REQUIREMENT_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-requirement-record.schema.json";
 const OUTPUT_CONTRACT_SCHEMA_PATH = "benchmarks/schemas/portfolio-output-contract.schema.json";
 
@@ -295,6 +308,73 @@ function assertNoDuplicateJsonObjectKeys(source, label) {
   if (offset !== source.length) throw new Error(`${label} contains trailing JSON content`);
 }
 
+function rawByteDigest(bytes) {
+  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function checkedInBytes(root, relativePath) {
+  try {
+    const repositoryTop = realpathSync(execFileSync("git", ["-C", root, "rev-parse", "--show-toplevel"], { encoding: "utf8", maxBuffer: 1024 * 1024 }).trim());
+    if (repositoryTop !== root) return null;
+    return execFileSync("git", ["-C", root, "show", `HEAD:${relativePath}`], { encoding: null, maxBuffer: 2 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+  } catch {
+    return null;
+  }
+}
+
+function resolveAuthorityArtifactPath(authorityRoot, relativePath, label) {
+  assertPortableRelativePath(relativePath, `${label} path`);
+  const absolutePath = resolve(authorityRoot, relativePath);
+  if (!isInside(authorityRoot, absolutePath)) throw new Error(`${label} path escapes the authority root`);
+  let current = authorityRoot;
+  for (const segment of relativePath.split("/")) {
+    current = resolve(current, segment);
+    if (!existsSync(current)) throw new Error(`${label} is missing`);
+    if (lstatSync(current).isSymbolicLink()) throw new Error(`${label} path must not traverse a symlink`);
+  }
+  if (!lstatSync(absolutePath).isFile()) throw new Error(`${label} must be a regular file`);
+  if (!isInside(authorityRoot, realpathSync(absolutePath))) throw new Error(`${label} path escapes the authority root`);
+  return absolutePath;
+}
+
+function authorityRelativePathForSupplied(authorityRoot, suppliedPath, label) {
+  if (!suppliedPath) throw new Error(`${label} path is required for scoring input authority closure`);
+  const relativePath = relative(authorityRoot, resolve(suppliedPath)).split(sep).join("/");
+  assertPortableRelativePath(relativePath, `${label} path`);
+  const authoritativePath = resolveAuthorityArtifactPath(authorityRoot, relativePath, label);
+  if (resolve(suppliedPath) !== authoritativePath) throw new Error(`${label} supplied path does not match its authority path`);
+  return { authoritativePath, relativePath };
+}
+
+function readAnchoredFreezeManifest({ root, freezeManifestPath, freezeManifestSourceDigest }) {
+  const authorityRoot = assertRealDirectory(root, "scoring input authority root");
+  const { authoritativePath, relativePath } = authorityRelativePathForSupplied(authorityRoot, freezeManifestPath, "scoring input freeze manifest");
+  const source = readJsonArtifact(authoritativePath, "scoring input freeze manifest", { publicArtifact: true });
+  const sourceDigest = rawByteDigest(source.bytes);
+  const committed = checkedInBytes(authorityRoot, relativePath);
+  const matchesCheckedInBytes = committed !== null && Buffer.compare(source.bytes, committed) === 0;
+  if (!matchesCheckedInBytes) {
+    if (!/^sha256:[a-f0-9]{64}$/u.test(freezeManifestSourceDigest ?? "")) {
+      throw new Error("scoring input freeze manifest requires checked-in bytes or an explicitly approved immutable source digest");
+    }
+    if (freezeManifestSourceDigest !== sourceDigest) throw new Error("scoring input freeze manifest raw-byte digest does not match the approved immutable source digest");
+  }
+  assertBenchmarkSchemaInstance(source.value, { schemaPath: resolve(root, SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH), label: "scoring input freeze manifest" });
+  assertPublicArtifactTree(source.value, "scoring input freeze manifest");
+  if (source.value.manifest_digest !== computeScoringInputFreezeManifestDigest(source.value)) throw new Error("scoring input freeze manifest digest closure is invalid");
+  return { authorityRoot, manifest: source.value, manifestPath: authoritativePath, manifestRelativePath: relativePath, sourceDigest };
+}
+
+function readFrozenJsonArtifact({ authorityRoot, root, reference, suppliedPath, schemaPath, label, publicArtifact = false }) {
+  const authoritativePath = resolveAuthorityArtifactPath(authorityRoot, reference.path, label);
+  if (!suppliedPath || resolve(suppliedPath) !== authoritativePath) throw new Error(`${label} supplied path does not match the freeze manifest authority path`);
+  const source = readJsonArtifact(authoritativePath, label, { publicArtifact });
+  if (rawByteDigest(source.bytes) !== reference.raw_byte_digest) throw new Error(`${label} raw-byte digest does not match the scoring input freeze manifest`);
+  assertBenchmarkSchemaInstance(source.value, { schemaPath: resolve(root, schemaPath), label });
+  if (publicArtifact) assertPublicArtifactTree(source.value, label);
+  return { ...source, absolutePath: authoritativePath };
+}
+
 function looksLikePrivatePathOrUri(value) {
   return posix.isAbsolute(value)
     || win32.isAbsolute(value)
@@ -399,6 +479,8 @@ export function computeEvaluatorReferenceDigest(reference) {
 
 export function computeEvaluationId(result) {
   return `evaluation-${canonicalDigest({
+    scoring_input_freeze_manifest_source_digest: result.scoring_input_freeze_manifest_source_digest,
+    scoring_input_freeze_manifest_digest: result.scoring_input_freeze_manifest_digest,
     catalog_digest: result.catalog_digest,
     policy_manifest_digest: result.policy_manifest_digest,
     scoring_policy_digest: result.scoring_policy_digest,
@@ -572,37 +654,84 @@ function readNormalizedRecord({ verified, result }) {
   return record;
 }
 
-function readScoringInputSources({ root, catalogPath, policyManifestPath, scoringPolicyPath, requirementRecordPath, outputContractPath }) {
+function readScoringInputSources({
+  root,
+  catalogPath,
+  policyManifestPath,
+  scoringPolicyPath,
+  admissionRecordPath,
+  requirementRecordPath,
+  outputContractPath,
+  referencePath,
+  freezeManifestPath,
+  freezeManifestSourceDigest,
+}) {
   for (const [path, label] of [
     [catalogPath, "portfolio catalog"],
     [policyManifestPath, "portfolio policy manifest"],
     [scoringPolicyPath, "portfolio scoring policy"],
+    [admissionRecordPath, "authoritative final admission record"],
     [requirementRecordPath, "authoritative requirement record"],
     [outputContractPath, "authoritative output contract"],
+    [referencePath, "authoritative evaluator public reference"],
+    [freezeManifestPath, "scoring input freeze manifest"],
   ]) {
     if (!path) throw new Error(`${label} path is required for scoring input closure`);
   }
-  const catalog = readJsonArtifact(catalogPath, "portfolio catalog").value;
-  const policyManifest = readJsonArtifact(policyManifestPath, "portfolio policy manifest").value;
-  const scoringPolicy = readJsonArtifact(scoringPolicyPath, "portfolio scoring policy").value;
-  const requirementRecord = readJsonArtifact(requirementRecordPath, "authoritative requirement record", { publicArtifact: true }).value;
-  const outputContract = readJsonArtifact(outputContractPath, "authoritative output contract", { publicArtifact: true }).value;
+  const freeze = readAnchoredFreezeManifest({ root, freezeManifestPath, freezeManifestSourceDigest });
+  const { authorityRoot, manifest: freezeManifest } = freeze;
+  const catalogSource = readFrozenJsonArtifact({ authorityRoot, root, reference: freezeManifest.catalog, suppliedPath: catalogPath, schemaPath: CATALOG_SCHEMA_PATH, label: "portfolio catalog" });
+  const policyManifestSource = readFrozenJsonArtifact({ authorityRoot, root, reference: freezeManifest.policy_manifest, suppliedPath: policyManifestPath, schemaPath: POLICY_MANIFEST_SCHEMA_PATH, label: "portfolio policy manifest" });
+  const scoringPolicySource = readFrozenJsonArtifact({ authorityRoot, root, reference: freezeManifest.scoring_policy, suppliedPath: scoringPolicyPath, schemaPath: SCORING_POLICY_SCHEMA_PATH, label: "portfolio scoring policy" });
+  const admissionRecordSource = readFrozenJsonArtifact({ authorityRoot, root, reference: freezeManifest.admission_record, suppliedPath: admissionRecordPath, schemaPath: FINAL_ADMISSION_RECORD_SCHEMA_PATH, label: "authoritative final admission record", publicArtifact: true });
+  const requirementRecordSource = readFrozenJsonArtifact({ authorityRoot, root, reference: freezeManifest.requirement_record, suppliedPath: requirementRecordPath, schemaPath: REQUIREMENT_RECORD_SCHEMA_PATH, label: "authoritative requirement record", publicArtifact: true });
+  const outputContractSource = readFrozenJsonArtifact({ authorityRoot, root, reference: freezeManifest.output_contract, suppliedPath: outputContractPath, schemaPath: OUTPUT_CONTRACT_SCHEMA_PATH, label: "authoritative output contract", publicArtifact: true });
+  const evaluatorReferenceSource = readFrozenJsonArtifact({ authorityRoot, root, reference: freezeManifest.evaluator_public_reference, suppliedPath: referencePath, schemaPath: EVALUATOR_REFERENCE_SCHEMA_PATH, label: "authoritative evaluator public reference", publicArtifact: true });
+  const catalog = catalogSource.value;
+  const policyManifest = policyManifestSource.value;
+  const scoringPolicy = scoringPolicySource.value;
+  const admissionRecord = admissionRecordSource.value;
+  const requirementRecord = requirementRecordSource.value;
+  const outputContract = outputContractSource.value;
+  const evaluatorReference = evaluatorReferenceSource.value;
   const requirementRecordSchema = readJsonArtifact(resolve(root, REQUIREMENT_RECORD_SCHEMA_PATH), "requirement record Schema").value;
   const evaluatorResultSchema = readJsonArtifact(resolve(root, EVALUATOR_RESULT_SCHEMA_PATH), "evaluator result Schema").value;
+  const admissionPolicy = readJsonArtifact(resolve(root, ADMISSION_POLICY_PATH), "portfolio admission policy").value;
+  assertBenchmarkSchemaInstance(admissionPolicy, { schemaPath: resolve(root, ADMISSION_POLICY_SCHEMA_PATH), label: "portfolio admission policy" });
 
-  for (const [value, schemaPath, label] of [
-    [catalog, CATALOG_SCHEMA_PATH, "portfolio catalog"],
-    [policyManifest, POLICY_MANIFEST_SCHEMA_PATH, "portfolio policy manifest"],
-    [scoringPolicy, SCORING_POLICY_SCHEMA_PATH, "portfolio scoring policy"],
-    [requirementRecord, REQUIREMENT_RECORD_SCHEMA_PATH, "authoritative requirement record"],
-    [outputContract, OUTPUT_CONTRACT_SCHEMA_PATH, "authoritative output contract"],
-  ]) assertBenchmarkSchemaInstance(value, { schemaPath: resolve(root, schemaPath), label });
-  assertPublicArtifactTree(requirementRecord, "authoritative requirement record");
-  assertPublicArtifactTree(outputContract, "authoritative output contract");
+  validatePortfolioPolicyArtifacts({ root, catalogPath, policyManifestPath, scoringPolicyPath });
   if (catalog.catalog_digest !== computePortfolioCatalogDigest(catalog)) throw new Error("portfolio catalog digest closure is invalid");
+  if (freezeManifest.catalog.semantic_digest !== catalog.catalog_digest) throw new Error("portfolio catalog semantic digest does not match the scoring input freeze manifest");
+  if (freezeManifest.policy_manifest.semantic_digest !== computePolicyManifestDigest(policyManifest)) throw new Error("portfolio policy manifest semantic digest does not match the scoring input freeze manifest");
+  if (freezeManifest.scoring_policy.semantic_digest !== computeScoringPolicyDigest(scoringPolicy)) throw new Error("portfolio scoring policy semantic digest does not match the scoring input freeze manifest");
+  if (freezeManifest.admission_record.semantic_digest !== computeFinalAdmissionRecordDigest(admissionRecord)) throw new Error("final admission record semantic digest does not match the scoring input freeze manifest");
+  if (freezeManifest.requirement_record.record_digest !== computeRequirementRecordDigest(requirementRecord) || freezeManifest.requirement_record.set_digest !== computeRequirementSetDigest(requirementRecord)) throw new Error("requirement record digest closure does not match the scoring input freeze manifest");
+  if (freezeManifest.output_contract.semantic_digest !== computeOutputContractDigest(outputContract)) throw new Error("output contract semantic digest does not match the scoring input freeze manifest");
+  if (freezeManifest.evaluator_public_reference.semantic_digest !== computeEvaluatorReferenceDigest(evaluatorReference)) throw new Error("evaluator public reference semantic digest does not match the scoring input freeze manifest");
   validateScoringContractSchemaParity({ scoringPolicy, requirementRecordSchema, evaluatorResultSchema });
+  validateFinalAdmissionRecordContract({
+    admissionPolicy,
+    admissionRecord,
+    finalAdmissionRecordSchema: readJsonArtifact(resolve(root, FINAL_ADMISSION_RECORD_SCHEMA_PATH), "final admission record Schema").value,
+  });
   validateRequirementRecordContract({ scoringPolicy, requirementRecord, requirementRecordSchema, evaluatorResultSchema });
-  return { catalog, policyManifest, scoringPolicy, requirementRecord, outputContract };
+  if (policyManifest.scoring_policy?.path !== freezeManifest.scoring_policy.path) throw new Error("policy manifest scoring policy path does not match the freeze manifest authority path");
+  if (requirementRecord.requirement_record_path !== freezeManifest.requirement_record.path) throw new Error("requirement record internal path does not match the freeze manifest authority path");
+  if (outputContract.output_contract_path !== freezeManifest.output_contract.path) throw new Error("output contract internal path does not match the freeze manifest authority path");
+  if (outputContract.evaluator_public_reference_path !== freezeManifest.evaluator_public_reference.path) throw new Error("output contract evaluator reference path does not match the freeze manifest authority path");
+  const fixture = catalog.fixtures.find(({ fixture_id }) => fixture_id === freezeManifest.fixture_id);
+  if (!fixture) throw new Error("scoring input freeze fixture is absent from the authoritative catalog");
+  if ([admissionRecord.fixture_id, requirementRecord.fixture_id, outputContract.fixture_id, evaluatorReference.fixture_id].some((fixtureId) => fixtureId !== freezeManifest.fixture_id)) throw new Error("scoring input freeze fixture identity does not close across authoritative artifacts");
+  if (admissionRecord.input_manifest_digest !== freezeManifest.fixture_input_digest || evaluatorReference.fixture_input_digest !== freezeManifest.fixture_input_digest) throw new Error("scoring input freeze fixture input digest does not close across authoritative artifacts");
+  if (admissionRecord.catalog_digest !== catalog.catalog_digest) throw new Error("final admission record catalog digest does not match the freeze authority catalog");
+  if (admissionRecord.evaluator_bundle_id !== evaluatorReference.evaluator_bundle_id || admissionRecord.evaluator_bundle_digest !== evaluatorReference.evaluator_bundle_digest) throw new Error("final admission record evaluator identity does not match the authoritative public reference");
+  if (admissionRecord.evaluator_requirement_count !== requirementRecord.requirements.length) throw new Error("final admission record requirement count does not match the authoritative requirement record");
+  const expectedEvidenceMapIds = requirementRecord.requirements.flatMap(({ evidence_map_ids }) => evidence_map_ids).sort();
+  const expectedMutationSetIds = requirementRecord.requirements.flatMap(({ mutation_ids }) => mutation_ids).sort();
+  if (stableCanonicalJson([...admissionRecord.evidence_map_ids].sort()) !== stableCanonicalJson(expectedEvidenceMapIds)) throw new Error("final admission evidence-map inventory does not match the authoritative requirement record");
+  if (stableCanonicalJson([...admissionRecord.mutation_set_ids].sort()) !== stableCanonicalJson(expectedMutationSetIds)) throw new Error("final admission mutation-set inventory does not match the authoritative requirement record");
+  if (requirementRecord.admission_record_digest !== admissionRecord.admission_digest) throw new Error("requirement record admission digest was not re-derived from the authoritative final admission record");
+  return { freezeManifest, freezeManifestSourceDigest: freeze.sourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference };
 }
 
 function assertBoundaryRootLineage(bundle, verified) {
@@ -634,8 +763,11 @@ export function verifyEvaluatorResult({
   catalogPath,
   policyManifestPath,
   scoringPolicyPath,
+  admissionRecordPath,
   requirementRecordPath,
   outputContractPath,
+  scoringInputFreezeManifestPath,
+  scoringInputFreezeManifestSourceDigest = null,
   referencePath,
   privateRoot,
   manifestPath,
@@ -652,7 +784,19 @@ export function verifyEvaluatorResult({
   assertBenchmarkSchemaInstance(result, { schemaPath: resolve(root, EVALUATOR_RESULT_SCHEMA_PATH), label: "evaluator result envelope" });
   assertPublicArtifactTree(result, "evaluator result envelope");
   assertResultCollectionIdentity(result);
-  const scoringInputs = readScoringInputSources({ root, catalogPath, policyManifestPath, scoringPolicyPath, requirementRecordPath, outputContractPath });
+  const scoringInputs = readScoringInputSources({
+    root,
+    catalogPath,
+    policyManifestPath,
+    scoringPolicyPath,
+    admissionRecordPath,
+    requirementRecordPath,
+    outputContractPath,
+    referencePath,
+    freezeManifestPath: scoringInputFreezeManifestPath,
+    freezeManifestSourceDigest: scoringInputFreezeManifestSourceDigest,
+  });
+  if (stableCanonicalJson(scoringInputs.evaluatorReference) !== stableCanonicalJson(bundle.reference)) throw new Error("private bundle evaluator reference does not match the scoring input freeze authority reference");
 
   const verified = verifyNormalizedPortfolioResults({
     root,
@@ -688,7 +832,6 @@ export function verifyEvaluatorResult({
   }
   const scoring = validateScoringInputBindings({
     ...scoringInputs,
-    evaluatorReference: bundle.reference,
     normalizedResult: normalized,
     evaluatorResult: result,
   });

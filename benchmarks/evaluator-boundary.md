@@ -1,6 +1,6 @@
 # Adaptive ASK Evaluator Isolation Boundary
 
-Status: Issue #204 boundary checkpoint plus Issue #205 Checkpoint B3 scoring-input closure; both Issues remain open
+Status: Issue #204 boundary checkpoint plus Issue #205 Checkpoint B3 scoring-input authority closure; both Issues remain open
 
 This checkpoint defines the answer-free exchange boundary between normalized execution evidence and a private evaluator package. It does not create the 24 evaluator packages, admit clean fixtures, define scoring semantics, execute an evaluator, or authorize measured execution.
 
@@ -29,7 +29,9 @@ The manifest is part of the bundle closure but is not listed as an evaluator ass
 - `evaluator_bundle_id`: SHA-256 over `schema_version`, `schema_path`, `fixture_identity`, `input_identity`, and the deterministically ordered complete `asset_inventory`.
 - `evaluator_bundle_digest`: SHA-256 over the sorted-key canonical JSON of the complete manifest with only `evaluator_bundle_digest` omitted. This includes the derived bundle ID, generator, independence and review provenance, capabilities, boundaries, and every asset digest and byte count.
 
-`evaluator-result-envelope.schema.json` is the public exchange form consumed by the future scoring engine. It binds the catalog, policy manifest, scoring policy, admission record, authoritative requirement record/set, output contract, public evaluator reference, normalized result, run, plan, fixture input, case, attempt, adapter, condition, repetition, normalized source snapshot, evaluator bundle, and evaluator revision. Requirement results retain only the requirement ID, `pass`/`fail`/`partial` or an explicit non-scoring state, earned points, matched equivalence-class IDs, finding IDs, and digest/byte evidence references. This checkpoint validates frozen points and partial-credit constraints but calculates no score or aggregate.
+`scoring-input-freeze-manifest.schema.json` is the authority artifact for one fixture/input pair. It binds repository-relative paths plus raw-byte and semantic digests for the catalog, policy manifest, scoring policy, final admission record, requirement record/set, output contract, and public evaluator reference. The manifest itself has a freeze revision and a self-excluding semantic digest. Its exact bytes must either match `HEAD` or an explicitly approved immutable source digest. Every path is resolved below the real repository authority root, and path escape, symlink traversal, non-regular files, a caller path that differs from the frozen authority path, or an internal `*_path` that differs from the resolved authority path fails closed. This checkpoint adds only the final-admission record Schema and synthetic contract evidence; it does not create a real fixture admission record.
+
+`evaluator-result-envelope.schema.json` is the public exchange form consumed by the future scoring engine. It binds both the approved raw source digest and semantic digest of the scoring-input freeze manifest, plus the catalog, policy manifest, scoring policy, admission record, authoritative requirement record/set, output contract, public evaluator reference, normalized result, run, plan, fixture input, case, attempt, adapter, condition, repetition, normalized source snapshot, evaluator bundle, and evaluator revision. Requirement results retain only the requirement ID, `pass`/`fail`/`partial` or an explicit non-scoring state, earned points, matched equivalence-class IDs, finding IDs, and digest/byte evidence references. Every scored outcome requires at least one valid evidence reference in both JSON Schema and semantic validation. This checkpoint validates frozen points and partial-credit constraints but calculates no score or aggregate.
 
 `evaluation_id` is derived from the scoring-input digests, normalized result ID/digest, evaluator bundle ID/digest, and evaluator revision. `evaluation_digest` covers the complete result envelope with only `evaluation_digest` omitted. A completed evaluation is scoring-ready only after it covers the authoritative requirement set exactly and every requirement outcome satisfies the frozen points contract. Non-completed, unavailable, manual-review, and not-evaluated states remain non-scoring and are never converted to zero. Findings retain only bounded public IDs, categories, severities, and digest/byte evidence references. Oracle, rubric, hidden-test, matcher, reference-answer, expected-patch, raw evaluator prompt, private path, credentials, secrets, customer data, and personal data fields are not part of the closed Schema.
 
@@ -56,8 +58,11 @@ node scripts/ask-benchmark.mjs verify-evaluator-result \
   --private-root /path/to/private-evaluator-root \
   --manifest /path/to/private-evaluator-root/private-evaluator-bundle.json \
   --result /path/to/public-evaluator-result.json \
+  --admission-record /path/to/public-final-admission-record.json \
   --requirement-record /path/to/public-requirement-record.json \
   --output-contract /path/to/public-output-contract.json \
+  --scoring-input-freeze /path/to/scoring-input-freeze-manifest.json \
+  --scoring-input-freeze-source-digest sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
   --materialized /path/to/materialized-root \
   --selection-state /path/to/selection-state-root \
   --run-dir /path/to/execution-run-root \
@@ -68,8 +73,11 @@ node scripts/ask-benchmark.mjs verify-evaluator-boundary \
   --private-root /path/to/private-evaluator-root \
   --manifest /path/to/private-evaluator-root/private-evaluator-bundle.json \
   --result /path/to/public-evaluator-result.json \
+  --admission-record /path/to/public-final-admission-record.json \
   --requirement-record /path/to/public-requirement-record.json \
   --output-contract /path/to/public-output-contract.json \
+  --scoring-input-freeze /path/to/scoring-input-freeze-manifest.json \
+  --scoring-input-freeze-source-digest sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
   --materialized /path/to/materialized-root \
   --selection-state /path/to/selection-state-root \
   --run-dir /path/to/execution-run-root \
@@ -77,7 +85,9 @@ node scripts/ask-benchmark.mjs verify-evaluator-boundary \
   --public-artifact-root /path/to/staged-public-artifacts
 ```
 
-Evaluator-result verification invokes the existing normalized-results verifier in immutable-snapshot mode, then resolves the referenced normalized attempt from that verified generation. It also validates the checked-in catalog, policy manifest, and scoring policy by default; alternate paths remain digest-closed explicit inputs. The supplied requirement record and output contract are closed public artifacts. Their digests bind the admission record and public evaluator reference without exposing either private evaluator content or answer-bearing text. To additionally prove that the normalized snapshot is current against the execution source, first run the existing current-source `verify-normalized-results` command with config, plan, materialized, selection, run, and output roots.
+Evaluator-result verification invokes the existing normalized-results verifier in immutable-snapshot mode, then resolves the referenced normalized attempt from that verified generation. The default frozen policy passes the complete `validatePortfolioPolicyArtifacts()` path. Caller-supplied catalog or policy paths must equal the freeze manifest authority paths; an alternate path that is not explicitly frozen is rejected. The admission digest is re-derived from the actual final-admission artifact rather than trusted from the requirement record. For an untracked synthetic freeze manifest, `--scoring-input-freeze-source-digest` is mandatory; a checked-in manifest whose bytes match `HEAD` needs no explicit source digest. To additionally prove that the normalized snapshot is current against the execution source, first run the existing current-source `verify-normalized-results` command with config, plan, materialized, selection, run, and output roots.
+
+The all-`a` source digest in the examples is a placeholder; callers must supply the separately approved SHA-256 of the exact untracked manifest bytes and must not derive approval from the manifest being verified.
 
 The focused regression uses synthetic normalized evidence and a synthetic private bundle only:
 

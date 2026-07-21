@@ -13,6 +13,9 @@ import {
   computeRequirementDigest,
   computeRequirementRecordDigest,
   computeRequirementSetDigest,
+  FINAL_ADMISSION_RECORD_SCHEMA_PATH,
+  SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH,
+  validateFinalAdmissionContractSchemaParity,
   validateRequirementMaxPoints,
   validateRequirementRecordContract,
   validateScoringContractSchemaParity,
@@ -1456,7 +1459,7 @@ export function validatePortfolioPolicyArtifacts({
     [lineagePolicy, "portfolio lineage policy", resolve(root, LINEAGE_SCHEMA_PATH), lineagePolicyPath],
   ];
   const errors = [];
-  for (const schemaPath of [REQUIREMENT_RECORD_SCHEMA_PATH, OUTPUT_CONTRACT_SCHEMA_PATH, LINEAGE_RECORD_SCHEMA_PATH, CLASSIFICATION_RECORD_SCHEMA_PATH, EVALUATOR_REFERENCE_SCHEMA_PATH, EVALUATOR_RESULT_SCHEMA_PATH]) {
+  for (const schemaPath of [REQUIREMENT_RECORD_SCHEMA_PATH, OUTPUT_CONTRACT_SCHEMA_PATH, LINEAGE_RECORD_SCHEMA_PATH, CLASSIFICATION_RECORD_SCHEMA_PATH, EVALUATOR_REFERENCE_SCHEMA_PATH, EVALUATOR_RESULT_SCHEMA_PATH, FINAL_ADMISSION_RECORD_SCHEMA_PATH, SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH]) {
     if (!existsSync(resolve(root, schemaPath))) errors.push(`required authoritative source schema is missing: ${schemaPath}`);
   }
   for (const [artifact, label, schemaPath, path] of artifacts) {
@@ -1480,6 +1483,16 @@ export function validatePortfolioPolicyArtifacts({
         scoringPolicy,
         requirementRecordSchema: readJson(resolve(root, REQUIREMENT_RECORD_SCHEMA_PATH), "requirement record Schema"),
         evaluatorResultSchema: readJson(resolve(root, EVALUATOR_RESULT_SCHEMA_PATH), "evaluator result Schema"),
+      });
+    } catch (error) {
+      errors.push(error.message);
+    }
+  }
+  if (existsSync(resolve(root, FINAL_ADMISSION_RECORD_SCHEMA_PATH))) {
+    try {
+      validateFinalAdmissionContractSchemaParity({
+        admissionPolicy,
+        finalAdmissionRecordSchema: readJson(resolve(root, FINAL_ADMISSION_RECORD_SCHEMA_PATH), "final admission record Schema"),
       });
     } catch (error) {
       errors.push(error.message);

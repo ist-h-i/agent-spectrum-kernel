@@ -3,6 +3,8 @@ import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 export const REQUIREMENT_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-requirement-record.schema.json";
 export const OUTPUT_CONTRACT_SCHEMA_PATH = "benchmarks/schemas/portfolio-output-contract.schema.json";
 export const EVALUATOR_RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result-envelope.schema.json";
+export const FINAL_ADMISSION_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-final-admission-record.schema.json";
+export const SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH = "benchmarks/schemas/scoring-input-freeze-manifest.schema.json";
 
 export const REQUIREMENT_FIELD_IDS = Object.freeze([
   "requirement_id",
@@ -27,6 +29,8 @@ export const REQUIREMENT_RESULT_FIELD_IDS = Object.freeze([
 ]);
 
 export const SCORING_IDENTITY_FIELD_IDS = Object.freeze([
+  "scoring_input_freeze_manifest_source_digest",
+  "scoring_input_freeze_manifest_digest",
   "catalog_digest",
   "policy_manifest_digest",
   "scoring_policy_digest",
@@ -35,6 +39,23 @@ export const SCORING_IDENTITY_FIELD_IDS = Object.freeze([
   "requirement_set_digest",
   "output_contract_digest",
   "evaluator_public_reference_digest",
+]);
+
+export const FINAL_ADMISSION_RECORD_FIELD_IDS = Object.freeze([
+  "fixture_id",
+  "catalog_digest",
+  "input_manifest_digest",
+  "evaluator_reference_schema",
+  "evaluator_bundle_id",
+  "evaluator_bundle_digest",
+  "evaluator_byte_count",
+  "evaluator_requirement_count",
+  "evidence_map_ids",
+  "mutation_set_ids",
+  "reviewer_record_id",
+  "admission_revision",
+  "admission_status",
+  "admission_digest",
 ]);
 
 const REQUIREMENT_RECORD_FIELD_IDS = Object.freeze([
@@ -108,6 +129,14 @@ export function computeOutputContractDigest(outputContract) {
   return canonicalDigest(withoutField(outputContract, "output_contract_digest"));
 }
 
+export function computeFinalAdmissionRecordDigest(admissionRecord) {
+  return canonicalDigest(withoutField(admissionRecord, "admission_digest"));
+}
+
+export function computeScoringInputFreezeManifestDigest(freezeManifest) {
+  return canonicalDigest(withoutField(freezeManifest, "manifest_digest"));
+}
+
 export function computeScoringPolicyDigest(scoringPolicy) {
   return canonicalDigest(withoutField(scoringPolicy, "policy_digest"));
 }
@@ -151,6 +180,25 @@ export function validateScoringContractSchemaParity({ scoringPolicy, requirement
   return true;
 }
 
+export function validateFinalAdmissionContractSchemaParity({ admissionPolicy, finalAdmissionRecordSchema }) {
+  const policyFields = admissionPolicy?.final_admission_record_contract?.required_fields?.map(({ field_id }) => field_id) ?? [];
+  assertExactFieldList(policyFields, FINAL_ADMISSION_RECORD_FIELD_IDS, "final admission policy fields");
+  assertExactFieldList(finalAdmissionRecordSchema?.required ?? [], policyFields, "final admission record Schema required fields");
+  assertExactFieldList(Object.keys(finalAdmissionRecordSchema?.properties ?? {}), policyFields, "final admission record Schema allowed fields");
+  return true;
+}
+
+export function validateFinalAdmissionRecordContract({ admissionPolicy, admissionRecord, finalAdmissionRecordSchema = null }) {
+  if (finalAdmissionRecordSchema) validateFinalAdmissionContractSchemaParity({ admissionPolicy, finalAdmissionRecordSchema });
+  assertClosedKeys(admissionRecord, FINAL_ADMISSION_RECORD_FIELD_IDS, "authoritative final admission record");
+  assertUniqueStrings(admissionRecord.evidence_map_ids, "final admission evidence-map IDs");
+  assertUniqueStrings(admissionRecord.mutation_set_ids, "final admission mutation-set IDs");
+  if (admissionRecord.evidence_map_ids.length === 0 || admissionRecord.mutation_set_ids.length === 0) throw new Error("admitted final admission record requires evidence-map and mutation-set IDs");
+  if (admissionRecord.admission_status !== "admitted") throw new Error("scoring input freeze requires an admitted final admission record");
+  assertDigestClosure(admissionRecord.admission_digest, computeFinalAdmissionRecordDigest(admissionRecord), "final admission record digest");
+  return admissionRecord;
+}
+
 export function validateRequirementRecordContract({ scoringPolicy, requirementRecord, requirementRecordSchema = null, evaluatorResultSchema = null }) {
   if (requirementRecordSchema && evaluatorResultSchema) validateScoringContractSchemaParity({ scoringPolicy, requirementRecordSchema, evaluatorResultSchema });
   assertClosedKeys(requirementRecord, REQUIREMENT_RECORD_FIELD_IDS, "authoritative requirement record");
@@ -183,6 +231,7 @@ export function validateRequirementRecordContract({ scoringPolicy, requirementRe
 function assertRequirementOutcome(requirement, observation) {
   const { outcome, earned_points: earnedPoints } = observation;
   if (SCORED_OUTCOMES.has(outcome)) {
+    if (!Array.isArray(observation.evidence_references) || observation.evidence_references.length === 0) throw new Error(`scored requirement result ${outcome} requires at least one evidence reference`);
     if (typeof earnedPoints !== "number" || !Number.isFinite(earnedPoints) || earnedPoints < 0) throw new Error(`${outcome} requirement result requires non-negative finite earned_points`);
     if (earnedPoints > requirement.max_points) throw new Error("requirement result earned_points exceeds max_points");
     if (outcome === "pass" && earnedPoints !== requirement.max_points) throw new Error("pass requirement result earned_points must equal max_points");
@@ -226,7 +275,7 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
   return { scoringReady: false };
 }
 
-export function validateScoringInputBindings({ catalog, policyManifest, scoringPolicy, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult }) {
+export function validateScoringInputBindings({ freezeManifest, freezeManifestSourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult }) {
   assertDigestClosure(policyManifest.manifest_digest, computePolicyManifestDigest(policyManifest), "policy manifest digest");
   assertDigestClosure(scoringPolicy.policy_digest, computeScoringPolicyDigest(scoringPolicy), "scoring policy digest");
   assertDigestClosure(outputContract.output_contract_digest, computeOutputContractDigest(outputContract), "output contract digest");
@@ -236,6 +285,7 @@ export function validateScoringInputBindings({ catalog, policyManifest, scoringP
   if (requirementRecord.catalog_digest !== catalog.catalog_digest) throw new Error("requirement record catalog binding does not match");
   if (requirementRecord.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("requirement record policy manifest binding does not match");
   if (requirementRecord.scoring_policy_digest !== scoringPolicy.policy_digest) throw new Error("requirement record scoring policy binding does not match");
+  if (requirementRecord.admission_record_digest !== admissionRecord.admission_digest) throw new Error("requirement record admission binding does not match the authoritative final admission record");
   if (outputContract.fixture_id !== normalizedResult.lineage.fixture_id) throw new Error("output contract fixture binding does not match normalized result");
   if (outputContract.catalog_digest !== catalog.catalog_digest || outputContract.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("output contract policy or catalog binding does not match");
   if (outputContract.evaluator_public_reference_digest !== evaluatorReference.public_metadata_digest) throw new Error("output contract evaluator public reference binding does not match");
@@ -244,10 +294,12 @@ export function validateScoringInputBindings({ catalog, policyManifest, scoringP
   if (fixture.suite !== normalizedResult.lineage.suite || fixture.task_class !== normalizedResult.lineage.task_class) throw new Error("normalized result suite or task class does not match the bound catalog");
 
   const expected = {
+    scoring_input_freeze_manifest_source_digest: freezeManifestSourceDigest,
+    scoring_input_freeze_manifest_digest: freezeManifest.manifest_digest,
     catalog_digest: catalog.catalog_digest,
     policy_manifest_digest: policyManifest.manifest_digest,
     scoring_policy_digest: scoringPolicy.policy_digest,
-    admission_record_digest: requirementRecord.admission_record_digest,
+    admission_record_digest: admissionRecord.admission_digest,
     requirement_record_digest: requirementRecord.requirement_record_digest,
     requirement_set_digest: requirementRecord.requirement_set_digest,
     output_contract_digest: outputContract.output_contract_digest,

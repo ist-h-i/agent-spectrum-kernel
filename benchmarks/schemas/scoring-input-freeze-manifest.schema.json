@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK scoring-input freeze manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "fixture_id",
+    "fixture_input_digest",
+    "catalog",
+    "policy_manifest",
+    "scoring_policy",
+    "admission_record",
+    "requirement_record",
+    "output_contract",
+    "evaluator_public_reference",
+    "freeze_revision",
+    "manifest_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json" },
+    "program": { "const": "adaptive_ask_scoring_input_freeze" },
+    "fixture_id": { "$ref": "#/$defs/token" },
+    "fixture_input_digest": { "$ref": "#/$defs/digest" },
+    "catalog": { "$ref": "#/$defs/semanticArtifact" },
+    "policy_manifest": { "$ref": "#/$defs/semanticArtifact" },
+    "scoring_policy": { "$ref": "#/$defs/semanticArtifact" },
+    "admission_record": { "$ref": "#/$defs/semanticArtifact" },
+    "requirement_record": { "$ref": "#/$defs/requirementArtifact" },
+    "output_contract": { "$ref": "#/$defs/semanticArtifact" },
+    "evaluator_public_reference": { "$ref": "#/$defs/semanticArtifact" },
+    "freeze_revision": { "$ref": "#/$defs/token" },
+    "manifest_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[a-zA-Z0-9._/-]+$" },
+    "semanticArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "raw_byte_digest", "semantic_digest"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "raw_byte_digest": { "$ref": "#/$defs/digest" },
+        "semantic_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "requirementArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "raw_byte_digest", "record_digest", "set_digest"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "raw_byte_digest": { "$ref": "#/$defs/digest" },
+        "record_digest": { "$ref": "#/$defs/digest" },
+        "set_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}
