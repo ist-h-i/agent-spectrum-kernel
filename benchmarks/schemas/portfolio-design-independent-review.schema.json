@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio independent design review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "review_record_id",
+    "review_record_path",
+    "review_revision",
+    "reviewer_identity",
+    "reviewer_class",
+    "human_review",
+    "identity_assurance",
+    "cryptographic_reviewer_signature_present",
+    "review_date",
+    "reviewed_input",
+    "external_review_evidence",
+    "review_payload",
+    "review_payload_digest",
+    "fixture_reviews",
+    "portfolio_design_review_status",
+    "review_record_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-design-independent-review.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio" },
+    "review_record_id": { "const": "portfolio-design-independent-review-b2b-r1" },
+    "review_record_path": { "const": "benchmarks/portfolio-design-independent-review.json" },
+    "review_revision": { "const": "issue-205-checkpoint-b2b-r1" },
+    "reviewer_identity": { "const": "chatgpt:gpt-5.6-thinking" },
+    "reviewer_class": { "const": "independent_ai_review" },
+    "human_review": { "const": false },
+    "identity_assurance": { "const": "repository_owner_attested_chatgpt_session" },
+    "cryptographic_reviewer_signature_present": { "const": false },
+    "review_date": { "const": "2026-07-21" },
+    "reviewed_input": { "$ref": "#/$defs/reviewedInput" },
+    "external_review_evidence": { "$ref": "#/$defs/externalEvidence" },
+    "review_payload": { "$ref": "#/$defs/reviewPayload" },
+    "review_payload_digest": { "$ref": "#/$defs/digest" },
+    "fixture_reviews": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "items": { "$ref": "#/$defs/fixtureReview" }
+    },
+    "portfolio_design_review_status": { "const": "approved_design_review" },
+    "review_record_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "recordReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_id", "record_path", "record_digest", "fixture_id"],
+      "properties": {
+        "record_id": { "$ref": "#/$defs/id" },
+        "record_path": { "type": "string", "pattern": "^benchmarks/portfolio-design-admission-records/[a-z0-9-]+\\.json$" },
+        "record_digest": { "$ref": "#/$defs/digest" },
+        "fixture_id": { "$ref": "#/$defs/id" }
+      }
+    },
+    "reviewedInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "pull_request_number",
+        "reviewed_head_sha",
+        "catalog_digest",
+        "policy_revision",
+        "policy_manifest_digest",
+        "design_manifest",
+        "pending_review_package",
+        "design_records"
+      ],
+      "properties": {
+        "repository": { "const": "ist-h-i/agent-spectrum-kernel" },
+        "pull_request_number": { "const": 215 },
+        "reviewed_head_sha": { "const": "875a23e820b92c8c7d42f566d1ef24cb650b3516" },
+        "catalog_digest": { "const": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972" },
+        "policy_revision": { "const": "issue-205-checkpoint-b1-r3" },
+        "policy_manifest_digest": { "const": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41" },
+        "design_manifest": { "$ref": "#/$defs/designManifestReference" },
+        "pending_review_package": { "$ref": "#/$defs/pendingPackageReference" },
+        "design_records": {
+          "type": "array",
+          "minItems": 24,
+          "maxItems": 24,
+          "items": { "$ref": "#/$defs/recordReference" }
+        }
+      }
+    },
+    "designManifestReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": { "const": "benchmarks/portfolio-design-admission-manifest.json" },
+        "digest": { "const": "sha256:42a1d0be4363c55ee0b433e59591e415e4008b24d4f03dc6c2dae5642b4c2d16" }
+      }
+    },
+    "pendingPackageReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": { "const": "benchmarks/portfolio-design-review-package.json" },
+        "digest": { "const": "sha256:964bc599530b730af7e9a2c5f5179ab7810f645518ce8b60cbbfc7d18c593ca4" }
+      }
+    },
+    "externalEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_type",
+        "repository",
+        "pull_request_number",
+        "comment_id",
+        "comment_url",
+        "comment_created_at",
+        "comment_updated_at",
+        "comment_body_digest",
+        "reviewer_identity",
+        "github_transport_actor",
+        "github_author_association",
+        "github_app_slug",
+        "comment_transport_actor_is_reviewer",
+        "github_transport_uses_repository_owner_account",
+        "remote_comment_content_cryptographically_verified_offline"
+      ],
+      "properties": {
+        "evidence_type": { "const": "github_pr_comment" },
+        "repository": { "const": "ist-h-i/agent-spectrum-kernel" },
+        "pull_request_number": { "const": 215 },
+        "comment_id": { "const": 5029786494 },
+        "comment_url": { "const": "https://github.com/ist-h-i/agent-spectrum-kernel/pull/215#issuecomment-5029786494" },
+        "comment_created_at": { "const": "2026-07-21T03:18:45Z" },
+        "comment_updated_at": { "const": "2026-07-21T03:19:38Z" },
+        "comment_body_digest": { "const": "sha256:9ef23037ba2aaa92cfbf7d45fe81f1cd837d884e97db9a89cbb0647286592755" },
+        "reviewer_identity": { "const": "chatgpt:gpt-5.6-thinking" },
+        "github_transport_actor": { "const": "ist-h-i" },
+        "github_author_association": { "const": "OWNER" },
+        "github_app_slug": { "const": "chatgpt-codex-connector" },
+        "comment_transport_actor_is_reviewer": { "const": false },
+        "github_transport_uses_repository_owner_account": { "const": true },
+        "remote_comment_content_cryptographically_verified_offline": { "const": false }
+      }
+    },
+    "reviewPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["portfolio_dimensions", "approved_fixture_ids", "scope", "residual_requirements"],
+      "properties": {
+        "portfolio_dimensions": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "items": { "$ref": "#/$defs/dimensionAssessment" }
+        },
+        "approved_fixture_ids": {
+          "type": "array",
+          "minItems": 24,
+          "maxItems": 24,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "scope": { "$ref": "#/$defs/reviewScope" },
+        "residual_requirements": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "actual_agent_visible_bytes_require_fair_access_revalidation" },
+            { "const": "actual_evidence_requires_recoverability_revalidation" }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "dimensionAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimension_id", "result", "assessment"],
+      "properties": {
+        "dimension_id": { "$ref": "#/$defs/id" },
+        "result": { "const": "pass" },
+        "assessment": { "type": "string", "minLength": 1 }
+      }
+    },
+    "dimensionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimension_id", "result"],
+      "properties": {
+        "dimension_id": { "$ref": "#/$defs/id" },
+        "result": { "const": "pass" }
+      }
+    },
+    "reviewScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_state",
+        "reviewed_state",
+        "final_admission_evaluated",
+        "implementation_pending_evaluated",
+        "actual_fixture_evidence_reviewed",
+        "actual_requirement_or_output_contract_reviewed",
+        "private_evaluator_reviewed",
+        "actual_lineage_or_scoring_reviewed",
+        "pilot_or_measured_result_reviewed"
+      ],
+      "properties": {
+        "source_state": { "const": "design_pending" },
+        "reviewed_state": { "const": "design_reviewed" },
+        "final_admission_evaluated": { "const": false },
+        "implementation_pending_evaluated": { "const": false },
+        "actual_fixture_evidence_reviewed": { "const": false },
+        "actual_requirement_or_output_contract_reviewed": { "const": false },
+        "private_evaluator_reviewed": { "const": false },
+        "actual_lineage_or_scoring_reviewed": { "const": false },
+        "pilot_or_measured_result_reviewed": { "const": false }
+      }
+    },
+    "fixtureReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_id",
+        "design_record_id",
+        "design_record_path",
+        "design_record_digest",
+        "implementation_owner_issue",
+        "dimension_results",
+        "design_review_status",
+        "final_admission_status",
+        "actual_fixture_evidence_reviewed",
+        "review_item_digest"
+      ],
+      "properties": {
+        "fixture_id": { "$ref": "#/$defs/id" },
+        "design_record_id": { "$ref": "#/$defs/id" },
+        "design_record_path": { "type": "string", "pattern": "^benchmarks/portfolio-design-admission-records/[a-z0-9-]+\\.json$" },
+        "design_record_digest": { "$ref": "#/$defs/digest" },
+        "implementation_owner_issue": { "enum": [206, 207, 208, 209] },
+        "dimension_results": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "items": { "$ref": "#/$defs/dimensionResult" }
+        },
+        "design_review_status": { "const": "approved_design_review" },
+        "final_admission_status": { "const": "not_evaluated" },
+        "actual_fixture_evidence_reviewed": { "const": false },
+        "review_item_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

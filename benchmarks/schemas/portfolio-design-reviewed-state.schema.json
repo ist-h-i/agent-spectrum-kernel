@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio design reviewed-state projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "projection_revision",
+    "source_state",
+    "projected_state",
+    "source_design_manifest",
+    "source_pending_review_package",
+    "independent_review",
+    "fixture_ids",
+    "fixture_reviews",
+    "all_records_approved",
+    "final_admission_implied",
+    "implementation_authorized",
+    "actual_requirement_evidence_verified",
+    "actual_output_contract_evidence_verified",
+    "actual_evaluator_evidence_verified",
+    "actual_lineage_evidence_verified",
+    "projection_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-design-reviewed-state.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio" },
+    "projection_revision": { "const": "issue-205-checkpoint-b2b-r1" },
+    "source_state": { "const": "design_pending" },
+    "projected_state": { "const": "design_reviewed" },
+    "source_design_manifest": { "$ref": "#/$defs/designManifestReference" },
+    "source_pending_review_package": { "$ref": "#/$defs/pendingPackageReference" },
+    "independent_review": { "$ref": "#/$defs/reviewReference" },
+    "fixture_ids": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "fixture_reviews": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "items": { "$ref": "#/$defs/fixtureReviewReference" }
+    },
+    "all_records_approved": { "const": true },
+    "final_admission_implied": { "const": false },
+    "implementation_authorized": { "const": false },
+    "actual_requirement_evidence_verified": { "const": false },
+    "actual_output_contract_evidence_verified": { "const": false },
+    "actual_evaluator_evidence_verified": { "const": false },
+    "actual_lineage_evidence_verified": { "const": false },
+    "projection_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "designManifestReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": { "const": "benchmarks/portfolio-design-admission-manifest.json" },
+        "digest": { "const": "sha256:42a1d0be4363c55ee0b433e59591e415e4008b24d4f03dc6c2dae5642b4c2d16" }
+      }
+    },
+    "pendingPackageReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": { "const": "benchmarks/portfolio-design-review-package.json" },
+        "digest": { "const": "sha256:964bc599530b730af7e9a2c5f5179ab7810f645518ce8b60cbbfc7d18c593ca4" }
+      }
+    },
+    "reviewReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": { "const": "benchmarks/portfolio-design-independent-review.json" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "fixtureReviewReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture_id", "review_item_digest"],
+      "properties": {
+        "fixture_id": { "$ref": "#/$defs/id" },
+        "review_item_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

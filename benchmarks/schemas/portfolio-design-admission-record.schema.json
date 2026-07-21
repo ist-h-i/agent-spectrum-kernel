@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio design admission record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "design_record_id",
+    "design_record_path",
+    "fixture_id",
+    "bindings",
+    "catalog_metadata",
+    "design_status",
+    "answer_neutral_design",
+    "implementation_owner_issue",
+    "design_record_revision",
+    "design_record_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-design-admission-record.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio" },
+    "design_record_id": { "$ref": "#/$defs/id" },
+    "design_record_path": { "type": "string", "pattern": "^benchmarks/portfolio-design-admission-records/[a-z0-9-]+\\.json$" },
+    "fixture_id": { "$ref": "#/$defs/id" },
+    "bindings": { "$ref": "#/$defs/bindings" },
+    "catalog_metadata": { "$ref": "#/$defs/catalogMetadata" },
+    "design_status": { "const": "design_pending" },
+    "answer_neutral_design": { "$ref": "#/$defs/answerNeutralDesign" },
+    "implementation_owner_issue": { "enum": [206, 207, 208, 209] },
+    "design_record_revision": { "const": "issue-205-checkpoint-b2a-r1" },
+    "design_record_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "idArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalog_revision",
+        "catalog_digest",
+        "fixture_metadata_digest",
+        "policy_revision",
+        "policy_manifest_digest",
+        "admission_policy_digest",
+        "scoring_policy_digest",
+        "lineage_policy_digest"
+      ],
+      "properties": {
+        "catalog_revision": { "const": "issue-205-checkpoint-1" },
+        "catalog_digest": { "$ref": "#/$defs/digest" },
+        "fixture_metadata_digest": { "$ref": "#/$defs/digest" },
+        "policy_revision": { "const": "issue-205-checkpoint-b1-r3" },
+        "policy_manifest_digest": { "$ref": "#/$defs/digest" },
+        "admission_policy_digest": { "$ref": "#/$defs/digest" },
+        "scoring_policy_digest": { "$ref": "#/$defs/digest" },
+        "lineage_policy_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "catalogMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite",
+        "task_class",
+        "domain",
+        "difficulty",
+        "repetitions",
+        "capability_families",
+        "evidence_topologies",
+        "outcome_dimensions",
+        "risk_boundary"
+      ],
+      "properties": {
+        "suite": { "enum": ["high_impact", "mechanism_negative", "mechanism_positive", "practice_frequency"] },
+        "task_class": { "$ref": "#/$defs/id" },
+        "domain": { "$ref": "#/$defs/id" },
+        "difficulty": { "$ref": "#/$defs/id" },
+        "repetitions": { "type": "integer", "minimum": 1 },
+        "capability_families": { "$ref": "#/$defs/idArray" },
+        "evidence_topologies": { "$ref": "#/$defs/idArray" },
+        "outcome_dimensions": { "$ref": "#/$defs/idArray" },
+        "risk_boundary": { "$ref": "#/$defs/id" }
+      }
+    },
+    "answerNeutralDesign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinary_engineering_intent",
+        "fair_paths",
+        "task_wording_constraint",
+        "agent_visible_evidence_types",
+        "output_contract_type",
+        "admission_gate_plan",
+        "requirement_kind_plan",
+        "evidence_removal_mutation_topology",
+        "suspicious_but_correct_control_required",
+        "safety_approval_boundary_required",
+        "final_admission_assumptions"
+      ],
+      "properties": {
+        "ordinary_engineering_intent": { "type": "string", "minLength": 1 },
+        "fair_paths": { "$ref": "#/$defs/fairPaths" },
+        "task_wording_constraint": { "$ref": "#/$defs/taskWordingConstraint" },
+        "agent_visible_evidence_types": { "$ref": "#/$defs/idArray" },
+        "output_contract_type": {
+          "enum": ["design_or_operation_plan_producing", "findings_producing", "implementation_producing"]
+        },
+        "admission_gate_plan": { "$ref": "#/$defs/gatePlan" },
+        "requirement_kind_plan": { "$ref": "#/$defs/requirementKindPlan" },
+        "evidence_removal_mutation_topology": { "$ref": "#/$defs/id" },
+        "suspicious_but_correct_control_required": { "type": "boolean" },
+        "safety_approval_boundary_required": { "type": "boolean" },
+        "final_admission_assumptions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "authoritative_output_contract_remains_pending",
+              "authoritative_requirement_records_remain_pending",
+              "evaluator_and_input_digests_remain_pending",
+              "planned_gate_selectors_require_final_rederivation"
+            ]
+          }
+        }
+      }
+    },
+    "fairPaths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plain_condition", "kernel_only_condition"],
+      "properties": {
+        "plain_condition": { "type": "string", "minLength": 1 },
+        "kernel_only_condition": { "type": "string", "minLength": 1 }
+      }
+    },
+    "taskWordingConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinary_engineering_language_required", "ask_specific_vocabulary_allowed", "task_may_name_evaluation_mechanisms"],
+      "properties": {
+        "ordinary_engineering_language_required": { "const": true },
+        "ask_specific_vocabulary_allowed": { "const": false },
+        "task_may_name_evaluation_mechanisms": { "const": false }
+      }
+    },
+    "gatePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["planned_fixture_predicates", "applicable_gate_ids", "non_applicable_gates", "final_selector_revalidation_required"],
+      "properties": {
+        "planned_fixture_predicates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["finding_producing_task", "scored_primary_requirement"] }
+        },
+        "applicable_gate_ids": { "$ref": "#/$defs/idArray" },
+        "non_applicable_gates": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonApplicableGate" }
+        },
+        "final_selector_revalidation_required": { "const": true }
+      }
+    },
+    "nonApplicableGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "selector_reason"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/id" },
+        "selector_reason": {
+          "enum": [
+            "suite_task_class_and_risk_boundary_do_not_match_safety_selector",
+            "task_class_not_in_frozen_review_selector",
+            "task_class_not_review_and_output_contract_not_findings"
+          ]
+        }
+      }
+    },
+    "requirementKindPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blocker_count_band", "weighted_count_band", "informational_count_band", "counts_are_not_final"],
+      "properties": {
+        "blocker_count_band": { "enum": ["one_or_more", "zero_or_more"] },
+        "weighted_count_band": { "const": "one_or_more" },
+        "informational_count_band": { "const": "zero_or_more" },
+        "counts_are_not_final": { "const": true }
+      }
+    }
+  }
+}
