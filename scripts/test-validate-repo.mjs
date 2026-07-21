@@ -271,6 +271,7 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/schemas/portfolio-lineage-record.schema.json",
     "benchmarks/schemas/portfolio-classification-record.schema.json",
     "benchmarks/schemas/evaluator-reference.schema.json",
+    "benchmarks/schemas/evaluator-result-envelope.schema.json",
     "benchmarks/schemas/portfolio-design-admission-manifest.schema.json",
     "benchmarks/schemas/portfolio-design-admission-record.schema.json",
     "benchmarks/schemas/portfolio-design-review-package.schema.json",

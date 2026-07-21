@@ -13,12 +13,23 @@ import {
 } from "node:fs";
 import { posix, relative, resolve, sep, win32 } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
+import {
+  validateRequirementRecordContract,
+  validateScoringContractSchemaParity,
+  validateScoringInputBindings,
+} from "./ask-benchmark-scoring-contract.mjs";
 
 export const EVALUATOR_REFERENCE_SCHEMA_PATH = "benchmarks/schemas/evaluator-reference.schema.json";
 export const PRIVATE_EVALUATOR_BUNDLE_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-bundle.schema.json";
 export const EVALUATOR_RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result-envelope.schema.json";
+const CATALOG_SCHEMA_PATH = "benchmarks/schemas/portfolio-catalog.schema.json";
+const POLICY_MANIFEST_SCHEMA_PATH = "benchmarks/schemas/portfolio-policy-manifest.schema.json";
+const SCORING_POLICY_SCHEMA_PATH = "benchmarks/schemas/portfolio-scoring-policy.schema.json";
+const REQUIREMENT_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-requirement-record.schema.json";
+const OUTPUT_CONTRACT_SCHEMA_PATH = "benchmarks/schemas/portfolio-output-contract.schema.json";
 
 const MAX_PUBLIC_ARTIFACT_BYTES = 1024 * 1024;
 const MAX_JSON_ARTIFACT_BYTES = 1024 * 1024;
@@ -388,6 +399,14 @@ export function computeEvaluatorReferenceDigest(reference) {
 
 export function computeEvaluationId(result) {
   return `evaluation-${canonicalDigest({
+    catalog_digest: result.catalog_digest,
+    policy_manifest_digest: result.policy_manifest_digest,
+    scoring_policy_digest: result.scoring_policy_digest,
+    admission_record_digest: result.admission_record_digest,
+    requirement_record_digest: result.requirement_record_digest,
+    requirement_set_digest: result.requirement_set_digest,
+    output_contract_digest: result.output_contract_digest,
+    evaluator_public_reference_digest: result.evaluator_public_reference_digest,
     normalized_result_id: result.normalized_result_id,
     normalized_result_digest: result.normalized_result_digest,
     evaluator_bundle_id: result.evaluator_bundle_id,
@@ -553,6 +572,39 @@ function readNormalizedRecord({ verified, result }) {
   return record;
 }
 
+function readScoringInputSources({ root, catalogPath, policyManifestPath, scoringPolicyPath, requirementRecordPath, outputContractPath }) {
+  for (const [path, label] of [
+    [catalogPath, "portfolio catalog"],
+    [policyManifestPath, "portfolio policy manifest"],
+    [scoringPolicyPath, "portfolio scoring policy"],
+    [requirementRecordPath, "authoritative requirement record"],
+    [outputContractPath, "authoritative output contract"],
+  ]) {
+    if (!path) throw new Error(`${label} path is required for scoring input closure`);
+  }
+  const catalog = readJsonArtifact(catalogPath, "portfolio catalog").value;
+  const policyManifest = readJsonArtifact(policyManifestPath, "portfolio policy manifest").value;
+  const scoringPolicy = readJsonArtifact(scoringPolicyPath, "portfolio scoring policy").value;
+  const requirementRecord = readJsonArtifact(requirementRecordPath, "authoritative requirement record", { publicArtifact: true }).value;
+  const outputContract = readJsonArtifact(outputContractPath, "authoritative output contract", { publicArtifact: true }).value;
+  const requirementRecordSchema = readJsonArtifact(resolve(root, REQUIREMENT_RECORD_SCHEMA_PATH), "requirement record Schema").value;
+  const evaluatorResultSchema = readJsonArtifact(resolve(root, EVALUATOR_RESULT_SCHEMA_PATH), "evaluator result Schema").value;
+
+  for (const [value, schemaPath, label] of [
+    [catalog, CATALOG_SCHEMA_PATH, "portfolio catalog"],
+    [policyManifest, POLICY_MANIFEST_SCHEMA_PATH, "portfolio policy manifest"],
+    [scoringPolicy, SCORING_POLICY_SCHEMA_PATH, "portfolio scoring policy"],
+    [requirementRecord, REQUIREMENT_RECORD_SCHEMA_PATH, "authoritative requirement record"],
+    [outputContract, OUTPUT_CONTRACT_SCHEMA_PATH, "authoritative output contract"],
+  ]) assertBenchmarkSchemaInstance(value, { schemaPath: resolve(root, schemaPath), label });
+  assertPublicArtifactTree(requirementRecord, "authoritative requirement record");
+  assertPublicArtifactTree(outputContract, "authoritative output contract");
+  if (catalog.catalog_digest !== computePortfolioCatalogDigest(catalog)) throw new Error("portfolio catalog digest closure is invalid");
+  validateScoringContractSchemaParity({ scoringPolicy, requirementRecordSchema, evaluatorResultSchema });
+  validateRequirementRecordContract({ scoringPolicy, requirementRecord, requirementRecordSchema, evaluatorResultSchema });
+  return { catalog, policyManifest, scoringPolicy, requirementRecord, outputContract };
+}
+
 function assertBoundaryRootLineage(bundle, verified) {
   const source = verified.manifest.source;
   const materializedPath = bundle.markerPaths.materializedPath;
@@ -579,6 +631,11 @@ function assertBoundaryRootLineage(bundle, verified) {
 
 export function verifyEvaluatorResult({
   root,
+  catalogPath,
+  policyManifestPath,
+  scoringPolicyPath,
+  requirementRecordPath,
+  outputContractPath,
   referencePath,
   privateRoot,
   manifestPath,
@@ -595,6 +652,7 @@ export function verifyEvaluatorResult({
   assertBenchmarkSchemaInstance(result, { schemaPath: resolve(root, EVALUATOR_RESULT_SCHEMA_PATH), label: "evaluator result envelope" });
   assertPublicArtifactTree(result, "evaluator result envelope");
   assertResultCollectionIdentity(result);
+  const scoringInputs = readScoringInputSources({ root, catalogPath, policyManifestPath, scoringPolicyPath, requirementRecordPath, outputContractPath });
 
   const verified = verifyNormalizedPortfolioResults({
     root,
@@ -610,6 +668,7 @@ export function verifyEvaluatorResult({
     normalized_result_digest: normalized.normalized_result_digest,
     run_instance_id: lineage.run_instance_id,
     plan_id: lineage.plan_id,
+    plan_digest: lineage.plan_digest,
     fixture_id: lineage.fixture_id,
     fixture_input_digest: lineage.fixture_input_digest,
     case_id: lineage.case_id,
@@ -627,7 +686,13 @@ export function verifyEvaluatorResult({
   if (bundle.reference.fixture_id !== lineage.fixture_id || bundle.reference.fixture_input_digest !== lineage.fixture_input_digest || bundle.reference.task_class !== lineage.task_class || bundle.reference.suite !== lineage.suite) {
     throw new Error("evaluator reference is transplanted across normalized fixture or input identity");
   }
-  return { bundle, normalized, result, verified };
+  const scoring = validateScoringInputBindings({
+    ...scoringInputs,
+    evaluatorReference: bundle.reference,
+    normalizedResult: normalized,
+    evaluatorResult: result,
+  });
+  return { bundle, normalized, result, verified, scoringReady: scoring.scoringReady };
 }
 
 export function assertNoPrivateBundlePublication(publicArtifactRoot, bundle) {

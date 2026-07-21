@@ -8,6 +8,23 @@ import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { verifyPublicEvaluatorReference } from "./ask-benchmark-evaluator-boundary.mjs";
 import { stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { computeFixtureMetadataDigest, validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
+import {
+  computeOutputContractDigest,
+  computeRequirementDigest,
+  computeRequirementRecordDigest,
+  computeRequirementSetDigest,
+  validateRequirementMaxPoints,
+  validateRequirementRecordContract,
+  validateScoringContractSchemaParity,
+} from "./ask-benchmark-scoring-contract.mjs";
+
+export {
+  computeOutputContractDigest,
+  computeRequirementDigest,
+  computeRequirementRecordDigest,
+  computeRequirementSetDigest,
+  validateRequirementMaxPoints,
+};
 
 export const PORTFOLIO_POLICY_SCHEMA_VERSION = "1.0.0";
 export const PORTFOLIO_POLICY_CONTRACT_VERSION = "3.7.0-portfolio-policy";
@@ -35,6 +52,7 @@ const OUTPUT_CONTRACT_SCHEMA_PATH = "benchmarks/schemas/portfolio-output-contrac
 const LINEAGE_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-lineage-record.schema.json";
 const CLASSIFICATION_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-classification-record.schema.json";
 const EVALUATOR_REFERENCE_SCHEMA_PATH = "benchmarks/schemas/evaluator-reference.schema.json";
+const EVALUATOR_RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result-envelope.schema.json";
 
 const LIFECYCLE_STATES = Object.freeze([
   "design_pending",
@@ -294,18 +312,6 @@ function readAuthoritativeJsonArtifact({ artifactRoot, relativePath, immutableAr
   return { absolutePath, relativePath, sourceDigest, value };
 }
 
-export function computeRequirementSetDigest(requirementRecord) {
-  return digest(Array.isArray(requirementRecord) ? requirementRecord : requirementRecord.requirements);
-}
-
-export function computeRequirementRecordDigest(requirementRecord) {
-  return digest(withoutField(requirementRecord, "requirement_record_digest"));
-}
-
-export function computeOutputContractDigest(outputContract) {
-  return digest(withoutField(outputContract, "output_contract_digest"));
-}
-
 export function computeLineageRecordDigest(lineageRecord) {
   return digest(withoutField(lineageRecord, "lineage_record_digest"));
 }
@@ -337,20 +343,17 @@ function validateRequirementRecordSource({ scoringPolicy, policyManifest, catalo
   }).value;
   if (stableCanonicalJson(reference) !== stableCanonicalJson(source)) throw new Error("requirement record reference does not match authoritative source");
   if (source.requirement_record_schema_path !== REQUIREMENT_RECORD_SCHEMA_PATH) throw new Error("requirement record schema path does not match the closed schema");
-  if (source.requirement_record_digest !== computeRequirementRecordDigest(source)) throw new Error("requirement record digest does not match authoritative source");
+  validateRequirementRecordContract({
+    scoringPolicy,
+    requirementRecord: source,
+    requirementRecordSchema: readJson(resolve(DEFAULT_ROOT, REQUIREMENT_RECORD_SCHEMA_PATH), "requirement record Schema"),
+    evaluatorResultSchema: readJson(resolve(DEFAULT_ROOT, EVALUATOR_RESULT_SCHEMA_PATH), "evaluator result Schema"),
+  });
   if (source.fixture_id !== fixture.fixture_id) throw new Error("requirement record fixture_id binding does not match selector fixture");
   if (source.catalog_digest !== catalog.catalog_digest) throw new Error("requirement record catalog digest binding does not match");
   if (source.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("requirement record policy manifest digest binding does not match");
   if (source.scoring_policy_digest !== scoringPolicy.policy_digest) throw new Error("requirement record scoring policy digest binding does not match");
   assertDigest(source.admission_record_digest, "requirement record admission record digest");
-  if (source.requirement_set_digest !== computeRequirementSetDigest(source)) throw new Error("requirement set digest does not match authoritative requirements");
-  const requirementIds = source.requirements.map(({ requirement_id }) => requirement_id);
-  assertUniqueStrings(requirementIds, "requirement IDs");
-  for (const requirement of source.requirements) {
-    if (!REQUIREMENT_KINDS.includes(requirement.requirement_kind)) throw new Error(`requirement record has unknown kind: ${requirement.requirement_kind}`);
-    assertUniqueStrings(requirement.agent_visible_evidence_map_ids, "requirement evidence-map IDs");
-    if (["blocker", "weighted"].includes(requirement.requirement_kind) && requirement.agent_visible_evidence_map_ids.length === 0) throw new Error("scored requirement must have at least one agent-visible evidence-map ID");
-  }
   return source;
 }
 
@@ -393,7 +396,7 @@ function deriveFixturePredicates(admissionPolicy, scoringPolicy, policyManifest,
   const scoredRequirements = requirementRecord.requirements.filter(({ requirement_kind }) => requirement_kind === "blocker" || requirement_kind === "weighted");
   const scoredPrimaryRequirement = fixture.fixture_role === "primary"
     && scoredRequirements.length > 0
-    && scoredRequirements.every(({ agent_visible_evidence_map_ids }) => agent_visible_evidence_map_ids.length >= scoringPolicy.requirement_contract.scored_requirement_minimum_agent_visible_evidence_map_ids);
+    && scoredRequirements.every(({ evidence_map_ids }) => evidence_map_ids.length >= scoringPolicy.requirement_contract.scored_requirement_minimum_agent_visible_evidence_map_ids);
 
   let outputContractDeclaresFindings = false;
   let outputContract = null;
@@ -473,15 +476,6 @@ export function validateAdmissionGateResult(options) {
   const selectorMatches = admissionGateSelectorMatches(gate, validatedContext);
   if (selectorMatches && result === "not_applicable") throw new Error(`${gateId} not_applicable is prohibited when selector matches`);
   if (!selectorMatches && result !== "not_applicable") throw new Error(`${gateId} must be not_applicable when selector does not match`);
-  return true;
-}
-
-export function validateRequirementMaxPoints(scoringPolicy, requirement) {
-  const kind = scoringPolicy.requirement_contract.requirement_kinds.find((entry) => entry.requirement_kind === requirement.requirement_kind);
-  if (!kind) throw new Error(`unknown requirement kind: ${requirement.requirement_kind}`);
-  if (typeof requirement.max_points !== "number" || !Number.isFinite(requirement.max_points) || requirement.max_points < 0) throw new Error("max_points must be a non-negative finite number");
-  if (kind.max_points_constraint === "positive" && requirement.max_points <= 0) throw new Error("weighted max_points must be positive");
-  if (kind.max_points_constraint === "required_zero" && requirement.max_points !== 0) throw new Error("informational max_points must be zero");
   return true;
 }
 
@@ -1462,7 +1456,7 @@ export function validatePortfolioPolicyArtifacts({
     [lineagePolicy, "portfolio lineage policy", resolve(root, LINEAGE_SCHEMA_PATH), lineagePolicyPath],
   ];
   const errors = [];
-  for (const schemaPath of [REQUIREMENT_RECORD_SCHEMA_PATH, OUTPUT_CONTRACT_SCHEMA_PATH, LINEAGE_RECORD_SCHEMA_PATH, CLASSIFICATION_RECORD_SCHEMA_PATH, EVALUATOR_REFERENCE_SCHEMA_PATH]) {
+  for (const schemaPath of [REQUIREMENT_RECORD_SCHEMA_PATH, OUTPUT_CONTRACT_SCHEMA_PATH, LINEAGE_RECORD_SCHEMA_PATH, CLASSIFICATION_RECORD_SCHEMA_PATH, EVALUATOR_REFERENCE_SCHEMA_PATH, EVALUATOR_RESULT_SCHEMA_PATH]) {
     if (!existsSync(resolve(root, schemaPath))) errors.push(`required authoritative source schema is missing: ${schemaPath}`);
   }
   for (const [artifact, label, schemaPath, path] of artifacts) {
@@ -1480,6 +1474,17 @@ export function validatePortfolioPolicyArtifacts({
   validateAdmissionSemantics(admissionPolicy, errors);
   validateScoringSemantics(scoringPolicy, errors);
   validateLineageSemantics(lineagePolicy, errors);
+  if (existsSync(resolve(root, REQUIREMENT_RECORD_SCHEMA_PATH)) && existsSync(resolve(root, EVALUATOR_RESULT_SCHEMA_PATH))) {
+    try {
+      validateScoringContractSchemaParity({
+        scoringPolicy,
+        requirementRecordSchema: readJson(resolve(root, REQUIREMENT_RECORD_SCHEMA_PATH), "requirement record Schema"),
+        evaluatorResultSchema: readJson(resolve(root, EVALUATOR_RESULT_SCHEMA_PATH), "evaluator result Schema"),
+      });
+    } catch (error) {
+      errors.push(error.message);
+    }
+  }
 
   const manifestBinding = commonPolicyFields(catalog, MANIFEST_SCHEMA_PATH);
   for (const [field, value] of Object.entries(manifestBinding)) {

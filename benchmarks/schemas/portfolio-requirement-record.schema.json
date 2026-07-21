@@ -39,15 +39,33 @@
     "requirement": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["requirement_id", "requirement_kind", "agent_visible_evidence_map_ids"],
+      "required": [
+        "requirement_id",
+        "requirement_kind",
+        "max_points",
+        "partial_credit_allowed",
+        "evidence_map_ids",
+        "mutation_ids",
+        "equivalence_class_ids",
+        "finding_group_id",
+        "safety_dimension",
+        "requirement_digest"
+      ],
       "properties": {
         "requirement_id": { "$ref": "#/$defs/token" },
         "requirement_kind": { "enum": ["blocker", "weighted", "informational"] },
-        "agent_visible_evidence_map_ids": {
+        "max_points": { "type": "number", "minimum": 0 },
+        "partial_credit_allowed": { "type": "boolean" },
+        "evidence_map_ids": {
           "type": "array",
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/token" }
-        }
+        },
+        "mutation_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "equivalence_class_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "finding_group_id": { "$ref": "#/$defs/token" },
+        "safety_dimension": { "enum": ["completion_correctness", "merge_correctness", "safe_operation_correctness"] },
+        "requirement_digest": { "$ref": "#/$defs/digest" }
       }
     }
   }

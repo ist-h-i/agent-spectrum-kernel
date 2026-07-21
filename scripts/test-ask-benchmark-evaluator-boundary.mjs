@@ -27,12 +27,19 @@ import {
   verifyPublicEvaluatorReference,
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import {
+  computeOutputContractDigest,
+  computeRequirementDigest,
+  computeRequirementRecordDigest,
+  computeRequirementSetDigest,
+} from "./ask-benchmark-scoring-contract.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
 const work = mkdtempSync(resolve(root, ".ask-benchmark-evaluator-boundary-test-"));
 const privateWork = mkdtempSync(resolve(tmpdir(), "ask-private-evaluator-boundary-test-"));
 const REVISION = "b".repeat(40);
+const FIXTURE_ID = "cal-atomic-rule-batch";
 const ADAPTERS = ["codex", "claude"];
 const CONDITIONS = ["plain", "kernel_only", "adaptive_ask", "full_ask"];
 const STATUSES = ["pending", "active", "completed", "failed", "unavailable", "interrupted", "invalid"];
@@ -82,6 +89,11 @@ const ASSET_ROLES = [
   "human_evaluation_instructions",
   "reference_outcome",
 ].sort();
+const catalog = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-catalog.json"), "utf8"));
+const policyManifest = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-policy-manifest.json"), "utf8"));
+const scoringPolicy = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-scoring-policy.json"), "utf8"));
+const fixture = catalog.fixtures.find(({ fixture_id }) => fixture_id === FIXTURE_ID);
+assert.ok(fixture, "synthetic evaluator test fixture must exist in the public catalog");
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -160,10 +172,10 @@ function normalizedResult({ source, adapterDigests, caseRecord, attempt, outcome
       plan_digest: source.plan_digest,
       repository_revision: source.repository_revision,
       materialization_manifest_digest: source.materialization_manifest_digest,
-      fixture_id: "synthetic-evaluator-fixture",
+      fixture_id: FIXTURE_ID,
       fixture_input_digest: digest("synthetic-fixture-input"),
       suite: "calibration",
-      task_class: "review",
+      task_class: fixture.task_class,
       difficulty: "synthetic",
       registered_repetitions: 3,
       aggregate_eligible: false,
@@ -249,7 +261,7 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir 
       case_id: caseId(index + 1),
       adapter_track: definition.adapter_track,
       condition: definition.condition,
-      fixture_id: "synthetic-evaluator-fixture",
+      fixture_id: FIXTURE_ID,
       repetition: 1,
       condition_order_position: index + 1,
       block_id: blockId(index + 1),
@@ -398,11 +410,88 @@ function referenceFor(manifest) {
   return reference;
 }
 
+function createScoringInputs(path, reference) {
+  mkdirSync(path);
+  const requirements = [
+    {
+      requirement_id: "weighted-requirement",
+      requirement_kind: "weighted",
+      max_points: 4,
+      partial_credit_allowed: true,
+      evidence_map_ids: ["evidence-weighted"],
+      mutation_ids: ["mutation-weighted"],
+      equivalence_class_ids: ["equivalence-weighted"],
+      finding_group_id: "finding-group-weighted",
+      safety_dimension: "completion_correctness",
+      requirement_digest: digest("placeholder"),
+    },
+    {
+      requirement_id: "blocker-requirement",
+      requirement_kind: "blocker",
+      max_points: 2,
+      partial_credit_allowed: false,
+      evidence_map_ids: ["evidence-blocker"],
+      mutation_ids: ["mutation-blocker"],
+      equivalence_class_ids: ["equivalence-blocker"],
+      finding_group_id: "finding-group-blocker",
+      safety_dimension: "safe_operation_correctness",
+      requirement_digest: digest("placeholder"),
+    },
+    {
+      requirement_id: "informational-requirement",
+      requirement_kind: "informational",
+      max_points: 0,
+      partial_credit_allowed: false,
+      evidence_map_ids: [],
+      mutation_ids: ["mutation-informational"],
+      equivalence_class_ids: ["equivalence-informational"],
+      finding_group_id: "finding-group-informational",
+      safety_dimension: "merge_correctness",
+      requirement_digest: digest("placeholder"),
+    },
+  ];
+  for (const requirement of requirements) requirement.requirement_digest = computeRequirementDigest(requirement);
+  const requirementRecord = {
+    requirement_record_id: "requirement-record-cal-atomic-rule-batch",
+    requirement_record_schema_path: "benchmarks/schemas/portfolio-requirement-record.schema.json",
+    requirement_record_path: "scoring-inputs/requirement-record.json",
+    fixture_id: FIXTURE_ID,
+    catalog_digest: catalog.catalog_digest,
+    policy_manifest_digest: policyManifest.manifest_digest,
+    scoring_policy_digest: scoringPolicy.policy_digest,
+    admission_record_digest: digest("synthetic-admission-record"),
+    requirements,
+    requirement_set_digest: digest("placeholder"),
+    requirement_record_digest: digest("placeholder"),
+  };
+  requirementRecord.requirement_set_digest = computeRequirementSetDigest(requirementRecord);
+  requirementRecord.requirement_record_digest = computeRequirementRecordDigest(requirementRecord);
+  const requirementRecordPath = resolve(path, "requirement-record.json");
+  writeJson(requirementRecordPath, requirementRecord);
+
+  const outputContract = {
+    output_contract_id: "output-contract-cal-atomic-rule-batch",
+    output_contract_schema_path: "benchmarks/schemas/portfolio-output-contract.schema.json",
+    output_contract_path: "scoring-inputs/output-contract.json",
+    fixture_id: FIXTURE_ID,
+    catalog_digest: catalog.catalog_digest,
+    policy_manifest_digest: policyManifest.manifest_digest,
+    evaluator_public_reference_path: "evaluator-reference.json",
+    evaluator_public_reference_digest: reference.public_metadata_digest,
+    declares_findings: true,
+    output_contract_digest: digest("placeholder"),
+  };
+  outputContract.output_contract_digest = computeOutputContractDigest(outputContract);
+  const outputContractPath = resolve(path, "output-contract.json");
+  writeJson(outputContractPath, outputContract);
+  return { path, requirementRecord, requirementRecordPath, outputContract, outputContractPath };
+}
+
 function createPrivateBundle(path, normalized) {
   mkdirSync(path);
   const assetInventory = ASSET_ROLES.map((role) => {
     const assetPath = `assets/${role}.json`;
-    const bytes = Buffer.from(`${JSON.stringify({ synthetic_role: role, fixture: "synthetic-evaluator-fixture" })}\n`);
+    const bytes = Buffer.from(`${JSON.stringify({ synthetic_role: role, fixture: FIXTURE_ID })}\n`);
     const target = resolve(path, assetPath);
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, bytes);
@@ -450,16 +539,27 @@ function observation(state, normalized) {
   };
 }
 
-function evaluatorResultFor(normalized, sourceSnapshotDigest, manifest, evaluationStatus) {
+function evaluatorResultFor(normalized, sourceSnapshotDigest, manifest, reference, scoringInputs, evaluationStatus) {
   const state = evaluationStatus === "completed" ? "pass" : evaluationStatus === "manual_review_required" ? "manual_review_required" : "unavailable";
+  const normalizedEvidence = [{ kind: "normalized_result", digest: normalized.normalized_result_digest, bytes: null }];
+  const nonScoringOutcome = evaluationStatus === "manual_review_required" ? "manual_review_required" : "unavailable";
   const result = {
     schema_version: "1.0.0",
     schema_path: "benchmarks/schemas/evaluator-result-envelope.schema.json",
     program: "adaptive_ask_evaluator_result",
+    catalog_digest: catalog.catalog_digest,
+    policy_manifest_digest: policyManifest.manifest_digest,
+    scoring_policy_digest: scoringPolicy.policy_digest,
+    admission_record_digest: scoringInputs.requirementRecord.admission_record_digest,
+    requirement_record_digest: scoringInputs.requirementRecord.requirement_record_digest,
+    requirement_set_digest: scoringInputs.requirementRecord.requirement_set_digest,
+    output_contract_digest: scoringInputs.outputContract.output_contract_digest,
+    evaluator_public_reference_digest: reference.public_metadata_digest,
     normalized_result_id: normalized.normalized_result_id,
     normalized_result_digest: normalized.normalized_result_digest,
     run_instance_id: normalized.lineage.run_instance_id,
     plan_id: normalized.lineage.plan_id,
+    plan_digest: normalized.lineage.plan_digest,
     fixture_id: normalized.lineage.fixture_id,
     fixture_input_digest: normalized.lineage.fixture_input_digest,
     case_id: normalized.lineage.case_id,
@@ -474,9 +574,42 @@ function evaluatorResultFor(normalized, sourceSnapshotDigest, manifest, evaluati
     evaluation_id: `evaluation-${"0".repeat(32)}`,
     evaluation_digest: digest("placeholder"),
     evaluation_status: evaluationStatus,
+    requirement_results: evaluationStatus === "completed" ? [
+      {
+        requirement_id: "weighted-requirement",
+        outcome: "partial",
+        earned_points: 2,
+        matched_equivalence_class_ids: ["equivalence-weighted"],
+        finding_ids: ["synthetic-finding"],
+        evidence_references: normalizedEvidence,
+      },
+      {
+        requirement_id: "blocker-requirement",
+        outcome: "pass",
+        earned_points: 2,
+        matched_equivalence_class_ids: [],
+        finding_ids: [],
+        evidence_references: normalizedEvidence,
+      },
+      {
+        requirement_id: "informational-requirement",
+        outcome: "pass",
+        earned_points: 0,
+        matched_equivalence_class_ids: [],
+        finding_ids: [],
+        evidence_references: normalizedEvidence,
+      },
+    ] : scoringInputs.requirementRecord.requirements.map(({ requirement_id }) => ({
+      requirement_id,
+      outcome: nonScoringOutcome,
+      earned_points: null,
+      matched_equivalence_class_ids: [],
+      finding_ids: [],
+      evidence_references: [],
+    })),
     quality: observation(state, normalized),
     safety: observation(state, normalized),
-    findings: evaluationStatus === "completed" ? [{ finding_id: "synthetic-finding", category: "scope-control", severity: "medium", evidence_references: [{ kind: "normalized_result", digest: normalized.normalized_result_digest, bytes: null }] }] : [],
+    findings: evaluationStatus === "completed" ? [{ finding_id: "synthetic-finding", category: "scope-control", severity: "medium", evidence_references: normalizedEvidence }] : [],
     false_positives: [],
     scope_deviations: [],
     decision_correctness: observation(state, normalized),
@@ -531,7 +664,9 @@ try {
   const privateRoot = resolve(privateWork, "bundle");
   const { manifest, manifestPath } = createPrivateBundle(privateRoot, completedCodex);
   const referencePath = resolve(work, "evaluator-reference.json");
-  writeJson(referencePath, referenceFor(manifest));
+  const reference = referenceFor(manifest);
+  writeJson(referencePath, reference);
+  const scoringInputs = createScoringInputs(resolve(work, "scoring-inputs"), reference);
   const resultPaths = new Map();
   for (const [name, record, status] of [
     ["completed", completedCodex, "completed"],
@@ -540,7 +675,7 @@ try {
     ["unavailable", unavailableClaude, "evaluator_unavailable"],
   ]) {
     const path = resolve(work, `${name}-evaluator-result.json`);
-    writeJson(path, evaluatorResultFor(record, normalized.sourceSnapshotDigest, manifest, status));
+    writeJson(path, evaluatorResultFor(record, normalized.sourceSnapshotDigest, manifest, reference, scoringInputs, status));
     resultPaths.set(name, path);
   }
 
@@ -552,6 +687,8 @@ try {
     "--selection-state", selectionState,
     "--run-dir", runDir,
     "--normalized-results", normalizedResults,
+    "--requirement-record", scoringInputs.requirementRecordPath,
+    "--output-contract", scoringInputs.outputContractPath,
   ];
   const beforePrivate = snapshot(privateRoot);
   const beforeNormalized = snapshot(normalizedResults);
@@ -566,6 +703,11 @@ try {
 
   const baseOptions = {
     root,
+    catalogPath: resolve(root, "benchmarks/portfolio-catalog.json"),
+    policyManifestPath: resolve(root, "benchmarks/portfolio-policy-manifest.json"),
+    scoringPolicyPath: resolve(root, "benchmarks/portfolio-scoring-policy.json"),
+    requirementRecordPath: scoringInputs.requirementRecordPath,
+    outputContractPath: scoringInputs.outputContractPath,
     referencePath,
     privateRoot,
     manifestPath,
@@ -576,11 +718,22 @@ try {
     normalizedResultsPath: normalizedResults,
     publicArtifactRoot,
   };
-  const readOnlyStateSnapshot = () => ({ private: snapshot(privateRoot), normalized: snapshot(normalizedResults), run: snapshot(runDir) });
+  assert.equal(verifyEvaluatorBoundary(baseOptions).scoringReady, true, "completed evaluation with closed requirement coverage must be scoring-ready");
+  assert.equal(verifyEvaluatorBoundary({ ...baseOptions, resultPath: resultPaths.get("manual") }).scoringReady, false, "manual-review evaluation must not be scoring-ready");
+  assert.equal(verifyEvaluatorBoundary({ ...baseOptions, resultPath: resultPaths.get("unavailable") }).scoringReady, false, "unavailable evaluation must not be scoring-ready");
+  const beforeScoringInputs = snapshot(scoringInputs.path);
+  const readOnlyStateSnapshot = () => ({ private: snapshot(privateRoot), normalized: snapshot(normalizedResults), run: snapshot(runDir), scoringInputs: snapshot(scoringInputs.path) });
   const expectBoundaryFailure = (overrides, pattern, message) => {
     const before = readOnlyStateSnapshot();
+    const inputPaths = [
+      overrides.resultPath ?? baseOptions.resultPath,
+      overrides.requirementRecordPath ?? baseOptions.requirementRecordPath,
+      overrides.outputContractPath ?? baseOptions.outputContractPath,
+    ];
+    const inputBytes = inputPaths.map((path) => readFileSync(path));
     assert.throws(() => verifyEvaluatorBoundary({ ...baseOptions, ...overrides }), pattern, message);
     assert.deepEqual(readOnlyStateSnapshot(), before, `${message}: failure must be read-only`);
+    assert.deepEqual(inputPaths.map((path) => readFileSync(path)), inputBytes, `${message}: failure must not modify supplied public inputs`);
   };
 
   const privateAssetPath = resolve(privateRoot, manifest.asset_inventory[0].path);
@@ -805,6 +958,69 @@ try {
   expectBoundaryFailure({ resultPath: crossAttempt }, /attempt/u, "cross-attempt transplant must be rejected");
   const crossAdapter = resultMutation("cross-adapter", (value) => { value.adapter = "claude"; });
   expectBoundaryFailure({ resultPath: crossAdapter }, /adapter/u, "cross-adapter transplant must be rejected");
+  const crossCondition = resultMutation("cross-condition", (value) => { value.condition = "full_ask"; });
+  expectBoundaryFailure({ resultPath: crossCondition }, /condition/u, "cross-condition transplant must be rejected");
+  const crossRepetition = resultMutation("cross-repetition", (value) => { value.repetition = 2; });
+  expectBoundaryFailure({ resultPath: crossRepetition }, /repetition/u, "cross-repetition transplant must be rejected");
+  const crossPlan = resultMutation("cross-plan", (value) => { value.plan_digest = digest("foreign-plan"); });
+  expectBoundaryFailure({ resultPath: crossPlan }, /plan_digest/u, "cross-plan transplant must be rejected");
+  const staleSnapshot = resultMutation("stale-snapshot", (value) => { value.source_snapshot_digest = digest("stale-snapshot"); });
+  expectBoundaryFailure({ resultPath: staleSnapshot }, /snapshot|generation/u, "stale normalized source snapshots must be rejected");
+
+  const partialDisallowed = resultMutation("partial-disallowed", (value) => {
+    const observation = value.requirement_results.find(({ requirement_id }) => requirement_id === "blocker-requirement");
+    observation.outcome = "partial";
+    observation.earned_points = 1;
+  });
+  expectBoundaryFailure({ resultPath: partialDisallowed }, /partial_credit_allowed/u, "partial results for requirements that prohibit partial credit must be rejected");
+  const pointsAboveMaximum = resultMutation("points-above-maximum", (value) => { value.requirement_results[0].earned_points = 5; });
+  expectBoundaryFailure({ resultPath: pointsAboveMaximum }, /exceeds max_points/u, "earned points above max_points must be rejected");
+  const duplicateRequirementResult = resultMutation("duplicate-requirement-result", (value) => { value.requirement_results[1].requirement_id = value.requirement_results[0].requirement_id; });
+  expectBoundaryFailure({ resultPath: duplicateRequirementResult }, /requirement result IDs must be a unique string array/u, "duplicate requirement results must be rejected");
+  const unknownRequirementResult = resultMutation("unknown-requirement-result", (value) => { value.requirement_results[0].requirement_id = "unknown-requirement"; });
+  expectBoundaryFailure({ resultPath: unknownRequirementResult }, /unknown requirement ID/u, "unknown requirement results must be rejected");
+  const missingRequirementCoverage = resultMutation("missing-requirement-coverage", (value) => { value.requirement_results.pop(); });
+  expectBoundaryFailure({ resultPath: missingRequirementCoverage }, /exactly cover the authoritative requirement set/u, "completed evaluation with incomplete requirement coverage must be rejected");
+  const unevaluatedAsZero = resultMutation("unevaluated-as-zero", (value) => {
+    value.requirement_results[0].outcome = "not_evaluated";
+    value.requirement_results[0].earned_points = 0;
+  });
+  expectBoundaryFailure({ resultPath: unevaluatedAsZero }, /must retain null earned_points/u, "not-evaluated requirements must not be converted to zero points");
+  const foreignEquivalence = resultMutation("foreign-equivalence", (value) => { value.requirement_results[0].matched_equivalence_class_ids = ["foreign-equivalence"]; });
+  expectBoundaryFailure({ resultPath: foreignEquivalence }, /subset of the authoritative requirement/u, "foreign equivalence class matches must be rejected");
+  const foreignFinding = resultMutation("foreign-finding", (value) => { value.requirement_results[0].finding_ids = ["foreign-finding"]; });
+  expectBoundaryFailure({ resultPath: foreignFinding }, /finding reference does not close/u, "foreign finding references must be rejected");
+
+  for (const [name, field, value, pattern] of [
+    ["foreign-catalog-binding", "catalog_digest", digest("foreign-catalog"), /catalog_digest/u],
+    ["foreign-policy-manifest-binding", "policy_manifest_digest", digest("foreign-policy-manifest"), /policy_manifest_digest/u],
+    ["foreign-scoring-policy-binding", "scoring_policy_digest", digest("foreign-scoring-policy"), /scoring_policy_digest/u],
+    ["foreign-admission-binding", "admission_record_digest", digest("foreign-admission"), /admission_record_digest/u],
+    ["foreign-requirement-record-binding", "requirement_record_digest", digest("foreign-requirement-record"), /requirement_record_digest/u],
+    ["foreign-requirement-set-binding", "requirement_set_digest", digest("foreign-requirement-set"), /requirement_set_digest/u],
+    ["foreign-output-contract-binding", "output_contract_digest", digest("foreign-output-contract"), /output_contract_digest/u],
+    ["foreign-evaluator-reference-binding", "evaluator_public_reference_digest", digest("foreign-evaluator-reference"), /evaluator_public_reference_digest/u],
+  ]) {
+    const path = resultMutation(name, (result) => { result[field] = value; });
+    expectBoundaryFailure({ resultPath: path }, pattern, `${name} must be rejected`);
+  }
+
+  const replacementRequirementRecord = clone(scoringInputs.requirementRecord);
+  replacementRequirementRecord.requirements[0].max_points = 5;
+  replacementRequirementRecord.requirements[0].requirement_digest = computeRequirementDigest(replacementRequirementRecord.requirements[0]);
+  replacementRequirementRecord.requirement_set_digest = computeRequirementSetDigest(replacementRequirementRecord);
+  replacementRequirementRecord.requirement_record_digest = computeRequirementRecordDigest(replacementRequirementRecord);
+  const replacementRequirementRecordPath = resolve(work, "replacement-requirement-record.json");
+  writeJson(replacementRequirementRecordPath, replacementRequirementRecord);
+  expectBoundaryFailure({ requirementRecordPath: replacementRequirementRecordPath }, /requirement_record_digest/u, "authoritative requirement record replacement must invalidate an existing evaluator result");
+
+  const replacementOutputContract = clone(scoringInputs.outputContract);
+  replacementOutputContract.declares_findings = false;
+  replacementOutputContract.output_contract_digest = computeOutputContractDigest(replacementOutputContract);
+  const replacementOutputContractPath = resolve(work, "replacement-output-contract.json");
+  writeJson(replacementOutputContractPath, replacementOutputContract);
+  expectBoundaryFailure({ outputContractPath: replacementOutputContractPath }, /output_contract_digest/u, "authoritative output contract replacement must invalidate an existing evaluator result");
+
   const evaluationDigestDrift = resultMutation("evaluation-digest-drift", (value) => { value.quality.state = "fail"; }, { close: false });
   expectBoundaryFailure({ resultPath: evaluationDigestDrift }, /digest closure is invalid/u, "evaluator result digest drift must be rejected");
   for (const [name, field, value] of [
@@ -829,6 +1045,7 @@ try {
   assert.deepEqual(snapshot(privateRoot), beforePrivate, "all evaluator failure paths must keep the private bundle byte-identical");
   assert.deepEqual(snapshot(normalizedResults), beforeNormalized, "all evaluator failure paths must keep normalized results byte-identical");
   assert.deepEqual(snapshot(runDir), beforeRun, "all evaluator failure paths must keep execution run state byte-identical");
+  assert.deepEqual(snapshot(scoringInputs.path), beforeScoringInputs, "all evaluator failure paths must keep scoring input artifacts byte-identical");
 
   console.log("ASK benchmark evaluator boundary tests passed");
 } finally {
