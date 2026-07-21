@@ -1,0 +1,1666 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-design-independent-review.schema.json",
+  "program": "adaptive_ask_portfolio",
+  "review_record_id": "portfolio-design-independent-review-b2b-r1",
+  "review_record_path": "benchmarks/portfolio-design-independent-review.json",
+  "review_revision": "issue-205-checkpoint-b2b-r1",
+  "reviewer_identity": "chatgpt:gpt-5.6-thinking",
+  "reviewer_class": "independent_ai_review",
+  "human_review": false,
+  "identity_assurance": "repository_owner_attested_chatgpt_session",
+  "cryptographic_reviewer_signature_present": false,
+  "review_date": "2026-07-21",
+  "reviewed_input": {
+    "repository": "ist-h-i/agent-spectrum-kernel",
+    "pull_request_number": 215,
+    "reviewed_head_sha": "875a23e820b92c8c7d42f566d1ef24cb650b3516",
+    "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+    "policy_revision": "issue-205-checkpoint-b1-r3",
+    "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+    "design_manifest": {
+      "path": "benchmarks/portfolio-design-admission-manifest.json",
+      "digest": "sha256:42a1d0be4363c55ee0b433e59591e415e4008b24d4f03dc6c2dae5642b4c2d16"
+    },
+    "pending_review_package": {
+      "path": "benchmarks/portfolio-design-review-package.json",
+      "digest": "sha256:964bc599530b730af7e9a2c5f5179ab7810f645518ce8b60cbbfc7d18c593ca4"
+    },
+    "design_records": [
+      {
+        "record_id": "design-hi-authorization-exception",
+        "record_path": "benchmarks/portfolio-design-admission-records/hi-authorization-exception.json",
+        "record_digest": "sha256:b9658a762ec7ea2641c77c657a60d4b66969cf6746312c64871096a8edb56ba1",
+        "fixture_id": "hi-authorization-exception"
+      },
+      {
+        "record_id": "design-hi-external-action-approval",
+        "record_path": "benchmarks/portfolio-design-admission-records/hi-external-action-approval.json",
+        "record_digest": "sha256:0018e2c1da1264de77f78cd60bc44f27d6eadcd06972a0fac4967c719d19b5d1",
+        "fixture_id": "hi-external-action-approval"
+      },
+      {
+        "record_id": "design-hi-financial-state-integrity",
+        "record_path": "benchmarks/portfolio-design-admission-records/hi-financial-state-integrity.json",
+        "record_digest": "sha256:06e3936b00b761b39312732dce4cccb5584e0112b81104dd2a127b2dedf3e468",
+        "fixture_id": "hi-financial-state-integrity"
+      },
+      {
+        "record_id": "design-hi-versioned-migration-safety",
+        "record_path": "benchmarks/portfolio-design-admission-records/hi-versioned-migration-safety.json",
+        "record_digest": "sha256:4229e278bb6901c0d3dbdc48cec0b04c17109793ff094a64476b6d8f3335f317",
+        "fixture_id": "hi-versioned-migration-safety"
+      },
+      {
+        "record_id": "design-mn-build-option-update",
+        "record_path": "benchmarks/portfolio-design-admission-records/mn-build-option-update.json",
+        "record_digest": "sha256:cbc47fd81319d2e9804f011a6f0b8524c73d1e0c2b0033f38fbfc55b660d49ae",
+        "fixture_id": "mn-build-option-update"
+      },
+      {
+        "record_id": "design-mn-client-compatibility-fix",
+        "record_path": "benchmarks/portfolio-design-admission-records/mn-client-compatibility-fix.json",
+        "record_digest": "sha256:a5f9e0fb4e522e203f02158b04b9bc73c28413d6f4a83191675cf3ac58bf475a",
+        "fixture_id": "mn-client-compatibility-fix"
+      },
+      {
+        "record_id": "design-mn-doc-config-correction",
+        "record_path": "benchmarks/portfolio-design-admission-records/mn-doc-config-correction.json",
+        "record_digest": "sha256:e8d7e17b9753c1757e0f5f517e57e9205dd86e1303b2c6add2a420d01b008b97",
+        "fixture_id": "mn-doc-config-correction"
+      },
+      {
+        "record_id": "design-mn-focused-regression-test",
+        "record_path": "benchmarks/portfolio-design-admission-records/mn-focused-regression-test.json",
+        "record_digest": "sha256:e2082867ad97e7580e24ff2bc646c4aea7764fcf4215bd5af502763e2c2f7b3a",
+        "fixture_id": "mn-focused-regression-test"
+      },
+      {
+        "record_id": "design-mn-frontend-default-fix",
+        "record_path": "benchmarks/portfolio-design-admission-records/mn-frontend-default-fix.json",
+        "record_digest": "sha256:192a977e33570d752cae7367722f592a5b4334ccda0452276c244ca4bc0fa67a",
+        "fixture_id": "mn-frontend-default-fix"
+      },
+      {
+        "record_id": "design-mn-schema-field-alignment",
+        "record_path": "benchmarks/portfolio-design-admission-records/mn-schema-field-alignment.json",
+        "record_digest": "sha256:7ed94543c331bb617280f9a31dee370c26e201390fb5a87d3abb8662825d0342",
+        "fixture_id": "mn-schema-field-alignment"
+      },
+      {
+        "record_id": "design-mp-accessibility-interaction-review",
+        "record_path": "benchmarks/portfolio-design-admission-records/mp-accessibility-interaction-review.json",
+        "record_digest": "sha256:56efd076d229598c0fae3b5c67fb8e0df6f4afaf9bd05a36e89ffb13921239cb",
+        "fixture_id": "mp-accessibility-interaction-review"
+      },
+      {
+        "record_id": "design-mp-ci-evidence-gap",
+        "record_path": "benchmarks/portfolio-design-admission-records/mp-ci-evidence-gap.json",
+        "record_digest": "sha256:fc5cef362d445cbc3be313bc73f2533855340c32a6a7f0abd20a3bd366c7dc1f",
+        "fixture_id": "mp-ci-evidence-gap"
+      },
+      {
+        "record_id": "design-mp-data-migration-handoff",
+        "record_path": "benchmarks/portfolio-design-admission-records/mp-data-migration-handoff.json",
+        "record_digest": "sha256:4f301ec080246d69ac6bdfbc1dd6dcea4eb2952bf3a75013621241e5ea104f02",
+        "fixture_id": "mp-data-migration-handoff"
+      },
+      {
+        "record_id": "design-mp-frontend-state-review",
+        "record_path": "benchmarks/portfolio-design-admission-records/mp-frontend-state-review.json",
+        "record_digest": "sha256:c1b2eaf7792948fe6b3751f74eeaa9f915a6ccc38ef2ffdf46582b524b94c031",
+        "fixture_id": "mp-frontend-state-review"
+      },
+      {
+        "record_id": "design-mp-iac-rollback-design",
+        "record_path": "benchmarks/portfolio-design-admission-records/mp-iac-rollback-design.json",
+        "record_digest": "sha256:cf988b54c32e7c2dbb5f5c8af78b8d86f0fd4387b40b417be7cfcd3843a80dba",
+        "fixture_id": "mp-iac-rollback-design"
+      },
+      {
+        "record_id": "design-mp-performance-investigation",
+        "record_path": "benchmarks/portfolio-design-admission-records/mp-performance-investigation.json",
+        "record_digest": "sha256:3e155c7c81a4cc8ca40363f89f7b2f32138216c11cb98a479846c2ac1b55e36f",
+        "fixture_id": "mp-performance-investigation"
+      },
+      {
+        "record_id": "design-pf-api-pagination-behavior",
+        "record_path": "benchmarks/portfolio-design-admission-records/pf-api-pagination-behavior.json",
+        "record_digest": "sha256:5018b4cfc70e63f6842042bdab90b676cf32015160a0384449fefdaa80f62044",
+        "fixture_id": "pf-api-pagination-behavior"
+      },
+      {
+        "record_id": "design-pf-ci-cache-flake",
+        "record_path": "benchmarks/portfolio-design-admission-records/pf-ci-cache-flake.json",
+        "record_digest": "sha256:bd19f0333ca00b7ab4e93814baabc1fb1b83e038369a50513cc3507deeb93b0c",
+        "fixture_id": "pf-ci-cache-flake"
+      },
+      {
+        "record_id": "design-pf-data-schema-evolution",
+        "record_path": "benchmarks/portfolio-design-admission-records/pf-data-schema-evolution.json",
+        "record_digest": "sha256:272ef5548231d1d92f2ebabbe14011d05c26c022a490391b5309c80d9edfdd5c",
+        "fixture_id": "pf-data-schema-evolution"
+      },
+      {
+        "record_id": "design-pf-frontend-async-state",
+        "record_path": "benchmarks/portfolio-design-admission-records/pf-frontend-async-state.json",
+        "record_digest": "sha256:bcc1a34d6cfb580ff8a2b69768320c54551ce0859d6163b581e45fa8bf58f242",
+        "fixture_id": "pf-frontend-async-state"
+      },
+      {
+        "record_id": "design-pf-library-compat-upgrade",
+        "record_path": "benchmarks/portfolio-design-admission-records/pf-library-compat-upgrade.json",
+        "record_digest": "sha256:012774c4d2d9b0730eb92d1d5200d4ff117843e0d36f6b799a33a7833f7cd667",
+        "fixture_id": "pf-library-compat-upgrade"
+      },
+      {
+        "record_id": "design-pf-observability-redaction",
+        "record_path": "benchmarks/portfolio-design-admission-records/pf-observability-redaction.json",
+        "record_digest": "sha256:26b48dead816b0e9dae0d43b1630d1634d50a48bc70326061c4b2742e5956f92",
+        "fixture_id": "pf-observability-redaction"
+      },
+      {
+        "record_id": "design-pf-performance-regression",
+        "record_path": "benchmarks/portfolio-design-admission-records/pf-performance-regression.json",
+        "record_digest": "sha256:3b474c55f8f399da5c3d8fe013ed690c5ab1b6bb30c6d610c778f24853637a1a",
+        "fixture_id": "pf-performance-regression"
+      },
+      {
+        "record_id": "design-pf-review-error-contract",
+        "record_path": "benchmarks/portfolio-design-admission-records/pf-review-error-contract.json",
+        "record_digest": "sha256:d80b8b390cd77a6f0fb1880c695b46a7a867a9155e19a6ba1ee08bbc32ebe042",
+        "fixture_id": "pf-review-error-contract"
+      }
+    ]
+  },
+  "external_review_evidence": {
+    "evidence_type": "github_pr_comment",
+    "repository": "ist-h-i/agent-spectrum-kernel",
+    "pull_request_number": 215,
+    "comment_id": 5029786494,
+    "comment_url": "https://github.com/ist-h-i/agent-spectrum-kernel/pull/215#issuecomment-5029786494",
+    "comment_created_at": "2026-07-21T03:18:45Z",
+    "comment_updated_at": "2026-07-21T03:19:38Z",
+    "comment_body_digest": "sha256:9ef23037ba2aaa92cfbf7d45fe81f1cd837d884e97db9a89cbb0647286592755",
+    "reviewer_identity": "chatgpt:gpt-5.6-thinking",
+    "github_transport_actor": "ist-h-i",
+    "github_author_association": "OWNER",
+    "github_app_slug": "chatgpt-codex-connector",
+    "comment_transport_actor_is_reviewer": false,
+    "github_transport_uses_repository_owner_account": true,
+    "remote_comment_content_cryptographically_verified_offline": false
+  },
+  "review_payload": {
+    "portfolio_dimensions": [
+      {
+        "dimension_id": "ordinary_engineering_wording",
+        "result": "pass",
+        "assessment": "All 24 intents are ordinary engineering requests and do not describe the benchmark mechanism."
+      },
+      {
+        "dimension_id": "plain_fair_path",
+        "result": "pass",
+        "assessment": "Every record exposes agent-visible evidence topology and a task-type-appropriate Plain path without requiring hidden ASK assets."
+      },
+      {
+        "dimension_id": "kernel_only_fair_path",
+        "result": "pass",
+        "assessment": "Kernel guidance is limited to structure, scope, evidence, risk, and verification; it does not supply fixture-specific conclusions."
+      },
+      {
+        "dimension_id": "mechanism_diversity",
+        "result": "pass",
+        "assessment": "The frozen 6/6/8/4 portfolio spans review, investigation, implementation, verification, migration, handoff, design, and operation boundaries without an unresolved metadata duplicate."
+      },
+      {
+        "dimension_id": "domain_realism",
+        "result": "pass",
+        "assessment": "Frontend, accessibility, CI/build, IaC/operations, data/schema, performance, testing, client compatibility, observability, backend/API, financial, and authorization domains are represented."
+      },
+      {
+        "dimension_id": "difficulty_realism",
+        "result": "pass",
+        "assessment": "The set contains lightweight easy/medium negative controls, medium-hard recurring work, and hard high-impact/design tasks; repetition counts remain consistent with the catalog."
+      },
+      {
+        "dimension_id": "ask_vocabulary_cue_absence",
+        "result": "pass",
+        "assessment": "Public intents contain no ASK, condition, routing, or scoring cue."
+      },
+      {
+        "dimension_id": "answer_leakage_absence",
+        "result": "pass",
+        "assessment": "Records contain intent, topology, count bands, and gate plans only; no concrete defect, patch, decision, matcher, oracle, hidden test, or scoring weight is disclosed."
+      },
+      {
+        "dimension_id": "output_contract_appropriateness",
+        "result": "pass",
+        "assessment": "Review/investigation tasks are findings-producing, design/handoff/operation tasks are plan-producing, and implementation/verification/migration tasks are implementation-producing."
+      },
+      {
+        "dimension_id": "admission_gate_applicability",
+        "result": "pass",
+        "assessment": "Gate plans match the frozen selectors, including review false-positive controls and risk/high-impact unauthorized-attempt observability, and require final selector re-derivation."
+      },
+      {
+        "dimension_id": "child_issue_ownership",
+        "result": "pass",
+        "assessment": "Suite ownership is exact: #206=6, #207=6, #208=8, #209=4."
+      }
+    ],
+    "approved_fixture_ids": [
+      "hi-authorization-exception",
+      "hi-external-action-approval",
+      "hi-financial-state-integrity",
+      "hi-versioned-migration-safety",
+      "mn-build-option-update",
+      "mn-client-compatibility-fix",
+      "mn-doc-config-correction",
+      "mn-focused-regression-test",
+      "mn-frontend-default-fix",
+      "mn-schema-field-alignment",
+      "mp-accessibility-interaction-review",
+      "mp-ci-evidence-gap",
+      "mp-data-migration-handoff",
+      "mp-frontend-state-review",
+      "mp-iac-rollback-design",
+      "mp-performance-investigation",
+      "pf-api-pagination-behavior",
+      "pf-ci-cache-flake",
+      "pf-data-schema-evolution",
+      "pf-frontend-async-state",
+      "pf-library-compat-upgrade",
+      "pf-observability-redaction",
+      "pf-performance-regression",
+      "pf-review-error-contract"
+    ],
+    "scope": {
+      "source_state": "design_pending",
+      "reviewed_state": "design_reviewed",
+      "final_admission_evaluated": false,
+      "implementation_pending_evaluated": false,
+      "actual_fixture_evidence_reviewed": false,
+      "actual_requirement_or_output_contract_reviewed": false,
+      "private_evaluator_reviewed": false,
+      "actual_lineage_or_scoring_reviewed": false,
+      "pilot_or_measured_result_reviewed": false
+    },
+    "residual_requirements": [
+      "actual_agent_visible_bytes_require_fair_access_revalidation",
+      "actual_evidence_requires_recoverability_revalidation"
+    ]
+  },
+  "review_payload_digest": "sha256:7f6b9246f02a8fd46fda571d57667b42103b1bedd8643bdb6211048a400a8149",
+  "fixture_reviews": [
+    {
+      "fixture_id": "hi-authorization-exception",
+      "design_record_id": "design-hi-authorization-exception",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/hi-authorization-exception.json",
+      "design_record_digest": "sha256:b9658a762ec7ea2641c77c657a60d4b66969cf6746312c64871096a8edb56ba1",
+      "implementation_owner_issue": 209,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:8309fae3d38511c087940f5ff898cb486a1de57e6188c0897a64618546d2074e"
+    },
+    {
+      "fixture_id": "hi-external-action-approval",
+      "design_record_id": "design-hi-external-action-approval",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/hi-external-action-approval.json",
+      "design_record_digest": "sha256:0018e2c1da1264de77f78cd60bc44f27d6eadcd06972a0fac4967c719d19b5d1",
+      "implementation_owner_issue": 209,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:e84fa457ae45ade1798bd2541805d4fcc7c448649749740df5f70254b06ee590"
+    },
+    {
+      "fixture_id": "hi-financial-state-integrity",
+      "design_record_id": "design-hi-financial-state-integrity",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/hi-financial-state-integrity.json",
+      "design_record_digest": "sha256:06e3936b00b761b39312732dce4cccb5584e0112b81104dd2a127b2dedf3e468",
+      "implementation_owner_issue": 209,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:8c7b853b5e9505ee4759b656ec9483bb3913ee8ac500dd30a651d3597179120b"
+    },
+    {
+      "fixture_id": "hi-versioned-migration-safety",
+      "design_record_id": "design-hi-versioned-migration-safety",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/hi-versioned-migration-safety.json",
+      "design_record_digest": "sha256:4229e278bb6901c0d3dbdc48cec0b04c17109793ff094a64476b6d8f3335f317",
+      "implementation_owner_issue": 209,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:b6f233bdf6df3c8dbd9d7038c8c1af85789ffb7310a9f48256c668d0be97e2d1"
+    },
+    {
+      "fixture_id": "mn-build-option-update",
+      "design_record_id": "design-mn-build-option-update",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/mn-build-option-update.json",
+      "design_record_digest": "sha256:cbc47fd81319d2e9804f011a6f0b8524c73d1e0c2b0033f38fbfc55b660d49ae",
+      "implementation_owner_issue": 207,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:e3e5d3894b0f96e5c7e3e6c415c0c9b6a3ad964890650d2c94662a02c659d7cc"
+    },
+    {
+      "fixture_id": "mn-client-compatibility-fix",
+      "design_record_id": "design-mn-client-compatibility-fix",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/mn-client-compatibility-fix.json",
+      "design_record_digest": "sha256:a5f9e0fb4e522e203f02158b04b9bc73c28413d6f4a83191675cf3ac58bf475a",
+      "implementation_owner_issue": 207,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:82cd16be1c92b84adbfc6614f24a58a371903ec57bf82d93da3284ef42f418a2"
+    },
+    {
+      "fixture_id": "mn-doc-config-correction",
+      "design_record_id": "design-mn-doc-config-correction",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/mn-doc-config-correction.json",
+      "design_record_digest": "sha256:e8d7e17b9753c1757e0f5f517e57e9205dd86e1303b2c6add2a420d01b008b97",
+      "implementation_owner_issue": 207,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:392524ef3507cf4ea4c1b9553e4e01ac0f5deb70e1b965ceca29809b6eff63fd"
+    },
+    {
+      "fixture_id": "mn-focused-regression-test",
+      "design_record_id": "design-mn-focused-regression-test",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/mn-focused-regression-test.json",
+      "design_record_digest": "sha256:e2082867ad97e7580e24ff2bc646c4aea7764fcf4215bd5af502763e2c2f7b3a",
+      "implementation_owner_issue": 207,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:ca1ceee4baf395f66a48ae458e0e9ba586dee14b9cb55e09316e8742f98071a9"
+    },
+    {
+      "fixture_id": "mn-frontend-default-fix",
+      "design_record_id": "design-mn-frontend-default-fix",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/mn-frontend-default-fix.json",
+      "design_record_digest": "sha256:192a977e33570d752cae7367722f592a5b4334ccda0452276c244ca4bc0fa67a",
+      "implementation_owner_issue": 207,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:c94c7c92febd5b21ee5ae033191ef739ae325251e45cd07c023b7971dd70d934"
+    },
+    {
+      "fixture_id": "mn-schema-field-alignment",
+      "design_record_id": "design-mn-schema-field-alignment",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/mn-schema-field-alignment.json",
+      "design_record_digest": "sha256:7ed94543c331bb617280f9a31dee370c26e201390fb5a87d3abb8662825d0342",
+      "implementation_owner_issue": 207,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:98e527022223f90315561905f65645a32d6b9dd9a9aa7d0fe62658d8fc88672b"
+    },
+    {
+      "fixture_id": "mp-accessibility-interaction-review",
+      "design_record_id": "design-mp-accessibility-interaction-review",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/mp-accessibility-interaction-review.json",
+      "design_record_digest": "sha256:56efd076d229598c0fae3b5c67fb8e0df6f4afaf9bd05a36e89ffb13921239cb",
+      "implementation_owner_issue": 206,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:0614f4c194200e52c6062ff674987a06ddabf3eaa411a6e9e181760eb0b66db0"
+    },
+    {
+      "fixture_id": "mp-ci-evidence-gap",
+      "design_record_id": "design-mp-ci-evidence-gap",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/mp-ci-evidence-gap.json",
+      "design_record_digest": "sha256:fc5cef362d445cbc3be313bc73f2533855340c32a6a7f0abd20a3bd366c7dc1f",
+      "implementation_owner_issue": 206,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:6f337a970d5baea57a3b2a0e7a6401475591cae29bcee0dfae3a13dd7bc58fb0"
+    },
+    {
+      "fixture_id": "mp-data-migration-handoff",
+      "design_record_id": "design-mp-data-migration-handoff",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/mp-data-migration-handoff.json",
+      "design_record_digest": "sha256:4f301ec080246d69ac6bdfbc1dd6dcea4eb2952bf3a75013621241e5ea104f02",
+      "implementation_owner_issue": 206,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:7841a0012d6d1a3bbfbe4d536415b948cac533cc818002f16e92433c89c0f69d"
+    },
+    {
+      "fixture_id": "mp-frontend-state-review",
+      "design_record_id": "design-mp-frontend-state-review",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/mp-frontend-state-review.json",
+      "design_record_digest": "sha256:c1b2eaf7792948fe6b3751f74eeaa9f915a6ccc38ef2ffdf46582b524b94c031",
+      "implementation_owner_issue": 206,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:7d25e4c9827a3fdb08d9d6e9eb885227c2577413caa513626ccb7cba0dd99e34"
+    },
+    {
+      "fixture_id": "mp-iac-rollback-design",
+      "design_record_id": "design-mp-iac-rollback-design",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/mp-iac-rollback-design.json",
+      "design_record_digest": "sha256:cf988b54c32e7c2dbb5f5c8af78b8d86f0fd4387b40b417be7cfcd3843a80dba",
+      "implementation_owner_issue": 206,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:b4dd669504c1a0ab98b83654eaa1e9b6527fbcb19f4ef14d63b568d4544f3899"
+    },
+    {
+      "fixture_id": "mp-performance-investigation",
+      "design_record_id": "design-mp-performance-investigation",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/mp-performance-investigation.json",
+      "design_record_digest": "sha256:3e155c7c81a4cc8ca40363f89f7b2f32138216c11cb98a479846c2ac1b55e36f",
+      "implementation_owner_issue": 206,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:c03a9e05f2a72a339213b8afb0ead19b5c7f5c494de5aab221b52f4fa7144c41"
+    },
+    {
+      "fixture_id": "pf-api-pagination-behavior",
+      "design_record_id": "design-pf-api-pagination-behavior",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/pf-api-pagination-behavior.json",
+      "design_record_digest": "sha256:5018b4cfc70e63f6842042bdab90b676cf32015160a0384449fefdaa80f62044",
+      "implementation_owner_issue": 208,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:427f7d0b0eac0bf6065641e67291e4812d6b1d273c3c7d5bef7241a42d59935f"
+    },
+    {
+      "fixture_id": "pf-ci-cache-flake",
+      "design_record_id": "design-pf-ci-cache-flake",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/pf-ci-cache-flake.json",
+      "design_record_digest": "sha256:bd19f0333ca00b7ab4e93814baabc1fb1b83e038369a50513cc3507deeb93b0c",
+      "implementation_owner_issue": 208,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:2fd9bd2b49975b091313e71bcbd0db37940b3e55b7d5fe1e33d5c0e471430a30"
+    },
+    {
+      "fixture_id": "pf-data-schema-evolution",
+      "design_record_id": "design-pf-data-schema-evolution",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/pf-data-schema-evolution.json",
+      "design_record_digest": "sha256:272ef5548231d1d92f2ebabbe14011d05c26c022a490391b5309c80d9edfdd5c",
+      "implementation_owner_issue": 208,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:29ab8530427aee5a26612614763dc7c352a8a1837c497de27a2fe3bb688ad762"
+    },
+    {
+      "fixture_id": "pf-frontend-async-state",
+      "design_record_id": "design-pf-frontend-async-state",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/pf-frontend-async-state.json",
+      "design_record_digest": "sha256:bcc1a34d6cfb580ff8a2b69768320c54551ce0859d6163b581e45fa8bf58f242",
+      "implementation_owner_issue": 208,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:926cd8c63c41d1ad51f233f29678eb5d476960a54e14223c9f5f012d91e4174e"
+    },
+    {
+      "fixture_id": "pf-library-compat-upgrade",
+      "design_record_id": "design-pf-library-compat-upgrade",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/pf-library-compat-upgrade.json",
+      "design_record_digest": "sha256:012774c4d2d9b0730eb92d1d5200d4ff117843e0d36f6b799a33a7833f7cd667",
+      "implementation_owner_issue": 208,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:aa8517c95156f6cddbad180f8240519f13e01ac628be6c810ca70f399f76c04e"
+    },
+    {
+      "fixture_id": "pf-observability-redaction",
+      "design_record_id": "design-pf-observability-redaction",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/pf-observability-redaction.json",
+      "design_record_digest": "sha256:26b48dead816b0e9dae0d43b1630d1634d50a48bc70326061c4b2742e5956f92",
+      "implementation_owner_issue": 208,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:9b47077978064ae4a782ce98b19aa6d4b57e626986e6f9bcae1383c5ecb1a2cd"
+    },
+    {
+      "fixture_id": "pf-performance-regression",
+      "design_record_id": "design-pf-performance-regression",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/pf-performance-regression.json",
+      "design_record_digest": "sha256:3b474c55f8f399da5c3d8fe013ed690c5ab1b6bb30c6d610c778f24853637a1a",
+      "implementation_owner_issue": 208,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:d3c8309f2eb5cc2254f3e98a0b6a5514961561b48607784e780f9fafa13a0375"
+    },
+    {
+      "fixture_id": "pf-review-error-contract",
+      "design_record_id": "design-pf-review-error-contract",
+      "design_record_path": "benchmarks/portfolio-design-admission-records/pf-review-error-contract.json",
+      "design_record_digest": "sha256:d80b8b390cd77a6f0fb1880c695b46a7a867a9155e19a6ba1ee08bbc32ebe042",
+      "implementation_owner_issue": 208,
+      "dimension_results": [
+        {
+          "dimension_id": "ordinary_engineering_wording",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "plain_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "kernel_only_fair_path",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "mechanism_diversity",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "domain_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "difficulty_realism",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "ask_vocabulary_cue_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "answer_leakage_absence",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "output_contract_appropriateness",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "admission_gate_applicability",
+          "result": "pass"
+        },
+        {
+          "dimension_id": "child_issue_ownership",
+          "result": "pass"
+        }
+      ],
+      "design_review_status": "approved_design_review",
+      "final_admission_status": "not_evaluated",
+      "actual_fixture_evidence_reviewed": false,
+      "review_item_digest": "sha256:69b685fd57230f3f31bdaa1e789f0a119154568d0494a554a5cb81fd347b753b"
+    }
+  ],
+  "portfolio_design_review_status": "approved_design_review",
+  "review_record_digest": "sha256:27b8cba8aec18a232d1944187173e3629e35abfe9a943596d3fffc4263314ef9"
+}

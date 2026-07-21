@@ -7,6 +7,9 @@ import { canonicalPathSetDigest } from "./installer-lifecycle.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
+import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
+import { validatePortfolioDesignAdmissionArtifacts } from "./ask-benchmark-design-admission.mjs";
+import { validatePortfolioDesignIndependentReview, validatePortfolioDesignReviewedState } from "./ask-benchmark-design-review.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const defaultOutput = resolve(root, "docs/fixtures/adapter-runtime-bundle.json");
@@ -53,8 +56,17 @@ function projectionRecord(adapterId, plan) {
 export function buildAdapterRuntimeBundle() {
   const manifest = JSON.parse(readFileSync(resolve(root, "manifest.json"), "utf8"));
   validatePortfolioCatalogArtifacts({ root });
+  validatePortfolioPolicyArtifacts({ root });
+  validatePortfolioDesignAdmissionArtifacts({ root });
+  validatePortfolioDesignIndependentReview({ root });
+  validatePortfolioDesignReviewedState({ root });
   const portfolioCatalog = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-catalog.json"), "utf8"));
   const portfolioSimilarity = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-similarity.json"), "utf8"));
+  const portfolioPolicyManifest = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-policy-manifest.json"), "utf8"));
+  const portfolioDesignManifest = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-admission-manifest.json"), "utf8"));
+  const portfolioDesignReviewPackage = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-review-package.json"), "utf8"));
+  const portfolioIndependentDesignReview = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-independent-review.json"), "utf8"));
+  const portfolioDesignReviewedState = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-reviewed-state.json"), "utf8"));
   const profiles = [];
   const canonicalPaths = new Set(["AGENTS.md", "manifest.json"]);
   for (const profile of commonProfiles) {
@@ -87,13 +99,59 @@ export function buildAdapterRuntimeBundle() {
       portfolio_catalog: {
         issue: 205,
         checkpoint: "public_metadata_freeze",
-        protocol_version: "3.6.0-portfolio-catalog",
+        protocol_version: "3.7.0-portfolio-policy",
         catalog_path: "benchmarks/portfolio-catalog.json",
         catalog_file_sha256: fileSha256("benchmarks/portfolio-catalog.json"),
         catalog_digest: portfolioCatalog.catalog_digest,
         similarity_path: "benchmarks/portfolio-similarity.json",
         similarity_file_sha256: fileSha256("benchmarks/portfolio-similarity.json"),
         similarity_report_digest: portfolioSimilarity.report_digest,
+      },
+      portfolio_policy: {
+        issue: 205,
+        checkpoint: "policy_contract_freeze",
+        protocol_version: "3.7.0-portfolio-policy",
+        policy_revision: portfolioPolicyManifest.policy_revision,
+        policy_manifest_path: "benchmarks/portfolio-policy-manifest.json",
+        policy_manifest_file_sha256: fileSha256("benchmarks/portfolio-policy-manifest.json"),
+        policy_manifest_digest: portfolioPolicyManifest.manifest_digest,
+        admission_policy_digest: portfolioPolicyManifest.admission_policy.digest,
+        scoring_policy_digest: portfolioPolicyManifest.scoring_policy.digest,
+        lineage_policy_digest: portfolioPolicyManifest.lineage_policy.digest,
+        policy_status: portfolioPolicyManifest.policy_status,
+      },
+      portfolio_design_admission: {
+        issue: 205,
+        checkpoint: "design_pre_admission",
+        design_revision: portfolioDesignManifest.manifest_revision,
+        lifecycle_state: portfolioDesignManifest.design_lifecycle_state,
+        bound_policy_revision: portfolioDesignManifest.policy_revision,
+        design_manifest_path: "benchmarks/portfolio-design-admission-manifest.json",
+        design_manifest_file_sha256: fileSha256("benchmarks/portfolio-design-admission-manifest.json"),
+        design_manifest_digest: portfolioDesignManifest.manifest_digest,
+        design_record_count: portfolioDesignManifest.primary_fixture_count,
+        review_package_path: "benchmarks/portfolio-design-review-package.json",
+        review_package_file_sha256: fileSha256("benchmarks/portfolio-design-review-package.json"),
+        review_package_digest: portfolioDesignReviewPackage.package_digest,
+        reviewer_status: portfolioDesignReviewPackage.review_status_constraint.generated_status,
+      },
+      portfolio_design_review: {
+        issue: 205,
+        checkpoint: "independent_design_review",
+        review_revision: portfolioIndependentDesignReview.review_revision,
+        reviewed_head_sha: portfolioIndependentDesignReview.reviewed_input.reviewed_head_sha,
+        reviewer_identity: portfolioIndependentDesignReview.reviewer_identity,
+        reviewer_class: portfolioIndependentDesignReview.reviewer_class,
+        human_review: portfolioIndependentDesignReview.human_review,
+        independent_review_path: "benchmarks/portfolio-design-independent-review.json",
+        independent_review_file_sha256: fileSha256("benchmarks/portfolio-design-independent-review.json"),
+        independent_review_digest: portfolioIndependentDesignReview.review_record_digest,
+        reviewed_state_path: "benchmarks/portfolio-design-reviewed-state.json",
+        reviewed_state_file_sha256: fileSha256("benchmarks/portfolio-design-reviewed-state.json"),
+        reviewed_state_digest: portfolioDesignReviewedState.projection_digest,
+        projected_state: portfolioDesignReviewedState.projected_state,
+        final_admission_implied: portfolioDesignReviewedState.final_admission_implied,
+        implementation_authorized: portfolioDesignReviewedState.implementation_authorized,
       },
     },
   };

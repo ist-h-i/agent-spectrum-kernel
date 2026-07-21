@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { chmodSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, readdirSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, readdirSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -251,11 +251,35 @@ function writeFixture(root, skills = ["alpha"]) {
   for (const path of [
     "benchmarks/portfolio-catalog.json",
     "benchmarks/portfolio-similarity.json",
+    "benchmarks/portfolio-policy-manifest.json",
+    "benchmarks/portfolio-admission-policy.json",
+    "benchmarks/portfolio-scoring-policy.json",
+    "benchmarks/portfolio-lineage-policy.json",
+    "benchmarks/portfolio-design-admission-manifest.json",
+    "benchmarks/portfolio-design-review-package.json",
+    "benchmarks/portfolio-design-admission-records",
+    "benchmarks/portfolio-design-independent-review.json",
+    "benchmarks/portfolio-design-reviewed-state.json",
     "benchmarks/schemas/portfolio-catalog.schema.json",
     "benchmarks/schemas/portfolio-similarity.schema.json",
+    "benchmarks/schemas/portfolio-policy-manifest.schema.json",
+    "benchmarks/schemas/portfolio-admission-policy.schema.json",
+    "benchmarks/schemas/portfolio-scoring-policy.schema.json",
+    "benchmarks/schemas/portfolio-lineage-policy.schema.json",
+    "benchmarks/schemas/portfolio-requirement-record.schema.json",
+    "benchmarks/schemas/portfolio-output-contract.schema.json",
+    "benchmarks/schemas/portfolio-lineage-record.schema.json",
+    "benchmarks/schemas/portfolio-classification-record.schema.json",
+    "benchmarks/schemas/evaluator-reference.schema.json",
+    "benchmarks/schemas/portfolio-design-admission-manifest.schema.json",
+    "benchmarks/schemas/portfolio-design-admission-record.schema.json",
+    "benchmarks/schemas/portfolio-design-review-package.schema.json",
+    "benchmarks/schemas/portfolio-design-independent-review.schema.json",
+    "benchmarks/schemas/portfolio-design-reviewed-state.schema.json",
   ]) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    writeFileSync(resolve(root, path), readFileSync(resolve(repoRoot, path)));
+    if (path === "benchmarks/portfolio-design-admission-records") cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
+    else writeFileSync(resolve(root, path), readFileSync(resolve(repoRoot, path)));
   }
 
   writeFileSync(resolve(root, "AGENTS.md"), "# Kernel\n");
@@ -5811,6 +5835,27 @@ jobs:
   invalidPortfolioCatalog.catalog_digest = `sha256:${"f".repeat(64)}`;
   writeFileSync(invalidPortfolioCatalogPath, `${JSON.stringify(invalidPortfolioCatalog, null, 2)}\n`);
   assertFail("invalid portfolio catalog", invalidPortfolioCatalogRoot, "catalog digest does not match");
+
+  const invalidPortfolioPolicyRoot = cloneFixture("invalid-portfolio-policy");
+  const invalidPortfolioPolicyPath = resolve(invalidPortfolioPolicyRoot, "benchmarks/portfolio-policy-manifest.json");
+  const invalidPortfolioPolicy = JSON.parse(readFileSync(invalidPortfolioPolicyPath, "utf8"));
+  invalidPortfolioPolicy.manifest_digest = `sha256:${"f".repeat(64)}`;
+  writeFileSync(invalidPortfolioPolicyPath, `${JSON.stringify(invalidPortfolioPolicy, null, 2)}\n`);
+  assertFail("invalid portfolio policy", invalidPortfolioPolicyRoot, "policy manifest digest does not match");
+
+  const invalidPortfolioDesignRoot = cloneFixture("invalid-portfolio-design-admission");
+  const invalidPortfolioDesignPath = resolve(invalidPortfolioDesignRoot, "benchmarks/portfolio-design-review-package.json");
+  const invalidPortfolioDesign = JSON.parse(readFileSync(invalidPortfolioDesignPath, "utf8"));
+  invalidPortfolioDesign.records[0].reviewer_status = "approved";
+  writeFileSync(invalidPortfolioDesignPath, `${JSON.stringify(invalidPortfolioDesign, null, 2)}\n`);
+  assertFail("invalid portfolio design admission", invalidPortfolioDesignRoot, "pending_independent_review");
+
+  const invalidPortfolioDesignReviewRoot = cloneFixture("invalid-portfolio-design-review");
+  const invalidPortfolioDesignReviewPath = resolve(invalidPortfolioDesignReviewRoot, "benchmarks/portfolio-design-independent-review.json");
+  const invalidPortfolioDesignReview = JSON.parse(readFileSync(invalidPortfolioDesignReviewPath, "utf8"));
+  invalidPortfolioDesignReview.human_review = true;
+  writeFileSync(invalidPortfolioDesignReviewPath, `${JSON.stringify(invalidPortfolioDesignReview, null, 2)}\n`);
+  assertFail("invalid portfolio design review", invalidPortfolioDesignReviewRoot, "human_review");
 
   const stalePhraseRoot = cloneFixture("stale-phrase");
   writeFileSync(resolve(stalePhraseRoot, "docs/ok.md"), "# OK\n\nThis repository has 25 skills.\n");

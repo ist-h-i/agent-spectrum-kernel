@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio design independent review package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "package_revision",
+    "design_manifest",
+    "required_review_dimensions",
+    "review_status_constraint",
+    "records",
+    "package_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-design-review-package.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio" },
+    "package_revision": { "const": "issue-205-checkpoint-b2a-r1" },
+    "design_manifest": { "$ref": "#/$defs/manifestReference" },
+    "required_review_dimensions": {
+      "type": "array",
+      "prefixItems": [
+        { "const": "ordinary_engineering_wording" },
+        { "const": "plain_fair_path" },
+        { "const": "kernel_only_fair_path" },
+        { "const": "mechanism_diversity" },
+        { "const": "domain_realism" },
+        { "const": "difficulty_realism" },
+        { "const": "ask_vocabulary_cue_absence" },
+        { "const": "answer_leakage_absence" },
+        { "const": "output_contract_appropriateness" },
+        { "const": "admission_gate_applicability" },
+        { "const": "child_issue_ownership" }
+      ],
+      "items": false,
+      "minItems": 11,
+      "maxItems": 11
+    },
+    "review_status_constraint": { "$ref": "#/$defs/reviewStatusConstraint" },
+    "records": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "items": { "$ref": "#/$defs/reviewRecord" }
+    },
+    "package_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "manifestReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": { "const": "benchmarks/portfolio-design-admission-manifest.json" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "reviewStatusConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generated_status",
+        "generator_may_set_approved_or_rejected",
+        "generation_or_validation_counts_as_independent_review",
+        "reviewer_identity_required_for_terminal_review",
+        "review_record_digest_required_for_terminal_review"
+      ],
+      "properties": {
+        "generated_status": { "const": "pending_independent_review" },
+        "generator_may_set_approved_or_rejected": { "const": false },
+        "generation_or_validation_counts_as_independent_review": { "const": false },
+        "reviewer_identity_required_for_terminal_review": { "const": true },
+        "review_record_digest_required_for_terminal_review": { "const": true }
+      }
+    },
+    "reviewRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_id", "record_path", "record_digest", "fixture_id", "reviewer_status", "reviewer_identity", "review_record_digest"],
+      "properties": {
+        "record_id": { "$ref": "#/$defs/id" },
+        "record_path": { "type": "string", "pattern": "^benchmarks/portfolio-design-admission-records/[a-z0-9-]+\\.json$" },
+        "record_digest": { "$ref": "#/$defs/digest" },
+        "fixture_id": { "$ref": "#/$defs/id" },
+        "reviewer_status": { "const": "pending_independent_review" },
+        "reviewer_identity": { "type": "null" },
+        "review_record_digest": { "type": "null" }
+      }
+    }
+  }
+}

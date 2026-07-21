@@ -482,13 +482,59 @@
     "portfolio_catalog": {
       "issue": 205,
       "checkpoint": "public_metadata_freeze",
-      "protocol_version": "3.6.0-portfolio-catalog",
+      "protocol_version": "3.7.0-portfolio-policy",
       "catalog_path": "benchmarks/portfolio-catalog.json",
       "catalog_file_sha256": "cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
       "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
       "similarity_path": "benchmarks/portfolio-similarity.json",
       "similarity_file_sha256": "125023c855621080ed3fa7d3a1c8f533342ad2d17646423760d66d5d350bb312",
       "similarity_report_digest": "sha256:9fddba0a825e9d97016676b21ca616c3bbf23d5e89140116be9f5f0244f2dd62"
+    },
+    "portfolio_policy": {
+      "issue": 205,
+      "checkpoint": "policy_contract_freeze",
+      "protocol_version": "3.7.0-portfolio-policy",
+      "policy_revision": "issue-205-checkpoint-b1-r3",
+      "policy_manifest_path": "benchmarks/portfolio-policy-manifest.json",
+      "policy_manifest_file_sha256": "36fee800e7a8c943142d8d3d056e149adf773a72ee5b2373b03f5ad231752bcf",
+      "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+      "admission_policy_digest": "sha256:dbf088d550321caf7a1282c71d35479306f9b113081a6a2bb43d6c1a7de720f1",
+      "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+      "lineage_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0",
+      "policy_status": "contracts_frozen_design_records_pending"
+    },
+    "portfolio_design_admission": {
+      "issue": 205,
+      "checkpoint": "design_pre_admission",
+      "design_revision": "issue-205-checkpoint-b2a-r1",
+      "lifecycle_state": "design_pending",
+      "bound_policy_revision": "issue-205-checkpoint-b1-r3",
+      "design_manifest_path": "benchmarks/portfolio-design-admission-manifest.json",
+      "design_manifest_file_sha256": "25c82c3cccd092dcab522d080c2c59fcf6e147549ef8e2252f6e4df41ace0e1b",
+      "design_manifest_digest": "sha256:42a1d0be4363c55ee0b433e59591e415e4008b24d4f03dc6c2dae5642b4c2d16",
+      "design_record_count": 24,
+      "review_package_path": "benchmarks/portfolio-design-review-package.json",
+      "review_package_file_sha256": "cf854238945621aca4d34c56b65ca9f30fd0cef6af4290a24b354830ee3b39f8",
+      "review_package_digest": "sha256:964bc599530b730af7e9a2c5f5179ab7810f645518ce8b60cbbfc7d18c593ca4",
+      "reviewer_status": "pending_independent_review"
+    },
+    "portfolio_design_review": {
+      "issue": 205,
+      "checkpoint": "independent_design_review",
+      "review_revision": "issue-205-checkpoint-b2b-r1",
+      "reviewed_head_sha": "875a23e820b92c8c7d42f566d1ef24cb650b3516",
+      "reviewer_identity": "chatgpt:gpt-5.6-thinking",
+      "reviewer_class": "independent_ai_review",
+      "human_review": false,
+      "independent_review_path": "benchmarks/portfolio-design-independent-review.json",
+      "independent_review_file_sha256": "503c1204c96bfe09d713dd0230e199f3862c6c43760b61d94a816c135d7d84b5",
+      "independent_review_digest": "sha256:27b8cba8aec18a232d1944187173e3629e35abfe9a943596d3fffc4263314ef9",
+      "reviewed_state_path": "benchmarks/portfolio-design-reviewed-state.json",
+      "reviewed_state_file_sha256": "b1af49a11de9c2a0909992d12271339ac2b7c23e686f363c0ece4ae9f6fdd1e5",
+      "reviewed_state_digest": "sha256:c95a40ab07e96bbd71a38c809a0f9657df64446462964f2c1ff69ab33299b388",
+      "projected_state": "design_reviewed",
+      "final_admission_implied": false,
+      "implementation_authorized": false
     }
   }
 }

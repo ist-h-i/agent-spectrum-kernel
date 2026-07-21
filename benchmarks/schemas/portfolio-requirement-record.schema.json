@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio requirement record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "requirement_record_id",
+    "requirement_record_schema_path",
+    "requirement_record_path",
+    "fixture_id",
+    "catalog_digest",
+    "policy_manifest_digest",
+    "scoring_policy_digest",
+    "admission_record_digest",
+    "requirements",
+    "requirement_set_digest",
+    "requirement_record_digest"
+  ],
+  "properties": {
+    "requirement_record_id": { "$ref": "#/$defs/token" },
+    "requirement_record_schema_path": { "const": "benchmarks/schemas/portfolio-requirement-record.schema.json" },
+    "requirement_record_path": { "$ref": "#/$defs/path" },
+    "fixture_id": { "$ref": "#/$defs/token" },
+    "catalog_digest": { "$ref": "#/$defs/digest" },
+    "policy_manifest_digest": { "$ref": "#/$defs/digest" },
+    "scoring_policy_digest": { "$ref": "#/$defs/digest" },
+    "admission_record_digest": { "$ref": "#/$defs/digest" },
+    "requirements": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/requirement" }
+    },
+    "requirement_set_digest": { "$ref": "#/$defs/digest" },
+    "requirement_record_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[a-zA-Z0-9._/-]+$" },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requirement_id", "requirement_kind", "agent_visible_evidence_map_ids"],
+      "properties": {
+        "requirement_id": { "$ref": "#/$defs/token" },
+        "requirement_kind": { "enum": ["blocker", "weighted", "informational"] },
+        "agent_visible_evidence_map_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/token" }
+        }
+      }
+    }
+  }
+}

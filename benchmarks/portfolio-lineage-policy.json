@@ -1,0 +1,213 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-lineage-policy.schema.json",
+  "program": "adaptive_ask_portfolio",
+  "policy_schema_version": "1.0.0",
+  "policy_contract_version": "3.7.0-portfolio-policy",
+  "policy_revision": "issue-205-checkpoint-b1-r3",
+  "policy_status": "contracts_frozen_design_records_pending",
+  "catalog_schema_version": "1.0.0",
+  "catalog_revision": "issue-205-checkpoint-1",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "source_policy": {
+    "approved_source_types": [
+      "two_repository_occurrences",
+      "incident_plus_review",
+      "approved_anonymized_project_example",
+      "documented_external_pattern"
+    ],
+    "prohibited_source_types": [
+      "author_intuition_only",
+      "customer_private_raw_text",
+      "contaminated_issue_195_content",
+      "measured_ask_outcome",
+      "frequency_impact_conflation"
+    ],
+    "author_intuition_only_allowed": false,
+    "raw_private_text_allowed": false,
+    "issue_195_content_allowed": false,
+    "measured_ask_outcome_allowed": false
+  },
+  "lineage_record_contract": {
+    "schema_path": "benchmarks/schemas/portfolio-lineage-record.schema.json",
+    "closed_artifact": true,
+    "required_fields": [
+      {
+        "field_id": "lineage_record_id",
+        "value_type": "identifier"
+      },
+      {
+        "field_id": "lineage_record_schema_path",
+        "value_type": "repository_relative_schema_path"
+      },
+      {
+        "field_id": "lineage_record_path",
+        "value_type": "repository_relative_artifact_path"
+      },
+      {
+        "field_id": "fixture_id",
+        "value_type": "identifier"
+      },
+      {
+        "field_id": "catalog_digest",
+        "value_type": "sha256_digest"
+      },
+      {
+        "field_id": "policy_manifest_digest",
+        "value_type": "sha256_digest"
+      },
+      {
+        "field_id": "lineage_policy_digest",
+        "value_type": "sha256_digest"
+      },
+      {
+        "field_id": "source_type",
+        "value_type": "approved_source_type"
+      },
+      {
+        "field_id": "source_reference_ids",
+        "value_type": "identifier_array"
+      },
+      {
+        "field_id": "review_status",
+        "value_type": "review_status"
+      },
+      {
+        "field_id": "frequency_band",
+        "value_type": "frequency_band"
+      },
+      {
+        "field_id": "frequency_evidence_ids",
+        "value_type": "identifier_array"
+      },
+      {
+        "field_id": "frequency_reviewer_record_id",
+        "value_type": "identifier"
+      },
+      {
+        "field_id": "impact_band",
+        "value_type": "impact_band"
+      },
+      {
+        "field_id": "impact_evidence_ids",
+        "value_type": "identifier_array"
+      },
+      {
+        "field_id": "impact_reviewer_record_id",
+        "value_type": "identifier"
+      },
+      {
+        "field_id": "lineage_revision",
+        "value_type": "positive_integer"
+      },
+      {
+        "field_id": "lineage_record_digest",
+        "value_type": "sha256_digest"
+      }
+    ],
+    "reviewed_status_required_for_weighted_aggregate": true,
+    "source_paths_checked_in_or_immutable_digest_required": true,
+    "actual_assignment_in_policy_artifact": false
+  },
+  "frequency_bands": [
+    {
+      "band_id": "high",
+      "minimum_occurrences_per_year": 6,
+      "maximum_occurrences_per_year": null,
+      "cadence_evidence": "monthly_or_more_frequent",
+      "weight": 4,
+      "aggregate_eligible": true
+    },
+    {
+      "band_id": "medium",
+      "minimum_occurrences_per_year": 2,
+      "maximum_occurrences_per_year": 5,
+      "cadence_evidence": "approximately_quarterly",
+      "weight": 2,
+      "aggregate_eligible": true
+    },
+    {
+      "band_id": "low",
+      "minimum_occurrences_per_year": 0,
+      "maximum_occurrences_per_year": 1,
+      "cadence_evidence": "approved_evidence_of_real_occurrence",
+      "weight": 1,
+      "aggregate_eligible": true
+    },
+    {
+      "band_id": "unknown",
+      "minimum_occurrences_per_year": null,
+      "maximum_occurrences_per_year": null,
+      "cadence_evidence": "insufficient_evidence",
+      "weight": null,
+      "aggregate_eligible": false
+    }
+  ],
+  "impact_bands": [
+    {
+      "band_id": "high",
+      "evidence_dimensions": [
+        "authorization",
+        "safety",
+        "data_integrity",
+        "financial",
+        "release_or_rollback"
+      ],
+      "weight": 4,
+      "aggregate_eligible": true
+    },
+    {
+      "band_id": "medium",
+      "evidence_dimensions": [
+        "multiple_components",
+        "customer_impact",
+        "clear_rework",
+        "operational_burden"
+      ],
+      "weight": 2,
+      "aggregate_eligible": true
+    },
+    {
+      "band_id": "low",
+      "evidence_dimensions": [
+        "localized",
+        "reversible",
+        "limited_engineering_cost"
+      ],
+      "weight": 1,
+      "aggregate_eligible": true
+    },
+    {
+      "band_id": "unknown",
+      "evidence_dimensions": [
+        "insufficient_evidence"
+      ],
+      "weight": null,
+      "aggregate_eligible": false
+    }
+  ],
+  "frequency_impact_independence": {
+    "separate_evidence_reference_fields_required": true,
+    "separate_review_fields_required": true,
+    "same_evidence_required": false,
+    "frequency_may_substitute_for_impact": false,
+    "impact_may_substitute_for_frequency": false
+  },
+  "post_result_immutability": {
+    "condition_results_read": false,
+    "mutation_after_result_read": "prohibited",
+    "change_requires_new_policy_revision": true,
+    "retroactive_application_to_existing_run": false
+  },
+  "determinism": {
+    "digest_algorithm": "sha256",
+    "canonicalization": "sorted_key_canonical_json",
+    "excluded_digest_field": "policy_digest",
+    "array_order": "semantic",
+    "timestamp_in_digest_identity": false,
+    "network_dependency": false,
+    "llm_dependency": false,
+    "embedding_dependency": false
+  },
+  "policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"
+}

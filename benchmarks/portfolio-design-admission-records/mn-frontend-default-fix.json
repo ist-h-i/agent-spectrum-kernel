@@ -1,0 +1,108 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-design-admission-record.schema.json",
+  "program": "adaptive_ask_portfolio",
+  "design_record_id": "design-mn-frontend-default-fix",
+  "design_record_path": "benchmarks/portfolio-design-admission-records/mn-frontend-default-fix.json",
+  "fixture_id": "mn-frontend-default-fix",
+  "bindings": {
+    "catalog_revision": "issue-205-checkpoint-1",
+    "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+    "fixture_metadata_digest": "sha256:2d0d7d3689a13ed018872ef7539360bd1972c3e1577f8d1624fe82675c8b2eda",
+    "policy_revision": "issue-205-checkpoint-b1-r3",
+    "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+    "admission_policy_digest": "sha256:dbf088d550321caf7a1282c71d35479306f9b113081a6a2bb43d6c1a7de720f1",
+    "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+    "lineage_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"
+  },
+  "catalog_metadata": {
+    "suite": "mechanism_negative",
+    "task_class": "local_bug_fix",
+    "domain": "frontend",
+    "difficulty": "medium",
+    "repetitions": 3,
+    "capability_families": [
+      "focused_implementation",
+      "state_consistency"
+    ],
+    "evidence_topologies": [
+      "implementation_and_tests",
+      "single_file_spec"
+    ],
+    "outcome_dimensions": [
+      "behavioral_consistency",
+      "regression_prevention"
+    ],
+    "risk_boundary": "none"
+  },
+  "design_status": "design_pending",
+  "answer_neutral_design": {
+    "ordinary_engineering_intent": "Implement and verify a focused local default-state correction.",
+    "fair_paths": {
+      "plain_condition": "Inspect nearby implementation, contracts, and tests, make the smallest request-scoped change, and verify observable behavior with repository tooling.",
+      "kernel_only_condition": "Use the same supplied implementation evidence and verification tools while repository kernel guidance may structure scope, risk, and evidence without supplying a task-specific change."
+    },
+    "task_wording_constraint": {
+      "ordinary_engineering_language_required": true,
+      "ask_specific_vocabulary_allowed": false,
+      "task_may_name_evaluation_mechanisms": false
+    },
+    "agent_visible_evidence_types": [
+      "implementation_and_tests",
+      "single_file_spec"
+    ],
+    "output_contract_type": "implementation_producing",
+    "admission_gate_plan": {
+      "planned_fixture_predicates": [
+        "scored_primary_requirement"
+      ],
+      "applicable_gate_ids": [
+        "public_artifact_leakage",
+        "private_evaluator_boundary",
+        "requirement_recoverability",
+        "plain_fair_path",
+        "kernel_only_fair_path",
+        "ordinary_engineering_task_wording",
+        "ask_vocabulary_cue_absence",
+        "evidence_removal_mutation",
+        "equivalent_solution_coverage",
+        "independent_review",
+        "input_digest_freeze",
+        "evaluator_digest_freeze"
+      ],
+      "non_applicable_gates": [
+        {
+          "gate_id": "suspicious_but_correct_control",
+          "selector_reason": "task_class_not_in_frozen_review_selector"
+        },
+        {
+          "gate_id": "false_positive_boundary",
+          "selector_reason": "task_class_not_review_and_output_contract_not_findings"
+        },
+        {
+          "gate_id": "unauthorized_attempt_observability",
+          "selector_reason": "suite_task_class_and_risk_boundary_do_not_match_safety_selector"
+        }
+      ],
+      "final_selector_revalidation_required": true
+    },
+    "requirement_kind_plan": {
+      "blocker_count_band": "zero_or_more",
+      "weighted_count_band": "one_or_more",
+      "informational_count_band": "zero_or_more",
+      "counts_are_not_final": true
+    },
+    "evidence_removal_mutation_topology": "implementation_and_tests",
+    "suspicious_but_correct_control_required": false,
+    "safety_approval_boundary_required": false,
+    "final_admission_assumptions": [
+      "authoritative_output_contract_remains_pending",
+      "authoritative_requirement_records_remain_pending",
+      "evaluator_and_input_digests_remain_pending",
+      "planned_gate_selectors_require_final_rederivation"
+    ]
+  },
+  "implementation_owner_issue": 207,
+  "design_record_revision": "issue-205-checkpoint-b2a-r1",
+  "design_record_digest": "sha256:192a977e33570d752cae7367722f592a5b4334ccda0452276c244ca4bc0fa67a"
+}
