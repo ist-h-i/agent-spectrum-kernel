@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio output contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "output_contract_id",
+    "output_contract_schema_path",
+    "output_contract_path",
+    "fixture_id",
+    "catalog_digest",
+    "policy_manifest_digest",
+    "evaluator_public_reference_path",
+    "evaluator_public_reference_digest",
+    "declares_findings",
+    "output_contract_digest"
+  ],
+  "properties": {
+    "output_contract_id": { "$ref": "#/$defs/token" },
+    "output_contract_schema_path": { "const": "benchmarks/schemas/portfolio-output-contract.schema.json" },
+    "output_contract_path": { "$ref": "#/$defs/path" },
+    "fixture_id": { "$ref": "#/$defs/token" },
+    "catalog_digest": { "$ref": "#/$defs/digest" },
+    "policy_manifest_digest": { "$ref": "#/$defs/digest" },
+    "evaluator_public_reference_path": { "$ref": "#/$defs/path" },
+    "evaluator_public_reference_digest": { "$ref": "#/$defs/digest" },
+    "declares_findings": { "type": "boolean" },
+    "output_contract_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[a-zA-Z0-9._/-]+$" }
+  }
+}

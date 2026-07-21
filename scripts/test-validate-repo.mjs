@@ -251,8 +251,21 @@ function writeFixture(root, skills = ["alpha"]) {
   for (const path of [
     "benchmarks/portfolio-catalog.json",
     "benchmarks/portfolio-similarity.json",
+    "benchmarks/portfolio-policy-manifest.json",
+    "benchmarks/portfolio-admission-policy.json",
+    "benchmarks/portfolio-scoring-policy.json",
+    "benchmarks/portfolio-lineage-policy.json",
     "benchmarks/schemas/portfolio-catalog.schema.json",
     "benchmarks/schemas/portfolio-similarity.schema.json",
+    "benchmarks/schemas/portfolio-policy-manifest.schema.json",
+    "benchmarks/schemas/portfolio-admission-policy.schema.json",
+    "benchmarks/schemas/portfolio-scoring-policy.schema.json",
+    "benchmarks/schemas/portfolio-lineage-policy.schema.json",
+    "benchmarks/schemas/portfolio-requirement-record.schema.json",
+    "benchmarks/schemas/portfolio-output-contract.schema.json",
+    "benchmarks/schemas/portfolio-lineage-record.schema.json",
+    "benchmarks/schemas/portfolio-classification-record.schema.json",
+    "benchmarks/schemas/evaluator-reference.schema.json",
   ]) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
     writeFileSync(resolve(root, path), readFileSync(resolve(repoRoot, path)));
@@ -5811,6 +5824,13 @@ jobs:
   invalidPortfolioCatalog.catalog_digest = `sha256:${"f".repeat(64)}`;
   writeFileSync(invalidPortfolioCatalogPath, `${JSON.stringify(invalidPortfolioCatalog, null, 2)}\n`);
   assertFail("invalid portfolio catalog", invalidPortfolioCatalogRoot, "catalog digest does not match");
+
+  const invalidPortfolioPolicyRoot = cloneFixture("invalid-portfolio-policy");
+  const invalidPortfolioPolicyPath = resolve(invalidPortfolioPolicyRoot, "benchmarks/portfolio-policy-manifest.json");
+  const invalidPortfolioPolicy = JSON.parse(readFileSync(invalidPortfolioPolicyPath, "utf8"));
+  invalidPortfolioPolicy.manifest_digest = `sha256:${"f".repeat(64)}`;
+  writeFileSync(invalidPortfolioPolicyPath, `${JSON.stringify(invalidPortfolioPolicy, null, 2)}\n`);
+  assertFail("invalid portfolio policy", invalidPortfolioPolicyRoot, "policy manifest digest does not match");
 
   const stalePhraseRoot = cloneFixture("stale-phrase");
   writeFileSync(resolve(stalePhraseRoot, "docs/ok.md"), "# OK\n\nThis repository has 25 skills.\n");

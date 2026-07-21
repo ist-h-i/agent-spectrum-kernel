@@ -7,6 +7,7 @@ import { canonicalPathSetDigest } from "./installer-lifecycle.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
+import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const defaultOutput = resolve(root, "docs/fixtures/adapter-runtime-bundle.json");
@@ -53,8 +54,10 @@ function projectionRecord(adapterId, plan) {
 export function buildAdapterRuntimeBundle() {
   const manifest = JSON.parse(readFileSync(resolve(root, "manifest.json"), "utf8"));
   validatePortfolioCatalogArtifacts({ root });
+  validatePortfolioPolicyArtifacts({ root });
   const portfolioCatalog = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-catalog.json"), "utf8"));
   const portfolioSimilarity = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-similarity.json"), "utf8"));
+  const portfolioPolicyManifest = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-policy-manifest.json"), "utf8"));
   const profiles = [];
   const canonicalPaths = new Set(["AGENTS.md", "manifest.json"]);
   for (const profile of commonProfiles) {
@@ -87,13 +90,26 @@ export function buildAdapterRuntimeBundle() {
       portfolio_catalog: {
         issue: 205,
         checkpoint: "public_metadata_freeze",
-        protocol_version: "3.6.0-portfolio-catalog",
+        protocol_version: "3.7.0-portfolio-policy",
         catalog_path: "benchmarks/portfolio-catalog.json",
         catalog_file_sha256: fileSha256("benchmarks/portfolio-catalog.json"),
         catalog_digest: portfolioCatalog.catalog_digest,
         similarity_path: "benchmarks/portfolio-similarity.json",
         similarity_file_sha256: fileSha256("benchmarks/portfolio-similarity.json"),
         similarity_report_digest: portfolioSimilarity.report_digest,
+      },
+      portfolio_policy: {
+        issue: 205,
+        checkpoint: "policy_contract_freeze",
+        protocol_version: "3.7.0-portfolio-policy",
+        policy_revision: portfolioPolicyManifest.policy_revision,
+        policy_manifest_path: "benchmarks/portfolio-policy-manifest.json",
+        policy_manifest_file_sha256: fileSha256("benchmarks/portfolio-policy-manifest.json"),
+        policy_manifest_digest: portfolioPolicyManifest.manifest_digest,
+        admission_policy_digest: portfolioPolicyManifest.admission_policy.digest,
+        scoring_policy_digest: portfolioPolicyManifest.scoring_policy.digest,
+        lineage_policy_digest: portfolioPolicyManifest.lineage_policy.digest,
+        policy_status: portfolioPolicyManifest.policy_status,
       },
     },
   };

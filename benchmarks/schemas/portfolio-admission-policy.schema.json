@@ -1,0 +1,347 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio admission policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "policy_schema_version",
+    "policy_contract_version",
+    "policy_revision",
+    "policy_status",
+    "catalog_schema_version",
+    "catalog_revision",
+    "catalog_digest",
+    "lifecycle",
+    "selector_context_contract",
+    "aggregate_classification_contract",
+    "final_admission_record_contract",
+    "admission_gates",
+    "post_result_immutability",
+    "determinism",
+    "policy_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-admission-policy.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio" },
+    "policy_schema_version": { "const": "1.0.0" },
+    "policy_contract_version": { "const": "3.7.0-portfolio-policy" },
+    "policy_revision": { "const": "issue-205-checkpoint-b1-r3" },
+    "policy_status": { "const": "contracts_frozen_design_records_pending" },
+    "catalog_schema_version": { "const": "1.0.0" },
+    "catalog_revision": { "const": "issue-205-checkpoint-1" },
+    "catalog_digest": { "$ref": "#/$defs/digest" },
+    "lifecycle": { "$ref": "#/$defs/lifecycle" },
+    "selector_context_contract": { "$ref": "#/$defs/selectorContextContract" },
+    "aggregate_classification_contract": { "$ref": "#/$defs/aggregateClassificationContract" },
+    "final_admission_record_contract": { "$ref": "#/$defs/finalAdmissionRecordContract" },
+    "admission_gates": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": { "$ref": "#/$defs/admissionGate" }
+    },
+    "post_result_immutability": { "$ref": "#/$defs/immutability" },
+    "determinism": { "$ref": "#/$defs/determinism" },
+    "policy_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "stringArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected"] },
+        "to": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected"] }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "states",
+        "transitions",
+        "design_review_counts_as_admission",
+        "admitted_meaning",
+        "admitted_implies_primary_aggregate_eligibility",
+        "admitted_prerequisites",
+        "rejected_reentry_requires_new_revision",
+        "unknown_gate_result_counts_as_pass"
+      ],
+      "properties": {
+        "states": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected"] }
+        },
+        "transitions": { "type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true, "items": { "$ref": "#/$defs/transition" } },
+        "design_review_counts_as_admission": { "const": false },
+        "admitted_meaning": { "const": "fixture_approved_for_execution" },
+        "admitted_implies_primary_aggregate_eligibility": { "const": false },
+        "admitted_prerequisites": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "enum": ["fixture", "input_manifest", "private_evaluator_bundle", "evaluator_reference"] }
+        },
+        "rejected_reentry_requires_new_revision": { "const": true },
+        "unknown_gate_result_counts_as_pass": { "const": false }
+      }
+    },
+    "selectorContextField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field_id", "value_type", "derivation"],
+      "properties": {
+        "field_id": { "enum": ["fixture_id", "catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary", "capability_families", "fixture_predicates", "requirement_record_digest", "predicate_evidence_digest", "selector_context_digest"] },
+        "value_type": { "enum": ["identifier", "sha256_digest", "fixture_role", "suite", "task_class", "risk_boundary", "identifier_array", "fixture_predicate_array"] },
+        "derivation": { "enum": ["catalog_lookup_key", "catalog_derived", "predicate_evidence_derived", "authoritative_requirement_record_digest", "predicate_evidence_digest", "selector_context_digest"] }
+      }
+    },
+    "scoredPredicateDerivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["all_of"],
+      "properties": {
+        "all_of": { "type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true, "items": { "enum": ["fixture_role_primary", "frozen_blocker_or_weighted_requirement_present", "requirement_record_policy_and_fixture_bound", "scored_requirement_has_agent_visible_evidence_map", "requirement_set_digest_verified"] } }
+      }
+    },
+    "findingPredicateDerivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["any_of", "frozen_review_task_classes"],
+      "properties": {
+        "any_of": { "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": { "enum": ["frozen_review_task_class", "verified_evaluator_reference_bound_output_contract_declares_findings"] } },
+        "frozen_review_task_classes": { "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": { "enum": ["implementation_review", "pr_review", "review", "review_verification"] } }
+      }
+    },
+    "predicateDerivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caller_supplied_predicates_allowed", "scored_primary_requirement", "finding_producing_task"],
+      "properties": {
+        "caller_supplied_predicates_allowed": { "const": false },
+        "scored_primary_requirement": { "$ref": "#/$defs/scoredPredicateDerivation" },
+        "finding_producing_task": { "$ref": "#/$defs/findingPredicateDerivation" }
+      }
+    },
+    "selectorDigestContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["predicate_evidence_digest_algorithm", "selector_context_digest_algorithm", "selector_context_digest_excluded_field", "selector_context_authoritative_requirement_digest_field"],
+      "properties": {
+        "predicate_evidence_digest_algorithm": { "const": "sha256_sorted_key_canonical_json" },
+        "selector_context_digest_algorithm": { "const": "sha256_sorted_key_canonical_json" },
+        "selector_context_digest_excluded_field": { "const": "selector_context_digest" },
+        "selector_context_authoritative_requirement_digest_field": { "const": "requirement_record_digest" }
+      }
+    },
+    "selectorContextContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["closed_artifact", "required_fields", "catalog_lookup_key", "catalog_derived_fields", "unknown_fixture_id_result", "caller_supplied_catalog_values_trusted", "requirement_record_schema_path", "output_contract_schema_path", "evaluator_reference_schema_path", "source_paths_checked_in_or_immutable_digest_required", "source_symlinks_allowed", "predicate_derivation", "digest_contract"],
+      "properties": {
+        "closed_artifact": { "const": true },
+        "required_fields": { "type": "array", "minItems": 12, "maxItems": 12, "items": { "$ref": "#/$defs/selectorContextField" } },
+        "catalog_lookup_key": { "const": "fixture_id" },
+        "catalog_derived_fields": { "type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": { "enum": ["catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary", "capability_families"] } },
+        "unknown_fixture_id_result": { "const": "reject" },
+        "caller_supplied_catalog_values_trusted": { "const": false },
+        "requirement_record_schema_path": { "const": "benchmarks/schemas/portfolio-requirement-record.schema.json" },
+        "output_contract_schema_path": { "const": "benchmarks/schemas/portfolio-output-contract.schema.json" },
+        "evaluator_reference_schema_path": { "const": "benchmarks/schemas/evaluator-reference.schema.json" },
+        "source_paths_checked_in_or_immutable_digest_required": { "const": true },
+        "source_symlinks_allowed": { "const": false },
+        "predicate_derivation": { "$ref": "#/$defs/predicateDerivation" },
+        "digest_contract": { "$ref": "#/$defs/selectorDigestContract" }
+      }
+    },
+    "classificationTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "trigger", "evidence_type"],
+      "properties": {
+        "from": { "enum": ["pending_measurement", "redesign_required"] },
+        "to": { "enum": ["pending_measurement", "primary_eligible", "calibration_only", "redesign_required", "rejected", "insufficient_evidence"] },
+        "trigger": { "enum": ["fixture_role_calibration", "supported_tracks_or_required_inputs_insufficient", "ceiling_or_floor_candidate", "ceiling_and_floor_not_candidate", "explicit_admission_rejection", "redesign_review", "remeasurement"] },
+        "evidence_type": { "enum": ["validated_selector_context", "pilot_result_record", "classification_result_artifact", "admission_rejection_record", "redesign_review_record", "remeasurement_record"] }
+      }
+    },
+    "classificationDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["precedence", "decision_id", "outcome"],
+      "properties": {
+        "precedence": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "decision_id": { "enum": ["calibration_role", "invalid_binding_or_pilot_digest", "insufficient_or_unknown_input", "ceiling_or_floor_candidate", "ceiling_and_floor_not_candidate", "contradictory_combination"] },
+        "outcome": { "enum": ["calibration_only", "invalid_artifact_no_classification", "insufficient_evidence", "redesign_required", "primary_eligible", "invalid_classification_no_result"] }
+      }
+    },
+    "classificationResultArtifactContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["closed_artifact", "separate_from_policy_artifact", "schema_path", "required_fields"],
+      "properties": {
+        "closed_artifact": { "const": true },
+        "separate_from_policy_artifact": { "const": true },
+        "schema_path": { "const": "benchmarks/schemas/portfolio-classification-record.schema.json" },
+        "required_fields": { "type": "array", "minItems": 15, "maxItems": 15, "uniqueItems": true, "items": { "enum": ["classification_record_id", "classification_record_schema_path", "classification_record_path", "fixture_id", "fixture_role", "catalog_digest", "policy_manifest_digest", "pilot_result_digest", "supported_adapter_tracks", "ceiling_classification_result", "floor_classification_result", "classification_state", "reason_codes", "classification_revision", "classification_digest"] } }
+      }
+    },
+    "aggregateClassificationContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lifecycle_phase", "states", "input_artifact_type", "output_artifact_type", "output_separate_from_policy", "policy_mutation_after_result_read_allowed", "classification_results", "generic_pass_fail_result_allowed", "unavailable_adapter_value", "unavailable_adapter_treated_as_zero", "insufficient_supported_tracks_result", "calibration_primary_eligible", "state_transitions", "decision_precedence", "automatic_threshold_rejection_allowed", "rejected_transition_evidence_types", "redesign_transition_requires_new_fixture_revision", "redesign_transition_requires_new_admission_revision", "classification_result_artifact_contract"],
+      "properties": {
+        "lifecycle_phase": { "const": "post_pilot" },
+        "states": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": { "enum": ["pending_measurement", "primary_eligible", "calibration_only", "redesign_required", "rejected", "insufficient_evidence"] }
+        },
+        "input_artifact_type": { "const": "pilot_result_record" },
+        "output_artifact_type": { "const": "aggregate_classification_result" },
+        "output_separate_from_policy": { "const": true },
+        "policy_mutation_after_result_read_allowed": { "const": false },
+        "classification_results": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "enum": ["candidate", "not_candidate", "unknown", "not_applicable"] }
+        },
+        "generic_pass_fail_result_allowed": { "const": false },
+        "unavailable_adapter_value": { "const": "unavailable" },
+        "unavailable_adapter_treated_as_zero": { "const": false },
+        "insufficient_supported_tracks_result": { "const": "insufficient_evidence" },
+        "calibration_primary_eligible": { "const": false },
+        "state_transitions": { "type": "array", "minItems": 8, "maxItems": 8, "items": { "$ref": "#/$defs/classificationTransition" } },
+        "decision_precedence": { "type": "array", "minItems": 6, "maxItems": 6, "items": { "$ref": "#/$defs/classificationDecision" } },
+        "automatic_threshold_rejection_allowed": { "const": false },
+        "rejected_transition_evidence_types": { "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": { "enum": ["redesign_review_record", "admission_rejection_record"] } },
+        "redesign_transition_requires_new_fixture_revision": { "const": true },
+        "redesign_transition_requires_new_admission_revision": { "const": true },
+        "classification_result_artifact_contract": { "$ref": "#/$defs/classificationResultArtifactContract" }
+      }
+    },
+    "fieldDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field_id", "value_type"],
+      "properties": {
+        "field_id": { "$ref": "#/$defs/identifier" },
+        "value_type": { "enum": ["identifier", "sha256_digest", "repository_relative_schema_path", "non_negative_integer", "positive_integer", "identifier_array", "lifecycle_state"] }
+      }
+    },
+    "finalAdmissionRecordContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_fields", "admitted_requires_all_fields", "placeholder_values_in_policy_artifact"],
+      "properties": {
+        "required_fields": { "type": "array", "minItems": 14, "maxItems": 14, "items": { "$ref": "#/$defs/fieldDefinition" } },
+        "admitted_requires_all_fields": { "const": true },
+        "placeholder_values_in_policy_artifact": { "const": false }
+      }
+    },
+    "selectorClause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture_roles", "suites", "task_classes", "risk_boundaries", "capability_families", "fixture_predicates"],
+      "properties": {
+        "fixture_roles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["primary", "calibration"] } },
+        "suites": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"] } },
+        "task_classes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["*", "configuration", "dependency_migration", "design_gate", "documentation", "handoff_resume", "implementation", "implementation_review", "implementation_verification", "investigation", "investigation_implementation", "local_bug_fix", "local_implementation", "migration_design", "operation_boundary", "pr_review", "review", "review_verification", "small_feature", "verification_only"] } },
+        "risk_boundaries": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["*", "approval_required", "data_integrity", "external_effect", "financial_integrity", "none", "rollback_required", "security_boundary"] } },
+        "capability_families": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["*", "api_contracts", "async_state_management", "authorization_reasoning", "compatibility_management", "configuration_change", "contract_design", "data_minimization", "dependency_migration", "documentation_accuracy", "evidence_synthesis", "financial_integrity", "flake_isolation", "focused_implementation", "handoff_continuity", "hypothesis_testing", "interaction_semantics", "operation_approval", "performance_diagnosis", "regression_testing", "review_precision", "rollback_planning", "schema_evolution", "scope_control", "state_consistency", "verification_discipline"] } },
+        "fixture_predicates": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["*", "finding_producing_task", "scored_primary_requirement"] } }
+      }
+    },
+    "gateSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["match_operator", "clauses"],
+      "properties": {
+        "match_operator": { "const": "any_clause" },
+        "clauses": { "type": "array", "minItems": 1, "maxItems": 3, "items": { "$ref": "#/$defs/selectorClause" } }
+      }
+    },
+    "notApplicablePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_only_when_selector_mismatch", "prohibited_when_selector_matches"],
+      "properties": {
+        "allowed_only_when_selector_mismatch": { "const": true },
+        "prohibited_when_selector_matches": { "const": true }
+      }
+    },
+    "admissionGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "selector", "required_lifecycle_stage", "allowed_results", "not_applicable_policy", "blocking_status", "required_evidence_reference_type", "final_admission_effect"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/identifier" },
+        "selector": { "$ref": "#/$defs/gateSelector" },
+        "required_lifecycle_stage": { "const": "admission_pending" },
+        "allowed_results": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "enum": ["pass", "fail", "not_applicable", "unknown"] }
+        },
+        "not_applicable_policy": { "$ref": "#/$defs/notApplicablePolicy" },
+        "blocking_status": { "const": "blocking" },
+        "required_evidence_reference_type": { "enum": ["public_inventory_scan", "evaluator_boundary_record", "recoverability_review_record", "fair_path_review_record", "wording_review_record", "mutation_result_record", "control_result_record", "equivalence_review_record", "false_positive_review_record", "safety_observation_record", "independent_review_record", "digest_verification_record"] },
+        "final_admission_effect": { "const": "blocks_on_fail_or_unknown" }
+      }
+    },
+    "immutability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition_results_read", "mutation_after_result_read", "change_requires_new_policy_revision", "retroactive_application_to_existing_run"],
+      "properties": {
+        "condition_results_read": { "const": false },
+        "mutation_after_result_read": { "const": "prohibited" },
+        "change_requires_new_policy_revision": { "const": true },
+        "retroactive_application_to_existing_run": { "const": false }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest_algorithm", "canonicalization", "excluded_digest_field", "array_order", "timestamp_in_digest_identity", "network_dependency", "llm_dependency", "embedding_dependency"],
+      "properties": {
+        "digest_algorithm": { "const": "sha256" },
+        "canonicalization": { "const": "sorted_key_canonical_json" },
+        "excluded_digest_field": { "const": "policy_digest" },
+        "array_order": { "const": "semantic" },
+        "timestamp_in_digest_identity": { "const": false },
+        "network_dependency": { "const": false },
+        "llm_dependency": { "const": false },
+        "embedding_dependency": { "const": false }
+      }
+    }
+  }
+}

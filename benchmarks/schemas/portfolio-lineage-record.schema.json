@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio lineage record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "lineage_record_id",
+    "lineage_record_schema_path",
+    "lineage_record_path",
+    "fixture_id",
+    "catalog_digest",
+    "policy_manifest_digest",
+    "lineage_policy_digest",
+    "source_type",
+    "source_reference_ids",
+    "review_status",
+    "frequency_band",
+    "frequency_evidence_ids",
+    "frequency_reviewer_record_id",
+    "impact_band",
+    "impact_evidence_ids",
+    "impact_reviewer_record_id",
+    "lineage_revision",
+    "lineage_record_digest"
+  ],
+  "properties": {
+    "lineage_record_id": { "$ref": "#/$defs/token" },
+    "lineage_record_schema_path": { "const": "benchmarks/schemas/portfolio-lineage-record.schema.json" },
+    "lineage_record_path": { "$ref": "#/$defs/path" },
+    "fixture_id": { "$ref": "#/$defs/token" },
+    "catalog_digest": { "$ref": "#/$defs/digest" },
+    "policy_manifest_digest": { "$ref": "#/$defs/digest" },
+    "lineage_policy_digest": { "$ref": "#/$defs/digest" },
+    "source_type": { "enum": ["two_repository_occurrences", "incident_plus_review", "approved_anonymized_project_example", "documented_external_pattern"] },
+    "source_reference_ids": { "$ref": "#/$defs/tokenArray" },
+    "review_status": { "enum": ["reviewed", "pending_review"] },
+    "frequency_band": { "enum": ["high", "medium", "low", "unknown"] },
+    "frequency_evidence_ids": { "$ref": "#/$defs/tokenArray" },
+    "frequency_reviewer_record_id": { "$ref": "#/$defs/token" },
+    "impact_band": { "enum": ["high", "medium", "low", "unknown"] },
+    "impact_evidence_ids": { "$ref": "#/$defs/tokenArray" },
+    "impact_reviewer_record_id": { "$ref": "#/$defs/token" },
+    "lineage_revision": { "type": "integer", "minimum": 1 },
+    "lineage_record_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[a-zA-Z0-9._/-]+$" },
+    "tokenArray": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } }
+  }
+}

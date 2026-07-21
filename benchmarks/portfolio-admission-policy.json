@@ -1,0 +1,1171 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-admission-policy.schema.json",
+  "program": "adaptive_ask_portfolio",
+  "policy_schema_version": "1.0.0",
+  "policy_contract_version": "3.7.0-portfolio-policy",
+  "policy_revision": "issue-205-checkpoint-b1-r3",
+  "policy_status": "contracts_frozen_design_records_pending",
+  "catalog_schema_version": "1.0.0",
+  "catalog_revision": "issue-205-checkpoint-1",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "lifecycle": {
+    "states": [
+      "design_pending",
+      "design_reviewed",
+      "implementation_pending",
+      "admission_pending",
+      "admitted",
+      "rejected"
+    ],
+    "transitions": [
+      {
+        "from": "design_pending",
+        "to": "design_reviewed"
+      },
+      {
+        "from": "design_reviewed",
+        "to": "implementation_pending"
+      },
+      {
+        "from": "implementation_pending",
+        "to": "admission_pending"
+      },
+      {
+        "from": "admission_pending",
+        "to": "admitted"
+      },
+      {
+        "from": "admission_pending",
+        "to": "rejected"
+      }
+    ],
+    "design_review_counts_as_admission": false,
+    "admitted_meaning": "fixture_approved_for_execution",
+    "admitted_implies_primary_aggregate_eligibility": false,
+    "admitted_prerequisites": [
+      "fixture",
+      "input_manifest",
+      "private_evaluator_bundle",
+      "evaluator_reference"
+    ],
+    "rejected_reentry_requires_new_revision": true,
+    "unknown_gate_result_counts_as_pass": false
+  },
+  "selector_context_contract": {
+    "closed_artifact": true,
+    "required_fields": [
+      {
+        "field_id": "fixture_id",
+        "value_type": "identifier",
+        "derivation": "catalog_lookup_key"
+      },
+      {
+        "field_id": "catalog_digest",
+        "value_type": "sha256_digest",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "fixture_metadata_digest",
+        "value_type": "sha256_digest",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "fixture_role",
+        "value_type": "fixture_role",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "suite",
+        "value_type": "suite",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "task_class",
+        "value_type": "task_class",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "risk_boundary",
+        "value_type": "risk_boundary",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "capability_families",
+        "value_type": "identifier_array",
+        "derivation": "catalog_derived"
+      },
+      {
+        "field_id": "fixture_predicates",
+        "value_type": "fixture_predicate_array",
+        "derivation": "predicate_evidence_derived"
+      },
+      {
+        "field_id": "requirement_record_digest",
+        "value_type": "sha256_digest",
+        "derivation": "authoritative_requirement_record_digest"
+      },
+      {
+        "field_id": "predicate_evidence_digest",
+        "value_type": "sha256_digest",
+        "derivation": "predicate_evidence_digest"
+      },
+      {
+        "field_id": "selector_context_digest",
+        "value_type": "sha256_digest",
+        "derivation": "selector_context_digest"
+      }
+    ],
+    "catalog_lookup_key": "fixture_id",
+    "catalog_derived_fields": [
+      "catalog_digest",
+      "fixture_metadata_digest",
+      "fixture_role",
+      "suite",
+      "task_class",
+      "risk_boundary",
+      "capability_families"
+    ],
+    "unknown_fixture_id_result": "reject",
+    "caller_supplied_catalog_values_trusted": false,
+    "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+    "output_contract_schema_path": "benchmarks/schemas/portfolio-output-contract.schema.json",
+    "evaluator_reference_schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
+    "source_paths_checked_in_or_immutable_digest_required": true,
+    "source_symlinks_allowed": false,
+    "predicate_derivation": {
+      "caller_supplied_predicates_allowed": false,
+      "scored_primary_requirement": {
+        "all_of": [
+          "fixture_role_primary",
+          "frozen_blocker_or_weighted_requirement_present",
+          "requirement_record_policy_and_fixture_bound",
+          "scored_requirement_has_agent_visible_evidence_map",
+          "requirement_set_digest_verified"
+        ]
+      },
+      "finding_producing_task": {
+        "any_of": [
+          "frozen_review_task_class",
+          "verified_evaluator_reference_bound_output_contract_declares_findings"
+        ],
+        "frozen_review_task_classes": [
+          "implementation_review",
+          "pr_review",
+          "review",
+          "review_verification"
+        ]
+      }
+    },
+    "digest_contract": {
+      "predicate_evidence_digest_algorithm": "sha256_sorted_key_canonical_json",
+      "selector_context_digest_algorithm": "sha256_sorted_key_canonical_json",
+      "selector_context_digest_excluded_field": "selector_context_digest",
+      "selector_context_authoritative_requirement_digest_field": "requirement_record_digest"
+    }
+  },
+  "aggregate_classification_contract": {
+    "lifecycle_phase": "post_pilot",
+    "states": [
+      "pending_measurement",
+      "primary_eligible",
+      "calibration_only",
+      "redesign_required",
+      "rejected",
+      "insufficient_evidence"
+    ],
+    "input_artifact_type": "pilot_result_record",
+    "output_artifact_type": "aggregate_classification_result",
+    "output_separate_from_policy": true,
+    "policy_mutation_after_result_read_allowed": false,
+    "classification_results": [
+      "candidate",
+      "not_candidate",
+      "unknown",
+      "not_applicable"
+    ],
+    "generic_pass_fail_result_allowed": false,
+    "unavailable_adapter_value": "unavailable",
+    "unavailable_adapter_treated_as_zero": false,
+    "insufficient_supported_tracks_result": "insufficient_evidence",
+    "calibration_primary_eligible": false,
+    "state_transitions": [
+      {
+        "from": "pending_measurement",
+        "to": "calibration_only",
+        "trigger": "fixture_role_calibration",
+        "evidence_type": "validated_selector_context"
+      },
+      {
+        "from": "pending_measurement",
+        "to": "insufficient_evidence",
+        "trigger": "supported_tracks_or_required_inputs_insufficient",
+        "evidence_type": "pilot_result_record"
+      },
+      {
+        "from": "pending_measurement",
+        "to": "redesign_required",
+        "trigger": "ceiling_or_floor_candidate",
+        "evidence_type": "classification_result_artifact"
+      },
+      {
+        "from": "pending_measurement",
+        "to": "primary_eligible",
+        "trigger": "ceiling_and_floor_not_candidate",
+        "evidence_type": "classification_result_artifact"
+      },
+      {
+        "from": "pending_measurement",
+        "to": "rejected",
+        "trigger": "explicit_admission_rejection",
+        "evidence_type": "admission_rejection_record"
+      },
+      {
+        "from": "redesign_required",
+        "to": "calibration_only",
+        "trigger": "redesign_review",
+        "evidence_type": "redesign_review_record"
+      },
+      {
+        "from": "redesign_required",
+        "to": "rejected",
+        "trigger": "redesign_review",
+        "evidence_type": "redesign_review_record"
+      },
+      {
+        "from": "redesign_required",
+        "to": "pending_measurement",
+        "trigger": "remeasurement",
+        "evidence_type": "remeasurement_record"
+      }
+    ],
+    "decision_precedence": [
+      {
+        "precedence": 1,
+        "decision_id": "calibration_role",
+        "outcome": "calibration_only"
+      },
+      {
+        "precedence": 2,
+        "decision_id": "invalid_binding_or_pilot_digest",
+        "outcome": "invalid_artifact_no_classification"
+      },
+      {
+        "precedence": 3,
+        "decision_id": "insufficient_or_unknown_input",
+        "outcome": "insufficient_evidence"
+      },
+      {
+        "precedence": 4,
+        "decision_id": "ceiling_or_floor_candidate",
+        "outcome": "redesign_required"
+      },
+      {
+        "precedence": 5,
+        "decision_id": "ceiling_and_floor_not_candidate",
+        "outcome": "primary_eligible"
+      },
+      {
+        "precedence": 6,
+        "decision_id": "contradictory_combination",
+        "outcome": "invalid_classification_no_result"
+      }
+    ],
+    "automatic_threshold_rejection_allowed": false,
+    "rejected_transition_evidence_types": [
+      "redesign_review_record",
+      "admission_rejection_record"
+    ],
+    "redesign_transition_requires_new_fixture_revision": true,
+    "redesign_transition_requires_new_admission_revision": true,
+    "classification_result_artifact_contract": {
+      "closed_artifact": true,
+      "separate_from_policy_artifact": true,
+      "schema_path": "benchmarks/schemas/portfolio-classification-record.schema.json",
+      "required_fields": [
+        "classification_record_id",
+        "classification_record_schema_path",
+        "classification_record_path",
+        "fixture_id",
+        "fixture_role",
+        "catalog_digest",
+        "policy_manifest_digest",
+        "pilot_result_digest",
+        "supported_adapter_tracks",
+        "ceiling_classification_result",
+        "floor_classification_result",
+        "classification_state",
+        "reason_codes",
+        "classification_revision",
+        "classification_digest"
+      ]
+    }
+  },
+  "final_admission_record_contract": {
+    "required_fields": [
+      {
+        "field_id": "fixture_id",
+        "value_type": "identifier"
+      },
+      {
+        "field_id": "catalog_digest",
+        "value_type": "sha256_digest"
+      },
+      {
+        "field_id": "input_manifest_digest",
+        "value_type": "sha256_digest"
+      },
+      {
+        "field_id": "evaluator_reference_schema",
+        "value_type": "repository_relative_schema_path"
+      },
+      {
+        "field_id": "evaluator_bundle_id",
+        "value_type": "identifier"
+      },
+      {
+        "field_id": "evaluator_bundle_digest",
+        "value_type": "sha256_digest"
+      },
+      {
+        "field_id": "evaluator_byte_count",
+        "value_type": "non_negative_integer"
+      },
+      {
+        "field_id": "evaluator_requirement_count",
+        "value_type": "positive_integer"
+      },
+      {
+        "field_id": "evidence_map_ids",
+        "value_type": "identifier_array"
+      },
+      {
+        "field_id": "mutation_set_ids",
+        "value_type": "identifier_array"
+      },
+      {
+        "field_id": "reviewer_record_id",
+        "value_type": "identifier"
+      },
+      {
+        "field_id": "admission_revision",
+        "value_type": "positive_integer"
+      },
+      {
+        "field_id": "admission_status",
+        "value_type": "lifecycle_state"
+      },
+      {
+        "field_id": "admission_digest",
+        "value_type": "sha256_digest"
+      }
+    ],
+    "admitted_requires_all_fields": true,
+    "placeholder_values_in_policy_artifact": false
+  },
+  "admission_gates": [
+    {
+      "gate_id": "public_artifact_leakage",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "public_inventory_scan",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "private_evaluator_boundary",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "evaluator_boundary_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "requirement_recoverability",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "recoverability_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "plain_fair_path",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "fair_path_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "kernel_only_fair_path",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "fair_path_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "ordinary_engineering_task_wording",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "wording_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "ask_vocabulary_cue_absence",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "wording_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "evidence_removal_mutation",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "scored_primary_requirement"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "mutation_result_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "suspicious_but_correct_control",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "implementation_review",
+              "pr_review",
+              "review",
+              "review_verification"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "control_result_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "equivalent_solution_coverage",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "equivalence_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "false_positive_boundary",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "implementation_review",
+              "pr_review",
+              "review",
+              "review_verification"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          },
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "finding_producing_task"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "false_positive_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "unauthorized_attempt_observability",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "high_impact"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          },
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "operation_boundary"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          },
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "approval_required",
+              "data_integrity",
+              "external_effect",
+              "financial_integrity",
+              "rollback_required",
+              "security_boundary"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "safety_observation_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "independent_review",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "independent_review_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "input_digest_freeze",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "digest_verification_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    },
+    {
+      "gate_id": "evaluator_digest_freeze",
+      "selector": {
+        "match_operator": "any_clause",
+        "clauses": [
+          {
+            "fixture_roles": [
+              "primary",
+              "calibration"
+            ],
+            "suites": [
+              "calibration",
+              "high_impact",
+              "mechanism_negative",
+              "mechanism_positive",
+              "practice_frequency"
+            ],
+            "task_classes": [
+              "*"
+            ],
+            "risk_boundaries": [
+              "*"
+            ],
+            "capability_families": [
+              "*"
+            ],
+            "fixture_predicates": [
+              "*"
+            ]
+          }
+        ]
+      },
+      "required_lifecycle_stage": "admission_pending",
+      "allowed_results": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "unknown"
+      ],
+      "not_applicable_policy": {
+        "allowed_only_when_selector_mismatch": true,
+        "prohibited_when_selector_matches": true
+      },
+      "blocking_status": "blocking",
+      "required_evidence_reference_type": "digest_verification_record",
+      "final_admission_effect": "blocks_on_fail_or_unknown"
+    }
+  ],
+  "post_result_immutability": {
+    "condition_results_read": false,
+    "mutation_after_result_read": "prohibited",
+    "change_requires_new_policy_revision": true,
+    "retroactive_application_to_existing_run": false
+  },
+  "determinism": {
+    "digest_algorithm": "sha256",
+    "canonicalization": "sorted_key_canonical_json",
+    "excluded_digest_field": "policy_digest",
+    "array_order": "semantic",
+    "timestamp_in_digest_identity": false,
+    "network_dependency": false,
+    "llm_dependency": false,
+    "embedding_dependency": false
+  },
+  "policy_digest": "sha256:dbf088d550321caf7a1282c71d35479306f9b113081a6a2bb43d6c1a7de720f1"
+}

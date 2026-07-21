@@ -10,6 +10,7 @@ import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { codexCompactProfileCanonicalPaths } from "./codex-runtime-profile.mjs";
 import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
+import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REQUIRED_SKILL_SIGNALS = [
@@ -564,6 +565,31 @@ function validateAdaptivePortfolioCatalog(root, errors) {
       maximumSimilarityScore: "unknown",
       catalogDigest: "unknown",
       reportDigest: "unknown",
+    };
+  }
+}
+
+function validateAdaptivePortfolioPolicy(root, errors) {
+  try {
+    return {
+      valid: true,
+      ...validatePortfolioPolicyArtifacts({ root }),
+    };
+  } catch (error) {
+    fail(errors, "portfolio policy", error.message);
+    return {
+      valid: false,
+      policyRevision: "unknown",
+      policyStatus: "unknown",
+      catalogDigest: "unknown",
+      manifestDigest: "unknown",
+      admissionGateCount: 0,
+      lifecycleStateCount: 0,
+      requirementKindCount: 0,
+      frequencyBandCount: 0,
+      impactBandCount: 0,
+      ceilingThreshold: "unknown",
+      floorThreshold: "unknown",
     };
   }
 }
@@ -3778,7 +3804,7 @@ function validateAdapterGovernance(root, checks, errors) {
   }
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -3804,6 +3830,18 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     `- maximum similarity: ${portfolioCatalogChecks.maximumSimilarityScore}`,
     `- catalog digest: ${portfolioCatalogChecks.catalogDigest}`,
     `- similarity report digest: ${portfolioCatalogChecks.reportDigest}`,
+    "",
+    "## Adaptive ASK portfolio policy contracts",
+    "",
+    `- manifest and child policy validation: ${portfolioPolicyChecks.valid ? "ok" : "invalid"}`,
+    `- policy revision: ${portfolioPolicyChecks.policyRevision}`,
+    `- policy status: ${portfolioPolicyChecks.policyStatus}`,
+    `- policy manifest digest: ${portfolioPolicyChecks.manifestDigest}`,
+    `- admission gates: ${portfolioPolicyChecks.admissionGateCount}`,
+    `- lifecycle states: ${portfolioPolicyChecks.lifecycleStateCount}`,
+    `- requirement kinds: ${portfolioPolicyChecks.requirementKindCount}`,
+    `- frequency / impact bands: ${portfolioPolicyChecks.frequencyBandCount} / ${portfolioPolicyChecks.impactBandCount}`,
+    `- ceiling / floor median threshold: ${portfolioPolicyChecks.ceilingThreshold} / ${portfolioPolicyChecks.floorThreshold}`,
     "",
     "## Manifest / directory consistency",
     "",
@@ -4127,10 +4165,11 @@ export function validateRepository(options) {
   const lifecycleTraceabilityChecks = validateLifecycleTraceabilityContract(root, manifest, errors);
   const reviewSignalRegistryChecks = validateReviewSignalRegistry(root, manifest, errors);
   const portfolioCatalogChecks = validateAdaptivePortfolioCatalog(root, errors);
+  const portfolioPolicyChecks = validateAdaptivePortfolioPolicy(root, errors);
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 
