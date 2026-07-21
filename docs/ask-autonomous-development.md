@@ -84,11 +84,13 @@ If generation or validation fails or is cancelled after a target has been select
 
 The workflow separates reasoning, untrusted repository execution, and GitHub publication.
 
-1. **`context`** — read-only. It resolves `github.workflow_sha` once and records the identical control/workflow SHA, target mode and branch, exact target commit, exact base `main` commit, selected PR/Issue identity, run identity, and a canonical context digest.
-2. **`codex_generate`** — `contents: read` only. It checks out the control and target by exact SHA, gives Codex no GitHub write token, runs Codex in `workspace-write`, validates the raw result against the protected Schema, creates the binary patch, secret-scans patch/result fields, hashes context/result/patch, and uploads one raw artifact. After the Codex action, this job executes only trusted control-plane code; it does not execute `workspace/scripts/**`, tests, builds, or validators.
-3. **`validate_patch`** — `contents: read` only. It has no OpenAI key, publication token, Issue/PR write permission, contents write permission, deployment secret, or environment secret. It downloads the original raw artifact, verifies all bindings, applies the original patch to the exact target SHA, performs protected-path/binary/symlink/size/secret preflight, and runs the repository validation suite. After repository code has run, it checks out the control plane again at the same immutable SHA, re-downloads the original artifact, rechecks the working tree against that patch, and records a run/attempt-bound validation result.
-4. **`publish`** — the only patch-bearing job with GitHub write permission. It checks out the same exact control and target SHAs, independently downloads the original raw artifact and validation record, directly checks the GitHub validation-job conclusion, checks remote drift, applies the original patch to a fresh checkout, and recomputes the final guard. It does not accept a downloaded `guard.json` as authority. After the final guard it executes no model-changed repository code; only trusted git/GitHub publication operations remain.
-5. **`report_failure`** — publishes only a bounded failure status derived from the immutable context. It carries an empty patch and cannot update a branch, open a PR, merge, or close an Issue.
+1. **`context`** — read-only. It resolves `github.workflow_sha` once and records the identical control/workflow SHA, target mode and branch, exact target commit, exact base `main` commit, selected PR/Issue identity, run identity, and a canonical context digest. Immediately after GitHub retrieval, it secret-scans the untruncated source fields and the final context/prompt bytes before writing an artifact.
+2. **`report_sensitive_context`** — a dedicated trusted status path. If input scanning finds secret-like text, `context` writes only a minimal blocked identity. This job never starts Codex, receives a patch, checks out the target repository, creates a branch/PR, or includes matched text in its status.
+3. **`codex_generate`** — `contents: read` only. It runs only when the context boundary produced both a safe context and a pre-scanned prompt. It checks out the control and target by exact SHA, gives Codex no GitHub write token, runs Codex in `workspace-write`, validates the raw result against the protected Schema, creates the binary patch, secret-scans patch/result fields, hashes context/result/patch, and uploads one raw artifact. After the Codex action, this job executes only trusted control-plane code; it does not execute `workspace/scripts/**`, tests, builds, or validators.
+4. **`validate_execute`** — `contents: read` only and the untrusted repository execution domain. It has no OpenAI key, publication token, Issue/PR write permission, contents write permission, OIDC permission, deployment/environment secret, host credential mount, SSH agent, or Docker socket mount. A trusted host wrapper verifies and applies the original raw patch, then executes every immutable validation-plan command in a separate digest-pinned Node.js 24 container. The patched repository source and control inputs are mounted read-only; trusted container code copies source into a fresh writable tmpfs validation workspace. Only that disposable workspace and scratch tmpfs are writable. The container has no network and receives only `PATH`, `HOME`, `LANG`, `LC_ALL`, and `NODE_ENV` through `env -i`. Runner command files, tool cache, artifact token, host home, and host sockets are not mounted. `--rm --init` plus a fresh workspace/container per command destroys its process namespace, filesystem state, `PATH` changes, and background processes before the next command.
+5. **`attest_validation`** — a fresh runner with only the exact control checkout, original raw artifact, immutable plan, and digest-only execution evidence. It never checks out or executes the patched repository. It binds the actual `needs.validate_execute.result`, run/attempt, control/workflow/target/base SHAs, raw artifact digest, container digest, command-plan digest, all command-definition/output/safe-log digests, and produces the only validation attestation accepted by the publisher.
+6. **`publish`** — the only patch-bearing job with GitHub write permission. It checks out the same exact control and target SHAs, independently downloads the original raw artifact and trusted attestation, verifies the observed validation-job conclusion, checks remote drift, applies the original patch to a fresh checkout, and recomputes the final guard. It does not accept a downloaded `guard.json` or validation execution self-report as publication authority. After the final guard it executes no model-changed repository code; only trusted git/GitHub publication operations remain.
+7. **`report_failure`** — publishes only a bounded failure status derived from a context that passed input scanning. It carries an empty patch and cannot update a branch, open a PR, merge, or close an Issue.
 
 Issue and PR text is treated as untrusted context data, not executable instruction.
 
@@ -96,14 +98,19 @@ Issue and PR text is treated as untrusted context data, not executable instructi
 
 Every job uses the same exact `github.workflow_sha` as its control checkout. Per-job `ref: main` resolution is prohibited. PR maintenance records both the publication branch name and exact PR HEAD SHA; Issue advancement records `main` as the destination and binds both target/base identity to the exact selected `main` SHA. Branch names are publication destinations, never checkout identities for generation or validation.
 
-Publication checks the remote target before applying and again immediately before mutation:
+Publication checks the remote target before applying and again immediately before mutation. For Issue advancement it also fetches current Issue, open PR, run branch, and `main` state before acquiring a run-scoped lease and again immediately before push:
 
 - a moved PR HEAD rejects an update before push;
 - a moved review-only PR receives only a trusted stale-review status containing the reviewed and current HEADs, with no generated verdict/comment;
 - a moved Issue base rejects remote branch and PR creation;
+- a closed, completed, or `not_planned` Issue rejects publication;
+- a newly linked human PR, an automation-marker PR, or the same-run branch rejects duplicate publication;
+- an active lease owned by another run rejects publication; an expired lease can be reacquired;
 - a moved control branch does not change the control plane because every job remains pinned to the recorded workflow SHA.
 
-The final guard binds Schema version, control/workflow/target/base SHAs, context/result/patch SHA-256 values, changed paths, additions, deletions, total changed lines, validation run ID/attempt/status, and its own canonical digest.
+Linkage recognizes `Progresses #N`, `Closes #N`, `Fixes #N`, `Addresses #N`, and the automation marker. A stale or duplicate target receives only trusted run/Issue/target/current-state/existing-PR/reason metadata; generated text, patch push, remote branch, and Draft PR publication are suppressed. The Issue-comment lease binds Issue, run/attempt, target SHA, owner, acquisition/expiry timestamps, and a canonical digest. It coordinates cooperating automation runs; it cannot eliminate the final API race with unrelated human writes.
+
+The final guard binds Schema version, control/workflow/target/base SHAs, context/result/patch SHA-256 values, changed paths, additions, deletions, total changed lines, validation run ID/attempt/status, attestation/execution/container/plan digests, publication revalidation digest, and its own canonical digest.
 
 ## Hard boundaries
 
@@ -136,17 +143,21 @@ Each run is limited to:
 
 The Codex result must list the exact ASCII-ordered changed path set. A changed run must also report at least one validation command that Codex actually executed. The guard independently compares these claims with the working tree.
 
-## Secret scanning
+## Input and output secret scanning
 
-The protected scanner rejects secret-like material in the complete patch bytes and model-controlled outbound fields: summary, rationale, PR title/body, Issue/review comments, `tests_run`, `risks`, branch name, and commit message. It detects private-key headers, common GitHub/OpenAI/AWS credential forms, bearer/authorization credentials, explicit password/secret/token/API-key assignments, credential URLs, NUL/invalid control bytes, and abnormally large single lines.
+Before any model call, the protected scanner inspects untruncated Issue title/body/comments; PR title/body/comments, reviews, inline comments, check names/output descriptions, and status descriptions; roadmap/portfolio Issue context; and the final context JSON and prompt bytes. Scanning the raw source before truncation prevents a credential at or across a truncation boundary from disappearing before inspection.
+
+One finding stops generation. The workflow does not upload the full context, does not build a prompt artifact, does not start Codex, and does not redact the task into a different request. The replacement artifact contains only immutable target identity, reason, finding categories, and field/ID/line-or-byte-range locations. It never contains the match, surrounding source text, or full original field.
+
+After generation, the scanner also rejects secret-like material in the complete patch bytes and model-controlled outbound fields: summary, rationale, PR title/body, Issue/review comments, `tests_run`, `risks`, branch name, and commit message. It detects private-key headers, common GitHub/OpenAI/AWS credential forms, bearer/authorization credentials, explicit password/secret/token/API-key assignments, credential URLs, NUL/invalid control bytes, and abnormally large single lines.
 
 Findings contain only category, artifact/field, repository path when available, line, and byte range. The matched value and private evaluator text are never copied into scanner diagnostics. Source and outbound text are rejected; source code is never silently redacted.
 
-This is a bounded pattern scanner, not proof that arbitrary novel credential formats or semantically disguised secrets are absent. Credentials must still never be placed in prompts, Issues, PRs, artifacts, or repository files.
+This is a bounded pattern scanner, not proof that arbitrary novel credential formats, encoded values, split values outside covered assignment forms, or semantically disguised secrets are absent. It can also stop on a false positive; that is intentionally fail-closed rather than a redaction-and-continue path. Credentials must still never be placed in prompts, Issues, PRs, artifacts, or repository files.
 
 ## Validation
 
-The secret-free `validate_patch` job runs:
+The secret-free `validate_execute` job reads `.github/ask-automation/validation-plan.json` from the immutable control SHA and runs:
 
 - syntax checks for changed `.mjs` files;
 - `node scripts/test-ask-autonomous-development.mjs` from the protected target checkout;
@@ -155,6 +166,8 @@ The secret-free `validate_patch` job runs:
 - `node scripts/adapter-runtime-bundle.mjs --check`;
 - `node scripts/validate-repo.mjs`;
 - `git diff --check`.
+
+The reviewed image is pinned by OCI digest, not a mutable tag. Each command record contains the immutable command-definition digest, start/finish timestamps, exit status, stdout/stderr digests, digest-only safe-log path/hash, and container digest. Raw stdout/stderr—including a matched credential or private-evaluator text—is never included in the uploaded validation artifact.
 
 Codex may run additional focused tests and must report only commands it actually executed.
 
@@ -185,7 +198,7 @@ The PR remains Draft and contains the marker:
 <!-- ask-autonomous-development -->
 ```
 
-A single status comment marked with `ask-autonomous-development-status` is updated on the PR and linked Issue. The updater recognizes GitHub Actions, the repository owner, and dedicated GitHub App bot identities. No merge or Issue closure follows automatically.
+A single status comment marked with `ask-autonomous-development-status` is updated on the PR and linked Issue. Issue advancement additionally creates a short-lived `ask-autonomous-development-lease` comment before publication. The updater recognizes GitHub Actions, the repository owner, and dedicated GitHub App bot identities. No merge or Issue closure follows automatically.
 
 ## Operations
 

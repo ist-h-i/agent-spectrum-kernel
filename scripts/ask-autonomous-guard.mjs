@@ -304,6 +304,9 @@ export function createRawArtifact({ repository, contextPath, resultPath, schemaP
     result_sha256: sha256Bytes(resultBytes),
     patch_sha256: sha256Bytes(patch),
     changed_files: change.changed_files,
+    additions: change.additions,
+    deletions: change.deletions,
+    changed_lines: change.changed_lines,
   };
   manifest.artifact_digest = digestObject(manifest);
   writeFileSync(paths.manifest, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -350,57 +353,11 @@ export function verifyRawArtifact({ directory, schemaPath, expected = {} }) {
   return { context, result, patch, manifest, paths };
 }
 
-export function buildValidationRecord({ raw, change, runId, runAttempt, status = "success" }) {
-  if (status !== "success") throw new Error("validation status must be success before publication");
-  const record = {
-    schema_version: GUARD_SCHEMA_VERSION,
-    artifact_kind: "ask_autonomous_validation",
-    validation_job: "validate_patch",
-    validation_run_id: String(runId),
-    validation_run_attempt: String(runAttempt),
-    validation_status: status,
-    raw_artifact_digest: raw.manifest.artifact_digest,
-    control_sha: raw.context.control_sha,
-    workflow_sha: raw.context.workflow_sha,
-    target_branch: raw.context.target_branch,
-    target_commit_sha: raw.context.target_commit_sha,
-    base_main_sha: raw.context.base_main_sha,
-    context_sha256: raw.manifest.context_sha256,
-    result_sha256: raw.manifest.result_sha256,
-    patch_sha256: raw.manifest.patch_sha256,
-    changed_files: change.changed_files,
-    additions: change.additions,
-    deletions: change.deletions,
-    changed_lines: change.changed_lines,
-  };
-  record.validation_digest = digestObject(record);
-  return record;
-}
-
-export function verifyValidationRecord({ record, raw, runId, runAttempt }) {
-  if (record.validation_digest !== digestObject(record, "validation_digest")) throw new Error("validation record digest drift detected");
-  if (record.validation_status !== "success") throw new Error("validation job did not record success");
-  const expected = {
-    validation_job: "validate_patch",
-    validation_run_id: String(runId),
-    validation_run_attempt: String(runAttempt),
-    raw_artifact_digest: raw.manifest.artifact_digest,
-    control_sha: raw.context.control_sha,
-    workflow_sha: raw.context.workflow_sha,
-    target_branch: raw.context.target_branch,
-    target_commit_sha: raw.context.target_commit_sha,
-    base_main_sha: raw.context.base_main_sha,
-    context_sha256: raw.manifest.context_sha256,
-    result_sha256: raw.manifest.result_sha256,
-    patch_sha256: raw.manifest.patch_sha256,
-  };
-  for (const [field, value] of Object.entries(expected)) if (String(record[field]) !== String(value)) throw new Error(`validation artifact ${field} binding mismatch`);
-}
-
-export function buildFinalGuard({ raw, validation, change }) {
-  verifyValidationRecord({ record: validation, raw, runId: validation.validation_run_id, runAttempt: validation.validation_run_attempt });
+export function buildFinalGuard({ raw, attestation, change, publicationRevalidation = null }) {
+  if (!attestation || attestation.artifact_kind !== "ask_autonomous_validation_attestation") throw new Error("publisher requires a trusted validation attestation");
+  if (attestation.attestation_digest !== digestObject(attestation, "attestation_digest")) throw new Error("validation attestation digest drift detected");
   for (const field of ["changed_files", "additions", "deletions", "changed_lines"]) {
-    if (JSON.stringify(validation[field]) !== JSON.stringify(change[field])) throw new Error(`final guard ${field} does not match validated patch`);
+    if (JSON.stringify(raw.manifest[field]) !== JSON.stringify(change[field])) throw new Error(`final guard ${field} does not match the original raw patch`);
   }
   const guard = {
     schema_version: GUARD_SCHEMA_VERSION,
@@ -416,16 +373,21 @@ export function buildFinalGuard({ raw, validation, change }) {
     additions: change.additions,
     deletions: change.deletions,
     changed_lines: change.changed_lines,
-    validation_run_id: validation.validation_run_id,
-    validation_run_attempt: validation.validation_run_attempt,
-    validation_status: validation.validation_status,
+    validation_run_id: attestation.run_id,
+    validation_run_attempt: attestation.run_attempt,
+    validation_status: attestation.validation_job_result,
+    validation_attestation_digest: attestation.attestation_digest,
+    validation_execution_digest: attestation.execution_digest,
+    validation_container_image_digest: attestation.container_image_digest,
+    validation_command_plan_sha256: attestation.command_plan_sha256,
+    publication_revalidation_digest: publicationRevalidation?.revalidation_digest ?? null,
   };
   guard.guard_digest = digestObject(guard);
   return guard;
 }
 
 function parseArgs(argv) {
-  const args = { command: argv.shift(), repository: null, context: null, result: null, schema: null, outputDirectory: null, rawDirectory: null, output: null, runId: null, runAttempt: null, status: "success" };
+  const args = { command: argv.shift(), repository: null, context: null, result: null, schema: null, outputDirectory: null, rawDirectory: null, runId: null, runAttempt: null };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--repository") args.repository = resolve(argv.shift());
@@ -434,10 +396,8 @@ function parseArgs(argv) {
     else if (flag === "--schema") args.schema = resolve(argv.shift());
     else if (flag === "--output-directory") args.outputDirectory = resolve(argv.shift());
     else if (flag === "--raw-directory") args.rawDirectory = resolve(argv.shift());
-    else if (flag === "--output") args.output = resolve(argv.shift());
     else if (flag === "--run-id") args.runId = argv.shift();
     else if (flag === "--run-attempt") args.runAttempt = argv.shift();
-    else if (flag === "--status") args.status = argv.shift();
     else throw new Error(`Unknown argument: ${flag}`);
   }
   return args;
@@ -451,18 +411,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       if (!args.repository || !args.context || !args.result || !args.outputDirectory) throw new Error("raw requires --repository, --context, --result, and --output-directory");
       const created = createRawArtifact({ repository: args.repository, contextPath: args.context, resultPath: args.result, schemaPath: args.schema, outputDirectory: args.outputDirectory, runId: args.runId, runAttempt: args.runAttempt });
       console.log(`ASK raw artifact created: files=${created.change.changed_files.length}, lines=${created.change.changed_lines}`);
-    } else if (["preflight", "validation"].includes(args.command)) {
-      if (!args.repository || !args.rawDirectory) throw new Error(`${args.command} requires --repository and --raw-directory`);
+    } else if (args.command === "preflight") {
+      if (!args.repository || !args.rawDirectory) throw new Error("preflight requires --repository and --raw-directory");
       const raw = verifyRawArtifact({ directory: args.rawDirectory, schemaPath: args.schema, expected: { runId: args.runId, runAttempt: args.runAttempt } });
       const change = validateAutomationRun({ repository: args.repository, context: raw.context, result: raw.result, expectedPatch: raw.patch });
-      if (args.command === "validation") {
-        if (!args.output) throw new Error("validation requires --output");
-        const record = buildValidationRecord({ raw, change, runId: args.runId, runAttempt: args.runAttempt, status: args.status });
-        writeFileSync(args.output, `${JSON.stringify(record, null, 2)}\n`);
-      }
-      console.log(`ASK automation ${args.command} passed: files=${change.changed_files.length}, lines=${change.changed_lines}`);
+      console.log(`ASK automation preflight passed: files=${change.changed_files.length}, lines=${change.changed_lines}`);
     } else {
-      throw new Error("command must be raw, preflight, or validation");
+      throw new Error("command must be raw or preflight");
     }
   } catch (error) {
     console.error(`ASK automation guard failed: ${error.message}`);

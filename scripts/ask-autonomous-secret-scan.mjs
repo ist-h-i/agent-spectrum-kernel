@@ -35,20 +35,20 @@ function patchPathAtLine(lines, index) {
   return null;
 }
 
-function finding(category, artifact, field, path, line, start, end) {
-  return { category, artifact, field, path, line, byte_range: [start, end] };
+function finding(category, artifact, field, path, line, start, end, sourceId = null) {
+  return { category, artifact, field, source_id: sourceId, path, line, byte_range: [start, end] };
 }
 
-export function scanSecretBytes(bytes, { artifact, field = null, path = null } = {}) {
+export function scanSecretBytes(bytes, { artifact, field = null, path = null, sourceId = null } = {}) {
   const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
   const text = buffer.toString("utf8");
   const findings = [];
 
   for (let index = 0; index < buffer.length; index += 1) {
     const value = buffer[index];
-    if (value === 0) findings.push(finding("nul_byte", artifact, field, path, null, index, index + 1));
+    if (value === 0) findings.push(finding("nul_byte", artifact, field, path, null, index, index + 1, sourceId));
     else if ((value < 32 && ![9, 10, 13].includes(value)) || value === 127) {
-      findings.push(finding("control_character", artifact, field, path, null, index, index + 1));
+      findings.push(finding("control_character", artifact, field, path, null, index, index + 1, sourceId));
     }
   }
 
@@ -58,7 +58,7 @@ export function scanSecretBytes(bytes, { artifact, field = null, path = null } =
     const lineBytes = Buffer.byteLength(lines[index]);
     const detectedPath = artifact === "patch" ? patchPathAtLine(lines, index) : path;
     if (lineBytes > MAX_LINE_BYTES) {
-      findings.push(finding("oversized_line", artifact, field, detectedPath, index + 1, lineByteStart, lineByteStart + lineBytes));
+      findings.push(finding("oversized_line", artifact, field, detectedPath, index + 1, lineByteStart, lineByteStart + lineBytes, sourceId));
     }
     lineByteStart += lineBytes + 1;
   }
@@ -69,11 +69,36 @@ export function scanSecretBytes(bytes, { artifact, field = null, path = null } =
       const start = byteOffset(text, match.index);
       const end = start + Buffer.byteLength(match[0]);
       const line = lineForOffset(text, match.index);
-      findings.push(finding(category, artifact, field, artifact === "patch" ? patchPathAtLine(lines, line - 1) : path, line, start, end));
+      findings.push(finding(category, artifact, field, artifact === "patch" ? patchPathAtLine(lines, line - 1) : path, line, start, end, sourceId));
     }
   }
 
   return findings;
+}
+
+export function scanContextSources(sources) {
+  const findings = [];
+  for (const source of sources) {
+    if (typeof source.value !== "string") continue;
+    findings.push(...scanSecretBytes(Buffer.from(source.value), {
+      artifact: "github_context",
+      field: source.field,
+      sourceId: source.id ?? null,
+    }));
+  }
+  return findings.sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+}
+
+export function boundedFindingLocations(findings) {
+  const locations = findings.map((item) => ({
+    field: item.field,
+    id: item.source_id,
+    line: item.line,
+    byte_range: item.byte_range,
+    category: item.category,
+  }));
+  const unique = new Map(locations.map((location) => [JSON.stringify(location), location]));
+  return [...unique.values()].sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
 }
 
 function resultFields(result) {

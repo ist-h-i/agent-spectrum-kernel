@@ -5,11 +5,13 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { CRITICAL_PATH_ISSUES, computeContextDigest, selectTarget } from "./ask-autonomous-context.mjs";
+import { buildBlockedContext, CRITICAL_PATH_ISSUES, computeContextDigest, prepareContextArtifacts, selectTarget } from "./ask-autonomous-context.mjs";
 import { buildFailureArtifacts } from "./ask-autonomous-failure.mjs";
-import { buildFinalGuard, buildValidationRecord, createRawArtifact, digestObject, isDisallowedPath, sha256Bytes, validateAutomationRun, validateChangedPaths, validateCodexResult, verifyRawArtifact, verifyValidationRecord } from "./ask-autonomous-guard.mjs";
-import { branchNameForIssue, formatStaleReviewStatus, targetDrift } from "./ask-autonomous-publish.mjs";
-import { assertNoAutomationSecrets } from "./ask-autonomous-secret-scan.mjs";
+import { buildFinalGuard, createRawArtifact, digestObject, isDisallowedPath, sha256Bytes, validateAutomationRun, validateChangedPaths, validateCodexResult, verifyRawArtifact } from "./ask-autonomous-guard.mjs";
+import { buildValidationAttestation, verifyExecutionRecord, verifyValidationAttestation } from "./ask-autonomous-attest.mjs";
+import { branchNameForIssue, buildIssueLease, evaluateIssuePublicationState, formatStaleReviewStatus, linkedIssueNumbers, selectActiveLease, targetDrift } from "./ask-autonomous-publish.mjs";
+import { assertNoAutomationSecrets, scanContextSources } from "./ask-autonomous-secret-scan.mjs";
+import { commandDefinitionDigest, dockerArguments, executeValidationPlan, loadValidationPlan, VALIDATION_ENVIRONMENT, VALIDATION_IMAGE_DIGEST } from "./ask-autonomous-validate-execute.mjs";
 import { APPROVED_ASK_AUTOMATION_ACTION_PINS, validateAskAutomationActionPinsText } from "./validate-repo.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -221,15 +223,11 @@ try {
   writeFileSync(resolve(artifactRoot, "raw-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
   const raw = verifyRawArtifact({ directory: artifactRoot, schemaPath, expected: { runId: "123456", runAttempt: "1", controlSha: boundContext.control_sha, workflowSha: boundContext.workflow_sha } });
-  const emptyChange = { changed_files: [], additions: 0, deletions: 0, changed_lines: 0 };
-  const validation = buildValidationRecord({ raw, change: emptyChange, runId: "123456", runAttempt: "1" });
-  verifyValidationRecord({ record: validation, raw, runId: "123456", runAttempt: "1" });
 
   // F-214-01 TOCTOU / integrity: downloaded guard is never an input; all mutable raw fields are bound.
   const publisherSource = readFileSync(resolve(root, "scripts/ask-autonomous-publish.mjs"), "utf8");
   assert.doesNotMatch(publisherSource, /args\.guard|--guard/u);
   assert.match(publisherSource, /buildFinalGuard/);
-  assert.throws(() => verifyValidationRecord({ record: { ...validation, changed_lines: 1 }, raw, runId: "123456", runAttempt: "1" }), /validation record digest drift/);
 
   writeFileSync(resolve(artifactRoot, "result.json"), `${JSON.stringify({ ...rawResult, summary: "changed" }, null, 2)}\n`);
   assert.throws(() => verifyRawArtifact({ directory: artifactRoot, schemaPath, expected: { runId: "123456", runAttempt: "1" } }), /result digest drift/);
@@ -250,8 +248,6 @@ try {
   writeFileSync(resolve(artifactRoot, "raw-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
   assert.throws(() => verifyRawArtifact({ directory: artifactRoot, schemaPath, expected: { runId: "123456", runAttempt: "1", controlSha: "d".repeat(40) } }), /control_sha does not match expected immutable identity/);
-  assert.throws(() => buildValidationRecord({ raw, change: emptyChange, runId: "123456", runAttempt: "1", status: "failure" }), /validation status must be success/);
-  assert.throws(() => verifyValidationRecord({ record: validation, raw, runId: "different-run", runAttempt: "1" }), /validation_run_id binding mismatch/);
 } finally {
   rmSync(artifactRoot, { recursive: true, force: true });
 }
@@ -301,11 +297,20 @@ try {
   git(validationWorkspace, ["apply", "--binary", resolve(rawDirectory, "change.patch")]);
   const appliedRaw = verifyRawArtifact({ directory: rawDirectory, schemaPath, expected: { runId: "123456", runAttempt: "1", controlSha: integrationContext.control_sha } });
   const appliedChange = validateAutomationRun({ repository: validationWorkspace, context: appliedRaw.context, result: appliedRaw.result, expectedPatch: appliedRaw.patch });
-  const record = buildValidationRecord({ raw: appliedRaw, change: appliedChange, runId: "123456", runAttempt: "1" });
-  const finalGuard = buildFinalGuard({ raw: appliedRaw, validation: record, change: appliedChange });
+  const attestation = {
+    artifact_kind: "ask_autonomous_validation_attestation",
+    run_id: "123456",
+    run_attempt: "1",
+    validation_job_result: "success",
+    execution_digest: `sha256:${"d".repeat(64)}`,
+    container_image_digest: VALIDATION_IMAGE_DIGEST,
+    command_plan_sha256: `sha256:${"e".repeat(64)}`,
+  };
+  attestation.attestation_digest = digestObject(attestation);
+  const finalGuard = buildFinalGuard({ raw: appliedRaw, attestation, change: appliedChange });
   assert.equal(finalGuard.validation_status, "success");
   assert.match(finalGuard.guard_digest, /^sha256:[a-f0-9]{64}$/u);
-  for (const field of ["schema_version", "control_sha", "workflow_sha", "target_branch", "target_commit_sha", "base_main_sha", "context_sha256", "result_sha256", "patch_sha256", "changed_files", "additions", "deletions", "changed_lines", "validation_run_id", "validation_run_attempt", "validation_status", "guard_digest"]) {
+  for (const field of ["schema_version", "control_sha", "workflow_sha", "target_branch", "target_commit_sha", "base_main_sha", "context_sha256", "result_sha256", "patch_sha256", "changed_files", "additions", "deletions", "changed_lines", "validation_run_id", "validation_run_attempt", "validation_status", "validation_attestation_digest", "validation_execution_digest", "validation_container_image_digest", "validation_command_plan_sha256", "guard_digest"]) {
     assert.ok(field in finalGuard, `final guard must bind ${field}`);
   }
 
@@ -344,6 +349,156 @@ try {
   assert.doesNotMatch(error.message, new RegExp(openAiSecret, "u"));
 }
 
+// F-214-05: every immutable validation command gets a fresh, networkless container
+// with no runner command files, host credentials, or inherited environment.
+const planPath = resolve(root, ".github/ask-automation/validation-plan.json");
+const loadedPlan = loadValidationPlan(planPath);
+assert.equal(loadedPlan.plan.container.node_major, 24);
+assert.equal(loadedPlan.plan.container.image_digest, VALIDATION_IMAGE_DIGEST);
+assert.deepEqual(loadedPlan.plan.container.environment_allowlist, ["PATH", "HOME", "LANG", "LC_ALL", "NODE_ENV"]);
+const requiredCommandIds = [
+  "changed_mjs_syntax", "autonomous_development_control", "repository_validation_tests", "portfolio_catalog",
+  "portfolio_policy", "design_admission", "design_independent_review", "general_benchmark", "execution",
+  "normalized_results", "evaluator_boundary", "adapter_runtime_bundle", "repository_consistency", "whitespace",
+];
+assert.deepEqual(loadedPlan.plan.commands.map((command) => command.id), requiredCommandIds);
+const sampleDockerArgs = dockerArguments({ image: loadedPlan.plan.container.image, repository: "/safe/workspace", control: "/safe/control", planPath: "/safe/plan.json", commandId: "general_benchmark" });
+for (const required of ["--rm", "--init", "--network", "none", "--read-only", "--cap-drop", "ALL", "no-new-privileges", "/source,readonly", "/workspace:rw,nosuid,nodev", "/control,readonly", "/validation-plan.json,readonly", "/tmp:rw,nosuid,nodev"] ) assert.ok(sampleDockerArgs.join(" ").includes(required), `docker boundary must include ${required}`);
+for (const forbidden of ["GITHUB_ENV", "GITHUB_PATH", "GITHUB_OUTPUT", "GITHUB_STEP_SUMMARY", "RUNNER_TOOL_CACHE", "ACTIONS_RUNTIME_TOKEN", "SSH_AUTH_SOCK", "docker.sock", "BASH_ENV", "/home/runner"]) assert.doesNotMatch(sampleDockerArgs.join(" "), new RegExp(forbidden, "u"));
+assert.deepEqual(Object.keys(VALIDATION_ENVIRONMENT), ["PATH", "HOME", "LANG", "LC_ALL", "NODE_ENV"]);
+assert.ok(sampleDockerArgs.indexOf("-i") < sampleDockerArgs.indexOf("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"));
+assert.deepEqual(sampleDockerArgs.slice(-4), ["--plan", "/validation-plan.json", "--command-id", "general_benchmark"]);
+
+const validationEvidenceRoot = mkdtempSync(resolve(tmpdir(), "ask-validation-evidence-"));
+try {
+  const calls = [];
+  const validationRaw = {
+    context: boundContext,
+    manifest: { artifact_digest: `sha256:${"f".repeat(64)}` },
+  };
+  const record = executeValidationPlan({
+    repository: "/safe/workspace",
+    control: "/safe/control",
+    raw: validationRaw,
+    plan: loadedPlan.plan,
+    planDigest: loadedPlan.digest,
+    planPath,
+    outputDirectory: validationEvidenceRoot,
+    runId: "123456",
+    runAttempt: "1",
+    now: () => "2026-07-21T00:00:00.000Z",
+    spawn: (command, args) => {
+      calls.push({ command, args });
+      return { status: 0, stdout: Buffer.from(openAiSecret), stderr: Buffer.from("private evaluator output") };
+    },
+  });
+  assert.equal(calls.length, loadedPlan.plan.commands.length, "background process, PATH, and BASH_ENV state must not share a container between commands");
+  assert.ok(calls.every((call) => call.command === "docker" && call.args.includes("--rm") && call.args.includes("none")));
+  assert.equal(record.status, "success");
+  assert.equal(record.commands.length, requiredCommandIds.length);
+  for (const evidence of record.commands) {
+    assert.equal(evidence.definition_sha256, commandDefinitionDigest(loadedPlan.plan.commands.find((command) => command.id === evidence.id)));
+    const safeLog = readFileSync(resolve(validationEvidenceRoot, evidence.safe_log_path), "utf8");
+    assert.match(safeLog, /output_withheld=true/u);
+    assert.doesNotMatch(safeLog, new RegExp(openAiSecret, "u"));
+    assert.doesNotMatch(safeLog, /private evaluator output/u);
+  }
+  verifyExecutionRecord({ record, raw: validationRaw, plan: loadedPlan.plan, planDigest: loadedPlan.digest, executionDirectory: validationEvidenceRoot, runId: "123456", runAttempt: "1", validationJobResult: "success" });
+  assert.throws(() => verifyExecutionRecord({ record, raw: validationRaw, plan: loadedPlan.plan, planDigest: loadedPlan.digest, executionDirectory: validationEvidenceRoot, runId: "other-run", runAttempt: "1", validationJobResult: "success" }), /run_id binding mismatch/u);
+  assert.throws(() => verifyExecutionRecord({ record, raw: validationRaw, plan: loadedPlan.plan, planDigest: loadedPlan.digest, executionDirectory: validationEvidenceRoot, runId: "123456", runAttempt: "2", validationJobResult: "success" }), /run_attempt binding mismatch/u);
+  assert.throws(() => verifyExecutionRecord({ record: { ...record, status: "success" }, raw: validationRaw, plan: loadedPlan.plan, planDigest: loadedPlan.digest, executionDirectory: validationEvidenceRoot, runId: "123456", runAttempt: "1", validationJobResult: "failure" }), /conclusion is not success/u);
+  const firstLog = resolve(validationEvidenceRoot, record.commands[0].safe_log_path);
+  const originalLog = readFileSync(firstLog);
+  writeFileSync(firstLog, "rewritten after validation\n");
+  assert.throws(() => verifyExecutionRecord({ record, raw: validationRaw, plan: loadedPlan.plan, planDigest: loadedPlan.digest, executionDirectory: validationEvidenceRoot, runId: "123456", runAttempt: "1", validationJobResult: "success" }), /safe_log_sha256 binding mismatch/u);
+  writeFileSync(firstLog, originalLog);
+  const attestation = buildValidationAttestation({ raw: validationRaw, record, plan: loadedPlan.plan, planDigest: loadedPlan.digest, runId: "123456", runAttempt: "1", validationJobResult: "success" });
+  verifyValidationAttestation({ attestation, raw: validationRaw, plan: loadedPlan.plan, planDigest: loadedPlan.digest, runId: "123456", runAttempt: "1", validationJobResult: "success" });
+  assert.throws(() => verifyValidationAttestation({ attestation, raw: validationRaw, plan: loadedPlan.plan, planDigest: loadedPlan.digest, runId: "different", runAttempt: "1", validationJobResult: "success" }), /run_id binding mismatch/u);
+} finally {
+  rmSync(validationEvidenceRoot, { recursive: true, force: true });
+}
+
+// F-214-06: raw GitHub input and final bytes are scanned before any model artifact is written.
+const safePromptTemplate = "Implement only the selected bounded task.";
+const safeAdvanceContext = {
+  ...boundContext,
+  mode: "advance_issue",
+  target_ref: "main",
+  target_branch: "main",
+  target_commit_sha: boundContext.base_main_sha,
+  target_issue_number: 197,
+  target_pr_number: null,
+  pull_request: null,
+};
+safeAdvanceContext.context_digest = computeContextDigest(safeAdvanceContext);
+const sensitiveCases = [
+  ["issue.body", 197, openAiSecret, "openai_api_key"],
+  ["pull_request.body", 214, githubSecret, "github_token"],
+  ["issue.comments.body", 1, `AKIA${"C".repeat(16)}`, "aws_access_key"],
+  ["pull_request.inline_review_comments.body", 2, "-----BEGIN PRIVATE KEY-----", "pem_private_key"],
+  ["pull_request.checks.output.summary", 3, `Authorization: Bearer ${"d".repeat(24)}`, "authorization_credential"],
+  ["roadmap.body", 170, `password=${"e".repeat(20)}`, "explicit_credential_assignment"],
+  ["issue.body", 197, `${"x".repeat(7_995)} ${openAiSecret}`, "openai_api_key"],
+  ["portfolio.comments.body", 4, `認証 token =\n${"f".repeat(20)}`, "explicit_credential_assignment"],
+];
+for (const [field, id, value, category] of sensitiveCases) {
+  const artifacts = prepareContextArtifacts({ context: safeAdvanceContext, sources: [{ field, id, value }], promptTemplate: safePromptTemplate, runId: "123456" });
+  assert.equal(artifacts.shouldGenerate, false);
+  assert.equal(artifacts.shouldReportSensitiveContext, true);
+  assert.equal(artifacts.promptBytes, null);
+  assert.equal(artifacts.context.blocked_reason, "sensitive_context");
+  assert.ok(artifacts.context.finding_categories.includes(category));
+  assert.doesNotMatch(artifacts.contextBytes.toString("utf8"), new RegExp(value.slice(-20).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "u"));
+}
+const falsePositiveBlocked = prepareContextArtifacts({ context: safeAdvanceContext, sources: [{ field: "issue.body", id: 197, value: `token=${"g".repeat(20)}` }], promptTemplate: safePromptTemplate, runId: "123456" });
+assert.equal(falsePositiveBlocked.shouldGenerate, false, "a possible false positive must block instead of silently redacting and continuing");
+assert.equal(falsePositiveBlocked.promptBytes, null);
+const blockedOne = buildBlockedContext(safeAdvanceContext, scanContextSources([{ field: "issue.body", id: 197, value: openAiSecret }]), "123456");
+const blockedTwo = buildBlockedContext(safeAdvanceContext, scanContextSources([{ field: "issue.body", id: 197, value: openAiSecret }]), "123456");
+assert.deepEqual(blockedOne, blockedTwo, "minimal blocked context identity must be deterministic");
+assert.deepEqual(Object.keys(blockedOne).sort(), ["base_main_sha", "blocked_reason", "context_digest", "control_sha", "finding_categories", "finding_locations", "repository", "run_id", "schema_version", "target_branch", "target_commit_sha", "target_issue_number", "target_mode", "target_pr_number", "workflow_sha"].sort());
+const safeArtifacts = prepareContextArtifacts({ context: safeAdvanceContext, sources: [{ field: "issue.body", id: 197, value: "safe task" }], promptTemplate: safePromptTemplate, runId: "123456" });
+assert.equal(safeArtifacts.shouldGenerate, true);
+assert.ok(safeArtifacts.promptBytes.includes(Buffer.from("safe task")) === false, "prompt is built from the final context, not a separately mutable source list");
+
+// F-214-07: Issue advancement is revalidated against live Issue/PR/main/branch state and a run lease.
+const publicationBase = {
+  context: safeAdvanceContext,
+  repository: safeAdvanceContext.repository,
+  issue: { number: 197, state: "open", state_reason: null },
+  pulls: [],
+  branchExists: false,
+  mainSha: safeAdvanceContext.base_main_sha,
+  activeLease: null,
+  runId: "123456",
+  runAttempt: "1",
+};
+assert.equal(evaluateIssuePublicationState(publicationBase).can_publish, true);
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, issue: { state: "closed", state_reason: "completed" } }).reason, "issue_completed");
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, issue: { state: "closed", state_reason: "not_planned" } }).reason, "issue_not_planned");
+for (const verb of ["Progresses", "Closes", "Fixes", "Addresses"]) assert.deepEqual(linkedIssueNumbers(`${verb} #197`), [197]);
+const humanPull = { number: 301, state: "open", body: "Fixes #197", head: { ref: "human/issue-197" } };
+const automationPull = { number: 302, state: "open", body: "Progresses #197\n<!-- ask-autonomous-development -->", head: { ref: "automation/ask-issue-197-other" } };
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, pulls: [humanPull] }).reason, "linked_open_pr_exists");
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, pulls: [automationPull] }).reason, "automation_pr_exists");
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, branchExists: true }).reason, "same_run_branch_exists");
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, mainSha: "0".repeat(40) }).reason, "main_sha_changed");
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, currentRepository: "renamed/repository" }).reason, "repository_or_base_changed");
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, baseBranch: "trunk" }).reason, "repository_or_base_changed");
+for (const stale of [
+  evaluateIssuePublicationState({ ...publicationBase, issue: { state: "closed", state_reason: "completed" } }),
+  evaluateIssuePublicationState({ ...publicationBase, pulls: [humanPull] }),
+  evaluateIssuePublicationState({ ...publicationBase, branchExists: true }),
+]) assert.deepEqual(stale.allowed_publication_actions, ["trusted_status"], "stale publication must not allow patch, branch, or PR actions");
+const leaseNow = new Date("2026-07-21T00:00:00.000Z");
+const activeLease = buildIssueLease({ issueNumber: 197, runId: "other", runAttempt: "1", targetSha: safeAdvanceContext.target_commit_sha, owner: "other", acquiredAt: "2026-07-20T23:59:00.000Z", expiresAt: "2026-07-21T00:10:00.000Z" });
+const expiredLease = buildIssueLease({ issueNumber: 197, runId: "old", runAttempt: "1", targetSha: safeAdvanceContext.target_commit_sha, owner: "old", acquiredAt: "2026-07-20T23:40:00.000Z", expiresAt: "2026-07-20T23:55:00.000Z" });
+const leaseComment = (id, lease) => ({ id, body: `<!-- ask-autonomous-development-lease -->\n${JSON.stringify(lease)}` });
+assert.equal(selectActiveLease([leaseComment(1, expiredLease)], leaseNow), null);
+assert.equal(selectActiveLease([leaseComment(1, expiredLease), leaseComment(2, activeLease)], leaseNow).lease_digest, activeLease.lease_digest);
+assert.equal(evaluateIssuePublicationState({ ...publicationBase, activeLease }).reason, "active_lease_exists");
+
 const schema = JSON.parse(readFileSync(resolve(root, ".github/ask-automation/result.schema.json"), "utf8"));
 assert.equal(schema.additionalProperties, false);
 assert.ok(schema.properties.action.enum.includes("blocked"));
@@ -360,22 +515,41 @@ assert.match(workflow, /report_failure:/);
 assert.match(workflow, /ASK_AUTOMATION_USES_DEDICATED_TOKEN/);
 assert.doesNotMatch(workflow, /gh pr merge|merge_pull_request|auto-merge/iu);
 
-const codexJob = jobBlock(workflow, "codex_generate", "validate_patch");
-const validationJob = jobBlock(workflow, "validate_patch", "publish");
+const contextJob = jobBlock(workflow, "context", "report_sensitive_context");
+const sensitiveJob = jobBlock(workflow, "report_sensitive_context", "codex_generate");
+const codexJob = jobBlock(workflow, "codex_generate", "validate_execute");
+const validationJob = jobBlock(workflow, "validate_execute", "attest_validation");
+const attestJob = jobBlock(workflow, "attest_validation", "publish");
 const publishJob = jobBlock(workflow, "publish", "report_failure");
+assert.match(contextJob, /should_generate/u);
+assert.match(contextJob, /should_report_sensitive_context/u);
+assert.match(contextJob, /Build and scan bounded GitHub context before generation/u);
+assert.match(sensitiveJob, /needs\.context\.outputs\.should_report_sensitive_context == 'true'/u);
+assert.doesNotMatch(sensitiveJob, /openai\/codex-action|workspace|change\.patch/u);
 assert.match(codexJob, /permissions:\n\s+contents: read/u);
+assert.match(codexJob, /needs\.context\.outputs\.should_generate == 'true'/u);
+assert.match(codexJob, /prompt-file: control\/\.ask-automation\/input\/prompt\.md/u);
+assert.doesNotMatch(codexJob, /Build Codex prompt/u);
 assert.doesNotMatch(codexJob.slice(codexJob.indexOf("Run Codex in repository-only workspace")), /workspace\/scripts\//u);
 assert.match(validationJob, /permissions:\n\s+contents: read/u);
 assert.doesNotMatch(validationJob, /secrets\.|issues: write|pull-requests: write|contents: write/u);
-assert.match(validationJob, /Re-download original raw artifact after repository execution/u);
-assert.match(validationJob, /Re-check out immutable control plane after repository execution/u);
-for (const match of validationJob.matchAll(/run: node scripts\/([^\s]+)/gu)) assert.equal(isDisallowedPath(`scripts/${match[1]}`), true, `direct validation entrypoint scripts/${match[1]} must be protected`);
-assert.match(publishJob, /Recompute final guard and publish bounded updates/u);
-assert.match(publishJob, /ASK_VALIDATION_STATUS: \$\{\{ needs\.validate_patch\.result \}\}/u);
+assert.match(validationJob, /ask-autonomous-validate-execute\.mjs execute/u);
+assert.match(validationJob, /ask-automation-raw/u);
+assert.match(validationJob, /ask-validation-execution/u);
+assert.doesNotMatch(validationJob, /control-after/u);
+assert.doesNotMatch(validationJob, /working-directory: workspace|run: node workspace\/|docker\.sock|ACTIONS_RUNTIME_TOKEN/u);
+assert.match(attestJob, /needs\.validate_execute\.result/u);
+assert.match(attestJob, /ask-autonomous-attest\.mjs/u);
+assert.doesNotMatch(attestJob, /Check out exact development target|path: workspace|working-directory: workspace|docker run/u);
+assert.match(publishJob, /Recompute final guard, revalidate concurrency, and publish bounded updates/u);
+assert.match(publishJob, /ASK_VALIDATION_STATUS: \$\{\{ needs\.validate_execute\.result \}\}/u);
+assert.match(publishJob, /--attestation/u);
+assert.doesNotMatch(publishJob, /--validation/u);
 assert.doesNotMatch(publishJob, /working-directory: workspace[\s\S]*run: node scripts\//u);
 assert.doesNotMatch(workflow, /\n\s+ref: main\s*$/mu);
 assert.ok((workflow.match(/ref: \$\{\{ needs\.context\.outputs\.target_commit_sha \}\}/gu) ?? []).length >= 3);
-assert.match(workflow, /needs\.validate_patch\.result == 'success'/u);
+assert.match(workflow, /needs\.validate_execute\.result == 'success'/u);
+assert.match(workflow, /needs\.attest_validation\.result == 'success'/u);
 
 const checkoutPin = APPROVED_ASK_AUTOMATION_ACTION_PINS["actions/checkout"];
 const validPinLine = `steps:\n  - uses: actions/checkout@${checkoutPin.sha} # ${checkoutPin.version}\n`;
