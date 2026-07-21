@@ -9,17 +9,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Run repository validation tests
         run: node scripts/test-validate-repo.mjs
+
+      - name: Run autonomous development control tests
+        run: node scripts/test-ask-autonomous-development.mjs
 
       - name: Run portfolio catalog tests
         run: node scripts/test-ask-benchmark-portfolio-catalog.mjs

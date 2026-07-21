@@ -45,6 +45,14 @@ const SKILL_COUNT_REFERENCE_PATTERNS = [
 ];
 const MAINTAINED_SCAN_ROOTS = ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "README.md", "docs", "examples", "skills"];
 const GENERATED_REPORT_PATH = "docs/validation-report.md";
+const ASK_AUTOMATION_WORKFLOW_PATH = ".github/workflows/ask-autonomous-development.yml";
+export const APPROVED_ASK_AUTOMATION_ACTION_PINS = Object.freeze({
+  "actions/checkout": Object.freeze({ sha: "3d3c42e5aac5ba805825da76410c181273ba90b1", version: "v7.0.1" }),
+  "actions/setup-node": Object.freeze({ sha: "820762786026740c76f36085b0efc47a31fe5020", version: "v7.0.0" }),
+  "actions/upload-artifact": Object.freeze({ sha: "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a", version: "v7.0.1" }),
+  "actions/download-artifact": Object.freeze({ sha: "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c", version: "v8.0.1" }),
+  "openai/codex-action": Object.freeze({ sha: "52fe01ec70a42f454c9d2ebd47598f9fd6893d56", version: "v1.11" }),
+});
 const REQUIRED_SCHEMA_PATHS = [
   "schemas/metrics-event.schema.json",
   "schemas/execution-envelope.schema.json",
@@ -547,6 +555,43 @@ Options:
 
 function fail(errors, section, message) {
   errors.push({ section, message });
+}
+
+export function validateAskAutomationActionPinsText(text) {
+  const errors = [];
+  const usesPattern = /^\s*(?:-\s+)?uses:\s+([^@\s]+)@([^\s#]+)(?:\s+#\s*(\S.*))?\s*$/gmu;
+  const lines = text.split(/\r?\n/u);
+  let externalUses = 0;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!/^\s*(?:-\s+)?uses:/u.test(line)) continue;
+    usesPattern.lastIndex = 0;
+    const match = usesPattern.exec(line);
+    if (!match) {
+      errors.push(`line ${index + 1}: malformed Action reference`);
+      continue;
+    }
+    const [, action, revision, comment] = match;
+    if (action.startsWith("./")) continue;
+    externalUses += 1;
+    const approved = APPROVED_ASK_AUTOMATION_ACTION_PINS[action];
+    if (!approved) {
+      errors.push(`line ${index + 1}: Action ${action} is not in the automation allowlist`);
+      continue;
+    }
+    if (!/^[a-f0-9]{40}$/u.test(revision)) errors.push(`line ${index + 1}: Action ${action} must use a full 40-character commit SHA`);
+    else if (revision !== approved.sha) errors.push(`line ${index + 1}: Action ${action} commit SHA is not the reviewed pin`);
+    if (!comment) errors.push(`line ${index + 1}: Action ${action} requires a version comment`);
+    else if (comment.trim() !== approved.version) errors.push(`line ${index + 1}: Action ${action} version comment must be ${approved.version}`);
+  }
+  if (externalUses === 0) errors.push("automation workflow must contain pinned external Actions");
+  return errors;
+}
+
+function validateAskAutomationActionPins(root, errors) {
+  const path = resolve(root, ASK_AUTOMATION_WORKFLOW_PATH);
+  if (!existsSync(path)) return;
+  for (const message of validateAskAutomationActionPinsText(readFileSync(path, "utf8"))) fail(errors, "ASK automation Action pins", message);
 }
 
 function validateAdaptivePortfolioCatalog(root, errors) {
@@ -4244,6 +4289,7 @@ export function validateRepository(options) {
   const portfolioPolicyChecks = validateAdaptivePortfolioPolicy(root, errors);
   const portfolioDesignAdmissionChecks = validateAdaptivePortfolioDesignAdmission(root, errors);
   const portfolioDesignReviewChecks = validateAdaptivePortfolioDesignReview(root, errors);
+  validateAskAutomationActionPins(root, errors);
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);

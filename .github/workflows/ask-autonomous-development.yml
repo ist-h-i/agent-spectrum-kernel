@@ -1,0 +1,431 @@
+name: ASK autonomous development
+
+on:
+  schedule:
+    # Weekdays at 09:20 and 17:20 Asia/Tokyo (00:20 and 08:20 UTC).
+    - cron: "20 0 * * 1-5"
+    - cron: "20 8 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      run_kind:
+        description: Prefer PR review/maintenance, Issue advancement, or automatic selection.
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto
+          - review
+          - advance
+
+permissions: {}
+
+concurrency:
+  group: ask-autonomous-development
+  cancel-in-progress: false
+
+jobs:
+  context:
+    if: github.event_name == 'workflow_dispatch' || vars.ASK_AUTOMATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      should_run: ${{ steps.context.outputs.should_run }}
+      should_generate: ${{ steps.context.outputs.should_generate }}
+      should_report_sensitive_context: ${{ steps.context.outputs.should_report_sensitive_context }}
+      mode: ${{ steps.context.outputs.mode }}
+      target_branch: ${{ steps.context.outputs.target_branch }}
+      target_commit_sha: ${{ steps.context.outputs.target_commit_sha }}
+      base_main_sha: ${{ steps.context.outputs.base_main_sha }}
+      control_sha: ${{ steps.context.outputs.control_sha }}
+      workflow_sha: ${{ steps.context.outputs.workflow_sha }}
+      context_digest: ${{ steps.context.outputs.context_digest }}
+      issue_number: ${{ steps.context.outputs.issue_number }}
+      pr_number: ${{ steps.context.outputs.pr_number }}
+    steps:
+      - name: Check out immutable automation control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Build and scan bounded GitHub context before generation
+        id: context
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ASK_CONTROL_SHA: ${{ github.workflow_sha }}
+          ASK_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          ASK_RUN_KIND: ${{ github.event_name == 'workflow_dispatch' && inputs.run_kind || (github.event.schedule == '20 8 * * 1-5' && 'review' || 'auto') }}
+        run: node control/scripts/ask-autonomous-context.mjs control/.ask-automation/context-artifact
+
+      - name: Upload safe selected context boundary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ask-automation-context
+          path: control/.ask-automation/context-artifact
+          if-no-files-found: error
+          retention-days: 7
+
+  report_sensitive_context:
+    needs: context
+    if: needs.context.outputs.should_report_sensitive_context == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Check out immutable automation control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.context.outputs.control_sha }}
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Download minimal blocked context only
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ask-automation-context
+          path: control/.ask-automation/blocked
+
+      - name: Publish trusted sensitive-context status only
+        env:
+          ASK_AUTOMATION_TOKEN: ${{ secrets.ASK_AUTOMATION_GITHUB_TOKEN || github.token }}
+          ASK_CONTROL_SHA: ${{ needs.context.outputs.control_sha }}
+          ASK_WORKFLOW_SHA: ${{ needs.context.outputs.workflow_sha }}
+        run: node control/scripts/ask-autonomous-publish.mjs sensitive --context control/.ask-automation/blocked/context.json
+
+  codex_generate:
+    needs: context
+    if: needs.context.outputs.should_generate == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - name: Check out immutable automation control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.context.outputs.control_sha }}
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out exact development target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.context.outputs.target_commit_sha }}
+          path: workspace
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Download pre-scanned context and prompt
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ask-automation-context
+          path: control/.ask-automation/input
+
+      - name: Require OpenAI credential
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "Repository secret OPENAI_API_KEY is required for openai/codex-action." >&2
+            exit 1
+          fi
+
+      - name: Run Codex in repository-only workspace
+        id: codex
+        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56 # v1.11
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: control/.ask-automation/input/prompt.md
+          output-schema-file: control/.github/ask-automation/result.schema.json
+          output-file: control/.ask-automation/result.json
+          working-directory: workspace
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          allow-bots: true
+          effort: high
+
+      - name: Create immutable raw artifact with trusted control code
+        run: |
+          node control/scripts/ask-autonomous-guard.mjs raw \
+            --repository workspace \
+            --context control/.ask-automation/input/context.json \
+            --result control/.ask-automation/result.json \
+            --schema control/.github/ask-automation/result.schema.json \
+            --output-directory control/.ask-automation/raw \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Upload original raw artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ask-automation-raw-${{ github.run_id }}-${{ github.run_attempt }}
+          path: control/.ask-automation/raw
+          if-no-files-found: error
+          retention-days: 14
+
+  validate_execute:
+    needs:
+      - context
+      - codex_generate
+    if: needs.context.outputs.should_generate == 'true' && needs.codex_generate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Check out immutable automation control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.context.outputs.control_sha }}
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out exact disposable validation target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.context.outputs.target_commit_sha }}
+          path: workspace
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up trusted Node.js wrapper
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Download original raw artifact outside container mounts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ask-automation-raw-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ask-automation-raw
+
+      - name: Execute immutable validation plan in isolated containers
+        run: |
+          node control/scripts/ask-autonomous-validate-execute.mjs execute \
+            --repository workspace \
+            --control control \
+            --raw-directory "${{ runner.temp }}/ask-automation-raw" \
+            --schema control/.github/ask-automation/result.schema.json \
+            --plan control/.github/ask-automation/validation-plan.json \
+            --output-directory "${{ runner.temp }}/ask-validation-execution" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Upload digest-only validation execution evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ask-automation-execution-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ask-validation-execution
+          if-no-files-found: warn
+          retention-days: 14
+
+  attest_validation:
+    needs:
+      - context
+      - codex_generate
+      - validate_execute
+    if: always() && needs.context.outputs.should_generate == 'true' && needs.codex_generate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact immutable control plane only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.context.outputs.control_sha }}
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Download original raw artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ask-automation-raw-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ask-automation-raw
+
+      - name: Download isolated execution evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ask-automation-execution-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ask-validation-execution
+
+      - name: Attest GitHub conclusion and immutable evidence on a fresh runner
+        run: |
+          mkdir -p "${{ runner.temp }}/ask-validation-attestation"
+          node control/scripts/ask-autonomous-attest.mjs \
+            --raw-directory "${{ runner.temp }}/ask-automation-raw" \
+            --schema control/.github/ask-automation/result.schema.json \
+            --execution-directory "${{ runner.temp }}/ask-validation-execution" \
+            --plan control/.github/ask-automation/validation-plan.json \
+            --output "${{ runner.temp }}/ask-validation-attestation/attestation.json" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}" \
+            --validation-job-result "${{ needs.validate_execute.result }}"
+
+      - name: Upload trusted validation attestation
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ask-automation-attestation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ask-validation-attestation/attestation.json
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs:
+      - context
+      - codex_generate
+      - validate_execute
+      - attest_validation
+    if: needs.context.outputs.should_generate == 'true' && needs.codex_generate.result == 'success' && needs.validate_execute.result == 'success' && needs.attest_validation.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Check out immutable automation control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.context.outputs.control_sha }}
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out exact publication target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.context.outputs.target_commit_sha }}
+          path: workspace
+          fetch-depth: 0
+          token: ${{ secrets.ASK_AUTOMATION_GITHUB_TOKEN || github.token }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Download original raw artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ask-automation-raw-${{ github.run_id }}-${{ github.run_attempt }}
+          path: control/.ask-automation/raw-publish
+
+      - name: Download trusted validation attestation
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ask-automation-attestation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: control/.ask-automation/attestation-publish
+
+      - name: Recompute final guard, revalidate concurrency, and publish bounded updates
+        env:
+          ASK_AUTOMATION_TOKEN: ${{ secrets.ASK_AUTOMATION_GITHUB_TOKEN || github.token }}
+          ASK_AUTOMATION_USES_DEDICATED_TOKEN: ${{ secrets.ASK_AUTOMATION_GITHUB_TOKEN != '' && 'true' || 'false' }}
+          ASK_CONTROL_SHA: ${{ needs.context.outputs.control_sha }}
+          ASK_WORKFLOW_SHA: ${{ needs.context.outputs.workflow_sha }}
+          ASK_VALIDATION_STATUS: ${{ needs.validate_execute.result }}
+        run: |
+          node control/scripts/ask-autonomous-publish.mjs publish \
+            --repository-path workspace \
+            --raw-directory control/.ask-automation/raw-publish \
+            --attestation control/.ask-automation/attestation-publish/attestation.json \
+            --plan control/.github/ask-automation/validation-plan.json \
+            --schema control/.github/ask-automation/result.schema.json
+
+  report_failure:
+    needs:
+      - context
+      - codex_generate
+      - validate_execute
+      - attest_validation
+    if: >-
+      always() &&
+      needs.context.outputs.should_generate == 'true' &&
+      (needs.codex_generate.result == 'failure' ||
+       needs.codex_generate.result == 'cancelled' ||
+       needs.validate_execute.result == 'failure' ||
+       needs.validate_execute.result == 'cancelled' ||
+       needs.attest_validation.result == 'failure' ||
+       needs.attest_validation.result == 'cancelled')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Check out immutable automation control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.context.outputs.control_sha }}
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Download selected context
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ask-automation-context
+          path: control/.ask-automation/failure
+
+      - name: Build bounded failure status
+        env:
+          CODEX_JOB_RESULT: codex_generate=${{ needs.codex_generate.result }}, validate_execute=${{ needs.validate_execute.result }}, attest_validation=${{ needs.attest_validation.result }}
+        run: |
+          node control/scripts/ask-autonomous-failure.mjs \
+            --context control/.ask-automation/failure/context.json \
+            --result control/.ask-automation/failure/result.json \
+            --guard control/.ask-automation/failure/guard.json \
+            --patch control/.ask-automation/failure/change.patch
+
+      - name: Publish failure status only
+        env:
+          ASK_AUTOMATION_TOKEN: ${{ secrets.ASK_AUTOMATION_GITHUB_TOKEN || github.token }}
+          ASK_CONTROL_SHA: ${{ needs.context.outputs.control_sha }}
+          ASK_WORKFLOW_SHA: ${{ needs.context.outputs.workflow_sha }}
+        run: |
+          node control/scripts/ask-autonomous-publish.mjs failure \
+            --context control/.ask-automation/failure/context.json \
+            --result control/.ask-automation/failure/result.json

@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0.0",
+  "container": {
+    "image": "node@sha256:5711a0d445a1af54af9589066c646df387d1831a608226f4cd694fc59e745059",
+    "image_digest": "sha256:5711a0d445a1af54af9589066c646df387d1831a608226f4cd694fc59e745059",
+    "node_major": 24,
+    "environment_allowlist": [
+      "PATH",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "NODE_ENV"
+    ]
+  },
+  "commands": [
+    {
+      "id": "changed_mjs_syntax",
+      "argv": ["node", "/control/scripts/ask-autonomous-validate-execute.mjs", "changed-syntax", "--repository", "/workspace", "--base", "HEAD^"]
+    },
+    {
+      "id": "autonomous_development_control",
+      "argv": ["node", "scripts/test-ask-autonomous-development.mjs"]
+    },
+    {
+      "id": "repository_validation_tests",
+      "argv": ["node", "scripts/test-validate-repo.mjs"]
+    },
+    {
+      "id": "portfolio_catalog",
+      "argv": ["node", "scripts/test-ask-benchmark-portfolio-catalog.mjs"]
+    },
+    {
+      "id": "portfolio_policy",
+      "argv": ["node", "scripts/test-ask-benchmark-portfolio-policy.mjs"]
+    },
+    {
+      "id": "design_admission",
+      "argv": ["node", "scripts/test-ask-benchmark-design-admission.mjs"]
+    },
+    {
+      "id": "design_independent_review",
+      "argv": ["node", "scripts/test-ask-benchmark-design-review.mjs"]
+    },
+    {
+      "id": "general_benchmark",
+      "argv": ["node", "scripts/test-ask-benchmark.mjs"]
+    },
+    {
+      "id": "execution",
+      "argv": ["node", "scripts/test-ask-benchmark-execution.mjs"]
+    },
+    {
+      "id": "normalized_results",
+      "argv": ["node", "scripts/test-ask-benchmark-normalized-results.mjs"]
+    },
+    {
+      "id": "evaluator_boundary",
+      "argv": ["node", "scripts/test-ask-benchmark-evaluator-boundary.mjs"]
+    },
+    {
+      "id": "adapter_runtime_bundle",
+      "argv": ["node", "scripts/adapter-runtime-bundle.mjs", "--check"]
+    },
+    {
+      "id": "repository_consistency",
+      "argv": ["node", "scripts/validate-repo.mjs"]
+    },
+    {
+      "id": "whitespace",
+      "argv": ["git", "diff", "--check", "HEAD^", "HEAD"]
+    }
+  ]
+}
