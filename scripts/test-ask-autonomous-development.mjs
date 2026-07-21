@@ -365,7 +365,7 @@ assert.deepEqual(loadedPlan.plan.container.environment_allowlist, ["PATH", "HOME
 const requiredCommandIds = [
   "changed_mjs_syntax", "autonomous_development_control", "repository_validation_tests", "portfolio_catalog",
   "portfolio_policy", "design_admission", "design_independent_review", "general_benchmark", "execution",
-  "normalized_results", "evaluator_boundary", "adapter_runtime_bundle", "repository_consistency", "whitespace",
+  "normalized_results", "evaluator_boundary", "portfolio_score", "adapter_runtime_bundle", "repository_consistency", "whitespace",
 ];
 assert.deepEqual(loadedPlan.plan.commands.map((command) => command.id), requiredCommandIds);
 const sampleDockerArgs = dockerArguments({ image: loadedPlan.plan.container.image, repository: "/safe/workspace", control: "/safe/control", planPath: "/safe/plan.json", commandId: "general_benchmark" });
@@ -717,7 +717,7 @@ assert.match(validateWorkflow, /actions\/checkout@v5/);
 assert.match(validateWorkflow, /actions\/setup-node@v5/);
 assert.match(validateWorkflow, /node-version: "24"/);
 assert.match(validateWorkflow, /Run autonomous development control tests/);
-for (const required of ["portfolio catalog", "portfolio policy", "portfolio design pre-admission", "portfolio independent design review", "general benchmark", "adaptive portfolio execution", "adaptive portfolio normalized result", "evaluator isolation boundary", "repository consistency", "whitespace"]) {
+for (const required of ["portfolio catalog", "portfolio policy", "portfolio design pre-admission", "portfolio independent design review", "general benchmark", "adaptive portfolio execution", "adaptive portfolio normalized result", "evaluator isolation boundary", "portfolio raw engineering result score", "repository consistency", "whitespace"]) {
   assert.match(validateWorkflow.toLowerCase(), new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "u"));
 }
 

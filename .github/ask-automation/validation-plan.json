@@ -58,6 +58,10 @@
       "argv": ["node", "scripts/test-ask-benchmark-evaluator-boundary.mjs"]
     },
     {
+      "id": "portfolio_score",
+      "argv": ["node", "scripts/test-ask-benchmark-portfolio-score.mjs"]
+    },
+    {
       "id": "adapter_runtime_bundle",
       "argv": ["node", "scripts/adapter-runtime-bundle.mjs", "--check"]
     },
