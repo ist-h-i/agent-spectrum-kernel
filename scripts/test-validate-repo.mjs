@@ -261,6 +261,11 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/schemas/portfolio-admission-policy.schema.json",
     "benchmarks/schemas/portfolio-scoring-policy.schema.json",
     "benchmarks/schemas/portfolio-lineage-policy.schema.json",
+    "benchmarks/schemas/portfolio-requirement-record.schema.json",
+    "benchmarks/schemas/portfolio-output-contract.schema.json",
+    "benchmarks/schemas/portfolio-lineage-record.schema.json",
+    "benchmarks/schemas/portfolio-classification-record.schema.json",
+    "benchmarks/schemas/evaluator-reference.schema.json",
   ]) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
     writeFileSync(resolve(root, path), readFileSync(resolve(repoRoot, path)));

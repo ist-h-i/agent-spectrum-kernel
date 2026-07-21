@@ -4,7 +4,7 @@
   "program": "adaptive_ask_portfolio",
   "policy_schema_version": "1.0.0",
   "policy_contract_version": "3.7.0-portfolio-policy",
-  "policy_revision": "issue-205-checkpoint-b1-r2",
+  "policy_revision": "issue-205-checkpoint-b1-r3",
   "policy_status": "contracts_frozen_design_records_pending",
   "catalog_schema_version": "1.0.0",
   "catalog_revision": "issue-205-checkpoint-1",
@@ -101,6 +101,11 @@
         "derivation": "predicate_evidence_derived"
       },
       {
+        "field_id": "requirement_record_digest",
+        "value_type": "sha256_digest",
+        "derivation": "authoritative_requirement_record_digest"
+      },
+      {
         "field_id": "predicate_evidence_digest",
         "value_type": "sha256_digest",
         "derivation": "predicate_evidence_digest"
@@ -123,6 +128,11 @@
     ],
     "unknown_fixture_id_result": "reject",
     "caller_supplied_catalog_values_trusted": false,
+    "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+    "output_contract_schema_path": "benchmarks/schemas/portfolio-output-contract.schema.json",
+    "evaluator_reference_schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
+    "source_paths_checked_in_or_immutable_digest_required": true,
+    "source_symlinks_allowed": false,
     "predicate_derivation": {
       "caller_supplied_predicates_allowed": false,
       "scored_primary_requirement": {
@@ -137,8 +147,7 @@
       "finding_producing_task": {
         "any_of": [
           "frozen_review_task_class",
-          "answer_neutral_output_contract_declares_findings",
-          "evaluator_public_reference_bound_output_contract_digest_declares_findings"
+          "verified_evaluator_reference_bound_output_contract_declares_findings"
         ],
         "frozen_review_task_classes": [
           "implementation_review",
@@ -151,7 +160,8 @@
     "digest_contract": {
       "predicate_evidence_digest_algorithm": "sha256_sorted_key_canonical_json",
       "selector_context_digest_algorithm": "sha256_sorted_key_canonical_json",
-      "selector_context_digest_excluded_field": "selector_context_digest"
+      "selector_context_digest_excluded_field": "selector_context_digest",
+      "selector_context_authoritative_requirement_digest_field": "requirement_record_digest"
     }
   },
   "aggregate_classification_contract": {
@@ -271,7 +281,11 @@
     "classification_result_artifact_contract": {
       "closed_artifact": true,
       "separate_from_policy_artifact": true,
+      "schema_path": "benchmarks/schemas/portfolio-classification-record.schema.json",
       "required_fields": [
+        "classification_record_id",
+        "classification_record_schema_path",
+        "classification_record_path",
         "fixture_id",
         "fixture_role",
         "catalog_digest",
@@ -1153,5 +1167,5 @@
     "llm_dependency": false,
     "embedding_dependency": false
   },
-  "policy_digest": "sha256:39dfd6dbe2ce5d57b3262f0a6183d554becca659529bc4d2176832bce75c4857"
+  "policy_digest": "sha256:dbf088d550321caf7a1282c71d35479306f9b113081a6a2bb43d6c1a7de720f1"
 }

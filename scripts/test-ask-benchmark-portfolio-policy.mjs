@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -8,9 +9,12 @@ import {
   buildSelectorContextArtifact,
   buildPortfolioPolicyArtifacts,
   computeAggregateResultDigest,
+  computeClassificationRecordDigest,
+  computeLineageRecordDigest,
   computeOutputContractDigest,
   computePortfolioPolicyDigest,
   computePortfolioPolicyManifestDigest,
+  computeRequirementRecordDigest,
   computeRequirementSetDigest,
   computeSelectorContextDigest,
   determineAggregateClassification,
@@ -20,10 +24,15 @@ import {
   validatePortfolioPolicyArtifacts,
   validateRequirementMaxPoints,
 } from "./ask-benchmark-portfolio-policy.mjs";
+import { computeEvaluatorReferenceDigest } from "./ask-benchmark-evaluator-boundary.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
 const work = mkdtempSync(resolve(tmpdir(), "ask-portfolio-policy-test-"));
+const authoritativeRoot = resolve(work, "authoritative");
+mkdirSync(authoritativeRoot);
+const immutableArtifactDigests = {};
+let artifactSequence = 0;
 const catalog = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-catalog.json"), "utf8"));
 const base = {
   manifest: JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-policy-manifest.json"), "utf8")),
@@ -34,6 +43,25 @@ const base = {
 
 function serialized(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function rawDigest(bytes) {
+  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function writeAuthoritativeJson(relativePath, value, { authorize = true } = {}) {
+  const path = resolve(authoritativeRoot, relativePath);
+  mkdirSync(resolve(path, ".."), { recursive: true });
+  const bytes = Buffer.from(serialized(value));
+  writeFileSync(path, bytes);
+  if (authorize) immutableArtifactDigests[relativePath] = rawDigest(bytes);
+  else delete immutableArtifactDigests[relativePath];
+  return value;
+}
+
+function nextArtifactId(prefix, fixtureId) {
+  artifactSequence += 1;
+  return `${prefix}-${fixtureId}-${artifactSequence}`;
 }
 
 function cloneBase() {
@@ -90,27 +118,85 @@ function unsafeCategory(policy, categoryId) {
   return value;
 }
 
-function predicateEvidenceFor(fixtureId, { requirementKinds = ["weighted"] } = {}) {
+function predicateEvidenceFor(fixtureId, { requirementKinds = ["weighted"], authorize = true, overrides = {} } = {}) {
+  const requirementRecordId = nextArtifactId("requirement-record", fixtureId);
   const requirementRecord = {
+    requirement_record_id: requirementRecordId,
+    requirement_record_schema_path: "benchmarks/schemas/portfolio-requirement-record.schema.json",
+    requirement_record_path: `requirements/${requirementRecordId}.json`,
     fixture_id: fixtureId,
-    policy_digest: base.scoringPolicy.policy_digest,
+    catalog_digest: catalog.catalog_digest,
+    policy_manifest_digest: base.manifest.manifest_digest,
+    scoring_policy_digest: base.scoringPolicy.policy_digest,
+    admission_record_digest: `sha256:${"a".repeat(64)}`,
     requirements: requirementKinds.map((requirementKind, index) => ({
       requirement_id: `requirement_${index + 1}`,
       requirement_kind: requirementKind,
       agent_visible_evidence_map_ids: requirementKind === "informational" ? [] : [`evidence_${index + 1}`],
     })),
+    ...overrides,
   };
   requirementRecord.requirement_set_digest = computeRequirementSetDigest(requirementRecord);
-  return { requirement_record: requirementRecord };
+  requirementRecord.requirement_record_digest = computeRequirementRecordDigest(requirementRecord);
+  writeAuthoritativeJson(requirementRecord.requirement_record_path, requirementRecord, { authorize });
+  return { requirement_record: structuredClone(requirementRecord) };
+}
+
+function outputPredicateEvidenceFor(fixtureId, { declaresFindings = true, referenceOverrides = {}, outputOverrides = {} } = {}) {
+  const fixture = catalog.fixtures.find((entry) => entry.fixture_id === fixtureId);
+  const evaluatorReferenceId = nextArtifactId("evaluator-reference", fixtureId);
+  const evaluatorReferencePath = `evaluator-references/${evaluatorReferenceId}.json`;
+  const evaluatorReference = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/evaluator-reference.schema.json",
+    program: "adaptive_ask_evaluator_reference",
+    evaluator_bundle_id: `evaluator-${"1".repeat(64)}`,
+    evaluator_bundle_digest: `sha256:${"2".repeat(64)}`,
+    evaluator_bundle_schema_version: "1.0.0",
+    fixture_id: fixtureId,
+    fixture_input_digest: `sha256:${"3".repeat(64)}`,
+    task_class: fixture.task_class,
+    suite: fixture.suite,
+    evaluator_revision: "4".repeat(40),
+    generator_identity: `sha256:${"5".repeat(64)}`,
+    independence_statement_digest: `sha256:${"6".repeat(64)}`,
+    review_record_digest: `sha256:${"7".repeat(64)}`,
+    storage_class: "private_evaluator",
+    public_metadata_digest: `sha256:${"0".repeat(64)}`,
+    ...referenceOverrides,
+  };
+  evaluatorReference.public_metadata_digest = computeEvaluatorReferenceDigest(evaluatorReference);
+  writeAuthoritativeJson(evaluatorReferencePath, evaluatorReference);
+  const outputContractId = nextArtifactId("output-contract", fixtureId);
+  const outputContract = {
+    output_contract_id: outputContractId,
+    output_contract_schema_path: "benchmarks/schemas/portfolio-output-contract.schema.json",
+    output_contract_path: `output-contracts/${outputContractId}.json`,
+    fixture_id: fixtureId,
+    catalog_digest: catalog.catalog_digest,
+    policy_manifest_digest: base.manifest.manifest_digest,
+    evaluator_public_reference_path: evaluatorReferencePath,
+    evaluator_public_reference_digest: evaluatorReference.public_metadata_digest,
+    declares_findings: declaresFindings,
+    ...outputOverrides,
+  };
+  outputContract.output_contract_digest = computeOutputContractDigest(outputContract);
+  writeAuthoritativeJson(outputContract.output_contract_path, outputContract);
+  const evidence = predicateEvidenceFor(fixtureId);
+  evidence.output_contract = structuredClone(outputContract);
+  return { evidence, evaluatorReference, outputContract };
 }
 
 function selectorContextFor(fixtureId, predicateEvidence = predicateEvidenceFor(fixtureId)) {
   return buildSelectorContextArtifact({
     admissionPolicy: base.admissionPolicy,
     scoringPolicy: base.scoringPolicy,
+    policyManifest: base.manifest,
     catalog,
     fixtureId,
     predicateEvidence,
+    artifactRoot: authoritativeRoot,
+    immutableArtifactDigests,
   });
 }
 
@@ -122,11 +208,14 @@ function validateGate(gateId, selectorContext, predicateEvidence, result) {
   return validateAdmissionGateResult({
     admissionPolicy: base.admissionPolicy,
     scoringPolicy: base.scoringPolicy,
+    policyManifest: base.manifest,
     catalog,
     gateId,
     selectorContext,
     predicateEvidence,
     result,
+    artifactRoot: authoritativeRoot,
+    immutableArtifactDigests,
   });
 }
 
@@ -142,6 +231,106 @@ function aggregateFixtureIds() {
   return ["pf-frontend-async-state", "pf-performance-regression"];
 }
 
+function classificationReferenceFor(fixtureId, classificationState = "primary_eligible") {
+  const fixture = catalog.fixtures.find((entry) => entry.fixture_id === fixtureId);
+  const recordId = nextArtifactId("classification-record", fixtureId);
+  const record = {
+    classification_record_id: recordId,
+    classification_record_schema_path: "benchmarks/schemas/portfolio-classification-record.schema.json",
+    classification_record_path: `classifications/${recordId}.json`,
+    fixture_id: fixtureId,
+    fixture_role: fixture.fixture_role,
+    catalog_digest: catalog.catalog_digest,
+    policy_manifest_digest: base.manifest.manifest_digest,
+    pilot_result_digest: `sha256:${"8".repeat(64)}`,
+    supported_adapter_tracks: ["codex"],
+    ceiling_classification_result: classificationState === "redesign_required" ? "candidate" : "not_candidate",
+    floor_classification_result: "not_candidate",
+    classification_state: classificationState,
+    reason_codes: [classificationState === "primary_eligible" ? "ceiling_and_floor_not_candidate" : "ceiling_candidate"],
+    classification_revision: 1,
+  };
+  record.classification_digest = computeClassificationRecordDigest(record);
+  writeAuthoritativeJson(record.classification_record_path, record);
+  return {
+    fixture_id: fixtureId,
+    classification_record_id: record.classification_record_id,
+    classification_record_path: record.classification_record_path,
+    classification_digest: record.classification_digest,
+    classification_state: record.classification_state,
+    policy_manifest_digest: record.policy_manifest_digest,
+    catalog_digest: record.catalog_digest,
+  };
+}
+
+function lineageReferenceFor(fixtureId, index) {
+  const recordId = nextArtifactId("lineage-record", fixtureId);
+  const frequencyBand = index === 0 ? "medium" : "low";
+  const impactBand = index === 0 ? "high" : "medium";
+  const record = {
+    lineage_record_id: recordId,
+    lineage_record_schema_path: "benchmarks/schemas/portfolio-lineage-record.schema.json",
+    lineage_record_path: `lineage/${recordId}.json`,
+    fixture_id: fixtureId,
+    catalog_digest: catalog.catalog_digest,
+    policy_manifest_digest: base.manifest.manifest_digest,
+    lineage_policy_digest: base.lineagePolicy.policy_digest,
+    source_type: "two_repository_occurrences",
+    source_reference_ids: [`source-${index + 1}`],
+    review_status: "reviewed",
+    frequency_band: frequencyBand,
+    frequency_evidence_ids: [`frequency-evidence-${index + 1}`],
+    frequency_reviewer_record_id: `frequency-review-${index + 1}`,
+    impact_band: impactBand,
+    impact_evidence_ids: [`impact-evidence-${index + 1}`],
+    impact_reviewer_record_id: `impact-review-${index + 1}`,
+    lineage_revision: 1,
+  };
+  record.lineage_record_digest = computeLineageRecordDigest(record);
+  writeAuthoritativeJson(record.lineage_record_path, record);
+  const frequencyWeight = base.lineagePolicy.frequency_bands.find(({ band_id }) => band_id === frequencyBand).weight;
+  const impactWeight = base.lineagePolicy.impact_bands.find(({ band_id }) => band_id === impactBand).weight;
+  return {
+    fixture_id: fixtureId,
+    lineage_record_id: record.lineage_record_id,
+    lineage_record_path: record.lineage_record_path,
+    lineage_record_digest: record.lineage_record_digest,
+    lineage_policy_digest: record.lineage_policy_digest,
+    frequency_band: frequencyBand,
+    impact_band: impactBand,
+    frequency_weight: frequencyWeight,
+    impact_weight: impactWeight,
+  };
+}
+
+function mutateLineageSource(reference, mutate, { syncFixture = false } = {}) {
+  const record = JSON.parse(readFileSync(resolve(authoritativeRoot, reference.lineage_record_path), "utf8"));
+  mutate(record);
+  record.lineage_record_digest = computeLineageRecordDigest(record);
+  writeAuthoritativeJson(record.lineage_record_path, record);
+  reference.lineage_record_digest = record.lineage_record_digest;
+  reference.lineage_policy_digest = record.lineage_policy_digest;
+  reference.frequency_band = record.frequency_band;
+  reference.impact_band = record.impact_band;
+  reference.frequency_weight = base.lineagePolicy.frequency_bands.find(({ band_id }) => band_id === record.frequency_band)?.weight;
+  reference.impact_weight = base.lineagePolicy.impact_bands.find(({ band_id }) => band_id === record.impact_band)?.weight;
+  if (syncFixture) reference.fixture_id = record.fixture_id;
+  return record;
+}
+
+function mutateClassificationSource(reference, mutate, { syncFixture = false, syncState = true } = {}) {
+  const record = JSON.parse(readFileSync(resolve(authoritativeRoot, reference.classification_record_path), "utf8"));
+  mutate(record);
+  record.classification_digest = computeClassificationRecordDigest(record);
+  writeAuthoritativeJson(record.classification_record_path, record);
+  reference.classification_digest = record.classification_digest;
+  reference.catalog_digest = record.catalog_digest;
+  reference.policy_manifest_digest = record.policy_manifest_digest;
+  if (syncFixture) reference.fixture_id = record.fixture_id;
+  if (syncState) reference.classification_state = record.classification_state;
+  return record;
+}
+
 function makeAggregateResult({
   suite = "practice_frequency",
   taskClass = "investigation_implementation",
@@ -149,16 +338,16 @@ function makeAggregateResult({
   weighted = true,
 } = {}) {
   const contributions = fixtureIds.map((fixtureId, index) => ({ fixture_id: fixtureId, normalized_quality_delta: 0.2 + index * 0.2 }));
-  const lineageRecords = fixtureIds.map((fixtureId, index) => ({ fixture_id: fixtureId, frequency_weight: index === 0 ? 2 : 1, impact_weight: index === 0 ? 4 : 2 }));
+  const lineageRecords = weighted ? fixtureIds.map((fixtureId, index) => lineageReferenceFor(fixtureId, index)) : [];
   const denominator = lineageRecords.reduce((sum, { frequency_weight, impact_weight }) => sum + frequency_weight * impact_weight, 0);
-  const numerator = contributions.reduce((sum, contribution) => {
+  const numerator = weighted ? contributions.reduce((sum, contribution) => {
     const lineage = lineageRecords.find(({ fixture_id }) => fixture_id === contribution.fixture_id);
     return sum + lineage.frequency_weight * lineage.impact_weight * contribution.normalized_quality_delta;
-  }, 0);
+  }, 0) : null;
   const result = {
     catalog_digest: catalog.catalog_digest,
     policy_manifest_digest: base.manifest.manifest_digest,
-    classification_digests: fixtureIds.map((_, index) => `sha256:${String(index + 1).repeat(64)}`),
+    classification_records: fixtureIds.map((fixtureId) => classificationReferenceFor(fixtureId)),
     adapter_track: "codex",
     comparison_view: "adaptive_vs_kernel",
     suite,
@@ -169,7 +358,7 @@ function makeAggregateResult({
     excluded_fixtures: [],
     lineage_records: lineageRecords,
     fixture_contributions: contributions,
-    numerator: weighted ? numerator : null,
+    numerator,
     denominator: weighted ? denominator : null,
     weighted_quality_delta: weighted ? numerator / denominator : null,
     unweighted_quality_delta: contributions.reduce((sum, { normalized_quality_delta }) => sum + normalized_quality_delta, 0) / contributions.length,
@@ -201,12 +390,24 @@ function expectAggregateFailure(name, mutate, expected, { reseal = true, options
   const result = makeAggregateResult(options);
   mutate(result);
   if (reseal) resealAggregateResult(result);
-  assert.throws(() => validateAggregationResult({ scoringPolicy: base.scoringPolicy, catalog, policyManifest: base.manifest, result }), expected, name);
+  assert.throws(() => validateAggregate(result), expected, name);
+}
+
+function validateAggregate(result) {
+  return validateAggregationResult({
+    scoringPolicy: base.scoringPolicy,
+    lineagePolicy: base.lineagePolicy,
+    catalog,
+    policyManifest: base.manifest,
+    result,
+    artifactRoot: authoritativeRoot,
+    immutableArtifactDigests,
+  });
 }
 
 try {
   const summary = validatePortfolioPolicyArtifacts({ root });
-  assert.equal(summary.policyRevision, "issue-205-checkpoint-b1-r2");
+  assert.equal(summary.policyRevision, "issue-205-checkpoint-b1-r3");
   assert.equal(summary.policyStatus, "contracts_frozen_design_records_pending");
   assert.equal(summary.catalogDigest, catalog.catalog_digest);
   assert.equal(summary.admissionGateCount, 15);
@@ -219,7 +420,7 @@ try {
 
   const cliSuccess = spawnSync(process.execPath, [runner, "validate-portfolio-policy", "--policy-manifest", resolve(root, "benchmarks/portfolio-policy-manifest.json")], { cwd: root, encoding: "utf8" });
   assert.equal(cliSuccess.status, 0, cliSuccess.stderr);
-  for (const expected of ["revision=issue-205-checkpoint-b1-r2", `catalog=${catalog.catalog_digest}`, `manifest=${base.manifest.manifest_digest}`, "gates=15", "lifecycle_states=6", "requirement_kinds=3", "frequency_bands=4", "impact_bands=4", "ceiling=0.95", "floor=0.2", "status=contracts_frozen_design_records_pending"]) {
+  for (const expected of ["revision=issue-205-checkpoint-b1-r3", `catalog=${catalog.catalog_digest}`, `manifest=${base.manifest.manifest_digest}`, "gates=15", "lifecycle_states=6", "requirement_kinds=3", "frequency_bands=4", "impact_bands=4", "ceiling=0.95", "floor=0.2", "status=contracts_frozen_design_records_pending"]) {
     assert.match(cliSuccess.stdout, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
 
@@ -412,7 +613,7 @@ try {
 
   expectSelectorContextFailure("predicate-evidence-digest-drift", "mn-build-option-update", ({ predicateEvidence }) => {
     predicateEvidence.requirement_record.requirements[0].agent_visible_evidence_map_ids.push("forged_evidence");
-  }, /predicate evidence digest drift/, { resealContext: false });
+  }, /does not match authoritative source/, { resealContext: false });
 
   expectSelectorContextFailure("selector-context-digest-drift", "mn-build-option-update", ({ selectorContext }) => {
     selectorContext.selector_context_digest = `sha256:${"f".repeat(64)}`;
@@ -429,14 +630,86 @@ try {
   assert.throws(() => selectorContextFor("mn-build-option-update", {}), /predicate evidence is missing fields: requirement_record/);
   assert.throws(() => validateAdmissionGateResult(base.admissionPolicy, "input_digest_freeze", {}, "pass"), /admission gate validation input has unknown fields/);
 
-  const outputPredicateEvidence = predicateEvidenceFor("mn-build-option-update");
-  outputPredicateEvidence.output_contract = {
-    fixture_id: "mn-build-option-update",
-    declares_findings: true,
-    evaluator_public_reference_digest: `sha256:${"a".repeat(64)}`,
-  };
-  outputPredicateEvidence.output_contract.output_contract_digest = computeOutputContractDigest(outputPredicateEvidence.output_contract);
-  assert.ok(selectorContextFor("mn-build-option-update", outputPredicateEvidence).fixture_predicates.includes("finding_producing_task"));
+  const { evidence: outputPredicateEvidence } = outputPredicateEvidenceFor("mn-build-option-update");
+  const outputSelectorContext = selectorContextFor("mn-build-option-update", outputPredicateEvidence);
+  assert.ok(outputSelectorContext.fixture_predicates.includes("finding_producing_task"));
+  assert.equal(outputSelectorContext.requirement_record_digest, outputPredicateEvidence.requirement_record.requirement_record_digest);
+
+  const selfAuthoredEmpty = predicateEvidenceFor("mn-build-option-update", { requirementKinds: [], authorize: false });
+  assert.throws(() => selectorContextFor("mn-build-option-update", selfAuthoredEmpty), /supplied immutable artifact digest/);
+
+  const resealedEmpty = predicateEvidenceFor("mn-build-option-update", { requirementKinds: [], authorize: false });
+  resealedEmpty.requirement_record.requirement_set_digest = computeRequirementSetDigest(resealedEmpty.requirement_record);
+  resealedEmpty.requirement_record.requirement_record_digest = computeRequirementRecordDigest(resealedEmpty.requirement_record);
+  assert.throws(() => selectorContextFor("mn-build-option-update", resealedEmpty), /supplied immutable artifact digest/);
+
+  const staleRequirement = predicateEvidenceFor("mn-build-option-update");
+  staleRequirement.requirement_record.requirement_record_digest = `sha256:${"f".repeat(64)}`;
+  writeAuthoritativeJson(staleRequirement.requirement_record.requirement_record_path, staleRequirement.requirement_record);
+  assert.throws(() => selectorContextFor("mn-build-option-update", staleRequirement), /requirement record digest does not match/);
+
+  assert.throws(() => selectorContextFor("mn-build-option-update", predicateEvidenceFor("mn-build-option-update", { overrides: { fixture_id: "cal-atomic-rule-batch" } })), /fixture_id binding/);
+  assert.throws(() => selectorContextFor("mn-build-option-update", predicateEvidenceFor("mn-build-option-update", { overrides: { catalog_digest: `sha256:${"b".repeat(64)}` } })), /catalog digest binding/);
+  assert.throws(() => selectorContextFor("mn-build-option-update", predicateEvidenceFor("mn-build-option-update", { overrides: { scoring_policy_digest: `sha256:${"c".repeat(64)}` } })), /scoring policy digest binding/);
+  assert.throws(() => selectorContextFor("mn-build-option-update", predicateEvidenceFor("mn-build-option-update", { overrides: { policy_manifest_digest: `sha256:${"d".repeat(64)}` } })), /policy manifest digest binding/);
+
+  const unknownRequirementPath = predicateEvidenceFor("mn-build-option-update");
+  unknownRequirementPath.requirement_record.requirement_record_path = "requirements/unknown-record.json";
+  unknownRequirementPath.requirement_record.requirement_record_digest = computeRequirementRecordDigest(unknownRequirementPath.requirement_record);
+  assert.throws(() => selectorContextFor("mn-build-option-update", unknownRequirementPath), /authoritative requirement record is missing/);
+
+  const escapingRequirementPath = predicateEvidenceFor("mn-build-option-update");
+  escapingRequirementPath.requirement_record.requirement_record_path = "../escape.json";
+  escapingRequirementPath.requirement_record.requirement_record_digest = computeRequirementRecordDigest(escapingRequirementPath.requirement_record);
+  assert.throws(() => selectorContextFor("mn-build-option-update", escapingRequirementPath), /repository-relative normalized path/);
+
+  const symlinkRequirement = predicateEvidenceFor("mn-build-option-update");
+  const symlinkRequirementPath = `symlinks/${nextArtifactId("requirement-link", "mn-build-option-update")}.json`;
+  mkdirSync(resolve(authoritativeRoot, "symlinks"), { recursive: true });
+  symlinkSync(resolve(authoritativeRoot, symlinkRequirement.requirement_record.requirement_record_path), resolve(authoritativeRoot, symlinkRequirementPath));
+  symlinkRequirement.requirement_record.requirement_record_path = symlinkRequirementPath;
+  symlinkRequirement.requirement_record.requirement_record_digest = computeRequirementRecordDigest(symlinkRequirement.requirement_record);
+  assert.throws(() => selectorContextFor("mn-build-option-update", symlinkRequirement), /must not traverse a symlink/);
+
+  const duplicateRequirementIds = predicateEvidenceFor("mn-build-option-update", { requirementKinds: ["weighted", "blocker"] });
+  duplicateRequirementIds.requirement_record.requirements[1].requirement_id = duplicateRequirementIds.requirement_record.requirements[0].requirement_id;
+  duplicateRequirementIds.requirement_record.requirement_set_digest = computeRequirementSetDigest(duplicateRequirementIds.requirement_record);
+  duplicateRequirementIds.requirement_record.requirement_record_digest = computeRequirementRecordDigest(duplicateRequirementIds.requirement_record);
+  writeAuthoritativeJson(duplicateRequirementIds.requirement_record.requirement_record_path, duplicateRequirementIds.requirement_record);
+  assert.throws(() => selectorContextFor("mn-build-option-update", duplicateRequirementIds), /requirement IDs must be a unique string array/);
+
+  const missingEvidenceMap = predicateEvidenceFor("mn-build-option-update");
+  missingEvidenceMap.requirement_record.requirements[0].agent_visible_evidence_map_ids = [];
+  missingEvidenceMap.requirement_record.requirement_set_digest = computeRequirementSetDigest(missingEvidenceMap.requirement_record);
+  missingEvidenceMap.requirement_record.requirement_record_digest = computeRequirementRecordDigest(missingEvidenceMap.requirement_record);
+  writeAuthoritativeJson(missingEvidenceMap.requirement_record.requirement_record_path, missingEvidenceMap.requirement_record);
+  assert.throws(() => selectorContextFor("mn-build-option-update", missingEvidenceMap), /scored requirement must have at least one/);
+
+  const arbitraryEvaluatorDigest = outputPredicateEvidenceFor("mn-build-option-update", { outputOverrides: { evaluator_public_reference_digest: `sha256:${"a".repeat(64)}` } });
+  assert.throws(() => selectorContextFor("mn-build-option-update", arbitraryEvaluatorDigest.evidence), /evaluator public reference digest binding/);
+
+  const missingEvaluatorReference = outputPredicateEvidenceFor("mn-build-option-update", { outputOverrides: { evaluator_public_reference_path: "evaluator-references/missing-reference.json" } });
+  assert.throws(() => selectorContextFor("mn-build-option-update", missingEvaluatorReference.evidence), /authoritative evaluator public reference is missing/);
+
+  const mismatchedEvaluatorFixture = outputPredicateEvidenceFor("mn-build-option-update", { referenceOverrides: { fixture_id: "cal-atomic-rule-batch" } });
+  assert.throws(() => selectorContextFor("mn-build-option-update", mismatchedEvaluatorFixture.evidence), /evaluator public reference fixture binding/);
+
+  const staleEvaluatorBinding = outputPredicateEvidenceFor("mn-build-option-update");
+  staleEvaluatorBinding.evaluatorReference.review_record_digest = `sha256:${"9".repeat(64)}`;
+  staleEvaluatorBinding.evaluatorReference.public_metadata_digest = computeEvaluatorReferenceDigest(staleEvaluatorBinding.evaluatorReference);
+  writeAuthoritativeJson(staleEvaluatorBinding.outputContract.evaluator_public_reference_path, staleEvaluatorBinding.evaluatorReference);
+  assert.throws(() => selectorContextFor("mn-build-option-update", staleEvaluatorBinding.evidence), /evaluator public reference digest binding/);
+
+  const changedDeclaresFindings = outputPredicateEvidenceFor("mn-build-option-update");
+  changedDeclaresFindings.evidence.output_contract.declares_findings = false;
+  changedDeclaresFindings.evidence.output_contract.output_contract_digest = computeOutputContractDigest(changedDeclaresFindings.evidence.output_contract);
+  assert.throws(() => selectorContextFor("mn-build-option-update", changedDeclaresFindings.evidence), /output contract reference does not match authoritative source/);
+
+  const mismatchedOutputFixture = outputPredicateEvidenceFor("mn-build-option-update", { outputOverrides: { fixture_id: "cal-atomic-rule-batch" } });
+  assert.throws(() => selectorContextFor("mn-build-option-update", mismatchedOutputFixture.evidence), /output contract fixture_id binding/);
+
+  const alternatePredicateRecord = predicateEvidenceFor("mn-build-option-update", { requirementKinds: [], authorize: false });
+  assert.throws(() => selectorContextFor("mn-build-option-update", { alternate_requirement_record: alternatePredicateRecord.requirement_record }), /predicate evidence has unknown fields|missing fields/);
 
   const ordinaryPredicateEvidence = predicateEvidenceFor("mn-build-option-update");
   const ordinarySelectorContext = selectorContextFor("mn-build-option-update", ordinaryPredicateEvidence);
@@ -478,9 +751,138 @@ try {
     admissionRevision: 3,
   }), /requires new fixture and admission revisions/);
 
-  assert.equal(validateAggregationResult({ scoringPolicy: base.scoringPolicy, catalog, policyManifest: base.manifest, result: makeAggregateResult() }), true);
+  assert.equal(validateAggregate(makeAggregateResult()), true);
 
-  expectAggregateFailure("weight-applied-outside-practice-frequency", () => {}, /weighted quality is allowed only for practice_frequency/, {
+  expectAggregateFailure("arbitrary-numeric-frequency-weight", (result) => {
+    result.lineage_records[0].frequency_weight += 1;
+  }, /policy-derived band weight/);
+
+  expectAggregateFailure("arbitrary-numeric-impact-weight", (result) => {
+    result.lineage_records[0].impact_weight += 1;
+  }, /policy-derived band weight/);
+
+  expectAggregateFailure("lineage-band-weight-mismatch", (result) => {
+    const reference = result.lineage_records[0];
+    const originalWeight = reference.frequency_weight;
+    mutateLineageSource(reference, (record) => {
+      record.frequency_band = "high";
+    });
+    reference.frequency_weight = originalWeight;
+  }, /policy-derived band weight/);
+
+  expectAggregateFailure("stale-lineage-digest", (result) => {
+    result.lineage_records[0].lineage_record_digest = `sha256:${"f".repeat(64)}`;
+  }, /lineage record digest does not match/);
+
+  expectAggregateFailure("wrong-fixture-lineage", (result) => {
+    mutateLineageSource(result.lineage_records[0], (record) => {
+      record.fixture_id = "pf-performance-regression";
+    });
+  }, /lineage fixture binding/);
+
+  expectAggregateFailure("wrong-catalog-lineage-binding", (result) => {
+    mutateLineageSource(result.lineage_records[0], (record) => {
+      record.catalog_digest = `sha256:${"b".repeat(64)}`;
+    });
+  }, /lineage record catalog digest binding/);
+
+  expectAggregateFailure("wrong-lineage-policy-binding", (result) => {
+    mutateLineageSource(result.lineage_records[0], (record) => {
+      record.lineage_policy_digest = `sha256:${"c".repeat(64)}`;
+    });
+  }, /lineage record policy digest binding/);
+
+  expectAggregateFailure("unreviewed-authoritative-lineage", (result) => {
+    mutateLineageSource(result.lineage_records[0], (record) => {
+      record.review_status = "pending_review";
+    });
+  }, /requires insufficient_evidence/);
+
+  expectAggregateFailure("missing-frequency-evidence", (result) => {
+    mutateLineageSource(result.lineage_records[0], (record) => {
+      record.frequency_evidence_ids = [];
+    });
+  }, /requires insufficient_evidence/);
+
+  expectAggregateFailure("missing-impact-evidence", (result) => {
+    mutateLineageSource(result.lineage_records[0], (record) => {
+      record.impact_evidence_ids = [];
+    });
+  }, /requires insufficient_evidence/);
+
+  expectAggregateFailure("unknown-authoritative-lineage-band", (result) => {
+    mutateLineageSource(result.lineage_records[0], (record) => {
+      record.frequency_band = "unknown";
+    });
+  }, /requires insufficient_evidence/);
+
+  const missingLineageResult = makeAggregateResult();
+  missingLineageResult.lineage_records.pop();
+  missingLineageResult.result_status = "insufficient_evidence";
+  missingLineageResult.numerator = null;
+  missingLineageResult.denominator = null;
+  missingLineageResult.weighted_quality_delta = null;
+  resealAggregateResult(missingLineageResult);
+  assert.equal(validateAggregate(missingLineageResult), true);
+
+  expectAggregateFailure("duplicate-lineage-record", (result) => {
+    result.lineage_records.push(structuredClone(result.lineage_records[0]));
+  }, /lineage fixture IDs must be a unique string array/);
+
+  expectAggregateFailure("classification-digest-unrelated-to-fixture", (result) => {
+    result.classification_records[0].classification_digest = result.classification_records[1].classification_digest;
+  }, /classification digest does not match/);
+
+  expectAggregateFailure("classification-fixture-mismatch", (result) => {
+    mutateClassificationSource(result.classification_records[0], (record) => {
+      record.fixture_id = "pf-performance-regression";
+    });
+  }, /classification fixture binding/);
+
+  expectAggregateFailure("non-primary-eligible-included", (result) => {
+    mutateClassificationSource(result.classification_records[0], (record) => {
+      record.classification_state = "redesign_required";
+      record.reason_codes = ["ceiling_candidate"];
+    });
+  }, /only primary_eligible classifications may be included/);
+
+  expectAggregateFailure("missing-classification-record", (result) => {
+    result.classification_records.pop();
+  }, /must map one-to-one/);
+
+  expectAggregateFailure("excluded-reason-not-derived-from-classification", (result) => {
+    const fixtureId = result.included_fixture_ids.shift();
+    mutateClassificationSource(result.classification_records.find((reference) => reference.fixture_id === fixtureId), (record) => {
+      record.classification_state = "redesign_required";
+      record.reason_codes = ["ceiling_candidate"];
+    });
+    result.excluded_fixtures = [{ fixture_id: fixtureId, reason: "manual_exclusion" }];
+    result.excluded_fixture_count = 1;
+    result.fixture_contributions.shift();
+    result.unweighted_quality_delta = result.fixture_contributions[0].normalized_quality_delta;
+  }, /reason must be derived from classification state/);
+
+  expectAggregateFailure("aggregate-digest-drift-after-lineage-replacement", (result) => {
+    result.lineage_records[0] = lineageReferenceFor(result.lineage_records[0].fixture_id, 0);
+  }, /aggregate result digest drift/, { reseal: false });
+
+  const deterministicAggregate = makeAggregateResult();
+  const deterministicClone = structuredClone(deterministicAggregate);
+  assert.equal(serialized(deterministicAggregate), serialized(deterministicClone));
+  assert.equal(computeAggregateResultDigest(deterministicAggregate), computeAggregateResultDigest(deterministicClone));
+
+  const noWriteAggregate = makeAggregateResult();
+  const noWritePaths = [
+    ...noWriteAggregate.lineage_records.map(({ lineage_record_path }) => lineage_record_path),
+    ...noWriteAggregate.classification_records.map(({ classification_record_path }) => classification_record_path),
+  ];
+  const noWriteBefore = noWritePaths.map((path) => readFileSync(resolve(authoritativeRoot, path)));
+  noWriteAggregate.lineage_records[0].frequency_weight += 1;
+  resealAggregateResult(noWriteAggregate);
+  assert.throws(() => validateAggregate(noWriteAggregate), /policy-derived band weight/);
+  assert.deepEqual(noWritePaths.map((path) => readFileSync(resolve(authoritativeRoot, path))), noWriteBefore);
+
+  expectAggregateFailure("weight-applied-outside-practice-frequency", () => {}, /allowed only for practice_frequency/, {
     options: { suite: "mechanism_positive", taskClass: "pr_review", fixtureIds: ["mp-accessibility-interaction-review"], weighted: true },
   });
 
@@ -508,11 +910,17 @@ try {
     result.numerator = 0;
     result.denominator = 0;
     result.weighted_quality_delta = 0;
-  }, /denominator must be non-zero/);
+  }, /policy-derived band weight/);
 
   expectAggregateFailure("zero-eligible-fixtures", (result) => {
     result.included_fixture_ids = [];
-    result.excluded_fixtures = result.expected_fixture_ids.map((fixtureId) => ({ fixture_id: fixtureId, reason: "classification_ineligible" }));
+    for (const reference of result.classification_records) {
+      mutateClassificationSource(reference, (record) => {
+        record.classification_state = "redesign_required";
+        record.reason_codes = ["ceiling_candidate"];
+      });
+    }
+    result.excluded_fixtures = result.expected_fixture_ids.map((fixtureId) => ({ fixture_id: fixtureId, reason: "classification_redesign_required" }));
     result.excluded_fixture_count = result.excluded_fixtures.length;
     result.fixture_contributions = [];
     result.numerator = null;
@@ -524,36 +932,44 @@ try {
 
   expectAggregateFailure("unknown-frequency-weight", (result) => {
     result.lineage_records[0].frequency_weight = null;
-  }, /unknown frequency or impact requires insufficient_evidence/);
+  }, /policy-derived band weight/);
 
   expectAggregateFailure("unknown-impact-weight", (result) => {
     result.lineage_records[0].impact_weight = null;
-  }, /unknown frequency or impact requires insufficient_evidence/);
+  }, /policy-derived band weight/);
 
   const unknownLineageResult = makeAggregateResult();
-  unknownLineageResult.lineage_records[0].frequency_weight = null;
+  mutateLineageSource(unknownLineageResult.lineage_records[0], (record) => {
+    record.frequency_band = "unknown";
+  });
   unknownLineageResult.result_status = "insufficient_evidence";
   unknownLineageResult.numerator = null;
   unknownLineageResult.denominator = null;
   unknownLineageResult.weighted_quality_delta = null;
   resealAggregateResult(unknownLineageResult);
-  assert.equal(validateAggregationResult({ scoringPolicy: base.scoringPolicy, catalog, policyManifest: base.manifest, result: unknownLineageResult }), true);
+  assert.equal(validateAggregate(unknownLineageResult), true);
   assert.equal(typeof unknownLineageResult.unweighted_quality_delta, "number");
 
   expectAggregateFailure("unknown-excluded-practice-lineage", (result) => {
     const excludedId = result.included_fixture_ids.shift();
-    result.excluded_fixtures = [{ fixture_id: excludedId, reason: "unknown_lineage" }];
+    mutateClassificationSource(result.classification_records.find(({ fixture_id }) => fixture_id === excludedId), (record) => {
+      record.classification_state = "insufficient_evidence";
+      record.reason_codes = ["unknown_classification_input"];
+    });
+    result.excluded_fixtures = [{ fixture_id: excludedId, reason: "classification_insufficient_evidence" }];
     result.excluded_fixture_count = 1;
     result.fixture_contributions.shift();
     result.unweighted_quality_delta = result.fixture_contributions[0].normalized_quality_delta;
-    result.lineage_records.find(({ fixture_id }) => fixture_id === excludedId).frequency_weight = null;
-  }, /unknown frequency or impact requires insufficient_evidence/);
+    mutateLineageSource(result.lineage_records.find(({ fixture_id }) => fixture_id === excludedId), (record) => {
+      record.frequency_band = "unknown";
+    });
+  }, /requires insufficient_evidence/);
 
   expectAggregateFailure("partial-lineage-silent-exclusion", (result) => {
     result.lineage_records.pop();
-  }, /partial lineage exclusion is prohibited/);
+  }, /requires insufficient_evidence/);
 
-  expectAggregateFailure("high-impact-in-weighted-view", () => {}, /weighted quality is allowed only for practice_frequency/, {
+  expectAggregateFailure("high-impact-in-weighted-view", () => {}, /allowed only for practice_frequency/, {
     options: { suite: "high_impact", taskClass: "pr_review", fixtureIds: ["hi-authorization-exception"], weighted: true },
   });
 

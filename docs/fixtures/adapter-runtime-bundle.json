@@ -494,13 +494,13 @@
       "issue": 205,
       "checkpoint": "policy_contract_freeze",
       "protocol_version": "3.7.0-portfolio-policy",
-      "policy_revision": "issue-205-checkpoint-b1-r2",
+      "policy_revision": "issue-205-checkpoint-b1-r3",
       "policy_manifest_path": "benchmarks/portfolio-policy-manifest.json",
-      "policy_manifest_file_sha256": "c6e47b14f136ec2db5be6bdb28d966b33b58c531c36eda06e5f0a37bc7967761",
-      "policy_manifest_digest": "sha256:5fad43285dde4486a08f33d0fb47a8fb729321ff3db1919dbfafe462f0665335",
-      "admission_policy_digest": "sha256:39dfd6dbe2ce5d57b3262f0a6183d554becca659529bc4d2176832bce75c4857",
-      "scoring_policy_digest": "sha256:2b9de684c8e1439d46c193faa43eb7bba85b916d2427bd1a24348a168f854161",
-      "lineage_policy_digest": "sha256:7fc820c7001d7a5a05e5d61d51aa94369ead4be42c0821cb6c9b1ff8e44e98ef",
+      "policy_manifest_file_sha256": "36fee800e7a8c943142d8d3d056e149adf773a72ee5b2373b03f5ad231752bcf",
+      "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+      "admission_policy_digest": "sha256:dbf088d550321caf7a1282c71d35479306f9b113081a6a2bb43d6c1a7de720f1",
+      "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+      "lineage_policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0",
       "policy_status": "contracts_frozen_design_records_pending"
     }
   }

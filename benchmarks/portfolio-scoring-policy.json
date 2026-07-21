@@ -4,7 +4,7 @@
   "program": "adaptive_ask_portfolio",
   "policy_schema_version": "1.0.0",
   "policy_contract_version": "3.7.0-portfolio-policy",
-  "policy_revision": "issue-205-checkpoint-b1-r2",
+  "policy_revision": "issue-205-checkpoint-b1-r3",
   "policy_status": "contracts_frozen_design_records_pending",
   "catalog_schema_version": "1.0.0",
   "catalog_revision": "issue-205-checkpoint-1",
@@ -364,6 +364,9 @@
       ],
       "lineage_owner_issue": 208,
       "actual_lineage_required": true,
+      "authoritative_lineage_records_required": true,
+      "caller_supplied_numeric_weight_authoritative": false,
+      "lineage_policy_weight_derivation_required": true,
       "designer_intuition_weight_allowed": false,
       "formula": "sum(frequency_weight * impact_weight * normalized_quality_delta) / sum(frequency_weight * impact_weight)",
       "fixture_id_unique_within_group": true,
@@ -481,7 +484,7 @@
       "required_fields": [
         "catalog_digest",
         "policy_manifest_digest",
-        "classification_digests",
+        "classification_records",
         "adapter_track",
         "comparison_view",
         "suite",
@@ -502,6 +505,9 @@
         "result_status",
         "aggregate_result_digest"
       ],
+      "classification_record_schema_path": "benchmarks/schemas/portfolio-classification-record.schema.json",
+      "lineage_record_schema_path": "benchmarks/schemas/portfolio-lineage-record.schema.json",
+      "source_paths_checked_in_or_immutable_digest_required": true,
       "result_statuses": [
         "complete",
         "insufficient_evidence"
@@ -579,5 +585,5 @@
     "llm_dependency": false,
     "embedding_dependency": false
   },
-  "policy_digest": "sha256:2b9de684c8e1439d46c193faa43eb7bba85b916d2427bd1a24348a168f854161"
+  "policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831"
 }

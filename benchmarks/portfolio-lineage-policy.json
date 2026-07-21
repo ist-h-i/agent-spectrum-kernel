@@ -4,7 +4,7 @@
   "program": "adaptive_ask_portfolio",
   "policy_schema_version": "1.0.0",
   "policy_contract_version": "3.7.0-portfolio-policy",
-  "policy_revision": "issue-205-checkpoint-b1-r2",
+  "policy_revision": "issue-205-checkpoint-b1-r3",
   "policy_status": "contracts_frozen_design_records_pending",
   "catalog_schema_version": "1.0.0",
   "catalog_revision": "issue-205-checkpoint-1",
@@ -29,14 +29,36 @@
     "measured_ask_outcome_allowed": false
   },
   "lineage_record_contract": {
+    "schema_path": "benchmarks/schemas/portfolio-lineage-record.schema.json",
+    "closed_artifact": true,
     "required_fields": [
       {
         "field_id": "lineage_record_id",
         "value_type": "identifier"
       },
       {
+        "field_id": "lineage_record_schema_path",
+        "value_type": "repository_relative_schema_path"
+      },
+      {
+        "field_id": "lineage_record_path",
+        "value_type": "repository_relative_artifact_path"
+      },
+      {
         "field_id": "fixture_id",
         "value_type": "identifier"
+      },
+      {
+        "field_id": "catalog_digest",
+        "value_type": "sha256_digest"
+      },
+      {
+        "field_id": "policy_manifest_digest",
+        "value_type": "sha256_digest"
+      },
+      {
+        "field_id": "lineage_policy_digest",
+        "value_type": "sha256_digest"
       },
       {
         "field_id": "source_type",
@@ -45,6 +67,10 @@
       {
         "field_id": "source_reference_ids",
         "value_type": "identifier_array"
+      },
+      {
+        "field_id": "review_status",
+        "value_type": "review_status"
       },
       {
         "field_id": "frequency_band",
@@ -75,10 +101,12 @@
         "value_type": "positive_integer"
       },
       {
-        "field_id": "lineage_digest",
+        "field_id": "lineage_record_digest",
         "value_type": "sha256_digest"
       }
     ],
+    "reviewed_status_required_for_weighted_aggregate": true,
+    "source_paths_checked_in_or_immutable_digest_required": true,
     "actual_assignment_in_policy_artifact": false
   },
   "frequency_bands": [
@@ -181,5 +209,5 @@
     "llm_dependency": false,
     "embedding_dependency": false
   },
-  "policy_digest": "sha256:7fc820c7001d7a5a05e5d61d51aa94369ead4be42c0821cb6c9b1ff8e44e98ef"
+  "policy_digest": "sha256:031825ec9174f3aa31c09c347cdd426f45c0a1867955e06c1ea0d08b5031f0c0"
 }

@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve, sep } from "node:path";
+import { execFileSync } from "node:child_process";
+import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { dirname, posix, relative, resolve, sep, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { verifyPublicEvaluatorReference } from "./ask-benchmark-evaluator-boundary.mjs";
 import { stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { computeFixtureMetadataDigest, validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
 
 export const PORTFOLIO_POLICY_SCHEMA_VERSION = "1.0.0";
 export const PORTFOLIO_POLICY_CONTRACT_VERSION = "3.7.0-portfolio-policy";
-export const PORTFOLIO_POLICY_REVISION = "issue-205-checkpoint-b1-r2";
+export const PORTFOLIO_POLICY_REVISION = "issue-205-checkpoint-b1-r3";
 export const PORTFOLIO_POLICY_STATUS = "contracts_frozen_design_records_pending";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -28,6 +30,11 @@ const MANIFEST_SCHEMA_PATH = "benchmarks/schemas/portfolio-policy-manifest.schem
 const ADMISSION_SCHEMA_PATH = "benchmarks/schemas/portfolio-admission-policy.schema.json";
 const SCORING_SCHEMA_PATH = "benchmarks/schemas/portfolio-scoring-policy.schema.json";
 const LINEAGE_SCHEMA_PATH = "benchmarks/schemas/portfolio-lineage-policy.schema.json";
+const REQUIREMENT_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-requirement-record.schema.json";
+const OUTPUT_CONTRACT_SCHEMA_PATH = "benchmarks/schemas/portfolio-output-contract.schema.json";
+const LINEAGE_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-lineage-record.schema.json";
+const CLASSIFICATION_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-classification-record.schema.json";
+const EVALUATOR_REFERENCE_SCHEMA_PATH = "benchmarks/schemas/evaluator-reference.schema.json";
 
 const LIFECYCLE_STATES = Object.freeze([
   "design_pending",
@@ -224,12 +231,87 @@ function assertDigest(value, label) {
   if (!/^sha256:[a-f0-9]{64}$/.test(value ?? "")) throw new Error(`${label} must be a sha256 digest`);
 }
 
+function assertPortableRelativePath(value, label) {
+  const segments = typeof value === "string" ? value.split("/") : [];
+  if (
+    typeof value !== "string"
+    || value.length === 0
+    || value.length > 240
+    || value.includes("\\")
+    || value.includes(":")
+    || value.includes("\0")
+    || posix.isAbsolute(value)
+    || win32.isAbsolute(value)
+    || segments.some((segment) => segment === "" || segment === "." || segment === "..")
+    || posix.normalize(value) !== value
+  ) throw new Error(`${label} must be a repository-relative normalized path without escape segments`);
+  return value;
+}
+
+function isInside(root, path) {
+  const resolvedRoot = resolve(root);
+  const resolvedPath = resolve(path);
+  return resolvedPath === resolvedRoot || resolvedPath.startsWith(`${resolvedRoot}${sep}`);
+}
+
+function checkedInBytes(root, relativePath) {
+  try {
+    return execFileSync("git", ["-C", root, "show", `HEAD:${relativePath}`], { encoding: null, maxBuffer: 2 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+  } catch {
+    return null;
+  }
+}
+
+function readAuthoritativeJsonArtifact({ artifactRoot, relativePath, immutableArtifactDigests = {}, schemaPath, label }) {
+  assertPortableRelativePath(relativePath, `${label} path`);
+  const root = realpathSync(artifactRoot);
+  const absolutePath = resolve(root, relativePath);
+  if (!isInside(root, absolutePath)) throw new Error(`${label} path escapes the artifact root`);
+  let current = root;
+  for (const segment of relativePath.split("/")) {
+    current = resolve(current, segment);
+    if (!existsSync(current)) throw new Error(`${label} is missing: ${relativePath}`);
+    if (lstatSync(current).isSymbolicLink()) throw new Error(`${label} path must not traverse a symlink`);
+  }
+  if (!lstatSync(absolutePath).isFile() || !isInside(root, realpathSync(absolutePath))) throw new Error(`${label} must be a regular file inside the artifact root`);
+  const bytes = readFileSync(absolutePath);
+  if (bytes.length > 1024 * 1024) throw new Error(`${label} exceeds the JSON artifact size limit`);
+  const sourceDigest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+  const committed = checkedInBytes(root, relativePath);
+  const matchesCheckedInBytes = committed !== null && Buffer.compare(bytes, committed) === 0;
+  if (!matchesCheckedInBytes) {
+    const immutableDigest = immutableArtifactDigests[relativePath];
+    assertDigest(immutableDigest, `${label} supplied immutable artifact digest`);
+    if (immutableDigest !== sourceDigest) throw new Error(`${label} supplied immutable artifact digest does not match source bytes`);
+  }
+  let value;
+  try {
+    value = JSON.parse(bytes.toString("utf8"));
+  } catch (error) {
+    throw new Error(`${label} is not valid JSON: ${error.message}`);
+  }
+  assertBenchmarkSchemaInstance(value, { schemaPath: resolve(DEFAULT_ROOT, schemaPath), label });
+  return { absolutePath, relativePath, sourceDigest, value };
+}
+
 export function computeRequirementSetDigest(requirementRecord) {
-  return digest(withoutField(requirementRecord, "requirement_set_digest"));
+  return digest(Array.isArray(requirementRecord) ? requirementRecord : requirementRecord.requirements);
+}
+
+export function computeRequirementRecordDigest(requirementRecord) {
+  return digest(withoutField(requirementRecord, "requirement_record_digest"));
 }
 
 export function computeOutputContractDigest(outputContract) {
   return digest(withoutField(outputContract, "output_contract_digest"));
+}
+
+export function computeLineageRecordDigest(lineageRecord) {
+  return digest(withoutField(lineageRecord, "lineage_record_digest"));
+}
+
+export function computeClassificationRecordDigest(classificationRecord) {
+  return digest(withoutField(classificationRecord, "classification_digest"));
 }
 
 export function computePredicateEvidenceDigest(predicateEvidence) {
@@ -240,46 +322,103 @@ export function computeSelectorContextDigest(selectorContext) {
   return digest(withoutField(selectorContext, "selector_context_digest"));
 }
 
-function deriveFixturePredicates(admissionPolicy, scoringPolicy, fixture, predicateEvidence) {
-  assertClosedKeys(predicateEvidence, ["requirement_record", "output_contract"], "predicate evidence", { requiredKeys: ["requirement_record"] });
-  const requirementRecord = predicateEvidence.requirement_record;
-  assertClosedKeys(requirementRecord, ["fixture_id", "policy_digest", "requirements", "requirement_set_digest"], "requirement record");
-  if (requirementRecord.fixture_id !== fixture.fixture_id) throw new Error("requirement record fixture_id binding does not match selector fixture");
-  if (requirementRecord.policy_digest !== scoringPolicy.policy_digest) throw new Error("requirement record policy digest binding does not match scoring policy");
-  if (!Array.isArray(requirementRecord.requirements)) throw new Error("requirement record requirements must be an array");
-  if (requirementRecord.requirement_set_digest !== computeRequirementSetDigest(requirementRecord)) throw new Error("requirement set digest does not match");
-  for (const [index, requirement] of requirementRecord.requirements.entries()) {
-    assertClosedKeys(requirement, ["requirement_id", "requirement_kind", "agent_visible_evidence_map_ids"], `requirement record requirements[${index}]`);
+function validateRequirementRecordSource({ scoringPolicy, policyManifest, catalog, fixture, reference, artifactRoot, immutableArtifactDigests }) {
+  const requiredKeys = [
+    "requirement_record_id", "requirement_record_schema_path", "requirement_record_path", "fixture_id", "catalog_digest",
+    "policy_manifest_digest", "scoring_policy_digest", "admission_record_digest", "requirements", "requirement_set_digest", "requirement_record_digest",
+  ];
+  assertClosedKeys(reference, requiredKeys, "requirement record reference");
+  const source = readAuthoritativeJsonArtifact({
+    artifactRoot,
+    relativePath: reference.requirement_record_path,
+    immutableArtifactDigests,
+    schemaPath: REQUIREMENT_RECORD_SCHEMA_PATH,
+    label: "authoritative requirement record",
+  }).value;
+  if (stableCanonicalJson(reference) !== stableCanonicalJson(source)) throw new Error("requirement record reference does not match authoritative source");
+  if (source.requirement_record_schema_path !== REQUIREMENT_RECORD_SCHEMA_PATH) throw new Error("requirement record schema path does not match the closed schema");
+  if (source.requirement_record_digest !== computeRequirementRecordDigest(source)) throw new Error("requirement record digest does not match authoritative source");
+  if (source.fixture_id !== fixture.fixture_id) throw new Error("requirement record fixture_id binding does not match selector fixture");
+  if (source.catalog_digest !== catalog.catalog_digest) throw new Error("requirement record catalog digest binding does not match");
+  if (source.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("requirement record policy manifest digest binding does not match");
+  if (source.scoring_policy_digest !== scoringPolicy.policy_digest) throw new Error("requirement record scoring policy digest binding does not match");
+  assertDigest(source.admission_record_digest, "requirement record admission record digest");
+  if (source.requirement_set_digest !== computeRequirementSetDigest(source)) throw new Error("requirement set digest does not match authoritative requirements");
+  const requirementIds = source.requirements.map(({ requirement_id }) => requirement_id);
+  assertUniqueStrings(requirementIds, "requirement IDs");
+  for (const requirement of source.requirements) {
     if (!REQUIREMENT_KINDS.includes(requirement.requirement_kind)) throw new Error(`requirement record has unknown kind: ${requirement.requirement_kind}`);
-    if (!Array.isArray(requirement.agent_visible_evidence_map_ids)) throw new Error("requirement evidence-map IDs must be an array");
+    assertUniqueStrings(requirement.agent_visible_evidence_map_ids, "requirement evidence-map IDs");
+    if (["blocker", "weighted"].includes(requirement.requirement_kind) && requirement.agent_visible_evidence_map_ids.length === 0) throw new Error("scored requirement must have at least one agent-visible evidence-map ID");
   }
+  return source;
+}
+
+function validateOutputContractSource({ policyManifest, catalog, fixture, reference, artifactRoot, immutableArtifactDigests }) {
+  const requiredKeys = [
+    "output_contract_id", "output_contract_schema_path", "output_contract_path", "fixture_id", "catalog_digest", "policy_manifest_digest",
+    "evaluator_public_reference_path", "evaluator_public_reference_digest", "declares_findings", "output_contract_digest",
+  ];
+  assertClosedKeys(reference, requiredKeys, "output contract reference");
+  const source = readAuthoritativeJsonArtifact({
+    artifactRoot,
+    relativePath: reference.output_contract_path,
+    immutableArtifactDigests,
+    schemaPath: OUTPUT_CONTRACT_SCHEMA_PATH,
+    label: "authoritative output contract",
+  }).value;
+  if (stableCanonicalJson(reference) !== stableCanonicalJson(source)) throw new Error("output contract reference does not match authoritative source");
+  if (source.output_contract_schema_path !== OUTPUT_CONTRACT_SCHEMA_PATH) throw new Error("output contract schema path does not match the closed schema");
+  if (source.output_contract_digest !== computeOutputContractDigest(source)) throw new Error("output contract digest does not match authoritative source");
+  if (source.fixture_id !== fixture.fixture_id) throw new Error("output contract fixture_id binding does not match selector fixture");
+  if (source.catalog_digest !== catalog.catalog_digest) throw new Error("output contract catalog digest binding does not match");
+  if (source.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("output contract policy manifest digest binding does not match");
+  const evaluatorSource = readAuthoritativeJsonArtifact({
+    artifactRoot,
+    relativePath: source.evaluator_public_reference_path,
+    immutableArtifactDigests,
+    schemaPath: EVALUATOR_REFERENCE_SCHEMA_PATH,
+    label: "authoritative evaluator public reference",
+  });
+  const evaluatorReference = verifyPublicEvaluatorReference({ root: DEFAULT_ROOT, referencePath: evaluatorSource.absolutePath });
+  if (source.evaluator_public_reference_digest !== evaluatorReference.public_metadata_digest) throw new Error("output contract evaluator public reference digest binding does not match authoritative reference");
+  if (evaluatorReference.fixture_id !== fixture.fixture_id) throw new Error("evaluator public reference fixture binding does not match output contract");
+  if (evaluatorReference.suite !== fixture.suite || evaluatorReference.task_class !== fixture.task_class) throw new Error("evaluator public reference suite or task class binding does not match catalog");
+  return source;
+}
+
+function deriveFixturePredicates(admissionPolicy, scoringPolicy, policyManifest, catalog, fixture, predicateEvidence, artifactRoot, immutableArtifactDigests) {
+  assertClosedKeys(predicateEvidence, ["requirement_record", "output_contract"], "predicate evidence", { requiredKeys: ["requirement_record"] });
+  const requirementRecord = validateRequirementRecordSource({ scoringPolicy, policyManifest, catalog, fixture, reference: predicateEvidence.requirement_record, artifactRoot, immutableArtifactDigests });
   const scoredRequirements = requirementRecord.requirements.filter(({ requirement_kind }) => requirement_kind === "blocker" || requirement_kind === "weighted");
   const scoredPrimaryRequirement = fixture.fixture_role === "primary"
     && scoredRequirements.length > 0
     && scoredRequirements.every(({ agent_visible_evidence_map_ids }) => agent_visible_evidence_map_ids.length >= scoringPolicy.requirement_contract.scored_requirement_minimum_agent_visible_evidence_map_ids);
 
   let outputContractDeclaresFindings = false;
+  let outputContract = null;
   if (predicateEvidence.output_contract) {
-    const outputContract = predicateEvidence.output_contract;
-    assertClosedKeys(outputContract, ["fixture_id", "declares_findings", "evaluator_public_reference_digest", "output_contract_digest"], "output contract");
-    if (outputContract.fixture_id !== fixture.fixture_id) throw new Error("output contract fixture_id binding does not match selector fixture");
-    if (typeof outputContract.declares_findings !== "boolean") throw new Error("output contract declares_findings must be boolean");
-    assertDigest(outputContract.evaluator_public_reference_digest, "output contract evaluator public reference digest");
-    if (outputContract.output_contract_digest !== computeOutputContractDigest(outputContract)) throw new Error("output contract digest does not match evaluator public reference binding");
+    outputContract = validateOutputContractSource({ policyManifest, catalog, fixture, reference: predicateEvidence.output_contract, artifactRoot, immutableArtifactDigests });
     outputContractDeclaresFindings = outputContract.declares_findings;
   }
 
   const predicates = [];
   if (scoredPrimaryRequirement) predicates.push("scored_primary_requirement");
   if (REVIEW_TASK_CLASSES.includes(fixture.task_class) || outputContractDeclaresFindings) predicates.push("finding_producing_task");
-  return predicates.sort(compareAscii);
+  const verifiedPredicateEvidence = { requirement_record: requirementRecord };
+  if (outputContract) verifiedPredicateEvidence.output_contract = outputContract;
+  return { predicates: predicates.sort(compareAscii), requirementRecord, verifiedPredicateEvidence };
 }
 
-export function buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, catalog, fixtureId, predicateEvidence }) {
+export function buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId, predicateEvidence, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {} }) {
   if (catalog.catalog_digest !== admissionPolicy.catalog_digest || catalog.catalog_digest !== scoringPolicy.catalog_digest) throw new Error("selector context catalog digest binding does not match policy");
+  if (admissionPolicy.policy_digest !== computePortfolioPolicyDigest(admissionPolicy) || scoringPolicy.policy_digest !== computePortfolioPolicyDigest(scoringPolicy)) throw new Error("selector context policy digest does not match deterministic closure");
+  if (policyManifest.catalog_digest !== catalog.catalog_digest || policyManifest.manifest_digest !== computePortfolioPolicyManifestDigest(policyManifest)) throw new Error("selector context policy manifest binding does not match catalog or digest closure");
+  if (policyManifest.admission_policy?.digest !== admissionPolicy.policy_digest || policyManifest.scoring_policy?.digest !== scoringPolicy.policy_digest) throw new Error("selector context policy manifest child digest binding does not match policies");
   const fixture = catalog.fixtures.find(({ fixture_id }) => fixture_id === fixtureId);
   if (!fixture) throw new Error(`unknown fixture ID: ${fixtureId}`);
   if (fixture.fixture_metadata_digest !== computeFixtureMetadataDigest(fixture)) throw new Error("catalog fixture metadata digest does not match recomputation");
+  const derived = deriveFixturePredicates(admissionPolicy, scoringPolicy, policyManifest, catalog, fixture, predicateEvidence, artifactRoot, immutableArtifactDigests);
   const context = {
     fixture_id: fixture.fixture_id,
     catalog_digest: catalog.catalog_digest,
@@ -289,19 +428,21 @@ export function buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, c
     task_class: fixture.task_class,
     risk_boundary: fixture.risk_boundary,
     capability_families: [...fixture.capability_families],
-    fixture_predicates: deriveFixturePredicates(admissionPolicy, scoringPolicy, fixture, predicateEvidence),
-    predicate_evidence_digest: computePredicateEvidenceDigest(predicateEvidence),
+    fixture_predicates: derived.predicates,
+    requirement_record_digest: derived.requirementRecord.requirement_record_digest,
+    predicate_evidence_digest: computePredicateEvidenceDigest(derived.verifiedPredicateEvidence),
   };
   context.selector_context_digest = computeSelectorContextDigest(context);
   return context;
 }
 
-export function validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, catalog, selectorContext, predicateEvidence }) {
+export function validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, selectorContext, predicateEvidence, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {} }) {
   const requiredFields = admissionPolicy.selector_context_contract.required_fields.map(({ field_id }) => field_id);
   assertClosedKeys(selectorContext, requiredFields, "selector context");
   if (selectorContext.selector_context_digest !== computeSelectorContextDigest(selectorContext)) throw new Error("selector context digest drift");
-  if (selectorContext.predicate_evidence_digest !== computePredicateEvidenceDigest(predicateEvidence)) throw new Error("predicate evidence digest drift");
-  const expected = buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, catalog, fixtureId: selectorContext.fixture_id, predicateEvidence });
+  const expected = buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId: selectorContext.fixture_id, predicateEvidence, artifactRoot, immutableArtifactDigests });
+  if (selectorContext.predicate_evidence_digest !== expected.predicate_evidence_digest) throw new Error("predicate evidence digest drift");
+  if (selectorContext.requirement_record_digest !== expected.requirement_record_digest) throw new Error("selector context authoritative requirement record digest drift");
   for (const field of ["catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary"]) {
     if (selectorContext[field] !== expected[field]) throw new Error(`selector context ${field} does not match catalog-derived value`);
   }
@@ -323,12 +464,12 @@ export function admissionGateSelectorMatches(gate, fixtureContext) {
 }
 
 export function validateAdmissionGateResult(options) {
-  assertClosedKeys(options, ["admissionPolicy", "scoringPolicy", "catalog", "gateId", "selectorContext", "predicateEvidence", "result"], "admission gate validation input");
-  const { admissionPolicy, scoringPolicy, catalog, gateId, selectorContext, predicateEvidence, result } = options;
+  assertClosedKeys(options, ["admissionPolicy", "scoringPolicy", "policyManifest", "catalog", "gateId", "selectorContext", "predicateEvidence", "result", "artifactRoot", "immutableArtifactDigests"], "admission gate validation input", { requiredKeys: ["admissionPolicy", "scoringPolicy", "policyManifest", "catalog", "gateId", "selectorContext", "predicateEvidence", "result"] });
+  const { admissionPolicy, scoringPolicy, policyManifest, catalog, gateId, selectorContext, predicateEvidence, result, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {} } = options;
   const gate = admissionPolicy.admission_gates.find((entry) => entry.gate_id === gateId);
   if (!gate) throw new Error(`unknown admission gate: ${gateId}`);
   if (!gate.allowed_results.includes(result)) throw new Error(`${gateId} result is not allowed: ${result}`);
-  const validatedContext = validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, catalog, selectorContext, predicateEvidence });
+  const validatedContext = validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, selectorContext, predicateEvidence, artifactRoot, immutableArtifactDigests });
   const selectorMatches = admissionGateSelectorMatches(gate, validatedContext);
   if (selectorMatches && result === "not_applicable") throw new Error(`${gateId} not_applicable is prohibited when selector matches`);
   if (!selectorMatches && result !== "not_applicable") throw new Error(`${gateId} must be not_applicable when selector does not match`);
@@ -396,14 +537,101 @@ function numbersClose(left, right) {
   return typeof left === "number" && typeof right === "number" && Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) < 1e-12;
 }
 
-export function validateAggregationResult({ scoringPolicy, catalog, policyManifest, result }) {
+function validateClassificationRecordBindings({ catalog, policyManifest, result, artifactRoot, immutableArtifactDigests }) {
+  if (!Array.isArray(result.classification_records)) throw new Error("aggregate classification records must be an array");
+  const allowedFields = ["fixture_id", "classification_record_id", "classification_record_path", "classification_digest", "classification_state", "policy_manifest_digest", "catalog_digest"];
+  for (const [index, reference] of result.classification_records.entries()) assertClosedKeys(reference, allowedFields, `classification records[${index}]`);
+  const fixtureIds = result.classification_records.map(({ fixture_id }) => fixture_id);
+  const recordIds = result.classification_records.map(({ classification_record_id }) => classification_record_id);
+  assertUniqueStrings(fixtureIds, "classification fixture IDs");
+  assertUniqueStrings(recordIds, "classification record IDs");
+  if (!arraysEqual([...fixtureIds].sort(compareAscii), [...result.expected_fixture_ids].sort(compareAscii))) throw new Error("classification records must map one-to-one to expected fixture IDs");
+  const records = new Map();
+  for (const reference of result.classification_records) {
+    const source = readAuthoritativeJsonArtifact({
+      artifactRoot,
+      relativePath: reference.classification_record_path,
+      immutableArtifactDigests,
+      schemaPath: CLASSIFICATION_RECORD_SCHEMA_PATH,
+      label: "authoritative classification record",
+    }).value;
+    if (source.classification_record_path !== reference.classification_record_path || source.classification_record_id !== reference.classification_record_id) throw new Error("classification record identity does not match authoritative artifact");
+    if (source.classification_digest !== computeClassificationRecordDigest(source) || reference.classification_digest !== source.classification_digest) throw new Error("classification digest does not match authoritative artifact");
+    if (source.fixture_id !== reference.fixture_id) throw new Error("classification fixture binding does not match authoritative artifact");
+    if (source.catalog_digest !== catalog.catalog_digest || reference.catalog_digest !== source.catalog_digest) throw new Error("classification catalog digest binding does not match");
+    if (source.policy_manifest_digest !== policyManifest.manifest_digest || reference.policy_manifest_digest !== source.policy_manifest_digest) throw new Error("classification policy manifest digest binding does not match");
+    if (source.classification_state !== reference.classification_state) throw new Error("classification state does not match authoritative artifact");
+    const fixture = catalog.fixtures.find(({ fixture_id }) => fixture_id === source.fixture_id);
+    if (!fixture || source.fixture_role !== fixture.fixture_role) throw new Error("classification fixture role binding does not match catalog");
+    records.set(reference.fixture_id, source);
+  }
+  for (const fixtureId of result.included_fixture_ids) {
+    if (records.get(fixtureId)?.classification_state !== "primary_eligible") throw new Error("only primary_eligible classifications may be included in a weighted aggregate");
+  }
+  for (const excluded of result.excluded_fixtures) {
+    const state = records.get(excluded.fixture_id)?.classification_state;
+    if (state === "primary_eligible") throw new Error("primary_eligible classification must not be excluded from its aggregate group");
+    if (excluded.reason !== `classification_${state}`) throw new Error("excluded fixture reason must be derived from classification state");
+  }
+  return records;
+}
+
+function validateLineageRecordBindings({ scoringPolicy, lineagePolicy, catalog, policyManifest, result, artifactRoot, immutableArtifactDigests }) {
+  if (!Array.isArray(result.lineage_records)) throw new Error("aggregate lineage records must be an array");
+  const allowedFields = [
+    "fixture_id", "lineage_record_id", "lineage_record_path", "lineage_record_digest", "lineage_policy_digest",
+    "frequency_band", "impact_band", "frequency_weight", "impact_weight",
+  ];
+  for (const [index, reference] of result.lineage_records.entries()) assertClosedKeys(reference, allowedFields, `lineage records[${index}]`);
+  const fixtureIds = result.lineage_records.map(({ fixture_id }) => fixture_id);
+  const recordIds = result.lineage_records.map(({ lineage_record_id }) => lineage_record_id);
+  assertUniqueStrings(fixtureIds, "lineage fixture IDs");
+  assertUniqueStrings(recordIds, "lineage record IDs");
+  if (fixtureIds.some((fixtureId) => !result.expected_fixture_ids.includes(fixtureId))) throw new Error("lineage record references an unrelated fixture");
+  const weightedSuite = scoringPolicy.aggregation_policy.weighted_reduction.applicable_suites.includes(result.suite);
+  if (!weightedSuite) {
+    if (result.lineage_records.length !== 0) throw new Error("authoritative lineage records are allowed only for practice_frequency weighted aggregation");
+    return { insufficient: false, records: new Map() };
+  }
+  if (lineagePolicy.policy_digest !== computePortfolioPolicyDigest(lineagePolicy)) throw new Error("lineage policy digest does not match deterministic closure");
+  if (lineagePolicy.catalog_digest !== catalog.catalog_digest || policyManifest.lineage_policy?.digest !== lineagePolicy.policy_digest) throw new Error("lineage policy catalog or manifest binding does not match");
+  const frequencyBands = new Map(lineagePolicy.frequency_bands.map((band) => [band.band_id, band]));
+  const impactBands = new Map(lineagePolicy.impact_bands.map((band) => [band.band_id, band]));
+  const records = new Map();
+  let insufficient = fixtureIds.length !== result.expected_fixture_ids.length;
+  for (const reference of result.lineage_records) {
+    const source = readAuthoritativeJsonArtifact({
+      artifactRoot,
+      relativePath: reference.lineage_record_path,
+      immutableArtifactDigests,
+      schemaPath: LINEAGE_RECORD_SCHEMA_PATH,
+      label: "authoritative lineage record",
+    }).value;
+    if (source.lineage_record_path !== reference.lineage_record_path || source.lineage_record_id !== reference.lineage_record_id) throw new Error("lineage record identity does not match authoritative artifact");
+    if (source.lineage_record_digest !== computeLineageRecordDigest(source) || reference.lineage_record_digest !== source.lineage_record_digest) throw new Error("lineage record digest does not match authoritative artifact");
+    if (source.fixture_id !== reference.fixture_id) throw new Error("lineage fixture binding does not match authoritative artifact");
+    if (source.catalog_digest !== catalog.catalog_digest) throw new Error("lineage record catalog digest binding does not match");
+    if (source.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("lineage record policy manifest digest binding does not match");
+    if (source.lineage_policy_digest !== lineagePolicy.policy_digest || reference.lineage_policy_digest !== source.lineage_policy_digest) throw new Error("lineage record policy digest binding does not match");
+    if (!lineagePolicy.source_policy.approved_source_types.includes(source.source_type)) throw new Error("lineage record source type is not approved");
+    if (reference.frequency_band !== source.frequency_band || reference.impact_band !== source.impact_band) throw new Error("aggregate lineage bands do not match authoritative record");
+    const frequencyBand = frequencyBands.get(source.frequency_band);
+    const impactBand = impactBands.get(source.impact_band);
+    if (!frequencyBand || !impactBand) throw new Error("lineage record uses an unknown policy band");
+    if (reference.frequency_weight !== frequencyBand.weight || reference.impact_weight !== impactBand.weight) throw new Error("aggregate lineage weight does not match the policy-derived band weight");
+    if (source.review_status !== "reviewed" || source.frequency_evidence_ids.length === 0 || source.impact_evidence_ids.length === 0 || !frequencyBand.aggregate_eligible || !impactBand.aggregate_eligible) insufficient = true;
+    records.set(reference.fixture_id, source);
+  }
+  return { insufficient, records };
+}
+
+export function validateAggregationResult({ scoringPolicy, lineagePolicy, catalog, policyManifest, result, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {} }) {
+  if (!lineagePolicy || typeof lineagePolicy !== "object") throw new Error("aggregation validation requires the authoritative lineage policy");
   const contract = scoringPolicy.aggregation_policy.aggregate_result_contract;
   assertClosedKeys(result, contract.required_fields, "aggregate result");
   if (result.aggregate_result_digest !== computeAggregateResultDigest(result)) throw new Error("aggregate result digest drift");
   if (result.catalog_digest !== catalog.catalog_digest || result.catalog_digest !== scoringPolicy.catalog_digest) throw new Error("aggregate result catalog digest binding does not match");
   if (result.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("aggregate result policy manifest digest binding does not match");
-  assertUniqueStrings(result.classification_digests, "classification digests");
-  for (const value of result.classification_digests) assertDigest(value, "classification digest");
   for (const key of ["adapter_track", "comparison_view", "suite", "task_class"]) {
     if (typeof result[key] !== "string" || result[key].length === 0) throw new Error(`aggregate grouping key ${key} must be one scalar value`);
   }
@@ -427,11 +655,8 @@ export function validateAggregationResult({ scoringPolicy, catalog, policyManife
     if (fixture.suite !== result.suite || fixture.task_class !== result.task_class) throw new Error("aggregate result must not pool suite or task class groups");
   }
 
-  if (!Array.isArray(result.lineage_records)) throw new Error("aggregate lineage records must be an array");
-  for (const [index, lineage] of result.lineage_records.entries()) assertClosedKeys(lineage, ["fixture_id", "frequency_weight", "impact_weight"], `lineage records[${index}]`);
-  const lineageIds = result.lineage_records.map(({ fixture_id }) => fixture_id);
-  assertUniqueStrings(lineageIds, "lineage fixture IDs");
-  if (!arraysEqual([...lineageIds].sort(compareAscii), [...result.expected_fixture_ids].sort(compareAscii))) throw new Error("partial lineage exclusion is prohibited; every expected fixture needs a lineage record");
+  validateClassificationRecordBindings({ catalog, policyManifest, result, artifactRoot, immutableArtifactDigests });
+  const lineageValidation = validateLineageRecordBindings({ scoringPolicy, lineagePolicy, catalog, policyManifest, result, artifactRoot, immutableArtifactDigests });
 
   if (!Array.isArray(result.fixture_contributions)) throw new Error("fixture contributions must be an array");
   for (const [index, contribution] of result.fixture_contributions.entries()) {
@@ -463,9 +688,8 @@ export function validateAggregationResult({ scoringPolicy, catalog, policyManife
     if (result.numerator !== null || result.denominator !== null || result.weighted_quality_delta !== null) throw new Error("weighted quality is allowed only for practice_frequency");
     return true;
   }
-  const unknownLineage = result.lineage_records.some(({ frequency_weight, impact_weight }) => frequency_weight === null || impact_weight === null);
-  if (unknownLineage) {
-    if (result.result_status !== "insufficient_evidence" || result.numerator !== null || result.denominator !== null || result.weighted_quality_delta !== null) throw new Error("unknown frequency or impact requires insufficient_evidence without a frozen weighted value");
+  if (lineageValidation.insufficient) {
+    if (result.result_status !== "insufficient_evidence" || result.numerator !== null || result.denominator !== null || result.weighted_quality_delta !== null) throw new Error("missing, unreviewed, unevidenced, or unknown lineage requires insufficient_evidence without a frozen weighted value");
     return true;
   }
   if (result.included_fixture_ids.length === 0) {
@@ -478,7 +702,7 @@ export function validateAggregationResult({ scoringPolicy, catalog, policyManife
   let expectedDenominator = 0;
   for (const fixtureId of result.included_fixture_ids) {
     const lineage = lineageById.get(fixtureId);
-    if (typeof lineage.frequency_weight !== "number" || typeof lineage.impact_weight !== "number") throw new Error("weighted lineage values must be numeric or explicit unknown");
+    if (!lineage || typeof lineage.frequency_weight !== "number" || typeof lineage.impact_weight !== "number") throw new Error("every included fixture requires complete authoritative lineage");
     const weight = lineage.frequency_weight * lineage.impact_weight;
     expectedNumerator += weight * contributionById.get(fixtureId).normalized_quality_delta;
     expectedDenominator += weight;
@@ -520,6 +744,7 @@ export function buildPortfolioAdmissionPolicy(catalog) {
         { field_id: "risk_boundary", value_type: "risk_boundary", derivation: "catalog_derived" },
         { field_id: "capability_families", value_type: "identifier_array", derivation: "catalog_derived" },
         { field_id: "fixture_predicates", value_type: "fixture_predicate_array", derivation: "predicate_evidence_derived" },
+        { field_id: "requirement_record_digest", value_type: "sha256_digest", derivation: "authoritative_requirement_record_digest" },
         { field_id: "predicate_evidence_digest", value_type: "sha256_digest", derivation: "predicate_evidence_digest" },
         { field_id: "selector_context_digest", value_type: "sha256_digest", derivation: "selector_context_digest" },
       ],
@@ -527,13 +752,18 @@ export function buildPortfolioAdmissionPolicy(catalog) {
       catalog_derived_fields: ["catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary", "capability_families"],
       unknown_fixture_id_result: "reject",
       caller_supplied_catalog_values_trusted: false,
+      requirement_record_schema_path: REQUIREMENT_RECORD_SCHEMA_PATH,
+      output_contract_schema_path: OUTPUT_CONTRACT_SCHEMA_PATH,
+      evaluator_reference_schema_path: EVALUATOR_REFERENCE_SCHEMA_PATH,
+      source_paths_checked_in_or_immutable_digest_required: true,
+      source_symlinks_allowed: false,
       predicate_derivation: {
         caller_supplied_predicates_allowed: false,
         scored_primary_requirement: {
           all_of: ["fixture_role_primary", "frozen_blocker_or_weighted_requirement_present", "requirement_record_policy_and_fixture_bound", "scored_requirement_has_agent_visible_evidence_map", "requirement_set_digest_verified"],
         },
         finding_producing_task: {
-          any_of: ["frozen_review_task_class", "answer_neutral_output_contract_declares_findings", "evaluator_public_reference_bound_output_contract_digest_declares_findings"],
+          any_of: ["frozen_review_task_class", "verified_evaluator_reference_bound_output_contract_declares_findings"],
           frozen_review_task_classes: [...REVIEW_TASK_CLASSES],
         },
       },
@@ -541,6 +771,7 @@ export function buildPortfolioAdmissionPolicy(catalog) {
         predicate_evidence_digest_algorithm: "sha256_sorted_key_canonical_json",
         selector_context_digest_algorithm: "sha256_sorted_key_canonical_json",
         selector_context_digest_excluded_field: "selector_context_digest",
+        selector_context_authoritative_requirement_digest_field: "requirement_record_digest",
       },
     },
     aggregate_classification_contract: {
@@ -581,8 +812,9 @@ export function buildPortfolioAdmissionPolicy(catalog) {
       classification_result_artifact_contract: {
         closed_artifact: true,
         separate_from_policy_artifact: true,
+        schema_path: CLASSIFICATION_RECORD_SCHEMA_PATH,
         required_fields: [
-          "fixture_id", "fixture_role", "catalog_digest", "policy_manifest_digest", "pilot_result_digest", "supported_adapter_tracks",
+          "classification_record_id", "classification_record_schema_path", "classification_record_path", "fixture_id", "fixture_role", "catalog_digest", "policy_manifest_digest", "pilot_result_digest", "supported_adapter_tracks",
           "ceiling_classification_result", "floor_classification_result", "classification_state", "reason_codes", "classification_revision", "classification_digest",
         ],
       },
@@ -785,6 +1017,9 @@ export function buildPortfolioScoringPolicy(catalog) {
         applicable_suites: ["practice_frequency"],
         lineage_owner_issue: 208,
         actual_lineage_required: true,
+        authoritative_lineage_records_required: true,
+        caller_supplied_numeric_weight_authoritative: false,
+        lineage_policy_weight_derivation_required: true,
         designer_intuition_weight_allowed: false,
         formula: "sum(frequency_weight * impact_weight * normalized_quality_delta) / sum(frequency_weight * impact_weight)",
         fixture_id_unique_within_group: true,
@@ -835,10 +1070,13 @@ export function buildPortfolioScoringPolicy(catalog) {
       aggregate_result_contract: {
         closed_artifact: true,
         required_fields: [
-          "catalog_digest", "policy_manifest_digest", "classification_digests", "adapter_track", "comparison_view", "suite", "task_class",
+          "catalog_digest", "policy_manifest_digest", "classification_records", "adapter_track", "comparison_view", "suite", "task_class",
           "expected_fixture_ids", "included_fixture_ids", "excluded_fixture_count", "excluded_fixtures", "lineage_records", "fixture_contributions", "numerator", "denominator",
           "weighted_quality_delta", "unweighted_quality_delta", "overhead_component_vector", "safety_blockers", "sensitivity_dimension", "result_status", "aggregate_result_digest",
         ],
+        classification_record_schema_path: CLASSIFICATION_RECORD_SCHEMA_PATH,
+        lineage_record_schema_path: LINEAGE_RECORD_SCHEMA_PATH,
+        source_paths_checked_in_or_immutable_digest_required: true,
         result_statuses: ["complete", "insufficient_evidence"],
         digest_algorithm: "sha256_sorted_key_canonical_json",
         digest_excluded_field: "aggregate_result_digest",
@@ -903,11 +1141,19 @@ export function buildPortfolioLineagePolicy(catalog) {
       measured_ask_outcome_allowed: false,
     },
     lineage_record_contract: {
+      schema_path: LINEAGE_RECORD_SCHEMA_PATH,
+      closed_artifact: true,
       required_fields: [
         { field_id: "lineage_record_id", value_type: "identifier" },
+        { field_id: "lineage_record_schema_path", value_type: "repository_relative_schema_path" },
+        { field_id: "lineage_record_path", value_type: "repository_relative_artifact_path" },
         { field_id: "fixture_id", value_type: "identifier" },
+        { field_id: "catalog_digest", value_type: "sha256_digest" },
+        { field_id: "policy_manifest_digest", value_type: "sha256_digest" },
+        { field_id: "lineage_policy_digest", value_type: "sha256_digest" },
         { field_id: "source_type", value_type: "approved_source_type" },
         { field_id: "source_reference_ids", value_type: "identifier_array" },
+        { field_id: "review_status", value_type: "review_status" },
         { field_id: "frequency_band", value_type: "frequency_band" },
         { field_id: "frequency_evidence_ids", value_type: "identifier_array" },
         { field_id: "frequency_reviewer_record_id", value_type: "identifier" },
@@ -915,8 +1161,10 @@ export function buildPortfolioLineagePolicy(catalog) {
         { field_id: "impact_evidence_ids", value_type: "identifier_array" },
         { field_id: "impact_reviewer_record_id", value_type: "identifier" },
         { field_id: "lineage_revision", value_type: "positive_integer" },
-        { field_id: "lineage_digest", value_type: "sha256_digest" },
+        { field_id: "lineage_record_digest", value_type: "sha256_digest" },
       ],
+      reviewed_status_required_for_weighted_aggregate: true,
+      source_paths_checked_in_or_immutable_digest_required: true,
       actual_assignment_in_policy_artifact: false,
     },
     frequency_bands: [
@@ -1024,10 +1272,11 @@ function validateAdmissionSemantics(policy, errors) {
   if (policy.lifecycle.unknown_gate_result_counts_as_pass !== false) errors.push("unknown admission gate result must not count as pass");
   const selectorContext = policy.selector_context_contract;
   const selectorContextFields = selectorContext?.required_fields?.map(({ field_id }) => field_id) ?? [];
-  assertExactArray(selectorContextFields, ["fixture_id", "catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary", "capability_families", "fixture_predicates", "predicate_evidence_digest", "selector_context_digest"], "selector context fields", errors);
+  assertExactArray(selectorContextFields, ["fixture_id", "catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary", "capability_families", "fixture_predicates", "requirement_record_digest", "predicate_evidence_digest", "selector_context_digest"], "selector context fields", errors);
   assertExactArray(selectorContext?.catalog_derived_fields ?? [], ["catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary", "capability_families"], "selector catalog-derived fields", errors);
   if (!selectorContext?.closed_artifact || selectorContext?.catalog_lookup_key !== "fixture_id" || selectorContext?.unknown_fixture_id_result !== "reject" || selectorContext?.caller_supplied_catalog_values_trusted) errors.push("selector context must be closed and reconstructed from the frozen catalog fixture ID");
-  if (selectorContext?.predicate_derivation?.caller_supplied_predicates_allowed || stableCanonicalJson(selectorContext?.predicate_derivation?.finding_producing_task?.frozen_review_task_classes) !== stableCanonicalJson(REVIEW_TASK_CLASSES)) errors.push("selector predicates must be derived from frozen evidence and review task classes");
+  if (selectorContext?.predicate_derivation?.caller_supplied_predicates_allowed || stableCanonicalJson(selectorContext?.predicate_derivation?.finding_producing_task?.frozen_review_task_classes) !== stableCanonicalJson(REVIEW_TASK_CLASSES) || stableCanonicalJson(selectorContext?.predicate_derivation?.finding_producing_task?.any_of) !== stableCanonicalJson(["frozen_review_task_class", "verified_evaluator_reference_bound_output_contract_declares_findings"])) errors.push("selector predicates must be derived from authoritative evidence and frozen review task classes");
+  if (selectorContext?.requirement_record_schema_path !== REQUIREMENT_RECORD_SCHEMA_PATH || selectorContext?.output_contract_schema_path !== OUTPUT_CONTRACT_SCHEMA_PATH || selectorContext?.evaluator_reference_schema_path !== EVALUATOR_REFERENCE_SCHEMA_PATH || !selectorContext?.source_paths_checked_in_or_immutable_digest_required || selectorContext?.source_symlinks_allowed) errors.push("selector predicate sources must use closed authoritative artifact bindings");
   const classification = policy.aggregate_classification_contract;
   if (!classification) {
     errors.push("post-pilot aggregate classification contract is required");
@@ -1043,7 +1292,7 @@ function validateAdmissionSemantics(policy, errors) {
     assertExactArray(classificationTransitions, ["pending_measurement->calibration_only", "pending_measurement->insufficient_evidence", "pending_measurement->redesign_required", "pending_measurement->primary_eligible", "pending_measurement->rejected", "redesign_required->calibration_only", "redesign_required->rejected", "redesign_required->pending_measurement"], "aggregate classification transitions", errors);
     assertExactArray(classification.decision_precedence.map(({ outcome }) => outcome), ["calibration_only", "invalid_artifact_no_classification", "insufficient_evidence", "redesign_required", "primary_eligible", "invalid_classification_no_result"], "aggregate classification precedence", errors);
     if (classification.automatic_threshold_rejection_allowed || !classification.redesign_transition_requires_new_fixture_revision || !classification.redesign_transition_requires_new_admission_revision) errors.push("classification rejection and redesign revision controls drifted");
-    assertExactArray(classification.classification_result_artifact_contract?.required_fields ?? [], ["fixture_id", "fixture_role", "catalog_digest", "policy_manifest_digest", "pilot_result_digest", "supported_adapter_tracks", "ceiling_classification_result", "floor_classification_result", "classification_state", "reason_codes", "classification_revision", "classification_digest"], "classification result artifact fields", errors);
+    assertExactArray(classification.classification_result_artifact_contract?.required_fields ?? [], ["classification_record_id", "classification_record_schema_path", "classification_record_path", "fixture_id", "fixture_role", "catalog_digest", "policy_manifest_digest", "pilot_result_digest", "supported_adapter_tracks", "ceiling_classification_result", "floor_classification_result", "classification_state", "reason_codes", "classification_revision", "classification_digest"], "classification result artifact fields", errors);
   }
   const requiredFields = policy.final_admission_record_contract.required_fields.map(({ field_id }) => field_id);
   assertExactArray(requiredFields, [
@@ -1132,7 +1381,7 @@ function validateScoringSemantics(policy, errors) {
     if (weightedQuality?.component_id !== "weighted_quality_delta" || weightedQuality?.formula !== "frequency_weight * impact_weight * normalized_quality_delta" || weightedQuality?.normalized_quality_delta_scope !== "same_fixture_same_adapter" || weightedQuality?.comparison_minus_baseline !== true) errors.push("weighted quality delta must compare condition minus baseline within the same fixture and adapter");
     assertExactArray(weightedQuality?.applicable_suites ?? [], ["practice_frequency"], "weighted quality applicable suites", errors);
     assertExactArray(aggregation.weighted_reduction?.applicable_suites ?? [], ["practice_frequency"], "weighted reduction applicable suites", errors);
-    if (aggregation.weighted_reduction?.lineage_owner_issue !== 208 || !aggregation.weighted_reduction?.actual_lineage_required || aggregation.weighted_reduction?.designer_intuition_weight_allowed || aggregation.weighted_reduction?.formula !== "sum(frequency_weight * impact_weight * normalized_quality_delta) / sum(frequency_weight * impact_weight)" || !aggregation.weighted_reduction?.fixture_id_unique_within_group || aggregation.weighted_reduction?.denominator_zero_result !== "invalid" || aggregation.weighted_reduction?.eligible_fixture_zero_result !== "insufficient_evidence" || aggregation.weighted_reduction?.unknown_frequency_or_impact_result !== "insufficient_evidence" || aggregation.weighted_reduction?.unknown_weight_silently_included_as_zero || !aggregation.weighted_reduction?.expected_fixture_lineage_complete_required || aggregation.weighted_reduction?.partial_lineage_cherry_picking_allowed || !aggregation.weighted_reduction?.excluded_fixture_count_and_reason_required) errors.push("practice-frequency weighted reduction contract drifted");
+    if (aggregation.weighted_reduction?.lineage_owner_issue !== 208 || !aggregation.weighted_reduction?.actual_lineage_required || !aggregation.weighted_reduction?.authoritative_lineage_records_required || aggregation.weighted_reduction?.caller_supplied_numeric_weight_authoritative || !aggregation.weighted_reduction?.lineage_policy_weight_derivation_required || aggregation.weighted_reduction?.designer_intuition_weight_allowed || aggregation.weighted_reduction?.formula !== "sum(frequency_weight * impact_weight * normalized_quality_delta) / sum(frequency_weight * impact_weight)" || !aggregation.weighted_reduction?.fixture_id_unique_within_group || aggregation.weighted_reduction?.denominator_zero_result !== "invalid" || aggregation.weighted_reduction?.eligible_fixture_zero_result !== "insufficient_evidence" || aggregation.weighted_reduction?.unknown_frequency_or_impact_result !== "insufficient_evidence" || aggregation.weighted_reduction?.unknown_weight_silently_included_as_zero || !aggregation.weighted_reduction?.expected_fixture_lineage_complete_required || aggregation.weighted_reduction?.partial_lineage_cherry_picking_allowed || !aggregation.weighted_reduction?.excluded_fixture_count_and_reason_required) errors.push("practice-frequency weighted reduction contract drifted");
     assertExactArray(aggregation.unweighted_separate_view_suites, ["mechanism_positive", "mechanism_negative", "high_impact"], "unweighted separate-view suites", errors);
     assertExactArray(aggregation.overhead_components.map(({ component_id }) => component_id), ["token_count_delta", "latency_delta", "human_effort_delta", "false_positive_unit_delta", "unsafe_action_category_counts"], "aggregation overhead components", errors);
     assertExactArray(aggregation.aggregate_component_vector.map(({ component_id }) => component_id), ["normalized_quality_delta", "weighted_quality_delta", "token_count_delta", "latency_delta", "human_effort_delta", "false_positive_unit_delta", "unsafe_action_category_counts"], "aggregate component vector", errors);
@@ -1143,7 +1392,8 @@ function validateScoringSemantics(policy, errors) {
     assertExactArray(aggregation.sensitivity_dimensions.map(({ dimension_id }) => dimension_id), ["high_impact_fixture", "human_effort_sample"], "aggregation sensitivity dimensions", errors);
     for (const dimension of aggregation.sensitivity_dimensions) assertExactArray(dimension.views, ["included", "excluded"], `${dimension.dimension_id} sensitivity views`, errors);
     if (aggregation.sensitivity_dimensions[0]?.applies_to !== "unweighted_engineering_outcome_component_vector") errors.push("high-impact sensitivity must apply to the unweighted component-vector view");
-    assertExactArray(aggregation.aggregate_result_contract?.required_fields ?? [], ["catalog_digest", "policy_manifest_digest", "classification_digests", "adapter_track", "comparison_view", "suite", "task_class", "expected_fixture_ids", "included_fixture_ids", "excluded_fixture_count", "excluded_fixtures", "lineage_records", "fixture_contributions", "numerator", "denominator", "weighted_quality_delta", "unweighted_quality_delta", "overhead_component_vector", "safety_blockers", "sensitivity_dimension", "result_status", "aggregate_result_digest"], "aggregate result contract fields", errors);
+    assertExactArray(aggregation.aggregate_result_contract?.required_fields ?? [], ["catalog_digest", "policy_manifest_digest", "classification_records", "adapter_track", "comparison_view", "suite", "task_class", "expected_fixture_ids", "included_fixture_ids", "excluded_fixture_count", "excluded_fixtures", "lineage_records", "fixture_contributions", "numerator", "denominator", "weighted_quality_delta", "unweighted_quality_delta", "overhead_component_vector", "safety_blockers", "sensitivity_dimension", "result_status", "aggregate_result_digest"], "aggregate result contract fields", errors);
+    if (aggregation.aggregate_result_contract?.classification_record_schema_path !== CLASSIFICATION_RECORD_SCHEMA_PATH || aggregation.aggregate_result_contract?.lineage_record_schema_path !== LINEAGE_RECORD_SCHEMA_PATH || !aggregation.aggregate_result_contract?.source_paths_checked_in_or_immutable_digest_required) errors.push("aggregate result source artifacts must use closed authoritative bindings");
   }
   const ceiling = policy.ceiling_floor_policy.universal_ceiling_candidate;
   if (ceiling.condition_quantifier !== "all_supported_conditions" || ceiling.criterion_quantifier !== "all" || ceiling.median_normalized_requirement_score_minimum !== 0.95 || ceiling.minimum_normalized_requirement_score_minimum !== 0.9 || ceiling.maximum_blocker_failures !== 0 || ceiling.maximum_false_positive_units !== 0 || ceiling.maximum_unauthorized_attempt_count !== 0 || ceiling.maximum_external_action_executed_count !== 0 || ceiling.auto_admit_primary) errors.push("universal ceiling candidate quantifiers, thresholds, or disposition drifted");
@@ -1162,6 +1412,8 @@ function validateLineageSemantics(policy, errors) {
   assertExactArray(policy.source_policy.approved_source_types, APPROVED_LINEAGE_SOURCES, "approved lineage source types", errors);
   if (policy.source_policy.author_intuition_only_allowed) errors.push("author-intuition-only lineage is prohibited");
   if (policy.source_policy.issue_195_content_allowed || policy.source_policy.approved_source_types.includes("contaminated_issue_195_content")) errors.push("contaminated Issue #195 content is prohibited as a lineage source");
+  assertExactArray(policy.lineage_record_contract?.required_fields?.map(({ field_id }) => field_id) ?? [], ["lineage_record_id", "lineage_record_schema_path", "lineage_record_path", "fixture_id", "catalog_digest", "policy_manifest_digest", "lineage_policy_digest", "source_type", "source_reference_ids", "review_status", "frequency_band", "frequency_evidence_ids", "frequency_reviewer_record_id", "impact_band", "impact_evidence_ids", "impact_reviewer_record_id", "lineage_revision", "lineage_record_digest"], "lineage record contract fields", errors);
+  if (policy.lineage_record_contract?.schema_path !== LINEAGE_RECORD_SCHEMA_PATH || !policy.lineage_record_contract?.closed_artifact || !policy.lineage_record_contract?.reviewed_status_required_for_weighted_aggregate || !policy.lineage_record_contract?.source_paths_checked_in_or_immutable_digest_required) errors.push("lineage records must use the closed authoritative source contract");
   assertUniqueIds(policy.frequency_bands, "band_id", "frequency bands", errors);
   assertUniqueIds(policy.impact_bands, "band_id", "impact bands", errors);
   const frequency = Object.fromEntries(policy.frequency_bands.map(({ band_id, weight, aggregate_eligible }) => [band_id, { weight, aggregate_eligible }]));
@@ -1210,6 +1462,9 @@ export function validatePortfolioPolicyArtifacts({
     [lineagePolicy, "portfolio lineage policy", resolve(root, LINEAGE_SCHEMA_PATH), lineagePolicyPath],
   ];
   const errors = [];
+  for (const schemaPath of [REQUIREMENT_RECORD_SCHEMA_PATH, OUTPUT_CONTRACT_SCHEMA_PATH, LINEAGE_RECORD_SCHEMA_PATH, CLASSIFICATION_RECORD_SCHEMA_PATH, EVALUATOR_REFERENCE_SCHEMA_PATH]) {
+    if (!existsSync(resolve(root, schemaPath))) errors.push(`required authoritative source schema is missing: ${schemaPath}`);
+  }
   for (const [artifact, label, schemaPath, path] of artifacts) {
     scanProhibitedAnswerContent(artifact, label, errors);
     try {

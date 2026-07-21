@@ -29,7 +29,7 @@
     "program": { "const": "adaptive_ask_portfolio" },
     "policy_schema_version": { "const": "1.0.0" },
     "policy_contract_version": { "const": "3.7.0-portfolio-policy" },
-    "policy_revision": { "const": "issue-205-checkpoint-b1-r2" },
+    "policy_revision": { "const": "issue-205-checkpoint-b1-r3" },
     "policy_status": { "const": "contracts_frozen_design_records_pending" },
     "catalog_schema_version": { "const": "1.0.0" },
     "catalog_revision": { "const": "issue-205-checkpoint-1" },
@@ -93,15 +93,19 @@
       "required": ["field_id", "value_type"],
       "properties": {
         "field_id": { "$ref": "#/$defs/identifier" },
-        "value_type": { "enum": ["identifier", "approved_source_type", "identifier_array", "frequency_band", "impact_band", "positive_integer", "sha256_digest"] }
+        "value_type": { "enum": ["identifier", "repository_relative_schema_path", "repository_relative_artifact_path", "approved_source_type", "identifier_array", "review_status", "frequency_band", "impact_band", "positive_integer", "sha256_digest"] }
       }
     },
     "lineageRecordContract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["required_fields", "actual_assignment_in_policy_artifact"],
+      "required": ["schema_path", "closed_artifact", "required_fields", "reviewed_status_required_for_weighted_aggregate", "source_paths_checked_in_or_immutable_digest_required", "actual_assignment_in_policy_artifact"],
       "properties": {
-        "required_fields": { "type": "array", "minItems": 12, "maxItems": 12, "items": { "$ref": "#/$defs/fieldDefinition" } },
+        "schema_path": { "const": "benchmarks/schemas/portfolio-lineage-record.schema.json" },
+        "closed_artifact": { "const": true },
+        "required_fields": { "type": "array", "minItems": 18, "maxItems": 18, "items": { "$ref": "#/$defs/fieldDefinition" } },
+        "reviewed_status_required_for_weighted_aggregate": { "const": true },
+        "source_paths_checked_in_or_immutable_digest_required": { "const": true },
         "actual_assignment_in_policy_artifact": { "const": false }
       }
     },
