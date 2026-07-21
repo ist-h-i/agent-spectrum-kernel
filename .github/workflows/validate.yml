@@ -51,6 +51,9 @@ jobs:
       - name: Run portfolio raw engineering result score tests
         run: node scripts/test-ask-benchmark-portfolio-score.mjs
 
+      - name: Run portfolio engineering result-set tests
+        run: node scripts/test-ask-benchmark-portfolio-result-set.mjs
+
       - name: Validate repository consistency
         run: node scripts/validate-repo.mjs
 

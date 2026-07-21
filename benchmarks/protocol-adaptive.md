@@ -252,6 +252,30 @@ Only a verified normalized `completed` outcome plus evaluator `completed` and th
 
 The output Schema and semantic validator prohibit aggregates, comparison views, severity-to-unit mapping, false-positive penalties, mechanism credit, repetition statistics, practice-frequency weighting, and product recommendations. Publication deterministically serializes into a same-directory `wx` staging file, fsyncs the complete bytes, and claims the absent target with atomic hard-link creation. `EEXIST` leaves the winner byte-identical and makes the loser fail; unsupported hard-link/no-replace filesystems fail closed and never fall back to replacing rename or overwrite. Staging is removed on every handled terminal path. Parent-directory fsync is attempted where supported; if the platform rejects directory fsync, crash-durability is limited to that filesystem's guarantee while no-replace semantics remain enforced. Symlinked/path-overlapping destinations are rejected, and verified inputs or private evaluator material are never mutated.
 
+`collect-engineering-results` closes the next boundary before any repetition statistic or mechanism scorecard is allowed. The verified normalized generation supplies the plan, run, snapshot, fixture, adapter, condition, repetition, and terminal-attempt inventory; caller counts and selected file lists are not authority. Each selected adapter case must be terminal, each fixture must close over all four plan conditions and its recorded three or five repetitions, and exactly one raw engineering result must match the terminal normalized attempt. Retry history therefore cannot be cherry-picked into or used to overweight the result set. Non-ready evaluation and normalized outcomes remain required raw entries with their typed scoring, blocker, and safety states.
+
+An independent `portfolio-engineering-result-source-manifest.schema.json` lists every approved repository-relative result path with exact raw-byte digest, byte count, and result/normalized identities. Its exact bytes must match checked-in `HEAD:<path>` or a caller-supplied approved immutable digest; the validator does not claim who approved that digest. The result root is a real, bounded, symlink-free public directory and must exactly equal the source inventory. `portfolio-engineering-result-set.schema.json` records the source authority, normalized generation, complete deterministic inventory, structural counts, and self-derived ID/digest. It has no mean, median, min/max, variance, confidence interval, comparison, weighting, mechanism credit, aggregate, or product-value fields. Generate and verify share the same semantic validator, while publication reuses the single-result scorer's same-directory `wx` + fsync + atomic hard-link no-replace helper.
+
+```bash
+node scripts/ask-benchmark.mjs collect-engineering-results \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/raw-engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
+  --adapter codex \
+  --output /path/to/engineering-result-set.json
+
+node scripts/ask-benchmark.mjs verify-engineering-result-set \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/raw-engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
+  --adapter codex \
+  --input /path/to/engineering-result-set.json
+```
+
 ```bash
 node scripts/ask-benchmark.mjs score-evaluator-result \
   --reference /path/to/public-evaluator-reference.json \

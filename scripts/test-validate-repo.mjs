@@ -5836,6 +5836,19 @@ jobs:
     "required authoritative source schema is missing: benchmarks/schemas/portfolio-engineering-result.schema.json",
   );
 
+  for (const schemaPath of [
+    "benchmarks/schemas/portfolio-engineering-result-source-manifest.schema.json",
+    "benchmarks/schemas/portfolio-engineering-result-set.schema.json",
+  ]) {
+    const missingResultSetSchemaRoot = cloneFixture(`missing-${schemaPath.split("/").at(-1)}`);
+    rmSync(resolve(missingResultSetSchemaRoot, schemaPath));
+    assertFail(
+      `missing ${schemaPath}`,
+      missingResultSetSchemaRoot,
+      `required authoritative source schema is missing: ${schemaPath}`,
+    );
+  }
+
   const invalidPortfolioDesignRoot = cloneFixture("invalid-portfolio-design-admission");
   const invalidPortfolioDesignPath = resolve(invalidPortfolioDesignRoot, "benchmarks/portfolio-design-review-package.json");
   const invalidPortfolioDesign = JSON.parse(readFileSync(invalidPortfolioDesignPath, "utf8"));

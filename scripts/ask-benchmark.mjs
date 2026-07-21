@@ -27,6 +27,7 @@ import { executePortfolio, recoverPortfolioCase, verifyPortfolioExecution } from
 import { assertCurrentPortfolioRunInput, normalizePortfolioExecution, verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { verifyEvaluatorBoundary, verifyEvaluatorResult, verifyPrivateEvaluatorBundle } from "./ask-benchmark-evaluator-boundary.mjs";
 import { scoreEvaluatorResult } from "./ask-benchmark-portfolio-score.mjs";
+import { collectEngineeringResults, verifyEngineeringResultSet } from "./ask-benchmark-portfolio-result-set.mjs";
 import {
   DEFAULT_PORTFOLIO_CATALOG_PATH,
   DEFAULT_PORTFOLIO_SIMILARITY_PATH,
@@ -74,7 +75,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -104,6 +105,9 @@ function parseArgs(argv) {
     else if (flag === "--scoring-input-freeze") args.scoringInputFreezeManifest = resolve(argv.shift());
     else if (flag === "--scoring-input-freeze-source-digest") args.scoringInputFreezeManifestSourceDigest = argv.shift();
     else if (flag === "--normalized-results") args.normalizedResults = resolve(argv.shift());
+    else if (flag === "--engineering-results") args.engineeringResults = resolve(argv.shift());
+    else if (flag === "--engineering-result-source-manifest") args.engineeringResultSourceManifest = resolve(argv.shift());
+    else if (flag === "--engineering-result-source-manifest-source-digest") args.engineeringResultSourceManifestSourceDigest = argv.shift();
     else if (flag === "--public-artifact-root") args.publicArtifactRoot = resolve(argv.shift());
     else if (flag === "--catalog") args.catalogPath = resolve(argv.shift());
     else if (flag === "--similarity") args.similarityPath = resolve(argv.shift());
@@ -144,6 +148,8 @@ Commands:
   verify-evaluator-result --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> [--catalog <catalog.json>] [--policy-manifest <manifest.json>] [--scoring-policy <policy.json>] [--public-artifact-root <staged-public-artifact-directory>]
   verify-evaluator-boundary --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> --public-artifact-root <staged-public-artifact-directory>
   score-evaluator-result --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> --output <engineering-result.json> [--public-artifact-root <staged-public-artifact-directory>]
+  collect-engineering-results --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --output <engineering-result-set.json>
+  verify-engineering-result-set --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --input <engineering-result-set.json>
   recover-case --run-dir <run-directory> --case-id <case-id> --claim-id <claim-id> --reason <reason>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
@@ -535,6 +541,36 @@ function scoreEvaluatorResultCommand(args) {
   if (!args.admissionRecord || !args.requirementRecord || !args.outputContract || !args.scoringInputFreezeManifest) throw new Error("score-evaluator-result requires --admission-record, --requirement-record, --output-contract, and --scoring-input-freeze");
   const result = scoreEvaluatorResult({ ...evaluatorBoundaryOptions(args), outputPath: args.output });
   console.log(`Published raw engineering result ${result.artifact.engineering_result_id} with status ${result.artifact.scoring_status}`);
+}
+
+function engineeringResultSetOptions(args) {
+  if (!args.normalizedResults || !args.snapshotDigest || !args.engineeringResults || !args.engineeringResultSourceManifest || !args.adapter) {
+    throw new Error("engineering result-set commands require --normalized-results, --snapshot-digest, --engineering-results, --engineering-result-source-manifest, and --adapter");
+  }
+  return {
+    root: ROOT,
+    normalizedResultsPath: args.normalizedResults,
+    sourceSnapshotDigest: args.snapshotDigest,
+    engineeringResultsPath: args.engineeringResults,
+    sourceManifestPath: args.engineeringResultSourceManifest,
+    sourceManifestSourceDigest: args.engineeringResultSourceManifestSourceDigest,
+    adapter: args.adapter,
+    materializedPath: args.materialized,
+    selectionState: args.stateDir,
+    runDir: args.runDir,
+  };
+}
+
+function collectEngineeringResultsCommand(args) {
+  if (!args.output) throw new Error("collect-engineering-results requires --output");
+  const result = collectEngineeringResults({ ...engineeringResultSetOptions(args), outputPath: args.output });
+  console.log(`Published complete ${result.artifact.adapter_track} engineering result set ${result.artifact.result_set_id} with ${result.artifact.inventory.length} raw results`);
+}
+
+function verifyEngineeringResultSetCommand(args) {
+  if (!args.input) throw new Error("verify-engineering-result-set requires --input");
+  const result = verifyEngineeringResultSet({ ...engineeringResultSetOptions(args), inputPath: args.input });
+  console.log(`Verified complete ${result.artifact.adapter_track} engineering result set ${result.artifact.result_set_id} with ${result.artifact.inventory.length} raw results`);
 }
 
 function recoverCase(args) {
@@ -1008,6 +1044,8 @@ try {
   else if (args.command === "verify-evaluator-result") verifyEvaluatorResultCommand(args);
   else if (args.command === "verify-evaluator-boundary") verifyEvaluatorBoundaryCommand(args);
   else if (args.command === "score-evaluator-result") scoreEvaluatorResultCommand(args);
+  else if (args.command === "collect-engineering-results") collectEngineeringResultsCommand(args);
+  else if (args.command === "verify-engineering-result-set") verifyEngineeringResultSetCommand(args);
   else if (args.command === "recover-case") recoverCase(args);
   else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);

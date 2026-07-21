@@ -253,7 +253,8 @@ function buildNormalizedResult(args) {
   };
 }
 
-function assertNormalizedResult(root, record) {
+export function validateNormalizedPortfolioResult(record, { root } = {}) {
+  if (!root) throw new Error("normalized result validation requires the repository root");
   const { normalized_result_id: id, normalized_result_digest: digest, ...base } = record;
   const expectedDigest = canonicalDigest(base);
   const expectedId = `normalized-${canonicalDigest({
@@ -264,6 +265,7 @@ function assertNormalizedResult(root, record) {
   }).slice("sha256:".length, "sha256:".length + 32)}`;
   if (digest !== expectedDigest || id !== expectedId) throw new Error(`${base.lineage.case_id}/${base.lineage.attempt} normalized result identity is invalid`);
   assertBenchmarkSchemaInstance(record, { schemaPath: resolve(root, NORMALIZED_RESULT_SCHEMA_PATH), label: `${base.lineage.case_id}/${base.lineage.attempt} normalized result` });
+  return record;
 }
 
 function countCases(cases, predicate) {
@@ -387,7 +389,7 @@ function buildNormalizedArtifacts({ root, inspection }) {
       if (!adapterIdentity) throw new Error(`${inspectedCase.entry.adapter_track} runtime identity is missing for committed normalized evidence`);
       for (const attempt of inspectedCase.attempts) {
         const record = buildNormalizedResult({ inspection, inspectedCase, attempt, adapterIdentity });
-        assertNormalizedResult(root, record);
+        validateNormalizedPortfolioResult(record, { root });
         const path = `adapters/${inspectedCase.entry.adapter_track}/cases/${inspectedCase.entry.case_id}/attempts/${attempt.attempt}.json`;
         const bytes = jsonBytes(record);
         files.set(path, bytes);
@@ -738,7 +740,7 @@ function assertSelfContainedGeneration({ root, collection, generation, requested
     } catch {
       throw new Error(`normalized result is invalid JSON at ${item.path}`);
     }
-    assertNormalizedResult(root, record);
+    validateNormalizedPortfolioResult(record, { root });
     records.push(record);
     recordsByPath.set(item.path, record);
   }

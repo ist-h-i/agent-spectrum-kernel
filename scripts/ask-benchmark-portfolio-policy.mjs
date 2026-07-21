@@ -57,6 +57,8 @@ const CLASSIFICATION_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-classifi
 const EVALUATOR_REFERENCE_SCHEMA_PATH = "benchmarks/schemas/evaluator-reference.schema.json";
 const EVALUATOR_RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result-envelope.schema.json";
 const ENGINEERING_RESULT_SCHEMA_PATH = "benchmarks/schemas/portfolio-engineering-result.schema.json";
+const ENGINEERING_RESULT_SOURCE_MANIFEST_SCHEMA_PATH = "benchmarks/schemas/portfolio-engineering-result-source-manifest.schema.json";
+const ENGINEERING_RESULT_SET_SCHEMA_PATH = "benchmarks/schemas/portfolio-engineering-result-set.schema.json";
 
 const LIFECYCLE_STATES = Object.freeze([
   "design_pending",
@@ -1460,7 +1462,7 @@ export function validatePortfolioPolicyArtifacts({
     [lineagePolicy, "portfolio lineage policy", resolve(root, LINEAGE_SCHEMA_PATH), lineagePolicyPath],
   ];
   const errors = [];
-  for (const schemaPath of [REQUIREMENT_RECORD_SCHEMA_PATH, OUTPUT_CONTRACT_SCHEMA_PATH, LINEAGE_RECORD_SCHEMA_PATH, CLASSIFICATION_RECORD_SCHEMA_PATH, EVALUATOR_REFERENCE_SCHEMA_PATH, EVALUATOR_RESULT_SCHEMA_PATH, ENGINEERING_RESULT_SCHEMA_PATH, FINAL_ADMISSION_RECORD_SCHEMA_PATH, SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH]) {
+  for (const schemaPath of [REQUIREMENT_RECORD_SCHEMA_PATH, OUTPUT_CONTRACT_SCHEMA_PATH, LINEAGE_RECORD_SCHEMA_PATH, CLASSIFICATION_RECORD_SCHEMA_PATH, EVALUATOR_REFERENCE_SCHEMA_PATH, EVALUATOR_RESULT_SCHEMA_PATH, ENGINEERING_RESULT_SCHEMA_PATH, ENGINEERING_RESULT_SOURCE_MANIFEST_SCHEMA_PATH, ENGINEERING_RESULT_SET_SCHEMA_PATH, FINAL_ADMISSION_RECORD_SCHEMA_PATH, SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH]) {
     if (!existsSync(resolve(root, schemaPath))) errors.push(`required authoritative source schema is missing: ${schemaPath}`);
   }
   for (const [artifact, label, schemaPath, path] of artifacts) {

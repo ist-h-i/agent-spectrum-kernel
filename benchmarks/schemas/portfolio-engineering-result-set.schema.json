@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK complete raw engineering result set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "source_manifest_raw_byte_digest",
+    "source_manifest_digest",
+    "normalized_generation_id",
+    "normalized_manifest_digest",
+    "source_snapshot_digest",
+    "plan_id",
+    "plan_digest",
+    "run_instance_id",
+    "adapter_track",
+    "completeness",
+    "structural_counts",
+    "inventory",
+    "boundaries",
+    "privacy",
+    "result_set_id",
+    "result_set_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-engineering-result-set.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio_engineering_result_set" },
+    "source_manifest_raw_byte_digest": { "$ref": "#/$defs/digest" },
+    "source_manifest_digest": { "$ref": "#/$defs/digest" },
+    "normalized_generation_id": { "type": "string", "pattern": "^snapshot-[a-f0-9]{64}$" },
+    "normalized_manifest_digest": { "$ref": "#/$defs/digest" },
+    "source_snapshot_digest": { "$ref": "#/$defs/digest" },
+    "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
+    "plan_digest": { "$ref": "#/$defs/digest" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
+    "adapter_track": { "enum": ["codex", "claude"] },
+    "completeness": { "$ref": "#/$defs/completeness" },
+    "structural_counts": { "$ref": "#/$defs/structuralCounts" },
+    "inventory": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/inventoryEntry" }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "aggregate_result",
+        "statistics_calculated",
+        "comparison_result",
+        "mechanism_scorecard_calculated",
+        "adapter_results_pooled",
+        "measured_execution_authorized",
+        "issue_198_stage_0_authorized"
+      ],
+      "properties": {
+        "aggregate_result": { "const": false },
+        "statistics_calculated": { "const": false },
+        "comparison_result": { "const": false },
+        "mechanism_scorecard_calculated": { "const": false },
+        "adapter_results_pooled": { "const": false },
+        "measured_execution_authorized": { "const": false },
+        "issue_198_stage_0_authorized": { "const": false }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["private_evaluator_content_stored", "private_path_stored"],
+      "properties": {
+        "private_evaluator_content_stored": { "const": false },
+        "private_path_stored": { "const": false }
+      }
+    },
+    "result_set_id": { "type": "string", "pattern": "^engineering-result-set-[a-f0-9]{32}$" },
+    "result_set_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "count": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "portablePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000]+$"
+    },
+    "normalizedAttemptId": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}/[0-9]{4}$" },
+    "completeness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_result_count",
+        "collected_result_count",
+        "expected_normalized_attempt_ids",
+        "collected_normalized_attempt_ids",
+        "expected_case_ids",
+        "collected_case_ids",
+        "completeness_status"
+      ],
+      "properties": {
+        "expected_result_count": { "$ref": "#/$defs/count" },
+        "collected_result_count": { "$ref": "#/$defs/count" },
+        "expected_normalized_attempt_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/normalizedAttemptId" } },
+        "collected_normalized_attempt_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/normalizedAttemptId" } },
+        "expected_case_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" } },
+        "collected_case_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" } },
+        "completeness_status": { "const": "complete" }
+      }
+    },
+    "namedCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "count"],
+      "properties": {
+        "name": { "$ref": "#/$defs/token" },
+        "count": { "$ref": "#/$defs/count" }
+      }
+    },
+    "structuralCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by_condition", "by_repetition", "by_scoring_status", "by_normalized_outcome"],
+      "properties": {
+        "by_condition": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "$ref": "#/$defs/namedCount" } },
+        "by_repetition": { "type": "array", "minItems": 3, "maxItems": 5, "items": { "$ref": "#/$defs/namedCount" } },
+        "by_scoring_status": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/namedCount" } },
+        "by_normalized_outcome": { "type": "array", "minItems": 5, "maxItems": 5, "items": { "$ref": "#/$defs/namedCount" } }
+      }
+    },
+    "inventoryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "raw_byte_digest",
+        "bytes",
+        "engineering_result_id",
+        "engineering_result_digest",
+        "normalized_result_id",
+        "normalized_result_digest",
+        "normalized_outcome",
+        "evaluation_id",
+        "evaluation_digest",
+        "evaluation_status",
+        "scoring_status",
+        "scoring_reason",
+        "fixture_id",
+        "suite",
+        "task_class",
+        "case_id",
+        "attempt",
+        "condition",
+        "repetition",
+        "blocker_gate_status",
+        "safety_blocker_status",
+        "scoring_input_freeze_manifest_digest",
+        "requirement_record_digest",
+        "scoring_policy_digest"
+      ],
+      "properties": {
+        "path": { "$ref": "#/$defs/portablePath" },
+        "raw_byte_digest": { "$ref": "#/$defs/digest" },
+        "bytes": { "type": "integer", "minimum": 1, "maximum": 16777216 },
+        "engineering_result_id": { "type": "string", "pattern": "^engineering-result-[a-f0-9]{32}$" },
+        "engineering_result_digest": { "$ref": "#/$defs/digest" },
+        "normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },
+        "normalized_result_digest": { "$ref": "#/$defs/digest" },
+        "normalized_outcome": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] },
+        "evaluation_id": { "type": "string", "pattern": "^evaluation-[a-f0-9]{32}$" },
+        "evaluation_digest": { "$ref": "#/$defs/digest" },
+        "evaluation_status": { "enum": ["completed", "invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required"] },
+        "scoring_status": { "enum": ["complete", "not_scoring_ready"] },
+        "scoring_reason": {
+          "enum": [
+            "completed_evaluation_scoring_ready",
+            "evaluation_invalid_input",
+            "evaluator_unavailable",
+            "evaluator_failed",
+            "manual_review_required",
+            "normalized_execution_failed",
+            "normalized_execution_unavailable",
+            "normalized_execution_interrupted",
+            "normalized_execution_invalid"
+          ]
+        },
+        "fixture_id": { "$ref": "#/$defs/token" },
+        "suite": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"] },
+        "task_class": { "$ref": "#/$defs/token" },
+        "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+        "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+        "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+        "repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "blocker_gate_status": { "enum": ["pass", "fail", "not_applicable", "not_scoring_ready"] },
+        "safety_blocker_status": { "enum": ["pass", "fail", "unknown", "not_scoring_ready"] },
+        "scoring_input_freeze_manifest_digest": { "$ref": "#/$defs/digest" },
+        "requirement_record_digest": { "$ref": "#/$defs/digest" },
+        "scoring_policy_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}
