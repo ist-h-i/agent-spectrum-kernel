@@ -31,20 +31,7 @@ const FIXTURE_PATHS = [
   "benchmarks/portfolio-design-admission-manifest.json",
   "benchmarks/portfolio-design-review-package.json",
   "benchmarks/portfolio-design-admission-records",
-  "benchmarks/schemas/portfolio-catalog.schema.json",
-  "benchmarks/schemas/portfolio-similarity.schema.json",
-  "benchmarks/schemas/portfolio-policy-manifest.schema.json",
-  "benchmarks/schemas/portfolio-admission-policy.schema.json",
-  "benchmarks/schemas/portfolio-scoring-policy.schema.json",
-  "benchmarks/schemas/portfolio-lineage-policy.schema.json",
-  "benchmarks/schemas/portfolio-requirement-record.schema.json",
-  "benchmarks/schemas/portfolio-output-contract.schema.json",
-  "benchmarks/schemas/portfolio-lineage-record.schema.json",
-  "benchmarks/schemas/portfolio-classification-record.schema.json",
-  "benchmarks/schemas/evaluator-reference.schema.json",
-  "benchmarks/schemas/portfolio-design-admission-manifest.schema.json",
-  "benchmarks/schemas/portfolio-design-admission-record.schema.json",
-  "benchmarks/schemas/portfolio-design-review-package.schema.json",
+  "benchmarks/schemas",
 ];
 
 function readJson(fixtureRoot, path) {
