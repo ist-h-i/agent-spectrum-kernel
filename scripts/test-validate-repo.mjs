@@ -260,28 +260,10 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/portfolio-design-admission-records",
     "benchmarks/portfolio-design-independent-review.json",
     "benchmarks/portfolio-design-reviewed-state.json",
-    "benchmarks/schemas/portfolio-catalog.schema.json",
-    "benchmarks/schemas/portfolio-similarity.schema.json",
-    "benchmarks/schemas/portfolio-policy-manifest.schema.json",
-    "benchmarks/schemas/portfolio-admission-policy.schema.json",
-    "benchmarks/schemas/portfolio-scoring-policy.schema.json",
-    "benchmarks/schemas/portfolio-lineage-policy.schema.json",
-    "benchmarks/schemas/portfolio-requirement-record.schema.json",
-    "benchmarks/schemas/portfolio-final-admission-record.schema.json",
-    "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
-    "benchmarks/schemas/portfolio-output-contract.schema.json",
-    "benchmarks/schemas/portfolio-lineage-record.schema.json",
-    "benchmarks/schemas/portfolio-classification-record.schema.json",
-    "benchmarks/schemas/evaluator-reference.schema.json",
-    "benchmarks/schemas/evaluator-result-envelope.schema.json",
-    "benchmarks/schemas/portfolio-design-admission-manifest.schema.json",
-    "benchmarks/schemas/portfolio-design-admission-record.schema.json",
-    "benchmarks/schemas/portfolio-design-review-package.schema.json",
-    "benchmarks/schemas/portfolio-design-independent-review.schema.json",
-    "benchmarks/schemas/portfolio-design-reviewed-state.schema.json",
+    "benchmarks/schemas",
   ]) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    if (path === "benchmarks/portfolio-design-admission-records") cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
+    if (["benchmarks/portfolio-design-admission-records", "benchmarks/schemas"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
     else writeFileSync(resolve(root, path), readFileSync(resolve(repoRoot, path)));
   }
 
@@ -5845,6 +5827,14 @@ jobs:
   invalidPortfolioPolicy.manifest_digest = `sha256:${"f".repeat(64)}`;
   writeFileSync(invalidPortfolioPolicyPath, `${JSON.stringify(invalidPortfolioPolicy, null, 2)}\n`);
   assertFail("invalid portfolio policy", invalidPortfolioPolicyRoot, "policy manifest digest does not match");
+
+  const missingEngineeringResultSchemaRoot = cloneFixture("missing-portfolio-engineering-result-schema");
+  rmSync(resolve(missingEngineeringResultSchemaRoot, "benchmarks/schemas/portfolio-engineering-result.schema.json"));
+  assertFail(
+    "missing portfolio engineering result Schema",
+    missingEngineeringResultSchemaRoot,
+    "required authoritative source schema is missing: benchmarks/schemas/portfolio-engineering-result.schema.json",
+  );
 
   const invalidPortfolioDesignRoot = cloneFixture("invalid-portfolio-design-admission");
   const invalidPortfolioDesignPath = resolve(invalidPortfolioDesignRoot, "benchmarks/portfolio-design-review-package.json");

@@ -519,8 +519,16 @@
       "scoring_contract_validator_path": "scripts/ask-benchmark-scoring-contract.mjs",
       "scoring_contract_validator_file_sha256": "7447c6051977041abfaa20c937352b8ae1cc14c2a1b36818bf6fd9bdfe831ae0",
       "scoring_authority_validator_path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-      "scoring_authority_validator_file_sha256": "8808cb09a189c2532fda4d5726477019074caca18da1d2ef6f604aee4d4d5443",
-      "scoring_implemented": false,
+      "scoring_authority_validator_file_sha256": "8b0a3c9f53eb63aaaa943e864073f73411cd1bbac69efa5398713475cd8252ce",
+      "engineering_result_schema_path": "benchmarks/schemas/portfolio-engineering-result.schema.json",
+      "engineering_result_schema_file_sha256": "e665aedcf47be91db9f153180b263049e7b9522acd1a5f46e85a34ab2884725d",
+      "scoring_implementation_path": "scripts/ask-benchmark-portfolio-score.mjs",
+      "scoring_implementation_file_sha256": "4729652faff49bf9751d6246ee71399bc725e57f019cfbd936af7fb8c3fe1571",
+      "scoring_test_path": "scripts/test-ask-benchmark-portfolio-score.mjs",
+      "scoring_test_file_sha256": "1fa3c93f6b7e69034a6337d0e19f17efc2c13632570a7270f8feb6a41d9285af",
+      "scoring_issue": 197,
+      "scoring_slice": "single_result_raw_engineering_result",
+      "scoring_implemented": true,
       "aggregate_reporting_implemented": false
     },
     "portfolio_design_admission": {

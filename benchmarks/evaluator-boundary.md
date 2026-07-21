@@ -2,7 +2,7 @@
 
 Status: Issue #204 boundary checkpoint plus Issue #205 Checkpoint B3 scoring-input authority closure; both Issues remain open
 
-This checkpoint defines the answer-free exchange boundary between normalized execution evidence and a private evaluator package. It does not create the 24 evaluator packages, admit clean fixtures, define scoring semantics, execute an evaluator, or authorize measured execution.
+This checkpoint defines the answer-free exchange boundary between normalized execution evidence and a private evaluator package. The adjacent Issue #197 raw-scoring slice consumes this verified boundary but does not create the 24 evaluator packages, admit clean fixtures, execute an evaluator, aggregate results, or authorize measured execution.
 
 ## Storage boundary
 
@@ -93,10 +93,13 @@ The focused regression uses synthetic normalized evidence and a synthetic privat
 
 ```bash
 node scripts/test-ask-benchmark-evaluator-boundary.mjs
+node scripts/test-ask-benchmark-portfolio-score.mjs
 ```
+
+The second command exercises `score-evaluator-result`, which reuses `verifyEvaluatorResult()` and writes one Schema-valid raw engineering result. It does not re-read the evaluator or normalized JSON after verification. The derived artifact keeps blocker and safety gates separate from the normalized requirement score and retains false positives, correctness, scope, mechanism, and overhead observations in native typed form. It performs no aggregate, comparison, repetition, severity conversion, penalty, mechanism credit, or practice-frequency weighting.
 
 ## Responsibility and stop boundary
 
-This checkpoint does not complete Issue #204 or #205. Issues #206 through #209 still own clean fixture and private evaluator package creation. Issue #197 owns deterministic joining and scoring after this closed input contract; it must not invent missing requirement semantics. Issue #198 owns preregistration, calibration, pilot, measured execution, human evaluation, interpretation, and product recommendations.
+This checkpoint does not complete Issue #204 or #205. Issues #206 through #209 still own clean fixture and private evaluator package creation. The current Issue #197 slice deterministically joins and scores one verified result without inventing missing requirement semantics; later Issue #197 slices still own aggregation. Issue #198 owns preregistration, calibration, pilot, measured execution, human evaluation, interpretation, and product recommendations.
 
-#198 Stage 0 remains blocked. No evaluator execution, score, measured run, or product-value conclusion is authorized by this boundary.
+#198 Stage 0 remains blocked. No evaluator execution, measured-result score, measured run, aggregate, or product-value conclusion is authorized by this boundary.

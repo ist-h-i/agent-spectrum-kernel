@@ -835,7 +835,7 @@ export function verifyEvaluatorResult({
     normalizedResult: normalized,
     evaluatorResult: result,
   });
-  return { bundle, normalized, result, verified, scoringReady: scoring.scoringReady };
+  return { bundle, normalized, result, verified, scoringInputs, scoringReady: scoring.scoringReady };
 }
 
 export function assertNoPrivateBundlePublication(publicArtifactRoot, bundle) {

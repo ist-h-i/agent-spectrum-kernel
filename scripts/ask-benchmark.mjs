@@ -26,6 +26,7 @@ import { sealAdaptiveSelection, verifyAdaptiveSelection } from "./ask-benchmark-
 import { executePortfolio, recoverPortfolioCase, verifyPortfolioExecution } from "./ask-benchmark-execution.mjs";
 import { assertCurrentPortfolioRunInput, normalizePortfolioExecution, verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { verifyEvaluatorBoundary, verifyEvaluatorResult, verifyPrivateEvaluatorBundle } from "./ask-benchmark-evaluator-boundary.mjs";
+import { scoreEvaluatorResult } from "./ask-benchmark-portfolio-score.mjs";
 import {
   DEFAULT_PORTFOLIO_CATALOG_PATH,
   DEFAULT_PORTFOLIO_SIMILARITY_PATH,
@@ -142,6 +143,7 @@ Commands:
   verify-evaluator-bundle --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> [--public-artifact-root <staged-public-artifact-directory>]
   verify-evaluator-result --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> [--catalog <catalog.json>] [--policy-manifest <manifest.json>] [--scoring-policy <policy.json>] [--public-artifact-root <staged-public-artifact-directory>]
   verify-evaluator-boundary --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> --public-artifact-root <staged-public-artifact-directory>
+  score-evaluator-result --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> --output <engineering-result.json> [--public-artifact-root <staged-public-artifact-directory>]
   recover-case --run-dir <run-directory> --case-id <case-id> --claim-id <claim-id> --reason <reason>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
@@ -526,6 +528,13 @@ function verifyEvaluatorBoundaryCommand(args) {
   if (!args.publicArtifactRoot) throw new Error("verify-evaluator-boundary requires --public-artifact-root for full boundary verification");
   const result = verifyEvaluatorBoundary(evaluatorBoundaryOptions(args));
   console.log(`Full evaluator isolation boundary verified for ${result.result.evaluation_id}`);
+}
+
+function scoreEvaluatorResultCommand(args) {
+  if (!args.evaluatorResult || !args.output) throw new Error("score-evaluator-result requires --result and --output");
+  if (!args.admissionRecord || !args.requirementRecord || !args.outputContract || !args.scoringInputFreezeManifest) throw new Error("score-evaluator-result requires --admission-record, --requirement-record, --output-contract, and --scoring-input-freeze");
+  const result = scoreEvaluatorResult({ ...evaluatorBoundaryOptions(args), outputPath: args.output });
+  console.log(`Published raw engineering result ${result.artifact.engineering_result_id} with status ${result.artifact.scoring_status}`);
 }
 
 function recoverCase(args) {
@@ -998,6 +1007,7 @@ try {
   else if (args.command === "verify-evaluator-bundle") verifyEvaluatorBundleCommand(args);
   else if (args.command === "verify-evaluator-result") verifyEvaluatorResultCommand(args);
   else if (args.command === "verify-evaluator-boundary") verifyEvaluatorBoundaryCommand(args);
+  else if (args.command === "score-evaluator-result") scoreEvaluatorResultCommand(args);
   else if (args.command === "recover-case") recoverCase(args);
   else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);
