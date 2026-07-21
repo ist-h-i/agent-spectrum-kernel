@@ -12,6 +12,7 @@ import { codexCompactProfileCanonicalPaths } from "./codex-runtime-profile.mjs";
 import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { validatePortfolioDesignAdmissionArtifacts } from "./ask-benchmark-design-admission.mjs";
+import { validatePortfolioDesignIndependentReview, validatePortfolioDesignReviewedState } from "./ask-benchmark-design-review.mjs";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REQUIRED_SKILL_SIGNALS = [
@@ -613,6 +614,31 @@ function validateAdaptivePortfolioDesignAdmission(root, errors) {
       recordCount: 0,
       pendingIndependentReviewCount: 0,
       approvedReviewCount: 0,
+    };
+  }
+}
+
+function validateAdaptivePortfolioDesignReview(root, errors) {
+  try {
+    const review = validatePortfolioDesignIndependentReview({ root });
+    const state = validatePortfolioDesignReviewedState({ root });
+    return { valid: true, ...review, ...state };
+  } catch (error) {
+    fail(errors, "portfolio design review", error.message);
+    return {
+      valid: false,
+      reviewRevision: "unknown",
+      reviewedHeadSha: "unknown",
+      reviewerIdentity: "unknown",
+      reviewerClass: "unknown",
+      humanReview: "unknown",
+      reviewedFixtureCount: 0,
+      passedPortfolioDimensionCount: 0,
+      reviewRecordDigest: "unknown",
+      projectedState: "unknown",
+      finalAdmissionImplied: "unknown",
+      implementationAuthorized: "unknown",
+      projectionDigest: "unknown",
     };
   }
 }
@@ -3827,7 +3853,7 @@ function validateAdapterGovernance(root, checks, errors) {
   }
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -3877,6 +3903,21 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     `- approved or rejected reviews generated: ${portfolioDesignAdmissionChecks.approvedReviewCount}`,
     `- design manifest digest: ${portfolioDesignAdmissionChecks.manifestDigest}`,
     `- design review package digest: ${portfolioDesignAdmissionChecks.reviewPackageDigest}`,
+    "",
+    "## Adaptive ASK portfolio independent design review",
+    "",
+    `- independent review and reviewed-state validation: ${portfolioDesignReviewChecks.valid ? "ok" : "invalid"}`,
+    `- review revision: ${portfolioDesignReviewChecks.reviewRevision}`,
+    `- reviewed HEAD: ${portfolioDesignReviewChecks.reviewedHeadSha}`,
+    `- reviewer identity / class: ${portfolioDesignReviewChecks.reviewerIdentity} / ${portfolioDesignReviewChecks.reviewerClass}`,
+    `- human review: ${portfolioDesignReviewChecks.humanReview}`,
+    `- reviewed fixtures: ${portfolioDesignReviewChecks.reviewedFixtureCount}`,
+    `- passed portfolio dimensions: ${portfolioDesignReviewChecks.passedPortfolioDimensionCount}`,
+    `- projected state: ${portfolioDesignReviewChecks.projectedState}`,
+    `- final admission implied: ${portfolioDesignReviewChecks.finalAdmissionImplied}`,
+    `- implementation authorized: ${portfolioDesignReviewChecks.implementationAuthorized}`,
+    `- independent review digest: ${portfolioDesignReviewChecks.reviewRecordDigest}`,
+    `- reviewed-state projection digest: ${portfolioDesignReviewChecks.projectionDigest}`,
     "",
     "## Manifest / directory consistency",
     "",
@@ -4202,10 +4243,11 @@ export function validateRepository(options) {
   const portfolioCatalogChecks = validateAdaptivePortfolioCatalog(root, errors);
   const portfolioPolicyChecks = validateAdaptivePortfolioPolicy(root, errors);
   const portfolioDesignAdmissionChecks = validateAdaptivePortfolioDesignAdmission(root, errors);
+  const portfolioDesignReviewChecks = validateAdaptivePortfolioDesignReview(root, errors);
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

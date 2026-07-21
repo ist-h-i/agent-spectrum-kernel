@@ -258,6 +258,8 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/portfolio-design-admission-manifest.json",
     "benchmarks/portfolio-design-review-package.json",
     "benchmarks/portfolio-design-admission-records",
+    "benchmarks/portfolio-design-independent-review.json",
+    "benchmarks/portfolio-design-reviewed-state.json",
     "benchmarks/schemas/portfolio-catalog.schema.json",
     "benchmarks/schemas/portfolio-similarity.schema.json",
     "benchmarks/schemas/portfolio-policy-manifest.schema.json",
@@ -272,6 +274,8 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/schemas/portfolio-design-admission-manifest.schema.json",
     "benchmarks/schemas/portfolio-design-admission-record.schema.json",
     "benchmarks/schemas/portfolio-design-review-package.schema.json",
+    "benchmarks/schemas/portfolio-design-independent-review.schema.json",
+    "benchmarks/schemas/portfolio-design-reviewed-state.schema.json",
   ]) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
     if (path === "benchmarks/portfolio-design-admission-records") cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
@@ -5845,6 +5849,13 @@ jobs:
   invalidPortfolioDesign.records[0].reviewer_status = "approved";
   writeFileSync(invalidPortfolioDesignPath, `${JSON.stringify(invalidPortfolioDesign, null, 2)}\n`);
   assertFail("invalid portfolio design admission", invalidPortfolioDesignRoot, "pending_independent_review");
+
+  const invalidPortfolioDesignReviewRoot = cloneFixture("invalid-portfolio-design-review");
+  const invalidPortfolioDesignReviewPath = resolve(invalidPortfolioDesignReviewRoot, "benchmarks/portfolio-design-independent-review.json");
+  const invalidPortfolioDesignReview = JSON.parse(readFileSync(invalidPortfolioDesignReviewPath, "utf8"));
+  invalidPortfolioDesignReview.human_review = true;
+  writeFileSync(invalidPortfolioDesignReviewPath, `${JSON.stringify(invalidPortfolioDesignReview, null, 2)}\n`);
+  assertFail("invalid portfolio design review", invalidPortfolioDesignReviewRoot, "human_review");
 
   const stalePhraseRoot = cloneFixture("stale-phrase");
   writeFileSync(resolve(stalePhraseRoot, "docs/ok.md"), "# OK\n\nThis repository has 25 skills.\n");

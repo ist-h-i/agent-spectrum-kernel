@@ -40,6 +40,7 @@ run(["validate", "--config", advancedConfig]);
 run(["validate-portfolio-catalog", "--catalog", resolve(root, "benchmarks/portfolio-catalog.json"), "--similarity", resolve(root, "benchmarks/portfolio-similarity.json")]);
 run(["validate-portfolio-policy", "--policy-manifest", resolve(root, "benchmarks/portfolio-policy-manifest.json")]);
 run(["validate-portfolio-design-admission", "--design-admission-manifest", resolve(root, "benchmarks/portfolio-design-admission-manifest.json"), "--design-review-package", resolve(root, "benchmarks/portfolio-design-review-package.json")]);
+run(["validate-portfolio-design-review", "--independent-design-review", resolve(root, "benchmarks/portfolio-design-independent-review.json"), "--design-reviewed-state", resolve(root, "benchmarks/portfolio-design-reviewed-state.json")]);
 const frozenCheckpointC = JSON.parse(readFileSync(checkpointCConfig, "utf8"));
 const currentRuntimeBundle = resolve(root, frozenCheckpointC.attribution.adapter.runtime_bundle_path);
 assert.notEqual(

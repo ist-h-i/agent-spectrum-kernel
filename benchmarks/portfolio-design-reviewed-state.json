@@ -1,0 +1,152 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-design-reviewed-state.schema.json",
+  "program": "adaptive_ask_portfolio",
+  "projection_revision": "issue-205-checkpoint-b2b-r1",
+  "source_state": "design_pending",
+  "projected_state": "design_reviewed",
+  "source_design_manifest": {
+    "path": "benchmarks/portfolio-design-admission-manifest.json",
+    "digest": "sha256:42a1d0be4363c55ee0b433e59591e415e4008b24d4f03dc6c2dae5642b4c2d16"
+  },
+  "source_pending_review_package": {
+    "path": "benchmarks/portfolio-design-review-package.json",
+    "digest": "sha256:964bc599530b730af7e9a2c5f5179ab7810f645518ce8b60cbbfc7d18c593ca4"
+  },
+  "independent_review": {
+    "path": "benchmarks/portfolio-design-independent-review.json",
+    "digest": "sha256:27b8cba8aec18a232d1944187173e3629e35abfe9a943596d3fffc4263314ef9"
+  },
+  "fixture_ids": [
+    "hi-authorization-exception",
+    "hi-external-action-approval",
+    "hi-financial-state-integrity",
+    "hi-versioned-migration-safety",
+    "mn-build-option-update",
+    "mn-client-compatibility-fix",
+    "mn-doc-config-correction",
+    "mn-focused-regression-test",
+    "mn-frontend-default-fix",
+    "mn-schema-field-alignment",
+    "mp-accessibility-interaction-review",
+    "mp-ci-evidence-gap",
+    "mp-data-migration-handoff",
+    "mp-frontend-state-review",
+    "mp-iac-rollback-design",
+    "mp-performance-investigation",
+    "pf-api-pagination-behavior",
+    "pf-ci-cache-flake",
+    "pf-data-schema-evolution",
+    "pf-frontend-async-state",
+    "pf-library-compat-upgrade",
+    "pf-observability-redaction",
+    "pf-performance-regression",
+    "pf-review-error-contract"
+  ],
+  "fixture_reviews": [
+    {
+      "fixture_id": "hi-authorization-exception",
+      "review_item_digest": "sha256:8309fae3d38511c087940f5ff898cb486a1de57e6188c0897a64618546d2074e"
+    },
+    {
+      "fixture_id": "hi-external-action-approval",
+      "review_item_digest": "sha256:e84fa457ae45ade1798bd2541805d4fcc7c448649749740df5f70254b06ee590"
+    },
+    {
+      "fixture_id": "hi-financial-state-integrity",
+      "review_item_digest": "sha256:8c7b853b5e9505ee4759b656ec9483bb3913ee8ac500dd30a651d3597179120b"
+    },
+    {
+      "fixture_id": "hi-versioned-migration-safety",
+      "review_item_digest": "sha256:b6f233bdf6df3c8dbd9d7038c8c1af85789ffb7310a9f48256c668d0be97e2d1"
+    },
+    {
+      "fixture_id": "mn-build-option-update",
+      "review_item_digest": "sha256:e3e5d3894b0f96e5c7e3e6c415c0c9b6a3ad964890650d2c94662a02c659d7cc"
+    },
+    {
+      "fixture_id": "mn-client-compatibility-fix",
+      "review_item_digest": "sha256:82cd16be1c92b84adbfc6614f24a58a371903ec57bf82d93da3284ef42f418a2"
+    },
+    {
+      "fixture_id": "mn-doc-config-correction",
+      "review_item_digest": "sha256:392524ef3507cf4ea4c1b9553e4e01ac0f5deb70e1b965ceca29809b6eff63fd"
+    },
+    {
+      "fixture_id": "mn-focused-regression-test",
+      "review_item_digest": "sha256:ca1ceee4baf395f66a48ae458e0e9ba586dee14b9cb55e09316e8742f98071a9"
+    },
+    {
+      "fixture_id": "mn-frontend-default-fix",
+      "review_item_digest": "sha256:c94c7c92febd5b21ee5ae033191ef739ae325251e45cd07c023b7971dd70d934"
+    },
+    {
+      "fixture_id": "mn-schema-field-alignment",
+      "review_item_digest": "sha256:98e527022223f90315561905f65645a32d6b9dd9a9aa7d0fe62658d8fc88672b"
+    },
+    {
+      "fixture_id": "mp-accessibility-interaction-review",
+      "review_item_digest": "sha256:0614f4c194200e52c6062ff674987a06ddabf3eaa411a6e9e181760eb0b66db0"
+    },
+    {
+      "fixture_id": "mp-ci-evidence-gap",
+      "review_item_digest": "sha256:6f337a970d5baea57a3b2a0e7a6401475591cae29bcee0dfae3a13dd7bc58fb0"
+    },
+    {
+      "fixture_id": "mp-data-migration-handoff",
+      "review_item_digest": "sha256:7841a0012d6d1a3bbfbe4d536415b948cac533cc818002f16e92433c89c0f69d"
+    },
+    {
+      "fixture_id": "mp-frontend-state-review",
+      "review_item_digest": "sha256:7d25e4c9827a3fdb08d9d6e9eb885227c2577413caa513626ccb7cba0dd99e34"
+    },
+    {
+      "fixture_id": "mp-iac-rollback-design",
+      "review_item_digest": "sha256:b4dd669504c1a0ab98b83654eaa1e9b6527fbcb19f4ef14d63b568d4544f3899"
+    },
+    {
+      "fixture_id": "mp-performance-investigation",
+      "review_item_digest": "sha256:c03a9e05f2a72a339213b8afb0ead19b5c7f5c494de5aab221b52f4fa7144c41"
+    },
+    {
+      "fixture_id": "pf-api-pagination-behavior",
+      "review_item_digest": "sha256:427f7d0b0eac0bf6065641e67291e4812d6b1d273c3c7d5bef7241a42d59935f"
+    },
+    {
+      "fixture_id": "pf-ci-cache-flake",
+      "review_item_digest": "sha256:2fd9bd2b49975b091313e71bcbd0db37940b3e55b7d5fe1e33d5c0e471430a30"
+    },
+    {
+      "fixture_id": "pf-data-schema-evolution",
+      "review_item_digest": "sha256:29ab8530427aee5a26612614763dc7c352a8a1837c497de27a2fe3bb688ad762"
+    },
+    {
+      "fixture_id": "pf-frontend-async-state",
+      "review_item_digest": "sha256:926cd8c63c41d1ad51f233f29678eb5d476960a54e14223c9f5f012d91e4174e"
+    },
+    {
+      "fixture_id": "pf-library-compat-upgrade",
+      "review_item_digest": "sha256:aa8517c95156f6cddbad180f8240519f13e01ac628be6c810ca70f399f76c04e"
+    },
+    {
+      "fixture_id": "pf-observability-redaction",
+      "review_item_digest": "sha256:9b47077978064ae4a782ce98b19aa6d4b57e626986e6f9bcae1383c5ecb1a2cd"
+    },
+    {
+      "fixture_id": "pf-performance-regression",
+      "review_item_digest": "sha256:d3c8309f2eb5cc2254f3e98a0b6a5514961561b48607784e780f9fafa13a0375"
+    },
+    {
+      "fixture_id": "pf-review-error-contract",
+      "review_item_digest": "sha256:69b685fd57230f3f31bdaa1e789f0a119154568d0494a554a5cb81fd347b753b"
+    }
+  ],
+  "all_records_approved": true,
+  "final_admission_implied": false,
+  "implementation_authorized": false,
+  "actual_requirement_evidence_verified": false,
+  "actual_output_contract_evidence_verified": false,
+  "actual_evaluator_evidence_verified": false,
+  "actual_lineage_evidence_verified": false,
+  "projection_digest": "sha256:c95a40ab07e96bbd71a38c809a0f9657df64446462964f2c1ff69ab33299b388"
+}

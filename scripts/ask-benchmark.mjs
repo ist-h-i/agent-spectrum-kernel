@@ -43,6 +43,12 @@ import {
   DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH,
   validatePortfolioDesignAdmissionArtifacts,
 } from "./ask-benchmark-design-admission.mjs";
+import {
+  DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH,
+  DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH,
+  validatePortfolioDesignIndependentReview,
+  validatePortfolioDesignReviewedState,
+} from "./ask-benchmark-design-review.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_CONFIG_PATH = resolve(ROOT, "benchmarks/checkpoint-b.config.json");
@@ -67,7 +73,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, normalizedResults: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, normalizedResults: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -101,6 +107,8 @@ function parseArgs(argv) {
     else if (flag === "--lineage-policy") args.lineagePolicyPath = resolve(argv.shift());
     else if (flag === "--design-admission-manifest") args.designManifestPath = resolve(argv.shift());
     else if (flag === "--design-review-package") args.designReviewPackagePath = resolve(argv.shift());
+    else if (flag === "--independent-design-review") args.independentDesignReviewPath = resolve(argv.shift());
+    else if (flag === "--design-reviewed-state") args.designReviewedStatePath = resolve(argv.shift());
     else if (flag === "--config") args.configPath = resolve(argv.shift());
     else if (flag === "--help" || flag === "-h") args.command = "help";
     else throw new Error(`Unknown argument: ${flag}`);
@@ -116,6 +124,7 @@ Commands:
   validate-portfolio-catalog [--catalog <catalog.json>] [--similarity <similarity.json>]
   validate-portfolio-policy [--policy-manifest <manifest.json>] [--admission-policy <policy.json>] [--scoring-policy <policy.json>] [--lineage-policy <policy.json>]
   validate-portfolio-design-admission [--design-admission-manifest <manifest.json>] [--design-review-package <package.json>]
+  validate-portfolio-design-review [--independent-design-review <review.json>] [--design-reviewed-state <state.json>]
   plan --config <portfolio-config.json> --output <execution-plan.json> --seed <value>
   materialize --config <portfolio-config.json> --plan <execution-plan.json> --output <absent-or-empty-directory>
   seal-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id> --input <selection-input.json>
@@ -947,6 +956,8 @@ try {
     validateProtocol(args.configPath);
     validatePortfolioPolicyArtifacts();
     validatePortfolioDesignAdmissionArtifacts();
+    validatePortfolioDesignIndependentReview();
+    validatePortfolioDesignReviewedState();
     console.log("ASK benchmark protocol validation passed");
   } else if (args.command === "validate-portfolio-catalog") {
     const summary = validatePortfolioCatalogArtifacts({ catalogPath: args.catalogPath, similarityPath: args.similarityPath });
@@ -957,6 +968,10 @@ try {
   } else if (args.command === "validate-portfolio-design-admission") {
     const summary = validatePortfolioDesignAdmissionArtifacts({ designManifestPath: args.designManifestPath, designReviewPackagePath: args.designReviewPackagePath });
     console.log(`Adaptive ASK portfolio design admission validation passed: revision=${summary.revision}, policy=${summary.policyRevision}, records=${summary.recordCount}, pending_review=${summary.pendingIndependentReviewCount}`);
+  } else if (args.command === "validate-portfolio-design-review") {
+    const review = validatePortfolioDesignIndependentReview({ independentReviewPath: args.independentDesignReviewPath });
+    const state = validatePortfolioDesignReviewedState({ independentReviewPath: args.independentDesignReviewPath, reviewedStatePath: args.designReviewedStatePath });
+    console.log(`Adaptive ASK portfolio design review validation passed: revision=${review.reviewRevision}, reviewer=${review.reviewerIdentity}, fixtures=${review.reviewedFixtureCount}, state=${state.projectedState}`);
   } else if (args.command === "plan") planPortfolio(args);
   else if (args.command === "materialize") materialize(args);
   else if (args.command === "seal-selection") sealSelection(args);
