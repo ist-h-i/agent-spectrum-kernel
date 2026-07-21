@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio final admission record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fixture_id",
+    "catalog_digest",
+    "input_manifest_digest",
+    "evaluator_reference_schema",
+    "evaluator_bundle_id",
+    "evaluator_bundle_digest",
+    "evaluator_byte_count",
+    "evaluator_requirement_count",
+    "evidence_map_ids",
+    "mutation_set_ids",
+    "reviewer_record_id",
+    "admission_revision",
+    "admission_status",
+    "admission_digest"
+  ],
+  "properties": {
+    "fixture_id": { "$ref": "#/$defs/token" },
+    "catalog_digest": { "$ref": "#/$defs/digest" },
+    "input_manifest_digest": { "$ref": "#/$defs/digest" },
+    "evaluator_reference_schema": { "const": "benchmarks/schemas/evaluator-reference.schema.json" },
+    "evaluator_bundle_id": { "type": "string", "pattern": "^evaluator-[a-f0-9]{64}$" },
+    "evaluator_bundle_digest": { "$ref": "#/$defs/digest" },
+    "evaluator_byte_count": { "type": "integer", "minimum": 0 },
+    "evaluator_requirement_count": { "type": "integer", "minimum": 1 },
+    "evidence_map_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+    "mutation_set_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+    "reviewer_record_id": { "$ref": "#/$defs/token" },
+    "admission_revision": { "type": "integer", "minimum": 1 },
+    "admission_status": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected"] },
+    "admission_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9_-]*$" }
+  }
+}

@@ -73,7 +73,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, normalizedResults: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -97,6 +97,11 @@ function parseArgs(argv) {
     else if (flag === "--private-root") args.privateRoot = resolve(argv.shift());
     else if (flag === "--manifest" || flag === "--evaluator-manifest") args.evaluatorManifest = resolve(argv.shift());
     else if (flag === "--result" || flag === "--evaluator-result") args.evaluatorResult = resolve(argv.shift());
+    else if (flag === "--admission-record") args.admissionRecord = resolve(argv.shift());
+    else if (flag === "--requirement-record") args.requirementRecord = resolve(argv.shift());
+    else if (flag === "--output-contract") args.outputContract = resolve(argv.shift());
+    else if (flag === "--scoring-input-freeze") args.scoringInputFreezeManifest = resolve(argv.shift());
+    else if (flag === "--scoring-input-freeze-source-digest") args.scoringInputFreezeManifestSourceDigest = argv.shift();
     else if (flag === "--normalized-results") args.normalizedResults = resolve(argv.shift());
     else if (flag === "--public-artifact-root") args.publicArtifactRoot = resolve(argv.shift());
     else if (flag === "--catalog") args.catalogPath = resolve(argv.shift());
@@ -135,8 +140,8 @@ Commands:
   verify-normalized-results --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --output <normalized-results-directory>
   verify-normalized-results --output <normalized-results-directory> --snapshot-digest <sha256:digest>
   verify-evaluator-bundle --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> [--public-artifact-root <staged-public-artifact-directory>]
-  verify-evaluator-result --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> [--public-artifact-root <staged-public-artifact-directory>]
-  verify-evaluator-boundary --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> --public-artifact-root <staged-public-artifact-directory>
+  verify-evaluator-result --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> [--catalog <catalog.json>] [--policy-manifest <manifest.json>] [--scoring-policy <policy.json>] [--public-artifact-root <staged-public-artifact-directory>]
+  verify-evaluator-boundary --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> --public-artifact-root <staged-public-artifact-directory>
   recover-case --run-dir <run-directory> --case-id <case-id> --claim-id <claim-id> --reason <reason>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
@@ -481,6 +486,14 @@ function evaluatorBoundaryOptions(args) {
   }
   return {
     root: ROOT,
+    catalogPath: args.catalogPath,
+    policyManifestPath: args.policyManifestPath,
+    scoringPolicyPath: args.scoringPolicyPath,
+    admissionRecordPath: args.admissionRecord,
+    requirementRecordPath: args.requirementRecord,
+    outputContractPath: args.outputContract,
+    scoringInputFreezeManifestPath: args.scoringInputFreezeManifest,
+    scoringInputFreezeManifestSourceDigest: args.scoringInputFreezeManifestSourceDigest,
     referencePath: args.reference,
     privateRoot: args.privateRoot,
     manifestPath: args.evaluatorManifest,
@@ -501,6 +514,7 @@ function verifyEvaluatorBundleCommand(args) {
 
 function verifyEvaluatorResultCommand(args) {
   if (!args.evaluatorResult) throw new Error("verify-evaluator-result requires --result");
+  if (!args.admissionRecord || !args.requirementRecord || !args.outputContract || !args.scoringInputFreezeManifest) throw new Error("verify-evaluator-result requires --admission-record, --requirement-record, --output-contract, and --scoring-input-freeze");
   const result = verifyEvaluatorResult(evaluatorBoundaryOptions(args));
   const publicationStatus = args.publicArtifactRoot ? "including the staged publication scan" : "without staged public artifact publication verification";
   console.log(`Evaluator result lineage isolation ${result.result.evaluation_id} verified against normalized result ${result.result.normalized_result_id}, ${publicationStatus}`);
@@ -508,6 +522,7 @@ function verifyEvaluatorResultCommand(args) {
 
 function verifyEvaluatorBoundaryCommand(args) {
   if (!args.evaluatorResult) throw new Error("verify-evaluator-boundary requires --result");
+  if (!args.admissionRecord || !args.requirementRecord || !args.outputContract || !args.scoringInputFreezeManifest) throw new Error("verify-evaluator-boundary requires --admission-record, --requirement-record, --output-contract, and --scoring-input-freeze");
   if (!args.publicArtifactRoot) throw new Error("verify-evaluator-boundary requires --public-artifact-root for full boundary verification");
   const result = verifyEvaluatorBoundary(evaluatorBoundaryOptions(args));
   console.log(`Full evaluator isolation boundary verified for ${result.result.evaluation_id}`);

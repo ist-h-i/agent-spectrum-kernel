@@ -14,6 +14,7 @@ import {
   computeOutputContractDigest,
   computePortfolioPolicyDigest,
   computePortfolioPolicyManifestDigest,
+  computeRequirementDigest,
   computeRequirementRecordDigest,
   computeRequirementSetDigest,
   computeSelectorContextDigest,
@@ -62,6 +63,13 @@ function writeAuthoritativeJson(relativePath, value, { authorize = true } = {}) 
 function nextArtifactId(prefix, fixtureId) {
   artifactSequence += 1;
   return `${prefix}-${fixtureId}-${artifactSequence}`;
+}
+
+function sealRequirementRecord(requirementRecord) {
+  for (const requirement of requirementRecord.requirements) requirement.requirement_digest = computeRequirementDigest(requirement);
+  requirementRecord.requirement_set_digest = computeRequirementSetDigest(requirementRecord);
+  requirementRecord.requirement_record_digest = computeRequirementRecordDigest(requirementRecord);
+  return requirementRecord;
 }
 
 function cloneBase() {
@@ -132,14 +140,29 @@ function predicateEvidenceFor(fixtureId, { requirementKinds = ["weighted"], auth
     requirements: requirementKinds.map((requirementKind, index) => ({
       requirement_id: `requirement_${index + 1}`,
       requirement_kind: requirementKind,
-      agent_visible_evidence_map_ids: requirementKind === "informational" ? [] : [`evidence_${index + 1}`],
+      max_points: requirementKind === "informational" ? 0 : requirementKind === "weighted" ? 4 : 2,
+      partial_credit_allowed: requirementKind === "weighted",
+      evidence_map_ids: requirementKind === "informational" ? [] : [`evidence_${index + 1}`],
+      mutation_ids: [`mutation_${index + 1}`],
+      equivalence_class_ids: [`equivalence_${index + 1}`],
+      finding_group_id: `finding_group_${index + 1}`,
+      safety_dimension: ["completion_correctness", "merge_correctness", "safe_operation_correctness"][index % 3],
+      requirement_digest: `sha256:${"0".repeat(64)}`,
     })),
     ...overrides,
   };
-  requirementRecord.requirement_set_digest = computeRequirementSetDigest(requirementRecord);
-  requirementRecord.requirement_record_digest = computeRequirementRecordDigest(requirementRecord);
+  sealRequirementRecord(requirementRecord);
   writeAuthoritativeJson(requirementRecord.requirement_record_path, requirementRecord, { authorize });
   return { requirement_record: structuredClone(requirementRecord) };
+}
+
+function writeRequirementEvidence(predicateEvidence, { closeRequirements = true, closeSet = true, closeRecord = true } = {}) {
+  const record = predicateEvidence.requirement_record;
+  if (closeRequirements) for (const requirement of record.requirements) requirement.requirement_digest = computeRequirementDigest(requirement);
+  if (closeSet) record.requirement_set_digest = computeRequirementSetDigest(record);
+  if (closeRecord) record.requirement_record_digest = computeRequirementRecordDigest(record);
+  writeAuthoritativeJson(record.requirement_record_path, record);
+  return predicateEvidence;
 }
 
 function outputPredicateEvidenceFor(fixtureId, { declaresFindings = true, referenceOverrides = {}, outputOverrides = {} } = {}) {
@@ -545,6 +568,14 @@ try {
   assert.throws(() => validateRequirementMaxPoints(base.scoringPolicy, { requirement_kind: "weighted", max_points: 0 }), /weighted max_points must be positive/);
   assert.equal(validateRequirementMaxPoints(base.scoringPolicy, { requirement_kind: "blocker", max_points: 0 }), true);
 
+  expectFailure("requirement-evidence-field-alias-drift", ({ scoringPolicy }) => {
+    scoringPolicy.requirement_contract.required_fields.find(({ field_id }) => field_id === "evidence_map_ids").field_id = "agent_visible_evidence_map_ids";
+  }, /scoring policy requirement fields must match the frozen ordered field names/);
+
+  expectFailure("requirement-policy-field-added-without-schema-or-validator", ({ scoringPolicy }) => {
+    scoringPolicy.requirement_contract.required_fields.push({ field_id: "unregistered_scoring_field", value_type: "identifier" });
+  }, /too many items|scoring policy requirement fields must match the frozen ordered field names/);
+
   expectFailure("requirement-kind-constraint-drift", ({ scoringPolicy }) => {
     scoringPolicy.requirement_contract.requirement_kinds.find(({ requirement_kind }) => requirement_kind === "informational").max_points_constraint = "non_negative";
   }, /requirement max_points constraints/);
@@ -612,7 +643,7 @@ try {
   }, /fixture_predicates do not exactly match derived predicate evidence/);
 
   expectSelectorContextFailure("predicate-evidence-digest-drift", "mn-build-option-update", ({ predicateEvidence }) => {
-    predicateEvidence.requirement_record.requirements[0].agent_visible_evidence_map_ids.push("forged_evidence");
+    predicateEvidence.requirement_record.requirements[0].evidence_map_ids.push("forged_evidence");
   }, /does not match authoritative source/, { resealContext: false });
 
   expectSelectorContextFailure("selector-context-digest-drift", "mn-build-option-update", ({ selectorContext }) => {
@@ -673,17 +704,60 @@ try {
 
   const duplicateRequirementIds = predicateEvidenceFor("mn-build-option-update", { requirementKinds: ["weighted", "blocker"] });
   duplicateRequirementIds.requirement_record.requirements[1].requirement_id = duplicateRequirementIds.requirement_record.requirements[0].requirement_id;
-  duplicateRequirementIds.requirement_record.requirement_set_digest = computeRequirementSetDigest(duplicateRequirementIds.requirement_record);
-  duplicateRequirementIds.requirement_record.requirement_record_digest = computeRequirementRecordDigest(duplicateRequirementIds.requirement_record);
+  sealRequirementRecord(duplicateRequirementIds.requirement_record);
   writeAuthoritativeJson(duplicateRequirementIds.requirement_record.requirement_record_path, duplicateRequirementIds.requirement_record);
   assert.throws(() => selectorContextFor("mn-build-option-update", duplicateRequirementIds), /requirement IDs must be a unique string array/);
 
   const missingEvidenceMap = predicateEvidenceFor("mn-build-option-update");
-  missingEvidenceMap.requirement_record.requirements[0].agent_visible_evidence_map_ids = [];
-  missingEvidenceMap.requirement_record.requirement_set_digest = computeRequirementSetDigest(missingEvidenceMap.requirement_record);
-  missingEvidenceMap.requirement_record.requirement_record_digest = computeRequirementRecordDigest(missingEvidenceMap.requirement_record);
+  missingEvidenceMap.requirement_record.requirements[0].evidence_map_ids = [];
+  sealRequirementRecord(missingEvidenceMap.requirement_record);
   writeAuthoritativeJson(missingEvidenceMap.requirement_record.requirement_record_path, missingEvidenceMap.requirement_record);
   assert.throws(() => selectorContextFor("mn-build-option-update", missingEvidenceMap), /scored requirement must have at least one/);
+
+  const missingMaxPoints = predicateEvidenceFor("mn-build-option-update");
+  delete missingMaxPoints.requirement_record.requirements[0].max_points;
+  writeRequirementEvidence(missingMaxPoints);
+  assert.throws(() => selectorContextFor("mn-build-option-update", missingMaxPoints), /max_points.*required/);
+
+  const zeroWeightedPoints = predicateEvidenceFor("mn-build-option-update");
+  zeroWeightedPoints.requirement_record.requirements[0].max_points = 0;
+  writeRequirementEvidence(zeroWeightedPoints);
+  assert.throws(() => selectorContextFor("mn-build-option-update", zeroWeightedPoints), /weighted max_points must be positive/);
+
+  const nonzeroInformationalPoints = predicateEvidenceFor("mn-build-option-update", { requirementKinds: ["informational"] });
+  nonzeroInformationalPoints.requirement_record.requirements[0].max_points = 1;
+  writeRequirementEvidence(nonzeroInformationalPoints);
+  assert.throws(() => selectorContextFor("mn-build-option-update", nonzeroInformationalPoints), /informational max_points must be zero/);
+
+  const requirementDigestDrift = predicateEvidenceFor("mn-build-option-update");
+  requirementDigestDrift.requirement_record.requirements[0].requirement_digest = `sha256:${"f".repeat(64)}`;
+  writeRequirementEvidence(requirementDigestDrift, { closeRequirements: false });
+  assert.throws(() => selectorContextFor("mn-build-option-update", requirementDigestDrift), /requirement requirement_1 digest/);
+
+  const requirementSetDigestDrift = predicateEvidenceFor("mn-build-option-update");
+  requirementSetDigestDrift.requirement_record.requirement_set_digest = `sha256:${"e".repeat(64)}`;
+  writeRequirementEvidence(requirementSetDigestDrift, { closeRequirements: false, closeSet: false });
+  assert.throws(() => selectorContextFor("mn-build-option-update", requirementSetDigestDrift), /requirement set digest/);
+
+  const duplicateRequirementBindings = predicateEvidenceFor("mn-build-option-update", { requirementKinds: ["weighted", "blocker"] });
+  duplicateRequirementBindings.requirement_record.requirements[1].mutation_ids = [...duplicateRequirementBindings.requirement_record.requirements[0].mutation_ids];
+  writeRequirementEvidence(duplicateRequirementBindings);
+  assert.throws(() => selectorContextFor("mn-build-option-update", duplicateRequirementBindings), /mutation IDs must be unique across/);
+
+  const duplicateEquivalenceBindings = predicateEvidenceFor("mn-build-option-update", { requirementKinds: ["weighted", "blocker"] });
+  duplicateEquivalenceBindings.requirement_record.requirements[1].equivalence_class_ids = [...duplicateEquivalenceBindings.requirement_record.requirements[0].equivalence_class_ids];
+  writeRequirementEvidence(duplicateEquivalenceBindings);
+  assert.throws(() => selectorContextFor("mn-build-option-update", duplicateEquivalenceBindings), /equivalence class IDs must be unique across/);
+
+  const duplicateFindingGroups = predicateEvidenceFor("mn-build-option-update", { requirementKinds: ["weighted", "blocker"] });
+  duplicateFindingGroups.requirement_record.requirements[1].finding_group_id = duplicateFindingGroups.requirement_record.requirements[0].finding_group_id;
+  writeRequirementEvidence(duplicateFindingGroups);
+  assert.throws(() => selectorContextFor("mn-build-option-update", duplicateFindingGroups), /finding group IDs must be unique across/);
+
+  const unknownRequirementField = predicateEvidenceFor("mn-build-option-update");
+  unknownRequirementField.requirement_record.requirements[0].unexpected_scoring_field = "closed";
+  writeRequirementEvidence(unknownRequirementField);
+  assert.throws(() => selectorContextFor("mn-build-option-update", unknownRequirementField), /unexpected_scoring_field.*unknown property/);
 
   const arbitraryEvaluatorDigest = outputPredicateEvidenceFor("mn-build-option-update", { outputOverrides: { evaluator_public_reference_digest: `sha256:${"a".repeat(64)}` } });
   assert.throws(() => selectorContextFor("mn-build-option-update", arbitraryEvaluatorDigest.evidence), /evaluator public reference digest binding/);
