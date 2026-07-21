@@ -733,7 +733,7 @@ function globMatches(path, pattern) {
 }
 
 function implementationMetrics(caseRoot, workspace, expected, hiddenTestsPath) {
-  const hidden = spawnSync(process.execPath, [hiddenTestsPath, workspace], { cwd: caseRoot, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
+  const hidden = spawnSync(process.execPath, ["--test-reporter=tap", hiddenTestsPath, workspace], { cwd: caseRoot, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
   const summary = testSummary(hidden);
   const tracked = git(workspace, ["diff", "--name-only", "HEAD", "--"]).split("\n").filter(Boolean);
   const untracked = git(workspace, ["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean);
