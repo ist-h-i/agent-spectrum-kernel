@@ -42,7 +42,7 @@ jobs:
       pr_number: ${{ steps.context.outputs.pr_number }}
     steps:
       - name: Check out automation control plane
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
           path: control
@@ -50,9 +50,9 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Build bounded GitHub context
         id: context
@@ -64,7 +64,7 @@ jobs:
           node control/scripts/ask-autonomous-context.mjs control/.ask-automation/context.json
 
       - name: Upload selected context
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ask-automation-context
           path: control/.ask-automation/context.json
@@ -80,7 +80,7 @@ jobs:
       contents: read
     steps:
       - name: Check out automation control plane
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
           path: control
@@ -88,7 +88,7 @@ jobs:
           persist-credentials: false
 
       - name: Check out selected development ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.context.outputs.target_ref }}
           path: workspace
@@ -96,12 +96,12 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Download selected context
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ask-automation-context
           path: control/.ask-automation
@@ -175,7 +175,7 @@ jobs:
           git -C workspace diff --binary -- . > control/.ask-automation/change.patch
 
       - name: Upload guarded automation result
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ask-automation-result
           path: |
@@ -200,7 +200,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Check out automation control plane
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
           path: control
@@ -208,7 +208,7 @@ jobs:
           persist-credentials: false
 
       - name: Check out publication workspace
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
           path: workspace
@@ -216,12 +216,12 @@ jobs:
           token: ${{ secrets.ASK_AUTOMATION_GITHUB_TOKEN || github.token }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Download guarded result
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ask-automation-result
           path: control/.ask-automation
@@ -251,7 +251,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Check out automation control plane
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
           path: control
@@ -259,12 +259,12 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Download selected context
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ask-automation-context
           path: control/.ask-automation
@@ -273,40 +273,11 @@ jobs:
         env:
           CODEX_JOB_RESULT: ${{ needs.codex.result }}
         run: |
-          node --input-type=module <<'NODE'
-          import { readFileSync, writeFileSync } from "node:fs";
-          const contextPath = "control/.ask-automation/context.json";
-          const context = JSON.parse(readFileSync(contextPath, "utf8"));
-          const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-          const reviewingPull = context.target_pr_number !== null;
-          const result = {
-            action: "blocked",
-            target_issue_number: context.target_issue_number,
-            target_pr_number: context.target_pr_number,
-            summary: `Codex or bounded validation job ${process.env.CODEX_JOB_RESULT ?? "failed"}.`,
-            rationale: `No patch was published. Inspect the recorded workflow run: ${runUrl}`,
-            pr_title: null,
-            pr_body: null,
-            issue_comment: `Automation stopped without GitHub mutation. Workflow evidence: ${runUrl}`,
-            review_verdict: reviewingPull ? "comment" : "not_applicable",
-            review_comment: reviewingPull ? `Automation could not complete the requested review or fix. No branch update or merge occurred. Evidence: ${runUrl}` : null,
-            tests_run: [],
-            risks: ["The selected work remains incomplete until the workflow failure is diagnosed."],
-            changed_files_expected: [],
-          };
-          const guard = {
-            schema_version: "1.0.0",
-            mode: context.mode,
-            action: "blocked",
-            target_issue_number: context.target_issue_number,
-            target_pr_number: context.target_pr_number,
-            changed_files: [],
-            changed_lines: 0,
-          };
-          writeFileSync("control/.ask-automation/result.json", `${JSON.stringify(result, null, 2)}\n`);
-          writeFileSync("control/.ask-automation/guard.json", `${JSON.stringify(guard, null, 2)}\n`);
-          writeFileSync("control/.ask-automation/change.patch", "");
-          NODE
+          node control/scripts/ask-autonomous-failure.mjs \
+            --context control/.ask-automation/context.json \
+            --result control/.ask-automation/result.json \
+            --guard control/.ask-automation/guard.json \
+            --patch control/.ask-automation/change.patch
 
       - name: Publish failure status only
         env:

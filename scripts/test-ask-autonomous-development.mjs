@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CRITICAL_PATH_ISSUES, selectTarget } from "./ask-autonomous-context.mjs";
+import { buildFailureArtifacts } from "./ask-autonomous-failure.mjs";
 import { isDisallowedPath, validateChangedPaths, validateCodexResult } from "./ask-autonomous-guard.mjs";
 import { branchNameForIssue } from "./ask-autonomous-publish.mjs";
 
@@ -50,7 +51,9 @@ const advancedAfterClose = selectTarget({
   issues: CRITICAL_PATH_ISSUES.map((number) => issue(number, number === 205 ? "closed" : "open")),
   runKind: "auto",
 });
+assert.equal(advancedAfterClose.mode, "advance_issue");
 assert.equal(advancedAfterClose.issueNumber, 197);
+assert.equal(advancedAfterClose.issue.state, "open");
 
 const foreignPullIgnored = selectTarget({
   owner: "ist-h-i",
@@ -144,6 +147,12 @@ assert.equal(schema.properties.changed_files_expected.maxItems, 60);
 const workflow = readFileSync(resolve(root, ".github/workflows/ask-autonomous-development.yml"), "utf8");
 assert.match(workflow, /20 0 \* \* 1-5/);
 assert.match(workflow, /20 8 \* \* 1-5/);
+assert.match(workflow, /actions\/checkout@v5/);
+assert.match(workflow, /actions\/setup-node@v5/);
+assert.match(workflow, /actions\/upload-artifact@v6/);
+assert.match(workflow, /actions\/download-artifact@v7/);
+assert.match(workflow, /node-version: "24"/);
+assert.doesNotMatch(workflow, /actions\/(?:checkout|setup-node|upload-artifact|download-artifact)@v4/);
 assert.match(workflow, /openai\/codex-action@v1/);
 assert.match(workflow, /ASK_AUTOMATION_ENABLED/);
 assert.match(workflow, /report_failure:/);
@@ -160,5 +169,25 @@ const publisher = readFileSync(resolve(root, "scripts/ask-autonomous-publish.mjs
 assert.match(publisher, /login\.endsWith\("\[bot\]"\)/);
 assert.match(publisher, /ordinary pull-request CI expected from dedicated publication token/);
 assert.doesNotMatch(publisher, /merge_pull_request|gh pr merge/iu);
+
+const failureRunUrl = "https://github.com/ist-h-i/agent-spectrum-kernel/actions/runs/123";
+const failureArtifacts = buildFailureArtifacts(prContext, { jobResult: "failure", runUrl: failureRunUrl });
+assert.equal(failureArtifacts.result.action, "blocked");
+assert.equal(failureArtifacts.result.target_issue_number, 205);
+assert.equal(failureArtifacts.result.target_pr_number, 213);
+assert.match(failureArtifacts.result.rationale, /No patch was published/);
+assert.match(failureArtifacts.result.review_comment, /No branch update or merge occurred/);
+assert.deepEqual(failureArtifacts.guard.changed_files, []);
+assert.equal(failureArtifacts.guard.changed_lines, 0);
+assert.equal(failureArtifacts.patch, "");
+
+const validateWorkflow = readFileSync(resolve(root, ".github/workflows/validate.yml"), "utf8");
+assert.match(validateWorkflow, /actions\/checkout@v5/);
+assert.match(validateWorkflow, /actions\/setup-node@v5/);
+assert.match(validateWorkflow, /node-version: "24"/);
+assert.match(validateWorkflow, /Run autonomous development control tests/);
+for (const required of ["portfolio catalog", "portfolio policy", "portfolio design pre-admission", "portfolio independent design review", "general benchmark", "adaptive portfolio execution", "adaptive portfolio normalized result", "evaluator isolation boundary", "repository consistency", "whitespace"]) {
+  assert.match(validateWorkflow.toLowerCase(), new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "u"));
+}
 
 console.log("ASK autonomous development control tests passed");
