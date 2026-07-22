@@ -84,7 +84,24 @@
         "scoring_status": { "enum": ["complete", "not_scoring_ready"] },
         "evaluation_status": { "enum": ["completed", "invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required"] },
         "normalized_outcome": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] }
-      }
+      },
+      "allOf": [{
+        "if": { "properties": { "scoring_status": { "const": "complete" } }, "required": ["scoring_status"] },
+        "then": { "properties": { "evaluation_status": { "const": "completed" }, "normalized_outcome": { "const": "completed" } } },
+        "else": {
+          "properties": { "scoring_status": { "const": "not_scoring_ready" } },
+          "allOf": [
+            {
+              "if": { "properties": { "evaluation_status": { "const": "completed" } }, "required": ["evaluation_status"] },
+              "then": { "properties": { "normalized_outcome": { "enum": ["failed", "unavailable", "interrupted", "invalid"] } } }
+            },
+            {
+              "if": { "properties": { "normalized_outcome": { "const": "completed" } }, "required": ["normalized_outcome"] },
+              "then": { "properties": { "evaluation_status": { "enum": ["invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required"] } } }
+            }
+          ]
+        }
+      }]
     },
     "mechanismScorecard": {
       "type": "object",

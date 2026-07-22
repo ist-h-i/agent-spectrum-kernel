@@ -6,10 +6,12 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, 
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
+import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import {
   buildPortfolioMechanismScorecard,
   computePortfolioMechanismScorecardDigest,
   computePortfolioMechanismScorecardId,
+  PORTFOLIO_MECHANISM_SCORECARD_SCHEMA_PATH,
   reportEngineeringMechanismScorecards,
   validatePortfolioMechanismScorecard,
 } from "./ask-benchmark-portfolio-mechanism-scorecard.mjs";
@@ -189,6 +191,21 @@ function expectBuildFailure(name, mutate, pattern = /inventory|inventories|dupli
 function expectResealedFailure(name, source, mutate, pattern = /closure|ordering|drift|Schema validation|inventory|duplicate|absolute|private|authority|readiness|status/u) {
   check(name, () => { const changed = structuredClone(source); mutate(changed); close(changed); assert.throws(() => validatePortfolioMechanismScorecard(changed, { root }), pattern); });
 }
+function expectSchemaFailure(name, source, mutate) {
+  check(name, () => { const changed = structuredClone(source); mutate(changed); close(changed); assert.throws(() => assertBenchmarkSchemaInstance(changed, { schemaPath: resolve(root, PORTFOLIO_MECHANISM_SCORECARD_SCHEMA_PATH), label: "portfolio mechanism scorecard" }), /Schema validation/u); });
+}
+function makeRunObservationNonReady(scorecard, conditionName = "plain", repetition = 1, fixtureId = "fixture-three") {
+  for (const item of fixture(scorecard, fixtureId).mechanism_scorecards) {
+    const summary = item.condition_scorecards.find(({ condition: name }) => name === conditionName);
+    const observed = summary.observations.find((entry) => entry.repetition === repetition);
+    summary.state_counts[observed.state] -= 1;
+    summary.state_counts.not_scoring_ready += 1;
+    summary.observation_coverage_status = "insufficient_evidence";
+    observed.observation_status = "not_scoring_ready";
+    observed.state = null;
+    observed.evidence_references = [];
+  }
+}
 
 const scorecard = build();
 validatePortfolioMechanismScorecard(scorecard, { root });
@@ -265,6 +282,12 @@ expectResealedFailure("re-sealed fixture run inventory missing entry", scorecard
 expectResealedFailure("re-sealed fixture run inventory duplicate entry", scorecard, (changed) => { fixture(changed).run_inventory[1] = structuredClone(fixture(changed).run_inventory[0]); });
 expectResealedFailure("re-sealed fixture run inventory reordered", scorecard, (changed) => { fixture(changed).run_inventory.reverse(); });
 expectResealedFailure("re-sealed readiness observation contradiction", scorecard, (changed) => { runEntry(changed).scoring_status = "not_scoring_ready"; });
+expectResealedFailure("re-sealed stable-empty completed sources marked not ready", scorecard, (changed) => { const item = fixture(changed, "fixture-stable-empty"); for (const entry of item.run_inventory) entry.scoring_status = "not_scoring_ready"; item.mechanism_inventory_status = "insufficient_evidence"; });
+expectResealedFailure("re-sealed non-empty completed source marked not ready", scorecard, (changed) => { runEntry(changed).scoring_status = "not_scoring_ready"; makeRunObservationNonReady(changed); });
+expectResealedFailure("re-sealed complete with unavailable evaluator", scorecard, (changed) => { runEntry(changed).evaluation_status = "evaluator_unavailable"; });
+expectResealedFailure("re-sealed complete with unavailable normalized outcome", scorecard, (changed) => { runEntry(changed).normalized_outcome = "unavailable"; });
+expectSchemaFailure("Schema rejects completed sources marked not ready", scorecard, (changed) => { runEntry(changed).scoring_status = "not_scoring_ready"; });
+expectSchemaFailure("Schema rejects complete with incomplete source", scorecard, (changed) => { runEntry(changed).evaluation_status = "evaluator_unavailable"; });
 expectResealedFailure("re-sealed classification drift", scorecard, (changed) => { mechanism(changed).classification = "unnecessary"; });
 expectResealedFailure("re-sealed observation state drift", scorecard, (changed) => { observation(changed).state = "missing"; });
 expectResealedFailure("re-sealed evidence-reference drift", scorecard, (changed) => { observation(changed, 1, "plain", "zeta_fixture_token").evidence_references.reverse(); });
@@ -301,5 +324,5 @@ check("measured execution remains false", () => assert.equal(scorecard.boundarie
 check("product claim remains false", () => assert.equal(scorecard.boundaries.product_value_claim, false));
 check("Issue #198 remains false", () => assert.equal(scorecard.boundaries.issue_198_stage_0_authorized, false));
 
-assert.equal(covered.size, 92, `expected 92 focused closures, received ${covered.size}`);
+assert.equal(covered.size, 98, `expected 98 focused closures, received ${covered.size}`);
 console.log(`Portfolio mechanism observation scorecard contract test passed (${covered.size} closures).`);

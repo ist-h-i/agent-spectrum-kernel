@@ -109,7 +109,8 @@ function assertRunInventory(fixture) {
   if (stableCanonicalJson(actualKeys) !== stableCanonicalJson(expectedKeys)) throw new Error(`${fixture.fixture_id} run inventory must contain each condition/repetition exactly once in canonical order`);
   if (new Set(actualKeys.map(({ condition, repetition }) => `${condition}:${repetition}`)).size !== fixture.run_inventory.length) throw new Error(`${fixture.fixture_id} run inventory contains a duplicate condition/repetition`);
   for (const entry of fixture.run_inventory) {
-    if (entry.scoring_status === "complete" && !isComplete(entry)) throw new Error(`${fixture.fixture_id}/${entry.condition}/${entry.repetition} complete scoring readiness is inconsistent`);
+    const sourceCompleted = entry.evaluation_status === "completed" && entry.normalized_outcome === "completed";
+    if ((entry.scoring_status === "complete") !== sourceCompleted) throw new Error(`${fixture.fixture_id}/${entry.condition}/${entry.repetition} scoring readiness must exactly match completed evaluation and normalized sources`);
   }
 }
 
