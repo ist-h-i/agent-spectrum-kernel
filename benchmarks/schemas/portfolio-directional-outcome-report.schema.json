@@ -109,7 +109,26 @@
         "paired_normalized_quality_delta": { "type": ["number", "null"], "minimum": -1, "maximum": 1 },
         "directional_outcome": { "enum": ["comparison_win", "comparison_loss", "exact_tie", "insufficient_evidence"] },
         "outcome_perspective": { "const": "comparison_condition" }
-      }
+      },
+      "allOf": [{
+        "if": {
+          "properties": { "paired_quality_delta_status": { "const": "complete" } },
+          "required": ["paired_quality_delta_status"]
+        },
+        "then": {
+          "properties": {
+            "paired_normalized_quality_delta": { "type": "number", "minimum": -1, "maximum": 1 },
+            "directional_outcome": { "enum": ["comparison_win", "comparison_loss", "exact_tie"] }
+          }
+        },
+        "else": {
+          "properties": {
+            "paired_quality_delta_status": { "const": "insufficient_evidence" },
+            "paired_normalized_quality_delta": { "type": "null" },
+            "directional_outcome": { "const": "insufficient_evidence" }
+          }
+        }
+      }]
     },
     "boundaries": {
       "type": "object",

@@ -1053,6 +1053,10 @@ try {
   assert.equal(directionalOutcome.artifact.fixture_outcomes.length, 2);
   assert.equal(directionalOutcome.artifact.comparison_view_definitions.length, 3);
   assert.equal(directionalOutcome.artifact.authority.paired_comparison_report_id, pairedComparison.artifact.paired_comparison_report_id);
+  const insufficientDirectionalPairs = directionalOutcome.artifact.fixture_outcomes.flatMap((fixture) => fixture.comparison_views.flatMap((itemView) => itemView.pair_outcomes)).filter((itemPair) => itemPair.paired_quality_delta_status === "insufficient_evidence");
+  assert.ok(insufficientDirectionalPairs.length > 0);
+  assert.ok(insufficientDirectionalPairs.every((itemPair) => itemPair.paired_normalized_quality_delta === null && itemPair.directional_outcome === "insufficient_evidence"));
+  covered.add("directional-production-non-ready-canonical-contract");
   const verifiedDirectionalOutcome = verifyEngineeringDirectionalOutcomeReport({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, comparisonReportPath: pairedComparisonPath, directionalReportPath: directionalOutcomePath });
   assert.equal(verifiedDirectionalOutcome.artifact.directional_outcome_report_digest, directionalOutcome.artifact.directional_outcome_report_digest);
   covered.add("directional-full-authority");
@@ -1699,6 +1703,7 @@ try {
     "concurrent-paired-publication", "successful-paired-publication-inputs-unchanged", "failed-paired-publication-inputs-unchanged",
     "paired-pre-existing-output", "paired-output-symlink", "paired-output-inside-authority-root",
     "directional-full-authority", "directional-different-valid-bytes-replacement", "directional-same-bytes-different-inode-replacement",
+    "directional-production-non-ready-canonical-contract",
     "directional-paired-authority-drift", "directional-repetition-authority-drift", "directional-result-set-authority-drift", "directional-policy-authority-drift",
     "concurrent-directional-publication", "directional-no-filesystem-reread-after-full-verification",
     "successful-directional-publication-inputs-unchanged", "failed-directional-publication-inputs-unchanged",

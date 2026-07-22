@@ -105,8 +105,27 @@ function view(report, id = "kernel_vs_plain", fixtureId = "fixture-three") { ret
 function pair(report, repetition = 1, viewId = "kernel_vs_plain", fixtureId = "fixture-three") { return view(report, viewId, fixtureId).pair_outcomes.find((entry) => entry.repetition === repetition); }
 function pairedPair(report, repetition = 1, viewId = "kernel_vs_plain", fixtureId = "fixture-three") { return report.fixture_comparisons.find((entry) => entry.fixture_id === fixtureId).comparison_views.find((entry) => entry.view_id === viewId).pairs.find((entry) => entry.repetition === repetition); }
 function setDelta(report, delta, status = "complete", repetition = 1, viewId = "kernel_vs_plain") { const item = pairedPair(report, repetition, viewId); item.quality_delta.delta_status = status; item.quality_delta.normalized_requirement_score_delta = delta; }
+function recloseViewCounts(itemView) {
+  const counts = { comparison_win: 0, comparison_loss: 0, exact_tie: 0, insufficient_evidence: 0 };
+  itemView.pair_outcomes.forEach((itemPair) => { counts[itemPair.directional_outcome] += 1; });
+  itemView.comparison_win_count = counts.comparison_win;
+  itemView.comparison_loss_count = counts.comparison_loss;
+  itemView.exact_tie_count = counts.exact_tie;
+  itemView.insufficient_evidence_count = counts.insufficient_evidence;
+  itemView.directional_summary_status = counts.insufficient_evidence === 0 ? "complete" : "insufficient_evidence";
+}
 function expectReclosedFailure(name, source, mutate, pattern = /closure|drift|Schema validation|ordering|inventory|authority|condition|B1 comparison views/u) {
   check(name, () => { const changed = structuredClone(source); mutate(changed); close(changed); assert.throws(() => validatePortfolioDirectionalOutcomeReport(changed, { root }), pattern); });
+}
+function expectResealedPairContractFailure(name, status, delta) {
+  expectReclosedFailure(name, report, (changed) => {
+    const itemView = view(changed);
+    const itemPair = pair(changed);
+    itemPair.paired_quality_delta_status = status;
+    itemPair.paired_normalized_quality_delta = delta;
+    itemPair.directional_outcome = "insufficient_evidence";
+    recloseViewCounts(itemView);
+  }, /paired_normalized_quality_delta|paired_quality_delta_status|directional_outcome|Schema validation|directional pair/u);
 }
 
 const report = build();
@@ -124,11 +143,15 @@ check("zero delta is exact tie", () => assert.equal(pair(build((source) => setDe
 check("negative zero becomes exact zero", () => { const item = pair(build((source) => setDelta(source, -0))); assert.equal(item.directional_outcome, "exact_tie"); assert.equal(Object.is(item.paired_normalized_quality_delta, -0), false); });
 check("tiny positive remains win", () => assert.equal(pair(build((source) => setDelta(source, Number.MIN_VALUE))).directional_outcome, "comparison_win"));
 check("tiny negative remains loss", () => assert.equal(pair(build((source) => setDelta(source, -Number.MIN_VALUE))).directional_outcome, "comparison_loss"));
-check("non-finite delta is insufficient", () => assert.deepEqual(classifyPortfolioDirectionalOutcome("complete", Number.POSITIVE_INFINITY), { directional_outcome: "insufficient_evidence", paired_normalized_quality_delta: null }));
-check("NaN delta is insufficient", () => assert.deepEqual(classifyPortfolioDirectionalOutcome("complete", Number.NaN), { directional_outcome: "insufficient_evidence", paired_normalized_quality_delta: null }));
+check("complete NaN fails closed", () => assert.throws(() => classifyPortfolioDirectionalOutcome("complete", Number.NaN), /finite number/u));
+check("complete positive infinity fails closed", () => assert.throws(() => classifyPortfolioDirectionalOutcome("complete", Number.POSITIVE_INFINITY), /finite number/u));
+check("complete negative infinity fails closed", () => assert.throws(() => classifyPortfolioDirectionalOutcome("complete", Number.NEGATIVE_INFINITY), /finite number/u));
+check("unsupported delta status fails closed", () => assert.throws(() => classifyPortfolioDirectionalOutcome("unknown", null), /unsupported paired quality delta status/u));
 check("non-ready baseline is insufficient", () => { const changed = build((source) => { const item = pairedPair(source); item.baseline.scoring_status = "not_scoring_ready"; setDelta(source, null, "insufficient_evidence"); }); assert.equal(pair(changed).directional_outcome, "insufficient_evidence"); });
 check("non-ready comparison is insufficient", () => { const changed = build((source) => { const item = pairedPair(source); item.comparison.scoring_status = "not_scoring_ready"; setDelta(source, null, "insufficient_evidence"); }); assert.equal(pair(changed).directional_outcome, "insufficient_evidence"); });
-check("null delta is insufficient", () => assert.equal(pair(build((source) => setDelta(source, null, "complete"))).directional_outcome, "insufficient_evidence"));
+check("valid insufficient delta remains null", () => { const item = pair(build((source) => setDelta(source, null, "insufficient_evidence"))); assert.deepEqual({ status: item.paired_quality_delta_status, delta: item.paired_normalized_quality_delta, outcome: item.directional_outcome }, { status: "insufficient_evidence", delta: null, outcome: "insufficient_evidence" }); });
+check("upstream insufficient finite delta fails closed", () => assert.throws(() => build((source) => setDelta(source, 0.25, "insufficient_evidence")), /must have a null delta/u));
+check("upstream complete null delta fails closed", () => assert.throws(() => build((source) => setDelta(source, null, "complete")), /finite number/u));
 check("unavailable is not tie", () => assert.notEqual(pair(build((source) => setDelta(source, null, "insufficient_evidence"))).directional_outcome, "exact_tie"));
 check("manual review is not loss", () => assert.notEqual(pair(build((source) => setDelta(source, null, "insufficient_evidence"))).directional_outcome, "comparison_loss"));
 check("structural missing pair fails", () => assert.throws(() => build((source) => { source.fixture_comparisons[0].comparison_views[0].pairs.pop(); }), /missing a structural pair/u));
@@ -148,6 +171,11 @@ check("no ready subset denominator", () => assert.equal(Object.hasOwn(view(repor
 check("no win rate", () => assert.equal(Object.hasOwn(view(report), "win_rate"), false));
 check("no majority winner", () => assert.equal(Object.hasOwn(view(report), "majority_winner"), false));
 check("no net win scalar", () => assert.equal(Object.hasOwn(view(report), "net_wins"), false));
+
+expectResealedPairContractFailure("re-sealed insufficient positive finite delta", "insufficient_evidence", 0.25);
+expectResealedPairContractFailure("re-sealed insufficient negative finite delta", "insufficient_evidence", -0.25);
+expectResealedPairContractFailure("re-sealed insufficient zero delta", "insufficient_evidence", 0);
+expectResealedPairContractFailure("re-sealed complete null delta", "complete", null);
 
 expectReclosedFailure("reclosed wrong pair outcome", report, (changed) => { pair(changed).directional_outcome = "exact_tie"; });
 expectReclosedFailure("reclosed wrong win count", report, (changed) => { view(changed).comparison_win_count -= 1; });
@@ -186,5 +214,6 @@ check("majority winner remains false", () => assert.equal(report.boundaries.majo
 check("outcome perspective is comparison condition", () => assert.ok(report.fixture_outcomes.every((item) => item.comparison_views.every((itemView) => itemView.pair_outcomes.every((itemPair) => itemPair.outcome_perspective === "comparison_condition")))));
 check("serialized artifact excludes runtime verifier body", () => assert.equal(Object.hasOwn(report, "verified_comparison_report"), false));
 
-assert.ok(covered.size >= 70, `expected at least 70 focused closures, received ${covered.size}`);
+const EXPECTED_DIRECTIONAL_CLOSURE_COUNT = 82;
+assert.equal(covered.size, EXPECTED_DIRECTIONAL_CLOSURE_COUNT, `expected ${EXPECTED_DIRECTIONAL_CLOSURE_COUNT} focused closures, received ${covered.size}`);
 console.log(`Portfolio directional outcome report contract test passed (${covered.size} closures).`);

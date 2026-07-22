@@ -51,12 +51,19 @@ function assertComparisonViews(views) {
 }
 
 export function classifyPortfolioDirectionalOutcome(deltaStatus, delta) {
-  if (deltaStatus !== "complete" || delta === null || !Number.isFinite(delta)) return { directional_outcome: "insufficient_evidence", paired_normalized_quality_delta: Number.isFinite(delta) ? delta : null };
-  const canonicalDelta = normalizeZero(delta);
-  return {
-    directional_outcome: canonicalDelta > 0 ? "comparison_win" : canonicalDelta < 0 ? "comparison_loss" : "exact_tie",
-    paired_normalized_quality_delta: canonicalDelta,
-  };
+  if (deltaStatus === "complete") {
+    if (!Number.isFinite(delta)) throw new Error("a complete directional delta must be a finite number");
+    const canonicalDelta = normalizeZero(delta);
+    return {
+      directional_outcome: canonicalDelta > 0 ? "comparison_win" : canonicalDelta < 0 ? "comparison_loss" : "exact_tie",
+      paired_normalized_quality_delta: canonicalDelta,
+    };
+  }
+  if (deltaStatus === "insufficient_evidence") {
+    if (delta !== null) throw new Error("an insufficient_evidence directional pair must have a null delta");
+    return { directional_outcome: "insufficient_evidence", paired_normalized_quality_delta: null };
+  }
+  throw new Error(`unsupported paired quality delta status: ${deltaStatus}`);
 }
 
 function directionalPair(pair, view) {
