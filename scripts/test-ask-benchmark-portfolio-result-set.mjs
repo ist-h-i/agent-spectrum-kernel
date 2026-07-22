@@ -158,7 +158,7 @@ function normalizedRecord({ adapter, fixture, repetitions, condition, repetition
   const attempt = "0001";
   const telemetry = Object.fromEntries(TELEMETRY_FIELDS.map((field) => [field, missingMetric(outcome)]));
   const base = {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     schema_path: "benchmarks/schemas/normalized-portfolio-result.schema.json",
     program: "adaptive_ask_normalized_execution_result",
     lineage: {
@@ -194,7 +194,7 @@ function normalizedRecord({ adapter, fixture, repetitions, condition, repetition
     outcome,
     command_evidence: {
       manifest_digest: digest(`command-evidence:${case_id}`), capture_support: adapter === "codex" ? "supported" : "unsupported", evidence_level: "unavailable", command_event_count: 0,
-      verification_command_contract_digest: null, required_command_ids: [], attempted_command_ids: [], succeeded_command_ids: [], failed_command_ids: [], unavailable_command_ids: [], unmatched_command_count: 0, references: [],
+      verification_command_contract_digest: null, required_command_ids: [], required_alternative_groups: [], command_summaries: [], attempted_command_ids: [], succeeded_command_ids: [], failed_command_ids: [], unavailable_command_ids: [], unmatched_command_count: 0, references: [],
     },
     telemetry,
     privacy: {
@@ -315,11 +315,11 @@ function buildNormalizedRoot(target) {
     };
   });
   const manifestBase = {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     schema_path: "benchmarks/schemas/normalized-portfolio-run.schema.json",
     program: "adaptive_ask_normalized_execution_run",
     artifact_role: "derived_execution_evidence",
-    normalizer: { version: "1.1.0", source_revision: SOURCE_REVISION },
+    normalizer: { version: "1.2.0", source_revision: SOURCE_REVISION },
     source: {
       run_instance_id: RUN_INSTANCE_ID,
       run_identity_digest: digest("run-identity"),
@@ -331,7 +331,7 @@ function buildNormalizedRoot(target) {
     },
     source_snapshot,
     source_snapshot_digest,
-    output_root_identity: canonicalDigest({ run_instance_id: RUN_INSTANCE_ID, plan_id: PLAN_ID, normalizer_version: "1.1.0", source_snapshot_digest }),
+    output_root_identity: canonicalDigest({ run_instance_id: RUN_INSTANCE_ID, plan_id: PLAN_ID, normalizer_version: "1.2.0", source_snapshot_digest }),
     pool_adapter_results: false,
     completeness,
     telemetry_coverage,
@@ -354,7 +354,7 @@ function buildNormalizedRoot(target) {
     schema_path: "benchmarks/schemas/normalized-portfolio-root.schema.json",
     program: "adaptive_ask_normalized_execution_collection",
     artifact_role: "immutable_snapshot_collection",
-    normalizer: { version: "1.1.0", source_revision: SOURCE_REVISION },
+    normalizer: { version: "1.2.0", source_revision: SOURCE_REVISION },
     source: { run_instance_id: RUN_INSTANCE_ID, run_identity_digest: digest("run-identity"), plan_id: PLAN_ID, plan_digest: PLAN_DIGEST, repository_revision: SOURCE_REVISION },
     generations_directory: "generations",
   };

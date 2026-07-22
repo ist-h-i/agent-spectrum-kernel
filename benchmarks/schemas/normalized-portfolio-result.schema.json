@@ -16,7 +16,7 @@
     "privacy"
   ],
   "properties": {
-    "schema_version": { "const": "1.1.0" },
+    "schema_version": { "const": "1.2.0" },
     "schema_path": { "const": "benchmarks/schemas/normalized-portfolio-result.schema.json" },
     "program": { "const": "adaptive_ask_normalized_execution_result" },
     "normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },
@@ -89,7 +89,7 @@
     "command_evidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["manifest_digest", "capture_support", "evidence_level", "command_event_count", "verification_command_contract_digest", "required_command_ids", "attempted_command_ids", "succeeded_command_ids", "failed_command_ids", "unavailable_command_ids", "unmatched_command_count", "references"],
+      "required": ["manifest_digest", "capture_support", "evidence_level", "command_event_count", "verification_command_contract_digest", "required_command_ids", "required_alternative_groups", "command_summaries", "attempted_command_ids", "succeeded_command_ids", "failed_command_ids", "unavailable_command_ids", "unmatched_command_count", "references"],
       "properties": {
         "manifest_digest": { "$ref": "#/$defs/digest" },
         "capture_support": { "enum": ["supported", "unsupported", "unknown"] },
@@ -97,6 +97,34 @@
         "command_event_count": { "type": "integer", "minimum": 0 },
         "verification_command_contract_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" },
         "required_command_ids": { "$ref": "#/$defs/commandIds" },
+        "required_alternative_groups": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["group_id", "member_ids", "attempted_ids", "succeeded_ids", "satisfaction_state"],
+            "properties": {
+              "group_id": { "$ref": "#/$defs/commandId" },
+              "member_ids": { "$ref": "#/$defs/nonEmptyCommandIds" },
+              "attempted_ids": { "$ref": "#/$defs/commandIds" },
+              "succeeded_ids": { "$ref": "#/$defs/commandIds" },
+              "satisfaction_state": { "enum": ["satisfied", "unsatisfied", "unavailable"] }
+            }
+          }
+        },
+        "command_summaries": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["command_id", "execution_count", "latest_outcome", "any_success", "any_failure"],
+            "properties": {
+              "command_id": { "$ref": "#/$defs/commandId" },
+              "execution_count": { "type": "integer", "minimum": 1 },
+              "latest_outcome": { "enum": ["succeeded", "failed", "interrupted"] },
+              "any_success": { "type": "boolean" },
+              "any_failure": { "type": "boolean" }
+            }
+          }
+        },
         "attempted_command_ids": { "$ref": "#/$defs/commandIds" },
         "succeeded_command_ids": { "$ref": "#/$defs/commandIds" },
         "failed_command_ids": { "$ref": "#/$defs/commandIds" },
@@ -216,7 +244,9 @@
     "caseId": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
-    "commandIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" } },
+    "commandId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "commandIds": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/commandId" } },
+    "nonEmptyCommandIds": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "$ref": "#/$defs/commandId" } },
     "missingMetric": {
       "type": "object",
       "additionalProperties": false,

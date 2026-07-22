@@ -400,8 +400,9 @@ function probeAvailableRuntime(runtime, verifiedExecutable, command, environment
 
 function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable, command, environmentSnapshot, availabilityEvidence = null }) {
   const captureAvailable = runtime.availability === "available" && adapter === "codex" && runtime.command_evidence.support === "supported";
+  const captureSupported = runtime.command_evidence.support === "supported";
   return {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     adapter,
     runtime_config_sha256: runtimeConfigDigest,
     availability: runtime.availability,
@@ -430,9 +431,9 @@ function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable, co
     command_evidence: {
       support: runtime.command_evidence.support,
       evidence_level: captureAvailable ? "executed" : "unavailable",
-      event_transport: captureAvailable ? runtime.command_evidence.event_transport : "none",
-      event_format_revision: captureAvailable ? runtime.command_evidence.event_format_revision : null,
-      parser_revision: captureAvailable ? runtime.command_evidence.parser_revision : null,
+      event_transport: captureSupported ? runtime.command_evidence.event_transport : "none",
+      event_format_revision: captureSupported ? runtime.command_evidence.event_format_revision : null,
+      parser_revision: captureSupported ? runtime.command_evidence.parser_revision : null,
       contract_probe_evidence: captureAvailable ? "local_version_help_json_probe" : (runtime.availability === "unavailable" ? "declared_unavailable" : adapter === "claude" ? "adapter_event_contract_not_implemented" : "contract_probe_failed"),
       downgrade_reason: captureAvailable ? null : (runtime.unavailable_reason ?? (adapter === "claude" ? "adapter_event_contract_not_implemented" : "command_event_contract_not_proven")),
     },
@@ -614,6 +615,11 @@ function readAdapterIdentity(root, runDir, adapter) {
     if (entry.value !== null && !identity.environment_value_allowlist.includes(entry.name)) throw new Error(`${adapter} environment snapshot exposes a non-declared value`);
   }
   if (identity.policy_enforcement.sandbox_policy !== identity.sandbox_policy || identity.policy_enforcement.permission_policy !== identity.permission_policy) throw new Error(`${adapter} runtime policy identity is inconsistent`);
+  const capture = identity.command_evidence;
+  if (capture.evidence_level === "executed" && (identity.availability !== "available" || adapter !== "codex" || capture.support !== "supported" || capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || capture.contract_probe_evidence !== "local_version_help_json_probe" || capture.downgrade_reason !== null)) throw new Error(`${adapter} executed command evidence identity is inconsistent`);
+  if (capture.evidence_level === "unavailable" && capture.downgrade_reason === null) throw new Error(`${adapter} unavailable command evidence identity lacks a downgrade reason`);
+  if (capture.support === "supported" && (capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION)) throw new Error(`${adapter} supported command evidence identity is inconsistent`);
+  if (capture.support !== "supported" && (capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null || capture.evidence_level !== "unavailable")) throw new Error(`${adapter} unsupported command evidence identity is inconsistent`);
   if (identity.availability === "available" && adapter === "codex") {
     const argv = identity.effective_command.argv;
     if (!argv.includes("--ephemeral") || !argv.includes("--ignore-user-config") || !argv.includes("--ignore-rules") || !argv.includes("--skip-git-repo-check") || !argv.includes("--json") || argv[argv.indexOf("--sandbox") + 1] !== identity.sandbox_policy || !argv.includes(`approval_policy=\"${identity.permission_policy}\"`) || argv[argv.indexOf("--output-schema") + 1] !== "{output_schema}") throw new Error("Codex effective command does not enforce its runtime policy");
@@ -1054,7 +1060,7 @@ function commandEvidenceIdentity({ entry, claim }) {
   };
 }
 
-function sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity, processResult = null, contract = null, forceUnavailable = null }) {
+function sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity, processResult = null, contract = null, workspaceRoot = null, forceUnavailable = null }) {
   const path = resolve(attemptRoot, COMMAND_EVIDENCE_PATH);
   assertNoSymlinkSegments(path, `${entry.case_id} command evidence`);
   let manifest;
@@ -1062,7 +1068,7 @@ function sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity,
   const identity = commandEvidenceIdentity({ entry, claim });
   if (!forceUnavailable && adapterIdentity.command_evidence.evidence_level === "executed" && contract && processResult) {
     try {
-      manifest = buildCodexCommandEvidence({ identity, stream: processResult.stdout ?? "", contract });
+      manifest = buildCodexCommandEvidence({ identity, stream: processResult.stdout ?? "", contract, workspaceRoot });
     } catch (error) {
       captureError = error;
       manifest = buildUnavailableCommandEvidence({ identity, support: "supported", probe: "capture_invalid", reason: `capture_invalid:${error?.code ?? "unclassified"}`, stream: processResult.stdout ?? "" });
@@ -1437,7 +1443,7 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     const started = process.hrtime.bigint();
     const raw = executeVerifiedAgent({ root, runtime, verifiedExecutable, workspace, outputTemporary: temporaryOutput, command: adapter.identity.effective_command, environmentSnapshot });
     processResult = { ...raw, duration_ms: Math.round(Number(process.hrtime.bigint() - started) / 1_000_000) };
-    sealedCommandEvidence = sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity: adapter.identity, processResult, contract });
+    sealedCommandEvidence = sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity: adapter.identity, processResult, contract, workspaceRoot: workspace });
     if (selection) {
       const afterSpawn = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision });
       if (afterSpawn.selection_digest.value !== claim.selection.digest) throw new Error("Adaptive selection changed during process execution");

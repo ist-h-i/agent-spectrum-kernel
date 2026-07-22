@@ -7,7 +7,12 @@ import { tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { effectiveCommand } from "./ask-benchmark-execution.mjs";
-import { computeCommandContractDigest, computeVerificationCommandContractDigest } from "./ask-benchmark-command-evidence.mjs";
+import {
+  computeCommandContractDigest,
+  computeVerificationCommandContractDigest,
+  logicalCommandDigest,
+  renderedEventCommandDigest,
+} from "./ask-benchmark-command-evidence.mjs";
 import { validateJsonSchema } from "./execution-envelope.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -91,7 +96,7 @@ function selectionInput(caseRecord, plan, bypass = false) {
 
 function runtimeConfig(adapter, availability = "available") {
   return {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     adapter,
     availability,
     unavailable_reason: availability === "unavailable" ? "Fixture runtime intentionally unavailable." : null,
@@ -114,7 +119,7 @@ function runtimeConfig(adapter, availability = "available") {
       }
       : null,
     command_evidence: adapter === "codex"
-      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.0.0" }
+      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.1.0" }
       : { capture_required: true, support: "unsupported", event_transport: "none", event_format_revision: null, parser_revision: null },
   };
 }
@@ -140,20 +145,21 @@ if [ -z "$output" ]; then echo "missing output argument" >&2; exit 64; fi
 if [ "${adapter}" = "codex" ] && [ "$skip_git_repo_check" != "1" ] && [ ! -d .git ]; then echo "not inside a trusted git repository" >&2; exit 65; fi
 if [ -n "\${FAKE_DELAY:-}" ]; then sleep "$FAKE_DELAY"; fi
 printf '${adapter}\\n' >> "$FAKE_EXEC_LOG"
-if [ "${adapter}" = "codex" ]; then printf '%s\\n' '{"type":"item.started","item":{"type":"command_execution","id":"fixture-command","command":"node workspace-test.mjs","cwd":"."}}'; fi
+quote="'"
+if [ "${adapter}" = "codex" ]; then printf '{"type":"item.started","item":{"type":"command_execution","id":"fixture-command","command":"/bin/bash -lc %snode workspace-test.mjs%s","cwd":"%s"}}\\n' "$quote" "$quote" "$PWD"; fi
 if [ "\${FAKE_FAIL:-}" = "1" ]; then
-  if [ "${adapter}" = "codex" ]; then printf '%s\\n' '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"node workspace-test.mjs","cwd":".","status":"failed","exit_code":12,"aggregated_output":"fixture failed"}}' '{"type":"turn.completed"}'; fi
+  if [ "${adapter}" = "codex" ]; then printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"/bin/bash -lc %snode workspace-test.mjs%s","cwd":"%s","status":"failed","exit_code":12,"aggregated_output":"fixture failed"}}\\n' "$quote" "$quote" "$PWD"; printf '%s\\n' '{"type":"turn.completed"}'; fi
   exit 12
 fi
 if [ -n "\${FAKE_FAIL_ONCE:-}" ] && [ ! -e "$FAKE_FAIL_ONCE" ]; then
   : > "$FAKE_FAIL_ONCE"
-  if [ "${adapter}" = "codex" ]; then printf '%s\\n' '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"node workspace-test.mjs","cwd":".","status":"failed","exit_code":12,"aggregated_output":"fixture failed once"}}' '{"type":"turn.completed"}'; fi
+  if [ "${adapter}" = "codex" ]; then printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"/bin/bash -lc %snode workspace-test.mjs%s","cwd":"%s","status":"failed","exit_code":12,"aggregated_output":"fixture failed once"}}\\n' "$quote" "$quote" "$PWD"; printf '%s\\n' '{"type":"turn.completed"}'; fi
   exit 12
 fi
 if [ "\${FAKE_OVERSIZED_FINAL:-}" = "1" ]; then dd if=/dev/zero of="$output" bs=1048577 count=1 2>/dev/null; exit 0; fi
 printf '%s\\n' '{"claimed":"passed","authority":false}' > verification-report.json
 printf '%s\\n' '{"task_type":"implementation","decision":"not_applicable","findings":[],"requirement_status":[],"verification_commands":[{"command":"node forged-report.mjs","result":"passed"}],"completion_claim":"complete","route":null,"summary":"fixture final"}' > "$output"
-if [ "${adapter}" = "codex" ]; then printf '%s\\n' '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"node workspace-test.mjs","cwd":".","status":"completed","exit_code":0,"aggregated_output":"fixture passed"}}' '{"type":"turn.completed"}'; fi
+if [ "${adapter}" = "codex" ]; then printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"/bin/bash -lc %snode workspace-test.mjs%s","cwd":"%s","status":"completed","exit_code":0,"aggregated_output":"fixture passed"}}\\n' "$quote" "$quote" "$PWD"; printf '%s\\n' '{"type":"turn.completed"}'; fi
 if [ "\${FAKE_MUTATE_EXECUTABLE:-}" = "1" ]; then
   printf '%s\\n' '#!/bin/sh' 'exit 99' > "$0.replacement"
   chmod 755 "$0.replacement"
@@ -171,15 +177,20 @@ try {
     command_id: "fixture-test",
     purpose: "test",
     working_directory: ".",
-    safe_argv: ["node", "workspace-test.mjs"],
-    execution_form: "direct_argv",
+    safe_argv: null,
+    execution_form: "codex_shell_command",
+    shell_family: "posix_bash",
+    shell_envelope: { executable: "/bin/bash", arguments: ["-lc"] },
+    canonical_script: "node workspace-test.mjs",
     requirement: "required",
     alternative_group_id: null,
     timeout_ms: 5000,
   };
+  command.logical_command_digest = logicalCommandDigest(command);
+  command.rendered_event_command_digest = renderedEventCommandDigest(command);
   command.command_contract_digest = computeCommandContractDigest(command);
   const contract = {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
     schema_path: "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
     program: "adaptive_ask_verification_command_contract",
     fixture_id: config.fixtures[0].id,

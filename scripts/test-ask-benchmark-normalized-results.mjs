@@ -50,7 +50,7 @@ function readGeneration(output, sourceSnapshotDigest = null) {
 
 function runtimeConfig(adapter, availability = "available") {
   return {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     adapter,
     availability,
     unavailable_reason: availability === "unavailable" ? "fixture_runtime_unavailable" : null,
@@ -73,7 +73,7 @@ function runtimeConfig(adapter, availability = "available") {
       }
       : null,
     command_evidence: adapter === "codex"
-      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.0.0" }
+      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.1.0" }
       : { capture_required: true, support: "unsupported", event_transport: "none", event_format_revision: null, parser_revision: null },
   };
 }

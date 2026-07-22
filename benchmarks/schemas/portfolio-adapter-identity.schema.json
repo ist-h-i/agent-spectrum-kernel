@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "adapter", "runtime_config_sha256", "availability", "unavailable_reason", "executor", "model", "reasoning_effort", "sandbox_policy", "permission_policy", "case_timeout_ms", "thermal_state", "environment_allowlist", "environment_value_allowlist", "environment_snapshot", "executable", "effective_command", "effective_command_digest", "policy_enforcement", "availability_evidence", "command_evidence"],
   "properties": {
-    "schema_version": { "const": "1.1.0" },
+    "schema_version": { "const": "1.2.0" },
     "adapter": { "enum": ["codex", "claude"] },
     "runtime_config_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "availability": { "enum": ["available", "unavailable"] },
@@ -92,7 +92,19 @@
         "parser_revision": { "type": ["string", "null"] },
         "contract_probe_evidence": { "enum": ["local_version_help_json_probe", "declared_unavailable", "adapter_event_contract_not_implemented", "contract_probe_failed"] },
         "downgrade_reason": { "type": ["string", "null"], "minLength": 1 }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "evidence_level": { "const": "executed" } }, "required": ["evidence_level"] },
+          "then": { "properties": { "support": { "const": "supported" }, "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.1.0" }, "contract_probe_evidence": { "const": "local_version_help_json_probe" }, "downgrade_reason": { "type": "null" } } },
+          "else": { "properties": { "downgrade_reason": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "support": { "const": "supported" } }, "required": ["support"] },
+          "then": { "properties": { "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.1.0" } } },
+          "else": { "properties": { "evidence_level": { "const": "unavailable" }, "event_transport": { "const": "none" }, "event_format_revision": { "type": "null" }, "parser_revision": { "type": "null" } } }
+        }
+      ]
     }
   }
 }

@@ -17,7 +17,7 @@ import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { projectVerifiedCommandEvidence } from "./ask-benchmark-command-evidence.mjs";
 
-export const NORMALIZER_VERSION = "1.1.0";
+export const NORMALIZER_VERSION = "1.2.0";
 export const NORMALIZED_RESULT_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-result.schema.json";
 export const NORMALIZED_RUN_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-run.schema.json";
 export const NORMALIZED_ROOT_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-root.schema.json";
@@ -191,7 +191,7 @@ function normalizedResultBase({ inspection, inspectedCase, attempt, adapterIdent
   const { entry } = inspectedCase;
   const telemetry = telemetryFor(attempt, adapterIdentity);
   return {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     schema_path: NORMALIZED_RESULT_SCHEMA_PATH,
     program: "adaptive_ask_normalized_execution_result",
     lineage: {
@@ -267,7 +267,49 @@ export function validateNormalizedPortfolioResult(record, { root } = {}) {
   }).slice("sha256:".length, "sha256:".length + 32)}`;
   if (digest !== expectedDigest || id !== expectedId) throw new Error(`${base.lineage.case_id}/${base.lineage.attempt} normalized result identity is invalid`);
   assertBenchmarkSchemaInstance(record, { schemaPath: resolve(root, NORMALIZED_RESULT_SCHEMA_PATH), label: `${base.lineage.case_id}/${base.lineage.attempt} normalized result` });
+  validateNormalizedCommandEvidence(record.command_evidence);
   return record;
+}
+
+export function validateNormalizedCommandEvidence(evidence) {
+  if (evidence.command_event_count !== evidence.references.length) throw new Error("normalized command event count is inconsistent");
+  const matched = evidence.references.filter(({ command_id: id }) => id !== null);
+  const grouped = new Map();
+  for (const reference of matched) grouped.set(reference.command_id, [...(grouped.get(reference.command_id) ?? []), reference]);
+  if (stableCanonicalJson([...grouped.keys()].sort()) !== stableCanonicalJson([...evidence.attempted_command_ids].sort())) throw new Error("normalized attempted command inventory is inconsistent");
+  const expectedSummaries = evidence.attempted_command_ids.map((commandId) => {
+    const executions = grouped.get(commandId) ?? [];
+    if (executions.length === 0) throw new Error("normalized attempted command lacks an evidence reference");
+    return {
+      command_id: commandId,
+      execution_count: executions.length,
+      latest_outcome: executions.at(-1).outcome,
+      any_success: executions.some(({ outcome }) => outcome === "succeeded"),
+      any_failure: executions.some(({ outcome }) => outcome === "failed"),
+    };
+  });
+  if (stableCanonicalJson(evidence.command_summaries) !== stableCanonicalJson(expectedSummaries)) throw new Error("normalized repeated command summary is inconsistent");
+  const latest = new Map(expectedSummaries.map((summary) => [summary.command_id, summary.latest_outcome]));
+  if (stableCanonicalJson(evidence.succeeded_command_ids) !== stableCanonicalJson(evidence.attempted_command_ids.filter((id) => latest.get(id) === "succeeded"))) throw new Error("normalized succeeded command inventory is inconsistent");
+  if (stableCanonicalJson(evidence.failed_command_ids) !== stableCanonicalJson(evidence.attempted_command_ids.filter((id) => latest.get(id) === "failed"))) throw new Error("normalized failed command inventory is inconsistent");
+  const expectedUnavailable = evidence.required_command_ids.filter((id) => !latest.has(id));
+  if (stableCanonicalJson(evidence.unavailable_command_ids) !== stableCanonicalJson(expectedUnavailable)) throw new Error("normalized unavailable command inventory is inconsistent");
+  if (evidence.unmatched_command_count !== evidence.references.filter(({ command_id: id }) => id === null).length) throw new Error("normalized unmatched command count is inconsistent");
+  const groupIds = new Set();
+  const memberIds = new Set();
+  for (const group of evidence.required_alternative_groups) {
+    if (groupIds.has(group.group_id)) throw new Error("normalized alternative group ID is duplicated");
+    groupIds.add(group.group_id);
+    for (const id of group.member_ids) {
+      if (memberIds.has(id)) throw new Error("normalized alternative command belongs to multiple groups");
+      memberIds.add(id);
+    }
+    const attempted = group.member_ids.filter((id) => latest.has(id));
+    const succeeded = group.member_ids.filter((id) => latest.get(id) === "succeeded");
+    if (stableCanonicalJson(group.attempted_ids) !== stableCanonicalJson(attempted) || stableCanonicalJson(group.succeeded_ids) !== stableCanonicalJson(succeeded)) throw new Error("normalized alternative group inventory is inconsistent");
+    const state = evidence.evidence_level === "unavailable" ? "unavailable" : succeeded.length > 0 ? "satisfied" : "unsatisfied";
+    if (group.satisfaction_state !== state) throw new Error("normalized alternative group satisfaction is inconsistent");
+  }
 }
 
 function countCases(cases, predicate) {
@@ -434,7 +476,7 @@ function buildNormalizedArtifacts({ root, inspection }) {
   const sourceSnapshot = sourceSnapshotFor(inspection, cases);
   const sourceSnapshotDigest = canonicalDigest(sourceSnapshot);
   const manifestWithoutDigest = {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     schema_path: NORMALIZED_RUN_SCHEMA_PATH,
     program: "adaptive_ask_normalized_execution_run",
     artifact_role: "derived_execution_evidence",

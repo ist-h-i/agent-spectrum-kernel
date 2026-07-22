@@ -658,10 +658,12 @@ export function validateExecutionEventEvidenceReferences({ normalized, result })
     const item = verified.get(reference.digest);
     if (!item || item.bytes !== reference.bytes) throw new Error("evaluator result contains an unverified or transplanted execution-event reference");
   }
-  if (normalized.command_evidence.required_command_ids.length > 0 && result.verification_correctness.state === "pass") {
+  const requiredGroups = normalized.command_evidence.required_alternative_groups ?? [];
+  if ((normalized.command_evidence.required_command_ids.length > 0 || requiredGroups.length > 0) && result.verification_correctness.state === "pass") {
     if (executionReferences.length === 0) throw new Error("verification correctness cannot pass without verified execution-event evidence");
     const successes = new Set(normalized.command_evidence.succeeded_command_ids);
     if (normalized.command_evidence.required_command_ids.some((id) => !successes.has(id))) throw new Error("verification correctness cannot pass while required command evidence is absent or unsuccessful");
+    if (requiredGroups.some(({ satisfaction_state: state }) => state !== "satisfied")) throw new Error("verification correctness cannot pass while a required alternative command group is unsatisfied");
   }
   return structuredClone(executionReferences);
 }

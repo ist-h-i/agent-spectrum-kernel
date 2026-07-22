@@ -188,7 +188,7 @@ function normalizedResult({ source, adapterDigests, caseRecord, attempt, outcome
     final_output_bytes: finalOutput.bytes,
   };
   const base = {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     schema_path: "benchmarks/schemas/normalized-portfolio-result.schema.json",
     program: "adaptive_ask_normalized_execution_result",
     lineage: {
@@ -225,6 +225,8 @@ function normalizedResult({ source, adapterDigests, caseRecord, attempt, outcome
       command_event_count: 0,
       verification_command_contract_digest: null,
       required_command_ids: [],
+      required_alternative_groups: [],
+      command_summaries: [],
       attempted_command_ids: [],
       succeeded_command_ids: [],
       failed_command_ids: [],
@@ -357,15 +359,15 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir 
     };
   });
   const manifestWithoutDigest = {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     schema_path: "benchmarks/schemas/normalized-portfolio-run.schema.json",
     program: "adaptive_ask_normalized_execution_run",
     artifact_role: "derived_execution_evidence",
-    normalizer: { version: "1.1.0", source_revision: source.repository_revision },
+    normalizer: { version: "1.2.0", source_revision: source.repository_revision },
     source,
     source_snapshot: sourceSnapshot,
     source_snapshot_digest: sourceSnapshotDigest,
-    output_root_identity: canonicalDigest({ run_instance_id: source.run_instance_id, plan_id: source.plan_id, normalizer_version: "1.1.0", source_snapshot_digest: sourceSnapshotDigest }),
+    output_root_identity: canonicalDigest({ run_instance_id: source.run_instance_id, plan_id: source.plan_id, normalizer_version: "1.2.0", source_snapshot_digest: sourceSnapshotDigest }),
     pool_adapter_results: false,
     completeness: {
       partial: false,
@@ -400,7 +402,7 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir 
     schema_path: "benchmarks/schemas/normalized-portfolio-root.schema.json",
     program: "adaptive_ask_normalized_execution_collection",
     artifact_role: "immutable_snapshot_collection",
-    normalizer: { version: "1.1.0", source_revision: source.repository_revision },
+    normalizer: { version: "1.2.0", source_revision: source.repository_revision },
     source: {
       run_instance_id: source.run_instance_id,
       run_identity_digest: source.run_identity_digest,
@@ -1357,6 +1359,7 @@ try {
   const normalizedExecutionEvidence = {
     command_evidence: {
       required_command_ids: ["fixture-test"],
+      required_alternative_groups: [],
       succeeded_command_ids: ["fixture-test"],
       references: [{ command_id: "fixture-test", command_evidence_id: `command-evidence-${"a".repeat(32)}`, digest: executionEvidenceDigest, bytes: 321, outcome: "succeeded", exit_code: 0 }],
     },
@@ -1365,6 +1368,20 @@ try {
   assert.equal(validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: evaluatorExecutionReference }).length, 1, "verified normalized execution evidence must be referenceable by the evaluator");
   assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [] } } }), /cannot pass without verified execution-event/u, "verification pass without execution evidence must fail closed");
   assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 322 }] } } }), /unverified or transplanted/u, "execution evidence byte drift must be rejected");
+
+  const alternativeExecutionEvidence = {
+    command_evidence: {
+      required_command_ids: [],
+      required_alternative_groups: [{ group_id: "fixture-alternatives", member_ids: ["fixture-a", "fixture-b"], attempted_ids: ["fixture-b"], succeeded_ids: ["fixture-b"], satisfaction_state: "satisfied" }],
+      succeeded_command_ids: ["fixture-b"],
+      references: [{ command_id: "fixture-b", command_evidence_id: `command-evidence-${"b".repeat(32)}`, digest: executionEvidenceDigest, bytes: 321, outcome: "succeeded", exit_code: 0 }],
+    },
+  };
+  assert.equal(validateExecutionEventEvidenceReferences({ normalized: alternativeExecutionEvidence, result: evaluatorExecutionReference }).length, 1, "one successful member must satisfy a required alternative group");
+  const unsatisfiedAlternativeEvidence = structuredClone(alternativeExecutionEvidence);
+  unsatisfiedAlternativeEvidence.command_evidence.required_alternative_groups[0].satisfaction_state = "unsatisfied";
+  unsatisfiedAlternativeEvidence.command_evidence.required_alternative_groups[0].succeeded_ids = [];
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: unsatisfiedAlternativeEvidence, result: evaluatorExecutionReference }), /alternative command group/u, "an unsatisfied required alternative group must fail closed");
 
   assert.deepEqual(snapshot(privateRoot), beforePrivate, "all evaluator failure paths must keep the private bundle byte-identical");
   assert.deepEqual(snapshot(materialized), beforeMaterialized, "all evaluator failure paths must keep materialized inputs byte-identical");
