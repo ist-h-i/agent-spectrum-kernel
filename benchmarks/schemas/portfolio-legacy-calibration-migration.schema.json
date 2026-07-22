@@ -1,0 +1,308 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Legacy checkpoint calibration compatibility migration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schema_path", "program", "migration_revision", "source_authority", "target_authority", "fixture_migrations", "boundaries", "migration_id", "migration_digest"],
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "nullableNonNegative": { "type": ["number", "null"], "minimum": 0 },
+    "condition": { "enum": ["plain", "kernel_only", "full_ask"] },
+    "repetitionEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "value"],
+      "properties": {
+        "status": { "enum": ["recorded", "not_recorded"] },
+        "value": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["valid_blocking_or_major_findings", "major_findings_missed", "unsupported_or_false_positive_findings", "merge_decision_correct", "requirement_satisfaction_rate", "requirements_total", "requirements_satisfied", "hidden_test_counts", "scope_deviations", "changed_file_count", "automated_correction_units", "unverified_completion_or_readiness_claims", "rework_count"],
+      "properties": {
+        "valid_blocking_or_major_findings": { "$ref": "#/$defs/nullableNonNegative" },
+        "major_findings_missed": { "$ref": "#/$defs/nullableNonNegative" },
+        "unsupported_or_false_positive_findings": { "$ref": "#/$defs/nullableNonNegative" },
+        "merge_decision_correct": { "type": ["boolean", "null"] },
+        "requirement_satisfaction_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "requirements_total": { "type": ["integer", "null"], "minimum": 0 },
+        "requirements_satisfied": { "type": ["integer", "null"], "minimum": 0 },
+        "hidden_test_counts": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["total", "passed", "failed", "exit_code"],
+              "properties": {
+                "total": { "type": "integer", "minimum": 0 },
+                "passed": { "type": ["integer", "null"], "minimum": 0 },
+                "failed": { "type": ["integer", "null"], "minimum": 0 },
+                "exit_code": { "type": ["integer", "null"] }
+              }
+            }
+          ]
+        },
+        "scope_deviations": { "type": "integer", "minimum": 0 },
+        "changed_file_count": { "type": ["integer", "null"], "minimum": 0 },
+        "automated_correction_units": { "$ref": "#/$defs/nullableNonNegative" },
+        "unverified_completion_or_readiness_claims": { "type": "integer", "minimum": 0 },
+        "rework_count": { "$ref": "#/$defs/nullableNonNegative" }
+      }
+    },
+    "humanEffort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["senior_review_minutes", "additional_investigation_minutes", "unresolved_human_decisions"],
+      "properties": {
+        "senior_review_minutes": { "$ref": "#/$defs/nullableNonNegative" },
+        "additional_investigation_minutes": { "$ref": "#/$defs/nullableNonNegative" },
+        "unresolved_human_decisions": { "$ref": "#/$defs/nullableNonNegative" }
+      }
+    },
+    "costLatency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total_duration_ms", "ai_tool_execution_ms", "input_tokens", "output_tokens", "usage_cost", "final_output_bytes"],
+      "properties": {
+        "total_duration_ms": { "$ref": "#/$defs/nullableNonNegative" },
+        "ai_tool_execution_ms": { "$ref": "#/$defs/nullableNonNegative" },
+        "input_tokens": { "$ref": "#/$defs/nullableNonNegative" },
+        "output_tokens": { "$ref": "#/$defs/nullableNonNegative" },
+        "usage_cost": { "$ref": "#/$defs/nullableNonNegative" },
+        "final_output_bytes": { "$ref": "#/$defs/nullableNonNegative" }
+      }
+    },
+    "adoption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correct_route", "under_processing", "over_processing", "contracts_reported"],
+      "properties": {
+        "correct_route": { "type": ["boolean", "null"] },
+        "under_processing": { "type": ["boolean", "null"] },
+        "over_processing": { "type": ["boolean", "null"] },
+        "contracts_reported": { "type": "boolean" }
+      }
+    },
+    "runtimeEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projected_assets_available", "full_skill_projection_available", "execution_status", "output_digest", "capability_downgrade"],
+      "properties": {
+        "projected_assets_available": { "enum": ["present", "missing", "not_applicable"] },
+        "full_skill_projection_available": { "type": ["boolean", "null"] },
+        "execution_status": { "enum": ["executed", "failed", "unknown"] },
+        "output_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" },
+        "capability_downgrade": { "type": ["string", "null"] }
+      }
+    },
+    "checkpointCAttribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline_checkpoint", "baseline_result_path", "baseline_repository_revision", "fixture_manifest_path", "fixture_manifest_sha256", "architecture", "model", "cli", "adapter", "repository"],
+      "properties": {
+        "baseline_checkpoint": { "const": "B2" },
+        "baseline_result_path": { "const": "benchmarks/results/checkpoint-b2-2026-07-12.json" },
+        "baseline_repository_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "fixture_manifest_path": { "type": "string", "minLength": 1 },
+        "fixture_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "architecture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseline", "current", "issue", "merge_revision", "canonical_contract_revision", "canonical_source_digest"],
+          "properties": {
+            "baseline": { "type": "string", "minLength": 1 },
+            "current": { "type": "string", "minLength": 1 },
+            "issue": { "type": "integer", "minimum": 1 },
+            "merge_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+            "canonical_contract_revision": { "type": "string", "minLength": 1 },
+            "canonical_source_digest": { "$ref": "#/$defs/digest" }
+          }
+        },
+        "model": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseline", "current", "changed"],
+          "properties": {
+            "baseline": { "type": "string", "minLength": 1 },
+            "current": { "type": "string", "minLength": 1 },
+            "changed": { "type": "boolean" }
+          }
+        },
+        "cli": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseline", "current", "changed"],
+          "properties": {
+            "baseline": { "type": "string", "minLength": 1 },
+            "current": { "type": "string", "minLength": 1 },
+            "changed": { "type": "boolean" }
+          }
+        },
+        "adapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "baseline_projection_digest", "baseline_evidence", "current_profile", "renderer_version", "runtime_bundle_path", "runtime_bundle_sha256", "profile_fingerprint", "projected_asset_digest"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "baseline_projection_digest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+            "baseline_evidence": { "enum": ["unknown", "available"] },
+            "current_profile": { "type": "string", "minLength": 1 },
+            "renderer_version": { "type": "string", "minLength": 1 },
+            "runtime_bundle_path": { "type": "string", "minLength": 1 },
+            "runtime_bundle_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "profile_fingerprint": { "$ref": "#/$defs/digest" },
+            "projected_asset_digest": { "$ref": "#/$defs/digest" }
+          }
+        },
+        "repository": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseline_revision", "current_revision_source", "fixture_inputs_changed"],
+          "properties": {
+            "baseline_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+            "current_revision_source": { "const": "protocol.repository_revision" },
+            "fixture_inputs_changed": { "const": false }
+          }
+        }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-legacy-calibration-migration.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio" },
+    "migration_revision": { "const": "issue-197-legacy-calibration-r1" },
+    "source_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_path", "checkpoint", "source_raw_byte_digest", "source_semantic_digest", "legacy_schema_path", "protocol_identity", "runtime_identity", "checkpoint_c_attribution"],
+      "properties": {
+        "source_path": { "enum": ["benchmarks/results/checkpoint-b-2026-07-12.json", "benchmarks/results/checkpoint-b2-2026-07-12.json", "benchmarks/results/checkpoint-c-2026-07-14.json"] },
+        "checkpoint": { "enum": ["B", "B2", "C"] },
+        "source_raw_byte_digest": { "$ref": "#/$defs/digest" },
+        "source_semantic_digest": { "$ref": "#/$defs/digest" },
+        "legacy_schema_path": { "const": "benchmarks/schemas/result.schema.json" },
+        "protocol_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "frozen_at", "protocol_digest", "config_digest", "repository_revision"],
+          "properties": {
+            "status": { "const": "frozen" },
+            "frozen_at": { "type": "string", "minLength": 1 },
+            "protocol_digest": { "$ref": "#/$defs/digest" },
+            "config_digest": { "$ref": "#/$defs/digest" },
+            "repository_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+          }
+        },
+        "runtime_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["agent", "agent_version", "observed_agent_version", "model", "reasoning_effort", "sequential", "case_timeout_ms", "network_required_by_fixtures"],
+          "properties": {
+            "agent": { "type": "string", "minLength": 1 },
+            "agent_version": { "type": "string", "minLength": 1 },
+            "observed_agent_version": { "type": ["string", "null"] },
+            "model": { "type": "string", "minLength": 1 },
+            "reasoning_effort": { "type": "string", "minLength": 1 },
+            "sequential": { "type": "boolean" },
+            "case_timeout_ms": { "type": ["integer", "null"], "minimum": 1 },
+            "network_required_by_fixtures": { "type": "boolean" }
+          }
+        },
+        "checkpoint_c_attribution": { "oneOf": [{ "$ref": "#/$defs/checkpointCAttribution" }, { "type": "null" }] }
+      }
+    },
+    "target_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalog_revision", "catalog_digest", "policy_revision", "policy_manifest_digest"],
+      "properties": {
+        "catalog_revision": { "type": "string", "minLength": 1 },
+        "catalog_digest": { "$ref": "#/$defs/digest" },
+        "policy_revision": { "type": "string", "minLength": 1 },
+        "policy_manifest_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "fixture_migrations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_fixture_id", "mapping_status", "target_fixture_id", "target_fixture_metadata_digest", "source_task_class", "target_task_class", "target_fixture_role", "target_suite", "target_repetitions", "target_aggregate_eligible", "source_conditions", "missing_current_conditions", "source_repetition_evidence", "run_projections", "compatibility_status", "current_scoring_status", "non_ready_reason_codes"],
+        "properties": {
+          "source_fixture_id": { "type": "string", "minLength": 1 },
+          "mapping_status": { "enum": ["mapped_calibration_fixture", "unmapped_legacy_history"] },
+          "target_fixture_id": { "type": ["string", "null"] },
+          "target_fixture_metadata_digest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+          "source_task_class": { "enum": ["review", "implementation"] },
+          "target_task_class": { "type": ["string", "null"] },
+          "target_fixture_role": { "enum": ["calibration", null] },
+          "target_suite": { "enum": ["calibration", null] },
+          "target_repetitions": { "type": ["integer", "null"], "minimum": 1 },
+          "target_aggregate_eligible": { "enum": [false, null] },
+          "source_conditions": { "type": "array", "items": { "$ref": "#/$defs/condition" }, "minItems": 3, "maxItems": 3 },
+          "missing_current_conditions": { "const": ["adaptive_ask"] },
+          "source_repetition_evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "recorded_values"],
+            "properties": {
+              "status": { "enum": ["recorded", "not_recorded"] },
+              "recorded_values": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "maxItems": 1 }
+            }
+          },
+          "run_projections": {
+            "type": "array",
+            "minItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source_case_id", "condition", "repetition_evidence", "task_class", "outcome_quality", "human_effort", "cost_latency", "adoption_behavior", "runtime_evidence", "source_run_canonical_digest"],
+              "properties": {
+                "source_case_id": { "type": "string", "minLength": 1 },
+                "condition": { "$ref": "#/$defs/condition" },
+                "repetition_evidence": { "$ref": "#/$defs/repetitionEvidence" },
+                "task_class": { "enum": ["review", "implementation"] },
+                "outcome_quality": { "$ref": "#/$defs/quality" },
+                "human_effort": { "$ref": "#/$defs/humanEffort" },
+                "cost_latency": { "$ref": "#/$defs/costLatency" },
+                "adoption_behavior": { "$ref": "#/$defs/adoption" },
+                "runtime_evidence": { "$ref": "#/$defs/runtimeEvidence" },
+                "source_run_canonical_digest": { "$ref": "#/$defs/digest" }
+              }
+            }
+          },
+          "compatibility_status": { "enum": ["mapped_legacy_calibration_readable", "unmapped_legacy_history_readable"] },
+          "current_scoring_status": { "const": "not_scoring_ready" },
+          "non_ready_reason_codes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "enum": ["adaptive_condition_absent", "current_repetition_requirement_unsatisfied", "current_normalized_authority_absent", "current_evaluator_authority_absent", "current_engineering_result_authority_absent", "legacy_metric_semantics_not_equivalent", "current_catalog_mapping_absent"] }
+          }
+        }
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_role", "calibration_only", "aggregate_eligible", "current_scoring_status", "legacy_metric_semantics", "adaptive_run_generated", "current_authority_identities_generated", "product_value_claimed"],
+      "properties": {
+        "artifact_role": { "const": "read_only_legacy_calibration_compatibility" },
+        "calibration_only": { "const": true },
+        "aggregate_eligible": { "const": false },
+        "current_scoring_status": { "const": "not_scoring_ready" },
+        "legacy_metric_semantics": { "const": "not_equivalent_to_current_portfolio_metrics" },
+        "adaptive_run_generated": { "const": false },
+        "current_authority_identities_generated": { "const": false },
+        "product_value_claimed": { "const": false }
+      }
+    },
+    "migration_id": { "type": "string", "pattern": "^legacy-calibration-migration-[a-f0-9]{32}$" },
+    "migration_digest": { "$ref": "#/$defs/digest" }
+  }
+}

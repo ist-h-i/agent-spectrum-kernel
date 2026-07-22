@@ -278,6 +278,16 @@ Each fixture serializes a closed run-authority/readiness inventory for all four 
 
 The mechanism scorecard is a raw state/count artifact. Mechanism numeric score, observed/missing rate, ranking, transition matrix, condition comparison, win/loss/tie, meaningful delta, quality credit, Skill-load credit, agent-start credit, artifact-creation credit, weighting, cross-fixture/suite aggregate, adapter pooling, product value, measured execution, and Issue #198 authorization are all absent and false.
 
+## Legacy calibration compatibility migration
+
+Checkpoint B, B2, and C results use the frozen legacy `result.schema.json`; they are not current normalized, evaluator, engineering-result, result-set, or repetition-report authorities. `migrate-legacy-calibration-result` stable-reads one approved checked-in source, requires byte identity with `HEAD` (or an explicit immutable raw-byte digest under a custom test root), validates the legacy Schema, fully validates the current catalog and policy artifacts, and derives a closed calibration-only compatibility artifact. Its source authority binds raw-byte and sorted-key semantic digests plus protocol, runtime, and Checkpoint C attribution. Its target authority binds the current catalog revision/digest and policy revision/manifest digest.
+
+Only these mappings exist: `impl-rule-batch-medium-hard -> cal-atomic-rule-batch`, `impl-transfer-hard -> cal-concurrent-transfer`, `pr-export-lease-hard -> cal-export-lease`, and `pr-session-refresh-medium-hard -> cal-session-refresh`. Each target is re-read from the current catalog and must remain calibration role, calibration suite, aggregate-ineligible, and task-class compatible. Checkpoint B's `review-001` and `implementation-001` remain explicitly unmapped. No similarity or metric value can create another mapping.
+
+Run projections preserve source case ID, condition, recorded-or-unrecorded repetition evidence, task class, non-answer-bearing quality counts/booleans/nulls, human-effort nulls, token/duration/output/cost values, adoption behavior, runtime availability/downgrade evidence, and a canonical source-run digest. Hidden-test names, passed/failed name arrays, concrete requirement failures, evaluator oracle/rubric, reference patches, prompts, full outputs, and answer-bearing comparison reasons are excluded recursively. `adaptive_ask` remains an explicit missing condition; B's absent repetition is never filled with `1`, and B2/C's recorded `1` is never amplified to the current three/five requirement.
+
+Every migration is `not_scoring_ready`, calibration-only, aggregate-ineligible, and declares legacy metric semantics non-equivalent to current portfolio metrics. Migration ID binds source authority, target authority, and ordered fixture/run closure; migration digest binds the complete artifact except itself. Timestamps are not added to identity and negative zero is canonicalized. Full verification stable-reads the supplied artifact, validates Schema and semantics, completely re-derives it from source/catalog/policy authority, compares canonical equality, and re-stable-reads the supplied artifact to reject path, canonical path, device, inode, metadata, digest, or byte replacement. Publication uses atomic no-replace and rejects overlap with source, authorities, validation inventory, or another migration input.
+
 ## Paired per-fixture condition comparison report
 
 `report-engineering-paired-comparisons` consumes only the full repetition-report verifier return, its underlying full result-set authority, and the recursively frozen B1 scoring policy. It derives exactly the three policy-ordered views `kernel_vs_plain`, `adaptive_vs_kernel`, and diagnostic-only `full_vs_kernel_diagnostic`. Every observation pairs the same adapter, fixture, and repetition, and records raw `comparison - baseline` deltas. Structural omissions, duplicates, reversals, cross-fixture/adapter/repetition pairing, policy or requirement authority drift, and mechanism ID/classification inventory drift fail closed.
@@ -398,6 +408,14 @@ node scripts/ask-benchmark.mjs verify-engineering-mechanism-scorecard \
   --result-set /path/to/engineering-result-set.json \
   --repetition-report /path/to/repetition-report.json \
   --input /path/to/mechanism-scorecard.json
+
+node scripts/ask-benchmark.mjs migrate-legacy-calibration-result \
+  --input benchmarks/results/checkpoint-b2-2026-07-12.json \
+  --output /path/to/legacy-calibration-migration.json
+
+node scripts/ask-benchmark.mjs verify-legacy-calibration-migration \
+  --source benchmarks/results/checkpoint-b2-2026-07-12.json \
+  --input /path/to/legacy-calibration-migration.json
 ```
 
 ```bash

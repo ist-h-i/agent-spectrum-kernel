@@ -82,6 +82,10 @@
       "argv": ["node", "scripts/test-ask-benchmark-portfolio-mechanism-scorecard.mjs"]
     },
     {
+      "id": "portfolio_legacy_calibration_migration",
+      "argv": ["node", "scripts/test-ask-benchmark-portfolio-legacy-calibration-migration.mjs"]
+    },
+    {
       "id": "adapter_runtime_bundle",
       "argv": ["node", "scripts/adapter-runtime-bundle.mjs", "--check"]
     },

@@ -28,6 +28,7 @@ const DISALLOWED_EXACT_PATHS = new Set([
   "scripts/test-ask-benchmark-portfolio-paired-comparison-report.mjs",
   "scripts/test-ask-benchmark-portfolio-directional-outcome-report.mjs",
   "scripts/test-ask-benchmark-portfolio-mechanism-scorecard.mjs",
+  "scripts/test-ask-benchmark-portfolio-legacy-calibration-migration.mjs",
   "scripts/test-ask-benchmark.mjs",
   "scripts/test-validate-repo.mjs",
   "scripts/validate-repo.mjs",

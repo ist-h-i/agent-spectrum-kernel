@@ -32,6 +32,7 @@ import { reportEngineeringResultRepetitions, verifyEngineeringRepetitionReport }
 import { reportEngineeringPairedComparisons, verifyEngineeringPairedComparisonReport } from "./ask-benchmark-portfolio-paired-comparison-report.mjs";
 import { reportEngineeringDirectionalOutcomes, verifyEngineeringDirectionalOutcomeReport } from "./ask-benchmark-portfolio-directional-outcome-report.mjs";
 import { reportEngineeringMechanismScorecards, verifyEngineeringMechanismScorecard } from "./ask-benchmark-portfolio-mechanism-scorecard.mjs";
+import { migrateLegacyCalibrationResult, verifyLegacyCalibrationMigration } from "./ask-benchmark-portfolio-legacy-calibration-migration.mjs";
 import {
   DEFAULT_PORTFOLIO_CATALOG_PATH,
   DEFAULT_PORTFOLIO_SIMILARITY_PATH,
@@ -79,10 +80,11 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, pairedComparisonReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, source: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, pairedComparisonReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
+    else if (flag === "--source") args.source = resolve(argv.shift());
     else if (flag === "--plan") args.plan = resolve(argv.shift());
     else if (flag === "--materialized") args.materialized = resolve(argv.shift());
     else if (flag === "--state-dir") args.stateDir = resolve(argv.shift());
@@ -142,6 +144,8 @@ Commands:
   validate-portfolio-policy [--policy-manifest <manifest.json>] [--admission-policy <policy.json>] [--scoring-policy <policy.json>] [--lineage-policy <policy.json>]
   validate-portfolio-design-admission [--design-admission-manifest <manifest.json>] [--design-review-package <package.json>]
   validate-portfolio-design-review [--independent-design-review <review.json>] [--design-reviewed-state <state.json>]
+  migrate-legacy-calibration-result --input <legacy-result.json> --output <absent-migration.json>
+  verify-legacy-calibration-migration --source <legacy-result.json> --input <migration.json>
   plan --config <portfolio-config.json> --output <execution-plan.json> --seed <value>
   materialize --config <portfolio-config.json> --plan <execution-plan.json> --output <absent-or-empty-directory>
   seal-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id> --input <selection-input.json>
@@ -1105,6 +1109,18 @@ function score(args) {
   console.log(`Wrote normalized benchmark result to ${args.output}`);
 }
 
+function migrateLegacyCalibrationResultCommand(args) {
+  if (!args.input || !args.output) throw new Error("migrate-legacy-calibration-result requires --input and --output");
+  const result = migrateLegacyCalibrationResult({ sourcePath: args.input, outputPath: args.output });
+  console.log(`Legacy calibration migration written: ${result.artifact.migration_id}`);
+}
+
+function verifyLegacyCalibrationMigrationCommand(args) {
+  if (!args.source || !args.input) throw new Error("verify-legacy-calibration-migration requires --source and --input");
+  const result = verifyLegacyCalibrationMigration({ sourcePath: args.source, migrationPath: args.input });
+  console.log(`Legacy calibration migration verified: ${result.artifact.migration_id}`);
+}
+
 try {
   const args = parseArgs(process.argv.slice(2));
   if (args.command === "validate") {
@@ -1127,7 +1143,9 @@ try {
     const review = validatePortfolioDesignIndependentReview({ independentReviewPath: args.independentDesignReviewPath });
     const state = validatePortfolioDesignReviewedState({ independentReviewPath: args.independentDesignReviewPath, reviewedStatePath: args.designReviewedStatePath });
     console.log(`Adaptive ASK portfolio design review validation passed: revision=${review.reviewRevision}, reviewer=${review.reviewerIdentity}, fixtures=${review.reviewedFixtureCount}, state=${state.projectedState}`);
-  } else if (args.command === "plan") planPortfolio(args);
+  } else if (args.command === "migrate-legacy-calibration-result") migrateLegacyCalibrationResultCommand(args);
+  else if (args.command === "verify-legacy-calibration-migration") verifyLegacyCalibrationMigrationCommand(args);
+  else if (args.command === "plan") planPortfolio(args);
   else if (args.command === "materialize") materialize(args);
   else if (args.command === "seal-selection") sealSelection(args);
   else if (args.command === "verify-selection") verifySelection(args);

@@ -1,0 +1,444 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-legacy-calibration-migration.schema.json",
+  "program": "adaptive_ask_portfolio",
+  "migration_revision": "issue-197-legacy-calibration-r1",
+  "source_authority": {
+    "source_path": "benchmarks/results/checkpoint-b-2026-07-12.json",
+    "checkpoint": "B",
+    "source_raw_byte_digest": "sha256:6cc61a07b4da9640a8f1a1e7ea66352faaf4858cbdbd28e12458700fed88db46",
+    "source_semantic_digest": "sha256:f9a009781f2c74c28abaa45addea89000e1018b0e09c4b52d7fb4d503cd3b7bd",
+    "legacy_schema_path": "benchmarks/schemas/result.schema.json",
+    "protocol_identity": {
+      "status": "frozen",
+      "frozen_at": "2026-07-12T00:00:00+09:00",
+      "protocol_digest": "sha256:2a1f78b7f088884284a8af6de96845e746e6d6ffcb354842928993dc37a47e2e",
+      "config_digest": "sha256:4104ecd5dcb9b83719a523a5e46650ef97577a028715bc89d90feda66fc3adff",
+      "repository_revision": "6daae5eb40194db4b814322022494c230be18fc3"
+    },
+    "runtime_identity": {
+      "agent": "codex-cli",
+      "agent_version": "0.144.1",
+      "observed_agent_version": "codex-cli 0.144.1",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high",
+      "sequential": true,
+      "case_timeout_ms": null,
+      "network_required_by_fixtures": false
+    },
+    "checkpoint_c_attribution": null
+  },
+  "target_authority": {
+    "catalog_revision": "issue-205-checkpoint-1",
+    "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+    "policy_revision": "issue-205-checkpoint-b1-r3",
+    "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41"
+  },
+  "fixture_migrations": [
+    {
+      "source_fixture_id": "implementation-001",
+      "mapping_status": "unmapped_legacy_history",
+      "target_fixture_id": null,
+      "target_fixture_metadata_digest": null,
+      "source_task_class": "implementation",
+      "target_task_class": null,
+      "target_fixture_role": null,
+      "target_suite": null,
+      "target_repetitions": null,
+      "target_aggregate_eligible": null,
+      "source_conditions": [
+        "plain",
+        "kernel_only",
+        "full_ask"
+      ],
+      "missing_current_conditions": [
+        "adaptive_ask"
+      ],
+      "source_repetition_evidence": {
+        "status": "not_recorded",
+        "recorded_values": []
+      },
+      "run_projections": [
+        {
+          "source_case_id": "case-d96ec91ae251",
+          "condition": "plain",
+          "repetition_evidence": {
+            "status": "not_recorded",
+            "value": null
+          },
+          "task_class": "implementation",
+          "outcome_quality": {
+            "valid_blocking_or_major_findings": null,
+            "major_findings_missed": null,
+            "unsupported_or_false_positive_findings": null,
+            "merge_decision_correct": null,
+            "requirement_satisfaction_rate": 1,
+            "requirements_total": null,
+            "requirements_satisfied": null,
+            "hidden_test_counts": {
+              "total": 7,
+              "passed": 7,
+              "failed": 0,
+              "exit_code": 0
+            },
+            "scope_deviations": 0,
+            "changed_file_count": 2,
+            "automated_correction_units": null,
+            "unverified_completion_or_readiness_claims": 0,
+            "rework_count": null
+          },
+          "human_effort": {
+            "senior_review_minutes": null,
+            "additional_investigation_minutes": null,
+            "unresolved_human_decisions": null
+          },
+          "cost_latency": {
+            "total_duration_ms": 76051,
+            "ai_tool_execution_ms": 76051,
+            "input_tokens": 89332,
+            "output_tokens": 3580,
+            "usage_cost": null,
+            "final_output_bytes": 1636
+          },
+          "adoption_behavior": {
+            "correct_route": true,
+            "under_processing": false,
+            "over_processing": null,
+            "contracts_reported": true
+          },
+          "runtime_evidence": {
+            "projected_assets_available": "not_applicable",
+            "full_skill_projection_available": null,
+            "execution_status": "executed",
+            "output_digest": "sha256:0c0d6e57fd27ca9eb85199160326c27ab6e2ff8da2d8c5e2820d552ecbafbc2e",
+            "capability_downgrade": null
+          },
+          "source_run_canonical_digest": "sha256:4bfbe2dd7f94cf66fd1ef6d447f585854ccc903da2509dea044fe44a01173661"
+        },
+        {
+          "source_case_id": "case-0040b4aa9849",
+          "condition": "kernel_only",
+          "repetition_evidence": {
+            "status": "not_recorded",
+            "value": null
+          },
+          "task_class": "implementation",
+          "outcome_quality": {
+            "valid_blocking_or_major_findings": null,
+            "major_findings_missed": null,
+            "unsupported_or_false_positive_findings": null,
+            "merge_decision_correct": null,
+            "requirement_satisfaction_rate": 1,
+            "requirements_total": null,
+            "requirements_satisfied": null,
+            "hidden_test_counts": {
+              "total": 7,
+              "passed": 7,
+              "failed": 0,
+              "exit_code": 0
+            },
+            "scope_deviations": 0,
+            "changed_file_count": 2,
+            "automated_correction_units": null,
+            "unverified_completion_or_readiness_claims": 0,
+            "rework_count": null
+          },
+          "human_effort": {
+            "senior_review_minutes": null,
+            "additional_investigation_minutes": null,
+            "unresolved_human_decisions": null
+          },
+          "cost_latency": {
+            "total_duration_ms": 81241,
+            "ai_tool_execution_ms": 81241,
+            "input_tokens": 101619,
+            "output_tokens": 3768,
+            "usage_cost": null,
+            "final_output_bytes": 1702
+          },
+          "adoption_behavior": {
+            "correct_route": false,
+            "under_processing": true,
+            "over_processing": null,
+            "contracts_reported": true
+          },
+          "runtime_evidence": {
+            "projected_assets_available": "present",
+            "full_skill_projection_available": null,
+            "execution_status": "executed",
+            "output_digest": "sha256:0fae7f47f0afa6e30c2b48a984a1405e4b48af0f10b6b22f267dc8e07dd2689b",
+            "capability_downgrade": null
+          },
+          "source_run_canonical_digest": "sha256:50f5b6e0604b232ff8c5495908d6eb5df49305aee6c3bc61a3de30bd83fbf68c"
+        },
+        {
+          "source_case_id": "case-793a06ea9035",
+          "condition": "full_ask",
+          "repetition_evidence": {
+            "status": "not_recorded",
+            "value": null
+          },
+          "task_class": "implementation",
+          "outcome_quality": {
+            "valid_blocking_or_major_findings": null,
+            "major_findings_missed": null,
+            "unsupported_or_false_positive_findings": null,
+            "merge_decision_correct": null,
+            "requirement_satisfaction_rate": 1,
+            "requirements_total": null,
+            "requirements_satisfied": null,
+            "hidden_test_counts": {
+              "total": 7,
+              "passed": 7,
+              "failed": 0,
+              "exit_code": 0
+            },
+            "scope_deviations": 0,
+            "changed_file_count": 2,
+            "automated_correction_units": null,
+            "unverified_completion_or_readiness_claims": 0,
+            "rework_count": null
+          },
+          "human_effort": {
+            "senior_review_minutes": null,
+            "additional_investigation_minutes": null,
+            "unresolved_human_decisions": null
+          },
+          "cost_latency": {
+            "total_duration_ms": 109734,
+            "ai_tool_execution_ms": 109734,
+            "input_tokens": 217519,
+            "output_tokens": 4285,
+            "usage_cost": null,
+            "final_output_bytes": 1762
+          },
+          "adoption_behavior": {
+            "correct_route": true,
+            "under_processing": false,
+            "over_processing": null,
+            "contracts_reported": true
+          },
+          "runtime_evidence": {
+            "projected_assets_available": "present",
+            "full_skill_projection_available": true,
+            "execution_status": "executed",
+            "output_digest": "sha256:d5e9e40c462c3fb3a326e77ccbe763276c116775cf7236e75c2c288c0d35bd8f",
+            "capability_downgrade": null
+          },
+          "source_run_canonical_digest": "sha256:1f446f06100da85566f80fbb14fb37f1287c947aa8806fc7310c26ccbd84beb6"
+        }
+      ],
+      "compatibility_status": "unmapped_legacy_history_readable",
+      "current_scoring_status": "not_scoring_ready",
+      "non_ready_reason_codes": [
+        "adaptive_condition_absent",
+        "current_normalized_authority_absent",
+        "current_evaluator_authority_absent",
+        "current_engineering_result_authority_absent",
+        "legacy_metric_semantics_not_equivalent",
+        "current_catalog_mapping_absent"
+      ]
+    },
+    {
+      "source_fixture_id": "review-001",
+      "mapping_status": "unmapped_legacy_history",
+      "target_fixture_id": null,
+      "target_fixture_metadata_digest": null,
+      "source_task_class": "review",
+      "target_task_class": null,
+      "target_fixture_role": null,
+      "target_suite": null,
+      "target_repetitions": null,
+      "target_aggregate_eligible": null,
+      "source_conditions": [
+        "plain",
+        "kernel_only",
+        "full_ask"
+      ],
+      "missing_current_conditions": [
+        "adaptive_ask"
+      ],
+      "source_repetition_evidence": {
+        "status": "not_recorded",
+        "recorded_values": []
+      },
+      "run_projections": [
+        {
+          "source_case_id": "case-25a8f384789a",
+          "condition": "plain",
+          "repetition_evidence": {
+            "status": "not_recorded",
+            "value": null
+          },
+          "task_class": "review",
+          "outcome_quality": {
+            "valid_blocking_or_major_findings": 2,
+            "major_findings_missed": 0,
+            "unsupported_or_false_positive_findings": 0,
+            "merge_decision_correct": null,
+            "requirement_satisfaction_rate": null,
+            "requirements_total": null,
+            "requirements_satisfied": null,
+            "hidden_test_counts": null,
+            "scope_deviations": 0,
+            "changed_file_count": null,
+            "automated_correction_units": null,
+            "unverified_completion_or_readiness_claims": 0,
+            "rework_count": null
+          },
+          "human_effort": {
+            "senior_review_minutes": null,
+            "additional_investigation_minutes": null,
+            "unresolved_human_decisions": null
+          },
+          "cost_latency": {
+            "total_duration_ms": 35268,
+            "ai_tool_execution_ms": 35268,
+            "input_tokens": 67413,
+            "output_tokens": 1413,
+            "usage_cost": null,
+            "final_output_bytes": 2157
+          },
+          "adoption_behavior": {
+            "correct_route": true,
+            "under_processing": false,
+            "over_processing": null,
+            "contracts_reported": true
+          },
+          "runtime_evidence": {
+            "projected_assets_available": "not_applicable",
+            "full_skill_projection_available": null,
+            "execution_status": "executed",
+            "output_digest": "sha256:b52ca983157e47fa945ceb959932ca1a46865de9d7b7b09130aa2b61fd204c8a",
+            "capability_downgrade": null
+          },
+          "source_run_canonical_digest": "sha256:4e6c8766f2b66838adf6de97a08f12bb31c02c3c652ce851bb5f497708f695d1"
+        },
+        {
+          "source_case_id": "case-f465d4c248cb",
+          "condition": "kernel_only",
+          "repetition_evidence": {
+            "status": "not_recorded",
+            "value": null
+          },
+          "task_class": "review",
+          "outcome_quality": {
+            "valid_blocking_or_major_findings": 2,
+            "major_findings_missed": 0,
+            "unsupported_or_false_positive_findings": 0,
+            "merge_decision_correct": null,
+            "requirement_satisfaction_rate": null,
+            "requirements_total": null,
+            "requirements_satisfied": null,
+            "hidden_test_counts": null,
+            "scope_deviations": 0,
+            "changed_file_count": null,
+            "automated_correction_units": null,
+            "unverified_completion_or_readiness_claims": 0,
+            "rework_count": null
+          },
+          "human_effort": {
+            "senior_review_minutes": null,
+            "additional_investigation_minutes": null,
+            "unresolved_human_decisions": null
+          },
+          "cost_latency": {
+            "total_duration_ms": 47551,
+            "ai_tool_execution_ms": 47551,
+            "input_tokens": 93479,
+            "output_tokens": 1895,
+            "usage_cost": null,
+            "final_output_bytes": 2358
+          },
+          "adoption_behavior": {
+            "correct_route": true,
+            "under_processing": false,
+            "over_processing": null,
+            "contracts_reported": true
+          },
+          "runtime_evidence": {
+            "projected_assets_available": "present",
+            "full_skill_projection_available": null,
+            "execution_status": "executed",
+            "output_digest": "sha256:9d3d9baf0874145e9499fb95f13639d38bfbd268f31bd345f98af69ae8da2cb6",
+            "capability_downgrade": null
+          },
+          "source_run_canonical_digest": "sha256:558265994b5306e7491941e57966be403d5b97c7d13564c58f6f1c9062673fff"
+        },
+        {
+          "source_case_id": "case-a171b7690f57",
+          "condition": "full_ask",
+          "repetition_evidence": {
+            "status": "not_recorded",
+            "value": null
+          },
+          "task_class": "review",
+          "outcome_quality": {
+            "valid_blocking_or_major_findings": 2,
+            "major_findings_missed": 0,
+            "unsupported_or_false_positive_findings": 0,
+            "merge_decision_correct": null,
+            "requirement_satisfaction_rate": null,
+            "requirements_total": null,
+            "requirements_satisfied": null,
+            "hidden_test_counts": null,
+            "scope_deviations": 0,
+            "changed_file_count": null,
+            "automated_correction_units": null,
+            "unverified_completion_or_readiness_claims": 0,
+            "rework_count": null
+          },
+          "human_effort": {
+            "senior_review_minutes": null,
+            "additional_investigation_minutes": null,
+            "unresolved_human_decisions": null
+          },
+          "cost_latency": {
+            "total_duration_ms": 84415,
+            "ai_tool_execution_ms": 84415,
+            "input_tokens": 243975,
+            "output_tokens": 2759,
+            "usage_cost": null,
+            "final_output_bytes": 2865
+          },
+          "adoption_behavior": {
+            "correct_route": true,
+            "under_processing": false,
+            "over_processing": null,
+            "contracts_reported": true
+          },
+          "runtime_evidence": {
+            "projected_assets_available": "present",
+            "full_skill_projection_available": true,
+            "execution_status": "executed",
+            "output_digest": "sha256:b9d92e9c2f2f321c93f4c0c6214c42829e0543e4a93d7f2463773c244d3197b8",
+            "capability_downgrade": null
+          },
+          "source_run_canonical_digest": "sha256:d02aa8e23b79ee6b711b67b4259d367f65470caaea8b8c011e39d1c78ba224ca"
+        }
+      ],
+      "compatibility_status": "unmapped_legacy_history_readable",
+      "current_scoring_status": "not_scoring_ready",
+      "non_ready_reason_codes": [
+        "adaptive_condition_absent",
+        "current_normalized_authority_absent",
+        "current_evaluator_authority_absent",
+        "current_engineering_result_authority_absent",
+        "legacy_metric_semantics_not_equivalent",
+        "current_catalog_mapping_absent"
+      ]
+    }
+  ],
+  "boundaries": {
+    "artifact_role": "read_only_legacy_calibration_compatibility",
+    "calibration_only": true,
+    "aggregate_eligible": false,
+    "current_scoring_status": "not_scoring_ready",
+    "legacy_metric_semantics": "not_equivalent_to_current_portfolio_metrics",
+    "adaptive_run_generated": false,
+    "current_authority_identities_generated": false,
+    "product_value_claimed": false
+  },
+  "migration_id": "legacy-calibration-migration-18c073250e0aed4cf48f69e25a3c4baf",
+  "migration_digest": "sha256:3b87e8b22f892a927de0726b949da03148fe3ff05271952b80a1750eb02543fe"
+}

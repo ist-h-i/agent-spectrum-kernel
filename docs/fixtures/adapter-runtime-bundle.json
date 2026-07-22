@@ -562,14 +562,49 @@
       "mechanism_scorecard_implementation_file_sha256": "7d584195745204db886e75d4e79d1eb5e8ea03e59df6b93e2067f4056ddc1044",
       "mechanism_scorecard_test_path": "scripts/test-ask-benchmark-portfolio-mechanism-scorecard.mjs",
       "mechanism_scorecard_test_file_sha256": "630d68a0973be8aaa6df988a4a2790afe05190b5fea0355000b58c19dba44d74",
+      "legacy_calibration_migration_schema_path": "benchmarks/schemas/portfolio-legacy-calibration-migration.schema.json",
+      "legacy_calibration_migration_schema_file_sha256": "60294edd35870ce137ca7ebbd832d39827f49e5d3fc014e84dac38aa25fde5d0",
+      "legacy_calibration_migration_implementation_path": "scripts/ask-benchmark-portfolio-legacy-calibration-migration.mjs",
+      "legacy_calibration_migration_implementation_file_sha256": "be2bed6a3b8f978d0fe1521918a085167a9f598fa047a53ea80e956026585bc6",
+      "legacy_calibration_migration_test_path": "scripts/test-ask-benchmark-portfolio-legacy-calibration-migration.mjs",
+      "legacy_calibration_migration_test_file_sha256": "e45d36995b86a7aab98bd34a9f9d8edce331bb2c0539672bb6bda26981023ba8",
+      "legacy_calibration_sources": [
+        {
+          "path": "benchmarks/results/checkpoint-b-2026-07-12.json",
+          "file_sha256": "6cc61a07b4da9640a8f1a1e7ea66352faaf4858cbdbd28e12458700fed88db46"
+        },
+        {
+          "path": "benchmarks/results/checkpoint-b2-2026-07-12.json",
+          "file_sha256": "80dd7a195dc8c9c1cbf3e793b18398bcf911d50bf17151e8981d8d8508c98cae"
+        },
+        {
+          "path": "benchmarks/results/checkpoint-c-2026-07-14.json",
+          "file_sha256": "d0a6281abf113d7eb73d60cdcf9b27a2efd222189a9709d0869973ff7d342fdc"
+        }
+      ],
+      "legacy_calibration_migrations": [
+        {
+          "path": "benchmarks/results/checkpoint-b-2026-07-12.migration.json",
+          "file_sha256": "c972505bc96bd3334c0ed088d630b448d60e1909c50b96c1d009c16ca291fbf5"
+        },
+        {
+          "path": "benchmarks/results/checkpoint-b2-2026-07-12.migration.json",
+          "file_sha256": "83bcabc0424afc298b1fcd63f3d4d611f02f4ffae7ec11e8c0abfa155bbfdf64"
+        },
+        {
+          "path": "benchmarks/results/checkpoint-c-2026-07-14.migration.json",
+          "file_sha256": "a6f23fa5f4f7a250f29552705dc95f33ab7f1d63ae036051cc65e6d8ca4194d2"
+        }
+      ],
       "scoring_issue": 197,
-      "scoring_slice": "mechanism_observation_scorecard",
+      "scoring_slice": "legacy_calibration_compatibility_migration",
       "scoring_implemented": true,
       "result_set_authority_implemented": true,
       "unweighted_repetition_reporting_implemented": true,
       "paired_comparison_reporting_implemented": true,
       "directional_win_loss_tie_reporting_implemented": true,
       "mechanism_observation_scorecard_implemented": true,
+      "legacy_calibration_compatibility_migration_implemented": true,
       "comparative_or_weighted_reporting_implemented": true,
       "weighted_reporting_implemented": false
     },
