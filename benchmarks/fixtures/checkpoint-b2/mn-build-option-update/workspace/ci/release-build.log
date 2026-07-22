@@ -1,0 +1,7 @@
+Build Tool 4.2 configuration validation
+profile: release
+target: node20
+minify: enabled
+error BT4207: release.sourceMap no longer accepts the boolean shorthand
+expected: structured source map options
+configuration validation failed before compilation

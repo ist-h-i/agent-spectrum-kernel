@@ -1,0 +1,12 @@
+{
+  "output_contract_id": "output-contract-mn-build-option-update",
+  "output_contract_schema_path": "benchmarks/schemas/portfolio-output-contract.schema.json",
+  "output_contract_path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/output-contract.json",
+  "fixture_id": "mn-build-option-update",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json",
+  "evaluator_public_reference_digest": "sha256:2b7c49e72b91aefd6e9c7dc9056d1707adf06c6f81ed3022a9be5e158bde570f",
+  "declares_findings": false,
+  "output_contract_digest": "sha256:d775b10211f063788adc59d5cf421b8a71200f0c2ef4e8b8d6698ce6ccbc0639"
+}

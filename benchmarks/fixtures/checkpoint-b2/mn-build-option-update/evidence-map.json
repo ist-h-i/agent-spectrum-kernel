@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mn-build-option-update",
+  "maps": [
+    {
+      "evidence_map_id": "ci-config-contract",
+      "agent_visible_paths": [
+        "workspace/ci/release-build.log",
+        "workspace/docs/build-options.md",
+        "workspace/scripts/validate-build-config.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "task-config-boundary",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/build.config.json"
+      ]
+    },
+    {
+      "evidence_map_id": "workspace-verification-route",
+      "agent_visible_paths": [
+        "workspace/package.json",
+        "workspace/scripts/validate-build-config.mjs",
+        "workspace/test/build-config.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contract": {
+    "mutation_id": "remove-ci-config-contract",
+    "target_evidence_map_id": "ci-config-contract",
+    "expected_recoverability_state": "not_recoverable",
+    "expected_admission_result": "fail",
+    "mutation_digest": "sha256:4f20969f7cbf8fe59a682110ccdd888fe4afd4bd153f8225dac0b9f1ed17b830"
+  }
+}

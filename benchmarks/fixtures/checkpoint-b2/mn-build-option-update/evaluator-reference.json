@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
+  "program": "adaptive_ask_evaluator_reference",
+  "evaluator_bundle_id": "evaluator-9920522a1c78e7d433b095e9761d80d2e774d84bdb66ccf99f47ce001be5ddf1",
+  "evaluator_bundle_digest": "sha256:b3143bf1d21f9aae86791e8dce06440c6d3e2abd6a42c9d8cf25f2440bc69612",
+  "evaluator_bundle_schema_version": "1.0.0",
+  "fixture_id": "mn-build-option-update",
+  "fixture_input_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
+  "task_class": "configuration",
+  "suite": "mechanism_negative",
+  "evaluator_revision": "9095dea8e7bfe216569bbc932059b7e794ebb3fd",
+  "generator_identity": "sha256:42afe1fd12ee19291e60cb6ce4b4a42f25207fa6a9fc00d21da1544fcf5a49e3",
+  "independence_statement_digest": "sha256:74c6e877da90238c259bc5af0d3a0692ea970a0100bd08e1256bd11b943aff07",
+  "review_record_digest": "sha256:2c68bfa2808be77476fd03ba5ad71f5bf0a0c09e0011f9d07711e257a2457cfb",
+  "storage_class": "private_evaluator",
+  "public_metadata_digest": "sha256:2b7c49e72b91aefd6e9c7dc9056d1707adf06c6f81ed3022a9be5e158bde570f"
+}

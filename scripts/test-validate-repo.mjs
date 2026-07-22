@@ -260,21 +260,26 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/portfolio-design-admission-records",
     "benchmarks/portfolio-design-independent-review.json",
     "benchmarks/portfolio-design-reviewed-state.json",
+    "benchmarks/adaptive-portfolio.config.json",
+    "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
+    "benchmarks/fixtures/checkpoint-b2/mn-build-option-update",
     "scripts/ask-benchmark-portfolio-repetition-report.mjs",
     "scripts/ask-benchmark-portfolio-paired-comparison-report.mjs",
     "scripts/ask-benchmark-portfolio-directional-outcome-report.mjs",
     "scripts/ask-benchmark-portfolio-mechanism-scorecard.mjs",
     "scripts/ask-benchmark-portfolio-legacy-calibration-migration.mjs",
     "scripts/ask-benchmark-stable-file.mjs",
+    "scripts/ask-benchmark-mn-build-option-update.mjs",
     "scripts/test-ask-benchmark-portfolio-repetition-report.mjs",
     "scripts/test-ask-benchmark-portfolio-paired-comparison-report.mjs",
     "scripts/test-ask-benchmark-portfolio-directional-outcome-report.mjs",
     "scripts/test-ask-benchmark-portfolio-mechanism-scorecard.mjs",
     "scripts/test-ask-benchmark-portfolio-legacy-calibration-migration.mjs",
+    "scripts/test-ask-benchmark-mn-build-option-update.mjs",
     "benchmarks/schemas",
   ]) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    if (["benchmarks/portfolio-design-admission-records", "benchmarks/schemas"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
+    if (["benchmarks/portfolio-design-admission-records", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update", "benchmarks/schemas"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
     else writeFileSync(resolve(root, path), readFileSync(resolve(repoRoot, path)));
   }
 

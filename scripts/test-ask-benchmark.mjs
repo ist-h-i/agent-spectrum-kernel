@@ -105,6 +105,7 @@ assert.match(`${invalidEmittedPlan.stderr}\n${invalidEmittedPlan.stdout}`, /exec
 assert.equal(existsSync(invalidEmittedPlanPath), false);
 
 const portfolioPlan = JSON.parse(readFileSync(portfolioPlanPath, "utf8"));
+const portfolioRuntimeConfig = JSON.parse(readFileSync(portfolioConfig, "utf8"));
 const repeatedPortfolioPlan = JSON.parse(readFileSync(portfolioPlanRepeatPath, "utf8"));
 const alternatePortfolioPlan = JSON.parse(readFileSync(portfolioPlanAlternatePath, "utf8"));
 assert.deepEqual(repeatedPortfolioPlan, portfolioPlan);
@@ -115,13 +116,15 @@ assert.equal(portfolioPlan.randomization_seed.sha256, createHash("sha256").updat
 assert.match(portfolioPlan.plan_id, /^plan-[a-f0-9]{64}$/);
 run(["plan", "--config", portfolioConfig, "--output", portfolioPlanFromRecordedSeedPath, "--seed", portfolioPlan.randomization_seed.value]);
 assert.deepEqual(JSON.parse(readFileSync(portfolioPlanFromRecordedSeedPath, "utf8")), portfolioPlan);
-assert.equal(portfolioPlan.cases.length, 112);
+const expectedPortfolioCaseCount = portfolioRuntimeConfig.fixtures.reduce((sum, fixture) => sum + fixture.repetitions * portfolioRuntimeConfig.adapter_tracks.length * portfolioRuntimeConfig.conditions.length, 0);
+assert.equal(portfolioPlan.cases.length, expectedPortfolioCaseCount);
 assert.deepEqual(new Set(portfolioPlan.adapter_tracks.map((entry) => entry.id)), new Set(["codex", "claude"]));
 assert.ok(portfolioPlan.adapter_tracks.every((entry) => entry.runtime_status === "unverified"));
 assert.equal(portfolioPlan.pool_adapter_results, false);
 assert.deepEqual(new Set(portfolioPlan.conditions), new Set(["plain", "kernel_only", "adaptive_ask", "full_ask"]));
 assert.equal(portfolioPlan.schema_path, "benchmarks/schemas/execution-plan.schema.json");
-assert.ok(portfolioPlan.cases.every((entry) => entry.suite === "calibration" && entry.aggregate_eligible === false));
+assert.ok(portfolioPlan.cases.filter((entry) => entry.fixture_id !== "mn-build-option-update").every((entry) => entry.suite === "calibration" && entry.aggregate_eligible === false));
+assert.ok(portfolioPlan.cases.filter((entry) => entry.fixture_id === "mn-build-option-update").every((entry) => entry.suite === "mechanism_negative" && entry.task_class === "configuration" && entry.aggregate_eligible === true));
 assert.equal(new Set(portfolioPlan.cases.map((entry) => entry.case_id)).size, portfolioPlan.cases.length);
 
 const casesByBlock = groupBy(portfolioPlan.cases, (entry) => entry.block_id);

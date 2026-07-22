@@ -51,6 +51,9 @@ jobs:
       - name: Run evaluator isolation boundary tests
         run: node scripts/test-ask-benchmark-evaluator-boundary.mjs
 
+      - name: Run build-option fixture contract tests
+        run: node scripts/test-ask-benchmark-mn-build-option-update.mjs
+
       - name: Run portfolio raw engineering result score tests
         run: node scripts/test-ask-benchmark-portfolio-score.mjs
 

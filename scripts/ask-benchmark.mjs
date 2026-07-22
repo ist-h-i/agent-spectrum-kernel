@@ -239,7 +239,10 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
     if (fixture.aggregate_eligible !== (fixture.suite !== "calibration")) errors.push(`${fixture.id} aggregate eligibility must exclude calibration only`);
     if (fixture.id === "impl-transfer-hard" && fixture.suite === "calibration" && fixture.repetitions !== 5) errors.push("concurrent transfer calibration requires 5 repetitions");
     const root = resolve(fixtureRoot(config), fixture.id);
-    for (const path of ["task.md", "workspace/package.json", "evaluator/expected.json"]) {
+    const requiredFixturePaths = fixture.suite === "calibration"
+      ? ["task.md", "workspace/package.json", "evaluator/expected.json"]
+      : ["task.md", "workspace/package.json", "metadata.json", "evaluator-reference.json", "requirement-record.json", "output-contract.json", "final-admission-record.json", "scoring-input-freeze-manifest.json", "admission-review.json"];
+    for (const path of requiredFixturePaths) {
       if (!existsSync(resolve(root, path))) errors.push(`${fixture.id}/${path} is missing`);
     }
     if (!fixture.input_manifest_path) {
