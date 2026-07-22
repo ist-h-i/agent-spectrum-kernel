@@ -272,6 +272,12 @@ Blocker and safety state counts remain separate from requirement scores. False-p
 
 Only `verifyEngineeringRepetitionReport()` closes those external boundaries. It uses the full result-set verifier's frozen raw result bodies, a recursively frozen scoring-policy object returned by complete B1 Schema/semantic/deterministic validation, complete report re-derivation, and a final shared stable-file check that binds the supplied report path, canonical path, device, inode, metadata, digest, and bytes. It returns a runtime-only recursively frozen `verified_report`; serialized repetition-report bytes do not contain that verifier body.
 
+`report-engineering-mechanism-scorecards` consumes only that full verifier boundary: the recursively frozen repetition report, verified result-set artifact, frozen raw engineering results, and a separately full-verified frozen B1 scoring policy. A fixture inventory is derived from the first completed scoring-ready evaluator result and must match exactly, by raw mechanism ID and `required`/`unnecessary` classification, across every other complete result. Required mechanisms precede unnecessary mechanisms and IDs are ascending within each classification. IDs are fixture-specific evaluator vocabulary; there is no global taxonomy, alias mapping, or derivation from Issue prose.
+
+Each mechanism retains all four conditions and exactly the fixture's three or five repetitions. Completed observations preserve the raw state and only the public evidence-reference `kind`, `digest`, and `bytes`, in canonical order with duplicates rejected. A known-inventory non-ready repetition is `not_scoring_ready` with null state and empty evidence; it is never counted as `missing` or `unknown`. If no complete result exists, the inventory is `insufficient_evidence` and empty without inferring IDs. A stable empty inventory from complete results remains `complete`. The closed bare validator re-derives ordering, repetition closure, evidence ordering, state counts, coverage, identity, digest, and privacy. Only `verify-engineering-mechanism-scorecard` re-runs the full repetition, result-set, raw-result, and B1 policy authority chain and performs the final stable-file replacement check.
+
+The mechanism scorecard is a raw state/count artifact. Mechanism numeric score, observed/missing rate, ranking, transition matrix, condition comparison, win/loss/tie, meaningful delta, quality credit, Skill-load credit, agent-start credit, artifact-creation credit, weighting, cross-fixture/suite aggregate, adapter pooling, product value, measured execution, and Issue #198 authorization are all absent and false.
+
 ## Paired per-fixture condition comparison report
 
 `report-engineering-paired-comparisons` consumes only the full repetition-report verifier return, its underlying full result-set authority, and the recursively frozen B1 scoring policy. It derives exactly the three policy-ordered views `kernel_vs_plain`, `adaptive_vs_kernel`, and diagnostic-only `full_vs_kernel_diagnostic`. Every observation pairs the same adapter, fixture, and repetition, and records raw `comparison - baseline` deltas. Structural omissions, duplicates, reversals, cross-fixture/adapter/repetition pairing, policy or requirement authority drift, and mechanism ID/classification inventory drift fail closed.
@@ -372,6 +378,26 @@ node scripts/ask-benchmark.mjs verify-engineering-directional-outcome-report \
   --repetition-report /path/to/repetition-report.json \
   --paired-comparison-report /path/to/paired-comparison-report.json \
   --input /path/to/directional-outcome-report.json
+
+node scripts/ask-benchmark.mjs report-engineering-mechanism-scorecards \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --adapter codex \
+  --result-set /path/to/engineering-result-set.json \
+  --repetition-report /path/to/repetition-report.json \
+  --output /path/to/mechanism-scorecard.json
+
+node scripts/ask-benchmark.mjs verify-engineering-mechanism-scorecard \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --adapter codex \
+  --result-set /path/to/engineering-result-set.json \
+  --repetition-report /path/to/repetition-report.json \
+  --input /path/to/mechanism-scorecard.json
 ```
 
 ```bash

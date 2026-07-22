@@ -31,6 +31,10 @@ import {
   verifyEngineeringDirectionalOutcomeReport,
 } from "./ask-benchmark-portfolio-directional-outcome-report.mjs";
 import {
+  reportEngineeringMechanismScorecards,
+  verifyEngineeringMechanismScorecard,
+} from "./ask-benchmark-portfolio-mechanism-scorecard.mjs";
+import {
   assertVerifiedResultInventory,
   collectEngineeringResults,
   computeEngineeringResultSetDigest,
@@ -725,6 +729,105 @@ async function concurrentDirectionalOutcomePublication(fixture, repetitionReport
   return Promise.all([launch(), launch()]);
 }
 
+async function concurrentMechanismScorecardPublication(fixture, repetitionReportPath, outputPath) {
+  const args = [runner, "report-engineering-mechanism-scorecards", ...reportCliAuthorityArgs(fixture), "--result-set", fixture.outputPath, "--repetition-report", repetitionReportPath, "--output", outputPath];
+  const launch = () => new Promise((resolvePromise) => {
+    const child = spawn(process.execPath, args, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = ""; let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("close", (status) => resolvePromise({ status, stdout, stderr }));
+  });
+  return Promise.all([launch(), launch()]);
+}
+
+async function concurrentMechanismScorecardVerifyReplacement(fixture, repetitionReportPath, scorecardPath, replacementPath) {
+  const markerPath = resolve(fixture.target, `mechanism-final-read-${hash(replacementPath).slice(0, 8)}.marker`);
+  const continuePath = `${markerPath}.continue`;
+  const preloadPath = `${markerPath}.preload.mjs`;
+  writeFileSync(preloadPath, `
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import { resolve } from "node:path";
+const originalOpenSync = fs.openSync;
+const originalCloseSync = fs.closeSync;
+const inputPath = resolve(process.env.ASK_MECHANISM_TEST_INPUT);
+const markerPath = process.env.ASK_MECHANISM_TEST_MARKER;
+const continuePath = process.env.ASK_MECHANISM_TEST_CONTINUE;
+let openCount = 0;
+let synchronizedDescriptor = null;
+let synchronized = false;
+fs.openSync = function (path, ...args) {
+  const descriptor = originalOpenSync.call(fs, path, ...args);
+  if (resolve(String(path)) === inputPath) {
+    openCount += 1;
+    if (openCount === 2) synchronizedDescriptor = descriptor;
+  }
+  return descriptor;
+};
+fs.closeSync = function (descriptor) {
+  originalCloseSync.call(fs, descriptor);
+  if (!synchronized && descriptor === synchronizedDescriptor) {
+    synchronized = true;
+    fs.writeFileSync(markerPath, "final mechanism descriptor closed\\n", { flag: "wx" });
+    const waitArray = new Int32Array(new SharedArrayBuffer(4));
+    while (!fs.existsSync(continuePath)) Atomics.wait(waitArray, 0, 0, 10);
+  }
+};
+syncBuiltinESMExports();
+`);
+  const child = spawn(process.execPath, [
+    "--import", preloadPath,
+    runner,
+    "verify-engineering-mechanism-scorecard",
+    ...reportCliAuthorityArgs(fixture),
+    "--result-set", fixture.outputPath,
+    "--repetition-report", repetitionReportPath,
+    "--input", scorecardPath,
+  ], {
+    cwd: root,
+    env: { ...process.env, ASK_MECHANISM_TEST_INPUT: scorecardPath, ASK_MECHANISM_TEST_MARKER: markerPath, ASK_MECHANISM_TEST_CONTINUE: continuePath },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let stdout = ""; let stderr = "";
+  child.stdout.on("data", (chunk) => { stdout += chunk; });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  try { await waitForPath(markerPath, child); } catch (error) { throw new Error(`${error.message}\n${stderr}`); }
+  renameSync(replacementPath, scorecardPath);
+  writeFileSync(continuePath, "continue\n", { flag: "wx" });
+  const status = await new Promise((resolvePromise) => child.on("close", resolvePromise));
+  return { status, stdout, stderr };
+}
+
+function mechanismScorecardNoReportReread(fixture, repetitionReportPath, outputPath) {
+  const preloadPath = resolve(fixture.target, "mechanism-no-report-reread.preload.mjs");
+  writeFileSync(preloadPath, `
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import { resolve } from "node:path";
+const originalOpenSync = fs.openSync;
+const reportPath = resolve(process.env.ASK_MECHANISM_REPETITION_INPUT);
+let reportOpenCount = 0;
+fs.openSync = function (path, ...args) {
+  if (resolve(String(path)) === reportPath) {
+    reportOpenCount += 1;
+    if (reportOpenCount > 2) throw new Error("mechanism reporter reread repetition input after full verification");
+  }
+  return originalOpenSync.call(fs, path, ...args);
+};
+syncBuiltinESMExports();
+`);
+  return spawnSync(process.execPath, [
+    "--import", preloadPath,
+    runner,
+    "report-engineering-mechanism-scorecards",
+    ...reportCliAuthorityArgs(fixture),
+    "--result-set", fixture.outputPath,
+    "--repetition-report", repetitionReportPath,
+    "--output", outputPath,
+  ], { cwd: root, env: { ...process.env, ASK_MECHANISM_REPETITION_INPUT: repetitionReportPath }, encoding: "utf8", maxBuffer: 40 * 1024 * 1024 });
+}
+
 async function concurrentDirectionalOutcomeVerifyReplacement(fixture, repetitionReportPath, comparisonReportPath, directionalReportPath, replacementPath) {
   const markerPath = resolve(fixture.target, `directional-final-read-${hash(replacementPath).slice(0, 8)}.marker`);
   const continuePath = `${markerPath}.continue`;
@@ -1034,6 +1137,57 @@ try {
   assert.equal(verifiedRepetitionReport.artifact.repetition_report_digest, repetitionReport.artifact.repetition_report_digest);
   assert.equal(Object.isFrozen(verifiedRepetitionReport.verified_report), true);
   assert.equal(Object.isFrozen(verifiedRepetitionReport.verified_report.fixture_reports[0]), true);
+  assert.equal(Object.isFrozen(verifiedRepetitionReport.verified_result_set), true);
+  assert.equal(Object.isFrozen(verifiedRepetitionReport.verified_results), true);
+  assert.equal(Object.isFrozen(verifiedRepetitionReport.verified_scoring_policy), true);
+  assert.equal(Object.hasOwn(verifiedRepetitionReport.artifact, "verified_results"), false);
+  covered.add("repetition-runtime-authority-closure");
+
+  const mechanismScorecardPath = resolve(positive.target, "mechanism-scorecard.json");
+  const mechanismScorecard = reportEngineeringMechanismScorecards({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, outputPath: mechanismScorecardPath });
+  assert.equal(mechanismScorecard.artifact.fixture_scorecards.length, 2);
+  assert.equal(mechanismScorecard.artifact.authority.repetition_report_id, repetitionReport.artifact.repetition_report_id);
+  assert.ok(mechanismScorecard.artifact.fixture_scorecards.flatMap(({ mechanism_scorecards }) => mechanism_scorecards).every(({ condition_scorecards }) => condition_scorecards.length === 4));
+  assert.ok(mechanismScorecard.artifact.fixture_scorecards.some(({ mechanism_inventory_status }) => mechanism_inventory_status === "insufficient_evidence"));
+  assert.ok(mechanismScorecard.artifact.fixture_scorecards.flatMap(({ mechanism_scorecards }) => mechanism_scorecards).flatMap(({ condition_scorecards }) => condition_scorecards).flatMap(({ observations }) => observations).filter(({ observation_status }) => observation_status === "not_scoring_ready").every(({ state, evidence_references }) => state === null && evidence_references.length === 0));
+  const verifiedMechanismScorecard = verifyEngineeringMechanismScorecard({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, scorecardPath: mechanismScorecardPath });
+  assert.equal(verifiedMechanismScorecard.artifact.mechanism_scorecard_digest, mechanismScorecard.artifact.mechanism_scorecard_digest);
+  assert.equal(Object.isFrozen(verifiedMechanismScorecard.verified_scorecard), true);
+  covered.add("mechanism-scorecard-full-authority");
+
+  for (const replacementKind of ["different-valid-bytes", "same-bytes-different-inode"]) {
+    const scorecardPath = resolve(positive.target, `mechanism-${replacementKind}.json`);
+    writeFileSync(scorecardPath, mechanismScorecard.bytes);
+    const replacementPath = resolve(positive.target, `mechanism-${replacementKind}-replacement.json`);
+    writeFileSync(replacementPath, replacementKind === "different-valid-bytes" ? Buffer.concat([Buffer.from("\n"), mechanismScorecard.bytes]) : mechanismScorecard.bytes);
+    const raced = await concurrentMechanismScorecardVerifyReplacement(positive, repetitionReportPath, scorecardPath, replacementPath);
+    assert.notEqual(raced.status, 0, `${replacementKind}: mechanism scorecard verification must fail after final-open path replacement`);
+    assert.doesNotMatch(raced.stdout, /Verified mechanism observation scorecard/u);
+    assert.match(raced.stderr, /path was replaced|changed or was replaced/u);
+    covered.add(`mechanism-${replacementKind}-replacement`);
+  }
+
+  const concurrentMechanismPath = resolve(positive.target, "concurrent-mechanism.json");
+  const concurrentMechanismResults = await concurrentMechanismScorecardPublication(positive, repetitionReportPath, concurrentMechanismPath);
+  assert.deepEqual(concurrentMechanismResults.map(({ status }) => status).sort((left, right) => left - right), [0, 1]);
+  assert.equal(concurrentMechanismResults.filter(({ status }) => status === 0).length, 1);
+  assert.deepEqual(readFileSync(concurrentMechanismPath), mechanismScorecard.bytes);
+  assert.equal(readdirSync(dirname(concurrentMechanismPath)).some((name) => name.startsWith(`.${basename(concurrentMechanismPath)}.staging-`)), false);
+  covered.add("concurrent-mechanism-publication");
+
+  const mechanismInputBefore = { ...reportInputEvidence(positive), repetitionReport: regularFileEvidence(repetitionReportPath) };
+  const mechanismNoRereadPath = resolve(positive.target, "mechanism-no-reread.json");
+  const mechanismNoReread = mechanismScorecardNoReportReread(positive, repetitionReportPath, mechanismNoRereadPath);
+  assert.equal(mechanismNoReread.status, 0, mechanismNoReread.stderr);
+  assert.deepEqual(readFileSync(mechanismNoRereadPath), mechanismScorecard.bytes);
+  assert.deepEqual({ ...reportInputEvidence(positive), repetitionReport: regularFileEvidence(repetitionReportPath) }, mechanismInputBefore);
+  covered.add("mechanism-no-filesystem-reread-after-full-verification");
+  covered.add("successful-mechanism-publication-inputs-unchanged");
+  const failedMechanismBefore = { ...reportInputEvidence(positive), repetitionReport: regularFileEvidence(repetitionReportPath) };
+  assert.throws(() => reportEngineeringMechanismScorecards({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, outputPath: repetitionReportPath }), /must not already exist|disjoint/u);
+  assert.deepEqual({ ...reportInputEvidence(positive), repetitionReport: regularFileEvidence(repetitionReportPath) }, failedMechanismBefore);
+  covered.add("failed-mechanism-publication-inputs-unchanged");
+
   const pairedComparisonPath = resolve(positive.target, "paired-comparison-report.json");
   const pairedComparison = reportEngineeringPairedComparisons({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, outputPath: pairedComparisonPath });
   assert.equal(pairedComparison.artifact.fixture_comparisons.length, 2);
@@ -1699,6 +1853,10 @@ try {
     "repository-private-root-overlap",
     "report-different-valid-bytes-replacement", "report-same-bytes-different-inode-replacement",
     "concurrent-report-publication", "successful-report-publication-inputs-unchanged",
+    "repetition-runtime-authority-closure", "mechanism-scorecard-full-authority",
+    "mechanism-different-valid-bytes-replacement", "mechanism-same-bytes-different-inode-replacement",
+    "concurrent-mechanism-publication", "mechanism-no-filesystem-reread-after-full-verification",
+    "successful-mechanism-publication-inputs-unchanged", "failed-mechanism-publication-inputs-unchanged",
     "paired-comparison-full-authority", "paired-different-valid-bytes-replacement", "paired-same-bytes-different-inode-replacement",
     "concurrent-paired-publication", "successful-paired-publication-inputs-unchanged", "failed-paired-publication-inputs-unchanged",
     "paired-pre-existing-output", "paired-output-symlink", "paired-output-inside-authority-root",
