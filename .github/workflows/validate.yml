@@ -60,6 +60,9 @@ jobs:
       - name: Run portfolio paired comparison report tests
         run: node scripts/test-ask-benchmark-portfolio-paired-comparison-report.mjs
 
+      - name: Run portfolio directional outcome report tests
+        run: node scripts/test-ask-benchmark-portfolio-directional-outcome-report.mjs
+
       - name: Validate repository consistency
         run: node scripts/validate-repo.mjs
 
