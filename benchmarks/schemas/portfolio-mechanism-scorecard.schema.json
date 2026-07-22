@@ -56,15 +56,34 @@
     "fixtureScorecard": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fixture_id", "fixture_input_digest", "suite", "task_class", "expected_repetition_count", "mechanism_inventory_status", "mechanism_scorecards"],
+      "required": ["fixture_id", "fixture_input_digest", "suite", "task_class", "expected_repetition_count", "run_inventory", "mechanism_inventory_status", "mechanism_scorecards"],
       "properties": {
         "fixture_id": { "$ref": "#/$defs/token" },
         "fixture_input_digest": { "$ref": "#/$defs/digest" },
         "suite": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"] },
         "task_class": { "$ref": "#/$defs/token" },
         "expected_repetition_count": { "enum": [3, 5] },
+        "run_inventory": { "type": "array", "minItems": 12, "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/runEntry" } },
         "mechanism_inventory_status": { "enum": ["complete", "insufficient_evidence"] },
         "mechanism_scorecards": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/mechanismScorecard" } }
+      }
+    },
+    "runEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition", "repetition", "engineering_result_id", "engineering_result_digest", "normalized_result_id", "normalized_result_digest", "evaluation_id", "evaluation_digest", "scoring_status", "evaluation_status", "normalized_outcome"],
+      "properties": {
+        "condition": { "$ref": "#/$defs/condition" },
+        "repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "engineering_result_id": { "type": "string", "pattern": "^engineering-result-[a-f0-9]{32}$" },
+        "engineering_result_digest": { "$ref": "#/$defs/digest" },
+        "normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },
+        "normalized_result_digest": { "$ref": "#/$defs/digest" },
+        "evaluation_id": { "type": "string", "pattern": "^evaluation-[a-f0-9]{32}$" },
+        "evaluation_digest": { "$ref": "#/$defs/digest" },
+        "scoring_status": { "enum": ["complete", "not_scoring_ready"] },
+        "evaluation_status": { "enum": ["completed", "invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required"] },
+        "normalized_outcome": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] }
       }
     },
     "mechanismScorecard": {

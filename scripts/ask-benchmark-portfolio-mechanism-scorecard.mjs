@@ -19,6 +19,11 @@ export const PORTFOLIO_MECHANISM_SCORECARD_POLICY_REVISION = "issue-205-checkpoi
 
 const DEFAULT_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const CONDITIONS = Object.freeze(["plain", "kernel_only", "adaptive_ask", "full_ask"]);
+const RUN_IDENTITY_FIELDS = Object.freeze([
+  "engineering_result_id", "engineering_result_digest",
+  "normalized_result_id", "normalized_result_digest",
+  "evaluation_id", "evaluation_digest",
+]);
 const STATES = Object.freeze(["observed", "missing", "unnecessary", "unknown", "not_applicable"]);
 const COUNT_STATES = Object.freeze([...STATES, "not_scoring_ready"]);
 const MAX_SCORECARD_BYTES = 512 * 1024 * 1024;
@@ -73,6 +78,51 @@ function mechanismInventory(result) {
 
 function isComplete(result) {
   return result.scoring_status === "complete" && result.evaluation_status === "completed" && result.normalized_outcome === "completed";
+}
+
+function runOrder(left, right) {
+  return CONDITIONS.indexOf(left.condition) - CONDITIONS.indexOf(right.condition) || left.repetition - right.repetition;
+}
+
+function runAuthority(result) {
+  return {
+    condition: result.condition,
+    repetition: result.repetition,
+    engineering_result_id: result.engineering_result_id,
+    engineering_result_digest: result.engineering_result_digest,
+    normalized_result_id: result.normalized_result_id,
+    normalized_result_digest: result.normalized_result_digest,
+    evaluation_id: result.evaluation_id,
+    evaluation_digest: result.evaluation_digest,
+    scoring_status: result.scoring_status,
+    evaluation_status: result.evaluation_status,
+    normalized_outcome: result.normalized_outcome,
+  };
+}
+
+function assertRunInventory(fixture) {
+  const expectedKeys = CONDITIONS.flatMap((condition) => Array.from(
+    { length: fixture.expected_repetition_count },
+    (_, index) => ({ condition, repetition: index + 1 }),
+  ));
+  const actualKeys = fixture.run_inventory.map(({ condition, repetition }) => ({ condition, repetition }));
+  if (stableCanonicalJson(actualKeys) !== stableCanonicalJson(expectedKeys)) throw new Error(`${fixture.fixture_id} run inventory must contain each condition/repetition exactly once in canonical order`);
+  if (new Set(actualKeys.map(({ condition, repetition }) => `${condition}:${repetition}`)).size !== fixture.run_inventory.length) throw new Error(`${fixture.fixture_id} run inventory contains a duplicate condition/repetition`);
+  for (const entry of fixture.run_inventory) {
+    if (entry.scoring_status === "complete" && !isComplete(entry)) throw new Error(`${fixture.fixture_id}/${entry.condition}/${entry.repetition} complete scoring readiness is inconsistent`);
+  }
+}
+
+function runIndex(fixture) {
+  return new Map(fixture.run_inventory.map((entry) => [`${entry.condition}:${entry.repetition}`, entry]));
+}
+
+function assertObservationAuthority(fixture, item, authority) {
+  if (!authority) throw new Error(`${fixture.fixture_id}/${item.condition}/${item.repetition} observation has no run authority`);
+  for (const field of RUN_IDENTITY_FIELDS) if (item[field] !== authority[field]) throw new Error(`${fixture.fixture_id}/${item.condition}/${item.repetition} observation ${field} does not match run authority`);
+  const expectedStatus = isComplete(authority) ? "available" : "not_scoring_ready";
+  if (item.observation_status !== expectedStatus) throw new Error(`${fixture.fixture_id}/${item.condition}/${item.repetition} observation status does not match run readiness`);
+  if (expectedStatus === "not_scoring_ready" && (item.state !== null || item.evidence_references.length !== 0)) throw new Error(`${fixture.fixture_id}/${item.condition}/${item.repetition} non-ready observation must have null state and empty evidence`);
 }
 
 function assertNonReadyEmpty(result) {
@@ -182,6 +232,7 @@ export function buildPortfolioMechanismScorecard({ verifiedReport, verifiedResul
       assertNonReadyEmpty(raw);
       return raw;
     }));
+    const run_inventory = rawResults.map(runAuthority).sort(runOrder);
     const completeResults = rawResults.filter(isComplete);
     let inventory = [];
     let mechanism_inventory_status = "insufficient_evidence";
@@ -205,6 +256,7 @@ export function buildPortfolioMechanismScorecard({ verifiedReport, verifiedResul
       suite: fixture.suite,
       task_class: fixture.task_class,
       expected_repetition_count: fixture.expected_repetition_count,
+      run_inventory,
       mechanism_inventory_status,
       mechanism_scorecards,
     };
@@ -249,15 +301,19 @@ export function validatePortfolioMechanismScorecard(value, { root = DEFAULT_ROOT
   assertPrivacy(value);
   if (value.fixture_scorecards.some((fixture, index, all) => index > 0 && all[index - 1].fixture_id.localeCompare(fixture.fixture_id) >= 0)) throw new Error("fixture scorecard ordering drift");
   for (const fixture of value.fixture_scorecards) {
-    if (fixture.mechanism_inventory_status === "insufficient_evidence" && fixture.mechanism_scorecards.length !== 0) throw new Error(`${fixture.fixture_id} insufficient inventory must be empty`);
-    if (fixture.mechanism_scorecards.length > 0 && fixture.mechanism_inventory_status !== "complete") throw new Error(`${fixture.fixture_id} populated inventory must be complete`);
+    assertRunInventory(fixture);
+    const expectedInventoryStatus = fixture.run_inventory.some(isComplete) ? "complete" : "insufficient_evidence";
+    if (fixture.mechanism_inventory_status !== expectedInventoryStatus) throw new Error(`${fixture.fixture_id} mechanism inventory status does not match run readiness`);
+    if (expectedInventoryStatus === "insufficient_evidence" && fixture.mechanism_scorecards.length !== 0) throw new Error(`${fixture.fixture_id} insufficient inventory must be empty`);
     if (stableCanonicalJson(fixture.mechanism_scorecards) !== stableCanonicalJson([...fixture.mechanism_scorecards].sort(mechanismOrder))) throw new Error(`${fixture.fixture_id} mechanism ordering drift`);
     if (new Set(fixture.mechanism_scorecards.map(({ mechanism_id }) => mechanism_id)).size !== fixture.mechanism_scorecards.length) throw new Error(`${fixture.fixture_id} duplicate mechanism ID`);
+    const authorityByRun = runIndex(fixture);
     for (const mechanism of fixture.mechanism_scorecards) {
       if (stableCanonicalJson(mechanism.condition_scorecards.map(({ condition }) => condition)) !== stableCanonicalJson(CONDITIONS)) throw new Error(`${fixture.fixture_id}/${mechanism.mechanism_id} condition ordering drift`);
       for (const condition of mechanism.condition_scorecards) {
         const rebuilt = deriveConditionScorecard(condition.condition, condition.observations, fixture.expected_repetition_count, mechanism);
         if (stableCanonicalJson(rebuilt) !== stableCanonicalJson(condition)) throw new Error(`${fixture.fixture_id}/${mechanism.mechanism_id}/${condition.condition} state count or coverage closure mismatch`);
+        for (const item of condition.observations) assertObservationAuthority(fixture, item, authorityByRun.get(`${item.condition}:${item.repetition}`));
       }
     }
   }

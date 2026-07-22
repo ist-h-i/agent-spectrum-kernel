@@ -180,12 +180,13 @@ function close(value) {
 }
 
 function fixture(scorecard, id = "fixture-three") { return scorecard.fixture_scorecards.find((entry) => entry.fixture_id === id); }
+function runEntry(scorecard, conditionName = "plain", repetition = 1, fixtureId = "fixture-three") { return fixture(scorecard, fixtureId).run_inventory.find((entry) => entry.condition === conditionName && entry.repetition === repetition); }
 function mechanism(scorecard, id = "alpha_fixture_token", fixtureId = "fixture-three") { return fixture(scorecard, fixtureId).mechanism_scorecards.find((entry) => entry.mechanism_id === id); }
 function condition(scorecard, name = "plain", mechanismId = "alpha_fixture_token", fixtureId = "fixture-three") { return mechanism(scorecard, mechanismId, fixtureId).condition_scorecards.find((entry) => entry.condition === name); }
 function observation(scorecard, repetition = 1, conditionName = "plain", mechanismId = "alpha_fixture_token", fixtureId = "fixture-three") { return condition(scorecard, conditionName, mechanismId, fixtureId).observations.find((entry) => entry.repetition === repetition); }
 function raw(input, fixtureId = "fixture-three", conditionName = "plain", repetition = 1) { return input.verified_results.find(({ result: item }) => item.fixture_id === fixtureId && item.condition === conditionName && item.repetition === repetition).result; }
 function expectBuildFailure(name, mutate, pattern = /inventory|inventories|duplicate|semantically unbound|authority|cross-fixture|cross-adapter/u) { check(name, () => { const input = verified(); mutate(input); assert.throws(() => build(input), pattern); }); }
-function expectResealedFailure(name, source, mutate, pattern = /closure|ordering|drift|Schema validation|inventory|duplicate|absolute|private/u) {
+function expectResealedFailure(name, source, mutate, pattern = /closure|ordering|drift|Schema validation|inventory|duplicate|absolute|private|authority|readiness|status/u) {
   check(name, () => { const changed = structuredClone(source); mutate(changed); close(changed); assert.throws(() => validatePortfolioMechanismScorecard(changed, { root }), pattern); });
 }
 
@@ -193,6 +194,9 @@ const scorecard = build();
 validatePortfolioMechanismScorecard(scorecard, { root });
 
 check("one adapter only", () => assert.equal(scorecard.authority.adapter_track, "codex"));
+check("fixture run inventory exact count", () => assert.equal(fixture(scorecard).run_inventory.length, CONDITIONS.length * 3));
+check("fixture run inventory condition order", () => assert.deepEqual(fixture(scorecard).run_inventory.filter(({ repetition }) => repetition === 1).map(({ condition: name }) => name), CONDITIONS));
+check("fixture run inventory repetition order", () => assert.deepEqual(fixture(scorecard).run_inventory.filter(({ condition: name }) => name === "plain").map(({ repetition }) => repetition), [1, 2, 3]));
 check("all four conditions", () => assert.deepEqual(mechanism(scorecard).condition_scorecards.map(({ condition: name }) => name), CONDITIONS));
 check("exact 3 repetitions", () => assert.equal(condition(scorecard).observations.length, 3));
 check("exact 5 repetitions", () => assert.equal(condition(scorecard, "plain", "alpha_fixture_token", "fixture-five").observations.length, 5));
@@ -251,6 +255,16 @@ check("no ranking", () => assert.equal(JSON.stringify(scorecard).includes("ranki
 expectResealedFailure("re-sealed wrong state count", scorecard, (changed) => { condition(changed).state_counts.observed += 1; });
 expectResealedFailure("re-sealed wrong coverage status", scorecard, (changed) => { condition(changed).observation_coverage_status = "insufficient_evidence"; });
 expectResealedFailure("re-sealed wrong inventory status", scorecard, (changed) => { fixture(changed).mechanism_inventory_status = "insufficient_evidence"; });
+expectResealedFailure("re-sealed all-non-ready inventory marked complete", scorecard, (changed) => { fixture(changed, "fixture-all-non-ready").mechanism_inventory_status = "complete"; });
+expectResealedFailure("re-sealed stable-empty inventory marked insufficient", scorecard, (changed) => { fixture(changed, "fixture-stable-empty").mechanism_inventory_status = "insufficient_evidence"; });
+expectResealedFailure("re-sealed one-mechanism engineering identity drift", scorecard, (changed) => { const item = observation(changed); item.engineering_result_id = `engineering-result-${hash("drift-engineering-id").slice(0, 32)}`; item.engineering_result_digest = digest("drift-engineering-digest"); });
+expectResealedFailure("re-sealed one-mechanism normalized identity drift", scorecard, (changed) => { const item = observation(changed); item.normalized_result_id = `normalized-${hash("drift-normalized-id").slice(0, 32)}`; item.normalized_result_digest = digest("drift-normalized-digest"); });
+expectResealedFailure("re-sealed one-mechanism evaluation identity drift", scorecard, (changed) => { const item = observation(changed); item.evaluation_id = `evaluation-${hash("drift-evaluation-id").slice(0, 32)}`; item.evaluation_digest = digest("drift-evaluation-digest"); });
+expectResealedFailure("re-sealed same-run mechanism identity mismatch", scorecard, (changed) => { const source = runEntry(changed, "kernel_only", 1); const item = observation(changed, 1, "plain", "zeta_fixture_token"); for (const field of ["engineering_result_id", "engineering_result_digest", "normalized_result_id", "normalized_result_digest", "evaluation_id", "evaluation_digest"]) item[field] = source[field]; });
+expectResealedFailure("re-sealed fixture run inventory missing entry", scorecard, (changed) => { fixture(changed).run_inventory.shift(); });
+expectResealedFailure("re-sealed fixture run inventory duplicate entry", scorecard, (changed) => { fixture(changed).run_inventory[1] = structuredClone(fixture(changed).run_inventory[0]); });
+expectResealedFailure("re-sealed fixture run inventory reordered", scorecard, (changed) => { fixture(changed).run_inventory.reverse(); });
+expectResealedFailure("re-sealed readiness observation contradiction", scorecard, (changed) => { runEntry(changed).scoring_status = "not_scoring_ready"; });
 expectResealedFailure("re-sealed classification drift", scorecard, (changed) => { mechanism(changed).classification = "unnecessary"; });
 expectResealedFailure("re-sealed observation state drift", scorecard, (changed) => { observation(changed).state = "missing"; });
 expectResealedFailure("re-sealed evidence-reference drift", scorecard, (changed) => { observation(changed, 1, "plain", "zeta_fixture_token").evidence_references.reverse(); });
@@ -287,5 +301,5 @@ check("measured execution remains false", () => assert.equal(scorecard.boundarie
 check("product claim remains false", () => assert.equal(scorecard.boundaries.product_value_claim, false));
 check("Issue #198 remains false", () => assert.equal(scorecard.boundaries.issue_198_stage_0_authorized, false));
 
-assert.equal(covered.size, 79, `expected 79 focused closures, received ${covered.size}`);
+assert.equal(covered.size, 92, `expected 92 focused closures, received ${covered.size}`);
 console.log(`Portfolio mechanism observation scorecard contract test passed (${covered.size} closures).`);

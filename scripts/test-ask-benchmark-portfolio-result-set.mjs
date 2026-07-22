@@ -31,6 +31,8 @@ import {
   verifyEngineeringDirectionalOutcomeReport,
 } from "./ask-benchmark-portfolio-directional-outcome-report.mjs";
 import {
+  computePortfolioMechanismScorecardDigest,
+  computePortfolioMechanismScorecardId,
   reportEngineeringMechanismScorecards,
   verifyEngineeringMechanismScorecard,
 } from "./ask-benchmark-portfolio-mechanism-scorecard.mjs";
@@ -1155,6 +1157,27 @@ try {
   assert.equal(Object.isFrozen(verifiedMechanismScorecard.verified_scorecard), true);
   covered.add("mechanism-scorecard-full-authority");
 
+  const mechanismIdentityDriftPath = resolve(positive.target, "mechanism-identity-drift.json");
+  const mechanismIdentityDrift = structuredClone(mechanismScorecard.artifact);
+  const driftRun = mechanismIdentityDrift.fixture_scorecards[0].run_inventory[0];
+  driftRun.engineering_result_id = `engineering-result-${hash("production-mechanism-identity-drift").slice(0, 32)}`;
+  driftRun.engineering_result_digest = `sha256:${hash("production-mechanism-identity-drift-digest")}`;
+  mechanismIdentityDrift.mechanism_scorecard_id = computePortfolioMechanismScorecardId(mechanismIdentityDrift);
+  mechanismIdentityDrift.mechanism_scorecard_digest = computePortfolioMechanismScorecardDigest(mechanismIdentityDrift);
+  writeFileSync(mechanismIdentityDriftPath, `${JSON.stringify(mechanismIdentityDrift, null, 2)}\n`);
+  const mechanismIdentityDriftResult = spawnSync(process.execPath, [
+    runner,
+    "verify-engineering-mechanism-scorecard",
+    ...reportCliAuthorityArgs(positive),
+    "--result-set", positive.outputPath,
+    "--repetition-report", repetitionReportPath,
+    "--input", mechanismIdentityDriftPath,
+  ], { cwd: root, encoding: "utf8", maxBuffer: 40 * 1024 * 1024 });
+  assert.notEqual(mechanismIdentityDriftResult.status, 0);
+  assert.doesNotMatch(mechanismIdentityDriftResult.stdout, /Verified mechanism observation scorecard/u);
+  assert.match(mechanismIdentityDriftResult.stderr, /run authority|re-derived full authority/u);
+  covered.add("mechanism-production-resealed-identity-drift");
+
   for (const replacementKind of ["different-valid-bytes", "same-bytes-different-inode"]) {
     const scorecardPath = resolve(positive.target, `mechanism-${replacementKind}.json`);
     writeFileSync(scorecardPath, mechanismScorecard.bytes);
@@ -1853,7 +1876,7 @@ try {
     "repository-private-root-overlap",
     "report-different-valid-bytes-replacement", "report-same-bytes-different-inode-replacement",
     "concurrent-report-publication", "successful-report-publication-inputs-unchanged",
-    "repetition-runtime-authority-closure", "mechanism-scorecard-full-authority",
+    "repetition-runtime-authority-closure", "mechanism-scorecard-full-authority", "mechanism-production-resealed-identity-drift",
     "mechanism-different-valid-bytes-replacement", "mechanism-same-bytes-different-inode-replacement",
     "concurrent-mechanism-publication", "mechanism-no-filesystem-reread-after-full-verification",
     "successful-mechanism-publication-inputs-unchanged", "failed-mechanism-publication-inputs-unchanged",
