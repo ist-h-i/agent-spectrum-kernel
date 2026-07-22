@@ -565,9 +565,9 @@
       "legacy_calibration_migration_schema_path": "benchmarks/schemas/portfolio-legacy-calibration-migration.schema.json",
       "legacy_calibration_migration_schema_file_sha256": "60294edd35870ce137ca7ebbd832d39827f49e5d3fc014e84dac38aa25fde5d0",
       "legacy_calibration_migration_implementation_path": "scripts/ask-benchmark-portfolio-legacy-calibration-migration.mjs",
-      "legacy_calibration_migration_implementation_file_sha256": "da5a8654464bda07f2d8f8d75af2bc32349c0517842b629aeaa7698e41ec88fe",
+      "legacy_calibration_migration_implementation_file_sha256": "be2bed6a3b8f978d0fe1521918a085167a9f598fa047a53ea80e956026585bc6",
       "legacy_calibration_migration_test_path": "scripts/test-ask-benchmark-portfolio-legacy-calibration-migration.mjs",
-      "legacy_calibration_migration_test_file_sha256": "c489dff9db11badf455e2b400964491e451bbc5ae3bfa068bbf40cc4a3b652fc",
+      "legacy_calibration_migration_test_file_sha256": "e45d36995b86a7aab98bd34a9f9d8edce331bb2c0539672bb6bda26981023ba8",
       "legacy_calibration_sources": [
         {
           "path": "benchmarks/results/checkpoint-b-2026-07-12.json",

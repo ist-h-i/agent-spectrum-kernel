@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { spawn } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { closeSync, cpSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
@@ -85,8 +85,36 @@ if (process.argv[2] === "--stable-child") {
   }
 }
 
-function copyAuthorityRoot(parent, sourcePath) {
-  const customRoot = resolve(parent, "custom-root");
+if (process.argv[2] === "--verify-child") {
+  try {
+    const [customRoot, sourcePath, migrationPath, expectedSourceRawByteDigest] = process.argv.slice(3);
+    verifyLegacyCalibrationMigration({ root: customRoot, sourcePath, migrationPath, expectedSourceRawByteDigest });
+    process.exit(0);
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+}
+
+if (process.argv[2] === "--fifo-writer") {
+  try {
+    const [fifoPath, schemaBytesPath, markerPath, continuePath] = process.argv.slice(3);
+    const schemaBytes = readFileSync(schemaBytesPath);
+    const descriptor = openSync(fifoPath, "w");
+    writeFileSync(markerPath, "ready\n", { flag: "wx" });
+    const waitArray = new Int32Array(new SharedArrayBuffer(4));
+    while (!readFileIfPresent(continuePath)) Atomics.wait(waitArray, 0, 0, 10);
+    writeFileSync(descriptor, schemaBytes);
+    closeSync(descriptor);
+    process.exit(0);
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+}
+
+function copyAuthorityRoot(parent, sourcePath, name = "custom-root") {
+  const customRoot = resolve(parent, name);
   mkdirSync(resolve(customRoot, "benchmarks/results"), { recursive: true });
   cpSync(resolve(root, "benchmarks/schemas"), resolve(customRoot, "benchmarks/schemas"), { recursive: true });
   for (const path of targetFiles) {
@@ -95,6 +123,30 @@ function copyAuthorityRoot(parent, sourcePath) {
   }
   cpSync(resolve(root, sourcePath), resolve(customRoot, sourcePath));
   return customRoot;
+}
+
+async function verifierSourceReplacementOutcome(work, name, replaceSource) {
+  const sourcePath = sources[1];
+  const customRoot = copyAuthorityRoot(work, sourcePath, `source-race-${name}`);
+  const customSource = resolve(customRoot, sourcePath);
+  const expectedDigest = sha256(readFileSync(customSource));
+  const schemaPath = resolve(customRoot, "benchmarks/schemas/portfolio-catalog.schema.json");
+  const schemaBytesPath = resolve(customRoot, "portfolio-catalog.schema.original.json");
+  const markerPath = resolve(customRoot, "schema-reader.marker");
+  const continuePath = resolve(customRoot, "schema-reader.continue");
+  cpSync(schemaPath, schemaBytesPath);
+  rmSync(schemaPath);
+  const fifo = spawnSync("mkfifo", [schemaPath], { encoding: "utf8" });
+  if (fifo.status !== 0) throw new Error(`mkfifo failed: ${fifo.stderr || fifo.stdout}`);
+  const writer = launchChild(["--fifo-writer", schemaPath, schemaBytesPath, markerPath, continuePath]);
+  const verification = launchChild(["--verify-child", customRoot, customSource, resolve(root, checkedMigrations[1]), expectedDigest]);
+  await waitForFile(markerPath);
+  replaceSource({ customRoot, customSource });
+  renameSync(schemaBytesPath, schemaPath);
+  writeFileSync(continuePath, "continue\n", { flag: "wx" });
+  const [writerOutcome, verificationOutcome] = await Promise.all([writer, verification]);
+  assert.equal(writerOutcome.status, 0, writerOutcome.stderr);
+  return verificationOutcome;
 }
 
 function verifyMutation(work, name, sourcePath, baseArtifact, mutate, pattern = /Schema validation|rederivation|drift|contradict|prohibited|canonical|mapping|duplicate|absolute filesystem path/u) {
@@ -199,6 +251,30 @@ try {
   check("different-byte replacement rejected", () => { assert.notEqual(different.status, 0); assert.match(different.stderr, /changed or was replaced|path was replaced/u); });
   const same = await replacement("same-bytes", "original\n");
   check("same-byte different-inode replacement rejected", () => { assert.notEqual(same.status, 0); assert.match(same.stderr, /changed or was replaced|path was replaced/u); });
+
+  const sourceDifferentBytes = await verifierSourceReplacementOutcome(work, "different-bytes", ({ customSource }) => {
+    const changed = readJson(customSource);
+    changed.runtime.reasoning_effort = "low";
+    const replacementPath = `${customSource}.replacement`;
+    writeJson(replacementPath, changed);
+    renameSync(replacementPath, customSource);
+  });
+  check("verifier rejects different-byte source replacement", () => { assert.notEqual(sourceDifferentBytes.status, 0); assert.match(sourceDifferentBytes.stderr, /changed or was replaced|path was replaced/u); });
+
+  const sourceSameBytes = await verifierSourceReplacementOutcome(work, "same-bytes", ({ customSource }) => {
+    const replacementPath = `${customSource}.replacement`;
+    cpSync(customSource, replacementPath);
+    renameSync(replacementPath, customSource);
+  });
+  check("verifier rejects same-byte different-inode source replacement", () => { assert.notEqual(sourceSameBytes.status, 0); assert.match(sourceSameBytes.stderr, /changed or was replaced|path was replaced/u); });
+
+  const sourcePathChange = await verifierSourceReplacementOutcome(work, "path-change", ({ customRoot, customSource }) => {
+    const replacementTarget = resolve(customRoot, "replacement-source.json");
+    cpSync(customSource, replacementTarget);
+    rmSync(customSource);
+    symlinkSync(replacementTarget, customSource);
+  });
+  check("verifier rejects source path change", () => { assert.notEqual(sourcePathChange.status, 0); assert.match(sourcePathChange.stderr, /symlink|changed or was replaced|path was replaced/u); });
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
@@ -208,7 +284,7 @@ check("shared stable read reused", () => assert.match(implementation, /readStabl
 check("shared stable evidence reused", () => assert.match(implementation, /assertStableFileEvidence/u));
 check("shared atomic no-replace reused", () => assert.match(implementation, /publishJsonAtomicNoReplace/u));
 check("shared atomic absence reused", () => assert.match(implementation, /assertAtomicOutputAbsent/u));
-check("no legacy reread after verification", () => { const body = implementation.slice(implementation.indexOf("export function verifyLegacyCalibrationMigration")); assert.equal((body.match(/readStableFile\(absoluteSource/gu) ?? []).length, 0); });
+check("verifier closes legacy source authority", () => { const body = implementation.slice(implementation.indexOf("export function verifyLegacyCalibrationMigration")); assert.equal((body.match(/readStableFile\(absoluteSource/gu) ?? []).length, 1); assert.match(body, /assertStableFileEvidence\(derived\.sourceEvidence, sourceAfter, "legacy source"\)/u); });
 
 assert.ok(covered.size >= 55, `expected at least 55 focused closures, received ${covered.size}`);
 console.log(`Portfolio legacy calibration migration contract test passed (${covered.size} closures).`);

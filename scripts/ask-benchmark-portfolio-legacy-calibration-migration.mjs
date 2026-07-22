@@ -375,6 +375,8 @@ export function verifyLegacyCalibrationMigration({ root = DEFAULT_ROOT, sourcePa
   assertMigrationSemantics(supplied);
   const derived = deriveFromAuthorities({ root: absoluteRoot, sourcePath: absoluteSource, expectedSourceRawByteDigest });
   if (stableCanonicalJson(supplied) !== stableCanonicalJson(derived.artifact)) throw new Error("legacy calibration migration input does not match full deterministic rederivation");
+  const sourceAfter = readStableFile(absoluteSource, "legacy source", MAX_JSON_BYTES, { allowEmpty: false });
+  assertStableFileEvidence(derived.sourceEvidence, sourceAfter, "legacy source");
   const inputAfter = readStableFile(migrationPath, "legacy calibration migration input", MAX_JSON_BYTES, { allowEmpty: false });
   assertStableFileEvidence(input, inputAfter, "legacy calibration migration input");
   return { artifact: supplied, inputEvidence: input, sourceEvidence: derived.sourceEvidence };
