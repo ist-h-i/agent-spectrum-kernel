@@ -23,7 +23,7 @@
     "boundaries"
   ],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
+    "schema_version": { "const": "1.1.0" },
     "schema_path": { "const": "benchmarks/schemas/normalized-portfolio-run.schema.json" },
     "program": { "const": "adaptive_ask_normalized_execution_run" },
     "artifact_role": { "const": "derived_execution_evidence" },
@@ -32,7 +32,7 @@
       "additionalProperties": false,
       "required": ["version", "source_revision"],
       "properties": {
-        "version": { "const": "1.0.0" },
+        "version": { "const": "1.1.0" },
         "source_revision": { "$ref": "#/$defs/revision" }
       }
     },
@@ -226,10 +226,11 @@
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["attempt", "request_digest", "raw_result_digest", "terminal_commit_digest", "final_output_digest", "final_output_bytes"],
+                  "required": ["attempt", "request_digest", "command_evidence_digest", "raw_result_digest", "terminal_commit_digest", "final_output_digest", "final_output_bytes"],
                   "properties": {
                     "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
                     "request_digest": { "$ref": "#/$defs/digest" },
+                    "command_evidence_digest": { "$ref": "#/$defs/digest" },
                     "raw_result_digest": { "$ref": "#/$defs/digest" },
                     "terminal_commit_digest": { "$ref": "#/$defs/digest" },
                     "final_output_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" },

@@ -42,6 +42,9 @@ jobs:
       - name: Run adaptive portfolio execution tests
         run: node scripts/test-ask-benchmark-execution.mjs
 
+      - name: Run verification command evidence contract tests
+        run: node scripts/test-ask-benchmark-command-evidence.mjs
+
       - name: Run adaptive portfolio normalized result tests
         run: node scripts/test-ask-benchmark-normalized-results.mjs
 

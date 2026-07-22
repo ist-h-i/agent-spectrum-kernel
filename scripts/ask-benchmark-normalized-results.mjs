@@ -15,8 +15,9 @@ import { basename, dirname, parse, posix, relative, resolve, sep, win32 } from "
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
+import { projectVerifiedCommandEvidence } from "./ask-benchmark-command-evidence.mjs";
 
-export const NORMALIZER_VERSION = "1.0.0";
+export const NORMALIZER_VERSION = "1.1.0";
 export const NORMALIZED_RESULT_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-result.schema.json";
 export const NORMALIZED_RUN_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-run.schema.json";
 export const NORMALIZED_ROOT_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-root.schema.json";
@@ -190,7 +191,7 @@ function normalizedResultBase({ inspection, inspectedCase, attempt, adapterIdent
   const { entry } = inspectedCase;
   const telemetry = telemetryFor(attempt, adapterIdentity);
   return {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
     schema_path: NORMALIZED_RESULT_SCHEMA_PATH,
     program: "adaptive_ask_normalized_execution_result",
     lineage: {
@@ -224,6 +225,7 @@ function normalizedResultBase({ inspection, inspectedCase, attempt, adapterIdent
       adaptive_selection_digest: attempt.request.selection ? `sha256:${attempt.request.selection.digest}` : null,
     },
     outcome: attempt.result.status,
+    command_evidence: projectVerifiedCommandEvidence({ manifest: attempt.commandEvidence, contract: attempt.verificationCommandContract }),
     telemetry,
     privacy: {
       raw_stdout_stored: false,
@@ -335,6 +337,7 @@ function sourceSnapshotFor(inspection, cases) {
       committed_attempts: inspectedCase.attempts.map((attempt) => ({
         attempt: attempt.attempt,
         request_digest: attempt.evidence.request_digest,
+        command_evidence_digest: attempt.evidence.command_evidence_digest,
         raw_result_digest: attempt.evidence.result_digest,
         terminal_commit_digest: attempt.evidence.commit_digest,
         final_output_digest: attempt.evidence.final_output_digest,
@@ -431,7 +434,7 @@ function buildNormalizedArtifacts({ root, inspection }) {
   const sourceSnapshot = sourceSnapshotFor(inspection, cases);
   const sourceSnapshotDigest = canonicalDigest(sourceSnapshot);
   const manifestWithoutDigest = {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
     schema_path: NORMALIZED_RUN_SCHEMA_PATH,
     program: "adaptive_ask_normalized_execution_run",
     artifact_role: "derived_execution_evidence",

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -50,7 +50,7 @@ function readGeneration(output, sourceSnapshotDigest = null) {
 
 function runtimeConfig(adapter, availability = "available") {
   return {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
     adapter,
     availability,
     unavailable_reason: availability === "unavailable" ? "fixture_runtime_unavailable" : null,
@@ -72,6 +72,9 @@ function runtimeConfig(adapter, availability = "available") {
         command: ["--benchmark-output", "{output}", "--benchmark-task", "{task}", "--sandbox", "{sandbox_policy}", "--permission-policy", "{permission_policy}"],
       }
       : null,
+    command_evidence: adapter === "codex"
+      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.0.0" }
+      : { capture_required: true, support: "unsupported", event_transport: "none", event_format_revision: null, parser_revision: null },
   };
 }
 
@@ -80,11 +83,11 @@ function fakeExecutable(adapter) {
   writeFileSync(path, `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "fake-${adapter} 1.0.0"; exit 0; fi
 if [ "$1" = "--help" ]; then echo "ASK_NORMALIZED_FAKE_CLAUDE_V1 --benchmark-output --benchmark-task --sandbox --permission-policy"; exit 0; fi
-if [ "$1" = "exec" ] && [ "$2" = "--help" ]; then echo "--ephemeral --ignore-user-config --ignore-rules --skip-git-repo-check --model --config --sandbox --output-schema --output-last-message"; exit 0; fi
+if [ "$1" = "exec" ] && [ "$2" = "--help" ]; then echo "--ephemeral --ignore-user-config --ignore-rules --skip-git-repo-check --json --model --config --sandbox --output-schema --output-last-message"; exit 0; fi
 output=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    exec|--ephemeral|--ignore-user-config|--ignore-rules|--skip-git-repo-check|-) shift ;;
+    exec|--ephemeral|--ignore-user-config|--ignore-rules|--skip-git-repo-check|--json|-) shift ;;
     --model|-c|--sandbox|--output-schema|--benchmark-task|--permission-policy) shift 2 ;;
     --output-last-message|--benchmark-output) output="$2"; shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 64 ;;
@@ -280,6 +283,8 @@ try {
   const invalidResultPath = resolve(invalidAttemptRoot, "result.json");
   const invalidCommitPath = resolve(invalidAttemptRoot, "commit.json");
   const invalidResult = JSON.parse(readFileSync(invalidResultPath, "utf8"));
+  const copiedCommandEvidenceStat = statSync(resolve(invalidAttemptRoot, "command-evidence.json"));
+  invalidResult.command_evidence.file_identity = { device: String(copiedCommandEvidenceStat.dev), inode: String(copiedCommandEvidenceStat.ino) };
   invalidResult.status = "invalid";
   invalidResult.failure_kind = "invalid_input_or_selection";
   writeJson(invalidResultPath, invalidResult);
@@ -314,6 +319,23 @@ try {
   function clonedRun(source, name) {
     const target = resolve(work, name);
     cpSync(source, target, { recursive: true });
+    for (const caseName of readdirSync(resolve(target, "cases"))) {
+      const attemptsRoot = resolve(target, "cases", caseName, "attempts");
+      for (const attempt of readdirSync(attemptsRoot)) {
+        const attemptRoot = resolve(attemptsRoot, attempt);
+        const commandPath = resolve(attemptRoot, "command-evidence.json");
+        const resultPath = resolve(attemptRoot, "result.json");
+        const commitPath = resolve(attemptRoot, "commit.json");
+        if (!existsSync(commandPath) || !existsSync(resultPath) || !existsSync(commitPath)) continue;
+        const commandStat = statSync(commandPath);
+        const result = JSON.parse(readFileSync(resultPath, "utf8"));
+        result.command_evidence.file_identity = { device: String(commandStat.dev), inode: String(commandStat.ino) };
+        writeJson(resultPath, result);
+        const commit = JSON.parse(readFileSync(commitPath, "utf8"));
+        commit.result_sha256 = fileDigest(resultPath);
+        writeJson(commitPath, commit);
+      }
+    }
     return target;
   }
 

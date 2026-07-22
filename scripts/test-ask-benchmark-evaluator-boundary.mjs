@@ -25,6 +25,7 @@ import {
   computeEvaluatorBundleDigest,
   computeEvaluatorBundleId,
   computeEvaluatorReferenceDigest,
+  validateExecutionEventEvidenceReferences,
   verifyEvaluatorBoundary,
   verifyPrivateEvaluatorBundle,
   verifyPublicEvaluatorReference,
@@ -187,7 +188,7 @@ function normalizedResult({ source, adapterDigests, caseRecord, attempt, outcome
     final_output_bytes: finalOutput.bytes,
   };
   const base = {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
     schema_path: "benchmarks/schemas/normalized-portfolio-result.schema.json",
     program: "adaptive_ask_normalized_execution_result",
     lineage: {
@@ -217,6 +218,20 @@ function normalizedResult({ source, adapterDigests, caseRecord, attempt, outcome
       adaptive_selection_digest: caseRecord.condition === "adaptive_ask" ? digest(`${caseRecord.case_id}:selection`) : null,
     },
     outcome,
+    command_evidence: {
+      manifest_digest: digest(`${caseRecord.case_id}:${attempt}:command-evidence-manifest`),
+      capture_support: caseRecord.adapter_track === "codex" ? "supported" : "unsupported",
+      evidence_level: "unavailable",
+      command_event_count: 0,
+      verification_command_contract_digest: null,
+      required_command_ids: [],
+      attempted_command_ids: [],
+      succeeded_command_ids: [],
+      failed_command_ids: [],
+      unavailable_command_ids: [],
+      unmatched_command_count: 0,
+      references: [],
+    },
     telemetry: telemetry(outcome),
     privacy: {
       raw_stdout_stored: false,
@@ -319,6 +334,7 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir 
         return {
           attempt: attempt.attempt,
           request_digest: normalized.lineage.request_digest,
+          command_evidence_digest: digest(`${entry.case_id}:${attempt.attempt}:command-evidence-file`),
           raw_result_digest: normalized.lineage.raw_result_digest,
           terminal_commit_digest: normalized.lineage.terminal_commit_digest,
           final_output_digest: normalized.lineage.final_output_digest,
@@ -341,15 +357,15 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir 
     };
   });
   const manifestWithoutDigest = {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
     schema_path: "benchmarks/schemas/normalized-portfolio-run.schema.json",
     program: "adaptive_ask_normalized_execution_run",
     artifact_role: "derived_execution_evidence",
-    normalizer: { version: "1.0.0", source_revision: source.repository_revision },
+    normalizer: { version: "1.1.0", source_revision: source.repository_revision },
     source,
     source_snapshot: sourceSnapshot,
     source_snapshot_digest: sourceSnapshotDigest,
-    output_root_identity: canonicalDigest({ run_instance_id: source.run_instance_id, plan_id: source.plan_id, normalizer_version: "1.0.0", source_snapshot_digest: sourceSnapshotDigest }),
+    output_root_identity: canonicalDigest({ run_instance_id: source.run_instance_id, plan_id: source.plan_id, normalizer_version: "1.1.0", source_snapshot_digest: sourceSnapshotDigest }),
     pool_adapter_results: false,
     completeness: {
       partial: false,
@@ -384,7 +400,7 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir 
     schema_path: "benchmarks/schemas/normalized-portfolio-root.schema.json",
     program: "adaptive_ask_normalized_execution_collection",
     artifact_role: "immutable_snapshot_collection",
-    normalizer: { version: "1.0.0", source_revision: source.repository_revision },
+    normalizer: { version: "1.1.0", source_revision: source.repository_revision },
     source: {
       run_instance_id: source.run_instance_id,
       run_identity_digest: source.run_identity_digest,
@@ -1336,6 +1352,19 @@ try {
   mkdirSync(manifestPublication);
   cpSync(manifestPath, resolve(manifestPublication, "bundle.json"));
   expectBoundaryFailure({ publicArtifactRoot: manifestPublication }, /byte-identical private evaluator material|private evaluator bundle manifest/u, "public CI artifact publication of the private manifest must be rejected");
+
+  const executionEvidenceDigest = digest("synthetic-execution-event");
+  const normalizedExecutionEvidence = {
+    command_evidence: {
+      required_command_ids: ["fixture-test"],
+      succeeded_command_ids: ["fixture-test"],
+      references: [{ command_id: "fixture-test", command_evidence_id: `command-evidence-${"a".repeat(32)}`, digest: executionEvidenceDigest, bytes: 321, outcome: "succeeded", exit_code: 0 }],
+    },
+  };
+  const evaluatorExecutionReference = { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 321 }] } };
+  assert.equal(validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: evaluatorExecutionReference }).length, 1, "verified normalized execution evidence must be referenceable by the evaluator");
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [] } } }), /cannot pass without verified execution-event/u, "verification pass without execution evidence must fail closed");
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 322 }] } } }), /unverified or transplanted/u, "execution evidence byte drift must be rejected");
 
   assert.deepEqual(snapshot(privateRoot), beforePrivate, "all evaluator failure paths must keep the private bundle byte-identical");
   assert.deepEqual(snapshot(materialized), beforeMaterialized, "all evaluator failure paths must keep materialized inputs byte-identical");

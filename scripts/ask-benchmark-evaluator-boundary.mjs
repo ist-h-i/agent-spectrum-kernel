@@ -643,6 +643,29 @@ function assertResultCollectionIdentity(result) {
   }
 }
 
+export function validateExecutionEventEvidenceReferences({ normalized, result }) {
+  const executionReferences = [];
+  function collect(value) {
+    if (Array.isArray(value)) for (const entry of value) collect(entry);
+    else if (value && typeof value === "object") {
+      if (value.kind === "execution_event" && value.digest && Object.hasOwn(value, "bytes")) executionReferences.push(value);
+      else for (const child of Object.values(value)) collect(child);
+    }
+  }
+  collect(result);
+  const verified = new Map(normalized.command_evidence.references.map((entry) => [entry.digest, entry]));
+  for (const reference of executionReferences) {
+    const item = verified.get(reference.digest);
+    if (!item || item.bytes !== reference.bytes) throw new Error("evaluator result contains an unverified or transplanted execution-event reference");
+  }
+  if (normalized.command_evidence.required_command_ids.length > 0 && result.verification_correctness.state === "pass") {
+    if (executionReferences.length === 0) throw new Error("verification correctness cannot pass without verified execution-event evidence");
+    const successes = new Set(normalized.command_evidence.succeeded_command_ids);
+    if (normalized.command_evidence.required_command_ids.some((id) => !successes.has(id))) throw new Error("verification correctness cannot pass while required command evidence is absent or unsuccessful");
+  }
+  return structuredClone(executionReferences);
+}
+
 function readNormalizedRecord({ verified, result }) {
   const normalizedReference = verified.manifest.cases
     .flatMap((entry) => entry.normalized_attempts)
@@ -806,6 +829,7 @@ export function verifyEvaluatorResult({
   if (result.source_snapshot_digest !== verified.manifest.source_snapshot_digest) throw new Error("evaluator result source snapshot lineage is inconsistent");
   assertBoundaryRootLineage(bundle, verified);
   const normalized = readNormalizedRecord({ verified, result });
+  validateExecutionEventEvidenceReferences({ normalized, result });
   const lineage = normalized.lineage;
   const expectedLineage = {
     normalized_result_id: normalized.normalized_result_id,

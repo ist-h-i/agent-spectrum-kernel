@@ -3,9 +3,9 @@
   "title": "Adaptive ASK portfolio execution attempt result",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "kind", "run_instance_id", "case_id", "attempt", "adapter", "condition", "runtime_identity_digest", "effective_command_digest", "request_sha256", "status", "exit_code", "duration_ms", "failure_kind", "recovery_reason", "final_output", "stdout", "stderr", "event_counts"],
+  "required": ["schema_version", "kind", "run_instance_id", "case_id", "attempt", "adapter", "condition", "runtime_identity_digest", "effective_command_digest", "request_sha256", "command_evidence", "status", "exit_code", "duration_ms", "failure_kind", "recovery_reason", "final_output", "stdout", "stderr", "event_counts"],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
+    "schema_version": { "const": "1.1.0" },
     "kind": { "const": "result" },
     "run_instance_id": { "type": "string", "format": "uuid" },
     "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
@@ -15,6 +15,22 @@
     "runtime_identity_digest": { "$ref": "#/$defs/digest" },
     "effective_command_digest": { "$ref": "#/$defs/digest" },
     "request_sha256": { "$ref": "#/$defs/digest" },
+    "command_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest", "bytes", "capture_status", "evidence_count", "file_identity"],
+      "properties": {
+        "path": { "const": "command-evidence.json" },
+        "digest": { "$ref": "#/$defs/digest" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "capture_status": { "enum": ["executed", "unavailable"] },
+        "evidence_count": { "type": "integer", "minimum": 0 },
+        "file_identity": {
+          "type": "object", "additionalProperties": false, "required": ["device", "inode"],
+          "properties": { "device": { "type": "string", "pattern": "^[0-9]+$" }, "inode": { "type": "string", "pattern": "^[0-9]+$" } }
+        }
+      }
+    },
     "status": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] },
     "exit_code": { "type": ["integer", "null"] },
     "duration_ms": { "type": ["integer", "null"], "minimum": 0 },

@@ -3,9 +3,9 @@
   "title": "Adaptive ASK portfolio effective adapter runtime identity",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "adapter", "runtime_config_sha256", "availability", "unavailable_reason", "executor", "model", "reasoning_effort", "sandbox_policy", "permission_policy", "case_timeout_ms", "thermal_state", "environment_allowlist", "environment_value_allowlist", "environment_snapshot", "executable", "effective_command", "effective_command_digest", "policy_enforcement", "availability_evidence"],
+  "required": ["schema_version", "adapter", "runtime_config_sha256", "availability", "unavailable_reason", "executor", "model", "reasoning_effort", "sandbox_policy", "permission_policy", "case_timeout_ms", "thermal_state", "environment_allowlist", "environment_value_allowlist", "environment_snapshot", "executable", "effective_command", "effective_command_digest", "policy_enforcement", "availability_evidence", "command_evidence"],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
+    "schema_version": { "const": "1.1.0" },
     "adapter": { "enum": ["codex", "claude"] },
     "runtime_config_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "availability": { "enum": ["available", "unavailable"] },
@@ -79,6 +79,20 @@
         "rules_isolated": { "type": "boolean" }
       }
     },
-    "availability_evidence": { "enum": ["local_version_and_contract_probe", "declared_unavailable", "contract_probe_failed"] }
+    "availability_evidence": { "enum": ["local_version_and_contract_probe", "declared_unavailable", "contract_probe_failed"] },
+    "command_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["support", "evidence_level", "event_transport", "event_format_revision", "parser_revision", "contract_probe_evidence", "downgrade_reason"],
+      "properties": {
+        "support": { "enum": ["supported", "unsupported", "unknown"] },
+        "evidence_level": { "enum": ["executed", "unavailable"] },
+        "event_transport": { "enum": ["codex_exec_jsonl", "none"] },
+        "event_format_revision": { "type": ["string", "null"] },
+        "parser_revision": { "type": ["string", "null"] },
+        "contract_probe_evidence": { "enum": ["local_version_help_json_probe", "declared_unavailable", "adapter_event_contract_not_implemented", "contract_probe_failed"] },
+        "downgrade_reason": { "type": ["string", "null"], "minLength": 1 }
+      }
+    }
   }
 }

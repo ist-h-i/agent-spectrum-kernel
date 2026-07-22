@@ -11,11 +11,12 @@
     "normalized_result_digest",
     "lineage",
     "outcome",
+    "command_evidence",
     "telemetry",
     "privacy"
   ],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
+    "schema_version": { "const": "1.1.0" },
     "schema_path": { "const": "benchmarks/schemas/normalized-portfolio-result.schema.json" },
     "program": { "const": "adaptive_ask_normalized_execution_result" },
     "normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },
@@ -85,6 +86,39 @@
       }
     },
     "outcome": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] },
+    "command_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest_digest", "capture_support", "evidence_level", "command_event_count", "verification_command_contract_digest", "required_command_ids", "attempted_command_ids", "succeeded_command_ids", "failed_command_ids", "unavailable_command_ids", "unmatched_command_count", "references"],
+      "properties": {
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "capture_support": { "enum": ["supported", "unsupported", "unknown"] },
+        "evidence_level": { "enum": ["executed", "unavailable"] },
+        "command_event_count": { "type": "integer", "minimum": 0 },
+        "verification_command_contract_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" },
+        "required_command_ids": { "$ref": "#/$defs/commandIds" },
+        "attempted_command_ids": { "$ref": "#/$defs/commandIds" },
+        "succeeded_command_ids": { "$ref": "#/$defs/commandIds" },
+        "failed_command_ids": { "$ref": "#/$defs/commandIds" },
+        "unavailable_command_ids": { "$ref": "#/$defs/commandIds" },
+        "unmatched_command_count": { "type": "integer", "minimum": 0 },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["command_id", "command_evidence_id", "digest", "bytes", "outcome", "exit_code"],
+            "properties": {
+              "command_id": { "type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+              "command_evidence_id": { "type": "string", "pattern": "^command-evidence-[a-f0-9]{32}$" },
+              "digest": { "$ref": "#/$defs/digest" },
+              "bytes": { "type": "integer", "minimum": 1 },
+              "outcome": { "enum": ["succeeded", "failed", "interrupted"] },
+              "exit_code": { "type": ["integer", "null"] }
+            }
+          }
+        }
+      }
+    },
     "telemetry": {
       "type": "object",
       "additionalProperties": false,
@@ -182,6 +216,7 @@
     "caseId": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "commandIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" } },
     "missingMetric": {
       "type": "object",
       "additionalProperties": false,

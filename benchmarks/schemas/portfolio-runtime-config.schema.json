@@ -18,10 +18,11 @@
     "environment_allowlist",
     "environment_value_allowlist",
     "thermal_state",
-    "claude_cli"
+    "claude_cli",
+    "command_evidence"
   ],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
+    "schema_version": { "const": "1.1.0" },
     "adapter": { "enum": ["codex", "claude"] },
     "availability": { "enum": ["available", "unavailable"] },
     "unavailable_reason": { "type": ["string", "null"], "minLength": 1, "maxLength": 160, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u2028\\u2029]+$" },
@@ -66,6 +67,18 @@
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 }
         }
+      }
+    },
+    "command_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capture_required", "support", "event_transport", "event_format_revision", "parser_revision"],
+      "properties": {
+        "capture_required": { "const": true },
+        "support": { "enum": ["supported", "unsupported", "unknown"] },
+        "event_transport": { "enum": ["codex_exec_jsonl", "none"] },
+        "event_format_revision": { "type": ["string", "null"] },
+        "parser_revision": { "type": ["string", "null"] }
       }
     }
   }

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK public verification command contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schema_path", "program", "fixture_id", "fixture_input_digest", "commands", "contract_digest"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-verification-command-contract.schema.json" },
+    "program": { "const": "adaptive_ask_verification_command_contract" },
+    "fixture_id": { "$ref": "#/$defs/token" },
+    "fixture_input_digest": { "$ref": "#/$defs/digest" },
+    "commands": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/command" } },
+    "contract_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 96, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "relativePath": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?:\\.|(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[A-Za-z0-9._/-]+)$" },
+    "safeArg": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|/)\\.\\.(?:/|$))(?![A-Za-z_][A-Za-z0-9_]*=)[A-Za-z0-9._/:@%+,=-]+$" },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command_id", "purpose", "working_directory", "safe_argv", "execution_form", "requirement", "alternative_group_id", "timeout_ms", "command_contract_digest"],
+      "properties": {
+        "command_id": { "$ref": "#/$defs/token" },
+        "purpose": { "enum": ["test", "validation", "build", "lint", "typecheck"] },
+        "working_directory": { "$ref": "#/$defs/relativePath" },
+        "safe_argv": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/safeArg" } },
+        "execution_form": { "enum": ["direct_argv"] },
+        "requirement": { "enum": ["required", "optional", "alternative"] },
+        "alternative_group_id": { "oneOf": [{ "$ref": "#/$defs/token" }, { "type": "null" }] },
+        "timeout_ms": { "type": ["integer", "null"], "minimum": 1, "maximum": 3600000 },
+        "command_contract_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

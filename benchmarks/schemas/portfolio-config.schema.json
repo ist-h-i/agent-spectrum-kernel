@@ -80,7 +80,16 @@
           "repetitions": { "enum": [3, 5] },
           "aggregate_eligible": { "type": "boolean" },
           "input_manifest_path": { "type": "string", "minLength": 1 },
-          "input_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          "input_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "verification_command_contract": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            }
+          }
         }
       }
     },
@@ -99,7 +108,7 @@
       "required": ["schema_path", "schema_version"],
       "properties": {
         "schema_path": { "const": "benchmarks/schemas/execution-plan.schema.json" },
-        "schema_version": { "const": "1.0.0" }
+        "schema_version": { "const": "1.1.0" }
       }
     },
     "adaptive_selection": {

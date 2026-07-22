@@ -23,7 +23,7 @@
       "additionalProperties": false,
       "required": ["version", "source_revision"],
       "properties": {
-        "version": { "const": "1.0.0" },
+        "version": { "const": "1.1.0" },
         "source_revision": { "$ref": "#/$defs/revision" }
       }
     },
