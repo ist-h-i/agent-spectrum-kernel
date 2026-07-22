@@ -463,6 +463,9 @@ function structuralCounts(inventory) {
   };
 }
 
+// This bare validator proves only the serialized manifest's Schema and internal
+// closure. External normalized/source/result authority and raw result bodies are
+// available only from verifyEngineeringResultSet().
 export function validatePortfolioEngineeringResultSet(value, { root = DEFAULT_ROOT } = {}) {
   assertBenchmarkSchemaInstance(value, { schemaPath: resolve(root, ENGINEERING_RESULT_SET_SCHEMA_PATH), label: "portfolio engineering result set" });
   for (const entry of value.inventory) assertPortableRelativePath(entry.path, "engineering result set inventory path");
@@ -486,6 +489,60 @@ export function validatePortfolioEngineeringResultSet(value, { root = DEFAULT_RO
   if (value.result_set_id !== computeEngineeringResultSetId(value)) throw new Error("engineering result set ID is invalid");
   if (value.result_set_digest !== computeEngineeringResultSetDigest(value)) throw new Error("engineering result set digest is invalid");
   return value;
+}
+
+export function assertVerifiedResultInventory(artifact, verifiedResults) {
+  if (!Array.isArray(verifiedResults) || verifiedResults.length !== artifact.inventory.length) throw new Error("verified result inventory length does not match the result-set artifact");
+  const entryKeys = ["bytes", "path", "raw_byte_digest", "result"];
+  for (let index = 0; index < artifact.inventory.length; index += 1) {
+    const inventory = artifact.inventory[index];
+    const verified = verifiedResults[index];
+    if (!verified || stableCanonicalJson(Object.keys(verified).sort()) !== stableCanonicalJson(entryKeys)) throw new Error(`verified result inventory entry ${index} has an invalid runtime shape`);
+    assertPortableRelativePath(verified.path, `verified result inventory path ${index}`);
+    if (PRIVATE_EVALUATOR_PATTERN.test(verified.path)) throw new Error(`verified result inventory path ${index} exposes a private evaluator path`);
+    const actual = {
+      path: verified.path,
+      raw_byte_digest: verified.raw_byte_digest,
+      bytes: verified.bytes,
+      engineering_result_id: verified.result?.engineering_result_id,
+      engineering_result_digest: verified.result?.engineering_result_digest,
+      normalized_result_id: verified.result?.normalized_result_id,
+      normalized_result_digest: verified.result?.normalized_result_digest,
+      case_id: verified.result?.case_id,
+      attempt: verified.result?.attempt,
+      condition: verified.result?.condition,
+      repetition: verified.result?.repetition,
+    };
+    const expected = {
+      path: inventory.path,
+      raw_byte_digest: inventory.raw_byte_digest,
+      bytes: inventory.bytes,
+      engineering_result_id: inventory.engineering_result_id,
+      engineering_result_digest: inventory.engineering_result_digest,
+      normalized_result_id: inventory.normalized_result_id,
+      normalized_result_digest: inventory.normalized_result_digest,
+      case_id: inventory.case_id,
+      attempt: inventory.attempt,
+      condition: inventory.condition,
+      repetition: inventory.repetition,
+    };
+    if (stableCanonicalJson(actual) !== stableCanonicalJson(expected)) throw new Error(`verified result inventory entry ${index} does not match the result-set artifact inventory`);
+  }
+  return verifiedResults;
+}
+
+function deepFreezeJson(value) {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const entry of Object.values(value)) deepFreezeJson(entry);
+  return Object.freeze(value);
+}
+
+function sourceAuthorityReturn(authority) {
+  return deepFreezeJson({
+    manifest: structuredClone(authority.manifest),
+    rawByteDigest: authority.rawByteDigest,
+    authority: authority.authority,
+  });
 }
 
 function assertInputBoundaries({ root, engineeringResultsPath, normalizedResultsPath, sourceManifestPath, outputPath = null, inputPath = null, materializedPath = null, selectionState = null, runDir = null }) {
@@ -544,6 +601,7 @@ function deriveEngineeringResultSet(options) {
   const results = [];
   const resultByNormalizedId = new Map();
   const collectedInventory = [];
+  const verifiedResults = [];
   for (const sourceEntry of sourceManifest.inventory) {
     const evidence = firstScan.files.get(sourceEntry.path);
     if (!evidence) throw new Error(`engineering result source manifest references a missing file: ${sourceEntry.path}`);
@@ -564,8 +622,13 @@ function deriveEngineeringResultSet(options) {
     if (!actual) throw new Error(`engineering result is missing for normalized attempt ${normalizedAttemptId(expected)}`);
     assertResultMatchesExpected(actual.result, expected, options.adapter);
     collectedInventory.push(inventoryEntry(actual.path, actual.result, actual.evidence));
+    verifiedResults.push({
+      path: actual.path,
+      raw_byte_digest: actual.evidence.rawByteDigest,
+      bytes: actual.evidence.bytes.length,
+      result: structuredClone(actual.result),
+    });
   }
-  collectedInventory.sort(resultOrder);
   const secondScan = scanResultRoot(options.engineeringResultsPath);
   assertSameFileEvidence(firstScan, secondScan);
   const sourceManifestAfter = readStableFile(authority.path, "engineering result source manifest", MAX_SOURCE_MANIFEST_BYTES);
@@ -613,7 +676,8 @@ function deriveEngineeringResultSet(options) {
   const withId = { ...base, result_set_id: computeEngineeringResultSetId(base) };
   const artifact = { ...withId, result_set_digest: computeEngineeringResultSetDigest(withId) };
   validatePortfolioEngineeringResultSet(artifact, { root });
-  return { artifact, authority };
+  assertVerifiedResultInventory(artifact, verifiedResults);
+  return { artifact, authority: sourceAuthorityReturn(authority), verified_results: deepFreezeJson(verifiedResults) };
 }
 
 export function collectEngineeringResults(options) {
@@ -632,5 +696,7 @@ export function verifyEngineeringResultSet(options) {
   if (stableCanonicalJson(supplied) !== stableCanonicalJson(derived.artifact)) throw new Error("engineering result-set input does not match the re-derived authoritative complete inventory");
   const inputAfter = readStableFile(options.inputPath, "engineering result-set input", MAX_SOURCE_MANIFEST_BYTES);
   assertStableFileEvidence(input, inputAfter, "engineering result-set input");
-  return { artifact: supplied, bytes: input.bytes, authority: derived.authority };
+  // Consumers receive only the cloned, frozen raw results whose complete
+  // authority and final supplied-input stability checks have now succeeded.
+  return { artifact: supplied, bytes: input.bytes, authority: derived.authority, verified_results: derived.verified_results };
 }

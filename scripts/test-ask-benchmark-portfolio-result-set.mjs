@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
+import fs from "node:fs";
 import {
   cpSync,
   existsSync,
@@ -16,11 +17,13 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { syncBuiltinESMExports } from "node:module";
+import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
-import { computeEngineeringResultDigest, computeEngineeringResultId } from "./ask-benchmark-portfolio-score.mjs";
+import { computeEngineeringResultDigest, computeEngineeringResultId, validatePortfolioEngineeringResult } from "./ask-benchmark-portfolio-score.mjs";
 import {
+  assertVerifiedResultInventory,
   collectEngineeringResults,
   computeEngineeringResultSetDigest,
   computeEngineeringResultSetId,
@@ -79,6 +82,48 @@ function run(args, { expectedStatus = 0 } = {}) {
   const result = spawnSync(process.execPath, [runner, ...args], { cwd: root, encoding: "utf8", maxBuffer: 40 * 1024 * 1024 });
   assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
   return result;
+}
+
+function projectVerifiedResults(verifiedResults) {
+  return verifiedResults.map(({ path, result }) => ({
+    path,
+    normalized_requirement_score: result.requirement_score.normalized_requirement_score,
+    scoring_status: result.scoring_status,
+    duration_status: result.overhead_telemetry.duration_ms.status,
+  }));
+}
+
+function stringValues(value) {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(stringValues);
+  if (value && typeof value === "object") return Object.values(value).flatMap(stringValues);
+  return [];
+}
+
+function withResultReadTrap(resultRoot, callback) {
+  const originalOpenSync = fs.openSync;
+  const originalReadFileSync = fs.readFileSync;
+  const canonicalRoot = resolve(resultRoot);
+  const isResultPath = (candidate) => {
+    const absolute = resolve(String(candidate));
+    return absolute === canonicalRoot || absolute.startsWith(`${canonicalRoot}${sep}`);
+  };
+  fs.openSync = function (candidate, ...args) {
+    if (isResultPath(candidate)) throw new Error("consumer attempted to reopen a verified result file");
+    return originalOpenSync.call(fs, candidate, ...args);
+  };
+  fs.readFileSync = function (candidate, ...args) {
+    if (isResultPath(candidate)) throw new Error("consumer attempted to reread a verified result file");
+    return originalReadFileSync.call(fs, candidate, ...args);
+  };
+  syncBuiltinESMExports();
+  try {
+    return callback();
+  } finally {
+    fs.openSync = originalOpenSync;
+    fs.readFileSync = originalReadFileSync;
+    syncBuiltinESMExports();
+  }
 }
 
 function missingMetric(outcome) {
@@ -692,13 +737,112 @@ try {
   assert.ok(collected.artifact.inventory.some(({ scoring_status }) => scoring_status === "not_scoring_ready"));
   assert.ok(collected.artifact.inventory.some(({ normalized_outcome }) => normalized_outcome === "unavailable"));
   assert.deepEqual([...new Set(collected.artifact.inventory.map(({ evaluation_status: status }) => status))].sort(), ["completed", "evaluator_failed", "evaluator_unavailable", "invalid_input", "manual_review_required"].sort());
-  verifyEngineeringResultSet({ ...options(positive), inputPath: positive.outputPath, outputPath: undefined });
+  const fullyVerified = verifyEngineeringResultSet({ ...options(positive), inputPath: positive.outputPath, outputPath: undefined });
+  assert.deepEqual(Object.keys(collected).sort(), ["artifact", "authority", "bytes", "outputPath", "verified_results"]);
+  assert.deepEqual(Object.keys(fullyVerified).sort(), ["artifact", "authority", "bytes", "verified_results"]);
+  for (const returned of [collected, fullyVerified]) {
+    assert.equal(Object.hasOwn(returned.authority, "path"), false);
+    assert.equal(Object.hasOwn(returned.authority, "evidence"), false);
+    assert.equal(stringValues(returned.authority).some((value) => isAbsolute(value) || value.includes(positive.resultRoot)), false);
+    assert.equal(returned.verified_results.length, returned.artifact.inventory.length);
+    returned.verified_results.forEach((entry, index) => {
+      const inventory = returned.artifact.inventory[index];
+      assert.deepEqual(
+        {
+          path: entry.path,
+          raw_byte_digest: entry.raw_byte_digest,
+          bytes: entry.bytes,
+          engineering_result_id: entry.result.engineering_result_id,
+          engineering_result_digest: entry.result.engineering_result_digest,
+          normalized_result_id: entry.result.normalized_result_id,
+          normalized_result_digest: entry.result.normalized_result_digest,
+          case_id: entry.result.case_id,
+          attempt: entry.result.attempt,
+          condition: entry.result.condition,
+          repetition: entry.result.repetition,
+        },
+        {
+          path: inventory.path,
+          raw_byte_digest: inventory.raw_byte_digest,
+          bytes: inventory.bytes,
+          engineering_result_id: inventory.engineering_result_id,
+          engineering_result_digest: inventory.engineering_result_digest,
+          normalized_result_id: inventory.normalized_result_id,
+          normalized_result_digest: inventory.normalized_result_digest,
+          case_id: inventory.case_id,
+          attempt: inventory.attempt,
+          condition: inventory.condition,
+          repetition: inventory.repetition,
+        },
+      );
+      validatePortfolioEngineeringResult(entry.result, { root });
+      assert.equal(resolve(positive.resultRoot, entry.path).startsWith(`${positive.resultRoot}/`), true);
+      assert.equal(isAbsolute(entry.path), false);
+      const strings = stringValues(entry.result);
+      assert.equal(strings.some((value) => value.startsWith("/") || value.includes(positive.resultRoot) || /(?:^|\/)(?:private[-_]?evaluator|evaluator[-_]?private)(?:\/|$)/iu.test(value)), false);
+    });
+  }
+  assert.equal(Object.hasOwn(JSON.parse(collected.bytes.toString("utf8")), "verified_results"), false);
+  assert.equal(Object.hasOwn(collected.artifact, "verified_results"), false);
+  covered.add("full-verifier-returns-verified-results");
+  covered.add("verified-results-match-inventory-order");
+
+  const verifiedBodies = fullyVerified.verified_results.map(({ result }) => result);
+  const normalizedOutcomes = new Set(verifiedBodies.map(({ normalized_outcome: outcome }) => outcome));
+  for (const outcome of ["unavailable", "failed", "interrupted", "invalid"]) assert.equal(normalizedOutcomes.has(outcome), true);
+  const evaluatorStatuses = new Set(verifiedBodies.map(({ evaluation_status: status }) => status));
+  for (const status of ["evaluator_unavailable", "evaluator_failed", "invalid_input", "manual_review_required"]) assert.equal(evaluatorStatuses.has(status), true);
+  assert.ok(verifiedBodies.some(({ scoring_status: status, requirement_score: score }) => status === "not_scoring_ready" && score.normalized_requirement_score === null && score.requirement_points_earned === null && score.requirement_points_possible === null));
+  covered.add("verified-results-preserve-non-ready-bodies");
+
+  const scoringReadyBody = verifiedBodies.find(({ scoring_status: status }) => status === "complete");
+  assert.ok(scoringReadyBody);
+  assert.equal(scoringReadyBody.requirement_score.normalized_requirement_score, 1);
+  assert.equal(scoringReadyBody.requirement_score.requirement_points_earned, 1);
+  assert.equal(scoringReadyBody.requirement_score.requirement_points_possible, 1);
+  for (const field of ["blockers", "safety_blocker", "false_positives", "correctness_observations", "mechanism_observations"]) assert.equal(Object.hasOwn(scoringReadyBody, field), true);
+  for (const field of ["duration_ms", "input_tokens", "output_tokens", "cached_tokens", "human_effort"]) assert.equal(Object.hasOwn(scoringReadyBody.overhead_telemetry, field), true);
+  covered.add("verified-results-expose-score-and-telemetry");
+
+  assert.equal(Object.isFrozen(fullyVerified.verified_results), true);
+  assert.equal(Object.isFrozen(fullyVerified.verified_results[0]), true);
+  assert.equal(Object.isFrozen(fullyVerified.verified_results[0].result), true);
+  const originalScoringStatus = fullyVerified.verified_results[0].result.scoring_status;
+  assert.throws(() => { fullyVerified.verified_results[0].result.scoring_status = "mutated"; }, TypeError);
+  assert.equal(fullyVerified.verified_results[0].result.scoring_status, originalScoringStatus);
+  const independentlyVerified = verifyEngineeringResultSet({ ...options(positive), inputPath: positive.outputPath, outputPath: undefined });
+  assert.notEqual(independentlyVerified.verified_results[0].result, fullyVerified.verified_results[0].result);
+  assert.equal(independentlyVerified.verified_results[0].result.scoring_status, originalScoringStatus);
+  covered.add("verified-results-mutation-isolated");
+
+  const bareValidated = validatePortfolioEngineeringResultSet(structuredClone(collected.artifact), { root });
+  assert.equal(Object.hasOwn(bareValidated, "verified_results"), false);
+  covered.add("bare-validator-does-not-return-result-bodies");
+
+  const mismatchedVerifiedResults = structuredClone(fullyVerified.verified_results);
+  [mismatchedVerifiedResults[0], mismatchedVerifiedResults[1]] = [mismatchedVerifiedResults[1], mismatchedVerifiedResults[0]];
+  assert.throws(() => assertVerifiedResultInventory(fullyVerified.artifact, mismatchedVerifiedResults), /inventory/u);
+  covered.add("verified-result-inventory-mismatch-rejected");
   const cliVerified = run([
     "verify-engineering-result-set", "--normalized-results", positive.normalizedRoot, "--snapshot-digest", positive.sourceSnapshotDigest,
     "--engineering-results", positive.resultRoot, "--engineering-result-source-manifest", positive.sourcePath,
     "--engineering-result-source-manifest-source-digest", positive.sourceDigest, "--adapter", "codex", "--input", positive.outputPath,
   ]);
   assert.match(cliVerified.stdout, /Verified complete codex engineering result set/u);
+  assert.doesNotMatch(cliVerified.stdout, /normalized_requirement_score|requirement_points_earned|overhead_telemetry/u);
+  const postReturnFixture = cloneFixture("post-return-result-replacement");
+  collectEngineeringResults(options(postReturnFixture));
+  const postReturnVerified = verifyEngineeringResultSet(options(postReturnFixture, { inputPath: postReturnFixture.outputPath, outputPath: undefined }));
+  const projectionBeforeReplacement = projectVerifiedResults(postReturnVerified.verified_results);
+  const replacedEntry = postReturnVerified.verified_results[0];
+  writeFileSync(resolve(postReturnFixture.resultRoot, replacedEntry.path), "{}\n");
+  assert.deepEqual(withResultReadTrap(postReturnFixture.resultRoot, () => projectVerifiedResults(postReturnVerified.verified_results)), projectionBeforeReplacement);
+  assert.throws(
+    () => verifyEngineeringResultSet(options(postReturnFixture, { inputPath: postReturnFixture.outputPath, outputPath: undefined })),
+    /raw-byte digest drifted|Schema validation/u,
+  );
+  covered.add("consumer-does-not-reread-result-files");
+  covered.add("verified-results-survive-post-return-file-replacement");
   for (const name of ["complete-one-adapter", "all-four-conditions", "plan-three-repetitions", "plan-five-repetitions", "complete-with-non-ready", "unknown-unavailable-not-zero", "source-revision-matches-normalized-authority"]) covered.add(name);
 
   const checkedIn = cloneFixture("checked-in-authority");
@@ -1063,6 +1207,10 @@ try {
     "concurrent-output-publication", "failure-inputs-unchanged", "byte-identical-regeneration", "unknown-unavailable-not-zero",
     "result-set-id-binds-source-revision", "result-set-revision-drift", "bare-validator-is-not-full-authority-verification",
     "concurrent-verify-input-replacement", "same-byte-inode-replacement", "successful-external-output-inputs-unchanged",
+    "full-verifier-returns-verified-results", "verified-results-match-inventory-order", "verified-results-preserve-non-ready-bodies",
+    "verified-results-expose-score-and-telemetry", "consumer-does-not-reread-result-files",
+    "verified-results-survive-post-return-file-replacement", "verified-results-mutation-isolated",
+    "bare-validator-does-not-return-result-bodies", "verified-result-inventory-mismatch-rejected",
     "statistics-aggregate-schema-rejected", "adapter-pooling-rejected", "adapter-separate-result-sets", "checked-in-source-authority",
     "input-root-overlap", "output-inside-normalized-root", "output-equal-normalized-root", "output-inside-materialized-root",
     "output-inside-selection-state-root", "output-inside-run-root", "output-inside-engineering-result-root",
