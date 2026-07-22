@@ -26,11 +26,27 @@
       ]
     }
   ],
-  "mutation_contract": {
-    "mutation_id": "remove-ci-config-contract",
-    "target_evidence_map_id": "ci-config-contract",
-    "expected_recoverability_state": "not_recoverable",
-    "expected_admission_result": "fail",
-    "mutation_digest": "sha256:4f20969f7cbf8fe59a682110ccdd888fe4afd4bd153f8225dac0b9f1ed17b830"
-  }
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-ci-config-contract",
+      "target_evidence_map_id": "ci-config-contract",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:cefddbc034b61ea3d96dfb3b49dc84e5dd2262e89f45e1c6c83888a59b54e02c"
+    },
+    {
+      "mutation_id": "remove-task-config-boundary",
+      "target_evidence_map_id": "task-config-boundary",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:80909fff283610ec899017db51a4f98f882a973acc551375ad1ea8eefc5b496f"
+    },
+    {
+      "mutation_id": "remove-verification-route",
+      "target_evidence_map_id": "workspace-verification-route",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:5565fb9751528cf57ee937aecfad052dc2824b14fe10379815248027f79040d8"
+    }
+  ]
 }

@@ -886,6 +886,52 @@ try {
     assert.deepEqual(inputPaths.map((path) => readFileSync(path)), inputBytes, `${message}: failure must not modify supplied public inputs`);
   };
 
+  const pendingAuthorityRoot = resolve(work, "pending-full-authority");
+  const pendingAdmissionPath = resolve(pendingAuthorityRoot, "admission-record.json");
+  const pendingAdmission = clone(scoringInputs.admissionRecord);
+  pendingAdmission.admission_status = "admission_pending";
+  pendingAdmission.admission_digest = computeFinalAdmissionRecordDigest(pendingAdmission);
+  writeJson(pendingAdmissionPath, pendingAdmission);
+  const pendingRequirementPath = resolve(pendingAuthorityRoot, "requirement-record.json");
+  const pendingRequirement = clone(scoringInputs.requirementRecord);
+  pendingRequirement.requirement_record_path = repoPath(pendingRequirementPath);
+  pendingRequirement.admission_record_digest = pendingAdmission.admission_digest;
+  pendingRequirement.requirement_set_digest = computeRequirementSetDigest(pendingRequirement);
+  pendingRequirement.requirement_record_digest = computeRequirementRecordDigest(pendingRequirement);
+  writeJson(pendingRequirementPath, pendingRequirement);
+  const pendingFreezePath = resolve(pendingAuthorityRoot, "scoring-input-freeze.json");
+  const pendingFreeze = clone(scoringInputs.freezeManifest);
+  pendingFreeze.admission_record = {
+    path: repoPath(pendingAdmissionPath),
+    raw_byte_digest: fileDigest(pendingAdmissionPath),
+    semantic_digest: pendingAdmission.admission_digest,
+  };
+  pendingFreeze.requirement_record = {
+    path: repoPath(pendingRequirementPath),
+    raw_byte_digest: fileDigest(pendingRequirementPath),
+    record_digest: pendingRequirement.requirement_record_digest,
+    set_digest: pendingRequirement.requirement_set_digest,
+  };
+  pendingFreeze.manifest_digest = computeScoringInputFreezeManifestDigest(pendingFreeze);
+  writeJson(pendingFreezePath, pendingFreeze);
+  const pendingFreezeSourceDigest = fileDigest(pendingFreezePath);
+  const pendingResultPath = resolve(pendingAuthorityRoot, "evaluator-result.json");
+  const pendingResult = JSON.parse(readFileSync(resultPaths.get("completed"), "utf8"));
+  pendingResult.scoring_input_freeze_manifest_source_digest = pendingFreezeSourceDigest;
+  pendingResult.scoring_input_freeze_manifest_digest = pendingFreeze.manifest_digest;
+  pendingResult.admission_record_digest = pendingAdmission.admission_digest;
+  pendingResult.requirement_record_digest = pendingRequirement.requirement_record_digest;
+  pendingResult.requirement_set_digest = pendingRequirement.requirement_set_digest;
+  closeResult(pendingResult);
+  writeJson(pendingResultPath, pendingResult);
+  expectBoundaryFailure({
+    admissionRecordPath: pendingAdmissionPath,
+    requirementRecordPath: pendingRequirementPath,
+    scoringInputFreezeManifestPath: pendingFreezePath,
+    scoringInputFreezeManifestSourceDigest: pendingFreezeSourceDigest,
+    resultPath: pendingResultPath,
+  }, /requires an admitted final admission record/u, "full-authority evaluator verification must reject pending admission even when every downstream binding is re-derived");
+
   const privateAssetPath = resolve(privateRoot, manifest.asset_inventory[0].path);
   function clonedBoundaryRoot(name, source) {
     const target = resolve(work, name);

@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:293d82416b67d67b9d3dc3dd501aa34188cc234a3b505af1291470305351ac79",
+  "admission_record_digest": "sha256:ad355e3388b1c7c0a6b3e25c3d2e7e344cdd39ddc18bcf2a5d52b9fe7b8d78be",
   "requirements": [
     {
       "requirement_id": "configuration-contract",
@@ -64,5 +64,5 @@
     }
   ],
   "requirement_set_digest": "sha256:5c237c4db6bb10aac62ab010ef81d6f8dda962b76e15ebe5b00bc34cff605d4a",
-  "requirement_record_digest": "sha256:9045870b2d9dee1f48299e11446b5ba3bc16699be6f67f5f04ece6a63057d643"
+  "requirement_record_digest": "sha256:a4429febf868352780ecc05df3cedc2030488e0db395fdb50ef3c807c17ebe48"
 }

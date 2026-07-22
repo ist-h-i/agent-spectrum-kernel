@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,9 +14,18 @@ import {
   validateMnBuildOptionUpdatePrivateFixture,
   validateMnBuildOptionUpdatePublicFixture,
   validateFairPaths,
+  validateEquivalenceAuthority,
+  validateMatchedEquivalenceIds,
+  validateMutationAuthority,
   validatePendingIndependentReview,
 } from "./ask-benchmark-mn-build-option-update.mjs";
-import { validateScoringInputBindings } from "./ask-benchmark-scoring-contract.mjs";
+import {
+  computeFinalAdmissionRecordDigest,
+  computeRequirementRecordDigest,
+  computeScoringInputFreezeManifestDigest,
+  validateScoringInputBindings,
+} from "./ask-benchmark-scoring-contract.mjs";
+import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
@@ -98,11 +108,117 @@ function syntheticScoringInput() {
   return { freezeManifest, freezeManifestSourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult };
 }
 
+function admittedSyntheticScoringInput(source) {
+  const scoring = structuredClone(source);
+  const jsonDigest = (value) => `sha256:${createHash("sha256").update(`${JSON.stringify(value, null, 2)}\n`).digest("hex")}`;
+  scoring.admissionRecord.admission_status = "admitted";
+  scoring.admissionRecord.admission_digest = computeFinalAdmissionRecordDigest(scoring.admissionRecord);
+  scoring.requirementRecord.admission_record_digest = scoring.admissionRecord.admission_digest;
+  scoring.requirementRecord.requirement_record_digest = computeRequirementRecordDigest(scoring.requirementRecord);
+  scoring.freezeManifest.admission_record.raw_byte_digest = jsonDigest(scoring.admissionRecord);
+  scoring.freezeManifest.admission_record.semantic_digest = scoring.admissionRecord.admission_digest;
+  scoring.freezeManifest.requirement_record.raw_byte_digest = jsonDigest(scoring.requirementRecord);
+  scoring.freezeManifest.requirement_record.record_digest = scoring.requirementRecord.requirement_record_digest;
+  scoring.freezeManifest.requirement_record.set_digest = scoring.requirementRecord.requirement_set_digest;
+  scoring.freezeManifest.manifest_digest = computeScoringInputFreezeManifestDigest(scoring.freezeManifest);
+  scoring.evaluatorResult.scoring_input_freeze_manifest_digest = scoring.freezeManifest.manifest_digest;
+  scoring.evaluatorResult.admission_record_digest = scoring.admissionRecord.admission_digest;
+  scoring.evaluatorResult.requirement_record_digest = scoring.requirementRecord.requirement_record_digest;
+  return scoring;
+}
+
+function privateSemanticAuthority(privateRoot) {
+  const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
+  const asset = (role) => readJson(resolve(privateRoot, manifest.asset_inventory.find((entry) => entry.role === role).path));
+  return {
+    requirementRecord: readJson(resolve(fixtureRoot, "requirement-record.json")),
+    admissionRecord: readJson(resolve(fixtureRoot, "final-admission-record.json")),
+    evidenceMapArtifact: readJson(resolve(fixtureRoot, "evidence-map.json")),
+    inputManifestRecord: readJson(resolve(fixtureRoot, "input-manifest.json")).fixtures["mn-build-option-update"],
+    mutationAsset: asset("evidence_removal_mutations"),
+    equivalenceAsset: asset("equivalent_solution_rules"),
+  };
+}
+
+function closeMutation(mutation) {
+  const closure = structuredClone(mutation);
+  delete closure.mutation_digest;
+  mutation.mutation_digest = canonicalDigest(closure);
+}
+
+function closeEquivalenceRule(rule) {
+  const closure = structuredClone(rule);
+  delete closure.rule_digest;
+  rule.rule_digest = canonicalDigest(closure);
+}
+
+function runPrivateSemanticNegativeChecks(privateRoot) {
+  const authority = privateSemanticAuthority(privateRoot);
+  const mutationFailure = (label, mutate, pattern) => {
+    const changed = structuredClone(authority);
+    mutate(changed);
+    expectFailure(() => validateMutationAuthority(changed), pattern, label);
+  };
+  mutationFailure("second mutation omission", ({ mutationAsset }) => mutationAsset.mutations.splice(1, 1), /inventory does not exactly match/u);
+  mutationFailure("third mutation omission", ({ mutationAsset }) => mutationAsset.mutations.splice(2, 1), /inventory does not exactly match/u);
+  mutationFailure("duplicate mutation", ({ mutationAsset }) => mutationAsset.mutations.push(structuredClone(mutationAsset.mutations[0])), /duplicate ID/u);
+  mutationFailure("extra mutation", ({ mutationAsset }) => {
+    const extra = structuredClone(mutationAsset.mutations[0]);
+    extra.mutation_id = "extra-mutation";
+    closeMutation(extra);
+    mutationAsset.mutations.push(extra);
+  }, /inventory does not exactly match/u);
+  mutationFailure("mutation ID transplant", ({ mutationAsset }) => {
+    [mutationAsset.mutations[0].mutation_id, mutationAsset.mutations[1].mutation_id] = [mutationAsset.mutations[1].mutation_id, mutationAsset.mutations[0].mutation_id];
+    closeMutation(mutationAsset.mutations[0]);
+    closeMutation(mutationAsset.mutations[1]);
+  }, /transplanted across requirements/u);
+  mutationFailure("target evidence map transplant", ({ mutationAsset }) => {
+    mutationAsset.mutations[0].target_evidence_map_id = mutationAsset.mutations[1].target_evidence_map_id;
+    closeMutation(mutationAsset.mutations[0]);
+  }, /another requirement's evidence map/u);
+  mutationFailure("remove path drift", ({ mutationAsset }) => {
+    mutationAsset.mutations[0].remove_paths[0] = "workspace/package.json";
+    closeMutation(mutationAsset.mutations[0]);
+  }, /remove path inventory/u);
+  mutationFailure("mutation digest drift", ({ mutationAsset }) => { mutationAsset.mutations[0].mutation_digest = `sha256:${"0".repeat(64)}`; }, /digest mismatch/u);
+
+  const equivalenceFailure = (label, mutate, pattern) => {
+    const changed = structuredClone(authority);
+    mutate(changed);
+    expectFailure(() => validateEquivalenceAuthority(changed), pattern, label);
+  };
+  equivalenceFailure("equivalence rule omission", ({ equivalenceAsset }) => equivalenceAsset.rules.splice(1, 1), /inventory does not exactly match/u);
+  equivalenceFailure("duplicate equivalence rule", ({ equivalenceAsset }) => equivalenceAsset.rules.push(structuredClone(equivalenceAsset.rules[0])), /duplicate ID/u);
+  equivalenceFailure("extra equivalence rule", ({ equivalenceAsset }) => {
+    const extra = structuredClone(equivalenceAsset.rules[0]);
+    extra.equivalence_class_id = "extra-equivalence";
+    closeEquivalenceRule(extra);
+    equivalenceAsset.rules.push(extra);
+  }, /inventory does not exactly match/u);
+  equivalenceFailure("unknown equivalence rule ID", ({ equivalenceAsset }) => {
+    equivalenceAsset.rules[0].equivalence_class_id = "unknown-equivalence";
+    closeEquivalenceRule(equivalenceAsset.rules[0]);
+  }, /inventory does not exactly match/u);
+  equivalenceFailure("equivalence requirement transplant", ({ equivalenceAsset }) => {
+    equivalenceAsset.rules[0].requirement_id = equivalenceAsset.rules[1].requirement_id;
+    closeEquivalenceRule(equivalenceAsset.rules[0]);
+  }, /transplanted across requirements/u);
+  equivalenceFailure("equivalence rule digest drift", ({ equivalenceAsset }) => { equivalenceAsset.rules[0].rule_digest = `sha256:${"0".repeat(64)}`; }, /digest mismatch/u);
+  expectFailure(() => validateMatchedEquivalenceIds({
+    requirementRecord: authority.requirementRecord,
+    equivalenceAsset: authority.equivalenceAsset,
+    matchedEquivalenceClassIds: ["undeclared-equivalence"],
+  }), /undeclared equivalence ID/u, "hidden evaluator undeclared equivalence ID");
+}
+
 function runPrivateCandidateChecks(privateRoot) {
   const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
   const assetPath = (role) => resolve(privateRoot, manifest.asset_inventory.find((entry) => entry.role === role).path);
   const referenceContract = readJson(assetPath("oracle"));
   const automatedEvaluator = assetPath("hidden_tests");
+  const equivalenceAsset = readJson(assetPath("equivalent_solution_rules"));
+  const requirementRecord = readJson(resolve(fixtureRoot, "requirement-record.json"));
   const baseWorkspace = resolve(fixtureRoot, "workspace");
   const candidate = (name) => {
     const path = resolve(work, name);
@@ -125,6 +241,10 @@ function runPrivateCandidateChecks(privateRoot) {
   const runHidden = (workspace, evidence, expectedStatus = 0) => {
     const result = spawnSync(process.execPath, [automatedEvaluator, workspace, ...evidence], { encoding: "utf8" });
     assert.equal(result.status, expectedStatus);
+    if (expectedStatus === 0) {
+      const evaluatorOutput = JSON.parse(result.stdout);
+      validateMatchedEquivalenceIds({ requirementRecord, equivalenceAsset, matchedEquivalenceClassIds: evaluatorOutput.matched_equivalence_class_ids });
+    }
   };
 
   const contract = referenceContract.observable_contract.release_source_map;
@@ -161,7 +281,7 @@ try {
   expectFailure(() => validateFairPaths({ fair_paths: { plain: { status: "pass", agent_visible_evidence: ["task.md"] } } }, new Set(["task.md"])), /kernel_only fair path is missing/u, "Plain and Kernel-only fair paths are both required");
 
   const evidenceMap = readJson(resolve(fixtureRoot, "evidence-map.json"));
-  const target = evidenceMap.maps.find(({ evidence_map_id }) => evidence_map_id === evidenceMap.mutation_contract.target_evidence_map_id);
+  const target = evidenceMap.maps.find(({ evidence_map_id }) => evidence_map_id === evidenceMap.mutation_contracts[0].target_evidence_map_id);
   assert.equal(evaluateEvidenceRemoval({ evidenceMap: target, removedPaths: target.agent_visible_paths, expectedRecoverabilityState: "not_recoverable" }), "not_recoverable");
   expectFailure(() => evaluateEvidenceRemoval({ evidenceMap: target, removedPaths: target.agent_visible_paths, expectedRecoverabilityState: "recoverable" }), /expectation is invalid/u, "removed scored evidence must not remain recoverable");
 
@@ -170,8 +290,16 @@ try {
   assert.equal(visiblePaths.includes("evaluator-reference.json"), false, "evaluator reference must not enter the pre-output agent-visible collection");
   assert.equal(visiblePaths.every((path) => path === "task.md" || path.startsWith("workspace/")), true);
 
-  const scoring = syntheticScoringInput();
-  assert.equal(validateScoringInputBindings(scoring).scoringReady, true, "synthetic completed evaluator evidence must be consumable by the frozen scoring interface");
+  const pendingScoring = syntheticScoringInput();
+  expectFailure(() => validateScoringInputBindings(pendingScoring), /requires an admitted/u, "checked-in pending admission must fail standalone scoring binding");
+  const statusOnly = structuredClone(pendingScoring);
+  statusOnly.admissionRecord.admission_status = "admitted";
+  expectFailure(() => validateScoringInputBindings(statusOnly), /final admission record digest/u, "admitted status with a stale digest must fail closed");
+  const admissionOnly = structuredClone(statusOnly);
+  admissionOnly.admissionRecord.admission_digest = computeFinalAdmissionRecordDigest(admissionOnly.admissionRecord);
+  expectFailure(() => validateScoringInputBindings(admissionOnly), /admission binding/u, "admission digest without downstream authority updates must fail closed");
+  const scoring = admittedSyntheticScoringInput(pendingScoring);
+  assert.equal(validateScoringInputBindings(scoring).scoringReady, true, "only a fully re-derived synthetic admitted authority may become scoring-ready");
   const replacedReference = structuredClone(scoring);
   replacedReference.evaluatorResult.evaluator_public_reference_digest = `sha256:${"d".repeat(64)}`;
   expectFailure(() => validateScoringInputBindings(replacedReference), /binding mismatch/u, "evaluator reference replacement must fail closed");
@@ -190,6 +318,7 @@ try {
     const roots = boundaryRoots();
     const privateSummary = validateMnBuildOptionUpdatePrivateFixture({ root, privateRoot, ...roots });
     assert.equal(privateSummary.evaluatorBundleDigest, summary.evaluatorBundleDigest);
+    runPrivateSemanticNegativeChecks(privateRoot);
     runPrivateCandidateChecks(privateRoot);
 
     const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));

@@ -137,6 +137,84 @@ export function evaluateEvidenceRemoval({ evidenceMap, removedPaths, expectedRec
   return recoverabilityState;
 }
 
+function assertUniqueIds(values, label) {
+  if (!Array.isArray(values) || values.some((value) => typeof value !== "string" || value.length === 0)) throw new Error(`${label} must be a non-empty string array`);
+  if (new Set(values).size !== values.length) throw new Error(`${label} contains a duplicate ID`);
+}
+
+function assertExactIdSet(actual, expected, label) {
+  assertUniqueIds(actual, `${label} actual inventory`);
+  assertUniqueIds(expected, `${label} expected inventory`);
+  const actualSorted = [...actual].sort();
+  const expectedSorted = [...expected].sort();
+  if (stableCanonicalJson(actualSorted) !== stableCanonicalJson(expectedSorted)) throw new Error(`${label} inventory does not exactly match authority`);
+}
+
+export function validateMutationAuthority({ requirementRecord, admissionRecord, evidenceMapArtifact, inputManifestRecord, mutationAsset }) {
+  if (!Array.isArray(mutationAsset?.mutations)) throw new Error("private mutation asset must declare a mutation array");
+  const expectedIds = requirementRecord.requirements.flatMap((requirement) => requirement.mutation_ids);
+  const privateIds = mutationAsset.mutations.map((mutation) => mutation.mutation_id);
+  assertExactIdSet(admissionRecord.mutation_set_ids, expectedIds, "final admission mutation");
+  assertExactIdSet(privateIds, expectedIds, "private mutation");
+
+  const publicContracts = evidenceMapArtifact.mutation_contracts;
+  if (!Array.isArray(publicContracts)) throw new Error("public mutation contract inventory is missing");
+  assertExactIdSet(publicContracts.map((entry) => entry.mutation_id), expectedIds, "public mutation contract");
+  const publicContractById = new Map(publicContracts.map((entry) => [entry.mutation_id, entry]));
+  const evidenceMapById = new Map(evidenceMapArtifact.maps.map((entry) => [entry.evidence_map_id, entry]));
+  const agentVisiblePaths = new Set(inputManifestRecord.files.map((entry) => entry.path));
+  const requirementByMutation = new Map(requirementRecord.requirements.flatMap((requirement) => requirement.mutation_ids.map((mutationId) => [mutationId, requirement])));
+
+  for (const mutation of mutationAsset.mutations) {
+    const requirement = requirementByMutation.get(mutation.mutation_id);
+    if (!requirement) throw new Error(`private mutation references unknown ID: ${mutation.mutation_id}`);
+    if (mutation.requirement_id !== requirement.requirement_id) throw new Error(`private mutation ${mutation.mutation_id} is transplanted across requirements`);
+    const evidenceMap = evidenceMapById.get(mutation.target_evidence_map_id);
+    if (!evidenceMap) throw new Error(`private mutation ${mutation.mutation_id} targets an unknown public evidence map`);
+    if (!requirement.evidence_map_ids.includes(mutation.target_evidence_map_id)) throw new Error(`private mutation ${mutation.mutation_id} targets another requirement's evidence map`);
+    assertUniqueIds(mutation.remove_paths, `private mutation ${mutation.mutation_id} remove paths`);
+    if (mutation.remove_paths.length === 0) throw new Error(`private mutation ${mutation.mutation_id} remove paths must not be empty`);
+    if (mutation.remove_paths.some((path) => !agentVisiblePaths.has(path))) throw new Error(`private mutation ${mutation.mutation_id} removes a non-agent-visible path`);
+    assertExactIdSet(mutation.remove_paths, evidenceMap.agent_visible_paths, `private mutation ${mutation.mutation_id} remove path`);
+    if (mutation.mutation_digest !== canonicalDigest(withoutField(mutation, "mutation_digest"))) throw new Error(`private mutation ${mutation.mutation_id} digest mismatch`);
+    if (mutation.expected_admission_result !== "fail") throw new Error(`private mutation ${mutation.mutation_id} admission expectation is invalid`);
+    evaluateEvidenceRemoval({ evidenceMap, removedPaths: mutation.remove_paths, expectedRecoverabilityState: mutation.expected_recoverability_state });
+    const publicContract = publicContractById.get(mutation.mutation_id);
+    assertEqual(publicContract, {
+      mutation_id: mutation.mutation_id,
+      target_evidence_map_id: mutation.target_evidence_map_id,
+      expected_recoverability_state: mutation.expected_recoverability_state,
+      expected_admission_result: mutation.expected_admission_result,
+      mutation_digest: mutation.mutation_digest,
+    }, `public mutation contract ${mutation.mutation_id}`);
+  }
+  return { mutationIds: [...expectedIds] };
+}
+
+export function validateEquivalenceAuthority({ requirementRecord, equivalenceAsset }) {
+  if (!Array.isArray(equivalenceAsset?.rules)) throw new Error("private equivalence asset must declare a rule array");
+  const expectedIds = requirementRecord.requirements.flatMap((requirement) => requirement.equivalence_class_ids);
+  const privateIds = equivalenceAsset.rules.map((rule) => rule.equivalence_class_id);
+  assertExactIdSet(privateIds, expectedIds, "private equivalence rule");
+  const requirementByEquivalence = new Map(requirementRecord.requirements.flatMap((requirement) => requirement.equivalence_class_ids.map((equivalenceId) => [equivalenceId, requirement])));
+  for (const rule of equivalenceAsset.rules) {
+    const requirement = requirementByEquivalence.get(rule.equivalence_class_id);
+    if (!requirement) throw new Error(`private equivalence rule references unknown ID: ${rule.equivalence_class_id}`);
+    if (rule.requirement_id !== requirement.requirement_id) throw new Error(`private equivalence rule ${rule.equivalence_class_id} is transplanted across requirements`);
+    assertUniqueIds(rule.match_basis, `private equivalence rule ${rule.equivalence_class_id} match basis`);
+    if (!rule.match_basis.includes("observable_behavior") || rule.property_order_only !== false) throw new Error(`private equivalence rule ${rule.equivalence_class_id} lacks observable-contract authority`);
+    if (rule.rule_digest !== canonicalDigest(withoutField(rule, "rule_digest"))) throw new Error(`private equivalence rule ${rule.equivalence_class_id} digest mismatch`);
+  }
+  return { equivalenceIds: [...expectedIds] };
+}
+
+export function validateMatchedEquivalenceIds({ requirementRecord, equivalenceAsset, matchedEquivalenceClassIds }) {
+  const { equivalenceIds } = validateEquivalenceAuthority({ requirementRecord, equivalenceAsset });
+  assertUniqueIds(matchedEquivalenceClassIds, "hidden evaluator matched equivalence IDs");
+  if (matchedEquivalenceClassIds.some((id) => !equivalenceIds.includes(id))) throw new Error("hidden evaluator returned an undeclared equivalence ID");
+  return true;
+}
+
 function validateRawFreezeArtifact(root, record, semanticDigest, label) {
   const path = resolve(root, record.path);
   assertDigest(record.raw_byte_digest, sha256(readFileSync(path)), `${label} raw byte`);
@@ -288,13 +366,20 @@ export function validateMnBuildOptionUpdatePrivateFixture(options) {
   });
   const requiredRoles = ["equivalent_solution_rules", "evidence_removal_mutations", "hidden_tests", "human_evaluation_instructions", "oracle", "rubric", "scope_boundaries"];
   assertEqual(bundle.manifest.asset_inventory.map(({ role }) => role), requiredRoles, "private evaluator role inventory");
+  const requirementRecord = readJson(resolve(root, FIXTURE_ROOT_RELATIVE, "requirement-record.json"), "public requirement record");
+  const admissionRecord = readJson(resolve(root, FIXTURE_ROOT_RELATIVE, "final-admission-record.json"), "public final admission record");
+  const evidenceMapArtifact = readJson(resolve(root, FIXTURE_ROOT_RELATIVE, "evidence-map.json"), "public evidence map");
+  const inputManifestRecord = readJson(resolve(root, FIXTURE_ROOT_RELATIVE, "input-manifest.json"), "public input manifest").fixtures[FIXTURE_ID];
   const mutationAsset = bundle.manifest.asset_inventory.find(({ role }) => role === "evidence_removal_mutations");
-  const privateMutation = readJson(resolve(privateRoot, mutationAsset.path), "private evidence-removal contract").mutations[0];
-  const publicMutation = readJson(resolve(root, FIXTURE_ROOT_RELATIVE, "evidence-map.json"), "public evidence map").mutation_contract;
-  assertDigest(privateMutation.mutation_digest, canonicalDigest(withoutField(privateMutation, "mutation_digest")), "private evidence-removal mutation");
-  if (privateMutation.mutation_id !== publicMutation.mutation_id || privateMutation.target_evidence_map_id !== publicMutation.target_evidence_map_id || privateMutation.mutation_digest !== publicMutation.mutation_digest) throw new Error("public/private evidence-removal identity mismatch");
-  const evidenceMap = readJson(resolve(root, FIXTURE_ROOT_RELATIVE, "evidence-map.json"), "public evidence map").maps.find(({ evidence_map_id }) => evidence_map_id === privateMutation.target_evidence_map_id);
-  evaluateEvidenceRemoval({ evidenceMap, removedPaths: privateMutation.remove_paths, expectedRecoverabilityState: privateMutation.expected_recoverability_state });
+  const equivalenceAsset = bundle.manifest.asset_inventory.find(({ role }) => role === "equivalent_solution_rules");
+  validateMutationAuthority({
+    requirementRecord,
+    admissionRecord,
+    evidenceMapArtifact,
+    inputManifestRecord,
+    mutationAsset: readJson(resolve(privateRoot, mutationAsset.path), "private evidence-removal contract"),
+  });
+  validateEquivalenceAuthority({ requirementRecord, equivalenceAsset: readJson(resolve(privateRoot, equivalenceAsset.path), "private equivalent-solution contract") });
   if (bundle.manifest.evaluator_bundle_id !== publicSummary.evaluatorBundleId || bundle.manifest.evaluator_bundle_digest !== publicSummary.evaluatorBundleDigest) throw new Error("public/private evaluator identity mismatch");
   return publicSummary;
 }

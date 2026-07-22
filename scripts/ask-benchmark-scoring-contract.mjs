@@ -279,6 +279,8 @@ export function validateScoringInputBindings({ freezeManifest, freezeManifestSou
   assertDigestClosure(policyManifest.manifest_digest, computePolicyManifestDigest(policyManifest), "policy manifest digest");
   assertDigestClosure(scoringPolicy.policy_digest, computeScoringPolicyDigest(scoringPolicy), "scoring policy digest");
   assertDigestClosure(outputContract.output_contract_digest, computeOutputContractDigest(outputContract), "output contract digest");
+  if (admissionRecord.admission_status !== "admitted") throw new Error("scoring input binding requires an admitted final admission record");
+  assertDigestClosure(admissionRecord.admission_digest, computeFinalAdmissionRecordDigest(admissionRecord), "final admission record digest");
   if (policyManifest.catalog_digest !== catalog.catalog_digest || scoringPolicy.catalog_digest !== catalog.catalog_digest) throw new Error("scoring policy or manifest catalog binding does not match");
   if (policyManifest.scoring_policy?.digest !== scoringPolicy.policy_digest) throw new Error("policy manifest scoring policy binding does not match");
   if (requirementRecord.fixture_id !== normalizedResult.lineage.fixture_id) throw new Error("requirement record fixture binding does not match normalized result");
