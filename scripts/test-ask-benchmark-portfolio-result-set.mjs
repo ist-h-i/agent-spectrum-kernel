@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { computeEngineeringResultDigest, computeEngineeringResultId, validatePortfolioEngineeringResult } from "./ask-benchmark-portfolio-score.mjs";
 import { reportEngineeringResultRepetitions, verifyEngineeringRepetitionReport } from "./ask-benchmark-portfolio-repetition-report.mjs";
+import { reportEngineeringPairedComparisons, verifyEngineeringPairedComparisonReport } from "./ask-benchmark-portfolio-paired-comparison-report.mjs";
 import {
   assertVerifiedResultInventory,
   collectEngineeringResults,
@@ -613,7 +614,7 @@ function reportInputEvidence(fixture) {
   return {
     resultSetInputs: inputEvidence(fixture),
     resultSet: regularFileEvidence(fixture.outputPath),
-    policies: Object.fromEntries(["portfolio-policy-manifest.json", "portfolio-admission-policy.json", "portfolio-scoring-policy.json", "portfolio-lineage-policy.json"].map((name) => [name, regularFileEvidence(resolve(root, "benchmarks", name))])),
+    policies: Object.fromEntries(["portfolio-catalog.json", "portfolio-policy-manifest.json", "portfolio-admission-policy.json", "portfolio-scoring-policy.json", "portfolio-lineage-policy.json"].map((name) => [name, regularFileEvidence(resolve(root, "benchmarks", name))])),
   };
 }
 
@@ -681,6 +682,19 @@ function reportCliAuthorityArgs(fixture) {
 
 async function concurrentReportPublication(fixture, outputPath) {
   const args = [runner, "report-engineering-result-repetitions", ...reportCliAuthorityArgs(fixture), "--input", fixture.outputPath, "--output", outputPath];
+  const launch = () => new Promise((resolvePromise) => {
+    const child = spawn(process.execPath, args, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("close", (status) => resolvePromise({ status, stdout, stderr }));
+  });
+  return Promise.all([launch(), launch()]);
+}
+
+async function concurrentPairedComparisonPublication(fixture, repetitionReportPath, outputPath) {
+  const args = [runner, "report-engineering-paired-comparisons", ...reportCliAuthorityArgs(fixture), "--result-set", fixture.outputPath, "--repetition-report", repetitionReportPath, "--output", outputPath];
   const launch = () => new Promise((resolvePromise) => {
     const child = spawn(process.execPath, args, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
@@ -822,6 +836,66 @@ syncBuiltinESMExports();
   return { status, stdout, stderr };
 }
 
+async function concurrentPairedComparisonVerifyReplacement(fixture, repetitionReportPath, comparisonReportPath, replacementPath) {
+  const markerPath = resolve(fixture.target, `paired-final-read-${hash(replacementPath).slice(0, 8)}.marker`);
+  const continuePath = `${markerPath}.continue`;
+  const preloadPath = `${markerPath}.preload.mjs`;
+  writeFileSync(preloadPath, `
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import { resolve } from "node:path";
+const originalOpenSync = fs.openSync;
+const originalCloseSync = fs.closeSync;
+const inputPath = resolve(process.env.ASK_PAIRED_TEST_INPUT);
+const markerPath = process.env.ASK_PAIRED_TEST_MARKER;
+const continuePath = process.env.ASK_PAIRED_TEST_CONTINUE;
+let openCount = 0;
+let synchronizedDescriptor = null;
+let synchronized = false;
+fs.openSync = function (path, ...args) {
+  const descriptor = originalOpenSync.call(fs, path, ...args);
+  if (resolve(String(path)) === inputPath) {
+    openCount += 1;
+    if (openCount === 2) synchronizedDescriptor = descriptor;
+  }
+  return descriptor;
+};
+fs.closeSync = function (descriptor) {
+  originalCloseSync.call(fs, descriptor);
+  if (!synchronized && descriptor === synchronizedDescriptor) {
+    synchronized = true;
+    fs.writeFileSync(markerPath, "final comparison descriptor closed\\n", { flag: "wx" });
+    const waitArray = new Int32Array(new SharedArrayBuffer(4));
+    while (!fs.existsSync(continuePath)) Atomics.wait(waitArray, 0, 0, 10);
+  }
+};
+syncBuiltinESMExports();
+`);
+  const args = [
+    "--import", preloadPath,
+    runner,
+    "verify-engineering-paired-comparison-report",
+    ...reportCliAuthorityArgs(fixture),
+    "--result-set", fixture.outputPath,
+    "--repetition-report", repetitionReportPath,
+    "--input", comparisonReportPath,
+  ];
+  const child = spawn(process.execPath, args, {
+    cwd: root,
+    env: { ...process.env, ASK_PAIRED_TEST_INPUT: comparisonReportPath, ASK_PAIRED_TEST_MARKER: markerPath, ASK_PAIRED_TEST_CONTINUE: continuePath },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk) => { stdout += chunk; });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  try { await waitForPath(markerPath, child); } catch (error) { throw new Error(`${error.message}\n${stderr}`); }
+  renameSync(replacementPath, comparisonReportPath);
+  writeFileSync(continuePath, "continue\n", { flag: "wx" });
+  const status = await new Promise((resolvePromise) => child.on("close", resolvePromise));
+  return { status, stdout, stderr };
+}
+
 try {
   const base = resolve(work, "base");
   const normalizedRoot = resolve(base, "normalized");
@@ -848,6 +922,70 @@ try {
   assert.equal(repetitionReport.artifact.fixture_reports[0].condition_reports[0].score_distribution.distribution_status, "insufficient_evidence");
   const verifiedRepetitionReport = verifyEngineeringRepetitionReport({ ...options(positive), inputPath: positive.outputPath, outputPath: undefined, reportPath: repetitionReportPath });
   assert.equal(verifiedRepetitionReport.artifact.repetition_report_digest, repetitionReport.artifact.repetition_report_digest);
+  assert.equal(Object.isFrozen(verifiedRepetitionReport.verified_report), true);
+  assert.equal(Object.isFrozen(verifiedRepetitionReport.verified_report.fixture_reports[0]), true);
+  const pairedComparisonPath = resolve(positive.target, "paired-comparison-report.json");
+  const pairedComparison = reportEngineeringPairedComparisons({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, outputPath: pairedComparisonPath });
+  assert.equal(pairedComparison.artifact.fixture_comparisons.length, 2);
+  assert.equal(pairedComparison.artifact.comparison_view_definitions.length, 3);
+  const verifiedPairedComparison = verifyEngineeringPairedComparisonReport({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, comparisonReportPath: pairedComparisonPath });
+  assert.equal(verifiedPairedComparison.artifact.paired_comparison_report_digest, pairedComparison.artifact.paired_comparison_report_digest);
+  covered.add("paired-comparison-full-authority");
+  assert.throws(() => reportEngineeringPairedComparisons({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, outputPath: pairedComparisonPath }), /must not already exist/u);
+  covered.add("paired-pre-existing-output");
+  const pairedSymlinkTarget = resolve(positive.target, "paired-symlink-target.json");
+  const pairedSymlinkOutput = resolve(positive.target, "paired-symlink-output.json");
+  writeFileSync(pairedSymlinkTarget, "target\n");
+  symlinkSync(pairedSymlinkTarget, pairedSymlinkOutput);
+  assert.throws(() => reportEngineeringPairedComparisons({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, outputPath: pairedSymlinkOutput }), /symlink/u);
+  covered.add("paired-output-symlink");
+  assert.throws(() => reportEngineeringPairedComparisons({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, outputPath: resolve(positive.normalizedRoot, "paired.json") }), /disjoint from normalized result authority/u);
+  covered.add("paired-output-inside-authority-root");
+
+  for (const replacementKind of ["different-valid-bytes", "same-bytes-different-inode"]) {
+    const raceFixture = cloneFixture(`paired-${replacementKind}`);
+    collectEngineeringResults(options(raceFixture));
+    const raceRepetitionPath = resolve(raceFixture.target, "repetition.json");
+    reportEngineeringResultRepetitions({ ...options(raceFixture), inputPath: raceFixture.outputPath, outputPath: raceRepetitionPath });
+    const comparisonPath = resolve(raceFixture.target, "paired.json");
+    reportEngineeringPairedComparisons({ ...options(raceFixture), resultSetPath: raceFixture.outputPath, repetitionReportPath: raceRepetitionPath, outputPath: comparisonPath });
+    const originalBytes = readFileSync(comparisonPath);
+    const replacementPath = resolve(raceFixture.target, "paired-replacement.json");
+    writeFileSync(replacementPath, replacementKind === "different-valid-bytes" ? Buffer.concat([Buffer.from("\n"), originalBytes]) : originalBytes);
+    const raced = await concurrentPairedComparisonVerifyReplacement(raceFixture, raceRepetitionPath, comparisonPath, replacementPath);
+    assert.notEqual(raced.status, 0, `${replacementKind}: paired comparison verification must fail after final-open path replacement`);
+    assert.doesNotMatch(raced.stdout, /Verified paired comparison report/u);
+    assert.match(raced.stderr, /path was replaced|changed or was replaced/u);
+    covered.add(`paired-${replacementKind}-replacement`);
+  }
+
+  const concurrentPairedFixture = cloneFixture("concurrent-paired-publication");
+  collectEngineeringResults(options(concurrentPairedFixture));
+  const concurrentPairedRepetitionPath = resolve(concurrentPairedFixture.target, "repetition.json");
+  reportEngineeringResultRepetitions({ ...options(concurrentPairedFixture), inputPath: concurrentPairedFixture.outputPath, outputPath: concurrentPairedRepetitionPath });
+  const concurrentPairedPath = resolve(concurrentPairedFixture.target, "paired.json");
+  const concurrentPairedResults = await concurrentPairedComparisonPublication(concurrentPairedFixture, concurrentPairedRepetitionPath, concurrentPairedPath);
+  assert.deepEqual(concurrentPairedResults.map(({ status }) => status).sort((left, right) => left - right), [0, 1]);
+  assert.equal(concurrentPairedResults.filter(({ status }) => status === 0).length, 1);
+  assert.deepEqual(readFileSync(concurrentPairedPath), pairedComparison.bytes);
+  assert.equal(readdirSync(dirname(concurrentPairedPath)).some((name) => name.startsWith(`.${basename(concurrentPairedPath)}.staging-`)), false);
+  covered.add("concurrent-paired-publication");
+
+  const immutablePairedFixture = addOptionalInputRoots(cloneFixture("successful-paired-publication-inputs-unchanged"));
+  collectEngineeringResults(options(immutablePairedFixture, { materializedPath: immutablePairedFixture.materializedPath, selectionState: immutablePairedFixture.selectionState, runDir: immutablePairedFixture.runDir }));
+  const immutablePairedRepetitionPath = resolve(immutablePairedFixture.target, "repetition.json");
+  reportEngineeringResultRepetitions({ ...options(immutablePairedFixture), inputPath: immutablePairedFixture.outputPath, outputPath: immutablePairedRepetitionPath, materializedPath: immutablePairedFixture.materializedPath, selectionState: immutablePairedFixture.selectionState, runDir: immutablePairedFixture.runDir });
+  const immutablePairedBefore = { ...reportInputEvidence(immutablePairedFixture), repetitionReport: regularFileEvidence(immutablePairedRepetitionPath) };
+  const immutablePairedOutput = resolve(work, "external-paired-publication", "paired.json");
+  mkdirSync(dirname(immutablePairedOutput), { recursive: true });
+  reportEngineeringPairedComparisons({ ...options(immutablePairedFixture), resultSetPath: immutablePairedFixture.outputPath, repetitionReportPath: immutablePairedRepetitionPath, outputPath: immutablePairedOutput, materializedPath: immutablePairedFixture.materializedPath, selectionState: immutablePairedFixture.selectionState, runDir: immutablePairedFixture.runDir });
+  assert.deepEqual({ ...reportInputEvidence(immutablePairedFixture), repetitionReport: regularFileEvidence(immutablePairedRepetitionPath) }, immutablePairedBefore);
+  covered.add("successful-paired-publication-inputs-unchanged");
+
+  const failedPairedBefore = { ...reportInputEvidence(immutablePairedFixture), repetitionReport: regularFileEvidence(immutablePairedRepetitionPath) };
+  assert.throws(() => reportEngineeringPairedComparisons({ ...options(immutablePairedFixture), resultSetPath: immutablePairedFixture.outputPath, repetitionReportPath: immutablePairedRepetitionPath, outputPath: immutablePairedRepetitionPath }), /must not already exist|disjoint/u);
+  assert.deepEqual({ ...reportInputEvidence(immutablePairedFixture), repetitionReport: regularFileEvidence(immutablePairedRepetitionPath) }, failedPairedBefore);
+  covered.add("failed-paired-publication-inputs-unchanged");
 
   for (const replacementKind of ["different-valid-bytes", "same-bytes-different-inode"]) {
     const raceFixture = cloneFixture(`report-${replacementKind}`);
@@ -1373,6 +1511,9 @@ try {
     "repository-private-root-overlap",
     "report-different-valid-bytes-replacement", "report-same-bytes-different-inode-replacement",
     "concurrent-report-publication", "successful-report-publication-inputs-unchanged",
+    "paired-comparison-full-authority", "paired-different-valid-bytes-replacement", "paired-same-bytes-different-inode-replacement",
+    "concurrent-paired-publication", "successful-paired-publication-inputs-unchanged", "failed-paired-publication-inputs-unchanged",
+    "paired-pre-existing-output", "paired-output-symlink", "paired-output-inside-authority-root",
   ];
   assert.deepEqual([...covered].filter((name) => required.includes(name)).sort(), [...required].sort(), "focused result-set coverage inventory must remain closed");
   console.log(`ASK benchmark portfolio engineering result-set tests passed (${required.length} named closures)`);

@@ -70,6 +70,10 @@
       "argv": ["node", "scripts/test-ask-benchmark-portfolio-repetition-report.mjs"]
     },
     {
+      "id": "portfolio_paired_comparison_report",
+      "argv": ["node", "scripts/test-ask-benchmark-portfolio-paired-comparison-report.mjs"]
+    },
+    {
       "id": "adapter_runtime_bundle",
       "argv": ["node", "scripts/adapter-runtime-bundle.mjs", "--check"]
     },

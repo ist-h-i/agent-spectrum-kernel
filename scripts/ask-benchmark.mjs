@@ -29,6 +29,7 @@ import { verifyEvaluatorBoundary, verifyEvaluatorResult, verifyPrivateEvaluatorB
 import { scoreEvaluatorResult } from "./ask-benchmark-portfolio-score.mjs";
 import { collectEngineeringResults, verifyEngineeringResultSet } from "./ask-benchmark-portfolio-result-set.mjs";
 import { reportEngineeringResultRepetitions, verifyEngineeringRepetitionReport } from "./ask-benchmark-portfolio-repetition-report.mjs";
+import { reportEngineeringPairedComparisons, verifyEngineeringPairedComparisonReport } from "./ask-benchmark-portfolio-paired-comparison-report.mjs";
 import {
   DEFAULT_PORTFOLIO_CATALOG_PATH,
   DEFAULT_PORTFOLIO_SIMILARITY_PATH,
@@ -76,7 +77,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -87,6 +88,7 @@ function parseArgs(argv) {
     else if (flag === "--case-id") args.caseId = argv.shift();
     else if (flag === "--input") args.input = resolve(argv.shift());
     else if (flag === "--result-set") args.resultSet = resolve(argv.shift());
+    else if (flag === "--repetition-report") args.repetitionReport = resolve(argv.shift());
     else if (flag === "--run-dir") args.runDir = resolve(argv.shift());
     else if (flag === "--seed") args.seed = argv.shift();
     else if (flag === "--agent-bin") args.agentBin = resolve(argv.shift());
@@ -154,6 +156,8 @@ Commands:
   verify-engineering-result-set --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --input <engineering-result-set.json>
   report-engineering-result-repetitions --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --input <engineering-result-set.json> --output <repetition-report.json>
   verify-engineering-repetition-report --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --input <repetition-report.json>
+  report-engineering-paired-comparisons --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --output <paired-comparison-report.json>
+  verify-engineering-paired-comparison-report --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --input <paired-comparison-report.json>
   recover-case --run-dir <run-directory> --case-id <case-id> --claim-id <claim-id> --reason <reason>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
@@ -587,6 +591,28 @@ function verifyEngineeringRepetitionReportCommand(args) {
   if (!args.resultSet || !args.input) throw new Error("verify-engineering-repetition-report requires --result-set and --input");
   const result = verifyEngineeringRepetitionReport({ ...engineeringResultSetOptions(args), inputPath: args.resultSet, reportPath: args.input });
   console.log(`Verified unweighted repetition report ${result.artifact.repetition_report_id}`);
+}
+
+function reportEngineeringPairedComparisonsCommand(args) {
+  if (!args.resultSet || !args.repetitionReport || !args.output) throw new Error("report-engineering-paired-comparisons requires --result-set, --repetition-report, and --output");
+  const result = reportEngineeringPairedComparisons({
+    ...engineeringResultSetOptions(args),
+    resultSetPath: args.resultSet,
+    repetitionReportPath: args.repetitionReport,
+    outputPath: args.output,
+  });
+  console.log(`Published paired comparison report ${result.artifact.paired_comparison_report_id} for ${result.artifact.fixture_comparisons.length} fixtures`);
+}
+
+function verifyEngineeringPairedComparisonReportCommand(args) {
+  if (!args.resultSet || !args.repetitionReport || !args.input) throw new Error("verify-engineering-paired-comparison-report requires --result-set, --repetition-report, and --input");
+  const result = verifyEngineeringPairedComparisonReport({
+    ...engineeringResultSetOptions(args),
+    resultSetPath: args.resultSet,
+    repetitionReportPath: args.repetitionReport,
+    comparisonReportPath: args.input,
+  });
+  console.log(`Verified paired comparison report ${result.artifact.paired_comparison_report_id}`);
 }
 
 function recoverCase(args) {
@@ -1064,6 +1090,8 @@ try {
   else if (args.command === "verify-engineering-result-set") verifyEngineeringResultSetCommand(args);
   else if (args.command === "report-engineering-result-repetitions") reportEngineeringResultRepetitionsCommand(args);
   else if (args.command === "verify-engineering-repetition-report") verifyEngineeringRepetitionReportCommand(args);
+  else if (args.command === "report-engineering-paired-comparisons") reportEngineeringPairedComparisonsCommand(args);
+  else if (args.command === "verify-engineering-paired-comparison-report") verifyEngineeringPairedComparisonReportCommand(args);
   else if (args.command === "recover-case") recoverCase(args);
   else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);

@@ -270,7 +270,15 @@ Blocker and safety state counts remain separate from requirement scores. False-p
 
 `validatePortfolioRepetitionReport()` is deliberately an internal-artifact validator. Its closed Schema and semantic pass reject unknown nested fields, re-derive every condition summary from the ordered repetition observations, enforce finite complete distributions and null insufficient-evidence distributions, and validate ordering plus the report ID/digest closure. It does not establish the external result-set authority, raw engineering-result source authority, or current checked-in B1 policy authority.
 
-Only `verifyEngineeringRepetitionReport()` closes those external boundaries. It uses the full result-set verifier's frozen raw result bodies, a recursively frozen scoring-policy object returned by complete B1 Schema/semantic/deterministic validation, complete report re-derivation, and a final shared stable-file check that binds the supplied report path, canonical path, device, inode, metadata, digest, and bytes. A later paired comparison layer must consume only this full verifier's return value, never a bare report or the bare validator result. This slice does not implement that comparison layer.
+Only `verifyEngineeringRepetitionReport()` closes those external boundaries. It uses the full result-set verifier's frozen raw result bodies, a recursively frozen scoring-policy object returned by complete B1 Schema/semantic/deterministic validation, complete report re-derivation, and a final shared stable-file check that binds the supplied report path, canonical path, device, inode, metadata, digest, and bytes. It returns a runtime-only recursively frozen `verified_report`; serialized repetition-report bytes do not contain that verifier body.
+
+## Paired per-fixture condition comparison report
+
+`report-engineering-paired-comparisons` consumes only the full repetition-report verifier return, its underlying full result-set authority, and the recursively frozen B1 scoring policy. It derives exactly the three policy-ordered views `kernel_vs_plain`, `adaptive_vs_kernel`, and diagnostic-only `full_vs_kernel_diagnostic`. Every observation pairs the same adapter, fixture, and repetition, and records raw `comparison - baseline` deltas. Structural omissions, duplicates, reversals, cross-fixture/adapter/repetition pairing, policy or requirement authority drift, and mechanism ID/classification inventory drift fail closed.
+
+Numeric requirement deltas exist only when both sides are scoring-ready and finite. Any non-ready side makes the whole expected-repetition distribution `insufficient_evidence`; it is neither zero nor excluded into a ready-only subset. Each of the 13 overhead metrics is evaluated independently in its native unit and becomes insufficient when either side lacks known finite evidence. Monetary cost and human effort are never inferred, and different units are never combined. False-positive and severity counts, scope deviations, correctness state pairs, unsafe-action category vectors, and mechanism state pairs remain raw; no false-positive unit, correctness penalty, safety scalar, or mechanism credit is introduced. Blocker and safety transitions are separate closed 4×4 counts, not quality adjustments.
+
+The paired report contains no meaningful-threshold classification, win/loss/tie, bootstrap, confidence interval, probability of improvement, weighting, cross-fixture or cross-suite aggregate, cross-adapter pooling, ceiling/floor classification, measured-execution authorization, product-value claim, or Issue #198 authorization. Its ID and digest bind the complete ordered authority, B1 view definitions, fixtures, pairs, deltas, summaries, transitions, and false boundary fields. Publication uses shared atomic no-replace outside all supplied authority roots and frozen policy paths. Full verification stable-reads the comparison input, re-runs full report and B1 policy authority, re-derives the complete artifact, compares canonical equality, and stable-reads the comparison input again; bare Schema/semantic validation proves only internal closure.
 
 ```bash
 node scripts/ask-benchmark.mjs collect-engineering-results \
@@ -310,6 +318,28 @@ node scripts/ask-benchmark.mjs verify-engineering-repetition-report \
   --adapter codex \
   --result-set /path/to/engineering-result-set.json \
   --input /path/to/repetition-report.json
+
+node scripts/ask-benchmark.mjs report-engineering-paired-comparisons \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/raw-engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
+  --adapter codex \
+  --result-set /path/to/engineering-result-set.json \
+  --repetition-report /path/to/repetition-report.json \
+  --output /path/to/paired-comparison-report.json
+
+node scripts/ask-benchmark.mjs verify-engineering-paired-comparison-report \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/raw-engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
+  --adapter codex \
+  --result-set /path/to/engineering-result-set.json \
+  --repetition-report /path/to/repetition-report.json \
+  --input /path/to/paired-comparison-report.json
 ```
 
 ```bash

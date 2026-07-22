@@ -365,7 +365,7 @@ assert.deepEqual(loadedPlan.plan.container.environment_allowlist, ["PATH", "HOME
 const requiredCommandIds = [
   "changed_mjs_syntax", "autonomous_development_control", "repository_validation_tests", "portfolio_catalog",
   "portfolio_policy", "design_admission", "design_independent_review", "general_benchmark", "execution",
-  "normalized_results", "evaluator_boundary", "portfolio_score", "portfolio_result_set", "portfolio_repetition_report", "adapter_runtime_bundle", "repository_consistency", "whitespace",
+  "normalized_results", "evaluator_boundary", "portfolio_score", "portfolio_result_set", "portfolio_repetition_report", "portfolio_paired_comparison_report", "adapter_runtime_bundle", "repository_consistency", "whitespace",
 ];
 assert.deepEqual(loadedPlan.plan.commands.map((command) => command.id), requiredCommandIds);
 const sampleDockerArgs = dockerArguments({ image: loadedPlan.plan.container.image, repository: "/safe/workspace", control: "/safe/control", planPath: "/safe/plan.json", commandId: "general_benchmark" });
