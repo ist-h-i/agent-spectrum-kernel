@@ -263,10 +263,12 @@ function writeFixture(root, skills = ["alpha"]) {
     "scripts/ask-benchmark-portfolio-repetition-report.mjs",
     "scripts/ask-benchmark-portfolio-paired-comparison-report.mjs",
     "scripts/ask-benchmark-portfolio-directional-outcome-report.mjs",
+    "scripts/ask-benchmark-portfolio-mechanism-scorecard.mjs",
     "scripts/ask-benchmark-stable-file.mjs",
     "scripts/test-ask-benchmark-portfolio-repetition-report.mjs",
     "scripts/test-ask-benchmark-portfolio-paired-comparison-report.mjs",
     "scripts/test-ask-benchmark-portfolio-directional-outcome-report.mjs",
+    "scripts/test-ask-benchmark-portfolio-mechanism-scorecard.mjs",
     "benchmarks/schemas",
   ]) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
@@ -5849,6 +5851,7 @@ jobs:
     "benchmarks/schemas/portfolio-repetition-report.schema.json",
     "benchmarks/schemas/portfolio-paired-comparison-report.schema.json",
     "benchmarks/schemas/portfolio-directional-outcome-report.schema.json",
+    "benchmarks/schemas/portfolio-mechanism-scorecard.schema.json",
   ]) {
     const missingResultSetSchemaRoot = cloneFixture(`missing-${schemaPath.split("/").at(-1)}`);
     rmSync(resolve(missingResultSetSchemaRoot, schemaPath));

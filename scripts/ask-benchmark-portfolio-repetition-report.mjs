@@ -251,7 +251,7 @@ function policyAuthority(root) {
   const verified = verifyPortfolioPolicyArtifacts({ root });
   const scoringPolicy = verified.verified_scoring_policy;
   if (scoringPolicy.policy_revision !== PORTFOLIO_REPETITION_REPORT_POLICY_REVISION) throw new Error(`scoring policy revision must remain ${PORTFOLIO_REPETITION_REPORT_POLICY_REVISION}`);
-  return { policyRevision: scoringPolicy.policy_revision, scoringPolicyDigest: scoringPolicy.policy_digest };
+  return { policyRevision: scoringPolicy.policy_revision, scoringPolicyDigest: scoringPolicy.policy_digest, verified_scoring_policy: scoringPolicy };
 }
 
 function pathsOverlap(left, right) {
@@ -273,7 +273,7 @@ function derive(options) {
   const policy = policyAuthority(resolve(options.root ?? DEFAULT_ROOT));
   const artifact = buildPortfolioRepetitionReport({ verified, ...policy });
   validatePortfolioRepetitionReport(artifact, { root: options.root ?? DEFAULT_ROOT });
-  return { artifact, verified };
+  return { artifact, verified, verified_scoring_policy: policy.verified_scoring_policy };
 }
 
 export function reportEngineeringResultRepetitions(options) {
@@ -299,5 +299,13 @@ export function verifyEngineeringRepetitionReport(options) {
     }
     return value;
   };
-  return { artifact: supplied, bytes: input.bytes, verified: derived.verified, verified_report: freeze(verified_report) };
+  return {
+    artifact: supplied,
+    bytes: input.bytes,
+    verified: derived.verified,
+    verified_report: freeze(verified_report),
+    verified_result_set: freeze(structuredClone(derived.verified.artifact)),
+    verified_results: derived.verified.verified_results,
+    verified_scoring_policy: derived.verified_scoring_policy,
+  };
 }

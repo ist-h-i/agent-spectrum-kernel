@@ -31,6 +31,7 @@ import { collectEngineeringResults, verifyEngineeringResultSet } from "./ask-ben
 import { reportEngineeringResultRepetitions, verifyEngineeringRepetitionReport } from "./ask-benchmark-portfolio-repetition-report.mjs";
 import { reportEngineeringPairedComparisons, verifyEngineeringPairedComparisonReport } from "./ask-benchmark-portfolio-paired-comparison-report.mjs";
 import { reportEngineeringDirectionalOutcomes, verifyEngineeringDirectionalOutcomeReport } from "./ask-benchmark-portfolio-directional-outcome-report.mjs";
+import { reportEngineeringMechanismScorecards, verifyEngineeringMechanismScorecard } from "./ask-benchmark-portfolio-mechanism-scorecard.mjs";
 import {
   DEFAULT_PORTFOLIO_CATALOG_PATH,
   DEFAULT_PORTFOLIO_SIMILARITY_PATH,
@@ -162,6 +163,8 @@ Commands:
   verify-engineering-paired-comparison-report --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --input <paired-comparison-report.json>
   report-engineering-directional-outcomes --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --paired-comparison-report <paired-comparison-report.json> --output <directional-outcome-report.json>
   verify-engineering-directional-outcome-report --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --paired-comparison-report <paired-comparison-report.json> --input <directional-outcome-report.json>
+  report-engineering-mechanism-scorecards --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --output <mechanism-scorecard.json>
+  verify-engineering-mechanism-scorecard --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --result-set <engineering-result-set.json> --repetition-report <repetition-report.json> --input <mechanism-scorecard.json>
   recover-case --run-dir <run-directory> --case-id <case-id> --claim-id <claim-id> --reason <reason>
   prepare [--config <config.json>] --output <empty-directory> --seed <value>
   run [--config <config.json>] --run-dir <prepared-directory> --agent-bin <codex-path>
@@ -643,6 +646,28 @@ function verifyEngineeringDirectionalOutcomeReportCommand(args) {
   console.log(`Verified directional outcome report ${result.artifact.directional_outcome_report_id}`);
 }
 
+function reportEngineeringMechanismScorecardsCommand(args) {
+  if (!args.resultSet || !args.repetitionReport || !args.output) throw new Error("report-engineering-mechanism-scorecards requires --result-set, --repetition-report, and --output");
+  const result = reportEngineeringMechanismScorecards({
+    ...engineeringResultSetOptions(args),
+    resultSetPath: args.resultSet,
+    repetitionReportPath: args.repetitionReport,
+    outputPath: args.output,
+  });
+  console.log(`Published mechanism observation scorecard ${result.artifact.mechanism_scorecard_id} for ${result.artifact.fixture_scorecards.length} fixtures`);
+}
+
+function verifyEngineeringMechanismScorecardCommand(args) {
+  if (!args.resultSet || !args.repetitionReport || !args.input) throw new Error("verify-engineering-mechanism-scorecard requires --result-set, --repetition-report, and --input");
+  const result = verifyEngineeringMechanismScorecard({
+    ...engineeringResultSetOptions(args),
+    resultSetPath: args.resultSet,
+    repetitionReportPath: args.repetitionReport,
+    scorecardPath: args.input,
+  });
+  console.log(`Verified mechanism observation scorecard ${result.artifact.mechanism_scorecard_id}`);
+}
+
 function recoverCase(args) {
   if (!args.runDir) throw new Error("recover-case requires --run-dir");
   const result = recoverPortfolioCase({ root: ROOT, runDir: args.runDir, caseId: args.caseId, claimId: args.claimId, reason: args.reason });
@@ -1122,6 +1147,8 @@ try {
   else if (args.command === "verify-engineering-paired-comparison-report") verifyEngineeringPairedComparisonReportCommand(args);
   else if (args.command === "report-engineering-directional-outcomes") reportEngineeringDirectionalOutcomesCommand(args);
   else if (args.command === "verify-engineering-directional-outcome-report") verifyEngineeringDirectionalOutcomeReportCommand(args);
+  else if (args.command === "report-engineering-mechanism-scorecards") reportEngineeringMechanismScorecardsCommand(args);
+  else if (args.command === "verify-engineering-mechanism-scorecard") verifyEngineeringMechanismScorecardCommand(args);
   else if (args.command === "recover-case") recoverCase(args);
   else if (args.command === "prepare") prepare(args);
   else if (args.command === "run") executeCases(args);
