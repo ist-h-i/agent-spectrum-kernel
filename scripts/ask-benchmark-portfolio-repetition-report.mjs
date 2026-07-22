@@ -51,7 +51,7 @@ function assertReportPrivacy(value, path = "$") {
   if (value && typeof value === "object") for (const [key, entry] of Object.entries(value)) assertReportPrivacy(entry, `${path}.${key}`);
 }
 
-function distribution(values, expectedCount, label) {
+export function derivePortfolioDistribution(values, expectedCount, label) {
   if (values.length !== expectedCount || values.some((value) => typeof value !== "number" || !Number.isFinite(value))) {
     return { distribution_status: "insufficient_evidence", sample_count: 0, mean: null, median: null, minimum: null, maximum: null, population_variance: null, population_standard_deviation: null };
   }
@@ -132,10 +132,10 @@ function deriveConditionSummaries(observations, expectedCount) {
   const scoreValues = observations.map((item) => item.scoring_status === "complete" && Number.isFinite(item.requirement_score.normalized_requirement_score) && item.requirement_score.normalized_requirement_score >= 0 && item.requirement_score.normalized_requirement_score <= 1 ? item.requirement_score.normalized_requirement_score : null);
   const overhead_distributions = Object.fromEntries(TELEMETRY_METRICS.map(([metric, unit]) => {
     const values = observations.map((item) => item.overhead_telemetry[metric]);
-    return [metric, { unit, ...distribution(values.map((item) => item?.status === "known" ? item.value : null), expectedCount, `overhead ${metric}`) }];
+    return [metric, { unit, ...derivePortfolioDistribution(values.map((item) => item?.status === "known" ? item.value : null), expectedCount, `overhead ${metric}`) }];
   }));
   return {
-    score_distribution: distribution(scoreValues, expectedCount, "normalized requirement score"),
+    score_distribution: derivePortfolioDistribution(scoreValues, expectedCount, "normalized requirement score"),
     blocker_counts: stateCounts(observations.map((item) => item.blocker_gate_status), BLOCKER_STATES),
     safety_counts: stateCounts(observations.map((item) => item.safety_blocker_status), SAFETY_STATES),
     overhead_distributions,
@@ -291,5 +291,13 @@ export function verifyEngineeringRepetitionReport(options) {
   if (stableCanonicalJson(supplied) !== stableCanonicalJson(derived.artifact)) throw new Error("portfolio repetition report does not match the re-derived full-verifier report");
   const after = readStableFile(options.reportPath, "portfolio repetition report input", MAX_REPORT_BYTES, { allowEmpty: false });
   assertStableFileEvidence(input, after, "portfolio repetition report input");
-  return { artifact: supplied, bytes: input.bytes, verified: derived.verified };
+  const verified_report = structuredClone(supplied);
+  const freeze = (value) => {
+    if (value && typeof value === "object" && !Object.isFrozen(value)) {
+      Object.values(value).forEach(freeze);
+      Object.freeze(value);
+    }
+    return value;
+  };
+  return { artifact: supplied, bytes: input.bytes, verified: derived.verified, verified_report: freeze(verified_report) };
 }
