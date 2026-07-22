@@ -100,6 +100,15 @@ The per-fixture mechanism observation scorecard consumes the full repetition-rep
 
 Only completed, scoring-ready results establish a fixture inventory. A fixture with no complete result is explicitly `insufficient_evidence` with an empty inventory; a verified complete evaluator inventory that is stably empty remains `complete`. Non-ready results never become `missing`, `unknown`, or `not_applicable`: when an inventory is known they produce `not_scoring_ready`, null state, and empty evidence. Non-ready results containing partial mechanism arrays fail closed because their semantics are unbound. Skill loading, agent start, and artifact creation are not evidence of observation and receive no quality credit. Weighting, cross-fixture or cross-suite aggregation, condition comparison, global taxonomy, measured execution, product-value claims, and Issue #198 remain unauthorized.
 
+The checked-in Checkpoint B, B2, and C legacy results remain governed by `schemas/result.schema.json`. Their `.migration.json` companions are read-only, calibration-only compatibility artifacts that bind exact source bytes and semantic closure to the fully validated current catalog and policy manifest. B2/C use only the four frozen legacy-to-calibration mappings; B's `review-001` and `implementation-001` remain `unmapped_legacy_history`. Every projected run preserves source-native non-answer-bearing metrics, nulls, runtime downgrade evidence, and whether repetition was recorded. Hidden-test names, requirement failures, raw prompts, full outputs, and current evaluator/normalized/engineering identities are never copied.
+
+These migrations do not create `adaptive_ask` runs, expand one legacy repetition to three or five, equate legacy and current metric semantics, or establish current scoring readiness. All fixtures remain `not_scoring_ready` and aggregate-ineligible. Generate and independently verify an artifact with:
+
+```bash
+node scripts/ask-benchmark.mjs migrate-legacy-calibration-result --input benchmarks/results/checkpoint-b2-2026-07-12.json --output /path/to/absent-migration.json
+node scripts/ask-benchmark.mjs verify-legacy-calibration-migration --source benchmarks/results/checkpoint-b2-2026-07-12.json --input /path/to/migration.json
+```
+
 The read-only policy command validates all closed Schemas, catalog and child digest binding, manifest closure, lifecycle/scoring/lineage semantics, scoring-policy/Schema/validator field parity, final-admission-policy/Schema parity, prohibited answer content, and deterministic checked-in bytes. The runtime source contracts add `portfolio-final-admission-record.schema.json` and `scoring-input-freeze-manifest.schema.json` alongside the requirement, output, lineage, and classification contracts; B3 connects the authority closure to the production evaluator path, while no actual fixture admission/requirement/output records or #208 lineage records are created here. Current catalog aggregate eligibility remains provisional and does not bypass final admission.
 
 The `plan` command records the non-sensitive canonical seed with its ID and SHA-256 digest so the artifact can be independently regenerated. Its `plan_id` binds the config digest, protocol digest, repository revision, and seed into every case/block namespace.
@@ -147,6 +156,7 @@ node scripts/test-ask-benchmark-portfolio-repetition-report.mjs
 node scripts/test-ask-benchmark-portfolio-paired-comparison-report.mjs
 node scripts/test-ask-benchmark-portfolio-directional-outcome-report.mjs
 node scripts/test-ask-benchmark-portfolio-mechanism-scorecard.mjs
+node scripts/test-ask-benchmark-portfolio-legacy-calibration-migration.mjs
 ```
 
 See [protocol-adaptive.md](protocol-adaptive.md) for the condition, adapter-separation, balanced-ordering, repetition, privacy, pre-result Adaptive selection, normalized evidence, and evaluator-boundary contracts.
