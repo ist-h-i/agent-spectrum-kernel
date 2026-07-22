@@ -25,6 +25,12 @@ import { computeEngineeringResultDigest, computeEngineeringResultId, validatePor
 import { reportEngineeringResultRepetitions, verifyEngineeringRepetitionReport } from "./ask-benchmark-portfolio-repetition-report.mjs";
 import { reportEngineeringPairedComparisons, verifyEngineeringPairedComparisonReport } from "./ask-benchmark-portfolio-paired-comparison-report.mjs";
 import {
+  computePortfolioDirectionalOutcomeReportDigest,
+  computePortfolioDirectionalOutcomeReportId,
+  reportEngineeringDirectionalOutcomes,
+  verifyEngineeringDirectionalOutcomeReport,
+} from "./ask-benchmark-portfolio-directional-outcome-report.mjs";
+import {
   assertVerifiedResultInventory,
   collectEngineeringResults,
   computeEngineeringResultSetDigest,
@@ -706,6 +712,110 @@ async function concurrentPairedComparisonPublication(fixture, repetitionReportPa
   return Promise.all([launch(), launch()]);
 }
 
+async function concurrentDirectionalOutcomePublication(fixture, repetitionReportPath, comparisonReportPath, outputPath) {
+  const args = [runner, "report-engineering-directional-outcomes", ...reportCliAuthorityArgs(fixture), "--result-set", fixture.outputPath, "--repetition-report", repetitionReportPath, "--paired-comparison-report", comparisonReportPath, "--output", outputPath];
+  const launch = () => new Promise((resolvePromise) => {
+    const child = spawn(process.execPath, args, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("close", (status) => resolvePromise({ status, stdout, stderr }));
+  });
+  return Promise.all([launch(), launch()]);
+}
+
+async function concurrentDirectionalOutcomeVerifyReplacement(fixture, repetitionReportPath, comparisonReportPath, directionalReportPath, replacementPath) {
+  const markerPath = resolve(fixture.target, `directional-final-read-${hash(replacementPath).slice(0, 8)}.marker`);
+  const continuePath = `${markerPath}.continue`;
+  const preloadPath = `${markerPath}.preload.mjs`;
+  writeFileSync(preloadPath, `
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import { resolve } from "node:path";
+const originalOpenSync = fs.openSync;
+const originalCloseSync = fs.closeSync;
+const inputPath = resolve(process.env.ASK_DIRECTIONAL_TEST_INPUT);
+const markerPath = process.env.ASK_DIRECTIONAL_TEST_MARKER;
+const continuePath = process.env.ASK_DIRECTIONAL_TEST_CONTINUE;
+let openCount = 0;
+let synchronizedDescriptor = null;
+let synchronized = false;
+fs.openSync = function (path, ...args) {
+  const descriptor = originalOpenSync.call(fs, path, ...args);
+  if (resolve(String(path)) === inputPath) {
+    openCount += 1;
+    if (openCount === 2) synchronizedDescriptor = descriptor;
+  }
+  return descriptor;
+};
+fs.closeSync = function (descriptor) {
+  originalCloseSync.call(fs, descriptor);
+  if (!synchronized && descriptor === synchronizedDescriptor) {
+    synchronized = true;
+    fs.writeFileSync(markerPath, "final directional descriptor closed\\n", { flag: "wx" });
+    const waitArray = new Int32Array(new SharedArrayBuffer(4));
+    while (!fs.existsSync(continuePath)) Atomics.wait(waitArray, 0, 0, 10);
+  }
+};
+syncBuiltinESMExports();
+`);
+  const args = [
+    "--import", preloadPath,
+    runner,
+    "verify-engineering-directional-outcome-report",
+    ...reportCliAuthorityArgs(fixture),
+    "--result-set", fixture.outputPath,
+    "--repetition-report", repetitionReportPath,
+    "--paired-comparison-report", comparisonReportPath,
+    "--input", directionalReportPath,
+  ];
+  const child = spawn(process.execPath, args, {
+    cwd: root,
+    env: { ...process.env, ASK_DIRECTIONAL_TEST_INPUT: directionalReportPath, ASK_DIRECTIONAL_TEST_MARKER: markerPath, ASK_DIRECTIONAL_TEST_CONTINUE: continuePath },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk) => { stdout += chunk; });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  try { await waitForPath(markerPath, child); } catch (error) { throw new Error(`${error.message}\n${stderr}`); }
+  renameSync(replacementPath, directionalReportPath);
+  writeFileSync(continuePath, "continue\n", { flag: "wx" });
+  const status = await new Promise((resolvePromise) => child.on("close", resolvePromise));
+  return { status, stdout, stderr };
+}
+
+function directionalOutcomeNoPairedReread(fixture, repetitionReportPath, comparisonReportPath, outputPath) {
+  const preloadPath = resolve(fixture.target, "directional-no-paired-reread.preload.mjs");
+  writeFileSync(preloadPath, `
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import { resolve } from "node:path";
+const originalOpenSync = fs.openSync;
+const comparisonPath = resolve(process.env.ASK_DIRECTIONAL_PAIRED_INPUT);
+let pairedOpenCount = 0;
+fs.openSync = function (path, ...args) {
+  if (resolve(String(path)) === comparisonPath) {
+    pairedOpenCount += 1;
+    if (pairedOpenCount > 2) throw new Error("directional reporter reread paired comparison input after full verification");
+  }
+  return originalOpenSync.call(fs, path, ...args);
+};
+syncBuiltinESMExports();
+`);
+  return spawnSync(process.execPath, [
+    "--import", preloadPath,
+    runner,
+    "report-engineering-directional-outcomes",
+    ...reportCliAuthorityArgs(fixture),
+    "--result-set", fixture.outputPath,
+    "--repetition-report", repetitionReportPath,
+    "--paired-comparison-report", comparisonReportPath,
+    "--output", outputPath,
+  ], { cwd: root, env: { ...process.env, ASK_DIRECTIONAL_PAIRED_INPUT: comparisonReportPath }, encoding: "utf8" });
+}
+
 async function waitForPath(path, child) {
   for (let attempt = 0; attempt < 500; attempt += 1) {
     if (existsSync(path)) return;
@@ -930,7 +1040,85 @@ try {
   assert.equal(pairedComparison.artifact.comparison_view_definitions.length, 3);
   const verifiedPairedComparison = verifyEngineeringPairedComparisonReport({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, comparisonReportPath: pairedComparisonPath });
   assert.equal(verifiedPairedComparison.artifact.paired_comparison_report_digest, pairedComparison.artifact.paired_comparison_report_digest);
+  assert.equal(Object.isFrozen(verifiedPairedComparison.verified_comparison_report), true);
+  assert.equal(Object.isFrozen(verifiedPairedComparison.verified_comparison_report.fixture_comparisons[0]), true);
+  assert.equal(Object.isFrozen(verifiedPairedComparison.verified_repetition_report), true);
+  assert.equal(Array.isArray(verifiedPairedComparison.verified_result_set.verified_results), true);
+  assert.equal(Object.isFrozen(verifiedPairedComparison.verified_scoring_policy), true);
+  assert.equal(Object.hasOwn(verifiedPairedComparison.artifact, "verified_comparison_report"), false);
   covered.add("paired-comparison-full-authority");
+
+  const directionalOutcomePath = resolve(positive.target, "directional-outcome-report.json");
+  const directionalOutcome = reportEngineeringDirectionalOutcomes({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, comparisonReportPath: pairedComparisonPath, outputPath: directionalOutcomePath });
+  assert.equal(directionalOutcome.artifact.fixture_outcomes.length, 2);
+  assert.equal(directionalOutcome.artifact.comparison_view_definitions.length, 3);
+  assert.equal(directionalOutcome.artifact.authority.paired_comparison_report_id, pairedComparison.artifact.paired_comparison_report_id);
+  const insufficientDirectionalPairs = directionalOutcome.artifact.fixture_outcomes.flatMap((fixture) => fixture.comparison_views.flatMap((itemView) => itemView.pair_outcomes)).filter((itemPair) => itemPair.paired_quality_delta_status === "insufficient_evidence");
+  assert.ok(insufficientDirectionalPairs.length > 0);
+  assert.ok(insufficientDirectionalPairs.every((itemPair) => itemPair.paired_normalized_quality_delta === null && itemPair.directional_outcome === "insufficient_evidence"));
+  covered.add("directional-production-non-ready-canonical-contract");
+  const verifiedDirectionalOutcome = verifyEngineeringDirectionalOutcomeReport({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, comparisonReportPath: pairedComparisonPath, directionalReportPath: directionalOutcomePath });
+  assert.equal(verifiedDirectionalOutcome.artifact.directional_outcome_report_digest, directionalOutcome.artifact.directional_outcome_report_digest);
+  covered.add("directional-full-authority");
+  for (const [name, field] of [
+    ["directional-paired-authority-drift", "paired_comparison_report_digest"],
+    ["directional-repetition-authority-drift", "repetition_report_digest"],
+    ["directional-result-set-authority-drift", "result_set_digest"],
+    ["directional-policy-authority-drift", "scoring_policy_digest"],
+  ]) {
+    const changed = structuredClone(directionalOutcome.artifact);
+    changed.authority[field] = digest(name);
+    changed.directional_outcome_report_id = computePortfolioDirectionalOutcomeReportId(changed);
+    changed.directional_outcome_report_digest = computePortfolioDirectionalOutcomeReportDigest(changed);
+    const changedPath = resolve(positive.target, `${name}.json`);
+    writeFileSync(changedPath, `${JSON.stringify(changed, null, 2)}\n`);
+    assert.throws(() => verifyEngineeringDirectionalOutcomeReport({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, comparisonReportPath: pairedComparisonPath, directionalReportPath: changedPath }), /does not match the re-derived full authority report/u);
+    covered.add(name);
+  }
+  assert.throws(() => reportEngineeringDirectionalOutcomes({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, comparisonReportPath: pairedComparisonPath, outputPath: directionalOutcomePath }), /must not already exist/u);
+  covered.add("directional-pre-existing-output");
+  const directionalSymlinkTarget = resolve(positive.target, "directional-symlink-target.json");
+  const directionalSymlinkOutput = resolve(positive.target, "directional-symlink-output.json");
+  writeFileSync(directionalSymlinkTarget, "target\n");
+  symlinkSync(directionalSymlinkTarget, directionalSymlinkOutput);
+  assert.throws(() => reportEngineeringDirectionalOutcomes({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, comparisonReportPath: pairedComparisonPath, outputPath: directionalSymlinkOutput }), /symlink/u);
+  covered.add("directional-output-symlink");
+  assert.throws(() => reportEngineeringDirectionalOutcomes({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, comparisonReportPath: pairedComparisonPath, outputPath: resolve(positive.normalizedRoot, "directional.json") }), /disjoint from normalized result authority/u);
+  covered.add("directional-output-inside-authority-root");
+
+  for (const replacementKind of ["different-valid-bytes", "same-bytes-different-inode"]) {
+    const reportPath = resolve(positive.target, `directional-${replacementKind}.json`);
+    writeFileSync(reportPath, directionalOutcome.bytes);
+    const replacementPath = resolve(positive.target, `directional-${replacementKind}-replacement.json`);
+    writeFileSync(replacementPath, replacementKind === "different-valid-bytes" ? Buffer.concat([Buffer.from("\n"), directionalOutcome.bytes]) : directionalOutcome.bytes);
+    const raced = await concurrentDirectionalOutcomeVerifyReplacement(positive, repetitionReportPath, pairedComparisonPath, reportPath, replacementPath);
+    assert.notEqual(raced.status, 0, `${replacementKind}: directional outcome verification must fail after final-open path replacement`);
+    assert.doesNotMatch(raced.stdout, /Verified directional outcome report/u);
+    assert.match(raced.stderr, /path was replaced|changed or was replaced/u);
+    covered.add(`directional-${replacementKind}-replacement`);
+  }
+
+  const concurrentDirectionalPath = resolve(positive.target, "concurrent-directional.json");
+  const concurrentDirectionalResults = await concurrentDirectionalOutcomePublication(positive, repetitionReportPath, pairedComparisonPath, concurrentDirectionalPath);
+  assert.deepEqual(concurrentDirectionalResults.map(({ status }) => status).sort((left, right) => left - right), [0, 1]);
+  assert.equal(concurrentDirectionalResults.filter(({ status }) => status === 0).length, 1);
+  assert.deepEqual(readFileSync(concurrentDirectionalPath), directionalOutcome.bytes);
+  assert.equal(readdirSync(dirname(concurrentDirectionalPath)).some((name) => name.startsWith(`.${basename(concurrentDirectionalPath)}.staging-`)), false);
+  covered.add("concurrent-directional-publication");
+
+  const directionalInputBefore = { ...reportInputEvidence(positive), repetitionReport: regularFileEvidence(repetitionReportPath), pairedComparison: regularFileEvidence(pairedComparisonPath) };
+  const noRereadPath = resolve(positive.target, "directional-no-reread.json");
+  const noReread = directionalOutcomeNoPairedReread(positive, repetitionReportPath, pairedComparisonPath, noRereadPath);
+  assert.equal(noReread.status, 0, noReread.stderr);
+  assert.deepEqual(readFileSync(noRereadPath), directionalOutcome.bytes);
+  assert.deepEqual({ ...reportInputEvidence(positive), repetitionReport: regularFileEvidence(repetitionReportPath), pairedComparison: regularFileEvidence(pairedComparisonPath) }, directionalInputBefore);
+  covered.add("directional-no-filesystem-reread-after-full-verification");
+  covered.add("successful-directional-publication-inputs-unchanged");
+  const failedDirectionalBefore = { ...reportInputEvidence(positive), repetitionReport: regularFileEvidence(repetitionReportPath), pairedComparison: regularFileEvidence(pairedComparisonPath) };
+  assert.throws(() => reportEngineeringDirectionalOutcomes({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, comparisonReportPath: pairedComparisonPath, outputPath: pairedComparisonPath }), /must not already exist|disjoint/u);
+  assert.deepEqual({ ...reportInputEvidence(positive), repetitionReport: regularFileEvidence(repetitionReportPath), pairedComparison: regularFileEvidence(pairedComparisonPath) }, failedDirectionalBefore);
+  covered.add("failed-directional-publication-inputs-unchanged");
+
   assert.throws(() => reportEngineeringPairedComparisons({ ...options(positive), resultSetPath: positive.outputPath, repetitionReportPath, outputPath: pairedComparisonPath }), /must not already exist/u);
   covered.add("paired-pre-existing-output");
   const pairedSymlinkTarget = resolve(positive.target, "paired-symlink-target.json");
@@ -1514,6 +1702,12 @@ try {
     "paired-comparison-full-authority", "paired-different-valid-bytes-replacement", "paired-same-bytes-different-inode-replacement",
     "concurrent-paired-publication", "successful-paired-publication-inputs-unchanged", "failed-paired-publication-inputs-unchanged",
     "paired-pre-existing-output", "paired-output-symlink", "paired-output-inside-authority-root",
+    "directional-full-authority", "directional-different-valid-bytes-replacement", "directional-same-bytes-different-inode-replacement",
+    "directional-production-non-ready-canonical-contract",
+    "directional-paired-authority-drift", "directional-repetition-authority-drift", "directional-result-set-authority-drift", "directional-policy-authority-drift",
+    "concurrent-directional-publication", "directional-no-filesystem-reread-after-full-verification",
+    "successful-directional-publication-inputs-unchanged", "failed-directional-publication-inputs-unchanged",
+    "directional-pre-existing-output", "directional-output-symlink", "directional-output-inside-authority-root",
   ];
   assert.deepEqual([...covered].filter((name) => required.includes(name)).sort(), [...required].sort(), "focused result-set coverage inventory must remain closed");
   console.log(`ASK benchmark portfolio engineering result-set tests passed (${required.length} named closures)`);

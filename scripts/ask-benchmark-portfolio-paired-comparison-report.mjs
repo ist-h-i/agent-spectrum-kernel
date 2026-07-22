@@ -51,6 +51,12 @@ function normalizeZero(value) {
   return Object.is(value, -0) ? 0 : value;
 }
 
+function deepFreezeJson(value) {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const entry of Object.values(value)) deepFreezeJson(entry);
+  return Object.freeze(value);
+}
+
 function finiteDelta(comparison, baseline, label) {
   const value = comparison - baseline;
   if (!Number.isFinite(value)) throw new Error(`${label} delta is not finite`);
@@ -432,5 +438,13 @@ export function verifyEngineeringPairedComparisonReport(options) {
   if (stableCanonicalJson(supplied) !== stableCanonicalJson(derived.artifact)) throw new Error("paired comparison report does not match the re-derived full authority report");
   const after = readStableFile(options.comparisonReportPath, "portfolio paired comparison report input", MAX_REPORT_BYTES, { allowEmpty: false });
   assertStableFileEvidence(input, after, "portfolio paired comparison report input");
-  return { artifact: supplied, bytes: input.bytes };
+  const verified_comparison_report = deepFreezeJson(structuredClone(supplied));
+  return {
+    artifact: supplied,
+    bytes: input.bytes,
+    verified_comparison_report,
+    verified_repetition_report: derived.verified_report,
+    verified_result_set: derived.verified_result_set,
+    verified_scoring_policy: derived.verified_scoring_policy,
+  };
 }

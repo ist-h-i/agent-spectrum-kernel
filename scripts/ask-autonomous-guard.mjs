@@ -26,6 +26,7 @@ const DISALLOWED_EXACT_PATHS = new Set([
   "scripts/test-ask-benchmark-portfolio-policy.mjs",
   "scripts/test-ask-benchmark-portfolio-repetition-report.mjs",
   "scripts/test-ask-benchmark-portfolio-paired-comparison-report.mjs",
+  "scripts/test-ask-benchmark-portfolio-directional-outcome-report.mjs",
   "scripts/test-ask-benchmark.mjs",
   "scripts/test-validate-repo.mjs",
   "scripts/validate-repo.mjs",

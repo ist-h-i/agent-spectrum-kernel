@@ -280,6 +280,14 @@ Numeric requirement deltas exist only when both sides are scoring-ready and fini
 
 The paired report contains no meaningful-threshold classification, win/loss/tie, bootstrap, confidence interval, probability of improvement, weighting, cross-fixture or cross-suite aggregate, cross-adapter pooling, ceiling/floor classification, measured-execution authorization, product-value claim, or Issue #198 authorization. Its ID and digest bind the complete ordered authority, B1 view definitions, fixtures, pairs, deltas, summaries, transitions, and false boundary fields. Publication uses shared atomic no-replace outside all supplied authority roots and frozen policy paths. Full verification stable-reads the comparison input, re-runs full report and B1 policy authority, re-derives the complete artifact, compares canonical equality, and stable-reads the comparison input again; bare Schema/semantic validation proves only internal closure.
 
+## Exact directional win, loss, and tie report
+
+`report-engineering-directional-outcomes` consumes the runtime-only recursively frozen report returned by the full paired-comparison verifier and separately re-runs the complete B1 policy verifier. It never reopens the paired, repetition, result-set, engineering-result, or scoring-policy input after that full paired authority has been obtained. Exactly the three policy-ordered B1 views are retained, including diagnostic-only `full_vs_kernel_diagnostic`, and each artifact remains scoped to one adapter track.
+
+Direction is the exact sign of the paired normalized requirement-score delta from the comparison-condition perspective. A `complete` pair requires a finite delta: positive is `comparison_win`, negative is `comparison_loss`, and JavaScript numeric zero alone is `exact_tie`. Negative zero is canonicalized to zero. An `insufficient_evidence` pair requires a null delta and an `insufficient_evidence` outcome; finite deltas cannot coexist with insufficient status, and complete status cannot coexist with null or non-finite deltas. Contradictory frozen upstream authority fails closed in the directional layer instead of being reinterpreted. No epsilon, tolerance, rounding, normalized-score threshold, percentage, standard-deviation multiplier, effect size, confidence interval, or practical-significance rule is applied; arbitrarily small positive and negative finite values remain wins and losses. A missing structural pair fails report generation.
+
+Each fixture/view records raw win, loss, exact-tie, and insufficient counts over the complete expected 3- or 5-pair inventory. Any insufficient pair makes the view summary `insufficient_evidence` while preserving all raw complete-pair directions. There is no ready-subset denominator, rate, majority winner, net-win score, rank, weighting, cross-fixture/suite aggregate, or cross-adapter pooling. The report makes no product-value claim and does not authorize Issue #198. ID and digest bind the external authority, B1 definitions, ordered fixture/view/pair identities, raw delta statuses and values, directions, counts, and boundary flags. Closed Schema and semantic validation re-derive pair directions and view counts; full verification additionally re-establishes every external authority and stable-file boundary.
+
 ```bash
 node scripts/ask-benchmark.mjs collect-engineering-results \
   --normalized-results /path/to/normalized-results \
@@ -340,6 +348,30 @@ node scripts/ask-benchmark.mjs verify-engineering-paired-comparison-report \
   --result-set /path/to/engineering-result-set.json \
   --repetition-report /path/to/repetition-report.json \
   --input /path/to/paired-comparison-report.json
+
+node scripts/ask-benchmark.mjs report-engineering-directional-outcomes \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/raw-engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
+  --adapter codex \
+  --result-set /path/to/engineering-result-set.json \
+  --repetition-report /path/to/repetition-report.json \
+  --paired-comparison-report /path/to/paired-comparison-report.json \
+  --output /path/to/directional-outcome-report.json
+
+node scripts/ask-benchmark.mjs verify-engineering-directional-outcome-report \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/raw-engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
+  --adapter codex \
+  --result-set /path/to/engineering-result-set.json \
+  --repetition-report /path/to/repetition-report.json \
+  --paired-comparison-report /path/to/paired-comparison-report.json \
+  --input /path/to/directional-outcome-report.json
 ```
 
 ```bash
