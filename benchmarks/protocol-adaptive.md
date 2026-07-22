@@ -252,6 +252,36 @@ Only a verified normalized `completed` outcome plus evaluator `completed` and th
 
 The output Schema and semantic validator prohibit aggregates, comparison views, severity-to-unit mapping, false-positive penalties, mechanism credit, repetition statistics, practice-frequency weighting, and product recommendations. Publication deterministically serializes into a same-directory `wx` staging file, fsyncs the complete bytes, and claims the absent target with atomic hard-link creation. `EEXIST` leaves the winner byte-identical and makes the loser fail; unsupported hard-link/no-replace filesystems fail closed and never fall back to replacing rename or overwrite. Staging is removed on every handled terminal path. Parent-directory fsync is attempted where supported; if the platform rejects directory fsync, crash-durability is limited to that filesystem's guarantee while no-replace semantics remain enforced. Symlinked/path-overlapping destinations are rejected, and verified inputs or private evaluator material are never mutated.
 
+`collect-engineering-results` closes the next boundary before any repetition statistic or mechanism scorecard is allowed. The verified normalized generation supplies the plan, run, snapshot, fixture, adapter, condition, repetition, and terminal-attempt inventory; caller counts and selected file lists are not authority. Each selected adapter case must be terminal, each fixture must close over all four plan conditions and its recorded three or five repetitions, and exactly one raw engineering result must match the terminal normalized attempt. Retry history therefore cannot be cherry-picked into or used to overweight the result set. Non-ready evaluation and normalized outcomes remain required raw entries with their typed scoring, blocker, and safety states.
+
+An independent `portfolio-engineering-result-source-manifest.schema.json` lists every approved repository-relative result path with exact raw-byte digest, byte count, and result/normalized identities. Its exact bytes must match checked-in `HEAD:<path>` or a caller-supplied approved immutable digest; the validator does not claim who approved that digest. Its `source_revision` is fixed to the verified normalized manifest's `source.repository_revision`, which must also equal `normalizer.source_revision`; arbitrary valid commit-shaped metadata is rejected even when the source manifest is re-sealed and its new raw digest is explicitly supplied. The result set retains that revision in its artifact, identity, and digest closure. The result root is a real, bounded, symlink-free public directory and must exactly equal the source inventory.
+
+The result-set output and verification input must be an ancestor-, equality-, and descendant-disjoint path from the engineering-result root, normalized-results root, and every supplied materialized, selection-state, or execution-run root. Canonical filesystem paths resolve existing symlinks and the nearest existing ancestor of a not-yet-created output. Collection publishes only outside those roots and does not change their bytes, inventories, inodes, or the source manifest. Verification retains the initial input bytes, raw digest, device, inode, size, mtime, ctime, and canonical path, then performs a second stable read after authority re-derivation and comparison; any path, identity, metadata, digest, or complete-byte change—including replacement by the same bytes on a new inode—fails before the success message.
+
+`portfolio-engineering-result-set.schema.json` records the source authority, normalized generation, complete deterministic inventory, structural counts, and self-derived ID/digest. The serialized artifact is only an identity/completeness manifest; raw result bodies and the runtime-only `verified_results` field are never added to its Schema, bytes, ID, or digest. `validatePortfolioEngineeringResultSet()` validates Schema plus internal closure, ID, digest, ordering, and counts only. It cannot prove the external normalized generation, source-manifest byte authority, actual result directory, complete expected inventory, or verified raw score values.
+
+Only `verifyEngineeringResultSet()` performs full authority verification. After the result-root second scan, source-manifest evidence check, normalized-generation revalidation, source-revision binding, expected-inventory comparison, artifact validation, supplied-artifact equality, and final stable input read all succeed, it returns a deterministic `verified_results` array in exact artifact-inventory order. Each runtime entry contains only the portable result-root-relative path, observed raw-byte digest, byte count, and a cloned, recursively frozen public `portfolio-engineering-result` object. It contains no absolute or private path and no private evaluator material. Later statistics, variance, mechanism, and reporting code must use only that in-memory array; the prohibited sequence is full verification followed by reopening and parsing a result file. A bare artifact or bare validator result is never a numeric-input authority. This slice adds none of those later computations. The result-set Schema has no mean, median, min/max, variance, confidence interval, comparison, weighting, mechanism credit, aggregate, or product-value fields. Publication reuses the single-result scorer's same-directory `wx` + fsync + atomic hard-link no-replace helper.
+
+```bash
+node scripts/ask-benchmark.mjs collect-engineering-results \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/raw-engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
+  --adapter codex \
+  --output /path/to/engineering-result-set.json
+
+node scripts/ask-benchmark.mjs verify-engineering-result-set \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/raw-engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
+  --adapter codex \
+  --input /path/to/engineering-result-set.json
+```
+
 ```bash
 node scripts/ask-benchmark.mjs score-evaluator-result \
   --reference /path/to/public-evaluator-reference.json \

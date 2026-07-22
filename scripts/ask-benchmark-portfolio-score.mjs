@@ -1,17 +1,6 @@
-import { randomUUID } from "node:crypto";
-import {
-  closeSync,
-  existsSync,
-  fsyncSync,
-  linkSync,
-  lstatSync,
-  openSync,
-  rmSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { basename, dirname, parse, relative, resolve, sep } from "node:path";
+import { resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertAtomicOutputAbsent, publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { verifyEvaluatorResult } from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
@@ -83,42 +72,15 @@ function withoutField(value, field) {
   return rest;
 }
 
-function lstatIfPresent(path) {
-  try {
-    return lstatSync(path);
-  } catch (error) {
-    if (error?.code === "ENOENT") return null;
-    throw error;
-  }
-}
-
 function isInside(root, path) {
   const resolvedRoot = resolve(root);
   const resolvedPath = resolve(path);
   return resolvedPath === resolvedRoot || resolvedPath.startsWith(`${resolvedRoot}${sep}`);
 }
 
-function assertNoSymlinkSegments(path, label) {
-  const absolute = resolve(path);
-  const root = parse(absolute).root;
-  const segments = relative(root, absolute).split(sep).filter(Boolean);
-  let current = root;
-  for (const segment of segments) {
-    current = resolve(current, segment);
-    const status = lstatIfPresent(current);
-    if (!status) throw new Error(`${label} does not exist: ${current}`);
-    if (status.isSymbolicLink()) throw new Error(`${label} traverses a symlink`);
-  }
-}
-
 function assertOutputBoundary({ outputPath, privateRoot, materializedPath, selectionState, runDir, normalizedResultsPath, inputPaths }) {
   if (!outputPath) throw new Error("score-evaluator-result requires --output");
-  const output = resolve(outputPath);
-  const parent = dirname(output);
-  assertNoSymlinkSegments(parent, "engineering result output parent");
-  const parentStatus = lstatSync(parent);
-  if (!parentStatus.isDirectory()) throw new Error("engineering result output parent must be a directory");
-  if (lstatIfPresent(output)) throw new Error("engineering result output must not already exist");
+  const output = assertAtomicOutputAbsent(outputPath, "engineering result output");
   for (const [path, label] of [
     [privateRoot, "private evaluator root"],
     [materializedPath, "materialized root"],
@@ -446,43 +408,6 @@ export function buildPortfolioEngineeringResult(verified, { root = DEFAULT_ROOT 
   return validatePortfolioEngineeringResult(artifact, { root });
 }
 
-function publishEngineeringResult(output, artifact, { privateRoot, manifestPath }) {
-  const bytes = Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`);
-  for (const value of [privateRoot, manifestPath].filter(Boolean).map((path) => resolve(path))) {
-    if (bytes.includes(Buffer.from(value))) throw new Error("engineering result contains a private evaluator path");
-  }
-  const staging = resolve(dirname(output), `.${basename(output)}.staging-${randomUUID()}`);
-  let descriptor;
-  try {
-    descriptor = openSync(staging, "wx", 0o600);
-    writeFileSync(descriptor, bytes);
-    fsyncSync(descriptor);
-    closeSync(descriptor);
-    descriptor = undefined;
-    assertNoSymlinkSegments(dirname(output), "engineering result output parent");
-    try {
-      linkSync(staging, output);
-    } catch (error) {
-      if (error?.code === "EEXIST") throw new Error("engineering result output appeared during atomic no-replace publication");
-      throw new Error(`engineering result atomic no-replace publication is unavailable (${error?.code ?? "unknown_error"})`);
-    }
-    unlinkSync(staging);
-    let directoryDescriptor;
-    try {
-      directoryDescriptor = openSync(dirname(output), "r");
-      fsyncSync(directoryDescriptor);
-    } catch (error) {
-      if (!["EINVAL", "ENOTSUP", "EISDIR", "EPERM", "EBADF"].includes(error?.code)) throw error;
-    } finally {
-      if (directoryDescriptor !== undefined) closeSync(directoryDescriptor);
-    }
-  } finally {
-    if (descriptor !== undefined) closeSync(descriptor);
-    if (existsSync(staging)) rmSync(staging, { force: true });
-  }
-  return bytes;
-}
-
 export function scoreEvaluatorResult(options) {
   const output = assertOutputBoundary({
     outputPath: options.outputPath,
@@ -506,6 +431,11 @@ export function scoreEvaluatorResult(options) {
   });
   const verified = verifyEvaluatorResult(options);
   const artifact = buildPortfolioEngineeringResult(verified, { root: options.root });
-  const bytes = publishEngineeringResult(output, artifact, options);
+  const { bytes } = publishJsonAtomicNoReplace({
+    outputPath: output,
+    artifact,
+    label: "engineering result output",
+    forbiddenByteValues: [options.privateRoot, options.manifestPath].filter(Boolean).map((path) => resolve(path)),
+  });
   return { artifact, bytes, outputPath: output };
 }

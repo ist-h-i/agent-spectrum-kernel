@@ -933,7 +933,7 @@ try {
   const symlinkOutput = resolve(base.path, "symlink-output.json");
   symlinkSync(symlinkTarget, symlinkOutput);
   const symlinkRun = runScore(base, { resultPath: completed.path, outputPath: symlinkOutput, expectedStatus: 1 });
-  assert.match(symlinkRun.stderr, /must not already exist/u);
+  assert.match(symlinkRun.stderr, /must not be a symlink|must not already exist/u);
   assert.equal(lstatSync(symlinkOutput).isSymbolicLink(), true);
 
   const realParent = resolve(base.path, "real-output-parent");
@@ -963,8 +963,11 @@ try {
 
   // F-197-SCORE-03: independent processes with different valid bytes publish exactly once without replacement.
   const scorerSource = readFileSync(resolve(root, "scripts/ask-benchmark-portfolio-score.mjs"), "utf8");
-  assert.match(scorerSource, /\blinkSync\(staging, output\)/u, "publication must use atomic no-replace hard-link creation");
+  const publicationSource = readFileSync(resolve(root, "scripts/ask-benchmark-atomic-publication.mjs"), "utf8");
+  assert.match(scorerSource, /publishJsonAtomicNoReplace/u, "scorer must use the shared atomic no-replace publisher");
+  assert.match(publicationSource, /\blinkSync\(staging, output\)/u, "publication must use atomic no-replace hard-link creation");
   assert.doesNotMatch(scorerSource, /\brenameSync\(/u, "publication must not use replacing rename semantics");
+  assert.doesNotMatch(publicationSource, /\brenameSync\(/u, "shared publication must not use replacing rename semantics");
   const concurrentOutput = resolve(base.path, "concurrent-engineering-result.json");
   const competitors = await Promise.all([
     runScoreConcurrent(base, { name: "blocker-pass", resultPath: completed.path, outputPath: concurrentOutput }),

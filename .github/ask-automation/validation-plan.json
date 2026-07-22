@@ -62,6 +62,10 @@
       "argv": ["node", "scripts/test-ask-benchmark-portfolio-score.mjs"]
     },
     {
+      "id": "portfolio_result_set",
+      "argv": ["node", "scripts/test-ask-benchmark-portfolio-result-set.mjs"]
+    },
+    {
       "id": "adapter_runtime_bundle",
       "argv": ["node", "scripts/adapter-runtime-bundle.mjs", "--check"]
     },
