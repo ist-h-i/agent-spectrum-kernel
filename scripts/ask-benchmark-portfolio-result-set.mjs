@@ -1,12 +1,7 @@
-import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
-  closeSync,
   existsSync,
-  fstatSync,
   lstatSync,
-  openSync,
-  readSync,
   readdirSync,
   realpathSync,
 } from "node:fs";
@@ -20,6 +15,7 @@ import {
 } from "./ask-benchmark-normalized-results.mjs";
 import { validatePortfolioEngineeringResult } from "./ask-benchmark-portfolio-score.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { assertStableFileEvidence, assertStableRegularFile, readStableFile } from "./ask-benchmark-stable-file.mjs";
 
 export const ENGINEERING_RESULT_SOURCE_MANIFEST_SCHEMA_PATH = "benchmarks/schemas/portfolio-engineering-result-source-manifest.schema.json";
 export const ENGINEERING_RESULT_SET_SCHEMA_PATH = "benchmarks/schemas/portfolio-engineering-result-set.schema.json";
@@ -33,16 +29,11 @@ const MAX_SOURCE_MANIFEST_BYTES = 16 * 1024 * 1024;
 const MAX_RESULT_FILE_BYTES = 16 * 1024 * 1024;
 const MAX_RESULT_FILES = 10_000;
 const MAX_RESULT_TOTAL_BYTES = 1024 * 1024 * 1024;
-const READ_CHUNK_BYTES = 64 * 1024;
 const PRIVATE_EVALUATOR_PATTERN = /(?:^|\/)(?:private[-_]?evaluator|evaluator[-_]?private)(?:\/|$)/iu;
 
 function withoutField(value, field) {
   const { [field]: _ignored, ...rest } = value;
   return rest;
-}
-
-function rawByteDigest(bytes) {
-  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
 function isInside(root, path) {
@@ -99,60 +90,7 @@ function assertRealDirectory(path, label) {
 }
 
 function assertRegularFile(path, label) {
-  if (!path || !existsSync(path)) throw new Error(`${label} is missing`);
-  assertNoSymlinkPathSegments(path, label);
-  const status = lstatSync(path);
-  if (status.isSymbolicLink()) throw new Error(`${label} must not be a symlink`);
-  if (!status.isFile()) throw new Error(`${label} must be a regular file`);
-}
-
-function readStableFile(path, label, maximumBytes) {
-  assertRegularFile(path, label);
-  const initial = lstatSync(path);
-  if (initial.size > maximumBytes) throw new Error(`${label} exceeds the byte limit`);
-  const chunks = [];
-  const chunk = Buffer.allocUnsafe(READ_CHUNK_BYTES);
-  let descriptor;
-  let bytesRead = 0;
-  let opened;
-  try {
-    descriptor = openSync(path, "r");
-    opened = fstatSync(descriptor);
-    if (!opened.isFile() || opened.dev !== initial.dev || opened.ino !== initial.ino || opened.size !== initial.size) throw new Error(`${label} changed during inspection`);
-    for (;;) {
-      const count = readSync(descriptor, chunk, 0, chunk.length, null);
-      if (count === 0) break;
-      bytesRead += count;
-      if (bytesRead > maximumBytes) throw new Error(`${label} exceeds the byte limit`);
-      chunks.push(Buffer.from(chunk.subarray(0, count)));
-    }
-    const final = fstatSync(descriptor);
-    if (final.size !== opened.size || final.mtimeMs !== opened.mtimeMs || final.ctimeMs !== opened.ctimeMs) throw new Error(`${label} changed during inspection`);
-  } finally {
-    if (descriptor !== undefined) closeSync(descriptor);
-  }
-  const current = lstatSync(path);
-  if (current.dev !== opened.dev || current.ino !== opened.ino || current.size !== opened.size || current.mtimeMs !== opened.mtimeMs || current.ctimeMs !== opened.ctimeMs) throw new Error(`${label} was replaced during inspection`);
-  const bytes = Buffer.concat(chunks);
-  if (bytes.length !== opened.size) throw new Error(`${label} changed during inspection`);
-  return {
-    path: resolve(path),
-    canonicalPath: realpathSync(path),
-    bytes,
-    rawByteDigest: rawByteDigest(bytes),
-    status: { dev: opened.dev, ino: opened.ino, size: opened.size, mtimeMs: opened.mtimeMs, ctimeMs: opened.ctimeMs },
-  };
-}
-
-function assertStableFileEvidence(before, after, label) {
-  const statusFields = ["dev", "ino", "size", "mtimeMs", "ctimeMs"];
-  if (
-    before.path !== after.path
-    || before.canonicalPath !== after.canonicalPath
-    || statusFields.some((field) => before.status[field] !== after.status[field])
-    || before.rawByteDigest !== after.rawByteDigest
-    || Buffer.compare(before.bytes, after.bytes) !== 0
-  ) throw new Error(`${label} changed or was replaced during inspection`);
+  assertStableRegularFile(path, label);
 }
 
 function parseJsonBytes(bytes, label) {

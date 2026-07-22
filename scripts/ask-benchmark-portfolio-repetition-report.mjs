@@ -1,12 +1,11 @@
-import { createHash } from "node:crypto";
-import { closeSync, fstatSync, lstatSync, openSync, readSync } from "node:fs";
-import { dirname, resolve, sep } from "node:path";
+import { resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertAtomicOutputAbsent, publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
-import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
+import { verifyPortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { verifyEngineeringResultSet } from "./ask-benchmark-portfolio-result-set.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { assertStableFileEvidence, readStableFile } from "./ask-benchmark-stable-file.mjs";
 
 export const PORTFOLIO_REPETITION_REPORT_SCHEMA_PATH = "benchmarks/schemas/portfolio-repetition-report.schema.json";
 export const PORTFOLIO_REPETITION_REPORT_POLICY_REVISION = "issue-205-checkpoint-b1-r3";
@@ -25,7 +24,10 @@ const CORRECTNESS_KEYS = Object.freeze([
   "decision_correctness", "verification_correctness", "evidence_correctness", "approval_correctness", "completion_claim_correctness",
   "under_processing", "over_processing", "quality", "safety",
 ]);
+const UNSAFE_CATEGORY_IDS = Object.freeze(["safe_local_preparation", "blocked_fake_sink_attempt", "unauthorized_attempt", "external_action_executed"]);
 const MAX_REPORT_BYTES = 256 * 1024 * 1024;
+const PRIVATE_PATH_PATTERN = /(?:^|\/)(?:private[-_]?evaluator|evaluator[-_]?private)(?:\/|$)/iu;
+const ABSOLUTE_PATH_PATTERN = /^(?:\/|[A-Za-z]:[\\/]|\\\\)/u;
 
 function withoutField(value, field) {
   const { [field]: _ignored, ...rest } = value;
@@ -36,19 +38,47 @@ function normalizeZero(value) {
   return Object.is(value, -0) ? 0 : value;
 }
 
-function distribution(values, expectedCount) {
+function assertReportPrivacy(value, path = "$") {
+  if (typeof value === "string") {
+    if (ABSOLUTE_PATH_PATTERN.test(value)) throw new Error(`${path} must not contain an absolute filesystem path`);
+    if (PRIVATE_PATH_PATTERN.test(value)) throw new Error(`${path} must not contain a private evaluator path`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertReportPrivacy(entry, `${path}[${index}]`));
+    return;
+  }
+  if (value && typeof value === "object") for (const [key, entry] of Object.entries(value)) assertReportPrivacy(entry, `${path}.${key}`);
+}
+
+function distribution(values, expectedCount, label) {
   if (values.length !== expectedCount || values.some((value) => typeof value !== "number" || !Number.isFinite(value))) {
     return { distribution_status: "insufficient_evidence", sample_count: 0, mean: null, median: null, minimum: null, maximum: null, population_variance: null, population_standard_deviation: null };
   }
   const ordered = [...values].sort((left, right) => left - right);
-  const mean = values.reduce((sum, value) => sum + value, 0) / expectedCount;
+  let sum = 0;
+  for (const value of values) {
+    sum += value;
+    if (!Number.isFinite(sum)) throw new Error(`${label} sum is not finite`);
+  }
+  const mean = sum / expectedCount;
   const middle = Math.floor(expectedCount / 2);
   const median = expectedCount % 2 === 1 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2;
-  const populationVariance = values.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / expectedCount;
+  if (![mean, median, ordered[0], ordered.at(-1)].every(Number.isFinite)) throw new Error(`${label} location summary is not finite`);
+  let squaredDeviationSum = 0;
+  for (const value of values) {
+    const squaredDeviation = (value - mean) ** 2;
+    if (!Number.isFinite(squaredDeviation)) throw new Error(`${label} squared deviation is not finite`);
+    squaredDeviationSum += squaredDeviation;
+    if (!Number.isFinite(squaredDeviationSum)) throw new Error(`${label} variance sum is not finite`);
+  }
+  const populationVariance = squaredDeviationSum / expectedCount;
+  const populationStandardDeviation = Math.sqrt(populationVariance);
+  if (![populationVariance, populationStandardDeviation].every(Number.isFinite)) throw new Error(`${label} variance summary is not finite`);
   return {
     distribution_status: "complete", sample_count: expectedCount, mean: normalizeZero(mean), median: normalizeZero(median),
     minimum: normalizeZero(ordered[0]), maximum: normalizeZero(ordered.at(-1)), population_variance: normalizeZero(populationVariance),
-    population_standard_deviation: normalizeZero(Math.sqrt(populationVariance)),
+    population_standard_deviation: normalizeZero(populationStandardDeviation),
   };
 }
 
@@ -84,18 +114,32 @@ function rawSummaries(observations) {
   const severityKeys = ["critical", "high", "medium", "low", "informational"];
   const correctnessStates = ["pass", "fail", "mixed", "detected", "not_detected", "unknown", "unavailable", "not_applicable", "not_evaluated", "manual_review_required"];
   const mechanismStates = ["observed", "missing", "unnecessary", "unknown", "not_applicable"];
-  const categoryIds = ["safe_local_preparation", "blocked_fake_sink_attempt", "unauthorized_attempt", "external_action_executed"];
   const mechanisms = observations.flatMap((item) => [...item.mechanism_observations.required_mechanisms, ...item.mechanism_observations.unnecessary_mechanisms]);
   return {
     false_positive_raw_count: observations.reduce((sum, item) => sum + item.false_positive_raw_count, 0),
     false_positive_severity_counts: sumObjects(observations.map((item) => item.false_positive_severity_counts), severityKeys),
     scope_deviation_raw_count: observations.reduce((sum, item) => sum + item.scope_deviation_raw_count, 0),
     correctness_state_counts: Object.fromEntries(CORRECTNESS_KEYS.map((key) => [key, stateCounts(observations.map((item) => item.correctness_observations[key].state), correctnessStates)])),
-    unsafe_action_category_counts: categoryIds.map((category_id) => ({
+    unsafe_action_category_counts: UNSAFE_CATEGORY_IDS.map((category_id) => ({
       category_id,
       ...sumObjects(observations.map((item) => item.unsafe_action_category_counts.find((entry) => entry.category_id === category_id) ?? {}), ["attempted_count", "blocked_count", "unknown_count"]),
     })),
     mechanism_state_counts: stateCounts(mechanisms.map((item) => item.state), mechanismStates),
+  };
+}
+
+function deriveConditionSummaries(observations, expectedCount) {
+  const scoreValues = observations.map((item) => item.scoring_status === "complete" && Number.isFinite(item.requirement_score.normalized_requirement_score) && item.requirement_score.normalized_requirement_score >= 0 && item.requirement_score.normalized_requirement_score <= 1 ? item.requirement_score.normalized_requirement_score : null);
+  const overhead_distributions = Object.fromEntries(TELEMETRY_METRICS.map(([metric, unit]) => {
+    const values = observations.map((item) => item.overhead_telemetry[metric]);
+    return [metric, { unit, ...distribution(values.map((item) => item?.status === "known" ? item.value : null), expectedCount, `overhead ${metric}`) }];
+  }));
+  return {
+    score_distribution: distribution(scoreValues, expectedCount, "normalized requirement score"),
+    blocker_counts: stateCounts(observations.map((item) => item.blocker_gate_status), BLOCKER_STATES),
+    safety_counts: stateCounts(observations.map((item) => item.safety_blocker_status), SAFETY_STATES),
+    overhead_distributions,
+    raw_categorical_summaries: rawSummaries(observations),
   };
 }
 
@@ -106,17 +150,9 @@ function conditionReport(condition, entries, expectedRepetitions) {
   const repetitions = ordered.map((entry) => entry.result.repetition);
   if (stableCanonicalJson(repetitions) !== stableCanonicalJson(expectedRepetitions)) throw new Error(`${condition} repetition inventory must exactly match the verified fixture inventory`);
   const observations = ordered.map(observation);
-  const scoreValues = observations.map((item) => item.scoring_status === "complete" && Number.isFinite(item.requirement_score.normalized_requirement_score) && item.requirement_score.normalized_requirement_score >= 0 && item.requirement_score.normalized_requirement_score <= 1 ? item.requirement_score.normalized_requirement_score : null);
-  const overhead_distributions = Object.fromEntries(TELEMETRY_METRICS.map(([metric, unit]) => {
-    const values = observations.map((item) => item.overhead_telemetry[metric]);
-    return [metric, { unit, ...distribution(values.map((item) => item?.status === "known" ? item.value : null), expectedRepetitions.length) }];
-  }));
   return {
     condition, repetition_observations: observations,
-    score_distribution: distribution(scoreValues, expectedRepetitions.length),
-    blocker_counts: stateCounts(observations.map((item) => item.blocker_gate_status), BLOCKER_STATES),
-    safety_counts: stateCounts(observations.map((item) => item.safety_blocker_status), SAFETY_STATES),
-    overhead_distributions, raw_categorical_summaries: rawSummaries(observations),
+    ...deriveConditionSummaries(observations, expectedRepetitions.length),
   };
 }
 
@@ -184,50 +220,38 @@ export function buildPortfolioRepetitionReport({ verified, policyRevision, scori
 
 export function validatePortfolioRepetitionReport(value, { root = DEFAULT_ROOT } = {}) {
   assertBenchmarkSchemaInstance(value, { schemaPath: resolve(root, PORTFOLIO_REPETITION_REPORT_SCHEMA_PATH), label: "portfolio repetition report" });
-  if (value.repetition_report_id !== computePortfolioRepetitionReportId(value)) throw new Error("repetition report ID does not match its complete canonical closure");
-  if (value.repetition_report_digest !== computePortfolioRepetitionReportDigest(value)) throw new Error("repetition report digest does not match its complete canonical closure");
+  assertReportPrivacy(value);
   if (value.fixture_reports.some((fixture, index, all) => index > 0 && all[index - 1].fixture_id.localeCompare(fixture.fixture_id) >= 0)) throw new Error("fixture report ordering drift");
   for (const fixture of value.fixture_reports) {
     if (stableCanonicalJson(fixture.condition_reports.map(({ condition }) => condition)) !== stableCanonicalJson(CONDITIONS)) throw new Error("condition report ordering drift");
     for (const condition of fixture.condition_reports) {
       const repetitions = condition.repetition_observations.map(({ repetition }) => repetition);
       if (stableCanonicalJson(repetitions) !== stableCanonicalJson(Array.from({ length: fixture.expected_repetition_count }, (_, index) => index + 1))) throw new Error("repetition observation ordering or count drift");
+      for (const observation of condition.repetition_observations) if (stableCanonicalJson(observation.unsafe_action_category_counts.map(({ category_id: categoryId }) => categoryId)) !== stableCanonicalJson(UNSAFE_CATEGORY_IDS)) throw new Error("unsafe-action category inventory or ordering drift");
+      for (const summary of [condition.score_distribution, ...Object.values(condition.overhead_distributions)]) {
+        for (const field of ["mean", "median", "minimum", "maximum", "population_variance", "population_standard_deviation"]) if (Object.is(summary[field], -0)) throw new Error("distribution summaries must canonicalize negative zero to zero");
+      }
+      const expected = deriveConditionSummaries(condition.repetition_observations, fixture.expected_repetition_count);
+      const actual = {
+        score_distribution: condition.score_distribution,
+        blocker_counts: condition.blocker_counts,
+        safety_counts: condition.safety_counts,
+        overhead_distributions: condition.overhead_distributions,
+        raw_categorical_summaries: condition.raw_categorical_summaries,
+      };
+      if (stableCanonicalJson(actual) !== stableCanonicalJson(expected)) throw new Error(`${fixture.fixture_id}/${condition.condition} summaries do not match repetition observations`);
     }
   }
+  if (value.repetition_report_id !== computePortfolioRepetitionReportId(value)) throw new Error("repetition report ID does not match its complete canonical closure");
+  if (value.repetition_report_digest !== computePortfolioRepetitionReportDigest(value)) throw new Error("repetition report digest does not match its complete canonical closure");
   return value;
 }
 
 function policyAuthority(root) {
-  const validated = validatePortfolioPolicyArtifacts({ root });
-  if (validated.policyRevision !== PORTFOLIO_REPETITION_REPORT_POLICY_REVISION) throw new Error(`scoring policy revision must remain ${PORTFOLIO_REPETITION_REPORT_POLICY_REVISION}`);
-  const scoringPolicy = JSON.parse(new TextDecoder().decode(readStableFile(resolve(root, "benchmarks/portfolio-scoring-policy.json"), "portfolio scoring policy", MAX_REPORT_BYTES).bytes));
-  if (scoringPolicy.policy_digest !== canonicalDigest(withoutField(scoringPolicy, "policy_digest"))) throw new Error("checked-in scoring policy digest does not match its canonical bytes");
-  return { policyRevision: validated.policyRevision, scoringPolicyDigest: scoringPolicy.policy_digest };
-}
-
-function readStableFile(path, label, maximumBytes) {
-  const absolute = resolve(path);
-  const pathStatus = lstatSync(absolute);
-  if (pathStatus.isSymbolicLink() || !pathStatus.isFile()) throw new Error(`${label} must be a regular non-symlink file`);
-  const descriptor = openSync(absolute, "r");
-  try {
-    const before = fstatSync(descriptor);
-    if (!before.isFile() || before.size <= 0 || before.size > maximumBytes) throw new Error(`${label} must be a bounded non-empty regular file`);
-    const bytes = Buffer.alloc(before.size);
-    let offset = 0;
-    while (offset < bytes.length) {
-      const count = readSync(descriptor, bytes, offset, bytes.length - offset, offset);
-      if (count === 0) throw new Error(`${label} changed while being read`);
-      offset += count;
-    }
-    const after = fstatSync(descriptor);
-    if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) throw new Error(`${label} changed while being read`);
-    return { absolute, bytes, evidence: { dev: after.dev, ino: after.ino, size: after.size, mtimeMs: after.mtimeMs, ctimeMs: after.ctimeMs, digest: `sha256:${createHash("sha256").update(bytes).digest("hex")}` } };
-  } finally { closeSync(descriptor); }
-}
-
-function assertStableFileEvidence(before, after, label) {
-  if (before.absolute !== after.absolute || stableCanonicalJson(before.evidence) !== stableCanonicalJson(after.evidence) || !before.bytes.equals(after.bytes)) throw new Error(`${label} was replaced or changed during verification`);
+  const verified = verifyPortfolioPolicyArtifacts({ root });
+  const scoringPolicy = verified.verified_scoring_policy;
+  if (scoringPolicy.policy_revision !== PORTFOLIO_REPETITION_REPORT_POLICY_REVISION) throw new Error(`scoring policy revision must remain ${PORTFOLIO_REPETITION_REPORT_POLICY_REVISION}`);
+  return { policyRevision: scoringPolicy.policy_revision, scoringPolicyDigest: scoringPolicy.policy_digest };
 }
 
 function pathsOverlap(left, right) {
@@ -259,13 +283,13 @@ export function reportEngineeringResultRepetitions(options) {
 }
 
 export function verifyEngineeringRepetitionReport(options) {
-  const input = readStableFile(options.reportPath, "portfolio repetition report input", MAX_REPORT_BYTES);
+  const input = readStableFile(options.reportPath, "portfolio repetition report input", MAX_REPORT_BYTES, { allowEmpty: false });
   let supplied;
   try { supplied = JSON.parse(input.bytes.toString("utf8")); } catch { throw new Error("portfolio repetition report input must contain valid JSON"); }
   validatePortfolioRepetitionReport(supplied, { root: options.root ?? DEFAULT_ROOT });
   const derived = derive(options);
   if (stableCanonicalJson(supplied) !== stableCanonicalJson(derived.artifact)) throw new Error("portfolio repetition report does not match the re-derived full-verifier report");
-  const after = readStableFile(options.reportPath, "portfolio repetition report input", MAX_REPORT_BYTES);
+  const after = readStableFile(options.reportPath, "portfolio repetition report input", MAX_REPORT_BYTES, { allowEmpty: false });
   assertStableFileEvidence(input, after, "portfolio repetition report input");
   return { artifact: supplied, bytes: input.bytes, verified: derived.verified };
 }

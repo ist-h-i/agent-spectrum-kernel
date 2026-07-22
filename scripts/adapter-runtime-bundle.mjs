@@ -145,6 +145,8 @@ export function buildAdapterRuntimeBundle() {
         scoring_test_file_sha256: fileSha256("scripts/test-ask-benchmark-portfolio-score.mjs"),
         atomic_publication_implementation_path: "scripts/ask-benchmark-atomic-publication.mjs",
         atomic_publication_implementation_file_sha256: fileSha256("scripts/ask-benchmark-atomic-publication.mjs"),
+        stable_file_implementation_path: "scripts/ask-benchmark-stable-file.mjs",
+        stable_file_implementation_file_sha256: fileSha256("scripts/ask-benchmark-stable-file.mjs"),
         engineering_result_source_manifest_schema_path: "benchmarks/schemas/portfolio-engineering-result-source-manifest.schema.json",
         engineering_result_source_manifest_schema_file_sha256: fileSha256("benchmarks/schemas/portfolio-engineering-result-source-manifest.schema.json"),
         engineering_result_set_schema_path: "benchmarks/schemas/portfolio-engineering-result-set.schema.json",

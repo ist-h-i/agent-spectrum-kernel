@@ -262,6 +262,7 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/portfolio-design-reviewed-state.json",
     "benchmarks/schemas/portfolio-repetition-report.schema.json",
     "scripts/ask-benchmark-portfolio-repetition-report.mjs",
+    "scripts/ask-benchmark-stable-file.mjs",
     "scripts/test-ask-benchmark-portfolio-repetition-report.mjs",
     "benchmarks/schemas",
   ]) {

@@ -11,7 +11,6 @@ import {
   reportEngineeringResultRepetitions,
   validatePortfolioRepetitionReport,
 } from "./ask-benchmark-portfolio-repetition-report.mjs";
-import { publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const policy = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-scoring-policy.json"), "utf8"));
@@ -41,7 +40,10 @@ function result(fixture, repetitions, condition, repetition, adapter = "codex") 
     correctness_observations: Object.fromEntries(["decision_correctness", "verification_correctness", "evidence_correctness", "approval_correctness", "completion_claim_correctness", "under_processing", "over_processing", "quality", "safety"].map((name) => [name, observation()])),
     unsafe_actions: { categories: ["safe_local_preparation", "blocked_fake_sink_attempt", "unauthorized_attempt", "external_action_executed"].map((category_id) => ({ category_id, attempted_count: 0, blocked_count: 0, unknown_count: 0 })) },
     mechanism_observations: { required_mechanisms: [{ mechanism_id: "verification", state: "observed", evidence_references: [] }], unnecessary_mechanisms: [], quality_credit_applied: false },
-    overhead_telemetry: Object.fromEntries(["duration_ms", "input_tokens", "output_tokens", "cached_tokens", "monetary_cost", "human_effort", "tool_call_count", "file_read_count", "final_output_bytes", "runtime_agent_count", "harness_spawned_secondary_agent_count", "subagent_activity", "capability_downgrade_count"].map((name, index) => [name, metric(repetition + index)])),
+    overhead_telemetry: {
+      ...Object.fromEntries(["duration_ms", "input_tokens", "output_tokens", "cached_tokens", "monetary_cost", "human_effort", "tool_call_count", "file_read_count", "final_output_bytes", "runtime_agent_count", "harness_spawned_secondary_agent_count", "subagent_activity", "capability_downgrade_count"].map((name, index) => [name, metric(repetition + index)])),
+      runtime_unavailable_reason: { code: metric(null, "not_applicable"), digest: metric(null, "not_applicable"), bytes: metric(null, "not_applicable") },
+    },
   };
 }
 
@@ -72,6 +74,14 @@ function close(value) {
 
 function check(name, callback) { callback(); covered.add(name); }
 function reportGroup(report, fixture = "fixture-three", condition = "plain") { return report.fixture_reports.find((item) => item.fixture_id === fixture).condition_reports.find((item) => item.condition === condition); }
+function expectReclosedFailure(name, source, mutate, pattern = /summaries do not match|Schema validation|absolute filesystem path|negative zero/u) {
+  check(name, () => {
+    const changed = structuredClone(source);
+    mutate(changed, reportGroup(changed));
+    close(changed);
+    assert.throws(() => validatePortfolioRepetitionReport(changed, { root }), pattern);
+  });
+}
 
 const report = build();
 validatePortfolioRepetitionReport(report, { root });
@@ -114,6 +124,9 @@ check("reporter consumes verified_results", () => assert.match(implementation, /
 check("result file is not re-read after full verification", () => assert.equal(/readFileSync/u.test(implementation), false));
 check("post-verification replacement uses in-memory values", () => assert.equal(Object.isFrozen(report), false));
 check("fresh full verification detects changed result files", () => assert.match(implementation, /verifyEngineeringResultSet\(options\)/u));
+check("reporter uses fully verified policy object", () => assert.match(implementation, /verifyPortfolioPolicyArtifacts\(\{ root \}\)/u));
+check("reporter has no independent scoring-policy reread", () => assert.equal(implementation.includes("benchmarks/portfolio-scoring-policy.json"), false));
+check("scoring-policy revision mismatch", () => assert.throws(() => buildPortfolioRepetitionReport({ verified: verified(), policyRevision: "issue-205-checkpoint-b1-r4", scoringPolicyDigest: policy.policy_digest }), /scoring policy revision/u));
 check("scoring-policy digest mismatch", () => { const input = verified(); input.verified_results[0].result.scoring_policy_digest = digest("wrong"); assert.throws(() => build(input), /authoritative scoring policy digest/u); });
 check("mixed scoring-policy digests", () => { const input = verified(); input.verified_results.at(-1).result.scoring_policy_digest = digest("mixed"); assert.throws(() => build(input), /authoritative scoring policy digest/u); });
 check("fixture identity drift", () => { const input = verified(); input.verified_results[1].result.fixture_input_digest = digest("drift"); assert.throws(() => build(input), /identity changes/u); });
@@ -131,21 +144,44 @@ for (const [name, mutate, pattern] of [
   ["weighting field is rejected", (r) => { r.fixture_reports[0].condition_reports[0].weight = 1; }, /unknown property/u],
 ]) check(name, () => { const changed = structuredClone(report); mutate(changed); if (!name.includes("ID") && !name.includes("digest")) close(changed); assert.throws(() => validatePortfolioRepetitionReport(changed, { root }), pattern); });
 
+expectReclosedFailure("reclosed wrong mean", report, (_report, group) => { group.score_distribution.mean += 0.01; });
+expectReclosedFailure("reclosed wrong median", report, (_report, group) => { group.score_distribution.median += 0.01; });
+expectReclosedFailure("reclosed wrong variance", report, (_report, group) => { group.score_distribution.population_variance += 0.01; });
+expectReclosedFailure("reclosed sample count", report, (_report, group) => { group.score_distribution.sample_count -= 1; });
+expectReclosedFailure("complete distribution with null", report, (_report, group) => { group.score_distribution.mean = null; });
+const insufficientInput = verified();
+insufficientInput.verified_results[0].result.scoring_status = "not_scoring_ready";
+insufficientInput.verified_results[0].result.requirement_score = { scored_requirement_count: null, requirement_points_earned: null, requirement_points_possible: null, normalized_requirement_score: null };
+const insufficientReport = build(insufficientInput);
+expectReclosedFailure("insufficient distribution with numeric values", insufficientReport, (_report, group) => { group.score_distribution.mean = 0; });
+expectReclosedFailure("blocker count drift", report, (_report, group) => { group.blocker_counts.pass -= 1; group.blocker_counts.fail += 1; });
+expectReclosedFailure("safety count drift", report, (_report, group) => { group.safety_counts.pass -= 1; group.safety_counts.fail += 1; });
+expectReclosedFailure("false-positive raw count drift", report, (_report, group) => { group.raw_categorical_summaries.false_positive_raw_count += 1; });
+expectReclosedFailure("severity count drift", report, (_report, group) => { group.raw_categorical_summaries.false_positive_severity_counts.medium += 1; });
+expectReclosedFailure("scope count drift", report, (_report, group) => { group.raw_categorical_summaries.scope_deviation_raw_count += 1; });
+expectReclosedFailure("correctness count drift", report, (_report, group) => { group.raw_categorical_summaries.correctness_state_counts.quality.pass -= 1; group.raw_categorical_summaries.correctness_state_counts.quality.fail += 1; });
+expectReclosedFailure("unsafe-action count drift", report, (_report, group) => { group.raw_categorical_summaries.unsafe_action_category_counts[0].attempted_count += 1; });
+expectReclosedFailure("mechanism count drift", report, (_report, group) => { group.raw_categorical_summaries.mechanism_state_counts.observed += 1; });
+expectReclosedFailure("telemetry summary drift", report, (_report, group) => { group.overhead_distributions.duration_ms.mean += 1; });
+expectReclosedFailure("unknown nested property", report, (_report, group) => { group.repetition_observations[0].requirement_score.arbitrary_nested_property = true; });
+expectReclosedFailure("nested raw evaluator prompt", report, (_report, group) => { group.repetition_observations[0].correctness_observations.quality.raw_evaluator_prompt = "forbidden"; });
+expectReclosedFailure("nested absolute path", report, (_report, group) => { group.repetition_observations[0].overhead_telemetry.runtime_unavailable_reason.code.reason = "/private/tmp/evidence"; }, /absolute filesystem path/u);
+expectReclosedFailure("nested private field", report, (_report, group) => { group.repetition_observations[0].correctness_observations.quality.private_root = "private-evaluator/root"; });
+expectReclosedFailure("unknown final-output content", report, (_report, group) => { group.repetition_observations[0].correctness_observations.quality.final_output_content = "unknown"; });
+check("arithmetic overflow", () => { const input = verified(); for (const entry of input.verified_results.filter(({ result }) => result.fixture_id === "fixture-three" && result.condition === "plain")) entry.result.overhead_telemetry.monetary_cost = metric(Number.MAX_VALUE); assert.throws(() => build(input), /sum is not finite/u); });
+expectReclosedFailure("negative zero", report, (_report, group) => { group.score_distribution.population_variance = -0; }, /negative zero/u);
+
 const publicationWork = mkdtempSync(resolve(root, ".ask-repetition-report-publication-"));
 try {
   check("pre-existing output", () => { const outputPath = resolve(publicationWork, "existing.json"); writeFileSync(outputPath, "existing\n"); assert.throws(() => reportEngineeringResultRepetitions({ outputPath }), /must not already exist/u); });
   check("output symlink", () => { const target = resolve(publicationWork, "target.json"); const outputPath = resolve(publicationWork, "link.json"); writeFileSync(target, "target\n"); symlinkSync(target, outputPath); assert.throws(() => reportEngineeringResultRepetitions({ outputPath }), /symlink/u); });
   check("output inside authority root", () => { const normalizedResultsPath = resolve(publicationWork, "normalized"); mkdirSync(normalizedResultsPath); assert.throws(() => reportEngineeringResultRepetitions({ outputPath: resolve(normalizedResultsPath, "report.json"), normalizedResultsPath }), /disjoint/u); });
-  check("concurrent output publication", () => { const outputPath = resolve(publicationWork, "race.json"); publishJsonAtomicNoReplace({ outputPath, artifact: report, label: "synthetic report" }); assert.throws(() => publishJsonAtomicNoReplace({ outputPath, artifact: report, label: "synthetic report" }), /must not already exist/u); });
   check("failure keeps all inputs unchanged", () => { const inputPath = resolve(publicationWork, "input.json"); writeFileSync(inputPath, "authority\n"); const before = readFileSync(inputPath); assert.throws(() => reportEngineeringResultRepetitions({ outputPath: inputPath, inputPath }), /must not already exist|disjoint/u); assert.deepEqual(readFileSync(inputPath), before); });
-  check("successful publication keeps all inputs unchanged", () => { const input = verified(); const before = structuredClone(input); build(input); assert.deepEqual(input, before); });
   check("byte-identical deterministic regeneration", () => assert.equal(JSON.stringify(build()), JSON.stringify(build())));
-  check("verify-report input replacement", () => assert.match(implementation, /assertStableFileEvidence\(input, after/u));
-  check("same-byte inode replacement", () => assert.match(implementation, /before\.dev !== after\.dev \|\| before\.ino !== after\.ino/u));
 } finally { rmSync(publicationWork, { recursive: true, force: true }); }
 check("absolute path leakage rejection", () => assert.throws(() => { const changed = structuredClone(report); changed.fixture_reports[0].condition_reports[0].repetition_observations[0].path = "/private/result.json"; close(changed); validatePortfolioRepetitionReport(changed, { root }); }, /pattern|match/u));
 check("private path leakage rejection", () => assert.equal(JSON.stringify(report).includes(root), false));
 check("serialized report does not contain full raw result bodies", () => assert.equal(JSON.stringify(report).includes("raw_evaluator_prompt"), false));
 
-assert.equal(covered.size, 58, `expected 58 focused closures, received ${covered.size}`);
+assert.equal(covered.size, 79, `expected 79 focused closures, received ${covered.size}`);
 console.log(`Portfolio repetition report contract test passed (${covered.size} closures).`);
