@@ -23,6 +23,7 @@ import {
   validateAggregateClassificationTransition,
   validateAggregationResult,
   validatePortfolioPolicyArtifacts,
+  verifyPortfolioPolicyArtifacts,
   validateRequirementMaxPoints,
 } from "./ask-benchmark-portfolio-policy.mjs";
 import { computeEvaluatorReferenceDigest } from "./ask-benchmark-evaluator-boundary.mjs";
@@ -440,12 +441,23 @@ try {
   assert.equal(summary.impactBandCount, 4);
   assert.equal(summary.ceilingThreshold, 0.95);
   assert.equal(summary.floorThreshold, 0.2);
+  const verifiedPolicy = verifyPortfolioPolicyArtifacts({ root });
+  assert.equal(verifiedPolicy.verified_scoring_policy.policy_revision, "issue-205-checkpoint-b1-r3");
+  assert.equal(verifiedPolicy.verified_scoring_policy.policy_digest, "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831");
+  assert.equal(Object.isFrozen(verifiedPolicy.verified_scoring_policy), true);
+  assert.equal(Object.isFrozen(verifiedPolicy.verified_scoring_policy.requirement_contract), true);
+  assert.throws(() => { verifiedPolicy.verified_scoring_policy.policy_revision = "mutated"; }, TypeError);
+  assert.equal(verifiedPolicy.verified_scoring_policy.policy_revision, "issue-205-checkpoint-b1-r3");
+  const checkedInScoringPolicy = spawnSync("git", ["show", "HEAD:benchmarks/portfolio-scoring-policy.json"], { cwd: root, encoding: null });
+  assert.equal(checkedInScoringPolicy.status, 0, checkedInScoringPolicy.stderr?.toString());
+  assert.deepEqual(readFileSync(resolve(root, "benchmarks/portfolio-scoring-policy.json")), checkedInScoringPolicy.stdout);
 
   const cliSuccess = spawnSync(process.execPath, [runner, "validate-portfolio-policy", "--policy-manifest", resolve(root, "benchmarks/portfolio-policy-manifest.json")], { cwd: root, encoding: "utf8" });
   assert.equal(cliSuccess.status, 0, cliSuccess.stderr);
   for (const expected of ["revision=issue-205-checkpoint-b1-r3", `catalog=${catalog.catalog_digest}`, `manifest=${base.manifest.manifest_digest}`, "gates=15", "lifecycle_states=6", "requirement_kinds=3", "frequency_bands=4", "impact_bands=4", "ceiling=0.95", "floor=0.2", "status=contracts_frozen_design_records_pending"]) {
     assert.match(cliSuccess.stdout, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+  assert.doesNotMatch(cliSuccess.stdout, /verified_scoring_policy|requirement_contract|ceiling_floor_policy/u);
 
   expectFailure("catalog-digest-drift", ({ manifest }) => {
     manifest.catalog_digest = `sha256:${"f".repeat(64)}`;
@@ -455,6 +467,10 @@ try {
     admissionPolicy.policy_digest = `sha256:${"f".repeat(64)}`;
   }, /admission policy digest does not match/, { resealArtifacts: false });
 
+  expectFailure("verified-scoring-policy-digest-drift", ({ scoringPolicy }) => {
+    scoringPolicy.policy_digest = `sha256:${"f".repeat(64)}`;
+  }, /scoring policy digest does not match/, { resealArtifacts: false });
+
   expectFailure("manifest-digest-drift", ({ manifest }) => {
     manifest.manifest_digest = `sha256:${"f".repeat(64)}`;
   }, /policy manifest digest does not match/, { resealArtifacts: false });
@@ -462,6 +478,14 @@ try {
   expectFailure("policy-version-mismatch", ({ admissionPolicy }) => {
     admissionPolicy.policy_contract_version = "3.7.1-portfolio-policy";
   }, /policy_contract_version/);
+
+  expectFailure("verified-scoring-policy-revision-mismatch", ({ scoringPolicy }) => {
+    scoringPolicy.policy_revision = "issue-205-checkpoint-b1-r4";
+  }, /policy_revision|deterministic policy recomputation/);
+
+  expectFailure("verified-scoring-policy-resealed-modification", ({ scoringPolicy }) => {
+    scoringPolicy.ceiling_floor_policy.universal_ceiling_candidate.median_normalized_requirement_score_minimum = 0.94;
+  }, /ceiling|deterministic policy recomputation/);
 
   expectFailure("unknown-property", ({ admissionPolicy }) => {
     admissionPolicy.unexpected_property = true;

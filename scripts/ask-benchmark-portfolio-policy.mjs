@@ -59,6 +59,7 @@ const EVALUATOR_RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result-envelo
 const ENGINEERING_RESULT_SCHEMA_PATH = "benchmarks/schemas/portfolio-engineering-result.schema.json";
 const ENGINEERING_RESULT_SOURCE_MANIFEST_SCHEMA_PATH = "benchmarks/schemas/portfolio-engineering-result-source-manifest.schema.json";
 const ENGINEERING_RESULT_SET_SCHEMA_PATH = "benchmarks/schemas/portfolio-engineering-result-set.schema.json";
+const REPETITION_REPORT_SCHEMA_PATH = "benchmarks/schemas/portfolio-repetition-report.schema.json";
 
 const LIFECYCLE_STATES = Object.freeze([
   "design_pending",
@@ -1440,7 +1441,18 @@ function assertInside(root, path, label) {
   return absolute;
 }
 
-export function validatePortfolioPolicyArtifacts({
+function cloneAndFreeze(value) {
+  const clone = structuredClone(value);
+  for (const child of Object.values(clone)) if (child && typeof child === "object") cloneAndFreezeInPlace(child);
+  return Object.freeze(clone);
+}
+
+function cloneAndFreezeInPlace(value) {
+  for (const child of Object.values(value)) if (child && typeof child === "object") cloneAndFreezeInPlace(child);
+  Object.freeze(value);
+}
+
+function validatePortfolioPolicyArtifactsInternal({
   root = DEFAULT_ROOT,
   policyManifestPath = resolve(root, MANIFEST_PATH),
   admissionPolicyPath = resolve(root, ADMISSION_PATH),
@@ -1448,6 +1460,7 @@ export function validatePortfolioPolicyArtifacts({
   lineagePolicyPath = resolve(root, LINEAGE_PATH),
   catalogPath = resolve(root, CATALOG_PATH),
   similarityPath = resolve(root, SIMILARITY_PATH),
+  includeVerifiedScoringPolicy = false,
 } = {}) {
   validatePortfolioCatalogArtifacts({ root, catalogPath, similarityPath });
   const catalog = readJson(catalogPath, "portfolio catalog");
@@ -1462,7 +1475,7 @@ export function validatePortfolioPolicyArtifacts({
     [lineagePolicy, "portfolio lineage policy", resolve(root, LINEAGE_SCHEMA_PATH), lineagePolicyPath],
   ];
   const errors = [];
-  for (const schemaPath of [REQUIREMENT_RECORD_SCHEMA_PATH, OUTPUT_CONTRACT_SCHEMA_PATH, LINEAGE_RECORD_SCHEMA_PATH, CLASSIFICATION_RECORD_SCHEMA_PATH, EVALUATOR_REFERENCE_SCHEMA_PATH, EVALUATOR_RESULT_SCHEMA_PATH, ENGINEERING_RESULT_SCHEMA_PATH, ENGINEERING_RESULT_SOURCE_MANIFEST_SCHEMA_PATH, ENGINEERING_RESULT_SET_SCHEMA_PATH, FINAL_ADMISSION_RECORD_SCHEMA_PATH, SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH]) {
+  for (const schemaPath of [REQUIREMENT_RECORD_SCHEMA_PATH, OUTPUT_CONTRACT_SCHEMA_PATH, LINEAGE_RECORD_SCHEMA_PATH, CLASSIFICATION_RECORD_SCHEMA_PATH, EVALUATOR_REFERENCE_SCHEMA_PATH, EVALUATOR_RESULT_SCHEMA_PATH, ENGINEERING_RESULT_SOURCE_MANIFEST_SCHEMA_PATH, ENGINEERING_RESULT_SCHEMA_PATH, ENGINEERING_RESULT_SET_SCHEMA_PATH, REPETITION_REPORT_SCHEMA_PATH, FINAL_ADMISSION_RECORD_SCHEMA_PATH, SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH]) {
     if (!existsSync(resolve(root, schemaPath))) errors.push(`required authoritative source schema is missing: ${schemaPath}`);
   }
   for (const [artifact, label, schemaPath, path] of artifacts) {
@@ -1521,7 +1534,7 @@ export function validatePortfolioPolicyArtifacts({
     if (stableCanonicalJson(actual) !== stableCanonicalJson(expectedValue)) errors.push(`${label} does not match deterministic policy recomputation`);
   }
   if (errors.length > 0) throw new Error(errors.join("\n"));
-  return {
+  const summary = {
     policyRevision: manifest.policy_revision,
     policyStatus: manifest.policy_status,
     catalogDigest: manifest.catalog_digest,
@@ -1534,6 +1547,15 @@ export function validatePortfolioPolicyArtifacts({
     ceilingThreshold: scoringPolicy.ceiling_floor_policy.universal_ceiling_candidate.median_normalized_requirement_score_minimum,
     floorThreshold: scoringPolicy.ceiling_floor_policy.universal_floor_candidate.median_normalized_requirement_score_maximum,
   };
+  return includeVerifiedScoringPolicy ? { ...summary, verified_scoring_policy: cloneAndFreeze(scoringPolicy) } : summary;
+}
+
+export function validatePortfolioPolicyArtifacts(options = {}) {
+  return validatePortfolioPolicyArtifactsInternal(options);
+}
+
+export function verifyPortfolioPolicyArtifacts(options = {}) {
+  return validatePortfolioPolicyArtifactsInternal({ ...options, includeVerifiedScoringPolicy: true });
 }
 
 function parseArgs(argv) {

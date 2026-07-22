@@ -137,6 +137,7 @@ node scripts/test-ask-benchmark-normalized-results.mjs
 node scripts/test-ask-benchmark-evaluator-boundary.mjs
 node scripts/test-ask-benchmark-portfolio-score.mjs
 node scripts/test-ask-benchmark-portfolio-result-set.mjs
+node scripts/test-ask-benchmark-portfolio-repetition-report.mjs
 ```
 
 See [protocol-adaptive.md](protocol-adaptive.md) for the condition, adapter-separation, balanced-ordering, repetition, privacy, pre-result Adaptive selection, normalized evidence, and evaluator-boundary contracts.

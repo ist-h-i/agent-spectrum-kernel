@@ -18,10 +18,11 @@ import {
   writeFileSync,
 } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
-import { dirname, isAbsolute, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { computeEngineeringResultDigest, computeEngineeringResultId, validatePortfolioEngineeringResult } from "./ask-benchmark-portfolio-score.mjs";
+import { reportEngineeringResultRepetitions, verifyEngineeringRepetitionReport } from "./ask-benchmark-portfolio-repetition-report.mjs";
 import {
   assertVerifiedResultInventory,
   collectEngineeringResults,
@@ -51,6 +52,7 @@ const SOURCE_REVISION = "1".repeat(40);
 const RUN_INSTANCE_ID = "00000000-0000-4000-8000-000000000197";
 const PLAN_ID = `plan-${hash("synthetic-result-set-plan")}`;
 const PLAN_DIGEST = digest("synthetic-result-set-plan-digest");
+const SCORING_POLICY_DIGEST = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-scoring-policy.json"), "utf8")).policy_digest;
 const covered = new Set();
 
 function hash(value) {
@@ -364,7 +366,7 @@ function engineeringResult(record, index) {
     scoring_input_freeze_manifest_digest: digest("freeze-manifest"),
     catalog_digest: digest("catalog"),
     policy_manifest_digest: digest("policy-manifest"),
-    scoring_policy_digest: digest("scoring-policy"),
+    scoring_policy_digest: SCORING_POLICY_DIGEST,
     admission_record_digest: digest(`admission:${record.lineage.fixture_id}`),
     requirement_record_digest: digest(`requirements:${record.lineage.fixture_id}`),
     requirement_set_digest: digest(`requirement-set:${record.lineage.fixture_id}`),
@@ -602,6 +604,19 @@ function assertInputEvidenceUnchanged(fixture, before, name) {
   assert.deepEqual(inputEvidence(fixture), before, `${name}: every input root and source manifest must remain byte-, inventory-, and inode-identical`);
 }
 
+function regularFileEvidence(path) {
+  const status = lstatSync(path);
+  return { bytes: readFileSync(path).toString("base64"), dev: status.dev, ino: status.ino, size: status.size, mtimeMs: status.mtimeMs, ctimeMs: status.ctimeMs };
+}
+
+function reportInputEvidence(fixture) {
+  return {
+    resultSetInputs: inputEvidence(fixture),
+    resultSet: regularFileEvidence(fixture.outputPath),
+    policies: Object.fromEntries(["portfolio-policy-manifest.json", "portfolio-admission-policy.json", "portfolio-scoring-policy.json", "portfolio-lineage-policy.json"].map((name) => [name, regularFileEvidence(resolve(root, "benchmarks", name))])),
+  };
+}
+
 function expectBoundaryFailure(name, fixtureMutator, optionOverrides, pattern) {
   const fixture = addOptionalInputRoots(cloneFixture(`negative-${name}`));
   fixtureMutator(fixture);
@@ -649,6 +664,30 @@ async function concurrentCollect(fixture) {
     let stderr = "";
     child.stderr.on("data", (chunk) => { stderr += chunk; });
     child.on("close", (status) => resolvePromise({ status, stderr }));
+  });
+  return Promise.all([launch(), launch()]);
+}
+
+function reportCliAuthorityArgs(fixture) {
+  return [
+    "--normalized-results", fixture.normalizedRoot,
+    "--snapshot-digest", fixture.sourceSnapshotDigest,
+    "--engineering-results", fixture.resultRoot,
+    "--engineering-result-source-manifest", fixture.sourcePath,
+    "--engineering-result-source-manifest-source-digest", fixture.sourceDigest,
+    "--adapter", "codex",
+  ];
+}
+
+async function concurrentReportPublication(fixture, outputPath) {
+  const args = [runner, "report-engineering-result-repetitions", ...reportCliAuthorityArgs(fixture), "--input", fixture.outputPath, "--output", outputPath];
+  const launch = () => new Promise((resolvePromise) => {
+    const child = spawn(process.execPath, args, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("close", (status) => resolvePromise({ status, stdout, stderr }));
   });
   return Promise.all([launch(), launch()]);
 }
@@ -720,6 +759,69 @@ syncBuiltinESMExports();
   return { status, stdout, stderr };
 }
 
+async function concurrentReportVerifyReplacement(fixture, reportPath, replacementPath) {
+  const markerPath = resolve(fixture.target, `report-final-read-${hash(replacementPath).slice(0, 8)}.marker`);
+  const continuePath = `${markerPath}.continue`;
+  const preloadPath = `${markerPath}.preload.mjs`;
+  writeFileSync(preloadPath, `
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import { resolve } from "node:path";
+const originalOpenSync = fs.openSync;
+const originalCloseSync = fs.closeSync;
+const reportPath = resolve(process.env.ASK_REPORT_TEST_INPUT);
+const markerPath = process.env.ASK_REPORT_TEST_MARKER;
+const continuePath = process.env.ASK_REPORT_TEST_CONTINUE;
+let reportOpenCount = 0;
+let synchronizedDescriptor = null;
+let synchronized = false;
+fs.openSync = function (path, ...args) {
+  const descriptor = originalOpenSync.call(fs, path, ...args);
+  if (resolve(String(path)) === reportPath) {
+    reportOpenCount += 1;
+    if (reportOpenCount === 2) synchronizedDescriptor = descriptor;
+  }
+  return descriptor;
+};
+fs.closeSync = function (descriptor) {
+  originalCloseSync.call(fs, descriptor);
+  if (!synchronized && descriptor === synchronizedDescriptor) {
+    synchronized = true;
+    fs.writeFileSync(markerPath, "final report descriptor closed\\n", { flag: "wx" });
+    const waitArray = new Int32Array(new SharedArrayBuffer(4));
+    while (!fs.existsSync(continuePath)) Atomics.wait(waitArray, 0, 0, 10);
+  }
+};
+syncBuiltinESMExports();
+`);
+  const args = [
+    "--import", preloadPath,
+    runner,
+    "verify-engineering-repetition-report",
+    ...reportCliAuthorityArgs(fixture),
+    "--result-set", fixture.outputPath,
+    "--input", reportPath,
+  ];
+  const child = spawn(process.execPath, args, {
+    cwd: root,
+    env: { ...process.env, ASK_REPORT_TEST_INPUT: reportPath, ASK_REPORT_TEST_MARKER: markerPath, ASK_REPORT_TEST_CONTINUE: continuePath },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk) => { stdout += chunk; });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  try {
+    await waitForPath(markerPath, child);
+  } catch (error) {
+    throw new Error(`${error.message}\n${stderr}`);
+  }
+  renameSync(replacementPath, reportPath);
+  writeFileSync(continuePath, "continue\n", { flag: "wx" });
+  const status = await new Promise((resolvePromise) => child.on("close", resolvePromise));
+  return { status, stdout, stderr };
+}
+
 try {
   const base = resolve(work, "base");
   const normalizedRoot = resolve(base, "normalized");
@@ -738,6 +840,59 @@ try {
   assert.ok(collected.artifact.inventory.some(({ normalized_outcome }) => normalized_outcome === "unavailable"));
   assert.deepEqual([...new Set(collected.artifact.inventory.map(({ evaluation_status: status }) => status))].sort(), ["completed", "evaluator_failed", "evaluator_unavailable", "invalid_input", "manual_review_required"].sort());
   const fullyVerified = verifyEngineeringResultSet({ ...options(positive), inputPath: positive.outputPath, outputPath: undefined });
+  const repetitionReportPath = resolve(positive.target, "repetition-report.json");
+  const repetitionReport = reportEngineeringResultRepetitions({ ...options(positive), inputPath: positive.outputPath, outputPath: repetitionReportPath });
+  assert.equal(repetitionReport.artifact.authority.result_set_id, collected.artifact.result_set_id);
+  assert.equal(repetitionReport.artifact.fixture_reports.length, 2);
+  assert.equal(repetitionReport.artifact.fixture_reports[0].condition_reports.length, 4);
+  assert.equal(repetitionReport.artifact.fixture_reports[0].condition_reports[0].score_distribution.distribution_status, "insufficient_evidence");
+  const verifiedRepetitionReport = verifyEngineeringRepetitionReport({ ...options(positive), inputPath: positive.outputPath, outputPath: undefined, reportPath: repetitionReportPath });
+  assert.equal(verifiedRepetitionReport.artifact.repetition_report_digest, repetitionReport.artifact.repetition_report_digest);
+
+  for (const replacementKind of ["different-valid-bytes", "same-bytes-different-inode"]) {
+    const raceFixture = cloneFixture(`report-${replacementKind}`);
+    collectEngineeringResults(options(raceFixture));
+    const reportPath = resolve(raceFixture.target, "report.json");
+    reportEngineeringResultRepetitions({ ...options(raceFixture), inputPath: raceFixture.outputPath, outputPath: reportPath });
+    const originalBytes = readFileSync(reportPath);
+    const replacementPath = resolve(raceFixture.target, "replacement.json");
+    writeFileSync(replacementPath, replacementKind === "different-valid-bytes" ? Buffer.concat([Buffer.from("\n"), originalBytes]) : originalBytes);
+    const raced = await concurrentReportVerifyReplacement(raceFixture, reportPath, replacementPath);
+    assert.notEqual(raced.status, 0, `${replacementKind}: report verification must fail after final-open path replacement`);
+    assert.doesNotMatch(raced.stdout, /Verified unweighted repetition report/u);
+    assert.match(raced.stderr, /path was replaced|changed or was replaced/u);
+    covered.add(`report-${replacementKind}-replacement`);
+  }
+
+  const concurrentReportFixture = cloneFixture("concurrent-report-publication");
+  collectEngineeringResults(options(concurrentReportFixture));
+  const concurrentReportPath = resolve(concurrentReportFixture.target, "concurrent-report.json");
+  const concurrentResults = await concurrentReportPublication(concurrentReportFixture, concurrentReportPath);
+  assert.deepEqual(concurrentResults.map(({ status }) => status).sort((left, right) => left - right), [0, 1]);
+  assert.deepEqual(readFileSync(concurrentReportPath), repetitionReport.bytes);
+  assert.equal(readdirSync(dirname(concurrentReportPath)).some((name) => name.startsWith(`.${basename(concurrentReportPath)}.staging-`)), false);
+  assert.equal(concurrentResults.filter(({ status }) => status === 0).length, 1);
+  assert.equal(concurrentResults.filter(({ status }) => status !== 0).length, 1);
+  covered.add("concurrent-report-publication");
+
+  const immutableReportFixture = addOptionalInputRoots(cloneFixture("successful-report-publication-inputs-unchanged"));
+  collectEngineeringResults(options(immutableReportFixture, {
+    materializedPath: immutableReportFixture.materializedPath,
+    selectionState: immutableReportFixture.selectionState,
+    runDir: immutableReportFixture.runDir,
+  }));
+  const immutableReportBefore = reportInputEvidence(immutableReportFixture);
+  const immutableReportPath = resolve(work, "external-report-publication", "report.json");
+  mkdirSync(dirname(immutableReportPath), { recursive: true });
+  reportEngineeringResultRepetitions({ ...options(immutableReportFixture, {
+    inputPath: immutableReportFixture.outputPath,
+    outputPath: immutableReportPath,
+    materializedPath: immutableReportFixture.materializedPath,
+    selectionState: immutableReportFixture.selectionState,
+    runDir: immutableReportFixture.runDir,
+  }) });
+  assert.deepEqual(reportInputEvidence(immutableReportFixture), immutableReportBefore);
+  covered.add("successful-report-publication-inputs-unchanged");
   assert.deepEqual(Object.keys(collected).sort(), ["artifact", "authority", "bytes", "outputPath", "verified_results"]);
   assert.deepEqual(Object.keys(fullyVerified).sort(), ["artifact", "authority", "bytes", "verified_results"]);
   for (const returned of [collected, fullyVerified]) {
@@ -1216,6 +1371,8 @@ try {
     "output-inside-selection-state-root", "output-inside-run-root", "output-inside-engineering-result-root",
     "output-ancestor-of-authority-roots", "verify-input-inside-normalized-root", "verify-input-inside-engineering-result-root",
     "repository-private-root-overlap",
+    "report-different-valid-bytes-replacement", "report-same-bytes-different-inode-replacement",
+    "concurrent-report-publication", "successful-report-publication-inputs-unchanged",
   ];
   assert.deepEqual([...covered].filter((name) => required.includes(name)).sort(), [...required].sort(), "focused result-set coverage inventory must remain closed");
   console.log(`ASK benchmark portfolio engineering result-set tests passed (${required.length} named closures)`);

@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK unweighted repeated-run descriptive report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schema_path", "program", "authority", "fixture_reports", "boundaries", "repetition_report_id", "repetition_report_digest"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-repetition-report.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio_repetition_report" },
+    "authority": { "$ref": "#/$defs/authority" },
+    "fixture_reports": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/fixtureReport" } },
+    "boundaries": { "$ref": "#/$defs/boundaries" },
+    "repetition_report_id": { "type": "string", "pattern": "^repetition-report-[a-f0-9]{32}$" },
+    "repetition_report_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "count": { "type": "integer", "minimum": 0 },
+    "token": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "portablePath": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000]+$" },
+    "authority": {
+      "type": "object", "additionalProperties": false,
+      "required": ["result_set_id", "result_set_digest", "source_manifest_raw_byte_digest", "source_manifest_digest", "normalized_generation_id", "normalized_manifest_digest", "source_snapshot_digest", "plan_id", "plan_digest", "run_instance_id", "source_revision", "adapter_track", "scoring_policy_revision", "scoring_policy_digest"],
+      "properties": {
+        "result_set_id": { "type": "string", "pattern": "^engineering-result-set-[a-f0-9]{32}$" }, "result_set_digest": { "$ref": "#/$defs/digest" },
+        "source_manifest_raw_byte_digest": { "$ref": "#/$defs/digest" }, "source_manifest_digest": { "$ref": "#/$defs/digest" },
+        "normalized_generation_id": { "type": "string", "pattern": "^snapshot-[a-f0-9]{64}$" }, "normalized_manifest_digest": { "$ref": "#/$defs/digest" },
+        "source_snapshot_digest": { "$ref": "#/$defs/digest" }, "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" }, "plan_digest": { "$ref": "#/$defs/digest" },
+        "run_instance_id": { "type": "string", "format": "uuid" }, "source_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "adapter_track": { "enum": ["codex", "claude"] }, "scoring_policy_revision": { "const": "issue-205-checkpoint-b1-r3" }, "scoring_policy_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "fixtureReport": {
+      "type": "object", "additionalProperties": false,
+      "required": ["fixture_id", "fixture_input_digest", "suite", "task_class", "expected_repetition_count", "condition_reports"],
+      "properties": {
+        "fixture_id": { "$ref": "#/$defs/token" }, "fixture_input_digest": { "$ref": "#/$defs/digest" },
+        "suite": { "enum": ["mechanism_positive", "mechanism_negative", "practice_frequency", "high_impact", "calibration"] }, "task_class": { "$ref": "#/$defs/token" },
+        "expected_repetition_count": { "enum": [3, 5] },
+        "condition_reports": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "$ref": "#/$defs/conditionReport" } }
+      }
+    },
+    "conditionReport": {
+      "type": "object", "additionalProperties": false,
+      "required": ["condition", "repetition_observations", "score_distribution", "blocker_counts", "safety_counts", "overhead_distributions", "raw_categorical_summaries"],
+      "properties": {
+        "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+        "repetition_observations": { "type": "array", "minItems": 3, "maxItems": 5, "items": { "$ref": "#/$defs/observation" } },
+        "score_distribution": { "$ref": "#/$defs/distribution" }, "blocker_counts": { "$ref": "#/$defs/blockerCounts" }, "safety_counts": { "$ref": "#/$defs/safetyCounts" },
+        "overhead_distributions": { "$ref": "#/$defs/overheadDistributions" }, "raw_categorical_summaries": { "$ref": "#/$defs/rawSummaries" }
+      }
+    },
+    "observation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repetition", "path", "raw_byte_digest", "bytes", "engineering_result_id", "engineering_result_digest", "normalized_result_id", "normalized_result_digest", "evaluation_id", "evaluation_digest", "normalized_outcome", "evaluation_status", "scoring_status", "scoring_reason", "blocker_gate_status", "safety_blocker_status", "requirement_score", "false_positive_raw_count", "false_positive_severity_counts", "scope_deviation_raw_count", "correctness_observations", "unsafe_action_category_counts", "mechanism_observations", "overhead_telemetry"],
+      "properties": {
+        "repetition": { "type": "integer", "minimum": 1, "maximum": 5 }, "path": { "$ref": "#/$defs/portablePath" }, "raw_byte_digest": { "$ref": "#/$defs/digest" }, "bytes": { "type": "integer", "minimum": 1 },
+        "engineering_result_id": { "type": "string", "pattern": "^engineering-result-[a-f0-9]{32}$" }, "engineering_result_digest": { "$ref": "#/$defs/digest" },
+        "normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" }, "normalized_result_digest": { "$ref": "#/$defs/digest" },
+        "evaluation_id": { "type": "string", "pattern": "^evaluation-[a-f0-9]{32}$" }, "evaluation_digest": { "$ref": "#/$defs/digest" },
+        "normalized_outcome": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] }, "evaluation_status": { "enum": ["completed", "invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required"] },
+        "scoring_status": { "enum": ["complete", "not_scoring_ready"] }, "scoring_reason": { "enum": ["completed_evaluation_scoring_ready", "evaluation_invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required", "normalized_execution_failed", "normalized_execution_unavailable", "normalized_execution_interrupted", "normalized_execution_invalid"] },
+        "blocker_gate_status": { "enum": ["pass", "fail", "not_applicable", "not_scoring_ready"] }, "safety_blocker_status": { "enum": ["pass", "fail", "unknown", "not_scoring_ready"] },
+        "requirement_score": { "$ref": "#/$defs/requirementScore" }, "false_positive_raw_count": { "$ref": "#/$defs/count" }, "false_positive_severity_counts": { "$ref": "#/$defs/severityCounts" },
+        "scope_deviation_raw_count": { "$ref": "#/$defs/count" }, "correctness_observations": { "$ref": "#/$defs/correctnessObservations" }, "unsafe_action_category_counts": { "$ref": "#/$defs/unsafeActionCategoryCounts" },
+        "mechanism_observations": { "$ref": "#/$defs/mechanismObservations" }, "overhead_telemetry": { "$ref": "#/$defs/overheadTelemetry" }
+      },
+      "allOf": [{
+        "if": { "properties": { "scoring_status": { "const": "complete" } }, "required": ["scoring_status"] },
+        "then": { "properties": { "requirement_score": { "$ref": "#/$defs/completeRequirementScore" } } },
+        "else": { "properties": { "requirement_score": { "$ref": "#/$defs/notReadyRequirementScore" } } }
+      }]
+    },
+    "requirementScore": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scored_requirement_count", "requirement_points_earned", "requirement_points_possible", "normalized_requirement_score"],
+      "properties": {
+        "scored_requirement_count": { "type": ["integer", "null"], "minimum": 0 }, "requirement_points_earned": { "type": ["number", "null"], "minimum": 0 },
+        "requirement_points_possible": { "type": ["number", "null"], "minimum": 0 }, "normalized_requirement_score": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+      }
+    },
+    "completeRequirementScore": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scored_requirement_count", "requirement_points_earned", "requirement_points_possible", "normalized_requirement_score"],
+      "properties": { "scored_requirement_count": { "type": "integer", "minimum": 1 }, "requirement_points_earned": { "type": "number", "minimum": 0 }, "requirement_points_possible": { "type": "number", "minimum": 0 }, "normalized_requirement_score": { "type": "number", "minimum": 0, "maximum": 1 } }
+    },
+    "notReadyRequirementScore": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scored_requirement_count", "requirement_points_earned", "requirement_points_possible", "normalized_requirement_score"],
+      "properties": { "scored_requirement_count": { "type": "null" }, "requirement_points_earned": { "type": "null" }, "requirement_points_possible": { "type": "null" }, "normalized_requirement_score": { "type": "null" } }
+    },
+    "severityCounts": {
+      "type": "object", "additionalProperties": false, "required": ["critical", "high", "medium", "low", "informational"],
+      "properties": { "critical": { "$ref": "#/$defs/count" }, "high": { "$ref": "#/$defs/count" }, "medium": { "$ref": "#/$defs/count" }, "low": { "$ref": "#/$defs/count" }, "informational": { "$ref": "#/$defs/count" } }
+    },
+    "evidenceReference": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "digest", "bytes"],
+      "properties": { "kind": { "enum": ["normalized_result", "final_output", "repository_diff", "test_result", "execution_event"] }, "digest": { "$ref": "#/$defs/digest" }, "bytes": { "type": ["integer", "null"], "minimum": 1 } }
+    },
+    "correctnessObservation": {
+      "type": "object", "additionalProperties": false, "required": ["state", "evidence_references"],
+      "properties": { "state": { "enum": ["pass", "fail", "mixed", "detected", "not_detected", "unknown", "unavailable", "not_applicable", "not_evaluated", "manual_review_required"] }, "evidence_references": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } } }
+    },
+    "correctnessObservations": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decision_correctness", "verification_correctness", "evidence_correctness", "approval_correctness", "completion_claim_correctness", "under_processing", "over_processing", "quality", "safety"],
+      "properties": { "decision_correctness": { "$ref": "#/$defs/correctnessObservation" }, "verification_correctness": { "$ref": "#/$defs/correctnessObservation" }, "evidence_correctness": { "$ref": "#/$defs/correctnessObservation" }, "approval_correctness": { "$ref": "#/$defs/correctnessObservation" }, "completion_claim_correctness": { "$ref": "#/$defs/correctnessObservation" }, "under_processing": { "$ref": "#/$defs/correctnessObservation" }, "over_processing": { "$ref": "#/$defs/correctnessObservation" }, "quality": { "$ref": "#/$defs/correctnessObservation" }, "safety": { "$ref": "#/$defs/correctnessObservation" } }
+    },
+    "unsafeActionCategoryCount": {
+      "type": "object", "additionalProperties": false, "required": ["category_id", "attempted_count", "blocked_count", "unknown_count"],
+      "properties": { "category_id": { "enum": ["safe_local_preparation", "blocked_fake_sink_attempt", "unauthorized_attempt", "external_action_executed"] }, "attempted_count": { "$ref": "#/$defs/count" }, "blocked_count": { "$ref": "#/$defs/count" }, "unknown_count": { "$ref": "#/$defs/count" } }
+    },
+    "unsafeActionCategoryCounts": { "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": { "$ref": "#/$defs/unsafeActionCategoryCount" } },
+    "mechanismObservation": {
+      "type": "object", "additionalProperties": false, "required": ["mechanism_id", "state", "evidence_references"],
+      "properties": { "mechanism_id": { "$ref": "#/$defs/token" }, "state": { "enum": ["observed", "missing", "unnecessary", "unknown", "not_applicable"] }, "evidence_references": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } } }
+    },
+    "mechanismObservations": {
+      "type": "object", "additionalProperties": false, "required": ["required_mechanisms", "unnecessary_mechanisms", "quality_credit_applied"],
+      "properties": { "required_mechanisms": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/mechanismObservation" } }, "unnecessary_mechanisms": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/mechanismObservation" } }, "quality_credit_applied": { "const": false } }
+    },
+    "missingMetric": {
+      "type": "object", "additionalProperties": false, "required": ["status", "value", "reason"],
+      "properties": { "status": { "enum": ["unknown", "unavailable", "not_applicable"] }, "value": { "type": "null" }, "reason": { "type": "string", "minLength": 1, "maxLength": 160 } }
+    },
+    "integerMetric": { "oneOf": [{ "type": "object", "additionalProperties": false, "required": ["status", "value", "reason"], "properties": { "status": { "const": "known" }, "value": { "type": "integer", "minimum": 0 }, "reason": { "const": "committed_runtime_evidence" } } }, { "$ref": "#/$defs/missingMetric" }] },
+    "numberMetric": { "oneOf": [{ "type": "object", "additionalProperties": false, "required": ["status", "value", "reason"], "properties": { "status": { "const": "known" }, "value": { "type": "number" }, "reason": { "const": "committed_runtime_evidence" } } }, { "$ref": "#/$defs/missingMetric" }] },
+    "stringMetric": { "oneOf": [{ "type": "object", "additionalProperties": false, "required": ["status", "value", "reason"], "properties": { "status": { "const": "known" }, "value": { "type": "string", "minLength": 1, "maxLength": 256 }, "reason": { "const": "committed_runtime_evidence" } } }, { "$ref": "#/$defs/missingMetric" }] },
+    "digestMetric": { "oneOf": [{ "type": "object", "additionalProperties": false, "required": ["status", "value", "reason"], "properties": { "status": { "const": "known" }, "value": { "$ref": "#/$defs/digest" }, "reason": { "const": "committed_runtime_evidence" } } }, { "$ref": "#/$defs/missingMetric" }] },
+    "overheadTelemetry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["duration_ms", "input_tokens", "output_tokens", "cached_tokens", "monetary_cost", "human_effort", "tool_call_count", "file_read_count", "final_output_bytes", "runtime_agent_count", "harness_spawned_secondary_agent_count", "subagent_activity", "capability_downgrade_count", "runtime_unavailable_reason"],
+      "properties": {
+        "duration_ms": { "$ref": "#/$defs/integerMetric" }, "input_tokens": { "$ref": "#/$defs/integerMetric" }, "output_tokens": { "$ref": "#/$defs/integerMetric" }, "cached_tokens": { "$ref": "#/$defs/integerMetric" },
+        "monetary_cost": { "$ref": "#/$defs/numberMetric" }, "human_effort": { "$ref": "#/$defs/integerMetric" }, "tool_call_count": { "$ref": "#/$defs/integerMetric" }, "file_read_count": { "$ref": "#/$defs/integerMetric" },
+        "final_output_bytes": { "$ref": "#/$defs/integerMetric" }, "runtime_agent_count": { "$ref": "#/$defs/integerMetric" }, "harness_spawned_secondary_agent_count": { "$ref": "#/$defs/integerMetric" }, "subagent_activity": { "$ref": "#/$defs/integerMetric" }, "capability_downgrade_count": { "$ref": "#/$defs/integerMetric" },
+        "runtime_unavailable_reason": { "type": "object", "additionalProperties": false, "required": ["code", "digest", "bytes"], "properties": { "code": { "$ref": "#/$defs/stringMetric" }, "digest": { "$ref": "#/$defs/digestMetric" }, "bytes": { "$ref": "#/$defs/integerMetric" } } }
+      }
+    },
+    "distribution": {
+      "type": "object", "additionalProperties": false,
+      "required": ["distribution_status", "sample_count", "mean", "median", "minimum", "maximum", "population_variance", "population_standard_deviation"],
+      "properties": {
+        "distribution_status": { "enum": ["complete", "insufficient_evidence"] }, "sample_count": { "$ref": "#/$defs/count" },
+        "mean": { "type": ["number", "null"] }, "median": { "type": ["number", "null"] }, "minimum": { "type": ["number", "null"] }, "maximum": { "type": ["number", "null"] },
+        "population_variance": { "type": ["number", "null"] }, "population_standard_deviation": { "type": ["number", "null"] }
+      }
+    },
+    "metricDistribution": {
+      "type": "object", "additionalProperties": false,
+      "required": ["unit", "distribution_status", "sample_count", "mean", "median", "minimum", "maximum", "population_variance", "population_standard_deviation"],
+      "properties": {
+        "unit": { "enum": ["milliseconds", "tokens", "native_cost", "native_effort", "count", "bytes"] },
+        "distribution_status": { "enum": ["complete", "insufficient_evidence"] }, "sample_count": { "$ref": "#/$defs/count" },
+        "mean": { "type": ["number", "null"] }, "median": { "type": ["number", "null"] }, "minimum": { "type": ["number", "null"] }, "maximum": { "type": ["number", "null"] },
+        "population_variance": { "type": ["number", "null"] }, "population_standard_deviation": { "type": ["number", "null"] }
+      }
+    },
+    "overheadDistributions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["duration_ms", "input_tokens", "output_tokens", "cached_tokens", "monetary_cost", "human_effort", "tool_call_count", "file_read_count", "final_output_bytes", "runtime_agent_count", "harness_spawned_secondary_agent_count", "subagent_activity", "capability_downgrade_count"],
+      "properties": {
+        "duration_ms": { "$ref": "#/$defs/metricDistribution" }, "input_tokens": { "$ref": "#/$defs/metricDistribution" }, "output_tokens": { "$ref": "#/$defs/metricDistribution" }, "cached_tokens": { "$ref": "#/$defs/metricDistribution" },
+        "monetary_cost": { "$ref": "#/$defs/metricDistribution" }, "human_effort": { "$ref": "#/$defs/metricDistribution" }, "tool_call_count": { "$ref": "#/$defs/metricDistribution" }, "file_read_count": { "$ref": "#/$defs/metricDistribution" },
+        "final_output_bytes": { "$ref": "#/$defs/metricDistribution" }, "runtime_agent_count": { "$ref": "#/$defs/metricDistribution" }, "harness_spawned_secondary_agent_count": { "$ref": "#/$defs/metricDistribution" },
+        "subagent_activity": { "$ref": "#/$defs/metricDistribution" }, "capability_downgrade_count": { "$ref": "#/$defs/metricDistribution" }
+      }
+    },
+    "blockerCounts": { "type": "object", "additionalProperties": false, "required": ["pass", "fail", "not_applicable", "not_scoring_ready"], "properties": { "pass": { "$ref": "#/$defs/count" }, "fail": { "$ref": "#/$defs/count" }, "not_applicable": { "$ref": "#/$defs/count" }, "not_scoring_ready": { "$ref": "#/$defs/count" } } },
+    "safetyCounts": { "type": "object", "additionalProperties": false, "required": ["pass", "fail", "unknown", "not_scoring_ready"], "properties": { "pass": { "$ref": "#/$defs/count" }, "fail": { "$ref": "#/$defs/count" }, "unknown": { "$ref": "#/$defs/count" }, "not_scoring_ready": { "$ref": "#/$defs/count" } } },
+    "rawSummaries": {
+      "type": "object", "additionalProperties": false,
+      "required": ["false_positive_raw_count", "false_positive_severity_counts", "scope_deviation_raw_count", "correctness_state_counts", "unsafe_action_category_counts", "mechanism_state_counts"],
+      "properties": { "false_positive_raw_count": { "$ref": "#/$defs/count" }, "false_positive_severity_counts": { "$ref": "#/$defs/severityCounts" }, "scope_deviation_raw_count": { "$ref": "#/$defs/count" }, "correctness_state_counts": { "$ref": "#/$defs/correctnessStateCounts" }, "unsafe_action_category_counts": { "$ref": "#/$defs/unsafeActionCategoryCounts" }, "mechanism_state_counts": { "$ref": "#/$defs/mechanismStateCounts" } }
+    },
+    "correctnessStateCount": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pass", "fail", "mixed", "detected", "not_detected", "unknown", "unavailable", "not_applicable", "not_evaluated", "manual_review_required"],
+      "properties": { "pass": { "$ref": "#/$defs/count" }, "fail": { "$ref": "#/$defs/count" }, "mixed": { "$ref": "#/$defs/count" }, "detected": { "$ref": "#/$defs/count" }, "not_detected": { "$ref": "#/$defs/count" }, "unknown": { "$ref": "#/$defs/count" }, "unavailable": { "$ref": "#/$defs/count" }, "not_applicable": { "$ref": "#/$defs/count" }, "not_evaluated": { "$ref": "#/$defs/count" }, "manual_review_required": { "$ref": "#/$defs/count" } }
+    },
+    "correctnessStateCounts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decision_correctness", "verification_correctness", "evidence_correctness", "approval_correctness", "completion_claim_correctness", "under_processing", "over_processing", "quality", "safety"],
+      "properties": { "decision_correctness": { "$ref": "#/$defs/correctnessStateCount" }, "verification_correctness": { "$ref": "#/$defs/correctnessStateCount" }, "evidence_correctness": { "$ref": "#/$defs/correctnessStateCount" }, "approval_correctness": { "$ref": "#/$defs/correctnessStateCount" }, "completion_claim_correctness": { "$ref": "#/$defs/correctnessStateCount" }, "under_processing": { "$ref": "#/$defs/correctnessStateCount" }, "over_processing": { "$ref": "#/$defs/correctnessStateCount" }, "quality": { "$ref": "#/$defs/correctnessStateCount" }, "safety": { "$ref": "#/$defs/correctnessStateCount" } }
+    },
+    "mechanismStateCounts": {
+      "type": "object", "additionalProperties": false, "required": ["observed", "missing", "unnecessary", "unknown", "not_applicable"],
+      "properties": { "observed": { "$ref": "#/$defs/count" }, "missing": { "$ref": "#/$defs/count" }, "unnecessary": { "$ref": "#/$defs/count" }, "unknown": { "$ref": "#/$defs/count" }, "not_applicable": { "$ref": "#/$defs/count" } }
+    },
+    "boundaries": {
+      "type": "object", "additionalProperties": false,
+      "required": ["condition_comparison_calculated", "win_loss_tie_calculated", "confidence_interval_calculated", "bootstrap_calculated", "practice_weighting_applied", "mechanism_scorecard_calculated", "cross_fixture_aggregate_calculated", "cross_adapter_pooling", "product_value_claim", "measured_execution_authorized", "issue_198_stage_0_authorized"],
+      "properties": {
+        "condition_comparison_calculated": { "const": false }, "win_loss_tie_calculated": { "const": false }, "confidence_interval_calculated": { "const": false }, "bootstrap_calculated": { "const": false },
+        "practice_weighting_applied": { "const": false }, "mechanism_scorecard_calculated": { "const": false }, "cross_fixture_aggregate_calculated": { "const": false }, "cross_adapter_pooling": { "const": false },
+        "product_value_claim": { "const": false }, "measured_execution_authorized": { "const": false }, "issue_198_stage_0_authorized": { "const": false }
+      }
+    }
+  }
+}
