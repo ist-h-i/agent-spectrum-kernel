@@ -541,7 +541,7 @@
       "repetition_report_implementation_path": "scripts/ask-benchmark-portfolio-repetition-report.mjs",
       "repetition_report_implementation_file_sha256": "4073b21f667a0332fe3c0e439c1578f61b48c4381bc7feec66a770d5ad7cd50b",
       "repetition_report_test_path": "scripts/test-ask-benchmark-portfolio-repetition-report.mjs",
-      "repetition_report_test_file_sha256": "11b540f8888c3a45d4c7824c8e25021003f33d338862a16e68e62e71512dbd65",
+      "repetition_report_test_file_sha256": "68ab5cc51b525c3e2eaaf5d315b556909eeeb47265d8d87a6abd9df94047ec94",
       "scoring_issue": 197,
       "scoring_slice": "unweighted_repeated_run_descriptive_report",
       "scoring_implemented": true,

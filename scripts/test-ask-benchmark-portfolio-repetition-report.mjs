@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildPortfolioRepetitionReport,
   computePortfolioRepetitionReportDigest,
   computePortfolioRepetitionReportId,
+  reportEngineeringResultRepetitions,
   validatePortfolioRepetitionReport,
 } from "./ask-benchmark-portfolio-repetition-report.mjs";
+import { publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const policy = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-scoring-policy.json"), "utf8"));
@@ -129,7 +131,18 @@ for (const [name, mutate, pattern] of [
   ["weighting field is rejected", (r) => { r.fixture_reports[0].condition_reports[0].weight = 1; }, /unknown property/u],
 ]) check(name, () => { const changed = structuredClone(report); mutate(changed); if (!name.includes("ID") && !name.includes("digest")) close(changed); assert.throws(() => validatePortfolioRepetitionReport(changed, { root }), pattern); });
 
-for (const name of ["pre-existing output", "output symlink", "output inside authority root", "concurrent output publication", "failure keeps all inputs unchanged", "successful publication keeps all inputs unchanged", "byte-identical deterministic regeneration", "verify-report input replacement", "same-byte inode replacement"]) check(name, () => assert.match(implementation, /assertOutputBoundary|publishJsonAtomicNoReplace|readStableFile|assertStableFileEvidence/u));
+const publicationWork = mkdtempSync(resolve(root, ".ask-repetition-report-publication-"));
+try {
+  check("pre-existing output", () => { const outputPath = resolve(publicationWork, "existing.json"); writeFileSync(outputPath, "existing\n"); assert.throws(() => reportEngineeringResultRepetitions({ outputPath }), /must not already exist/u); });
+  check("output symlink", () => { const target = resolve(publicationWork, "target.json"); const outputPath = resolve(publicationWork, "link.json"); writeFileSync(target, "target\n"); symlinkSync(target, outputPath); assert.throws(() => reportEngineeringResultRepetitions({ outputPath }), /symlink/u); });
+  check("output inside authority root", () => { const normalizedResultsPath = resolve(publicationWork, "normalized"); mkdirSync(normalizedResultsPath); assert.throws(() => reportEngineeringResultRepetitions({ outputPath: resolve(normalizedResultsPath, "report.json"), normalizedResultsPath }), /disjoint/u); });
+  check("concurrent output publication", () => { const outputPath = resolve(publicationWork, "race.json"); publishJsonAtomicNoReplace({ outputPath, artifact: report, label: "synthetic report" }); assert.throws(() => publishJsonAtomicNoReplace({ outputPath, artifact: report, label: "synthetic report" }), /must not already exist/u); });
+  check("failure keeps all inputs unchanged", () => { const inputPath = resolve(publicationWork, "input.json"); writeFileSync(inputPath, "authority\n"); const before = readFileSync(inputPath); assert.throws(() => reportEngineeringResultRepetitions({ outputPath: inputPath, inputPath }), /must not already exist|disjoint/u); assert.deepEqual(readFileSync(inputPath), before); });
+  check("successful publication keeps all inputs unchanged", () => { const input = verified(); const before = structuredClone(input); build(input); assert.deepEqual(input, before); });
+  check("byte-identical deterministic regeneration", () => assert.equal(JSON.stringify(build()), JSON.stringify(build())));
+  check("verify-report input replacement", () => assert.match(implementation, /assertStableFileEvidence\(input, after/u));
+  check("same-byte inode replacement", () => assert.match(implementation, /before\.dev !== after\.dev \|\| before\.ino !== after\.ino/u));
+} finally { rmSync(publicationWork, { recursive: true, force: true }); }
 check("absolute path leakage rejection", () => assert.throws(() => { const changed = structuredClone(report); changed.fixture_reports[0].condition_reports[0].repetition_observations[0].path = "/private/result.json"; close(changed); validatePortfolioRepetitionReport(changed, { root }); }, /pattern|match/u));
 check("private path leakage rejection", () => assert.equal(JSON.stringify(report).includes(root), false));
 check("serialized report does not contain full raw result bodies", () => assert.equal(JSON.stringify(report).includes("raw_evaluator_prompt"), false));
