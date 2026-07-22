@@ -535,12 +535,19 @@
       "engineering_result_set_implementation_path": "scripts/ask-benchmark-portfolio-result-set.mjs",
       "engineering_result_set_implementation_file_sha256": "2db02bf9e6def61e8ce91b95ea58e9046858d99e7d6702e62192d89a906e0fd2",
       "engineering_result_set_test_path": "scripts/test-ask-benchmark-portfolio-result-set.mjs",
-      "engineering_result_set_test_file_sha256": "d9f52ba2f9e89943678c59fe875fb17c6b4cd3e46fc054f30efa8fda66409c7e",
+      "engineering_result_set_test_file_sha256": "ddb6450d3d13433a8a22d0f91bd8277866b1ebd842a9de5d65c6a29c420b3856",
+      "repetition_report_schema_path": "benchmarks/schemas/portfolio-repetition-report.schema.json",
+      "repetition_report_schema_file_sha256": "a636b616d5e8b50cdc9b59f29d20cd60bae00fb30517ff01507fc5bf4bd9fa0f",
+      "repetition_report_implementation_path": "scripts/ask-benchmark-portfolio-repetition-report.mjs",
+      "repetition_report_implementation_file_sha256": "4073b21f667a0332fe3c0e439c1578f61b48c4381bc7feec66a770d5ad7cd50b",
+      "repetition_report_test_path": "scripts/test-ask-benchmark-portfolio-repetition-report.mjs",
+      "repetition_report_test_file_sha256": "11b540f8888c3a45d4c7824c8e25021003f33d338862a16e68e62e71512dbd65",
       "scoring_issue": 197,
-      "scoring_slice": "complete_raw_engineering_result_inventory",
+      "scoring_slice": "unweighted_repeated_run_descriptive_report",
       "scoring_implemented": true,
       "result_set_authority_implemented": true,
-      "aggregate_reporting_implemented": false
+      "unweighted_repetition_reporting_implemented": true,
+      "comparative_or_weighted_reporting_implemented": false
     },
     "portfolio_design_admission": {
       "issue": 205,

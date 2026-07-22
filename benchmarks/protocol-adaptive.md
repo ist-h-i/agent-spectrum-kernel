@@ -260,7 +260,13 @@ The result-set output and verification input must be an ancestor-, equality-, an
 
 `portfolio-engineering-result-set.schema.json` records the source authority, normalized generation, complete deterministic inventory, structural counts, and self-derived ID/digest. The serialized artifact is only an identity/completeness manifest; raw result bodies and the runtime-only `verified_results` field are never added to its Schema, bytes, ID, or digest. `validatePortfolioEngineeringResultSet()` validates Schema plus internal closure, ID, digest, ordering, and counts only. It cannot prove the external normalized generation, source-manifest byte authority, actual result directory, complete expected inventory, or verified raw score values.
 
-Only `verifyEngineeringResultSet()` performs full authority verification. After the result-root second scan, source-manifest evidence check, normalized-generation revalidation, source-revision binding, expected-inventory comparison, artifact validation, supplied-artifact equality, and final stable input read all succeed, it returns a deterministic `verified_results` array in exact artifact-inventory order. Each runtime entry contains only the portable result-root-relative path, observed raw-byte digest, byte count, and a cloned, recursively frozen public `portfolio-engineering-result` object. It contains no absolute or private path and no private evaluator material. Later statistics, variance, mechanism, and reporting code must use only that in-memory array; the prohibited sequence is full verification followed by reopening and parsing a result file. A bare artifact or bare validator result is never a numeric-input authority. This slice adds none of those later computations. The result-set Schema has no mean, median, min/max, variance, confidence interval, comparison, weighting, mechanism credit, aggregate, or product-value fields. Publication reuses the single-result scorer's same-directory `wx` + fsync + atomic hard-link no-replace helper.
+Only `verifyEngineeringResultSet()` performs full authority verification. After the result-root second scan, source-manifest evidence check, normalized-generation revalidation, source-revision binding, expected-inventory comparison, artifact validation, supplied-artifact equality, and final stable input read all succeed, it returns a deterministic `verified_results` array in exact artifact-inventory order. Each runtime entry contains only the portable result-root-relative path, observed raw-byte digest, byte count, and a cloned, recursively frozen public `portfolio-engineering-result` object. It contains no absolute or private path and no private evaluator material. Later statistics, variance, mechanism, and reporting code must use only that in-memory array; the prohibited sequence is full verification followed by reopening and parsing a result file. A bare artifact or bare validator result is never a numeric-input authority. The result-set Schema itself has no mean, median, min/max, variance, confidence interval, comparison, weighting, mechanism credit, aggregate, or product-value fields. Publication reuses the single-result scorer's same-directory `wx` + fsync + atomic hard-link no-replace helper.
+
+## Unweighted repeated-run descriptive report
+
+`report-engineering-result-repetitions` is the first consumer of that runtime-only `verified_results` boundary. It always runs the full result-set verifier and the complete frozen B1 policy validator, then derives exactly one adapter report without reopening raw result files. Every fixture retains the four conditions separately and must close over its verified `1..3` or `1..5` repetition inventory. Requirement and telemetry distributions use unrounded mean, median, minimum, maximum, population variance (`N`), and population standard deviation only when every expected repetition has finite native-unit evidence. Any non-ready, unknown, unavailable, not-applicable, null, or non-finite input makes that metric `insufficient_evidence` with a zero sample count and null summaries; no ready subset is averaged and no missing value becomes zero.
+
+Blocker and safety state counts remain separate from requirement scores. False-positive severity, scope deviations, correctness states, unsafe-action categories, and mechanism states remain raw categorical summaries: the report adds no penalties, false-positive units, mechanism credit, condition comparison, weighting, confidence interval, cross-fixture aggregate, cross-adapter pooling, product claim, measured execution, or Issue #198 authorization. Report ID and digest cover the complete canonical ordered closure without timestamps or host paths. Publication uses the shared atomic no-replace helper outside every authority root. `verify-engineering-repetition-report` stable-reads a supplied report, re-runs full result-set and B1 policy authority, compares the complete re-derived report, and rejects report replacement including same-byte inode replacement.
 
 ```bash
 node scripts/ask-benchmark.mjs collect-engineering-results \
@@ -280,6 +286,26 @@ node scripts/ask-benchmark.mjs verify-engineering-result-set \
   --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
   --adapter codex \
   --input /path/to/engineering-result-set.json
+
+node scripts/ask-benchmark.mjs report-engineering-result-repetitions \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/raw-engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
+  --adapter codex \
+  --input /path/to/engineering-result-set.json \
+  --output /path/to/repetition-report.json
+
+node scripts/ask-benchmark.mjs verify-engineering-repetition-report \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/raw-engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
+  --adapter codex \
+  --result-set /path/to/engineering-result-set.json \
+  --input /path/to/repetition-report.json
 ```
 
 ```bash

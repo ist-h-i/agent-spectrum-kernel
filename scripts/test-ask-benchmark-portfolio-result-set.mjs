@@ -22,6 +22,7 @@ import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { computeEngineeringResultDigest, computeEngineeringResultId, validatePortfolioEngineeringResult } from "./ask-benchmark-portfolio-score.mjs";
+import { reportEngineeringResultRepetitions, verifyEngineeringRepetitionReport } from "./ask-benchmark-portfolio-repetition-report.mjs";
 import {
   assertVerifiedResultInventory,
   collectEngineeringResults,
@@ -51,6 +52,7 @@ const SOURCE_REVISION = "1".repeat(40);
 const RUN_INSTANCE_ID = "00000000-0000-4000-8000-000000000197";
 const PLAN_ID = `plan-${hash("synthetic-result-set-plan")}`;
 const PLAN_DIGEST = digest("synthetic-result-set-plan-digest");
+const SCORING_POLICY_DIGEST = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-scoring-policy.json"), "utf8")).policy_digest;
 const covered = new Set();
 
 function hash(value) {
@@ -364,7 +366,7 @@ function engineeringResult(record, index) {
     scoring_input_freeze_manifest_digest: digest("freeze-manifest"),
     catalog_digest: digest("catalog"),
     policy_manifest_digest: digest("policy-manifest"),
-    scoring_policy_digest: digest("scoring-policy"),
+    scoring_policy_digest: SCORING_POLICY_DIGEST,
     admission_record_digest: digest(`admission:${record.lineage.fixture_id}`),
     requirement_record_digest: digest(`requirements:${record.lineage.fixture_id}`),
     requirement_set_digest: digest(`requirement-set:${record.lineage.fixture_id}`),
@@ -738,6 +740,14 @@ try {
   assert.ok(collected.artifact.inventory.some(({ normalized_outcome }) => normalized_outcome === "unavailable"));
   assert.deepEqual([...new Set(collected.artifact.inventory.map(({ evaluation_status: status }) => status))].sort(), ["completed", "evaluator_failed", "evaluator_unavailable", "invalid_input", "manual_review_required"].sort());
   const fullyVerified = verifyEngineeringResultSet({ ...options(positive), inputPath: positive.outputPath, outputPath: undefined });
+  const repetitionReportPath = resolve(positive.target, "repetition-report.json");
+  const repetitionReport = reportEngineeringResultRepetitions({ ...options(positive), inputPath: positive.outputPath, outputPath: repetitionReportPath });
+  assert.equal(repetitionReport.artifact.authority.result_set_id, collected.artifact.result_set_id);
+  assert.equal(repetitionReport.artifact.fixture_reports.length, 2);
+  assert.equal(repetitionReport.artifact.fixture_reports[0].condition_reports.length, 4);
+  assert.equal(repetitionReport.artifact.fixture_reports[0].condition_reports[0].score_distribution.distribution_status, "insufficient_evidence");
+  const verifiedRepetitionReport = verifyEngineeringRepetitionReport({ ...options(positive), inputPath: positive.outputPath, outputPath: undefined, reportPath: repetitionReportPath });
+  assert.equal(verifiedRepetitionReport.artifact.repetition_report_digest, repetitionReport.artifact.repetition_report_digest);
   assert.deepEqual(Object.keys(collected).sort(), ["artifact", "authority", "bytes", "outputPath", "verified_results"]);
   assert.deepEqual(Object.keys(fullyVerified).sort(), ["artifact", "authority", "bytes", "verified_results"]);
   for (const returned of [collected, fullyVerified]) {

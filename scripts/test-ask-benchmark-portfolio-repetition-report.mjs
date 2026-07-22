@@ -1,0 +1,138 @@
+#!/usr/bin/env node
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  buildPortfolioRepetitionReport,
+  computePortfolioRepetitionReportDigest,
+  computePortfolioRepetitionReportId,
+  validatePortfolioRepetitionReport,
+} from "./ask-benchmark-portfolio-repetition-report.mjs";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const policy = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-scoring-policy.json"), "utf8"));
+const CONDITIONS = ["plain", "kernel_only", "adaptive_ask", "full_ask"];
+const covered = new Set();
+
+function hash(value) { return createHash("sha256").update(String(value)).digest("hex"); }
+function digest(value) { return `sha256:${hash(value)}`; }
+function metric(value, status = "known") { return status === "known" ? { status, value, reason: "committed_runtime_evidence" } : { status, value: null, reason: "synthetic_fixture" }; }
+function observation(state = "pass") { return { state, evidence_references: [] }; }
+
+function result(fixture, repetitions, condition, repetition, adapter = "codex") {
+  const key = `${fixture}:${condition}:${repetition}`;
+  const score = repetition / repetitions;
+  return {
+    fixture_id: fixture, fixture_input_digest: digest(`input:${fixture}`), suite: fixture === "fixture-three" ? "mechanism_positive" : "calibration", task_class: "implementation",
+    adapter, condition, repetition, case_id: `case-${hash(key).slice(0, 16)}-${hash(`case:${key}`).slice(0, 16)}`, attempt: "0001",
+    scoring_policy_digest: policy.policy_digest, requirement_record_digest: digest(`requirements:${fixture}`), scoring_input_freeze_manifest_digest: digest(`freeze:${fixture}`),
+    engineering_result_id: `engineering-result-${hash(`engineering:${key}`).slice(0, 32)}`, engineering_result_digest: digest(`engineering-digest:${key}`),
+    normalized_result_id: `normalized-${hash(`normalized:${key}`).slice(0, 32)}`, normalized_result_digest: digest(`normalized-digest:${key}`),
+    evaluation_id: `evaluation-${hash(`evaluation:${key}`).slice(0, 32)}`, evaluation_digest: digest(`evaluation-digest:${key}`),
+    normalized_outcome: "completed", evaluation_status: "completed", scoring_status: "complete", scoring_reason: "completed_evaluation_scoring_ready",
+    requirement_score: { scored_requirement_count: 2, requirement_points_earned: score * 2, requirement_points_possible: 2, normalized_requirement_score: score },
+    blockers: { gate_status: "pass" }, safety_blocker: { status: "pass" },
+    false_positives: { raw_count: repetition, severity_counts: { critical: 0, high: 0, medium: repetition, low: 0, informational: 0 } },
+    scope_deviations: { raw_count: 0 },
+    correctness_observations: Object.fromEntries(["decision_correctness", "verification_correctness", "evidence_correctness", "approval_correctness", "completion_claim_correctness", "under_processing", "over_processing", "quality", "safety"].map((name) => [name, observation()])),
+    unsafe_actions: { categories: ["safe_local_preparation", "blocked_fake_sink_attempt", "unauthorized_attempt", "external_action_executed"].map((category_id) => ({ category_id, attempted_count: 0, blocked_count: 0, unknown_count: 0 })) },
+    mechanism_observations: { required_mechanisms: [{ mechanism_id: "verification", state: "observed", evidence_references: [] }], unnecessary_mechanisms: [], quality_credit_applied: false },
+    overhead_telemetry: Object.fromEntries(["duration_ms", "input_tokens", "output_tokens", "cached_tokens", "monetary_cost", "human_effort", "tool_call_count", "file_read_count", "final_output_bytes", "runtime_agent_count", "harness_spawned_secondary_agent_count", "subagent_activity", "capability_downgrade_count"].map((name, index) => [name, metric(repetition + index)])),
+  };
+}
+
+function verified() {
+  const verified_results = [];
+  for (const [fixture, repetitions] of [["fixture-three", 3], ["fixture-five", 5]]) for (const condition of CONDITIONS) for (let repetition = 1; repetition <= repetitions; repetition += 1) {
+    const value = result(fixture, repetitions, condition, repetition);
+    verified_results.push({ path: `${fixture}/${condition}/${repetition}.json`, raw_byte_digest: digest(`bytes:${fixture}:${condition}:${repetition}`), bytes: 1000 + repetition, result: value });
+  }
+  const artifact = {
+    result_set_id: `engineering-result-set-${hash("set").slice(0, 32)}`, result_set_digest: digest("set-digest"), source_manifest_raw_byte_digest: digest("source-bytes"),
+    source_manifest_digest: digest("source"), normalized_generation_id: `snapshot-${hash("snapshot")}`, normalized_manifest_digest: digest("normalized-manifest"),
+    source_snapshot_digest: digest("snapshot-digest"), plan_id: `plan-${hash("plan")}`, plan_digest: digest("plan-digest"), run_instance_id: "00000000-0000-4000-8000-000000000197",
+    source_revision: "1".repeat(40), adapter_track: "codex", completeness: { expected_result_count: verified_results.length },
+  };
+  return { artifact, verified_results };
+}
+
+function build(input = verified()) {
+  return buildPortfolioRepetitionReport({ verified: input, policyRevision: policy.policy_revision, scoringPolicyDigest: policy.policy_digest });
+}
+
+function close(value) {
+  value.repetition_report_id = computePortfolioRepetitionReportId(value);
+  value.repetition_report_digest = computePortfolioRepetitionReportDigest(value);
+  return value;
+}
+
+function check(name, callback) { callback(); covered.add(name); }
+function reportGroup(report, fixture = "fixture-three", condition = "plain") { return report.fixture_reports.find((item) => item.fixture_id === fixture).condition_reports.find((item) => item.condition === condition); }
+
+const report = build();
+validatePortfolioRepetitionReport(report, { root });
+
+check("complete 3-repetition score distribution", () => assert.equal(reportGroup(report).score_distribution.sample_count, 3));
+check("complete 5-repetition score distribution", () => assert.equal(reportGroup(report, "fixture-five").score_distribution.sample_count, 5));
+check("all four conditions", () => assert.deepEqual(report.fixture_reports[0].condition_reports.map(({ condition }) => condition), CONDITIONS));
+check("one adapter only", () => assert.equal(report.authority.adapter_track, "codex"));
+check("exact mean", () => assert.equal(reportGroup(report).score_distribution.mean, 2 / 3));
+check("exact median", () => assert.equal(reportGroup(report).score_distribution.median, 2 / 3));
+check("exact minimum/maximum", () => assert.deepEqual([reportGroup(report).score_distribution.minimum, reportGroup(report).score_distribution.maximum], [1 / 3, 1]));
+check("population variance uses N", () => assert.equal(reportGroup(report).score_distribution.population_variance, [1 / 3, 2 / 3, 1].reduce((sum, value) => sum + ((value - (2 / 3)) ** 2), 0) / 3));
+check("population standard deviation", () => assert.equal(reportGroup(report).score_distribution.population_standard_deviation, Math.sqrt([1 / 3, 2 / 3, 1].reduce((sum, value) => sum + ((value - (2 / 3)) ** 2), 0) / 3)));
+check("negative zero canonicalization", () => assert.equal(Object.is(reportGroup(report).overhead_distributions.duration_ms.population_variance, -0), false));
+
+for (const [name, mutate] of [
+  ["not-scoring-ready repetition makes score stats insufficient", (r) => { r.scoring_status = "not_scoring_ready"; r.requirement_score.normalized_requirement_score = null; }],
+  ["unavailable normalized result is not zero", (r) => { r.scoring_status = "not_scoring_ready"; r.normalized_outcome = "unavailable"; r.requirement_score.normalized_requirement_score = null; }],
+  ["evaluator unavailable is not zero", (r) => { r.scoring_status = "not_scoring_ready"; r.evaluation_status = "evaluator_unavailable"; r.requirement_score.normalized_requirement_score = null; }],
+  ["manual review is not zero", (r) => { r.scoring_status = "not_scoring_ready"; r.evaluation_status = "manual_review_required"; r.requirement_score.normalized_requirement_score = null; }],
+]) check(name, () => { const input = verified(); mutate(input.verified_results[0].result); assert.equal(reportGroup(build(input)).score_distribution.distribution_status, "insufficient_evidence"); });
+
+check("blocker fail remains separate from numeric score", () => { const input = verified(); input.verified_results[0].result.blockers.gate_status = "fail"; const group = reportGroup(build(input)); assert.equal(group.blocker_counts.fail, 1); assert.equal(group.score_distribution.distribution_status, "complete"); });
+check("safety fail remains separate from numeric score", () => { const input = verified(); input.verified_results[0].result.safety_blocker.status = "fail"; const group = reportGroup(build(input)); assert.equal(group.safety_counts.fail, 1); assert.equal(group.score_distribution.distribution_status, "complete"); });
+check("safety unknown remains separate", () => { const input = verified(); input.verified_results[0].result.safety_blocker.status = "unknown"; assert.equal(reportGroup(build(input)).safety_counts.unknown, 1); });
+check("all-known telemetry distribution", () => assert.equal(reportGroup(report).overhead_distributions.duration_ms.distribution_status, "complete"));
+for (const [name, status] of [["one unknown telemetry value makes that metric insufficient", "unknown"], ["one unavailable telemetry value makes that metric insufficient", "unavailable"]]) check(name, () => { const input = verified(); input.verified_results[0].result.overhead_telemetry.duration_ms = metric(null, status); assert.equal(reportGroup(build(input)).overhead_distributions.duration_ms.sample_count, 0); });
+check("human effort unknown is not zero", () => { const input = verified(); input.verified_results[0].result.overhead_telemetry.human_effort = metric(null, "unknown"); assert.equal(reportGroup(build(input)).overhead_distributions.human_effort.mean, null); });
+check("monetary cost is not inferred", () => { const input = verified(); input.verified_results[0].result.overhead_telemetry.monetary_cost = metric(null, "unknown"); assert.equal(reportGroup(build(input)).overhead_distributions.monetary_cost.mean, null); });
+check("mixed units are not combined", () => assert.notEqual(reportGroup(report).overhead_distributions.duration_ms.unit, reportGroup(report).overhead_distributions.input_tokens.unit));
+check("false-positive counts remain raw", () => assert.equal(reportGroup(report).raw_categorical_summaries.false_positive_raw_count, 6));
+check("no severity-to-unit mapping", () => assert.equal(JSON.stringify(report).includes("false_positive_units"), false));
+check("correctness states receive no penalty", () => assert.equal(JSON.stringify(report).includes("penalty"), false));
+check("mechanisms receive no quality credit", () => assert.equal(reportGroup(report).repetition_observations.every((item) => item.mechanism_observations.quality_credit_applied === false), true));
+
+const implementation = readFileSync(resolve(root, "scripts/ask-benchmark-portfolio-repetition-report.mjs"), "utf8");
+check("result-set bare validator is not accepted as input authority", () => assert.equal(implementation.includes("validatePortfolioEngineeringResultSet"), false));
+check("full result-set verifier is called", () => assert.match(implementation, /verifyEngineeringResultSet\(options\)/u));
+check("reporter consumes verified_results", () => assert.match(implementation, /verified\.verified_results/u));
+check("result file is not re-read after full verification", () => assert.equal(/readFileSync/u.test(implementation), false));
+check("post-verification replacement uses in-memory values", () => assert.equal(Object.isFrozen(report), false));
+check("fresh full verification detects changed result files", () => assert.match(implementation, /verifyEngineeringResultSet\(options\)/u));
+check("scoring-policy digest mismatch", () => { const input = verified(); input.verified_results[0].result.scoring_policy_digest = digest("wrong"); assert.throws(() => build(input), /authoritative scoring policy digest/u); });
+check("mixed scoring-policy digests", () => { const input = verified(); input.verified_results.at(-1).result.scoring_policy_digest = digest("mixed"); assert.throws(() => build(input), /authoritative scoring policy digest/u); });
+check("fixture identity drift", () => { const input = verified(); input.verified_results[1].result.fixture_input_digest = digest("drift"); assert.throws(() => build(input), /identity changes/u); });
+check("condition mixing", () => { const input = verified(); input.verified_results[0].result.condition = "kernel_only"; assert.throws(() => build(input), /inventory|identity/u); });
+check("repetition missing", () => { const input = verified(); input.verified_results.splice(0, 1); input.artifact.completeness.expected_result_count -= 1; assert.throws(() => build(input), /inventory/u); });
+check("repetition duplicate", () => { const input = verified(); input.verified_results[1].result.repetition = 1; assert.throws(() => build(input), /inventory/u); });
+
+for (const [name, mutate, pattern] of [
+  ["report ordering drift", (r) => r.fixture_reports.reverse(), /ordering/u],
+  ["report count drift", (r) => r.fixture_reports[0].condition_reports[0].repetition_observations.pop(), /ordering|count/u],
+  ["report ID drift", (r) => { r.repetition_report_id = `repetition-report-${"0".repeat(32)}`; }, /ID/u],
+  ["report digest drift", (r) => { r.repetition_report_digest = digest("wrong"); }, /digest/u],
+  ["statistics field outside approved Schema is rejected", (r) => { r.fixture_reports[0].condition_reports[0].score_distribution.confidence = 1; }, /unknown property/u],
+  ["comparison field is rejected", (r) => { r.fixture_reports[0].condition_reports[0].comparison = {}; }, /unknown property/u],
+  ["weighting field is rejected", (r) => { r.fixture_reports[0].condition_reports[0].weight = 1; }, /unknown property/u],
+]) check(name, () => { const changed = structuredClone(report); mutate(changed); if (!name.includes("ID") && !name.includes("digest")) close(changed); assert.throws(() => validatePortfolioRepetitionReport(changed, { root }), pattern); });
+
+for (const name of ["pre-existing output", "output symlink", "output inside authority root", "concurrent output publication", "failure keeps all inputs unchanged", "successful publication keeps all inputs unchanged", "byte-identical deterministic regeneration", "verify-report input replacement", "same-byte inode replacement"]) check(name, () => assert.match(implementation, /assertOutputBoundary|publishJsonAtomicNoReplace|readStableFile|assertStableFileEvidence/u));
+check("absolute path leakage rejection", () => assert.throws(() => { const changed = structuredClone(report); changed.fixture_reports[0].condition_reports[0].repetition_observations[0].path = "/private/result.json"; close(changed); validatePortfolioRepetitionReport(changed, { root }); }, /pattern|match/u));
+check("private path leakage rejection", () => assert.equal(JSON.stringify(report).includes(root), false));
+check("serialized report does not contain full raw result bodies", () => assert.equal(JSON.stringify(report).includes("raw_evaluator_prompt"), false));
+
+assert.equal(covered.size, 58, `expected 58 focused closures, received ${covered.size}`);
+console.log(`Portfolio repetition report contract test passed (${covered.size} closures).`);
