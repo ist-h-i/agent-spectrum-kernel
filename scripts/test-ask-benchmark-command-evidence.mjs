@@ -17,6 +17,7 @@ import {
   validateCommandEvidenceManifest,
   validateVerificationCommandContract,
 } from "./ask-benchmark-command-evidence.mjs";
+import { validateBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { validateNormalizedCommandEvidence } from "./ask-benchmark-normalized-results.mjs";
 
 const root = new URL("..", import.meta.url).pathname;
@@ -185,6 +186,14 @@ try {
   expectFailure("absolute path in public script", () => validateVerificationCommandContract(contract([
     shellCommand("unsafe-path", "node /usr/local/test.mjs"),
   ]), { root }), /unsafe/u);
+  expectFailure("arbitrary absolute path in public script", () => validateVerificationCommandContract(contract([
+    shellCommand("unsafe-arbitrary-path", "node /workspace/test.mjs"),
+  ]), { root }), /unsafe/u);
+  const commandContractSchemaPath = resolve(root, "benchmarks/schemas/portfolio-verification-command-contract.schema.json");
+  const schemaAlternativeWithoutGroup = contract([shellCommand("schema-alternative", "node workspace/test.mjs", "alternative", null)]);
+  assert.ok(validateBenchmarkSchemaInstance(schemaAlternativeWithoutGroup, { schemaPath: commandContractSchemaPath }).some((error) => /alternative_group_id/u.test(error)), "Schema must require a group ID for alternative commands");
+  const schemaRequiredWithGroup = contract([shellCommand("schema-required", "node workspace/test.mjs", "required", "forbidden-group")]);
+  assert.ok(validateBenchmarkSchemaInstance(schemaRequiredWithGroup, { schemaPath: commandContractSchemaPath }).some((error) => /alternative_group_id/u.test(error)), "Schema must forbid a group ID for non-alternative commands");
   validateVerificationCommandContract(contract([directCommand("portable-direct", ["node", "workspace/test.mjs"])]), { root });
 
   expectFailure("shell envelope drift", () => build(authority, [commandPair({ command: "/bin/bash -c 'node workspace/test.mjs'" })]), /unsupported shell/u);
@@ -192,6 +201,7 @@ try {
   expectFailure("malformed shell quote", () => build(authority, [commandPair({ command: "/bin/bash -lc 'node workspace/test.mjs" })]), /malformed quoting/u);
   expectFailure("unsupported platform shell", () => build(authority, [commandPair({ command: "cmd.exe /c node workspace/test.mjs" })]), /unsupported shell/u);
   expectFailure("absolute path in runtime script", () => build(authority, [commandPair({ command: "/bin/bash -lc 'node /Users/example/test.mjs'" })]), /safely classified/u);
+  expectFailure("arbitrary absolute path in runtime script", () => build(authority, [commandPair({ command: "/bin/bash -lc 'node /workspace/test.mjs'" })]), /safely classified/u);
   expectFailure("environment assignment in runtime script", () => build(authority, [commandPair({ command: "/bin/bash -lc 'TOKEN=value node workspace/test.mjs'" })]), /safely classified/u);
   const differentScript = build(authority, [commandPair({ command: "/bin/bash -lc 'node workspace/other.mjs'" })]);
   assert.equal(differentScript.commands[0].match_state, "unmatched", "different safe public script must not match by inference");

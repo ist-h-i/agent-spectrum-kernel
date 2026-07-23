@@ -16,7 +16,7 @@ const TERMINAL_ITEM_STATUSES = new Set(["completed", "failed"]);
 const SHELL_PREFIX = "/bin/bash -lc ";
 const STREAM_INTEGRITY_ERROR = /(?:drop(?:ped)?\s+event|event\s+(?:drop|loss)|stream\s+lag|lagged|backpressure|truncat|sequence\s+integrity|integrity\s+failure)/iu;
 const SENSITIVE_VALUE = /(?:^|\s)(?:[A-Za-z_][A-Za-z0-9_]*=|\/Users\/|\/home\/|\/private\/|\/var\/folders\/|[A-Za-z]:[\\/]|file:\/\/|(?:token|secret|password|credential)[A-Za-z0-9_-]*=)/iu;
-const UNSAFE_SCRIPT = /(?:^|[\s;&|])(?:[A-Za-z_][A-Za-z0-9_]*=|\/(?:Users|home|private|var\/folders|tmp|etc|usr|bin|opt|Volumes)(?:\/|$)|[A-Za-z]:[\\/]|file:\/\/|(?:token|secret|password|credential)[A-Za-z0-9_-]*=)/iu;
+const UNSAFE_SCRIPT = /(?:^|[\s;&|(<"'])(?:[A-Za-z_][A-Za-z0-9_]*=|\/(?:[^/\s;&|()<>"']|$)|[A-Za-z]:[\\/]|file:\/\/|(?:token|secret|password|credential)[A-Za-z0-9_-]*=)/iu;
 
 export class CommandEvidenceError extends Error {
   constructor(code, message) {

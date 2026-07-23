@@ -49,6 +49,11 @@
           "if": { "properties": { "execution_form": { "const": "direct_argv" } }, "required": ["execution_form"] },
           "then": { "properties": { "safe_argv": { "type": "array" }, "shell_family": { "type": "null" }, "shell_envelope": { "type": "null" }, "canonical_script": { "type": "null" } } },
           "else": { "properties": { "safe_argv": { "type": "null" }, "shell_family": { "const": "posix_bash" }, "shell_envelope": { "type": "object" }, "canonical_script": { "$ref": "#/$defs/canonicalScript" } } }
+        },
+        {
+          "if": { "properties": { "requirement": { "const": "alternative" } }, "required": ["requirement"] },
+          "then": { "properties": { "alternative_group_id": { "$ref": "#/$defs/token" } } },
+          "else": { "properties": { "alternative_group_id": { "type": "null" } } }
         }
       ]
     }
