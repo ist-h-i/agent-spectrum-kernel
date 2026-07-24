@@ -294,7 +294,9 @@ export function validateNormalizedCommandEvidence(evidence) {
   if (stableCanonicalJson(evidence.failed_command_ids) !== stableCanonicalJson(evidence.attempted_command_ids.filter((id) => latest.get(id) === "failed"))) throw new Error("normalized failed command inventory is inconsistent");
   const expectedUnavailable = evidence.required_command_ids.filter((id) => !latest.has(id));
   if (stableCanonicalJson(evidence.unavailable_command_ids) !== stableCanonicalJson(expectedUnavailable)) throw new Error("normalized unavailable command inventory is inconsistent");
-  if (evidence.unmatched_command_count !== evidence.references.filter(({ command_id: id }) => id === null).length) throw new Error("normalized unmatched command count is inconsistent");
+  if (evidence.unmatched_command_count !== evidence.references.filter(({ match_state: state }) => state === "unmatched").length) throw new Error("normalized unmatched command count is inconsistent");
+  if (evidence.cwd_unverified_command_count !== evidence.references.filter(({ match_state: state }) => state === "cwd_unverified").length) throw new Error("normalized cwd-unverified command count is inconsistent");
+  for (const reference of evidence.references) if ((reference.match_state === "matched") !== (reference.command_id !== null)) throw new Error("normalized command match state is inconsistent");
   const groupIds = new Set();
   const memberIds = new Set();
   for (const group of evidence.required_alternative_groups) {

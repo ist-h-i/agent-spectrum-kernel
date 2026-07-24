@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
@@ -32,6 +32,19 @@ function writeJson(path, value) {
 
 function prefixedFileDigest(path) {
   return `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`;
+}
+
+function commandEvidenceFileIdentity(path) {
+  const status = statSync(path);
+  return {
+    device: String(status.dev),
+    inode: String(status.ino),
+    size: status.size,
+    mtime_ms: status.mtimeMs,
+    ctime_ms: status.ctimeMs,
+    raw_digest: prefixedFileDigest(path),
+    canonical_path: { classification: "attempt_relative", digest: `sha256:${createHash("sha256").update(realpathSync(path)).digest("hex")}` },
+  };
 }
 
 function wait(milliseconds) {
@@ -107,8 +120,8 @@ function runtimeConfig(adapter, availability = "available") {
     sandbox_policy: "workspace-write",
     permission_policy: adapter === "codex" ? "never" : "strict",
     executor: { id: `fixture-${adapter}`, version: "1.0.0" },
-    environment_allowlist: ["PATH", "FAKE_EXEC_LOG", "FAKE_FAIL", "FAKE_FAIL_ONCE", "FAKE_DELAY", "FAKE_MUTATE_EXECUTABLE", "FAKE_OVERSIZED_FINAL", "FAKE_PUBLIC_MODE"],
-    environment_value_allowlist: ["FAKE_PUBLIC_MODE"],
+    environment_allowlist: ["PATH", "FAKE_EXEC_LOG", "FAKE_FAIL", "FAKE_FAIL_ONCE", "FAKE_DELAY", "FAKE_MUTATE_EXECUTABLE", "FAKE_OVERSIZED_FINAL", "FAKE_PUBLIC_MODE", "FAKE_SHELL_MODE"],
+    environment_value_allowlist: ["FAKE_PUBLIC_MODE", "FAKE_SHELL_MODE"],
     thermal_state: "cold",
     claude_cli: adapter === "claude" && availability === "available"
       ? {
@@ -119,8 +132,8 @@ function runtimeConfig(adapter, availability = "available") {
       }
       : null,
     command_evidence: adapter === "codex"
-      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.1.0" }
-      : { capture_required: true, support: "unsupported", event_transport: "none", event_format_revision: null, parser_revision: null },
+      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.2.0", shell_capability: { support_status: "supported", family: "posix_bash", executable: "/bin/bash", envelope_arguments: ["-lc"], authority_source: "codex_exec_jsonl_command_rendering", probe_status: "runtime_event_required", downgrade_reason: null } }
+      : { capture_required: true, support: "unsupported", event_transport: "none", event_format_revision: null, parser_revision: null, shell_capability: { support_status: "unsupported", family: null, executable: null, envelope_arguments: null, authority_source: "none", probe_status: "unsupported", downgrade_reason: "adapter_event_contract_not_implemented" } },
   };
 }
 
@@ -146,20 +159,29 @@ if [ "${adapter}" = "codex" ] && [ "$skip_git_repo_check" != "1" ] && [ ! -d .gi
 if [ -n "\${FAKE_DELAY:-}" ]; then sleep "$FAKE_DELAY"; fi
 printf '${adapter}\\n' >> "$FAKE_EXEC_LOG"
 quote="'"
-if [ "${adapter}" = "codex" ]; then printf '{"type":"item.started","item":{"type":"command_execution","id":"fixture-command","command":"/bin/bash -lc %snode workspace-test.mjs%s","cwd":"%s"}}\\n' "$quote" "$quote" "$PWD"; fi
+event_command="/bin/bash -lc 'node workspace-test.mjs'"
+case "\${FAKE_SHELL_MODE:-bash}" in
+  zsh) event_command="/bin/zsh -lc 'node workspace-test.mjs'" ;;
+  sh) event_command="/bin/sh -lc 'node workspace-test.mjs'" ;;
+  powershell) event_command="powershell.exe -Command node workspace-test.mjs" ;;
+  cmd) event_command="cmd.exe /c node workspace-test.mjs" ;;
+  unknown) event_command="fish -c node workspace-test.mjs" ;;
+  malformed) event_command="/bin/bash -lc 'node workspace-test.mjs" ;;
+esac
+if [ "${adapter}" = "codex" ]; then printf '{"type":"item.started","item":{"type":"command_execution","id":"fixture-command","command":"%s"}}\\n' "$event_command"; fi
 if [ "\${FAKE_FAIL:-}" = "1" ]; then
-  if [ "${adapter}" = "codex" ]; then printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"/bin/bash -lc %snode workspace-test.mjs%s","cwd":"%s","status":"failed","exit_code":12,"aggregated_output":"fixture failed"}}\\n' "$quote" "$quote" "$PWD"; printf '%s\\n' '{"type":"turn.completed"}'; fi
+  if [ "${adapter}" = "codex" ]; then printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"%s","status":"failed","exit_code":12,"aggregated_output":"fixture failed"}}\\n' "$event_command"; printf '%s\\n' '{"type":"turn.completed"}'; fi
   exit 12
 fi
 if [ -n "\${FAKE_FAIL_ONCE:-}" ] && [ ! -e "$FAKE_FAIL_ONCE" ]; then
   : > "$FAKE_FAIL_ONCE"
-  if [ "${adapter}" = "codex" ]; then printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"/bin/bash -lc %snode workspace-test.mjs%s","cwd":"%s","status":"failed","exit_code":12,"aggregated_output":"fixture failed once"}}\\n' "$quote" "$quote" "$PWD"; printf '%s\\n' '{"type":"turn.completed"}'; fi
+  if [ "${adapter}" = "codex" ]; then printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"%s","status":"failed","exit_code":12,"aggregated_output":"fixture failed once"}}\\n' "$event_command"; printf '%s\\n' '{"type":"turn.completed"}'; fi
   exit 12
 fi
 if [ "\${FAKE_OVERSIZED_FINAL:-}" = "1" ]; then dd if=/dev/zero of="$output" bs=1048577 count=1 2>/dev/null; exit 0; fi
 printf '%s\\n' '{"claimed":"passed","authority":false}' > verification-report.json
 printf '%s\\n' '{"task_type":"implementation","decision":"not_applicable","findings":[],"requirement_status":[],"verification_commands":[{"command":"node forged-report.mjs","result":"passed"}],"completion_claim":"complete","route":null,"summary":"fixture final"}' > "$output"
-if [ "${adapter}" = "codex" ]; then printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"/bin/bash -lc %snode workspace-test.mjs%s","cwd":"%s","status":"completed","exit_code":0,"aggregated_output":"fixture passed"}}\\n' "$quote" "$quote" "$PWD"; printf '%s\\n' '{"type":"turn.completed"}'; fi
+if [ "${adapter}" = "codex" ]; then printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"%s","status":"completed","exit_code":0,"aggregated_output":"fixture passed"}}\\n' "$event_command"; printf '%s\\n' '{"type":"turn.completed"}'; fi
 if [ "\${FAKE_MUTATE_EXECUTABLE:-}" = "1" ]; then
   printf '%s\\n' '#!/bin/sh' 'exit 99' > "$0.replacement"
   chmod 755 "$0.replacement"
@@ -176,7 +198,7 @@ try {
   const command = {
     command_id: "fixture-test",
     purpose: "test",
-    working_directory: ".",
+    working_directory: { path: ".", evidence_requirement: "runtime_observed" },
     safe_argv: null,
     execution_form: "codex_shell_command",
     shell_family: "posix_bash",
@@ -190,7 +212,7 @@ try {
   command.rendered_event_command_digest = renderedEventCommandDigest(command);
   command.command_contract_digest = computeCommandContractDigest(command);
   const contract = {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     schema_path: "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
     program: "adaptive_ask_verification_command_contract",
     fixture_id: config.fixtures[0].id,
@@ -290,8 +312,39 @@ try {
   const normalizedReference = normalizedManifest.cases.find((entry) => entry.case_id === codexCases[0].case_id).normalized_attempts[0];
   const normalizedCommandEvidence = JSON.parse(readFileSync(resolve(normalizedGeneration, normalizedReference.path), "utf8")).command_evidence;
   assert.deepEqual(normalizedCommandEvidence.required_command_ids, ["fixture-test"], "normalized required command inventory must come from public authority");
-  assert.deepEqual(normalizedCommandEvidence.succeeded_command_ids, ["fixture-test"], "normalized success must come from verified runtime events");
+  assert.deepEqual(normalizedCommandEvidence.succeeded_command_ids, [], "cwd-dependent commands must not succeed without runtime-observed cwd evidence");
+  assert.deepEqual(normalizedCommandEvidence.unavailable_command_ids, ["fixture-test"], "cwd-dependent command obligations must remain unavailable");
+  assert.equal(normalizedCommandEvidence.cwd_unverified_command_count, 1, "normalized evidence must preserve cwd-unverified event state");
   assert.equal(JSON.stringify(normalizedCommandEvidence).includes("fixture passed"), false, "normalized command evidence must not copy raw command output");
+
+  const unsupportedShellRuns = new Map();
+  for (const shellMode of ["zsh", "sh", "powershell", "cmd", "unknown"]) {
+    const shellRun = resolve(work, `${shellMode}-shell-run`);
+    unsupportedShellRuns.set(shellMode, shellRun);
+    const shellCase = codexCases[0];
+    run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", shellRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", shellCase.case_id], { env: { ...env, FAKE_SHELL_MODE: shellMode } });
+    const shellAttemptRoot = resolve(shellRun, "cases", shellCase.case_id, "attempts", "0001");
+    const shellResult = JSON.parse(readFileSync(resolve(shellAttemptRoot, "result.json"), "utf8"));
+    const shellEvidence = JSON.parse(readFileSync(resolve(shellAttemptRoot, "command-evidence.json"), "utf8"));
+    assert.equal(shellResult.status, "completed", `${shellMode} shell must not invalidate the outer engineering attempt`);
+    assert.equal(shellEvidence.capture.evidence_level, "unavailable", `${shellMode} shell command evidence must be unavailable`);
+    assert.equal(shellEvidence.command_event_count, 0, `${shellMode} shell evidence must have zero authoritative events`);
+    assert.equal(shellEvidence.capture.contract_probe_evidence, "shell_capability_unavailable");
+  }
+
+  const malformedShellRun = resolve(work, "malformed-shell-run");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", malformedShellRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", codexCases[0].case_id], { env: { ...env, FAKE_SHELL_MODE: "malformed" } });
+  assert.equal(JSON.parse(readFileSync(resolve(malformedShellRun, "cases", codexCases[0].case_id, "state.json"), "utf8")).status, "invalid", "malformed shell quoting must remain an integrity failure");
+
+  const helpOnlyRuntime = resolve(work, "help-only-runtime.json");
+  const helpOnlyConfig = runtimeConfig("codex");
+  helpOnlyConfig.command_evidence = { capture_required: true, support: "unknown", event_transport: "none", event_format_revision: null, parser_revision: null, shell_capability: { support_status: "unknown", family: null, executable: null, envelope_arguments: null, authority_source: "none", probe_status: "unknown", downgrade_reason: "runtime_shell_authority_unproven" } };
+  writeJson(helpOnlyRuntime, helpOnlyConfig);
+  const helpOnlyRun = resolve(work, "help-only-run");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", helpOnlyRun, "--adapter", "codex", "--runtime-config", helpOnlyRuntime, "--agent-bin", codexBin, "--case-id", codexCases[0].case_id], { env });
+  const helpOnlyEvidence = JSON.parse(readFileSync(resolve(helpOnlyRun, "cases", codexCases[0].case_id, "attempts", "0001", "command-evidence.json"), "utf8"));
+  assert.equal(helpOnlyEvidence.capture.evidence_level, "unavailable", "--json help support alone must not prove active shell capability");
+  assert.equal(helpOnlyEvidence.command_event_count, 0);
 
   const retryRun = resolve(work, "retry-run");
   const retryCase = codexCases[1];
@@ -878,9 +931,8 @@ exit 64
         const resultPath = resolve(attemptRoot, "result.json");
         const commitPath = resolve(attemptRoot, "commit.json");
         if (!existsSync(commandPath) || !existsSync(resultPath) || !existsSync(commitPath)) continue;
-        const commandStat = statSync(commandPath);
         const result = JSON.parse(readFileSync(resultPath, "utf8"));
-        result.command_evidence.file_identity = { device: String(commandStat.dev), inode: String(commandStat.ino) };
+        result.command_evidence.file_identity = commandEvidenceFileIdentity(commandPath);
         writeJson(resultPath, result);
         const commit = JSON.parse(readFileSync(commitPath, "utf8"));
         commit.result_sha256 = prefixedFileDigest(resultPath);
@@ -889,6 +941,26 @@ exit 64
     }
     return { target, common: ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", target] };
   }
+
+  const unsupportedPromotedInvalid = cloneRun(unsupportedShellRuns.get("zsh"), "unsupported-shell-promoted-invalid-run");
+  const unsupportedAttemptRoot = resolve(unsupportedPromotedInvalid.target, "cases", codexCases[0].case_id, "attempts", "0001");
+  const unsupportedResultPath = resolve(unsupportedAttemptRoot, "result.json");
+  const unsupportedResult = JSON.parse(readFileSync(unsupportedResultPath, "utf8"));
+  unsupportedResult.status = "invalid";
+  unsupportedResult.exit_code = null;
+  unsupportedResult.failure_kind = "invalid_input_or_selection";
+  unsupportedResult.final_output = null;
+  writeJson(unsupportedResultPath, unsupportedResult);
+  const unsupportedCommitPath = resolve(unsupportedAttemptRoot, "commit.json");
+  const unsupportedCommit = JSON.parse(readFileSync(unsupportedCommitPath, "utf8"));
+  unsupportedCommit.status = "invalid";
+  unsupportedCommit.result_sha256 = prefixedFileDigest(unsupportedResultPath);
+  writeJson(unsupportedCommitPath, unsupportedCommit);
+  const unsupportedStatePath = resolve(unsupportedPromotedInvalid.target, "cases", codexCases[0].case_id, "state.json");
+  const unsupportedState = JSON.parse(readFileSync(unsupportedStatePath, "utf8"));
+  unsupportedState.status = "invalid";
+  writeJson(unsupportedStatePath, unsupportedState);
+  assertCaseStatus(unsupportedPromotedInvalid.common, codexCases[0].case_id, "invalid", "unsupported shell evidence rewritten as invalid must be rejected");
 
   const runIdentityChanged = cloneRun(runDir, "run-identity-changed-run");
   const changedRunIdentityPath = resolve(runIdentityChanged.target, "run-identity.json");

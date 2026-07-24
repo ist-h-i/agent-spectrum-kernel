@@ -23,6 +23,7 @@ import { basename, dirname, parse, relative, resolve, sep } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { assertTrackedRepositoryMatchesHead, canonicalDigest, stableCanonicalJson, validateMaterializedPortfolio } from "./ask-benchmark-materialize.mjs";
 import { verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
+import { assertStableFileEvidence, readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildCodexProjectionPlan, resolveCodexSkillClosure } from "./install-codex-adapter.mjs";
 import { buildClaudeProjectionPlan, resolveClaudeSkillClosure } from "./install-claude-adapter.mjs";
 import {
@@ -61,6 +62,8 @@ const WORKSPACE_OWNERSHIP_FILE = "ownership.json";
 const PRE_CLAIM_FILE = "pre-claim.json";
 const RESULT_STAGING_FILE = "result.pending.json";
 const TEMP_ROOT = realpathSync(tmpdir());
+const SHELL_CAPABILITY_UNAVAILABLE_CODES = new Set(["unsupported_shell"]);
+const MAX_COMMAND_EVIDENCE_FILE_BYTES = MAX_PROCESS_OUTPUT_BYTES + (2 * 1024 * 1024);
 
 class RuntimeIntegrityError extends Error {}
 
@@ -124,6 +127,47 @@ function publishJsonExclusive(path, value) {
 
 function prefixedFileDigest(path) {
   return `sha256:${fileDigest(path)}`;
+}
+
+function stableJsonValue(file, label) {
+  try {
+    return JSON.parse(file.bytes.toString("utf8"));
+  } catch {
+    throw new Error(`${label} contains invalid JSON`);
+  }
+}
+
+function readStableCommandEvidence(path, label, options = {}) {
+  const file = readStableFile(path, label, MAX_COMMAND_EVIDENCE_FILE_BYTES, { allowEmpty: false, ...options });
+  return { file, manifest: stableJsonValue(file, label) };
+}
+
+function commandEvidenceFileIdentity(file) {
+  const status = file.evidence.openedDescriptor;
+  return {
+    device: String(status.dev),
+    inode: String(status.ino),
+    size: status.size,
+    mtime_ms: status.mtimeMs,
+    ctime_ms: status.ctimeMs,
+    raw_digest: file.rawByteDigest,
+    canonical_path: { classification: "attempt_relative", digest: `sha256:${sha256(Buffer.from(file.canonicalPath))}` },
+  };
+}
+
+function commandEvidenceReference(file, manifest) {
+  return {
+    path: COMMAND_EVIDENCE_PATH,
+    digest: file.rawByteDigest,
+    bytes: file.bytes.length,
+    capture_status: manifest.capture.evidence_level,
+    evidence_count: manifest.command_event_count,
+    file_identity: commandEvidenceFileIdentity(file),
+  };
+}
+
+function sameCommandEvidenceReference(left, right) {
+  return stableCanonicalJson(left) === stableCanonicalJson(right);
 }
 
 function fault(name) {
@@ -255,7 +299,8 @@ function readRuntimeConfig(root, path, adapter) {
   }
   if (adapter === "codex" && value.claude_cli !== null) throw new Error("Codex runtime config must not provide a Claude CLI contract");
   const capture = value.command_evidence;
-  if (adapter === "codex" && (capture.support !== "supported" || capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION)) throw new Error("Codex runtime config must declare the supported command event contract");
+  if (capture.support === "supported" && (capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || capture.shell_capability.support_status !== "supported" || capture.shell_capability.family !== "posix_bash" || capture.shell_capability.executable !== "/bin/bash" || stableCanonicalJson(capture.shell_capability.envelope_arguments) !== stableCanonicalJson(["-lc"]) || capture.shell_capability.authority_source !== "codex_exec_jsonl_command_rendering" || capture.shell_capability.probe_status !== "runtime_event_required" || capture.shell_capability.downgrade_reason !== null)) throw new Error("supported command evidence requires runtime event shell authority");
+  if (capture.support !== "supported" && (capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null || capture.shell_capability.support_status !== capture.support || capture.shell_capability.family !== null || capture.shell_capability.executable !== null || capture.shell_capability.envelope_arguments !== null || capture.shell_capability.authority_source !== "none" || capture.shell_capability.downgrade_reason === null)) throw new Error("unavailable command evidence shell capability is inconsistent");
   if (adapter === "claude" && (capture.support !== "unsupported" || capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null)) throw new Error("Claude command evidence must remain explicitly unsupported");
   if (adapter === "claude" && value.availability === "available") validateClaudeCommandTemplate(value);
   if (value.environment_value_allowlist.some((key) => !value.environment_allowlist.includes(key))) throw new Error("environment value allowlist must be a subset of environment allowlist");
@@ -399,7 +444,6 @@ function probeAvailableRuntime(runtime, verifiedExecutable, command, environment
 }
 
 function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable, command, environmentSnapshot, availabilityEvidence = null }) {
-  const captureAvailable = runtime.availability === "available" && adapter === "codex" && runtime.command_evidence.support === "supported";
   const captureSupported = runtime.command_evidence.support === "supported";
   return {
     schema_version: "1.2.0",
@@ -430,12 +474,13 @@ function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable, co
     availability_evidence: availabilityEvidence ?? (runtime.availability === "available" ? "local_version_and_contract_probe" : "declared_unavailable"),
     command_evidence: {
       support: runtime.command_evidence.support,
-      evidence_level: captureAvailable ? "executed" : "unavailable",
+      evidence_level: "unavailable",
       event_transport: captureSupported ? runtime.command_evidence.event_transport : "none",
       event_format_revision: captureSupported ? runtime.command_evidence.event_format_revision : null,
       parser_revision: captureSupported ? runtime.command_evidence.parser_revision : null,
-      contract_probe_evidence: captureAvailable ? "local_version_help_json_probe" : (runtime.availability === "unavailable" ? "declared_unavailable" : adapter === "claude" ? "adapter_event_contract_not_implemented" : "contract_probe_failed"),
-      downgrade_reason: captureAvailable ? null : (runtime.unavailable_reason ?? (adapter === "claude" ? "adapter_event_contract_not_implemented" : "command_event_contract_not_proven")),
+      contract_probe_evidence: captureSupported && runtime.availability === "available" ? "runtime_event_required" : (runtime.availability === "unavailable" ? "declared_unavailable" : adapter === "claude" ? "adapter_event_contract_not_implemented" : "contract_probe_failed"),
+      downgrade_reason: runtime.unavailable_reason ?? (adapter === "claude" ? "adapter_event_contract_not_implemented" : captureSupported ? "runtime_event_not_observed" : runtime.command_evidence.shell_capability.downgrade_reason),
+      shell_capability: structuredClone(runtime.command_evidence.shell_capability),
     },
   };
 }
@@ -616,10 +661,10 @@ function readAdapterIdentity(root, runDir, adapter) {
   }
   if (identity.policy_enforcement.sandbox_policy !== identity.sandbox_policy || identity.policy_enforcement.permission_policy !== identity.permission_policy) throw new Error(`${adapter} runtime policy identity is inconsistent`);
   const capture = identity.command_evidence;
-  if (capture.evidence_level === "executed" && (identity.availability !== "available" || adapter !== "codex" || capture.support !== "supported" || capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || capture.contract_probe_evidence !== "local_version_help_json_probe" || capture.downgrade_reason !== null)) throw new Error(`${adapter} executed command evidence identity is inconsistent`);
+  if (capture.evidence_level === "executed") throw new Error(`${adapter} runtime identity cannot claim executed command evidence before event inspection`);
   if (capture.evidence_level === "unavailable" && capture.downgrade_reason === null) throw new Error(`${adapter} unavailable command evidence identity lacks a downgrade reason`);
-  if (capture.support === "supported" && (capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION)) throw new Error(`${adapter} supported command evidence identity is inconsistent`);
-  if (capture.support !== "supported" && (capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null || capture.evidence_level !== "unavailable")) throw new Error(`${adapter} unsupported command evidence identity is inconsistent`);
+  if (capture.support === "supported" && (capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || capture.shell_capability.support_status !== "supported" || capture.shell_capability.family !== "posix_bash" || capture.shell_capability.executable !== "/bin/bash" || stableCanonicalJson(capture.shell_capability.envelope_arguments) !== stableCanonicalJson(["-lc"]) || capture.shell_capability.authority_source !== "codex_exec_jsonl_command_rendering" || capture.shell_capability.probe_status !== "runtime_event_required")) throw new Error(`${adapter} supported command evidence identity is inconsistent`);
+  if (capture.support !== "supported" && (capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null || capture.evidence_level !== "unavailable" || capture.shell_capability.support_status !== capture.support || capture.shell_capability.family !== null || capture.shell_capability.executable !== null || capture.shell_capability.envelope_arguments !== null || capture.shell_capability.authority_source !== "none" || capture.shell_capability.downgrade_reason === null)) throw new Error(`${adapter} unsupported command evidence identity is inconsistent`);
   if (identity.availability === "available" && adapter === "codex") {
     const argv = identity.effective_command.argv;
     if (!argv.includes("--ephemeral") || !argv.includes("--ignore-user-config") || !argv.includes("--ignore-rules") || !argv.includes("--skip-git-repo-check") || !argv.includes("--json") || argv[argv.indexOf("--sandbox") + 1] !== identity.sandbox_policy || !argv.includes(`approval_policy=\"${identity.permission_policy}\"`) || argv[argv.indexOf("--output-schema") + 1] !== "{output_schema}") throw new Error("Codex effective command does not enforce its runtime policy");
@@ -1066,12 +1111,13 @@ function sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity,
   let manifest;
   let captureError = null;
   const identity = commandEvidenceIdentity({ entry, claim });
-  if (!forceUnavailable && adapterIdentity.command_evidence.evidence_level === "executed" && contract && processResult) {
+  if (!forceUnavailable && adapterIdentity.command_evidence.support === "supported" && contract && processResult) {
     try {
-      manifest = buildCodexCommandEvidence({ identity, stream: processResult.stdout ?? "", contract, workspaceRoot });
+      manifest = buildCodexCommandEvidence({ identity, stream: processResult.stdout ?? "", contract });
     } catch (error) {
-      captureError = error;
-      manifest = buildUnavailableCommandEvidence({ identity, support: "supported", probe: "capture_invalid", reason: `capture_invalid:${error?.code ?? "unclassified"}`, stream: processResult.stdout ?? "" });
+      const shellUnavailable = SHELL_CAPABILITY_UNAVAILABLE_CODES.has(error?.code);
+      captureError = shellUnavailable ? null : error;
+      manifest = buildUnavailableCommandEvidence({ identity, support: "supported", probe: shellUnavailable ? "shell_capability_unavailable" : "capture_invalid", reason: shellUnavailable ? `shell_capability_unavailable:${error.code}` : `capture_invalid:${error?.code ?? "unclassified"}`, stream: processResult.stdout ?? "" });
     }
   } else {
     const support = adapterIdentity.command_evidence.support;
@@ -1080,20 +1126,21 @@ function sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity,
     manifest = buildUnavailableCommandEvidence({ identity, support, probe, reason, stream: processResult?.stdout ?? "" });
   }
   validateCommandEvidenceManifest(manifest, { root, contract, expectedContractDigest: identity.verification_command_contract_digest });
-  writeJsonIdempotent(path, manifest, `${entry.case_id} command evidence`, { stagingOwner: claim.claim_id, faultName: "after_command_evidence_staged" });
+  if (existsSync(path)) {
+    const existing = readStableCommandEvidence(path, `${entry.case_id} existing command evidence`);
+    if (stableCanonicalJson(existing.manifest) !== stableCanonicalJson(manifest)) throw new Error(`${entry.case_id} command evidence already exists with different content`);
+  } else {
+    writeJsonAtomic(path, manifest, { stagingOwner: claim.claim_id, faultName: "after_command_evidence_staged" });
+  }
   fault("after_command_evidence_published");
-  const file = statSync(path);
+  const published = readStableCommandEvidence(path, `${entry.case_id} published command evidence`);
+  const verifiedPublishedManifest = validateCommandEvidenceManifest(published.manifest, { root, contract, expectedContractDigest: identity.verification_command_contract_digest });
+  const publishedAfter = readStableCommandEvidence(path, `${entry.case_id} published command evidence`);
+  assertStableFileEvidence(published.file, publishedAfter.file, `${entry.case_id} published command evidence`);
   return {
-    manifest,
+    manifest: verifiedPublishedManifest,
     captureError,
-    reference: {
-      path: COMMAND_EVIDENCE_PATH,
-      digest: prefixedFileDigest(path),
-      bytes: file.size,
-      capture_status: manifest.capture.evidence_level,
-      evidence_count: manifest.command_event_count,
-      file_identity: { device: String(file.dev), inode: String(file.ino) },
-    },
+    reference: commandEvidenceReference(published.file, verifiedPublishedManifest),
   };
 }
 
@@ -1124,7 +1171,7 @@ function resultRecord({ entry, attempt, claim, requestPath, commandEvidence, sta
   };
 }
 
-function commitRecord({ claim, result, requestPath, commandEvidencePath, resultPath }) {
+function commitRecord({ claim, result, requestPath, commandEvidenceReference, resultPath }) {
   return {
     schema_version: "1.1.0",
     kind: "terminal_commit",
@@ -1139,7 +1186,7 @@ function commitRecord({ claim, result, requestPath, commandEvidencePath, resultP
     runtime_identity_digest: claim.runtime_identity_digest,
     effective_command_digest: claim.effective_command_digest,
     request_sha256: prefixedFileDigest(requestPath),
-    command_evidence_sha256: prefixedFileDigest(commandEvidencePath),
+    command_evidence_sha256: commandEvidenceReference.digest,
     result_sha256: prefixedFileDigest(resultPath),
   };
 }
@@ -1150,9 +1197,9 @@ function completeCase({ root, runDir, entry, state, claim, attempt, attemptRoot,
   if (!existsSync(requestPath)) throw new Error("terminal attempt request is missing");
   const commandEvidencePath = resolve(attemptRoot, COMMAND_EVIDENCE_PATH);
   assertNoSymlinkSegments(commandEvidencePath, `${entry.case_id} command evidence`);
-  if (!existsSync(commandEvidencePath) || !lstatSync(commandEvidencePath).isFile()) throw new Error("terminal command evidence is missing");
-  const commandStat = statSync(commandEvidencePath);
-  if (result.command_evidence.digest !== prefixedFileDigest(commandEvidencePath) || result.command_evidence.bytes !== commandStat.size || result.command_evidence.file_identity.device !== String(commandStat.dev) || result.command_evidence.file_identity.inode !== String(commandStat.ino)) throw new Error("terminal result command evidence reference mismatch");
+  const stableCommandEvidence = readStableCommandEvidence(commandEvidencePath, `${entry.case_id} terminal command evidence`);
+  const observedCommandEvidenceReference = commandEvidenceReference(stableCommandEvidence.file, stableCommandEvidence.manifest);
+  if (!sameCommandEvidenceReference(result.command_evidence, observedCommandEvidenceReference)) throw new Error("terminal result command evidence reference mismatch");
   validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${entry.case_id} attempt result`);
   const resultPath = resolve(attemptRoot, "result.json");
   assertNoSymlinkSegments(resultPath, `${entry.case_id} attempt result`);
@@ -1173,7 +1220,9 @@ function completeCase({ root, runDir, entry, state, claim, attempt, attemptRoot,
     writeJsonIdempotent(resultPath, result, `${entry.case_id} attempt result`, { stagingOwner: claim.claim_id });
   }
   fault("after_result_published");
-  const commit = commitRecord({ claim, result, requestPath, commandEvidencePath, resultPath });
+  const commandEvidenceAfter = readStableCommandEvidence(commandEvidencePath, `${entry.case_id} terminal command evidence`);
+  assertStableFileEvidence(stableCommandEvidence.file, commandEvidenceAfter.file, `${entry.case_id} terminal command evidence`);
+  const commit = commitRecord({ claim, result, requestPath, commandEvidenceReference: observedCommandEvidenceReference, resultPath });
   validate(root, commit, ATTEMPT_COMMIT_SCHEMA_PATH, `${entry.case_id} terminal commit`);
   const commitPath = resolve(attemptRoot, "commit.json");
   assertNoSymlinkSegments(commitPath, `${entry.case_id} terminal commit`);
@@ -1217,7 +1266,8 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
     if (!existsSync(path) || !lstatSync(path).isFile()) throw new Error(`${entry.case_id} ${label} is missing`);
   }
   const request = readJson(requestPath);
-  const commandEvidence = readJson(commandEvidencePath);
+  const stableCommandEvidence = readStableCommandEvidence(commandEvidencePath, `${entry.case_id} command evidence`);
+  const commandEvidence = stableCommandEvidence.manifest;
   const result = readJson(resultPath);
   const commit = readJson(commitPath);
   validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${entry.case_id} request`);
@@ -1237,12 +1287,13 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
   if (result.status === "completed") {
     if (result.exit_code !== 0 || result.failure_kind !== null || result.recovery_reason !== null || result.final_output === null) throw new Error(`${entry.case_id} completed result semantics mismatch`);
   } else if (result.failure_kind === null || result.final_output !== null || (result.failure_kind === "stale_claim_recovered") !== (result.recovery_reason !== null)) throw new Error(`${entry.case_id} terminal failure result semantics mismatch`);
+  if (commandEvidence.capture.contract_probe_evidence === "shell_capability_unavailable" && result.status === "invalid") throw new Error(`${entry.case_id} unsupported shell capability must not invalidate the outer attempt`);
   if (result.runtime_identity_digest !== runtimeIdentityDigest || result.effective_command_digest !== adapterIdentity.effective_command_digest || result.request_sha256 !== prefixedFileDigest(requestPath)) throw new Error(`${entry.case_id} result evidence mismatch`);
-  const commandStat = statSync(commandEvidencePath);
   if (commandEvidence.run_instance_id !== runInstanceId || commandEvidence.case_id !== entry.case_id || commandEvidence.attempt !== attempt || commandEvidence.adapter !== entry.adapter_track || commandEvidence.condition !== entry.condition || commandEvidence.fixture_id !== request.input_identity.fixture_id || commandEvidence.repetition !== request.input_identity.repetition || commandEvidence.fixture_input_digest !== request.input_identity.fixture_input_digest || commandEvidence.runtime_identity_digest !== runtimeIdentityDigest || commandEvidence.effective_command_digest !== adapterIdentity.effective_command_digest) throw new Error(`${entry.case_id} command evidence identity mismatch`);
-  if (result.command_evidence.path !== COMMAND_EVIDENCE_PATH || result.command_evidence.digest !== prefixedFileDigest(commandEvidencePath) || result.command_evidence.bytes !== commandStat.size || result.command_evidence.capture_status !== commandEvidence.capture.evidence_level || result.command_evidence.evidence_count !== commandEvidence.command_event_count || result.command_evidence.file_identity.device !== String(commandStat.dev) || result.command_evidence.file_identity.inode !== String(commandStat.ino)) throw new Error(`${entry.case_id} result command evidence binding mismatch`);
+  const observedCommandEvidenceReference = commandEvidenceReference(stableCommandEvidence.file, commandEvidence);
+  if (!sameCommandEvidenceReference(result.command_evidence, observedCommandEvidenceReference)) throw new Error(`${entry.case_id} result command evidence binding mismatch`);
   if (commit.run_instance_id !== runInstanceId || commit.case_id !== entry.case_id || commit.attempt !== attempt || commit.adapter !== entry.adapter_track || commit.condition !== entry.condition || commit.status !== result.status) throw new Error(`${entry.case_id} terminal commit identity mismatch`);
-  if (commit.runtime_identity_digest !== runtimeIdentityDigest || commit.effective_command_digest !== adapterIdentity.effective_command_digest || commit.request_sha256 !== prefixedFileDigest(requestPath) || commit.command_evidence_sha256 !== prefixedFileDigest(commandEvidencePath) || commit.result_sha256 !== prefixedFileDigest(resultPath)) throw new Error(`${entry.case_id} terminal commit evidence mismatch`);
+  if (commit.runtime_identity_digest !== runtimeIdentityDigest || commit.effective_command_digest !== adapterIdentity.effective_command_digest || commit.request_sha256 !== prefixedFileDigest(requestPath) || commit.command_evidence_sha256 !== stableCommandEvidence.file.rawByteDigest || commit.result_sha256 !== prefixedFileDigest(resultPath)) throw new Error(`${entry.case_id} terminal commit evidence mismatch`);
   if (claim) {
     if (claim.run_instance_id !== runInstanceId || claim.case_id !== entry.case_id || claim.adapter !== entry.adapter_track || claim.condition !== entry.condition || claim.runtime_identity_digest !== runtimeIdentityDigest || claim.effective_command_digest !== adapterIdentity.effective_command_digest || claim.environment_snapshot_digest !== adapterIdentity.environment_snapshot.digest) throw new Error(`${entry.case_id} recovery claim identity mismatch`);
     if (claim.input_identity.plan_id !== runIdentity.plan.id || claim.input_identity.plan_digest !== runIdentity.plan.digest || claim.input_identity.materialization_manifest_digest !== runIdentity.materialization.manifest_digest) throw new Error(`${entry.case_id} recovery claim run input mismatch`);
@@ -1261,6 +1312,8 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
     if (size > MAX_FINAL_OUTPUT_BYTES || size !== result.final_output.bytes || fileDigest(finalPath) !== result.final_output.sha256) throw new Error(`${entry.case_id} final output digest mismatch`);
     validate(root, readJson(finalPath), OUTPUT_SCHEMA_PATH, `${entry.case_id} completed output`);
   }
+  const commandEvidenceAfter = readStableCommandEvidence(commandEvidencePath, `${entry.case_id} command evidence`);
+  assertStableFileEvidence(stableCommandEvidence.file, commandEvidenceAfter.file, `${entry.case_id} command evidence`);
   return {
     request,
     result,
@@ -1271,7 +1324,7 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
       request_digest: prefixedFileDigest(requestPath),
       result_digest: prefixedFileDigest(resultPath),
       commit_digest: prefixedFileDigest(commitPath),
-      command_evidence_digest: prefixedFileDigest(commandEvidencePath),
+      command_evidence_digest: stableCommandEvidence.file.rawByteDigest,
       final_output_digest: result.final_output ? `sha256:${result.final_output.sha256}` : null,
       final_output_bytes: result.final_output?.bytes ?? null,
     },
@@ -1604,20 +1657,14 @@ function recoveryCommandEvidence({ root, run, attemptRoot, entry, claim }) {
     });
   }
   assertNoSymlinkSegments(path, `${entry.case_id} recovered command evidence`);
-  const manifest = readJson(path);
-  validateCommandEvidenceManifest(manifest, { root, expectedContractDigest: claim.input_identity.verification_command_contract_digest });
-  const file = statSync(path);
+  const recovered = readStableCommandEvidence(path, `${entry.case_id} recovered command evidence`);
+  const manifest = validateCommandEvidenceManifest(recovered.manifest, { root, expectedContractDigest: claim.input_identity.verification_command_contract_digest });
+  const recoveredAfter = readStableCommandEvidence(path, `${entry.case_id} recovered command evidence`);
+  assertStableFileEvidence(recovered.file, recoveredAfter.file, `${entry.case_id} recovered command evidence`);
   return {
     manifest,
     captureError: null,
-    reference: {
-      path: COMMAND_EVIDENCE_PATH,
-      digest: prefixedFileDigest(path),
-      bytes: file.size,
-      capture_status: manifest.capture.evidence_level,
-      evidence_count: manifest.command_event_count,
-      file_identity: { device: String(file.dev), inode: String(file.ino) },
-    },
+    reference: commandEvidenceReference(recovered.file, manifest),
   };
 }
 

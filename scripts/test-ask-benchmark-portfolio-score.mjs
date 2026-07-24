@@ -196,7 +196,7 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir,
     outcome,
     command_evidence: {
       manifest_digest: digest("score-command-evidence"), capture_support: "supported", evidence_level: "unavailable", command_event_count: 0,
-      verification_command_contract_digest: null, required_command_ids: [], required_alternative_groups: [], command_summaries: [], attempted_command_ids: [], succeeded_command_ids: [], failed_command_ids: [], unavailable_command_ids: [], unmatched_command_count: 0, references: [],
+      verification_command_contract_digest: null, required_command_ids: [], required_alternative_groups: [], command_summaries: [], attempted_command_ids: [], succeeded_command_ids: [], failed_command_ids: [], unavailable_command_ids: [], unmatched_command_count: 0, cwd_unverified_command_count: 0, references: [],
     },
     telemetry: telemetry(outcome),
     privacy: {

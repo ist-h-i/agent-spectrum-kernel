@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "schema_path", "program", "run_instance_id", "case_id", "attempt", "adapter", "condition", "fixture_id", "repetition", "fixture_input_digest", "verification_command_contract_digest", "runtime_identity_digest", "effective_command_digest", "capture", "stream", "command_event_count", "commands", "privacy", "manifest_digest"],
   "properties": {
-    "schema_version": { "const": "1.1.0" },
+    "schema_version": { "const": "1.2.0" },
     "schema_path": { "const": "benchmarks/schemas/portfolio-command-evidence.schema.json" },
     "program": { "const": "adaptive_ask_command_evidence" },
     "run_instance_id": { "type": "string", "format": "uuid" },
@@ -29,16 +29,16 @@
         "event_transport": { "enum": ["codex_exec_jsonl", "none"] },
         "event_format_revision": { "type": ["string", "null"], "pattern": "^[0-9A-Za-z._-]+$" },
         "parser_revision": { "type": ["string", "null"], "pattern": "^[0-9A-Za-z._-]+$" },
-        "contract_probe_evidence": { "enum": ["local_version_help_json_probe", "adapter_event_contract_not_implemented", "runtime_unavailable", "capture_invalid", "command_contract_unavailable"] },
+        "contract_probe_evidence": { "enum": ["runtime_event_shell_authority", "shell_capability_unavailable", "adapter_event_contract_not_implemented", "runtime_unavailable", "capture_invalid", "command_contract_unavailable"] },
         "downgrade_reason": { "type": ["string", "null"], "minLength": 1, "maxLength": 160, "pattern": "^[a-z0-9][a-z0-9_.:-]*$" }
       },
       "allOf": [
         {
           "if": { "properties": { "evidence_level": { "const": "executed" } }, "required": ["evidence_level"] },
-          "then": { "properties": { "support": { "const": "supported" }, "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.1.0" }, "contract_probe_evidence": { "const": "local_version_help_json_probe" }, "downgrade_reason": { "type": "null" } } },
+          "then": { "properties": { "support": { "const": "supported" }, "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.2.0" }, "contract_probe_evidence": { "const": "runtime_event_shell_authority" }, "downgrade_reason": { "type": "null" } } },
           "else": {
             "if": { "properties": { "support": { "const": "supported" } }, "required": ["support"] },
-            "then": { "properties": { "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.1.0" }, "downgrade_reason": { "type": "string" } } },
+            "then": { "properties": { "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.2.0" }, "downgrade_reason": { "type": "string" } } },
             "else": { "properties": { "event_transport": { "const": "none" }, "event_format_revision": { "type": "null" }, "parser_revision": { "type": "null" }, "downgrade_reason": { "type": "string" } } }
           }
         }
@@ -79,11 +79,22 @@
         "event_sequence": { "type": "object", "additionalProperties": false, "required": ["started", "completed"], "properties": { "started": { "type": "integer", "minimum": 1 }, "completed": { "type": "integer", "minimum": 2 } } },
         "runtime_item_id_digest": { "$ref": "#/$defs/digest" },
         "matched_command_id": { "oneOf": [{ "$ref": "#/$defs/token" }, { "type": "null" }] },
-        "match_state": { "enum": ["matched", "unmatched"] },
+        "match_state": { "enum": ["matched", "unmatched", "cwd_unverified"] },
         "execution_form": { "enum": ["direct_argv", "codex_shell_command"] },
         "logical_command_digest": { "$ref": "#/$defs/digest" },
         "rendered_event_command_digest": { "$ref": "#/$defs/digest" },
-        "working_directory": { "type": "object", "additionalProperties": false, "required": ["classification", "digest"], "properties": { "classification": { "enum": ["workspace_root", "workspace_relative"] }, "digest": { "$ref": "#/$defs/digest" } } },
+        "working_directory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "classification", "value", "digest", "source"],
+          "properties": {
+            "status": { "const": "unavailable" },
+            "classification": { "type": "null" },
+            "value": { "type": "null" },
+            "digest": { "type": "null" },
+            "source": { "const": "codex_exec_jsonl_cwd_not_exposed" }
+          }
+        },
         "status": { "enum": ["succeeded", "failed", "interrupted"] },
         "exit_code": { "type": ["integer", "null"] },
         "duration": { "type": "object", "additionalProperties": false, "required": ["status", "milliseconds"], "properties": { "status": { "enum": ["known", "unknown"] }, "milliseconds": { "type": ["integer", "null"], "minimum": 0 } } },

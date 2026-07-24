@@ -232,6 +232,7 @@ function normalizedResult({ source, adapterDigests, caseRecord, attempt, outcome
       failed_command_ids: [],
       unavailable_command_ids: [],
       unmatched_command_count: 0,
+      cwd_unverified_command_count: 0,
       references: [],
     },
     telemetry: telemetry(outcome),
@@ -1361,20 +1362,25 @@ try {
       required_command_ids: ["fixture-test"],
       required_alternative_groups: [],
       succeeded_command_ids: ["fixture-test"],
-      references: [{ command_id: "fixture-test", command_evidence_id: `command-evidence-${"a".repeat(32)}`, digest: executionEvidenceDigest, bytes: 321, outcome: "succeeded", exit_code: 0 }],
+      references: [{ command_id: "fixture-test", match_state: "matched", command_evidence_id: `command-evidence-${"a".repeat(32)}`, digest: executionEvidenceDigest, bytes: 321, outcome: "succeeded", exit_code: 0 }],
     },
   };
   const evaluatorExecutionReference = { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 321 }] } };
   assert.equal(validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: evaluatorExecutionReference }).length, 1, "verified normalized execution evidence must be referenceable by the evaluator");
   assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [] } } }), /cannot pass without verified execution-event/u, "verification pass without execution evidence must fail closed");
   assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 322 }] } } }), /unverified or transplanted/u, "execution evidence byte drift must be rejected");
+  const cwdUnverifiedExecutionEvidence = structuredClone(normalizedExecutionEvidence);
+  cwdUnverifiedExecutionEvidence.command_evidence.succeeded_command_ids = [];
+  cwdUnverifiedExecutionEvidence.command_evidence.references[0].command_id = null;
+  cwdUnverifiedExecutionEvidence.command_evidence.references[0].match_state = "cwd_unverified";
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: cwdUnverifiedExecutionEvidence, result: evaluatorExecutionReference }), /required command evidence is absent or unsuccessful/u, "evaluator verification pass must reject cwd-dependent command evidence without runtime cwd authority");
 
   const alternativeExecutionEvidence = {
     command_evidence: {
       required_command_ids: [],
       required_alternative_groups: [{ group_id: "fixture-alternatives", member_ids: ["fixture-a", "fixture-b"], attempted_ids: ["fixture-b"], succeeded_ids: ["fixture-b"], satisfaction_state: "satisfied" }],
       succeeded_command_ids: ["fixture-b"],
-      references: [{ command_id: "fixture-b", command_evidence_id: `command-evidence-${"b".repeat(32)}`, digest: executionEvidenceDigest, bytes: 321, outcome: "succeeded", exit_code: 0 }],
+      references: [{ command_id: "fixture-b", match_state: "matched", command_evidence_id: `command-evidence-${"b".repeat(32)}`, digest: executionEvidenceDigest, bytes: 321, outcome: "succeeded", exit_code: 0 }],
     },
   };
   assert.equal(validateExecutionEventEvidenceReferences({ normalized: alternativeExecutionEvidence, result: evaluatorExecutionReference }).length, 1, "one successful member must satisfy a required alternative group");

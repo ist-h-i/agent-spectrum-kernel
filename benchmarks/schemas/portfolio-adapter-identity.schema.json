@@ -83,26 +83,64 @@
     "command_evidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["support", "evidence_level", "event_transport", "event_format_revision", "parser_revision", "contract_probe_evidence", "downgrade_reason"],
+      "required": ["support", "evidence_level", "event_transport", "event_format_revision", "parser_revision", "contract_probe_evidence", "downgrade_reason", "shell_capability"],
       "properties": {
         "support": { "enum": ["supported", "unsupported", "unknown"] },
         "evidence_level": { "enum": ["executed", "unavailable"] },
         "event_transport": { "enum": ["codex_exec_jsonl", "none"] },
         "event_format_revision": { "type": ["string", "null"] },
         "parser_revision": { "type": ["string", "null"] },
-        "contract_probe_evidence": { "enum": ["local_version_help_json_probe", "declared_unavailable", "adapter_event_contract_not_implemented", "contract_probe_failed"] },
-        "downgrade_reason": { "type": ["string", "null"], "minLength": 1 }
+        "contract_probe_evidence": { "enum": ["runtime_event_required", "declared_unavailable", "adapter_event_contract_not_implemented", "contract_probe_failed"] },
+        "downgrade_reason": { "type": ["string", "null"], "minLength": 1 },
+        "shell_capability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["support_status", "family", "executable", "envelope_arguments", "authority_source", "probe_status", "downgrade_reason"],
+          "properties": {
+            "support_status": { "enum": ["supported", "unsupported", "unknown"] },
+            "family": { "enum": ["posix_bash", null] },
+            "executable": { "enum": ["/bin/bash", null] },
+            "envelope_arguments": { "oneOf": [{ "const": ["-lc"] }, { "type": "null" }] },
+            "authority_source": { "enum": ["codex_exec_jsonl_command_rendering", "none"] },
+            "probe_status": { "enum": ["runtime_event_required", "unsupported", "unknown"] },
+            "downgrade_reason": { "type": ["string", "null"], "minLength": 1 }
+          }
+        }
       },
       "allOf": [
         {
           "if": { "properties": { "evidence_level": { "const": "executed" } }, "required": ["evidence_level"] },
-          "then": { "properties": { "support": { "const": "supported" }, "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.1.0" }, "contract_probe_evidence": { "const": "local_version_help_json_probe" }, "downgrade_reason": { "type": "null" } } },
+          "then": { "properties": { "support": { "const": "supported" }, "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.2.0" }, "contract_probe_evidence": { "const": "runtime_event_required" } } },
           "else": { "properties": { "downgrade_reason": { "type": "string" } } }
         },
         {
           "if": { "properties": { "support": { "const": "supported" } }, "required": ["support"] },
-          "then": { "properties": { "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.1.0" } } },
-          "else": { "properties": { "evidence_level": { "const": "unavailable" }, "event_transport": { "const": "none" }, "event_format_revision": { "type": "null" }, "parser_revision": { "type": "null" } } }
+          "then": {
+            "properties": {
+              "event_transport": { "const": "codex_exec_jsonl" },
+              "event_format_revision": { "const": "codex-exec-jsonl-v1" },
+              "parser_revision": { "const": "1.2.0" },
+              "shell_capability": {
+                "properties": {
+                  "support_status": { "const": "supported" },
+                  "family": { "const": "posix_bash" },
+                  "executable": { "const": "/bin/bash" },
+                  "envelope_arguments": { "const": ["-lc"] },
+                  "authority_source": { "const": "codex_exec_jsonl_command_rendering" },
+                  "probe_status": { "const": "runtime_event_required" }
+                }
+              }
+            }
+          },
+          "else": { "properties": { "evidence_level": { "const": "unavailable" }, "event_transport": { "const": "none" }, "event_format_revision": { "type": "null" }, "parser_revision": { "type": "null" }, "shell_capability": { "properties": { "family": { "type": "null" }, "executable": { "type": "null" }, "envelope_arguments": { "type": "null" }, "authority_source": { "const": "none" }, "downgrade_reason": { "type": "string" } } } } }
+        },
+        {
+          "if": { "properties": { "support": { "const": "unsupported" } }, "required": ["support"] },
+          "then": { "properties": { "shell_capability": { "properties": { "support_status": { "const": "unsupported" }, "probe_status": { "const": "unsupported" } } } } },
+          "else": {
+            "if": { "properties": { "support": { "const": "unknown" } }, "required": ["support"] },
+            "then": { "properties": { "shell_capability": { "properties": { "support_status": { "const": "unknown" }, "probe_status": { "const": "unknown" } } } } }
+          }
         }
       ]
     }

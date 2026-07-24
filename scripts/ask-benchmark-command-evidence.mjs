@@ -1,13 +1,12 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, realpathSync } from "node:fs";
-import { posix, relative, resolve, sep, win32 } from "node:path";
+import { posix, resolve, win32 } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 
 export const VERIFICATION_COMMAND_CONTRACT_SCHEMA_PATH = "benchmarks/schemas/portfolio-verification-command-contract.schema.json";
 export const COMMAND_EVIDENCE_SCHEMA_PATH = "benchmarks/schemas/portfolio-command-evidence.schema.json";
 export const CODEX_COMMAND_EVENT_FORMAT_REVISION = "codex-exec-jsonl-v1";
-export const COMMAND_EVIDENCE_PARSER_REVISION = "1.1.0";
+export const COMMAND_EVIDENCE_PARSER_REVISION = "1.2.0";
 export const COMMAND_EVIDENCE_PATH = "command-evidence.json";
 export const MAX_COMMAND_EVENT_STREAM_BYTES = 16 * 1024 * 1024;
 export const MAX_COMMAND_EVENT_LINE_BYTES = 1024 * 1024;
@@ -92,7 +91,7 @@ export function validateVerificationCommandContract(contract, { root }) {
   assertUnique(contract.commands.map(({ command_contract_digest: digest }) => digest), "verification command digests");
   const alternatives = new Map();
   for (const command of contract.commands) {
-    assertSafeContractPath(command.working_directory, `verification command ${command.command_id} working directory`);
+    assertSafeContractPath(command.working_directory.path, `verification command ${command.command_id} working directory`);
     if (command.execution_form === "direct_argv") {
       if (command.safe_argv.some((arg) => SENSITIVE_VALUE.test(arg) || posix.isAbsolute(arg) || win32.isAbsolute(arg) || arg.includes(".."))) throw new Error(`verification command ${command.command_id} contains an unsafe argv value`);
     } else {
@@ -139,60 +138,28 @@ function classifyRuntimeCommand(rawCommand, contract) {
   return { execution_form: "codex_shell_command", logical_digest: canonicalDigest({ execution_form: "codex_shell_command", canonical_script: script }), rendered_digest: sha256(Buffer.from(rawCommand)), script };
 }
 
-function assertNoSymlinkTraversal(root, relativePath) {
-  let current = root;
-  for (const part of relativePath === "." ? [] : relativePath.split("/")) {
-    current = resolve(current, part);
-    if (!existsSync(current) || lstatSync(current).isSymbolicLink()) throw new CommandEvidenceError("unsafe_working_directory", "runtime working directory traverses a missing or symlinked path");
-  }
-  if (existsSync(current) && !lstatSync(current).isDirectory()) throw new CommandEvidenceError("unsafe_working_directory", "runtime working directory is not a directory");
-}
-
-function normalizeRuntimeWorkingDirectory(value, workspaceRoot) {
-  if (typeof value !== "string" || value.length === 0) throw new CommandEvidenceError("unsafe_working_directory", "runtime working directory cannot be safely classified");
-  if (value === ".") return ".";
-  if (!posix.isAbsolute(value) && !win32.isAbsolute(value)) {
-    try { assertSafeContractPath(value, "runtime working directory"); } catch { throw new CommandEvidenceError("unsafe_working_directory", "runtime working directory is not portable"); }
-    if (workspaceRoot) assertNoSymlinkTraversal(realpathSync(workspaceRoot), value);
-    return value;
-  }
-  if (!workspaceRoot || !existsSync(workspaceRoot) || !lstatSync(workspaceRoot).isDirectory() || lstatSync(workspaceRoot).isSymbolicLink()) throw new CommandEvidenceError("unsafe_working_directory", "absolute runtime working directory lacks workspace authority");
-  const resolvedRoot = resolve(workspaceRoot);
-  const canonicalRoot = realpathSync(resolvedRoot);
-  const candidate = resolve(value);
-  const path = relative(resolvedRoot, candidate);
-  if (path === "" || path === ".") return ".";
-  if (path === ".." || path.startsWith(`..${sep}`) || posix.isAbsolute(path) || win32.isAbsolute(path)) throw new CommandEvidenceError("unsafe_working_directory", "runtime working directory escapes the workspace");
-  const portable = path.split(sep).join("/");
-  assertNoSymlinkTraversal(canonicalRoot, portable);
-  if (realpathSync(candidate) !== resolve(canonicalRoot, portable)) throw new CommandEvidenceError("unsafe_working_directory", "runtime working directory is not canonical");
-  return portable;
-}
-
-function commandEvidenceBase({ sequence, started, completed, contract, workspaceRoot }) {
+function commandEvidenceBase({ sequence, started, completed, contract }) {
   const rawCommand = completed.command ?? started.command;
   if (started.command !== undefined && completed.command !== undefined && started.command !== completed.command) throw new CommandEvidenceError("command_drift", "runtime command changed between started and completed events");
-  if (started.cwd !== undefined && completed.cwd !== undefined && started.cwd !== completed.cwd) throw new CommandEvidenceError("working_directory_drift", "runtime working directory changed between started and completed events");
   const classified = classifyRuntimeCommand(rawCommand, contract);
-  const workingDirectory = normalizeRuntimeWorkingDirectory(started.cwd ?? completed.cwd ?? ".", workspaceRoot);
   const renderedMatches = contract?.commands.filter((command) => command.rendered_event_command_digest === classified.rendered_digest && command.execution_form === classified.execution_form) ?? [];
-  const matched = renderedMatches.find((command) => command.logical_command_digest === classified.logical_digest && command.working_directory === workingDirectory) ?? null;
-  if (!matched && renderedMatches.length > 0) throw new CommandEvidenceError("working_directory_mismatch", "runtime working directory does not match public command authority");
+  const commandMatch = renderedMatches.find((command) => command.logical_command_digest === classified.logical_digest) ?? null;
+  const matched = commandMatch?.working_directory.evidence_requirement === "not_required" ? commandMatch : null;
+  const matchState = matched ? "matched" : commandMatch ? "cwd_unverified" : "unmatched";
   const exitCode = completed.exit_code;
   if (!Number.isInteger(exitCode)) throw new CommandEvidenceError("missing_exit_code", "completed command event lacks an integer exit code");
   if (!TERMINAL_ITEM_STATUSES.has(completed.status)) throw new CommandEvidenceError("unknown_status", "completed command event has an unsupported status");
   if ((completed.status === "completed" && exitCode !== 0) || (completed.status === "failed" && exitCode === 0)) throw new CommandEvidenceError("status_exit_contradiction", "command status contradicts exit code");
   const output = Buffer.from(completed.aggregated_output ?? "");
-  const classification = workingDirectory === "." ? "workspace_root" : "workspace_relative";
   return {
     event_sequence: { started: sequence.started, completed: sequence.completed },
     runtime_item_id_digest: sha256(Buffer.from(started.id)),
     matched_command_id: matched?.command_id ?? null,
-    match_state: matched ? "matched" : "unmatched",
+    match_state: matchState,
     execution_form: classified.execution_form,
     logical_command_digest: classified.logical_digest,
     rendered_event_command_digest: classified.rendered_digest,
-    working_directory: { classification, digest: canonicalDigest({ classification, path: workingDirectory }) },
+    working_directory: { status: "unavailable", classification: null, value: null, digest: null, source: "codex_exec_jsonl_cwd_not_exposed" },
     status: exitCode === 0 ? "succeeded" : "failed",
     exit_code: exitCode,
     duration: { status: "unknown", milliseconds: null },
@@ -219,7 +186,7 @@ function failOnRuntimeErrorEvent(event) {
   throw new CommandEvidenceError("runtime_item_error", "runtime emitted an unclassified error item");
 }
 
-export function parseCodexCommandEvents({ stream, identity, contract, workspaceRoot = null }) {
+export function parseCodexCommandEvents({ stream, identity, contract }) {
   const bytes = Buffer.isBuffer(stream) ? stream : Buffer.from(stream ?? "");
   if (bytes.length > MAX_COMMAND_EVENT_STREAM_BYTES) throw new CommandEvidenceError("stream_oversized", "command event stream exceeds the byte limit");
   if (bytes.length === 0 || bytes.at(-1) !== 0x0a) throw new CommandEvidenceError("stream_truncated", "command event stream is empty or truncated");
@@ -253,7 +220,7 @@ export function parseCodexCommandEvents({ stream, identity, contract, workspaceR
     if (!started) throw new CommandEvidenceError("completed_without_started", "command completed without a matching started event");
     active.delete(item.id);
     completedIds.add(item.id);
-    commands.push(closeCommandEvidence(commandEvidenceBase({ sequence: { started: started.sequence, completed: eventSequence }, started: started.item, completed: item, contract, workspaceRoot }), identity));
+    commands.push(closeCommandEvidence(commandEvidenceBase({ sequence: { started: started.sequence, completed: eventSequence }, started: started.item, completed: item, contract }), identity));
   }
   if (active.size > 0) throw new CommandEvidenceError("started_without_completed", "command started without a matching completed event");
   if (!terminalTurn) throw new CommandEvidenceError("missing_terminal_turn", "command event stream lacks terminal turn completion");
@@ -278,7 +245,7 @@ function manifestIdentity(args) {
 
 export function buildCommandEvidenceManifest({ identity, capture, stream, command_event_count, commands }) {
   const base = {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     schema_path: COMMAND_EVIDENCE_SCHEMA_PATH,
     program: "adaptive_ask_command_evidence",
     ...manifestIdentity(identity),
@@ -310,8 +277,8 @@ export function buildUnavailableCommandEvidence({ identity, support, probe, reas
   });
 }
 
-export function buildCodexCommandEvidence({ identity, stream, contract, workspaceRoot = null }) {
-  const parsed = parseCodexCommandEvents({ stream, identity: manifestIdentity(identity), contract, workspaceRoot });
+export function buildCodexCommandEvidence({ identity, stream, contract }) {
+  const parsed = parseCodexCommandEvents({ stream, identity: manifestIdentity(identity), contract });
   return buildCommandEvidenceManifest({
     identity,
     capture: {
@@ -320,7 +287,7 @@ export function buildCodexCommandEvidence({ identity, stream, contract, workspac
       event_transport: "codex_exec_jsonl",
       event_format_revision: CODEX_COMMAND_EVENT_FORMAT_REVISION,
       parser_revision: COMMAND_EVIDENCE_PARSER_REVISION,
-      contract_probe_evidence: "local_version_help_json_probe",
+      contract_probe_evidence: "runtime_event_shell_authority",
       downgrade_reason: null,
     },
     ...parsed,
@@ -330,11 +297,11 @@ export function buildCodexCommandEvidence({ identity, stream, contract, workspac
 function assertCaptureSemantics(manifest) {
   const capture = manifest.capture;
   if (capture.evidence_level === "executed") {
-    if (capture.support !== "supported" || capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || capture.contract_probe_evidence !== "local_version_help_json_probe" || capture.downgrade_reason !== null) throw new Error("executed command evidence capture contract is inconsistent");
+    if (capture.support !== "supported" || capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || capture.contract_probe_evidence !== "runtime_event_shell_authority" || capture.downgrade_reason !== null) throw new Error("executed command evidence capture contract is inconsistent");
     return;
   }
   if (capture.support === "supported") {
-    if (capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || !["capture_invalid", "command_contract_unavailable", "runtime_unavailable"].includes(capture.contract_probe_evidence) || capture.downgrade_reason === null) throw new Error("supported unavailable command evidence capture contract is inconsistent");
+    if (capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || !["capture_invalid", "command_contract_unavailable", "runtime_unavailable", "shell_capability_unavailable"].includes(capture.contract_probe_evidence) || capture.downgrade_reason === null) throw new Error("supported unavailable command evidence capture contract is inconsistent");
   } else if (capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null || capture.downgrade_reason === null) throw new Error("unsupported command evidence capture contract is inconsistent");
 }
 
@@ -361,10 +328,11 @@ export function validateCommandEvidenceManifest(manifest, { root, contract = nul
     if ((command.status === "succeeded" && command.exit_code !== 0) || (command.status === "failed" && (!Number.isInteger(command.exit_code) || command.exit_code === 0))) throw new Error("command evidence status contradicts exit code");
     if (command.match_state === "matched") {
       const authority = commandById.get(command.matched_command_id);
-      const classification = authority?.working_directory === "." ? "workspace_root" : "workspace_relative";
-      const cwdDigest = authority ? canonicalDigest({ classification, path: authority.working_directory }) : null;
-      if (requireContractClosure && (!authority || authority.execution_form !== command.execution_form || authority.logical_command_digest !== command.logical_command_digest || authority.rendered_event_command_digest !== command.rendered_event_command_digest || command.working_directory.classification !== classification || command.working_directory.digest !== cwdDigest)) throw new Error("matched command evidence does not close to public authority");
-    } else if (command.matched_command_id !== null) throw new Error("unmatched command evidence must not name a command ID");
+      if (requireContractClosure && (!authority || authority.execution_form !== command.execution_form || authority.logical_command_digest !== command.logical_command_digest || authority.rendered_event_command_digest !== command.rendered_event_command_digest || authority.working_directory.evidence_requirement !== "not_required" || command.working_directory.status !== "unavailable")) throw new Error("matched command evidence does not close to public authority");
+    } else {
+      if (command.matched_command_id !== null) throw new Error("unmatched or cwd-unverified command evidence must not name a command ID");
+      if (requireContractClosure && command.match_state === "cwd_unverified" && !contract?.commands.some((authority) => authority.execution_form === command.execution_form && authority.logical_command_digest === command.logical_command_digest && authority.rendered_event_command_digest === command.rendered_event_command_digest && authority.working_directory.evidence_requirement === "runtime_observed")) throw new Error("cwd-unverified command evidence does not close to public authority");
+    }
   }
   return structuredClone(manifest);
 }
@@ -426,8 +394,10 @@ export function projectVerifiedCommandEvidence({ manifest, contract }) {
     failed_command_ids: failed,
     unavailable_command_ids: unavailable,
     unmatched_command_count: manifest.commands.filter(({ match_state }) => match_state === "unmatched").length,
+    cwd_unverified_command_count: manifest.commands.filter(({ match_state }) => match_state === "cwd_unverified").length,
     references: manifest.commands.map((command) => ({
       command_id: command.matched_command_id,
+      match_state: command.match_state,
       command_evidence_id: command.command_evidence_id,
       digest: command.command_evidence_digest,
       bytes: command.bytes,

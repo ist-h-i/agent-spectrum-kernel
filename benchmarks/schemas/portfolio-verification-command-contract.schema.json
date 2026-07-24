@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "schema_path", "program", "fixture_id", "fixture_input_digest", "commands", "contract_digest"],
   "properties": {
-    "schema_version": { "const": "1.1.0" },
+    "schema_version": { "const": "1.2.0" },
     "schema_path": { "const": "benchmarks/schemas/portfolio-verification-command-contract.schema.json" },
     "program": { "const": "adaptive_ask_verification_command_contract" },
     "fixture_id": { "$ref": "#/$defs/token" },
@@ -26,7 +26,15 @@
       "properties": {
         "command_id": { "$ref": "#/$defs/token" },
         "purpose": { "enum": ["test", "validation", "build", "lint", "typecheck"] },
-        "working_directory": { "$ref": "#/$defs/relativePath" },
+        "working_directory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "evidence_requirement"],
+          "properties": {
+            "path": { "$ref": "#/$defs/relativePath" },
+            "evidence_requirement": { "enum": ["runtime_observed", "not_required"] }
+          }
+        },
         "safe_argv": { "oneOf": [{ "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/safeArg" } }, { "type": "null" }] },
         "execution_form": { "enum": ["direct_argv", "codex_shell_command"] },
         "shell_family": { "enum": ["posix_bash", null] },

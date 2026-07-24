@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,6 +23,15 @@ function writeJson(path, value) {
 
 function fileDigest(path) {
   return `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`;
+}
+
+function commandEvidenceFileIdentity(path) {
+  const status = statSync(path);
+  return {
+    device: String(status.dev), inode: String(status.ino), size: status.size, mtime_ms: status.mtimeMs, ctime_ms: status.ctimeMs,
+    raw_digest: fileDigest(path),
+    canonical_path: { classification: "attempt_relative", digest: `sha256:${createHash("sha256").update(realpathSync(path)).digest("hex")}` },
+  };
 }
 
 function snapshot(path) {
@@ -73,8 +82,8 @@ function runtimeConfig(adapter, availability = "available") {
       }
       : null,
     command_evidence: adapter === "codex"
-      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.1.0" }
-      : { capture_required: true, support: "unsupported", event_transport: "none", event_format_revision: null, parser_revision: null },
+      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.2.0", shell_capability: { support_status: "supported", family: "posix_bash", executable: "/bin/bash", envelope_arguments: ["-lc"], authority_source: "codex_exec_jsonl_command_rendering", probe_status: "runtime_event_required", downgrade_reason: null } }
+      : { capture_required: true, support: "unsupported", event_transport: "none", event_format_revision: null, parser_revision: null, shell_capability: { support_status: "unsupported", family: null, executable: null, envelope_arguments: null, authority_source: "none", probe_status: "unsupported", downgrade_reason: "adapter_event_contract_not_implemented" } },
   };
 }
 
@@ -283,8 +292,7 @@ try {
   const invalidResultPath = resolve(invalidAttemptRoot, "result.json");
   const invalidCommitPath = resolve(invalidAttemptRoot, "commit.json");
   const invalidResult = JSON.parse(readFileSync(invalidResultPath, "utf8"));
-  const copiedCommandEvidenceStat = statSync(resolve(invalidAttemptRoot, "command-evidence.json"));
-  invalidResult.command_evidence.file_identity = { device: String(copiedCommandEvidenceStat.dev), inode: String(copiedCommandEvidenceStat.ino) };
+  invalidResult.command_evidence.file_identity = commandEvidenceFileIdentity(resolve(invalidAttemptRoot, "command-evidence.json"));
   invalidResult.status = "invalid";
   invalidResult.failure_kind = "invalid_input_or_selection";
   writeJson(invalidResultPath, invalidResult);
@@ -327,9 +335,8 @@ try {
         const resultPath = resolve(attemptRoot, "result.json");
         const commitPath = resolve(attemptRoot, "commit.json");
         if (!existsSync(commandPath) || !existsSync(resultPath) || !existsSync(commitPath)) continue;
-        const commandStat = statSync(commandPath);
         const result = JSON.parse(readFileSync(resultPath, "utf8"));
-        result.command_evidence.file_identity = { device: String(commandStat.dev), inode: String(commandStat.ino) };
+        result.command_evidence.file_identity = commandEvidenceFileIdentity(commandPath);
         writeJson(resultPath, result);
         const commit = JSON.parse(readFileSync(commitPath, "utf8"));
         commit.result_sha256 = fileDigest(resultPath);

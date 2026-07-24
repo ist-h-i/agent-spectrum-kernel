@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import {
@@ -19,6 +19,8 @@ import {
 } from "./ask-benchmark-command-evidence.mjs";
 import { validateBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { validateNormalizedCommandEvidence } from "./ask-benchmark-normalized-results.mjs";
+import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
+import { assertStableFileEvidence, readStableFile } from "./ask-benchmark-stable-file.mjs";
 
 const root = new URL("..", import.meta.url).pathname;
 const digest = (character) => `sha256:${character.repeat(64)}`;
@@ -27,11 +29,11 @@ mkdirSync(resolve(workspaceRoot, "workspace", "subdir"), { recursive: true });
 mkdirSync(resolve(workspaceRoot, "sibling"));
 symlinkSync(resolve(workspaceRoot, "workspace", "subdir"), resolve(workspaceRoot, "workspace", "linked-subdir"));
 
-function shellCommand(command_id, canonical_script, requirement = "required", alternative_group_id = null, working_directory = ".") {
+function shellCommand(command_id, canonical_script, requirement = "required", alternative_group_id = null, working_directory = ".", evidence_requirement = "not_required") {
   const base = {
     command_id,
     purpose: "test",
-    working_directory,
+    working_directory: { path: working_directory, evidence_requirement },
     safe_argv: null,
     execution_form: "codex_shell_command",
     shell_family: "posix_bash",
@@ -50,7 +52,7 @@ function directCommand(command_id, safe_argv) {
   const base = {
     command_id,
     purpose: "test",
-    working_directory: ".",
+    working_directory: { path: ".", evidence_requirement: "not_required" },
     safe_argv,
     execution_form: "direct_argv",
     shell_family: null,
@@ -67,7 +69,7 @@ function directCommand(command_id, safe_argv) {
 
 function contract(commands = [shellCommand("focused-test", "node workspace/test.mjs")]) {
   const base = {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     schema_path: "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
     program: "adaptive_ask_verification_command_contract",
     fixture_id: "synthetic-command-evidence",
@@ -95,10 +97,11 @@ function stream(events) {
   return Buffer.from(`${events.map((event) => JSON.stringify(event)).join("\n")}\n`);
 }
 
-function commandPair({ id = "runtime-item-1", command, cwd = ".", status = "completed", exit_code = 0, output = "focused pass\n", completed = {} }) {
+function commandPair({ id = "runtime-item-1", command, cwd, status = "completed", exit_code = 0, output = "focused pass\n", completed = {} }) {
+  const unknownCwd = cwd === undefined ? {} : { cwd };
   return [
-    { type: "item.started", item: { id, type: "command_execution", command, cwd, status: "in_progress" } },
-    { type: "item.completed", item: { id, type: "command_execution", command, cwd, status, exit_code, aggregated_output: output, ...completed } },
+    { type: "item.started", item: { id, type: "command_execution", command, status: "in_progress", ...unknownCwd } },
+    { type: "item.completed", item: { id, type: "command_execution", command, status, exit_code, aggregated_output: output, ...unknownCwd, ...completed } },
   ];
 }
 
@@ -111,7 +114,6 @@ function build(authority, pairs, options = {}) {
     identity: { ...identity, verification_command_contract_digest: authority.contract_digest },
     stream: commandStream(pairs),
     contract: authority,
-    workspaceRoot: options.workspaceRoot ?? workspaceRoot,
   });
 }
 
@@ -119,11 +121,26 @@ function expectFailure(label, action, pattern) {
   assert.throws(action, pattern, label);
 }
 
+function resealCommandEvidence(manifest, commandIndex, mutate) {
+  const sealed = structuredClone(manifest);
+  const current = sealed.commands[commandIndex];
+  const { command_evidence_id: _id, command_evidence_digest: _digest, bytes: _bytes, ...base } = current;
+  mutate(base);
+  const identityFields = Object.fromEntries(["run_instance_id", "case_id", "attempt", "adapter", "condition", "fixture_id", "repetition", "fixture_input_digest", "verification_command_contract_digest", "runtime_identity_digest", "effective_command_digest"].map((field) => [field, sealed[field]]));
+  const digestValue = canonicalDigest({ ...identityFields, ...base });
+  const id = `command-evidence-${digestValue.slice("sha256:".length, "sha256:".length + 32)}`;
+  sealed.commands[commandIndex] = { command_evidence_id: id, command_evidence_digest: digestValue, ...base };
+  sealed.commands[commandIndex].bytes = Buffer.from(stableCanonicalJson(sealed.commands[commandIndex])).length;
+  const { manifest_digest: _manifestDigest, ...manifestBase } = sealed;
+  sealed.manifest_digest = canonicalDigest(manifestBase);
+  return sealed;
+}
+
 try {
   const authority = validateVerificationCommandContract(contract(), { root });
   const rendered = renderCommandEvent(authority.commands[0]);
   assert.equal(rendered, "/bin/bash -lc 'node workspace/test.mjs'");
-  const executed = build(authority, [commandPair({ command: rendered, cwd: workspaceRoot })]);
+  const executed = build(authority, [commandPair({ command: rendered })]);
   validateCommandEvidenceManifest(executed, { root, contract: authority });
   const projection = projectVerifiedCommandEvidence({ manifest: executed, contract: authority });
   assert.deepEqual(projection.required_command_ids, ["focused-test"]);
@@ -137,6 +154,7 @@ try {
   assert.equal(JSON.stringify(executed).includes("focused pass"), false, "raw command output must not be durable");
   assert.equal(JSON.stringify(executed).includes(rendered), false, "raw shell command must not be durable");
   assert.equal(JSON.stringify(executed).includes(workspaceRoot), false, "absolute workspace path must not be durable");
+  assert.deepEqual(executed.commands[0].working_directory, { status: "unavailable", classification: null, value: null, digest: null, source: "codex_exec_jsonl_cwd_not_exposed" });
 
   for (const script of [
     "node workspace/test.mjs",
@@ -206,26 +224,28 @@ try {
   const differentScript = build(authority, [commandPair({ command: "/bin/bash -lc 'node workspace/other.mjs'" })]);
   assert.equal(differentScript.commands[0].match_state, "unmatched", "different safe public script must not match by inference");
 
-  const subdirAuthority = validateVerificationCommandContract(contract([shellCommand("subdir-test", "node test.mjs", "required", null, "workspace/subdir")]), { root });
-  const subdirRendered = renderCommandEvent(subdirAuthority.commands[0]);
-  const subdirEvidence = build(subdirAuthority, [commandPair({ command: subdirRendered, cwd: resolve(workspaceRoot, "workspace", "subdir") })]);
-  assert.equal(subdirEvidence.commands[0].match_state, "matched", "absolute ephemeral cwd must normalize to public relative authority");
-  expectFailure("contract root runtime subdirectory", () => build(authority, [commandPair({ command: rendered, cwd: resolve(workspaceRoot, "workspace", "subdir") })]), /working directory.*authority/u);
-  expectFailure("contract subdirectory runtime root", () => build(subdirAuthority, [commandPair({ command: subdirRendered, cwd: workspaceRoot })]), /working directory.*authority/u);
-  expectFailure("sibling directory", () => build(subdirAuthority, [commandPair({ command: subdirRendered, cwd: resolve(workspaceRoot, "sibling") })]), /working directory.*authority/u);
-  expectFailure("workspace escape", () => build(authority, [commandPair({ command: rendered, cwd: resolve(workspaceRoot, "..") })]), /escapes the workspace/u);
-  expectFailure("absolute external directory", () => build(authority, [commandPair({ command: rendered, cwd: tmpdir() })]), /escapes the workspace/u);
-  expectFailure("symlinked subdirectory", () => build(subdirAuthority, [commandPair({ command: subdirRendered, cwd: resolve(workspaceRoot, "workspace", "linked-subdir") })]), /symlinked|canonical/u);
-  expectFailure("started completed cwd drift", () => buildCodexCommandEvidence({
-    identity: { ...identity, verification_command_contract_digest: authority.contract_digest },
-    contract: authority,
-    workspaceRoot,
-    stream: stream([
-      { type: "item.started", item: { id: "cwd-drift", type: "command_execution", command: rendered, cwd: "." } },
-      { type: "item.completed", item: { id: "cwd-drift", type: "command_execution", command: rendered, cwd: "workspace/subdir", status: "completed", exit_code: 0, aggregated_output: "" } },
-      { type: "turn.completed" },
-    ]),
-  }), /working directory changed/u);
+  const runtimeObservedCommand = shellCommand("cwd-dependent", "node workspace/test.mjs", "required", null, ".", "runtime_observed");
+  const runtimeObservedAuthority = validateVerificationCommandContract(contract([runtimeObservedCommand]), { root });
+  const runtimeObservedRendered = renderCommandEvent(runtimeObservedCommand);
+  const cwdUnavailable = build(runtimeObservedAuthority, [commandPair({ command: runtimeObservedRendered })]);
+  assert.equal(cwdUnavailable.commands[0].match_state, "cwd_unverified", "missing transport cwd must not be inferred as workspace root");
+  assert.equal(cwdUnavailable.commands[0].matched_command_id, null);
+  assert.deepEqual(projectVerifiedCommandEvidence({ manifest: cwdUnavailable, contract: runtimeObservedAuthority }).unavailable_command_ids, ["cwd-dependent"]);
+  const fakeCwd = build(runtimeObservedAuthority, [commandPair({ command: runtimeObservedRendered, cwd: workspaceRoot })]);
+  assert.equal(fakeCwd.commands[0].match_state, "cwd_unverified", "unknown fake cwd fields must not become production authority");
+  const fakeSubdirectoryCwd = build(runtimeObservedAuthority, [commandPair({ command: runtimeObservedRendered, cwd: resolve(workspaceRoot, "workspace", "subdir") })]);
+  assert.equal(fakeSubdirectoryCwd.commands[0].match_state, "cwd_unverified", "a root command observed from a fake subdirectory cwd must not gain inferred success");
+  assert.equal(executed.commands[0].match_state, "matched", "only an explicit not_required contract may match without cwd evidence");
+  const inferredCwd = resealCommandEvidence(cwdUnavailable, 0, (command) => {
+    command.working_directory = { status: "observed", classification: "workspace_root", value: ".", digest: canonicalDigest({ classification: "workspace_root", path: "." }), source: "forged_runtime_cwd" };
+    command.match_state = "matched";
+    command.matched_command_id = "cwd-dependent";
+  });
+  expectFailure("re-sealed unavailable cwd promoted to workspace root", () => validateCommandEvidenceManifest(inferredCwd, { root, contract: runtimeObservedAuthority }), /Schema|authority/u);
+  const promotedCwdProjection = projectVerifiedCommandEvidence({ manifest: cwdUnavailable, contract: runtimeObservedAuthority });
+  promotedCwdProjection.succeeded_command_ids = ["cwd-dependent"];
+  promotedCwdProjection.unavailable_command_ids = [];
+  expectFailure("normalized cwd unavailable promoted to success", () => validateNormalizedCommandEvidence(promotedCwdProjection), /reference|inventory|summary/u);
 
   const repeatPair = (id, status = "completed", exitCode = 0) => commandPair({ id, command: rendered, status, exit_code: exitCode });
   const twice = projectVerifiedCommandEvidence({ manifest: build(authority, [repeatPair("repeat-1"), repeatPair("repeat-2")]), contract: authority });
@@ -314,7 +334,39 @@ try {
   const successFromUnavailable = structuredClone(unavailable);
   successFromUnavailable.capture.evidence_level = "executed";
   expectFailure("unavailable changed to success", () => validateCommandEvidenceManifest(successFromUnavailable, { root, contract: authority }), /Schema|digest|capture/u);
-  assert.equal(COMMAND_EVIDENCE_PARSER_REVISION, "1.1.0");
+
+  const stableReadRoot = resolve(realpathSync(workspaceRoot), "stable-command-evidence-races");
+  mkdirSync(stableReadRoot);
+  const stablePath = resolve(stableReadRoot, "command-evidence.json");
+  const replacementPath = resolve(stableReadRoot, "replacement.json");
+  writeFileSync(stablePath, "{\"value\":1}\n");
+  writeFileSync(replacementPath, "{\"value\":2}\n");
+  expectFailure("different-byte replacement after descriptor open", () => readStableFile(stablePath, "command evidence", 1024, { allowEmpty: false, afterOpen: () => renameSync(replacementPath, stablePath) }), /replaced|changed/u);
+  writeFileSync(stablePath, "{\"value\":1}\n");
+  writeFileSync(replacementPath, "{\"value\":1}\n");
+  expectFailure("same-byte different-inode replacement after descriptor open", () => readStableFile(stablePath, "command evidence", 1024, { allowEmpty: false, afterOpen: () => renameSync(replacementPath, stablePath) }), /replaced|changed/u);
+
+  const canonicalParent = resolve(stableReadRoot, "canonical-parent");
+  const canonicalOriginal = resolve(stableReadRoot, "canonical-parent-original");
+  const canonicalAlternate = resolve(stableReadRoot, "canonical-alternate");
+  mkdirSync(canonicalParent);
+  mkdirSync(canonicalAlternate);
+  writeFileSync(resolve(canonicalParent, "command-evidence.json"), "{\"value\":1}\n");
+  writeFileSync(resolve(canonicalAlternate, "command-evidence.json"), "{\"value\":1}\n");
+  expectFailure("canonical parent replacement after descriptor open", () => readStableFile(resolve(canonicalParent, "command-evidence.json"), "command evidence", 1024, {
+    allowEmpty: false,
+    afterOpen: () => {
+      renameSync(canonicalParent, canonicalOriginal);
+      symlinkSync(canonicalAlternate, canonicalParent, "dir");
+    },
+  }), /replaced|canonical|changed/u);
+
+  writeFileSync(stablePath, "{\"value\":3}\n");
+  const stableBefore = readStableFile(stablePath, "command evidence", 1024, { allowEmpty: false, afterOpen: () => {} });
+  const stableAfter = readStableFile(stablePath, "command evidence", 1024, { allowEmpty: false });
+  assertStableFileEvidence(stableBefore, stableAfter, "command evidence");
+  assert.equal(stableBefore.bytes.toString("utf8"), "{\"value\":3}\n", "stable verification must remain read-only");
+  assert.equal(COMMAND_EVIDENCE_PARSER_REVISION, "1.2.0");
 
   console.log("ASK benchmark command evidence contract tests passed");
 } finally {

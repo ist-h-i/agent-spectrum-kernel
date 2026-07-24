@@ -89,7 +89,7 @@
     "command_evidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["manifest_digest", "capture_support", "evidence_level", "command_event_count", "verification_command_contract_digest", "required_command_ids", "required_alternative_groups", "command_summaries", "attempted_command_ids", "succeeded_command_ids", "failed_command_ids", "unavailable_command_ids", "unmatched_command_count", "references"],
+      "required": ["manifest_digest", "capture_support", "evidence_level", "command_event_count", "verification_command_contract_digest", "required_command_ids", "required_alternative_groups", "command_summaries", "attempted_command_ids", "succeeded_command_ids", "failed_command_ids", "unavailable_command_ids", "unmatched_command_count", "cwd_unverified_command_count", "references"],
       "properties": {
         "manifest_digest": { "$ref": "#/$defs/digest" },
         "capture_support": { "enum": ["supported", "unsupported", "unknown"] },
@@ -130,13 +130,15 @@
         "failed_command_ids": { "$ref": "#/$defs/commandIds" },
         "unavailable_command_ids": { "$ref": "#/$defs/commandIds" },
         "unmatched_command_count": { "type": "integer", "minimum": 0 },
+        "cwd_unverified_command_count": { "type": "integer", "minimum": 0 },
         "references": {
           "type": "array",
           "items": {
             "type": "object", "additionalProperties": false,
-            "required": ["command_id", "command_evidence_id", "digest", "bytes", "outcome", "exit_code"],
+            "required": ["command_id", "match_state", "command_evidence_id", "digest", "bytes", "outcome", "exit_code"],
             "properties": {
               "command_id": { "type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+              "match_state": { "enum": ["matched", "unmatched", "cwd_unverified"] },
               "command_evidence_id": { "type": "string", "pattern": "^command-evidence-[a-f0-9]{32}$" },
               "digest": { "$ref": "#/$defs/digest" },
               "bytes": { "type": "integer", "minimum": 1 },

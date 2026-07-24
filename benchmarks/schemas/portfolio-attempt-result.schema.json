@@ -26,8 +26,19 @@
         "capture_status": { "enum": ["executed", "unavailable"] },
         "evidence_count": { "type": "integer", "minimum": 0 },
         "file_identity": {
-          "type": "object", "additionalProperties": false, "required": ["device", "inode"],
-          "properties": { "device": { "type": "string", "pattern": "^[0-9]+$" }, "inode": { "type": "string", "pattern": "^[0-9]+$" } }
+          "type": "object", "additionalProperties": false, "required": ["device", "inode", "size", "mtime_ms", "ctime_ms", "raw_digest", "canonical_path"],
+          "properties": {
+            "device": { "type": "string", "pattern": "^[0-9]+$" },
+            "inode": { "type": "string", "pattern": "^[0-9]+$" },
+            "size": { "type": "integer", "minimum": 1 },
+            "mtime_ms": { "type": "number", "minimum": 0 },
+            "ctime_ms": { "type": "number", "minimum": 0 },
+            "raw_digest": { "$ref": "#/$defs/digest" },
+            "canonical_path": {
+              "type": "object", "additionalProperties": false, "required": ["classification", "digest"],
+              "properties": { "classification": { "const": "attempt_relative" }, "digest": { "$ref": "#/$defs/digest" } }
+            }
+          }
         }
       }
     },
