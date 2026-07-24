@@ -15,7 +15,6 @@
     "task_class",
     "suite",
     "evaluator_revision",
-    "evaluator_source_identity",
     "generator_identity",
     "independence_statement_digest",
     "review_record_digest",

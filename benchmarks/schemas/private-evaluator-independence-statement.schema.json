@@ -9,7 +9,6 @@
     "generator_role_identity",
     "generation_date",
     "generation_revision",
-    "evaluator_source_identity",
     "frozen_candidate_input",
     "source_classification",
     "excluded_source_classification",

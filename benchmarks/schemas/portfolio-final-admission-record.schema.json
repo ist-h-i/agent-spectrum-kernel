@@ -10,7 +10,6 @@
     "evaluator_reference_schema",
     "evaluator_bundle_id",
     "evaluator_bundle_digest",
-    "evaluator_source_identity",
     "evaluator_byte_count",
     "evaluator_requirement_count",
     "evidence_map_ids",

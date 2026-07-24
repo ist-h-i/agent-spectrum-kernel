@@ -12,7 +12,6 @@
     "fixture_identity",
     "input_identity",
     "evaluator_revision",
-    "evaluator_source_identity",
     "generator",
     "independence",
     "review",

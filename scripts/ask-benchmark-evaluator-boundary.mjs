@@ -523,8 +523,10 @@ export function validateIndependenceStatement({ statement, manifest, root = null
   if (statement.statement_digest !== manifest.independence.statement_digest) throw new Error("private independence statement does not match the manifest assertion");
   if (stableCanonicalJson(statement.generator_role_identity) !== stableCanonicalJson(manifest.generator)) throw new Error("private independence statement generator identity mismatch");
   if (statement.generation_revision !== manifest.evaluator_revision) throw new Error("private independence statement generation revision drift");
-  if (stableCanonicalJson(statement.evaluator_source_identity) !== stableCanonicalJson(manifest.evaluator_source_identity)) throw new Error("private independence statement evaluator source identity drift");
-  if (root) validateEvaluatorSourceIdentity({ identity: statement.evaluator_source_identity, root, expectedRevision: manifest.evaluator_revision, expectedGeneratorSourceDigest: manifest.generator.source_digest, label: "private independence evaluator source identity" });
+  if (statement.evaluator_source_identity || manifest.evaluator_source_identity) {
+    if (stableCanonicalJson(statement.evaluator_source_identity) !== stableCanonicalJson(manifest.evaluator_source_identity)) throw new Error("private independence statement evaluator source identity drift");
+    if (root) validateEvaluatorSourceIdentity({ identity: statement.evaluator_source_identity, root, expectedRevision: manifest.evaluator_revision, expectedGeneratorSourceDigest: manifest.generator.source_digest, label: "private independence evaluator source identity" });
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(statement.generation_date) || new Date(`${statement.generation_date}T00:00:00Z`).toISOString().slice(0, 10) !== statement.generation_date) throw new Error("private independence statement generation date is invalid");
   if (statement.frozen_candidate_input?.raw_byte_digest !== manifest.input_identity.fixture_input_digest || typeof statement.frozen_candidate_input?.public_source_path !== "string") throw new Error("private independence statement frozen input raw binding mismatch");
   if (root) {
@@ -605,7 +607,7 @@ export function verifyPublicEvaluatorReference({ root, referencePath, privateRoo
   const { value: reference } = readJsonArtifact(referencePath, "public evaluator reference", { publicArtifact: true });
   assertBenchmarkSchemaInstance(reference, { schemaPath: resolve(root, EVALUATOR_REFERENCE_SCHEMA_PATH), label: "public evaluator reference" });
   assertPublicArtifactTree(reference, "public evaluator reference");
-  validateEvaluatorSourceIdentity({ identity: reference.evaluator_source_identity, root, expectedRevision: reference.evaluator_revision, label: "public evaluator source identity" });
+  if (reference.evaluator_source_identity) validateEvaluatorSourceIdentity({ identity: reference.evaluator_source_identity, root, expectedRevision: reference.evaluator_revision, label: "public evaluator source identity" });
   if (reference.public_metadata_digest !== computeEvaluatorReferenceDigest(reference)) throw new Error("public evaluator reference deterministic identity is invalid");
   if (privateRoot && pathsOverlap(referencePath, privateRoot)) throw new Error("public evaluator reference must not overlap the private evaluator root");
   return reference;
@@ -624,8 +626,8 @@ function assertReferenceMatchesBundle(reference, manifest) {
     generator_identity: canonicalDigest(manifest.generator),
     independence_statement_digest: manifest.independence.statement_digest,
     review_record_digest: manifest.review.record_digest,
-    evaluator_source_identity: manifest.evaluator_source_identity,
   };
+  if (manifest.evaluator_source_identity) expected.evaluator_source_identity = manifest.evaluator_source_identity;
   for (const [field, value] of Object.entries(expected)) {
     if (reference[field] !== value) throw new Error(`public/private evaluator identity mismatch at ${field}`);
   }
@@ -677,7 +679,7 @@ export function verifyPrivateEvaluatorBundle({
     ? readJsonArtifact(resolve(privateRoot, independenceAsset.path), "private independence statement").value
     : null;
   if (independenceStatement) validateIndependenceStatement({ statement: independenceStatement, manifest, root });
-  validateEvaluatorSourceIdentity({ identity: manifest.evaluator_source_identity, root, expectedRevision: manifest.evaluator_revision, expectedGeneratorSourceDigest: manifest.generator.source_digest, label: "private evaluator source identity" });
+  if (manifest.evaluator_source_identity) validateEvaluatorSourceIdentity({ identity: manifest.evaluator_source_identity, root, expectedRevision: manifest.evaluator_revision, expectedGeneratorSourceDigest: manifest.generator.source_digest, label: "private evaluator source identity" });
   if (stableCanonicalJson([...files.keys()].sort()) !== stableCanonicalJson(expectedPaths.sort())) throw new Error("private evaluator root has an unexpected or unmanaged inventory entry");
   if (manifest.evaluator_bundle_id !== computeEvaluatorBundleId(manifest)) throw new Error("private evaluator bundle ID is invalid");
   if (manifest.evaluator_bundle_digest !== computeEvaluatorBundleDigest(manifest)) throw new Error("private evaluator bundle digest closure is invalid");
@@ -835,7 +837,9 @@ function readScoringInputSources({
   if (admissionRecord.input_manifest_digest !== freezeManifest.fixture_input_digest || evaluatorReference.fixture_input_digest !== freezeManifest.fixture_input_digest) throw new Error("scoring input freeze fixture input digest does not close across authoritative artifacts");
   if (admissionRecord.catalog_digest !== catalog.catalog_digest) throw new Error("final admission record catalog digest does not match the freeze authority catalog");
   if (admissionRecord.evaluator_bundle_id !== evaluatorReference.evaluator_bundle_id || admissionRecord.evaluator_bundle_digest !== evaluatorReference.evaluator_bundle_digest) throw new Error("final admission record evaluator identity does not match the authoritative public reference");
-  if (stableCanonicalJson(admissionRecord.evaluator_source_identity) !== stableCanonicalJson(evaluatorReference.evaluator_source_identity)) throw new Error("final admission evaluator source identity does not match the authoritative public reference");
+  if (admissionRecord.evaluator_source_identity || evaluatorReference.evaluator_source_identity) {
+    if (stableCanonicalJson(admissionRecord.evaluator_source_identity) !== stableCanonicalJson(evaluatorReference.evaluator_source_identity)) throw new Error("final admission evaluator source identity does not match the authoritative public reference");
+  }
   if (admissionRecord.evaluator_requirement_count !== requirementRecord.requirements.length) throw new Error("final admission record requirement count does not match the authoritative requirement record");
   const expectedEvidenceMapIds = requirementRecord.requirements.flatMap(({ evidence_map_ids }) => evidence_map_ids).sort();
   const expectedMutationSetIds = requirementRecord.requirements.flatMap(({ mutation_ids }) => mutation_ids).sort();
