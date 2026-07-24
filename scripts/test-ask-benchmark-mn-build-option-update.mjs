@@ -1081,7 +1081,7 @@ async function runPrivatePortabilityChecks(privateRoot) {
 
   const driftedModule = resolve(alternate, "scripts/ask-benchmark-scoring-contract.mjs");
   writeFileSync(driftedModule, `${readFileSync(driftedModule, "utf8")}\n// R7 source transplant\n`);
-  await assert.rejects(() => evaluator.evaluateCandidate({ repositoryRoot: alternate, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true }), /source bytes drifted|base Git revision/u, "source identity/load transplant must fail closed");
+  await assert.rejects(() => evaluator.evaluateCandidate({ repositoryRoot: alternate, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true }), /source .*bytes drifted|base Git revision/u, "source identity/load transplant must fail closed");
 
   const symlinkRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-r7-symlink-copy-"));
   rmSync(symlinkRoot, { recursive: true, force: true });
