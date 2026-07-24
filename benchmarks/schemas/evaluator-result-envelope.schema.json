@@ -89,6 +89,7 @@
     "evaluation_id": { "type": "string", "pattern": "^evaluation-[a-f0-9]{32}$" },
     "evaluation_digest": { "$ref": "#/$defs/digest" },
     "evaluation_status": { "enum": ["completed", "invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required"] },
+    "invalid_input_authority": { "$ref": "#/$defs/invalidInputAuthority" },
     "requirement_results": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/requirementResult" } },
     "classification": { "enum": ["correct_narrow_execution", "under_processing", "over_processing", "invalid_evidence"] },
     "quality": { "$ref": "#/$defs/observation" },
@@ -170,6 +171,16 @@
         "kind": { "enum": ["normalized_result", "final_output", "repository_diff", "test_result", "execution_event"] },
         "digest": { "$ref": "#/$defs/digest" },
         "bytes": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "invalidInputAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layer", "category", "evidence_references"],
+      "properties": {
+        "layer": { "enum": ["evaluation_input", "command_evidence"] },
+        "category": { "$ref": "#/$defs/token" },
+        "evidence_references": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } }
       }
     },
     "requirementResult": {

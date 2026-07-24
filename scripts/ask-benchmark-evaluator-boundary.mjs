@@ -25,11 +25,14 @@ import {
   computeRequirementSetDigest,
   computeScoringInputFreezeManifestDigest,
   computeScoringPolicyDigest,
-  deriveVerificationEvidenceReferences,
+  deriveEffectiveVerificationEvidenceReferences,
+  deriveEffectiveVerificationEvidenceState,
   FINAL_ADMISSION_RECORD_SCHEMA_PATH,
   SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH,
   validateFinalAdmissionRecordContract,
+  validateBinaryScopeVerificationResult,
   validateRequirementRecordContract,
+  validateRequirementResultObservations,
   validateScoringContractSchemaParity,
   validateScoringInputBindings,
 } from "./ask-benchmark-scoring-contract.mjs";
@@ -37,6 +40,7 @@ import {
 export const EVALUATOR_REFERENCE_SCHEMA_PATH = "benchmarks/schemas/evaluator-reference.schema.json";
 export const PRIVATE_EVALUATOR_BUNDLE_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-bundle.schema.json";
 export const PRIVATE_EVALUATOR_INDEPENDENCE_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-independence-statement.schema.json";
+export const PRIVATE_EVALUATOR_FRAGMENT_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-fragment.schema.json";
 export const EVALUATOR_RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result-envelope.schema.json";
 const CATALOG_SCHEMA_PATH = "benchmarks/schemas/portfolio-catalog.schema.json";
 const POLICY_MANIFEST_SCHEMA_PATH = "benchmarks/schemas/portfolio-policy-manifest.schema.json";
@@ -576,6 +580,112 @@ export function computeEvaluationDigest(result) {
   return canonicalDigest(closure);
 }
 
+function fragmentEnvelopeView(fragment) {
+  return {
+    ...fragment,
+    false_positives: [],
+  };
+}
+
+export function validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy, requirementRecord, normalizedResult }) {
+  assertBenchmarkSchemaInstance(fragment, { schemaPath: resolve(root, PRIVATE_EVALUATOR_FRAGMENT_SCHEMA_PATH), label: "private evaluator result fragment" });
+  if (fragment.scoring_ready !== false) throw new Error("private evaluator fragment must remain scoring-ineligible");
+  const envelopeView = fragmentEnvelopeView(fragment);
+  validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult: envelopeView });
+  validateBinaryScopeVerificationResult({ evaluatorResult: envelopeView, requirementRecord, normalizedResult });
+  return structuredClone(fragment);
+}
+
+function fragmentObservation(fragment, field, fallbackState) {
+  const source = fragment[field];
+  return { state: source?.state ?? fallbackState, evidence_references: structuredClone(source?.evidence_references ?? []) };
+}
+
+function authorityPrivacy() {
+  return {
+    oracle_content_stored: false,
+    rubric_content_stored: false,
+    hidden_test_content_stored: false,
+    matcher_content_stored: false,
+    reference_answer_stored: false,
+    raw_evaluator_prompt_stored: false,
+    private_path_stored: false,
+    secret_customer_or_personal_data_stored: false,
+  };
+}
+
+export function adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment, authority }) {
+  const normalized = authority.normalizedResult;
+  const validated = validatePrivateEvaluatorFragment({
+    root,
+    fragment,
+    scoringPolicy: authority.scoringPolicy,
+    requirementRecord: authority.requirementRecord,
+    normalizedResult: normalized,
+  });
+  const lineage = normalized.lineage;
+  const manifest = authority.bundleManifest;
+  const result = {
+    schema_version: "1.0.0",
+    schema_path: EVALUATOR_RESULT_SCHEMA_PATH,
+    program: "adaptive_ask_evaluator_result",
+    scoring_input_freeze_manifest_source_digest: authority.freezeManifestSourceDigest,
+    scoring_input_freeze_manifest_digest: authority.freezeManifest.manifest_digest,
+    catalog_digest: authority.catalog.catalog_digest,
+    policy_manifest_digest: authority.policyManifest.manifest_digest,
+    scoring_policy_digest: authority.scoringPolicy.policy_digest,
+    admission_record_digest: authority.admissionRecord.admission_digest,
+    requirement_record_digest: authority.requirementRecord.requirement_record_digest,
+    requirement_set_digest: authority.requirementRecord.requirement_set_digest,
+    output_contract_digest: authority.outputContract.output_contract_digest,
+    evaluator_public_reference_digest: authority.evaluatorReference.public_metadata_digest,
+    normalized_result_id: normalized.normalized_result_id,
+    normalized_result_digest: normalized.normalized_result_digest,
+    run_instance_id: lineage.run_instance_id,
+    plan_id: lineage.plan_id,
+    plan_digest: lineage.plan_digest,
+    fixture_id: lineage.fixture_id,
+    fixture_input_digest: lineage.fixture_input_digest,
+    case_id: lineage.case_id,
+    attempt: lineage.attempt,
+    adapter: lineage.adapter_track,
+    condition: lineage.condition,
+    repetition: lineage.repetition,
+    source_snapshot_digest: authority.sourceSnapshotDigest,
+    evaluator_bundle_id: manifest.evaluator_bundle_id,
+    evaluator_bundle_digest: manifest.evaluator_bundle_digest,
+    evaluator_revision: manifest.evaluator_revision,
+    evaluation_id: "evaluation-placeholder",
+    evaluation_digest: "sha256:" + "0".repeat(64),
+    evaluation_status: validated.evaluation_status,
+    requirement_results: structuredClone(validated.requirement_results),
+    result_profile: structuredClone(validated.result_profile),
+    classification: validated.classification,
+    quality: fragmentObservation(validated, "verification_correctness", "fail"),
+    safety: fragmentObservation(validated, "evidence_correctness", "fail"),
+    findings: structuredClone(validated.findings),
+    false_positives: [],
+    scope_deviations: structuredClone(validated.scope_deviations),
+    decision_correctness: fragmentObservation(validated, "verification_correctness", "fail"),
+    verification_correctness: fragmentObservation(validated, "verification_correctness", "fail"),
+    evidence_correctness: fragmentObservation(validated, "evidence_correctness", "fail"),
+    approval_correctness: fragmentObservation(validated, "evidence_correctness", "fail"),
+    completion_claim_correctness: fragmentObservation(validated, "verification_correctness", "fail"),
+    under_processing: fragmentObservation(validated, "under_processing", "not_detected"),
+    over_processing: fragmentObservation(validated, "over_processing", "not_detected"),
+    required_mechanisms: [],
+    unnecessary_mechanisms: [],
+    unsafe_attempted_actions: [],
+    evaluator_notes_state: { state: "not_recorded", digest: null, bytes: null },
+    privacy: authorityPrivacy(),
+  };
+  if (validated.invalid_input_authority) result.invalid_input_authority = structuredClone(validated.invalid_input_authority);
+  result.evaluation_id = computeEvaluationId(result);
+  result.evaluation_digest = computeEvaluationDigest(result);
+  assertBenchmarkSchemaInstance(result, { schemaPath: resolve(root, EVALUATOR_RESULT_SCHEMA_PATH), label: "authority-owned evaluator result envelope" });
+  return result;
+}
+
 function assertPrivateBoundary({ root, privateRoot, materializedPath, selectionState, runDir, normalizedResultsPath, publicArtifactRoot = null }) {
   const canonicalPrivateRoot = assertRealDirectory(privateRoot, "private evaluator root");
   const boundaries = [
@@ -749,7 +859,7 @@ export function validateExecutionEventEvidenceReferences({ normalized, result })
     const state = typedState ?? (verification.state === "pass" ? "executed_success" : null);
     const hasCommandAuthority = normalized.command_evidence.required_command_ids.length > 0 || (normalized.command_evidence.required_alternative_groups ?? []).length > 0;
     if (state && (typedState || hasCommandAuthority)) {
-      const expected = deriveVerificationEvidenceReferences(normalized, state);
+      const expected = deriveEffectiveVerificationEvidenceReferences({ normalizedResult: normalized, evaluatorResult: result, state: deriveEffectiveVerificationEvidenceState({ normalizedResult: normalized, evaluatorResult: result }) });
       const key = (reference) => `${reference.kind}:${reference.digest}:${reference.kind === "normalized_result" ? "normalized" : reference.bytes}`;
       const actualKeys = verification.evidence_references.map(key).sort();
       const expectedKeys = expected.map(key).sort();

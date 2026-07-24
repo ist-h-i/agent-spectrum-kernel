@@ -26,6 +26,8 @@ import {
   computeEvaluatorBundleDigest,
   computeEvaluatorBundleId,
   computeIndependenceStatementDigest,
+  adaptPrivateEvaluatorFragmentToEnvelope,
+  validatePrivateEvaluatorFragment,
   validateEvaluatorSourceIdentity,
   verifyEvaluatorBoundary,
 } from "./ask-benchmark-evaluator-boundary.mjs";
@@ -37,6 +39,8 @@ import {
   computeResultProfileDigest,
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
   deriveVerificationEvidenceReferences,
+  deriveEffectiveVerificationEvidenceReferences,
+  deriveEffectiveVerificationEvidenceState,
   deriveVerificationEvidenceState,
   validateScoringInputBindings,
 } from "./ask-benchmark-scoring-contract.mjs";
@@ -588,6 +592,7 @@ function syntheticEvaluatorResult({ state, authority, normalizedAuthority, bundl
     evaluator_notes_state: { state: "not_recorded", digest: null, bytes: null },
     privacy: { oracle_content_stored: false, rubric_content_stored: false, hidden_test_content_stored: false, matcher_content_stored: false, reference_answer_stored: false, raw_evaluator_prompt_stored: false, private_path_stored: false, secret_customer_or_personal_data_stored: false },
   };
+  if (invalid) result.invalid_input_authority = { layer: "command_evidence", category: "normalized_command_evidence_invalid", evidence_references: [normalizedReference] };
   result.evaluation_id = computeEvaluationId(result);
   result.evaluation_digest = computeEvaluationDigest(result);
   return result;
@@ -627,12 +632,40 @@ function persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scor
   return { snapshot, evaluatorResultPath, chainManifest };
 }
 
-function runPersistentFullEvaluatorAuthority(privateRoot, state) {
+async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority }) {
+  const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
+  const hiddenAsset = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
+  const evaluator = await import(pathToFileURL(resolve(privateRoot, hiddenAsset.path)).href);
+  const frozenWorkspace = resolve(authorityRoot, "frozen-workspace");
+  const candidateWorkspace = resolve(authorityRoot, "candidate-workspace");
+  cpSync(resolve(fixtureRoot, "workspace"), frozenWorkspace, { recursive: true });
+  cpSync(resolve(fixtureRoot, "workspace"), candidateWorkspace, { recursive: true });
+  const fragment = await evaluator.evaluateCandidateSafe({
+    repositoryRoot: root,
+    frozenWorkspace,
+    candidateWorkspace,
+    normalizedResult: normalizedAuthority.normalized,
+  });
+  assert.equal(fragment.program, "adaptive_ask_private_evaluator_fragment", "full authority must persist the actual private fragment");
+  return { fragment, frozenWorkspace, candidateWorkspace };
+}
+
+async function runPersistentFullEvaluatorAuthority(privateRoot, state) {
   const authorityRoot = mkdtempSync(resolve(root, `.ask-mn-r6-${state}-`));
   const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot, state });
   const scoringAuthority = persistentScoringAuthorities(authorityRoot);
   const bundleManifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
-  const evaluatorResult = syntheticEvaluatorResult({ state, authority: scoringAuthority, normalizedAuthority, bundleManifest });
+  const actual = await actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority });
+  const evaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({
+    root,
+    fragment: actual.fragment,
+    authority: {
+      ...scoringAuthority,
+      normalizedResult: normalizedAuthority.normalized,
+      sourceSnapshotDigest: normalizedAuthority.sourceSnapshotDigest,
+      bundleManifest,
+    },
+  });
   const chain = persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scoringAuthority, evaluatorResult });
   const common = {
     root,
@@ -848,6 +881,7 @@ async function runPrivateCandidateChecks(privateRoot) {
   const evaluator = await import(pathToFileURL(automatedEvaluator));
   const requirementRecord = readJson(resolve(fixtureRoot, "requirement-record.json"));
   const commandContract = readJson(resolve(fixtureRoot, "verification-command-contract.json"));
+  const scoringPolicy = readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json"));
   const baseWorkspace = resolve(fixtureRoot, "workspace");
   const candidate = (name) => {
     const path = resolve(work, name);
@@ -912,7 +946,11 @@ async function runPrivateCandidateChecks(privateRoot) {
   cwdUnverified.command_evidence.succeeded_command_ids = [];
   cwdUnverified.command_evidence.unavailable_command_ids = [...REQUIRED_COMMAND_IDS_FOR_TEST];
   cwdUnverified.command_evidence.cwd_unverified_command_count = cwdUnverified.command_evidence.references.length;
-  const evaluate = (workspace, evidence = normalized(), options = {}) => evaluator.evaluateCandidateSafe({ repositoryRoot: root, frozenWorkspace: baseWorkspace, candidateWorkspace: workspace, normalizedResult: evidence, skipFullNormalizedValidation: options.full !== true });
+  const evaluate = async (workspace, evidence = normalized(), options = {}) => {
+    const result = await evaluator.evaluateCandidateSafe({ repositoryRoot: root, frozenWorkspace: baseWorkspace, candidateWorkspace: workspace, normalizedResult: evidence, skipFullNormalizedValidation: options.full !== true });
+    validatePrivateEvaluatorFragment({ root, fragment: result, scoringPolicy, requirementRecord, normalizedResult: evidence });
+    return result;
+  };
   const assertResult = (result, outcomes, classification) => {
     assert.deepEqual(result.requirement_results.map(({ outcome }) => outcome), outcomes);
     assert.deepEqual(result.requirement_results.map(({ earned_points }, index) => earned_points), outcomes.map((outcome, index) => outcome === "pass" ? requirementRecord.requirements[index].max_points : 0));
@@ -1188,7 +1226,7 @@ try {
       "repeated_success_success", "repeated_failure_success", "repeated_declined_success", "repeated_success_failure", "repeated_success_declined", "repeated_success_cwd",
     ];
     for (const state of fullAuthorityStates) {
-      const fullAuthority = runPersistentFullEvaluatorAuthority(privateRoot, state);
+      const fullAuthority = await runPersistentFullEvaluatorAuthority(privateRoot, state);
       assert.equal(fullAuthority.verifiedResult.result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state, deriveVerificationEvidenceState(fullAuthority.normalizedAuthority.normalized), `full verifier must preserve the typed state for ${state}`);
       rmSync(fullAuthority.authorityRoot, { recursive: true, force: true });
     }

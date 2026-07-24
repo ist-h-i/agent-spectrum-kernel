@@ -358,6 +358,64 @@ export function deriveVerificationEvidenceState(normalizedResult) {
   return "invalid";
 }
 
+const INVALID_EVALUATION_INPUT_CATEGORIES = new Set([
+  "workspace_special_node",
+  "frozen_workspace_drift",
+  "candidate_path_escape",
+  "candidate_source_invalid",
+  "evaluator_input_authority_failure",
+]);
+
+const INVALID_EVALUATION_INPUT_REFERENCE_KINDS = new Map([
+  ["workspace_special_node", "test_result"],
+  ["frozen_workspace_drift", "test_result"],
+  ["candidate_path_escape", "test_result"],
+  ["candidate_source_invalid", "test_result"],
+  ["evaluator_input_authority_failure", "test_result"],
+]);
+
+function invalidInputAuthorityReferences({ evaluatorResult, normalizedResult }) {
+  const authority = evaluatorResult?.invalid_input_authority;
+  if (!authority) return [normalizedResultReference(normalizedResult)];
+  if (authority.layer === "command_evidence") {
+    if (authority.category !== "normalized_command_evidence_invalid" || authority.evidence_references.length !== 1 || authority.evidence_references[0].kind !== "normalized_result") {
+      throw new Error("command-evidence invalid authority must close to exactly one normalized-result reference");
+    }
+    if (authority.evidence_references[0].digest !== normalizedResult.normalized_result_digest) throw new Error("command-evidence invalid authority does not close to the normalized result");
+  } else {
+    if (!INVALID_EVALUATION_INPUT_CATEGORIES.has(authority.category) || authority.evidence_references.some((reference) => reference.kind !== INVALID_EVALUATION_INPUT_REFERENCE_KINDS.get(authority.category))) {
+      throw new Error("evaluation-input invalid authority category and reference kind are inconsistent");
+    }
+  }
+  return authority.evidence_references;
+}
+
+export function deriveEffectiveVerificationEvidenceState({ normalizedResult, evaluatorResult = null }) {
+  if (evaluatorResult?.evaluation_status === "invalid_input" || evaluatorResult?.invalid_input_authority || evaluatorResult?.classification === "invalid_evidence") return "invalid";
+  return deriveVerificationEvidenceState(normalizedResult);
+}
+
+export function deriveEffectiveVerificationEvidenceReferences({ normalizedResult, evaluatorResult = null, state = deriveEffectiveVerificationEvidenceState({ normalizedResult, evaluatorResult }) }) {
+  if (state === "invalid") return invalidInputAuthorityReferences({ evaluatorResult, normalizedResult });
+  return deriveVerificationEvidenceReferences(normalizedResult, state);
+}
+
+function validateInvalidInputContract({ evaluatorResult, normalizedResult, expectedReferences }) {
+  if (evaluatorResult.evaluation_status !== "invalid_input" || evaluatorResult.classification !== "invalid_evidence" || evaluatorResult.evidence_correctness?.state !== "fail") {
+    throw new Error("invalid verification state requires invalid_input status, invalid_evidence classification, and failed evidence correctness");
+  }
+  const authority = evaluatorResult.invalid_input_authority;
+  if (!authority) throw new Error("invalid verification state requires typed invalid-input authority");
+  const finding = evaluatorResult.findings.find(({ category }) => category === authority.category);
+  if (!finding) throw new Error("invalid verification state requires a finding for its typed invalid-input authority");
+  assertReferenceSet(finding.evidence_references, expectedReferences, "invalid-input finding references");
+  if (authority.layer === "command_evidence") {
+    if (authority.category !== "normalized_command_evidence_invalid") throw new Error("command-evidence invalid authority category is invalid");
+  } else if (!INVALID_EVALUATION_INPUT_CATEGORIES.has(authority.category)) {
+    throw new Error("evaluation-input invalid authority category is invalid");
+  }
+}
+
 function executionEventReference(entry) {
   return { kind: "execution_event", digest: entry.digest, bytes: entry.bytes };
 }
@@ -430,7 +488,8 @@ export function deriveVerificationEvidenceReferences(normalizedResult, state = d
 export function deriveBinaryScopeVerificationClassification({ evaluatorResult }) {
   const invalidEvidence = evaluatorResult.evaluation_status === "invalid_input"
     || evaluatorResult.evidence_correctness?.state === "fail"
-    || evaluatorResult.findings?.some(({ category }) => category === "invalid_evidence");
+    || evaluatorResult.invalid_input_authority
+    || evaluatorResult.findings?.some(({ category }) => category === "invalid_evidence" || INVALID_EVALUATION_INPUT_CATEGORIES.has(category) || category === "normalized_command_evidence_invalid");
   if (invalidEvidence) return "invalid_evidence";
   const results = new Map(evaluatorResult.requirement_results.map(({ requirement_id, outcome }) => [requirement_id, outcome]));
   const configurationPass = results.get("configuration-contract") === "pass";
@@ -456,15 +515,19 @@ export function validateBinaryScopeVerificationResult({ evaluatorResult, require
     } else if (result.scope_deviation_references.length !== 0) throw new Error(`${requirement.requirement_id} must not carry scope-deviation references`);
     if (requirement.requirement_id === "verification-evidence") {
       if (!VERIFICATION_EVIDENCE_STATES.includes(result.verification_evidence_state)) throw new Error("verification result must include a typed verification evidence state");
-      const derivedState = deriveVerificationEvidenceState(normalizedResult);
+      const derivedState = deriveEffectiveVerificationEvidenceState({ normalizedResult, evaluatorResult });
       if (result.verification_evidence_state !== derivedState) throw new Error(`verification evidence state does not rederive to ${derivedState}`);
       const topLevelPass = evaluatorResult.verification_correctness?.state === "pass";
-      const expectedReferences = deriveVerificationEvidenceReferences(normalizedResult, derivedState);
+      const expectedReferences = deriveEffectiveVerificationEvidenceReferences({ normalizedResult, evaluatorResult, state: derivedState });
       if (!evaluatorResult.verification_correctness || !Array.isArray(evaluatorResult.verification_correctness.evidence_references)) throw new Error("verification correctness must include typed evidence references");
       assertReferenceSet(evaluatorResult.verification_correctness.evidence_references, expectedReferences, "top-level verification correctness references");
       assertReferenceSet(result.verification_evidence_references, expectedReferences, "verification evidence references");
-      assertStateSpecificReferenceSemantics(evaluatorResult.verification_correctness.evidence_references, normalizedResult, derivedState, "top-level verification correctness references");
-      assertStateSpecificReferenceSemantics(result.verification_evidence_references, normalizedResult, derivedState, "verification evidence references");
+      if (derivedState === "invalid") {
+        validateInvalidInputContract({ evaluatorResult, normalizedResult, expectedReferences });
+      } else {
+        assertStateSpecificReferenceSemantics(evaluatorResult.verification_correctness.evidence_references, normalizedResult, derivedState, "top-level verification correctness references");
+        assertStateSpecificReferenceSemantics(result.verification_evidence_references, normalizedResult, derivedState, "verification evidence references");
+      }
       const requiredLatestSuccess = derivedState === "executed_success";
       if (result.outcome === "pass") {
         if (!topLevelPass || derivedState !== "executed_success" || !requiredLatestSuccess) throw new Error("passing verification result requires top-level pass and latest success for every required command");
