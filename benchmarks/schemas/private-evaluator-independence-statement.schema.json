@@ -9,6 +9,7 @@
     "generator_role_identity",
     "generation_date",
     "generation_revision",
+    "evaluator_source_identity",
     "frozen_candidate_input",
     "source_classification",
     "excluded_source_classification",
@@ -27,6 +28,7 @@
     "generator_role_identity": { "$ref": "#/$defs/generator" },
     "generation_date": { "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
     "generation_revision": { "$ref": "#/$defs/revision" },
+    "evaluator_source_identity": { "$ref": "#/$defs/sourceIdentity" },
     "frozen_candidate_input": {
       "type": "object",
       "additionalProperties": false,
@@ -60,6 +62,31 @@
   "$defs": {
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sourceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_git_revision", "source_tree_digest", "generator_source_digest", "source_files"],
+      "properties": {
+        "base_git_revision": { "$ref": "#/$defs/revision" },
+        "source_tree_digest": { "$ref": "#/$defs/digest" },
+        "generator_source_digest": { "$ref": "#/$defs/digest" },
+        "source_files": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "bytes", "sha256"],
+            "properties": {
+              "path": { "$ref": "#/$defs/path" },
+              "bytes": { "type": "integer", "minimum": 1 },
+              "sha256": { "$ref": "#/$defs/digest" }
+            }
+          }
+        }
+      }
+    },
     "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!\\./)[a-zA-Z0-9._/-]+$" },
     "generator": {
       "type": "object",

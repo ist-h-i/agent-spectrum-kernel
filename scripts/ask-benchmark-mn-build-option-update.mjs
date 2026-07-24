@@ -308,6 +308,7 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
   assertDigest(admission.admission_digest, computeFinalAdmissionRecordDigest(admission), "final admission record");
   if (requirementRecord.admission_record_digest !== admission.admission_digest) throw new Error("requirement/admission binding mismatch");
   if (admission.evaluator_bundle_id !== reference.evaluator_bundle_id || admission.evaluator_bundle_digest !== reference.evaluator_bundle_digest) throw new Error("admission/evaluator binding mismatch");
+  if (stableCanonicalJson(admission.evaluator_source_identity) !== stableCanonicalJson(reference.evaluator_source_identity)) throw new Error("admission/evaluator source identity mismatch");
 
   const outputContract = artifacts["output-contract.json"];
   assertBenchmarkSchemaInstance(outputContract, { schemaPath: resolve(root, "benchmarks/schemas/portfolio-output-contract.schema.json"), label: "fixture output contract" });

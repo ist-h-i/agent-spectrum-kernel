@@ -184,7 +184,8 @@
         "finding_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
         "evidence_references": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } },
         "scope_deviation_references": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
-        "verification_evidence_references": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } }
+        "verification_evidence_references": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } },
+        "verification_evidence_state": { "enum": ["executed_success", "executed_failure", "declined", "cwd_unverified", "missing", "unavailable", "adapter_unsupported", "invalid"] }
       },
       "allOf": [
         {
