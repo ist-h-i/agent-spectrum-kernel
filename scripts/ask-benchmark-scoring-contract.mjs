@@ -292,7 +292,8 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
       if (observation.scope_deviation_references.some((id) => !scopeDeviationIds.has(id))) throw new Error("requirement result scope-deviation reference does not close within the evaluator envelope");
     }
     if (observation.verification_evidence_references) {
-      if (!Array.isArray(observation.verification_evidence_references) || observation.verification_evidence_references.some((entry) => !entry || !["execution_event", "normalized_result"].includes(entry.kind))) throw new Error("requirement result verification evidence must reference normalized authority or execution events");
+      const allowsInvalidAuthority = observation.verification_evidence_state === "invalid";
+      if (!Array.isArray(observation.verification_evidence_references) || observation.verification_evidence_references.some((entry) => !entry || !(allowsInvalidAuthority ? ["execution_event", "normalized_result", "repository_diff", "test_result"] : ["execution_event", "normalized_result"]).includes(entry.kind))) throw new Error("requirement result verification evidence must reference normalized authority, execution events, or typed invalid authority");
       const evidence = new Set(observation.evidence_references.map((entry) => `${entry.kind}:${entry.digest}:${entry.bytes}`));
       if (observation.verification_evidence_references.some((entry) => !evidence.has(`${entry.kind}:${entry.digest}:${entry.bytes}`))) throw new Error("requirement result verification evidence does not close within its evidence references");
     }
