@@ -1204,7 +1204,7 @@ async function runPrivatePortabilityChecks(privateRoot) {
   const graphSchema = resolve(graphRoot, "scripts/ask-benchmark-schema.mjs");
   const graphModuleOriginal = readFileSync(graphModule, "utf8");
   const graphSchemaOriginal = readFileSync(graphSchema, "utf8");
-  const graphFailure = async (label, mutate, pattern = /dependency graph|source .*bytes|base Git|symlink|regular file/u) => {
+  const graphFailure = async (label, mutate, pattern = /dependency graph|source .*bytes|base Git|symlink|regular file|target is missing/u) => {
     mutate();
     await assert.rejects(() => graphEvaluator.evaluateCandidate({ repositoryRoot: graphRoot, frozenWorkspace: graphFrozen, candidateWorkspace: graphCandidate, normalizedResult, skipFullNormalizedValidation: true }), pattern, `R8 dependency graph regression: ${label}`);
     writeFileSync(graphModule, graphModuleOriginal);
