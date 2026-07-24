@@ -659,6 +659,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state) {
   const actual = await actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority });
   const adapterAuthority = {
     ...scoringAuthority,
+    evaluatorReference: scoringAuthority.reference,
     normalizedResult: normalizedAuthority.normalized,
     sourceSnapshotDigest: normalizedAuthority.sourceSnapshotDigest,
     bundleManifest,
