@@ -525,7 +525,7 @@
       "scoring_implementation_path": "scripts/ask-benchmark-portfolio-score.mjs",
       "scoring_implementation_file_sha256": "c8ea0c9261e2c46dce59854dd405bd7409189a8fb69b16f33b61253cc95af0e5",
       "scoring_test_path": "scripts/test-ask-benchmark-portfolio-score.mjs",
-      "scoring_test_file_sha256": "d6cee87293eb229c34c5d42a4bf1258b47360f5dc7890da765df12de46917d51",
+      "scoring_test_file_sha256": "6e466106f85326bcc03c616a070efdb9b9438b28e2d61e614358fc166924711a",
       "atomic_publication_implementation_path": "scripts/ask-benchmark-atomic-publication.mjs",
       "atomic_publication_implementation_file_sha256": "1227b73efd9bcfe254fa8f448acb9aed5078c8f42fa4273ec1f71ab609fdb67a",
       "stable_file_implementation_path": "scripts/ask-benchmark-stable-file.mjs",
