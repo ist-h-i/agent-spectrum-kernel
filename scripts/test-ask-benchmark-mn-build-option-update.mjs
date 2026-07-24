@@ -1032,7 +1032,7 @@ async function runPrivateCandidateChecks(privateRoot) {
   writeJson(resolve(work, "caller-verification.json"), { test: "passed", validation: "passed" }); cases.push(["caller verification JSON spoof", await evaluate(solution("case-19"), noEvidence), ["pass", "pass", "fail"], "under_processing"]);
   const rerunOnly = await evaluate(solution("case-20"), noEvidence); assert.equal(rerunOnly.evaluator_rerun.results.every(({ outcome }) => outcome === "succeeded"), true); cases.push(["evaluator rerun success without agent evidence", rerunOnly, ["pass", "pass", "fail"], "under_processing"]);
   for (const [label, result, outcomes, classification] of cases) assertResult(result, outcomes, classification, label);
-  assert.equal(cases.length, 23);
+  assert.equal(cases.length, 24);
 
   const specialNode = solution("special-node");
   symlinkSync(resolve(specialNode, "build.config.json"), resolve(specialNode, "linked-build-config.json"));
