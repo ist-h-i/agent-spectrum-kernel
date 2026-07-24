@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK sealed repository diff artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schema_path", "program", "run_instance_id", "case_id", "attempt", "frozen_workspace_tree_digest", "candidate_workspace_tree_digest", "diff_entries", "artifact_digest", "artifact_bytes"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/repository-diff-artifact.schema.json" },
+    "program": { "const": "adaptive_ask_repository_diff_artifact" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
+    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "frozen_workspace_tree_digest": { "$ref": "#/$defs/digest" },
+    "candidate_workspace_tree_digest": { "$ref": "#/$defs/digest" },
+    "diff_entries": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/diffEntry" } },
+    "artifact_digest": { "$ref": "#/$defs/digest" },
+    "artifact_bytes": { "type": "integer", "minimum": 1 }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\.{1,2}(?:/|$))(?!.*\\)(?!\./)[a-zA-Z0-9._/-]+$" },
+    "fileState": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["file_type", "mode", "bytes", "sha256"],
+      "properties": {
+        "file_type": { "enum": ["file", "directory", "missing"] },
+        "mode": { "type": ["integer", "null"], "minimum": 0 },
+        "bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "sha256": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "diffEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "change_type", "before", "after"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "change_type": { "enum": ["added", "removed", "modified", "type_changed"] },
+        "before": { "$ref": "#/$defs/fileState" },
+        "after": { "$ref": "#/$defs/fileState" }
+      }
+    }
+  }
+}

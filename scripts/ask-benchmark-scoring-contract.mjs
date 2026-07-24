@@ -367,6 +367,13 @@ const INVALID_EVALUATION_INPUT_CATEGORIES = new Set([
   "evaluator_input_authority_failure",
 ]);
 
+const INVALID_TYPED_AUTHORITY_CATEGORIES = new Map([
+  ["evaluation_input", INVALID_EVALUATION_INPUT_CATEGORIES],
+  ["evaluator_source", new Set(["evaluator_source_dependency_invalid"])],
+  ["private_fragment", new Set(["private_fragment_invalid"])],
+  ["adapter_authority", new Set(["adapter_authority_invalid"])],
+]);
+
 const INVALID_EVALUATION_INPUT_REFERENCE_KINDS = new Map([
   ["workspace_special_node", "test_result"],
   ["frozen_workspace_drift", "test_result"],
@@ -384,7 +391,8 @@ function invalidInputAuthorityReferences({ evaluatorResult, normalizedResult }) 
     }
     if (authority.evidence_references[0].digest !== normalizedResult.normalized_result_digest) throw new Error("command-evidence invalid authority does not close to the normalized result");
   } else {
-    if (!INVALID_EVALUATION_INPUT_CATEGORIES.has(authority.category) || authority.evidence_references.some((reference) => reference.kind !== INVALID_EVALUATION_INPUT_REFERENCE_KINDS.get(authority.category))) {
+    const categories = INVALID_TYPED_AUTHORITY_CATEGORIES.get(authority.layer);
+    if (!categories?.has(authority.category) || authority.evidence_references.some((reference) => reference.kind !== "test_result")) {
       throw new Error("evaluation-input invalid authority category and reference kind are inconsistent");
     }
   }
@@ -412,8 +420,8 @@ function validateInvalidInputContract({ evaluatorResult, normalizedResult, expec
   assertReferenceSet(finding.evidence_references, expectedReferences, "invalid-input finding references");
   if (authority.layer === "command_evidence") {
     if (authority.category !== "normalized_command_evidence_invalid") throw new Error("command-evidence invalid authority category is invalid");
-  } else if (!INVALID_EVALUATION_INPUT_CATEGORIES.has(authority.category)) {
-    throw new Error("evaluation-input invalid authority category is invalid");
+  } else if (!INVALID_TYPED_AUTHORITY_CATEGORIES.get(authority.layer)?.has(authority.category)) {
+    throw new Error("typed invalid authority category is invalid");
   }
 }
 
@@ -490,7 +498,7 @@ export function deriveBinaryScopeVerificationClassification({ evaluatorResult })
   const invalidEvidence = evaluatorResult.evaluation_status === "invalid_input"
     || evaluatorResult.evidence_correctness?.state === "fail"
     || evaluatorResult.invalid_input_authority
-    || evaluatorResult.findings?.some(({ category }) => category === "invalid_evidence" || INVALID_EVALUATION_INPUT_CATEGORIES.has(category) || category === "normalized_command_evidence_invalid");
+    || evaluatorResult.findings?.some(({ category }) => category === "invalid_evidence" || [...INVALID_TYPED_AUTHORITY_CATEGORIES.values()].some((categories) => categories.has(category)) || category === "normalized_command_evidence_invalid");
   if (invalidEvidence) return "invalid_evidence";
   const results = new Map(evaluatorResult.requirement_results.map(({ requirement_id, outcome }) => [requirement_id, outcome]));
   const configurationPass = results.get("configuration-contract") === "pass";

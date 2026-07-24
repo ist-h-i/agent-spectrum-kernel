@@ -97,7 +97,7 @@
       "additionalProperties": false,
       "required": ["layer", "category", "evidence_references"],
       "properties": {
-        "layer": { "enum": ["evaluation_input", "command_evidence"] },
+        "layer": { "enum": ["evaluation_input", "evaluator_source", "command_evidence", "private_fragment", "adapter_authority"] },
         "category": { "$ref": "#/$defs/token" },
         "evidence_references": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } }
       }

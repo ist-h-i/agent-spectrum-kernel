@@ -11,7 +11,7 @@ import {
   readdirSync,
   realpathSync,
 } from "node:fs";
-import { posix, relative, resolve, sep, win32 } from "node:path";
+import { extname, posix, relative, resolve, sep, win32 } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
@@ -41,7 +41,32 @@ export const EVALUATOR_REFERENCE_SCHEMA_PATH = "benchmarks/schemas/evaluator-ref
 export const PRIVATE_EVALUATOR_BUNDLE_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-bundle.schema.json";
 export const PRIVATE_EVALUATOR_INDEPENDENCE_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-independence-statement.schema.json";
 export const PRIVATE_EVALUATOR_FRAGMENT_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-fragment.schema.json";
+export const PRIVATE_EVALUATION_RECORD_SCHEMA_PATH = "benchmarks/schemas/private-evaluation-record.schema.json";
+export const REPOSITORY_DIFF_ARTIFACT_SCHEMA_PATH = "benchmarks/schemas/repository-diff-artifact.schema.json";
+export const EVALUATION_INPUT_FAILURE_ARTIFACT_SCHEMA_PATH = "benchmarks/schemas/evaluation-input-failure-artifact.schema.json";
+export const EVALUATOR_CHECK_ARTIFACT_SCHEMA_PATH = "benchmarks/schemas/evaluator-check-artifact.schema.json";
 export const EVALUATOR_RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result-envelope.schema.json";
+export const EVALUATOR_DEPENDENCY_ENTRY_PATHS = Object.freeze([
+  "scripts/ask-benchmark-scoring-contract.mjs",
+  "scripts/ask-benchmark-materialize.mjs",
+  "scripts/ask-benchmark-normalized-results.mjs",
+  "scripts/ask-benchmark-evaluator-boundary.mjs",
+]);
+export const EVALUATOR_AUTHORITY_PATHS = Object.freeze([
+  "benchmarks/schemas/evaluator-reference.schema.json",
+  "benchmarks/schemas/evaluator-result-envelope.schema.json",
+  "benchmarks/schemas/evaluator-check-artifact.schema.json",
+  "benchmarks/schemas/evaluation-input-failure-artifact.schema.json",
+  "benchmarks/schemas/portfolio-final-admission-record.schema.json",
+  "benchmarks/schemas/portfolio-requirement-record.schema.json",
+  "benchmarks/schemas/portfolio-output-contract.schema.json",
+  "benchmarks/schemas/private-evaluator-bundle.schema.json",
+  "benchmarks/schemas/private-evaluator-fragment.schema.json",
+  "benchmarks/schemas/private-evaluator-independence-statement.schema.json",
+  "benchmarks/schemas/private-evaluation-record.schema.json",
+  "benchmarks/schemas/repository-diff-artifact.schema.json",
+  "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
+]);
 const CATALOG_SCHEMA_PATH = "benchmarks/schemas/portfolio-catalog.schema.json";
 const POLICY_MANIFEST_SCHEMA_PATH = "benchmarks/schemas/portfolio-policy-manifest.schema.json";
 const SCORING_POLICY_SCHEMA_PATH = "benchmarks/schemas/portfolio-scoring-policy.schema.json";
@@ -340,8 +365,104 @@ function checkedInBytesAtRevision(root, revision, relativePath) {
   }
 }
 
+const MODULE_IMPORT_PATTERNS = Object.freeze([
+  { kind: "static_import", pattern: /\bimport\s+(?:[^"'();\n]*?\sfrom\s+)?["']([^"']+)["']/gu },
+  { kind: "export_from", pattern: /\bexport\s+(?:[^"'();\n]*?\sfrom\s+)["']([^"']+)["']/gu },
+  { kind: "dynamic_import", pattern: /\bimport\s*\(\s*["']([^"']+)["']\s*\)/gu },
+]);
+
+function dependencySpecifierTarget(root, fromPath, specifier, label) {
+  if (!specifier.startsWith(".")) return null;
+  if (specifier.includes("\\") || specifier.includes(":") || specifier.includes("\0") || posix.isAbsolute(specifier) || win32.isAbsolute(specifier) || specifier.split("/").some((segment) => segment === ".." || segment === "")) throw new Error(`${label} specifier is not portable`);
+  const fromDirectory = resolve(root, fromPath, "..");
+  const candidate = resolve(fromDirectory, specifier);
+  if (!isInside(root, candidate)) throw new Error(`${label} escapes the repository root`);
+  const candidates = [candidate, `${candidate}.mjs`, `${candidate}.js`, `${candidate}.json`];
+  const target = candidates.find((path) => existsSync(path));
+  if (!target) throw new Error(`${label} target is missing: ${specifier}`);
+  const relativeTarget = relative(root, target).split(sep).join("/");
+  assertPortableRelativePath(relativeTarget, `${label} target`);
+  assertPathInsideRootWithoutSymlinks(root, target, `${label} target`);
+  return relativeTarget;
+}
+
+function parseLocalModuleEdges(root, path, source) {
+  const edges = [];
+  for (const { kind, pattern } of MODULE_IMPORT_PATTERNS) {
+    pattern.lastIndex = 0;
+    for (const match of source.matchAll(pattern)) {
+      const specifier = match[1];
+      const target = dependencySpecifierTarget(root, path, specifier, `${kind} from ${path}`);
+      if (target) edges.push({ from: path, to: target, kind, specifier });
+    }
+  }
+  return edges;
+}
+
+function dependencyFileType(path) {
+  if (EVALUATOR_AUTHORITY_PATHS.includes(path)) return "authority_data";
+  if (extname(path).toLowerCase() === ".json") return "json";
+  return "module";
+}
+
+export function deriveEvaluatorDependencyGraph({ root, baseRevision, entryPaths = EVALUATOR_DEPENDENCY_ENTRY_PATHS } = {}) {
+  const canonicalRoot = assertRealDirectory(root, "evaluator dependency graph repository root");
+  if (!baseRevision || !/^[a-f0-9]{40}$/u.test(baseRevision)) throw new Error("evaluator dependency graph base Git revision is invalid");
+  const entries = [...entryPaths].map((path) => assertPortableRelativePath(path, "evaluator dependency graph entry path")).sort();
+  if (new Set(entries).size !== entries.length) throw new Error("evaluator dependency graph entry paths contain duplicates");
+  const nodePaths = new Set();
+  const edges = new Map();
+  const visit = (path) => {
+    if (nodePaths.has(path)) return;
+    nodePaths.add(path);
+    const absolute = resolveAuthorityArtifactPath(canonicalRoot, path, `evaluator dependency ${path}`);
+    const bytes = readFileSync(absolute);
+    const fileType = dependencyFileType(path);
+    const committed = checkedInBytesAtRevision(canonicalRoot, baseRevision, path);
+    if (!committed) throw new Error(`evaluator dependency base Git revision is unavailable at ${path}`);
+    if (committed.length !== bytes.length || rawByteDigest(committed) !== rawByteDigest(bytes)) throw new Error(`evaluator dependency bytes do not match the base Git revision at ${path}`);
+    if (fileType !== "json") {
+      for (const edge of parseLocalModuleEdges(canonicalRoot, path, bytes.toString("utf8"))) {
+        const edgeKey = stableCanonicalJson(edge);
+        edges.set(edgeKey, edge);
+        visit(edge.to);
+      }
+    }
+  };
+  for (const entry of entries) visit(entry);
+  for (const authorityPath of EVALUATOR_AUTHORITY_PATHS) {
+    visit(authorityPath);
+    const owner = authorityPath.includes("scoring-input") || authorityPath.includes("portfolio-" )
+      ? "scripts/ask-benchmark-scoring-contract.mjs"
+      : "scripts/ask-benchmark-evaluator-boundary.mjs";
+    const edge = { from: owner, to: authorityPath, kind: "authority_read", specifier: authorityPath };
+    edges.set(stableCanonicalJson(edge), edge);
+  }
+  const casePaths = new Map();
+  for (const path of nodePaths) {
+    const folded = path.toLocaleLowerCase("en-US");
+    if (casePaths.has(folded) && casePaths.get(folded) !== path) throw new Error(`evaluator dependency graph contains a case collision: ${casePaths.get(folded)} / ${path}`);
+    casePaths.set(folded, path);
+  }
+  const nodeInventory = [...nodePaths].sort().map((path) => {
+    const bytes = readFileSync(resolve(canonicalRoot, path));
+    const committed = checkedInBytesAtRevision(canonicalRoot, baseRevision, path);
+    return {
+      path,
+      bytes: bytes.length,
+      sha256: rawByteDigest(bytes),
+      file_type: dependencyFileType(path),
+      base_git_revision_bytes: committed.length,
+      base_git_revision_sha256: rawByteDigest(committed),
+    };
+  });
+  const edgeInventory = [...edges.values()].sort((left, right) => stableCanonicalJson(left).localeCompare(stableCanonicalJson(right)));
+  const graph = { entry_paths: entries, node_inventory: nodeInventory, edge_inventory: edgeInventory };
+  return { ...graph, graph_digest: canonicalDigest(graph) };
+}
+
 export function validateEvaluatorSourceIdentity({ identity, root, expectedRevision = null, expectedGeneratorSourceDigest = null, label = "evaluator source identity" }) {
-  if (!identity || typeof identity !== "object" || !Array.isArray(identity.source_files) || identity.source_files.length === 0) throw new Error(`${label} is missing or empty`);
+  if (!identity || typeof identity !== "object" || !Array.isArray(identity.source_files) || identity.source_files.length === 0 || !identity.dependency_graph) throw new Error(`${label} is missing or empty`);
   if (expectedRevision && identity.base_git_revision !== expectedRevision) throw new Error(`${label} base Git revision drift`);
   if (expectedGeneratorSourceDigest && identity.generator_source_digest !== expectedGeneratorSourceDigest) throw new Error(`${label} generator source digest drift`);
   const sourceFiles = identity.source_files.map((entry) => ({ path: assertPortableRelativePath(entry.path, `${label} source path`), bytes: entry.bytes, sha256: entry.sha256 }));
@@ -357,6 +478,10 @@ export function validateEvaluatorSourceIdentity({ identity, root, expectedRevisi
     if (!committed) throw new Error(`${label} base Git revision or source path is unavailable at ${entry.path}`);
     if (committed.length !== entry.bytes || rawByteDigest(committed) !== entry.sha256) throw new Error(`${label} source bytes do not match the immutable base Git revision at ${entry.path}`);
   }
+  const graph = deriveEvaluatorDependencyGraph({ root, baseRevision: identity.base_git_revision });
+  if (stableCanonicalJson(identity.dependency_graph) !== stableCanonicalJson(graph)) throw new Error(`${label} dependency graph closure is invalid`);
+  const graphSourceFiles = graph.node_inventory.map(({ path, bytes, sha256 }) => ({ path, bytes, sha256 }));
+  if (stableCanonicalJson(sourceFiles) !== stableCanonicalJson(graphSourceFiles)) throw new Error(`${label} source inventory does not match the dependency graph`);
   return structuredClone(identity);
 }
 
@@ -596,6 +721,20 @@ export function validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy
   return structuredClone(fragment);
 }
 
+export function computePrivateEvaluationRecordDigest(record) {
+  const closure = structuredClone(record);
+  delete closure.evaluation_record_digest;
+  return canonicalDigest(closure);
+}
+
+export function computeAdapterResultEnvelopeDigest(result) {
+  const closure = structuredClone(result);
+  delete closure.evaluation_id;
+  delete closure.evaluation_digest;
+  delete closure.private_evaluation_record_digest;
+  return canonicalDigest(closure);
+}
+
 function fragmentObservation(fragment, field, fallbackState) {
   const source = fragment[field];
   return { state: source?.state ?? fallbackState, evidence_references: structuredClone(source?.evidence_references ?? []) };
@@ -684,6 +823,11 @@ export function adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment, author
     privacy: authorityPrivacy(),
   };
   if (validated.invalid_input_authority) result.invalid_input_authority = structuredClone(validated.invalid_input_authority);
+  if (authority.privateFragmentDigest) {
+    result.private_fragment_digest = authority.privateFragmentDigest;
+    result.private_fragment_bytes = authority.privateFragmentBytes;
+  }
+  if (authority.privateEvaluationRecordDigest) result.private_evaluation_record_digest = authority.privateEvaluationRecordDigest;
   result.evaluation_id = computeEvaluationId(result);
   result.evaluation_digest = computeEvaluationDigest(result);
   assertBenchmarkSchemaInstance(result, { schemaPath: resolve(root, EVALUATOR_RESULT_SCHEMA_PATH), label: "authority-owned evaluator result envelope" });
@@ -897,6 +1041,111 @@ function readNormalizedRecord({ verified, result }) {
   return record;
 }
 
+function evidenceReferencesIn(value) {
+  const references = [];
+  const visit = (entry) => {
+    if (Array.isArray(entry)) for (const child of entry) visit(child);
+    else if (entry && typeof entry === "object") {
+      if (typeof entry.kind === "string" && typeof entry.digest === "string" && Object.hasOwn(entry, "bytes")) references.push(entry);
+      else for (const child of Object.values(entry)) visit(child);
+    }
+  };
+  visit(value);
+  return references;
+}
+
+function validatePrivateEvaluationEvidenceArtifacts({ root, privateEvaluationRoot, record, normalized, result }) {
+  const canonicalEvaluationRoot = assertRealDirectory(privateEvaluationRoot, "private evaluation authority root");
+  const artifacts = new Map();
+  let repositoryDiffArtifact = null;
+  for (const entry of record.evidence_artifacts) {
+    const artifactPath = resolveAuthorityArtifactPath(canonicalEvaluationRoot, entry.path, `private evaluation ${entry.kind} artifact`);
+    const evidence = streamingFileDigest(artifactPath, `private evaluation ${entry.kind} artifact`);
+    if (evidence.bytes !== entry.bytes) throw new Error(`private evaluation ${entry.kind} artifact byte binding is invalid`);
+    const artifact = readJsonArtifact(artifactPath, `private evaluation ${entry.kind} artifact`).value;
+    if (artifact.artifact_digest !== entry.digest || artifact.artifact_bytes !== entry.bytes) throw new Error(`private evaluation ${entry.kind} artifact digest or byte closure is invalid`);
+    const artifactClosure = structuredClone(artifact);
+    delete artifactClosure.artifact_digest;
+    delete artifactClosure.artifact_bytes;
+    if (canonicalDigest(artifactClosure) !== entry.digest) throw new Error(`private evaluation ${entry.kind} artifact semantic digest is invalid`);
+    if (entry.run_instance_id !== normalized.lineage.run_instance_id || entry.case_id !== normalized.lineage.case_id || entry.attempt !== normalized.lineage.attempt || entry.normalized_result_id !== normalized.normalized_result_id || entry.normalized_result_digest !== normalized.normalized_result_digest || entry.evaluator_bundle_id !== result.evaluator_bundle_id || entry.evaluator_bundle_digest !== result.evaluator_bundle_digest) {
+      throw new Error(`private evaluation ${entry.kind} artifact lineage is inconsistent`);
+    }
+    if (entry.kind === "repository_diff") {
+      assertBenchmarkSchemaInstance(artifact, { schemaPath: resolve(root, REPOSITORY_DIFF_ARTIFACT_SCHEMA_PATH), label: "repository diff artifact" });
+      if (artifact.run_instance_id !== normalized.lineage.run_instance_id || artifact.case_id !== normalized.lineage.case_id || artifact.attempt !== normalized.lineage.attempt) throw new Error("repository diff artifact lineage is inconsistent");
+      if (entry.digest !== record.repository_diff_artifact_digest || entry.bytes !== record.repository_diff_artifact_bytes) throw new Error("repository diff artifact is not bound to the private evaluation record");
+      repositoryDiffArtifact = artifact;
+    } else {
+      if (artifact.schema_path === EVALUATION_INPUT_FAILURE_ARTIFACT_SCHEMA_PATH) {
+        assertBenchmarkSchemaInstance(artifact, { schemaPath: resolve(root, EVALUATION_INPUT_FAILURE_ARTIFACT_SCHEMA_PATH), label: "evaluation-input failure artifact" });
+        if (result.invalid_input_authority && (artifact.layer !== result.invalid_input_authority.layer || artifact.category !== result.invalid_input_authority.category)) throw new Error("evaluation-input failure artifact authority does not match the evaluator result");
+      } else if (artifact.schema_path === EVALUATOR_CHECK_ARTIFACT_SCHEMA_PATH) {
+        assertBenchmarkSchemaInstance(artifact, { schemaPath: resolve(root, EVALUATOR_CHECK_ARTIFACT_SCHEMA_PATH), label: "evaluator check artifact" });
+      } else throw new Error("private test-result artifact schema is not authorized");
+    }
+    artifacts.set(`${entry.kind}:${entry.digest}:${entry.bytes}`, entry);
+  }
+  const references = evidenceReferencesIn(result);
+  for (const reference of references) {
+    if (reference.kind === "repository_diff" || reference.kind === "test_result") {
+      const key = `${reference.kind}:${reference.digest}:${reference.bytes}`;
+      if (!artifacts.has(key)) throw new Error(`${reference.kind} evidence reference is not bound to a sealed private artifact`);
+    }
+  }
+  return { canonicalEvaluationRoot, artifacts, repositoryDiffArtifact };
+}
+
+function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, normalized, result, scoringInputs }) {
+  if (!privateEvaluationRoot || !privateEvaluationRecordPath || !privateFragmentPath) throw new Error("private evaluation record, root, and fragment paths are required for durable evaluator verification");
+  const canonicalEvaluationRoot = assertRealDirectory(privateEvaluationRoot, "private evaluation authority root");
+  if (pathsOverlap(canonicalEvaluationRoot, bundle.canonicalPrivateRoot)) throw new Error("private evaluation authority root must not overlap the static evaluator bundle");
+  const recordInfo = authorityRelativePathForSupplied(canonicalEvaluationRoot, privateEvaluationRecordPath, "private evaluation record");
+  const fragmentInfo = authorityRelativePathForSupplied(canonicalEvaluationRoot, privateFragmentPath, "private evaluator fragment");
+  const record = readJsonArtifact(recordInfo.authoritativePath, "private evaluation record").value;
+  assertBenchmarkSchemaInstance(record, { schemaPath: resolve(root, PRIVATE_EVALUATION_RECORD_SCHEMA_PATH), label: "private evaluation record" });
+  if (record.evaluation_record_digest !== computePrivateEvaluationRecordDigest(record)) throw new Error("private evaluation record digest closure is invalid");
+  if (record.evaluator_bundle_id !== bundle.manifest.evaluator_bundle_id || record.evaluator_bundle_digest !== bundle.manifest.evaluator_bundle_digest || record.evaluator_revision !== bundle.manifest.evaluator_revision) throw new Error("private evaluation record bundle identity is inconsistent");
+  if (stableCanonicalJson(record.evaluator_source_identity) !== stableCanonicalJson(bundle.manifest.evaluator_source_identity)) throw new Error("private evaluation record source identity is inconsistent");
+  if (record.normalized_result_id !== normalized.normalized_result_id || record.normalized_result_digest !== normalized.normalized_result_digest || record.run_instance_id !== normalized.lineage.run_instance_id || record.case_id !== normalized.lineage.case_id || record.attempt !== normalized.lineage.attempt) throw new Error("private evaluation record normalized lineage is inconsistent");
+  if (record.private_fragment_path !== fragmentInfo.relativePath) throw new Error("private evaluation record fragment path is inconsistent");
+  const fragmentEvidence = streamingFileDigest(fragmentInfo.authoritativePath, "private evaluator fragment");
+  if (fragmentEvidence.bytes !== record.private_fragment_bytes || fragmentEvidence.digest !== record.private_fragment_sha256) throw new Error("private evaluator fragment digest or byte closure is invalid");
+  const fragment = readJsonArtifact(fragmentInfo.authoritativePath, "private evaluator fragment").value;
+  const fragmentSchemaDigest = rawByteDigest(readFileSync(resolve(root, PRIVATE_EVALUATOR_FRAGMENT_SCHEMA_PATH)));
+  if (record.fragment_schema_digest !== fragmentSchemaDigest) throw new Error("private evaluator fragment schema digest is inconsistent");
+  const adapterSourceDigest = rawByteDigest(readFileSync(resolve(root, "scripts/ask-benchmark-evaluator-boundary.mjs")));
+  if (record.adapter_source_digest !== adapterSourceDigest) throw new Error("private evaluator adapter source digest is inconsistent");
+  const evidence = validatePrivateEvaluationEvidenceArtifacts({ root, privateEvaluationRoot: canonicalEvaluationRoot, record, normalized, result });
+  const validatedFragment = validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy: scoringInputs.scoringPolicy, requirementRecord: scoringInputs.requirementRecord, normalizedResult: normalized });
+  const expected = adaptPrivateEvaluatorFragmentToEnvelope({
+    root,
+    fragment: validatedFragment,
+    authority: {
+      ...scoringInputs,
+      evaluatorReference: bundle.reference,
+      normalizedResult: normalized,
+      sourceSnapshotDigest: result.source_snapshot_digest,
+      bundleManifest: bundle.manifest,
+      privateFragmentDigest: record.private_fragment_sha256,
+      privateFragmentBytes: record.private_fragment_bytes,
+      privateEvaluationRecordDigest: record.evaluation_record_digest,
+      fragmentBinding: {
+        normalized_result_id: normalized.normalized_result_id,
+        normalized_result_digest: normalized.normalized_result_digest,
+        run_instance_id: normalized.lineage.run_instance_id,
+        case_id: normalized.lineage.case_id,
+        attempt: normalized.lineage.attempt,
+      },
+    },
+  });
+  if (stableCanonicalJson(expected) !== stableCanonicalJson(result)) throw new Error("public evaluator envelope is not the authority-owned adapter output for the sealed fragment");
+  if (record.adapter_result_envelope_digest !== computeAdapterResultEnvelopeDigest(result)) throw new Error("private evaluation record adapter envelope digest is inconsistent");
+  if (result.private_fragment_digest !== record.private_fragment_sha256 || result.private_fragment_bytes !== record.private_fragment_bytes || result.private_evaluation_record_digest !== record.evaluation_record_digest) throw new Error("public evaluator envelope private authority bindings are inconsistent");
+  if (!evidence.repositoryDiffArtifact || record.frozen_workspace_inventory_digest !== evidence.repositoryDiffArtifact.frozen_workspace_tree_digest || record.candidate_workspace_inventory_digest !== evidence.repositoryDiffArtifact.candidate_workspace_tree_digest) throw new Error("private evaluation record workspace authority is incomplete");
+  return { record, fragment, canonicalEvaluationRoot };
+}
+
 function readScoringInputSources({
   root,
   catalogPath,
@@ -1018,6 +1267,9 @@ export function verifyEvaluatorResult({
   privateRoot,
   manifestPath,
   resultPath,
+  privateEvaluationRoot = null,
+  privateEvaluationRecordPath = null,
+  privateFragmentPath = null,
   materializedPath,
   selectionState,
   runDir,
@@ -1053,6 +1305,9 @@ export function verifyEvaluatorResult({
   assertBoundaryRootLineage(bundle, verified);
   const normalized = readNormalizedRecord({ verified, result });
   validateExecutionEventEvidenceReferences({ normalized, result });
+  if (privateEvaluationRoot || privateEvaluationRecordPath || privateFragmentPath) {
+    verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, normalized, result, scoringInputs });
+  }
   const lineage = normalized.lineage;
   const expectedLineage = {
     normalized_result_id: normalized.normalized_result_id,

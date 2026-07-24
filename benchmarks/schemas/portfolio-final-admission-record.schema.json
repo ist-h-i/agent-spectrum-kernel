@@ -44,7 +44,7 @@
     ,"sourceIdentity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["base_git_revision", "source_tree_digest", "generator_source_digest", "source_files"],
+      "required": ["base_git_revision", "source_tree_digest", "generator_source_digest", "source_files", "dependency_graph"],
       "properties": {
         "base_git_revision": { "$ref": "#/$defs/revision" },
         "source_tree_digest": { "$ref": "#/$defs/digest" },
@@ -63,7 +63,43 @@
               "sha256": { "$ref": "#/$defs/digest" }
             }
           }
-        }
+        },
+        "dependency_graph": { "$ref": "#/$defs/dependencyGraph" }
+      }
+    },
+    "dependencyGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry_paths", "node_inventory", "edge_inventory", "graph_digest"],
+      "properties": {
+        "entry_paths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/path" } },
+        "node_inventory": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/dependencyNode" } },
+        "edge_inventory": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/dependencyEdge" } },
+        "graph_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "dependencyNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "bytes", "sha256", "file_type", "base_git_revision_bytes", "base_git_revision_sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/digest" },
+        "file_type": { "enum": ["module", "json", "authority_data"] },
+        "base_git_revision_bytes": { "type": "integer", "minimum": 1 },
+        "base_git_revision_sha256": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "dependencyEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "kind", "specifier"],
+      "properties": {
+        "from": { "$ref": "#/$defs/path" },
+        "to": { "$ref": "#/$defs/path" },
+        "kind": { "enum": ["static_import", "export_from", "dynamic_import", "authority_read"] },
+        "specifier": { "type": "string", "minLength": 1, "maxLength": 240 }
       }
     }
   }

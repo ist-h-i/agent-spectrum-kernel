@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK sealed evaluator check artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schema_path", "program", "run_instance_id", "case_id", "attempt", "normalized_result_id", "normalized_result_digest", "checks", "artifact_digest", "artifact_bytes"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/evaluator-check-artifact.schema.json" },
+    "program": { "const": "adaptive_ask_evaluator_check_artifact" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
+    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },
+    "normalized_result_digest": { "$ref": "#/$defs/digest" },
+    "checks": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/check" } },
+    "artifact_digest": { "$ref": "#/$defs/digest" },
+    "artifact_bytes": { "type": "integer", "minimum": 1 }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 96, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command_id", "outcome", "exit_code", "evidence_role"],
+      "properties": {
+        "command_id": { "$ref": "#/$defs/token" },
+        "outcome": { "enum": ["succeeded", "failed"] },
+        "exit_code": { "type": ["integer", "null"] },
+        "evidence_role": { "const": "candidate_correctness_only" }
+      }
+    }
+  }
+}
