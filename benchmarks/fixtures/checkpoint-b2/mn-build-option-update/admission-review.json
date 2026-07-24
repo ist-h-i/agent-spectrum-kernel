@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "mn-build-option-update",
   "candidate_input_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
-  "candidate_evaluator_digest": "sha256:8204a4c84d80f9812c1545cc6327208c266009642abae89d936a857c253c38fc",
+  "candidate_evaluator_digest": "sha256:502a2707d0f07524e1f21e437826f0655f5750334db9f9fc8889b009a8da4409",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -105,5 +105,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:3c62e914fcbbf80c567c5709a014a254739c6073d70572fec2126e3f5d1b0c38"
+  "review_package_digest": "sha256:80707e814fc183c188ef23fe7e633489160b1b19d0e3771a7798c9bca6632bee"
 }

@@ -24,6 +24,7 @@ import {
   computeEvaluatorBundleDigest,
   computeEvaluatorBundleId,
   computeIndependenceStatementDigest,
+  validateEvaluatorSourceIdentity,
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import {
   computeFinalAdmissionRecordDigest,
@@ -102,6 +103,11 @@ function syntheticScoringInput() {
     normalized_result_digest: `sha256:${"d".repeat(64)}`,
     command_evidence: {
       required_command_ids: ["build-config-focused-test", "build-config-semantic-validator"],
+      required_alternative_groups: [],
+      capture_support: "supported",
+      evidence_level: "executed",
+      cwd_unverified_command_count: 0,
+      succeeded_command_ids: ["build-config-focused-test", "build-config-semantic-validator"],
       references: [
         { command_id: "build-config-focused-test", outcome: "succeeded", exit_code: 0, digest: `sha256:${"e".repeat(64)}`, bytes: 1 },
         { command_id: "build-config-semantic-validator", outcome: "succeeded", exit_code: 0, digest: `sha256:${"f".repeat(64)}`, bytes: 1 },
@@ -124,6 +130,7 @@ function syntheticScoringInput() {
     result_profile: resultProfile,
     classification: "correct_narrow_execution",
     evaluation_status: "completed",
+    verification_correctness: { state: "pass", evidence_references: normalizedResult.command_evidence.references.map(({ digest, bytes }) => ({ kind: "execution_event", digest, bytes })) },
     requirement_results: requirementRecord.requirements.map((requirement) => ({
       requirement_id: requirement.requirement_id,
       outcome: "pass",
@@ -137,6 +144,7 @@ function syntheticScoringInput() {
       verification_evidence_references: requirement.requirement_id === "verification-evidence"
         ? normalizedResult.command_evidence.references.map(({ digest, bytes }) => ({ kind: "execution_event", digest, bytes }))
         : [],
+      ...(requirement.requirement_id === "verification-evidence" ? { verification_evidence_state: "executed_success" } : {}),
     })),
     findings: [],
     false_positives: [],
@@ -290,6 +298,15 @@ function runIndependenceNegativeChecks(privateRoot, boundaryRoots) {
   contradictionStatement.statement_digest = computeIndependenceStatementDigest(contradictionStatement);
   writeJson(contradictionPath, contradictionStatement);
   expectFailure(() => validateMnBuildOptionUpdatePrivateFixture({ root, privateRoot: contradiction, ...boundaryRoots }), /asset digest|statement does not match|contaminat/u, "independence negative: statement digest contradiction");
+
+  const sourceIdentity = readJson(resolve(fixtureRoot, "evaluator-reference.json")).evaluator_source_identity;
+  expectFailure(() => validateEvaluatorSourceIdentity({ identity: { ...sourceIdentity, base_git_revision: "0".repeat(40) }, root }), /base Git revision|unavailable/u, "source identity must reject a nonexistent revision");
+  expectFailure(() => validateEvaluatorSourceIdentity({ identity: { ...sourceIdentity, source_tree_digest: `sha256:${"0".repeat(64)}` }, root }), /source-tree digest/u, "source identity must reject source-tree drift");
+  const sourceBytesDrift = structuredClone(sourceIdentity);
+  sourceBytesDrift.source_files[0].sha256 = `sha256:${"1".repeat(64)}`;
+  sourceBytesDrift.source_tree_digest = canonicalDigest(sourceBytesDrift.source_files);
+  expectFailure(() => validateEvaluatorSourceIdentity({ identity: sourceBytesDrift, root }), /source bytes drift|do not match/u, "source identity must reject source-byte drift");
+  expectFailure(() => validateEvaluatorSourceIdentity({ identity: { ...sourceIdentity, generator_source_digest: `sha256:${"2".repeat(64)}` }, root, expectedGeneratorSourceDigest: sourceIdentity.generator_source_digest }), /generator source digest/u, "source identity must reject generator drift");
 }
 
 async function runPrivateCandidateChecks(privateRoot) {
@@ -339,6 +356,23 @@ async function runPrivateCandidateChecks(privateRoot) {
     const digest = canonicalDigest(base);
     return { ...base, normalized_result_id: `normalized-${digest.slice(7, 39)}`, normalized_result_digest: digest, _command_evidence: commandEvidence };
   };
+  const repeatedNormalized = (latestStatus) => {
+    const identity = evidenceIdentity();
+    const commandEvidence = buildCodexCommandEvidence({
+      identity,
+      contract: commandContract,
+      stream: stream([
+        ...commandContract.commands.flatMap((command, index) => [
+          ...pair(renderCommandEvent(command), index * 2, "completed", 0),
+          ...pair(renderCommandEvent(command), index * 2 + 1, latestStatus, latestStatus === "completed" ? 0 : latestStatus === "declined" ? null : 2),
+        ]),
+        { type: "turn.completed" },
+      ]),
+    });
+    const result = normalized({ identity });
+    result.command_evidence = projectVerifiedCommandEvidence({ manifest: commandEvidence, contract: commandContract });
+    return result;
+  };
   const noEvidence = normalized({ outcomes: [] });
   const cwdUnverified = structuredClone(normalized());
   cwdUnverified.command_evidence.references = cwdUnverified.command_evidence.references.map((entry) => ({ ...entry, command_id: null, match_state: "cwd_unverified" }));
@@ -381,7 +415,11 @@ async function runPrivateCandidateChecks(privateRoot) {
   cases.push(["correct candidate with declined command", await evaluate(solution("case-03"), normalized({ outcomes: ["declined", "declined"] })), ["pass", "pass", "fail"], "under_processing"]);
   cases.push(["correct candidate with failed command", await evaluate(solution("case-04"), normalized({ outcomes: ["failed", "failed"] })), ["pass", "pass", "fail"], "under_processing"]);
   cases.push(["correct candidate with unavailable command evidence", await evaluate(solution("case-05"), normalized({ unavailable: true })), ["pass", "pass", "fail"], "under_processing"]);
+  const unsupportedAdapter = normalized({ unavailable: true }); unsupportedAdapter.command_evidence.capture_support = "unsupported";
+  cases.push(["correct candidate with unsupported adapter evidence", await evaluate(solution("case-05b"), unsupportedAdapter), ["pass", "pass", "fail"], "under_processing"]);
   cases.push(["correct candidate with cwd-unverified evidence", await evaluate(solution("case-06"), cwdUnverified), ["pass", "pass", "fail"], "under_processing"]);
+  cases.push(["correct candidate after success then failure", await evaluate(solution("case-06b"), repeatedNormalized("failed")), ["pass", "pass", "fail"], "under_processing"]);
+  cases.push(["correct candidate after success then decline", await evaluate(solution("case-06c"), repeatedNormalized("declined")), ["pass", "pass", "fail"], "under_processing"]);
   cases.push(["configuration unchanged", await evaluate(candidate("case-07")), ["fail", "fail", "pass"], "under_processing"]);
   cases.push(["configuration incorrect", await evaluate(solution("case-08", { scripts: "invalid", styles: true })), ["fail", "pass", "pass"], "under_processing"]);
   const modified = solution("case-09"); writeFileSync(resolve(modified, "package.json"), `${readFileSync(resolve(modified, "package.json"), "utf8")} `); cases.push(["unrelated modification", await evaluate(modified), ["pass", "fail", "pass"], "over_processing"]);
@@ -399,7 +437,7 @@ async function runPrivateCandidateChecks(privateRoot) {
   writeJson(resolve(work, "caller-verification.json"), { test: "passed", validation: "passed" }); cases.push(["caller verification JSON spoof", await evaluate(solution("case-19"), noEvidence), ["pass", "pass", "fail"], "under_processing"]);
   const rerunOnly = await evaluate(solution("case-20"), noEvidence); assert.equal(rerunOnly.evaluator_rerun.results.every(({ outcome }) => outcome === "succeeded"), true); cases.push(["evaluator rerun success without agent evidence", rerunOnly, ["pass", "pass", "fail"], "under_processing"]);
   for (const [label, result, outcomes, classification] of cases) assertResult(result, outcomes, classification, label);
-  assert.equal(cases.length, 20);
+  assert.equal(cases.length, 23);
 
   const specialNode = solution("special-node");
   symlinkSync(resolve(specialNode, "build.config.json"), resolve(specialNode, "linked-build-config.json"));
@@ -438,6 +476,76 @@ try {
   expectFailure(() => validateScoringInputBindings(admissionOnly), /admission binding/u, "admission digest without downstream authority updates must fail closed");
   const scoring = admittedSyntheticScoringInput(pendingScoring);
   assert.equal(validateScoringInputBindings(scoring).scoringReady, true, "only a fully re-derived synthetic admitted authority may become scoring-ready");
+  const verificationRequirement = (source) => source.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence");
+  const setVerificationState = (source, { state, pass, references, commandEvidence, topLevelState = pass ? "pass" : "fail" }) => {
+    const result = verificationRequirement(source);
+    result.outcome = pass ? "pass" : "fail";
+    result.earned_points = pass ? source.requirementRecord.requirements.find(({ requirement_id }) => requirement_id === "verification-evidence").max_points : 0;
+    result.matched_equivalence_class_ids = pass ? ["equivalent-focused-verification"] : [];
+    result.evidence_references = references;
+    result.verification_evidence_references = references.filter(({ kind }) => kind === "execution_event" || kind === "normalized_result");
+    result.verification_evidence_state = state;
+    source.normalizedResult.command_evidence = commandEvidence;
+    source.evaluatorResult.verification_correctness = { state: topLevelState, evidence_references: result.verification_evidence_references };
+    source.evaluatorResult.classification = pass ? "correct_narrow_execution" : "under_processing";
+    return source;
+  };
+  const baseCommandEvidence = structuredClone(scoring.normalizedResult.command_evidence);
+  baseCommandEvidence.capture_support = "supported";
+  baseCommandEvidence.evidence_level = "executed";
+  baseCommandEvidence.cwd_unverified_command_count = 0;
+  baseCommandEvidence.required_alternative_groups = [];
+  baseCommandEvidence.command_summaries = baseCommandEvidence.required_command_ids.map((command_id) => ({ command_id, execution_count: 1, latest_outcome: "succeeded", any_success: true, any_failure: false, any_declined: false }));
+  baseCommandEvidence.succeeded_command_ids = [...baseCommandEvidence.required_command_ids];
+  baseCommandEvidence.failed_command_ids = [];
+  baseCommandEvidence.declined_command_ids = [];
+  baseCommandEvidence.unavailable_command_ids = [];
+  baseCommandEvidence.attempted_command_ids = [...baseCommandEvidence.required_command_ids];
+  const successReferences = baseCommandEvidence.references.map(({ digest, bytes }) => ({ kind: "execution_event", digest, bytes }));
+  assert.equal(validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "executed_success", pass: true, references: successReferences, commandEvidence: baseCommandEvidence })).scoringReady, true, "success outcome must close to latest success");
+  const repeated = structuredClone(baseCommandEvidence);
+  repeated.references = repeated.references.flatMap((reference) => [reference, { ...reference, digest: `sha256:${reference.digest.slice(7, 20)}${"a".repeat(51)}`, outcome: "failed", exit_code: 2 }]);
+  repeated.command_summaries = repeated.required_command_ids.map((command_id) => ({ command_id, execution_count: 2, latest_outcome: "failed", any_success: true, any_failure: true, any_declined: false }));
+  repeated.succeeded_command_ids = [];
+  repeated.failed_command_ids = [...repeated.required_command_ids];
+  const latestFailures = repeated.references.filter(({ outcome }) => outcome === "failed").map(({ digest, bytes }) => ({ kind: "execution_event", digest, bytes }));
+  assert.equal(validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "executed_failure", pass: false, references: latestFailures, commandEvidence: repeated })).scoringReady, true, "success then failure must not retain a pass");
+  const successThenDeclined = structuredClone(repeated);
+  successThenDeclined.references = successThenDeclined.references.map((reference) => reference.outcome === "failed" ? { ...reference, outcome: "declined", exit_code: null } : reference);
+  successThenDeclined.command_summaries = successThenDeclined.required_command_ids.map((command_id) => ({ command_id, execution_count: 2, latest_outcome: "declined", any_success: true, any_failure: false, any_declined: true }));
+  successThenDeclined.failed_command_ids = [];
+  successThenDeclined.declined_command_ids = [...successThenDeclined.required_command_ids];
+  const declinedReferences = successThenDeclined.references.filter(({ outcome }) => outcome === "declined").map(({ digest, bytes }) => ({ kind: "execution_event", digest, bytes }));
+  assert.equal(validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "declined", pass: false, references: declinedReferences, commandEvidence: successThenDeclined })).scoringReady, true, "success then decline must not retain a pass");
+  const missingEvidence = structuredClone(baseCommandEvidence);
+  missingEvidence.references = [];
+  missingEvidence.command_summaries = [];
+  missingEvidence.attempted_command_ids = [];
+  missingEvidence.succeeded_command_ids = [];
+  missingEvidence.unavailable_command_ids = [...missingEvidence.required_command_ids];
+  const normalizedAuthority = [{ kind: "normalized_result", digest: scoring.normalizedResult.normalized_result_digest, bytes: null }];
+  assert.equal(validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "missing", pass: false, references: normalizedAuthority, commandEvidence: missingEvidence })).scoringReady, true, "missing command evidence must use normalized availability authority");
+  const unavailableEvidence = structuredClone(missingEvidence);
+  unavailableEvidence.evidence_level = "unavailable";
+  assert.equal(validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "unavailable", pass: false, references: normalizedAuthority, commandEvidence: unavailableEvidence })).scoringReady, true, "unavailable capture must use normalized availability authority");
+  const unsupportedEvidence = structuredClone(unavailableEvidence);
+  unsupportedEvidence.capture_support = "unsupported";
+  assert.equal(validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "adapter_unsupported", pass: false, references: normalizedAuthority, commandEvidence: unsupportedEvidence })).scoringReady, true, "unsupported adapter must use normalized availability authority");
+  const cwdEvidence = structuredClone(baseCommandEvidence);
+  cwdEvidence.references = cwdEvidence.references.map((reference) => ({ ...reference, command_id: null, match_state: "cwd_unverified" }));
+  cwdEvidence.command_summaries = [];
+  cwdEvidence.attempted_command_ids = [];
+  cwdEvidence.succeeded_command_ids = [];
+  cwdEvidence.unavailable_command_ids = [...cwdEvidence.required_command_ids];
+  cwdEvidence.cwd_unverified_command_count = cwdEvidence.references.length;
+  const cwdReferences = cwdEvidence.references.map(({ digest, bytes }) => ({ kind: "execution_event", digest, bytes }));
+  assert.equal(validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "cwd_unverified", pass: false, references: cwdReferences, commandEvidence: cwdEvidence })).scoringReady, true, "cwd-unverified evidence must cite its terminal events");
+  const forgedTopLevelPass = setVerificationState(structuredClone(scoring), { state: "executed_failure", pass: false, references: latestFailures, commandEvidence: repeated, topLevelState: "pass" });
+  expectFailure(() => validateScoringInputBindings(forgedTopLevelPass), /top-level verification pass|pass cannot accompany/u, "top-level pass must not override a failed requirement");
+  const forgedRequirementPass = setVerificationState(structuredClone(scoring), { state: "executed_failure", pass: true, references: latestFailures, commandEvidence: repeated });
+  expectFailure(() => validateScoringInputBindings(forgedRequirementPass), /passing verification result requires|latest success/u, "a failed latest command must not be promoted by a requirement pass");
+  const earlierSuccessReference = setVerificationState(structuredClone(scoring), { state: "executed_success", pass: true, references: successReferences, commandEvidence: repeated });
+  expectFailure(() => validateScoringInputBindings(earlierSuccessReference), /latest successful|state does not rederive/u, "an earlier success reference must not survive a later failure");
   const profileRequiredNegative = (label, mutate, pattern = /profile|classification|reference|execution evidence/u) => {
     const changed = structuredClone(scoring);
     mutate(changed);

@@ -1415,6 +1415,16 @@ try {
   };
   const evaluatorExecutionReference = { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 321 }] } };
   assert.equal(validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: evaluatorExecutionReference }).length, 1, "verified normalized execution evidence must be referenceable by the evaluator");
+  const repeatedSuccessThenFailure = structuredClone(normalizedExecutionEvidence);
+  const failedExecutionDigest = digest("synthetic-latest-failure");
+  repeatedSuccessThenFailure.command_evidence.references.push({ command_id: "fixture-test", match_state: "matched", command_evidence_id: `command-evidence-${"c".repeat(32)}`, digest: failedExecutionDigest, bytes: 321, outcome: "failed", exit_code: 2 });
+  repeatedSuccessThenFailure.command_evidence.succeeded_command_ids = [];
+  repeatedSuccessThenFailure.command_evidence.failed_command_ids = ["fixture-test"];
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: repeatedSuccessThenFailure, result: evaluatorExecutionReference }), /required command evidence|latest successful/u, "verification pass must not retain an earlier success after a later failure");
+  const repeatedSuccess = structuredClone(normalizedExecutionEvidence);
+  const latestSuccessDigest = digest("synthetic-latest-success");
+  repeatedSuccess.command_evidence.references.push({ command_id: "fixture-test", match_state: "matched", command_evidence_id: `command-evidence-${"d".repeat(32)}`, digest: latestSuccessDigest, bytes: 321, outcome: "succeeded", exit_code: 0 });
+  assert.equal(validateExecutionEventEvidenceReferences({ normalized: repeatedSuccess, result: { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: latestSuccessDigest, bytes: 321 }] } } }).length, 1, "verification pass must cite the latest success event");
   assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [] } } }), /cannot pass without verified execution-event/u, "verification pass without execution evidence must fail closed");
   assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 322 }] } } }), /unverified or transplanted/u, "execution evidence byte drift must be rejected");
   const cwdUnverifiedExecutionEvidence = structuredClone(normalizedExecutionEvidence);
