@@ -750,7 +750,7 @@ export function validateExecutionEventEvidenceReferences({ normalized, result })
     const hasCommandAuthority = normalized.command_evidence.required_command_ids.length > 0 || (normalized.command_evidence.required_alternative_groups ?? []).length > 0;
     if (state && (typedState || hasCommandAuthority)) {
       const expected = deriveVerificationEvidenceReferences(normalized, state);
-      const key = (reference) => `${reference.kind}:${reference.digest}:${reference.bytes}`;
+      const key = (reference) => `${reference.kind}:${reference.digest}:${reference.kind === "normalized_result" ? "normalized" : reference.bytes}`;
       const actualKeys = verification.evidence_references.map(key).sort();
       const expectedKeys = expected.map(key).sort();
       if (actualKeys.length !== expectedKeys.length || actualKeys.some((value, index) => value !== expectedKeys[index])) throw new Error("verification correctness references must match the deterministically derived causal reference set");

@@ -363,7 +363,7 @@ function executionEventReference(entry) {
 }
 
 function referenceKey(reference) {
-  return `${reference.kind}:${reference.digest}:${reference.bytes}`;
+  return `${reference.kind}:${reference.digest}:${reference.kind === "normalized_result" ? "normalized" : reference.bytes}`;
 }
 
 function assertReferenceSet(actual, expected, label) {
