@@ -2,58 +2,113 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-1130ca28be67c413afc685f0ceb259629445fab2cede7f3a3f8484d9007e3c7a",
-  "evaluator_bundle_digest": "sha256:7df32309800509cb13b38a8273df42c4c11654abb86492e9d4f048e0c5d75fd3",
+  "evaluator_bundle_id": "evaluator-ea03bda3fb0310ada3c17adcc8ac83b0e01c7ed991d8584b646e3b724b517b9f",
+  "evaluator_bundle_digest": "sha256:035647f3338ed79eb3a6393e489d237c3ef1c8070a73ebccd5af89577984f6f5",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mn-build-option-update",
   "fixture_input_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
   "task_class": "configuration",
   "suite": "mechanism_negative",
-  "evaluator_revision": "b5b43979c7ef5733a5c6d940b3d38f8d0fcefc14",
+  "evaluator_revision": "6818f127d0ade5dced74e9db58bd9b4363d49936",
   "generator_identity": "sha256:b317f60b18f1ac7eb0c639a6cba173ec1cedac4ad6e6990611b03be172c5cbd1",
-  "independence_statement_digest": "sha256:5801c2622a31799ad5261b6edb8ce3d7d70694aa144090b564ed3054ffd0ed6e",
+  "independence_statement_digest": "sha256:ec7514714751c3802e8d9ea91aa1b3701c7098082b580ac2ddb0980b08c60729",
   "review_record_digest": "sha256:2c68bfa2808be77476fd03ba5ad71f5bf0a0c09e0011f9d07711e257a2457cfb",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:f443c15e6c0e4f935ba53ad67c5acb42145cdc4ac23227e910e73afdab7f9a05",
+  "public_metadata_digest": "sha256:55c17fdac4fc0c92b40b27fc86823106b3fc5a3c9bb2f34accadce094c3282e9",
   "evaluator_source_identity": {
-    "base_git_revision": "b5b43979c7ef5733a5c6d940b3d38f8d0fcefc14",
-    "source_tree_digest": "sha256:cb8f635049ca4e27a78a5d2798e65a3a396aa07633d3a5baa00e1430ed41efd3",
+    "base_git_revision": "6818f127d0ade5dced74e9db58bd9b4363d49936",
+    "source_tree_digest": "sha256:10d1a5abb85b43020b693d757c3eea1e54268e37e1c7147b36565377129abedb",
     "generator_source_digest": "sha256:39bab4ae26d26e95d0106f7a6e12f41b86aff2b93db84540d1f6892cc1f0f484",
     "source_files": [
       {
+        "path": "benchmarks/schemas/evaluation-input-failure-artifact.schema.json",
+        "bytes": 2323,
+        "sha256": "sha256:7a058dde723d778adb38f78cb8d4d7e2079ef8da2377a2eccb82d6e760b46ef5"
+      },
+      {
+        "path": "benchmarks/schemas/evaluator-check-artifact.schema.json",
+        "bytes": 1778,
+        "sha256": "sha256:82e7d214b6318a5f0d3fc7de0130d8cd4eec4418e40cf4459f62254c5dd2fe2f"
+      },
+      {
         "path": "benchmarks/schemas/evaluator-reference.schema.json",
-        "bytes": 3072,
-        "sha256": "sha256:df62fc32a821ec78c007860396e52503933a74d8c8da394168baeffe0bf2688c"
+        "bytes": 4812,
+        "sha256": "sha256:d82676b260afec7268eb0b8acfac0127b78ba7489e29d49ee4fe8afb79d6c7e2"
       },
       {
         "path": "benchmarks/schemas/evaluator-result-envelope.schema.json",
-        "bytes": 11336,
-        "sha256": "sha256:efa6297b5a167daee97603d9fc47cdbef2e5da9650715aa9e1ab87516b9509d2"
+        "bytes": 11595,
+        "sha256": "sha256:275eace8f5d1adc049adffec231039529db74c5b72f74588ac4a837801711bd3"
       },
       {
         "path": "benchmarks/schemas/portfolio-final-admission-record.schema.json",
-        "bytes": 3073,
-        "sha256": "sha256:70912935e69da95ecd865485905a5f5798faad5dc3cf343e8647ba8d12d8deb1"
+        "bytes": 4813,
+        "sha256": "sha256:ea995849a52088c322e0dd6a2cbf9388961781899eb4cba34745d3071c8c2fb5"
+      },
+      {
+        "path": "benchmarks/schemas/portfolio-output-contract.schema.json",
+        "bytes": 2072,
+        "sha256": "sha256:14086b37a8f96f654f49d9ad1ef37a43f00deedaab73aa334f9177959deb18a9"
+      },
+      {
+        "path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+        "bytes": 2876,
+        "sha256": "sha256:7fd5c6489be63599b19a5825c43ae1f3d20c55fb9fd044dd81c179939b5c55bd"
+      },
+      {
+        "path": "benchmarks/schemas/private-evaluation-record.schema.json",
+        "bytes": 4175,
+        "sha256": "sha256:b65e66d87a0e2879a2408bbc7eca80b8c3e0236400dcff63dd05f50cc9b3d11b"
       },
       {
         "path": "benchmarks/schemas/private-evaluator-bundle.schema.json",
-        "bytes": 6311,
-        "sha256": "sha256:98073d2f85235a2676b446bca9308a96d5955106612a81d421d4b7e96df53a85"
+        "bytes": 8180,
+        "sha256": "sha256:7759b0085c2f44851cfe3b12d620af46bace07d0b7ad1ef34e21e7998699c386"
       },
       {
         "path": "benchmarks/schemas/private-evaluator-fragment.schema.json",
-        "bytes": 6294,
-        "sha256": "sha256:f478338133c32bae9ed52f061863a1b274803a6532a7de3cd88448d264fde3c4"
+        "bytes": 6355,
+        "sha256": "sha256:72bb59192b5bd210c7b7b37766c4b8bd7ee8ae0684bcc363fd5c4d35ec98aafb"
       },
       {
         "path": "benchmarks/schemas/private-evaluator-independence-statement.schema.json",
-        "bytes": 4668,
-        "sha256": "sha256:97b5956d0f0a490436be4c295b12474a3738be5d0eb4865041383162c6abdd73"
+        "bytes": 6408,
+        "sha256": "sha256:c3b99ce14114425115c8492585db392ce1bc5a6ca533b4d3c56b1b20318b3e6d"
+      },
+      {
+        "path": "benchmarks/schemas/repository-diff-artifact.schema.json",
+        "bytes": 2298,
+        "sha256": "sha256:57efa83951b8b0b0cdfc1d0b3a597af78deb77663ed367d12ff692c078aba249"
+      },
+      {
+        "path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
+        "bytes": 2956,
+        "sha256": "sha256:a028c4cbd1bdee9f1f382e69b3e383f926932b1096e61302bf9c352b07473cbf"
+      },
+      {
+        "path": "scripts/adapter-runtime-inventory.mjs",
+        "bytes": 4244,
+        "sha256": "sha256:1076c9b2cc4dec03d08ea4b9255137d693afcbb27aa62cfe36e246b106509de0"
+      },
+      {
+        "path": "scripts/ask-benchmark-atomic-publication.mjs",
+        "bytes": 3179,
+        "sha256": "sha256:1227b73efd9bcfe254fa8f448acb9aed5078c8f42fa4273ec1f71ab609fdb67a"
+      },
+      {
+        "path": "scripts/ask-benchmark-command-evidence.mjs",
+        "bytes": 29588,
+        "sha256": "sha256:28117978ce67bf16e9581eefbff0167caef5e6a5f849ea570a00fbc1e4a70358"
       },
       {
         "path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-        "bytes": 65703,
-        "sha256": "sha256:b37970126d4ad7e7dc0d42e89a37540f405da2df66b94aef765eb9a982c2cda9"
+        "bytes": 84743,
+        "sha256": "sha256:43f9b8de4b690f6d1c24314615a6eb6c11d48787fc8fbe686b5e6cf173396884"
+      },
+      {
+        "path": "scripts/ask-benchmark-execution.mjs",
+        "bytes": 111746,
+        "sha256": "sha256:3b8b4d8d75f756f09f85a1b2c847828db42132d06e26e603c7b6b2c22c23cc33"
       },
       {
         "path": "scripts/ask-benchmark-materialize.mjs",
@@ -61,30 +116,670 @@
         "sha256": "sha256:3bf334a412f76b68ff873aff35d5122355a7de447233cb8b79b2d79c8d61b90f"
       },
       {
-        "path": "scripts/ask-benchmark-mn-build-option-update.mjs",
-        "bytes": 31711,
-        "sha256": "sha256:92cffaefe59334821e0a14338d2f8adb275ffb445824f72963202b9de7561cbe"
-      },
-      {
         "path": "scripts/ask-benchmark-normalized-results.mjs",
         "bytes": 47479,
         "sha256": "sha256:92e40b8ce7a0b8da8f3a512673c91a48034b5699512782122eebd00c6c22a7bc"
       },
       {
+        "path": "scripts/ask-benchmark-plan.mjs",
+        "bytes": 3927,
+        "sha256": "sha256:9b950a99f790c326b19a935618ed62b615072665c72d6eeed5e5c29e85bde684"
+      },
+      {
+        "path": "scripts/ask-benchmark-portfolio-catalog.mjs",
+        "bytes": 21036,
+        "sha256": "sha256:7221194b0376461a2883493556cd4ed3d6a6017677c9393cda81f45ce57969c1"
+      },
+      {
+        "path": "scripts/ask-benchmark-portfolio-policy.mjs",
+        "bytes": 119782,
+        "sha256": "sha256:28f9b43b00f45cacc3abae276a37e286cde16f0ad5dd8e65ed5cbed4558342be"
+      },
+      {
+        "path": "scripts/ask-benchmark-schema.mjs",
+        "bytes": 1408,
+        "sha256": "sha256:b04c70eda284ee9be0ba2c2ac35f42807ea7de280a6f77ee2850cc289d4d0051"
+      },
+      {
         "path": "scripts/ask-benchmark-scoring-contract.mjs",
-        "bytes": 43316,
-        "sha256": "sha256:8b1156cfa80dd5fda0aa5e8bbea2ac0d3ee993febdda93ea16cb1afdfda0e1e1"
+        "bytes": 43698,
+        "sha256": "sha256:ac060fc604b362722b416bdb612df01ccbb828d4a0ede55e17447f1f54b5a5d1"
       },
       {
-        "path": "scripts/test-ask-benchmark-evaluator-boundary.mjs",
-        "bytes": 87734,
-        "sha256": "sha256:567530da955d5d1448519ae92f836591f597ab659e0ffc5c3bfe44f09254e857"
+        "path": "scripts/ask-benchmark-selection.mjs",
+        "bytes": 19127,
+        "sha256": "sha256:2926faf7aa0c3c641b8a1f8c8a9aed5e04bc8c0b7c2b77a594e75b58227800d1"
       },
       {
-        "path": "scripts/test-ask-benchmark-mn-build-option-update.mjs",
-        "bytes": 108492,
-        "sha256": "sha256:4cd2d0b40d69bfba306c31d85d3b3ee05b1a2acb672bd660ef2c542a2f90f37a"
+        "path": "scripts/ask-benchmark-stable-file.mjs",
+        "bytes": 4105,
+        "sha256": "sha256:ccfad4185ef3720dda5e10e1c1479f18916402b990ff7224aab9eb7293ae577b"
+      },
+      {
+        "path": "scripts/ask-shared.mjs",
+        "bytes": 17487,
+        "sha256": "sha256:1fd2efdcda57d9bba7bceb6676e7c5090021ae241713c2f14cff50fb8a83e97c"
+      },
+      {
+        "path": "scripts/codex-runtime-profile.mjs",
+        "bytes": 17570,
+        "sha256": "sha256:6af49b66359bd2f35455a44a8f2b318c271fb216d85de5cf877eb0a3648e3407"
+      },
+      {
+        "path": "scripts/execution-envelope.mjs",
+        "bytes": 10070,
+        "sha256": "sha256:07cd7b3aad33111fad97b50b8ea41b4b098cc03e41814167992ae1c16596748c"
+      },
+      {
+        "path": "scripts/install-claude-adapter.mjs",
+        "bytes": 57033,
+        "sha256": "sha256:2e81391d20ee7b274b93c4c82ff1a4ed42859bd8c4d8e0875f99f792f820dc62"
+      },
+      {
+        "path": "scripts/install-codex-adapter.mjs",
+        "bytes": 64117,
+        "sha256": "sha256:b6b2e42e2f4131767ee65f71f58c6204ae6a72df5a222c6e30802028778b9dcf"
+      },
+      {
+        "path": "scripts/installer-lifecycle.mjs",
+        "bytes": 25082,
+        "sha256": "sha256:89409760297368e3baae0ebad3d582f6d9308b9acf9767ceef37cb107134c1a1"
       }
-    ]
+    ],
+    "dependency_graph": {
+      "entry_paths": [
+        "scripts/ask-benchmark-evaluator-boundary.mjs",
+        "scripts/ask-benchmark-materialize.mjs",
+        "scripts/ask-benchmark-normalized-results.mjs",
+        "scripts/ask-benchmark-scoring-contract.mjs"
+      ],
+      "node_inventory": [
+        {
+          "path": "benchmarks/schemas/evaluation-input-failure-artifact.schema.json",
+          "bytes": 2323,
+          "sha256": "sha256:7a058dde723d778adb38f78cb8d4d7e2079ef8da2377a2eccb82d6e760b46ef5",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 2323,
+          "base_git_revision_sha256": "sha256:7a058dde723d778adb38f78cb8d4d7e2079ef8da2377a2eccb82d6e760b46ef5"
+        },
+        {
+          "path": "benchmarks/schemas/evaluator-check-artifact.schema.json",
+          "bytes": 1778,
+          "sha256": "sha256:82e7d214b6318a5f0d3fc7de0130d8cd4eec4418e40cf4459f62254c5dd2fe2f",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 1778,
+          "base_git_revision_sha256": "sha256:82e7d214b6318a5f0d3fc7de0130d8cd4eec4418e40cf4459f62254c5dd2fe2f"
+        },
+        {
+          "path": "benchmarks/schemas/evaluator-reference.schema.json",
+          "bytes": 4812,
+          "sha256": "sha256:d82676b260afec7268eb0b8acfac0127b78ba7489e29d49ee4fe8afb79d6c7e2",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 4812,
+          "base_git_revision_sha256": "sha256:d82676b260afec7268eb0b8acfac0127b78ba7489e29d49ee4fe8afb79d6c7e2"
+        },
+        {
+          "path": "benchmarks/schemas/evaluator-result-envelope.schema.json",
+          "bytes": 11595,
+          "sha256": "sha256:275eace8f5d1adc049adffec231039529db74c5b72f74588ac4a837801711bd3",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 11595,
+          "base_git_revision_sha256": "sha256:275eace8f5d1adc049adffec231039529db74c5b72f74588ac4a837801711bd3"
+        },
+        {
+          "path": "benchmarks/schemas/portfolio-final-admission-record.schema.json",
+          "bytes": 4813,
+          "sha256": "sha256:ea995849a52088c322e0dd6a2cbf9388961781899eb4cba34745d3071c8c2fb5",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 4813,
+          "base_git_revision_sha256": "sha256:ea995849a52088c322e0dd6a2cbf9388961781899eb4cba34745d3071c8c2fb5"
+        },
+        {
+          "path": "benchmarks/schemas/portfolio-output-contract.schema.json",
+          "bytes": 2072,
+          "sha256": "sha256:14086b37a8f96f654f49d9ad1ef37a43f00deedaab73aa334f9177959deb18a9",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 2072,
+          "base_git_revision_sha256": "sha256:14086b37a8f96f654f49d9ad1ef37a43f00deedaab73aa334f9177959deb18a9"
+        },
+        {
+          "path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+          "bytes": 2876,
+          "sha256": "sha256:7fd5c6489be63599b19a5825c43ae1f3d20c55fb9fd044dd81c179939b5c55bd",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 2876,
+          "base_git_revision_sha256": "sha256:7fd5c6489be63599b19a5825c43ae1f3d20c55fb9fd044dd81c179939b5c55bd"
+        },
+        {
+          "path": "benchmarks/schemas/private-evaluation-record.schema.json",
+          "bytes": 4175,
+          "sha256": "sha256:b65e66d87a0e2879a2408bbc7eca80b8c3e0236400dcff63dd05f50cc9b3d11b",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 4175,
+          "base_git_revision_sha256": "sha256:b65e66d87a0e2879a2408bbc7eca80b8c3e0236400dcff63dd05f50cc9b3d11b"
+        },
+        {
+          "path": "benchmarks/schemas/private-evaluator-bundle.schema.json",
+          "bytes": 8180,
+          "sha256": "sha256:7759b0085c2f44851cfe3b12d620af46bace07d0b7ad1ef34e21e7998699c386",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 8180,
+          "base_git_revision_sha256": "sha256:7759b0085c2f44851cfe3b12d620af46bace07d0b7ad1ef34e21e7998699c386"
+        },
+        {
+          "path": "benchmarks/schemas/private-evaluator-fragment.schema.json",
+          "bytes": 6355,
+          "sha256": "sha256:72bb59192b5bd210c7b7b37766c4b8bd7ee8ae0684bcc363fd5c4d35ec98aafb",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 6355,
+          "base_git_revision_sha256": "sha256:72bb59192b5bd210c7b7b37766c4b8bd7ee8ae0684bcc363fd5c4d35ec98aafb"
+        },
+        {
+          "path": "benchmarks/schemas/private-evaluator-independence-statement.schema.json",
+          "bytes": 6408,
+          "sha256": "sha256:c3b99ce14114425115c8492585db392ce1bc5a6ca533b4d3c56b1b20318b3e6d",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 6408,
+          "base_git_revision_sha256": "sha256:c3b99ce14114425115c8492585db392ce1bc5a6ca533b4d3c56b1b20318b3e6d"
+        },
+        {
+          "path": "benchmarks/schemas/repository-diff-artifact.schema.json",
+          "bytes": 2298,
+          "sha256": "sha256:57efa83951b8b0b0cdfc1d0b3a597af78deb77663ed367d12ff692c078aba249",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 2298,
+          "base_git_revision_sha256": "sha256:57efa83951b8b0b0cdfc1d0b3a597af78deb77663ed367d12ff692c078aba249"
+        },
+        {
+          "path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
+          "bytes": 2956,
+          "sha256": "sha256:a028c4cbd1bdee9f1f382e69b3e383f926932b1096e61302bf9c352b07473cbf",
+          "file_type": "authority_data",
+          "base_git_revision_bytes": 2956,
+          "base_git_revision_sha256": "sha256:a028c4cbd1bdee9f1f382e69b3e383f926932b1096e61302bf9c352b07473cbf"
+        },
+        {
+          "path": "scripts/adapter-runtime-inventory.mjs",
+          "bytes": 4244,
+          "sha256": "sha256:1076c9b2cc4dec03d08ea4b9255137d693afcbb27aa62cfe36e246b106509de0",
+          "file_type": "module",
+          "base_git_revision_bytes": 4244,
+          "base_git_revision_sha256": "sha256:1076c9b2cc4dec03d08ea4b9255137d693afcbb27aa62cfe36e246b106509de0"
+        },
+        {
+          "path": "scripts/ask-benchmark-atomic-publication.mjs",
+          "bytes": 3179,
+          "sha256": "sha256:1227b73efd9bcfe254fa8f448acb9aed5078c8f42fa4273ec1f71ab609fdb67a",
+          "file_type": "module",
+          "base_git_revision_bytes": 3179,
+          "base_git_revision_sha256": "sha256:1227b73efd9bcfe254fa8f448acb9aed5078c8f42fa4273ec1f71ab609fdb67a"
+        },
+        {
+          "path": "scripts/ask-benchmark-command-evidence.mjs",
+          "bytes": 29588,
+          "sha256": "sha256:28117978ce67bf16e9581eefbff0167caef5e6a5f849ea570a00fbc1e4a70358",
+          "file_type": "module",
+          "base_git_revision_bytes": 29588,
+          "base_git_revision_sha256": "sha256:28117978ce67bf16e9581eefbff0167caef5e6a5f849ea570a00fbc1e4a70358"
+        },
+        {
+          "path": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "bytes": 84743,
+          "sha256": "sha256:43f9b8de4b690f6d1c24314615a6eb6c11d48787fc8fbe686b5e6cf173396884",
+          "file_type": "module",
+          "base_git_revision_bytes": 84743,
+          "base_git_revision_sha256": "sha256:43f9b8de4b690f6d1c24314615a6eb6c11d48787fc8fbe686b5e6cf173396884"
+        },
+        {
+          "path": "scripts/ask-benchmark-execution.mjs",
+          "bytes": 111746,
+          "sha256": "sha256:3b8b4d8d75f756f09f85a1b2c847828db42132d06e26e603c7b6b2c22c23cc33",
+          "file_type": "module",
+          "base_git_revision_bytes": 111746,
+          "base_git_revision_sha256": "sha256:3b8b4d8d75f756f09f85a1b2c847828db42132d06e26e603c7b6b2c22c23cc33"
+        },
+        {
+          "path": "scripts/ask-benchmark-materialize.mjs",
+          "bytes": 35384,
+          "sha256": "sha256:3bf334a412f76b68ff873aff35d5122355a7de447233cb8b79b2d79c8d61b90f",
+          "file_type": "module",
+          "base_git_revision_bytes": 35384,
+          "base_git_revision_sha256": "sha256:3bf334a412f76b68ff873aff35d5122355a7de447233cb8b79b2d79c8d61b90f"
+        },
+        {
+          "path": "scripts/ask-benchmark-normalized-results.mjs",
+          "bytes": 47479,
+          "sha256": "sha256:92e40b8ce7a0b8da8f3a512673c91a48034b5699512782122eebd00c6c22a7bc",
+          "file_type": "module",
+          "base_git_revision_bytes": 47479,
+          "base_git_revision_sha256": "sha256:92e40b8ce7a0b8da8f3a512673c91a48034b5699512782122eebd00c6c22a7bc"
+        },
+        {
+          "path": "scripts/ask-benchmark-plan.mjs",
+          "bytes": 3927,
+          "sha256": "sha256:9b950a99f790c326b19a935618ed62b615072665c72d6eeed5e5c29e85bde684",
+          "file_type": "module",
+          "base_git_revision_bytes": 3927,
+          "base_git_revision_sha256": "sha256:9b950a99f790c326b19a935618ed62b615072665c72d6eeed5e5c29e85bde684"
+        },
+        {
+          "path": "scripts/ask-benchmark-portfolio-catalog.mjs",
+          "bytes": 21036,
+          "sha256": "sha256:7221194b0376461a2883493556cd4ed3d6a6017677c9393cda81f45ce57969c1",
+          "file_type": "module",
+          "base_git_revision_bytes": 21036,
+          "base_git_revision_sha256": "sha256:7221194b0376461a2883493556cd4ed3d6a6017677c9393cda81f45ce57969c1"
+        },
+        {
+          "path": "scripts/ask-benchmark-portfolio-policy.mjs",
+          "bytes": 119782,
+          "sha256": "sha256:28f9b43b00f45cacc3abae276a37e286cde16f0ad5dd8e65ed5cbed4558342be",
+          "file_type": "module",
+          "base_git_revision_bytes": 119782,
+          "base_git_revision_sha256": "sha256:28f9b43b00f45cacc3abae276a37e286cde16f0ad5dd8e65ed5cbed4558342be"
+        },
+        {
+          "path": "scripts/ask-benchmark-schema.mjs",
+          "bytes": 1408,
+          "sha256": "sha256:b04c70eda284ee9be0ba2c2ac35f42807ea7de280a6f77ee2850cc289d4d0051",
+          "file_type": "module",
+          "base_git_revision_bytes": 1408,
+          "base_git_revision_sha256": "sha256:b04c70eda284ee9be0ba2c2ac35f42807ea7de280a6f77ee2850cc289d4d0051"
+        },
+        {
+          "path": "scripts/ask-benchmark-scoring-contract.mjs",
+          "bytes": 43698,
+          "sha256": "sha256:ac060fc604b362722b416bdb612df01ccbb828d4a0ede55e17447f1f54b5a5d1",
+          "file_type": "module",
+          "base_git_revision_bytes": 43698,
+          "base_git_revision_sha256": "sha256:ac060fc604b362722b416bdb612df01ccbb828d4a0ede55e17447f1f54b5a5d1"
+        },
+        {
+          "path": "scripts/ask-benchmark-selection.mjs",
+          "bytes": 19127,
+          "sha256": "sha256:2926faf7aa0c3c641b8a1f8c8a9aed5e04bc8c0b7c2b77a594e75b58227800d1",
+          "file_type": "module",
+          "base_git_revision_bytes": 19127,
+          "base_git_revision_sha256": "sha256:2926faf7aa0c3c641b8a1f8c8a9aed5e04bc8c0b7c2b77a594e75b58227800d1"
+        },
+        {
+          "path": "scripts/ask-benchmark-stable-file.mjs",
+          "bytes": 4105,
+          "sha256": "sha256:ccfad4185ef3720dda5e10e1c1479f18916402b990ff7224aab9eb7293ae577b",
+          "file_type": "module",
+          "base_git_revision_bytes": 4105,
+          "base_git_revision_sha256": "sha256:ccfad4185ef3720dda5e10e1c1479f18916402b990ff7224aab9eb7293ae577b"
+        },
+        {
+          "path": "scripts/ask-shared.mjs",
+          "bytes": 17487,
+          "sha256": "sha256:1fd2efdcda57d9bba7bceb6676e7c5090021ae241713c2f14cff50fb8a83e97c",
+          "file_type": "module",
+          "base_git_revision_bytes": 17487,
+          "base_git_revision_sha256": "sha256:1fd2efdcda57d9bba7bceb6676e7c5090021ae241713c2f14cff50fb8a83e97c"
+        },
+        {
+          "path": "scripts/codex-runtime-profile.mjs",
+          "bytes": 17570,
+          "sha256": "sha256:6af49b66359bd2f35455a44a8f2b318c271fb216d85de5cf877eb0a3648e3407",
+          "file_type": "module",
+          "base_git_revision_bytes": 17570,
+          "base_git_revision_sha256": "sha256:6af49b66359bd2f35455a44a8f2b318c271fb216d85de5cf877eb0a3648e3407"
+        },
+        {
+          "path": "scripts/execution-envelope.mjs",
+          "bytes": 10070,
+          "sha256": "sha256:07cd7b3aad33111fad97b50b8ea41b4b098cc03e41814167992ae1c16596748c",
+          "file_type": "module",
+          "base_git_revision_bytes": 10070,
+          "base_git_revision_sha256": "sha256:07cd7b3aad33111fad97b50b8ea41b4b098cc03e41814167992ae1c16596748c"
+        },
+        {
+          "path": "scripts/install-claude-adapter.mjs",
+          "bytes": 57033,
+          "sha256": "sha256:2e81391d20ee7b274b93c4c82ff1a4ed42859bd8c4d8e0875f99f792f820dc62",
+          "file_type": "module",
+          "base_git_revision_bytes": 57033,
+          "base_git_revision_sha256": "sha256:2e81391d20ee7b274b93c4c82ff1a4ed42859bd8c4d8e0875f99f792f820dc62"
+        },
+        {
+          "path": "scripts/install-codex-adapter.mjs",
+          "bytes": 64117,
+          "sha256": "sha256:b6b2e42e2f4131767ee65f71f58c6204ae6a72df5a222c6e30802028778b9dcf",
+          "file_type": "module",
+          "base_git_revision_bytes": 64117,
+          "base_git_revision_sha256": "sha256:b6b2e42e2f4131767ee65f71f58c6204ae6a72df5a222c6e30802028778b9dcf"
+        },
+        {
+          "path": "scripts/installer-lifecycle.mjs",
+          "bytes": 25082,
+          "sha256": "sha256:89409760297368e3baae0ebad3d582f6d9308b9acf9767ceef37cb107134c1a1",
+          "file_type": "module",
+          "base_git_revision_bytes": 25082,
+          "base_git_revision_sha256": "sha256:89409760297368e3baae0ebad3d582f6d9308b9acf9767ceef37cb107134c1a1"
+        }
+      ],
+      "edge_inventory": [
+        {
+          "from": "scripts/ask-benchmark-command-evidence.mjs",
+          "to": "scripts/ask-benchmark-materialize.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-materialize.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-command-evidence.mjs",
+          "to": "scripts/ask-benchmark-schema.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-schema.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "benchmarks/schemas/evaluation-input-failure-artifact.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/evaluation-input-failure-artifact.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "benchmarks/schemas/evaluator-check-artifact.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/evaluator-check-artifact.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "benchmarks/schemas/evaluator-reference.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/evaluator-reference.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "benchmarks/schemas/evaluator-result-envelope.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/evaluator-result-envelope.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "benchmarks/schemas/private-evaluation-record.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/private-evaluation-record.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "benchmarks/schemas/private-evaluator-bundle.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/private-evaluator-bundle.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "benchmarks/schemas/private-evaluator-fragment.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/private-evaluator-fragment.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "benchmarks/schemas/private-evaluator-independence-statement.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/private-evaluator-independence-statement.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "benchmarks/schemas/repository-diff-artifact.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/repository-diff-artifact.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "scripts/ask-benchmark-materialize.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-materialize.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "scripts/ask-benchmark-normalized-results.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-normalized-results.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "scripts/ask-benchmark-portfolio-catalog.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-portfolio-catalog.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "scripts/ask-benchmark-portfolio-policy.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-portfolio-policy.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "to": "scripts/ask-benchmark-schema.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-schema.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-materialize.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-materialize.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-schema.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-schema.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-selection.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-selection.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/ask-benchmark-stable-file.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-stable-file.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/install-claude-adapter.mjs",
+          "kind": "static_import",
+          "specifier": "./install-claude-adapter.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-execution.mjs",
+          "to": "scripts/install-codex-adapter.mjs",
+          "kind": "static_import",
+          "specifier": "./install-codex-adapter.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-materialize.mjs",
+          "to": "scripts/ask-benchmark-plan.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-plan.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-materialize.mjs",
+          "to": "scripts/ask-benchmark-schema.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-schema.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-materialize.mjs",
+          "to": "scripts/install-claude-adapter.mjs",
+          "kind": "static_import",
+          "specifier": "./install-claude-adapter.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-materialize.mjs",
+          "to": "scripts/install-codex-adapter.mjs",
+          "kind": "static_import",
+          "specifier": "./install-codex-adapter.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-normalized-results.mjs",
+          "to": "scripts/ask-benchmark-command-evidence.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-command-evidence.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-normalized-results.mjs",
+          "to": "scripts/ask-benchmark-execution.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-execution.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-normalized-results.mjs",
+          "to": "scripts/ask-benchmark-materialize.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-materialize.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-normalized-results.mjs",
+          "to": "scripts/ask-benchmark-schema.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-schema.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-plan.mjs",
+          "to": "scripts/ask-benchmark-schema.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-schema.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-portfolio-catalog.mjs",
+          "to": "scripts/ask-benchmark-materialize.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-materialize.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-portfolio-catalog.mjs",
+          "to": "scripts/ask-benchmark-schema.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-schema.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-portfolio-policy.mjs",
+          "to": "scripts/ask-benchmark-evaluator-boundary.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-evaluator-boundary.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-portfolio-policy.mjs",
+          "to": "scripts/ask-benchmark-materialize.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-materialize.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-portfolio-policy.mjs",
+          "to": "scripts/ask-benchmark-portfolio-catalog.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-portfolio-catalog.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-portfolio-policy.mjs",
+          "to": "scripts/ask-benchmark-schema.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-schema.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-schema.mjs",
+          "to": "scripts/execution-envelope.mjs",
+          "kind": "static_import",
+          "specifier": "./execution-envelope.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-scoring-contract.mjs",
+          "to": "benchmarks/schemas/portfolio-final-admission-record.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/portfolio-final-admission-record.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-scoring-contract.mjs",
+          "to": "benchmarks/schemas/portfolio-output-contract.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/portfolio-output-contract.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-scoring-contract.mjs",
+          "to": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/portfolio-requirement-record.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-scoring-contract.mjs",
+          "to": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
+          "kind": "authority_read",
+          "specifier": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json"
+        },
+        {
+          "from": "scripts/ask-benchmark-scoring-contract.mjs",
+          "to": "scripts/ask-benchmark-materialize.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-materialize.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-selection.mjs",
+          "to": "scripts/ask-benchmark-materialize.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-materialize.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-selection.mjs",
+          "to": "scripts/ask-benchmark-schema.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-schema.mjs"
+        },
+        {
+          "from": "scripts/ask-benchmark-stable-file.mjs",
+          "to": "scripts/ask-benchmark-atomic-publication.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-atomic-publication.mjs"
+        },
+        {
+          "from": "scripts/codex-runtime-profile.mjs",
+          "to": "scripts/ask-shared.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-shared.mjs"
+        },
+        {
+          "from": "scripts/install-claude-adapter.mjs",
+          "to": "scripts/adapter-runtime-inventory.mjs",
+          "kind": "static_import",
+          "specifier": "./adapter-runtime-inventory.mjs"
+        },
+        {
+          "from": "scripts/install-claude-adapter.mjs",
+          "to": "scripts/installer-lifecycle.mjs",
+          "kind": "static_import",
+          "specifier": "./installer-lifecycle.mjs"
+        },
+        {
+          "from": "scripts/install-codex-adapter.mjs",
+          "to": "scripts/adapter-runtime-inventory.mjs",
+          "kind": "static_import",
+          "specifier": "./adapter-runtime-inventory.mjs"
+        },
+        {
+          "from": "scripts/install-codex-adapter.mjs",
+          "to": "scripts/ask-shared.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-shared.mjs"
+        },
+        {
+          "from": "scripts/install-codex-adapter.mjs",
+          "to": "scripts/codex-runtime-profile.mjs",
+          "kind": "static_import",
+          "specifier": "./codex-runtime-profile.mjs"
+        },
+        {
+          "from": "scripts/install-codex-adapter.mjs",
+          "to": "scripts/installer-lifecycle.mjs",
+          "kind": "static_import",
+          "specifier": "./installer-lifecycle.mjs"
+        }
+      ],
+      "graph_digest": "sha256:002ab26c8dfa00747acadce472f9aff20be0b77499c16631177675c9f0a4765d"
+    }
   }
 }
