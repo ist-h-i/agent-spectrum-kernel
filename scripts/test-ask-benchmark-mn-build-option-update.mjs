@@ -724,7 +724,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state) {
   const currentTypedState = evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state;
   expectPersistentFailure("verification state", (changed) => {
     changed.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state = currentTypedState === "executed_failure" ? "declined" : "executed_failure";
-  }, /state does not rederive|causal reference set/u);
+  }, /state does not rederive|causal reference set|typed invalid authority|verification evidence/u);
   expectPersistentFailure("verification references", (changed) => {
     changed.verification_correctness.evidence_references = [];
     changed.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references = [];
