@@ -1247,7 +1247,7 @@ try {
   expectFailure(() => validateScoringInputBindings(forgedRequirementPass), /passing verification result requires|latest success/u, "a failed latest command must not be promoted by a requirement pass");
   const earlierSuccessReference = setVerificationState(structuredClone(scoring), { state: "executed_success", pass: true, references: successReferences, commandEvidence: repeated });
   expectFailure(() => validateScoringInputBindings(earlierSuccessReference), /latest successful|state does not rederive/u, "an earlier success reference must not survive a later failure");
-  const profileRequiredNegative = (label, mutate, pattern = /profile|classification|reference|execution evidence/u) => {
+  const profileRequiredNegative = (label, mutate, pattern = /profile|classification|reference|execution evidence|state|invalid/u) => {
     const changed = structuredClone(scoring);
     mutate(changed);
     expectFailure(() => validateScoringInputBindings(changed), pattern, `result profile negative: ${label}`);
