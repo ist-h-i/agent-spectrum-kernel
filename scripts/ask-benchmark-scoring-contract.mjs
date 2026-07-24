@@ -381,10 +381,11 @@ function assertStateSpecificReferenceSemantics(references, normalizedResult, sta
     }
     const source = sources.get(referenceKey(reference));
     if (!source) throw new Error(`${label} contains an unbound execution-event reference`);
-    if (state === "executed_success" && (source.match_state !== "matched" || source.outcome !== "succeeded" || source.exit_code !== 0)) throw new Error(`${label} contains a non-success causal event`);
+    const matchState = source.match_state ?? "matched";
+    if (state === "executed_success" && (matchState !== "matched" || source.outcome !== "succeeded" || source.exit_code !== 0)) throw new Error(`${label} contains a non-success causal event`);
     if (state === "executed_failure" && (source.outcome !== "failed" || source.exit_code === 0 || source.exit_code === null)) throw new Error(`${label} contains a non-failure causal event`);
     if (state === "declined" && (source.outcome !== "declined" || source.exit_code !== null)) throw new Error(`${label} contains a non-declined causal event`);
-    if (state === "cwd_unverified" && source.match_state !== "cwd_unverified") throw new Error(`${label} must reference cwd-unverified causal events`);
+    if (state === "cwd_unverified" && matchState !== "cwd_unverified") throw new Error(`${label} must reference cwd-unverified causal events`);
   }
 }
 
