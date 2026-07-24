@@ -95,8 +95,8 @@ const ASSET_ROLES = [
   "scope_boundaries",
   "unsafe_action_rules",
   "evidence_removal_mutations",
+  "evaluator_dependency_graph",
   "human_evaluation_instructions",
-  "reference_outcome",
 ].sort();
 const catalog = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-catalog.json"), "utf8"));
 const policyManifest = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-policy-manifest.json"), "utf8"));
@@ -639,6 +639,12 @@ function createPrivateBundle(path, normalized) {
       public_repository_allowed: false,
       public_ci_artifact_allowed: false,
       contains_answer_bearing_content: true,
+    },
+    dependency_graph: {
+      entry_paths: ["scripts/synthetic-entry.mjs"],
+      node_inventory: [{ path: "scripts/synthetic-entry.mjs", bytes: 1, sha256: digest("synthetic-node"), file_type: "module", base_git_revision_bytes: 1, base_git_revision_sha256: digest("synthetic-node") }],
+      edge_inventory: [],
+      graph_digest: digest("synthetic-dependency-graph"),
     },
   });
   const manifestPath = resolve(path, "private-evaluator-bundle.json");
