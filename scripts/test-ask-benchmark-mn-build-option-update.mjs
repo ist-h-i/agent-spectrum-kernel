@@ -693,7 +693,7 @@ function runPersistentFullEvaluatorAuthority(privateRoot, state) {
   const normalizedPath = resolve(normalizedAuthority.generationPath, normalizedAuthority.generationManifest.inventory[0].path);
   const originalNormalizedBytes = readFileSync(normalizedPath);
   const changedNormalized = JSON.parse(originalNormalizedBytes.toString("utf8"));
-  changedNormalized.command_evidence.command_summaries = changedNormalized.command_evidence.command_summaries.map((summary) => ({ ...summary, latest_outcome: summary.latest_outcome === "succeeded" ? "failed" : summary.latest_outcome }));
+  changedNormalized.command_evidence.command_summaries = changedNormalized.command_evidence.command_summaries.map((summary) => ({ ...summary, latest_outcome: summary.latest_outcome === "succeeded" ? "failed" : "succeeded" }));
   writeJson(normalizedPath, changedNormalized);
   assert.throws(() => verifyEvaluatorBoundary(common), /normalized result identity|digest|inventory/u, "persistent authority tamper: command summary");
   writeFileSync(normalizedPath, originalNormalizedBytes);
