@@ -1061,7 +1061,17 @@ try {
   cwdEvidence.cwd_unverified_command_count = cwdEvidence.references.length;
   const cwdReferences = cwdEvidence.references.map(({ digest, bytes }) => ({ kind: "execution_event", digest, bytes }));
   assert.equal(validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "cwd_unverified", pass: false, references: cwdReferences, commandEvidence: cwdEvidence })).scoringReady, true, "cwd-unverified evidence must cite its terminal events");
-  expectFailure(() => validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "cwd_unverified", pass: false, references: successReferences, commandEvidence: cwdEvidence })), /causal reference set/u, "cwd-unverified state must cite cwd cause events rather than matched successes");
+  const cwdEvidenceWithMatched = structuredClone(cwdEvidence);
+  cwdEvidenceWithMatched.references = [
+    { ...baseCommandEvidence.references[0], match_state: "matched" },
+    { ...cwdEvidence.references[1], match_state: "cwd_unverified" },
+  ];
+  cwdEvidenceWithMatched.command_summaries = [{ command_id: firstCommand, execution_count: 1, latest_outcome: "succeeded", any_success: true, any_failure: false, any_declined: false }];
+  cwdEvidenceWithMatched.attempted_command_ids = [firstCommand];
+  cwdEvidenceWithMatched.succeeded_command_ids = [firstCommand];
+  cwdEvidenceWithMatched.unavailable_command_ids = [secondCommand];
+  cwdEvidenceWithMatched.cwd_unverified_command_count = 1;
+  expectFailure(() => validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "cwd_unverified", pass: false, references: successReferences, commandEvidence: cwdEvidenceWithMatched })), /causal reference set|cwd-unverified causal/u, "cwd-unverified state must cite cwd cause events rather than matched successes");
   const missingWithExecution = structuredClone(missingEvidence);
   missingWithExecution.references = [firstSuccess];
   expectFailure(() => validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "missing", pass: false, references: [{ kind: "execution_event", digest: firstSuccess.digest, bytes: firstSuccess.bytes }], commandEvidence: missingWithExecution })), /causal reference set/u, "missing state must not add execution-event references");
