@@ -693,9 +693,11 @@ function runPersistentFullEvaluatorAuthority(privateRoot, state) {
   const normalizedPath = resolve(normalizedAuthority.generationPath, normalizedAuthority.generationManifest.inventory[0].path);
   const originalNormalizedBytes = readFileSync(normalizedPath);
   const changedNormalized = JSON.parse(originalNormalizedBytes.toString("utf8"));
-  changedNormalized.command_evidence.command_summaries = changedNormalized.command_evidence.command_summaries.map((summary) => ({ ...summary, latest_outcome: summary.latest_outcome === "succeeded" ? "failed" : "succeeded" }));
+  changedNormalized.command_evidence.command_summaries = changedNormalized.command_evidence.command_summaries.length > 0
+    ? changedNormalized.command_evidence.command_summaries.map((summary) => ({ ...summary, latest_outcome: summary.latest_outcome === "succeeded" ? "failed" : "succeeded" }))
+    : [{ command_id: "tampered-command", execution_count: 1, latest_outcome: "failed", any_success: false, any_failure: true, any_declined: false }];
   writeJson(normalizedPath, changedNormalized);
-  assert.throws(() => verifyEvaluatorBoundary(common), /normalized result identity|digest|inventory/u, "persistent authority tamper: command summary");
+  assert.throws(() => verifyEvaluatorBoundary(common), /normalized result identity|digest|inventory|summary|inconsistent/u, "persistent authority tamper: command summary");
   writeFileSync(normalizedPath, originalNormalizedBytes);
   assert.deepEqual(chain.snapshot(), before, "persistent authority tamper must restore command summary");
   return { authorityRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, chain, verifiedResult };
