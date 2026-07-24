@@ -2,22 +2,22 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-8a88fe3e762a43d32237daae421899c8e8e754cebcceb92d38e96ce1c564130d",
-  "evaluator_bundle_digest": "sha256:502a2707d0f07524e1f21e437826f0655f5750334db9f9fc8889b009a8da4409",
+  "evaluator_bundle_id": "evaluator-9824948f80013f992d0fa78599f778d7b1c221e961671f8a6756d2024d0f01fe",
+  "evaluator_bundle_digest": "sha256:ed51896050c49f035ab3389a782b21328390d8ff3307ec08e01c4f24a46b132e",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mn-build-option-update",
   "fixture_input_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
   "task_class": "configuration",
   "suite": "mechanism_negative",
-  "evaluator_revision": "086a1196fa4305260f86fc01afbcff90631bca70",
+  "evaluator_revision": "fca14cc874c2060ee336b5fd8792048796d7240f",
   "generator_identity": "sha256:b317f60b18f1ac7eb0c639a6cba173ec1cedac4ad6e6990611b03be172c5cbd1",
-  "independence_statement_digest": "sha256:1b37a9d8494fd9d0cec88c4699d4fb86ce2b61c1fdfe0727d8f8a89f2e5a1645",
+  "independence_statement_digest": "sha256:a9134e39023715307fc68e3f3bde5fa876494068bbd4cdaf4107361666945440",
   "review_record_digest": "sha256:2c68bfa2808be77476fd03ba5ad71f5bf0a0c09e0011f9d07711e257a2457cfb",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:745427d57ff13b39bf00be0803107e9b3bc0b34242626d279194db56c951b732",
+  "public_metadata_digest": "sha256:3a0cebedd386ecc599dd864b3955bcc9a5136f70794134ec3c4501e572af09da",
   "evaluator_source_identity": {
-    "base_git_revision": "086a1196fa4305260f86fc01afbcff90631bca70",
-    "source_tree_digest": "sha256:4a2936ba84bb1e13becd25eaa7f7d9b06fc0ce09ab5b190e5dcf564264ef406c",
+    "base_git_revision": "fca14cc874c2060ee336b5fd8792048796d7240f",
+    "source_tree_digest": "sha256:f6486e435249f9a5721809e203f8023b214f3d5dd3c2829d39cdf64f5af69405",
     "generator_source_digest": "sha256:39bab4ae26d26e95d0106f7a6e12f41b86aff2b93db84540d1f6892cc1f0f484",
     "source_files": [
       {
@@ -47,8 +47,8 @@
       },
       {
         "path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-        "bytes": 58185,
-        "sha256": "sha256:07f29b9931e5913cf846d1c2c4a011c864a8feacb6024f2c49c8537e7c1830dc"
+        "bytes": 59434,
+        "sha256": "sha256:b82a3655075e84ded37bbac60302569ccdd72dddffeedfa552c0a845cb6c1dec"
       },
       {
         "path": "scripts/ask-benchmark-mn-build-option-update.mjs",
@@ -57,8 +57,18 @@
       },
       {
         "path": "scripts/ask-benchmark-scoring-contract.mjs",
-        "bytes": 34614,
-        "sha256": "sha256:144bf5f1a33d00c51a1f8339a0e452daa9322cbe89fea49c508710e4fdeddc76"
+        "bytes": 39053,
+        "sha256": "sha256:1a8ed5885f0a15b0dd8a8522eb519a9d07329949fbcc7751af4933085c5f0253"
+      },
+      {
+        "path": "scripts/test-ask-benchmark-evaluator-boundary.mjs",
+        "bytes": 87734,
+        "sha256": "sha256:567530da955d5d1448519ae92f836591f597ab659e0ffc5c3bfe44f09254e857"
+      },
+      {
+        "path": "scripts/test-ask-benchmark-mn-build-option-update.mjs",
+        "bytes": 92815,
+        "sha256": "sha256:4b66fb67869d8d7609bff5bdb7ca4f4f168d43f7bc4f47d43f540ffa6a15bfac"
       }
     ]
   }
