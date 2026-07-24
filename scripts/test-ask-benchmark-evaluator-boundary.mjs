@@ -1420,18 +1420,18 @@ try {
   repeatedSuccessThenFailure.command_evidence.references.push({ command_id: "fixture-test", match_state: "matched", command_evidence_id: `command-evidence-${"c".repeat(32)}`, digest: failedExecutionDigest, bytes: 321, outcome: "failed", exit_code: 2 });
   repeatedSuccessThenFailure.command_evidence.succeeded_command_ids = [];
   repeatedSuccessThenFailure.command_evidence.failed_command_ids = ["fixture-test"];
-  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: repeatedSuccessThenFailure, result: evaluatorExecutionReference }), /required command evidence|latest successful/u, "verification pass must not retain an earlier success after a later failure");
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: repeatedSuccessThenFailure, result: evaluatorExecutionReference }), /required command evidence|latest successful|causal reference set/u, "verification pass must not retain an earlier success after a later failure");
   const repeatedSuccess = structuredClone(normalizedExecutionEvidence);
   const latestSuccessDigest = digest("synthetic-latest-success");
   repeatedSuccess.command_evidence.references.push({ command_id: "fixture-test", match_state: "matched", command_evidence_id: `command-evidence-${"d".repeat(32)}`, digest: latestSuccessDigest, bytes: 321, outcome: "succeeded", exit_code: 0 });
   assert.equal(validateExecutionEventEvidenceReferences({ normalized: repeatedSuccess, result: { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: latestSuccessDigest, bytes: 321 }] } } }).length, 1, "verification pass must cite the latest success event");
-  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [] } } }), /cannot pass without verified execution-event/u, "verification pass without execution evidence must fail closed");
-  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 322 }] } } }), /unverified or transplanted/u, "execution evidence byte drift must be rejected");
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [] } } }), /cannot pass without verified execution-event|causal reference set/u, "verification pass without execution evidence must fail closed");
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 322 }] } } }), /unverified or transplanted|causal reference set/u, "execution evidence byte drift must be rejected");
   const cwdUnverifiedExecutionEvidence = structuredClone(normalizedExecutionEvidence);
   cwdUnverifiedExecutionEvidence.command_evidence.succeeded_command_ids = [];
   cwdUnverifiedExecutionEvidence.command_evidence.references[0].command_id = null;
   cwdUnverifiedExecutionEvidence.command_evidence.references[0].match_state = "cwd_unverified";
-  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: cwdUnverifiedExecutionEvidence, result: evaluatorExecutionReference }), /required command evidence is absent or unsuccessful/u, "evaluator verification pass must reject cwd-dependent command evidence without runtime cwd authority");
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: cwdUnverifiedExecutionEvidence, result: evaluatorExecutionReference }), /required command evidence is absent or unsuccessful|causal reference set/u, "evaluator verification pass must reject cwd-dependent command evidence without runtime cwd authority");
   const declinedExecutionEvidence = structuredClone(normalizedExecutionEvidence);
   declinedExecutionEvidence.command_evidence.succeeded_command_ids = [];
   declinedExecutionEvidence.command_evidence.declined_command_ids = ["fixture-test"];
@@ -1459,7 +1459,7 @@ try {
   declinedAlternativeEvidence.command_evidence.required_alternative_groups[0].succeeded_ids = [];
   declinedAlternativeEvidence.command_evidence.references[0].outcome = "declined";
   declinedAlternativeEvidence.command_evidence.references[0].exit_code = null;
-  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: declinedAlternativeEvidence, result: evaluatorExecutionReference }), /alternative command group/u, "evaluator verification pass must reject a declined-only alternative group");
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: declinedAlternativeEvidence, result: evaluatorExecutionReference }), /alternative command group|causal reference set/u, "evaluator verification pass must reject a declined-only alternative group");
 
   assert.deepEqual(snapshot(privateRoot), beforePrivate, "all evaluator failure paths must keep the private bundle byte-identical");
   assert.deepEqual(snapshot(materialized), beforeMaterialized, "all evaluator failure paths must keep materialized inputs byte-identical");

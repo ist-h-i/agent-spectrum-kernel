@@ -2,9 +2,9 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 import {
@@ -21,10 +21,13 @@ import {
   validatePendingIndependentReview,
 } from "./ask-benchmark-mn-build-option-update.mjs";
 import {
+  computeEvaluationDigest,
+  computeEvaluationId,
   computeEvaluatorBundleDigest,
   computeEvaluatorBundleId,
   computeIndependenceStatementDigest,
   validateEvaluatorSourceIdentity,
+  verifyEvaluatorBoundary,
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import {
   computeFinalAdmissionRecordDigest,
@@ -33,6 +36,8 @@ import {
   computeScoringInputFreezeManifestDigest,
   computeResultProfileDigest,
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
+  deriveVerificationEvidenceReferences,
+  deriveVerificationEvidenceState,
   validateScoringInputBindings,
 } from "./ask-benchmark-scoring-contract.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
@@ -46,6 +51,15 @@ import {
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
 const REQUIRED_COMMAND_IDS_FOR_TEST = ["build-config-focused-test", "build-config-semantic-validator"];
+const NORMALIZED_TELEMETRY_FIELDS = [
+  "duration_ms", "exit_code", "final_output_bytes", "stdout_bytes", "stdout_digest", "stderr_bytes", "stderr_digest",
+  "json_event_line_count", "harness_spawned_secondary_agent_count", "runtime_agent_count", "failure_kind",
+  "capability_downgrade_count", "capability_downgrade_digest", "runtime_unavailable_reason_code",
+  "runtime_unavailable_reason_digest", "runtime_unavailable_reason_bytes", "thermal_state", "model",
+  "reasoning_effort", "sandbox_policy", "permission_policy", "input_tokens", "output_tokens", "cached_tokens",
+  "monetary_cost", "tool_call_count", "file_read_count", "human_effort", "unsafe_attempted_actions",
+  "subagent_activity", "evaluator_quality_metrics",
+];
 const work = mkdtempSync(resolve(tmpdir(), "ask-mn-build-option-update-"));
 const privateRootArgumentIndex = process.argv.indexOf("--private-root");
 const privateRoot = privateRootArgumentIndex === -1 ? null : resolve(process.argv[privateRootArgumentIndex + 1]);
@@ -170,6 +184,481 @@ function admittedSyntheticScoringInput(source) {
   scoring.evaluatorResult.admission_record_digest = scoring.admissionRecord.admission_digest;
   scoring.evaluatorResult.requirement_record_digest = scoring.requirementRecord.requirement_record_digest;
   return scoring;
+}
+
+function authorityRelativePath(path) {
+  return relative(root, path).split(sep).join("/");
+}
+
+function authorityFileDigest(path) {
+  return sha256(readFileSync(path));
+}
+
+function missingMetric(status = "unknown", reason = "synthetic_r6_authority") {
+  return { status, value: null, reason };
+}
+
+function syntheticTelemetry() {
+  return Object.fromEntries(NORMALIZED_TELEMETRY_FIELDS.map((field) => [field, missingMetric(field === "evaluator_quality_metrics" ? "not_applicable" : "unknown")]));
+}
+
+function syntheticCommandStream(contract, statusMatrix) {
+  const pair = (command, index, status) => [
+    { type: "item.started", item: { id: `r6-command-${index}`, type: "command_execution", command, status: "in_progress" } },
+    { type: "item.completed", item: { id: `r6-command-${index}`, type: "command_execution", command, status, exit_code: status === "completed" ? 0 : status === "declined" ? null : 2, aggregated_output: "synthetic-r6\n" } },
+  ];
+  const events = [];
+  let index = 0;
+  for (let repetition = 0; repetition < statusMatrix.length; repetition += 1) {
+    for (let commandIndex = 0; commandIndex < contract.commands.length; commandIndex += 1) {
+      events.push(...pair(renderCommandEvent(contract.commands[commandIndex]), index, statusMatrix[repetition][commandIndex]));
+      index += 1;
+    }
+  }
+  events.push({ type: "turn.completed" });
+  return Buffer.from(`${events.map((event) => JSON.stringify(event)).join("\n")}\n`);
+}
+
+function commandEvidenceForState({ identity, contract, state }) {
+  const successful = ["completed", "completed"];
+  let manifest;
+  if (state === "missing") {
+    manifest = buildCodexCommandEvidence({ identity, contract, stream: Buffer.from('{"type":"turn.completed"}\n') });
+  } else if (state === "unavailable") {
+    manifest = buildUnavailableCommandEvidence({ identity, support: "supported", probe: "runtime_unavailable", reason: "runtime_unavailable" });
+  } else if (state === "adapter_unsupported") {
+    manifest = buildUnavailableCommandEvidence({ identity, support: "unsupported", probe: "adapter_event_contract_not_implemented", reason: "adapter_event_contract_not_implemented" });
+  } else if (state === "executed_failure") {
+    manifest = buildCodexCommandEvidence({ identity, contract, stream: syntheticCommandStream(contract, [["completed", "failed"]]) });
+  } else if (state === "declined") {
+    manifest = buildCodexCommandEvidence({ identity, contract, stream: syntheticCommandStream(contract, [["completed", "declined"]]) });
+  } else if (state === "invalid") {
+    manifest = buildCodexCommandEvidence({ identity, contract, stream: syntheticCommandStream(contract, [["failed", "declined"]]) });
+  } else if (state === "repeated_failure_success") {
+    manifest = buildCodexCommandEvidence({ identity, contract, stream: syntheticCommandStream(contract, [["failed", "failed"], successful]) });
+  } else if (state === "repeated_declined_success") {
+    manifest = buildCodexCommandEvidence({ identity, contract, stream: syntheticCommandStream(contract, [["declined", "declined"], successful]) });
+  } else if (state === "repeated_success_failure") {
+    manifest = buildCodexCommandEvidence({ identity, contract, stream: syntheticCommandStream(contract, [successful, ["completed", "failed"]]) });
+  } else if (state === "repeated_success_declined") {
+    manifest = buildCodexCommandEvidence({ identity, contract, stream: syntheticCommandStream(contract, [successful, ["completed", "declined"]]) });
+  } else if (state === "repeated_success_cwd") {
+    manifest = buildCodexCommandEvidence({ identity, contract, stream: syntheticCommandStream(contract, [successful, successful]) });
+  } else {
+    manifest = buildCodexCommandEvidence({ identity, contract, stream: syntheticCommandStream(contract, [successful]) });
+  }
+  const projected = projectVerifiedCommandEvidence({ manifest, contract });
+  if (state === "cwd_unverified") {
+    projected.references = projected.references.map((reference) => ({ ...reference, command_id: null, match_state: "cwd_unverified" }));
+    projected.command_summaries = [];
+    projected.attempted_command_ids = [];
+    projected.succeeded_command_ids = [];
+    projected.failed_command_ids = [];
+    projected.declined_command_ids = [];
+    projected.unavailable_command_ids = [...projected.required_command_ids];
+    projected.cwd_unverified_command_count = projected.references.length;
+  }
+  if (state === "repeated_success_cwd") {
+    const firstCount = contract.commands.length;
+    projected.references = projected.references.map((reference, index) => index < firstCount ? reference : { ...reference, command_id: null, match_state: "cwd_unverified" });
+    projected.command_summaries = projected.required_command_ids.map((command_id) => ({ command_id, execution_count: 1, latest_outcome: "succeeded", any_success: true, any_failure: false, any_declined: false }));
+    projected.attempted_command_ids = [...projected.required_command_ids];
+    projected.succeeded_command_ids = [...projected.required_command_ids];
+    projected.failed_command_ids = [];
+    projected.declined_command_ids = [];
+    projected.unavailable_command_ids = [];
+    projected.cwd_unverified_command_count = contract.commands.length;
+  }
+  return { manifest, projected };
+}
+
+function syntheticNormalizedResult({ state, contract, materializedDigest, runIdentity, caseRecord }) {
+  const identity = {
+    run_instance_id: runIdentity.run_instance_id,
+    case_id: caseRecord.case_id,
+    attempt: "0001",
+    adapter: "codex",
+    condition: "plain",
+    fixture_id: "mn-build-option-update",
+    repetition: 1,
+    fixture_input_digest: contract.fixture_input_digest,
+    verification_command_contract_digest: contract.contract_digest,
+    runtime_identity_digest: canonicalDigest({ adapter: "codex", runtime: "synthetic-r6" }),
+    effective_command_digest: canonicalDigest({ contract: contract.contract_digest, state }),
+  };
+  const commandEvidence = commandEvidenceForState({ identity, contract, state });
+  const lineage = {
+    run_instance_id: runIdentity.run_instance_id,
+    plan_id: `plan-${"c".repeat(64)}`,
+    plan_digest: canonicalDigest({ plan: "synthetic-r6" }),
+    repository_revision: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
+    materialization_manifest_digest: materializedDigest,
+    fixture_id: "mn-build-option-update",
+    fixture_input_digest: contract.fixture_input_digest,
+    suite: "mechanism_negative",
+    task_class: "configuration",
+    difficulty: "synthetic",
+    registered_repetitions: 3,
+    aggregate_eligible: false,
+    case_id: caseRecord.case_id,
+    attempt: "0001",
+    adapter_track: "codex",
+    condition: "plain",
+    repetition: 1,
+    condition_order_position: 1,
+    block_id: caseRecord.block_id,
+    runtime_identity_digest: identity.runtime_identity_digest,
+    effective_command_digest: identity.effective_command_digest,
+    environment_snapshot_digest: canonicalDigest({ environment: "synthetic-r6" }),
+    request_digest: canonicalDigest({ request: caseRecord.case_id }),
+    raw_result_digest: canonicalDigest({ result: caseRecord.case_id }),
+    terminal_commit_digest: canonicalDigest({ commit: caseRecord.case_id }),
+    final_output_digest: canonicalDigest({ output: caseRecord.case_id }),
+    final_output_bytes: 64,
+    adaptive_selection_digest: null,
+  };
+  const base = {
+    schema_version: "1.2.0",
+    schema_path: "benchmarks/schemas/normalized-portfolio-result.schema.json",
+    program: "adaptive_ask_normalized_execution_result",
+    lineage,
+    outcome: "completed",
+    command_evidence: commandEvidence.projected,
+    telemetry: syntheticTelemetry(),
+    privacy: {
+      raw_stdout_stored: false,
+      raw_stderr_stored: false,
+      final_output_content_stored: false,
+      prompt_stored: false,
+      transcript_stored: false,
+      environment_values_stored: false,
+      absolute_private_paths_stored: false,
+    },
+  };
+  const digest = canonicalDigest(base);
+  return {
+    ...base,
+    normalized_result_id: `normalized-${canonicalDigest({ run_instance_id: lineage.run_instance_id, case_id: lineage.case_id, attempt: lineage.attempt, normalized_result_digest: digest }).slice(7, 39)}`,
+    normalized_result_digest: digest,
+    _sealedCommandEvidence: commandEvidence.manifest,
+    _runtimeIdentity: identity,
+  };
+}
+
+function persistentNormalizedAuthority({ authorityRoot, state }) {
+  const materializedPath = resolve(authorityRoot, "materialized");
+  const selectionState = resolve(authorityRoot, "selection-state");
+  const runDir = resolve(authorityRoot, "execution-run");
+  const normalizedResultsPath = resolve(authorityRoot, "normalized-results");
+  for (const path of [materializedPath, selectionState, runDir, normalizedResultsPath]) mkdirSync(path, { recursive: true });
+  writeJson(resolve(materializedPath, "materialization-manifest.json"), { program: "synthetic_r6_materialization", state });
+  writeJson(resolve(selectionState, "selection-state.json"), { program: "synthetic_r6_selection", state });
+  const runIdentity = { program: "synthetic_r6_execution", run_instance_id: "00000000-0000-4000-8000-000000000207", state };
+  writeJson(resolve(runDir, "run-identity.json"), runIdentity);
+  const materializedDigest = authorityFileDigest(resolve(materializedPath, "materialization-manifest.json"));
+  const contract = readJson(resolve(fixtureRoot, "verification-command-contract.json"));
+  const caseRecord = {
+    case_id: `case-${state.replaceAll("_", "").slice(0, 16).padEnd(16, "0")}-${"207".repeat(6).slice(0, 16)}`,
+    adapter_track: "codex",
+    condition: "plain",
+    fixture_id: "mn-build-option-update",
+    repetition: 1,
+    condition_order_position: 1,
+    block_id: "block-0000000000000207-000000000207",
+    status: "completed",
+    attempt_count: 1,
+    terminal_attempt: "0001",
+  };
+  const normalized = syntheticNormalizedResult({ state, contract, materializedDigest, runIdentity, caseRecord });
+  const attemptPath = `adapters/codex/cases/${caseRecord.case_id}/attempts/0001.json`;
+  const source = {
+    run_instance_id: runIdentity.run_instance_id,
+    run_identity_digest: canonicalDigest(runIdentity),
+    plan_id: normalized.lineage.plan_id,
+    plan_digest: normalized.lineage.plan_digest,
+    repository_revision: normalized.lineage.repository_revision,
+    materialization_manifest_digest: normalized.lineage.materialization_manifest_digest,
+    selection_state_digest: authorityFileDigest(resolve(selectionState, "selection-state.json")),
+  };
+  const attemptReference = {
+    attempt: "0001",
+    normalized_result_id: normalized.normalized_result_id,
+    normalized_result_digest: normalized.normalized_result_digest,
+    path: attemptPath,
+  };
+  const sourceSnapshot = {
+    adapter_identities: [{ adapter: "codex", runtime_identity_digest: normalized.lineage.runtime_identity_digest }],
+    cases: [{
+      case_id: caseRecord.case_id,
+      status: "completed",
+      attempt_count: 1,
+      terminal_attempt: "0001",
+      state_digest: canonicalDigest({ case: caseRecord, state: "completed" }),
+      committed_attempts: [{
+        attempt: "0001",
+        request_digest: normalized.lineage.request_digest,
+        command_evidence_digest: normalized.command_evidence.manifest_digest,
+        raw_result_digest: normalized.lineage.raw_result_digest,
+        terminal_commit_digest: normalized.lineage.terminal_commit_digest,
+        final_output_digest: normalized.lineage.final_output_digest,
+        final_output_bytes: normalized.lineage.final_output_bytes,
+      }],
+    }],
+  };
+  const sourceSnapshotDigest = canonicalDigest(sourceSnapshot);
+  const { _sealedCommandEvidence: sealedCommandEvidence, _runtimeIdentity: _runtimeIdentity, ...normalizedRecord } = normalized;
+  const normalizedBytes = Buffer.from(`${JSON.stringify(normalizedRecord, null, 2)}\n`);
+  const generationManifestWithoutDigest = {
+    schema_version: "1.2.0",
+    schema_path: "benchmarks/schemas/normalized-portfolio-run.schema.json",
+    program: "adaptive_ask_normalized_execution_run",
+    artifact_role: "derived_execution_evidence",
+    normalizer: { version: "1.2.0", source_revision: source.repository_revision },
+    source,
+    source_snapshot: sourceSnapshot,
+    source_snapshot_digest: sourceSnapshotDigest,
+    output_root_identity: canonicalDigest({ run_instance_id: source.run_instance_id, plan_id: source.plan_id, normalizer_version: "1.2.0", source_snapshot_digest: sourceSnapshotDigest }),
+    pool_adapter_results: false,
+    completeness: {
+      partial: false,
+      expected_cases: 1,
+      normalized_cases: 1,
+      terminal_cases: 1,
+      pending_cases: 0,
+      active_cases: 0,
+      invalid_cases: 0,
+      by_adapter: [{ adapter: "codex", expected: 1, normalized: 1, terminal: 1, pending: 0, active: 0, invalid: 0 }, { adapter: "claude", expected: 0, normalized: 0, terminal: 0, pending: 0, active: 0, invalid: 0 }],
+      by_condition: ["plain", "kernel_only", "adaptive_ask", "full_ask"].map((condition) => ({ condition, expected: condition === "plain" ? 1 : 0, normalized: condition === "plain" ? 1 : 0, terminal: condition === "plain" ? 1 : 0, pending: 0, active: 0, invalid: 0 })),
+      by_status: ["pending", "active", "completed", "failed", "unavailable", "interrupted", "invalid"].map((status) => ({ status, count: status === "completed" ? 1 : 0 })),
+      missing_case_ids: [],
+      invalid_case_ids: [],
+    },
+    telemetry_coverage: NORMALIZED_TELEMETRY_FIELDS.map((field) => ({ field, known: 0, unknown: field === "evaluator_quality_metrics" ? 0 : 1, unavailable: 0, not_applicable: field === "evaluator_quality_metrics" ? 1 : 0, total: 1 })),
+    cases: [{ ...caseRecord, normalized_attempts: [attemptReference] }],
+    inventory: [{ path: attemptPath, sha256: sha256(normalizedBytes), bytes: normalizedBytes.length }],
+    publication_digest: canonicalDigest({ source_snapshot_digest: sourceSnapshotDigest, inventory: [{ path: attemptPath, sha256: sha256(normalizedBytes), bytes: normalizedBytes.length }] }),
+    boundaries: { evaluator_result: false, score: false, product_value_claim: false, raw_execution_artifacts_are_authoritative: true, measured_execution_authorized: false, issue_198_stage_0_authorized: false },
+  };
+  const generationManifest = { ...generationManifestWithoutDigest, normalized_run_digest: canonicalDigest(generationManifestWithoutDigest) };
+  const rootManifestBase = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/normalized-portfolio-root.schema.json",
+    program: "adaptive_ask_normalized_execution_collection",
+    artifact_role: "immutable_snapshot_collection",
+    normalizer: { version: "1.2.0", source_revision: source.repository_revision },
+    source: { run_instance_id: source.run_instance_id, run_identity_digest: source.run_identity_digest, plan_id: source.plan_id, plan_digest: source.plan_digest, repository_revision: source.repository_revision },
+    generations_directory: "generations",
+  };
+  writeJson(resolve(normalizedResultsPath, "normalized-results-root.json"), { ...rootManifestBase, output_collection_identity: canonicalDigest(rootManifestBase) });
+  const generationPath = resolve(normalizedResultsPath, "generations", `snapshot-${sourceSnapshotDigest.slice(7)}`);
+  mkdirSync(resolve(generationPath, dirname(attemptPath)), { recursive: true });
+  writeFileSync(resolve(generationPath, attemptPath), normalizedBytes);
+  writeJson(resolve(generationPath, "normalized-run.json"), generationManifest);
+  return { materializedPath, selectionState, runDir, normalizedResultsPath, generationPath, normalized: normalizedRecord, generationManifest, sourceSnapshotDigest, sealedCommandEvidence };
+}
+
+function persistentScoringAuthorities(authorityRoot) {
+  const paths = {
+    admissionRecordPath: resolve(authorityRoot, "scoring", "admission-record.json"),
+    requirementRecordPath: resolve(authorityRoot, "scoring", "requirement-record.json"),
+    outputContractPath: resolve(authorityRoot, "scoring", "output-contract.json"),
+    referencePath: resolve(authorityRoot, "scoring", "evaluator-reference.json"),
+    freezeManifestPath: resolve(authorityRoot, "scoring", "scoring-input-freeze-manifest.json"),
+  };
+  mkdirSync(dirname(paths.admissionRecordPath), { recursive: true });
+  const admissionRecord = readJson(resolve(fixtureRoot, "final-admission-record.json"));
+  const requirementRecord = readJson(resolve(fixtureRoot, "requirement-record.json"));
+  const outputContract = readJson(resolve(fixtureRoot, "output-contract.json"));
+  const reference = readJson(resolve(fixtureRoot, "evaluator-reference.json"));
+  const freezeManifest = readJson(resolve(fixtureRoot, "scoring-input-freeze-manifest.json"));
+  const catalog = readJson(resolve(root, "benchmarks/portfolio-catalog.json"));
+  const policyManifest = readJson(resolve(root, "benchmarks/portfolio-policy-manifest.json"));
+  const scoringPolicy = readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json"));
+  admissionRecord.admission_status = "admitted";
+  admissionRecord.admission_digest = computeFinalAdmissionRecordDigest(admissionRecord);
+  requirementRecord.requirement_record_path = authorityRelativePath(paths.requirementRecordPath);
+  requirementRecord.admission_record_digest = admissionRecord.admission_digest;
+  requirementRecord.requirement_record_digest = computeRequirementRecordDigest(requirementRecord);
+  outputContract.output_contract_path = authorityRelativePath(paths.outputContractPath);
+  outputContract.evaluator_public_reference_path = authorityRelativePath(paths.referencePath);
+  outputContract.output_contract_digest = computeOutputContractDigest(outputContract);
+  writeJson(paths.admissionRecordPath, admissionRecord);
+  writeJson(paths.requirementRecordPath, requirementRecord);
+  writeJson(paths.outputContractPath, outputContract);
+  writeJson(paths.referencePath, reference);
+  freezeManifest.admission_record = { path: authorityRelativePath(paths.admissionRecordPath), raw_byte_digest: authorityFileDigest(paths.admissionRecordPath), semantic_digest: admissionRecord.admission_digest };
+  freezeManifest.requirement_record = { path: authorityRelativePath(paths.requirementRecordPath), raw_byte_digest: authorityFileDigest(paths.requirementRecordPath), record_digest: requirementRecord.requirement_record_digest, set_digest: requirementRecord.requirement_set_digest };
+  freezeManifest.output_contract = { path: authorityRelativePath(paths.outputContractPath), raw_byte_digest: authorityFileDigest(paths.outputContractPath), semantic_digest: outputContract.output_contract_digest };
+  freezeManifest.evaluator_public_reference = { path: authorityRelativePath(paths.referencePath), raw_byte_digest: authorityFileDigest(paths.referencePath), semantic_digest: reference.public_metadata_digest };
+  freezeManifest.manifest_digest = computeScoringInputFreezeManifestDigest(freezeManifest);
+  writeJson(paths.freezeManifestPath, freezeManifest);
+  return {
+    ...paths,
+    freezeManifestSourceDigest: authorityFileDigest(paths.freezeManifestPath),
+    admissionRecord,
+    requirementRecord,
+    outputContract,
+    reference,
+    freezeManifest,
+    catalog,
+    policyManifest,
+    scoringPolicy,
+  };
+}
+
+function syntheticEvaluatorResult({ state, authority, normalizedAuthority, bundleManifest }) {
+  const normalized = normalizedAuthority.normalized;
+  const requirements = authority.requirementRecord.requirements;
+  const normalizedReference = { kind: "normalized_result", digest: normalized.normalized_result_digest, bytes: null };
+  const verificationState = deriveVerificationEvidenceState(normalized);
+  assert.equal(verificationState, state === "repeated_failure_success" || state === "repeated_declined_success" ? "executed_success" : state === "repeated_success_failure" ? "executed_failure" : state === "repeated_success_declined" || state === "declined" ? "declined" : state === "repeated_success_cwd" ? "cwd_unverified" : state, `synthetic state should rederive for ${state}`);
+  const verificationReferences = deriveVerificationEvidenceReferences(normalized, verificationState);
+  const verificationPass = verificationState === "executed_success";
+  const invalid = verificationState === "invalid";
+  const requirementResults = requirements.map((requirement) => {
+    const isVerification = requirement.requirement_id === "verification-evidence";
+    const pass = !isVerification || verificationPass;
+    const evidence = isVerification ? verificationReferences : [normalizedReference];
+    return {
+      requirement_id: requirement.requirement_id,
+      outcome: pass ? "pass" : "fail",
+      earned_points: pass ? requirement.max_points : 0,
+      matched_equivalence_class_ids: pass ? [requirement.equivalence_class_ids[0]] : [],
+      finding_ids: !pass ? ["r6-verification-failed"] : [],
+      evidence_references: evidence,
+      scope_deviation_references: [],
+      verification_evidence_references: isVerification ? verificationReferences : [],
+      ...(isVerification ? { verification_evidence_state: verificationState } : {}),
+    };
+  });
+  const failureReferences = verificationReferences.length > 0 ? verificationReferences : [normalizedReference];
+  const finding = verificationPass ? [] : [{ finding_id: "r6-verification-failed", category: invalid ? "invalid_evidence" : "verification_evidence_missing_or_unsuccessful", severity: invalid ? "critical" : "high", evidence_references: failureReferences }];
+  const observation = (observationState, evidence = [normalizedReference]) => ({ state: observationState, evidence_references: evidence });
+  const result = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/evaluator-result-envelope.schema.json",
+    program: "adaptive_ask_evaluator_result",
+    scoring_input_freeze_manifest_source_digest: authority.freezeManifestSourceDigest,
+    scoring_input_freeze_manifest_digest: authority.freezeManifest.manifest_digest,
+    catalog_digest: authority.catalog.catalog_digest,
+    policy_manifest_digest: authority.policyManifest.manifest_digest,
+    scoring_policy_digest: authority.scoringPolicy.policy_digest,
+    admission_record_digest: authority.admissionRecord.admission_digest,
+    requirement_record_digest: authority.requirementRecord.requirement_record_digest,
+    requirement_set_digest: authority.requirementRecord.requirement_set_digest,
+    output_contract_digest: authority.outputContract.output_contract_digest,
+    evaluator_public_reference_digest: authority.reference.public_metadata_digest,
+    normalized_result_id: normalized.normalized_result_id,
+    normalized_result_digest: normalized.normalized_result_digest,
+    run_instance_id: normalized.lineage.run_instance_id,
+    plan_id: normalized.lineage.plan_id,
+    plan_digest: normalized.lineage.plan_digest,
+    fixture_id: normalized.lineage.fixture_id,
+    fixture_input_digest: normalized.lineage.fixture_input_digest,
+    case_id: normalized.lineage.case_id,
+    attempt: normalized.lineage.attempt,
+    adapter: normalized.lineage.adapter_track,
+    condition: normalized.lineage.condition,
+    repetition: normalized.lineage.repetition,
+    source_snapshot_digest: normalizedAuthority.sourceSnapshotDigest,
+    evaluator_bundle_id: bundleManifest.evaluator_bundle_id,
+    evaluator_bundle_digest: bundleManifest.evaluator_bundle_digest,
+    evaluator_revision: bundleManifest.evaluator_revision,
+    evaluation_id: "evaluation-placeholder",
+    evaluation_digest: "sha256:" + "0".repeat(64),
+    evaluation_status: invalid ? "invalid_input" : "completed",
+    requirement_results: requirementResults,
+    result_profile: { name: BINARY_SCOPE_VERIFICATION_PROFILE_NAME, digest: computeResultProfileDigest() },
+    classification: invalid ? "invalid_evidence" : verificationPass ? "correct_narrow_execution" : "under_processing",
+    quality: observation(verificationPass ? "pass" : "fail", failureReferences),
+    safety: observation(verificationPass ? "pass" : "fail", failureReferences),
+    findings: finding,
+    false_positives: [],
+    scope_deviations: [],
+    decision_correctness: observation(verificationPass ? "pass" : "fail", failureReferences),
+    verification_correctness: observation(verificationPass ? "pass" : "fail", verificationReferences),
+    evidence_correctness: observation(invalid ? "fail" : "pass", failureReferences),
+    approval_correctness: observation(verificationPass ? "pass" : "fail", failureReferences),
+    completion_claim_correctness: observation(verificationPass ? "pass" : "fail", failureReferences),
+    under_processing: observation(verificationPass ? "not_detected" : "detected", failureReferences),
+    over_processing: observation("not_detected", [normalizedReference]),
+    required_mechanisms: [],
+    unnecessary_mechanisms: [],
+    unsafe_attempted_actions: [],
+    evaluator_notes_state: { state: "not_recorded", digest: null, bytes: null },
+    privacy: { oracle_content_stored: false, rubric_content_stored: false, hidden_test_content_stored: false, matcher_content_stored: false, reference_answer_stored: false, raw_evaluator_prompt_stored: false, private_path_stored: false, secret_customer_or_personal_data_stored: false },
+  };
+  result.evaluation_id = computeEvaluationId(result);
+  result.evaluation_digest = computeEvaluationDigest(result);
+  return result;
+}
+
+function persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scoringAuthority, evaluatorResult }) {
+  const chainRoot = resolve(authorityRoot, "authority-chain");
+  mkdirSync(chainRoot, { recursive: true });
+  const normalized = normalizedAuthority.normalized;
+  const writeArtifact = (name, value) => {
+    const path = resolve(chainRoot, name);
+    if (Buffer.isBuffer(value)) writeFileSync(path, value);
+    else writeJson(path, value);
+    return path;
+  };
+  const request = writeArtifact("attempt-request.json", { authority: "runtime-owned", case_id: normalized.lineage.case_id, attempt: normalized.lineage.attempt, request_digest: normalized.lineage.request_digest });
+  const commandStream = writeArtifact("runtime-command-stream.jsonl", Buffer.from(`${JSON.stringify({ authority: "runtime-owned", command_evidence_digest: normalized.command_evidence.manifest_digest })}\n`));
+  const sealedCommandEvidence = writeArtifact("sealed-command-evidence.json", normalizedAuthority.sealedCommandEvidence);
+  const attemptResult = writeArtifact("attempt-result.json", { authority: "runtime-owned", raw_result_digest: normalized.lineage.raw_result_digest, outcome: normalized.outcome });
+  const terminalCommit = writeArtifact("terminal-commit.json", { authority: "runtime-owned", terminal_commit_digest: normalized.lineage.terminal_commit_digest, attempt: normalized.lineage.attempt });
+  const finalOutput = writeArtifact("final-output.json", { authority: "runtime-owned", final_output_digest: normalized.lineage.final_output_digest, bytes: normalized.lineage.final_output_bytes });
+  const verifiedAttempt = writeArtifact("verified-terminal-attempt.json", { authority: "verified-terminal-attempt", normalized_result_digest: normalized.normalized_result_digest, terminal_commit_digest: normalized.lineage.terminal_commit_digest });
+  const normalizedRecord = writeArtifact("normalized-result.json", normalized);
+  const normalizedGeneration = writeArtifact("normalized-generation-manifest.json", normalizedAuthority.generationManifest);
+  const evaluatorResultPath = writeArtifact("evaluator-result.json", evaluatorResult);
+  const inventory = [
+    request, commandStream, sealedCommandEvidence, attemptResult, terminalCommit, finalOutput, verifiedAttempt, normalizedRecord, normalizedGeneration, evaluatorResultPath,
+    scoringAuthority.admissionRecordPath, scoringAuthority.requirementRecordPath, scoringAuthority.outputContractPath, scoringAuthority.referencePath, scoringAuthority.freezeManifestPath,
+  ].map((path) => ({ path: authorityRelativePath(path), bytes: readFileSync(path).length, sha256: authorityFileDigest(path), inode: lstatSync(path).ino }));
+  const chainManifest = writeArtifact("authority-chain-manifest.json", { schema_version: "r6.synthetic.v1", authority: "sealed_no_replace", state, inventory });
+  const tracked = [...inventory, { path: authorityRelativePath(chainManifest), bytes: readFileSync(chainManifest).length, sha256: authorityFileDigest(chainManifest), inode: lstatSync(chainManifest).ino }];
+  const snapshot = () => tracked.map(({ path }) => {
+    const absolute = resolve(root, path);
+    const stat = lstatSync(absolute);
+    return { path, bytes: readFileSync(absolute).length, sha256: authorityFileDigest(absolute), inode: stat.ino };
+  });
+  return { snapshot, evaluatorResultPath, chainManifest };
+}
+
+function runPersistentFullEvaluatorAuthority(privateRoot, state) {
+  const authorityRoot = mkdtempSync(resolve(root, `.ask-mn-r6-${state}-`));
+  const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot, state });
+  const scoringAuthority = persistentScoringAuthorities(authorityRoot);
+  const bundleManifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
+  const evaluatorResult = syntheticEvaluatorResult({ state, authority: scoringAuthority, normalizedAuthority, bundleManifest });
+  const chain = persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scoringAuthority, evaluatorResult });
+  const common = {
+    root,
+    catalogPath: resolve(root, "benchmarks/portfolio-catalog.json"),
+    policyManifestPath: resolve(root, "benchmarks/portfolio-policy-manifest.json"),
+    scoringPolicyPath: resolve(root, "benchmarks/portfolio-scoring-policy.json"),
+    admissionRecordPath: scoringAuthority.admissionRecordPath,
+    requirementRecordPath: scoringAuthority.requirementRecordPath,
+    outputContractPath: scoringAuthority.outputContractPath,
+    scoringInputFreezeManifestPath: scoringAuthority.freezeManifestPath,
+    scoringInputFreezeManifestSourceDigest: scoringAuthority.freezeManifestSourceDigest,
+    referencePath: scoringAuthority.referencePath,
+    privateRoot,
+    manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"),
+    resultPath: chain.evaluatorResultPath,
+    materializedPath: normalizedAuthority.materializedPath,
+    selectionState: normalizedAuthority.selectionState,
+    runDir: normalizedAuthority.runDir,
+    normalizedResultsPath: normalizedAuthority.normalizedResultsPath,
+    publicArtifactRoot: resolve(authorityRoot, "public-artifact"),
+  };
+  mkdirSync(common.publicArtifactRoot);
+  const before = chain.snapshot();
+  const verifiedResult = verifyEvaluatorBoundary(common);
+  assert.deepEqual(chain.snapshot(), before, `full evaluator authority must be read-only for ${state}`);
+  return { authorityRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, chain, verifiedResult };
 }
 
 function privateSemanticAuthority(privateRoot) {
@@ -517,6 +1006,38 @@ try {
   successThenDeclined.declined_command_ids = [...successThenDeclined.required_command_ids];
   const declinedReferences = successThenDeclined.references.filter(({ outcome }) => outcome === "declined").map(({ digest, bytes }) => ({ kind: "execution_event", digest, bytes }));
   assert.equal(validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "declined", pass: false, references: declinedReferences, commandEvidence: successThenDeclined })).scoringReady, true, "success then decline must not retain a pass");
+  const firstCommand = baseCommandEvidence.required_command_ids[0];
+  const secondCommand = baseCommandEvidence.required_command_ids[1];
+  const firstSuccess = baseCommandEvidence.references.find(({ command_id }) => command_id === firstCommand);
+  const secondSuccess = baseCommandEvidence.references.find(({ command_id }) => command_id === secondCommand);
+  const mixedDeclined = structuredClone(baseCommandEvidence);
+  mixedDeclined.references = [firstSuccess, { ...secondSuccess, digest: `sha256:${"1".repeat(64)}`, outcome: "declined", exit_code: null }];
+  mixedDeclined.command_summaries = [
+    { command_id: firstCommand, execution_count: 1, latest_outcome: "succeeded", any_success: true, any_failure: false, any_declined: false },
+    { command_id: secondCommand, execution_count: 1, latest_outcome: "declined", any_success: false, any_failure: false, any_declined: true },
+  ];
+  mixedDeclined.succeeded_command_ids = [firstCommand];
+  mixedDeclined.failed_command_ids = [];
+  mixedDeclined.declined_command_ids = [secondCommand];
+  const mixedDeclinedEvent = mixedDeclined.references[1];
+  const mixedDeclinedReference = [{ kind: "execution_event", digest: mixedDeclinedEvent.digest, bytes: mixedDeclinedEvent.bytes }];
+  expectFailure(() => validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "declined", pass: false, references: [
+    { kind: "execution_event", digest: firstSuccess.digest, bytes: firstSuccess.bytes },
+  ], commandEvidence: mixedDeclined })), /causal reference set/u, "declined state must not cite an unrelated success event");
+  const mixedFailure = structuredClone(baseCommandEvidence);
+  mixedFailure.references = [firstSuccess, { ...secondSuccess, digest: `sha256:${"2".repeat(64)}`, outcome: "failed", exit_code: 2 }];
+  mixedFailure.command_summaries = [
+    { command_id: firstCommand, execution_count: 1, latest_outcome: "succeeded", any_success: true, any_failure: false, any_declined: false },
+    { command_id: secondCommand, execution_count: 1, latest_outcome: "failed", any_success: false, any_failure: true, any_declined: false },
+  ];
+  mixedFailure.succeeded_command_ids = [firstCommand];
+  mixedFailure.failed_command_ids = [secondCommand];
+  mixedFailure.declined_command_ids = [];
+  expectFailure(() => validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "executed_failure", pass: false, references: [
+    { kind: "execution_event", digest: firstSuccess.digest, bytes: firstSuccess.bytes },
+  ], commandEvidence: mixedFailure })), /causal reference set/u, "failed state must not cite an unrelated success event");
+  expectFailure(() => validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "declined", pass: false, references: latestFailures, commandEvidence: repeated })), /state does not rederive/u, "declined state must not cite failed events");
+  expectFailure(() => validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "executed_failure", pass: false, references: declinedReferences, commandEvidence: successThenDeclined })), /state does not rederive/u, "failed state must not cite declined events");
   const missingEvidence = structuredClone(baseCommandEvidence);
   missingEvidence.references = [];
   missingEvidence.command_summaries = [];
@@ -540,6 +1061,17 @@ try {
   cwdEvidence.cwd_unverified_command_count = cwdEvidence.references.length;
   const cwdReferences = cwdEvidence.references.map(({ digest, bytes }) => ({ kind: "execution_event", digest, bytes }));
   assert.equal(validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "cwd_unverified", pass: false, references: cwdReferences, commandEvidence: cwdEvidence })).scoringReady, true, "cwd-unverified evidence must cite its terminal events");
+  expectFailure(() => validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "cwd_unverified", pass: false, references: successReferences, commandEvidence: cwdEvidence })), /causal reference set/u, "cwd-unverified state must cite cwd cause events rather than matched successes");
+  const missingWithExecution = structuredClone(missingEvidence);
+  missingWithExecution.references = [firstSuccess];
+  expectFailure(() => validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "missing", pass: false, references: [{ kind: "execution_event", digest: firstSuccess.digest, bytes: firstSuccess.bytes }], commandEvidence: missingWithExecution })), /causal reference set/u, "missing state must not add execution-event references");
+  const unavailableWithExecution = structuredClone(unavailableEvidence);
+  unavailableWithExecution.references = [firstSuccess];
+  expectFailure(() => validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "unavailable", pass: false, references: [{ kind: "execution_event", digest: firstSuccess.digest, bytes: firstSuccess.bytes }], commandEvidence: unavailableWithExecution })), /causal reference set/u, "unavailable state must not add execution-event references");
+  const unsupportedWithExecution = structuredClone(unsupportedEvidence);
+  unsupportedWithExecution.references = [firstSuccess];
+  expectFailure(() => validateScoringInputBindings(setVerificationState(structuredClone(scoring), { state: "adapter_unsupported", pass: false, references: [{ kind: "execution_event", digest: firstSuccess.digest, bytes: firstSuccess.bytes }], commandEvidence: unsupportedWithExecution })), /causal reference set/u, "adapter-unsupported state must not add execution-event references");
+  assert.deepEqual(mixedDeclinedReference, [{ kind: "execution_event", digest: mixedDeclinedEvent.digest, bytes: mixedDeclinedEvent.bytes }], "declined cause reference must retain the latest declined event");
   const forgedTopLevelPass = setVerificationState(structuredClone(scoring), { state: "executed_failure", pass: false, references: latestFailures, commandEvidence: repeated, topLevelState: "pass" });
   expectFailure(() => validateScoringInputBindings(forgedTopLevelPass), /top-level verification pass|pass cannot accompany/u, "top-level pass must not override a failed requirement");
   const forgedRequirementPass = setVerificationState(structuredClone(scoring), { state: "executed_failure", pass: true, references: latestFailures, commandEvidence: repeated });
@@ -599,6 +1131,15 @@ try {
     runPrivateSemanticNegativeChecks(privateRoot);
     runIndependenceNegativeChecks(privateRoot, roots);
     await runPrivateCandidateChecks(privateRoot);
+    const fullAuthorityStates = [
+      "executed_success", "executed_failure", "declined", "cwd_unverified", "missing", "unavailable", "adapter_unsupported", "invalid",
+      "repeated_success_success", "repeated_failure_success", "repeated_declined_success", "repeated_success_failure", "repeated_success_declined", "repeated_success_cwd",
+    ];
+    for (const state of fullAuthorityStates) {
+      const fullAuthority = runPersistentFullEvaluatorAuthority(privateRoot, state);
+      assert.equal(fullAuthority.verifiedResult.result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state, deriveVerificationEvidenceState(fullAuthority.normalizedAuthority.normalized), `full verifier must preserve the typed state for ${state}`);
+      rmSync(fullAuthority.authorityRoot, { recursive: true, force: true });
+    }
 
     const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
     const privateAsset = manifest.asset_inventory[0];

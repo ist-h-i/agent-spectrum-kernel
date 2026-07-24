@@ -337,16 +337,77 @@ export function deriveVerificationEvidenceState(normalizedResult) {
   if (evidence.cwd_unverified_command_count > 0) return "cwd_unverified";
   const latest = latestCommandReferences(normalizedResult);
   if (evidence.required_command_ids.some((id) => !latest.has(id))) return "missing";
-  if (evidence.required_command_ids.some((id) => latest.get(id).outcome === "declined")) return "declined";
-  if (evidence.required_command_ids.some((id) => latest.get(id).outcome === "failed" || latest.get(id).exit_code !== 0)) return "executed_failure";
-  const groupsSatisfied = (evidence.required_alternative_groups ?? []).every(({ satisfaction_state }) => satisfaction_state === "satisfied");
+  const alternativeStates = (evidence.required_alternative_groups ?? []).map((group) => {
+    const members = group.member_ids.map((commandId) => latest.get(commandId)).filter(Boolean);
+    if (members.length === 0) return "missing";
+    if (members.some(({ outcome, exit_code: exitCode }) => outcome === "succeeded" && exitCode === 0)) return "satisfied";
+    if (members.every(({ outcome }) => outcome === "declined")) return "declined";
+    if (members.some(({ outcome }) => outcome === "failed" || outcome === "interrupted")) return "failed";
+    return "invalid";
+  });
+  if (alternativeStates.some((state) => state === "missing")) return "missing";
+  if (alternativeStates.some((state) => state === "invalid")) return "invalid";
+  const directOutcomes = evidence.required_command_ids.map((id) => latest.get(id).outcome);
+  const hasDeclined = directOutcomes.includes("declined") || alternativeStates.includes("declined");
+  const hasFailed = directOutcomes.some((outcome) => outcome === "failed" || outcome === "interrupted") || alternativeStates.includes("failed");
+  if (hasDeclined && hasFailed) return "invalid";
+  if (hasDeclined) return "declined";
+  if (hasFailed) return "executed_failure";
+  const groupsSatisfied = alternativeStates.every((state) => state === "satisfied");
   if (evidence.required_command_ids.every((id) => latest.get(id).outcome === "succeeded" && latest.get(id).exit_code === 0) && groupsSatisfied) return "executed_success";
   return "invalid";
 }
 
-function latestSuccessReferences(normalizedResult) {
+function executionEventReference(entry) {
+  return { kind: "execution_event", digest: entry.digest, bytes: entry.bytes };
+}
+
+function referenceKey(reference) {
+  return `${reference.kind}:${reference.digest}:${reference.bytes}`;
+}
+
+function assertReferenceSet(actual, expected, label) {
+  const actualKeys = actual.map(referenceKey).sort();
+  const expectedKeys = expected.map(referenceKey).sort();
+  if (!arraysEqual(actualKeys, expectedKeys)) throw new Error(`${label} must match the deterministically derived causal reference set`);
+}
+
+function latestAlternativeReferences(normalizedResult) {
   const latest = latestCommandReferences(normalizedResult);
-  return normalizedResult.command_evidence.required_command_ids.map((commandId) => latest.get(commandId)).filter(Boolean);
+  return (normalizedResult.command_evidence.required_alternative_groups ?? []).map((group) => ({
+    group,
+    members: group.member_ids.map((commandId) => latest.get(commandId)).filter(Boolean),
+  }));
+}
+
+export function deriveVerificationEvidenceReferences(normalizedResult, state = deriveVerificationEvidenceState(normalizedResult)) {
+  const evidence = normalizedResult.command_evidence;
+  const latest = latestCommandReferences(normalizedResult);
+  if (["missing", "unavailable", "adapter_unsupported", "invalid"].includes(state)) return [normalizedResultReference(normalizedResult)];
+  if (state === "cwd_unverified") return evidence.references.filter(({ match_state: matchState }) => matchState === "cwd_unverified").map(executionEventReference);
+  if (state === "executed_success") {
+    const direct = evidence.required_command_ids.map((commandId) => latest.get(commandId));
+    const alternatives = latestAlternativeReferences(normalizedResult).flatMap(({ members }) => members.filter(({ outcome, exit_code: exitCode }) => outcome === "succeeded" && exitCode === 0).slice(-1));
+    return [...direct, ...alternatives].filter(Boolean).map(executionEventReference);
+  }
+  if (state === "executed_failure") {
+    const direct = evidence.required_command_ids.map((commandId) => latest.get(commandId)).filter((entry) => entry?.outcome === "failed" && entry.exit_code !== 0);
+    const alternatives = latestAlternativeReferences(normalizedResult).flatMap(({ group, members }) => {
+      const failed = members.filter(({ outcome, exit_code: exitCode }) => outcome === "failed" && exitCode !== 0);
+      const hasSuccess = members.some(({ outcome, exit_code: exitCode }) => outcome === "succeeded" && exitCode === 0);
+      return !hasSuccess && failed.length > 0 ? failed.slice(-1) : [];
+    });
+    return [...direct, ...alternatives].map(executionEventReference);
+  }
+  if (state === "declined") {
+    const direct = evidence.required_command_ids.map((commandId) => latest.get(commandId)).filter((entry) => entry?.outcome === "declined" && entry.exit_code === null);
+    const alternatives = latestAlternativeReferences(normalizedResult).flatMap(({ members }) => {
+      const declined = members.filter(({ outcome, exit_code: exitCode }) => outcome === "declined" && exitCode === null);
+      return declined.length === members.length ? declined.slice(-1) : [];
+    });
+    return [...direct, ...alternatives].map(executionEventReference);
+  }
+  return [normalizedResultReference(normalizedResult)];
 }
 
 export function deriveBinaryScopeVerificationClassification({ evaluatorResult }) {
@@ -381,24 +442,16 @@ export function validateBinaryScopeVerificationResult({ evaluatorResult, require
       const derivedState = deriveVerificationEvidenceState(normalizedResult);
       if (result.verification_evidence_state !== derivedState) throw new Error(`verification evidence state does not rederive to ${derivedState}`);
       const topLevelPass = evaluatorResult.verification_correctness?.state === "pass";
-      const requiredLatestSuccess = normalizedResult.command_evidence.required_command_ids.every((commandId) => normalizedResult.command_evidence.succeeded_command_ids.includes(commandId))
-        && (normalizedResult.command_evidence.required_alternative_groups ?? []).every(({ satisfaction_state }) => satisfaction_state === "satisfied");
+      const expectedReferences = deriveVerificationEvidenceReferences(normalizedResult, derivedState);
+      if (!evaluatorResult.verification_correctness || !Array.isArray(evaluatorResult.verification_correctness.evidence_references)) throw new Error("verification correctness must include typed evidence references");
+      assertReferenceSet(evaluatorResult.verification_correctness.evidence_references, expectedReferences, "top-level verification correctness references");
+      assertReferenceSet(result.verification_evidence_references, expectedReferences, "verification evidence references");
+      const requiredLatestSuccess = derivedState === "executed_success";
       if (result.outcome === "pass") {
         if (!topLevelPass || derivedState !== "executed_success" || !requiredLatestSuccess) throw new Error("passing verification result requires top-level pass and latest success for every required command");
-        const latestSuccess = latestSuccessReferences(normalizedResult);
-        if (result.verification_evidence_references.length !== latestSuccess.length || result.verification_evidence_references.some(({ kind, digest, bytes }) => kind !== "execution_event" || !latestSuccess.some((entry) => entry.digest === digest && entry.bytes === bytes))) throw new Error("passing verification result must reference only the latest successful execution events");
+        if (result.verification_evidence_references.some(({ kind }) => kind !== "execution_event")) throw new Error("passing verification result must reference only execution events");
       } else {
-        if (topLevelPass) throw new Error("top-level verification pass cannot accompany a failing verification requirement");
-        if (result.verification_evidence_references.length === 0) throw new Error("failing verification result must retain typed evidence");
-        const normalizedRefs = result.verification_evidence_references.filter(({ kind }) => kind === "normalized_result");
-        if (["missing", "unavailable", "adapter_unsupported", "invalid"].includes(derivedState)) {
-          if (result.verification_evidence_references.length !== 1 || normalizedRefs.length !== 1 || normalizedRefs[0].digest !== normalizedResult.normalized_result_digest) throw new Error("unavailable verification evidence must reference the normalized availability authority");
-        } else {
-          if (normalizedRefs.length > 0 || result.verification_evidence_references.some(({ kind }) => kind !== "execution_event")) throw new Error("executed verification failure must reference execution events");
-          const latest = latestCommandReferences(normalizedResult);
-          const terminalEvents = [...latest.values(), ...normalizedResult.command_evidence.references.filter(({ match_state }) => match_state === "cwd_unverified")];
-          if (result.verification_evidence_references.some(({ digest, bytes }) => !terminalEvents.some((entry) => entry.digest === digest && entry.bytes === bytes))) throw new Error("verification failure references must close to latest terminal events");
-        }
+        if (topLevelPass || result.outcome !== "fail") throw new Error("top-level verification pass cannot accompany a failing verification requirement");
       }
     } else if (result.verification_evidence_references.length !== 0) throw new Error(`${requirement.requirement_id} must not carry verification evidence references`);
   }

@@ -25,6 +25,7 @@ import {
   computeRequirementSetDigest,
   computeScoringInputFreezeManifestDigest,
   computeScoringPolicyDigest,
+  deriveVerificationEvidenceReferences,
   FINAL_ADMISSION_RECORD_SCHEMA_PATH,
   SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH,
   validateFinalAdmissionRecordContract,
@@ -741,6 +742,19 @@ export function validateExecutionEventEvidenceReferences({ normalized, result })
   for (const reference of executionReferences) {
     const item = verified.get(reference.digest);
     if (!item || item.bytes !== reference.bytes) throw new Error("evaluator result contains an unverified or transplanted execution-event reference");
+  }
+  const verification = result.verification_correctness;
+  if (verification && Array.isArray(verification.evidence_references)) {
+    const typedState = result.requirement_results?.find(({ requirement_id }) => requirement_id === "verification-evidence")?.verification_evidence_state;
+    const state = typedState ?? (verification.state === "pass" ? "executed_success" : null);
+    const hasCommandAuthority = normalized.command_evidence.required_command_ids.length > 0 || (normalized.command_evidence.required_alternative_groups ?? []).length > 0;
+    if (state && (typedState || hasCommandAuthority)) {
+      const expected = deriveVerificationEvidenceReferences(normalized, state);
+      const key = (reference) => `${reference.kind}:${reference.digest}:${reference.bytes}`;
+      const actualKeys = verification.evidence_references.map(key).sort();
+      const expectedKeys = expected.map(key).sort();
+      if (actualKeys.length !== expectedKeys.length || actualKeys.some((value, index) => value !== expectedKeys[index])) throw new Error("verification correctness references must match the deterministically derived causal reference set");
+    }
   }
   const requiredGroups = normalized.command_evidence.required_alternative_groups ?? [];
   if ((normalized.command_evidence.required_command_ids.length > 0 || requiredGroups.length > 0) && result.verification_correctness.state === "pass") {
