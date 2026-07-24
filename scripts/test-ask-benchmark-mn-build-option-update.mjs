@@ -358,13 +358,13 @@ function persistentNormalizedAuthority({ authorityRoot, state }) {
   const materializedDigest = authorityFileDigest(resolve(materializedPath, "materialization-manifest.json"));
   const contract = readJson(resolve(fixtureRoot, "verification-command-contract.json"));
   const caseRecord = {
-    case_id: `case-${state.replaceAll("_", "").slice(0, 16).padEnd(16, "0")}-${"207".repeat(6).slice(0, 16)}`,
+    case_id: `case-${canonicalDigest({ state }).slice(7, 23)}-${canonicalDigest({ state, authority: "r6" }).slice(7, 23)}`,
     adapter_track: "codex",
     condition: "plain",
     fixture_id: "mn-build-option-update",
     repetition: 1,
     condition_order_position: 1,
-    block_id: "block-0000000000000207-000000000207",
+    block_id: "block-000000000000020a-00000000020a",
     status: "completed",
     attempt_count: 1,
     terminal_attempt: "0001",
