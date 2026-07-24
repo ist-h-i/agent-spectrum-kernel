@@ -1281,6 +1281,7 @@ try {
   invalidEvidenceResult.evaluatorResult.verification_correctness = { state: "fail", evidence_references: [invalidAuthorityReference] };
   const invalidVerificationRequirement = invalidEvidenceResult.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence");
   invalidVerificationRequirement.verification_evidence_state = "invalid";
+  invalidVerificationRequirement.evidence_references = [invalidAuthorityReference];
   invalidVerificationRequirement.verification_evidence_references = [invalidAuthorityReference];
   assert.equal(validateScoringInputBindings(invalidEvidenceResult).scoringReady, false, "invalid evidence classification must rederive fail-closed");
   profileRequiredNegative("invalid evidence forged as under-processing", (changed) => { changed.evaluatorResult.evaluation_status = "invalid_input"; changed.evaluatorResult.evidence_correctness = { state: "fail", evidence_references: [{ kind: "test_result", digest: `sha256:${"8".repeat(64)}`, bytes: 1 }] }; changed.evaluatorResult.classification = "under_processing"; });
