@@ -693,7 +693,7 @@ function privateEvaluationRecordFor({ authorityRoot, chain, normalizedAuthority,
   return { record, recordPath };
 }
 
-async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority }) {
+async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority, candidateMutator = null }) {
   const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
   const hiddenAsset = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
   const evaluator = await import(pathToFileURL(resolve(privateRoot, hiddenAsset.path)).href);
@@ -701,6 +701,7 @@ async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAut
   const candidateWorkspace = resolve(authorityRoot, "candidate-workspace");
   cpSync(resolve(fixtureRoot, "workspace"), frozenWorkspace, { recursive: true });
   cpSync(resolve(fixtureRoot, "workspace"), candidateWorkspace, { recursive: true });
+  if (candidateMutator) candidateMutator(candidateWorkspace);
   const fragment = await evaluator.evaluateCandidateSafe({
     repositoryRoot: root,
     frozenWorkspace,
@@ -712,12 +713,12 @@ async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAut
   return { fragment, frozenWorkspace, candidateWorkspace };
 }
 
-async function runPersistentFullEvaluatorAuthority(privateRoot, state) {
+async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candidateMutator = null } = {}) {
   const authorityRoot = mkdtempSync(resolve(root, `.ask-mn-r6-${state}-`));
   const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot, state });
   const scoringAuthority = persistentScoringAuthorities(authorityRoot);
   const bundleManifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
-  const actual = await actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority });
+  const actual = await actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority, candidateMutator });
   const adapterAuthority = {
     ...scoringAuthority,
     evaluatorReference: scoringAuthority.reference,
@@ -822,6 +823,35 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state) {
   assert.throws(() => verifyEvaluatorBoundary(common), /normalized result identity|digest|inventory|summary|inconsistent/u, "persistent authority tamper: command summary");
   writeFileSync(normalizedPath, originalNormalizedBytes);
   assert.deepEqual(chain.snapshot(), before, "persistent authority tamper must restore command summary");
+  if (state === "executed_success") {
+    const originalRecordBytes = readFileSync(privateRecord.recordPath);
+    const originalFragmentBytes = readFileSync(chain.privateFragmentPath);
+    const repositoryDiffPath = resolve(authorityRoot, "repository-diff-artifact.json");
+    const evaluatorCheckPath = resolve(authorityRoot, "evaluator-check-artifact.json");
+    const originalRepositoryDiffBytes = readFileSync(repositoryDiffPath);
+    const originalEvaluatorCheckBytes = readFileSync(evaluatorCheckPath);
+    const expectPrivateFailure = (label, mutate, pattern = /private evaluation|private evaluator|authority-owned adapter|artifact|record|fragment|lineage|path|digest/u) => {
+      const changedResult = JSON.parse(originalResultBytes.toString("utf8"));
+      const changedRecord = JSON.parse(originalRecordBytes.toString("utf8"));
+      mutate({ result: changedResult, record: changedRecord });
+      changedResult.evaluation_id = computeEvaluationId(changedResult);
+      changedResult.evaluation_digest = computeEvaluationDigest(changedResult);
+      writeJson(chain.evaluatorResultPath, changedResult);
+      assert.throws(() => verifyEvaluatorBoundary(common), pattern, `private authority tamper: ${label}`);
+      writeFileSync(chain.evaluatorResultPath, originalResultBytes);
+      writeFileSync(privateRecord.recordPath, originalRecordBytes);
+      writeFileSync(chain.privateFragmentPath, originalFragmentBytes);
+      writeFileSync(repositoryDiffPath, originalRepositoryDiffBytes);
+      writeFileSync(evaluatorCheckPath, originalEvaluatorCheckBytes);
+      assert.deepEqual(chain.snapshot(), before, `private authority tamper must restore ${label}`);
+    };
+    expectPrivateFailure("record digest", ({ record }) => { record.adapter_source_digest = `sha256:${"0".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /adapter source digest|record digest|source/u);
+    expectPrivateFailure("record fragment path replacement", ({ record }) => { record.private_fragment_path = "authority-chain/evaluator-result.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /fragment path|private evaluator fragment|Schema|authority/u);
+    expectPrivateFailure("fragment tamper", () => { const fragment = JSON.parse(originalFragmentBytes.toString("utf8")); fragment.classification = "over_processing"; writeJson(chain.privateFragmentPath, fragment); }, /fragment digest|byte closure|authority-owned adapter|classification/u);
+    expectPrivateFailure("repository diff tamper", () => { const artifact = JSON.parse(originalRepositoryDiffBytes.toString("utf8")); artifact.diff_entries = [...artifact.diff_entries, { path: "r8-tamper.txt", change_type: "added", before: null, after: { file_type: "file", mode: 420, bytes: 1, sha256: `sha256:${"0".repeat(64)}` } }]; writeJson(repositoryDiffPath, artifact); }, /artifact digest|byte closure|repository diff/u);
+    expectPrivateFailure("evaluator check replacement", ({ record }) => { const entry = record.evidence_artifacts.find(({ path }) => path.endsWith("evaluator-check-artifact.json")); entry.path = "repository-diff-artifact.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /repository diff artifact|artifact|schema|record/u);
+    expectPrivateFailure("public repository-diff reference transplant", ({ result }) => { const reference = result.findings.flatMap(({ evidence_references }) => evidence_references).find(({ kind }) => kind === "repository_diff"); assert.ok(reference); reference.digest = `sha256:${"f".repeat(64)}`; }, /sealed private artifact|artifact|authority-owned adapter/u);
+  }
   return { authorityRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, privateRecord, chain, verifiedResult };
 }
 
@@ -1161,6 +1191,36 @@ async function runPrivatePortabilityChecks(privateRoot) {
   rmSync(symlinkTarget);
   symlinkSync(resolve(root, "scripts/ask-benchmark-scoring-contract.mjs"), symlinkTarget);
   await assert.rejects(() => evaluator.evaluateCandidate({ repositoryRoot: symlinkRoot, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true }), /symlink|regular file/u, "symlinked public module must fail closed");
+
+  const graphRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-r8-graph-copy-"));
+  rmSync(graphRoot, { recursive: true, force: true });
+  execFileSync("git", ["clone", "--local", root, graphRoot], { stdio: "ignore" });
+  const graphEvaluator = await import(pathToFileURL(hiddenTestsPath).href);
+  const graphFrozen = resolve(graphRoot, "r8-frozen");
+  const graphCandidate = resolve(graphRoot, "r8-candidate");
+  cpSync(resolve(graphRoot, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/workspace"), graphFrozen, { recursive: true });
+  cpSync(resolve(graphRoot, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/workspace"), graphCandidate, { recursive: true });
+  const graphModule = resolve(graphRoot, "scripts/ask-benchmark-materialize.mjs");
+  const graphSchema = resolve(graphRoot, "scripts/ask-benchmark-schema.mjs");
+  const graphModuleOriginal = readFileSync(graphModule, "utf8");
+  const graphSchemaOriginal = readFileSync(graphSchema, "utf8");
+  const graphFailure = async (label, mutate, pattern = /dependency graph|source .*bytes|base Git|symlink|regular file/u) => {
+    mutate();
+    await assert.rejects(() => graphEvaluator.evaluateCandidate({ repositoryRoot: graphRoot, frozenWorkspace: graphFrozen, candidateWorkspace: graphCandidate, normalizedResult, skipFullNormalizedValidation: true }), pattern, `R8 dependency graph regression: ${label}`);
+    writeFileSync(graphModule, graphModuleOriginal);
+    if (lstatSync(graphSchema).isSymbolicLink()) rmSync(graphSchema);
+    writeFileSync(graphSchema, graphSchemaOriginal);
+  };
+  await graphFailure("transitive byte drift", () => writeFileSync(graphSchema, `${graphSchemaOriginal}\n// R8 transitive byte drift\n`));
+  await graphFailure("static import addition", () => writeFileSync(graphModule, `${graphModuleOriginal}\nimport \"./ask-benchmark-schema.mjs\";\n`));
+  await graphFailure("static import removal", () => writeFileSync(graphModule, graphModuleOriginal.replace('import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";\n', "")));
+  await graphFailure("literal dynamic import", () => writeFileSync(graphModule, `${graphModuleOriginal}\nvoid import(\"./ask-benchmark-schema.mjs\");\n`));
+  await graphFailure("export-from edge", () => writeFileSync(graphSchema, `${graphSchemaOriginal}\nexport { stableCanonicalJson } from \"./ask-benchmark-materialize.mjs\";\n`));
+  await graphFailure("transitive symlink", () => {
+    rmSync(graphSchema);
+    symlinkSync(resolve(root, "scripts/ask-benchmark-schema.mjs"), graphSchema);
+  });
+  await graphFailure("cycle edge", () => writeFileSync(graphSchema, `${graphSchemaOriginal}\nimport \"./ask-benchmark-materialize.mjs\";\n`));
 }
 
 try {
@@ -1392,6 +1452,14 @@ try {
       assert.equal(fullAuthority.verifiedResult.result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state, deriveVerificationEvidenceState(fullAuthority.normalizedAuthority.normalized), `full verifier must preserve the typed state for ${state}`);
       rmSync(fullAuthority.authorityRoot, { recursive: true, force: true });
     }
+    const invalidAuthority = await runPersistentFullEvaluatorAuthority(privateRoot, "executed_success", {
+      candidateMutator: (candidateWorkspace) => writeFileSync(resolve(candidateWorkspace, "build.config.json"), "{ malformed\n"),
+    });
+    assert.equal(invalidAuthority.evaluatorResult.evaluation_status, "invalid_input", "durable evaluation-input failure must remain typed");
+    assert.equal(invalidAuthority.evaluatorResult.invalid_input_authority.layer, "evaluation_input");
+    assert.equal(invalidAuthority.evaluatorResult.invalid_input_authority.category, "candidate_source_invalid");
+    assert.ok(existsSync(resolve(invalidAuthority.authorityRoot, "evaluation-input-failure-artifact.json")), "evaluation-input failure artifact must be persisted");
+    rmSync(invalidAuthority.authorityRoot, { recursive: true, force: true });
 
     const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
     const privateAsset = manifest.asset_inventory[0];
