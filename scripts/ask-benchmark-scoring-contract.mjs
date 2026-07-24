@@ -396,7 +396,8 @@ export function validateBinaryScopeVerificationResult({ evaluatorResult, require
         } else {
           if (normalizedRefs.length > 0 || result.verification_evidence_references.some(({ kind }) => kind !== "execution_event")) throw new Error("executed verification failure must reference execution events");
           const latest = latestCommandReferences(normalizedResult);
-          if (result.verification_evidence_references.some(({ digest, bytes }) => ![...latest.values()].some((entry) => entry.digest === digest && entry.bytes === bytes))) throw new Error("verification failure references must close to latest terminal events");
+          const terminalEvents = [...latest.values(), ...normalizedResult.command_evidence.references.filter(({ match_state }) => match_state === "cwd_unverified")];
+          if (result.verification_evidence_references.some(({ digest, bytes }) => !terminalEvents.some((entry) => entry.digest === digest && entry.bytes === bytes))) throw new Error("verification failure references must close to latest terminal events");
         }
       }
     } else if (result.verification_evidence_references.length !== 0) throw new Error(`${requirement.requirement_id} must not carry verification evidence references`);
