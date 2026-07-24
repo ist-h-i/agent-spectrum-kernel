@@ -658,6 +658,44 @@ function runPersistentFullEvaluatorAuthority(privateRoot, state) {
   const before = chain.snapshot();
   const verifiedResult = verifyEvaluatorBoundary(common);
   assert.deepEqual(chain.snapshot(), before, `full evaluator authority must be read-only for ${state}`);
+  const originalResultBytes = readFileSync(chain.evaluatorResultPath);
+  const expectPersistentFailure = (label, mutate, pattern) => {
+    const changed = JSON.parse(originalResultBytes.toString("utf8"));
+    mutate(changed);
+    changed.evaluation_id = computeEvaluationId(changed);
+    changed.evaluation_digest = computeEvaluationDigest(changed);
+    writeJson(chain.evaluatorResultPath, changed);
+    assert.throws(() => verifyEvaluatorBoundary(common), pattern, `persistent authority tamper: ${label}`);
+    writeFileSync(chain.evaluatorResultPath, originalResultBytes);
+    assert.deepEqual(chain.snapshot(), before, `persistent authority tamper must restore ${label}`);
+  };
+  expectPersistentFailure("verification state", (changed) => {
+    changed.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state = "executed_failure";
+  }, /state does not rederive|causal reference set/u);
+  expectPersistentFailure("verification references", (changed) => {
+    changed.verification_correctness.evidence_references = [];
+    changed.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references = [];
+  }, /causal reference set/u);
+  expectPersistentFailure("top-level correctness", (changed) => { changed.verification_correctness.state = "fail"; }, /top-level verification pass|failing verification/u);
+  expectPersistentFailure("normalized result digest", (changed) => { changed.normalized_result_digest = `sha256:${"0".repeat(64)}`; }, /normalized result digest|mismatched normalized-result/u);
+  expectPersistentFailure("normalized generation reference", (changed) => { changed.source_snapshot_digest = `sha256:${"1".repeat(64)}`; }, /source snapshot|normalized snapshot/u);
+  expectPersistentFailure("cross-run reference", (changed) => { changed.run_instance_id = "00000000-0000-4000-8000-000000000208"; }, /lineage mismatch|run_instance/u);
+  if (state === "repeated_success_failure") {
+    const firstSuccess = normalizedAuthority.normalized.command_evidence.references.find(({ outcome }) => outcome === "succeeded");
+    expectPersistentFailure("earlier success reference", (changed) => {
+      const reference = { kind: "execution_event", digest: firstSuccess.digest, bytes: firstSuccess.bytes };
+      changed.verification_correctness.evidence_references = [reference];
+      changed.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references = [reference];
+    }, /causal reference set|non-failure causal/u);
+  }
+  const normalizedPath = resolve(normalizedAuthority.generationPath, normalizedAuthority.generationManifest.inventory[0].path);
+  const originalNormalizedBytes = readFileSync(normalizedPath);
+  const changedNormalized = JSON.parse(originalNormalizedBytes.toString("utf8"));
+  changedNormalized.command_evidence.command_summaries = changedNormalized.command_evidence.command_summaries.map((summary) => ({ ...summary, latest_outcome: summary.latest_outcome === "succeeded" ? "failed" : summary.latest_outcome }));
+  writeJson(normalizedPath, changedNormalized);
+  assert.throws(() => verifyEvaluatorBoundary(common), /normalized result identity|digest|inventory/u, "persistent authority tamper: command summary");
+  writeFileSync(normalizedPath, originalNormalizedBytes);
+  assert.deepEqual(chain.snapshot(), before, "persistent authority tamper must restore command summary");
   return { authorityRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, chain, verifiedResult };
 }
 
