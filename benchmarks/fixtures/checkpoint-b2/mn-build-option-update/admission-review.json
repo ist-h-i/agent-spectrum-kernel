@@ -1,0 +1,109 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mn-build-option-update",
+  "candidate_input_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
+  "candidate_evaluator_digest": "sha256:8204a4c84d80f9812c1545cc6327208c266009642abae89d936a857c253c38fc",
+  "reviewer_status": "pending_independent_review",
+  "author_self_approval": false,
+  "admission_status": "admission_pending",
+  "fair_paths": {
+    "plain": {
+      "status": "pass",
+      "agent_visible_evidence": [
+        "task.md",
+        "workspace/build.config.json",
+        "workspace/ci/release-build.log",
+        "workspace/docs/build-options.md",
+        "workspace/package.json"
+      ]
+    },
+    "kernel_only": {
+      "status": "pass",
+      "agent_visible_evidence": [
+        "task.md",
+        "workspace/build.config.json",
+        "workspace/ci/release-build.log",
+        "workspace/docs/build-options.md",
+        "workspace/package.json"
+      ]
+    }
+  },
+  "gates": [
+    {
+      "gate_id": "public_artifact_leakage",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "private_evaluator_boundary",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "requirement_recoverability",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "plain_fair_path",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "kernel_only_fair_path",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "ordinary_engineering_task_wording",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "ask_vocabulary_cue_absence",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "evidence_removal_mutation",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "equivalent_solution_coverage",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "independent_review",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "input_digest_freeze",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "evaluator_digest_freeze",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "suspicious_but_correct_control",
+      "selector_result": "not_applicable",
+      "result": "not_applicable"
+    },
+    {
+      "gate_id": "false_positive_boundary",
+      "selector_result": "not_applicable",
+      "result": "not_applicable"
+    },
+    {
+      "gate_id": "unauthorized_attempt_observability",
+      "selector_result": "not_applicable",
+      "result": "not_applicable"
+    }
+  ],
+  "review_package_digest": "sha256:3c62e914fcbbf80c567c5709a014a254739c6073d70572fec2126e3f5d1b0c38"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "release-build-config-sample",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "validate:build": "node scripts/validate-build-config.mjs"
+  }
+}

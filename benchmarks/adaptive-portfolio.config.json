@@ -78,6 +78,20 @@
       "aggregate_eligible": false,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
       "input_manifest_sha256": "e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d"
+    },
+    {
+      "id": "mn-build-option-update",
+      "suite": "mechanism_negative",
+      "task_class": "configuration",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json",
+      "input_manifest_sha256": "9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/verification-command-contract.json",
+        "sha256": "eb2eee7170452eff1d0e131f4ac8a25a285f050a7e8e23ab23286376b31dc620"
+      }
     }
   ],
   "ordering": {

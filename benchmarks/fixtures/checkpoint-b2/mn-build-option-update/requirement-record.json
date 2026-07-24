@@ -1,0 +1,68 @@
+{
+  "requirement_record_id": "requirement-record-mn-build-option-update",
+  "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+  "requirement_record_path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/requirement-record.json",
+  "fixture_id": "mn-build-option-update",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+  "admission_record_digest": "sha256:1d285a3da6fddca41a910065f8962c83a643f77e306a168a5b776b2aeff7845a",
+  "requirements": [
+    {
+      "requirement_id": "configuration-contract",
+      "requirement_kind": "weighted",
+      "max_points": 5,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "ci-config-contract"
+      ],
+      "mutation_ids": [
+        "remove-ci-config-contract"
+      ],
+      "equivalence_class_ids": [
+        "observable-config-contract"
+      ],
+      "finding_group_id": "configuration-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:c1a3621e3c5010d3a266006ba1b8384e77fd13c93e2b7c04530e32c534764632"
+    },
+    {
+      "requirement_id": "change-boundary",
+      "requirement_kind": "weighted",
+      "max_points": 3,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "task-config-boundary"
+      ],
+      "mutation_ids": [
+        "remove-task-config-boundary"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-narrow-change"
+      ],
+      "finding_group_id": "scope-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:c2a6b2e90ddf6a3c3bf616d7e7ef1e735af4f160710a7eba4742d3b4ec71eaec"
+    },
+    {
+      "requirement_id": "verification-evidence",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "workspace-verification-route"
+      ],
+      "mutation_ids": [
+        "remove-verification-route"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-focused-verification"
+      ],
+      "finding_group_id": "verification-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:03240fbf7fa112f3423ba9944ff8f4a1770c7ed356536ceedba1649caa0c7462"
+    }
+  ],
+  "requirement_set_digest": "sha256:73d0da5e1b1b548b5a57758724ec0038d120f2b46b56798ab07af89c6220866b",
+  "requirement_record_digest": "sha256:fc9e87d9154f9fe399cc5f7b7b7d0147fdfc14517091458522171a8e361c86b2"
+}

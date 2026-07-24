@@ -1,4 +1,4 @@
-import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 
 export const REQUIREMENT_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-requirement-record.schema.json";
 export const OUTPUT_CONTRACT_SCHEMA_PATH = "benchmarks/schemas/portfolio-output-contract.schema.json";
@@ -27,6 +27,16 @@ export const REQUIREMENT_RESULT_FIELD_IDS = Object.freeze([
   "finding_ids",
   "evidence_references",
 ]);
+export const REQUIREMENT_RESULT_OPTIONAL_FIELD_IDS = Object.freeze([
+  "scope_deviation_references",
+  "verification_evidence_references",
+]);
+export const BINARY_SCOPE_VERIFICATION_PROFILE_NAME = "binary_scope_verification_v1";
+export const BINARY_SCOPE_VERIFICATION_PROFILE = Object.freeze({ name: BINARY_SCOPE_VERIFICATION_PROFILE_NAME });
+
+export function computeResultProfileDigest(profile = BINARY_SCOPE_VERIFICATION_PROFILE) {
+  return canonicalDigest({ name: profile.name });
+}
 
 export const SCORING_IDENTITY_FIELD_IDS = Object.freeze([
   "scoring_input_freeze_manifest_source_digest",
@@ -84,11 +94,11 @@ function arraysEqual(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function assertClosedKeys(value, allowedKeys, label) {
+function assertClosedKeys(value, allowedKeys, label, requiredKeys = allowedKeys) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object`);
   const keys = Object.keys(value);
   const unknown = keys.filter((key) => !allowedKeys.includes(key));
-  const missing = allowedKeys.filter((key) => !keys.includes(key));
+  const missing = requiredKeys.filter((key) => !keys.includes(key));
   if (unknown.length > 0) throw new Error(`${label} has unknown fields: ${unknown.join(", ")}`);
   if (missing.length > 0) throw new Error(`${label} is missing fields: ${missing.join(", ")}`);
 }
@@ -172,7 +182,7 @@ export function validateScoringContractSchemaParity({ scoringPolicy, requirement
   if (!arraysEqual(requirementDefinition.properties.safety_dimension?.enum ?? [], safetyDimensions)) throw new Error("safety dimension values drifted between policy and Schema");
 
   assertExactFieldList(requirementResultDefinition.required, REQUIREMENT_RESULT_FIELD_IDS, "evaluator requirement result required fields");
-  assertExactFieldList(Object.keys(requirementResultDefinition.properties ?? {}), REQUIREMENT_RESULT_FIELD_IDS, "evaluator requirement result allowed fields");
+  assertExactFieldList(Object.keys(requirementResultDefinition.properties ?? {}), [...REQUIREMENT_RESULT_FIELD_IDS, ...REQUIREMENT_RESULT_OPTIONAL_FIELD_IDS], "evaluator requirement result allowed fields");
   const evaluatorRequired = evaluatorResultSchema.required ?? [];
   for (const field of [...SCORING_IDENTITY_FIELD_IDS, "plan_digest", "requirement_results"]) {
     if (!evaluatorRequired.includes(field) || !Object.hasOwn(evaluatorResultSchema.properties ?? {}, field)) throw new Error(`evaluator result Schema is missing scoring input field: ${field}`);
@@ -253,9 +263,10 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
   const resultIds = evaluatorResult.requirement_results.map(({ requirement_id }) => requirement_id);
   assertUniqueStrings(resultIds, "evaluator requirement result IDs");
   const findingIds = new Set([...evaluatorResult.findings, ...evaluatorResult.false_positives, ...evaluatorResult.scope_deviations].map(({ finding_id }) => finding_id));
+  const scopeDeviationIds = new Set(evaluatorResult.scope_deviations.map(({ finding_id }) => finding_id));
 
   for (const observation of evaluatorResult.requirement_results) {
-    assertClosedKeys(observation, REQUIREMENT_RESULT_FIELD_IDS, `requirement result ${observation.requirement_id ?? "<unknown>"}`);
+    assertClosedKeys(observation, [...REQUIREMENT_RESULT_FIELD_IDS, ...REQUIREMENT_RESULT_OPTIONAL_FIELD_IDS], `requirement result ${observation.requirement_id ?? "<unknown>"}`, REQUIREMENT_RESULT_FIELD_IDS);
     const requirement = requirements.get(observation.requirement_id);
     if (!requirement) throw new Error(`evaluator result references unknown requirement ID: ${observation.requirement_id}`);
     assertUniqueStrings(observation.matched_equivalence_class_ids, "matched equivalence class IDs");
@@ -263,6 +274,15 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
     const allowedEquivalenceIds = new Set(requirement.equivalence_class_ids);
     if (observation.matched_equivalence_class_ids.some((id) => !allowedEquivalenceIds.has(id))) throw new Error("matched equivalence class IDs must be a subset of the authoritative requirement");
     if (observation.finding_ids.some((id) => !findingIds.has(id))) throw new Error("requirement result finding reference does not close within the evaluator envelope");
+    if (observation.scope_deviation_references) {
+      assertUniqueStrings(observation.scope_deviation_references, "requirement result scope-deviation references");
+      if (observation.scope_deviation_references.some((id) => !scopeDeviationIds.has(id))) throw new Error("requirement result scope-deviation reference does not close within the evaluator envelope");
+    }
+    if (observation.verification_evidence_references) {
+      if (!Array.isArray(observation.verification_evidence_references) || observation.verification_evidence_references.some((entry) => entry?.kind !== "execution_event")) throw new Error("requirement result verification evidence must reference execution events");
+      const evidence = new Set(observation.evidence_references.map((entry) => `${entry.kind}:${entry.digest}:${entry.bytes}`));
+      if (observation.verification_evidence_references.some((entry) => !evidence.has(`${entry.kind}:${entry.digest}:${entry.bytes}`))) throw new Error("requirement result verification evidence does not close within its evidence references");
+    }
     assertRequirementOutcome(requirement, observation);
   }
 
@@ -275,10 +295,72 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
   return { scoringReady: false };
 }
 
+function assertProfileReference(reference, normalizedResult, label) {
+  if (!reference || typeof reference !== "object" || !["execution_event", "normalized_result", "repository_diff", "test_result"].includes(reference.kind)) throw new Error(`${label} must be a typed evidence reference`);
+  if (typeof reference.digest !== "string" || !/^sha256:[a-f0-9]{64}$/u.test(reference.digest) || (reference.bytes !== null && (!Number.isInteger(reference.bytes) || reference.bytes < 1))) throw new Error(`${label} has an invalid digest or byte count`);
+  if (reference.kind === "execution_event") {
+    const source = normalizedResult.command_evidence.references.find((entry) => entry.digest === reference.digest);
+    if (!source || source.bytes !== reference.bytes) throw new Error(`${label} does not close to normalized command evidence`);
+  }
+  if (reference.kind === "normalized_result" && reference.digest !== normalizedResult.normalized_result_digest) throw new Error(`${label} does not close to the normalized result`);
+}
+
+export function deriveBinaryScopeVerificationClassification({ evaluatorResult }) {
+  const invalidEvidence = evaluatorResult.evaluation_status === "invalid_input"
+    || evaluatorResult.evidence_correctness?.state === "fail"
+    || evaluatorResult.findings?.some(({ category }) => category === "invalid_evidence");
+  if (invalidEvidence) return "invalid_evidence";
+  const results = new Map(evaluatorResult.requirement_results.map(({ requirement_id, outcome }) => [requirement_id, outcome]));
+  const configurationPass = results.get("configuration-contract") === "pass";
+  const scopePass = results.get("change-boundary") === "pass";
+  const verificationPass = results.get("verification-evidence") === "pass";
+  if (configurationPass && scopePass && verificationPass) return "correct_narrow_execution";
+  if (configurationPass && !scopePass) return "over_processing";
+  return "under_processing";
+}
+
+export function validateBinaryScopeVerificationResult({ evaluatorResult, requirementRecord, normalizedResult }) {
+  if (evaluatorResult.result_profile?.name !== BINARY_SCOPE_VERIFICATION_PROFILE_NAME || evaluatorResult.result_profile?.digest !== computeResultProfileDigest()) throw new Error("binary scope verification result profile is missing or invalid");
+  const byId = new Map(evaluatorResult.requirement_results.map((result) => [result.requirement_id, result]));
+  const scopeIds = new Set(evaluatorResult.scope_deviations.map(({ finding_id }) => finding_id));
+  for (const requirement of requirementRecord.requirements) {
+    const result = byId.get(requirement.requirement_id);
+    if (!result || !Array.isArray(result.scope_deviation_references) || !Array.isArray(result.verification_evidence_references)) throw new Error(`binary result ${requirement.requirement_id} must include closed scope and verification reference arrays`);
+    if (new Set(result.scope_deviation_references).size !== result.scope_deviation_references.length || result.scope_deviation_references.some((id) => !scopeIds.has(id))) throw new Error(`binary result ${requirement.requirement_id} has an invalid scope-deviation reference`);
+    for (const reference of result.verification_evidence_references) assertProfileReference(reference, normalizedResult, `binary result ${requirement.requirement_id} verification evidence`);
+    if (requirement.requirement_id === "change-boundary") {
+      if (result.outcome === "pass" && result.scope_deviation_references.length !== 0) throw new Error("passing change-boundary result must have no scope deviations");
+      if (result.outcome === "fail" && result.scope_deviation_references.length !== scopeIds.size) throw new Error("failing change-boundary result must reference every scope deviation");
+    } else if (result.scope_deviation_references.length !== 0) throw new Error(`${requirement.requirement_id} must not carry scope-deviation references`);
+    if (requirement.requirement_id === "verification-evidence") {
+      if (result.outcome === "pass") {
+        if (result.verification_evidence_references.length === 0 || result.verification_evidence_references.some(({ kind }) => kind !== "execution_event")) throw new Error("passing verification result must reference execution events");
+        for (const commandId of normalizedResult.command_evidence.required_command_ids) {
+          const successful = normalizedResult.command_evidence.references.filter(({ command_id, outcome, exit_code }) => command_id === commandId && outcome === "succeeded" && exit_code === 0).at(-1);
+          if (!successful || !result.verification_evidence_references.some(({ digest, bytes }) => digest === successful.digest && bytes === successful.bytes)) throw new Error(`passing verification result is missing execution evidence for ${commandId}`);
+        }
+      } else if (result.verification_evidence_references.length === 0) throw new Error("failing verification result must retain typed evidence");
+    } else if (result.verification_evidence_references.length !== 0) throw new Error(`${requirement.requirement_id} must not carry verification evidence references`);
+  }
+  const derived = deriveBinaryScopeVerificationClassification({ evaluatorResult });
+  if (evaluatorResult.classification !== derived) throw new Error(`classification does not rederive to ${derived}`);
+  return derived;
+}
+
+export function validateBinaryScopeVerificationProfile({ outputContract, freezeManifest, evaluatorResult, requirementRecord, normalizedResult }) {
+  const profile = outputContract.result_profile;
+  if (!profile || profile.name !== BINARY_SCOPE_VERIFICATION_PROFILE_NAME || profile.digest !== computeResultProfileDigest(profile)) throw new Error("output contract result profile is invalid");
+  if (stableCanonicalJson(freezeManifest.result_profile) !== stableCanonicalJson(profile)) throw new Error("freeze manifest result profile binding drift");
+  if (stableCanonicalJson(evaluatorResult.result_profile) !== stableCanonicalJson(profile)) throw new Error("evaluator result profile binding drift");
+  return validateBinaryScopeVerificationResult({ evaluatorResult, requirementRecord, normalizedResult });
+}
+
 export function validateScoringInputBindings({ freezeManifest, freezeManifestSourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult }) {
   assertDigestClosure(policyManifest.manifest_digest, computePolicyManifestDigest(policyManifest), "policy manifest digest");
   assertDigestClosure(scoringPolicy.policy_digest, computeScoringPolicyDigest(scoringPolicy), "scoring policy digest");
   assertDigestClosure(outputContract.output_contract_digest, computeOutputContractDigest(outputContract), "output contract digest");
+  if (admissionRecord.admission_status !== "admitted") throw new Error("scoring input binding requires an admitted final admission record");
+  assertDigestClosure(admissionRecord.admission_digest, computeFinalAdmissionRecordDigest(admissionRecord), "final admission record digest");
   if (policyManifest.catalog_digest !== catalog.catalog_digest || scoringPolicy.catalog_digest !== catalog.catalog_digest) throw new Error("scoring policy or manifest catalog binding does not match");
   if (policyManifest.scoring_policy?.digest !== scoringPolicy.policy_digest) throw new Error("policy manifest scoring policy binding does not match");
   if (requirementRecord.fixture_id !== normalizedResult.lineage.fixture_id) throw new Error("requirement record fixture binding does not match normalized result");
@@ -310,7 +392,9 @@ export function validateScoringInputBindings({ freezeManifest, freezeManifestSou
     if (evaluatorResult[field] !== value) throw new Error(`evaluator scoring input binding mismatch at ${field}`);
   }
   if (evaluatorReference.fixture_id !== normalizedResult.lineage.fixture_id || evaluatorReference.fixture_input_digest !== normalizedResult.lineage.fixture_input_digest) throw new Error("evaluator public reference fixture or input binding does not match normalized result");
-  return validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult });
+  const scoring = validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult });
+  if (outputContract.result_profile) validateBinaryScopeVerificationProfile({ outputContract, freezeManifest, evaluatorResult, requirementRecord, normalizedResult });
+  return scoring;
 }
 
 export function scoringContractFingerprint({ scoringPolicy, requirementRecordSchema, evaluatorResultSchema }) {

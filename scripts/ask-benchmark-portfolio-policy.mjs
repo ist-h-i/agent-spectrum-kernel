@@ -373,7 +373,8 @@ function validateOutputContractSource({ policyManifest, catalog, fixture, refere
     "output_contract_id", "output_contract_schema_path", "output_contract_path", "fixture_id", "catalog_digest", "policy_manifest_digest",
     "evaluator_public_reference_path", "evaluator_public_reference_digest", "declares_findings", "output_contract_digest",
   ];
-  assertClosedKeys(reference, requiredKeys, "output contract reference");
+  const optionalKeys = ["verification_command_contract_path", "verification_command_contract_digest", "scope_boundary_authority_path", "scope_boundary_authority_digest", "result_profile"];
+  assertClosedKeys(reference, [...requiredKeys, ...optionalKeys], "output contract reference", { requiredKeys });
   const source = readAuthoritativeJsonArtifact({
     artifactRoot,
     relativePath: reference.output_contract_path,

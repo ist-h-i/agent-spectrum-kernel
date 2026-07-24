@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mn-build-option-update",
+  "fixture_role": "primary",
+  "suite": "mechanism_negative",
+  "task_class": "configuration",
+  "domain": "ci_build",
+  "difficulty": "medium",
+  "repetitions": 3,
+  "risk_boundary": "none",
+  "capability_families": [
+    "configuration_change",
+    "focused_implementation"
+  ],
+  "evidence_topologies": [
+    "ci_logs_and_config",
+    "documentation_and_config"
+  ],
+  "outcome_dimensions": [
+    "configuration_accuracy",
+    "scope_discipline"
+  ],
+  "output_contract_type": "implementation_producing",
+  "requirement_record_id": "requirement-record-mn-build-option-update",
+  "output_contract_id": "output-contract-mn-build-option-update",
+  "evaluator_bundle_id": "evaluator-7a3e942907dc4186e2aa2154804f7ea7b9ad5d011db0d4f43fb2987c9cde0562",
+  "evaluator_bundle_digest": "sha256:8204a4c84d80f9812c1545cc6327208c266009642abae89d936a857c253c38fc",
+  "evaluator_byte_count": 27947,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:0408d50f15ae62fae47dc9484a47b7fd9e0954af6dfa6ef73c9bfdc2cf1d2af3"
+}

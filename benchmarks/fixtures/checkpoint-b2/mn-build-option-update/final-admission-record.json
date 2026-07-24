@@ -1,0 +1,24 @@
+{
+  "fixture_id": "mn-build-option-update",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "input_manifest_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
+  "evaluator_reference_schema": "benchmarks/schemas/evaluator-reference.schema.json",
+  "evaluator_bundle_id": "evaluator-7a3e942907dc4186e2aa2154804f7ea7b9ad5d011db0d4f43fb2987c9cde0562",
+  "evaluator_bundle_digest": "sha256:8204a4c84d80f9812c1545cc6327208c266009642abae89d936a857c253c38fc",
+  "evaluator_byte_count": 27947,
+  "evaluator_requirement_count": 3,
+  "evidence_map_ids": [
+    "ci-config-contract",
+    "task-config-boundary",
+    "workspace-verification-route"
+  ],
+  "mutation_set_ids": [
+    "remove-ci-config-contract",
+    "remove-task-config-boundary",
+    "remove-verification-route"
+  ],
+  "reviewer_record_id": "review-mn-build-option-update-pending",
+  "admission_revision": 1,
+  "admission_status": "admission_pending",
+  "admission_digest": "sha256:1d285a3da6fddca41a910065f8962c83a643f77e306a168a5b776b2aeff7845a"
+}
