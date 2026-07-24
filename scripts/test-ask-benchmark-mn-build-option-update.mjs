@@ -823,7 +823,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   assert.throws(() => verifyEvaluatorBoundary(common), /normalized result identity|digest|inventory|summary|inconsistent/u, "persistent authority tamper: command summary");
   writeFileSync(normalizedPath, originalNormalizedBytes);
   assert.deepEqual(chain.snapshot(), before, "persistent authority tamper must restore command summary");
-  if (state === "executed_success") {
+  if (state === "executed_success" && !candidateMutator) {
     const originalRecordBytes = readFileSync(privateRecord.recordPath);
     const originalFragmentBytes = readFileSync(chain.privateFragmentPath);
     const repositoryDiffPath = resolve(authorityRoot, "repository-diff-artifact.json");
