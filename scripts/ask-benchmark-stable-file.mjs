@@ -28,7 +28,7 @@ export function assertStableRegularFile(path, label) {
   return status;
 }
 
-export function readStableFile(path, label, maximumBytes, { allowEmpty = true } = {}) {
+export function readStableFile(path, label, maximumBytes, { allowEmpty = true, afterOpen = null } = {}) {
   const resolvedPath = resolve(path);
   const initialPathStatus = assertStableRegularFile(resolvedPath, label);
   if ((!allowEmpty && initialPathStatus.size === 0) || initialPathStatus.size > maximumBytes) throw new Error(`${label} must be a bounded${allowEmpty ? "" : " non-empty"} regular file`);
@@ -43,6 +43,7 @@ export function readStableFile(path, label, maximumBytes, { allowEmpty = true } 
     descriptor = openSync(resolvedPath, "r");
     openedDescriptorStatus = fstatSync(descriptor);
     if (!openedDescriptorStatus.isFile() || !sameStatus(statusEvidence(initialPathStatus), statusEvidence(openedDescriptorStatus))) throw new Error(`${label} changed between path inspection and descriptor open`);
+    if (afterOpen !== null) afterOpen({ path: resolvedPath, canonicalPath: initialCanonicalPath, evidence: statusEvidence(openedDescriptorStatus) });
     for (;;) {
       const count = readSync(descriptor, chunk, 0, chunk.length, null);
       if (count === 0) break;

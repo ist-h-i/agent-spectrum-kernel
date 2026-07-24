@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { relative } from "node:path";
+import { relative, resolve } from "node:path";
 import { computePortfolioPlanId } from "./ask-benchmark-schema.mjs";
 
 export const PORTFOLIO_CONDITIONS = Object.freeze(["plain", "kernel_only", "adaptive_ask", "full_ask"]);
@@ -42,6 +42,13 @@ export function buildPortfolioPlan({ root, config, repositoryRevision, seed }) {
           condition_order_position: index + 1,
           input_manifest_path: fixture.input_manifest_path,
           input_manifest_sha256: fixture.input_manifest_sha256,
+          verification_command_contract: fixture.verification_command_contract
+            ? {
+              path: fixture.verification_command_contract.path,
+              file_digest: `sha256:${fixture.verification_command_contract.sha256}`,
+              contract_digest: JSON.parse(readFileSync(resolve(root, fixture.verification_command_contract.path), "utf8")).contract_digest,
+            }
+            : null,
         }));
         blocks.push({ order_key: sha256(`${seed}:block-order:${adapter.id}:${fixture.id}:${repetition}`), cases });
       }

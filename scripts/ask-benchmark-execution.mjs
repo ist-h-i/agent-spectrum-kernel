@@ -19,12 +19,23 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, parse, resolve, sep } from "node:path";
+import { basename, dirname, parse, relative, resolve, sep } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { assertTrackedRepositoryMatchesHead, canonicalDigest, stableCanonicalJson, validateMaterializedPortfolio } from "./ask-benchmark-materialize.mjs";
 import { verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
+import { assertStableFileEvidence, readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { buildCodexProjectionPlan, resolveCodexSkillClosure } from "./install-codex-adapter.mjs";
 import { buildClaudeProjectionPlan, resolveClaudeSkillClosure } from "./install-claude-adapter.mjs";
+import {
+  buildCodexCommandEvidence,
+  buildUnavailableCommandEvidence,
+  CODEX_COMMAND_EVENT_FORMAT_REVISION,
+  COMMAND_EVIDENCE_PARSER_REVISION,
+  COMMAND_EVIDENCE_PATH,
+  COMMAND_EVIDENCE_SCHEMA_PATH,
+  validateCommandEvidenceManifest,
+  validateVerificationCommandContract,
+} from "./ask-benchmark-command-evidence.mjs";
 
 export const EXECUTION_RUNNER_VERSION = "1.0.0";
 export const RUNTIME_CONFIG_SCHEMA_PATH = "benchmarks/schemas/portfolio-runtime-config.schema.json";
@@ -51,6 +62,8 @@ const WORKSPACE_OWNERSHIP_FILE = "ownership.json";
 const PRE_CLAIM_FILE = "pre-claim.json";
 const RESULT_STAGING_FILE = "result.pending.json";
 const TEMP_ROOT = realpathSync(tmpdir());
+const SHELL_CAPABILITY_UNAVAILABLE_CODES = new Set(["unsupported_shell"]);
+const MAX_COMMAND_EVIDENCE_FILE_BYTES = MAX_PROCESS_OUTPUT_BYTES + (2 * 1024 * 1024);
 
 class RuntimeIntegrityError extends Error {}
 
@@ -114,6 +127,47 @@ function publishJsonExclusive(path, value) {
 
 function prefixedFileDigest(path) {
   return `sha256:${fileDigest(path)}`;
+}
+
+function stableJsonValue(file, label) {
+  try {
+    return JSON.parse(file.bytes.toString("utf8"));
+  } catch {
+    throw new Error(`${label} contains invalid JSON`);
+  }
+}
+
+function readStableCommandEvidence(path, label, options = {}) {
+  const file = readStableFile(path, label, MAX_COMMAND_EVIDENCE_FILE_BYTES, { allowEmpty: false, ...options });
+  return { file, manifest: stableJsonValue(file, label) };
+}
+
+function commandEvidenceFileIdentity(file) {
+  const status = file.evidence.openedDescriptor;
+  return {
+    device: String(status.dev),
+    inode: String(status.ino),
+    size: status.size,
+    mtime_ms: status.mtimeMs,
+    ctime_ms: status.ctimeMs,
+    raw_digest: file.rawByteDigest,
+    canonical_path: { classification: "attempt_relative", digest: `sha256:${sha256(Buffer.from(file.canonicalPath))}` },
+  };
+}
+
+function commandEvidenceReference(file, manifest) {
+  return {
+    path: COMMAND_EVIDENCE_PATH,
+    digest: file.rawByteDigest,
+    bytes: file.bytes.length,
+    capture_status: manifest.capture.evidence_level,
+    evidence_count: manifest.command_event_count,
+    file_identity: commandEvidenceFileIdentity(file),
+  };
+}
+
+function sameCommandEvidenceReference(left, right) {
+  return stableCanonicalJson(left) === stableCanonicalJson(right);
 }
 
 function fault(name) {
@@ -244,6 +298,10 @@ function readRuntimeConfig(root, path, adapter) {
     throw new Error("unavailable runtime config requires unavailable_reason");
   }
   if (adapter === "codex" && value.claude_cli !== null) throw new Error("Codex runtime config must not provide a Claude CLI contract");
+  const capture = value.command_evidence;
+  if (capture.support === "supported" && (capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || capture.shell_capability.support_status !== "supported" || capture.shell_capability.family !== "posix_bash" || capture.shell_capability.executable !== "/bin/bash" || stableCanonicalJson(capture.shell_capability.envelope_arguments) !== stableCanonicalJson(["-lc"]) || capture.shell_capability.authority_source !== "codex_exec_jsonl_command_rendering" || capture.shell_capability.probe_status !== "runtime_event_required" || capture.shell_capability.downgrade_reason !== null)) throw new Error("supported command evidence requires runtime event shell authority");
+  if (capture.support !== "supported" && (capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null || capture.shell_capability.support_status !== capture.support || capture.shell_capability.family !== null || capture.shell_capability.executable !== null || capture.shell_capability.envelope_arguments !== null || capture.shell_capability.authority_source !== "none" || capture.shell_capability.downgrade_reason === null)) throw new Error("unavailable command evidence shell capability is inconsistent");
+  if (adapter === "claude" && (capture.support !== "unsupported" || capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null)) throw new Error("Claude command evidence must remain explicitly unsupported");
   if (adapter === "claude" && value.availability === "available") validateClaudeCommandTemplate(value);
   if (value.environment_value_allowlist.some((key) => !value.environment_allowlist.includes(key))) throw new Error("environment value allowlist must be a subset of environment allowlist");
   return { value, digest: sha256(bytes) };
@@ -306,6 +364,7 @@ export function effectiveCommand(root, runtime) {
         "--ignore-user-config",
         "--ignore-rules",
         "--skip-git-repo-check",
+        "--json",
         "--model", runtime.model,
         "-c", `model_reasoning_effort=\"${runtime.reasoning_effort}\"`,
         "-c", `approval_policy=\"${runtime.permission_policy}\"`,
@@ -374,7 +433,7 @@ function probeAvailableRuntime(runtime, verifiedExecutable, command, environment
     assertExecutableIdentity(verifiedExecutable);
     const helpOutput = `${help.stdout ?? ""}${help.stderr ?? ""}`;
     const requiredFlags = runtime.adapter === "codex"
-      ? ["--ephemeral", "--ignore-user-config", "--ignore-rules", "--skip-git-repo-check", "--model", "--config", "--sandbox", "--output-schema", "--output-last-message"]
+      ? ["--ephemeral", "--ignore-user-config", "--ignore-rules", "--skip-git-repo-check", "--json", "--model", "--config", "--sandbox", "--output-schema", "--output-last-message"]
       : command.argv.filter((part) => part.startsWith("-") && part !== "-");
     const markerMatches = runtime.adapter === "codex" || helpOutput.includes(runtime.claude_cli.help_marker);
     if (help.status !== 0 || !markerMatches || !requiredFlags.every((flag) => helpOutput.includes(flag))) {
@@ -385,8 +444,9 @@ function probeAvailableRuntime(runtime, verifiedExecutable, command, environment
 }
 
 function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable, command, environmentSnapshot, availabilityEvidence = null }) {
+  const captureSupported = runtime.command_evidence.support === "supported";
   return {
-    schema_version: "1.0.0",
+    schema_version: "1.2.0",
     adapter,
     runtime_config_sha256: runtimeConfigDigest,
     availability: runtime.availability,
@@ -412,6 +472,16 @@ function adapterIdentity({ adapter, runtime, runtimeConfigDigest, executable, co
       rules_isolated: adapter === "codex",
     },
     availability_evidence: availabilityEvidence ?? (runtime.availability === "available" ? "local_version_and_contract_probe" : "declared_unavailable"),
+    command_evidence: {
+      support: runtime.command_evidence.support,
+      evidence_level: "unavailable",
+      event_transport: captureSupported ? runtime.command_evidence.event_transport : "none",
+      event_format_revision: captureSupported ? runtime.command_evidence.event_format_revision : null,
+      parser_revision: captureSupported ? runtime.command_evidence.parser_revision : null,
+      contract_probe_evidence: captureSupported && runtime.availability === "available" ? "runtime_event_required" : (runtime.availability === "unavailable" ? "declared_unavailable" : adapter === "claude" ? "adapter_event_contract_not_implemented" : "contract_probe_failed"),
+      downgrade_reason: runtime.unavailable_reason ?? (adapter === "claude" ? "adapter_event_contract_not_implemented" : captureSupported ? "runtime_event_not_observed" : runtime.command_evidence.shell_capability.downgrade_reason),
+      shell_capability: structuredClone(runtime.command_evidence.shell_capability),
+    },
   };
 }
 
@@ -590,9 +660,14 @@ function readAdapterIdentity(root, runDir, adapter) {
     if (entry.value !== null && !identity.environment_value_allowlist.includes(entry.name)) throw new Error(`${adapter} environment snapshot exposes a non-declared value`);
   }
   if (identity.policy_enforcement.sandbox_policy !== identity.sandbox_policy || identity.policy_enforcement.permission_policy !== identity.permission_policy) throw new Error(`${adapter} runtime policy identity is inconsistent`);
+  const capture = identity.command_evidence;
+  if (capture.evidence_level === "executed") throw new Error(`${adapter} runtime identity cannot claim executed command evidence before event inspection`);
+  if (capture.evidence_level === "unavailable" && capture.downgrade_reason === null) throw new Error(`${adapter} unavailable command evidence identity lacks a downgrade reason`);
+  if (capture.support === "supported" && (capture.event_transport !== "codex_exec_jsonl" || capture.event_format_revision !== CODEX_COMMAND_EVENT_FORMAT_REVISION || capture.parser_revision !== COMMAND_EVIDENCE_PARSER_REVISION || capture.shell_capability.support_status !== "supported" || capture.shell_capability.family !== "posix_bash" || capture.shell_capability.executable !== "/bin/bash" || stableCanonicalJson(capture.shell_capability.envelope_arguments) !== stableCanonicalJson(["-lc"]) || capture.shell_capability.authority_source !== "codex_exec_jsonl_command_rendering" || capture.shell_capability.probe_status !== "runtime_event_required")) throw new Error(`${adapter} supported command evidence identity is inconsistent`);
+  if (capture.support !== "supported" && (capture.event_transport !== "none" || capture.event_format_revision !== null || capture.parser_revision !== null || capture.evidence_level !== "unavailable" || capture.shell_capability.support_status !== capture.support || capture.shell_capability.family !== null || capture.shell_capability.executable !== null || capture.shell_capability.envelope_arguments !== null || capture.shell_capability.authority_source !== "none" || capture.shell_capability.downgrade_reason === null)) throw new Error(`${adapter} unsupported command evidence identity is inconsistent`);
   if (identity.availability === "available" && adapter === "codex") {
     const argv = identity.effective_command.argv;
-    if (!argv.includes("--ephemeral") || !argv.includes("--ignore-user-config") || !argv.includes("--ignore-rules") || !argv.includes("--skip-git-repo-check") || argv[argv.indexOf("--sandbox") + 1] !== identity.sandbox_policy || !argv.includes(`approval_policy=\"${identity.permission_policy}\"`) || argv[argv.indexOf("--output-schema") + 1] !== "{output_schema}") throw new Error("Codex effective command does not enforce its runtime policy");
+    if (!argv.includes("--ephemeral") || !argv.includes("--ignore-user-config") || !argv.includes("--ignore-rules") || !argv.includes("--skip-git-repo-check") || !argv.includes("--json") || argv[argv.indexOf("--sandbox") + 1] !== identity.sandbox_policy || !argv.includes(`approval_policy=\"${identity.permission_policy}\"`) || argv[argv.indexOf("--output-schema") + 1] !== "{output_schema}") throw new Error("Codex effective command does not enforce its runtime policy");
   }
   if (identity.availability === "available" && adapter === "claude") {
     const argv = identity.effective_command.argv;
@@ -683,7 +758,23 @@ function inputIdentityFor(context, entry) {
     plan_digest: context.identity.plan.digest,
     materialization_manifest_digest: context.materialized.manifestDigest,
     frozen_input_digest: context.materialized.casesById.get(entry.case_id).frozen_input_digest,
+    fixture_id: entry.fixture_id,
+    repetition: entry.repetition,
+    fixture_input_digest: `sha256:${entry.input_manifest_sha256}`,
+    verification_command_contract_digest: entry.verification_command_contract?.contract_digest ?? null,
   };
+}
+
+function loadVerificationCommandContract(root, entry) {
+  const reference = entry.verification_command_contract;
+  if (!reference) return null;
+  const path = assertInside(root, resolve(root, reference.path), `${entry.case_id} verification command contract`);
+  if (relative(root, path).startsWith("..") || !existsSync(path) || !lstatSync(path).isFile()) throw new Error(`${entry.case_id} verification command contract is missing`);
+  assertNoSymlinkSegments(path, `${entry.case_id} verification command contract`);
+  if (prefixedFileDigest(path) !== reference.file_digest) throw new Error(`${entry.case_id} verification command contract file digest mismatch`);
+  const contract = validateVerificationCommandContract(readJson(path), { root });
+  if (contract.fixture_id !== entry.fixture_id || contract.fixture_input_digest !== `sha256:${entry.input_manifest_sha256}` || contract.contract_digest !== reference.contract_digest) throw new Error(`${entry.case_id} verification command contract identity mismatch`);
+  return contract;
 }
 
 function selectionIdentityFor(context, entry) {
@@ -732,7 +823,7 @@ function acquireClaim({ root, context, entry, attempt, runtime, adapter }) {
   const injectedLeaseMs = process.env.ASK_BENCHMARK_FAULT ? Number(process.env.ASK_BENCHMARK_FAULT_LEASE_MS) : Number.NaN;
   const leaseMs = Number.isFinite(injectedLeaseMs) ? injectedLeaseMs : runtime.case_timeout_ms + CLAIM_GRACE_MS;
   const claim = {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
     run_instance_id: context.identity.run_instance_id,
     claim_id: claimId,
     case_id: entry.case_id,
@@ -977,7 +1068,7 @@ function requestClaimRecord(claim) {
 
 function requestRecord({ entry, attempt, claim, projection }) {
   return {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
     kind: "request",
     run_instance_id: claim.run_instance_id,
     case_id: entry.case_id,
@@ -998,11 +1089,66 @@ function requestRecord({ entry, attempt, claim, projection }) {
   };
 }
 
-function resultRecord({ entry, attempt, claim, requestPath, status, processResult = null, finalOutput = null, failureKind = null, recoveryReason = null }) {
+function commandEvidenceIdentity({ entry, claim }) {
+  return {
+    run_instance_id: claim.run_instance_id,
+    case_id: entry.case_id,
+    attempt: claim.attempt,
+    adapter: entry.adapter_track,
+    condition: entry.condition,
+    fixture_id: claim.input_identity.fixture_id,
+    repetition: claim.input_identity.repetition,
+    fixture_input_digest: claim.input_identity.fixture_input_digest,
+    verification_command_contract_digest: claim.input_identity.verification_command_contract_digest,
+    runtime_identity_digest: claim.runtime_identity_digest,
+    effective_command_digest: claim.effective_command_digest,
+  };
+}
+
+function sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity, processResult = null, contract = null, workspaceRoot = null, forceUnavailable = null }) {
+  const path = resolve(attemptRoot, COMMAND_EVIDENCE_PATH);
+  assertNoSymlinkSegments(path, `${entry.case_id} command evidence`);
+  let manifest;
+  let captureError = null;
+  const identity = commandEvidenceIdentity({ entry, claim });
+  if (!forceUnavailable && adapterIdentity.command_evidence.support === "supported" && contract && processResult) {
+    try {
+      manifest = buildCodexCommandEvidence({ identity, stream: processResult.stdout ?? "", contract });
+    } catch (error) {
+      const shellUnavailable = SHELL_CAPABILITY_UNAVAILABLE_CODES.has(error?.code);
+      captureError = shellUnavailable ? null : error;
+      manifest = buildUnavailableCommandEvidence({ identity, support: "supported", probe: shellUnavailable ? "shell_capability_unavailable" : "capture_invalid", reason: shellUnavailable ? `shell_capability_unavailable:${error.code}` : `capture_invalid:${error?.code ?? "unclassified"}`, stream: processResult.stdout ?? "" });
+    }
+  } else {
+    const support = adapterIdentity.command_evidence.support;
+    const probe = forceUnavailable?.probe ?? (adapterIdentity.availability === "unavailable" ? "runtime_unavailable" : contract ? "adapter_event_contract_not_implemented" : "command_contract_unavailable");
+    const reason = forceUnavailable?.reason ?? adapterIdentity.command_evidence.downgrade_reason ?? probe;
+    manifest = buildUnavailableCommandEvidence({ identity, support, probe, reason, stream: processResult?.stdout ?? "" });
+  }
+  validateCommandEvidenceManifest(manifest, { root, contract, expectedContractDigest: identity.verification_command_contract_digest });
+  if (existsSync(path)) {
+    const existing = readStableCommandEvidence(path, `${entry.case_id} existing command evidence`);
+    if (stableCanonicalJson(existing.manifest) !== stableCanonicalJson(manifest)) throw new Error(`${entry.case_id} command evidence already exists with different content`);
+  } else {
+    writeJsonAtomic(path, manifest, { stagingOwner: claim.claim_id, faultName: "after_command_evidence_staged" });
+  }
+  fault("after_command_evidence_published");
+  const published = readStableCommandEvidence(path, `${entry.case_id} published command evidence`);
+  const verifiedPublishedManifest = validateCommandEvidenceManifest(published.manifest, { root, contract, expectedContractDigest: identity.verification_command_contract_digest });
+  const publishedAfter = readStableCommandEvidence(path, `${entry.case_id} published command evidence`);
+  assertStableFileEvidence(published.file, publishedAfter.file, `${entry.case_id} published command evidence`);
+  return {
+    manifest: verifiedPublishedManifest,
+    captureError,
+    reference: commandEvidenceReference(published.file, verifiedPublishedManifest),
+  };
+}
+
+function resultRecord({ entry, attempt, claim, requestPath, commandEvidence, status, processResult = null, finalOutput = null, failureKind = null, recoveryReason = null }) {
   const stdout = streamEvidence(processResult?.stdout ?? "");
   const stderr = streamEvidence(processResult?.stderr ?? "");
   return {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
     kind: "result",
     run_instance_id: claim.run_instance_id,
     case_id: entry.case_id,
@@ -1012,6 +1158,7 @@ function resultRecord({ entry, attempt, claim, requestPath, status, processResul
     runtime_identity_digest: claim.runtime_identity_digest,
     effective_command_digest: claim.effective_command_digest,
     request_sha256: prefixedFileDigest(requestPath),
+    command_evidence: commandEvidence,
     status,
     exit_code: processResult?.status ?? null,
     duration_ms: processResult?.duration_ms ?? null,
@@ -1024,9 +1171,9 @@ function resultRecord({ entry, attempt, claim, requestPath, status, processResul
   };
 }
 
-function commitRecord({ claim, result, requestPath, resultPath }) {
+function commitRecord({ claim, result, requestPath, commandEvidenceReference, resultPath }) {
   return {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
     kind: "terminal_commit",
     run_instance_id: claim.run_instance_id,
     claim_id: claim.claim_id,
@@ -1039,6 +1186,7 @@ function commitRecord({ claim, result, requestPath, resultPath }) {
     runtime_identity_digest: claim.runtime_identity_digest,
     effective_command_digest: claim.effective_command_digest,
     request_sha256: prefixedFileDigest(requestPath),
+    command_evidence_sha256: commandEvidenceReference.digest,
     result_sha256: prefixedFileDigest(resultPath),
   };
 }
@@ -1047,6 +1195,11 @@ function completeCase({ root, runDir, entry, state, claim, attempt, attemptRoot,
   const requestPath = resolve(attemptRoot, "request.json");
   assertNoSymlinkSegments(requestPath, `${entry.case_id} attempt request`);
   if (!existsSync(requestPath)) throw new Error("terminal attempt request is missing");
+  const commandEvidencePath = resolve(attemptRoot, COMMAND_EVIDENCE_PATH);
+  assertNoSymlinkSegments(commandEvidencePath, `${entry.case_id} command evidence`);
+  const stableCommandEvidence = readStableCommandEvidence(commandEvidencePath, `${entry.case_id} terminal command evidence`);
+  const observedCommandEvidenceReference = commandEvidenceReference(stableCommandEvidence.file, stableCommandEvidence.manifest);
+  if (!sameCommandEvidenceReference(result.command_evidence, observedCommandEvidenceReference)) throw new Error("terminal result command evidence reference mismatch");
   validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${entry.case_id} attempt result`);
   const resultPath = resolve(attemptRoot, "result.json");
   assertNoSymlinkSegments(resultPath, `${entry.case_id} attempt result`);
@@ -1067,7 +1220,9 @@ function completeCase({ root, runDir, entry, state, claim, attempt, attemptRoot,
     writeJsonIdempotent(resultPath, result, `${entry.case_id} attempt result`, { stagingOwner: claim.claim_id });
   }
   fault("after_result_published");
-  const commit = commitRecord({ claim, result, requestPath, resultPath });
+  const commandEvidenceAfter = readStableCommandEvidence(commandEvidencePath, `${entry.case_id} terminal command evidence`);
+  assertStableFileEvidence(stableCommandEvidence.file, commandEvidenceAfter.file, `${entry.case_id} terminal command evidence`);
+  const commit = commitRecord({ claim, result, requestPath, commandEvidenceReference: observedCommandEvidenceReference, resultPath });
   validate(root, commit, ATTEMPT_COMMIT_SCHEMA_PATH, `${entry.case_id} terminal commit`);
   const commitPath = resolve(attemptRoot, "commit.json");
   assertNoSymlinkSegments(commitPath, `${entry.case_id} terminal commit`);
@@ -1091,20 +1246,33 @@ function assertCanonicalEqual(actual, expected, label) {
   if (stableCanonicalJson(actual) !== stableCanonicalJson(expected)) throw new Error(`${label} mismatch`);
 }
 
+function recursivelyFreeze(value) {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) recursivelyFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
 function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, attempt, expectedInput, expectedSelection, claim = null }) {
   const runInstanceId = runIdentity.run_instance_id;
   const attemptRoot = attemptRootPath(runDir, entry.case_id, attempt);
   const requestPath = resolve(attemptRoot, "request.json");
+  const commandEvidencePath = resolve(attemptRoot, COMMAND_EVIDENCE_PATH);
   const resultPath = resolve(attemptRoot, "result.json");
   const commitPath = resolve(attemptRoot, "commit.json");
-  for (const [path, label] of [[requestPath, "request"], [resultPath, "result"], [commitPath, "terminal commit"]]) {
+  for (const [path, label] of [[requestPath, "request"], [commandEvidencePath, "command evidence"], [resultPath, "result"], [commitPath, "terminal commit"]]) {
     assertNoSymlinkSegments(path, `${entry.case_id} ${label}`);
     if (!existsSync(path) || !lstatSync(path).isFile()) throw new Error(`${entry.case_id} ${label} is missing`);
   }
   const request = readJson(requestPath);
+  const stableCommandEvidence = readStableCommandEvidence(commandEvidencePath, `${entry.case_id} command evidence`);
+  const commandEvidence = stableCommandEvidence.manifest;
   const result = readJson(resultPath);
   const commit = readJson(commitPath);
   validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${entry.case_id} request`);
+  const contract = entry.verification_command_contract === undefined ? null : loadVerificationCommandContract(root, entry);
+  const verifiedCommandEvidence = validateCommandEvidenceManifest(commandEvidence, { root, contract, expectedContractDigest: request.input_identity.verification_command_contract_digest });
   validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${entry.case_id} result`);
   validate(root, commit, ATTEMPT_COMMIT_SCHEMA_PATH, `${entry.case_id} terminal commit`);
   const adapterIdentity = readAdapterIdentity(root, runDir, entry.adapter_track);
@@ -1119,9 +1287,13 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
   if (result.status === "completed") {
     if (result.exit_code !== 0 || result.failure_kind !== null || result.recovery_reason !== null || result.final_output === null) throw new Error(`${entry.case_id} completed result semantics mismatch`);
   } else if (result.failure_kind === null || result.final_output !== null || (result.failure_kind === "stale_claim_recovered") !== (result.recovery_reason !== null)) throw new Error(`${entry.case_id} terminal failure result semantics mismatch`);
+  if (commandEvidence.capture.contract_probe_evidence === "shell_capability_unavailable" && result.status === "invalid") throw new Error(`${entry.case_id} unsupported shell capability must not invalidate the outer attempt`);
   if (result.runtime_identity_digest !== runtimeIdentityDigest || result.effective_command_digest !== adapterIdentity.effective_command_digest || result.request_sha256 !== prefixedFileDigest(requestPath)) throw new Error(`${entry.case_id} result evidence mismatch`);
+  if (commandEvidence.run_instance_id !== runInstanceId || commandEvidence.case_id !== entry.case_id || commandEvidence.attempt !== attempt || commandEvidence.adapter !== entry.adapter_track || commandEvidence.condition !== entry.condition || commandEvidence.fixture_id !== request.input_identity.fixture_id || commandEvidence.repetition !== request.input_identity.repetition || commandEvidence.fixture_input_digest !== request.input_identity.fixture_input_digest || commandEvidence.runtime_identity_digest !== runtimeIdentityDigest || commandEvidence.effective_command_digest !== adapterIdentity.effective_command_digest) throw new Error(`${entry.case_id} command evidence identity mismatch`);
+  const observedCommandEvidenceReference = commandEvidenceReference(stableCommandEvidence.file, commandEvidence);
+  if (!sameCommandEvidenceReference(result.command_evidence, observedCommandEvidenceReference)) throw new Error(`${entry.case_id} result command evidence binding mismatch`);
   if (commit.run_instance_id !== runInstanceId || commit.case_id !== entry.case_id || commit.attempt !== attempt || commit.adapter !== entry.adapter_track || commit.condition !== entry.condition || commit.status !== result.status) throw new Error(`${entry.case_id} terminal commit identity mismatch`);
-  if (commit.runtime_identity_digest !== runtimeIdentityDigest || commit.effective_command_digest !== adapterIdentity.effective_command_digest || commit.request_sha256 !== prefixedFileDigest(requestPath) || commit.result_sha256 !== prefixedFileDigest(resultPath)) throw new Error(`${entry.case_id} terminal commit evidence mismatch`);
+  if (commit.runtime_identity_digest !== runtimeIdentityDigest || commit.effective_command_digest !== adapterIdentity.effective_command_digest || commit.request_sha256 !== prefixedFileDigest(requestPath) || commit.command_evidence_sha256 !== stableCommandEvidence.file.rawByteDigest || commit.result_sha256 !== prefixedFileDigest(resultPath)) throw new Error(`${entry.case_id} terminal commit evidence mismatch`);
   if (claim) {
     if (claim.run_instance_id !== runInstanceId || claim.case_id !== entry.case_id || claim.adapter !== entry.adapter_track || claim.condition !== entry.condition || claim.runtime_identity_digest !== runtimeIdentityDigest || claim.effective_command_digest !== adapterIdentity.effective_command_digest || claim.environment_snapshot_digest !== adapterIdentity.environment_snapshot.digest) throw new Error(`${entry.case_id} recovery claim identity mismatch`);
     if (claim.input_identity.plan_id !== runIdentity.plan.id || claim.input_identity.plan_digest !== runIdentity.plan.digest || claim.input_identity.materialization_manifest_digest !== runIdentity.materialization.manifest_digest) throw new Error(`${entry.case_id} recovery claim run input mismatch`);
@@ -1129,7 +1301,7 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
     assertCanonicalEqual(request.selection, claim.selection, `${entry.case_id} recovery claim selection`);
     if (claim.attempt === attempt) assertCanonicalEqual(request.claim, requestClaimRecord(claim), `${entry.case_id} recovery request claim`);
   }
-  const expectedInventory = result.status === "completed" ? ["commit.json", "final.json", "request.json", "result.json"] : ["commit.json", "request.json", "result.json"];
+  const expectedInventory = result.status === "completed" ? ["command-evidence.json", "commit.json", "final.json", "request.json", "result.json"] : ["command-evidence.json", "commit.json", "request.json", "result.json"];
   const inventory = readdirSync(attemptRoot).sort();
   assertCanonicalEqual(inventory, expectedInventory, `${entry.case_id} terminal attempt inventory`);
   if (result.status === "completed") {
@@ -1140,14 +1312,19 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
     if (size > MAX_FINAL_OUTPUT_BYTES || size !== result.final_output.bytes || fileDigest(finalPath) !== result.final_output.sha256) throw new Error(`${entry.case_id} final output digest mismatch`);
     validate(root, readJson(finalPath), OUTPUT_SCHEMA_PATH, `${entry.case_id} completed output`);
   }
+  const commandEvidenceAfter = readStableCommandEvidence(commandEvidencePath, `${entry.case_id} command evidence`);
+  assertStableFileEvidence(stableCommandEvidence.file, commandEvidenceAfter.file, `${entry.case_id} command evidence`);
   return {
     request,
     result,
     commit,
+    verificationCommandContract: contract ? recursivelyFreeze(structuredClone(contract)) : null,
+    commandEvidence: recursivelyFreeze(structuredClone(verifiedCommandEvidence)),
     evidence: {
       request_digest: prefixedFileDigest(requestPath),
       result_digest: prefixedFileDigest(resultPath),
       commit_digest: prefixedFileDigest(commitPath),
+      command_evidence_digest: stableCommandEvidence.file.rawByteDigest,
       final_output_digest: result.final_output ? `sha256:${result.final_output.sha256}` : null,
       final_output_bytes: result.final_output?.bytes ?? null,
     },
@@ -1270,7 +1447,9 @@ function markUnavailable({ root, context, entry, state, runtime, adapter }) {
   validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${entry.case_id} unavailable request`);
   const requestPath = resolve(attemptRoot, "request.json");
   writeJsonAtomic(requestPath, request, { stagingOwner: claim.claim_id, faultName: "after_request_staged" });
-  completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, status: "unavailable", failureKind: "runtime_unavailable" }) });
+  const contract = loadVerificationCommandContract(root, entry);
+  const sealed = sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity: adapter.identity, contract, forceUnavailable: { probe: "runtime_unavailable", reason: "runtime_unavailable" } });
+  completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, commandEvidence: sealed.reference, status: "unavailable", failureKind: "runtime_unavailable" }) });
   removeEphemeralWorkspace(claim, context.identity);
   return "unavailable";
 }
@@ -1289,6 +1468,8 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
   let processResult = null;
   let ephemeralRoot = null;
   let projection = { status: "attempt_setup_failed" };
+  let sealedCommandEvidence = null;
+  const contract = loadVerificationCommandContract(root, entry);
   try {
     mkdirSync(attemptRoot, { recursive: false });
     let selection = context.selections.selections.get(entry.case_id) ?? null;
@@ -1315,19 +1496,21 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     const started = process.hrtime.bigint();
     const raw = executeVerifiedAgent({ root, runtime, verifiedExecutable, workspace, outputTemporary: temporaryOutput, command: adapter.identity.effective_command, environmentSnapshot });
     processResult = { ...raw, duration_ms: Math.round(Number(process.hrtime.bigint() - started) / 1_000_000) };
+    sealedCommandEvidence = sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity: adapter.identity, processResult, contract, workspaceRoot: workspace });
     if (selection) {
       const afterSpawn = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision });
       if (afterSpawn.selection_digest.value !== claim.selection.digest) throw new Error("Adaptive selection changed during process execution");
     }
+    if (sealedCommandEvidence.captureError) throw new Error(`command evidence invalid:${sealedCommandEvidence.captureError.code ?? "unclassified"}`);
     if (processResult.error?.code === "ETIMEDOUT") throw new Error("case timeout");
     if (processResult.status !== 0) throw new Error(`agent exited ${processResult.status}`);
     const finalOutput = inspectFinal(root, temporaryOutput).record;
-    completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, status: "completed", processResult, finalOutput }), finalSource: temporaryOutput });
+    completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, commandEvidence: sealedCommandEvidence.reference, status: "completed", processResult, finalOutput }), finalSource: temporaryOutput });
     return "completed";
   } catch (error) {
     if (error instanceof RuntimeIntegrityError) throw error;
     const message = error instanceof Error ? error.message : String(error);
-    const invalid = /Adaptive selection|projection|materialized source|selection changed/u.test(message);
+    const invalid = /Adaptive selection|projection|materialized source|selection changed|command evidence invalid/u.test(message);
     const temporaryOutput = ephemeralRoot ? resolve(ephemeralRoot, "agent-final.json") : null;
     if (temporaryOutput && existsSync(temporaryOutput)) rmSync(temporaryOutput, { force: true });
     const requestPath = resolve(attemptRoot, "request.json");
@@ -1336,11 +1519,13 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
       validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${entry.case_id} failed attempt request`);
       writeJsonAtomic(requestPath, request, { stagingOwner: claim.claim_id, faultName: "after_request_staged" });
     }
+    if (existsSync(attemptRoot) && !sealedCommandEvidence) sealedCommandEvidence = sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity: adapter.identity, processResult, contract, forceUnavailable: { probe: "capture_invalid", reason: "attempt_failed_before_command_capture" } });
     const result = resultRecord({
       entry,
       attempt,
       claim,
       requestPath,
+      commandEvidence: sealedCommandEvidence?.reference,
       status: invalid ? "invalid" : "failed",
       processResult,
       failureKind: /timeout/u.test(message) ? "timeout" : invalid ? "invalid_input_or_selection" : "agent_failure",
@@ -1457,7 +1642,33 @@ function assertRecoveryEvidence({ root, run, state, claim, request, result, requ
   if (state.case_id !== claim.case_id || state.adapter !== claim.adapter || state.condition !== claim.condition || state.status !== "active" || state.active_claim_id !== claim.claim_id) throw new Error("recovery state identity mismatch");
 }
 
-function recoveryResult({ root, attemptRoot, entry, claim, requestPath, reason }) {
+function recoveryCommandEvidence({ root, run, attemptRoot, entry, claim }) {
+  const path = resolve(attemptRoot, COMMAND_EVIDENCE_PATH);
+  const adapterIdentity = readAdapterIdentity(root, run, claim.adapter);
+  if (!existsSync(path)) {
+    return sealCommandEvidence({
+      root,
+      attemptRoot,
+      entry,
+      claim,
+      adapterIdentity,
+      contract: null,
+      forceUnavailable: { probe: "capture_invalid", reason: "stale_recovery_without_committed_capture" },
+    });
+  }
+  assertNoSymlinkSegments(path, `${entry.case_id} recovered command evidence`);
+  const recovered = readStableCommandEvidence(path, `${entry.case_id} recovered command evidence`);
+  const manifest = validateCommandEvidenceManifest(recovered.manifest, { root, expectedContractDigest: claim.input_identity.verification_command_contract_digest });
+  const recoveredAfter = readStableCommandEvidence(path, `${entry.case_id} recovered command evidence`);
+  assertStableFileEvidence(recovered.file, recoveredAfter.file, `${entry.case_id} recovered command evidence`);
+  return {
+    manifest,
+    captureError: null,
+    reference: commandEvidenceReference(recovered.file, manifest),
+  };
+}
+
+function recoveryResult({ root, attemptRoot, entry, claim, requestPath, commandEvidence, reason }) {
   const resultPath = resolve(attemptRoot, "result.json");
   assertNoSymlinkSegments(resultPath, `${entry.case_id} recovery result`);
   if (existsSync(resultPath)) return readJson(resultPath);
@@ -1476,6 +1687,7 @@ function recoveryResult({ root, attemptRoot, entry, claim, requestPath, reason }
     attempt: claim.attempt,
     claim,
     requestPath,
+    commandEvidence,
     status: "interrupted",
     failureKind: "stale_claim_recovered",
     recoveryReason: durableScalarEvidence(reason, reason, "operator_recovery"),
@@ -1485,7 +1697,7 @@ function recoveryResult({ root, attemptRoot, entry, claim, requestPath, reason }
 function reconcileAttemptStaging(attemptRoot, claimId) {
   assertClaimId(claimId);
   if (!existsSync(attemptRoot)) return;
-  const targets = ["request.json", RESULT_STAGING_FILE, "result.json", "final.json", "commit.json"];
+  const targets = ["request.json", COMMAND_EVIDENCE_PATH, RESULT_STAGING_FILE, "result.json", "final.json", "commit.json"];
   for (const name of readdirSync(attemptRoot)) {
     if (!name.endsWith(".staging")) continue;
     const target = targets.find((candidate) => name.startsWith(`.${candidate}.${claimId}.`));
@@ -1558,7 +1770,7 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     validate(root, request, ATTEMPT_REQUEST_SCHEMA_PATH, `${caseId} recovery request`);
     if (request.claim.id !== claimId || !claimIsExpired({ lease_expires_at: request.claim.lease_expires_at })) throw new Error("lost claim evidence is not expired or does not match");
     const recoveredClaim = {
-      schema_version: "1.0.0",
+      schema_version: "1.1.0",
       run_instance_id: request.run_instance_id,
       claim_id: request.claim.id,
       case_id: request.case_id,
@@ -1579,7 +1791,8 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     };
     assertEphemeralWorkspaceOwnership(recoveredClaim, identity);
     const entry = { case_id: caseId, adapter_track: state.adapter, condition: state.condition };
-    const result = recoveryResult({ root, attemptRoot, entry, claim: recoveredClaim, requestPath, reason });
+    const commandEvidence = recoveryCommandEvidence({ root, run, attemptRoot, entry, claim: recoveredClaim });
+    const result = recoveryResult({ root, attemptRoot, entry, claim: recoveredClaim, requestPath, commandEvidence: commandEvidence.reference, reason });
     assertRecoveryEvidence({ root, run, state, claim: recoveredClaim, request, result, requestPath });
     const terminalState = completeCase({ root, runDir: run, entry, state, claim: recoveredClaim, attempt, attemptRoot, result });
     removeEphemeralWorkspace(recoveredClaim, identity);
@@ -1629,7 +1842,8 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     writeJsonAtomic(requestPath, recoveryRequest, { stagingOwner: claim.claim_id, faultName: "after_request_staged" });
   }
   const entry = { case_id: caseId, adapter_track: state.adapter, condition: state.condition };
-  const result = recoveryResult({ root, attemptRoot, entry, claim, requestPath, reason });
+  const commandEvidence = recoveryCommandEvidence({ root, run, attemptRoot, entry, claim });
+  const result = recoveryResult({ root, attemptRoot, entry, claim, requestPath, commandEvidence: commandEvidence.reference, reason });
   const request = readJson(requestPath);
   assertRecoveryEvidence({ root, run, state, claim, request, result, requestPath });
   const terminalState = completeCase({ root, runDir: run, entry, state, claim, attempt: claim.attempt, attemptRoot, result });

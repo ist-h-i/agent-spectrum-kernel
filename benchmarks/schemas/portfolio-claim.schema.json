@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "run_instance_id", "claim_id", "case_id", "attempt", "adapter", "condition", "worker_id", "pid", "acquired_at", "lease_expires_at", "workspace_parent", "workspace_token", "input_identity", "selection", "runtime_identity_digest", "effective_command_digest", "environment_snapshot_digest"],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
+    "schema_version": { "const": "1.1.0" },
     "run_instance_id": { "type": "string", "format": "uuid" },
     "claim_id": { "type": "string", "format": "uuid" },
     "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
@@ -46,12 +46,16 @@
     "inputIdentity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["plan_id", "plan_digest", "materialization_manifest_digest", "frozen_input_digest"],
+      "required": ["plan_id", "plan_digest", "materialization_manifest_digest", "frozen_input_digest", "fixture_id", "repetition", "fixture_input_digest", "verification_command_contract_digest"],
       "properties": {
         "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
         "plan_digest": { "$ref": "#/$defs/digest" },
         "materialization_manifest_digest": { "$ref": "#/$defs/digest" },
-        "frozen_input_digest": { "$ref": "#/$defs/digest" }
+        "frozen_input_digest": { "$ref": "#/$defs/digest" },
+        "fixture_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "fixture_input_digest": { "$ref": "#/$defs/digest" },
+        "verification_command_contract_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" }
       }
     },
     "selection": {

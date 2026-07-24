@@ -21,7 +21,7 @@
     "cases"
   ],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
+    "schema_version": { "const": "1.1.0" },
     "schema_path": { "const": "benchmarks/schemas/execution-plan.schema.json" },
     "program": { "const": "adaptive_ask_portfolio" },
     "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
@@ -85,6 +85,7 @@
           "condition_order_position",
           "input_manifest_path",
           "input_manifest_sha256"
+          ,"verification_command_contract"
         ],
         "properties": {
           "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
@@ -100,7 +101,17 @@
           "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
           "condition_order_position": { "type": "integer", "minimum": 1, "maximum": 4 },
           "input_manifest_path": { "type": "string", "minLength": 1 },
-          "input_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          "input_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "verification_command_contract": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["path", "file_digest", "contract_digest"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "file_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+              "contract_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+            }
+          }
         }
       }
     }

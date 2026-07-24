@@ -21,6 +21,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { buildPortfolioPlan, PORTFOLIO_CONDITIONS } from "./ask-benchmark-plan.mjs";
+import { validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
 import { assertTrackedRepositoryMatchesHead, materializePortfolio } from "./ask-benchmark-materialize.mjs";
 import { sealAdaptiveSelection, verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
 import { executePortfolio, recoverPortfolioCase, verifyPortfolioExecution } from "./ask-benchmark-execution.mjs";
@@ -254,16 +255,28 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
     if (actualDigest !== fixture.input_manifest_sha256) errors.push(`${fixture.id} input manifest digest does not match`);
     if (!inputManifests.has(manifestPath)) inputManifests.set(manifestPath, readJson(manifestPath));
     if (!inputManifests.get(manifestPath).fixtures?.[fixture.id]) errors.push(`${fixture.id} is absent from its input manifest`);
+    if (fixture.verification_command_contract) {
+      try {
+        const contractPath = resolveRepoPath(fixture.verification_command_contract.path, `${fixture.id} verification command contract`);
+        if (!existsSync(contractPath) || !lstatSync(contractPath).isFile()) throw new Error("contract is not a regular file");
+        const bytes = readFileSync(contractPath);
+        if (sha256(bytes) !== fixture.verification_command_contract.sha256) throw new Error("configured contract digest does not match");
+        const contract = validateVerificationCommandContract(JSON.parse(bytes), { root: ROOT });
+        if (contract.fixture_id !== fixture.id || contract.fixture_input_digest !== `sha256:${fixture.input_manifest_sha256}`) throw new Error("contract fixture identity does not match");
+      } catch (error) {
+        errors.push(`${fixture.id} verification command contract is invalid: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
   }
 
   if (config.ordering?.strategy !== "seeded_balanced_rotation" || config.ordering?.condition_count !== PORTFOLIO_CONDITIONS.length) errors.push("portfolio ordering must use four-condition seeded_balanced_rotation");
-  if (config.execution_plan?.schema_version !== "1.0.0" || !config.execution_plan?.schema_path) errors.push("portfolio execution plan schema version and path are required");
+  if (config.execution_plan?.schema_version !== "1.1.0" || !config.execution_plan?.schema_path) errors.push("portfolio execution plan schema version and path are required");
   else {
     const planSchemaPath = resolveRepoPath(config.execution_plan.schema_path, "execution plan schema");
     if (!existsSync(planSchemaPath)) errors.push(`execution plan schema is missing: ${config.execution_plan.schema_path}`);
     else {
       const planSchema = readJson(planSchemaPath);
-      const requiredCaseFields = ["case_id", "block_id", "adapter_track", "fixture_id", "suite", "repetition", "registered_repetitions", "condition", "condition_order_position", "input_manifest_sha256"];
+      const requiredCaseFields = ["case_id", "block_id", "adapter_track", "fixture_id", "suite", "repetition", "registered_repetitions", "condition", "condition_order_position", "input_manifest_sha256", "verification_command_contract"];
       if (planSchema.properties?.schema_version?.const !== config.execution_plan.schema_version || requiredCaseFields.some((field) => !planSchema.properties?.cases?.items?.required?.includes(field))) errors.push("execution plan schema does not match the configured case contract");
     }
   }

@@ -3,9 +3,9 @@
   "title": "Adaptive ASK portfolio terminal attempt commit",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "kind", "run_instance_id", "claim_id", "claim_lease_expires_at", "case_id", "attempt", "adapter", "condition", "status", "runtime_identity_digest", "effective_command_digest", "request_sha256", "result_sha256"],
+  "required": ["schema_version", "kind", "run_instance_id", "claim_id", "claim_lease_expires_at", "case_id", "attempt", "adapter", "condition", "status", "runtime_identity_digest", "effective_command_digest", "request_sha256", "command_evidence_sha256", "result_sha256"],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
+    "schema_version": { "const": "1.1.0" },
     "kind": { "const": "terminal_commit" },
     "run_instance_id": { "type": "string", "format": "uuid" },
     "claim_id": { "type": "string", "format": "uuid" },
@@ -18,6 +18,7 @@
     "runtime_identity_digest": { "$ref": "#/$defs/digest" },
     "effective_command_digest": { "$ref": "#/$defs/digest" },
     "request_sha256": { "$ref": "#/$defs/digest" },
+    "command_evidence_sha256": { "$ref": "#/$defs/digest" },
     "result_sha256": { "$ref": "#/$defs/digest" }
   },
   "$defs": { "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" } }

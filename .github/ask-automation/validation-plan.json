@@ -50,6 +50,10 @@
       "argv": ["node", "scripts/test-ask-benchmark-execution.mjs"]
     },
     {
+      "id": "command_evidence_contract",
+      "argv": ["node", "scripts/test-ask-benchmark-command-evidence.mjs"]
+    },
+    {
       "id": "normalized_results",
       "argv": ["node", "scripts/test-ask-benchmark-normalized-results.mjs"]
     },
