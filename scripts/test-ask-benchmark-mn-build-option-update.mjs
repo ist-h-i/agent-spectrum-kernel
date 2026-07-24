@@ -669,8 +669,9 @@ function runPersistentFullEvaluatorAuthority(privateRoot, state) {
     writeFileSync(chain.evaluatorResultPath, originalResultBytes);
     assert.deepEqual(chain.snapshot(), before, `persistent authority tamper must restore ${label}`);
   };
+  const currentTypedState = evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state;
   expectPersistentFailure("verification state", (changed) => {
-    changed.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state = "executed_failure";
+    changed.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state = currentTypedState === "executed_failure" ? "declined" : "executed_failure";
   }, /state does not rederive|causal reference set/u);
   expectPersistentFailure("verification references", (changed) => {
     changed.verification_correctness.evidence_references = [];
