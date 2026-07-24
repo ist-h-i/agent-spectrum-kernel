@@ -629,7 +629,10 @@ function assertReferenceMatchesBundle(reference, manifest) {
   };
   if (manifest.evaluator_source_identity) expected.evaluator_source_identity = manifest.evaluator_source_identity;
   for (const [field, value] of Object.entries(expected)) {
-    if (reference[field] !== value) throw new Error(`public/private evaluator identity mismatch at ${field}`);
+    const matches = value && typeof value === "object"
+      ? stableCanonicalJson(reference[field]) === stableCanonicalJson(value)
+      : reference[field] === value;
+    if (!matches) throw new Error(`public/private evaluator identity mismatch at ${field}`);
   }
 }
 
