@@ -511,7 +511,7 @@ function syntheticEvaluatorResult({ state, authority, normalizedAuthority, bundl
   const requirements = authority.requirementRecord.requirements;
   const normalizedReference = { kind: "normalized_result", digest: normalized.normalized_result_digest, bytes: null };
   const verificationState = deriveVerificationEvidenceState(normalized);
-  assert.equal(verificationState, state === "repeated_failure_success" || state === "repeated_declined_success" ? "executed_success" : state === "repeated_success_failure" ? "executed_failure" : state === "repeated_success_declined" || state === "declined" ? "declined" : state === "repeated_success_cwd" ? "cwd_unverified" : state, `synthetic state should rederive for ${state}`);
+  assert.equal(verificationState, state === "repeated_success_success" || state === "repeated_failure_success" || state === "repeated_declined_success" ? "executed_success" : state === "repeated_success_failure" ? "executed_failure" : state === "repeated_success_declined" || state === "declined" ? "declined" : state === "repeated_success_cwd" ? "cwd_unverified" : state, `synthetic state should rederive for ${state}`);
   const verificationReferences = deriveVerificationEvidenceReferences(normalized, verificationState);
   const verificationPass = verificationState === "executed_success";
   const invalid = verificationState === "invalid";
