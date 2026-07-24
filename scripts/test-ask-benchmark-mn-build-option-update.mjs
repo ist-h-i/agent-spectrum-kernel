@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -598,7 +598,7 @@ function syntheticEvaluatorResult({ state, authority, normalizedAuthority, bundl
   return result;
 }
 
-function persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scoringAuthority, evaluatorResult }) {
+function persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scoringAuthority, evaluatorResult, privateFragment }) {
   const chainRoot = resolve(authorityRoot, "authority-chain");
   mkdirSync(chainRoot, { recursive: true });
   const normalized = normalizedAuthority.normalized;
@@ -617,9 +617,10 @@ function persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scor
   const verifiedAttempt = writeArtifact("verified-terminal-attempt.json", { authority: "verified-terminal-attempt", normalized_result_digest: normalized.normalized_result_digest, terminal_commit_digest: normalized.lineage.terminal_commit_digest });
   const normalizedRecord = writeArtifact("normalized-result.json", normalized);
   const normalizedGeneration = writeArtifact("normalized-generation-manifest.json", normalizedAuthority.generationManifest);
+  const privateFragmentPath = writeArtifact("private-evaluator-fragment.json", privateFragment);
   const evaluatorResultPath = writeArtifact("evaluator-result.json", evaluatorResult);
   const inventory = [
-    request, commandStream, sealedCommandEvidence, attemptResult, terminalCommit, finalOutput, verifiedAttempt, normalizedRecord, normalizedGeneration, evaluatorResultPath,
+    request, commandStream, sealedCommandEvidence, attemptResult, terminalCommit, finalOutput, verifiedAttempt, normalizedRecord, normalizedGeneration, privateFragmentPath, evaluatorResultPath,
     scoringAuthority.admissionRecordPath, scoringAuthority.requirementRecordPath, scoringAuthority.outputContractPath, scoringAuthority.referencePath, scoringAuthority.freezeManifestPath,
   ].map((path) => ({ path: authorityRelativePath(path), bytes: readFileSync(path).length, sha256: authorityFileDigest(path), inode: lstatSync(path).ino }));
   const chainManifest = writeArtifact("authority-chain-manifest.json", { schema_version: "r6.synthetic.v1", authority: "sealed_no_replace", state, inventory });
@@ -629,7 +630,7 @@ function persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scor
     const stat = lstatSync(absolute);
     return { path, bytes: readFileSync(absolute).length, sha256: authorityFileDigest(absolute), inode: stat.ino };
   });
-  return { snapshot, evaluatorResultPath, chainManifest };
+  return { snapshot, evaluatorResultPath, privateFragmentPath, chainManifest };
 }
 
 async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority }) {
@@ -656,17 +657,34 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state) {
   const scoringAuthority = persistentScoringAuthorities(authorityRoot);
   const bundleManifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
   const actual = await actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority });
-  const evaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({
-    root,
-    fragment: actual.fragment,
-    authority: {
-      ...scoringAuthority,
-      normalizedResult: normalizedAuthority.normalized,
-      sourceSnapshotDigest: normalizedAuthority.sourceSnapshotDigest,
-      bundleManifest,
+  const adapterAuthority = {
+    ...scoringAuthority,
+    normalizedResult: normalizedAuthority.normalized,
+    sourceSnapshotDigest: normalizedAuthority.sourceSnapshotDigest,
+    bundleManifest,
+    fragmentBinding: {
+      normalized_result_id: normalizedAuthority.normalized.normalized_result_id,
+      normalized_result_digest: normalizedAuthority.normalized.normalized_result_digest,
+      run_instance_id: normalizedAuthority.normalized.lineage.run_instance_id,
+      case_id: normalizedAuthority.normalized.lineage.case_id,
+      attempt: normalizedAuthority.normalized.lineage.attempt,
     },
-  });
-  const chain = persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scoringAuthority, evaluatorResult });
+  };
+  const adapterFailure = (label, mutate, pattern = /fragment|classification|reference|authority|normalized/u) => {
+    const changed = structuredClone(actual.fragment);
+    mutate(changed);
+    assert.throws(() => adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: changed, authority: adapterAuthority }), pattern, `actual private fragment tamper: ${label}`);
+  };
+  adapterFailure("requirement outcome", (changed) => { const result = changed.requirement_results.find(({ requirement_id }) => requirement_id === "configuration-contract"); result.outcome = result.outcome === "pass" ? "fail" : "pass"; result.earned_points = result.outcome === "pass" ? 1 : 0; });
+  adapterFailure("classification", (changed) => { changed.classification = changed.classification === "over_processing" ? "under_processing" : "over_processing"; });
+  adapterFailure("causal reference", (changed) => { changed.verification_correctness.evidence_references = []; });
+  adapterFailure("identity injection", (changed) => { changed.normalized_result_id = "normalized-00000000000000000000000000000000"; }, /Schema|fragment/u);
+  const foreignAuthority = { ...adapterAuthority, normalizedResult: structuredClone(normalizedAuthority.normalized) };
+  foreignAuthority.normalizedResult.lineage.run_instance_id = "00000000-0000-4000-8000-000000000208";
+  assert.throws(() => adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: actual.fragment, authority: foreignAuthority }), /reference|state|normalized|lineage/u, "adapter must reject a cross-run normalized result");
+  const evaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: actual.fragment, authority: adapterAuthority });
+  assert.equal(Object.hasOwn(evaluatorResult, "evaluator_rerun"), false, "private-only rerun metadata must not leak into the public envelope");
+  const chain = persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scoringAuthority, evaluatorResult, privateFragment: actual.fragment });
   const common = {
     root,
     catalogPath: resolve(root, "benchmarks/portfolio-catalog.json"),
@@ -958,6 +976,13 @@ async function runPrivateCandidateChecks(privateRoot) {
     assert.equal(result.requirement_results.every(({ scope_deviation_references, verification_evidence_references }) => Array.isArray(scope_deviation_references) && Array.isArray(verification_evidence_references)), true);
     assert.equal(result.classification, classification);
     assert.equal(result.scoring_ready, false);
+    if (classification === "invalid_evidence") {
+      assert.equal(result.evaluation_status, "invalid_input");
+      assert.equal(result.evidence_correctness.state, "fail");
+      assert.equal(result.invalid_input_authority?.category, result.findings.find(({ finding_id }) => result.requirement_results.some((entry) => entry.finding_ids.includes(finding_id)))?.category ?? result.invalid_input_authority.category);
+      assert.deepEqual(result.verification_correctness.evidence_references, result.invalid_input_authority.evidence_references);
+      assert.deepEqual(result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references, result.invalid_input_authority.evidence_references);
+    }
   };
 
   const contract = referenceContract.observable_contract.release_source_map;
@@ -1001,7 +1026,8 @@ async function runPrivateCandidateChecks(privateRoot) {
   const crossAttempt = normalized({ identity: evidenceIdentity(undefined, "0002") });
   const invalidAttempt = await evaluate(solution("case-15"), crossAttempt, { full: true }); cases.push(["command evidence cross-attempt transplant", invalidAttempt, ["fail", "fail", "fail"], "invalid_evidence"]);
   const drift = structuredClone(normalized()); drift.normalized_result_digest = `sha256:${"0".repeat(64)}`; cases.push(["normalized result digest drift", await evaluate(solution("case-16"), drift, { full: true }), ["fail", "fail", "fail"], "invalid_evidence"]);
-  const frozenDrift = candidate("frozen-drift"); writeFileSync(resolve(frozenDrift, "package.json"), "{}\n"); cases.push(["frozen workspace drift", await evaluator.evaluateCandidateSafe({ repositoryRoot: root, frozenWorkspace: frozenDrift, candidateWorkspace: solution("case-17"), normalizedResult: normalized(), skipFullNormalizedValidation: true }), ["fail", "fail", "fail"], "invalid_evidence"]);
+  const frozenDrift = candidate("frozen-drift"); writeFileSync(resolve(frozenDrift, "package.json"), "{}\n"); const frozenDriftResult = await evaluator.evaluateCandidateSafe({ repositoryRoot: root, frozenWorkspace: frozenDrift, candidateWorkspace: solution("case-17"), normalizedResult: normalized(), skipFullNormalizedValidation: true }); validatePrivateEvaluatorFragment({ root, fragment: frozenDriftResult, scoringPolicy, requirementRecord, normalizedResult: normalized() }); cases.push(["frozen workspace drift", frozenDriftResult, ["fail", "fail", "fail"], "invalid_evidence"]);
+  const malformed = candidate("malformed-config"); writeFileSync(resolve(malformed, "build.config.json"), "{ malformed\n"); cases.push(["malformed candidate config", await evaluate(malformed), ["fail", "fail", "fail"], "invalid_evidence"]);
   const spoofedScope = solution("case-18"); writeFileSync(resolve(spoofedScope, "unrelated.txt"), "x\n"); writeJson(resolve(work, "caller-changed-files.json"), ["build.config.json"]); cases.push(["caller changed-file JSON spoof", await evaluate(spoofedScope), ["pass", "fail", "pass"], "over_processing"]);
   writeJson(resolve(work, "caller-verification.json"), { test: "passed", validation: "passed" }); cases.push(["caller verification JSON spoof", await evaluate(solution("case-19"), noEvidence), ["pass", "pass", "fail"], "under_processing"]);
   const rerunOnly = await evaluate(solution("case-20"), noEvidence); assert.equal(rerunOnly.evaluator_rerun.results.every(({ outcome }) => outcome === "succeeded"), true); cases.push(["evaluator rerun success without agent evidence", rerunOnly, ["pass", "pass", "fail"], "under_processing"]);
@@ -1011,6 +1037,59 @@ async function runPrivateCandidateChecks(privateRoot) {
   const specialNode = solution("special-node");
   symlinkSync(resolve(specialNode, "build.config.json"), resolve(specialNode, "linked-build-config.json"));
   assertResult(await evaluate(specialNode), ["fail", "fail", "fail"], "invalid_evidence");
+}
+
+async function runPrivatePortabilityChecks(privateRoot) {
+  const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
+  const hiddenTestsPath = resolve(privateRoot, manifest.asset_inventory.find(({ role }) => role === "hidden_tests").path);
+  const privateBytes = readFileSync(hiddenTestsPath, "utf8");
+  assert.equal(privateBytes.includes("/Users/") || privateBytes.includes("file:///"), false, "private evaluator must not retain author-local paths");
+  for (const entry of readdirSync(privateRoot)) {
+    const path = resolve(privateRoot, entry);
+    if (lstatSync(path).isFile()) {
+      const bytes = readFileSync(path, "utf8");
+      assert.equal(bytes.includes("/Users/") || bytes.includes("file:///"), false, `private asset must not retain author-local paths: ${entry}`);
+    }
+  }
+
+  const alternate = mkdtempSync(resolve(tmpdir(), "ask-mn-r7-repository-copy-"));
+  rmSync(alternate, { recursive: true, force: true });
+  execFileSync("git", ["clone", "--local", root, alternate], { stdio: "ignore" });
+  const evaluator = await import(pathToFileURL(hiddenTestsPath).href);
+  const commandContract = readJson(resolve(alternate, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/verification-command-contract.json"));
+  const identity = {
+    run_instance_id: "12345678-1234-4123-8123-123456789abc", case_id: "case-1111111111111111-2222222222222222", attempt: "0001", adapter: "codex", condition: "plain",
+    fixture_id: "mn-build-option-update", repetition: 1, fixture_input_digest: commandContract.fixture_input_digest,
+    verification_command_contract_digest: commandContract.contract_digest, runtime_identity_digest: `sha256:${"b".repeat(64)}`, effective_command_digest: `sha256:${"c".repeat(64)}`,
+  };
+  const events = commandContract.commands.flatMap((command, index) => [
+    { type: "item.started", item: { id: `r7-copy-${index}`, type: "command_execution", command: renderCommandEvent(command), status: "in_progress" } },
+    { type: "item.completed", item: { id: `r7-copy-${index}`, type: "command_execution", command: renderCommandEvent(command), status: "completed", exit_code: 0, aggregated_output: "r7\n" } },
+  ]);
+  events.push({ type: "turn.completed" });
+  const commandEvidence = buildCodexCommandEvidence({ identity, contract: commandContract, stream: Buffer.from(`${events.map((event) => JSON.stringify(event)).join("\n")}\n`) });
+  const projected = projectVerifiedCommandEvidence({ manifest: commandEvidence, contract: commandContract });
+  const normalizedBase = { lineage: { ...identity }, command_evidence: projected };
+  const normalizedDigest = canonicalDigest(normalizedBase);
+  const normalizedResult = { ...normalizedBase, normalized_result_id: `normalized-${normalizedDigest.slice(7, 39)}`, normalized_result_digest: normalizedDigest };
+  const frozen = resolve(alternate, "r7-frozen");
+  const candidate = resolve(alternate, "r7-candidate");
+  cpSync(resolve(alternate, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/workspace"), frozen, { recursive: true });
+  cpSync(resolve(alternate, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/workspace"), candidate, { recursive: true });
+  const portableResult = await evaluator.evaluateCandidate({ repositoryRoot: alternate, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true });
+  assert.equal(portableResult.classification, "correct_narrow_execution", "private evaluator must execute from a different absolute repository path");
+
+  const driftedModule = resolve(alternate, "scripts/ask-benchmark-scoring-contract.mjs");
+  writeFileSync(driftedModule, `${readFileSync(driftedModule, "utf8")}\n// R7 source transplant\n`);
+  await assert.rejects(() => evaluator.evaluateCandidate({ repositoryRoot: alternate, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true }), /source bytes drifted|base Git revision/u, "source identity/load transplant must fail closed");
+
+  const symlinkRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-r7-symlink-copy-"));
+  rmSync(symlinkRoot, { recursive: true, force: true });
+  execFileSync("git", ["clone", "--local", root, symlinkRoot], { stdio: "ignore" });
+  const symlinkTarget = resolve(symlinkRoot, "scripts/ask-benchmark-scoring-contract.mjs");
+  rmSync(symlinkTarget);
+  symlinkSync(resolve(root, "scripts/ask-benchmark-scoring-contract.mjs"), symlinkTarget);
+  await assert.rejects(() => evaluator.evaluateCandidate({ repositoryRoot: symlinkRoot, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true }), /symlink|regular file/u, "symlinked public module must fail closed");
 }
 
 try {
@@ -1194,8 +1273,13 @@ try {
   profileRequiredNegative("over-processing forged as correct", (changed) => { const result = changed.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary"); result.outcome = "fail"; result.earned_points = 0; result.scope_deviation_references = ["unrelated-modification-test"]; changed.evaluatorResult.scope_deviations = [overScope]; changed.evaluatorResult.classification = "correct_narrow_execution"; });
   const invalidEvidenceResult = structuredClone(scoring);
   invalidEvidenceResult.evaluatorResult.evaluation_status = "invalid_input";
-  invalidEvidenceResult.evaluatorResult.evidence_correctness = { state: "fail", evidence_references: [{ kind: "test_result", digest: `sha256:${"8".repeat(64)}`, bytes: 1 }] };
+  const invalidAuthorityReference = { kind: "test_result", digest: `sha256:${"8".repeat(64)}`, bytes: 1 };
+  invalidEvidenceResult.evaluatorResult.evidence_correctness = { state: "fail", evidence_references: [invalidAuthorityReference] };
   invalidEvidenceResult.evaluatorResult.classification = "invalid_evidence";
+  invalidEvidenceResult.evaluatorResult.invalid_input_authority = { layer: "evaluation_input", category: "evaluator_input_authority_failure", evidence_references: [invalidAuthorityReference] };
+  invalidEvidenceResult.evaluatorResult.findings.push({ finding_id: "invalid-input-authority", category: "evaluator_input_authority_failure", severity: "critical", evidence_references: [invalidAuthorityReference] });
+  invalidEvidenceResult.evaluatorResult.verification_correctness = { state: "fail", evidence_references: [invalidAuthorityReference] };
+  invalidEvidenceResult.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references = [invalidAuthorityReference];
   assert.equal(validateScoringInputBindings(invalidEvidenceResult).scoringReady, false, "invalid evidence classification must rederive fail-closed");
   profileRequiredNegative("invalid evidence forged as under-processing", (changed) => { changed.evaluatorResult.evaluation_status = "invalid_input"; changed.evaluatorResult.evidence_correctness = { state: "fail", evidence_references: [{ kind: "test_result", digest: `sha256:${"8".repeat(64)}`, bytes: 1 }] }; changed.evaluatorResult.classification = "under_processing"; });
   profileRequiredNegative("execution reference transplant", ({ evaluatorResult }) => { evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references[0].digest = `sha256:${"7".repeat(64)}`; });
@@ -1221,6 +1305,7 @@ try {
     runPrivateSemanticNegativeChecks(privateRoot);
     runIndependenceNegativeChecks(privateRoot, roots);
     await runPrivateCandidateChecks(privateRoot);
+    await runPrivatePortabilityChecks(privateRoot);
     const fullAuthorityStates = [
       "executed_success", "executed_failure", "declined", "cwd_unverified", "missing", "unavailable", "adapter_unsupported", "invalid",
       "repeated_success_success", "repeated_failure_success", "repeated_declined_success", "repeated_success_failure", "repeated_success_declined", "repeated_success_cwd",

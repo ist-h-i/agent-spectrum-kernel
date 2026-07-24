@@ -616,6 +616,10 @@ function authorityPrivacy() {
 
 export function adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment, authority }) {
   const normalized = authority.normalizedResult;
+  const binding = authority.fragmentBinding;
+  if (!binding || binding.normalized_result_id !== normalized.normalized_result_id || binding.normalized_result_digest !== normalized.normalized_result_digest || binding.run_instance_id !== normalized.lineage.run_instance_id || binding.case_id !== normalized.lineage.case_id || binding.attempt !== normalized.lineage.attempt) {
+    throw new Error("authority-owned fragment binding does not match the supplied normalized result");
+  }
   const validated = validatePrivateEvaluatorFragment({
     root,
     fragment,
