@@ -6,12 +6,12 @@ import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materializ
 export const VERIFICATION_COMMAND_CONTRACT_SCHEMA_PATH = "benchmarks/schemas/portfolio-verification-command-contract.schema.json";
 export const COMMAND_EVIDENCE_SCHEMA_PATH = "benchmarks/schemas/portfolio-command-evidence.schema.json";
 export const CODEX_COMMAND_EVENT_FORMAT_REVISION = "codex-exec-jsonl-v1";
-export const COMMAND_EVIDENCE_PARSER_REVISION = "1.2.0";
+export const COMMAND_EVIDENCE_PARSER_REVISION = "1.3.0";
 export const COMMAND_EVIDENCE_PATH = "command-evidence.json";
 export const MAX_COMMAND_EVENT_STREAM_BYTES = 16 * 1024 * 1024;
 export const MAX_COMMAND_EVENT_LINE_BYTES = 1024 * 1024;
 
-const TERMINAL_ITEM_STATUSES = new Set(["completed", "failed"]);
+const TERMINAL_ITEM_STATUSES = new Set(["completed", "failed", "declined"]);
 const SHELL_PREFIX = "/bin/bash -lc ";
 const STREAM_INTEGRITY_ERROR = /(?:drop(?:ped)?\s+event|event\s+(?:drop|loss)|stream\s+lag|lagged|backpressure|truncat|sequence\s+integrity|integrity\s+failure)/iu;
 const SENSITIVE_VALUE = /(?:^|\s)(?:[A-Za-z_][A-Za-z0-9_]*=|\/Users\/|\/home\/|\/private\/|\/var\/folders\/|[A-Za-z]:[\\/]|file:\/\/|(?:token|secret|password|credential)[A-Za-z0-9_-]*=)/iu;
@@ -138,18 +138,29 @@ function classifyRuntimeCommand(rawCommand, contract) {
   return { execution_form: "codex_shell_command", logical_digest: canonicalDigest({ execution_form: "codex_shell_command", canonical_script: script }), rendered_digest: sha256(Buffer.from(rawCommand)), script };
 }
 
+function commandTerminalOutcome(completed) {
+  if (!TERMINAL_ITEM_STATUSES.has(completed.status)) throw new CommandEvidenceError("unknown_status", "completed command event has an unsupported terminal status");
+  const exitCode = completed.exit_code ?? null;
+  if (completed.status === "completed" && (!Number.isInteger(exitCode) || exitCode !== 0)) throw new CommandEvidenceError("status_exit_contradiction", "command status contradicts exit code: completed requires zero");
+  if (completed.status === "failed" && (!Number.isInteger(exitCode) || exitCode === 0)) throw new CommandEvidenceError("status_exit_contradiction", "command status contradicts exit code: failed requires a nonzero integer");
+  if (completed.status === "declined" && exitCode !== null) throw new CommandEvidenceError("status_exit_contradiction", "command status contradicts exit code: declined requires absent or null");
+  return { status: completed.status === "completed" ? "succeeded" : completed.status, exitCode };
+}
+
+function assertCommandPairIntegrity(started, completed) {
+  if (started.command !== undefined && completed.command !== undefined && started.command !== completed.command) throw new CommandEvidenceError("command_drift", "runtime command changed between started and completed events");
+  if (started.status !== undefined && started.status !== "in_progress") throw new CommandEvidenceError("invalid_started_status", "started command event has a non-progress status");
+  commandTerminalOutcome(completed);
+}
+
 function commandEvidenceBase({ sequence, started, completed, contract }) {
   const rawCommand = completed.command ?? started.command;
-  if (started.command !== undefined && completed.command !== undefined && started.command !== completed.command) throw new CommandEvidenceError("command_drift", "runtime command changed between started and completed events");
   const classified = classifyRuntimeCommand(rawCommand, contract);
   const renderedMatches = contract?.commands.filter((command) => command.rendered_event_command_digest === classified.rendered_digest && command.execution_form === classified.execution_form) ?? [];
   const commandMatch = renderedMatches.find((command) => command.logical_command_digest === classified.logical_digest) ?? null;
   const matched = commandMatch?.working_directory.evidence_requirement === "not_required" ? commandMatch : null;
   const matchState = matched ? "matched" : commandMatch ? "cwd_unverified" : "unmatched";
-  const exitCode = completed.exit_code;
-  if (!Number.isInteger(exitCode)) throw new CommandEvidenceError("missing_exit_code", "completed command event lacks an integer exit code");
-  if (!TERMINAL_ITEM_STATUSES.has(completed.status)) throw new CommandEvidenceError("unknown_status", "completed command event has an unsupported status");
-  if ((completed.status === "completed" && exitCode !== 0) || (completed.status === "failed" && exitCode === 0)) throw new CommandEvidenceError("status_exit_contradiction", "command status contradicts exit code");
+  const outcome = commandTerminalOutcome(completed);
   const output = Buffer.from(completed.aggregated_output ?? "");
   return {
     event_sequence: { started: sequence.started, completed: sequence.completed },
@@ -160,8 +171,8 @@ function commandEvidenceBase({ sequence, started, completed, contract }) {
     logical_command_digest: classified.logical_digest,
     rendered_event_command_digest: classified.rendered_digest,
     working_directory: { status: "unavailable", classification: null, value: null, digest: null, source: "codex_exec_jsonl_cwd_not_exposed" },
-    status: exitCode === 0 ? "succeeded" : "failed",
-    exit_code: exitCode,
+    status: outcome.status,
+    exit_code: outcome.exitCode,
     duration: { status: "unknown", milliseconds: null },
     aggregated_output: { bytes: output.length, digest: sha256(output) },
     capture_source: "codex_exec_jsonl",
@@ -193,7 +204,7 @@ export function parseCodexCommandEvents({ stream, identity, contract }) {
   const lines = bytes.toString("utf8").split("\n").slice(0, -1);
   const active = new Map();
   const completedIds = new Set();
-  const commands = [];
+  const commandPairs = [];
   let terminalTurn = false;
   let eventSequence = 0;
   for (const line of lines) {
@@ -201,29 +212,44 @@ export function parseCodexCommandEvents({ stream, identity, contract }) {
     let event;
     try { event = JSON.parse(line); } catch { throw new CommandEvidenceError("malformed_jsonl", "command event stream contains malformed JSONL"); }
     eventSequence += 1;
-    failOnRuntimeErrorEvent(event);
     if (event.type === "turn.completed") {
       if (terminalTurn) throw new CommandEvidenceError("duplicate_terminal_turn", "command event stream contains duplicate terminal turn events");
       terminalTurn = true;
       continue;
     }
+    if (terminalTurn) throw new CommandEvidenceError("sequence_reversal", "runtime event appears after terminal turn completion");
+    failOnRuntimeErrorEvent(event);
+    if (event.type === "turn.failed") throw new CommandEvidenceError("turn_failed", "runtime turn failed before command evidence completion");
     if (!["item.started", "item.completed"].includes(event.type) || event.item?.type !== "command_execution") continue;
     const item = event.item;
     if (typeof item.id !== "string" || item.id.length === 0) throw new CommandEvidenceError("missing_item_id", "command event lacks a stable item ID");
-    if (terminalTurn) throw new CommandEvidenceError("sequence_reversal", "command event appears after terminal turn completion");
     if (event.type === "item.started") {
       if (active.has(item.id) || completedIds.has(item.id)) throw new CommandEvidenceError("duplicate_item_id", "command event item ID is duplicated");
+      if (item.status !== undefined && item.status !== "in_progress") throw new CommandEvidenceError("invalid_started_status", "started command event has a non-progress status");
       active.set(item.id, { item, sequence: eventSequence });
       continue;
     }
+    if (completedIds.has(item.id)) throw new CommandEvidenceError("duplicate_item_id", "command event item ID is duplicated");
     const started = active.get(item.id);
     if (!started) throw new CommandEvidenceError("completed_without_started", "command completed without a matching started event");
+    assertCommandPairIntegrity(started.item, item);
     active.delete(item.id);
     completedIds.add(item.id);
-    commands.push(closeCommandEvidence(commandEvidenceBase({ sequence: { started: started.sequence, completed: eventSequence }, started: started.item, completed: item, contract }), identity));
+    commandPairs.push({ sequence: { started: started.sequence, completed: eventSequence }, started: started.item, completed: item });
   }
   if (active.size > 0) throw new CommandEvidenceError("started_without_completed", "command started without a matching completed event");
   if (!terminalTurn) throw new CommandEvidenceError("missing_terminal_turn", "command event stream lacks terminal turn completion");
+  const commands = [];
+  let unsupportedShell = null;
+  for (const pair of commandPairs) {
+    try {
+      commands.push(closeCommandEvidence(commandEvidenceBase({ ...pair, contract }), identity));
+    } catch (error) {
+      if (error?.code !== "unsupported_shell") throw error;
+      unsupportedShell ??= error;
+    }
+  }
+  if (unsupportedShell) throw unsupportedShell;
   return { stream: { bytes: bytes.length, digest: sha256(bytes) }, command_event_count: commands.length, commands };
 }
 
@@ -325,7 +351,7 @@ export function validateCommandEvidenceManifest(manifest, { root, contract = nul
     if (command.bytes !== jsonBytes({ command_evidence_id: id, command_evidence_digest: digest, ...base }).length) throw new Error("command evidence byte count mismatch");
     if (command.event_sequence.completed <= command.event_sequence.started || command.event_sequence.completed <= previousCompleted) throw new Error("command event sequence is reversed");
     previousCompleted = command.event_sequence.completed;
-    if ((command.status === "succeeded" && command.exit_code !== 0) || (command.status === "failed" && (!Number.isInteger(command.exit_code) || command.exit_code === 0))) throw new Error("command evidence status contradicts exit code");
+    if ((command.status === "succeeded" && command.exit_code !== 0) || (command.status === "failed" && (!Number.isInteger(command.exit_code) || command.exit_code === 0)) || (command.status === "declined" && command.exit_code !== null)) throw new Error("command evidence status contradicts exit code");
     if (command.match_state === "matched") {
       const authority = commandById.get(command.matched_command_id);
       if (requireContractClosure && (!authority || authority.execution_form !== command.execution_form || authority.logical_command_digest !== command.logical_command_digest || authority.rendered_event_command_digest !== command.rendered_event_command_digest || authority.working_directory.evidence_requirement !== "not_required" || command.working_directory.status !== "unavailable")) throw new Error("matched command evidence does not close to public authority");
@@ -355,11 +381,13 @@ export function projectVerifiedCommandEvidence({ manifest, contract }) {
       latest_outcome: latest,
       any_success: executions.some(({ status }) => status === "succeeded"),
       any_failure: executions.some(({ status }) => status === "failed"),
+      any_declined: executions.some(({ status }) => status === "declined"),
     };
   });
   const latestById = new Map(summaries.map((summary) => [summary.command_id, summary.latest_outcome]));
   const succeeded = attempted.filter((id) => latestById.get(id) === "succeeded");
   const failed = attempted.filter((id) => latestById.get(id) === "failed");
+  const declined = attempted.filter((id) => latestById.get(id) === "declined");
   const required = commands.filter(({ requirement }) => requirement === "required").map(({ command_id }) => command_id);
   const unavailable = required.filter((id) => !latestById.has(id));
   const groups = new Map();
@@ -378,7 +406,7 @@ export function projectVerifiedCommandEvidence({ manifest, contract }) {
       satisfaction_state: manifest.capture.evidence_level === "unavailable" ? "unavailable" : succeededIds.length > 0 ? "satisfied" : "unsatisfied",
     };
   });
-  for (const values of [required, attempted, succeeded, failed, unavailable]) assertUnique(values, "normalized command evidence inventory");
+  for (const values of [required, attempted, succeeded, failed, declined, unavailable]) assertUnique(values, "normalized command evidence inventory");
   for (const group of requiredAlternativeGroups) for (const id of [...group.attempted_ids, ...group.succeeded_ids]) if (!commandOrder.has(id)) throw new Error("alternative group contains an undeclared command ID");
   return {
     manifest_digest: manifest.manifest_digest,
@@ -392,10 +420,20 @@ export function projectVerifiedCommandEvidence({ manifest, contract }) {
     attempted_command_ids: attempted,
     succeeded_command_ids: succeeded,
     failed_command_ids: failed,
+    declined_command_ids: declined,
     unavailable_command_ids: unavailable,
     unmatched_command_count: manifest.commands.filter(({ match_state }) => match_state === "unmatched").length,
     cwd_unverified_command_count: manifest.commands.filter(({ match_state }) => match_state === "cwd_unverified").length,
     references: manifest.commands.map((command) => ({
+      command_id: command.matched_command_id,
+      match_state: command.match_state,
+      command_evidence_id: command.command_evidence_id,
+      digest: command.command_evidence_digest,
+      bytes: command.bytes,
+      outcome: command.status,
+      exit_code: command.exit_code,
+    })),
+    declined_references: manifest.commands.filter(({ status }) => status === "declined").map((command) => ({
       command_id: command.matched_command_id,
       match_state: command.match_state,
       command_evidence_id: command.command_evidence_id,

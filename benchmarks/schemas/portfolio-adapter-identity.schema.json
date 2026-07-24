@@ -110,7 +110,7 @@
       "allOf": [
         {
           "if": { "properties": { "evidence_level": { "const": "executed" } }, "required": ["evidence_level"] },
-          "then": { "properties": { "support": { "const": "supported" }, "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.2.0" }, "contract_probe_evidence": { "const": "runtime_event_required" } } },
+          "then": { "properties": { "support": { "const": "supported" }, "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.3.0" }, "contract_probe_evidence": { "const": "runtime_event_required" } } },
           "else": { "properties": { "downgrade_reason": { "type": "string" } } }
         },
         {
@@ -119,7 +119,7 @@
             "properties": {
               "event_transport": { "const": "codex_exec_jsonl" },
               "event_format_revision": { "const": "codex-exec-jsonl-v1" },
-              "parser_revision": { "const": "1.2.0" },
+              "parser_revision": { "const": "1.3.0" },
               "shell_capability": {
                 "properties": {
                   "support_status": { "const": "supported" },

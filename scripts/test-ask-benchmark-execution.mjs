@@ -120,8 +120,8 @@ function runtimeConfig(adapter, availability = "available") {
     sandbox_policy: "workspace-write",
     permission_policy: adapter === "codex" ? "never" : "strict",
     executor: { id: `fixture-${adapter}`, version: "1.0.0" },
-    environment_allowlist: ["PATH", "FAKE_EXEC_LOG", "FAKE_FAIL", "FAKE_FAIL_ONCE", "FAKE_DELAY", "FAKE_MUTATE_EXECUTABLE", "FAKE_OVERSIZED_FINAL", "FAKE_PUBLIC_MODE", "FAKE_SHELL_MODE"],
-    environment_value_allowlist: ["FAKE_PUBLIC_MODE", "FAKE_SHELL_MODE"],
+    environment_allowlist: ["PATH", "FAKE_EXEC_LOG", "FAKE_FAIL", "FAKE_FAIL_ONCE", "FAKE_DELAY", "FAKE_MUTATE_EXECUTABLE", "FAKE_OVERSIZED_FINAL", "FAKE_PUBLIC_MODE", "FAKE_SHELL_MODE", "FAKE_EVENT_MODE"],
+    environment_value_allowlist: ["FAKE_PUBLIC_MODE", "FAKE_SHELL_MODE", "FAKE_EVENT_MODE"],
     thermal_state: "cold",
     claude_cli: adapter === "claude" && availability === "available"
       ? {
@@ -132,7 +132,7 @@ function runtimeConfig(adapter, availability = "available") {
       }
       : null,
     command_evidence: adapter === "codex"
-      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.2.0", shell_capability: { support_status: "supported", family: "posix_bash", executable: "/bin/bash", envelope_arguments: ["-lc"], authority_source: "codex_exec_jsonl_command_rendering", probe_status: "runtime_event_required", downgrade_reason: null } }
+      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.3.0", shell_capability: { support_status: "supported", family: "posix_bash", executable: "/bin/bash", envelope_arguments: ["-lc"], authority_source: "codex_exec_jsonl_command_rendering", probe_status: "runtime_event_required", downgrade_reason: null } }
       : { capture_required: true, support: "unsupported", event_transport: "none", event_format_revision: null, parser_revision: null, shell_capability: { support_status: "unsupported", family: null, executable: null, envelope_arguments: null, authority_source: "none", probe_status: "unsupported", downgrade_reason: "adapter_event_contract_not_implemented" } },
   };
 }
@@ -181,7 +181,34 @@ fi
 if [ "\${FAKE_OVERSIZED_FINAL:-}" = "1" ]; then dd if=/dev/zero of="$output" bs=1048577 count=1 2>/dev/null; exit 0; fi
 printf '%s\\n' '{"claimed":"passed","authority":false}' > verification-report.json
 printf '%s\\n' '{"task_type":"implementation","decision":"not_applicable","findings":[],"requirement_status":[],"verification_commands":[{"command":"node forged-report.mjs","result":"passed"}],"completion_claim":"complete","route":null,"summary":"fixture final"}' > "$output"
-if [ "${adapter}" = "codex" ]; then printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"%s","status":"completed","exit_code":0,"aggregated_output":"fixture passed"}}\\n' "$event_command"; printf '%s\\n' '{"type":"turn.completed"}'; fi
+if [ "${adapter}" = "codex" ]; then
+  case "\${FAKE_EVENT_MODE:-complete}" in
+    declined)
+      printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"%s","status":"declined","exit_code":null,"aggregated_output":""}}\\n' "$event_command"
+      printf '%s\\n' '{"type":"turn.completed"}'
+      ;;
+    dropped_after_command)
+      printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"%s","status":"completed","exit_code":0,"aggregated_output":"fixture passed"}}\\n' "$event_command"
+      printf '%s\\n' '{"type":"item.completed","item":{"type":"error","id":"stream-error","message":"event stream lagged; dropped events"}}' '{"type":"turn.completed"}'
+      ;;
+    malformed_after_command)
+      printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"%s","status":"completed","exit_code":0,"aggregated_output":"fixture passed"}}\\n' "$event_command"
+      printf '%s\\n' '{bad'
+      ;;
+    missing_terminal)
+      printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"%s","status":"completed","exit_code":0,"aggregated_output":"fixture passed"}}\\n' "$event_command"
+      ;;
+    duplicate_item)
+      printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"%s","status":"completed","exit_code":0,"aggregated_output":"fixture passed"}}\\n' "$event_command"
+      printf '{"type":"item.started","item":{"type":"command_execution","id":"fixture-command","command":"%s"}}\\n' "$event_command"
+      printf '%s\\n' '{"type":"turn.completed"}'
+      ;;
+    *)
+      printf '{"type":"item.completed","item":{"type":"command_execution","id":"fixture-command","command":"%s","status":"completed","exit_code":0,"aggregated_output":"fixture passed"}}\\n' "$event_command"
+      printf '%s\\n' '{"type":"turn.completed"}'
+      ;;
+  esac
+fi
 if [ "\${FAKE_MUTATE_EXECUTABLE:-}" = "1" ]; then
   printf '%s\\n' '#!/bin/sh' 'exit 99' > "$0.replacement"
   chmod 755 "$0.replacement"
@@ -331,6 +358,29 @@ try {
     assert.equal(shellEvidence.command_event_count, 0, `${shellMode} shell evidence must have zero authoritative events`);
     assert.equal(shellEvidence.capture.contract_probe_evidence, "shell_capability_unavailable");
   }
+
+  for (const eventMode of ["dropped_after_command", "malformed_after_command", "missing_terminal", "duplicate_item"]) {
+    const precedenceRun = resolve(work, `unsupported-${eventMode}-run`);
+    run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", precedenceRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", codexCases[0].case_id], { env: { ...env, FAKE_SHELL_MODE: "zsh", FAKE_EVENT_MODE: eventMode } });
+    assert.equal(JSON.parse(readFileSync(resolve(precedenceRun, "cases", codexCases[0].case_id, "state.json"), "utf8")).status, "invalid", `unsupported shell must not hide ${eventMode} integrity failure`);
+  }
+
+  const declinedRun = resolve(work, "declined-command-run");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", declinedRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", codexCases[0].case_id], { env: { ...env, FAKE_EVENT_MODE: "declined" } });
+  const declinedAttemptRoot = resolve(declinedRun, "cases", codexCases[0].case_id, "attempts", "0001");
+  const declinedResult = JSON.parse(readFileSync(resolve(declinedAttemptRoot, "result.json"), "utf8"));
+  const declinedEvidence = JSON.parse(readFileSync(resolve(declinedAttemptRoot, "command-evidence.json"), "utf8"));
+  assert.equal(declinedResult.status, "completed", "a declined command must not invalidate an otherwise completed outer attempt");
+  assert.equal(declinedEvidence.capture.evidence_level, "executed");
+  assert.equal(declinedEvidence.command_event_count, 1);
+  assert.equal(declinedEvidence.commands[0].status, "declined");
+  assert.equal(declinedEvidence.commands[0].exit_code, null);
+  const declinedTransplantTarget = resolve(work, "declined-cross-run-target");
+  run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", declinedTransplantTarget, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", codexCases[0].case_id], { env });
+  const declinedTargetCaseRoot = resolve(declinedTransplantTarget, "cases", codexCases[0].case_id);
+  rmSync(declinedTargetCaseRoot, { recursive: true, force: true });
+  cpSync(resolve(declinedRun, "cases", codexCases[0].case_id), declinedTargetCaseRoot, { recursive: true });
+  assertCaseStatus(["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", declinedTransplantTarget], codexCases[0].case_id, "invalid", "declined command evidence transplanted across runs must be rejected");
 
   const malformedShellRun = resolve(work, "malformed-shell-run");
   run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", malformedShellRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", codexCases[0].case_id], { env: { ...env, FAKE_SHELL_MODE: "malformed" } });

@@ -82,7 +82,7 @@ function runtimeConfig(adapter, availability = "available") {
       }
       : null,
     command_evidence: adapter === "codex"
-      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.2.0", shell_capability: { support_status: "supported", family: "posix_bash", executable: "/bin/bash", envelope_arguments: ["-lc"], authority_source: "codex_exec_jsonl_command_rendering", probe_status: "runtime_event_required", downgrade_reason: null } }
+      ? { capture_required: true, support: "supported", event_transport: "codex_exec_jsonl", event_format_revision: "codex-exec-jsonl-v1", parser_revision: "1.3.0", shell_capability: { support_status: "supported", family: "posix_bash", executable: "/bin/bash", envelope_arguments: ["-lc"], authority_source: "codex_exec_jsonl_command_rendering", probe_status: "runtime_event_required", downgrade_reason: null } }
       : { capture_required: true, support: "unsupported", event_transport: "none", event_format_revision: null, parser_revision: null, shell_capability: { support_status: "unsupported", family: null, executable: null, envelope_arguments: null, authority_source: "none", probe_status: "unsupported", downgrade_reason: "adapter_event_contract_not_implemented" } },
   };
 }

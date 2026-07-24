@@ -149,7 +149,7 @@ try {
   assert.deepEqual(projection.failed_command_ids, []);
   assert.deepEqual(projection.unavailable_command_ids, []);
   assert.deepEqual(projection.required_alternative_groups, []);
-  assert.deepEqual(projection.command_summaries, [{ command_id: "focused-test", execution_count: 1, latest_outcome: "succeeded", any_success: true, any_failure: false }]);
+  assert.deepEqual(projection.command_summaries, [{ command_id: "focused-test", execution_count: 1, latest_outcome: "succeeded", any_success: true, any_failure: false, any_declined: false }]);
   assert.equal(projection.references.length, 1);
   assert.equal(JSON.stringify(executed).includes("focused pass"), false, "raw command output must not be durable");
   assert.equal(JSON.stringify(executed).includes(rendered), false, "raw shell command must not be durable");
@@ -251,11 +251,11 @@ try {
   const twice = projectVerifiedCommandEvidence({ manifest: build(authority, [repeatPair("repeat-1"), repeatPair("repeat-2")]), contract: authority });
   assert.equal(twice.references.length, 2);
   assert.deepEqual(twice.attempted_command_ids, ["focused-test"]);
-  assert.deepEqual(twice.command_summaries[0], { command_id: "focused-test", execution_count: 2, latest_outcome: "succeeded", any_success: true, any_failure: false });
+  assert.deepEqual(twice.command_summaries[0], { command_id: "focused-test", execution_count: 2, latest_outcome: "succeeded", any_success: true, any_failure: false, any_declined: false });
   const failThenSuccess = projectVerifiedCommandEvidence({ manifest: build(authority, [repeatPair("repeat-fail", "failed", 2), repeatPair("repeat-success")]), contract: authority });
   assert.deepEqual(failThenSuccess.succeeded_command_ids, ["focused-test"]);
   assert.deepEqual(failThenSuccess.failed_command_ids, []);
-  assert.deepEqual(failThenSuccess.command_summaries[0], { command_id: "focused-test", execution_count: 2, latest_outcome: "succeeded", any_success: true, any_failure: true });
+  assert.deepEqual(failThenSuccess.command_summaries[0], { command_id: "focused-test", execution_count: 2, latest_outcome: "succeeded", any_success: true, any_failure: true, any_declined: false });
   const successThenFail = projectVerifiedCommandEvidence({ manifest: build(authority, [repeatPair("repeat-success"), repeatPair("repeat-fail", "failed", 2)]), contract: authority });
   assert.deepEqual(successThenFail.succeeded_command_ids, []);
   assert.deepEqual(successThenFail.failed_command_ids, ["focused-test"]);
@@ -263,6 +263,33 @@ try {
   const three = projectVerifiedCommandEvidence({ manifest: build(authority, [repeatPair("repeat-a"), repeatPair("repeat-b"), repeatPair("repeat-c")]), contract: authority });
   assert.equal(three.references.length, 3);
   assert.equal(three.command_summaries[0].execution_count, 3);
+
+  const declinedOnly = projectVerifiedCommandEvidence({ manifest: build(authority, [repeatPair("repeat-declined", "declined", null)]), contract: authority });
+  assert.deepEqual(declinedOnly.attempted_command_ids, ["focused-test"], "declined commands must remain observed attempts");
+  assert.deepEqual(declinedOnly.succeeded_command_ids, []);
+  assert.deepEqual(declinedOnly.failed_command_ids, []);
+  assert.deepEqual(declinedOnly.declined_command_ids, ["focused-test"]);
+  assert.equal(declinedOnly.declined_references.length, 1);
+  assert.equal(declinedOnly.declined_references[0].outcome, "declined");
+  assert.deepEqual(declinedOnly.command_summaries[0], { command_id: "focused-test", execution_count: 1, latest_outcome: "declined", any_success: false, any_failure: false, any_declined: true });
+  validateNormalizedCommandEvidence(declinedOnly);
+  const declinedWithoutExitCode = build(authority, [commandPair({ id: "declined-no-exit", command: rendered, status: "declined", completed: { exit_code: undefined } })]);
+  assert.equal(declinedWithoutExitCode.commands[0].status, "declined");
+  assert.equal(declinedWithoutExitCode.commands[0].exit_code, null, "an absent declined exit code must normalize to typed null");
+  const successThenDeclined = projectVerifiedCommandEvidence({ manifest: build(authority, [repeatPair("repeat-success"), repeatPair("repeat-declined", "declined", null)]), contract: authority });
+  assert.deepEqual(successThenDeclined.declined_command_ids, ["focused-test"]);
+  assert.deepEqual(successThenDeclined.succeeded_command_ids, []);
+  assert.deepEqual(successThenDeclined.command_summaries[0], { command_id: "focused-test", execution_count: 2, latest_outcome: "declined", any_success: true, any_failure: false, any_declined: true });
+  const declinedThenSuccess = projectVerifiedCommandEvidence({ manifest: build(authority, [repeatPair("repeat-declined", "declined", null), repeatPair("repeat-success")]), contract: authority });
+  assert.deepEqual(declinedThenSuccess.succeeded_command_ids, ["focused-test"]);
+  assert.deepEqual(declinedThenSuccess.declined_command_ids, []);
+  assert.deepEqual(declinedThenSuccess.command_summaries[0], { command_id: "focused-test", execution_count: 2, latest_outcome: "succeeded", any_success: true, any_failure: false, any_declined: true });
+  expectFailure("declined with zero exit code", () => build(authority, [repeatPair("declined-zero", "declined", 0)]), /exit code|contradicts/u);
+  expectFailure("declined with nonzero exit code", () => build(authority, [repeatPair("declined-nonzero", "declined", 7)]), /exit code|contradicts/u);
+  expectFailure("in-progress terminal status", () => build(authority, [repeatPair("in-progress", "in_progress", null)]), /terminal|status/u);
+  expectFailure("unknown terminal status", () => build(authority, [repeatPair("unknown", "cancelled", null)]), /terminal|status/u);
+  const declinedPromoted = resealCommandEvidence(build(authority, [repeatPair("declined-promoted", "declined", null)]), 0, (command) => { command.status = "succeeded"; });
+  expectFailure("declined evidence re-sealed as success", () => validateCommandEvidenceManifest(declinedPromoted, { root, contract: authority }), /Schema|exit code|contradicts/u);
 
   const alternatives = validateVerificationCommandContract(contract([
     shellCommand("alternative-a", "node workspace/a.mjs", "alternative", "test-group"),
@@ -280,6 +307,18 @@ try {
   validateNormalizedCommandEvidence(optionalOnly);
   const failedAlternative = projectVerifiedCommandEvidence({ manifest: build(alternatives, [commandPair({ command: renderCommandEvent(alternativeA), status: "failed", exit_code: 3 })]), contract: alternatives });
   assert.equal(failedAlternative.required_alternative_groups[0].satisfaction_state, "unsatisfied");
+  const declinedAlternative = projectVerifiedCommandEvidence({ manifest: build(alternatives, [commandPair({ command: renderCommandEvent(alternativeA), status: "declined", exit_code: null })]), contract: alternatives });
+  assert.equal(declinedAlternative.required_alternative_groups[0].satisfaction_state, "unsatisfied");
+  assert.deepEqual(declinedAlternative.required_alternative_groups[0].attempted_ids, ["alternative-a"]);
+  assert.deepEqual(declinedAlternative.required_alternative_groups[0].succeeded_ids, []);
+  const declinedThenAlternativeSuccess = projectVerifiedCommandEvidence({ manifest: build(alternatives, [
+    commandPair({ id: "alternative-declined", command: renderCommandEvent(alternativeA), status: "declined", exit_code: null }),
+    commandPair({ id: "alternative-success", command: renderCommandEvent(alternatives.commands[1]) }),
+  ]), contract: alternatives });
+  assert.equal(declinedThenAlternativeSuccess.required_alternative_groups[0].satisfaction_state, "satisfied");
+  const optionalDeclined = projectVerifiedCommandEvidence({ manifest: build(alternatives, [commandPair({ command: renderCommandEvent(optional), status: "declined", exit_code: null })]), contract: alternatives });
+  assert.deepEqual(optionalDeclined.declined_command_ids, ["optional-only"]);
+  validateNormalizedCommandEvidence(optionalDeclined);
   const unavailableAlternatives = projectVerifiedCommandEvidence({ manifest: buildUnavailableCommandEvidence({ identity: { ...identity, verification_command_contract_digest: alternatives.contract_digest }, support: "supported", probe: "command_contract_unavailable", reason: "command_contract_unavailable" }), contract: alternatives });
   assert.equal(unavailableAlternatives.required_alternative_groups[0].satisfaction_state, "unavailable");
   validateNormalizedCommandEvidence(unavailableAlternatives);
@@ -308,6 +347,23 @@ try {
       { type: "turn.completed" },
     ]),
   }), /integrity failure/u);
+  const unsupportedPair = commandPair({ command: "/bin/zsh -lc 'node workspace/test.mjs'" });
+  for (const [label, events, pattern] of [
+    ["unsupported shell then dropped event", [...unsupportedPair, { type: "item.completed", item: { id: "item-error", type: "error", message: "event stream lagged; dropped events" } }, { type: "turn.completed" }], /integrity failure/u],
+    ["unsupported shell then malformed JSON", null, /malformed JSONL/u],
+    ["unsupported shell without terminal turn", unsupportedPair, /terminal turn/u],
+    ["unsupported shell then duplicate item", [...unsupportedPair, ...commandPair({ id: "runtime-item-1", command: "/bin/zsh -lc 'node workspace/test.mjs'" }), { type: "turn.completed" }], /duplicate/u],
+  ]) {
+    const unsupportedStream = label.includes("malformed JSON")
+      ? Buffer.from(`${unsupportedPair.map((event) => JSON.stringify(event)).join("\n")}\n{bad}\n`)
+      : stream(events);
+    expectFailure(label, () => buildCodexCommandEvidence({ identity: { ...identity, verification_command_contract_digest: authority.contract_digest }, contract: authority, stream: unsupportedStream }), pattern);
+  }
+  expectFailure("integrity error before unsupported shell", () => buildCodexCommandEvidence({
+    identity: { ...identity, verification_command_contract_digest: authority.contract_digest },
+    contract: authority,
+    stream: stream([{ type: "item.completed", item: { id: "item-error", type: "error", message: "dropped event" } }, ...unsupportedPair, { type: "turn.completed" }]),
+  }), /integrity failure/u);
   expectFailure("unknown item-level error", () => buildCodexCommandEvidence({
     identity: { ...identity, verification_command_contract_digest: authority.contract_digest },
     contract: authority,
@@ -325,12 +381,13 @@ try {
   expectFailure("stream truncation", () => buildCodexCommandEvidence({ identity, contract: authority, stream: Buffer.from(JSON.stringify(commandPair({ command: rendered })[0])) }), /truncated/u);
   expectFailure("missing terminal turn", () => buildCodexCommandEvidence({ identity, contract: authority, stream: stream(commandPair({ command: rendered })) }), /terminal turn/u);
   expectFailure("top-level stream lag", () => buildCodexCommandEvidence({ identity, contract: authority, stream: stream([{ type: "error", message: "stream lag dropped event" }]) }), /integrity/u);
+  expectFailure("turn failure", () => buildCodexCommandEvidence({ identity, contract: authority, stream: stream([{ type: "turn.failed", error: { message: "runtime turn failed" } }]) }), /turn failed/u);
   expectFailure("oversized event line", () => buildCodexCommandEvidence({ identity, contract: authority, stream: Buffer.from(`${" ".repeat(MAX_COMMAND_EVENT_LINE_BYTES + 1)}\n`) }), /byte limit/u);
   expectFailure("unsupported event revision", () => buildCodexCommandEvidence({ identity, contract: authority, stream: stream([{ type: "thread.completed" }]) }), /terminal turn/u);
 
   const driftedManifest = structuredClone(executed);
   driftedManifest.commands[0].exit_code = 9;
-  expectFailure("command evidence digest drift", () => validateCommandEvidenceManifest(driftedManifest, { root, contract: authority }), /identity|digest/u);
+  expectFailure("command evidence digest drift", () => validateCommandEvidenceManifest(driftedManifest, { root, contract: authority }), /Schema|identity|digest/u);
   const successFromUnavailable = structuredClone(unavailable);
   successFromUnavailable.capture.evidence_level = "executed";
   expectFailure("unavailable changed to success", () => validateCommandEvidenceManifest(successFromUnavailable, { root, contract: authority }), /Schema|digest|capture/u);
@@ -366,7 +423,7 @@ try {
   const stableAfter = readStableFile(stablePath, "command evidence", 1024, { allowEmpty: false });
   assertStableFileEvidence(stableBefore, stableAfter, "command evidence");
   assert.equal(stableBefore.bytes.toString("utf8"), "{\"value\":3}\n", "stable verification must remain read-only");
-  assert.equal(COMMAND_EVIDENCE_PARSER_REVISION, "1.2.0");
+  assert.equal(COMMAND_EVIDENCE_PARSER_REVISION, "1.3.0");
 
   console.log("ASK benchmark command evidence contract tests passed");
 } finally {

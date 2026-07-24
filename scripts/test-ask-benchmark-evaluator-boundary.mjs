@@ -230,10 +230,12 @@ function normalizedResult({ source, adapterDigests, caseRecord, attempt, outcome
       attempted_command_ids: [],
       succeeded_command_ids: [],
       failed_command_ids: [],
+      declined_command_ids: [],
       unavailable_command_ids: [],
       unmatched_command_count: 0,
       cwd_unverified_command_count: 0,
       references: [],
+      declined_references: [],
     },
     telemetry: telemetry(outcome),
     privacy: {
@@ -1374,6 +1376,13 @@ try {
   cwdUnverifiedExecutionEvidence.command_evidence.references[0].command_id = null;
   cwdUnverifiedExecutionEvidence.command_evidence.references[0].match_state = "cwd_unverified";
   assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: cwdUnverifiedExecutionEvidence, result: evaluatorExecutionReference }), /required command evidence is absent or unsuccessful/u, "evaluator verification pass must reject cwd-dependent command evidence without runtime cwd authority");
+  const declinedExecutionEvidence = structuredClone(normalizedExecutionEvidence);
+  declinedExecutionEvidence.command_evidence.succeeded_command_ids = [];
+  declinedExecutionEvidence.command_evidence.declined_command_ids = ["fixture-test"];
+  declinedExecutionEvidence.command_evidence.references[0].outcome = "declined";
+  declinedExecutionEvidence.command_evidence.references[0].exit_code = null;
+  assert.equal(validateExecutionEventEvidenceReferences({ normalized: declinedExecutionEvidence, result: { verification_correctness: { state: "fail", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 321 }] } } }).length, 1, "declined execution-event references must remain valid runtime evidence");
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: declinedExecutionEvidence, result: evaluatorExecutionReference }), /required command evidence is absent or unsuccessful/u, "evaluator verification pass must reject declined-only required command evidence");
 
   const alternativeExecutionEvidence = {
     command_evidence: {
@@ -1388,6 +1397,13 @@ try {
   unsatisfiedAlternativeEvidence.command_evidence.required_alternative_groups[0].satisfaction_state = "unsatisfied";
   unsatisfiedAlternativeEvidence.command_evidence.required_alternative_groups[0].succeeded_ids = [];
   assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: unsatisfiedAlternativeEvidence, result: evaluatorExecutionReference }), /alternative command group/u, "an unsatisfied required alternative group must fail closed");
+  const declinedAlternativeEvidence = structuredClone(alternativeExecutionEvidence);
+  declinedAlternativeEvidence.command_evidence.succeeded_command_ids = [];
+  declinedAlternativeEvidence.command_evidence.required_alternative_groups[0].satisfaction_state = "unsatisfied";
+  declinedAlternativeEvidence.command_evidence.required_alternative_groups[0].succeeded_ids = [];
+  declinedAlternativeEvidence.command_evidence.references[0].outcome = "declined";
+  declinedAlternativeEvidence.command_evidence.references[0].exit_code = null;
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: declinedAlternativeEvidence, result: evaluatorExecutionReference }), /alternative command group/u, "evaluator verification pass must reject a declined-only alternative group");
 
   assert.deepEqual(snapshot(privateRoot), beforePrivate, "all evaluator failure paths must keep the private bundle byte-identical");
   assert.deepEqual(snapshot(materialized), beforeMaterialized, "all evaluator failure paths must keep materialized inputs byte-identical");

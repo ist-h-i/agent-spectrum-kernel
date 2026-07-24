@@ -194,7 +194,7 @@ function normalizedRecord({ adapter, fixture, repetitions, condition, repetition
     outcome,
     command_evidence: {
       manifest_digest: digest(`command-evidence:${case_id}`), capture_support: adapter === "codex" ? "supported" : "unsupported", evidence_level: "unavailable", command_event_count: 0,
-      verification_command_contract_digest: null, required_command_ids: [], required_alternative_groups: [], command_summaries: [], attempted_command_ids: [], succeeded_command_ids: [], failed_command_ids: [], unavailable_command_ids: [], unmatched_command_count: 0, cwd_unverified_command_count: 0, references: [],
+      verification_command_contract_digest: null, required_command_ids: [], required_alternative_groups: [], command_summaries: [], attempted_command_ids: [], succeeded_command_ids: [], failed_command_ids: [], declined_command_ids: [], unavailable_command_ids: [], unmatched_command_count: 0, cwd_unverified_command_count: 0, references: [], declined_references: [],
     },
     telemetry,
     privacy: {

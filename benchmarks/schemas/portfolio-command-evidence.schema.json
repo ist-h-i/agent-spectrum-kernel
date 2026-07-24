@@ -35,10 +35,10 @@
       "allOf": [
         {
           "if": { "properties": { "evidence_level": { "const": "executed" } }, "required": ["evidence_level"] },
-          "then": { "properties": { "support": { "const": "supported" }, "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.2.0" }, "contract_probe_evidence": { "const": "runtime_event_shell_authority" }, "downgrade_reason": { "type": "null" } } },
+          "then": { "properties": { "support": { "const": "supported" }, "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.3.0" }, "contract_probe_evidence": { "const": "runtime_event_shell_authority" }, "downgrade_reason": { "type": "null" } } },
           "else": {
             "if": { "properties": { "support": { "const": "supported" } }, "required": ["support"] },
-            "then": { "properties": { "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.2.0" }, "downgrade_reason": { "type": "string" } } },
+            "then": { "properties": { "event_transport": { "const": "codex_exec_jsonl" }, "event_format_revision": { "const": "codex-exec-jsonl-v1" }, "parser_revision": { "const": "1.3.0" }, "downgrade_reason": { "type": "string" } } },
             "else": { "properties": { "event_transport": { "const": "none" }, "event_format_revision": { "type": "null" }, "parser_revision": { "type": "null" }, "downgrade_reason": { "type": "string" } } }
           }
         }
@@ -95,14 +95,28 @@
             "source": { "const": "codex_exec_jsonl_cwd_not_exposed" }
           }
         },
-        "status": { "enum": ["succeeded", "failed", "interrupted"] },
+        "status": { "enum": ["succeeded", "failed", "declined", "interrupted"] },
         "exit_code": { "type": ["integer", "null"] },
         "duration": { "type": "object", "additionalProperties": false, "required": ["status", "milliseconds"], "properties": { "status": { "enum": ["known", "unknown"] }, "milliseconds": { "type": ["integer", "null"], "minimum": 0 } } },
         "aggregated_output": { "type": "object", "additionalProperties": false, "required": ["bytes", "digest"], "properties": { "bytes": { "type": "integer", "minimum": 0 }, "digest": { "$ref": "#/$defs/digest" } } },
         "capture_source": { "const": "codex_exec_jsonl" },
         "evidence_level": { "const": "executed" },
         "bytes": { "type": "integer", "minimum": 1 }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "succeeded" } }, "required": ["status"] },
+          "then": { "properties": { "exit_code": { "const": 0 } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
+          "then": { "properties": { "exit_code": { "type": "integer", "not": { "const": 0 } } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "declined" } }, "required": ["status"] },
+          "then": { "properties": { "exit_code": { "type": "null" } } }
+        }
+      ]
     }
   }
 }
