@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -651,6 +651,7 @@ function privateEvaluationRecordFor({ authorityRoot, chain, normalizedAuthority,
       path: relative(authorityRoot, path).split(sep).join("/"),
       digest: artifact.artifact_digest,
       bytes: readFileSync(path).length,
+      inode: lstatSync(path).ino,
       run_instance_id: artifact.run_instance_id,
       case_id: artifact.case_id,
       attempt: artifact.attempt,
@@ -681,6 +682,7 @@ function privateEvaluationRecordFor({ authorityRoot, chain, normalizedAuthority,
     private_fragment_path: relative(authorityRoot, chain.privateFragmentPath).split(sep).join("/"),
     private_fragment_sha256: privateFragmentDigest,
     private_fragment_bytes: privateFragmentBytes,
+    private_fragment_inode: lstatSync(chain.privateFragmentPath).ino,
     fragment_schema_digest: sha256(readFileSync(resolve(root, "benchmarks/schemas/private-evaluator-fragment.schema.json"))),
     adapter_source_digest: sha256(readFileSync(resolve(root, "scripts/ask-benchmark-evaluator-boundary.mjs"))),
     adapter_result_envelope_digest: computeAdapterResultEnvelopeDigest(draftEvaluatorResult),
@@ -830,6 +832,18 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     const evaluatorCheckPath = resolve(authorityRoot, "evaluator-check-artifact.json");
     const originalRepositoryDiffBytes = readFileSync(repositoryDiffPath);
     const originalEvaluatorCheckBytes = readFileSync(evaluatorCheckPath);
+    const expectPathFailure = (label, mutate, restore, pattern = /private evaluation|private evaluator|inode|symlink|missing|path|artifact/u) => {
+      mutate();
+      assert.throws(() => verifyEvaluatorBoundary(common), pattern, `private path authority tamper: ${label}`);
+      restore();
+      assert.deepEqual(chain.snapshot(), before, `private path authority tamper must restore ${label}`);
+    };
+    const fragmentBackup = resolve(authorityRoot, ".private-fragment-backup");
+    expectPathFailure("fragment missing", () => renameSync(chain.privateFragmentPath, fragmentBackup), () => renameSync(fragmentBackup, chain.privateFragmentPath), /missing|private evaluator fragment/u);
+    expectPathFailure("fragment symlink", () => { renameSync(chain.privateFragmentPath, fragmentBackup); symlinkSync(resolve(root, "scripts/ask-benchmark-evaluator-boundary.mjs"), chain.privateFragmentPath); }, () => { rmSync(chain.privateFragmentPath); renameSync(fragmentBackup, chain.privateFragmentPath); }, /symlink|private evaluator fragment/u);
+    expectPathFailure("fragment inode replacement", () => { renameSync(chain.privateFragmentPath, fragmentBackup); writeFileSync(chain.privateFragmentPath, originalFragmentBytes); }, () => { rmSync(chain.privateFragmentPath); renameSync(fragmentBackup, chain.privateFragmentPath); }, /inode|private evaluator fragment/u);
+    const repositoryBackup = resolve(authorityRoot, ".repository-diff-backup");
+    expectPathFailure("artifact replacement race", () => { renameSync(repositoryDiffPath, repositoryBackup); writeFileSync(repositoryDiffPath, originalRepositoryDiffBytes); }, () => { rmSync(repositoryDiffPath); renameSync(repositoryBackup, repositoryDiffPath); }, /inode|repository diff artifact/u);
     const expectPrivateFailure = (label, mutate, pattern = /private evaluation|private evaluator|authority-owned adapter|artifact|record|fragment|lineage|path|digest/u) => {
       const changedResult = JSON.parse(originalResultBytes.toString("utf8"));
       const changedRecord = JSON.parse(originalRecordBytes.toString("utf8"));
@@ -846,7 +860,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       assert.deepEqual(chain.snapshot(), before, `private authority tamper must restore ${label}`);
     };
     expectPrivateFailure("record digest", ({ record }) => { record.adapter_source_digest = `sha256:${"0".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /adapter source digest|record digest|source/u);
-    expectPrivateFailure("record fragment path replacement", ({ record }) => { record.private_fragment_path = "authority-chain/evaluator-result.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /fragment path|private evaluator fragment|Schema|authority/u);
+    expectPrivateFailure("record fragment path escape", ({ record }) => { record.private_fragment_path = "../escape.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /path|escape|Schema|authority/u);
     expectPrivateFailure("fragment tamper", () => { const fragment = JSON.parse(originalFragmentBytes.toString("utf8")); fragment.classification = "over_processing"; writeJson(chain.privateFragmentPath, fragment); }, /fragment digest|byte closure|authority-owned adapter|classification/u);
     expectPrivateFailure("repository diff tamper", () => { const artifact = JSON.parse(originalRepositoryDiffBytes.toString("utf8")); artifact.diff_entries = [...artifact.diff_entries, { path: "r8-tamper.txt", change_type: "added", before: null, after: { file_type: "file", mode: 420, bytes: 1, sha256: `sha256:${"0".repeat(64)}` } }]; writeJson(repositoryDiffPath, artifact); }, /artifact digest|byte closure|byte binding|repository diff/u);
     expectPrivateFailure("evaluator check replacement", ({ record }) => { const entry = record.evidence_artifacts.find(({ path }) => path.endsWith("evaluator-check-artifact.json")); entry.path = "repository-diff-artifact.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /repository diff artifact|artifact|schema|record/u);

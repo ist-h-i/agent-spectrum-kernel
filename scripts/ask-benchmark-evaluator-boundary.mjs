@@ -1069,6 +1069,7 @@ function validatePrivateEvaluationEvidenceArtifacts({ root, privateEvaluationRoo
     const artifactPath = resolveAuthorityArtifactPath(canonicalEvaluationRoot, entry.path, `private evaluation ${entry.kind} artifact`);
     const evidence = streamingFileDigest(artifactPath, `private evaluation ${entry.kind} artifact`);
     if (evidence.bytes !== entry.bytes) throw new Error(`private evaluation ${entry.kind} artifact byte binding is invalid`);
+    if (lstatSync(artifactPath).ino !== entry.inode) throw new Error(`private evaluation ${entry.kind} artifact inode binding is invalid`);
     const artifact = readJsonArtifact(artifactPath, `private evaluation ${entry.kind} artifact`).value;
     if (artifact.artifact_digest !== entry.digest || artifact.artifact_bytes !== entry.bytes) throw new Error(`private evaluation ${entry.kind} artifact digest or byte closure is invalid`);
     const artifactClosure = structuredClone(artifact);
@@ -1118,6 +1119,7 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   if (record.private_fragment_path !== fragmentInfo.relativePath) throw new Error("private evaluation record fragment path is inconsistent");
   const fragmentEvidence = streamingFileDigest(fragmentInfo.authoritativePath, "private evaluator fragment");
   if (fragmentEvidence.bytes !== record.private_fragment_bytes || fragmentEvidence.digest !== record.private_fragment_sha256) throw new Error("private evaluator fragment digest or byte closure is invalid");
+  if (lstatSync(fragmentInfo.authoritativePath).ino !== record.private_fragment_inode) throw new Error("private evaluator fragment inode binding is invalid");
   const fragment = readJsonArtifact(fragmentInfo.authoritativePath, "private evaluator fragment").value;
   const fragmentSchemaDigest = rawByteDigest(readFileSync(resolve(root, PRIVATE_EVALUATOR_FRAGMENT_SCHEMA_PATH)));
   if (record.fragment_schema_digest !== fragmentSchemaDigest) throw new Error("private evaluator fragment schema digest is inconsistent");
