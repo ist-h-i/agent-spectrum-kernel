@@ -62,6 +62,7 @@
   "$defs": {
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!\\./)[a-zA-Z0-9._/-]+$" },
     "sourceIdentity": {
       "type": "object",
       "additionalProperties": false,
