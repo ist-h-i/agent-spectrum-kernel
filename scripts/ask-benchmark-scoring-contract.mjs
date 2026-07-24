@@ -78,6 +78,7 @@ export const FINAL_ADMISSION_RECORD_FIELD_IDS = Object.freeze([
   "admission_status",
   "admission_digest",
 ]);
+const FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS = Object.freeze(["evaluator_source_identity"]);
 
 const REQUIREMENT_RECORD_FIELD_IDS = Object.freeze([
   "requirement_record_id",
@@ -205,13 +206,14 @@ export function validateFinalAdmissionContractSchemaParity({ admissionPolicy, fi
   const policyFields = admissionPolicy?.final_admission_record_contract?.required_fields?.map(({ field_id }) => field_id) ?? [];
   assertExactFieldList(policyFields, FINAL_ADMISSION_RECORD_FIELD_IDS, "final admission policy fields");
   assertExactFieldList(finalAdmissionRecordSchema?.required ?? [], policyFields, "final admission record Schema required fields");
-  assertExactFieldList(Object.keys(finalAdmissionRecordSchema?.properties ?? {}), policyFields, "final admission record Schema allowed fields");
+  const schemaFields = Object.keys(finalAdmissionRecordSchema?.properties ?? {});
+  if (!arraysEqual(schemaFields.filter((field) => !FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS.includes(field)), policyFields) || schemaFields.filter((field) => FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS.includes(field)).length !== FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS.length) throw new Error("final admission record Schema allowed fields must match the frozen ordered field names");
   return true;
 }
 
 export function validateFinalAdmissionRecordContract({ admissionPolicy, admissionRecord, finalAdmissionRecordSchema = null }) {
   if (finalAdmissionRecordSchema) validateFinalAdmissionContractSchemaParity({ admissionPolicy, finalAdmissionRecordSchema });
-  assertClosedKeys(admissionRecord, FINAL_ADMISSION_RECORD_FIELD_IDS, "authoritative final admission record");
+  assertClosedKeys(admissionRecord, [...FINAL_ADMISSION_RECORD_FIELD_IDS, ...FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS], "authoritative final admission record", FINAL_ADMISSION_RECORD_FIELD_IDS);
   assertUniqueStrings(admissionRecord.evidence_map_ids, "final admission evidence-map IDs");
   assertUniqueStrings(admissionRecord.mutation_set_ids, "final admission mutation-set IDs");
   if (admissionRecord.evidence_map_ids.length === 0 || admissionRecord.mutation_set_ids.length === 0) throw new Error("admitted final admission record requires evidence-map and mutation-set IDs");
