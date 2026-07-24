@@ -670,7 +670,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state) {
       attempt: normalizedAuthority.normalized.lineage.attempt,
     },
   };
-  const adapterFailure = (label, mutate, pattern = /fragment|classification|reference|authority|normalized/u) => {
+  const adapterFailure = (label, mutate, pattern = /fragment|classification|reference|authority|normalized|points|outcome|Schema/u) => {
     const changed = structuredClone(actual.fragment);
     mutate(changed);
     assert.throws(() => adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: changed, authority: adapterAuthority }), pattern, `actual private fragment tamper: ${label}`);
