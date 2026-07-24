@@ -35,6 +35,7 @@ import {
 
 export const EVALUATOR_REFERENCE_SCHEMA_PATH = "benchmarks/schemas/evaluator-reference.schema.json";
 export const PRIVATE_EVALUATOR_BUNDLE_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-bundle.schema.json";
+export const PRIVATE_EVALUATOR_INDEPENDENCE_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-independence-statement.schema.json";
 export const EVALUATOR_RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result-envelope.schema.json";
 const CATALOG_SCHEMA_PATH = "benchmarks/schemas/portfolio-catalog.schema.json";
 const POLICY_MANIFEST_SCHEMA_PATH = "benchmarks/schemas/portfolio-policy-manifest.schema.json";
@@ -482,22 +483,34 @@ export function computeIndependenceStatementDigest(statement) {
   return canonicalDigest(closure);
 }
 
-export function validateIndependenceStatement({ statement, manifest }) {
+export function validateIndependenceStatement({ statement, manifest, root = null }) {
   if (!statement || typeof statement !== "object" || Array.isArray(statement)) throw new Error("private independence statement must be an object");
-  if (statement.schema_version !== "1.0.0" || statement.fixture_id !== manifest.fixture_identity.fixture_id) throw new Error("private independence statement fixture identity mismatch");
+  if (root) assertBenchmarkSchemaInstance(statement, { schemaPath: resolve(root, PRIVATE_EVALUATOR_INDEPENDENCE_SCHEMA_PATH), label: "private independence statement" });
+  if (statement.schema_version !== "1.1.0" || statement.fixture_id !== manifest.fixture_identity.fixture_id) throw new Error("private independence statement fixture identity mismatch");
   if (statement.statement_digest !== computeIndependenceStatementDigest(statement)) throw new Error("private independence statement digest closure is invalid");
   if (statement.statement_digest !== manifest.independence.statement_digest) throw new Error("private independence statement does not match the manifest assertion");
   if (stableCanonicalJson(statement.generator_role_identity) !== stableCanonicalJson(manifest.generator)) throw new Error("private independence statement generator identity mismatch");
-  if (statement.frozen_candidate_input?.digest !== manifest.input_identity.fixture_input_digest || typeof statement.frozen_candidate_input?.public_source_path !== "string") throw new Error("private independence statement frozen input mismatch");
+  if (statement.generation_revision !== manifest.evaluator_revision) throw new Error("private independence statement generation revision drift");
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(statement.generation_date) || new Date(`${statement.generation_date}T00:00:00Z`).toISOString().slice(0, 10) !== statement.generation_date) throw new Error("private independence statement generation date is invalid");
+  if (statement.frozen_candidate_input?.raw_byte_digest !== manifest.input_identity.fixture_input_digest || typeof statement.frozen_candidate_input?.public_source_path !== "string") throw new Error("private independence statement frozen input raw binding mismatch");
+  if (root) {
+    const sourcePath = resolveAuthorityArtifactPath(realpathSync(root), statement.frozen_candidate_input.public_source_path, "private independence frozen public source");
+    const source = readJsonArtifact(sourcePath, "private independence frozen public source", { publicArtifact: true });
+    if (rawByteDigest(source.bytes) !== statement.frozen_candidate_input.raw_byte_digest) throw new Error("private independence frozen public source raw-byte digest drift");
+    if (canonicalDigest(source.value) !== statement.frozen_candidate_input.digest) throw new Error("private independence frozen public source semantic digest drift");
+    const fixture = source.value.fixtures?.[manifest.fixture_identity.fixture_id];
+    if (!fixture) throw new Error("private independence frozen public source fixture binding is missing");
+  }
   if (statement.measured_output_used !== false || statement.measured_result_used !== false) throw new Error("private independence statement must exclude measured evidence");
-  if (typeof statement.author_scratch?.used !== "boolean" || typeof statement.author_scratch?.scope !== "string") throw new Error("private independence statement author-scratch classification is incomplete");
+  if (typeof statement.author_scratch?.used !== "boolean" || typeof statement.author_scratch?.scope !== "string" || statement.author_scratch?.contamination_assessment?.state !== "not_used" || typeof statement.author_scratch?.contamination_assessment?.evidence_basis !== "string") throw new Error("private independence statement author-scratch classification is incomplete or contaminated");
   for (const field of ["source_classification", "excluded_source_classification"]) {
     const values = statement[field];
     if (!Array.isArray(values) || values.length === 0 || values.some((entry) => typeof entry !== "string" || entry.length === 0) || new Set(values).size !== values.length) throw new Error(`private independence statement ${field} is invalid`);
   }
   for (const field of ["contaminated_issues_193_196_as_oracle_source", "issue_194_body_used", "issue_194_edit_history_used", "issue_194_legacy_answer_structure_used"]) {
-    if (!statement[field] || !["not_used", "used", "unknown"].includes(statement[field].state) || typeof statement[field].evidence_basis !== "string" || statement[field].evidence_basis.length === 0) throw new Error(`private independence statement ${field} is incomplete`);
+    if (!statement[field] || statement[field].state !== "not_used" || typeof statement[field].evidence_basis !== "string" || statement[field].evidence_basis.length === 0) throw new Error(`private independence statement ${field} is contaminated or incomplete`);
   }
+  if (manifest.independence.public_answer_sources_used !== false || manifest.independence.generated_without_agent_output !== true || manifest.independence.measured_agent_access_allowed !== false) throw new Error("private independence manifest assertion is contaminated or unsafe");
   return structuredClone(statement);
 }
 
@@ -627,7 +640,7 @@ export function verifyPrivateEvaluatorBundle({
   const independenceStatement = independenceAsset
     ? readJsonArtifact(resolve(privateRoot, independenceAsset.path), "private independence statement").value
     : null;
-  if (independenceStatement) validateIndependenceStatement({ statement: independenceStatement, manifest });
+  if (independenceStatement) validateIndependenceStatement({ statement: independenceStatement, manifest, root });
   if (stableCanonicalJson([...files.keys()].sort()) !== stableCanonicalJson(expectedPaths.sort())) throw new Error("private evaluator root has an unexpected or unmanaged inventory entry");
   if (manifest.evaluator_bundle_id !== computeEvaluatorBundleId(manifest)) throw new Error("private evaluator bundle ID is invalid");
   if (manifest.evaluator_bundle_digest !== computeEvaluatorBundleDigest(manifest)) throw new Error("private evaluator bundle digest closure is invalid");

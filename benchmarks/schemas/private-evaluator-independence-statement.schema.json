@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK private evaluator independence provenance statement",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "generator_role_identity",
+    "generation_date",
+    "generation_revision",
+    "frozen_candidate_input",
+    "source_classification",
+    "excluded_source_classification",
+    "measured_output_used",
+    "measured_result_used",
+    "author_scratch",
+    "contaminated_issues_193_196_as_oracle_source",
+    "issue_194_body_used",
+    "issue_194_edit_history_used",
+    "issue_194_legacy_answer_structure_used",
+    "statement_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.1.0" },
+    "fixture_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "generator_role_identity": { "$ref": "#/$defs/generator" },
+    "generation_date": { "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "generation_revision": { "$ref": "#/$defs/revision" },
+    "frozen_candidate_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["public_source_path", "raw_byte_digest", "digest"],
+      "properties": {
+        "public_source_path": { "$ref": "#/$defs/path" },
+        "raw_byte_digest": { "$ref": "#/$defs/digest" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "source_classification": { "$ref": "#/$defs/stringSet" },
+    "excluded_source_classification": { "$ref": "#/$defs/stringSet" },
+    "measured_output_used": { "const": false },
+    "measured_result_used": { "const": false },
+    "author_scratch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["used", "scope", "contamination_assessment"],
+      "properties": {
+        "used": { "type": "boolean" },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "contamination_assessment": { "$ref": "#/$defs/contamination" }
+      }
+    },
+    "contaminated_issues_193_196_as_oracle_source": { "$ref": "#/$defs/contamination" },
+    "issue_194_body_used": { "$ref": "#/$defs/contamination" },
+    "issue_194_edit_history_used": { "$ref": "#/$defs/contamination" },
+    "issue_194_legacy_answer_structure_used": { "$ref": "#/$defs/contamination" },
+    "statement_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!\\./)[a-zA-Z0-9._/-]+$" },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "source_digest"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "source_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "stringSet": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 96 }
+    },
+    "contamination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "evidence_basis"],
+      "properties": {
+        "state": { "enum": ["not_used", "used", "unknown"] },
+        "evidence_basis": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    }
+  }
+}

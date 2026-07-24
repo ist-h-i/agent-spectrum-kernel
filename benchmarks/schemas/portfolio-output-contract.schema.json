@@ -28,6 +28,7 @@
     "verification_command_contract_digest": { "$ref": "#/$defs/digest" },
     "scope_boundary_authority_path": { "$ref": "#/$defs/path" },
     "scope_boundary_authority_digest": { "$ref": "#/$defs/digest" },
+    "result_profile": { "$ref": "#/$defs/resultProfile" },
     "declares_findings": { "type": "boolean" },
     "output_contract_digest": { "$ref": "#/$defs/digest" }
   },
@@ -35,5 +36,14 @@
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "token": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
     "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[a-zA-Z0-9._/-]+$" }
+    ,"resultProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "digest"],
+      "properties": {
+        "name": { "const": "binary_scope_verification_v1" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    }
   }
 }

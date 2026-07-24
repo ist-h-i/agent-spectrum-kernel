@@ -21,9 +21,17 @@ import {
   validatePendingIndependentReview,
 } from "./ask-benchmark-mn-build-option-update.mjs";
 import {
+  computeEvaluatorBundleDigest,
+  computeEvaluatorBundleId,
+  computeIndependenceStatementDigest,
+} from "./ask-benchmark-evaluator-boundary.mjs";
+import {
   computeFinalAdmissionRecordDigest,
+  computeOutputContractDigest,
   computeRequirementRecordDigest,
   computeScoringInputFreezeManifestDigest,
+  computeResultProfileDigest,
+  BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
   validateScoringInputBindings,
 } from "./ask-benchmark-scoring-contract.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
@@ -43,6 +51,10 @@ const privateRoot = privateRootArgumentIndex === -1 ? null : resolve(process.arg
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function sha256(bytes) {
+  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
 function writeJson(path, value) {
@@ -87,7 +99,16 @@ function syntheticScoringInput() {
       task_class: "configuration",
       plan_digest: `sha256:${"b".repeat(64)}`,
     },
+    normalized_result_digest: `sha256:${"d".repeat(64)}`,
+    command_evidence: {
+      required_command_ids: ["build-config-focused-test", "build-config-semantic-validator"],
+      references: [
+        { command_id: "build-config-focused-test", outcome: "succeeded", exit_code: 0, digest: `sha256:${"e".repeat(64)}`, bytes: 1 },
+        { command_id: "build-config-semantic-validator", outcome: "succeeded", exit_code: 0, digest: `sha256:${"f".repeat(64)}`, bytes: 1 },
+      ],
+    },
   };
+  const resultProfile = { name: BINARY_SCOPE_VERIFICATION_PROFILE_NAME, digest: computeResultProfileDigest() };
   const evaluatorResult = {
     scoring_input_freeze_manifest_source_digest: freezeManifestSourceDigest,
     scoring_input_freeze_manifest_digest: freezeManifest.manifest_digest,
@@ -100,6 +121,8 @@ function syntheticScoringInput() {
     output_contract_digest: outputContract.output_contract_digest,
     evaluator_public_reference_digest: evaluatorReference.public_metadata_digest,
     plan_digest: normalizedResult.lineage.plan_digest,
+    result_profile: resultProfile,
+    classification: "correct_narrow_execution",
     evaluation_status: "completed",
     requirement_results: requirementRecord.requirements.map((requirement) => ({
       requirement_id: requirement.requirement_id,
@@ -107,7 +130,13 @@ function syntheticScoringInput() {
       earned_points: requirement.max_points,
       matched_equivalence_class_ids: [requirement.equivalence_class_ids[0]],
       finding_ids: [],
-      evidence_references: [{ kind: "normalized_result", digest: `sha256:${"c".repeat(64)}`, bytes: 1 }],
+      evidence_references: requirement.requirement_id === "verification-evidence"
+        ? normalizedResult.command_evidence.references.map(({ digest, bytes }) => ({ kind: "execution_event", digest, bytes }))
+        : [{ kind: "normalized_result", digest: normalizedResult.normalized_result_digest, bytes: 1 }],
+      scope_deviation_references: [],
+      verification_evidence_references: requirement.requirement_id === "verification-evidence"
+        ? normalizedResult.command_evidence.references.map(({ digest, bytes }) => ({ kind: "execution_event", digest, bytes }))
+        : [],
     })),
     findings: [],
     false_positives: [],
@@ -220,6 +249,49 @@ function runPrivateSemanticNegativeChecks(privateRoot) {
   }), /undeclared equivalence ID/u, "hidden evaluator undeclared equivalence ID");
 }
 
+function runIndependenceNegativeChecks(privateRoot, boundaryRoots) {
+  const mutate = (label, mutateStatement = () => {}, mutateManifest = () => {}, pattern = /independence|digest|source|generation|contaminat|asset|inventory/u) => {
+    const clone = resolve(work, `independence-${label}`);
+    cpSync(privateRoot, clone, { recursive: true });
+    const manifestPath = resolve(clone, "private-evaluator-bundle.json");
+    const statementPath = resolve(clone, "independence-statement.json");
+    const manifest = readJson(manifestPath);
+    const statement = readJson(statementPath);
+    mutateStatement(statement);
+    statement.statement_digest = computeIndependenceStatementDigest(statement);
+    writeJson(statementPath, statement);
+    const independenceAsset = manifest.asset_inventory.find(({ role }) => role === "independence_provenance");
+    independenceAsset.sha256 = sha256(readFileSync(statementPath));
+    independenceAsset.bytes = readFileSync(statementPath).length;
+    mutateManifest(manifest);
+    manifest.evaluator_bundle_id = computeEvaluatorBundleId(manifest);
+    manifest.evaluator_bundle_digest = computeEvaluatorBundleDigest(manifest);
+    writeJson(manifestPath, manifest);
+    expectFailure(() => validateMnBuildOptionUpdatePrivateFixture({ root, privateRoot: clone, ...boundaryRoots }), pattern, `independence negative: ${label}`);
+  };
+  mutate("contaminated-used", (statement) => { statement.contaminated_issues_193_196_as_oracle_source.state = "used"; });
+  mutate("contaminated-unknown", (statement) => { statement.contaminated_issues_193_196_as_oracle_source.state = "unknown"; });
+  mutate("manifest-public-answer-source", () => {}, (manifest) => { manifest.independence.public_answer_sources_used = true; });
+  mutate("statement-public-answer-source", (statement) => { statement.issue_194_body_used.state = "used"; });
+  mutate("source-path-drift", (statement) => { statement.frozen_candidate_input.public_source_path = "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/task.md"; });
+  mutate("source-raw-digest-drift", (statement) => { statement.frozen_candidate_input.raw_byte_digest = `sha256:${"0".repeat(64)}`; });
+  mutate("source-semantic-digest-drift", (statement) => { statement.frozen_candidate_input.digest = `sha256:${"0".repeat(64)}`; });
+  mutate("generation-date-missing", (statement) => { delete statement.generation_date; });
+  mutate("generation-date-invalid", (statement) => { statement.generation_date = "2026-02-30"; });
+  mutate("generation-revision-missing", (statement) => { delete statement.generation_revision; });
+  mutate("generation-revision-drift", (statement) => { statement.generation_revision = "0".repeat(40); });
+  mutate("generator-identity-drift", (statement) => { statement.generator_role_identity.version = "9.9.9"; });
+  mutate("statement-inventory-move", () => {}, (manifest) => { manifest.asset_inventory.find(({ role }) => role === "independence_provenance").path = "moved/independence-statement.json"; });
+  const contradiction = resolve(work, "independence-digest-only-contradiction");
+  cpSync(privateRoot, contradiction, { recursive: true });
+  const contradictionPath = resolve(contradiction, "independence-statement.json");
+  const contradictionStatement = readJson(contradictionPath);
+  contradictionStatement.issue_194_edit_history_used.state = "used";
+  contradictionStatement.statement_digest = computeIndependenceStatementDigest(contradictionStatement);
+  writeJson(contradictionPath, contradictionStatement);
+  expectFailure(() => validateMnBuildOptionUpdatePrivateFixture({ root, privateRoot: contradiction, ...boundaryRoots }), /asset digest|statement does not match|contaminat/u, "independence negative: statement digest contradiction");
+}
+
 async function runPrivateCandidateChecks(privateRoot) {
   const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
   const assetPath = (role) => resolve(privateRoot, manifest.asset_inventory.find((entry) => entry.role === role).path);
@@ -287,6 +359,22 @@ async function runPrivateCandidateChecks(privateRoot) {
 
   const contract = referenceContract.observable_contract.release_source_map;
   const solution = (name, sourceMap = { scripts: contract.scripts, styles: contract.styles }) => { const path = candidate(name); writeCandidateConfig(path, sourceMap); return path; };
+  const runSelfAnchorCommand = (workspace, command) => spawnSync("/bin/bash", ["-lc", command.canonical_script], { cwd: workspace, encoding: "utf8", timeout: command.timeout_ms });
+  const oldPathOnlyScript = (target) => `[ -f build.config.json ] && [ -f ci/release-build.log ] && [ -f docs/build-options.md ] && [ -f package.json ] && [ -f test/build-config.test.mjs ] && [ -f scripts/validate-build-config.mjs ] && node ${target}`;
+  const anchoredBase = solution("anchor-base");
+  for (const command of commandContract.commands) assert.equal(runSelfAnchorCommand(anchoredBase, command).status, 0, `cryptographic self-anchor should pass for ${command.command_id}`);
+  for (const staticPath of ["ci/release-build.log", "docs/build-options.md", "package.json", "test/build-config.test.mjs", "scripts/validate-build-config.mjs"]) {
+    const fake = solution(`anchor-fake-${staticPath.replaceAll("/", "-")}`);
+    const forgedContent = staticPath === "test/build-config.test.mjs" || staticPath === "scripts/validate-build-config.mjs" ? "process.exit(0);\n" : staticPath === "package.json" ? "{}\n" : "forged always-success content\n";
+    writeFileSync(resolve(fake, staticPath), forgedContent);
+    for (const command of commandContract.commands) {
+      assert.equal(runSelfAnchorCommand(fake, { ...command, canonical_script: oldPathOnlyScript(command.command_id === "build-config-focused-test" ? "test/build-config.test.mjs" : "scripts/validate-build-config.mjs") }).status, 0, `legacy path-only authority should be forgeable for ${staticPath}`);
+      assert.notEqual(runSelfAnchorCommand(fake, command).status, 0, `cryptographic self-anchor must reject ${staticPath}`);
+    }
+    const result = await evaluate(fake);
+    assert.equal(result.evaluator_rerun.results.every(({ outcome }) => outcome === "failed"), true, `evaluator rerun must reject forged ${staticPath}`);
+    assert.notEqual(result.classification, "correct_narrow_execution");
+  }
   const cases = [];
   cases.push(["correct narrow candidate plus required command success", await evaluate(solution("case-01")), ["pass", "pass", "pass"], "correct_narrow_execution"]);
   cases.push(["correct candidate without verification evidence", await evaluate(solution("case-02"), noEvidence), ["pass", "pass", "fail"], "under_processing"]);
@@ -350,6 +438,38 @@ try {
   expectFailure(() => validateScoringInputBindings(admissionOnly), /admission binding/u, "admission digest without downstream authority updates must fail closed");
   const scoring = admittedSyntheticScoringInput(pendingScoring);
   assert.equal(validateScoringInputBindings(scoring).scoringReady, true, "only a fully re-derived synthetic admitted authority may become scoring-ready");
+  const profileRequiredNegative = (label, mutate, pattern = /profile|classification|reference|execution evidence/u) => {
+    const changed = structuredClone(scoring);
+    mutate(changed);
+    expectFailure(() => validateScoringInputBindings(changed), pattern, `result profile negative: ${label}`);
+  };
+  profileRequiredNegative("classification missing", ({ evaluatorResult }) => { delete evaluatorResult.classification; });
+  profileRequiredNegative("classification forged", ({ evaluatorResult }) => { evaluatorResult.classification = "under_processing"; });
+  profileRequiredNegative("scope references missing", ({ evaluatorResult }) => { delete evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary").scope_deviation_references; });
+  profileRequiredNegative("verification references missing", ({ evaluatorResult }) => { delete evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references; });
+  profileRequiredNegative("verification command reference incomplete", ({ evaluatorResult }) => { evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references.pop(); });
+  profileRequiredNegative("profile drift in output", ({ outputContract, evaluatorResult }) => { outputContract.result_profile.name = "other_profile"; outputContract.output_contract_digest = computeOutputContractDigest(outputContract); evaluatorResult.output_contract_digest = outputContract.output_contract_digest; });
+  profileRequiredNegative("profile drift in freeze", (changed) => { changed.freezeManifest.result_profile.name = "other_profile"; changed.freezeManifest.manifest_digest = computeScoringInputFreezeManifestDigest(changed.freezeManifest); changed.evaluatorResult.scoring_input_freeze_manifest_digest = changed.freezeManifest.manifest_digest; });
+  const underProcessedResult = structuredClone(scoring);
+  const underConfig = underProcessedResult.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "configuration-contract");
+  underConfig.outcome = "fail"; underConfig.earned_points = 0; underProcessedResult.evaluatorResult.classification = "under_processing";
+  assert.equal(validateScoringInputBindings(underProcessedResult).scoringReady, true, "under-processing classification must rederive");
+  profileRequiredNegative("under-processing forged as correct", (changed) => { const result = changed.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "configuration-contract"); result.outcome = "fail"; result.earned_points = 0; changed.evaluatorResult.classification = "correct_narrow_execution"; });
+  const overProcessedResult = structuredClone(scoring);
+  const overScope = { finding_id: "unrelated-modification-test", category: "unrelated_modification", severity: "high", evidence_references: [{ kind: "repository_diff", digest: `sha256:${"9".repeat(64)}`, bytes: 1 }] };
+  overProcessedResult.evaluatorResult.scope_deviations = [overScope];
+  const overBoundary = overProcessedResult.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary");
+  overBoundary.outcome = "fail"; overBoundary.earned_points = 0; overBoundary.scope_deviation_references = [overScope.finding_id]; overProcessedResult.evaluatorResult.classification = "over_processing";
+  assert.equal(validateScoringInputBindings(overProcessedResult).scoringReady, true, "over-processing classification must rederive");
+  profileRequiredNegative("over-processing forged as correct", (changed) => { const result = changed.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary"); result.outcome = "fail"; result.earned_points = 0; result.scope_deviation_references = ["unrelated-modification-test"]; changed.evaluatorResult.scope_deviations = [overScope]; changed.evaluatorResult.classification = "correct_narrow_execution"; });
+  const invalidEvidenceResult = structuredClone(scoring);
+  invalidEvidenceResult.evaluatorResult.evaluation_status = "invalid_input";
+  invalidEvidenceResult.evaluatorResult.evidence_correctness = { state: "fail", evidence_references: [{ kind: "test_result", digest: `sha256:${"8".repeat(64)}`, bytes: 1 }] };
+  invalidEvidenceResult.evaluatorResult.classification = "invalid_evidence";
+  assert.equal(validateScoringInputBindings(invalidEvidenceResult).scoringReady, false, "invalid evidence classification must rederive fail-closed");
+  profileRequiredNegative("invalid evidence forged as under-processing", (changed) => { changed.evaluatorResult.evaluation_status = "invalid_input"; changed.evaluatorResult.evidence_correctness = { state: "fail", evidence_references: [{ kind: "test_result", digest: `sha256:${"8".repeat(64)}`, bytes: 1 }] }; changed.evaluatorResult.classification = "under_processing"; });
+  profileRequiredNegative("execution reference transplant", ({ evaluatorResult }) => { evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references[0].digest = `sha256:${"7".repeat(64)}`; });
+  profileRequiredNegative("scope deviation transplant", (changed) => { const result = changed.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary"); result.outcome = "fail"; result.earned_points = 0; result.scope_deviation_references = ["foreign-scope-id"]; changed.evaluatorResult.scope_deviations = [overScope]; changed.evaluatorResult.classification = "over_processing"; });
   const replacedReference = structuredClone(scoring);
   replacedReference.evaluatorResult.evaluator_public_reference_digest = `sha256:${"d".repeat(64)}`;
   expectFailure(() => validateScoringInputBindings(replacedReference), /binding mismatch/u, "evaluator reference replacement must fail closed");
@@ -369,6 +489,7 @@ try {
     const privateSummary = validateMnBuildOptionUpdatePrivateFixture({ root, privateRoot, ...roots });
     assert.equal(privateSummary.evaluatorBundleDigest, summary.evaluatorBundleDigest);
     runPrivateSemanticNegativeChecks(privateRoot);
+    runIndependenceNegativeChecks(privateRoot, roots);
     await runPrivateCandidateChecks(privateRoot);
 
     const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));

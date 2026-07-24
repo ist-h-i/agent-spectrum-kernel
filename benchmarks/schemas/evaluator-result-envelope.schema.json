@@ -85,6 +85,7 @@
     "evaluator_bundle_id": { "type": "string", "pattern": "^evaluator-[a-f0-9]{64}$" },
     "evaluator_bundle_digest": { "$ref": "#/$defs/digest" },
     "evaluator_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "result_profile": { "$ref": "#/$defs/resultProfile" },
     "evaluation_id": { "type": "string", "pattern": "^evaluation-[a-f0-9]{32}$" },
     "evaluation_digest": { "$ref": "#/$defs/digest" },
     "evaluation_status": { "enum": ["completed", "invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required"] },
@@ -143,6 +144,15 @@
   "$defs": {
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "token": { "type": "string", "minLength": 1, "maxLength": 96, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "resultProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "digest"],
+      "properties": {
+        "name": { "const": "binary_scope_verification_v1" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
     "observation": {
       "type": "object",
       "additionalProperties": false,

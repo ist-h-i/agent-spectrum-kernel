@@ -34,6 +34,7 @@
     "evaluator_public_reference": { "$ref": "#/$defs/semanticArtifact" },
     "verification_command_contract": { "$ref": "#/$defs/semanticArtifact" },
     "evidence_map": { "$ref": "#/$defs/semanticArtifact" },
+    "result_profile": { "$ref": "#/$defs/resultProfile" },
     "freeze_revision": { "$ref": "#/$defs/token" },
     "manifest_digest": { "$ref": "#/$defs/digest" }
   },
@@ -60,6 +61,15 @@
         "raw_byte_digest": { "$ref": "#/$defs/digest" },
         "record_digest": { "$ref": "#/$defs/digest" },
         "set_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "resultProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "digest"],
+      "properties": {
+        "name": { "const": "binary_scope_verification_v1" },
+        "digest": { "$ref": "#/$defs/digest" }
       }
     }
   }

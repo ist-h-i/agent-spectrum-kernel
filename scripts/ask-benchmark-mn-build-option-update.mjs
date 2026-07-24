@@ -16,6 +16,8 @@ import {
   computeRequirementRecordDigest,
   computeRequirementSetDigest,
   computeScoringInputFreezeManifestDigest,
+  computeResultProfileDigest,
+  BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
   validateRequirementRecordContract,
 } from "./ask-benchmark-scoring-contract.mjs";
 import { validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
@@ -269,10 +271,17 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
     { command_id: "build-config-focused-test", purpose: "test", working_directory: { path: ".", evidence_requirement: "not_required" }, requirement: "required" },
     { command_id: "build-config-semantic-validator", purpose: "validation", working_directory: { path: ".", evidence_requirement: "not_required" }, requirement: "required" },
   ], "fixture verification command authority");
+  const immutableAnchors = {
+    "ci/release-build.log": "897fa262a51db0844805841456332745592b3e45c8bbd5fb705c10a8c90269c9",
+    "docs/build-options.md": "765541869cdc553e6566c905fabf81f1843b4aea4c10e1f4e4989f52f317b2c2",
+    "package.json": "50844c248aa736d57768a926544720b56914396bdc7b997f310897b4456aa5ed",
+    "test/build-config.test.mjs": "641fcf626c4a06509058e3d4ee49cefcd7166182f75ee26a3ab3c8d87190f6ff",
+    "scripts/validate-build-config.mjs": "884155195e0ad532a29ab1dc6122b343fea1bc6f285d54a55edd09653d447c2a",
+  };
   for (const command of verificationContract.commands) {
-    for (const sentinel of ["[ -f build.config.json ]", "[ -f ci/release-build.log ]", "[ -f docs/build-options.md ]", "[ -f test/build-config.test.mjs ]", "[ -f scripts/validate-build-config.mjs ]"]) {
-      if (!command.canonical_script.includes(sentinel)) throw new Error(`verification command ${command.command_id} is not self-anchoring`);
-    }
+    if (!command.canonical_script.includes("node -e") || !command.canonical_script.includes("crypto.createHash(\"sha256\")") || command.canonical_script.includes("check-fixture-anchor")) throw new Error(`verification command ${command.command_id} is not cryptographically self-anchoring`);
+    for (const [path, digest] of Object.entries(immutableAnchors)) if (!command.canonical_script.includes(`"${path}":"${digest}"`)) throw new Error(`verification command ${command.command_id} is missing immutable anchor ${path}`);
+    if (!command.canonical_script.includes("[ -f build.config.json ]")) throw new Error(`verification command ${command.command_id} is missing candidate config anchor`);
   }
 
   const manifestFixture = inputManifest.fixtures?.[FIXTURE_ID];
@@ -306,6 +315,7 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
   if (outputContract.declares_findings !== false || outputContract.evaluator_public_reference_digest !== reference.public_metadata_digest) throw new Error("implementation output contract binding mismatch");
   if (outputContract.verification_command_contract_path !== `${FIXTURE_ROOT_RELATIVE}/verification-command-contract.json` || outputContract.verification_command_contract_digest !== verificationContract.contract_digest) throw new Error("output contract verification-command binding mismatch");
   if (outputContract.scope_boundary_authority_path !== `${FIXTURE_ROOT_RELATIVE}/evidence-map.json` || outputContract.scope_boundary_authority_digest !== artifacts["evidence-map.json"].scope_boundary_authority.authority_digest) throw new Error("output contract scope-boundary binding mismatch");
+  if (outputContract.result_profile?.name !== BINARY_SCOPE_VERIFICATION_PROFILE_NAME || outputContract.result_profile.digest !== computeResultProfileDigest(outputContract.result_profile)) throw new Error("output contract result profile binding mismatch");
 
   const metadata = artifacts["metadata.json"];
   assertDigest(metadata.metadata_digest, canonicalDigest(withoutField(metadata, "metadata_digest")), "fixture metadata");
@@ -340,6 +350,7 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
   validateRawFreezeArtifact(root, freeze.evaluator_public_reference, reference.public_metadata_digest, "evaluator reference");
   validateRawFreezeArtifact(root, freeze.verification_command_contract, verificationContract.contract_digest, "verification command contract");
   validateRawFreezeArtifact(root, freeze.evidence_map, canonicalDigest(evidenceMap), "evidence map");
+  if (freeze.result_profile?.name !== outputContract.result_profile.name || freeze.result_profile.digest !== outputContract.result_profile.digest) throw new Error("freeze result profile binding mismatch");
   assertDigest(freeze.requirement_record.raw_byte_digest, sha256(readFileSync(paths["requirement-record.json"])), "requirement record raw byte");
   assertDigest(freeze.requirement_record.record_digest, computeRequirementRecordDigest(requirementRecord), "requirement record semantic");
   assertDigest(freeze.requirement_record.set_digest, computeRequirementSetDigest(requirementRecord), "requirement set");
