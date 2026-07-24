@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -23,6 +23,8 @@ import {
 import {
   computeEvaluationDigest,
   computeEvaluationId,
+  computePrivateEvaluationRecordDigest,
+  computeAdapterResultEnvelopeDigest,
   computeEvaluatorBundleDigest,
   computeEvaluatorBundleId,
   computeIndependenceStatementDigest,
@@ -630,7 +632,65 @@ function persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scor
     const stat = lstatSync(absolute);
     return { path, bytes: readFileSync(absolute).length, sha256: authorityFileDigest(absolute), inode: stat.ino };
   });
-  return { snapshot, evaluatorResultPath, privateFragmentPath, chainManifest };
+  const track = (path) => tracked.push({ path: authorityRelativePath(path), bytes: readFileSync(path).length, sha256: authorityFileDigest(path), inode: lstatSync(path).ino });
+  return { snapshot, track, evaluatorResultPath, privateFragmentPath, chainManifest };
+}
+
+function privateEvaluationRecordFor({ authorityRoot, chain, normalizedAuthority, bundleManifest, scoringAuthority, draftEvaluatorResult, privateFragmentBytes, privateFragmentDigest }) {
+  const artifactSpecs = [
+    ["repository_diff", "repository-diff-artifact.json"],
+    ["test_result", "evaluator-check-artifact.json"],
+    ["test_result", "evaluation-input-failure-artifact.json"],
+  ];
+  const artifacts = artifactSpecs.flatMap(([kind, name]) => {
+    const path = resolve(authorityRoot, name);
+    if (!existsSync(path)) return [];
+    const artifact = readJson(path);
+    return [{
+      kind,
+      path: relative(authorityRoot, path).split(sep).join("/"),
+      digest: artifact.artifact_digest,
+      bytes: readFileSync(path).length,
+      run_instance_id: artifact.run_instance_id,
+      case_id: artifact.case_id,
+      attempt: artifact.attempt,
+      normalized_result_id: artifact.normalized_result_id ?? normalizedAuthority.normalized.normalized_result_id,
+      normalized_result_digest: artifact.normalized_result_digest ?? normalizedAuthority.normalized.normalized_result_digest,
+      evaluator_bundle_id: bundleManifest.evaluator_bundle_id,
+      evaluator_bundle_digest: bundleManifest.evaluator_bundle_digest,
+    }];
+  });
+  const repositoryArtifact = readJson(resolve(authorityRoot, "repository-diff-artifact.json"));
+  const record = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/private-evaluation-record.schema.json",
+    program: "adaptive_ask_private_evaluation_record",
+    evaluator_bundle_id: bundleManifest.evaluator_bundle_id,
+    evaluator_bundle_digest: bundleManifest.evaluator_bundle_digest,
+    evaluator_revision: bundleManifest.evaluator_revision,
+    evaluator_source_identity: bundleManifest.evaluator_source_identity,
+    normalized_result_id: normalizedAuthority.normalized.normalized_result_id,
+    normalized_result_digest: normalizedAuthority.normalized.normalized_result_digest,
+    run_instance_id: normalizedAuthority.normalized.lineage.run_instance_id,
+    case_id: normalizedAuthority.normalized.lineage.case_id,
+    attempt: normalizedAuthority.normalized.lineage.attempt,
+    frozen_workspace_inventory_digest: repositoryArtifact.frozen_workspace_tree_digest,
+    candidate_workspace_inventory_digest: repositoryArtifact.candidate_workspace_tree_digest,
+    repository_diff_artifact_digest: repositoryArtifact.artifact_digest,
+    repository_diff_artifact_bytes: readFileSync(resolve(authorityRoot, "repository-diff-artifact.json")).length,
+    private_fragment_path: relative(authorityRoot, chain.privateFragmentPath).split(sep).join("/"),
+    private_fragment_sha256: privateFragmentDigest,
+    private_fragment_bytes: privateFragmentBytes,
+    fragment_schema_digest: sha256(readFileSync(resolve(root, "benchmarks/schemas/private-evaluator-fragment.schema.json"))),
+    adapter_source_digest: sha256(readFileSync(resolve(root, "scripts/ask-benchmark-evaluator-boundary.mjs"))),
+    adapter_result_envelope_digest: computeAdapterResultEnvelopeDigest(draftEvaluatorResult),
+    evidence_artifacts: artifacts,
+  };
+  record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record);
+  const recordPath = resolve(authorityRoot, "authority-chain", "private-evaluation-record.json");
+  writeJson(recordPath, record);
+  chain.track(recordPath);
+  return { record, recordPath };
 }
 
 async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority }) {
@@ -646,6 +706,7 @@ async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAut
     frozenWorkspace,
     candidateWorkspace,
     normalizedResult: normalizedAuthority.normalized,
+    evaluationInputEvidenceRoot: authorityRoot,
   });
   assert.equal(fragment.program, "adaptive_ask_private_evaluator_fragment", "full authority must persist the actual private fragment");
   return { fragment, frozenWorkspace, candidateWorkspace };
@@ -663,6 +724,8 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state) {
     normalizedResult: normalizedAuthority.normalized,
     sourceSnapshotDigest: normalizedAuthority.sourceSnapshotDigest,
     bundleManifest,
+    privateFragmentDigest: sha256(Buffer.from(`${JSON.stringify(actual.fragment, null, 2)}\n`)),
+    privateFragmentBytes: Buffer.byteLength(`${JSON.stringify(actual.fragment, null, 2)}\n`),
     fragmentBinding: {
       normalized_result_id: normalizedAuthority.normalized.normalized_result_id,
       normalized_result_digest: normalizedAuthority.normalized.normalized_result_digest,
@@ -683,9 +746,12 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state) {
   const foreignAuthority = { ...adapterAuthority, normalizedResult: structuredClone(normalizedAuthority.normalized) };
   foreignAuthority.normalizedResult.lineage.run_instance_id = "00000000-0000-4000-8000-000000000208";
   assert.throws(() => adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: actual.fragment, authority: foreignAuthority }), /reference|state|normalized|lineage/u, "adapter must reject a cross-run normalized result");
-  const evaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: actual.fragment, authority: adapterAuthority });
-  assert.equal(Object.hasOwn(evaluatorResult, "evaluator_rerun"), false, "private-only rerun metadata must not leak into the public envelope");
-  const chain = persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scoringAuthority, evaluatorResult, privateFragment: actual.fragment });
+  const draftEvaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: actual.fragment, authority: adapterAuthority });
+  assert.equal(Object.hasOwn(draftEvaluatorResult, "evaluator_rerun"), false, "private-only rerun metadata must not leak into the public envelope");
+  const chain = persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scoringAuthority, evaluatorResult: draftEvaluatorResult, privateFragment: actual.fragment });
+  const privateRecord = privateEvaluationRecordFor({ authorityRoot, chain, normalizedAuthority, bundleManifest, scoringAuthority, draftEvaluatorResult, privateFragmentBytes: adapterAuthority.privateFragmentBytes, privateFragmentDigest: adapterAuthority.privateFragmentDigest });
+  const evaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: actual.fragment, authority: { ...adapterAuthority, privateEvaluationRecordDigest: privateRecord.record.evaluation_record_digest } });
+  writeJson(chain.evaluatorResultPath, evaluatorResult);
   const common = {
     root,
     catalogPath: resolve(root, "benchmarks/portfolio-catalog.json"),
@@ -700,6 +766,9 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state) {
     privateRoot,
     manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"),
     resultPath: chain.evaluatorResultPath,
+    privateEvaluationRoot: authorityRoot,
+    privateEvaluationRecordPath: privateRecord.recordPath,
+    privateFragmentPath: chain.privateFragmentPath,
     materializedPath: normalizedAuthority.materializedPath,
     selectionState: normalizedAuthority.selectionState,
     runDir: normalizedAuthority.runDir,
@@ -752,7 +821,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state) {
   assert.throws(() => verifyEvaluatorBoundary(common), /normalized result identity|digest|inventory|summary|inconsistent/u, "persistent authority tamper: command summary");
   writeFileSync(normalizedPath, originalNormalizedBytes);
   assert.deepEqual(chain.snapshot(), before, "persistent authority tamper must restore command summary");
-  return { authorityRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, chain, verifiedResult };
+  return { authorityRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, privateRecord, chain, verifiedResult };
 }
 
 function privateSemanticAuthority(privateRoot) {

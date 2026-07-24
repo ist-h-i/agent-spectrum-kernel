@@ -354,16 +354,23 @@ function checkedInBytes(root, relativePath) {
 }
 
 function checkedInBytesAtRevision(root, revision, relativePath) {
+  const key = `${root}\0${revision}\0${relativePath}`;
+  const cached = CHECKED_IN_REVISION_BYTES.get(key);
+  if (cached) return cached;
   try {
-    return execFileSync("git", ["-C", root, "show", `${revision}:${relativePath}`], {
+    const bytes = execFileSync("git", ["-C", root, "show", `${revision}:${relativePath}`], {
       encoding: null,
       maxBuffer: 4 * 1024 * 1024,
       stdio: ["ignore", "pipe", "ignore"],
     });
+    CHECKED_IN_REVISION_BYTES.set(key, bytes);
+    return bytes;
   } catch {
     return null;
   }
 }
+
+const CHECKED_IN_REVISION_BYTES = new Map();
 
 const MODULE_IMPORT_PATTERNS = Object.freeze([
   { kind: "static_import", pattern: /\bimport\s+(?:[^"'();\n]*?\sfrom\s+)?["']([^"']+)["']/gu },

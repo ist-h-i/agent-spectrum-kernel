@@ -405,7 +405,7 @@ export function validateMnBuildOptionUpdatePrivateFixture(options) {
     referencePath: resolve(root, FIXTURE_ROOT_RELATIVE, "evaluator-reference.json"),
     manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"),
   });
-  const requiredRoles = ["equivalent_solution_rules", "evidence_removal_mutations", "hidden_tests", "human_evaluation_instructions", "independence_provenance", "oracle", "rubric", "scope_boundaries"];
+  const requiredRoles = ["equivalent_solution_rules", "evaluator_dependency_graph", "evidence_removal_mutations", "hidden_tests", "human_evaluation_instructions", "independence_provenance", "oracle", "rubric", "scope_boundaries"];
   assertEqual(bundle.manifest.asset_inventory.map(({ role }) => role), requiredRoles, "private evaluator role inventory");
   const requirementRecord = readJson(resolve(root, FIXTURE_ROOT_RELATIVE, "requirement-record.json"), "public requirement record");
   const admissionRecord = readJson(resolve(root, FIXTURE_ROOT_RELATIVE, "final-admission-record.json"), "public final admission record");
