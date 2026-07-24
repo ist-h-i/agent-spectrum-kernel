@@ -3,9 +3,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "input_manifest_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
   "evaluator_reference_schema": "benchmarks/schemas/evaluator-reference.schema.json",
-  "evaluator_bundle_id": "evaluator-d21ffbd2621140dcc1f350c37af6968cf32ef378d269bf98648aaafadee7d868",
-  "evaluator_bundle_digest": "sha256:2c462320a17a4b60d4b5f1bf69d780da4ea6000a7fd504eac5a4b5b18fa8e62f",
-  "evaluator_byte_count": 30724,
+  "evaluator_bundle_id": "evaluator-65dbcef4d634219560e1129a6adc9fcc47e42c6c5230ae2871ec5436d52567d0",
+  "evaluator_bundle_digest": "sha256:83d7e4ab46e548291b652b393fbb10b7dc4f5c009e40616999750d5a5faad1d1",
+  "evaluator_byte_count": 35141,
   "evaluator_requirement_count": 3,
   "evidence_map_ids": [
     "ci-config-contract",
@@ -20,10 +20,10 @@
   "reviewer_record_id": "review-mn-build-option-update-pending",
   "admission_revision": 1,
   "admission_status": "admission_pending",
-  "admission_digest": "sha256:1c6b6ca2a92925075324225b5d07c667630eebb3c9363547ae48172d754ebb1f",
+  "admission_digest": "sha256:9d30c42b919d3f5fb0b6d295a390c5c9fe3388087a7e984bb189ae58fd474a7e",
   "evaluator_source_identity": {
-    "base_git_revision": "3b5bdaed427f8c7e3cf1870c0f4d300703f0b440",
-    "source_tree_digest": "sha256:68e312553a28a93d07d23d21c51a31a4d540b2eb5df677811678eeccf4288a55",
+    "base_git_revision": "11ad9fb658d3506b598d564e2a3659b92b4a8d34",
+    "source_tree_digest": "sha256:cb8f635049ca4e27a78a5d2798e65a3a396aa07633d3a5baa00e1430ed41efd3",
     "generator_source_digest": "sha256:39bab4ae26d26e95d0106f7a6e12f41b86aff2b93db84540d1f6892cc1f0f484",
     "source_files": [
       {
@@ -33,8 +33,8 @@
       },
       {
         "path": "benchmarks/schemas/evaluator-result-envelope.schema.json",
-        "bytes": 10810,
-        "sha256": "sha256:01f33fdf1d6db26e23987ad05441e5262d6912e130461d24784a08d853f8de79"
+        "bytes": 11336,
+        "sha256": "sha256:efa6297b5a167daee97603d9fc47cdbef2e5da9650715aa9e1ab87516b9509d2"
       },
       {
         "path": "benchmarks/schemas/portfolio-final-admission-record.schema.json",
@@ -47,14 +47,24 @@
         "sha256": "sha256:98073d2f85235a2676b446bca9308a96d5955106612a81d421d4b7e96df53a85"
       },
       {
+        "path": "benchmarks/schemas/private-evaluator-fragment.schema.json",
+        "bytes": 6294,
+        "sha256": "sha256:f478338133c32bae9ed52f061863a1b274803a6532a7de3cd88448d264fde3c4"
+      },
+      {
         "path": "benchmarks/schemas/private-evaluator-independence-statement.schema.json",
         "bytes": 4668,
         "sha256": "sha256:97b5956d0f0a490436be4c295b12474a3738be5d0eb4865041383162c6abdd73"
       },
       {
         "path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-        "bytes": 59434,
-        "sha256": "sha256:b82a3655075e84ded37bbac60302569ccdd72dddffeedfa552c0a845cb6c1dec"
+        "bytes": 65703,
+        "sha256": "sha256:b37970126d4ad7e7dc0d42e89a37540f405da2df66b94aef765eb9a982c2cda9"
+      },
+      {
+        "path": "scripts/ask-benchmark-materialize.mjs",
+        "bytes": 35384,
+        "sha256": "sha256:3bf334a412f76b68ff873aff35d5122355a7de447233cb8b79b2d79c8d61b90f"
       },
       {
         "path": "scripts/ask-benchmark-mn-build-option-update.mjs",
@@ -62,9 +72,14 @@
         "sha256": "sha256:92cffaefe59334821e0a14338d2f8adb275ffb445824f72963202b9de7561cbe"
       },
       {
+        "path": "scripts/ask-benchmark-normalized-results.mjs",
+        "bytes": 47479,
+        "sha256": "sha256:92e40b8ce7a0b8da8f3a512673c91a48034b5699512782122eebd00c6c22a7bc"
+      },
+      {
         "path": "scripts/ask-benchmark-scoring-contract.mjs",
-        "bytes": 39053,
-        "sha256": "sha256:1a8ed5885f0a15b0dd8a8522eb519a9d07329949fbcc7751af4933085c5f0253"
+        "bytes": 43316,
+        "sha256": "sha256:8b1156cfa80dd5fda0aa5e8bbea2ac0d3ee993febdda93ea16cb1afdfda0e1e1"
       },
       {
         "path": "scripts/test-ask-benchmark-evaluator-boundary.mjs",
@@ -73,8 +88,8 @@
       },
       {
         "path": "scripts/test-ask-benchmark-mn-build-option-update.mjs",
-        "bytes": 96875,
-        "sha256": "sha256:cb4747ad05d4c93778ff1982c8c2d7db70946ff12ce91b9f637eb01a81b50a3f"
+        "bytes": 108492,
+        "sha256": "sha256:4cd2d0b40d69bfba306c31d85d3b3ee05b1a2acb672bd660ef2c542a2f90f37a"
       }
     ]
   }
