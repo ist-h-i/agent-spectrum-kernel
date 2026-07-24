@@ -81,7 +81,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, source: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, pairedComparisonReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, source: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, pairedComparisonReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, privateEvaluationRoot: null, privateEvaluationRecordPath: null, privateFragmentPath: null, admissionRecord: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -109,6 +109,9 @@ function parseArgs(argv) {
     else if (flag === "--private-root") args.privateRoot = resolve(argv.shift());
     else if (flag === "--manifest" || flag === "--evaluator-manifest") args.evaluatorManifest = resolve(argv.shift());
     else if (flag === "--result" || flag === "--evaluator-result") args.evaluatorResult = resolve(argv.shift());
+    else if (flag === "--private-evaluation-root") args.privateEvaluationRoot = resolve(argv.shift());
+    else if (flag === "--private-evaluation-record") args.privateEvaluationRecordPath = resolve(argv.shift());
+    else if (flag === "--private-fragment") args.privateFragmentPath = resolve(argv.shift());
     else if (flag === "--admission-record") args.admissionRecord = resolve(argv.shift());
     else if (flag === "--requirement-record") args.requirementRecord = resolve(argv.shift());
     else if (flag === "--output-contract") args.outputContract = resolve(argv.shift());
@@ -541,6 +544,9 @@ function evaluatorBoundaryOptions(args) {
     privateRoot: args.privateRoot,
     manifestPath: args.evaluatorManifest,
     resultPath: args.evaluatorResult,
+    privateEvaluationRoot: args.privateEvaluationRoot,
+    privateEvaluationRecordPath: args.privateEvaluationRecordPath,
+    privateFragmentPath: args.privateFragmentPath,
     materializedPath: args.materialized,
     selectionState: args.stateDir,
     runDir: args.runDir,
