@@ -372,6 +372,22 @@ function assertReferenceSet(actual, expected, label) {
   if (!arraysEqual(actualKeys, expectedKeys)) throw new Error(`${label} must match the deterministically derived causal reference set`);
 }
 
+function assertStateSpecificReferenceSemantics(references, normalizedResult, state, label) {
+  const sources = new Map(normalizedResult.command_evidence.references.map((entry) => [referenceKey({ kind: "execution_event", digest: entry.digest, bytes: entry.bytes }), entry]));
+  for (const reference of references) {
+    if (reference.kind === "normalized_result") {
+      if (state === "executed_success" || state === "executed_failure" || state === "declined" || state === "cwd_unverified") throw new Error(`${label} contains a normalized-result reference for an executed state`);
+      continue;
+    }
+    const source = sources.get(referenceKey(reference));
+    if (!source) throw new Error(`${label} contains an unbound execution-event reference`);
+    if (state === "executed_success" && (source.match_state !== "matched" || source.outcome !== "succeeded" || source.exit_code !== 0)) throw new Error(`${label} contains a non-success causal event`);
+    if (state === "executed_failure" && (source.outcome !== "failed" || source.exit_code === 0 || source.exit_code === null)) throw new Error(`${label} contains a non-failure causal event`);
+    if (state === "declined" && (source.outcome !== "declined" || source.exit_code !== null)) throw new Error(`${label} contains a non-declined causal event`);
+    if (state === "cwd_unverified" && source.match_state !== "cwd_unverified") throw new Error(`${label} must reference cwd-unverified causal events`);
+  }
+}
+
 function latestAlternativeReferences(normalizedResult) {
   const latest = latestCommandReferences(normalizedResult);
   return (normalizedResult.command_evidence.required_alternative_groups ?? []).map((group) => ({
@@ -446,6 +462,8 @@ export function validateBinaryScopeVerificationResult({ evaluatorResult, require
       if (!evaluatorResult.verification_correctness || !Array.isArray(evaluatorResult.verification_correctness.evidence_references)) throw new Error("verification correctness must include typed evidence references");
       assertReferenceSet(evaluatorResult.verification_correctness.evidence_references, expectedReferences, "top-level verification correctness references");
       assertReferenceSet(result.verification_evidence_references, expectedReferences, "verification evidence references");
+      assertStateSpecificReferenceSemantics(evaluatorResult.verification_correctness.evidence_references, normalizedResult, derivedState, "top-level verification correctness references");
+      assertStateSpecificReferenceSemantics(result.verification_evidence_references, normalizedResult, derivedState, "verification evidence references");
       const requiredLatestSuccess = derivedState === "executed_success";
       if (result.outcome === "pass") {
         if (!topLevelPass || derivedState !== "executed_success" || !requiredLatestSuccess) throw new Error("passing verification result requires top-level pass and latest success for every required command");
