@@ -59,7 +59,7 @@
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "bundleId": { "type": "string", "pattern": "^evaluator-[a-f0-9]{64}$" },
     "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
-    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\.{1,2}(?:/|$))(?!.*\\)(?!\./)[a-zA-Z0-9._/-]+$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!\\./)[a-zA-Z0-9._/-]+$" },
     "evidenceArtifact": {
       "type": "object",
       "additionalProperties": false,
