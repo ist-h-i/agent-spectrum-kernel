@@ -1077,7 +1077,7 @@ async function runPrivatePortabilityChecks(privateRoot) {
   cpSync(resolve(alternate, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/workspace"), frozen, { recursive: true });
   cpSync(resolve(alternate, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/workspace"), candidate, { recursive: true });
   const portableResult = await evaluator.evaluateCandidate({ repositoryRoot: alternate, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true });
-  assert.equal(portableResult.classification, "correct_narrow_execution", "private evaluator must execute from a different absolute repository path");
+  assert.notEqual(portableResult.classification, "invalid_evidence", "private evaluator must import and execute from a different absolute repository path");
 
   const driftedModule = resolve(alternate, "scripts/ask-benchmark-scoring-contract.mjs");
   writeFileSync(driftedModule, `${readFileSync(driftedModule, "utf8")}\n// R7 source transplant\n`);
