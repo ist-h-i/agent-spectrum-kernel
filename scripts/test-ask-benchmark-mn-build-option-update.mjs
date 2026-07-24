@@ -678,7 +678,7 @@ function runPersistentFullEvaluatorAuthority(privateRoot, state) {
     changed.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references = [];
   }, /causal reference set/u);
   const currentTopLevelState = evaluatorResult.verification_correctness.state;
-  expectPersistentFailure("top-level correctness", (changed) => { changed.verification_correctness.state = currentTopLevelState === "pass" ? "fail" : "pass"; }, /top-level verification pass|failing verification|passing verification result requires/u);
+  expectPersistentFailure("top-level correctness", (changed) => { changed.verification_correctness.state = currentTopLevelState === "pass" ? "fail" : "pass"; }, /top-level verification pass|failing verification|passing verification result requires|verification correctness cannot pass while required command evidence/u);
   expectPersistentFailure("normalized result digest", (changed) => { changed.normalized_result_digest = `sha256:${"0".repeat(64)}`; }, /normalized result digest|mismatched normalized-result/u);
   expectPersistentFailure("normalized generation reference", (changed) => { changed.source_snapshot_digest = `sha256:${"1".repeat(64)}`; }, /source snapshot|normalized snapshot/u);
   expectPersistentFailure("cross-run reference", (changed) => { changed.run_instance_id = "00000000-0000-4000-8000-000000000208"; }, /lineage mismatch|run_instance/u);
