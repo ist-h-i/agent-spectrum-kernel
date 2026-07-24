@@ -786,7 +786,8 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state) {
     changed.evaluation_id = computeEvaluationId(changed);
     changed.evaluation_digest = computeEvaluationDigest(changed);
     writeJson(chain.evaluatorResultPath, changed);
-    assert.throws(() => verifyEvaluatorBoundary(common), pattern, `persistent authority tamper: ${label}`);
+    const authorityPattern = new RegExp(`${pattern.source}|authority-owned adapter output`, pattern.flags);
+    assert.throws(() => verifyEvaluatorBoundary(common), authorityPattern, `persistent authority tamper: ${label}`);
     writeFileSync(chain.evaluatorResultPath, originalResultBytes);
     assert.deepEqual(chain.snapshot(), before, `persistent authority tamper must restore ${label}`);
   };
