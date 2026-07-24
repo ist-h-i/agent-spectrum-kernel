@@ -477,6 +477,30 @@ export function computeEvaluatorReferenceDigest(reference) {
   return canonicalDigest(metadata);
 }
 
+export function computeIndependenceStatementDigest(statement) {
+  const { statement_digest: _digest, ...closure } = statement;
+  return canonicalDigest(closure);
+}
+
+export function validateIndependenceStatement({ statement, manifest }) {
+  if (!statement || typeof statement !== "object" || Array.isArray(statement)) throw new Error("private independence statement must be an object");
+  if (statement.schema_version !== "1.0.0" || statement.fixture_id !== manifest.fixture_identity.fixture_id) throw new Error("private independence statement fixture identity mismatch");
+  if (statement.statement_digest !== computeIndependenceStatementDigest(statement)) throw new Error("private independence statement digest closure is invalid");
+  if (statement.statement_digest !== manifest.independence.statement_digest) throw new Error("private independence statement does not match the manifest assertion");
+  if (stableCanonicalJson(statement.generator_role_identity) !== stableCanonicalJson(manifest.generator)) throw new Error("private independence statement generator identity mismatch");
+  if (statement.frozen_candidate_input?.digest !== manifest.input_identity.fixture_input_digest || typeof statement.frozen_candidate_input?.public_source_path !== "string") throw new Error("private independence statement frozen input mismatch");
+  if (statement.measured_output_used !== false || statement.measured_result_used !== false) throw new Error("private independence statement must exclude measured evidence");
+  if (typeof statement.author_scratch?.used !== "boolean" || typeof statement.author_scratch?.scope !== "string") throw new Error("private independence statement author-scratch classification is incomplete");
+  for (const field of ["source_classification", "excluded_source_classification"]) {
+    const values = statement[field];
+    if (!Array.isArray(values) || values.length === 0 || values.some((entry) => typeof entry !== "string" || entry.length === 0) || new Set(values).size !== values.length) throw new Error(`private independence statement ${field} is invalid`);
+  }
+  for (const field of ["contaminated_issues_193_196_as_oracle_source", "issue_194_body_used", "issue_194_edit_history_used", "issue_194_legacy_answer_structure_used"]) {
+    if (!statement[field] || !["not_used", "used", "unknown"].includes(statement[field].state) || typeof statement[field].evidence_basis !== "string" || statement[field].evidence_basis.length === 0) throw new Error(`private independence statement ${field} is incomplete`);
+  }
+  return structuredClone(statement);
+}
+
 export function computeEvaluationId(result) {
   return `evaluation-${canonicalDigest({
     scoring_input_freeze_manifest_source_digest: result.scoring_input_freeze_manifest_source_digest,
@@ -599,13 +623,18 @@ export function verifyPrivateEvaluatorBundle({
     privateMaterialDigests.add(evidence.digest);
     expectedPaths.push(asset.path);
   }
+  const independenceAsset = manifest.asset_inventory.find(({ role }) => role === "independence_provenance");
+  const independenceStatement = independenceAsset
+    ? readJsonArtifact(resolve(privateRoot, independenceAsset.path), "private independence statement").value
+    : null;
+  if (independenceStatement) validateIndependenceStatement({ statement: independenceStatement, manifest });
   if (stableCanonicalJson([...files.keys()].sort()) !== stableCanonicalJson(expectedPaths.sort())) throw new Error("private evaluator root has an unexpected or unmanaged inventory entry");
   if (manifest.evaluator_bundle_id !== computeEvaluatorBundleId(manifest)) throw new Error("private evaluator bundle ID is invalid");
   if (manifest.evaluator_bundle_digest !== computeEvaluatorBundleDigest(manifest)) throw new Error("private evaluator bundle digest closure is invalid");
 
   const reference = verifyPublicEvaluatorReference({ root, referencePath, privateRoot: canonicalPrivateRoot });
   assertReferenceMatchesBundle(reference, manifest);
-  const bundle = { ...boundary, files, manifest, manifestEvidence, manifestRelativePath, privateMaterialDigests, reference };
+  const bundle = { ...boundary, files, manifest, manifestEvidence, manifestRelativePath, privateMaterialDigests, reference, independenceStatement };
   assertNoPrivateMaterial(managedRepositoryInventory(boundary.canonicalRoots.root), "managed repository", privateMaterialDigests);
   for (const [key, label] of [
     ["materializedPath", "materialized root"],

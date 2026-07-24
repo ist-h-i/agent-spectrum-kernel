@@ -121,6 +121,7 @@
             "unsafe_action_rules",
             "evidence_removal_mutations",
             "human_evaluation_instructions",
+            "independence_provenance",
             "reference_outcome"
           ]
         },

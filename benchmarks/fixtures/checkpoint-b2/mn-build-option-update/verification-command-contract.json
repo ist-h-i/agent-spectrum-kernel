@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "mn-build-option-update",
+  "fixture_input_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
+  "commands": [
+    {
+      "command_id": "build-config-focused-test",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "[ -f build.config.json ] && [ -f ci/release-build.log ] && [ -f docs/build-options.md ] && [ -f test/build-config.test.mjs ] && [ -f scripts/validate-build-config.mjs ] && node test/build-config.test.mjs",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:098a87339a91d6f11eb8252eed9835503be1ba089928baf25c2426c8689aaeff",
+      "rendered_event_command_digest": "sha256:65b65e3a1c9fed140d3beac25d518a62af962e399bd21f28a60ca085d0051832",
+      "command_contract_digest": "sha256:46faffc1795c03c307874df0b7a16ac3334ada4b61947d1032cce2259a4017b1"
+    },
+    {
+      "command_id": "build-config-semantic-validator",
+      "purpose": "validation",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "[ -f build.config.json ] && [ -f ci/release-build.log ] && [ -f docs/build-options.md ] && [ -f test/build-config.test.mjs ] && [ -f scripts/validate-build-config.mjs ] && node scripts/validate-build-config.mjs",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:4ac3ecbf3b055c47ec70f8c8df4f5117fb1b1afa2d4a96e01322823960826388",
+      "rendered_event_command_digest": "sha256:966a23a2ca0d2a47a7f683db8e97d2abb180e6b39165357a14590127dd74b206",
+      "command_contract_digest": "sha256:a28d7b3ab71bd77a462fba28152bbd0baaf587e3eb7349730487f525717fc665"
+    }
+  ],
+  "contract_digest": "sha256:c02e28ab4c2fe6e024e686acc35db89630b12a7a3cd050c064a143d44f2a3259"
+}

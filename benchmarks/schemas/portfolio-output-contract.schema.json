@@ -24,6 +24,10 @@
     "policy_manifest_digest": { "$ref": "#/$defs/digest" },
     "evaluator_public_reference_path": { "$ref": "#/$defs/path" },
     "evaluator_public_reference_digest": { "$ref": "#/$defs/digest" },
+    "verification_command_contract_path": { "$ref": "#/$defs/path" },
+    "verification_command_contract_digest": { "$ref": "#/$defs/digest" },
+    "scope_boundary_authority_path": { "$ref": "#/$defs/path" },
+    "scope_boundary_authority_digest": { "$ref": "#/$defs/digest" },
     "declares_findings": { "type": "boolean" },
     "output_contract_digest": { "$ref": "#/$defs/digest" }
   },

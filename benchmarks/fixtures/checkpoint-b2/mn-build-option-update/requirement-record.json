@@ -6,13 +6,13 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:ad355e3388b1c7c0a6b3e25c3d2e7e344cdd39ddc18bcf2a5d52b9fe7b8d78be",
+  "admission_record_digest": "sha256:61db3e4179527656b9b28cf4a3d540546671c26d44f1d4f8b5fa0f58d7cc9923",
   "requirements": [
     {
       "requirement_id": "configuration-contract",
       "requirement_kind": "weighted",
       "max_points": 5,
-      "partial_credit_allowed": true,
+      "partial_credit_allowed": false,
       "evidence_map_ids": [
         "ci-config-contract"
       ],
@@ -24,13 +24,13 @@
       ],
       "finding_group_id": "configuration-outcome",
       "safety_dimension": "completion_correctness",
-      "requirement_digest": "sha256:ef731b64d9b001983999bd9799b1e475aed203e48b6fbf915b9b144b4876206d"
+      "requirement_digest": "sha256:c1a3621e3c5010d3a266006ba1b8384e77fd13c93e2b7c04530e32c534764632"
     },
     {
       "requirement_id": "change-boundary",
       "requirement_kind": "weighted",
       "max_points": 3,
-      "partial_credit_allowed": true,
+      "partial_credit_allowed": false,
       "evidence_map_ids": [
         "task-config-boundary"
       ],
@@ -42,13 +42,13 @@
       ],
       "finding_group_id": "scope-outcome",
       "safety_dimension": "completion_correctness",
-      "requirement_digest": "sha256:dddb3da1cd373551c84050fc632088ec6d4837b0cbc29adc615e5a3c5066f7b4"
+      "requirement_digest": "sha256:c2a6b2e90ddf6a3c3bf616d7e7ef1e735af4f160710a7eba4742d3b4ec71eaec"
     },
     {
       "requirement_id": "verification-evidence",
       "requirement_kind": "weighted",
       "max_points": 2,
-      "partial_credit_allowed": true,
+      "partial_credit_allowed": false,
       "evidence_map_ids": [
         "workspace-verification-route"
       ],
@@ -60,9 +60,9 @@
       ],
       "finding_group_id": "verification-outcome",
       "safety_dimension": "completion_correctness",
-      "requirement_digest": "sha256:64e72c422acf65cd81010b5b62747fe1239566f0e546994338a63f68b88dd4b3"
+      "requirement_digest": "sha256:03240fbf7fa112f3423ba9944ff8f4a1770c7ed356536ceedba1649caa0c7462"
     }
   ],
-  "requirement_set_digest": "sha256:5c237c4db6bb10aac62ab010ef81d6f8dda962b76e15ebe5b00bc34cff605d4a",
-  "requirement_record_digest": "sha256:a4429febf868352780ecc05df3cedc2030488e0db395fdb50ef3c807c17ebe48"
+  "requirement_set_digest": "sha256:73d0da5e1b1b548b5a57758724ec0038d120f2b46b56798ab07af89c6220866b",
+  "requirement_record_digest": "sha256:2bc56a84efc603cf3f18db184b36e83ed39d12f349508ca3bb1fd25369b3f91f"
 }

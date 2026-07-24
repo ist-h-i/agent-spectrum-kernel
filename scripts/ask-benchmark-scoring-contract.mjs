@@ -27,6 +27,10 @@ export const REQUIREMENT_RESULT_FIELD_IDS = Object.freeze([
   "finding_ids",
   "evidence_references",
 ]);
+export const REQUIREMENT_RESULT_OPTIONAL_FIELD_IDS = Object.freeze([
+  "scope_deviation_references",
+  "verification_evidence_references",
+]);
 
 export const SCORING_IDENTITY_FIELD_IDS = Object.freeze([
   "scoring_input_freeze_manifest_source_digest",
@@ -84,11 +88,11 @@ function arraysEqual(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function assertClosedKeys(value, allowedKeys, label) {
+function assertClosedKeys(value, allowedKeys, label, requiredKeys = allowedKeys) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object`);
   const keys = Object.keys(value);
   const unknown = keys.filter((key) => !allowedKeys.includes(key));
-  const missing = allowedKeys.filter((key) => !keys.includes(key));
+  const missing = requiredKeys.filter((key) => !keys.includes(key));
   if (unknown.length > 0) throw new Error(`${label} has unknown fields: ${unknown.join(", ")}`);
   if (missing.length > 0) throw new Error(`${label} is missing fields: ${missing.join(", ")}`);
 }
@@ -172,7 +176,7 @@ export function validateScoringContractSchemaParity({ scoringPolicy, requirement
   if (!arraysEqual(requirementDefinition.properties.safety_dimension?.enum ?? [], safetyDimensions)) throw new Error("safety dimension values drifted between policy and Schema");
 
   assertExactFieldList(requirementResultDefinition.required, REQUIREMENT_RESULT_FIELD_IDS, "evaluator requirement result required fields");
-  assertExactFieldList(Object.keys(requirementResultDefinition.properties ?? {}), REQUIREMENT_RESULT_FIELD_IDS, "evaluator requirement result allowed fields");
+  assertExactFieldList(Object.keys(requirementResultDefinition.properties ?? {}), [...REQUIREMENT_RESULT_FIELD_IDS, ...REQUIREMENT_RESULT_OPTIONAL_FIELD_IDS], "evaluator requirement result allowed fields");
   const evaluatorRequired = evaluatorResultSchema.required ?? [];
   for (const field of [...SCORING_IDENTITY_FIELD_IDS, "plan_digest", "requirement_results"]) {
     if (!evaluatorRequired.includes(field) || !Object.hasOwn(evaluatorResultSchema.properties ?? {}, field)) throw new Error(`evaluator result Schema is missing scoring input field: ${field}`);
@@ -253,9 +257,10 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
   const resultIds = evaluatorResult.requirement_results.map(({ requirement_id }) => requirement_id);
   assertUniqueStrings(resultIds, "evaluator requirement result IDs");
   const findingIds = new Set([...evaluatorResult.findings, ...evaluatorResult.false_positives, ...evaluatorResult.scope_deviations].map(({ finding_id }) => finding_id));
+  const scopeDeviationIds = new Set(evaluatorResult.scope_deviations.map(({ finding_id }) => finding_id));
 
   for (const observation of evaluatorResult.requirement_results) {
-    assertClosedKeys(observation, REQUIREMENT_RESULT_FIELD_IDS, `requirement result ${observation.requirement_id ?? "<unknown>"}`);
+    assertClosedKeys(observation, [...REQUIREMENT_RESULT_FIELD_IDS, ...REQUIREMENT_RESULT_OPTIONAL_FIELD_IDS], `requirement result ${observation.requirement_id ?? "<unknown>"}`, REQUIREMENT_RESULT_FIELD_IDS);
     const requirement = requirements.get(observation.requirement_id);
     if (!requirement) throw new Error(`evaluator result references unknown requirement ID: ${observation.requirement_id}`);
     assertUniqueStrings(observation.matched_equivalence_class_ids, "matched equivalence class IDs");
@@ -263,6 +268,15 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
     const allowedEquivalenceIds = new Set(requirement.equivalence_class_ids);
     if (observation.matched_equivalence_class_ids.some((id) => !allowedEquivalenceIds.has(id))) throw new Error("matched equivalence class IDs must be a subset of the authoritative requirement");
     if (observation.finding_ids.some((id) => !findingIds.has(id))) throw new Error("requirement result finding reference does not close within the evaluator envelope");
+    if (observation.scope_deviation_references) {
+      assertUniqueStrings(observation.scope_deviation_references, "requirement result scope-deviation references");
+      if (observation.scope_deviation_references.some((id) => !scopeDeviationIds.has(id))) throw new Error("requirement result scope-deviation reference does not close within the evaluator envelope");
+    }
+    if (observation.verification_evidence_references) {
+      if (!Array.isArray(observation.verification_evidence_references) || observation.verification_evidence_references.some((entry) => entry?.kind !== "execution_event")) throw new Error("requirement result verification evidence must reference execution events");
+      const evidence = new Set(observation.evidence_references.map((entry) => `${entry.kind}:${entry.digest}:${entry.bytes}`));
+      if (observation.verification_evidence_references.some((entry) => !evidence.has(`${entry.kind}:${entry.digest}:${entry.bytes}`))) throw new Error("requirement result verification evidence does not close within its evidence references");
+    }
     assertRequirementOutcome(requirement, observation);
   }
 

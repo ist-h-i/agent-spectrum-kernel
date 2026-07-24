@@ -3,9 +3,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "input_manifest_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
   "evaluator_reference_schema": "benchmarks/schemas/evaluator-reference.schema.json",
-  "evaluator_bundle_id": "evaluator-ee43cf6018915626beb6b25603d4ef2e40ebbe929d3b8be9a1ba334e42e7f359",
-  "evaluator_bundle_digest": "sha256:8eaa2d1a75d7f03059198bdf71d913e4e030ae5ed1626e98451cd6e4319779b0",
-  "evaluator_byte_count": 8295,
+  "evaluator_bundle_id": "evaluator-42a52c6a5fdd469ae9a6384d9a6c0ee277ca59dd81a25d6d74513e0591432615",
+  "evaluator_bundle_digest": "sha256:1a8842c00f2a0ab8e07de822c275d9cffbf1b418464dab1e6210201924221689",
+  "evaluator_byte_count": 26885,
   "evaluator_requirement_count": 3,
   "evidence_map_ids": [
     "ci-config-contract",
@@ -20,5 +20,5 @@
   "reviewer_record_id": "review-mn-build-option-update-pending",
   "admission_revision": 1,
   "admission_status": "admission_pending",
-  "admission_digest": "sha256:ad355e3388b1c7c0a6b3e25c3d2e7e344cdd39ddc18bcf2a5d52b9fe7b8d78be"
+  "admission_digest": "sha256:61db3e4179527656b9b28cf4a3d540546671c26d44f1d4f8b5fa0f58d7cc9923"
 }

@@ -1,6 +1,21 @@
 {
   "schema_version": "1.0.0",
   "fixture_id": "mn-build-option-update",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/build.config.json"
+    ],
+    "required_candidate_paths": [
+      "workspace/build.config.json"
+    ],
+    "protected_candidate_paths": [
+      "workspace/test/build-config.test.mjs",
+      "workspace/scripts/validate-build-config.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "authority_digest": "sha256:1349706f4d7852808b8bfb3a2b73074fda6b8504c27b72dd0e7a1d0d4cb1eb76"
+  },
   "maps": [
     {
       "evidence_map_id": "ci-config-contract",

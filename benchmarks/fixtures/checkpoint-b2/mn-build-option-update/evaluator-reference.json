@@ -2,17 +2,17 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-ee43cf6018915626beb6b25603d4ef2e40ebbe929d3b8be9a1ba334e42e7f359",
-  "evaluator_bundle_digest": "sha256:8eaa2d1a75d7f03059198bdf71d913e4e030ae5ed1626e98451cd6e4319779b0",
+  "evaluator_bundle_id": "evaluator-42a52c6a5fdd469ae9a6384d9a6c0ee277ca59dd81a25d6d74513e0591432615",
+  "evaluator_bundle_digest": "sha256:1a8842c00f2a0ab8e07de822c275d9cffbf1b418464dab1e6210201924221689",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mn-build-option-update",
   "fixture_input_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
   "task_class": "configuration",
   "suite": "mechanism_negative",
-  "evaluator_revision": "909b277d8239fa0259a70167a30195f492180d39",
-  "generator_identity": "sha256:42afe1fd12ee19291e60cb6ce4b4a42f25207fa6a9fc00d21da1544fcf5a49e3",
-  "independence_statement_digest": "sha256:74c6e877da90238c259bc5af0d3a0692ea970a0100bd08e1256bd11b943aff07",
+  "evaluator_revision": "867087df6992ae8b7ae936382b5f1293da8ba48a",
+  "generator_identity": "sha256:b317f60b18f1ac7eb0c639a6cba173ec1cedac4ad6e6990611b03be172c5cbd1",
+  "independence_statement_digest": "sha256:929a992f24004e2f3cdc4376e4b929013f5b69a62c2be1cc608eab2df3e7d5b6",
   "review_record_digest": "sha256:2c68bfa2808be77476fd03ba5ad71f5bf0a0c09e0011f9d07711e257a2457cfb",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:9d2d54bb18f94b1fd64f1384de98cf0324354c7fc416384e0275c26f8130f688"
+  "public_metadata_digest": "sha256:200aeed7c8b699ae1280cdab85313bd9614ab005744b839f875b2773f047004f"
 }

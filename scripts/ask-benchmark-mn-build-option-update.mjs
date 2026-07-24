@@ -18,6 +18,7 @@ import {
   computeScoringInputFreezeManifestDigest,
   validateRequirementRecordContract,
 } from "./ask-benchmark-scoring-contract.mjs";
+import { validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
 import {
   admissionGateSelectorMatches,
   buildSelectorContextArtifact,
@@ -37,6 +38,7 @@ const PUBLIC_JSON_FILES = [
   "output-contract.json",
   "requirement-record.json",
   "scoring-input-freeze-manifest.json",
+  "verification-command-contract.json",
 ];
 const REQUIRED_APPLICABLE_GATES = [
   "public_artifact_leakage",
@@ -255,7 +257,23 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
     id: FIXTURE_ID, suite: "mechanism_negative", task_class: "configuration", difficulty: "medium", repetitions: 3,
     aggregate_eligible: true, input_manifest_path: `${FIXTURE_ROOT_RELATIVE}/input-manifest.json`,
     input_manifest_sha256: sha256(inputManifestBytes).slice("sha256:".length),
+    verification_command_contract: {
+      path: `${FIXTURE_ROOT_RELATIVE}/verification-command-contract.json`,
+      sha256: sha256(readFileSync(paths["verification-command-contract.json"])).slice("sha256:".length),
+    },
   }, "runtime fixture registration");
+
+  const verificationContract = validateVerificationCommandContract(artifacts["verification-command-contract.json"], { root });
+  assertDigest(verificationContract.fixture_input_digest, sha256(inputManifestBytes), "verification command fixture input binding");
+  assertEqual(verificationContract.commands.map(({ command_id, purpose, working_directory, requirement }) => ({ command_id, purpose, working_directory, requirement })), [
+    { command_id: "build-config-focused-test", purpose: "test", working_directory: { path: ".", evidence_requirement: "not_required" }, requirement: "required" },
+    { command_id: "build-config-semantic-validator", purpose: "validation", working_directory: { path: ".", evidence_requirement: "not_required" }, requirement: "required" },
+  ], "fixture verification command authority");
+  for (const command of verificationContract.commands) {
+    for (const sentinel of ["[ -f build.config.json ]", "[ -f ci/release-build.log ]", "[ -f docs/build-options.md ]", "[ -f test/build-config.test.mjs ]", "[ -f scripts/validate-build-config.mjs ]"]) {
+      if (!command.canonical_script.includes(sentinel)) throw new Error(`verification command ${command.command_id} is not self-anchoring`);
+    }
+  }
 
   const manifestFixture = inputManifest.fixtures?.[FIXTURE_ID];
   if (!manifestFixture || !manifestFixture.files.some(({ path }) => path === "task.md") || !manifestFixture.files.some(({ path }) => path.startsWith("workspace/"))) throw new Error("fixture input manifest is incomplete");
@@ -286,12 +304,21 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
   assertBenchmarkSchemaInstance(outputContract, { schemaPath: resolve(root, "benchmarks/schemas/portfolio-output-contract.schema.json"), label: "fixture output contract" });
   assertDigest(outputContract.output_contract_digest, computeOutputContractDigest(outputContract), "output contract");
   if (outputContract.declares_findings !== false || outputContract.evaluator_public_reference_digest !== reference.public_metadata_digest) throw new Error("implementation output contract binding mismatch");
+  if (outputContract.verification_command_contract_path !== `${FIXTURE_ROOT_RELATIVE}/verification-command-contract.json` || outputContract.verification_command_contract_digest !== verificationContract.contract_digest) throw new Error("output contract verification-command binding mismatch");
+  if (outputContract.scope_boundary_authority_path !== `${FIXTURE_ROOT_RELATIVE}/evidence-map.json` || outputContract.scope_boundary_authority_digest !== artifacts["evidence-map.json"].scope_boundary_authority.authority_digest) throw new Error("output contract scope-boundary binding mismatch");
 
   const metadata = artifacts["metadata.json"];
   assertDigest(metadata.metadata_digest, canonicalDigest(withoutField(metadata, "metadata_digest")), "fixture metadata");
   if (metadata.output_contract_type !== "implementation_producing" || metadata.measured_execution_performed !== false) throw new Error("fixture metadata output or measurement state mismatch");
 
   const evidenceMap = artifacts["evidence-map.json"];
+  const scopeAuthority = evidenceMap.scope_boundary_authority;
+  if (!scopeAuthority) throw new Error("public scope-boundary authority is missing");
+  assertDigest(scopeAuthority.authority_digest, canonicalDigest(withoutField(scopeAuthority, "authority_digest")), "public scope-boundary authority");
+  assertEqual(scopeAuthority.allowed_candidate_paths, ["workspace/build.config.json"], "public allowed candidate path");
+  assertEqual(scopeAuthority.required_candidate_paths, ["workspace/build.config.json"], "public required candidate path");
+  assertEqual(scopeAuthority.protected_candidate_paths, ["workspace/test/build-config.test.mjs", "workspace/scripts/validate-build-config.mjs"], "public protected candidate paths");
+  if (scopeAuthority.unmanaged_additions !== "forbidden" || scopeAuthority.unmanaged_deletions !== "forbidden") throw new Error("public scope-boundary unmanaged inventory policy is invalid");
   const mapsById = new Map(evidenceMap.maps.map((entry) => [entry.evidence_map_id, entry]));
   for (const requirement of requirementRecord.requirements) {
     for (const evidenceMapId of requirement.evidence_map_ids) {
@@ -311,6 +338,8 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
   validateRawFreezeArtifact(root, freeze.admission_record, admission.admission_digest, "admission record");
   validateRawFreezeArtifact(root, freeze.output_contract, outputContract.output_contract_digest, "output contract");
   validateRawFreezeArtifact(root, freeze.evaluator_public_reference, reference.public_metadata_digest, "evaluator reference");
+  validateRawFreezeArtifact(root, freeze.verification_command_contract, verificationContract.contract_digest, "verification command contract");
+  validateRawFreezeArtifact(root, freeze.evidence_map, canonicalDigest(evidenceMap), "evidence map");
   assertDigest(freeze.requirement_record.raw_byte_digest, sha256(readFileSync(paths["requirement-record.json"])), "requirement record raw byte");
   assertDigest(freeze.requirement_record.record_digest, computeRequirementRecordDigest(requirementRecord), "requirement record semantic");
   assertDigest(freeze.requirement_record.set_digest, computeRequirementSetDigest(requirementRecord), "requirement set");
@@ -364,7 +393,7 @@ export function validateMnBuildOptionUpdatePrivateFixture(options) {
     referencePath: resolve(root, FIXTURE_ROOT_RELATIVE, "evaluator-reference.json"),
     manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"),
   });
-  const requiredRoles = ["equivalent_solution_rules", "evidence_removal_mutations", "hidden_tests", "human_evaluation_instructions", "oracle", "rubric", "scope_boundaries"];
+  const requiredRoles = ["equivalent_solution_rules", "evidence_removal_mutations", "hidden_tests", "human_evaluation_instructions", "independence_provenance", "oracle", "rubric", "scope_boundaries"];
   assertEqual(bundle.manifest.asset_inventory.map(({ role }) => role), requiredRoles, "private evaluator role inventory");
   const requirementRecord = readJson(resolve(root, FIXTURE_ROOT_RELATIVE, "requirement-record.json"), "public requirement record");
   const admissionRecord = readJson(resolve(root, FIXTURE_ROOT_RELATIVE, "final-admission-record.json"), "public final admission record");

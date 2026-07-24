@@ -32,6 +32,8 @@
     "requirement_record": { "$ref": "#/$defs/requirementArtifact" },
     "output_contract": { "$ref": "#/$defs/semanticArtifact" },
     "evaluator_public_reference": { "$ref": "#/$defs/semanticArtifact" },
+    "verification_command_contract": { "$ref": "#/$defs/semanticArtifact" },
+    "evidence_map": { "$ref": "#/$defs/semanticArtifact" },
     "freeze_revision": { "$ref": "#/$defs/token" },
     "manifest_digest": { "$ref": "#/$defs/digest" }
   },
