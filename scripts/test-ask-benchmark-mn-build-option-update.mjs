@@ -1280,6 +1280,9 @@ try {
   invalidEvidenceResult.evaluatorResult.findings.push({ finding_id: "invalid-input-authority", category: "evaluator_input_authority_failure", severity: "critical", evidence_references: [invalidAuthorityReference] });
   invalidEvidenceResult.evaluatorResult.verification_correctness = { state: "fail", evidence_references: [invalidAuthorityReference] };
   const invalidVerificationRequirement = invalidEvidenceResult.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence");
+  invalidVerificationRequirement.outcome = "fail";
+  invalidVerificationRequirement.earned_points = 0;
+  invalidVerificationRequirement.matched_equivalence_class_ids = [];
   invalidVerificationRequirement.verification_evidence_state = "invalid";
   invalidVerificationRequirement.evidence_references = [invalidAuthorityReference];
   invalidVerificationRequirement.verification_evidence_references = [invalidAuthorityReference];
