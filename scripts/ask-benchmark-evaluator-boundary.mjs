@@ -408,7 +408,9 @@ function lexModule(source, label) {
       if (offset >= source.length) throw new Error(`${label} contains an unterminated comment`);
       advance(); advance(); continue;
     }
-    if (character === "/") {
+    const previous = tokens.at(-1)?.value;
+    const regexPrefix = previous === undefined || ["(", "[", "{", "=", ":", ",", ";", "!", "?", "return", "=>"].includes(previous);
+    if (character === "/" && regexPrefix) {
       advance();
       let inCharacterClass = false;
       while (offset < source.length) {
