@@ -98,13 +98,28 @@
     "dependencyEdge": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["from", "to", "kind", "specifier"],
+      "required": ["from", "to", "kind", "specifier", "edge_digest"],
       "properties": {
         "from": { "$ref": "#/$defs/path" },
         "to": { "$ref": "#/$defs/path" },
         "kind": { "enum": ["static_import", "export_from", "dynamic_import", "authority_read"] },
-        "specifier": { "type": "string", "minLength": 1, "maxLength": 240 }
-      }
+        "specifier": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "source_location": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["line", "column"],
+          "properties": {
+            "line": { "type": "integer", "minimum": 1 },
+            "column": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "syntax_identity": { "type": "string", "minLength": 1, "maxLength": 480 },
+        "edge_digest": { "$ref": "#/$defs/digest" }
+      },
+      "anyOf": [
+        { "required": ["source_location"] },
+        { "required": ["syntax_identity"] }
+      ]
     },
     "token": { "type": "string", "minLength": 1, "maxLength": 96, "pattern": "^[a-z0-9][a-z0-9_-]*$" }
   }

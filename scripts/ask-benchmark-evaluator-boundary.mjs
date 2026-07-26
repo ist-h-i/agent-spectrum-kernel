@@ -13,6 +13,7 @@ import {
 } from "node:fs";
 import { extname, posix, relative, resolve, sep, win32 } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
@@ -25,6 +26,7 @@ import {
   computeRequirementSetDigest,
   computeScoringInputFreezeManifestDigest,
   computeScoringPolicyDigest,
+  BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
   deriveEffectiveVerificationEvidenceReferences,
   deriveEffectiveVerificationEvidenceState,
   FINAL_ADMISSION_RECORD_SCHEMA_PATH,
@@ -231,16 +233,10 @@ function assertPathInsideRootWithoutSymlinks(root, path, label) {
 }
 
 function readJsonArtifact(path, label, { publicArtifact = false } = {}) {
-  assertRegularFile(path, label);
   const byteLimit = publicArtifact ? MAX_PUBLIC_ARTIFACT_BYTES : MAX_JSON_ARTIFACT_BYTES;
-  if (lstatSync(path).size > byteLimit) throw new Error(`${label} exceeds the raw JSON size limit`);
-  let bytes;
-  try {
-    bytes = readFileSync(path);
-  } catch {
-    throw new Error(`${label} could not be read`);
-  }
-  if (bytes.length > byteLimit) throw new Error(`${label} exceeds the raw JSON size limit`);
+  assertRegularFile(path, label);
+  const stable = readStableFile(realpathSync(path), label, byteLimit, { allowEmpty: false });
+  const { bytes } = stable;
   let value;
   try {
     value = JSON.parse(bytes.toString("utf8"));
@@ -248,7 +244,7 @@ function readJsonArtifact(path, label, { publicArtifact = false } = {}) {
     throw new Error(`${label} is invalid JSON`);
   }
   assertNoDuplicateJsonObjectKeys(bytes.toString("utf8"), label);
-  return { bytes, value };
+  return { ...stable, value };
 }
 
 function assertNoDuplicateJsonObjectKeys(source, label) {
@@ -372,11 +368,72 @@ function checkedInBytesAtRevision(root, revision, relativePath) {
 
 const CHECKED_IN_REVISION_BYTES = new Map();
 
-const MODULE_IMPORT_PATTERNS = Object.freeze([
-  { kind: "static_import", pattern: /\bimport\s+(?:[^"'();\n]*?\sfrom\s+)?["']([^"']+)["']/gu },
-  { kind: "export_from", pattern: /\bexport\s+(?:[^"'();\n]*?\sfrom\s+)["']([^"']+)["']/gu },
-  { kind: "dynamic_import", pattern: /\bimport\s*\(\s*["']([^"']+)["']\s*\)/gu },
-]);
+function lexModule(source, label) {
+  const tokens = [];
+  let offset = 0;
+  let line = 1;
+  let column = 1;
+  const advance = () => {
+    const character = source[offset++];
+    if (character === "\n") { line += 1; column = 1; } else column += 1;
+    return character;
+  };
+  const consumeQuoted = (quote) => {
+    const start = { line, column };
+    let raw = quote;
+    advance();
+    while (offset < source.length) {
+      const character = advance();
+      raw += character;
+      if (character === "\\") {
+        if (offset >= source.length) throw new Error(`${label} contains an unterminated string`);
+        raw += advance();
+      } else if (character === quote) {
+        try {
+          const value = quote === '"'
+            ? JSON.parse(raw)
+            : JSON.parse(`"${raw.slice(1, -1).replace(/"/gu, "\\\"").replace(/\\\\'/gu, "'")}"`);
+          tokens.push({ type: "string", value, ...start });
+          return;
+        } catch { throw new Error(`${label} contains an invalid string literal`); }
+      } else if (character === "\n" || character === "\r") throw new Error(`${label} contains an unterminated string`);
+    }
+    throw new Error(`${label} contains an unterminated string`);
+  };
+  while (offset < source.length) {
+    const character = source[offset];
+    if (/\s/u.test(character)) { advance(); continue; }
+    if (character === "/" && source[offset + 1] === "/") { while (offset < source.length && advance() !== "\n") {} continue; }
+    if (character === "/" && source[offset + 1] === "*") {
+      advance(); advance();
+      while (offset < source.length && !(source[offset] === "*" && source[offset + 1] === "/")) advance();
+      if (offset >= source.length) throw new Error(`${label} contains an unterminated comment`);
+      advance(); advance(); continue;
+    }
+    if (character === '"' || character === "'") { consumeQuoted(character); continue; }
+    if (character === "`") {
+      advance();
+      while (offset < source.length) { const value = advance(); if (value === "\\" && offset < source.length) advance(); else if (value === "`") break; }
+      if (source[offset - 1] !== "`") throw new Error(`${label} contains an unterminated template literal`);
+      continue;
+    }
+    const start = { line, column };
+    if (/[A-Za-z_$]/u.test(character)) {
+      let value = "";
+      while (offset < source.length && /[A-Za-z0-9_$]/u.test(source[offset])) value += advance();
+      tokens.push({ type: "identifier", value, ...start }); continue;
+    }
+    tokens.push({ type: "punctuation", value: advance(), ...start });
+  }
+  return tokens;
+}
+
+function assertNoUnsupportedLocalLoad(tokens, index, label) {
+  const token = tokens[index];
+  const next = tokens[index + 1];
+  if (["createRequire", "require", "eval", "Function"].includes(token.value) && next?.value === "(") throw new Error(`${label} contains unsupported local module loading via ${token.value}`);
+  if (token.value === "import" && next?.value === "." && tokens[index + 2]?.value === "meta" && tokens[index + 3]?.value === "." && tokens[index + 4]?.value === "resolve") throw new Error(`${label} contains unsupported local module loading via import.meta.resolve`);
+}
 
 function dependencySpecifierTarget(root, fromPath, specifier, label) {
   if (!specifier.startsWith(".")) return null;
@@ -394,13 +451,46 @@ function dependencySpecifierTarget(root, fromPath, specifier, label) {
 }
 
 function parseLocalModuleEdges(root, path, source) {
+  const tokens = lexModule(source, `evaluator dependency ${path}`);
   const edges = [];
-  for (const { kind, pattern } of MODULE_IMPORT_PATTERNS) {
-    pattern.lastIndex = 0;
-    for (const match of source.matchAll(pattern)) {
-      const specifier = match[1];
-      const target = dependencySpecifierTarget(root, path, specifier, `${kind} from ${path}`);
-      if (target) edges.push({ from: path, to: target, kind, specifier });
+  const add = (kind, token) => {
+    const target = dependencySpecifierTarget(root, path, token.value, `${kind} from ${path}`);
+    if (!target) return;
+    const edge = { from: path, to: target, kind, specifier: token.value, source_location: { line: token.line, column: token.column } };
+    edge.edge_digest = canonicalDigest(edge);
+    edges.push(edge);
+  };
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    assertNoUnsupportedLocalLoad(tokens, index, `evaluator dependency ${path}`);
+    if (token.value === "import") {
+      const next = tokens[index + 1];
+      if (next?.value === "(") {
+        const literal = tokens[index + 2];
+        if (literal?.type !== "string" || tokens[index + 3]?.value !== ")") throw new Error(`evaluator dependency ${path} contains an unsupported computed dynamic import`);
+        add("dynamic_import", literal);
+      } else if (next?.type === "string") add("static_import", next);
+      else {
+        for (let cursor = index + 1; cursor < tokens.length && tokens[cursor].value !== ";"; cursor += 1) {
+          if (tokens[cursor].value === "from") {
+            const literal = tokens[cursor + 1];
+            if (literal?.type !== "string") throw new Error(`evaluator dependency ${path} has an invalid static import`);
+            add("static_import", literal);
+            break;
+          }
+          if (tokens[cursor].value === "import" || tokens[cursor].value === "export") break;
+        }
+      }
+    } else if (token.value === "export") {
+      for (let cursor = index + 1; cursor < tokens.length && tokens[cursor].value !== ";"; cursor += 1) {
+        if (tokens[cursor].value === "from") {
+          const literal = tokens[cursor + 1];
+          if (literal?.type !== "string") throw new Error(`evaluator dependency ${path} has an invalid export-from`);
+          add("export_from", literal);
+          break;
+        }
+        if (tokens[cursor].value === "import" || tokens[cursor].value === "export") break;
+      }
     }
   }
   return edges;
@@ -442,7 +532,8 @@ export function deriveEvaluatorDependencyGraph({ root, baseRevision, entryPaths 
     const owner = authorityPath.includes("scoring-input") || authorityPath.includes("portfolio-" )
       ? "scripts/ask-benchmark-scoring-contract.mjs"
       : "scripts/ask-benchmark-evaluator-boundary.mjs";
-    const edge = { from: owner, to: authorityPath, kind: "authority_read", specifier: authorityPath };
+    const edge = { from: owner, to: authorityPath, kind: "authority_read", specifier: authorityPath, syntax_identity: ["authority_read", owner, authorityPath].join(":") };
+    edge.edge_digest = canonicalDigest(edge);
     edges.set(stableCanonicalJson(edge), edge);
   }
   const casePaths = new Map();
@@ -1067,10 +1158,10 @@ function validatePrivateEvaluationEvidenceArtifacts({ root, privateEvaluationRoo
   let repositoryDiffArtifact = null;
   for (const entry of record.evidence_artifacts) {
     const artifactPath = resolveAuthorityArtifactPath(canonicalEvaluationRoot, entry.path, `private evaluation ${entry.kind} artifact`);
-    const evidence = streamingFileDigest(artifactPath, `private evaluation ${entry.kind} artifact`);
-    if (evidence.bytes !== entry.bytes) throw new Error(`private evaluation ${entry.kind} artifact byte binding is invalid`);
-    if (lstatSync(artifactPath).ino !== entry.inode) throw new Error(`private evaluation ${entry.kind} artifact inode binding is invalid`);
-    const artifact = readJsonArtifact(artifactPath, `private evaluation ${entry.kind} artifact`).value;
+    const artifactRead = readJsonArtifact(artifactPath, `private evaluation ${entry.kind} artifact`);
+    if (artifactRead.bytes.length !== entry.bytes || artifactRead.rawByteDigest !== entry.digest) throw new Error(`private evaluation ${entry.kind} artifact byte binding is invalid`);
+    if (artifactRead.evidence.finalPath.ino !== entry.inode) throw new Error(`private evaluation ${entry.kind} artifact inode binding is invalid`);
+    const artifact = artifactRead.value;
     if (artifact.artifact_digest !== entry.digest || artifact.artifact_bytes !== entry.bytes) throw new Error(`private evaluation ${entry.kind} artifact digest or byte closure is invalid`);
     const artifactClosure = structuredClone(artifact);
     delete artifactClosure.artifact_digest;
@@ -1110,17 +1201,18 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   if (pathsOverlap(canonicalEvaluationRoot, bundle.canonicalPrivateRoot)) throw new Error("private evaluation authority root must not overlap the static evaluator bundle");
   const recordInfo = authorityRelativePathForSupplied(canonicalEvaluationRoot, privateEvaluationRecordPath, "private evaluation record");
   const fragmentInfo = authorityRelativePathForSupplied(canonicalEvaluationRoot, privateFragmentPath, "private evaluator fragment");
-  const record = readJsonArtifact(recordInfo.authoritativePath, "private evaluation record").value;
+  const recordRead = readJsonArtifact(recordInfo.authoritativePath, "private evaluation record");
+  const record = recordRead.value;
   assertBenchmarkSchemaInstance(record, { schemaPath: resolve(root, PRIVATE_EVALUATION_RECORD_SCHEMA_PATH), label: "private evaluation record" });
   if (record.evaluation_record_digest !== computePrivateEvaluationRecordDigest(record)) throw new Error("private evaluation record digest closure is invalid");
   if (record.evaluator_bundle_id !== bundle.manifest.evaluator_bundle_id || record.evaluator_bundle_digest !== bundle.manifest.evaluator_bundle_digest || record.evaluator_revision !== bundle.manifest.evaluator_revision) throw new Error("private evaluation record bundle identity is inconsistent");
   if (stableCanonicalJson(record.evaluator_source_identity) !== stableCanonicalJson(bundle.manifest.evaluator_source_identity)) throw new Error("private evaluation record source identity is inconsistent");
   if (record.normalized_result_id !== normalized.normalized_result_id || record.normalized_result_digest !== normalized.normalized_result_digest || record.run_instance_id !== normalized.lineage.run_instance_id || record.case_id !== normalized.lineage.case_id || record.attempt !== normalized.lineage.attempt) throw new Error("private evaluation record normalized lineage is inconsistent");
   if (record.private_fragment_path !== fragmentInfo.relativePath) throw new Error("private evaluation record fragment path is inconsistent");
-  const fragmentEvidence = streamingFileDigest(fragmentInfo.authoritativePath, "private evaluator fragment");
-  if (fragmentEvidence.bytes !== record.private_fragment_bytes || fragmentEvidence.digest !== record.private_fragment_sha256) throw new Error("private evaluator fragment digest or byte closure is invalid");
-  if (lstatSync(fragmentInfo.authoritativePath).ino !== record.private_fragment_inode) throw new Error("private evaluator fragment inode binding is invalid");
-  const fragment = readJsonArtifact(fragmentInfo.authoritativePath, "private evaluator fragment").value;
+  const fragmentRead = readJsonArtifact(fragmentInfo.authoritativePath, "private evaluator fragment");
+  if (fragmentRead.bytes.length !== record.private_fragment_bytes || fragmentRead.rawByteDigest !== record.private_fragment_sha256) throw new Error("private evaluator fragment digest or byte closure is invalid");
+  if (fragmentRead.evidence.finalPath.ino !== record.private_fragment_inode) throw new Error("private evaluator fragment inode binding is invalid");
+  const fragment = fragmentRead.value;
   const fragmentSchemaDigest = rawByteDigest(readFileSync(resolve(root, PRIVATE_EVALUATOR_FRAGMENT_SCHEMA_PATH)));
   if (record.fragment_schema_digest !== fragmentSchemaDigest) throw new Error("private evaluator fragment schema digest is inconsistent");
   const adapterSourceDigest = rawByteDigest(readFileSync(resolve(root, "scripts/ask-benchmark-evaluator-boundary.mjs")));
@@ -1314,7 +1406,16 @@ export function verifyEvaluatorResult({
   assertBoundaryRootLineage(bundle, verified);
   const normalized = readNormalizedRecord({ verified, result });
   validateExecutionEventEvidenceReferences({ normalized, result });
-  if (privateEvaluationRoot || privateEvaluationRecordPath || privateFragmentPath) {
+  const privateAuthorityPaths = [privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath];
+  const privateAuthorityCount = privateAuthorityPaths.filter(Boolean).length;
+  const requiresPrivateAuthority = result.result_profile?.name === BINARY_SCOPE_VERIFICATION_PROFILE_NAME;
+  if (requiresPrivateAuthority && privateAuthorityCount !== privateAuthorityPaths.length) {
+    throw new Error("binary scope verification requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together");
+  }
+  if (!requiresPrivateAuthority && privateAuthorityCount !== 0 && privateAuthorityCount !== privateAuthorityPaths.length) {
+    throw new Error("private evaluation root, record, and fragment paths must be supplied together");
+  }
+  if (requiresPrivateAuthority) {
     verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, normalized, result, scoringInputs });
   }
   const lineage = normalized.lineage;
