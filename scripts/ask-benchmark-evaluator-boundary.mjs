@@ -408,6 +408,21 @@ function lexModule(source, label) {
       if (offset >= source.length) throw new Error(`${label} contains an unterminated comment`);
       advance(); advance(); continue;
     }
+    if (character === "/") {
+      advance();
+      let inCharacterClass = false;
+      while (offset < source.length) {
+        const value = advance();
+        if (value === "\\" && offset < source.length) advance();
+        else if (value === "[") inCharacterClass = true;
+        else if (value === "]") inCharacterClass = false;
+        else if (value === "/" && !inCharacterClass) break;
+        else if (value === "\n" || value === "\r") throw new Error(`${label} contains an unterminated regular expression`);
+      }
+      if (source[offset - 1] !== "/") throw new Error(`${label} contains an unterminated regular expression`);
+      while (offset < source.length && /[A-Za-z]/u.test(source[offset])) advance();
+      continue;
+    }
     if (character === '"' || character === "'") { consumeQuoted(character); continue; }
     if (character === "`") {
       advance();
