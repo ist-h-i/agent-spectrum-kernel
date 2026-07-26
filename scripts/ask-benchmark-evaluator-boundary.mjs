@@ -390,9 +390,7 @@ function lexModule(source, label) {
         raw += advance();
       } else if (character === quote) {
         try {
-          const value = quote === '"'
-            ? JSON.parse(raw)
-            : JSON.parse(`"${raw.slice(1, -1).replace(/"/gu, "\\\"").replace(/\\\\'/gu, "'")}"`);
+          const value = raw.slice(1, -1).replace(/\\\\(.)/gsu, "$1");
           tokens.push({ type: "string", value, ...start });
           return;
         } catch { throw new Error(`${label} contains an invalid string literal`); }
