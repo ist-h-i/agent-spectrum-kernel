@@ -400,6 +400,7 @@ function lexModule(source, label) {
   };
   while (offset < source.length) {
     const character = source[offset];
+    if (offset === 0 && character === "#" && source[offset + 1] === "!") { while (offset < source.length && advance() !== "\n") {} continue; }
     if (/\s/u.test(character)) { advance(); continue; }
     if (character === "/" && source[offset + 1] === "/") { while (offset < source.length && advance() !== "\n") {} continue; }
     if (character === "/" && source[offset + 1] === "*") {
