@@ -398,8 +398,31 @@ function lexModule(source, label) {
     }
     throw new Error(`${label} contains an unterminated string`);
   };
-  while (offset < source.length) {
+  const consumeTemplate = () => {
+    advance();
+    while (offset < source.length) {
+      if (source[offset] === "\\") {
+        advance();
+        if (offset >= source.length) throw new Error(`${label} contains an unterminated template literal`);
+        advance();
+      } else if (source[offset] === "`") {
+        advance();
+        return;
+      } else if (source[offset] === "$" && source[offset + 1] === "{") {
+        advance();
+        advance();
+        consumeCode(true);
+      } else {
+        advance();
+      }
+    }
+    throw new Error(`${label} contains an unterminated template literal`);
+  };
+  const consumeCode = (stopAtTemplateExpressionEnd = false) => {
+    let nestedBraces = 0;
+    while (offset < source.length) {
     const character = source[offset];
+    if (stopAtTemplateExpressionEnd && character === "}" && nestedBraces === 0) { advance(); return; }
     if (offset === 0 && character === "#" && source[offset + 1] === "!") { while (offset < source.length && advance() !== "\n") {} continue; }
     if (/\s/u.test(character)) { advance(); continue; }
     if (character === "/" && source[offset + 1] === "/") { while (offset < source.length && advance() !== "\n") {} continue; }
@@ -427,20 +450,20 @@ function lexModule(source, label) {
       continue;
     }
     if (character === '"' || character === "'") { consumeQuoted(character); continue; }
-    if (character === "`") {
-      advance();
-      while (offset < source.length) { const value = advance(); if (value === "\\" && offset < source.length) advance(); else if (value === "`") break; }
-      if (source[offset - 1] !== "`") throw new Error(`${label} contains an unterminated template literal`);
-      continue;
-    }
+    if (character === "`") { consumeTemplate(); continue; }
     const start = { line, column };
     if (/[A-Za-z_$]/u.test(character)) {
       let value = "";
       while (offset < source.length && /[A-Za-z0-9_$]/u.test(source[offset])) value += advance();
       tokens.push({ type: "identifier", value, ...start }); continue;
     }
+    if (character === "{") nestedBraces += 1;
+    if (character === "}") nestedBraces -= 1;
     tokens.push({ type: "punctuation", value: advance(), ...start });
-  }
+    }
+    if (stopAtTemplateExpressionEnd) throw new Error(`${label} contains an unterminated template expression`);
+  };
+  consumeCode();
   return tokens;
 }
 
@@ -483,7 +506,14 @@ function parseLocalModuleEdges(root, path, source) {
       const next = tokens[index + 1];
       if (next?.value === "(") {
         const literal = tokens[index + 2];
-        if (literal?.type !== "string" || tokens[index + 3]?.value !== ")") throw new Error(`evaluator dependency ${path} contains an unsupported computed dynamic import`);
+        if (literal?.type !== "string") throw new Error(`evaluator dependency ${path} contains an unsupported computed dynamic import`);
+        let depth = 1;
+        let cursor = index + 3;
+        for (; cursor < tokens.length && depth > 0; cursor += 1) {
+          if (tokens[cursor].value === "(") depth += 1;
+          if (tokens[cursor].value === ")") depth -= 1;
+        }
+        if (depth !== 0) throw new Error(`evaluator dependency ${path} contains an unterminated dynamic import`);
         add("dynamic_import", literal);
       } else if (next?.type === "string") add("static_import", next);
       else {
@@ -512,17 +542,19 @@ function parseLocalModuleEdges(root, path, source) {
   return edges;
 }
 
-function dependencyFileType(path) {
-  if (EVALUATOR_AUTHORITY_PATHS.includes(path)) return "authority_data";
+function dependencyFileType(path, authorityPaths = EVALUATOR_AUTHORITY_PATHS) {
+  if (authorityPaths.includes(path)) return "authority_data";
   if (extname(path).toLowerCase() === ".json") return "json";
   return "module";
 }
 
-export function deriveEvaluatorDependencyGraph({ root, baseRevision, entryPaths = EVALUATOR_DEPENDENCY_ENTRY_PATHS } = {}) {
+export function deriveEvaluatorDependencyGraph({ root, baseRevision, entryPaths = EVALUATOR_DEPENDENCY_ENTRY_PATHS, authorityPaths = EVALUATOR_AUTHORITY_PATHS } = {}) {
   const canonicalRoot = assertRealDirectory(root, "evaluator dependency graph repository root");
   if (!baseRevision || !/^[a-f0-9]{40}$/u.test(baseRevision)) throw new Error("evaluator dependency graph base Git revision is invalid");
   const entries = [...entryPaths].map((path) => assertPortableRelativePath(path, "evaluator dependency graph entry path")).sort();
   if (new Set(entries).size !== entries.length) throw new Error("evaluator dependency graph entry paths contain duplicates");
+  const authorities = [...authorityPaths].map((path) => assertPortableRelativePath(path, "evaluator dependency graph authority path")).sort();
+  if (new Set(authorities).size !== authorities.length) throw new Error("evaluator dependency graph authority paths contain duplicates");
   const nodePaths = new Set();
   const edges = new Map();
   const visit = (path) => {
@@ -530,7 +562,7 @@ export function deriveEvaluatorDependencyGraph({ root, baseRevision, entryPaths 
     nodePaths.add(path);
     const absolute = resolveAuthorityArtifactPath(canonicalRoot, path, `evaluator dependency ${path}`);
     const bytes = readFileSync(absolute);
-    const fileType = dependencyFileType(path);
+    const fileType = dependencyFileType(path, authorities);
     const committed = checkedInBytesAtRevision(canonicalRoot, baseRevision, path);
     if (!committed) throw new Error(`evaluator dependency base Git revision is unavailable at ${path}`);
     if (committed.length !== bytes.length || rawByteDigest(committed) !== rawByteDigest(bytes)) throw new Error(`evaluator dependency bytes do not match the base Git revision at ${path}`);
@@ -543,7 +575,7 @@ export function deriveEvaluatorDependencyGraph({ root, baseRevision, entryPaths 
     }
   };
   for (const entry of entries) visit(entry);
-  for (const authorityPath of EVALUATOR_AUTHORITY_PATHS) {
+  for (const authorityPath of authorities) {
     visit(authorityPath);
     const owner = authorityPath.includes("scoring-input") || authorityPath.includes("portfolio-" )
       ? "scripts/ask-benchmark-scoring-contract.mjs"
@@ -565,7 +597,7 @@ export function deriveEvaluatorDependencyGraph({ root, baseRevision, entryPaths 
       path,
       bytes: bytes.length,
       sha256: rawByteDigest(bytes),
-      file_type: dependencyFileType(path),
+      file_type: dependencyFileType(path, authorities),
       base_git_revision_bytes: committed.length,
       base_git_revision_sha256: rawByteDigest(committed),
     };
