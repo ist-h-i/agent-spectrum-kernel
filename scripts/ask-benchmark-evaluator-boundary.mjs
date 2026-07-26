@@ -497,7 +497,7 @@ function parseLocalModuleEdges(root, path, source) {
           if (tokens[cursor].value === "import" || tokens[cursor].value === "export") break;
         }
       }
-    } else if (token.value === "export") {
+    } else if (token.value === "export" && ["{", "*"].includes(tokens[index + 1]?.value)) {
       for (let cursor = index + 1; cursor < tokens.length && tokens[cursor].value !== ";"; cursor += 1) {
         if (tokens[cursor].value === "from") {
           const literal = tokens[cursor + 1];
