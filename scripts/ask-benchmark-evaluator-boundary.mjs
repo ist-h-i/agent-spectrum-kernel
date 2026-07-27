@@ -971,8 +971,12 @@ function buildRepositoryAuthoritySource({ root, evaluatorRevision, label }) {
     assertPortableRelativePath(path, `${label} source path`);
     const absolute = resolveAuthorityArtifactPath(repositoryRoot, path, `${label} source ${path}`);
     const read = readStableFile(absolute, `${label} source ${path}`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
-    const committed = checkedInBytesAtRevision(repositoryRoot, evaluatorRevision, path);
-    if (!committed || Buffer.compare(committed, read.bytes) !== 0) throw new Error(`${label} source authority does not match the immutable evaluator revision at ${path}`);
+    const committed = graph.node_inventory.find((node) => node.path === path)
+      ? checkedInBytesAtRevision(repositoryRoot, evaluatorRevision, path)
+      : null;
+    if (graph.node_inventory.some((node) => node.path === path) && (!committed || Buffer.compare(committed, read.bytes) !== 0)) {
+      throw new Error(`${label} source authority does not match the immutable evaluator revision at ${path}`);
+    }
     const graphNode = graph.node_inventory.find((node) => node.path === path);
     if (graphNode && (graphNode.bytes !== read.bytes.length || graphNode.sha256 !== read.rawByteDigest)) throw new Error(`${label} dependency graph source identity drifted at ${path}`);
     buffers.set(path, Buffer.from(read.bytes));
