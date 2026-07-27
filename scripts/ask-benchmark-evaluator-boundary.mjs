@@ -699,7 +699,13 @@ function dependencyFileType(path, authorityPaths = EVALUATOR_AUTHORITY_PATHS) {
   return "module";
 }
 
-export function deriveEvaluatorDependencyGraph({ root, baseRevision, entryPaths = EVALUATOR_DEPENDENCY_ENTRY_PATHS, authorityPaths = EVALUATOR_AUTHORITY_PATHS } = {}) {
+export function deriveEvaluatorDependencyGraph({
+  root,
+  baseRevision,
+  entryPaths = EVALUATOR_DEPENDENCY_ENTRY_PATHS,
+  authorityPaths = EVALUATOR_AUTHORITY_PATHS,
+  privateEntryPaths = entryPaths === EVALUATOR_DEPENDENCY_ENTRY_PATHS ? EVALUATOR_PRIVATE_ENTRY_PATHS : [],
+} = {}) {
   const canonicalRoot = assertRealDirectory(root, "evaluator dependency graph repository root");
   if (!baseRevision || !/^[a-f0-9]{40}$/u.test(baseRevision)) throw new Error("evaluator dependency graph base Git revision is invalid");
   const entries = [...entryPaths].map((path) => assertPortableRelativePath(path, "evaluator dependency graph entry path")).sort();
@@ -735,16 +741,20 @@ export function deriveEvaluatorDependencyGraph({ root, baseRevision, entryPaths 
     edge.edge_digest = canonicalDigest(edge);
     edges.set(stableCanonicalJson(edge), edge);
   }
-  const privateRuntimeEdge = {
-    from: "scripts/ask-benchmark-private-evaluator-runner.mjs",
-    to: PRIVATE_EVALUATOR_VIRTUAL_PATH,
-    kind: "runtime_private_import",
-    specifier: "--verified-authority-payload",
-    syntax_identity: "runtime_private_import:scripts/ask-benchmark-private-evaluator-runner.mjs:verified-authority-payload",
-  };
-  privateRuntimeEdge.edge_digest = canonicalDigest(privateRuntimeEdge);
-  edges.set(stableCanonicalJson(privateRuntimeEdge), privateRuntimeEdge);
-  for (const path of EVALUATOR_PRIVATE_ENTRY_PATHS) {
+  const privateEntries = [...privateEntryPaths].map((path) => assertPortableRelativePath(path, "private evaluator entry path")).sort();
+  if (new Set(privateEntries).size !== privateEntries.length) throw new Error("private evaluator entry paths contain duplicates");
+  if (privateEntries.length > 0) {
+    const privateRuntimeEdge = {
+      from: "scripts/ask-benchmark-private-evaluator-runner.mjs",
+      to: PRIVATE_EVALUATOR_VIRTUAL_PATH,
+      kind: "runtime_private_import",
+      specifier: "--verified-authority-payload",
+      syntax_identity: "runtime_private_import:scripts/ask-benchmark-private-evaluator-runner.mjs:verified-authority-payload",
+    };
+    privateRuntimeEdge.edge_digest = canonicalDigest(privateRuntimeEdge);
+    edges.set(stableCanonicalJson(privateRuntimeEdge), privateRuntimeEdge);
+  }
+  for (const path of privateEntries) {
     if (!nodePaths.has(path)) throw new Error(`private evaluator entry is outside the dependency graph: ${path}`);
     const edge = {
       from: PRIVATE_EVALUATOR_VIRTUAL_PATH,
