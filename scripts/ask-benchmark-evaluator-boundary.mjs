@@ -956,6 +956,7 @@ export function createSealedEvaluatorExecution({
   const hiddenPath = resolveAuthorityArtifactPath(staticRoot, hiddenAsset.path, `${label} hidden evaluator`);
   const hiddenRead = readStableFile(hiddenPath, `${label} hidden evaluator`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
   if (hiddenRead.rawByteDigest !== hiddenAsset.sha256 || hiddenRead.bytes.length !== hiddenAsset.bytes) throw new Error(`${label} hidden evaluator source identity is inconsistent`);
+  const privateBundleSource = readStableWorkspaceInventory(staticRoot, `${label} static private bundle`);
   const runnerRelativePath = "scripts/ask-benchmark-private-evaluator-runner.mjs";
   const repositoryRoot = assertRealDirectory(root, `${label} repository root`);
   const runnerPath = resolveAuthorityArtifactPath(repositoryRoot, runnerRelativePath, `${label} runner source`);
@@ -969,7 +970,10 @@ export function createSealedEvaluatorExecution({
   assertFreshPath(executionRoot, `${label} root`);
   mkdirSync(executionRoot, 0o755);
   const runner = materializeSealedFile({ bytes: runnerRead.bytes, destination: resolve(executionRoot, "runner.mjs"), label: `${label} runner sealed copy`, mode: 0o444 });
-  const hidden = materializeSealedFile({ bytes: hiddenRead.bytes, destination: resolve(executionRoot, "hidden-evaluator.mjs"), label: `${label} hidden evaluator sealed copy`, mode: 0o444 });
+  const privateBundle = materializeSealedWorkspaceSnapshot({ inventory: privateBundleSource, destination: resolve(executionRoot, "private-bundle"), label: `${label} private bundle sealed snapshot` });
+  const hidden = readStableFile(resolve(privateBundle.root, hiddenAsset.path), `${label} hidden evaluator sealed copy`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
+  if (hidden.rawByteDigest !== hiddenAsset.sha256 || hidden.bytes.length !== hiddenAsset.bytes) throw new Error(`${label} hidden evaluator sealed copy does not match the verified source`);
+  const hiddenIdentity = runtimeIdentityFromStableRead(hidden);
   const frozen = materializeSealedWorkspaceSnapshot({ inventory: frozenSource, destination: resolve(executionRoot, "frozen-workspace"), label: `${label} frozen workspace sealed snapshot` });
   const candidate = materializeSealedWorkspaceSnapshot({ inventory: candidateSource, destination: resolve(executionRoot, "candidate-workspace"), label: `${label} candidate workspace sealed snapshot` });
   const evidence = materializeSealedWorkspaceSnapshot({ inventory: evidenceSource, destination: resolve(executionRoot, "evaluation-input-evidence"), label: `${label} evaluation-input evidence sealed snapshot` });
@@ -997,10 +1001,16 @@ export function createSealedEvaluatorExecution({
       sourceSha256: hiddenRead.rawByteDigest,
       path: hidden.path,
       relativePath: relativeAuthorityPath(evaluationRoot, hidden.path, `${label} hidden sealed copy`),
-      bytes: hidden.bytes,
-      sha256: hidden.sha256,
-      identityBefore: hidden.identity,
-      identityAfter: hidden.identity,
+      bytes: hidden.bytes.length,
+      sha256: hidden.rawByteDigest,
+      identityBefore: hiddenIdentity,
+      identityAfter: hiddenIdentity,
+    },
+    privateBundle: {
+      path: privateBundle.root,
+      relativePath: relativeAuthorityPath(evaluationRoot, privateBundle.root, `${label} private bundle sealed snapshot`),
+      source: sealedSnapshotBinding(privateBundleSource),
+      sealed: sealedSnapshotBinding(privateBundle),
     },
     frozen: {
       source: sealedSnapshotBinding(frozenSource),
@@ -1047,12 +1057,14 @@ function stableFragmentBytes(fragment) {
 function captureSealedExecutionState(execution, label) {
   const runner = readStableFile(execution.runner.path, `${label} runner sealed copy`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
   const hidden = readStableFile(execution.hidden.path, `${label} hidden evaluator sealed copy`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
+  const privateBundle = execution.privateBundle?.path ? readStableWorkspaceInventory(execution.privateBundle.path, `${label} private bundle sealed snapshot`) : null;
   const frozen = readStableWorkspaceInventory(execution.frozen.path, `${label} frozen sealed snapshot`);
   const candidate = readStableWorkspaceInventory(execution.candidate.path, `${label} candidate sealed snapshot`);
   const evidence = readStableWorkspaceInventory(execution.evidence.path, `${label} evidence sealed snapshot`);
   return {
     runner: { bytes: runner.bytes.length, sha256: runner.rawByteDigest, identity: runtimeIdentityFromStableRead(runner) },
     hidden: { bytes: hidden.bytes.length, sha256: hidden.rawByteDigest, identity: runtimeIdentityFromStableRead(hidden) },
+    privateBundle: privateBundle ? sealedSnapshotBinding(privateBundle) : null,
     frozen: sealedSnapshotBinding(frozen),
     candidate: sealedSnapshotBinding(candidate),
     evidence: sealedSnapshotBinding(evidence),
@@ -1698,6 +1710,10 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const sealedCandidateWorkspace = resolveSealedWorkspace(record.candidate_workspace_sealed_execution_path, "sealed candidate workspace");
   const sealedEvaluationInputRoot = resolveSealedWorkspace(record.evaluation_input_evidence_sealed_execution_path, "sealed evaluation-input evidence root");
   if (pathsOverlap(sealedFrozenWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(sealedCandidateWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(sealedEvaluationInputRoot, bundle.canonicalPrivateRoot)) throw new Error("sealed private evaluation workspaces overlap the static evaluator bundle");
+  const sealedPrivateBundleRoot = resolveSealedWorkspace(dirname(record.hidden_evaluator_sealed_execution_path), "sealed private evaluator bundle");
+  const staticPrivateBundleInventory = readStableWorkspaceInventory(bundle.canonicalPrivateRoot, "static private evaluator bundle");
+  const sealedPrivateBundleInventory = readStableWorkspaceInventory(sealedPrivateBundleRoot, "sealed private evaluator bundle");
+  if (staticPrivateBundleInventory.digest !== sealedPrivateBundleInventory.digest) throw new Error("sealed private evaluator bundle does not match the verified static bundle");
   const frozenInventory = readStableWorkspaceInventory(sealedFrozenWorkspace, "sealed frozen workspace");
   const candidateInventory = readStableWorkspaceInventory(sealedCandidateWorkspace, "sealed candidate workspace");
   const evidenceInventory = readStableWorkspaceInventory(sealedEvaluationInputRoot, "sealed evaluation-input evidence root");
@@ -1708,6 +1724,7 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const execution = {
     runner: { path: sealedRunnerPath },
     hidden: { path: sealedHiddenPath },
+    privateBundle: { path: dirname(sealedHiddenPath) },
     frozen: { path: sealedFrozenWorkspace },
     candidate: { path: sealedCandidateWorkspace },
     evidence: { path: sealedEvaluationInputRoot },
