@@ -28,6 +28,7 @@ import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-poli
 import { computeVerificationCommandContractDigest } from "./ask-benchmark-command-evidence.mjs";
 import {
   computeFinalAdmissionRecordDigest,
+  resolveRequirementAdmissionBindingDigest,
   computeOutputContractDigest,
   computePolicyManifestDigest,
   computeRequirementRecordDigest,
@@ -2535,7 +2536,7 @@ function readScoringInputSources({
   const expectedMutationSetIds = requirementRecord.requirements.flatMap(({ mutation_ids }) => mutation_ids).sort();
   if (stableCanonicalJson([...admissionRecord.evidence_map_ids].sort()) !== stableCanonicalJson(expectedEvidenceMapIds)) throw new Error("final admission evidence-map inventory does not match the authoritative requirement record");
   if (stableCanonicalJson([...admissionRecord.mutation_set_ids].sort()) !== stableCanonicalJson(expectedMutationSetIds)) throw new Error("final admission mutation-set inventory does not match the authoritative requirement record");
-  if (requirementRecord.admission_record_digest !== admissionRecord.admission_digest) throw new Error("requirement record admission digest was not re-derived from the authoritative final admission record");
+  if (requirementRecord.admission_record_digest !== resolveRequirementAdmissionBindingDigest(admissionRecord)) throw new Error("requirement record admission digest was not re-derived from the authoritative final admission record");
   return { freezeManifest, freezeManifestSourceDigest: freeze.sourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, evaluatorAuthorityManifest };
 }
 

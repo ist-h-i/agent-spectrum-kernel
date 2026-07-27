@@ -43,6 +43,7 @@ import {
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import {
   computeFinalAdmissionRecordDigest,
+  computeFinalAdmissionRequirementAuthorityDigest,
   computeOutputContractDigest,
   computeRequirementRecordDigest,
   computeScoringInputFreezeManifestDigest,
@@ -52,6 +53,7 @@ import {
   deriveEffectiveVerificationEvidenceReferences,
   deriveEffectiveVerificationEvidenceState,
   deriveVerificationEvidenceState,
+  resolveRequirementAdmissionBindingDigest,
   validateScoringInputBindings,
 } from "./ask-benchmark-scoring-contract.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
@@ -269,8 +271,9 @@ function admittedSyntheticScoringInput(source) {
   const scoring = structuredClone(source);
   const jsonDigest = (value) => `sha256:${createHash("sha256").update(`${JSON.stringify(value, null, 2)}\n`).digest("hex")}`;
   scoring.admissionRecord.admission_status = "admitted";
+  scoring.admissionRecord.requirement_authority_digest = computeFinalAdmissionRequirementAuthorityDigest(scoring.admissionRecord);
   scoring.admissionRecord.admission_digest = computeFinalAdmissionRecordDigest(scoring.admissionRecord);
-  scoring.requirementRecord.admission_record_digest = scoring.admissionRecord.admission_digest;
+  scoring.requirementRecord.admission_record_digest = resolveRequirementAdmissionBindingDigest(scoring.admissionRecord);
   scoring.requirementRecord.requirement_record_digest = computeRequirementRecordDigest(scoring.requirementRecord);
   scoring.freezeManifest.admission_record.raw_byte_digest = jsonDigest(scoring.admissionRecord);
   scoring.freezeManifest.admission_record.semantic_digest = scoring.admissionRecord.admission_digest;
@@ -573,9 +576,10 @@ function persistentScoringAuthorities(authorityRoot) {
   const policyManifest = readJson(resolve(root, "benchmarks/portfolio-policy-manifest.json"));
   const scoringPolicy = readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json"));
   admissionRecord.admission_status = "admitted";
+  admissionRecord.requirement_authority_digest = computeFinalAdmissionRequirementAuthorityDigest(admissionRecord);
   admissionRecord.admission_digest = computeFinalAdmissionRecordDigest(admissionRecord);
   requirementRecord.requirement_record_path = authorityRelativePath(paths.requirementRecordPath);
-  requirementRecord.admission_record_digest = admissionRecord.admission_digest;
+  requirementRecord.admission_record_digest = resolveRequirementAdmissionBindingDigest(admissionRecord);
   requirementRecord.requirement_record_digest = computeRequirementRecordDigest(requirementRecord);
   outputContract.output_contract_path = authorityRelativePath(paths.outputContractPath);
   outputContract.evaluator_public_reference_path = authorityRelativePath(paths.referencePath);
@@ -2087,6 +2091,7 @@ try {
   statusOnly.admissionRecord.admission_status = "admitted";
   expectFailure(() => validateScoringInputBindings(statusOnly), /final admission record digest/u, "admitted status with a stale digest must fail closed");
   const admissionOnly = structuredClone(statusOnly);
+  admissionOnly.admissionRecord.requirement_authority_digest = computeFinalAdmissionRequirementAuthorityDigest(admissionOnly.admissionRecord);
   admissionOnly.admissionRecord.admission_digest = computeFinalAdmissionRecordDigest(admissionOnly.admissionRecord);
   expectFailure(() => validateScoringInputBindings(admissionOnly), /admission binding/u, "admission digest without downstream authority updates must fail closed");
   const scoring = admittedSyntheticScoringInput(pendingScoring);

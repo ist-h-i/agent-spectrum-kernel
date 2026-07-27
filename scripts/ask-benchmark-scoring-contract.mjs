@@ -78,7 +78,13 @@ export const FINAL_ADMISSION_RECORD_FIELD_IDS = Object.freeze([
   "admission_status",
   "admission_digest",
 ]);
-const FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS = Object.freeze(["evaluator_source_identity"]);
+const FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS = Object.freeze([
+  "evaluator_authority_manifest_path",
+  "evaluator_authority_manifest_raw_sha256",
+  "evaluator_authority_manifest_digest",
+  "evaluator_source_identity",
+  "requirement_authority_digest",
+]);
 
 const REQUIREMENT_RECORD_FIELD_IDS = Object.freeze([
   "requirement_record_id",
@@ -155,6 +161,22 @@ export function computeFinalAdmissionRecordDigest(admissionRecord) {
   return canonicalDigest(withoutField(admissionRecord, "admission_digest"));
 }
 
+export function computeFinalAdmissionRequirementAuthorityDigest(admissionRecord) {
+  const {
+    admission_digest: _admissionDigest,
+    evaluator_authority_manifest_path: _authorityManifestPath,
+    evaluator_authority_manifest_raw_sha256: _authorityManifestRawSha256,
+    evaluator_authority_manifest_digest: _authorityManifestDigest,
+    requirement_authority_digest: _requirementAuthorityDigest,
+    ...requirementAuthority
+  } = admissionRecord;
+  return canonicalDigest(requirementAuthority);
+}
+
+export function resolveRequirementAdmissionBindingDigest(admissionRecord) {
+  return admissionRecord.requirement_authority_digest ?? admissionRecord.admission_digest;
+}
+
 export function computeScoringInputFreezeManifestDigest(freezeManifest) {
   return canonicalDigest(withoutField(freezeManifest, "manifest_digest"));
 }
@@ -218,6 +240,7 @@ export function validateFinalAdmissionRecordContract({ admissionPolicy, admissio
   assertUniqueStrings(admissionRecord.mutation_set_ids, "final admission mutation-set IDs");
   if (admissionRecord.evidence_map_ids.length === 0 || admissionRecord.mutation_set_ids.length === 0) throw new Error("admitted final admission record requires evidence-map and mutation-set IDs");
   if (admissionRecord.admission_status !== "admitted") throw new Error("scoring input freeze requires an admitted final admission record");
+  if (admissionRecord.requirement_authority_digest) assertDigestClosure(admissionRecord.requirement_authority_digest, computeFinalAdmissionRequirementAuthorityDigest(admissionRecord), "final admission requirement authority digest");
   assertDigestClosure(admissionRecord.admission_digest, computeFinalAdmissionRecordDigest(admissionRecord), "final admission record digest");
   return admissionRecord;
 }
@@ -566,6 +589,7 @@ export function validateScoringInputBindings({ freezeManifest, freezeManifestSou
   assertDigestClosure(scoringPolicy.policy_digest, computeScoringPolicyDigest(scoringPolicy), "scoring policy digest");
   assertDigestClosure(outputContract.output_contract_digest, computeOutputContractDigest(outputContract), "output contract digest");
   if (admissionRecord.admission_status !== "admitted") throw new Error("scoring input binding requires an admitted final admission record");
+  if (admissionRecord.requirement_authority_digest) assertDigestClosure(admissionRecord.requirement_authority_digest, computeFinalAdmissionRequirementAuthorityDigest(admissionRecord), "final admission requirement authority digest");
   assertDigestClosure(admissionRecord.admission_digest, computeFinalAdmissionRecordDigest(admissionRecord), "final admission record digest");
   if (policyManifest.catalog_digest !== catalog.catalog_digest || scoringPolicy.catalog_digest !== catalog.catalog_digest) throw new Error("scoring policy or manifest catalog binding does not match");
   if (policyManifest.scoring_policy?.digest !== scoringPolicy.policy_digest) throw new Error("policy manifest scoring policy binding does not match");
@@ -573,7 +597,7 @@ export function validateScoringInputBindings({ freezeManifest, freezeManifestSou
   if (requirementRecord.catalog_digest !== catalog.catalog_digest) throw new Error("requirement record catalog binding does not match");
   if (requirementRecord.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("requirement record policy manifest binding does not match");
   if (requirementRecord.scoring_policy_digest !== scoringPolicy.policy_digest) throw new Error("requirement record scoring policy binding does not match");
-  if (requirementRecord.admission_record_digest !== admissionRecord.admission_digest) throw new Error("requirement record admission binding does not match the authoritative final admission record");
+  if (requirementRecord.admission_record_digest !== resolveRequirementAdmissionBindingDigest(admissionRecord)) throw new Error("requirement record admission binding does not match the authoritative final admission record");
   if (outputContract.fixture_id !== normalizedResult.lineage.fixture_id) throw new Error("output contract fixture binding does not match normalized result");
   if (outputContract.catalog_digest !== catalog.catalog_digest || outputContract.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("output contract policy or catalog binding does not match");
   if (outputContract.evaluator_public_reference_digest !== evaluatorReference.public_metadata_digest) throw new Error("output contract evaluator public reference binding does not match");

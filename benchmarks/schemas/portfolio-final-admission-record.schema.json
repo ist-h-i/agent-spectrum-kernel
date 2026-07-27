@@ -30,6 +30,7 @@
     "evaluator_authority_manifest_raw_sha256": { "$ref": "#/$defs/digest" },
     "evaluator_authority_manifest_digest": { "$ref": "#/$defs/digest" },
     "evaluator_source_identity": { "$ref": "#/$defs/sourceIdentity" },
+    "requirement_authority_digest": { "$ref": "#/$defs/digest" },
     "evaluator_byte_count": { "type": "integer", "minimum": 0 },
     "evaluator_requirement_count": { "type": "integer", "minimum": 1 },
     "evidence_map_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },

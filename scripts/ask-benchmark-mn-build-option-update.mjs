@@ -14,12 +14,14 @@ import {
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import {
   computeFinalAdmissionRecordDigest,
+  computeFinalAdmissionRequirementAuthorityDigest,
   computeOutputContractDigest,
   computeRequirementRecordDigest,
   computeRequirementSetDigest,
   computeScoringInputFreezeManifestDigest,
   computeResultProfileDigest,
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
+  resolveRequirementAdmissionBindingDigest,
   validateRequirementRecordContract,
 } from "./ask-benchmark-scoring-contract.mjs";
 import { validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
@@ -323,8 +325,9 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
   });
   const admission = artifacts["final-admission-record.json"];
   assertBenchmarkSchemaInstance(admission, { schemaPath: resolve(root, "benchmarks/schemas/portfolio-final-admission-record.schema.json"), label: "fixture final admission record" });
+  assertDigest(admission.requirement_authority_digest, computeFinalAdmissionRequirementAuthorityDigest(admission), "final admission requirement authority");
   assertDigest(admission.admission_digest, computeFinalAdmissionRecordDigest(admission), "final admission record");
-  if (requirementRecord.admission_record_digest !== admission.admission_digest) throw new Error("requirement/admission binding mismatch");
+  if (requirementRecord.admission_record_digest !== resolveRequirementAdmissionBindingDigest(admission)) throw new Error("requirement/admission binding mismatch");
   if (admission.evaluator_bundle_id !== reference.evaluator_bundle_id || admission.evaluator_bundle_digest !== reference.evaluator_bundle_digest) throw new Error("admission/evaluator binding mismatch");
   if (stableCanonicalJson(admission.evaluator_source_identity) !== stableCanonicalJson(reference.evaluator_source_identity)) throw new Error("admission/evaluator source identity mismatch");
   if (admission.evaluator_authority_manifest_path !== expectedEvaluatorAuthority.path || admission.evaluator_authority_manifest_raw_sha256 !== expectedEvaluatorAuthority.raw || admission.evaluator_authority_manifest_digest !== expectedEvaluatorAuthority.semantic) throw new Error("admission evaluator authority-manifest binding mismatch");
