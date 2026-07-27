@@ -1076,7 +1076,7 @@ export function executeSealedEvaluator({ execution, repositoryRoot, normalized, 
   ];
   const run = () => {
     const child = spawnSync(process.execPath, [execution.runner.path, ...args], { encoding: "utf8", maxBuffer: MAX_BOUNDARY_FILE_BYTES, timeout });
-    if (child.status !== 0 || child.error) throw new Error(`${label} child execution failed`);
+    if (child.status !== 0 || child.error) throw new Error(`${label} child execution failed${child.error ? `: ${child.error.message}` : child.stderr ? `: ${child.stderr.trim().slice(0, 512)}` : ""}`);
     return parseRunnerFragment(child.stdout, `${label} child output`);
   };
   const stateA = captureSealedExecutionState(execution, `${label} before run`);
