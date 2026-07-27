@@ -25,6 +25,7 @@ import {
   computeEvaluatorBundleDigest,
   computeEvaluatorBundleId,
   computeEvaluatorReferenceDigest,
+  deriveEvaluatorDependencyGraph,
   validateExecutionEventEvidenceReferences,
   verifyEvaluatorBoundary,
   verifyPrivateEvaluatorBundle,
@@ -47,6 +48,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
 const work = mkdtempSync(resolve(root, ".ask-benchmark-evaluator-boundary-test-"));
 const privateWork = mkdtempSync(resolve(tmpdir(), "ask-private-evaluator-boundary-test-"));
+const graphWork = mkdtempSync(resolve(tmpdir(), "ask-evaluator-dependency-graph-test-"));
 const REVISION = "b".repeat(40);
 const FIXTURE_ID = "cal-atomic-rule-batch";
 const ADAPTERS = ["codex", "claude"];
@@ -154,6 +156,21 @@ function run(args, expectedStatus = 0) {
   const result = spawnSync(process.execPath, [runner, ...args], { cwd: root, encoding: "utf8", maxBuffer: 40 * 1024 * 1024 });
   assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
   return result;
+}
+
+function writeDependencyGraphFixture(name, source) {
+  const fixtureRoot = resolve(graphWork, name);
+  mkdirSync(fixtureRoot, { recursive: true });
+  writeFileSync(resolve(fixtureRoot, "entry.mjs"), source);
+  for (const path of ["command-evidence.mjs", "nested.mjs", "scoring-contract.mjs", "static.mjs", "options.mjs"]) {
+    writeFileSync(resolve(fixtureRoot, path), "export const value = true;\n");
+  }
+  for (const args of [["init"], ["add", "."], ["-c", "user.name=ASK test", "-c", "user.email=ask-test@example.invalid", "commit", "-m", "dependency graph fixture"], ["rev-parse", "HEAD"]]) {
+    const result = spawnSync("git", args, { cwd: fixtureRoot, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    if (args[0] === "rev-parse") return { root: fixtureRoot, revision: result.stdout.trim() };
+  }
+  throw new Error("dependency graph fixture did not produce a Git revision");
 }
 
 function missing(status, reason) {
@@ -768,6 +785,36 @@ function closeResult(result) {
 }
 
 try {
+  const dependencyFixture = writeDependencyGraphFixture("template-interpolation", [
+    'const ignored = `quasi import("./ignored.mjs")`; ',
+    'const evidence = `${import("./command-evidence.mjs")}`;',
+    'const nested = `${`nested ${import("./nested.mjs")}`}`;',
+    'export { value } from "./scoring-contract.mjs";',
+    'import value from "./static.mjs" with { type: "json" };',
+    'await import("./options.mjs", { with: { type: "json" } });',
+  ].join("\n"));
+  const dependencyGraph = deriveEvaluatorDependencyGraph({
+    root: dependencyFixture.root,
+    baseRevision: dependencyFixture.revision,
+    entryPaths: ["entry.mjs"],
+    authorityPaths: [],
+  });
+  assert.deepEqual(dependencyGraph.edge_inventory.map(({ from, to, kind, specifier }) => ({ from, to, kind, specifier })), [
+    { from: "entry.mjs", to: "static.mjs", kind: "static_import", specifier: "./static.mjs" },
+    { from: "entry.mjs", to: "command-evidence.mjs", kind: "dynamic_import", specifier: "./command-evidence.mjs" },
+    { from: "entry.mjs", to: "nested.mjs", kind: "dynamic_import", specifier: "./nested.mjs" },
+    { from: "entry.mjs", to: "options.mjs", kind: "dynamic_import", specifier: "./options.mjs" },
+    { from: "entry.mjs", to: "scoring-contract.mjs", kind: "export_from", specifier: "./scoring-contract.mjs" },
+  ], "dependency graph must include only real template interpolation imports and preserve exact local edges");
+  assert.ok(dependencyGraph.edge_inventory.every((edge) => /^sha256:[a-f0-9]{64}$/u.test(edge.edge_digest)), "dependency graph edges must each have a canonical digest");
+  const commandEvidenceEdge = dependencyGraph.edge_inventory.find((edge) => edge.to === "command-evidence.mjs");
+  assert.deepEqual(commandEvidenceEdge.source_location, { line: 2, column: 28 }, "template interpolation import source location must identify the string specifier");
+
+  const computedTemplateFixture = writeDependencyGraphFixture("computed-template", 'const value = `${import(dynamicSpecifier)}`;\n');
+  assert.throws(() => deriveEvaluatorDependencyGraph({ root: computedTemplateFixture.root, baseRevision: computedTemplateFixture.revision, entryPaths: ["entry.mjs"], authorityPaths: [] }), /unsupported computed dynamic import/u, "computed import in a template interpolation must fail closed");
+  const unsafeTemplateFixture = writeDependencyGraphFixture("unsafe-template", 'const value = `${require("./command-evidence.mjs")}`;\n');
+  assert.throws(() => deriveEvaluatorDependencyGraph({ root: unsafeTemplateFixture.root, baseRevision: unsafeTemplateFixture.revision, entryPaths: ["entry.mjs"], authorityPaths: [] }), /unsupported local module loading via require/u, "unsupported loaders in a template interpolation must fail closed");
+
   const materialized = resolve(work, "materialized");
   const selectionState = resolve(work, "selection-state");
   const runDir = resolve(work, "execution-run");
@@ -1482,4 +1529,5 @@ try {
 } finally {
   rmSync(work, { recursive: true, force: true });
   rmSync(privateWork, { recursive: true, force: true });
+  rmSync(graphWork, { recursive: true, force: true });
 }
