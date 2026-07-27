@@ -53,6 +53,7 @@ export const EVALUATOR_DEPENDENCY_ENTRY_PATHS = Object.freeze([
   "scripts/ask-benchmark-materialize.mjs",
   "scripts/ask-benchmark-normalized-results.mjs",
   "scripts/ask-benchmark-evaluator-boundary.mjs",
+  "scripts/ask-benchmark-private-evaluator-runner.mjs",
 ]);
 export const EVALUATOR_AUTHORITY_PATHS = Object.freeze([
   "benchmarks/schemas/evaluator-reference.schema.json",
