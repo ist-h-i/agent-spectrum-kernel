@@ -2647,18 +2647,6 @@ export function verifyEvaluatorResult({
   const normalizedSource = readNormalizedRecord({ verified, result });
   const normalized = normalizedSource.record;
   validateExecutionEventEvidenceReferences({ normalized, result });
-  const privateAuthorityPaths = [privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath];
-  const privateAuthorityCount = privateAuthorityPaths.filter(Boolean).length;
-  const requiresPrivateAuthority = result.result_profile?.name === BINARY_SCOPE_VERIFICATION_PROFILE_NAME;
-  if (requiresPrivateAuthority && privateAuthorityCount !== privateAuthorityPaths.length) {
-    throw new Error("binary scope verification requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together");
-  }
-  if (!requiresPrivateAuthority && privateAuthorityCount !== 0 && privateAuthorityCount !== privateAuthorityPaths.length) {
-    throw new Error("private evaluation root, record, and fragment paths must be supplied together");
-  }
-  if (requiresPrivateAuthority) {
-    verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, normalized, normalizedBytes: normalizedSource.bytes, result, scoringInputs });
-  }
   const lineage = normalized.lineage;
   const expectedLineage = {
     normalized_result_id: normalized.normalized_result_id,
@@ -2688,6 +2676,18 @@ export function verifyEvaluatorResult({
     normalizedResult: normalized,
     evaluatorResult: result,
   });
+  const privateAuthorityPaths = [privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath];
+  const privateAuthorityCount = privateAuthorityPaths.filter(Boolean).length;
+  const requiresPrivateAuthority = result.result_profile?.name === BINARY_SCOPE_VERIFICATION_PROFILE_NAME;
+  if (requiresPrivateAuthority && privateAuthorityCount !== privateAuthorityPaths.length) {
+    throw new Error("binary scope verification requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together");
+  }
+  if (!requiresPrivateAuthority && privateAuthorityCount !== 0 && privateAuthorityCount !== privateAuthorityPaths.length) {
+    throw new Error("private evaluation root, record, and fragment paths must be supplied together");
+  }
+  if (requiresPrivateAuthority) {
+    verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, normalized, normalizedBytes: normalizedSource.bytes, result, scoringInputs });
+  }
   return { bundle, normalized, result, verified, scoringInputs, scoringReady: scoring.scoringReady };
 }
 
