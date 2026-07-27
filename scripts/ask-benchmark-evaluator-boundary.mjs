@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   closeSync,
   existsSync,
@@ -1266,7 +1266,37 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const adapterSourceDigest = rawByteDigest(readFileSync(resolve(root, "scripts/ask-benchmark-evaluator-boundary.mjs")));
   if (record.adapter_source_digest !== adapterSourceDigest) throw new Error("private evaluator adapter source digest is inconsistent");
   const evidence = validatePrivateEvaluationEvidenceArtifacts({ root, privateEvaluationRoot: canonicalEvaluationRoot, record, normalized, result });
+  const hiddenAsset = bundle.manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
+  if (!hiddenAsset || record.hidden_evaluator_role !== "hidden_tests" || record.hidden_evaluator_path !== hiddenAsset.path || record.hidden_evaluator_sha256 !== hiddenAsset.sha256 || record.hidden_evaluator_bytes !== hiddenAsset.bytes) throw new Error("private evaluation record hidden evaluator identity is inconsistent");
+  const hiddenPath = resolveAuthorityArtifactPath(bundle.canonicalPrivateRoot, hiddenAsset.path, "private hidden evaluator");
+  const hiddenRead = readStableFile(hiddenPath, "private hidden evaluator", MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
+  if (hiddenRead.rawByteDigest !== hiddenAsset.sha256 || hiddenRead.bytes.length !== hiddenAsset.bytes || hiddenRead.evidence.finalPath.ino !== record.hidden_evaluator_inode) throw new Error("private hidden evaluator stable identity is inconsistent");
+  if (record.dependency_graph_digest !== bundle.manifest.dependency_graph.graph_digest) throw new Error("private evaluation record dependency graph is inconsistent");
+  const resolveEvaluationDirectory = (path, label) => {
+    assertPortableRelativePath(path, `${label} path`);
+    const absolute = resolve(canonicalEvaluationRoot, path);
+    if (!isInside(canonicalEvaluationRoot, absolute)) throw new Error(`${label} escapes the private evaluation root`);
+    let current = canonicalEvaluationRoot;
+    for (const segment of path.split("/")) { current = resolve(current, segment); if (!existsSync(current) || lstatSync(current).isSymbolicLink()) throw new Error(`${label} must be a real directory without symlinks`); }
+    if (!lstatSync(absolute).isDirectory() || !isInside(canonicalEvaluationRoot, realpathSync(absolute))) throw new Error(`${label} must be a private evaluation directory`);
+    return realpathSync(absolute);
+  };
+  const frozenWorkspace = resolveEvaluationDirectory(record.frozen_workspace_path, "frozen workspace");
+  const candidateWorkspace = resolveEvaluationDirectory(record.candidate_workspace_path, "candidate workspace");
+  const evaluationInputRoot = resolveEvaluationDirectory(record.evaluation_input_evidence_root_path, "evaluation-input evidence root");
+  if (frozenWorkspace === candidateWorkspace || pathsOverlap(frozenWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(candidateWorkspace, bundle.canonicalPrivateRoot)) throw new Error("private evaluation workspaces are overlapping or invalid");
   const validatedFragment = validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy: scoringInputs.scoringPolicy, requirementRecord: scoringInputs.requirementRecord, normalizedResult: normalized });
+  const executeHiddenEvaluator = () => {
+    const runner = resolve(root, "scripts/ask-benchmark-private-evaluator-runner.mjs");
+    const run = spawnSync(process.execPath, [runner, "--hidden-evaluator", hiddenPath, "--repository-root", root, "--frozen-workspace", frozenWorkspace, "--candidate-workspace", candidateWorkspace, "--evaluation-input-root", evaluationInputRoot, "--normalized-base64", Buffer.from(stableCanonicalJson(normalized)).toString("base64url")], { encoding: "utf8", maxBuffer: MAX_BOUNDARY_FILE_BYTES, timeout: 30_000 });
+    if (run.status !== 0 || run.error) throw new Error("private hidden evaluator execution failed");
+    assertNoDuplicateJsonObjectKeys(run.stdout, "private hidden evaluator output");
+    try { return JSON.parse(run.stdout); } catch { throw new Error("private hidden evaluator output is invalid JSON"); }
+  };
+  const actualFragment = executeHiddenEvaluator();
+  const repeatedFragment = executeHiddenEvaluator();
+  if (stableCanonicalJson(actualFragment) !== stableCanonicalJson(repeatedFragment)) throw new Error("private hidden evaluator output is nondeterministic");
+  if (stableCanonicalJson(actualFragment) !== stableCanonicalJson(validatedFragment)) throw new Error("persisted private fragment was not produced by the hidden evaluator");
   const expected = adaptPrivateEvaluatorFragmentToEnvelope({
     root,
     fragment: validatedFragment,

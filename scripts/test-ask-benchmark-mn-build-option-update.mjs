@@ -636,7 +636,7 @@ function persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scor
   return { snapshot, track, evaluatorResultPath, privateFragmentPath, chainManifest };
 }
 
-function privateEvaluationRecordFor({ authorityRoot, chain, normalizedAuthority, bundleManifest, scoringAuthority, draftEvaluatorResult, privateFragmentBytes, privateFragmentDigest }) {
+function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normalizedAuthority, bundleManifest, scoringAuthority, draftEvaluatorResult, privateFragmentBytes, privateFragmentDigest }) {
   const artifactSpecs = [
     ["repository_diff", "repository-diff-artifact.json"],
     ["test_result", "evaluator-check-artifact.json"],
@@ -662,6 +662,8 @@ function privateEvaluationRecordFor({ authorityRoot, chain, normalizedAuthority,
     }];
   });
   const repositoryArtifact = readJson(resolve(authorityRoot, "repository-diff-artifact.json"));
+  const hiddenAsset = bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests");
+  const hiddenPath = resolve(privateRoot, hiddenAsset.path);
   const record = {
     schema_version: "1.0.0",
     schema_path: "benchmarks/schemas/private-evaluation-record.schema.json",
@@ -675,6 +677,15 @@ function privateEvaluationRecordFor({ authorityRoot, chain, normalizedAuthority,
     run_instance_id: normalizedAuthority.normalized.lineage.run_instance_id,
     case_id: normalizedAuthority.normalized.lineage.case_id,
     attempt: normalizedAuthority.normalized.lineage.attempt,
+    hidden_evaluator_role: "hidden_tests",
+    hidden_evaluator_path: hiddenAsset.path,
+    hidden_evaluator_sha256: hiddenAsset.sha256,
+    hidden_evaluator_bytes: hiddenAsset.bytes,
+    hidden_evaluator_inode: lstatSync(hiddenPath).ino,
+    dependency_graph_digest: bundleManifest.dependency_graph.graph_digest,
+    frozen_workspace_path: "frozen-workspace",
+    candidate_workspace_path: "candidate-workspace",
+    evaluation_input_evidence_root_path: "authority-chain",
     frozen_workspace_inventory_digest: repositoryArtifact.frozen_workspace_tree_digest,
     candidate_workspace_inventory_digest: repositoryArtifact.candidate_workspace_tree_digest,
     repository_diff_artifact_digest: repositoryArtifact.artifact_digest,
@@ -752,7 +763,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   const draftEvaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: actual.fragment, authority: adapterAuthority });
   assert.equal(Object.hasOwn(draftEvaluatorResult, "evaluator_rerun"), false, "private-only rerun metadata must not leak into the public envelope");
   const chain = persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scoringAuthority, evaluatorResult: draftEvaluatorResult, privateFragment: actual.fragment });
-  const privateRecord = privateEvaluationRecordFor({ authorityRoot, chain, normalizedAuthority, bundleManifest, scoringAuthority, draftEvaluatorResult, privateFragmentBytes: adapterAuthority.privateFragmentBytes, privateFragmentDigest: adapterAuthority.privateFragmentDigest });
+  const privateRecord = privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normalizedAuthority, bundleManifest, scoringAuthority, draftEvaluatorResult, privateFragmentBytes: adapterAuthority.privateFragmentBytes, privateFragmentDigest: adapterAuthority.privateFragmentDigest });
   const evaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: actual.fragment, authority: { ...adapterAuthority, privateEvaluationRecordDigest: privateRecord.record.evaluation_record_digest } });
   writeJson(chain.evaluatorResultPath, evaluatorResult);
   const common = {
