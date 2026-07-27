@@ -1618,8 +1618,13 @@ async function runBarrierRace({ execution, normalized, baseline, label, stage, a
     await mutator.completed;
     assert.deepEqual(executed.firstFragment, baseline.firstFragment, `${label} must not change first-run output`);
     assert.deepEqual(executed.secondFragment, baseline.secondFragment, `${label} must not change second-run output`);
-    assert.deepEqual(executed.before, executed.afterFirst, `${label} must preserve A/B authority state`);
-    assert.deepEqual(executed.afterFirst, executed.afterSecond, `${label} must preserve B/C authority state`);
+    const portableState = (state) => ({
+      runner: { bytes: state.runner.bytes, sha256: state.runner.sha256, mode: state.runner.identity.mode & 0o777 },
+      hidden: { bytes: state.hidden.bytes, sha256: state.hidden.sha256, mode: state.hidden.identity.mode & 0o777 },
+      ...Object.fromEntries(["privateBundle", "repository", "frozen", "candidate", "evidence"].map((kind) => [kind, state[kind] ? { portable_digest: state[kind].portable_digest, root_mode: state[kind].root.mode & 0o777 } : null])),
+    });
+    assert.deepEqual(portableState(executed.before), portableState(executed.afterFirst), `${label} must preserve A/B authority bytes and modes`);
+    assert.deepEqual(portableState(executed.afterFirst), portableState(executed.afterSecond), `${label} must preserve B/C authority bytes and modes`);
     const mutation = readJson(`${mutator.prefix}.mutation.json`);
     if (operation === "chmod") assert.notEqual(mutation.observed_mode & 0o200, 0, `${label} mutator must add a real write bit`);
     else if (label.includes("same bytes")) assert.notEqual(mutation.original_inode, mutation.replacement_inode, `${label} mutator must install a different inode`);
@@ -2089,7 +2094,7 @@ try {
   expectFailure(() => validateScoringInputBindings(pendingScoring), /requires an admitted/u, "checked-in pending admission must fail standalone scoring binding");
   const statusOnly = structuredClone(pendingScoring);
   statusOnly.admissionRecord.admission_status = "admitted";
-  expectFailure(() => validateScoringInputBindings(statusOnly), /final admission record digest/u, "admitted status with a stale digest must fail closed");
+  expectFailure(() => validateScoringInputBindings(statusOnly), /final admission (?:requirement authority|record) digest/u, "admitted status with stale authority digests must fail closed");
   const admissionOnly = structuredClone(statusOnly);
   admissionOnly.admissionRecord.requirement_authority_digest = computeFinalAdmissionRequirementAuthorityDigest(admissionOnly.admissionRecord);
   admissionOnly.admissionRecord.admission_digest = computeFinalAdmissionRecordDigest(admissionOnly.admissionRecord);

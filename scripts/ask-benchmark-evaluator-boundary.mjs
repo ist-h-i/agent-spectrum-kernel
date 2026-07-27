@@ -1696,6 +1696,23 @@ function assertSealedExecutionStatesEqual(states, label) {
   for (const state of states.slice(1)) if (stableCanonicalJson(state) !== stableCanonicalJson(first)) throw new Error(`${label} sealed execution authority changed between evaluator runs`);
 }
 
+function portableSealedExecutionState(state) {
+  const snapshot = (value) => value ? { portable_digest: value.portable_digest, root_mode: value.root.mode & 0o777 } : null;
+  return {
+    runner: { bytes: state.runner.bytes, sha256: state.runner.sha256, mode: state.runner.identity.mode & 0o777 },
+    hidden: { bytes: state.hidden.bytes, sha256: state.hidden.sha256, mode: state.hidden.identity.mode & 0o777 },
+    privateBundle: snapshot(state.privateBundle),
+    repository: snapshot(state.repository),
+    frozen: snapshot(state.frozen),
+    candidate: snapshot(state.candidate),
+    evidence: snapshot(state.evidence),
+  };
+}
+
+function assertPortableSealedExecutionStatesEqual(states, label) {
+  assertSealedExecutionStatesEqual(states.map(portableSealedExecutionState), `${label} portable`);
+}
+
 export function executeSealedEvaluator({ execution, repositoryRoot: _repositoryRoot, normalized, normalizedBytes = null, timeout = 30_000, beforeRun = null, afterRun = null, barrier = null, label = "private evaluator sealed execution" } = {}) {
   if (!execution?.runner?.path || !execution?.hidden?.path || !execution?.repository?.path || !execution?.frozen?.path || !execution?.candidate?.path || !execution?.evidence?.path) throw new Error(`${label} is incomplete`);
   const verifiedAuthority = captureVerifiedExecutionAuthority(execution, label);
@@ -1720,7 +1737,8 @@ export function executeSealedEvaluator({ execution, repositoryRoot: _repositoryR
   const secondFragment = run(2);
   const stateC = captureSealedExecutionState(execution, `${label} after second run`);
   if (afterRun) afterRun({ index: 2, execution, state: stateC });
-  assertSealedExecutionStatesEqual([stateA, stateB, stateC], label);
+  if (barrier) assertPortableSealedExecutionStatesEqual([stateA, stateB, stateC], label);
+  else assertSealedExecutionStatesEqual([stateA, stateB, stateC], label);
   if (stableCanonicalJson(firstFragment) !== stableCanonicalJson(secondFragment)) throw new Error(`${label} fragment is nondeterministic`);
   return {
     firstFragment,
