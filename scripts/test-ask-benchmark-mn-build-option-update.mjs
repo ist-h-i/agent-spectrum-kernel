@@ -1328,7 +1328,7 @@ async function runPrivatePortabilityChecks(privateRoot) {
   const graphSchemaOriginal = readFileSync(graphSchema, "utf8");
   const graphFailure = async (label, mutate, pattern = /dependency graph|source .*bytes|base Git|symlink|regular file|target is missing/u) => {
     mutate();
-    await assert.rejects(() => validateEvaluatorSourceIdentity({ identity: manifest.evaluator_source_identity, root: graphRoot, expectedRevision: manifest.evaluator_revision, expectedGeneratorSourceDigest: manifest.generator.source_digest, label: `R8 dependency graph regression: ${label}` }), pattern, `R8 dependency graph regression: ${label}`);
+    await assert.rejects(async () => validateEvaluatorSourceIdentity({ identity: manifest.evaluator_source_identity, root: graphRoot, expectedRevision: manifest.evaluator_revision, expectedGeneratorSourceDigest: manifest.generator.source_digest, label: `R8 dependency graph regression: ${label}` }), pattern, `R8 dependency graph regression: ${label}`);
     writeFileSync(graphModule, graphModuleOriginal);
     if (lstatSync(graphSchema).isSymbolicLink()) rmSync(graphSchema);
     writeFileSync(graphSchema, graphSchemaOriginal);
