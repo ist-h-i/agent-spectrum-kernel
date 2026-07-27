@@ -23,8 +23,9 @@
     "fileState": {
       "type": ["object", "null"],
       "additionalProperties": false,
-      "required": ["file_type", "mode", "bytes", "sha256"],
+      "required": ["path", "file_type", "mode", "bytes", "sha256"],
       "properties": {
+        "path": { "$ref": "#/$defs/path" },
         "file_type": { "enum": ["file", "directory", "missing"] },
         "mode": { "type": ["integer", "null"], "minimum": 0 },
         "bytes": { "type": ["integer", "null"], "minimum": 0 },
