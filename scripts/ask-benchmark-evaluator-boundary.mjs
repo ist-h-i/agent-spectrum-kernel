@@ -1145,6 +1145,9 @@ export function computeEvaluatorBundleId(manifest) {
     schema_path: manifest.schema_path,
     fixture_identity: manifest.fixture_identity,
     input_identity: manifest.input_identity,
+    evaluator_revision: manifest.evaluator_revision,
+    evaluator_source_identity: manifest.evaluator_source_identity,
+    dependency_graph: manifest.dependency_graph,
     asset_inventory: manifest.asset_inventory,
   };
   return `evaluator-${canonicalDigest(identity).slice("sha256:".length)}`;
