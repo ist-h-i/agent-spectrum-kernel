@@ -827,6 +827,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       case_id: normalizedAuthority.normalized.lineage.case_id,
       attempt: normalizedAuthority.normalized.lineage.attempt,
     },
+    privateEvaluationRecordDigest: `sha256:${"0".repeat(64)}`,
   };
   const adapterFailure = (label, mutate, pattern = /fragment|classification|reference|authority|normalized|points|outcome|Schema/u) => {
     const changed = structuredClone(actual.fragment);
