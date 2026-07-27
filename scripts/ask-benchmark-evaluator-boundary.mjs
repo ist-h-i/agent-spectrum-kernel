@@ -727,6 +727,51 @@ function directoryFileInventory(root, label) {
   return files;
 }
 
+export function readStableWorkspaceInventory(root, label = "workspace authority") {
+  const canonicalRoot = assertRealDirectory(root, `${label} root`);
+  const rootBefore = lstatSync(canonicalRoot);
+  const entries = [];
+  const inodePaths = new Map();
+  const casePaths = new Map();
+  const visit = (directory) => {
+    const parentBefore = lstatSync(directory);
+    if (!parentBefore.isDirectory() || parentBefore.isSymbolicLink()) throw new Error(`${label} contains an invalid directory`);
+    const children = readdirSync(directory).sort((left, right) => left.localeCompare(right));
+    for (const name of children) {
+      const absolute = resolve(directory, name);
+      const path = relative(canonicalRoot, absolute).split(sep).join("/");
+      assertPortableRelativePath(path, `${label} path`);
+      const folded = path.toLocaleLowerCase("en-US");
+      if (casePaths.has(folded) && casePaths.get(folded) !== path) throw new Error(`${label} contains a case collision: ${casePaths.get(folded)} / ${path}`);
+      casePaths.set(folded, path);
+      const status = lstatSync(absolute);
+      if (status.isSymbolicLink() || status.isFIFO() || status.isSocket() || status.isBlockDevice() || status.isCharacterDevice()) throw new Error(`${label} contains a prohibited filesystem entry: ${path}`);
+      const mode = status.mode & 0o777;
+      if (status.isDirectory()) {
+        entries.push({ path, file_type: "directory", mode, dev: status.dev, ino: status.ino, bytes: null, sha256: null });
+        visit(absolute);
+      } else if (status.isFile()) {
+        if (status.nlink > 1) throw new Error(`${label} contains an implicit hard-link authority: ${path}`);
+        const stable = readStableFile(absolute, `${label} file ${path}`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: true });
+        const final = lstatSync(absolute);
+        if (final.dev !== status.dev || final.ino !== status.ino || final.mode !== status.mode || final.nlink !== status.nlink) throw new Error(`${label} file identity changed during inventory: ${path}`);
+        entries.push({ path, file_type: "file", mode, dev: status.dev, ino: status.ino, bytes: stable.bytes.length, sha256: stable.rawByteDigest });
+        const inodeKey = `${status.dev}:${status.ino}`;
+        if (inodePaths.has(inodeKey)) throw new Error(`${label} contains hard-linked paths: ${inodePaths.get(inodeKey)} / ${path}`);
+        inodePaths.set(inodeKey, path);
+      } else throw new Error(`${label} contains a non-regular entry: ${path}`);
+      if (entries.length > MAX_BOUNDARY_FILES) throw new Error(`${label} exceeds the boundary inspection file-count limit`);
+    }
+    const parentAfter = lstatSync(directory);
+    if (parentAfter.dev !== parentBefore.dev || parentAfter.ino !== parentBefore.ino || parentAfter.mtimeMs !== parentBefore.mtimeMs || parentAfter.ctimeMs !== parentBefore.ctimeMs) throw new Error(`${label} parent directory changed during inventory`);
+  };
+  visit(canonicalRoot);
+  const rootAfter = lstatSync(canonicalRoot);
+  if (rootAfter.dev !== rootBefore.dev || rootAfter.ino !== rootBefore.ino || rootAfter.mtimeMs !== rootBefore.mtimeMs || rootAfter.ctimeMs !== rootBefore.ctimeMs) throw new Error(`${label} root identity changed during inventory`);
+  entries.sort((left, right) => left.path.localeCompare(right.path));
+  return { root: canonicalRoot, entries, digest: canonicalDigest(entries) };
+}
+
 function managedRepositoryInventory(root) {
   const canonicalRoot = assertRealDirectory(root, "repository root");
   let repositoryTop;
@@ -1267,7 +1312,7 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   if (record.adapter_source_digest !== adapterSourceDigest) throw new Error("private evaluator adapter source digest is inconsistent");
   const evidence = validatePrivateEvaluationEvidenceArtifacts({ root, privateEvaluationRoot: canonicalEvaluationRoot, record, normalized, result });
   const hiddenAsset = bundle.manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
-  if (!hiddenAsset || record.hidden_evaluator_role !== "hidden_tests" || record.hidden_evaluator_path !== hiddenAsset.path || record.hidden_evaluator_sha256 !== hiddenAsset.sha256 || record.hidden_evaluator_bytes !== hiddenAsset.bytes) throw new Error("private evaluation record hidden evaluator identity is inconsistent");
+  if (!hiddenAsset || record.hidden_evaluator_asset_role !== "hidden_tests" || record.hidden_evaluator_path !== hiddenAsset.path || record.hidden_evaluator_sha256 !== hiddenAsset.sha256 || record.hidden_evaluator_bytes !== hiddenAsset.bytes || record.hidden_evaluator_entry_point !== "evaluateCandidateSafe") throw new Error("private evaluation record hidden evaluator identity is inconsistent");
   const hiddenPath = resolveAuthorityArtifactPath(bundle.canonicalPrivateRoot, hiddenAsset.path, "private hidden evaluator");
   const hiddenRead = readStableFile(hiddenPath, "private hidden evaluator", MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
   if (hiddenRead.rawByteDigest !== hiddenAsset.sha256 || hiddenRead.bytes.length !== hiddenAsset.bytes || hiddenRead.evidence.finalPath.ino !== record.hidden_evaluator_inode) throw new Error("private hidden evaluator stable identity is inconsistent");
@@ -1285,6 +1330,10 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const candidateWorkspace = resolveEvaluationDirectory(record.candidate_workspace_path, "candidate workspace");
   const evaluationInputRoot = resolveEvaluationDirectory(record.evaluation_input_evidence_root_path, "evaluation-input evidence root");
   if (frozenWorkspace === candidateWorkspace || pathsOverlap(frozenWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(candidateWorkspace, bundle.canonicalPrivateRoot)) throw new Error("private evaluation workspaces are overlapping or invalid");
+  const frozenInventory = readStableWorkspaceInventory(frozenWorkspace, "frozen workspace");
+  const candidateInventory = readStableWorkspaceInventory(candidateWorkspace, "candidate workspace");
+  if (record.frozen_workspace_inventory_digest !== frozenInventory.digest || record.candidate_workspace_inventory_digest !== candidateInventory.digest) throw new Error("private evaluation workspace inventory digest is inconsistent");
+  if (!evidence.repositoryDiffArtifact || evidence.repositoryDiffArtifact.frozen_workspace_tree_digest !== frozenInventory.digest || evidence.repositoryDiffArtifact.candidate_workspace_tree_digest !== candidateInventory.digest) throw new Error("repository diff workspace authority does not match the re-derived workspace inventory");
   const validatedFragment = validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy: scoringInputs.scoringPolicy, requirementRecord: scoringInputs.requirementRecord, normalizedResult: normalized });
   const executeHiddenEvaluator = () => {
     const runner = resolve(root, "scripts/ask-benchmark-private-evaluator-runner.mjs");
@@ -1296,6 +1345,9 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const actualFragment = executeHiddenEvaluator();
   const repeatedFragment = executeHiddenEvaluator();
   if (stableCanonicalJson(actualFragment) !== stableCanonicalJson(repeatedFragment)) throw new Error("private hidden evaluator output is nondeterministic");
+  const firstBytes = Buffer.from(`${JSON.stringify(actualFragment, null, 2)}\n`);
+  const secondBytes = Buffer.from(`${JSON.stringify(repeatedFragment, null, 2)}\n`);
+  if (record.evaluator_execution_status !== "completed" || record.first_run_fragment_sha256 !== rawByteDigest(firstBytes) || record.first_run_fragment_bytes !== firstBytes.length || record.second_run_fragment_sha256 !== rawByteDigest(secondBytes) || record.second_run_fragment_bytes !== secondBytes.length || record.deterministic_rerun !== true) throw new Error("private evaluator execution determinism evidence is inconsistent");
   if (stableCanonicalJson(actualFragment) !== stableCanonicalJson(validatedFragment)) throw new Error("persisted private fragment was not produced by the hidden evaluator");
   const expected = adaptPrivateEvaluatorFragmentToEnvelope({
     root,
