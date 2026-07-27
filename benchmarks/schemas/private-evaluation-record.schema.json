@@ -28,6 +28,17 @@
     "evaluator_runner_inode",
     "evaluator_runner_source_identity",
     "dependency_graph_digest",
+    "sealed_repository_root_relative_path",
+    "sealed_repository_descriptor_relative_path",
+    "sealed_repository_descriptor_sha256",
+    "sealed_repository_descriptor_bytes",
+    "sealed_repository_source_graph_digest",
+    "sealed_repository_fixture_authority_digest",
+    "sealed_repository_portable_digest",
+    "sealed_repository_runtime_digest",
+    "sealed_repository_root_identity_before",
+    "sealed_repository_root_identity_after_first",
+    "sealed_repository_root_identity_after_second",
     "frozen_workspace_path",
     "candidate_workspace_path",
     "evaluation_input_evidence_root_path",
@@ -113,6 +124,17 @@
     "evaluator_runner_inode": { "type": "integer", "minimum": 1 },
     "evaluator_runner_source_identity": { "$ref": "#/$defs/runnerSourceIdentity" },
     "dependency_graph_digest": { "$ref": "#/$defs/digest" },
+    "sealed_repository_root_relative_path": { "$ref": "#/$defs/path" },
+    "sealed_repository_descriptor_relative_path": { "$ref": "#/$defs/path" },
+    "sealed_repository_descriptor_sha256": { "$ref": "#/$defs/digest" },
+    "sealed_repository_descriptor_bytes": { "type": "integer", "minimum": 1 },
+    "sealed_repository_source_graph_digest": { "$ref": "#/$defs/digest" },
+    "sealed_repository_fixture_authority_digest": { "$ref": "#/$defs/digest" },
+    "sealed_repository_portable_digest": { "$ref": "#/$defs/digest" },
+    "sealed_repository_runtime_digest": { "$ref": "#/$defs/digest" },
+    "sealed_repository_root_identity_before": { "$ref": "#/$defs/rootIdentity" },
+    "sealed_repository_root_identity_after_first": { "$ref": "#/$defs/rootIdentity" },
+    "sealed_repository_root_identity_after_second": { "$ref": "#/$defs/rootIdentity" },
     "frozen_workspace_path": { "$ref": "#/$defs/path" },
     "candidate_workspace_path": { "$ref": "#/$defs/path" },
     "evaluation_input_evidence_root_path": { "$ref": "#/$defs/path" },
@@ -209,6 +231,19 @@
             "ctimeMs": { "type": "number" }
           }
         }
+      }
+    },
+    "rootIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dev", "ino", "nlink", "mode", "mtimeMs", "ctimeMs"],
+      "properties": {
+        "dev": { "type": "integer", "minimum": 0 },
+        "ino": { "type": "integer", "minimum": 1 },
+        "nlink": { "type": "integer", "minimum": 1 },
+        "mode": { "type": "integer", "minimum": 0 },
+        "mtimeMs": { "type": "number" },
+        "ctimeMs": { "type": "number" }
       }
     },
     "runnerSourceIdentity": {

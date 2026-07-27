@@ -597,7 +597,7 @@ function syntheticEvaluatorResult({ state, authority, normalizedAuthority, bundl
     evaluator_notes_state: { state: "not_recorded", digest: null, bytes: null },
     privacy: { oracle_content_stored: false, rubric_content_stored: false, hidden_test_content_stored: false, matcher_content_stored: false, reference_answer_stored: false, raw_evaluator_prompt_stored: false, private_path_stored: false, secret_customer_or_personal_data_stored: false },
   };
-  if (invalid) result.invalid_input_authority = { layer: "command_evidence", category: "normalized_command_evidence_invalid", evidence_references: [normalizedReference] };
+  if (invalid) result.invalid_input_authority = { layer: "command_evidence", category: "normalized_command_evidence_invalid", code: "normalized_command_evidence_invalid", evidence_references: [normalizedReference] };
   result.evaluation_id = computeEvaluationId(result);
   result.evaluation_digest = computeEvaluationDigest(result);
   return result;
@@ -714,7 +714,7 @@ function persistPrivateEvidenceArtifacts({ authorityRoot, normalizedAuthority, b
         evaluator_revision: bundleManifest.evaluator_revision,
         source_tree_digest: bundleManifest.evaluator_source_identity.source_tree_digest,
         dependency_graph_digest: bundleManifest.dependency_graph.graph_digest,
-        structured_failure_code: invalidAuthority.category,
+        structured_failure_code: invalidAuthority.code,
         details_digest: failureReference.digest,
         details_bytes: failureReference.bytes,
       };
@@ -763,6 +763,9 @@ function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normali
   const sealedHidden = executed.before.hidden;
   const sealedAfterRunner = executed.afterSecond.runner;
   const sealedAfterHidden = executed.afterSecond.hidden;
+  const sealedRepository = executed.before.repository;
+  const sealedRepositoryAfterFirst = executed.afterFirst.repository;
+  const sealedRepositoryAfterSecond = executed.afterSecond.repository;
   const sealedWorkspace = {
     frozen: executed.before.frozen,
     candidate: executed.before.candidate,
@@ -805,6 +808,17 @@ function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normali
       base_git_revision_sha256: runnerIdentity.baseGitRevisionSha256,
     },
     dependency_graph_digest: bundleManifest.dependency_graph.graph_digest,
+    sealed_repository_root_relative_path: execution.repository.relativePath,
+    sealed_repository_descriptor_relative_path: execution.repository.descriptorRelativePath,
+    sealed_repository_descriptor_sha256: execution.repository.descriptorSha256,
+    sealed_repository_descriptor_bytes: execution.repository.descriptorBytes,
+    sealed_repository_source_graph_digest: execution.repository.sourceGraphDigest,
+    sealed_repository_fixture_authority_digest: execution.repository.fixtureAuthorityDigest,
+    sealed_repository_portable_digest: sealedRepository.portable_digest,
+    sealed_repository_runtime_digest: sealedRepository.runtime_digest,
+    sealed_repository_root_identity_before: sealedRepository.root,
+    sealed_repository_root_identity_after_first: sealedRepositoryAfterFirst.root,
+    sealed_repository_root_identity_after_second: sealedRepositoryAfterSecond.root,
     frozen_workspace_path: "frozen-workspace",
     candidate_workspace_path: "candidate-workspace",
     evaluation_input_evidence_root_path: "authority-chain",
@@ -1071,7 +1085,10 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     const sealedCandidatePath = resolve(authorityRoot, privateRecord.record.candidate_workspace_sealed_execution_path);
     const sealedFrozenPath = resolve(authorityRoot, privateRecord.record.frozen_workspace_sealed_execution_path);
     const sealedEvidencePath = resolve(authorityRoot, privateRecord.record.evaluation_input_evidence_sealed_execution_path);
+    const sealedRepositoryPath = resolve(authorityRoot, privateRecord.record.sealed_repository_root_relative_path);
     const sealedPrivateBundlePath = dirname(sealedHiddenPath);
+    const sealedRepositoryModulePath = resolve(sealedRepositoryPath, "scripts/ask-benchmark-scoring-contract.mjs");
+    const sealedRepositoryFixturePath = resolve(sealedRepositoryPath, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json");
     const sealedRunnerBackup = resolve(authorityRoot, ".sealed-runner-backup");
     expectPathFailure("sealed runner same-bytes inode replacement", () => replaceStaticFile(sealedRunnerPath, sealedRunnerBackup, readFileSync(sealedRunnerPath)), () => restoreStaticFile(sealedRunnerPath, sealedRunnerBackup), /sealed evaluator runner|inode|identity|private evaluator/u);
     const sealedHiddenBackup = resolve(authorityRoot, ".sealed-hidden-backup");
@@ -1081,6 +1098,14 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     const sealedBundleAsset = resolve(sealedPrivateBundlePath, "scope-boundaries.json");
     const sealedBundleAssetBytes = readFileSync(sealedBundleAsset);
     expectPathFailure("sealed private bundle dependency drift", () => writeFileSync(sealedBundleAsset, Buffer.concat([sealedBundleAssetBytes, Buffer.from("\n// dependency drift\n")])), () => writeFileSync(sealedBundleAsset, sealedBundleAssetBytes), /sealed private evaluator bundle|digest|identity/u);
+    const sealedRepositoryModuleBytes = readFileSync(sealedRepositoryModulePath);
+    const sealedRepositoryModuleBackup = resolve(authorityRoot, ".sealed-repository-module-backup");
+    expectPathFailure("sealed repository direct module same-bytes inode replacement", () => { renameSync(sealedRepositoryModulePath, sealedRepositoryModuleBackup); writeFileSync(sealedRepositoryModulePath, sealedRepositoryModuleBytes); }, () => { rmSync(sealedRepositoryModulePath); renameSync(sealedRepositoryModuleBackup, sealedRepositoryModulePath); }, /sealed repository|identity|inventory|authority/u);
+    expectPathFailure("sealed repository transitive module replacement", () => writeFileSync(sealedRepositoryModulePath, Buffer.concat([sealedRepositoryModuleBytes, Buffer.from("\n// transitive source transplant\n")])), () => writeFileSync(sealedRepositoryModulePath, sealedRepositoryModuleBytes), /sealed repository|digest|authority/u);
+    const sealedRepositoryFixtureBytes = readFileSync(sealedRepositoryFixturePath);
+    expectPathFailure("sealed repository fixture input replacement", () => writeFileSync(sealedRepositoryFixturePath, Buffer.concat([sealedRepositoryFixtureBytes, Buffer.from("\n")])), () => writeFileSync(sealedRepositoryFixturePath, sealedRepositoryFixtureBytes), /sealed repository|fixture|authority|digest/u);
+    const sealedRepositorySymlinkBackup = resolve(authorityRoot, ".sealed-repository-module-symlink-backup");
+    expectPathFailure("sealed repository transitive module symlink", () => { renameSync(sealedRepositoryModulePath, sealedRepositorySymlinkBackup); symlinkSync(sealedHiddenPath, sealedRepositoryModulePath); }, () => { rmSync(sealedRepositoryModulePath); renameSync(sealedRepositorySymlinkBackup, sealedRepositoryModulePath); }, /symlink|sealed repository|authority/u);
     const sealedCandidateAdded = resolve(sealedCandidatePath, "r12-sealed-added.txt");
     expectPathFailure("sealed candidate snapshot addition", () => writeFileSync(sealedCandidateAdded, "sealed addition\n"), () => rmSync(sealedCandidateAdded), /workspace|inventory|authority|snapshot/u);
     const sealedFrozenFile = resolve(sealedFrozenPath, "package.json");
@@ -1096,6 +1121,44 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     const originalFrozenConfig = resolve(originalFrozenPath, "build.config.json");
     const originalFrozenBytes = readFileSync(originalFrozenConfig);
     expectPathFailure("original frozen workspace mutation", () => writeFileSync(originalFrozenConfig, Buffer.concat([originalFrozenBytes, Buffer.from("\n")])), () => writeFileSync(originalFrozenConfig, originalFrozenBytes), /original private evaluation workspace|workspace identity|workspace/u);
+    const repositoryRaceExecution = createSealedEvaluatorExecution({
+      root,
+      privateEvaluationRoot: authorityRoot,
+      privateRoot,
+      hiddenAsset: bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests"),
+      frozenWorkspace: bootstrap.frozenWorkspace,
+      candidateWorkspace: bootstrap.candidateWorkspace,
+      evaluationInputRoot: bootstrap.evaluationInputRoot,
+      evaluatorRevision: bundleManifest.evaluator_revision,
+      executionDirectoryName: "sealed-repository-race",
+      label: "private evaluator repository race",
+    });
+    let liveRepositoryMutated = false;
+    const liveRepositorySourcePath = resolve(root, "scripts/ask-benchmark-scoring-contract.mjs");
+    const liveRepositorySourceBytes = readFileSync(liveRepositorySourcePath);
+    const repositoryRace = executeSealedEvaluator({
+      execution: repositoryRaceExecution,
+      repositoryRoot: root,
+      normalized: normalizedAuthority.normalized,
+      beforeRun: () => {
+        if (!liveRepositoryMutated) {
+          writeFileSync(liveRepositorySourcePath, Buffer.concat([liveRepositorySourceBytes, Buffer.from("\n// live repository mutation must not affect sealed execution\n")]));
+          liveRepositoryMutated = true;
+        }
+      },
+      afterRun: ({ index }) => { if (index === 1 && liveRepositoryMutated) writeFileSync(liveRepositorySourcePath, liveRepositorySourceBytes); },
+      label: "private evaluator live repository isolation",
+    });
+    writeFileSync(liveRepositorySourcePath, liveRepositorySourceBytes);
+    assert.deepEqual(repositoryRace.firstFragment, executed.firstFragment, "live repository mutation must not change sealed evaluation");
+    assert.throws(() => executeSealedEvaluator({
+      execution: repositoryRaceExecution,
+      repositoryRoot: root,
+      normalized: normalizedAuthority.normalized,
+      afterRun: ({ index }) => { if (index === 1) writeFileSync(resolve(repositoryRaceExecution.repository.path, "scripts/ask-benchmark-scoring-contract.mjs"), Buffer.concat([sealedRepositoryModuleBytes, Buffer.from("\n// between-run sealed mutation\n")])); },
+      label: "private evaluator sealed repository race",
+    }), /authority changed|sealed repository|inventory|digest/u, "sealed repository mutation between runs must fail closed");
+    rmSync(resolve(authorityRoot, "sealed-repository-race"), { recursive: true, force: true });
     const childRaceExecution = createSealedEvaluatorExecution({
       root,
       privateEvaluationRoot: authorityRoot,
@@ -1516,6 +1579,32 @@ async function runPrivatePortabilityChecks(privateRoot) {
   await graphFailure("cycle edge", () => writeFileSync(graphSchema, `${graphSchemaOriginal}\nimport \"./ask-benchmark-materialize.mjs\";\n`));
 }
 
+async function runTypedPrivateErrorChecks(privateRoot) {
+  const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
+  const hiddenAsset = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
+  const hidden = await import(pathToFileURL(resolve(privateRoot, hiddenAsset.path)).href);
+  const typed = (layer, code, message) => new hidden.PrivateEvaluatorAuthorityError({ layer, category: hidden.PRIVATE_EVALUATOR_ERROR_CONTRACT[layer][code], code, message });
+  const sourceError = typed("evaluator_source", "source_graph_drift", "normalized source graph drift");
+  assert.equal(sourceError.layer, "evaluator_source", "source errors must retain their typed layer");
+  assert.equal(sourceError.code, "source_graph_drift", "source errors must retain their typed code");
+  assert.match(sourceError.message, /normalized/u, "source error regression must allow misleading message text");
+  const commandError = typed("command_evidence", "normalized_command_evidence_invalid", "evidence stream is malformed");
+  assert.equal(commandError.layer, "command_evidence", "command evidence errors must retain their typed layer");
+  assert.equal(commandError.message.includes("normalized"), false, "command evidence classification must not depend on message vocabulary");
+  const contradiction = typed("evaluator_source", "source_graph_drift", "command evidence failure");
+  assert.equal(contradiction.layer, "evaluator_source", "typed layer must win over contradictory message text");
+  for (const [layer, codes] of Object.entries(hidden.PRIVATE_EVALUATOR_ERROR_CONTRACT)) {
+    for (const code of Object.keys(codes)) assert.equal(typed(layer, code, `${layer}/${code}`).code, code, `closed typed error table must expose ${layer}/${code}`);
+  }
+  assert.throws(() => new hidden.PrivateEvaluatorAuthorityError({ layer: "unknown", category: "x", code: "x", message: "unknown layer" }), TypeError, "unknown layer must fail closed");
+  assert.throws(() => new hidden.PrivateEvaluatorAuthorityError({ layer: "evaluator_source", category: "x", code: "unknown", message: "unknown category" }), TypeError, "unknown category must fail closed");
+  assert.throws(() => new hidden.PrivateEvaluatorAuthorityError({ layer: "evaluator_source", category: hidden.PRIVATE_EVALUATOR_ERROR_CONTRACT.evaluator_source.source_graph_drift, message: "missing code" }), TypeError, "missing code must fail closed");
+  assert.equal(new Error("untyped").name, "Error", "untyped errors remain distinguishable from authority errors");
+  const unknownResult = await hidden.evaluateCandidateSafe({ repositoryRoot: resolve(work, "missing-sealed-repository"), normalizedResult: { normalized_result_digest: `sha256:${"0".repeat(64)}` } });
+  assert.equal(unknownResult.invalid_input_authority.layer, "evaluator_source", "source loader failures must be typed without reloading the scoring module");
+  assert.equal(unknownResult.invalid_input_authority.code, "source_graph_drift", "source loader failures must preserve their cause code");
+}
+
 try {
   const summary = validateMnBuildOptionUpdatePublicFixture({ root });
   assert.equal(summary.reviewStatus, "pending_independent_review");
@@ -1700,7 +1789,7 @@ try {
   const invalidAuthorityReference = { kind: "test_result", digest: `sha256:${"8".repeat(64)}`, bytes: 1 };
   invalidEvidenceResult.evaluatorResult.evidence_correctness = { state: "fail", evidence_references: [invalidAuthorityReference] };
   invalidEvidenceResult.evaluatorResult.classification = "invalid_evidence";
-  invalidEvidenceResult.evaluatorResult.invalid_input_authority = { layer: "evaluation_input", category: "evaluator_input_authority_failure", evidence_references: [invalidAuthorityReference] };
+  invalidEvidenceResult.evaluatorResult.invalid_input_authority = { layer: "evaluation_input", category: "evaluator_input_authority_failure", code: "evaluator_input_authority_failure", evidence_references: [invalidAuthorityReference] };
   invalidEvidenceResult.evaluatorResult.findings.push({ finding_id: "invalid-input-authority", category: "evaluator_input_authority_failure", severity: "critical", evidence_references: [invalidAuthorityReference] });
   invalidEvidenceResult.evaluatorResult.verification_correctness = { state: "fail", evidence_references: [invalidAuthorityReference] };
   const invalidVerificationRequirement = invalidEvidenceResult.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence");
@@ -1734,6 +1823,7 @@ try {
     assert.equal(privateSummary.evaluatorBundleDigest, summary.evaluatorBundleDigest);
     runPrivateSemanticNegativeChecks(privateRoot);
     runIndependenceNegativeChecks(privateRoot, roots);
+    await runTypedPrivateErrorChecks(privateRoot);
     await runPrivateCandidateChecks(privateRoot);
     await runPrivatePortabilityChecks(privateRoot);
     const fullAuthorityStates = [

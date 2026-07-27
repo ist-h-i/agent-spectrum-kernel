@@ -76,7 +76,18 @@ export const EVALUATOR_AUTHORITY_PATHS = Object.freeze([
   "benchmarks/schemas/private-evaluation-record.schema.json",
   "benchmarks/schemas/repository-diff-artifact.schema.json",
   "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
+  "benchmarks/schemas/normalized-portfolio-result.schema.json",
 ]);
+export const EVALUATOR_FIXTURE_AUTHORITY_PATHS = Object.freeze([
+  "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json",
+  "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evidence-map.json",
+  "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/verification-command-contract.json",
+  "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/requirement-record.json",
+]);
+export const EVALUATOR_RUNTIME_AUTHORITY_PATHS = Object.freeze([
+  "benchmarks/schemas/normalized-portfolio-result.schema.json",
+]);
+export const EVALUATOR_REPOSITORY_DESCRIPTOR_PATH = "repository-authority.json";
 const CATALOG_SCHEMA_PATH = "benchmarks/schemas/portfolio-catalog.schema.json";
 const POLICY_MANIFEST_SCHEMA_PATH = "benchmarks/schemas/portfolio-policy-manifest.schema.json";
 const SCORING_POLICY_SCHEMA_PATH = "benchmarks/schemas/portfolio-scoring-policy.schema.json";
@@ -892,6 +903,7 @@ export function materializeSealedWorkspaceSnapshot({ inventory, destination, lab
     const directory = resolve(destination, entry.path);
     assertFreshPath(directory, `${label} directory ${entry.path}`);
     mkdirSync(directory, entry.mode & 0o777);
+    chmodSync(directory, entry.mode & 0o777);
   }
   for (const entry of inventory.entries.filter(({ file_type }) => file_type === "file").sort((left, right) => left.path.localeCompare(right.path))) {
     const file = resolve(destination, entry.path);
@@ -902,6 +914,153 @@ export function materializeSealedWorkspaceSnapshot({ inventory, destination, lab
   const sealedInventory = readStableWorkspaceInventory(destination, label);
   comparePortableInventories(inventory, sealedInventory, label);
   return sealedInventory;
+}
+
+function descriptorFileRecord(path, read) {
+  return {
+    path,
+    file_type: "file",
+    mode: read.evidence.finalPath.mode & 0o777,
+    bytes: read.bytes.length,
+    sha256: read.rawByteDigest,
+  };
+}
+
+function descriptorDirectoryEntries(filePaths) {
+  const directories = new Map();
+  for (const path of filePaths) {
+    const segments = path.split("/");
+    for (let index = 1; index < segments.length; index += 1) {
+      const directory = segments.slice(0, index).join("/");
+      directories.set(directory, {
+        path: directory,
+        file_type: "directory",
+        mode: 0o755,
+        dev: 0,
+        ino: 1,
+        nlink: 1,
+        mtimeMs: 0,
+        ctimeMs: 0,
+        bytes: null,
+        sha256: null,
+      });
+    }
+  }
+  return [...directories.values()];
+}
+
+function assertDescriptorInventoryClosed({ inventory, descriptorPath, label }) {
+  const actual = inventory.portableEntries.filter(({ path }) => path !== descriptorPath);
+  if (stableCanonicalJson(actual) !== stableCanonicalJson(inventory.expectedPortableEntries)) throw new Error(`${label} portable inventory drifted from the sealed descriptor authority`);
+  const extra = inventory.portableEntries.filter(({ path }) => path !== descriptorPath && !inventory.expectedPathSet.has(path));
+  if (extra.length > 0) throw new Error(`${label} contains an unmanaged authority path: ${extra[0].path}`);
+}
+
+function buildRepositoryAuthoritySource({ root, evaluatorRevision, label }) {
+  const repositoryRoot = assertRealDirectory(root, `${label} source root`);
+  const rootBefore = filesystemIdentity(lstatSync(repositoryRoot));
+  const graph = deriveEvaluatorDependencyGraph({ root: repositoryRoot, baseRevision: evaluatorRevision });
+  const graphPaths = graph.node_inventory.map(({ path }) => path);
+  const fixturePaths = [...EVALUATOR_FIXTURE_AUTHORITY_PATHS];
+  const runtimePaths = [...EVALUATOR_RUNTIME_AUTHORITY_PATHS];
+  const allPaths = [...new Set([...graphPaths, ...fixturePaths, ...runtimePaths])].sort();
+  const pathSet = new Set(allPaths);
+  const buffers = new Map();
+  const records = new Map();
+  for (const path of allPaths) {
+    assertPortableRelativePath(path, `${label} source path`);
+    const absolute = resolveAuthorityArtifactPath(repositoryRoot, path, `${label} source ${path}`);
+    const read = readStableFile(absolute, `${label} source ${path}`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
+    const committed = checkedInBytesAtRevision(repositoryRoot, evaluatorRevision, path);
+    if (!committed || Buffer.compare(committed, read.bytes) !== 0) throw new Error(`${label} source authority does not match the immutable evaluator revision at ${path}`);
+    const graphNode = graph.node_inventory.find((node) => node.path === path);
+    if (graphNode && (graphNode.bytes !== read.bytes.length || graphNode.sha256 !== read.rawByteDigest)) throw new Error(`${label} dependency graph source identity drifted at ${path}`);
+    buffers.set(path, Buffer.from(read.bytes));
+    records.set(path, descriptorFileRecord(path, read));
+  }
+  if (pathSet.size !== buffers.size) throw new Error(`${label} source authority inventory contains duplicate paths`);
+  const fileEntries = [...records.values()].sort((left, right) => left.path.localeCompare(right.path));
+  const expectedPortableEntries = [...descriptorDirectoryEntries(allPaths), ...fileEntries].sort((left, right) => left.path.localeCompare(right.path));
+  const fixtureEntries = fixturePaths.map((path) => records.get(path));
+  const fixtureAuthorityDigest = canonicalDigest(fixtureEntries);
+  const sourceRuntimeEntries = allPaths.map((path) => {
+    const absolute = resolve(repositoryRoot, path);
+    const status = lstatSync(absolute);
+    return { path, file_type: "file", mode: status.mode & 0o777, dev: status.dev, ino: status.ino, nlink: status.nlink, mtimeMs: status.mtimeMs, ctimeMs: status.ctimeMs, bytes: status.size, sha256: records.get(path).sha256 };
+  });
+  const descriptorBase = {
+    schema_version: "1.0.0",
+    schema_path: "sealed-repository-authority-contract-v1",
+    program: "adaptive_ask_sealed_repository_authority",
+    evaluator_revision: evaluatorRevision,
+    source_graph_digest: graph.graph_digest,
+    source_graph: graph,
+    fixture_authority_digest: fixtureAuthorityDigest,
+    fixture_authority: fixtureEntries,
+    runtime_authority_paths: runtimePaths,
+    inventory: expectedPortableEntries,
+  };
+  const descriptor = { ...descriptorBase, authority_digest: canonicalDigest(descriptorBase) };
+  const descriptorBytes = Buffer.from(`${JSON.stringify(descriptor, null, 2)}\n`);
+  const rootAfter = filesystemIdentity(lstatSync(repositoryRoot));
+  if (!sameFilesystemIdentity(rootBefore, rootAfter)) throw new Error(`${label} source root identity changed while sealing repository authority`);
+  const sourceInventory = {
+    root: repositoryRoot,
+    entries: expectedPortableEntries.map((entry) => ({ ...entry, dev: 0, ino: 1, nlink: 1, mtimeMs: 0, ctimeMs: 0 })),
+    portableEntries: expectedPortableEntries,
+    runtimeEntries: sourceRuntimeEntries,
+    buffers,
+    digest: canonicalDigest(expectedPortableEntries),
+    runtimeDigest: canonicalDigest(sourceRuntimeEntries),
+    rootIdentity: rootBefore,
+    expectedPortableEntries,
+    expectedPathSet: new Set(expectedPortableEntries.map(({ path }) => path)),
+  };
+  return { graph, fixtureEntries, fixtureAuthorityDigest, descriptor, descriptorBytes, sourceInventory };
+}
+
+export function materializeSealedRepositorySnapshot({ authority, destination, label = "sealed repository authority" } = {}) {
+  if (!authority?.sourceInventory || !Buffer.isBuffer(authority.descriptorBytes)) throw new Error(`${label} requires a verified repository authority descriptor`);
+  const base = materializeSealedWorkspaceSnapshot({ inventory: authority.sourceInventory, destination, label: `${label} base snapshot` });
+  const descriptorPath = resolve(destination, EVALUATOR_REPOSITORY_DESCRIPTOR_PATH);
+  const descriptor = materializeSealedFile({ bytes: authority.descriptorBytes, destination: descriptorPath, label: `${label} descriptor`, mode: 0o444 });
+  const sealed = readStableWorkspaceInventory(destination, `${label} sealed snapshot`);
+  sealed.expectedPortableEntries = authority.sourceInventory.portableEntries;
+  sealed.expectedPathSet = authority.sourceInventory.expectedPathSet;
+  assertDescriptorInventoryClosed({ inventory: sealed, descriptorPath: EVALUATOR_REPOSITORY_DESCRIPTOR_PATH, label });
+  if (sealed.portableEntries.length !== authority.sourceInventory.portableEntries.length + 1) throw new Error(`${label} contains an unexpected sealed repository entry`);
+  return {
+    ...sealedSnapshotBinding(sealed),
+    path: sealed.root,
+    descriptorPath: descriptor.path,
+    descriptorRelativePath: EVALUATOR_REPOSITORY_DESCRIPTOR_PATH,
+    descriptorBytes: descriptor.bytes,
+    descriptorSha256: descriptor.sha256,
+    base,
+    sealed,
+    sourceGraphDigest: authority.graph.graph_digest,
+    fixtureAuthorityDigest: authority.fixtureAuthorityDigest,
+    authorityDigest: authority.descriptor.authority_digest,
+  };
+}
+
+function readSealedRepositoryDescriptor(root, label = "sealed repository authority") {
+  const repositoryRoot = assertRealDirectory(root, `${label} root`);
+  const descriptorPath = resolveAuthorityArtifactPath(repositoryRoot, EVALUATOR_REPOSITORY_DESCRIPTOR_PATH, `${label} descriptor`);
+  const descriptorRead = readJsonArtifact(descriptorPath, `${label} descriptor`);
+  const { authority_digest: authorityDigest, ...descriptorBase } = descriptorRead.value;
+  if (authorityDigest !== canonicalDigest(descriptorBase)) throw new Error(`${label} descriptor digest closure is invalid`);
+  if (descriptorBase.schema_version !== "1.0.0" || descriptorBase.program !== "adaptive_ask_sealed_repository_authority") throw new Error(`${label} descriptor contract is invalid`);
+  const inventory = readStableWorkspaceInventory(repositoryRoot, `${label} inventory`);
+  inventory.expectedPortableEntries = descriptorBase.inventory;
+  inventory.expectedPathSet = new Set(descriptorBase.inventory.map(({ path }) => path));
+  assertDescriptorInventoryClosed({ inventory, descriptorPath: EVALUATOR_REPOSITORY_DESCRIPTOR_PATH, label });
+  for (const entry of descriptorBase.inventory) {
+    if (entry.file_type !== "file") continue;
+    const actual = inventory.portableEntries.find(({ path }) => path === entry.path);
+    if (stableCanonicalJson(actual) !== stableCanonicalJson(entry)) throw new Error(`${label} descriptor authority drifted at ${entry.path}`);
+  }
+  return { repositoryRoot, descriptorPath, descriptorRead, descriptor: descriptorRead.value, inventory };
 }
 
 function runtimeIdentityFromStableRead(read) {
@@ -959,6 +1118,7 @@ export function createSealedEvaluatorExecution({
   const privateBundleSource = readStableWorkspaceInventory(staticRoot, `${label} static private bundle`);
   const runnerRelativePath = "scripts/ask-benchmark-private-evaluator-runner.mjs";
   const repositoryRoot = assertRealDirectory(root, `${label} repository root`);
+  const repositoryAuthority = buildRepositoryAuthoritySource({ root: repositoryRoot, evaluatorRevision, label });
   const runnerPath = resolveAuthorityArtifactPath(repositoryRoot, runnerRelativePath, `${label} runner source`);
   const runnerRead = readStableFile(runnerPath, `${label} runner source`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
   const runnerRevision = assertSourceBytesAtRevision(repositoryRoot, evaluatorRevision, runnerRelativePath, runnerRead.bytes, `${label} runner source`);
@@ -977,6 +1137,7 @@ export function createSealedEvaluatorExecution({
   const frozen = materializeSealedWorkspaceSnapshot({ inventory: frozenSource, destination: resolve(executionRoot, "frozen-workspace"), label: `${label} frozen workspace sealed snapshot` });
   const candidate = materializeSealedWorkspaceSnapshot({ inventory: candidateSource, destination: resolve(executionRoot, "candidate-workspace"), label: `${label} candidate workspace sealed snapshot` });
   const evidence = materializeSealedWorkspaceSnapshot({ inventory: evidenceSource, destination: resolve(executionRoot, "evaluation-input-evidence"), label: `${label} evaluation-input evidence sealed snapshot` });
+  const repository = materializeSealedRepositorySnapshot({ authority: repositoryAuthority, destination: resolve(executionRoot, "repository"), label: `${label} repository authority sealed snapshot` });
   return {
     evaluationRoot,
     executionRoot,
@@ -1011,6 +1172,22 @@ export function createSealedEvaluatorExecution({
       relativePath: relativeAuthorityPath(evaluationRoot, privateBundle.root, `${label} private bundle sealed snapshot`),
       source: sealedSnapshotBinding(privateBundleSource),
       sealed: sealedSnapshotBinding(privateBundle),
+    },
+    repository: {
+      path: repository.path,
+      relativePath: relativeAuthorityPath(evaluationRoot, repository.path, `${label} repository authority sealed snapshot`),
+      descriptorPath: repository.descriptorPath,
+      descriptorRelativePath: relativeAuthorityPath(evaluationRoot, repository.descriptorPath, `${label} repository authority descriptor`),
+      descriptorBytes: repository.descriptorBytes,
+      descriptorSha256: repository.descriptorSha256,
+      sourceGraphDigest: repository.sourceGraphDigest,
+      fixtureAuthorityDigest: repository.fixtureAuthorityDigest,
+      authorityDigest: repository.authorityDigest,
+      source: sealedSnapshotBinding(repositoryAuthority.sourceInventory),
+      sealed: sealedSnapshotBinding(repository.sealed),
+      identityBefore: sealedSnapshotBinding(repository.sealed),
+      identityAfterFirst: sealedSnapshotBinding(repository.sealed),
+      identityAfterSecond: sealedSnapshotBinding(repository.sealed),
     },
     frozen: {
       source: sealedSnapshotBinding(frozenSource),
@@ -1061,10 +1238,12 @@ function captureSealedExecutionState(execution, label) {
   const frozen = readStableWorkspaceInventory(execution.frozen.path, `${label} frozen sealed snapshot`);
   const candidate = readStableWorkspaceInventory(execution.candidate.path, `${label} candidate sealed snapshot`);
   const evidence = readStableWorkspaceInventory(execution.evidence.path, `${label} evidence sealed snapshot`);
+  const repository = readStableWorkspaceInventory(execution.repository.path, `${label} repository authority sealed snapshot`);
   return {
     runner: { bytes: runner.bytes.length, sha256: runner.rawByteDigest, identity: runtimeIdentityFromStableRead(runner) },
     hidden: { bytes: hidden.bytes.length, sha256: hidden.rawByteDigest, identity: runtimeIdentityFromStableRead(hidden) },
     privateBundle: privateBundle ? sealedSnapshotBinding(privateBundle) : null,
+    repository: sealedSnapshotBinding(repository),
     frozen: sealedSnapshotBinding(frozen),
     candidate: sealedSnapshotBinding(candidate),
     evidence: sealedSnapshotBinding(evidence),
@@ -1077,10 +1256,11 @@ function assertSealedExecutionStatesEqual(states, label) {
 }
 
 export function executeSealedEvaluator({ execution, repositoryRoot, normalized, timeout = 30_000, beforeRun = null, afterRun = null, label = "private evaluator sealed execution" } = {}) {
-  if (!execution?.runner?.path || !execution?.hidden?.path || !execution?.frozen?.path || !execution?.candidate?.path || !execution?.evidence?.path) throw new Error(`${label} is incomplete`);
+  if (!execution?.runner?.path || !execution?.hidden?.path || !execution?.repository?.path || !execution?.frozen?.path || !execution?.candidate?.path || !execution?.evidence?.path) throw new Error(`${label} is incomplete`);
+  const sealedRepositoryRoot = assertRealDirectory(execution.repository.path, `${label} sealed repository root`);
   const args = [
     "--hidden-evaluator", execution.hidden.path,
-    "--repository-root", repositoryRoot,
+    "--repository-root", sealedRepositoryRoot,
     "--frozen-workspace", execution.frozen.path,
     "--candidate-workspace", execution.candidate.path,
     "--evaluation-input-root", execution.evidence.path,
@@ -1621,7 +1801,7 @@ function validatePrivateEvaluationEvidenceArtifacts({ root, privateEvaluationRoo
     } else {
       if (artifact.schema_path === EVALUATION_INPUT_FAILURE_ARTIFACT_SCHEMA_PATH) {
         assertBenchmarkSchemaInstance(artifact, { schemaPath: resolve(root, EVALUATION_INPUT_FAILURE_ARTIFACT_SCHEMA_PATH), label: "evaluation-input failure artifact" });
-        if (result.invalid_input_authority && (artifact.layer !== result.invalid_input_authority.layer || artifact.category !== result.invalid_input_authority.category)) throw new Error("evaluation-input failure artifact authority does not match the evaluator result");
+        if (result.invalid_input_authority && (artifact.layer !== result.invalid_input_authority.layer || artifact.category !== result.invalid_input_authority.category || artifact.structured_failure_code !== result.invalid_input_authority.code)) throw new Error("evaluation-input failure artifact authority does not match the evaluator result");
       } else if (artifact.schema_path === EVALUATOR_CHECK_ARTIFACT_SCHEMA_PATH) {
         assertBenchmarkSchemaInstance(artifact, { schemaPath: resolve(root, EVALUATOR_CHECK_ARTIFACT_SCHEMA_PATH), label: "evaluator check artifact" });
       } else throw new Error("private test-result artifact schema is not authorized");
@@ -1718,7 +1898,18 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const sealedFrozenWorkspace = resolveSealedWorkspace(record.frozen_workspace_sealed_execution_path, "sealed frozen workspace");
   const sealedCandidateWorkspace = resolveSealedWorkspace(record.candidate_workspace_sealed_execution_path, "sealed candidate workspace");
   const sealedEvaluationInputRoot = resolveSealedWorkspace(record.evaluation_input_evidence_sealed_execution_path, "sealed evaluation-input evidence root");
+  const sealedRepositoryRoot = resolveSealedWorkspace(record.sealed_repository_root_relative_path, "sealed repository authority root");
   if (pathsOverlap(sealedFrozenWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(sealedCandidateWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(sealedEvaluationInputRoot, bundle.canonicalPrivateRoot)) throw new Error("sealed private evaluation workspaces overlap the static evaluator bundle");
+  if (!isInside(canonicalEvaluationRoot, sealedRepositoryRoot)) throw new Error("sealed repository authority must stay inside the private evaluation root");
+  if (pathsOverlap(sealedRepositoryRoot, bundle.canonicalPrivateRoot)) throw new Error("sealed repository authority overlaps the static evaluator bundle");
+  const sealedRepository = readSealedRepositoryDescriptor(sealedRepositoryRoot, "sealed repository authority");
+  if (record.sealed_repository_descriptor_relative_path !== relativeAuthorityPath(canonicalEvaluationRoot, sealedRepository.descriptorPath, "sealed repository authority descriptor") || record.sealed_repository_descriptor_sha256 !== sealedRepository.descriptorRead.rawByteDigest || record.sealed_repository_descriptor_bytes !== sealedRepository.descriptorRead.bytes.length) throw new Error("sealed repository descriptor identity is inconsistent");
+  if (record.sealed_repository_source_graph_digest !== bundle.manifest.dependency_graph.graph_digest || record.sealed_repository_fixture_authority_digest !== sealedRepository.descriptor.fixture_authority_digest) throw new Error("sealed repository source or fixture authority digest is inconsistent");
+  if (sealedRepository.descriptor.evaluator_revision !== bundle.manifest.evaluator_revision || sealedRepository.descriptor.source_graph_digest !== bundle.manifest.dependency_graph.graph_digest || stableCanonicalJson(sealedRepository.descriptor.source_graph) !== stableCanonicalJson(bundle.manifest.dependency_graph)) throw new Error("sealed repository source graph authority is inconsistent");
+  if (sealedRepository.descriptor.fixture_authority_digest !== record.sealed_repository_fixture_authority_digest || stableCanonicalJson(sealedRepository.descriptor.fixture_authority.map(({ path }) => path).sort()) !== stableCanonicalJson([...EVALUATOR_FIXTURE_AUTHORITY_PATHS].sort())) throw new Error("sealed repository fixture authority inventory is inconsistent");
+  if (stableCanonicalJson(sealedRepository.descriptor.runtime_authority_paths) !== stableCanonicalJson([...EVALUATOR_RUNTIME_AUTHORITY_PATHS])) throw new Error("sealed repository runtime authority inventory is inconsistent");
+  const sealedRepositoryBinding = sealedSnapshotBinding(sealedRepository.inventory);
+  if (record.sealed_repository_portable_digest !== sealedRepositoryBinding.portable_digest || record.sealed_repository_runtime_digest !== sealedRepositoryBinding.runtime_digest || stableCanonicalJson(record.sealed_repository_root_identity_before) !== stableCanonicalJson(sealedRepositoryBinding.root)) throw new Error("sealed repository snapshot identity is inconsistent");
   const sealedPrivateBundleRoot = resolveSealedWorkspace(dirname(record.hidden_evaluator_sealed_execution_path), "sealed private evaluator bundle");
   const staticPrivateBundleInventory = readStableWorkspaceInventory(bundle.canonicalPrivateRoot, "static private evaluator bundle");
   const sealedPrivateBundleInventory = readStableWorkspaceInventory(sealedPrivateBundleRoot, "sealed private evaluator bundle");
@@ -1733,6 +1924,7 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const execution = {
     runner: { path: sealedRunnerPath },
     hidden: { path: sealedHiddenPath },
+    repository: { path: sealedRepositoryRoot },
     privateBundle: { path: dirname(sealedHiddenPath) },
     frozen: { path: sealedFrozenWorkspace },
     candidate: { path: sealedCandidateWorkspace },
@@ -1745,7 +1937,16 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const secondBytes = executed.secondBytes;
   if (Buffer.compare(firstBytes, fragmentRead.bytes) !== 0 || Buffer.compare(secondBytes, fragmentRead.bytes) !== 0) throw new Error("persisted private fragment bytes do not match the sealed hidden evaluator output");
   const before = executed.before;
+  const afterFirst = executed.afterFirst;
   const after = executed.afterSecond;
+  for (const [field, state] of [
+    ["sealed_repository_root_identity_before", before.repository.root],
+    ["sealed_repository_root_identity_after_first", afterFirst.repository.root],
+    ["sealed_repository_root_identity_after_second", after.repository.root],
+  ]) {
+    if (stableCanonicalJson(record[field]) !== stableCanonicalJson(state)) throw new Error("sealed repository execution identity is inconsistent");
+  }
+  if (record.sealed_repository_portable_digest !== before.repository.portable_digest || record.sealed_repository_portable_digest !== afterFirst.repository.portable_digest || record.sealed_repository_portable_digest !== after.repository.portable_digest || record.sealed_repository_runtime_digest !== before.repository.runtime_digest || record.sealed_repository_runtime_digest !== afterFirst.repository.runtime_digest || record.sealed_repository_runtime_digest !== after.repository.runtime_digest) throw new Error("sealed repository execution digest is inconsistent");
   if (record.evaluator_runner_sealed_sha256 !== before.runner.sha256 || record.evaluator_runner_sealed_bytes !== before.runner.bytes || record.evaluator_runner_sealed_sha256 !== after.runner.sha256 || record.evaluator_runner_sealed_bytes !== after.runner.bytes || record.hidden_evaluator_sealed_sha256 !== before.hidden.sha256 || record.hidden_evaluator_sealed_bytes !== before.hidden.bytes || record.hidden_evaluator_sealed_sha256 !== after.hidden.sha256 || record.hidden_evaluator_sealed_bytes !== after.hidden.bytes) throw new Error("sealed evaluator source digest or byte binding is inconsistent");
   for (const [kind, state] of [["runner", before.runner], ["hidden", before.hidden]]) {
     const prefix = kind === "runner" ? "evaluator_runner" : "hidden_evaluator";

@@ -385,6 +385,7 @@ const INVALID_EVALUATION_INPUT_REFERENCE_KINDS = new Map([
 function invalidInputAuthorityReferences({ evaluatorResult, normalizedResult }) {
   const authority = evaluatorResult?.invalid_input_authority;
   if (!authority) return [normalizedResultReference(normalizedResult)];
+  if (typeof authority.code !== "string" || authority.code.length === 0) throw new Error("typed invalid authority code is required");
   if (authority.layer === "command_evidence") {
     if (authority.category !== "normalized_command_evidence_invalid" || authority.evidence_references.length !== 1 || authority.evidence_references[0].kind !== "normalized_result") {
       throw new Error("command-evidence invalid authority must close to exactly one normalized-result reference");
@@ -415,6 +416,7 @@ function validateInvalidInputContract({ evaluatorResult, normalizedResult, expec
   }
   const authority = evaluatorResult.invalid_input_authority;
   if (!authority) throw new Error("invalid verification state requires typed invalid-input authority");
+  if (typeof authority.code !== "string" || authority.code.length === 0) throw new Error("invalid verification state requires a typed invalid-input code");
   const finding = evaluatorResult.findings.find(({ category }) => category === authority.category);
   if (!finding) throw new Error("invalid verification state requires a finding for its typed invalid-input authority");
   assertReferenceSet(finding.evidence_references, expectedReferences, "invalid-input finding references");
