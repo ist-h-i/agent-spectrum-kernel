@@ -758,6 +758,8 @@ function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normali
   const hiddenAsset = bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests");
   const hiddenPath = resolve(privateRoot, hiddenAsset.path);
   const runnerIdentity = execution.runner;
+  const originalFrozenInventory = readStableWorkspaceInventory(resolve(authorityRoot, "frozen-workspace"), "record original frozen workspace");
+  const originalCandidateInventory = readStableWorkspaceInventory(resolve(authorityRoot, "candidate-workspace"), "record original candidate workspace");
   const sealedRunner = executed.before.runner;
   const sealedHidden = executed.before.hidden;
   const sealedAfterRunner = executed.afterSecond.runner;
@@ -794,6 +796,7 @@ function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normali
     evaluator_runner_path: runnerIdentity.sourcePath,
     evaluator_runner_sha256: runnerIdentity.sourceSha256,
     evaluator_runner_bytes: runnerIdentity.sourceBytes,
+    evaluator_runner_inode: lstatSync(resolve(root, runnerIdentity.sourcePath)).ino,
     evaluator_runner_source_identity: {
       path: runnerIdentity.sourcePath,
       base_git_revision: bundleManifest.evaluator_revision,
@@ -806,6 +809,8 @@ function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normali
     frozen_workspace_path: "frozen-workspace",
     candidate_workspace_path: "candidate-workspace",
     evaluation_input_evidence_root_path: "authority-chain",
+    frozen_workspace_original_identity: { portable_digest: originalFrozenInventory.digest, runtime_digest: originalFrozenInventory.runtimeDigest, root: originalFrozenInventory.rootIdentity },
+    candidate_workspace_original_identity: { portable_digest: originalCandidateInventory.digest, runtime_digest: originalCandidateInventory.runtimeDigest, root: originalCandidateInventory.rootIdentity },
     evaluator_runner_sealed_execution_path: runnerIdentity.relativePath,
     evaluator_runner_sealed_sha256: sealedRunner.sha256,
     evaluator_runner_sealed_bytes: sealedRunner.bytes,
@@ -1046,6 +1051,72 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       restore();
       assert.deepEqual(chain.snapshot(), before, `private path authority tamper must restore ${label}`);
     };
+    const staticRunnerPath = resolve(root, "scripts/ask-benchmark-private-evaluator-runner.mjs");
+    const staticHiddenPath = resolve(privateRoot, bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests").path);
+    const staticRunnerBytes = readFileSync(staticRunnerPath);
+    const staticHiddenBytes = readFileSync(staticHiddenPath);
+    const replaceStaticFile = (path, backup, bytes) => { renameSync(path, backup); writeFileSync(path, bytes); };
+    const restoreStaticFile = (path, backup) => { rmSync(path); renameSync(backup, path); };
+    const runnerBackup = resolve(authorityRoot, ".runner-source-backup");
+    expectPathFailure("runner same-bytes inode replacement", () => replaceStaticFile(staticRunnerPath, runnerBackup, staticRunnerBytes), () => restoreStaticFile(staticRunnerPath, runnerBackup), /inode|runner source|private evaluator/u);
+    expectPathFailure("runner source revision transplant", () => writeFileSync(staticRunnerPath, Buffer.concat([staticRunnerBytes, Buffer.from("\n// source transplant\n")])), () => writeFileSync(staticRunnerPath, staticRunnerBytes), /source|revision|dependency graph|private evaluator/u);
+    const runnerSymlinkBackup = resolve(authorityRoot, ".runner-source-symlink-backup");
+    expectPathFailure("runner source symlink replacement", () => { renameSync(staticRunnerPath, runnerSymlinkBackup); symlinkSync(staticHiddenPath, staticRunnerPath); }, () => { rmSync(staticRunnerPath); renameSync(runnerSymlinkBackup, staticRunnerPath); }, /symlink|runner source|private evaluator/u);
+    const hiddenBackup = resolve(authorityRoot, ".hidden-source-backup");
+    expectPathFailure("hidden evaluator same-bytes inode replacement", () => replaceStaticFile(staticHiddenPath, hiddenBackup, staticHiddenBytes), () => restoreStaticFile(staticHiddenPath, hiddenBackup), /inode|hidden evaluator|private evaluator/u);
+    expectPathFailure("hidden evaluator different bytes", () => writeFileSync(staticHiddenPath, Buffer.concat([staticHiddenBytes, Buffer.from("\n// hidden source transplant\n")])), () => writeFileSync(staticHiddenPath, staticHiddenBytes), /digest|bytes|hidden evaluator|private evaluator/u);
+    const hiddenSymlinkBackup = resolve(authorityRoot, ".hidden-source-symlink-backup");
+    expectPathFailure("hidden evaluator symlink replacement", () => { renameSync(staticHiddenPath, hiddenSymlinkBackup); symlinkSync(staticRunnerPath, staticHiddenPath); }, () => { rmSync(staticHiddenPath); renameSync(hiddenSymlinkBackup, staticHiddenPath); }, /symlink|hidden evaluator|private evaluator/u);
+    const sealedRunnerPath = resolve(authorityRoot, privateRecord.record.evaluator_runner_sealed_execution_path);
+    const sealedHiddenPath = resolve(authorityRoot, privateRecord.record.hidden_evaluator_sealed_execution_path);
+    const sealedCandidatePath = resolve(authorityRoot, privateRecord.record.candidate_workspace_sealed_execution_path);
+    const sealedFrozenPath = resolve(authorityRoot, privateRecord.record.frozen_workspace_sealed_execution_path);
+    const sealedEvidencePath = resolve(authorityRoot, privateRecord.record.evaluation_input_evidence_sealed_execution_path);
+    const sealedPrivateBundlePath = dirname(sealedHiddenPath);
+    const sealedRunnerBackup = resolve(authorityRoot, ".sealed-runner-backup");
+    expectPathFailure("sealed runner same-bytes inode replacement", () => replaceStaticFile(sealedRunnerPath, sealedRunnerBackup, readFileSync(sealedRunnerPath)), () => restoreStaticFile(sealedRunnerPath, sealedRunnerBackup), /sealed evaluator runner|inode|identity|private evaluator/u);
+    const sealedHiddenBackup = resolve(authorityRoot, ".sealed-hidden-backup");
+    expectPathFailure("sealed hidden evaluator same-bytes inode replacement", () => replaceStaticFile(sealedHiddenPath, sealedHiddenBackup, readFileSync(sealedHiddenPath)), () => restoreStaticFile(sealedHiddenPath, sealedHiddenBackup), /sealed hidden evaluator|inode|identity|private evaluator/u);
+    const sealedHiddenSymlinkBackup = resolve(authorityRoot, ".sealed-hidden-symlink-backup");
+    expectPathFailure("sealed hidden evaluator symlink replacement", () => { renameSync(sealedHiddenPath, sealedHiddenSymlinkBackup); symlinkSync(sealedRunnerPath, sealedHiddenPath); }, () => { rmSync(sealedHiddenPath); renameSync(sealedHiddenSymlinkBackup, sealedHiddenPath); }, /symlink|sealed hidden evaluator|private evaluator/u);
+    const sealedBundleAsset = resolve(sealedPrivateBundlePath, "scope-boundaries.json");
+    const sealedBundleAssetBytes = readFileSync(sealedBundleAsset);
+    expectPathFailure("sealed private bundle dependency drift", () => writeFileSync(sealedBundleAsset, Buffer.concat([sealedBundleAssetBytes, Buffer.from("\n// dependency drift\n")])), () => writeFileSync(sealedBundleAsset, sealedBundleAssetBytes), /sealed private evaluator bundle|digest|identity/u);
+    const sealedCandidateAdded = resolve(sealedCandidatePath, "r12-sealed-added.txt");
+    expectPathFailure("sealed candidate snapshot addition", () => writeFileSync(sealedCandidateAdded, "sealed addition\n"), () => rmSync(sealedCandidateAdded), /workspace|inventory|authority|snapshot/u);
+    const sealedFrozenFile = resolve(sealedFrozenPath, "package.json");
+    const sealedFrozenBytes = readFileSync(sealedFrozenFile);
+    expectPathFailure("sealed frozen snapshot mutation", () => writeFileSync(sealedFrozenFile, Buffer.concat([sealedFrozenBytes, Buffer.from("\n")])), () => writeFileSync(sealedFrozenFile, sealedFrozenBytes), /workspace|inventory|authority|snapshot/u);
+    const sealedEvidenceAdded = resolve(sealedEvidencePath, "r12-evidence-added.txt");
+    expectPathFailure("sealed evaluation-input snapshot addition", () => writeFileSync(sealedEvidenceAdded, "sealed evidence addition\n"), () => rmSync(sealedEvidenceAdded), /workspace|inventory|authority|snapshot/u);
+    const originalCandidatePath = resolve(authorityRoot, privateRecord.record.candidate_workspace_path);
+    const originalCandidateConfig = resolve(originalCandidatePath, "build.config.json");
+    const originalCandidateBytes = readFileSync(originalCandidateConfig);
+    expectPathFailure("original candidate workspace mutation", () => writeFileSync(originalCandidateConfig, Buffer.concat([originalCandidateBytes, Buffer.from("\n")])), () => writeFileSync(originalCandidateConfig, originalCandidateBytes), /original private evaluation workspace|workspace identity|workspace/u);
+    const originalFrozenPath = resolve(authorityRoot, privateRecord.record.frozen_workspace_path);
+    const originalFrozenConfig = resolve(originalFrozenPath, "build.config.json");
+    const originalFrozenBytes = readFileSync(originalFrozenConfig);
+    expectPathFailure("original frozen workspace mutation", () => writeFileSync(originalFrozenConfig, Buffer.concat([originalFrozenBytes, Buffer.from("\n")])), () => writeFileSync(originalFrozenConfig, originalFrozenBytes), /original private evaluation workspace|workspace identity|workspace/u);
+    const childRaceExecution = createSealedEvaluatorExecution({
+      root,
+      privateEvaluationRoot: authorityRoot,
+      privateRoot,
+      hiddenAsset: bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests"),
+      frozenWorkspace: bootstrap.frozenWorkspace,
+      candidateWorkspace: bootstrap.candidateWorkspace,
+      evaluationInputRoot: bootstrap.evaluationInputRoot,
+      evaluatorRevision: bundleManifest.evaluator_revision,
+      executionDirectoryName: "sealed-child-race",
+      label: "private evaluator child race",
+    });
+    assert.throws(() => executeSealedEvaluator({
+      execution: childRaceExecution,
+      repositoryRoot: root,
+      normalized: normalizedAuthority.normalized,
+      beforeRun: () => writeFileSync(resolve(childRaceExecution.candidate.path, "r12-child-race.txt"), "child mutation\n"),
+      label: "private evaluator child race",
+    }), /authority changed|workspace|inventory|deterministic/u, "sealed evaluator must reject child mutation between snapshot and execution");
+    rmSync(resolve(authorityRoot, "sealed-child-race"), { recursive: true, force: true });
     const fragmentBackup = resolve(authorityRoot, ".private-fragment-backup");
     expectPathFailure("fragment missing", () => renameSync(chain.privateFragmentPath, fragmentBackup), () => renameSync(fragmentBackup, chain.privateFragmentPath), /missing|private evaluator fragment/u);
     expectPathFailure("fragment symlink", () => { renameSync(chain.privateFragmentPath, fragmentBackup); symlinkSync(resolve(root, "scripts/ask-benchmark-evaluator-boundary.mjs"), chain.privateFragmentPath); }, () => { rmSync(chain.privateFragmentPath); renameSync(fragmentBackup, chain.privateFragmentPath); }, /symlink|private evaluator fragment/u);
@@ -1067,6 +1138,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       writeFileSync(evaluatorCheckPath, originalEvaluatorCheckBytes);
       assert.deepEqual(chain.snapshot(), before, `private authority tamper must restore ${label}`);
     };
+    expectPrivateFailure("runner source identity missing", ({ record }) => { delete record.evaluator_runner_source_identity; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /Schema|runner source identity|record/u);
     expectPrivateFailure("record digest", ({ record }) => { record.adapter_source_digest = `sha256:${"0".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /adapter source digest|record digest|source/u);
     expectPrivateFailure("record fragment path escape", ({ record }) => { record.private_fragment_path = "../escape.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /path|escape|Schema|authority/u);
     expectPrivateFailure("fragment tamper", () => { const fragment = JSON.parse(originalFragmentBytes.toString("utf8")); fragment.classification = "over_processing"; writeJson(chain.privateFragmentPath, fragment); }, /fragment digest|byte closure|authority-owned adapter|classification/u);

@@ -1671,7 +1671,7 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const runnerPath = resolveAuthorityArtifactPath(realpathSync(root), runnerRelativePath, "private evaluator runner source");
   const runnerRead = readStableFile(runnerPath, "private evaluator runner source", MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
   const runnerRevision = assertSourceBytesAtRevision(realpathSync(root), bundle.manifest.evaluator_revision, runnerRelativePath, runnerRead.bytes, "private evaluator runner source");
-  if (record.evaluator_runner_sha256 !== runnerRead.rawByteDigest || record.evaluator_runner_bytes !== runnerRead.bytes.length || stableCanonicalJson(record.evaluator_runner_source_identity) !== stableCanonicalJson({ path: runnerRelativePath, base_git_revision: bundle.manifest.evaluator_revision, source_bytes: runnerRead.bytes.length, source_sha256: runnerRead.rawByteDigest, base_git_revision_bytes: runnerRevision.bytes, base_git_revision_sha256: runnerRevision.sha256 })) throw new Error("private evaluator runner source identity is inconsistent");
+  if (record.evaluator_runner_sha256 !== runnerRead.rawByteDigest || record.evaluator_runner_bytes !== runnerRead.bytes.length || record.evaluator_runner_inode !== runnerRead.evidence.finalPath.ino || stableCanonicalJson(record.evaluator_runner_source_identity) !== stableCanonicalJson({ path: runnerRelativePath, base_git_revision: bundle.manifest.evaluator_revision, source_bytes: runnerRead.bytes.length, source_sha256: runnerRead.rawByteDigest, base_git_revision_bytes: runnerRevision.bytes, base_git_revision_sha256: runnerRevision.sha256 })) throw new Error("private evaluator runner source identity is inconsistent");
   if (record.dependency_graph_digest !== bundle.manifest.dependency_graph.graph_digest) throw new Error("private evaluation record dependency graph is inconsistent");
   const resolveEvaluationDirectory = (path, label) => {
     assertPortableRelativePath(path, `${label} path`);
@@ -1685,6 +1685,9 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const frozenWorkspace = resolveEvaluationDirectory(record.frozen_workspace_path, "frozen workspace");
   const candidateWorkspace = resolveEvaluationDirectory(record.candidate_workspace_path, "candidate workspace");
   const evaluationInputRoot = resolveEvaluationDirectory(record.evaluation_input_evidence_root_path, "evaluation-input evidence root");
+  const originalFrozenInventory = readStableWorkspaceInventory(frozenWorkspace, "original frozen workspace");
+  const originalCandidateInventory = readStableWorkspaceInventory(candidateWorkspace, "original candidate workspace");
+  if (stableCanonicalJson(record.frozen_workspace_original_identity) !== stableCanonicalJson({ portable_digest: originalFrozenInventory.digest, runtime_digest: originalFrozenInventory.runtimeDigest, root: originalFrozenInventory.rootIdentity }) || stableCanonicalJson(record.candidate_workspace_original_identity) !== stableCanonicalJson({ portable_digest: originalCandidateInventory.digest, runtime_digest: originalCandidateInventory.runtimeDigest, root: originalCandidateInventory.rootIdentity })) throw new Error("original private evaluation workspace identity is inconsistent");
   if (frozenWorkspace === candidateWorkspace || pathsOverlap(frozenWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(candidateWorkspace, bundle.canonicalPrivateRoot)) throw new Error("private evaluation workspaces are overlapping or invalid");
   const resolveSealedFile = (path, label) => {
     assertPortableRelativePath(path, `${label} path`);
