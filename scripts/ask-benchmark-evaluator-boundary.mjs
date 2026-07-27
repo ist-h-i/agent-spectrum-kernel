@@ -2327,6 +2327,7 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const originalFrozenInventory = readStableWorkspaceInventory(frozenWorkspace, "original frozen workspace");
   const originalCandidateInventory = readStableWorkspaceInventory(candidateWorkspace, "original candidate workspace");
   if (stableCanonicalJson(record.frozen_workspace_original_identity) !== stableCanonicalJson({ portable_digest: originalFrozenInventory.digest, runtime_digest: originalFrozenInventory.runtimeDigest, root: originalFrozenInventory.rootIdentity }) || stableCanonicalJson(record.candidate_workspace_original_identity) !== stableCanonicalJson({ portable_digest: originalCandidateInventory.digest, runtime_digest: originalCandidateInventory.runtimeDigest, root: originalCandidateInventory.rootIdentity })) throw new Error("original private evaluation workspace identity is inconsistent");
+  if (record.frozen_workspace_inventory_digest !== originalFrozenInventory.digest || record.candidate_workspace_inventory_digest !== originalCandidateInventory.digest) throw new Error("original private evaluation workspace inventory digest is inconsistent");
   if (frozenWorkspace === candidateWorkspace || pathsOverlap(frozenWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(candidateWorkspace, bundle.canonicalPrivateRoot)) throw new Error("private evaluation workspaces are overlapping or invalid");
   const resolveSealedFile = (path, label) => {
     assertPortableRelativePath(path, `${label} path`);
@@ -2376,13 +2377,14 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const sealedPrivateBundleRoot = resolveSealedWorkspace(dirname(record.hidden_evaluator_sealed_execution_path), "sealed private evaluator bundle");
   const staticPrivateBundleInventory = readStableWorkspaceInventory(bundle.canonicalPrivateRoot, "static private evaluator bundle");
   const sealedPrivateBundleInventory = readStableWorkspaceInventory(sealedPrivateBundleRoot, "sealed private evaluator bundle");
-  if (staticPrivateBundleInventory.digest !== sealedPrivateBundleInventory.digest) throw new Error("sealed private evaluator bundle does not match the verified static bundle");
+  const expectedSealedPrivateBundleDigest = canonicalDigest(expectedSealedPortableEntries(staticPrivateBundleInventory, SEALED_EXECUTABLE_PATHS, "sealed private evaluator bundle"));
+  if (expectedSealedPrivateBundleDigest !== sealedPrivateBundleInventory.digest) throw new Error("sealed private evaluator bundle does not match the verified static bundle");
+  assertSealedSnapshotModes(sealedPrivateBundleInventory, { label: "sealed private evaluator bundle" });
   const frozenInventory = readStableWorkspaceInventory(sealedFrozenWorkspace, "sealed frozen workspace");
   const candidateInventory = readStableWorkspaceInventory(sealedCandidateWorkspace, "sealed candidate workspace");
   const evidenceInventory = readStableWorkspaceInventory(sealedEvaluationInputRoot, "sealed evaluation-input evidence root");
-  if (record.frozen_workspace_inventory_digest !== frozenInventory.digest || record.candidate_workspace_inventory_digest !== candidateInventory.digest) throw new Error("private evaluation workspace inventory digest is inconsistent");
   if (record.frozen_workspace_sealed_inventory_digest !== frozenInventory.digest || record.candidate_workspace_sealed_inventory_digest !== candidateInventory.digest || record.evaluation_input_evidence_sealed_inventory_digest !== evidenceInventory.digest || record.frozen_workspace_sealed_runtime_digest !== frozenInventory.runtimeDigest || record.candidate_workspace_sealed_runtime_digest !== candidateInventory.runtimeDigest || record.evaluation_input_evidence_sealed_runtime_digest !== evidenceInventory.runtimeDigest) throw new Error("sealed private evaluation workspace identity is inconsistent");
-  if (!evidence.repositoryDiffArtifact || evidence.repositoryDiffArtifact.frozen_workspace_tree_digest !== frozenInventory.digest || evidence.repositoryDiffArtifact.candidate_workspace_tree_digest !== candidateInventory.digest) throw new Error("repository diff workspace authority does not match the sealed workspace inventory");
+  if (!evidence.repositoryDiffArtifact || evidence.repositoryDiffArtifact.frozen_workspace_tree_digest !== originalFrozenInventory.digest || evidence.repositoryDiffArtifact.candidate_workspace_tree_digest !== originalCandidateInventory.digest) throw new Error("repository diff workspace authority does not match the original workspace inventory");
   const validatedFragment = validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy: scoringInputs.scoringPolicy, requirementRecord: scoringInputs.requirementRecord, normalizedResult: normalized });
   const execution = {
     evaluatorRevision: bundle.manifest.evaluator_revision,
