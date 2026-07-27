@@ -595,7 +595,7 @@ export function deriveEvaluatorDependencyGraph({ root, baseRevision, entryPaths 
       for (const edge of parseLocalModuleEdges(canonicalRoot, path, bytes.toString("utf8"))) {
         const edgeKey = stableCanonicalJson(edge);
         edges.set(edgeKey, edge);
-        visit(edge.to);
+        if (edge.kind !== "runtime_private_import") visit(edge.to);
       }
     }
   };
