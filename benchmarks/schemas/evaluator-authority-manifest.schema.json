@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK evaluator fixture authority manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "fixture_id",
+    "evaluator_revision",
+    "file_inventory",
+    "manifest_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/evaluator-authority-manifest.schema.json" },
+    "program": { "const": "adaptive_ask_evaluator_authority_manifest" },
+    "fixture_id": { "const": "mn-build-option-update" },
+    "evaluator_revision": { "$ref": "#/$defs/revision" },
+    "file_inventory": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/authorityFile" }
+    },
+    "manifest_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[a-zA-Z0-9._/-]+$" },
+    "authorityFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "bytes", "raw_sha256", "semantic_digest", "authority_role"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "raw_sha256": { "$ref": "#/$defs/digest" },
+        "semantic_digest": { "$ref": "#/$defs/digest" },
+        "authority_role": { "enum": ["fixture_input", "evidence_map", "verification_command_contract", "requirement_record"] },
+        "fixture_input_identity": { "$ref": "#/$defs/digest" },
+        "semantic_fixture_entry_digest": { "$ref": "#/$defs/digest" },
+        "evidence_map_set_digest": { "$ref": "#/$defs/digest" },
+        "requirement_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "evidence_map_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "requirement_map_closure_digest": { "$ref": "#/$defs/digest" },
+        "contract_digest": { "$ref": "#/$defs/digest" },
+        "command_inventory_digest": { "$ref": "#/$defs/digest" },
+        "requirement_record_digest": { "$ref": "#/$defs/digest" },
+        "requirement_set_digest": { "$ref": "#/$defs/digest" }
+      },
+      "oneOf": [
+        { "properties": { "authority_role": { "const": "fixture_input" } }, "required": ["fixture_input_identity", "semantic_fixture_entry_digest"] },
+        { "properties": { "authority_role": { "const": "evidence_map" } }, "required": ["evidence_map_set_digest", "requirement_ids", "evidence_map_ids", "requirement_map_closure_digest"] },
+        { "properties": { "authority_role": { "const": "verification_command_contract" } }, "required": ["contract_digest", "command_inventory_digest"] },
+        { "properties": { "authority_role": { "const": "requirement_record" } }, "required": ["requirement_record_digest", "requirement_set_digest"] }
+      ]
+    }
+  }
+}

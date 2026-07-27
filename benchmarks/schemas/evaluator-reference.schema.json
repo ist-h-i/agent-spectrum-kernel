@@ -37,6 +37,9 @@
     "generator_identity": { "$ref": "#/$defs/digest" },
     "independence_statement_digest": { "$ref": "#/$defs/digest" },
     "review_record_digest": { "$ref": "#/$defs/digest" },
+    "evaluator_authority_manifest_path": { "$ref": "#/$defs/path" },
+    "evaluator_authority_manifest_raw_sha256": { "$ref": "#/$defs/digest" },
+    "evaluator_authority_manifest_digest": { "$ref": "#/$defs/digest" },
     "storage_class": { "const": "private_evaluator" },
     "public_metadata_digest": { "$ref": "#/$defs/digest" }
   },
@@ -102,7 +105,7 @@
       "properties": {
         "from": { "$ref": "#/$defs/path" },
         "to": { "$ref": "#/$defs/path" },
-        "kind": { "enum": ["static_import", "export_from", "dynamic_import", "runtime_private_import", "authority_read"] },
+        "kind": { "enum": ["static_import", "export_from", "dynamic_import", "runtime_private_import", "private_entry_import", "authority_read"] },
         "specifier": { "type": "string", "minLength": 1, "maxLength": 240 },
         "source_location": {
           "type": "object",

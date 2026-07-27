@@ -26,6 +26,9 @@
     "evaluator_reference_schema": { "const": "benchmarks/schemas/evaluator-reference.schema.json" },
     "evaluator_bundle_id": { "type": "string", "pattern": "^evaluator-[a-f0-9]{64}$" },
     "evaluator_bundle_digest": { "$ref": "#/$defs/digest" },
+    "evaluator_authority_manifest_path": { "$ref": "#/$defs/path" },
+    "evaluator_authority_manifest_raw_sha256": { "$ref": "#/$defs/digest" },
+    "evaluator_authority_manifest_digest": { "$ref": "#/$defs/digest" },
     "evaluator_source_identity": { "$ref": "#/$defs/sourceIdentity" },
     "evaluator_byte_count": { "type": "integer", "minimum": 0 },
     "evaluator_requirement_count": { "type": "integer", "minimum": 1 },
@@ -98,7 +101,7 @@
       "properties": {
         "from": { "$ref": "#/$defs/path" },
         "to": { "$ref": "#/$defs/path" },
-        "kind": { "enum": ["static_import", "export_from", "dynamic_import", "runtime_private_import", "authority_read"] },
+        "kind": { "enum": ["static_import", "export_from", "dynamic_import", "runtime_private_import", "private_entry_import", "authority_read"] },
         "specifier": { "type": "string", "minLength": 1, "maxLength": 240 },
         "source_location": {
           "type": "object",

@@ -28,6 +28,9 @@
     "verification_command_contract_digest": { "$ref": "#/$defs/digest" },
     "scope_boundary_authority_path": { "$ref": "#/$defs/path" },
     "scope_boundary_authority_digest": { "$ref": "#/$defs/digest" },
+    "evaluator_authority_manifest_path": { "$ref": "#/$defs/path" },
+    "evaluator_authority_manifest_raw_sha256": { "$ref": "#/$defs/digest" },
+    "evaluator_authority_manifest_digest": { "$ref": "#/$defs/digest" },
     "result_profile": { "$ref": "#/$defs/resultProfile" },
     "declares_findings": { "type": "boolean" },
     "output_contract_digest": { "$ref": "#/$defs/digest" }

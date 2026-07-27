@@ -7,6 +7,8 @@ import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import {
   computeEvaluatorReferenceDigest,
+  EVALUATOR_AUTHORITY_MANIFEST_PATH,
+  validateEvaluatorAuthorityManifest,
   verifyPrivateEvaluatorBundle,
   verifyPublicEvaluatorReference,
 } from "./ask-benchmark-evaluator-boundary.mjs";
@@ -32,6 +34,7 @@ export const FIXTURE_ROOT_RELATIVE = `benchmarks/fixtures/checkpoint-b2/${FIXTUR
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC_JSON_FILES = [
   "admission-review.json",
+  "evaluator-authority-manifest.json",
   "evaluator-reference.json",
   "evidence-map.json",
   "final-admission-record.json",
@@ -296,6 +299,21 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
   assertDigest(reference.fixture_input_digest, sha256(inputManifestBytes), "fixture input binding");
   if (reference.fixture_id !== FIXTURE_ID || reference.task_class !== fixture.task_class || reference.suite !== fixture.suite) throw new Error("evaluator reference fixture identity mismatch");
 
+  const evaluatorAuthorityBuffers = new Map([
+    "input-manifest.json",
+    "evidence-map.json",
+    "verification-command-contract.json",
+    "requirement-record.json",
+  ].map((name) => [`${FIXTURE_ROOT_RELATIVE}/${name}`, readFileSync(paths[name])]));
+  const evaluatorAuthorityManifest = artifacts["evaluator-authority-manifest.json"];
+  validateEvaluatorAuthorityManifest({ manifest: evaluatorAuthorityManifest, buffers: evaluatorAuthorityBuffers, evaluatorRevision: reference.evaluator_revision, root, label: "fixture evaluator authority manifest" });
+  const expectedEvaluatorAuthority = {
+    path: EVALUATOR_AUTHORITY_MANIFEST_PATH,
+    raw: sha256(readFileSync(paths["evaluator-authority-manifest.json"])),
+    semantic: evaluatorAuthorityManifest.manifest_digest,
+  };
+  if (reference.evaluator_authority_manifest_path !== expectedEvaluatorAuthority.path || reference.evaluator_authority_manifest_raw_sha256 !== expectedEvaluatorAuthority.raw || reference.evaluator_authority_manifest_digest !== expectedEvaluatorAuthority.semantic) throw new Error("evaluator reference authority-manifest binding mismatch");
+
   const requirementRecord = artifacts["requirement-record.json"];
   validateRequirementRecordContract({
     scoringPolicy,
@@ -309,6 +327,7 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
   if (requirementRecord.admission_record_digest !== admission.admission_digest) throw new Error("requirement/admission binding mismatch");
   if (admission.evaluator_bundle_id !== reference.evaluator_bundle_id || admission.evaluator_bundle_digest !== reference.evaluator_bundle_digest) throw new Error("admission/evaluator binding mismatch");
   if (stableCanonicalJson(admission.evaluator_source_identity) !== stableCanonicalJson(reference.evaluator_source_identity)) throw new Error("admission/evaluator source identity mismatch");
+  if (admission.evaluator_authority_manifest_path !== expectedEvaluatorAuthority.path || admission.evaluator_authority_manifest_raw_sha256 !== expectedEvaluatorAuthority.raw || admission.evaluator_authority_manifest_digest !== expectedEvaluatorAuthority.semantic) throw new Error("admission evaluator authority-manifest binding mismatch");
 
   const outputContract = artifacts["output-contract.json"];
   assertBenchmarkSchemaInstance(outputContract, { schemaPath: resolve(root, "benchmarks/schemas/portfolio-output-contract.schema.json"), label: "fixture output contract" });
@@ -316,6 +335,7 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
   if (outputContract.declares_findings !== false || outputContract.evaluator_public_reference_digest !== reference.public_metadata_digest) throw new Error("implementation output contract binding mismatch");
   if (outputContract.verification_command_contract_path !== `${FIXTURE_ROOT_RELATIVE}/verification-command-contract.json` || outputContract.verification_command_contract_digest !== verificationContract.contract_digest) throw new Error("output contract verification-command binding mismatch");
   if (outputContract.scope_boundary_authority_path !== `${FIXTURE_ROOT_RELATIVE}/evidence-map.json` || outputContract.scope_boundary_authority_digest !== artifacts["evidence-map.json"].scope_boundary_authority.authority_digest) throw new Error("output contract scope-boundary binding mismatch");
+  if (outputContract.evaluator_authority_manifest_path !== expectedEvaluatorAuthority.path || outputContract.evaluator_authority_manifest_raw_sha256 !== expectedEvaluatorAuthority.raw || outputContract.evaluator_authority_manifest_digest !== expectedEvaluatorAuthority.semantic) throw new Error("output contract evaluator authority-manifest binding mismatch");
   if (outputContract.result_profile?.name !== BINARY_SCOPE_VERIFICATION_PROFILE_NAME || outputContract.result_profile.digest !== computeResultProfileDigest(outputContract.result_profile)) throw new Error("output contract result profile binding mismatch");
 
   const metadata = artifacts["metadata.json"];
@@ -351,6 +371,8 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
   validateRawFreezeArtifact(root, freeze.evaluator_public_reference, reference.public_metadata_digest, "evaluator reference");
   validateRawFreezeArtifact(root, freeze.verification_command_contract, verificationContract.contract_digest, "verification command contract");
   validateRawFreezeArtifact(root, freeze.evidence_map, canonicalDigest(evidenceMap), "evidence map");
+  validateRawFreezeArtifact(root, freeze.evaluator_authority_manifest, evaluatorAuthorityManifest.manifest_digest, "evaluator authority manifest");
+  if (freeze.evaluator_authority_manifest.path !== expectedEvaluatorAuthority.path || freeze.evaluator_authority_manifest.raw_byte_digest !== expectedEvaluatorAuthority.raw) throw new Error("freeze evaluator authority-manifest binding mismatch");
   if (freeze.result_profile?.name !== outputContract.result_profile.name || freeze.result_profile.digest !== outputContract.result_profile.digest) throw new Error("freeze result profile binding mismatch");
   assertDigest(freeze.requirement_record.raw_byte_digest, sha256(readFileSync(paths["requirement-record.json"])), "requirement record raw byte");
   assertDigest(freeze.requirement_record.record_digest, computeRequirementRecordDigest(requirementRecord), "requirement record semantic");

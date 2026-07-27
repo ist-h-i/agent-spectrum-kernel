@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -29,9 +29,14 @@ import {
   computeEvaluatorBundleId,
   computeIndependenceStatementDigest,
   adaptPrivateEvaluatorFragmentToEnvelope,
+  assertSealedSnapshotModes,
   createSealedEvaluatorExecution,
+  EVALUATOR_REPOSITORY_DESCRIPTOR_PATH,
   executeSealedEvaluator,
   readStableWorkspaceInventory,
+  SEALED_DIRECTORY_MODE,
+  SEALED_REGULAR_FILE_MODE,
+  validateSealedRepositoryAuthorityBytes,
   validatePrivateEvaluatorFragment,
   validateEvaluatorSourceIdentity,
   verifyEvaluatorBoundary,
@@ -70,6 +75,7 @@ const NORMALIZED_TELEMETRY_FIELDS = [
   "subagent_activity", "evaluator_quality_metrics",
 ];
 const work = mkdtempSync(resolve(tmpdir(), "ask-mn-build-option-update-"));
+const temporaryAuthorityRoots = new Set();
 const privateRootArgumentIndex = process.argv.indexOf("--private-root");
 const privateRoot = privateRootArgumentIndex === -1 ? null : resolve(process.argv[privateRootArgumentIndex + 1]);
 
@@ -85,12 +91,78 @@ function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+function makeTreeRemovable(path) {
+  if (!existsSync(path)) return;
+  const status = lstatSync(path);
+  if (status.isSymbolicLink() || status.isFile()) {
+    if (!status.isSymbolicLink()) chmodSync(path, 0o600);
+    return;
+  }
+  chmodSync(path, 0o700);
+  for (const name of readdirSync(path)) makeTreeRemovable(resolve(path, name));
+}
+
+function removeTree(path) {
+  if (!existsSync(path)) return;
+  makeTreeRemovable(path);
+  rmSync(path, { recursive: true, force: true });
+}
+
+function withWritableSealedParent(path, action) {
+  const parent = dirname(path);
+  const mode = lstatSync(parent).mode & 0o777;
+  chmodSync(parent, mode | 0o200);
+  try { return action(); }
+  finally { chmodSync(parent, mode); }
+}
+
+function overwriteSealedFile(path, bytes) {
+  const mode = lstatSync(path).mode & 0o777;
+  chmodSync(path, mode | 0o200);
+  try { writeFileSync(path, bytes); }
+  finally { chmodSync(path, mode); }
+}
+
+function replaceSealedFile(path, backup, bytes) {
+  withWritableSealedParent(path, () => {
+    renameSync(path, backup);
+    writeFileSync(path, bytes);
+    chmodSync(path, SEALED_REGULAR_FILE_MODE);
+  });
+}
+
+function restoreSealedFile(path, backup) {
+  withWritableSealedParent(path, () => {
+    rmSync(path);
+    renameSync(backup, path);
+  });
+}
+
+function replaceSealedFileWithSymlink(path, backup, target) {
+  withWritableSealedParent(path, () => {
+    renameSync(path, backup);
+    symlinkSync(target, path);
+  });
+}
+
+function addSealedFile(path, bytes) {
+  withWritableSealedParent(path, () => {
+    writeFileSync(path, bytes);
+    chmodSync(path, SEALED_REGULAR_FILE_MODE);
+  });
+}
+
+function removeSealedFile(path) {
+  withWritableSealedParent(path, () => rmSync(path));
+}
+
 function expectFailure(fn, pattern, label) {
   assert.throws(fn, pattern, label);
 }
 
 function createDirectSealedRepository({ sourceRoot, privateRoot, manifest, hiddenAsset, frozenWorkspace, candidateWorkspace, label }) {
   const authorityRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-direct-sealed-authority-"));
+  temporaryAuthorityRoots.add(authorityRoot);
   const execution = createSealedEvaluatorExecution({
     root: sourceRoot,
     privateEvaluationRoot: authorityRoot,
@@ -1107,29 +1179,29 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     const sealedRepositoryModulePath = resolve(sealedRepositoryPath, "scripts/ask-benchmark-scoring-contract.mjs");
     const sealedRepositoryFixturePath = resolve(sealedRepositoryPath, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json");
     const sealedRunnerBackup = resolve(authorityRoot, ".sealed-runner-backup");
-    expectPathFailure("sealed runner same-bytes inode replacement", () => replaceStaticFile(sealedRunnerPath, sealedRunnerBackup, readFileSync(sealedRunnerPath)), () => restoreStaticFile(sealedRunnerPath, sealedRunnerBackup), /sealed evaluator runner|inode|identity|private evaluator/u);
+    expectPathFailure("sealed runner same-bytes inode replacement", () => replaceSealedFile(sealedRunnerPath, sealedRunnerBackup, readFileSync(sealedRunnerPath)), () => restoreSealedFile(sealedRunnerPath, sealedRunnerBackup), /sealed evaluator runner|inode|identity|private evaluator/u);
     const sealedHiddenBackup = resolve(authorityRoot, ".sealed-hidden-backup");
-    expectPathFailure("sealed hidden evaluator same-bytes inode replacement", () => replaceStaticFile(sealedHiddenPath, sealedHiddenBackup, readFileSync(sealedHiddenPath)), () => restoreStaticFile(sealedHiddenPath, sealedHiddenBackup), /sealed hidden evaluator|inode|identity|private evaluator/u);
+    expectPathFailure("sealed hidden evaluator same-bytes inode replacement", () => replaceSealedFile(sealedHiddenPath, sealedHiddenBackup, readFileSync(sealedHiddenPath)), () => restoreSealedFile(sealedHiddenPath, sealedHiddenBackup), /sealed hidden evaluator|inode|identity|private evaluator/u);
     const sealedHiddenSymlinkBackup = resolve(authorityRoot, ".sealed-hidden-symlink-backup");
-    expectPathFailure("sealed hidden evaluator symlink replacement", () => { renameSync(sealedHiddenPath, sealedHiddenSymlinkBackup); symlinkSync(sealedRunnerPath, sealedHiddenPath); }, () => { rmSync(sealedHiddenPath); renameSync(sealedHiddenSymlinkBackup, sealedHiddenPath); }, /symlink|sealed hidden evaluator|private evaluator/u);
+    expectPathFailure("sealed hidden evaluator symlink replacement", () => replaceSealedFileWithSymlink(sealedHiddenPath, sealedHiddenSymlinkBackup, sealedRunnerPath), () => restoreSealedFile(sealedHiddenPath, sealedHiddenSymlinkBackup), /symlink|sealed hidden evaluator|private evaluator/u);
     const sealedBundleAsset = resolve(sealedPrivateBundlePath, "scope-boundaries.json");
     const sealedBundleAssetBytes = readFileSync(sealedBundleAsset);
-    expectPathFailure("sealed private bundle dependency drift", () => writeFileSync(sealedBundleAsset, Buffer.concat([sealedBundleAssetBytes, Buffer.from("\n// dependency drift\n")])), () => writeFileSync(sealedBundleAsset, sealedBundleAssetBytes), /sealed private evaluator bundle|digest|identity/u);
+    expectPathFailure("sealed private bundle dependency drift", () => overwriteSealedFile(sealedBundleAsset, Buffer.concat([sealedBundleAssetBytes, Buffer.from("\n// dependency drift\n")])), () => overwriteSealedFile(sealedBundleAsset, sealedBundleAssetBytes), /sealed private evaluator bundle|digest|identity/u);
     const sealedRepositoryModuleBytes = readFileSync(sealedRepositoryModulePath);
     const sealedRepositoryModuleBackup = resolve(authorityRoot, ".sealed-repository-module-backup");
-    expectPathFailure("sealed repository direct module same-bytes inode replacement", () => { renameSync(sealedRepositoryModulePath, sealedRepositoryModuleBackup); writeFileSync(sealedRepositoryModulePath, sealedRepositoryModuleBytes); }, () => { rmSync(sealedRepositoryModulePath); renameSync(sealedRepositoryModuleBackup, sealedRepositoryModulePath); }, /sealed repository|identity|inventory|authority/u);
-    expectPathFailure("sealed repository transitive module replacement", () => writeFileSync(sealedRepositoryModulePath, Buffer.concat([sealedRepositoryModuleBytes, Buffer.from("\n// transitive source transplant\n")])), () => writeFileSync(sealedRepositoryModulePath, sealedRepositoryModuleBytes), /sealed repository|digest|authority/u);
+    expectPathFailure("sealed repository direct module same-bytes inode replacement", () => replaceSealedFile(sealedRepositoryModulePath, sealedRepositoryModuleBackup, sealedRepositoryModuleBytes), () => restoreSealedFile(sealedRepositoryModulePath, sealedRepositoryModuleBackup), /sealed repository|identity|inventory|authority/u);
+    expectPathFailure("sealed repository transitive module replacement", () => overwriteSealedFile(sealedRepositoryModulePath, Buffer.concat([sealedRepositoryModuleBytes, Buffer.from("\n// transitive source transplant\n")])), () => overwriteSealedFile(sealedRepositoryModulePath, sealedRepositoryModuleBytes), /sealed repository|digest|authority/u);
     const sealedRepositoryFixtureBytes = readFileSync(sealedRepositoryFixturePath);
-    expectPathFailure("sealed repository fixture input replacement", () => writeFileSync(sealedRepositoryFixturePath, Buffer.concat([sealedRepositoryFixtureBytes, Buffer.from("\n")])), () => writeFileSync(sealedRepositoryFixturePath, sealedRepositoryFixtureBytes), /sealed repository|fixture|authority|digest/u);
+    expectPathFailure("sealed repository fixture input replacement", () => overwriteSealedFile(sealedRepositoryFixturePath, Buffer.concat([sealedRepositoryFixtureBytes, Buffer.from("\n")])), () => overwriteSealedFile(sealedRepositoryFixturePath, sealedRepositoryFixtureBytes), /sealed repository|fixture|authority|digest/u);
     const sealedRepositorySymlinkBackup = resolve(authorityRoot, ".sealed-repository-module-symlink-backup");
-    expectPathFailure("sealed repository transitive module symlink", () => { renameSync(sealedRepositoryModulePath, sealedRepositorySymlinkBackup); symlinkSync(sealedHiddenPath, sealedRepositoryModulePath); }, () => { rmSync(sealedRepositoryModulePath); renameSync(sealedRepositorySymlinkBackup, sealedRepositoryModulePath); }, /symlink|sealed repository|authority/u);
+    expectPathFailure("sealed repository transitive module symlink", () => replaceSealedFileWithSymlink(sealedRepositoryModulePath, sealedRepositorySymlinkBackup, sealedHiddenPath), () => restoreSealedFile(sealedRepositoryModulePath, sealedRepositorySymlinkBackup), /symlink|sealed repository|authority/u);
     const sealedCandidateAdded = resolve(sealedCandidatePath, "r12-sealed-added.txt");
-    expectPathFailure("sealed candidate snapshot addition", () => writeFileSync(sealedCandidateAdded, "sealed addition\n"), () => rmSync(sealedCandidateAdded), /workspace|inventory|authority|snapshot/u);
+    expectPathFailure("sealed candidate snapshot addition", () => addSealedFile(sealedCandidateAdded, "sealed addition\n"), () => removeSealedFile(sealedCandidateAdded), /workspace|inventory|authority|snapshot/u);
     const sealedFrozenFile = resolve(sealedFrozenPath, "package.json");
     const sealedFrozenBytes = readFileSync(sealedFrozenFile);
-    expectPathFailure("sealed frozen snapshot mutation", () => writeFileSync(sealedFrozenFile, Buffer.concat([sealedFrozenBytes, Buffer.from("\n")])), () => writeFileSync(sealedFrozenFile, sealedFrozenBytes), /workspace|inventory|authority|snapshot/u);
+    expectPathFailure("sealed frozen snapshot mutation", () => overwriteSealedFile(sealedFrozenFile, Buffer.concat([sealedFrozenBytes, Buffer.from("\n")])), () => overwriteSealedFile(sealedFrozenFile, sealedFrozenBytes), /workspace|inventory|authority|snapshot/u);
     const sealedEvidenceAdded = resolve(sealedEvidencePath, "r12-evidence-added.txt");
-    expectPathFailure("sealed evaluation-input snapshot addition", () => writeFileSync(sealedEvidenceAdded, "sealed evidence addition\n"), () => rmSync(sealedEvidenceAdded), /workspace|inventory|authority|snapshot/u);
+    expectPathFailure("sealed evaluation-input snapshot addition", () => addSealedFile(sealedEvidenceAdded, "sealed evidence addition\n"), () => removeSealedFile(sealedEvidenceAdded), /workspace|inventory|authority|snapshot/u);
     const originalCandidatePath = resolve(authorityRoot, privateRecord.record.candidate_workspace_path);
     const originalCandidateConfig = resolve(originalCandidatePath, "build.config.json");
     const originalCandidateBytes = readFileSync(originalCandidateConfig);
@@ -1172,10 +1244,10 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       execution: repositoryRaceExecution,
       repositoryRoot: root,
       normalized: normalizedAuthority.normalized,
-      afterRun: ({ index }) => { if (index === 1) writeFileSync(resolve(repositoryRaceExecution.repository.path, "scripts/ask-benchmark-scoring-contract.mjs"), Buffer.concat([sealedRepositoryModuleBytes, Buffer.from("\n// between-run sealed mutation\n")])); },
+      afterRun: ({ index }) => { if (index === 1) overwriteSealedFile(resolve(repositoryRaceExecution.repository.path, "scripts/ask-benchmark-scoring-contract.mjs"), Buffer.concat([sealedRepositoryModuleBytes, Buffer.from("\n// between-run sealed mutation\n")])); },
       label: "private evaluator sealed repository race",
     }), /authority changed|sealed repository|inventory|digest/u, "sealed repository mutation between runs must fail closed");
-    rmSync(resolve(authorityRoot, "sealed-repository-race"), { recursive: true, force: true });
+    removeTree(resolve(authorityRoot, "sealed-repository-race"));
     const childRaceExecution = createSealedEvaluatorExecution({
       root,
       privateEvaluationRoot: authorityRoot,
@@ -1192,10 +1264,10 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       execution: childRaceExecution,
       repositoryRoot: root,
       normalized: normalizedAuthority.normalized,
-      beforeRun: () => writeFileSync(resolve(childRaceExecution.candidate.path, "r12-child-race.txt"), "child mutation\n"),
+      beforeRun: () => addSealedFile(resolve(childRaceExecution.candidate.path, "r12-child-race.txt"), "child mutation\n"),
       label: "private evaluator child race",
     }), /authority changed|workspace|inventory|deterministic/u, "sealed evaluator must reject child mutation between snapshot and execution");
-    rmSync(resolve(authorityRoot, "sealed-child-race"), { recursive: true, force: true });
+    removeTree(resolve(authorityRoot, "sealed-child-race"));
     const fragmentBackup = resolve(authorityRoot, ".private-fragment-backup");
     expectPathFailure("fragment missing", () => renameSync(chain.privateFragmentPath, fragmentBackup), () => renameSync(fragmentBackup, chain.privateFragmentPath), /missing|private evaluator fragment/u);
     expectPathFailure("fragment symlink", () => { renameSync(chain.privateFragmentPath, fragmentBackup); symlinkSync(resolve(root, "scripts/ask-benchmark-evaluator-boundary.mjs"), chain.privateFragmentPath); }, () => { rmSync(chain.privateFragmentPath); renameSync(fragmentBackup, chain.privateFragmentPath); }, /symlink|private evaluator fragment/u);
@@ -1363,6 +1435,340 @@ function runIndependenceNegativeChecks(privateRoot, boundaryRoots) {
   sourceBytesDrift.source_tree_digest = canonicalDigest(sourceBytesDrift.source_files);
   expectFailure(() => validateEvaluatorSourceIdentity({ identity: sourceBytesDrift, root }), /source bytes drift|do not match/u, "source identity must reject source-byte drift");
   expectFailure(() => validateEvaluatorSourceIdentity({ identity: { ...sourceIdentity, generator_source_digest: `sha256:${"2".repeat(64)}` }, root, expectedGeneratorSourceDigest: sourceIdentity.generator_source_digest }), /generator source digest/u, "source identity must reject generator drift");
+}
+
+function closeRepositoryDescriptor(descriptor, buffers) {
+  const { graph_digest: _graphDigest, ...graphBase } = descriptor.source_graph;
+  descriptor.source_graph.graph_digest = canonicalDigest(graphBase);
+  descriptor.source_graph_digest = descriptor.source_graph.graph_digest;
+  descriptor.fixture_authority_digest = canonicalDigest(descriptor.fixture_authority);
+  const { authority_digest: _authorityDigest, ...descriptorBase } = descriptor;
+  descriptor.authority_digest = canonicalDigest(descriptorBase);
+  const descriptorBytes = Buffer.from(`${JSON.stringify(descriptor, null, 2)}\n`);
+  buffers.set(EVALUATOR_REPOSITORY_DESCRIPTOR_PATH, descriptorBytes);
+  return descriptorBytes;
+}
+
+function simulatedSealedInventory(descriptor, descriptorBytes) {
+  return [
+    ...descriptor.inventory,
+    {
+      path: EVALUATOR_REPOSITORY_DESCRIPTOR_PATH,
+      file_type: "file",
+      mode: SEALED_REGULAR_FILE_MODE,
+      bytes: descriptorBytes.length,
+      sha256: sha256(descriptorBytes),
+    },
+  ].sort((left, right) => left.path.localeCompare(right.path));
+}
+
+function assertCrossBindingFailure({ baseDescriptor, baseBuffers, evaluatorRevision, label, mutate }) {
+  const descriptor = structuredClone(baseDescriptor);
+  const buffers = new Map([...baseBuffers].map(([path, bytes]) => [path, Buffer.from(bytes)]));
+  mutate(descriptor, buffers);
+  const descriptorBytes = closeRepositoryDescriptor(descriptor, buffers);
+  let candidateEvaluationStarted = false;
+  let failure = null;
+  try {
+    validateSealedRepositoryAuthorityBytes({
+      descriptor,
+      buffers,
+      actualInventory: simulatedSealedInventory(descriptor, descriptorBytes),
+      expectedEvaluatorRevision: evaluatorRevision,
+      rootForSchema: root,
+      label: `evaluator_source cross-binding ${label}`,
+    });
+    candidateEvaluationStarted = true;
+  } catch (error) {
+    failure = error;
+  }
+  assert.ok(failure, `${label} must fail before candidate evaluation`);
+  assert.match(failure.message, /evaluator_source/u, `${label} must retain evaluator_source classification`);
+  assert.equal(candidateEvaluationStarted, false, `${label} must not reach candidate evaluation`);
+}
+
+function runSealedCrossBindingChecks(execution) {
+  const repository = execution.verifiedAuthority.roots.repository;
+  const descriptor = JSON.parse(repository.buffers.get(EVALUATOR_REPOSITORY_DESCRIPTOR_PATH).toString("utf8"));
+  const moduleNodes = descriptor.source_graph.node_inventory.filter(({ file_type }) => file_type === "module");
+  assert.ok(moduleNodes.length >= 2, "cross-binding tests require at least two source modules");
+  const target = moduleNodes[0];
+  const second = moduleNodes[1];
+  const inventoryEntry = (value, path) => value.inventory.find((entry) => entry.path === path && entry.file_type === "file");
+
+  assertCrossBindingFailure({
+    baseDescriptor: descriptor,
+    baseBuffers: repository.buffers,
+    evaluatorRevision: execution.evaluatorRevision,
+    label: "false graph SHA with recomputed graph digest",
+    mutate(value) { value.source_graph.node_inventory.find(({ path }) => path === target.path).sha256 = `sha256:${"0".repeat(64)}`; },
+  });
+  assertCrossBindingFailure({
+    baseDescriptor: descriptor,
+    baseBuffers: repository.buffers,
+    evaluatorRevision: execution.evaluatorRevision,
+    label: "false graph byte count",
+    mutate(value) { value.source_graph.node_inventory.find(({ path }) => path === target.path).bytes += 1; },
+  });
+  assertCrossBindingFailure({
+    baseDescriptor: descriptor,
+    baseBuffers: repository.buffers,
+    evaluatorRevision: execution.evaluatorRevision,
+    label: "source graph path transplant",
+    mutate(value) {
+      const firstNode = value.source_graph.node_inventory.find(({ path }) => path === target.path);
+      const secondNode = value.source_graph.node_inventory.find(({ path }) => path === second.path);
+      [firstNode.path, secondNode.path] = [secondNode.path, firstNode.path];
+      value.source_graph.node_inventory.sort((left, right) => left.path.localeCompare(right.path));
+    },
+  });
+  assertCrossBindingFailure({
+    baseDescriptor: descriptor,
+    baseBuffers: repository.buffers,
+    evaluatorRevision: execution.evaluatorRevision,
+    label: "inventory-only consistent reseal",
+    mutate(value, buffers) {
+      const changed = Buffer.concat([buffers.get(target.path), Buffer.from("\n// inventory-only reseal\n")]);
+      buffers.set(target.path, changed);
+      const entry = inventoryEntry(value, target.path);
+      entry.bytes = changed.length;
+      entry.sha256 = sha256(changed);
+    },
+  });
+  assertCrossBindingFailure({
+    baseDescriptor: descriptor,
+    baseBuffers: repository.buffers,
+    evaluatorRevision: execution.evaluatorRevision,
+    label: "graph node deleted from inventory",
+    mutate(value, buffers) {
+      value.inventory = value.inventory.filter(({ path }) => path !== target.path);
+      buffers.delete(target.path);
+    },
+  });
+  assertCrossBindingFailure({
+    baseDescriptor: descriptor,
+    baseBuffers: repository.buffers,
+    evaluatorRevision: execution.evaluatorRevision,
+    label: "graph-external module added to inventory",
+    mutate(value, buffers) {
+      const path = "scripts/graph-external-authority.mjs";
+      const bytes = Buffer.from("export const graphExternal = true;\n");
+      value.inventory.push({ path, file_type: "file", mode: SEALED_REGULAR_FILE_MODE, bytes: bytes.length, sha256: sha256(bytes) });
+      value.inventory.sort((left, right) => left.path.localeCompare(right.path));
+      buffers.set(path, bytes);
+    },
+  });
+  assertCrossBindingFailure({
+    baseDescriptor: descriptor,
+    baseBuffers: repository.buffers,
+    evaluatorRevision: execution.evaluatorRevision,
+    label: "graph file type mismatch",
+    mutate(value) { value.source_graph.node_inventory.find(({ path }) => path === target.path).file_type = "authority_data"; },
+  });
+}
+
+function barrierPrefix({ directory, run_index, stage, authority_kind, path }) {
+  return resolve(directory, `${run_index}-${stage}-${authority_kind}-${sha256(Buffer.from(path)).slice(7, 19)}`);
+}
+
+function spawnBarrierMutator({ barrier, target, operation = "replace", replacement = null }) {
+  const prefix = barrierPrefix(barrier);
+  const configPath = resolve(barrier.directory, "mutator-config.json");
+  writeJson(configPath, {
+    prefix,
+    target,
+    operation,
+    ...(replacement ? { replacement_base64: replacement.toString("base64") } : {}),
+  });
+  const child = spawn(process.execPath, [
+    resolve(root, "scripts/test-fixtures/ask-authority-barrier-mutator.mjs"),
+    configPath,
+  ], { stdio: ["ignore", "pipe", "pipe"] });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (bytes) => { stdout += bytes; });
+  child.stderr.on("data", (bytes) => { stderr += bytes; });
+  const completed = new Promise((accept, reject) => {
+    child.once("error", reject);
+    child.once("close", (status) => {
+      if (status === 0) accept({ prefix, stdout, stderr });
+      else reject(new Error(`barrier mutator failed (${status}): ${stderr || stdout}`));
+    });
+  });
+  return { prefix, completed };
+}
+
+async function runBarrierRace({ execution, normalized, baseline, label, stage, authorityKind, relativePath, target, operation = "replace", replacement }) {
+  const directory = mkdtempSync(resolve(tmpdir(), "ask-mn-authority-barrier-"));
+  const barrier = { directory, run_index: 1, stage, authority_kind: authorityKind, path: relativePath };
+  const mutator = spawnBarrierMutator({ barrier, target, operation, replacement });
+  try {
+    const executed = executeSealedEvaluator({
+      execution,
+      repositoryRoot: root,
+      normalized,
+      normalizedBytes: Buffer.from(`${JSON.stringify(normalized, null, 2)}\n`),
+      barrier,
+      label: `private evaluator in-memory race ${label}`,
+    });
+    await mutator.completed;
+    assert.deepEqual(executed.firstFragment, baseline.firstFragment, `${label} must not change first-run output`);
+    assert.deepEqual(executed.secondFragment, baseline.secondFragment, `${label} must not change second-run output`);
+    assert.deepEqual(executed.before, executed.afterFirst, `${label} must preserve A/B authority state`);
+    assert.deepEqual(executed.afterFirst, executed.afterSecond, `${label} must preserve B/C authority state`);
+    const mutation = readJson(`${mutator.prefix}.mutation.json`);
+    if (operation === "chmod") assert.notEqual(mutation.observed_mode & 0o200, 0, `${label} mutator must add a real write bit`);
+    else if (label.includes("same bytes")) assert.notEqual(mutation.original_inode, mutation.replacement_inode, `${label} mutator must install a different inode`);
+  } finally {
+    removeTree(directory);
+  }
+}
+
+async function runSealedAuthorityAndRaceChecks(privateRoot) {
+  const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
+  const hiddenAsset = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
+  const authorityRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-sealed-r15-"));
+  const frozenWorkspace = resolve(authorityRoot, "frozen");
+  const candidateWorkspace = resolve(authorityRoot, "candidate");
+  const evidenceRoot = resolve(authorityRoot, "evidence");
+  cpSync(resolve(fixtureRoot, "workspace"), frozenWorkspace, { recursive: true });
+  cpSync(resolve(fixtureRoot, "workspace"), candidateWorkspace, { recursive: true });
+  mkdirSync(evidenceRoot);
+  writeJson(resolve(evidenceRoot, "evaluation-input-seed.json"), { authority: "r15-in-memory-race" });
+  const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot, state: "executed_success" });
+  const execution = createSealedEvaluatorExecution({
+    root,
+    privateEvaluationRoot: authorityRoot,
+    privateRoot,
+    hiddenAsset,
+    frozenWorkspace,
+    candidateWorkspace,
+    evaluationInputRoot: evidenceRoot,
+    evaluatorRevision: manifest.evaluator_revision,
+    executionDirectoryName: "sealed-r15",
+    label: "R15 sealed authority regression",
+  });
+  try {
+    for (const [kind, inventory] of Object.entries(execution.verifiedAuthority.roots)) {
+      assertSealedSnapshotModes(inventory, { label: `R15 ${kind} mode regression` });
+    }
+    assert.equal(lstatSync(execution.runner.path).mode & 0o777, SEALED_REGULAR_FILE_MODE, "sealed runner must be read-only and non-executable");
+    runSealedCrossBindingChecks(execution);
+    const normalized = normalizedAuthority.normalized;
+    const normalizedBytes = Buffer.from(`${JSON.stringify(normalized, null, 2)}\n`);
+    const baseline = executeSealedEvaluator({
+      execution,
+      repositoryRoot: root,
+      normalized,
+      normalizedBytes,
+      label: "R15 in-memory authority baseline",
+    });
+    assert.deepEqual(baseline.before, baseline.afterFirst, "sealed mode and identity must be invariant across A/B");
+    assert.deepEqual(baseline.afterFirst, baseline.afterSecond, "sealed mode and identity must be invariant across B/C");
+    const hiddenPath = resolve(execution.privateBundle.path, hiddenAsset.path);
+    const sourcePath = "scripts/ask-benchmark-scoring-contract.mjs";
+    const fixturePath = "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json";
+    const candidatePath = "build.config.json";
+    const evidencePath = "evaluation-input-seed.json";
+    const frozenPath = "package.json";
+    const races = [
+      {
+        label: "source replacement during module import",
+        stage: "before_module_link",
+        authorityKind: "repository",
+        relativePath: sourcePath,
+        target: resolve(execution.repository.path, sourcePath),
+        replacement: Buffer.concat([readFileSync(resolve(execution.repository.path, sourcePath)), Buffer.from("\n// concurrent source replacement\n")]),
+      },
+      {
+        label: "fixture replacement during verified read",
+        stage: "before_authority_read",
+        authorityKind: "repository",
+        relativePath: fixturePath,
+        target: resolve(execution.repository.path, fixturePath),
+        replacement: Buffer.concat([readFileSync(resolve(execution.repository.path, fixturePath)), Buffer.from("\n")]),
+      },
+      {
+        label: "hidden evaluator replacement during module import",
+        stage: "before_module_link",
+        authorityKind: "private_bundle",
+        relativePath: hiddenAsset.path,
+        target: hiddenPath,
+        replacement: Buffer.from("export const replaced = true;\n"),
+      },
+      {
+        label: "candidate config replacement during verified read",
+        stage: "before_authority_read",
+        authorityKind: "candidate",
+        relativePath: candidatePath,
+        target: resolve(execution.candidate.path, candidatePath),
+        replacement: Buffer.from("{ malformed concurrent candidate\n"),
+      },
+      {
+        label: "evidence artifact replacement during byte-map validation",
+        stage: "before_authority_map_validation",
+        authorityKind: "evidence",
+        relativePath: evidencePath,
+        target: resolve(execution.evidence.path, evidencePath),
+        replacement: Buffer.from("{\"authority\":\"concurrent replacement\"}\n"),
+      },
+      {
+        label: "chmod write-bit replacement",
+        stage: "before_authority_map_validation",
+        authorityKind: "repository",
+        relativePath: sourcePath,
+        target: resolve(execution.repository.path, sourcePath),
+        operation: "chmod",
+      },
+      {
+        label: "same bytes different inode replacement",
+        stage: "before_authority_read",
+        authorityKind: "frozen",
+        relativePath: frozenPath,
+        target: resolve(execution.frozen.path, frozenPath),
+        replacement: readFileSync(resolve(execution.frozen.path, frozenPath)),
+      },
+    ];
+    for (const race of races) await runBarrierRace({ execution, normalized, baseline, ...race });
+  } finally {
+    removeTree(authorityRoot);
+  }
+}
+
+function runClosedGraphImportRegression(evaluatorRevision) {
+  const authorityRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-closed-graph-"));
+  const privateRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-closed-graph-private-"));
+  const hiddenPath = resolve(privateRoot, "hidden-tests.mjs");
+  const hiddenBytes = Buffer.from("export async function evaluateCandidateSafe({ repositoryRoot }) { await import(`${repositoryRoot}/scripts/graph-external-authority.mjs`); return {}; }\n");
+  writeFileSync(hiddenPath, hiddenBytes);
+  const workspace = resolve(fixtureRoot, "workspace");
+  const evidence = resolve(authorityRoot, "evidence");
+  mkdirSync(evidence);
+  writeJson(resolve(evidence, "seed.json"), { authority: "closed-linker" });
+  try {
+    const execution = createSealedEvaluatorExecution({
+      root,
+      privateEvaluationRoot: authorityRoot,
+      privateRoot,
+      hiddenAsset: { path: "hidden-tests.mjs", bytes: hiddenBytes.length, sha256: sha256(hiddenBytes) },
+      frozenWorkspace: workspace,
+      candidateWorkspace: workspace,
+      evaluationInputRoot: evidence,
+      evaluatorRevision,
+      executionDirectoryName: "closed-linker",
+      label: "closed graph import regression",
+    });
+    assert.throws(() => executeSealedEvaluator({
+      execution,
+      repositoryRoot: root,
+      normalized: {},
+      normalizedBytes: Buffer.from("{}\n"),
+      label: "closed graph import regression",
+    }), /verified dependency edge|child execution failed|outside verified authority/u, "graph-external dynamic import must fail before candidate evaluation");
+  } finally {
+    removeTree(authorityRoot);
+    removeTree(privateRoot);
+  }
 }
 
 async function runPrivateCandidateChecks(privateRoot) {
@@ -1576,7 +1982,7 @@ async function runPrivatePortabilityChecks(privateRoot) {
   const isolatedResult = await evaluator.evaluateCandidate({ repositoryRoot: alternateRepositoryRoot, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true });
   assert.deepEqual(isolatedResult, portableResult, "live repository mutation must not affect a sealed evaluator snapshot");
   const sealedDriftedModule = resolve(alternateRepositoryRoot, "scripts/ask-benchmark-scoring-contract.mjs");
-  writeFileSync(sealedDriftedModule, `${readFileSync(sealedDriftedModule, "utf8")}\n// R14 sealed source transplant\n`);
+  overwriteSealedFile(sealedDriftedModule, `${readFileSync(sealedDriftedModule, "utf8")}\n// R15 sealed source transplant\n`);
   await assert.rejects(() => evaluator.evaluateCandidate({ repositoryRoot: alternateRepositoryRoot, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true }), /source .*bytes drifted|sealed repository|authority/u, "sealed source transplant must fail closed");
 
   const symlinkRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-r7-symlink-copy-"));
@@ -1658,6 +2064,7 @@ try {
   assert.equal(summary.scoringReady, false);
   assert.equal(summary.applicableGateCount, 12);
   assert.equal(summary.nonApplicableGateCount, 3);
+  runClosedGraphImportRegression(readJson(resolve(fixtureRoot, "evaluator-reference.json")).evaluator_revision);
 
   expectFailure(() => assertAnswerNeutralPublicValue({ hidden_answer: "x" }), /answer-bearing field/u, "public answer-bearing fields must fail closed");
   expectFailure(() => assertPrivateRootOutsideRepository(root, fixtureRoot), /outside the repository/u, "repository-local private bundles must be rejected");
@@ -1871,6 +2278,7 @@ try {
     runPrivateSemanticNegativeChecks(privateRoot);
     runIndependenceNegativeChecks(privateRoot, roots);
     await runTypedPrivateErrorChecks(privateRoot);
+    await runSealedAuthorityAndRaceChecks(privateRoot);
     await runPrivateCandidateChecks(privateRoot);
     await runPrivatePortabilityChecks(privateRoot);
     const fullAuthorityStates = [
@@ -1880,7 +2288,7 @@ try {
     for (const state of fullAuthorityStates) {
       const fullAuthority = await runPersistentFullEvaluatorAuthority(privateRoot, state);
       assert.equal(fullAuthority.verifiedResult.result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state, deriveVerificationEvidenceState(fullAuthority.normalizedAuthority.normalized), `full verifier must preserve the typed state for ${state}`);
-      rmSync(fullAuthority.authorityRoot, { recursive: true, force: true });
+      removeTree(fullAuthority.authorityRoot);
     }
     const invalidAuthority = await runPersistentFullEvaluatorAuthority(privateRoot, "executed_success", {
       candidateMutator: (candidateWorkspace) => writeFileSync(resolve(candidateWorkspace, "build.config.json"), "{ malformed\n"),
@@ -1889,7 +2297,7 @@ try {
     assert.equal(invalidAuthority.evaluatorResult.invalid_input_authority.layer, "evaluation_input");
     assert.equal(invalidAuthority.evaluatorResult.invalid_input_authority.category, "candidate_source_invalid");
     assert.ok(existsSync(resolve(invalidAuthority.authorityRoot, "evaluation-input-failure-artifact.json")), "evaluation-input failure artifact must be persisted");
-    rmSync(invalidAuthority.authorityRoot, { recursive: true, force: true });
+    removeTree(invalidAuthority.authorityRoot);
 
     const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
     const privateAsset = manifest.asset_inventory[0];
@@ -1936,5 +2344,6 @@ try {
     scoring_ready: false,
   }));
 } finally {
-  rmSync(work, { recursive: true, force: true });
+  for (const path of temporaryAuthorityRoots) removeTree(path);
+  removeTree(work);
 }
