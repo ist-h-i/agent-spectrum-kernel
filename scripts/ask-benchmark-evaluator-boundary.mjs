@@ -936,11 +936,6 @@ function descriptorDirectoryEntries(filePaths) {
         path: directory,
         file_type: "directory",
         mode: 0o755,
-        dev: 0,
-        ino: 1,
-        nlink: 1,
-        mtimeMs: 0,
-        ctimeMs: 0,
         bytes: null,
         sha256: null,
       });
