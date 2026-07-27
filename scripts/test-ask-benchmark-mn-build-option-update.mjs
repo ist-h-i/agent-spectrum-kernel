@@ -89,6 +89,23 @@ function expectFailure(fn, pattern, label) {
   assert.throws(fn, pattern, label);
 }
 
+function createDirectSealedRepository({ sourceRoot, privateRoot, manifest, hiddenAsset, frozenWorkspace, candidateWorkspace, label }) {
+  const authorityRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-direct-sealed-authority-"));
+  const execution = createSealedEvaluatorExecution({
+    root: sourceRoot,
+    privateEvaluationRoot: authorityRoot,
+    privateRoot,
+    hiddenAsset,
+    frozenWorkspace,
+    candidateWorkspace,
+    evaluationInputRoot: frozenWorkspace,
+    evaluatorRevision: manifest.evaluator_revision,
+    executionDirectoryName: "execution",
+    label,
+  });
+  return execution.repository.path;
+}
+
 function boundaryRoots() {
   const roots = {};
   for (const [key, marker] of [
@@ -1358,6 +1375,15 @@ async function runPrivateCandidateChecks(privateRoot) {
   const commandContract = readJson(resolve(fixtureRoot, "verification-command-contract.json"));
   const scoringPolicy = readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json"));
   const baseWorkspace = resolve(fixtureRoot, "workspace");
+  const directRepositoryRoot = createDirectSealedRepository({
+    sourceRoot: root,
+    privateRoot,
+    manifest,
+    hiddenAsset: manifest.asset_inventory.find(({ role }) => role === "hidden_tests"),
+    frozenWorkspace: baseWorkspace,
+    candidateWorkspace: baseWorkspace,
+    label: "direct private evaluator candidate checks",
+  });
   const candidate = (name) => {
     const path = resolve(work, name);
     cpSync(baseWorkspace, path, { recursive: true });
@@ -1422,7 +1448,7 @@ async function runPrivateCandidateChecks(privateRoot) {
   cwdUnverified.command_evidence.unavailable_command_ids = [...REQUIRED_COMMAND_IDS_FOR_TEST];
   cwdUnverified.command_evidence.cwd_unverified_command_count = cwdUnverified.command_evidence.references.length;
   const evaluate = async (workspace, evidence = normalized(), options = {}) => {
-    const result = await evaluator.evaluateCandidateSafe({ repositoryRoot: root, frozenWorkspace: baseWorkspace, candidateWorkspace: workspace, normalizedResult: evidence, skipFullNormalizedValidation: options.full !== true });
+    const result = await evaluator.evaluateCandidateSafe({ repositoryRoot: directRepositoryRoot, frozenWorkspace: baseWorkspace, candidateWorkspace: workspace, normalizedResult: evidence, skipFullNormalizedValidation: options.full !== true });
     validatePrivateEvaluatorFragment({ root, fragment: result, scoringPolicy, requirementRecord, normalizedResult: evidence });
     return result;
   };
@@ -1483,7 +1509,7 @@ async function runPrivateCandidateChecks(privateRoot) {
   const crossAttempt = normalized({ identity: evidenceIdentity(undefined, "0002") });
   const invalidAttempt = await evaluate(solution("case-15"), crossAttempt, { full: true }); cases.push(["command evidence cross-attempt transplant", invalidAttempt, ["fail", "fail", "fail"], "invalid_evidence"]);
   const drift = structuredClone(normalized()); drift.normalized_result_digest = `sha256:${"0".repeat(64)}`; cases.push(["normalized result digest drift", await evaluate(solution("case-16"), drift, { full: true }), ["fail", "fail", "fail"], "invalid_evidence"]);
-  const frozenDrift = candidate("frozen-drift"); writeFileSync(resolve(frozenDrift, "package.json"), "{}\n"); const frozenDriftResult = await evaluator.evaluateCandidateSafe({ repositoryRoot: root, frozenWorkspace: frozenDrift, candidateWorkspace: solution("case-17"), normalizedResult: normalized(), skipFullNormalizedValidation: true }); validatePrivateEvaluatorFragment({ root, fragment: frozenDriftResult, scoringPolicy, requirementRecord, normalizedResult: normalized() }); cases.push(["frozen workspace drift", frozenDriftResult, ["fail", "fail", "fail"], "invalid_evidence"]);
+  const frozenDrift = candidate("frozen-drift"); writeFileSync(resolve(frozenDrift, "package.json"), "{}\n"); const frozenDriftResult = await evaluator.evaluateCandidateSafe({ repositoryRoot: directRepositoryRoot, frozenWorkspace: frozenDrift, candidateWorkspace: solution("case-17"), normalizedResult: normalized(), skipFullNormalizedValidation: true }); validatePrivateEvaluatorFragment({ root, fragment: frozenDriftResult, scoringPolicy, requirementRecord, normalizedResult: normalized() }); cases.push(["frozen workspace drift", frozenDriftResult, ["fail", "fail", "fail"], "invalid_evidence"]);
   const malformed = candidate("malformed-config"); writeFileSync(resolve(malformed, "build.config.json"), "{ malformed\n"); cases.push(["malformed candidate config", await evaluate(malformed), ["fail", "fail", "fail"], "invalid_evidence"]);
   const spoofedScope = solution("case-18"); writeFileSync(resolve(spoofedScope, "unrelated.txt"), "x\n"); writeJson(resolve(work, "caller-changed-files.json"), ["build.config.json"]); cases.push(["caller changed-file JSON spoof", await evaluate(spoofedScope), ["pass", "fail", "pass"], "over_processing"]);
   writeJson(resolve(work, "caller-verification.json"), { test: "passed", validation: "passed" }); cases.push(["caller verification JSON spoof", await evaluate(solution("case-19"), noEvidence), ["pass", "pass", "fail"], "under_processing"]);
@@ -1533,12 +1559,25 @@ async function runPrivatePortabilityChecks(privateRoot) {
   const candidate = resolve(alternate, "r7-candidate");
   cpSync(resolve(alternate, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/workspace"), frozen, { recursive: true });
   cpSync(resolve(alternate, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/workspace"), candidate, { recursive: true });
-  const portableResult = await evaluator.evaluateCandidate({ repositoryRoot: alternate, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true });
+  const alternateRepositoryRoot = createDirectSealedRepository({
+    sourceRoot: alternate,
+    privateRoot,
+    manifest,
+    hiddenAsset: manifest.asset_inventory.find(({ role }) => role === "hidden_tests"),
+    frozenWorkspace: frozen,
+    candidateWorkspace: candidate,
+    label: "portable private evaluator checks",
+  });
+  const portableResult = await evaluator.evaluateCandidate({ repositoryRoot: alternateRepositoryRoot, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true });
   assert.notEqual(portableResult.classification, "invalid_evidence", "private evaluator must import and execute from a different absolute repository path");
 
   const driftedModule = resolve(alternate, "scripts/ask-benchmark-scoring-contract.mjs");
   writeFileSync(driftedModule, `${readFileSync(driftedModule, "utf8")}\n// R7 source transplant\n`);
-  await assert.rejects(() => evaluator.evaluateCandidate({ repositoryRoot: alternate, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true }), /source .*bytes drifted|base Git revision/u, "source identity/load transplant must fail closed");
+  const isolatedResult = await evaluator.evaluateCandidate({ repositoryRoot: alternateRepositoryRoot, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true });
+  assert.deepEqual(isolatedResult, portableResult, "live repository mutation must not affect a sealed evaluator snapshot");
+  const sealedDriftedModule = resolve(alternateRepositoryRoot, "scripts/ask-benchmark-scoring-contract.mjs");
+  writeFileSync(sealedDriftedModule, `${readFileSync(sealedDriftedModule, "utf8")}\n// R14 sealed source transplant\n`);
+  await assert.rejects(() => evaluator.evaluateCandidate({ repositoryRoot: alternateRepositoryRoot, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true }), /source .*bytes drifted|sealed repository|authority/u, "sealed source transplant must fail closed");
 
   const symlinkRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-r7-symlink-copy-"));
   rmSync(symlinkRoot, { recursive: true, force: true });
@@ -1546,7 +1585,15 @@ async function runPrivatePortabilityChecks(privateRoot) {
   const symlinkTarget = resolve(symlinkRoot, "scripts/ask-benchmark-scoring-contract.mjs");
   rmSync(symlinkTarget);
   symlinkSync(resolve(root, "scripts/ask-benchmark-scoring-contract.mjs"), symlinkTarget);
-  await assert.rejects(() => evaluator.evaluateCandidate({ repositoryRoot: symlinkRoot, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, skipFullNormalizedValidation: true }), /symlink|regular file/u, "symlinked public module must fail closed");
+  assert.throws(() => createDirectSealedRepository({
+    sourceRoot: symlinkRoot,
+    privateRoot,
+    manifest,
+    hiddenAsset: manifest.asset_inventory.find(({ role }) => role === "hidden_tests"),
+    frozenWorkspace: frozen,
+    candidateWorkspace: candidate,
+    label: "symlinked portable private evaluator checks",
+  }), /symlink|regular file/u, "symlinked public module must fail closed");
 
   const graphRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-r8-graph-copy-"));
   rmSync(graphRoot, { recursive: true, force: true });
