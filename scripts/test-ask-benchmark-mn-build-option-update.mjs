@@ -1167,7 +1167,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       label: "private evaluator live repository isolation",
     });
     writeFileSync(liveRepositorySourcePath, liveRepositorySourceBytes);
-    assert.deepEqual(repositoryRace.firstFragment, executed.firstFragment, "live repository mutation must not change sealed evaluation");
+    assert.deepEqual(repositoryRace.firstFragment, finalExecuted.firstFragment, "live repository mutation must not change sealed evaluation");
     assert.throws(() => executeSealedEvaluator({
       execution: repositoryRaceExecution,
       repositoryRoot: root,
