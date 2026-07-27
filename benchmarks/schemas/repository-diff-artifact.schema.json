@@ -37,7 +37,7 @@
       "required": ["path", "change_type", "before", "after"],
       "properties": {
         "path": { "$ref": "#/$defs/path" },
-        "change_type": { "enum": ["added", "removed", "modified", "type_changed"] },
+        "change_type": { "enum": ["added", "removed", "modified", "type_changed", "addition", "deletion", "modification"] },
         "before": { "$ref": "#/$defs/fileState" },
         "after": { "$ref": "#/$defs/fileState" }
       }

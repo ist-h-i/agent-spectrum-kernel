@@ -31,6 +31,7 @@ import {
   adaptPrivateEvaluatorFragmentToEnvelope,
   createSealedEvaluatorExecution,
   executeSealedEvaluator,
+  readStableWorkspaceInventory,
   validatePrivateEvaluatorFragment,
   validateEvaluatorSourceIdentity,
   verifyEvaluatorBoundary,
@@ -48,7 +49,7 @@ import {
   deriveVerificationEvidenceState,
   validateScoringInputBindings,
 } from "./ask-benchmark-scoring-contract.mjs";
-import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import {
   buildCodexCommandEvidence,
   buildUnavailableCommandEvidence,
@@ -638,6 +639,96 @@ function persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scor
   return { snapshot, track, evaluatorResultPath, privateFragmentPath, chainManifest };
 }
 
+function workspaceDiffEntries(frozenInventory, candidateInventory) {
+  const frozen = new Map(frozenInventory.portableEntries.map((entry) => [entry.path, entry]));
+  const candidate = new Map(candidateInventory.portableEntries.map((entry) => [entry.path, entry]));
+  const paths = [...new Set([...frozen.keys(), ...candidate.keys()])].sort();
+  return paths.flatMap((path) => {
+    const before = frozen.get(path) ?? null;
+    const after = candidate.get(path) ?? null;
+    if (!before) return [{ path, change_type: "addition", before, after }];
+    if (!after) return [{ path, change_type: "deletion", before, after }];
+    if (stableCanonicalJson(before) !== stableCanonicalJson(after)) return [{ path, change_type: "modification", before, after }];
+    return [];
+  });
+}
+
+function persistPrivateEvidenceArtifacts({ authorityRoot, normalizedAuthority, bundleManifest, frozenWorkspace, candidateWorkspace, privateFragment }) {
+  const frozenInventory = readStableWorkspaceInventory(frozenWorkspace, "private evidence frozen workspace");
+  const candidateInventory = readStableWorkspaceInventory(candidateWorkspace, "private evidence candidate workspace");
+  const diffEntries = workspaceDiffEntries(frozenInventory, candidateInventory);
+  const repositoryDiffClosure = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/repository-diff-artifact.schema.json",
+    program: "adaptive_ask_repository_diff_artifact",
+    run_instance_id: normalizedAuthority.normalized.lineage.run_instance_id,
+    case_id: normalizedAuthority.normalized.lineage.case_id,
+    attempt: normalizedAuthority.normalized.lineage.attempt,
+    frozen_workspace_tree_digest: frozenInventory.digest,
+    candidate_workspace_tree_digest: candidateInventory.digest,
+    diff_entries: diffEntries,
+  };
+  const repositoryDiffArtifact = {
+    ...repositoryDiffClosure,
+    artifact_digest: canonicalDigest(diffEntries),
+    artifact_bytes: Buffer.byteLength(stableCanonicalJson(diffEntries)) || 1,
+  };
+  writeJson(resolve(authorityRoot, "repository-diff-artifact.json"), repositoryDiffArtifact);
+
+  const checks = privateFragment.evaluator_rerun?.results ?? [];
+  const evaluatorCheckClosure = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/evaluator-check-artifact.schema.json",
+    program: "adaptive_ask_evaluator_check_artifact",
+    run_instance_id: normalizedAuthority.normalized.lineage.run_instance_id,
+    case_id: normalizedAuthority.normalized.lineage.case_id,
+    attempt: normalizedAuthority.normalized.lineage.attempt,
+    normalized_result_id: normalizedAuthority.normalized.normalized_result_id,
+    normalized_result_digest: normalizedAuthority.normalized.normalized_result_digest,
+    checks,
+  };
+  writeJson(resolve(authorityRoot, "evaluator-check-artifact.json"), {
+    ...evaluatorCheckClosure,
+    artifact_digest: canonicalDigest(checks),
+    artifact_bytes: Buffer.byteLength(stableCanonicalJson(checks)) || 1,
+  });
+
+  const invalidAuthority = privateFragment.invalid_input_authority;
+  if (invalidAuthority) {
+    const failureReference = invalidAuthority.evidence_references?.find((reference) => reference.kind === "test_result");
+    if (failureReference) {
+      const details = Buffer.from(stableCanonicalJson(invalidAuthority));
+      const failureClosure = {
+        schema_version: "1.0.0",
+        schema_path: "benchmarks/schemas/evaluation-input-failure-artifact.schema.json",
+        program: "adaptive_ask_evaluation_input_failure_artifact",
+        layer: invalidAuthority.layer,
+        category: invalidAuthority.category,
+        stage: "private-evaluator",
+        run_instance_id: normalizedAuthority.normalized.lineage.run_instance_id,
+        case_id: normalizedAuthority.normalized.lineage.case_id,
+        attempt: normalizedAuthority.normalized.lineage.attempt,
+        normalized_result_id: normalizedAuthority.normalized.normalized_result_id,
+        normalized_result_digest: normalizedAuthority.normalized.normalized_result_digest,
+        evaluator_bundle_id: bundleManifest.evaluator_bundle_id,
+        evaluator_bundle_digest: bundleManifest.evaluator_bundle_digest,
+        evaluator_revision: bundleManifest.evaluator_revision,
+        source_tree_digest: bundleManifest.evaluator_source_identity.source_tree_digest,
+        dependency_graph_digest: bundleManifest.dependency_graph.graph_digest,
+        structured_failure_code: invalidAuthority.category,
+        details_digest: failureReference.digest,
+        details_bytes: failureReference.bytes,
+      };
+      writeJson(resolve(authorityRoot, "evaluation-input-failure-artifact.json"), {
+        ...failureClosure,
+        artifact_digest: failureReference.digest,
+        artifact_bytes: failureReference.bytes,
+      });
+    }
+  }
+  return { frozenInventory, candidateInventory, repositoryDiffArtifact };
+}
+
 function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normalizedAuthority, bundleManifest, scoringAuthority, draftEvaluatorResult, execution, executed, privateFragmentBytes, privateFragmentDigest }) {
   const artifactSpecs = [
     ["repository_diff", "repository-diff-artifact.json"],
@@ -652,7 +743,7 @@ function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normali
       kind,
       path: relative(authorityRoot, path).split(sep).join("/"),
       digest: artifact.artifact_digest,
-      bytes: readFileSync(path).length,
+      bytes: artifact.artifact_bytes,
       inode: lstatSync(path).ino,
       run_instance_id: artifact.run_instance_id,
       case_id: artifact.case_id,
@@ -759,7 +850,7 @@ function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normali
     frozen_workspace_inventory_digest: repositoryArtifact.frozen_workspace_tree_digest,
     candidate_workspace_inventory_digest: repositoryArtifact.candidate_workspace_tree_digest,
     repository_diff_artifact_digest: repositoryArtifact.artifact_digest,
-    repository_diff_artifact_bytes: readFileSync(resolve(authorityRoot, "repository-diff-artifact.json")).length,
+    repository_diff_artifact_bytes: repositoryArtifact.artifact_bytes,
     private_fragment_path: relative(authorityRoot, chain.privateFragmentPath).split(sep).join("/"),
     private_fragment_sha256: privateFragmentDigest,
     private_fragment_bytes: privateFragmentBytes,
@@ -861,6 +952,14 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   const finalFragmentBytes = Buffer.from(`${JSON.stringify(finalExecuted.firstFragment, null, 2)}\n`);
   const finalAdapterAuthority = { ...adapterAuthority, privateFragmentDigest: sha256(finalFragmentBytes), privateFragmentBytes: finalFragmentBytes.length };
   const finalDraftEvaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: finalExecuted.firstFragment, authority: finalAdapterAuthority });
+  persistPrivateEvidenceArtifacts({
+    authorityRoot,
+    normalizedAuthority,
+    bundleManifest,
+    frozenWorkspace: bootstrap.frozenWorkspace,
+    candidateWorkspace: bootstrap.candidateWorkspace,
+    privateFragment: finalExecuted.firstFragment,
+  });
   const privateRecord = privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normalizedAuthority, bundleManifest, scoringAuthority, draftEvaluatorResult: finalDraftEvaluatorResult, execution: finalExecution, executed: finalExecuted, privateFragmentBytes: finalAdapterAuthority.privateFragmentBytes, privateFragmentDigest: finalAdapterAuthority.privateFragmentDigest });
   const evaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: finalExecuted.firstFragment, authority: { ...finalAdapterAuthority, privateEvaluationRecordDigest: privateRecord.record.evaluation_record_digest } });
   writeJson(chain.evaluatorResultPath, evaluatorResult);

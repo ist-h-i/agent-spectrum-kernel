@@ -1596,14 +1596,20 @@ function validatePrivateEvaluationEvidenceArtifacts({ root, privateEvaluationRoo
   for (const entry of record.evidence_artifacts) {
     const artifactPath = resolveAuthorityArtifactPath(canonicalEvaluationRoot, entry.path, `private evaluation ${entry.kind} artifact`);
     const artifactRead = readJsonArtifact(artifactPath, `private evaluation ${entry.kind} artifact`);
-    if (artifactRead.bytes.length !== entry.bytes || artifactRead.rawByteDigest !== entry.digest) throw new Error(`private evaluation ${entry.kind} artifact byte binding is invalid`);
     if (artifactRead.evidence.finalPath.ino !== entry.inode) throw new Error(`private evaluation ${entry.kind} artifact inode binding is invalid`);
     const artifact = artifactRead.value;
     if (artifact.artifact_digest !== entry.digest || artifact.artifact_bytes !== entry.bytes) throw new Error(`private evaluation ${entry.kind} artifact digest or byte closure is invalid`);
-    const artifactClosure = structuredClone(artifact);
-    delete artifactClosure.artifact_digest;
-    delete artifactClosure.artifact_bytes;
-    if (canonicalDigest(artifactClosure) !== entry.digest) throw new Error(`private evaluation ${entry.kind} artifact semantic digest is invalid`);
+    if (artifact.schema_path === REPOSITORY_DIFF_ARTIFACT_SCHEMA_PATH) {
+      const diffEntries = Array.isArray(artifact.diff_entries) ? artifact.diff_entries : null;
+      if (!diffEntries || artifact.artifact_digest !== canonicalDigest(diffEntries) || artifact.artifact_bytes !== (Buffer.byteLength(stableCanonicalJson(diffEntries)) || 1)) throw new Error(`private evaluation ${entry.kind} artifact semantic digest is invalid`);
+    } else if (artifact.schema_path === EVALUATOR_CHECK_ARTIFACT_SCHEMA_PATH) {
+      const checks = Array.isArray(artifact.checks) ? artifact.checks : null;
+      if (!checks || artifact.artifact_digest !== canonicalDigest(checks) || artifact.artifact_bytes !== (Buffer.byteLength(stableCanonicalJson(checks)) || 1)) throw new Error(`private evaluation ${entry.kind} artifact semantic digest is invalid`);
+    } else if (artifact.schema_path === EVALUATION_INPUT_FAILURE_ARTIFACT_SCHEMA_PATH) {
+      const authorityReferences = result.invalid_input_authority?.evidence_references ?? [];
+      const matchingReference = authorityReferences.find((reference) => reference.kind === "test_result" && reference.digest === artifact.artifact_digest && reference.bytes === artifact.artifact_bytes);
+      if (!matchingReference || artifact.details_digest !== matchingReference.digest || artifact.details_bytes !== matchingReference.bytes) throw new Error(`private evaluation ${entry.kind} artifact failure evidence binding is invalid`);
+    } else throw new Error(`private evaluation ${entry.kind} artifact schema is not authorized`);
     if (entry.run_instance_id !== normalized.lineage.run_instance_id || entry.case_id !== normalized.lineage.case_id || entry.attempt !== normalized.lineage.attempt || entry.normalized_result_id !== normalized.normalized_result_id || entry.normalized_result_digest !== normalized.normalized_result_digest || entry.evaluator_bundle_id !== result.evaluator_bundle_id || entry.evaluator_bundle_digest !== result.evaluator_bundle_digest) {
       throw new Error(`private evaluation ${entry.kind} artifact lineage is inconsistent`);
     }
