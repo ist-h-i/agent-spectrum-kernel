@@ -1,17 +1,24 @@
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
+  chmodSync,
   closeSync,
   existsSync,
   fstatSync,
+  fsyncSync,
   lstatSync,
+  mkdirSync,
   openSync,
   readFileSync,
   readSync,
   readdirSync,
+  rmSync,
   realpathSync,
+  writeSync,
 } from "node:fs";
-import { extname, posix, relative, resolve, sep, win32 } from "node:path";
+import { constants as fsConstants } from "node:fs";
+import { basename, dirname, extname, posix, relative, resolve, sep, win32 } from "node:path";
+import { tmpdir } from "node:os";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog.mjs";
@@ -53,6 +60,7 @@ export const EVALUATOR_DEPENDENCY_ENTRY_PATHS = Object.freeze([
   "scripts/ask-benchmark-materialize.mjs",
   "scripts/ask-benchmark-normalized-results.mjs",
   "scripts/ask-benchmark-evaluator-boundary.mjs",
+  "scripts/ask-benchmark-private-evaluator-runner.mjs",
 ]);
 export const EVALUATOR_AUTHORITY_PATHS = Object.freeze([
   "benchmarks/schemas/evaluator-reference.schema.json",
@@ -499,6 +507,17 @@ function parseLocalModuleEdges(root, path, source) {
     edge.edge_digest = canonicalDigest(edge);
     edges.push(edge);
   };
+  const addPrivateRuntimeEdge = (token) => {
+    const edge = {
+      from: path,
+      to: "private/hidden-evaluator.mjs",
+      kind: "runtime_private_import",
+      specifier: token,
+      syntax_identity: `runtime_private_import:${path}:${token}`,
+    };
+    edge.edge_digest = canonicalDigest(edge);
+    edges.push(edge);
+  };
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
     assertNoUnsupportedLocalLoad(tokens, index, `evaluator dependency ${path}`);
@@ -506,7 +525,13 @@ function parseLocalModuleEdges(root, path, source) {
       const next = tokens[index + 1];
       if (next?.value === "(") {
         const literal = tokens[index + 2];
-        if (literal?.type !== "string") throw new Error(`evaluator dependency ${path} contains an unsupported computed dynamic import`);
+        if (literal?.type !== "string") {
+          if (path === "scripts/ask-benchmark-private-evaluator-runner.mjs") {
+            addPrivateRuntimeEdge("--hidden-evaluator");
+            continue;
+          }
+          throw new Error(`evaluator dependency ${path} contains an unsupported computed dynamic import`);
+        }
         let depth = 1;
         let cursor = index + 3;
         for (; cursor < tokens.length && depth > 0; cursor += 1) {
@@ -731,6 +756,7 @@ export function readStableWorkspaceInventory(root, label = "workspace authority"
   const canonicalRoot = assertRealDirectory(root, `${label} root`);
   const rootBefore = lstatSync(canonicalRoot);
   const entries = [];
+  const buffers = new Map();
   const inodePaths = new Map();
   const casePaths = new Map();
   const visit = (directory) => {
@@ -748,14 +774,15 @@ export function readStableWorkspaceInventory(root, label = "workspace authority"
       if (status.isSymbolicLink() || status.isFIFO() || status.isSocket() || status.isBlockDevice() || status.isCharacterDevice()) throw new Error(`${label} contains a prohibited filesystem entry: ${path}`);
       const mode = status.mode & 0o777;
       if (status.isDirectory()) {
-        entries.push({ path, file_type: "directory", mode, dev: status.dev, ino: status.ino, bytes: null, sha256: null });
+        entries.push({ path, file_type: "directory", mode, dev: status.dev, ino: status.ino, nlink: status.nlink, mtimeMs: status.mtimeMs, ctimeMs: status.ctimeMs, bytes: null, sha256: null });
         visit(absolute);
       } else if (status.isFile()) {
         if (status.nlink > 1) throw new Error(`${label} contains an implicit hard-link authority: ${path}`);
         const stable = readStableFile(absolute, `${label} file ${path}`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: true });
         const final = lstatSync(absolute);
-        if (final.dev !== status.dev || final.ino !== status.ino || final.mode !== status.mode || final.nlink !== status.nlink) throw new Error(`${label} file identity changed during inventory: ${path}`);
-        entries.push({ path, file_type: "file", mode, dev: status.dev, ino: status.ino, bytes: stable.bytes.length, sha256: stable.rawByteDigest });
+        if (final.dev !== status.dev || final.ino !== status.ino || final.mode !== status.mode || final.nlink !== status.nlink || final.mtimeMs !== status.mtimeMs || final.ctimeMs !== status.ctimeMs) throw new Error(`${label} file identity changed during inventory: ${path}`);
+        buffers.set(path, Buffer.from(stable.bytes));
+        entries.push({ path, file_type: "file", mode, dev: status.dev, ino: status.ino, nlink: status.nlink, mtimeMs: status.mtimeMs, ctimeMs: status.ctimeMs, bytes: stable.bytes.length, sha256: stable.rawByteDigest });
         const inodeKey = `${status.dev}:${status.ino}`;
         if (inodePaths.has(inodeKey)) throw new Error(`${label} contains hard-linked paths: ${inodePaths.get(inodeKey)} / ${path}`);
         inodePaths.set(inodeKey, path);
@@ -767,9 +794,311 @@ export function readStableWorkspaceInventory(root, label = "workspace authority"
   };
   visit(canonicalRoot);
   const rootAfter = lstatSync(canonicalRoot);
-  if (rootAfter.dev !== rootBefore.dev || rootAfter.ino !== rootBefore.ino || rootAfter.mtimeMs !== rootBefore.mtimeMs || rootAfter.ctimeMs !== rootBefore.ctimeMs) throw new Error(`${label} root identity changed during inventory`);
+  if (rootAfter.dev !== rootBefore.dev || rootAfter.ino !== rootBefore.ino || rootAfter.nlink !== rootBefore.nlink || rootAfter.mtimeMs !== rootBefore.mtimeMs || rootAfter.ctimeMs !== rootBefore.ctimeMs) throw new Error(`${label} root identity changed during inventory`);
   entries.sort((left, right) => left.path.localeCompare(right.path));
-  return { root: canonicalRoot, entries, digest: canonicalDigest(entries) };
+  const portableEntries = entries.map(({ path, file_type, mode, bytes, sha256 }) => ({ path, file_type, mode, bytes, sha256 }));
+  const runtimeEntries = entries.map(({ path, file_type, mode, dev, ino, nlink, mtimeMs, ctimeMs, bytes, sha256 }) => ({ path, file_type, mode, dev, ino, nlink, mtimeMs, ctimeMs, bytes, sha256 }));
+  return {
+    root: canonicalRoot,
+    entries,
+    portableEntries,
+    runtimeEntries,
+    buffers,
+    digest: canonicalDigest(portableEntries),
+    runtimeDigest: canonicalDigest(runtimeEntries),
+    rootIdentity: {
+      dev: rootBefore.dev,
+      ino: rootBefore.ino,
+      nlink: rootBefore.nlink,
+      mode: rootBefore.mode,
+      mtimeMs: rootBefore.mtimeMs,
+      ctimeMs: rootBefore.ctimeMs,
+    },
+  };
+}
+
+function filesystemIdentity(status) {
+  return {
+    dev: status.dev,
+    ino: status.ino,
+    nlink: status.nlink,
+    mode: status.mode,
+    size: status.size,
+    mtimeMs: status.mtimeMs,
+    ctimeMs: status.ctimeMs,
+  };
+}
+
+function sameFilesystemIdentity(left, right) {
+  return stableCanonicalJson(left) === stableCanonicalJson(right);
+}
+
+function assertFreshPath(path, label) {
+  try {
+    lstatSync(path);
+    throw new Error(`${label} already exists`);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+}
+
+function assertRealParentDirectory(path, label) {
+  const parent = dirname(path);
+  assertRealDirectory(parent, `${label} parent`);
+  return parent;
+}
+
+export function materializeSealedFile({ bytes, destination, label = "sealed file", mode = 0o444, allowEmpty = false } = {}) {
+  if (!Buffer.isBuffer(bytes) || (!allowEmpty && bytes.length === 0)) throw new Error(`${label} requires ${allowEmpty ? "verified" : "non-empty verified"} bytes`);
+  assertFreshPath(destination, label);
+  const parent = assertRealParentDirectory(destination, label);
+  let descriptor;
+  try {
+    descriptor = openSync(destination, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
+    let offset = 0;
+    while (offset < bytes.length) offset += writeSync(descriptor, bytes, offset, bytes.length - offset);
+    fsyncSync(descriptor);
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+  chmodSync(destination, mode & 0o777);
+  try {
+    const parentDescriptor = openSync(parent, fsConstants.O_RDONLY);
+    try { fsyncSync(parentDescriptor); } finally { closeSync(parentDescriptor); }
+  } catch {
+    // Some filesystems do not allow fsync on directory descriptors. The file fsync above remains mandatory.
+  }
+  const verified = readStableFile(destination, label, MAX_BOUNDARY_FILE_BYTES, { allowEmpty });
+  if (Buffer.compare(verified.bytes, bytes) !== 0) throw new Error(`${label} sealed bytes do not match the verified source`);
+  return {
+    path: verified.path,
+    bytes: verified.bytes.length,
+    sha256: verified.rawByteDigest,
+    identity: filesystemIdentity(verified.evidence.finalPath),
+  };
+}
+
+function comparePortableInventories(expected, actual, label) {
+  if (stableCanonicalJson(expected.portableEntries) !== stableCanonicalJson(actual.portableEntries)) throw new Error(`${label} portable inventory does not match the verified source`);
+}
+
+export function materializeSealedWorkspaceSnapshot({ inventory, destination, label = "sealed workspace snapshot" } = {}) {
+  if (!inventory || !Array.isArray(inventory.entries) || !(inventory.buffers instanceof Map)) throw new Error(`${label} requires a verified workspace inventory`);
+  assertFreshPath(destination, label);
+  const parent = dirname(destination);
+  assertRealDirectory(parent, `${label} parent`);
+  mkdirSync(destination, 0o755);
+  for (const entry of inventory.entries.filter(({ file_type }) => file_type === "directory").sort((left, right) => left.path.localeCompare(right.path))) {
+    const directory = resolve(destination, entry.path);
+    assertFreshPath(directory, `${label} directory ${entry.path}`);
+    mkdirSync(directory, entry.mode & 0o777);
+  }
+  for (const entry of inventory.entries.filter(({ file_type }) => file_type === "file").sort((left, right) => left.path.localeCompare(right.path))) {
+    const file = resolve(destination, entry.path);
+    const content = inventory.buffers.get(entry.path);
+    if (!content) throw new Error(`${label} verified bytes are missing for ${entry.path}`);
+    materializeSealedFile({ bytes: content, destination: file, label: `${label} file ${entry.path}`, mode: entry.mode, allowEmpty: true });
+  }
+  const sealedInventory = readStableWorkspaceInventory(destination, label);
+  comparePortableInventories(inventory, sealedInventory, label);
+  return sealedInventory;
+}
+
+function runtimeIdentityFromStableRead(read) {
+  return filesystemIdentity(read.evidence.finalPath);
+}
+
+function assertRuntimeIdentityBinding(actual, expected, label) {
+  if (!expected || !sameFilesystemIdentity(actual, expected)) throw new Error(`${label} runtime identity binding is invalid`);
+}
+
+function assertWorkspaceRuntimeBinding(actual, expected, label) {
+  if (!expected || actual.digest !== expected.portable_digest || actual.runtimeDigest !== expected.runtime_digest || !sameFilesystemIdentity(actual.rootIdentity, expected.root)) throw new Error(`${label} sealed snapshot identity binding is invalid`);
+}
+
+function sealedSnapshotBinding(inventory) {
+  return {
+    portable_digest: inventory.digest,
+    runtime_digest: inventory.runtimeDigest,
+    root: inventory.rootIdentity,
+  };
+}
+
+function relativeAuthorityPath(root, path, label) {
+  const value = relative(root, path).split(sep).join("/");
+  assertPortableRelativePath(value, `${label} relative path`);
+  if (!isInside(root, path)) throw new Error(`${label} escapes its authority root`);
+  return value;
+}
+
+function assertSourceBytesAtRevision(root, revision, relativePath, bytes, label) {
+  const committed = checkedInBytesAtRevision(root, revision, relativePath);
+  if (!committed || Buffer.compare(committed, bytes) !== 0) throw new Error(`${label} does not match the immutable base Git revision`);
+  return { bytes: committed.length, sha256: rawByteDigest(committed) };
+}
+
+export function createSealedEvaluatorExecution({
+  root,
+  privateEvaluationRoot,
+  privateRoot,
+  hiddenAsset,
+  frozenWorkspace,
+  candidateWorkspace,
+  evaluationInputRoot,
+  evaluatorRevision,
+  executionDirectoryName = "sealed-execution",
+  label = "private evaluator sealed execution",
+} = {}) {
+  const evaluationRoot = assertRealDirectory(privateEvaluationRoot, `${label} authority root`);
+  const staticRoot = assertRealDirectory(privateRoot, `${label} static bundle root`);
+  if (pathsOverlap(evaluationRoot, staticRoot)) throw new Error(`${label} authority root overlaps the static evaluator bundle`);
+  if (!hiddenAsset?.path || !/^[a-f0-9]{40}$/u.test(evaluatorRevision ?? "")) throw new Error(`${label} hidden asset or evaluator revision is invalid`);
+  const hiddenPath = resolveAuthorityArtifactPath(staticRoot, hiddenAsset.path, `${label} hidden evaluator`);
+  const hiddenRead = readStableFile(hiddenPath, `${label} hidden evaluator`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
+  if (hiddenRead.rawByteDigest !== hiddenAsset.sha256 || hiddenRead.bytes.length !== hiddenAsset.bytes) throw new Error(`${label} hidden evaluator source identity is inconsistent`);
+  const runnerRelativePath = "scripts/ask-benchmark-private-evaluator-runner.mjs";
+  const repositoryRoot = assertRealDirectory(root, `${label} repository root`);
+  const runnerPath = resolveAuthorityArtifactPath(repositoryRoot, runnerRelativePath, `${label} runner source`);
+  const runnerRead = readStableFile(runnerPath, `${label} runner source`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
+  const runnerRevision = assertSourceBytesAtRevision(repositoryRoot, evaluatorRevision, runnerRelativePath, runnerRead.bytes, `${label} runner source`);
+  const frozenSource = readStableWorkspaceInventory(frozenWorkspace, `${label} frozen workspace source`);
+  const candidateSource = readStableWorkspaceInventory(candidateWorkspace, `${label} candidate workspace source`);
+  const evidenceSource = readStableWorkspaceInventory(evaluationInputRoot, `${label} evaluation-input evidence source`);
+  assertPortableRelativePath(executionDirectoryName, `${label} execution directory`);
+  const executionRoot = resolve(evaluationRoot, executionDirectoryName);
+  assertFreshPath(executionRoot, `${label} root`);
+  mkdirSync(executionRoot, 0o755);
+  const runner = materializeSealedFile({ bytes: runnerRead.bytes, destination: resolve(executionRoot, "runner.mjs"), label: `${label} runner sealed copy`, mode: 0o444 });
+  const hidden = materializeSealedFile({ bytes: hiddenRead.bytes, destination: resolve(executionRoot, "hidden-evaluator.mjs"), label: `${label} hidden evaluator sealed copy`, mode: 0o444 });
+  const frozen = materializeSealedWorkspaceSnapshot({ inventory: frozenSource, destination: resolve(executionRoot, "frozen-workspace"), label: `${label} frozen workspace sealed snapshot` });
+  const candidate = materializeSealedWorkspaceSnapshot({ inventory: candidateSource, destination: resolve(executionRoot, "candidate-workspace"), label: `${label} candidate workspace sealed snapshot` });
+  const evidence = materializeSealedWorkspaceSnapshot({ inventory: evidenceSource, destination: resolve(executionRoot, "evaluation-input-evidence"), label: `${label} evaluation-input evidence sealed snapshot` });
+  return {
+    evaluationRoot,
+    executionRoot,
+    executionRootPath: relativeAuthorityPath(evaluationRoot, executionRoot, `${label} root`),
+    evaluatorRevision,
+    runner: {
+      sourcePath: runnerRelativePath,
+      sourceBytes: runnerRead.bytes.length,
+      sourceSha256: runnerRead.rawByteDigest,
+      baseGitRevisionBytes: runnerRevision.bytes,
+      baseGitRevisionSha256: runnerRevision.sha256,
+      path: runner.path,
+      relativePath: relativeAuthorityPath(evaluationRoot, runner.path, `${label} runner sealed copy`),
+      bytes: runner.bytes,
+      sha256: runner.sha256,
+      identityBefore: runner.identity,
+      identityAfter: runner.identity,
+    },
+    hidden: {
+      sourcePath: hiddenAsset.path,
+      sourceBytes: hiddenRead.bytes.length,
+      sourceSha256: hiddenRead.rawByteDigest,
+      path: hidden.path,
+      relativePath: relativeAuthorityPath(evaluationRoot, hidden.path, `${label} hidden sealed copy`),
+      bytes: hidden.bytes,
+      sha256: hidden.sha256,
+      identityBefore: hidden.identity,
+      identityAfter: hidden.identity,
+    },
+    frozen: {
+      source: sealedSnapshotBinding(frozenSource),
+      path: frozen.root,
+      relativePath: relativeAuthorityPath(evaluationRoot, frozen.root, `${label} frozen sealed snapshot`),
+      sealed: sealedSnapshotBinding(frozen),
+      identityBefore: sealedSnapshotBinding(frozen),
+      identityAfter: sealedSnapshotBinding(frozen),
+    },
+    candidate: {
+      source: sealedSnapshotBinding(candidateSource),
+      path: candidate.root,
+      relativePath: relativeAuthorityPath(evaluationRoot, candidate.root, `${label} candidate sealed snapshot`),
+      sealed: sealedSnapshotBinding(candidate),
+      identityBefore: sealedSnapshotBinding(candidate),
+      identityAfter: sealedSnapshotBinding(candidate),
+    },
+    evidence: {
+      source: sealedSnapshotBinding(evidenceSource),
+      path: evidence.root,
+      relativePath: relativeAuthorityPath(evaluationRoot, evidence.root, `${label} evidence sealed snapshot`),
+      sealed: sealedSnapshotBinding(evidence),
+      identityBefore: sealedSnapshotBinding(evidence),
+      identityAfter: sealedSnapshotBinding(evidence),
+    },
+  };
+}
+
+function parseRunnerFragment(stdout, label) {
+  assertNoDuplicateJsonObjectKeys(stdout, label);
+  try {
+    const parsed = JSON.parse(stdout);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("fragment must be an object");
+    return parsed;
+  } catch {
+    throw new Error(`${label} is invalid JSON`);
+  }
+}
+
+function stableFragmentBytes(fragment) {
+  return Buffer.from(`${JSON.stringify(fragment, null, 2)}\n`);
+}
+
+function captureSealedExecutionState(execution, label) {
+  const runner = readStableFile(execution.runner.path, `${label} runner sealed copy`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
+  const hidden = readStableFile(execution.hidden.path, `${label} hidden evaluator sealed copy`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
+  const frozen = readStableWorkspaceInventory(execution.frozen.path, `${label} frozen sealed snapshot`);
+  const candidate = readStableWorkspaceInventory(execution.candidate.path, `${label} candidate sealed snapshot`);
+  const evidence = readStableWorkspaceInventory(execution.evidence.path, `${label} evidence sealed snapshot`);
+  return {
+    runner: { bytes: runner.bytes.length, sha256: runner.rawByteDigest, identity: runtimeIdentityFromStableRead(runner) },
+    hidden: { bytes: hidden.bytes.length, sha256: hidden.rawByteDigest, identity: runtimeIdentityFromStableRead(hidden) },
+    frozen: sealedSnapshotBinding(frozen),
+    candidate: sealedSnapshotBinding(candidate),
+    evidence: sealedSnapshotBinding(evidence),
+  };
+}
+
+function assertSealedExecutionStatesEqual(states, label) {
+  const first = states[0];
+  for (const state of states.slice(1)) if (stableCanonicalJson(state) !== stableCanonicalJson(first)) throw new Error(`${label} sealed execution authority changed between evaluator runs`);
+}
+
+export function executeSealedEvaluator({ execution, repositoryRoot, normalized, timeout = 30_000, beforeRun = null, afterRun = null, label = "private evaluator sealed execution" } = {}) {
+  if (!execution?.runner?.path || !execution?.hidden?.path || !execution?.frozen?.path || !execution?.candidate?.path || !execution?.evidence?.path) throw new Error(`${label} is incomplete`);
+  const args = [
+    "--hidden-evaluator", execution.hidden.path,
+    "--repository-root", repositoryRoot,
+    "--frozen-workspace", execution.frozen.path,
+    "--candidate-workspace", execution.candidate.path,
+    "--evaluation-input-root", execution.evidence.path,
+    "--normalized-base64", Buffer.from(stableCanonicalJson(normalized)).toString("base64url"),
+  ];
+  const run = () => {
+    const child = spawnSync(process.execPath, [execution.runner.path, ...args], { encoding: "utf8", maxBuffer: MAX_BOUNDARY_FILE_BYTES, timeout });
+    if (child.status !== 0 || child.error) throw new Error(`${label} child execution failed`);
+    return parseRunnerFragment(child.stdout, `${label} child output`);
+  };
+  const stateA = captureSealedExecutionState(execution, `${label} before run`);
+  if (beforeRun) beforeRun({ index: 1, execution, state: stateA });
+  const firstFragment = run();
+  const stateB = captureSealedExecutionState(execution, `${label} after first run`);
+  if (afterRun) afterRun({ index: 1, execution, state: stateB });
+  if (beforeRun) beforeRun({ index: 2, execution, state: stateB });
+  const secondFragment = run();
+  const stateC = captureSealedExecutionState(execution, `${label} after second run`);
+  if (afterRun) afterRun({ index: 2, execution, state: stateC });
+  assertSealedExecutionStatesEqual([stateA, stateB, stateC], label);
+  if (stableCanonicalJson(firstFragment) !== stableCanonicalJson(secondFragment)) throw new Error(`${label} fragment is nondeterministic`);
+  return {
+    firstFragment,
+    secondFragment,
+    firstBytes: stableFragmentBytes(firstFragment),
+    secondBytes: stableFragmentBytes(secondFragment),
+    before: stateA,
+    afterFirst: stateB,
+    afterSecond: stateC,
+  };
 }
 
 function managedRepositoryInventory(root) {
@@ -1316,6 +1645,12 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const hiddenPath = resolveAuthorityArtifactPath(bundle.canonicalPrivateRoot, hiddenAsset.path, "private hidden evaluator");
   const hiddenRead = readStableFile(hiddenPath, "private hidden evaluator", MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
   if (hiddenRead.rawByteDigest !== hiddenAsset.sha256 || hiddenRead.bytes.length !== hiddenAsset.bytes || hiddenRead.evidence.finalPath.ino !== record.hidden_evaluator_inode) throw new Error("private hidden evaluator stable identity is inconsistent");
+  const runnerRelativePath = "scripts/ask-benchmark-private-evaluator-runner.mjs";
+  if (record.evaluator_runner_path !== runnerRelativePath || record.evaluator_runner_source_identity?.path !== runnerRelativePath) throw new Error("private evaluator runner source path binding is inconsistent");
+  const runnerPath = resolveAuthorityArtifactPath(realpathSync(root), runnerRelativePath, "private evaluator runner source");
+  const runnerRead = readStableFile(runnerPath, "private evaluator runner source", MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
+  const runnerRevision = assertSourceBytesAtRevision(realpathSync(root), bundle.manifest.evaluator_revision, runnerRelativePath, runnerRead.bytes, "private evaluator runner source");
+  if (record.evaluator_runner_sha256 !== runnerRead.rawByteDigest || record.evaluator_runner_bytes !== runnerRead.bytes.length || stableCanonicalJson(record.evaluator_runner_source_identity) !== stableCanonicalJson({ path: runnerRelativePath, base_git_revision: bundle.manifest.evaluator_revision, source_bytes: runnerRead.bytes.length, source_sha256: runnerRead.rawByteDigest, base_git_revision_bytes: runnerRevision.bytes, base_git_revision_sha256: runnerRevision.sha256 })) throw new Error("private evaluator runner source identity is inconsistent");
   if (record.dependency_graph_digest !== bundle.manifest.dependency_graph.graph_digest) throw new Error("private evaluation record dependency graph is inconsistent");
   const resolveEvaluationDirectory = (path, label) => {
     assertPortableRelativePath(path, `${label} path`);
@@ -1330,23 +1665,66 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const candidateWorkspace = resolveEvaluationDirectory(record.candidate_workspace_path, "candidate workspace");
   const evaluationInputRoot = resolveEvaluationDirectory(record.evaluation_input_evidence_root_path, "evaluation-input evidence root");
   if (frozenWorkspace === candidateWorkspace || pathsOverlap(frozenWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(candidateWorkspace, bundle.canonicalPrivateRoot)) throw new Error("private evaluation workspaces are overlapping or invalid");
-  const frozenInventory = readStableWorkspaceInventory(frozenWorkspace, "frozen workspace");
-  const candidateInventory = readStableWorkspaceInventory(candidateWorkspace, "candidate workspace");
-  if (record.frozen_workspace_inventory_digest !== frozenInventory.digest || record.candidate_workspace_inventory_digest !== candidateInventory.digest) throw new Error("private evaluation workspace inventory digest is inconsistent");
-  if (!evidence.repositoryDiffArtifact || evidence.repositoryDiffArtifact.frozen_workspace_tree_digest !== frozenInventory.digest || evidence.repositoryDiffArtifact.candidate_workspace_tree_digest !== candidateInventory.digest) throw new Error("repository diff workspace authority does not match the re-derived workspace inventory");
-  const validatedFragment = validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy: scoringInputs.scoringPolicy, requirementRecord: scoringInputs.requirementRecord, normalizedResult: normalized });
-  const executeHiddenEvaluator = () => {
-    const runner = resolve(root, "scripts/ask-benchmark-private-evaluator-runner.mjs");
-    const run = spawnSync(process.execPath, [runner, "--hidden-evaluator", hiddenPath, "--repository-root", root, "--frozen-workspace", frozenWorkspace, "--candidate-workspace", candidateWorkspace, "--evaluation-input-root", evaluationInputRoot, "--normalized-base64", Buffer.from(stableCanonicalJson(normalized)).toString("base64url")], { encoding: "utf8", maxBuffer: MAX_BOUNDARY_FILE_BYTES, timeout: 30_000 });
-    if (run.status !== 0 || run.error) throw new Error("private hidden evaluator execution failed");
-    assertNoDuplicateJsonObjectKeys(run.stdout, "private hidden evaluator output");
-    try { return JSON.parse(run.stdout); } catch { throw new Error("private hidden evaluator output is invalid JSON"); }
+  const resolveSealedFile = (path, label) => {
+    assertPortableRelativePath(path, `${label} path`);
+    const absolute = resolve(canonicalEvaluationRoot, path);
+    if (!isInside(canonicalEvaluationRoot, absolute)) throw new Error(`${label} escapes the private evaluation root`);
+    let current = canonicalEvaluationRoot;
+    for (const segment of path.split("/")) {
+      current = resolve(current, segment);
+      if (!existsSync(current) || lstatSync(current).isSymbolicLink()) throw new Error(`${label} must not traverse a symlink`);
+    }
+    if (!lstatSync(absolute).isFile() || !isInside(canonicalEvaluationRoot, realpathSync(absolute))) throw new Error(`${label} must be a sealed regular file`);
+    return realpathSync(absolute);
   };
-  const actualFragment = executeHiddenEvaluator();
-  const repeatedFragment = executeHiddenEvaluator();
-  if (stableCanonicalJson(actualFragment) !== stableCanonicalJson(repeatedFragment)) throw new Error("private hidden evaluator output is nondeterministic");
-  const firstBytes = Buffer.from(`${JSON.stringify(actualFragment, null, 2)}\n`);
-  const secondBytes = Buffer.from(`${JSON.stringify(repeatedFragment, null, 2)}\n`);
+  const sealedRunnerPath = resolveSealedFile(record.evaluator_runner_sealed_execution_path, "sealed evaluator runner");
+  const sealedHiddenPath = resolveSealedFile(record.hidden_evaluator_sealed_execution_path, "sealed hidden evaluator");
+  const resolveSealedWorkspace = (path, label) => {
+    assertPortableRelativePath(path, `${label} path`);
+    const absolute = resolve(canonicalEvaluationRoot, path);
+    if (!isInside(canonicalEvaluationRoot, absolute)) throw new Error(`${label} escapes the private evaluation root`);
+    let current = canonicalEvaluationRoot;
+    for (const segment of path.split("/")) {
+      current = resolve(current, segment);
+      if (!existsSync(current) || lstatSync(current).isSymbolicLink()) throw new Error(`${label} must not traverse a symlink`);
+    }
+    if (!lstatSync(absolute).isDirectory() || !isInside(canonicalEvaluationRoot, realpathSync(absolute))) throw new Error(`${label} must be a sealed real directory`);
+    return realpathSync(absolute);
+  };
+  const sealedFrozenWorkspace = resolveSealedWorkspace(record.frozen_workspace_sealed_execution_path, "sealed frozen workspace");
+  const sealedCandidateWorkspace = resolveSealedWorkspace(record.candidate_workspace_sealed_execution_path, "sealed candidate workspace");
+  const sealedEvaluationInputRoot = resolveSealedWorkspace(record.evaluation_input_evidence_sealed_execution_path, "sealed evaluation-input evidence root");
+  if (pathsOverlap(sealedFrozenWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(sealedCandidateWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(sealedEvaluationInputRoot, bundle.canonicalPrivateRoot)) throw new Error("sealed private evaluation workspaces overlap the static evaluator bundle");
+  const frozenInventory = readStableWorkspaceInventory(sealedFrozenWorkspace, "sealed frozen workspace");
+  const candidateInventory = readStableWorkspaceInventory(sealedCandidateWorkspace, "sealed candidate workspace");
+  const evidenceInventory = readStableWorkspaceInventory(sealedEvaluationInputRoot, "sealed evaluation-input evidence root");
+  if (record.frozen_workspace_inventory_digest !== frozenInventory.digest || record.candidate_workspace_inventory_digest !== candidateInventory.digest) throw new Error("private evaluation workspace inventory digest is inconsistent");
+  if (record.frozen_workspace_sealed_inventory_digest !== frozenInventory.digest || record.candidate_workspace_sealed_inventory_digest !== candidateInventory.digest || record.evaluation_input_evidence_sealed_inventory_digest !== evidenceInventory.digest || record.frozen_workspace_sealed_runtime_digest !== frozenInventory.runtimeDigest || record.candidate_workspace_sealed_runtime_digest !== candidateInventory.runtimeDigest || record.evaluation_input_evidence_sealed_runtime_digest !== evidenceInventory.runtimeDigest) throw new Error("sealed private evaluation workspace identity is inconsistent");
+  if (!evidence.repositoryDiffArtifact || evidence.repositoryDiffArtifact.frozen_workspace_tree_digest !== frozenInventory.digest || evidence.repositoryDiffArtifact.candidate_workspace_tree_digest !== candidateInventory.digest) throw new Error("repository diff workspace authority does not match the sealed workspace inventory");
+  const validatedFragment = validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy: scoringInputs.scoringPolicy, requirementRecord: scoringInputs.requirementRecord, normalizedResult: normalized });
+  const execution = {
+    runner: { path: sealedRunnerPath },
+    hidden: { path: sealedHiddenPath },
+    frozen: { path: sealedFrozenWorkspace },
+    candidate: { path: sealedCandidateWorkspace },
+    evidence: { path: sealedEvaluationInputRoot },
+  };
+  const executed = executeSealedEvaluator({ execution, repositoryRoot: root, normalized, label: "private hidden evaluator" });
+  const actualFragment = executed.firstFragment;
+  const repeatedFragment = executed.secondFragment;
+  const firstBytes = executed.firstBytes;
+  const secondBytes = executed.secondBytes;
+  if (Buffer.compare(firstBytes, fragmentRead.bytes) !== 0 || Buffer.compare(secondBytes, fragmentRead.bytes) !== 0) throw new Error("persisted private fragment bytes do not match the sealed hidden evaluator output");
+  const before = executed.before;
+  const after = executed.afterSecond;
+  if (record.evaluator_runner_sealed_sha256 !== before.runner.sha256 || record.evaluator_runner_sealed_bytes !== before.runner.bytes || record.evaluator_runner_sealed_sha256 !== after.runner.sha256 || record.evaluator_runner_sealed_bytes !== after.runner.bytes || record.hidden_evaluator_sealed_sha256 !== before.hidden.sha256 || record.hidden_evaluator_sealed_bytes !== before.hidden.bytes || record.hidden_evaluator_sealed_sha256 !== after.hidden.sha256 || record.hidden_evaluator_sealed_bytes !== after.hidden.bytes) throw new Error("sealed evaluator source digest or byte binding is inconsistent");
+  for (const [kind, state] of [["runner", before.runner], ["hidden", before.hidden]]) {
+    const prefix = kind === "runner" ? "evaluator_runner" : "hidden_evaluator";
+    if (record[`${prefix}_sealed_dev`] !== state.identity.dev || record[`${prefix}_sealed_inode`] !== state.identity.ino || record[`${prefix}_sealed_nlink`] !== state.identity.nlink || record[`${prefix}_sealed_mtime_ms`] !== state.identity.mtimeMs || record[`${prefix}_sealed_ctime_ms`] !== state.identity.ctimeMs || stableCanonicalJson(record[`${prefix}_sealed_execution_identity_before`]) !== stableCanonicalJson(state.identity) || stableCanonicalJson(record[`${prefix}_sealed_execution_identity_after`]) !== stableCanonicalJson(after[kind].identity)) throw new Error(`${prefix} sealed execution identity is inconsistent`);
+  }
+  for (const [kind, state] of [["frozen_workspace", before.frozen], ["candidate_workspace", before.candidate], ["evaluation_input_evidence", before.evidence]]) {
+    if (record[`${kind}_sealed_runtime_identity_before`] === undefined || stableCanonicalJson(record[`${kind}_sealed_runtime_identity_before`]) !== stableCanonicalJson(state) || stableCanonicalJson(record[`${kind}_sealed_runtime_identity_after`]) !== stableCanonicalJson(after[kind === "frozen_workspace" ? "frozen" : kind === "candidate_workspace" ? "candidate" : "evidence"])) throw new Error(`${kind} sealed runtime identity is inconsistent`);
+  }
   if (record.evaluator_execution_status !== "completed" || record.first_run_fragment_sha256 !== rawByteDigest(firstBytes) || record.first_run_fragment_bytes !== firstBytes.length || record.second_run_fragment_sha256 !== rawByteDigest(secondBytes) || record.second_run_fragment_bytes !== secondBytes.length || record.deterministic_rerun !== true) throw new Error("private evaluator execution determinism evidence is inconsistent");
   if (stableCanonicalJson(actualFragment) !== stableCanonicalJson(validatedFragment)) throw new Error("persisted private fragment was not produced by the hidden evaluator");
   const expected = adaptPrivateEvaluatorFragmentToEnvelope({

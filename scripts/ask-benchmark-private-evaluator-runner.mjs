@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { lstatSync } from "node:fs";
+import { relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 function value(name) {
@@ -7,8 +9,24 @@ function value(name) {
   return process.argv[index + 1];
 }
 
+function sealedRegularFile(path, label) {
+  const absolute = resolve(path);
+  let current = absolute;
+  const segments = relative(resolve("/"), absolute).split(sep).filter(Boolean);
+  current = resolve("/", segments[0] ?? "");
+  for (const segment of segments.slice(1)) {
+    current = resolve(current, segment);
+    const status = lstatSync(current);
+    if (status.isSymbolicLink()) throw new Error(`${label} must not traverse a symlink`);
+  }
+  const status = lstatSync(absolute);
+  if (status.isSymbolicLink() || !status.isFile()) throw new Error(`${label} must be a regular sealed file`);
+  return absolute;
+}
+
 try {
-  const evaluator = await import(pathToFileURL(value("--hidden-evaluator")).href);
+  const hiddenEvaluator = sealedRegularFile(value("--hidden-evaluator"), "hidden evaluator sealed copy");
+  const evaluator = await import(pathToFileURL(hiddenEvaluator).href);
   if (typeof evaluator.evaluateCandidateSafe !== "function") throw new Error("hidden evaluator does not export evaluateCandidateSafe");
   const fragment = await evaluator.evaluateCandidateSafe({
     repositoryRoot: value("--repository-root"),

@@ -29,6 +29,8 @@ import {
   computeEvaluatorBundleId,
   computeIndependenceStatementDigest,
   adaptPrivateEvaluatorFragmentToEnvelope,
+  createSealedEvaluatorExecution,
+  executeSealedEvaluator,
   validatePrivateEvaluatorFragment,
   validateEvaluatorSourceIdentity,
   verifyEvaluatorBoundary,
@@ -636,7 +638,7 @@ function persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scor
   return { snapshot, track, evaluatorResultPath, privateFragmentPath, chainManifest };
 }
 
-function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normalizedAuthority, bundleManifest, scoringAuthority, draftEvaluatorResult, privateFragmentBytes, privateFragmentDigest }) {
+function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normalizedAuthority, bundleManifest, scoringAuthority, draftEvaluatorResult, execution, executed, privateFragmentBytes, privateFragmentDigest }) {
   const artifactSpecs = [
     ["repository_diff", "repository-diff-artifact.json"],
     ["test_result", "evaluator-check-artifact.json"],
@@ -664,6 +666,21 @@ function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normali
   const repositoryArtifact = readJson(resolve(authorityRoot, "repository-diff-artifact.json"));
   const hiddenAsset = bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests");
   const hiddenPath = resolve(privateRoot, hiddenAsset.path);
+  const runnerIdentity = execution.runner;
+  const sealedRunner = executed.before.runner;
+  const sealedHidden = executed.before.hidden;
+  const sealedAfterRunner = executed.afterSecond.runner;
+  const sealedAfterHidden = executed.afterSecond.hidden;
+  const sealedWorkspace = {
+    frozen: executed.before.frozen,
+    candidate: executed.before.candidate,
+    evidence: executed.before.evidence,
+  };
+  const sealedWorkspaceAfter = {
+    frozen: executed.afterSecond.frozen,
+    candidate: executed.afterSecond.candidate,
+    evidence: executed.afterSecond.evidence,
+  };
   const record = {
     schema_version: "1.0.0",
     schema_path: "benchmarks/schemas/private-evaluation-record.schema.json",
@@ -683,15 +700,61 @@ function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normali
     hidden_evaluator_bytes: hiddenAsset.bytes,
     hidden_evaluator_entry_point: "evaluateCandidateSafe",
     hidden_evaluator_inode: lstatSync(hiddenPath).ino,
+    evaluator_runner_path: runnerIdentity.sourcePath,
+    evaluator_runner_sha256: runnerIdentity.sourceSha256,
+    evaluator_runner_bytes: runnerIdentity.sourceBytes,
+    evaluator_runner_source_identity: {
+      path: runnerIdentity.sourcePath,
+      base_git_revision: bundleManifest.evaluator_revision,
+      source_bytes: runnerIdentity.sourceBytes,
+      source_sha256: runnerIdentity.sourceSha256,
+      base_git_revision_bytes: runnerIdentity.baseGitRevisionBytes,
+      base_git_revision_sha256: runnerIdentity.baseGitRevisionSha256,
+    },
     dependency_graph_digest: bundleManifest.dependency_graph.graph_digest,
     frozen_workspace_path: "frozen-workspace",
     candidate_workspace_path: "candidate-workspace",
     evaluation_input_evidence_root_path: "authority-chain",
+    evaluator_runner_sealed_execution_path: runnerIdentity.relativePath,
+    evaluator_runner_sealed_sha256: sealedRunner.sha256,
+    evaluator_runner_sealed_bytes: sealedRunner.bytes,
+    evaluator_runner_sealed_dev: sealedRunner.identity.dev,
+    evaluator_runner_sealed_inode: sealedRunner.identity.ino,
+    evaluator_runner_sealed_nlink: sealedRunner.identity.nlink,
+    evaluator_runner_sealed_mtime_ms: sealedRunner.identity.mtimeMs,
+    evaluator_runner_sealed_ctime_ms: sealedRunner.identity.ctimeMs,
+    evaluator_runner_sealed_execution_identity_before: sealedRunner.identity,
+    evaluator_runner_sealed_execution_identity_after: sealedAfterRunner.identity,
+    hidden_evaluator_sealed_execution_path: execution.hidden.relativePath,
+    hidden_evaluator_sealed_sha256: sealedHidden.sha256,
+    hidden_evaluator_sealed_bytes: sealedHidden.bytes,
+    hidden_evaluator_sealed_dev: sealedHidden.identity.dev,
+    hidden_evaluator_sealed_inode: sealedHidden.identity.ino,
+    hidden_evaluator_sealed_nlink: sealedHidden.identity.nlink,
+    hidden_evaluator_sealed_mtime_ms: sealedHidden.identity.mtimeMs,
+    hidden_evaluator_sealed_ctime_ms: sealedHidden.identity.ctimeMs,
+    hidden_evaluator_sealed_execution_identity_before: sealedHidden.identity,
+    hidden_evaluator_sealed_execution_identity_after: sealedAfterHidden.identity,
+    frozen_workspace_sealed_execution_path: execution.frozen.relativePath,
+    candidate_workspace_sealed_execution_path: execution.candidate.relativePath,
+    evaluation_input_evidence_sealed_execution_path: execution.evidence.relativePath,
+    frozen_workspace_sealed_inventory_digest: sealedWorkspace.frozen.portable_digest,
+    candidate_workspace_sealed_inventory_digest: sealedWorkspace.candidate.portable_digest,
+    evaluation_input_evidence_sealed_inventory_digest: sealedWorkspace.evidence.portable_digest,
+    frozen_workspace_sealed_runtime_digest: sealedWorkspace.frozen.runtime_digest,
+    candidate_workspace_sealed_runtime_digest: sealedWorkspace.candidate.runtime_digest,
+    evaluation_input_evidence_sealed_runtime_digest: sealedWorkspace.evidence.runtime_digest,
+    frozen_workspace_sealed_runtime_identity_before: sealedWorkspace.frozen,
+    frozen_workspace_sealed_runtime_identity_after: sealedWorkspaceAfter.frozen,
+    candidate_workspace_sealed_runtime_identity_before: sealedWorkspace.candidate,
+    candidate_workspace_sealed_runtime_identity_after: sealedWorkspaceAfter.candidate,
+    evaluation_input_evidence_sealed_runtime_identity_before: sealedWorkspace.evidence,
+    evaluation_input_evidence_sealed_runtime_identity_after: sealedWorkspaceAfter.evidence,
     evaluator_execution_status: "completed",
-    first_run_fragment_sha256: privateFragmentDigest,
-    first_run_fragment_bytes: privateFragmentBytes,
-    second_run_fragment_sha256: privateFragmentDigest,
-    second_run_fragment_bytes: privateFragmentBytes,
+    first_run_fragment_sha256: sha256(executed.firstBytes),
+    first_run_fragment_bytes: executed.firstBytes.length,
+    second_run_fragment_sha256: sha256(executed.secondBytes),
+    second_run_fragment_bytes: executed.secondBytes.length,
     deterministic_rerun: true,
     frozen_workspace_inventory_digest: repositoryArtifact.frozen_workspace_tree_digest,
     candidate_workspace_inventory_digest: repositoryArtifact.candidate_workspace_tree_digest,
@@ -716,21 +779,30 @@ function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normali
 async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority, candidateMutator = null }) {
   const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
   const hiddenAsset = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
-  const evaluator = await import(pathToFileURL(resolve(privateRoot, hiddenAsset.path)).href);
   const frozenWorkspace = resolve(authorityRoot, "frozen-workspace");
   const candidateWorkspace = resolve(authorityRoot, "candidate-workspace");
+  const evaluationInputRoot = resolve(authorityRoot, "authority-chain");
+  mkdirSync(evaluationInputRoot, { recursive: true });
+  writeJson(resolve(evaluationInputRoot, "evaluation-input-seed.json"), { authority: "sealed-evaluator-bootstrap" });
   cpSync(resolve(fixtureRoot, "workspace"), frozenWorkspace, { recursive: true });
   cpSync(resolve(fixtureRoot, "workspace"), candidateWorkspace, { recursive: true });
   if (candidateMutator) candidateMutator(candidateWorkspace);
-  const fragment = await evaluator.evaluateCandidateSafe({
-    repositoryRoot: root,
+  const execution = createSealedEvaluatorExecution({
+    root,
+    privateEvaluationRoot: authorityRoot,
+    privateRoot,
+    hiddenAsset,
     frozenWorkspace,
     candidateWorkspace,
-    normalizedResult: normalizedAuthority.normalized,
-    evaluationInputEvidenceRoot: authorityRoot,
+    evaluationInputRoot,
+    evaluatorRevision: manifest.evaluator_revision,
+    executionDirectoryName: "sealed-execution-bootstrap",
+    label: "private evaluator bootstrap",
   });
+  const executed = executeSealedEvaluator({ execution, repositoryRoot: root, normalized: normalizedAuthority.normalized, label: "private evaluator bootstrap" });
+  const fragment = executed.firstFragment;
   assert.equal(fragment.program, "adaptive_ask_private_evaluator_fragment", "full authority must persist the actual private fragment");
-  return { fragment, frozenWorkspace, candidateWorkspace };
+  return { fragment, frozenWorkspace, candidateWorkspace, evaluationInputRoot, execution, executed };
 }
 
 async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candidateMutator = null } = {}) {
@@ -738,7 +810,8 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot, state });
   const scoringAuthority = persistentScoringAuthorities(authorityRoot);
   const bundleManifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
-  const actual = await actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority, candidateMutator });
+  const bootstrap = await actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority, candidateMutator });
+  const actual = bootstrap;
   const adapterAuthority = {
     ...scoringAuthority,
     evaluatorReference: scoringAuthority.reference,
@@ -770,8 +843,25 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   const draftEvaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: actual.fragment, authority: adapterAuthority });
   assert.equal(Object.hasOwn(draftEvaluatorResult, "evaluator_rerun"), false, "private-only rerun metadata must not leak into the public envelope");
   const chain = persistAuthorityChain({ authorityRoot, state, normalizedAuthority, scoringAuthority, evaluatorResult: draftEvaluatorResult, privateFragment: actual.fragment });
-  const privateRecord = privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normalizedAuthority, bundleManifest, scoringAuthority, draftEvaluatorResult, privateFragmentBytes: adapterAuthority.privateFragmentBytes, privateFragmentDigest: adapterAuthority.privateFragmentDigest });
-  const evaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: actual.fragment, authority: { ...adapterAuthority, privateEvaluationRecordDigest: privateRecord.record.evaluation_record_digest } });
+  const finalExecution = createSealedEvaluatorExecution({
+    root,
+    privateEvaluationRoot: authorityRoot,
+    privateRoot,
+    hiddenAsset: bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests"),
+    frozenWorkspace: bootstrap.frozenWorkspace,
+    candidateWorkspace: bootstrap.candidateWorkspace,
+    evaluationInputRoot: bootstrap.evaluationInputRoot,
+    evaluatorRevision: bundleManifest.evaluator_revision,
+    label: "private evaluator final",
+  });
+  const finalExecuted = executeSealedEvaluator({ execution: finalExecution, repositoryRoot: root, normalized: normalizedAuthority.normalized, label: "private evaluator final" });
+  assert.equal(JSON.stringify(finalExecuted.firstFragment), JSON.stringify(actual.fragment), "sealed final execution must reproduce the bootstrap fragment");
+  writeJson(chain.privateFragmentPath, finalExecuted.firstFragment);
+  const finalFragmentBytes = Buffer.from(`${JSON.stringify(finalExecuted.firstFragment, null, 2)}\n`);
+  const finalAdapterAuthority = { ...adapterAuthority, privateFragmentDigest: sha256(finalFragmentBytes), privateFragmentBytes: finalFragmentBytes.length };
+  const finalDraftEvaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: finalExecuted.firstFragment, authority: finalAdapterAuthority });
+  const privateRecord = privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normalizedAuthority, bundleManifest, scoringAuthority, draftEvaluatorResult: finalDraftEvaluatorResult, execution: finalExecution, executed: finalExecuted, privateFragmentBytes: finalAdapterAuthority.privateFragmentBytes, privateFragmentDigest: finalAdapterAuthority.privateFragmentDigest });
+  const evaluatorResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: finalExecuted.firstFragment, authority: { ...finalAdapterAuthority, privateEvaluationRecordDigest: privateRecord.record.evaluation_record_digest } });
   writeJson(chain.evaluatorResultPath, evaluatorResult);
   const common = {
     root,

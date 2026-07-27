@@ -10,13 +10,15 @@ function statusEvidence(status) {
     dev: status.dev,
     ino: status.ino,
     size: status.size,
+    mode: status.mode,
+    nlink: status.nlink,
     mtimeMs: status.mtimeMs,
     ctimeMs: status.ctimeMs,
   };
 }
 
 function sameStatus(left, right) {
-  return ["dev", "ino", "size", "mtimeMs", "ctimeMs"].every((field) => left[field] === right[field]);
+  return ["dev", "ino", "size", "mode", "nlink", "mtimeMs", "ctimeMs"].every((field) => left[field] === right[field]);
 }
 
 export function assertStableRegularFile(path, label) {
