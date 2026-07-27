@@ -2,22 +2,22 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-dfe5ba9ab586949c36186bef83458d1aefe52cb3c8eb0dc689d8a55f782a77c7",
-  "evaluator_bundle_digest": "sha256:8d9da1b391b0533bcd029a54e15ca05214d8b0e650236f3474b94982f0f61f06",
+  "evaluator_bundle_id": "evaluator-da91903460fc5e9978bd8b3475acc4a7fdc91f562ce1faf4d1f325241e71507d",
+  "evaluator_bundle_digest": "sha256:4755acc4aef9e96656dfba740ac7206c7d915cf47aa41a98866319bc8f3d2295",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mn-build-option-update",
   "fixture_input_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
   "task_class": "configuration",
   "suite": "mechanism_negative",
-  "evaluator_revision": "447c56743b0cd9f7837688fd503d9821b9deafe5",
+  "evaluator_revision": "a823e4fac480ef8f2ac251845ba31e94ad4abf3b",
   "generator_identity": "sha256:b317f60b18f1ac7eb0c639a6cba173ec1cedac4ad6e6990611b03be172c5cbd1",
-  "independence_statement_digest": "sha256:cd69f4e6abb022a7405f5e4db64d57447d998da9e6f076bbdb2a8bc9d0fe3238",
+  "independence_statement_digest": "sha256:b606a6ca9351cd0514c3a0d7a3e740bc4f0cb0638e3932f5a6db556d410cf0dc",
   "review_record_digest": "sha256:2c68bfa2808be77476fd03ba5ad71f5bf0a0c09e0011f9d07711e257a2457cfb",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:300727c1729927a4299c9e31c04140745fd8850a4c100619cbadfc6dec8ad643",
+  "public_metadata_digest": "sha256:bec85c352fad09af6bdb504ae45c958aebe369c6e30155398e1ec652884b401c",
   "evaluator_source_identity": {
-    "base_git_revision": "447c56743b0cd9f7837688fd503d9821b9deafe5",
-    "source_tree_digest": "sha256:97eb349409bbc5b956c62cbf04017fdefe2e45d3f87e8d9f07123b973fd552bc",
+    "base_git_revision": "a823e4fac480ef8f2ac251845ba31e94ad4abf3b",
+    "source_tree_digest": "sha256:3754f95a23fb32f249aeab6cf5dfbb86e54df95f0dc26ff0a497ffb1509cbe3a",
     "generator_source_digest": "sha256:39bab4ae26d26e95d0106f7a6e12f41b86aff2b93db84540d1f6892cc1f0f484",
     "source_files": [
       {
@@ -57,8 +57,8 @@
       },
       {
         "path": "benchmarks/schemas/private-evaluation-record.schema.json",
-        "bytes": 4175,
-        "sha256": "sha256:b65e66d87a0e2879a2408bbc7eca80b8c3e0236400dcff63dd05f50cc9b3d11b"
+        "bytes": 5018,
+        "sha256": "sha256:9abbc14c7c572787e71a3c7ff413e1bb37b8fc4e02ae186a0cf5897869ef0d1d"
       },
       {
         "path": "benchmarks/schemas/private-evaluator-bundle.schema.json",
@@ -102,8 +102,8 @@
       },
       {
         "path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-        "bytes": 92535,
-        "sha256": "sha256:43bd44c894dfa5539c11b73aaa4a1206ba45a523bd7b9702900f10e982e26342"
+        "bytes": 96299,
+        "sha256": "sha256:82254b195c8c3757422fd6fdfbbf46bd42f5aba7316dddc166162e65da9a4f7f"
       },
       {
         "path": "scripts/ask-benchmark-execution.mjs",
@@ -252,11 +252,11 @@
         },
         {
           "path": "benchmarks/schemas/private-evaluation-record.schema.json",
-          "bytes": 4175,
-          "sha256": "sha256:b65e66d87a0e2879a2408bbc7eca80b8c3e0236400dcff63dd05f50cc9b3d11b",
+          "bytes": 5018,
+          "sha256": "sha256:9abbc14c7c572787e71a3c7ff413e1bb37b8fc4e02ae186a0cf5897869ef0d1d",
           "file_type": "authority_data",
-          "base_git_revision_bytes": 4175,
-          "base_git_revision_sha256": "sha256:b65e66d87a0e2879a2408bbc7eca80b8c3e0236400dcff63dd05f50cc9b3d11b"
+          "base_git_revision_bytes": 5018,
+          "base_git_revision_sha256": "sha256:9abbc14c7c572787e71a3c7ff413e1bb37b8fc4e02ae186a0cf5897869ef0d1d"
         },
         {
           "path": "benchmarks/schemas/private-evaluator-bundle.schema.json",
@@ -324,11 +324,11 @@
         },
         {
           "path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-          "bytes": 92535,
-          "sha256": "sha256:43bd44c894dfa5539c11b73aaa4a1206ba45a523bd7b9702900f10e982e26342",
+          "bytes": 96299,
+          "sha256": "sha256:82254b195c8c3757422fd6fdfbbf46bd42f5aba7316dddc166162e65da9a4f7f",
           "file_type": "module",
-          "base_git_revision_bytes": 92535,
-          "base_git_revision_sha256": "sha256:43bd44c894dfa5539c11b73aaa4a1206ba45a523bd7b9702900f10e982e26342"
+          "base_git_revision_bytes": 96299,
+          "base_git_revision_sha256": "sha256:82254b195c8c3757422fd6fdfbbf46bd42f5aba7316dddc166162e65da9a4f7f"
         },
         {
           "path": "scripts/ask-benchmark-execution.mjs",
@@ -1049,7 +1049,7 @@
           "edge_digest": "sha256:fe5afccacce85f1af999e1d2a5a4b9235274603aa8c27fffde8b16ca4ec9df74"
         }
       ],
-      "graph_digest": "sha256:288e92f0a005ecdf5f033423e3f27f660d9f1b33f72c5488df3d97f9e5fde649"
+      "graph_digest": "sha256:ad4946fbf449bc81ffc2ee6048bd8e8b81fe5a9074564ad2a52d4972dd3b95fa"
     }
   }
 }
