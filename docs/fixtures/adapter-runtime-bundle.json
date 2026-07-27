@@ -684,7 +684,7 @@
       "validator_path": "scripts/ask-benchmark-mn-build-option-update.mjs",
       "validator_file_sha256": "1552aeb8d980a6e58556f2a30f6fef7c25b5a438fbe9ee968eb6372a31a0104c",
       "focused_test_path": "scripts/test-ask-benchmark-mn-build-option-update.mjs",
-      "focused_test_file_sha256": "a60c8b7deda348b23db2b28bb95e764b82f1a9f030d1c31e0dec61a613ee63d8"
+      "focused_test_file_sha256": "e8e41832103770b071ad2ae51ab44b92c285671f218b18576a2c447a8528f8db"
     }
   }
 }
