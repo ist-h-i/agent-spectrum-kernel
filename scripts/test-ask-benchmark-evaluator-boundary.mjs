@@ -785,12 +785,17 @@ function closeResult(result) {
 }
 
 try {
+  const currentRevision = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
+  assert.equal(currentRevision.status, 0, currentRevision.stderr || currentRevision.stdout);
+  const currentDependencyGraph = deriveEvaluatorDependencyGraph({ root, baseRevision: currentRevision.stdout.trim() });
+  assert.ok(currentDependencyGraph.edge_inventory.some(({ from, to }) => from === "scripts/ask-benchmark-execution.mjs" && to === "scripts/ask-benchmark-command-evidence.mjs"), "current evaluator graph must include execution command-evidence authority");
+  assert.ok(currentDependencyGraph.edge_inventory.some(({ from, to }) => from === "scripts/ask-benchmark-evaluator-boundary.mjs" && to === "scripts/ask-benchmark-scoring-contract.mjs"), "current evaluator graph must include evaluator scoring-contract authority");
   const dependencyFixture = writeDependencyGraphFixture("template-interpolation", [
     'const ignored = `quasi import("./ignored.mjs")`; ',
     'const evidence = `${import("./command-evidence.mjs")}`;',
     'const nested = `${`nested ${import("./nested.mjs")}`}`;',
     'export { value } from "./scoring-contract.mjs";',
-    'import value from "./static.mjs" with { type: "json" };',
+    'import {\n  value,\n} from "./static.mjs" with { type: "json" }',
     'await import("./options.mjs", { with: { type: "json" } });',
   ].join("\n"));
   const dependencyGraph = deriveEvaluatorDependencyGraph({
@@ -799,12 +804,12 @@ try {
     entryPaths: ["entry.mjs"],
     authorityPaths: [],
   });
-  assert.deepEqual(dependencyGraph.edge_inventory.map(({ from, to, kind, specifier }) => ({ from, to, kind, specifier })), [
-    { from: "entry.mjs", to: "static.mjs", kind: "static_import", specifier: "./static.mjs" },
+  assert.deepEqual(dependencyGraph.edge_inventory.map(({ from, to, kind, specifier }) => ({ from, to, kind, specifier })).sort((left, right) => left.to.localeCompare(right.to)), [
     { from: "entry.mjs", to: "command-evidence.mjs", kind: "dynamic_import", specifier: "./command-evidence.mjs" },
     { from: "entry.mjs", to: "nested.mjs", kind: "dynamic_import", specifier: "./nested.mjs" },
     { from: "entry.mjs", to: "options.mjs", kind: "dynamic_import", specifier: "./options.mjs" },
     { from: "entry.mjs", to: "scoring-contract.mjs", kind: "export_from", specifier: "./scoring-contract.mjs" },
+    { from: "entry.mjs", to: "static.mjs", kind: "static_import", specifier: "./static.mjs" },
   ], "dependency graph must include only real template interpolation imports and preserve exact local edges");
   assert.ok(dependencyGraph.edge_inventory.every((edge) => /^sha256:[a-f0-9]{64}$/u.test(edge.edge_digest)), "dependency graph edges must each have a canonical digest");
   const commandEvidenceEdge = dependencyGraph.edge_inventory.find((edge) => edge.to === "command-evidence.mjs");
