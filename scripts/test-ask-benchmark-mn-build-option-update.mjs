@@ -27,12 +27,16 @@ import {
   computeAdapterResultEnvelopeDigest,
   computeEvaluatorBundleDigest,
   computeEvaluatorBundleId,
+  computeEvaluatorReferenceDigest,
   computeIndependenceStatementDigest,
+  deriveEvaluatorAuthorityManifest,
   adaptPrivateEvaluatorFragmentToEnvelope,
   assertSealedSnapshotModes,
   createSealedEvaluatorExecution,
+  EVALUATOR_AUTHORITY_MANIFEST_PATH,
   EVALUATOR_REPOSITORY_DESCRIPTOR_PATH,
   executeSealedEvaluator,
+  readEvaluatorAuthorityAnchorFromFreeze,
   readStableWorkspaceInventory,
   SEALED_DIRECTORY_MODE,
   SEALED_REGULAR_FILE_MODE,
@@ -67,6 +71,12 @@ import {
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
 const REQUIRED_COMMAND_IDS_FOR_TEST = ["build-config-focused-test", "build-config-semantic-validator"];
+const EVALUATOR_AUTHORITY_FILE_PATHS = [
+  "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json",
+  "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evidence-map.json",
+  "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/verification-command-contract.json",
+  "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/requirement-record.json",
+];
 const NORMALIZED_TELEMETRY_FIELDS = [
   "duration_ms", "exit_code", "final_output_bytes", "stdout_bytes", "stdout_digest", "stderr_bytes", "stderr_digest",
   "json_event_line_count", "harness_spawned_secondary_agent_count", "runtime_agent_count", "failure_kind",
@@ -91,6 +101,19 @@ function sha256(bytes) {
 
 function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function currentExternalAuthorityAnchor({
+  freezeManifestPath = resolve(fixtureRoot, "scoring-input-freeze-manifest.json"),
+  referencePath = resolve(fixtureRoot, "evaluator-reference.json"),
+  freezeManifestSourceDigest = sha256(readFileSync(freezeManifestPath)),
+} = {}) {
+  return readEvaluatorAuthorityAnchorFromFreeze({ root, freezeManifestPath, freezeManifestSourceDigest, referencePath, label: "R16 test external freeze authority" });
+}
+
+function copyCurrentFixtureAuthority(destinationRoot) {
+  const destinationFixtureRoot = resolve(destinationRoot, FIXTURE_ROOT_RELATIVE);
+  for (const name of ["evaluator-authority-manifest.json", ...EVALUATOR_AUTHORITY_FILE_PATHS.map((path) => path.split("/").at(-1))]) cpSync(resolve(fixtureRoot, name), resolve(destinationFixtureRoot, name));
 }
 
 function makeTreeRemovable(path) {
@@ -174,6 +197,7 @@ function createDirectSealedRepository({ sourceRoot, privateRoot, manifest, hidde
     candidateWorkspace,
     evaluationInputRoot: frozenWorkspace,
     evaluatorRevision: manifest.evaluator_revision,
+    externalAuthorityAnchor: currentExternalAuthorityAnchor(),
     executionDirectoryName: "execution",
     label,
   });
@@ -594,9 +618,16 @@ function persistentScoringAuthorities(authorityRoot) {
   freezeManifest.evaluator_public_reference = { path: authorityRelativePath(paths.referencePath), raw_byte_digest: authorityFileDigest(paths.referencePath), semantic_digest: reference.public_metadata_digest };
   freezeManifest.manifest_digest = computeScoringInputFreezeManifestDigest(freezeManifest);
   writeJson(paths.freezeManifestPath, freezeManifest);
+  const freezeManifestSourceDigest = authorityFileDigest(paths.freezeManifestPath);
+  const evaluatorAuthorityAnchor = currentExternalAuthorityAnchor({
+    freezeManifestPath: paths.freezeManifestPath,
+    referencePath: paths.referencePath,
+    freezeManifestSourceDigest,
+  });
   return {
     ...paths,
-    freezeManifestSourceDigest: authorityFileDigest(paths.freezeManifestPath),
+    freezeManifestSourceDigest,
+    evaluatorAuthorityAnchor,
     admissionRecord,
     requirementRecord,
     outputContract,
@@ -907,6 +938,9 @@ function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normali
     sealed_repository_descriptor_bytes: execution.repository.descriptorBytes,
     sealed_repository_source_graph_digest: execution.repository.sourceGraphDigest,
     sealed_repository_fixture_authority_digest: execution.repository.fixtureAuthorityDigest,
+    sealed_repository_evaluator_authority_manifest_path: execution.repository.evaluatorAuthorityManifestPath,
+    sealed_repository_evaluator_authority_manifest_raw_sha256: execution.repository.evaluatorAuthorityManifestRawSha256,
+    sealed_repository_evaluator_authority_manifest_digest: execution.repository.evaluatorAuthorityManifestDigest,
     sealed_repository_portable_digest: sealedRepository.portable_digest,
     sealed_repository_runtime_digest: sealedRepository.runtime_digest,
     sealed_repository_root_identity_before: sealedRepository.root,
@@ -978,7 +1012,7 @@ function privateEvaluationRecordFor({ authorityRoot, privateRoot, chain, normali
   return { record, recordPath };
 }
 
-async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority, candidateMutator = null }) {
+async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority, externalAuthorityAnchor, candidateMutator = null }) {
   const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
   const hiddenAsset = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
   const frozenWorkspace = resolve(authorityRoot, "frozen-workspace");
@@ -998,10 +1032,11 @@ async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAut
     candidateWorkspace,
     evaluationInputRoot,
     evaluatorRevision: manifest.evaluator_revision,
+    externalAuthorityAnchor,
     executionDirectoryName: "sealed-execution-bootstrap",
     label: "private evaluator bootstrap",
   });
-  const executed = executeSealedEvaluator({ execution, repositoryRoot: root, normalized: normalizedAuthority.normalized, label: "private evaluator bootstrap" });
+  const executed = executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized: normalizedAuthority.normalized, label: "private evaluator bootstrap" });
   const fragment = executed.firstFragment;
   assert.equal(fragment.program, "adaptive_ask_private_evaluator_fragment", "full authority must persist the actual private fragment");
   return { fragment, frozenWorkspace, candidateWorkspace, evaluationInputRoot, execution, executed };
@@ -1012,7 +1047,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot, state });
   const scoringAuthority = persistentScoringAuthorities(authorityRoot);
   const bundleManifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
-  const bootstrap = await actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority, candidateMutator });
+  const bootstrap = await actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority, externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor, candidateMutator });
   const actual = bootstrap;
   const adapterAuthority = {
     ...scoringAuthority,
@@ -1055,9 +1090,10 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     candidateWorkspace: bootstrap.candidateWorkspace,
     evaluationInputRoot: bootstrap.evaluationInputRoot,
     evaluatorRevision: bundleManifest.evaluator_revision,
+    externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor,
     label: "private evaluator final",
   });
-  const finalExecuted = executeSealedEvaluator({ execution: finalExecution, repositoryRoot: root, normalized: normalizedAuthority.normalized, label: "private evaluator final" });
+  const finalExecuted = executeSealedEvaluator({ execution: finalExecution, externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor, repositoryRoot: root, normalized: normalizedAuthority.normalized, label: "private evaluator final" });
   assert.equal(JSON.stringify(finalExecuted.firstFragment), JSON.stringify(actual.fragment), "sealed final execution must reproduce the bootstrap fragment");
   writeJson(chain.privateFragmentPath, finalExecuted.firstFragment);
   const finalFragmentBytes = Buffer.from(`${JSON.stringify(finalExecuted.firstFragment, null, 2)}\n`);
@@ -1223,6 +1259,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       candidateWorkspace: bootstrap.candidateWorkspace,
       evaluationInputRoot: bootstrap.evaluationInputRoot,
       evaluatorRevision: bundleManifest.evaluator_revision,
+      externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor,
       executionDirectoryName: "sealed-repository-race",
       label: "private evaluator repository race",
     });
@@ -1231,6 +1268,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     const liveRepositorySourceBytes = readFileSync(liveRepositorySourcePath);
     const repositoryRace = executeSealedEvaluator({
       execution: repositoryRaceExecution,
+      externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor,
       repositoryRoot: root,
       normalized: normalizedAuthority.normalized,
       beforeRun: () => {
@@ -1246,6 +1284,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     assert.deepEqual(repositoryRace.firstFragment, finalExecuted.firstFragment, "live repository mutation must not change sealed evaluation");
     assert.throws(() => executeSealedEvaluator({
       execution: repositoryRaceExecution,
+      externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor,
       repositoryRoot: root,
       normalized: normalizedAuthority.normalized,
       afterRun: ({ index }) => { if (index === 1) overwriteSealedFile(resolve(repositoryRaceExecution.repository.path, "scripts/ask-benchmark-scoring-contract.mjs"), Buffer.concat([sealedRepositoryModuleBytes, Buffer.from("\n// between-run sealed mutation\n")])); },
@@ -1261,11 +1300,13 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       candidateWorkspace: bootstrap.candidateWorkspace,
       evaluationInputRoot: bootstrap.evaluationInputRoot,
       evaluatorRevision: bundleManifest.evaluator_revision,
+      externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor,
       executionDirectoryName: "sealed-child-race",
       label: "private evaluator child race",
     });
     assert.throws(() => executeSealedEvaluator({
       execution: childRaceExecution,
+      externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor,
       repositoryRoot: root,
       normalized: normalizedAuthority.normalized,
       beforeRun: () => addSealedFile(resolve(childRaceExecution.candidate.path, "r12-child-race.txt"), "child mutation\n"),
@@ -1293,6 +1334,37 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       writeFileSync(evaluatorCheckPath, originalEvaluatorCheckBytes);
       assert.deepEqual(chain.snapshot(), before, `private authority tamper must restore ${label}`);
     };
+    const expectZeroChildFailure = (label, options, pattern) => {
+      let childExecutions = 0;
+      assert.throws(() => verifyEvaluatorBoundary({
+        ...options,
+        sealedEvaluatorChildExecutor() { childExecutions += 1; throw new Error("hidden evaluator child must not run"); },
+      }), pattern, `${label} must fail before hidden evaluator execution`);
+      assert.equal(childExecutions, 0, `${label} must invoke the hidden evaluator child zero times`);
+    };
+    const recordAuthorityDrift = JSON.parse(originalRecordBytes.toString("utf8"));
+    recordAuthorityDrift.sealed_repository_evaluator_authority_manifest_path = "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/drifted-authority-manifest.json";
+    recordAuthorityDrift.sealed_repository_evaluator_authority_manifest_raw_sha256 = `sha256:${"3".repeat(64)}`;
+    recordAuthorityDrift.sealed_repository_evaluator_authority_manifest_digest = `sha256:${"4".repeat(64)}`;
+    recordAuthorityDrift.evaluation_record_digest = computePrivateEvaluationRecordDigest(recordAuthorityDrift);
+    writeJson(privateRecord.recordPath, recordAuthorityDrift);
+    expectZeroChildFailure("private record-only authority reseal", common, /private evaluation record evaluator authority manifest closure.*external freeze authority/u);
+    writeFileSync(privateRecord.recordPath, originalRecordBytes);
+    const originalReferenceBytes = readFileSync(scoringAuthority.referencePath);
+    const replacedReference = JSON.parse(originalReferenceBytes.toString("utf8"));
+    replacedReference.evaluator_authority_manifest_raw_sha256 = `sha256:${"5".repeat(64)}`;
+    replacedReference.public_metadata_digest = computeEvaluatorReferenceDigest(replacedReference);
+    writeJson(scoringAuthority.referencePath, replacedReference);
+    expectZeroChildFailure("public reference-only replacement", common, /raw-byte digest.*freeze manifest|public reference.*closure/u);
+    writeFileSync(scoringAuthority.referencePath, originalReferenceBytes);
+    const originalFreezeBytes = readFileSync(scoringAuthority.freezeManifestPath);
+    const staleFreeze = JSON.parse(originalFreezeBytes.toString("utf8"));
+    staleFreeze.evaluator_authority_manifest.raw_byte_digest = `sha256:${"6".repeat(64)}`;
+    staleFreeze.manifest_digest = computeScoringInputFreezeManifestDigest(staleFreeze);
+    writeJson(scoringAuthority.freezeManifestPath, staleFreeze);
+    expectZeroChildFailure("stale scoring freeze manifest", { ...common, scoringInputFreezeManifestSourceDigest: authorityFileDigest(scoringAuthority.freezeManifestPath) }, /evaluator authority manifest raw-byte digest.*freeze manifest|raw-byte digest does not match/u);
+    writeFileSync(scoringAuthority.freezeManifestPath, originalFreezeBytes);
+    assert.deepEqual(chain.snapshot(), before, "external authority closure negatives must restore the persistent authority chain");
     expectPrivateFailure("runner source identity missing", ({ record }) => { delete record.evaluator_runner_source_identity; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /Schema|runner source identity|record/u);
     expectPrivateFailure("record digest", ({ record }) => { record.adapter_source_digest = `sha256:${"0".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /adapter source digest|record digest|source/u);
     expectPrivateFailure("record fragment path escape", ({ record }) => { record.private_fragment_path = "../escape.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /path|escape|Schema|authority/u);
@@ -1571,6 +1643,68 @@ function runSealedCrossBindingChecks(execution) {
   });
 }
 
+function resealedFixtureAuthorityExecution(execution, changedPaths) {
+  const originalAuthority = execution.verifiedAuthority;
+  const originalRepository = originalAuthority.roots.repository;
+  const buffers = new Map([...originalRepository.buffers].map(([path, bytes]) => [path, Buffer.from(bytes)]));
+  for (const changedPath of changedPaths) buffers.set(changedPath, Buffer.concat([buffers.get(changedPath), Buffer.from("\n")]));
+  const manifest = deriveEvaluatorAuthorityManifest({ buffers, evaluatorRevision: execution.evaluatorRevision });
+  const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
+  buffers.set(EVALUATOR_AUTHORITY_MANIFEST_PATH, manifestBytes);
+  const descriptor = JSON.parse(buffers.get(EVALUATOR_REPOSITORY_DESCRIPTOR_PATH).toString("utf8"));
+  const updateIdentity = (entry, bytes) => {
+    entry.bytes = bytes.length;
+    entry.sha256 = sha256(bytes);
+  };
+  for (const changedPath of [...new Set([...changedPaths, EVALUATOR_AUTHORITY_MANIFEST_PATH])]) {
+    const bytes = buffers.get(changedPath);
+    updateIdentity(descriptor.inventory.find(({ path }) => path === changedPath), bytes);
+    updateIdentity(descriptor.fixture_authority.find(({ path }) => path === changedPath), bytes);
+  }
+  descriptor.evaluator_authority_manifest_raw_sha256 = sha256(manifestBytes);
+  descriptor.evaluator_authority_manifest_digest = manifest.manifest_digest;
+  closeRepositoryDescriptor(descriptor, buffers);
+  const changedExecution = { ...execution };
+  Object.defineProperty(changedExecution, "verifiedAuthority", {
+    enumerable: false,
+    value: {
+      ...originalAuthority,
+      sourceGraph: structuredClone(descriptor.source_graph),
+      roots: { ...originalAuthority.roots, repository: { ...originalRepository, buffers } },
+    },
+  });
+  return changedExecution;
+}
+
+function runExternalFreezeAnchorNegativeChecks({ execution, externalAuthorityAnchor, normalized, normalizedBytes }) {
+  const expectNoChild = (label, candidateExecution, candidateAnchor, pattern = /external|freeze authority|anchor|manifest|fixture/u) => {
+    let childExecutions = 0;
+    assert.throws(() => executeSealedEvaluator({
+      execution: candidateExecution,
+      externalAuthorityAnchor: candidateAnchor,
+      repositoryRoot: root,
+      normalized,
+      normalizedBytes,
+      childExecutor() { childExecutions += 1; throw new Error("child executor must not run"); },
+      label: `R16 external freeze negative ${label}`,
+    }), pattern, `${label} must fail before hidden evaluator execution`);
+    assert.equal(childExecutions, 0, `${label} must invoke the hidden evaluator child zero times`);
+  };
+  expectNoChild("missing anchor", execution, null, /external evaluator authority anchor is required/u);
+  for (const changedPath of EVALUATOR_AUTHORITY_FILE_PATHS) {
+    expectNoChild(`single-file reseal ${changedPath}`, resealedFixtureAuthorityExecution(execution, [changedPath]), externalAuthorityAnchor);
+  }
+  expectNoChild("five-file authority transplant", resealedFixtureAuthorityExecution(execution, EVALUATOR_AUTHORITY_FILE_PATHS), externalAuthorityAnchor);
+  const mutateAnchor = (mutate) => { const changed = structuredClone(externalAuthorityAnchor); mutate(changed); return changed; };
+  expectNoChild("manifest path drift", execution, mutateAnchor((anchor) => { anchor.evaluator_authority_manifest_path = "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/drifted-authority-manifest.json"; }));
+  expectNoChild("manifest raw-byte digest drift", execution, mutateAnchor((anchor) => { anchor.evaluator_authority_manifest_raw_sha256 = `sha256:${"0".repeat(64)}`; }));
+  expectNoChild("manifest semantic digest drift", execution, mutateAnchor((anchor) => { anchor.evaluator_authority_manifest_digest = `sha256:${"1".repeat(64)}`; }));
+  expectNoChild("evaluator revision drift", execution, mutateAnchor((anchor) => { anchor.evaluator_revision = "0".repeat(40); }));
+  expectNoChild("manifest inventory omission", execution, mutateAnchor((anchor) => { anchor.file_inventory.pop(); }));
+  expectNoChild("manifest inventory addition", execution, mutateAnchor((anchor) => { anchor.file_inventory.push({ path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/added.json", bytes: 1, raw_sha256: `sha256:${"2".repeat(64)}` }); }));
+  expectNoChild("manifest inventory duplicate", execution, mutateAnchor((anchor) => { anchor.file_inventory[1] = structuredClone(anchor.file_inventory[0]); }));
+}
+
 function barrierPrefix({ directory, run_index, stage, authority_kind, path }) {
   return resolve(directory, `${run_index}-${stage}-${authority_kind}-${sha256(Buffer.from(path)).slice(7, 19)}`);
 }
@@ -1602,13 +1736,14 @@ function spawnBarrierMutator({ barrier, target, operation = "replace", replaceme
   return { prefix, completed };
 }
 
-async function runBarrierRace({ execution, normalized, baseline, label, stage, authorityKind, relativePath, target, operation = "replace", replacement }) {
+async function runBarrierRace({ execution, externalAuthorityAnchor, normalized, baseline, label, stage, authorityKind, relativePath, target, operation = "replace", replacement }) {
   const directory = mkdtempSync(resolve(tmpdir(), "ask-mn-authority-barrier-"));
   const barrier = { directory, run_index: 1, stage, authority_kind: authorityKind, path: relativePath };
   const mutator = spawnBarrierMutator({ barrier, target, operation, replacement });
   try {
     const executed = executeSealedEvaluator({
       execution,
+      externalAuthorityAnchor,
       repositoryRoot: root,
       normalized,
       normalizedBytes: Buffer.from(`${JSON.stringify(normalized, null, 2)}\n`),
@@ -1636,15 +1771,28 @@ async function runBarrierRace({ execution, normalized, baseline, label, stage, a
 async function runSealedAuthorityAndRaceChecks(privateRoot) {
   const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
   const hiddenAsset = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
-  const authorityRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-sealed-r15-"));
+  const externalAuthorityAnchor = currentExternalAuthorityAnchor();
+  const authorityRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-sealed-r16-"));
   const frozenWorkspace = resolve(authorityRoot, "frozen");
   const candidateWorkspace = resolve(authorityRoot, "candidate");
   const evidenceRoot = resolve(authorityRoot, "evidence");
   cpSync(resolve(fixtureRoot, "workspace"), frozenWorkspace, { recursive: true });
   cpSync(resolve(fixtureRoot, "workspace"), candidateWorkspace, { recursive: true });
   mkdirSync(evidenceRoot);
-  writeJson(resolve(evidenceRoot, "evaluation-input-seed.json"), { authority: "r15-in-memory-race" });
+  writeJson(resolve(evidenceRoot, "evaluation-input-seed.json"), { authority: "r16-external-freeze-anchor" });
   const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot, state: "executed_success" });
+  assert.throws(() => createSealedEvaluatorExecution({
+    root,
+    privateEvaluationRoot: authorityRoot,
+    privateRoot,
+    hiddenAsset,
+    frozenWorkspace,
+    candidateWorkspace,
+    evaluationInputRoot: evidenceRoot,
+    evaluatorRevision: manifest.evaluator_revision,
+    executionDirectoryName: "missing-external-anchor",
+    label: "R16 missing external freeze authority",
+  }), /external evaluator authority anchor is required/u, "sealed evaluator creation must fail closed without an external freeze authority anchor");
   const execution = createSealedEvaluatorExecution({
     root,
     privateEvaluationRoot: authorityRoot,
@@ -1654,12 +1802,13 @@ async function runSealedAuthorityAndRaceChecks(privateRoot) {
     candidateWorkspace,
     evaluationInputRoot: evidenceRoot,
     evaluatorRevision: manifest.evaluator_revision,
-    executionDirectoryName: "sealed-r15",
-    label: "R15 sealed authority regression",
+    externalAuthorityAnchor,
+    executionDirectoryName: "sealed-r16",
+    label: "R16 sealed authority regression",
   });
   try {
     for (const [kind, inventory] of Object.entries(execution.verifiedAuthority.roots)) {
-      assertSealedSnapshotModes(inventory, { label: `R15 ${kind} mode regression` });
+      assertSealedSnapshotModes(inventory, { label: `R16 ${kind} mode regression` });
     }
     assert.equal(lstatSync(execution.runner.path).mode & 0o777, SEALED_REGULAR_FILE_MODE, "sealed runner must be read-only and non-executable");
     runSealedCrossBindingChecks(execution);
@@ -1667,13 +1816,15 @@ async function runSealedAuthorityAndRaceChecks(privateRoot) {
     const normalizedBytes = Buffer.from(`${JSON.stringify(normalized, null, 2)}\n`);
     const baseline = executeSealedEvaluator({
       execution,
+      externalAuthorityAnchor,
       repositoryRoot: root,
       normalized,
       normalizedBytes,
-      label: "R15 in-memory authority baseline",
+      label: "R16 external authority baseline",
     });
     assert.deepEqual(baseline.before, baseline.afterFirst, "sealed mode and identity must be invariant across A/B");
     assert.deepEqual(baseline.afterFirst, baseline.afterSecond, "sealed mode and identity must be invariant across B/C");
+    runExternalFreezeAnchorNegativeChecks({ execution, externalAuthorityAnchor, normalized, normalizedBytes });
     const hiddenPath = resolve(execution.privateBundle.path, hiddenAsset.path);
     const sourcePath = "scripts/ask-benchmark-scoring-contract.mjs";
     const fixturePath = "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json";
@@ -1738,13 +1889,14 @@ async function runSealedAuthorityAndRaceChecks(privateRoot) {
         replacement: readFileSync(resolve(execution.frozen.path, frozenPath)),
       },
     ];
-    for (const race of races) await runBarrierRace({ execution, normalized, baseline, ...race });
+    for (const race of races) await runBarrierRace({ execution, externalAuthorityAnchor, normalized, baseline, ...race });
   } finally {
     removeTree(authorityRoot);
   }
 }
 
 function runClosedGraphImportRegression(evaluatorRevision) {
+  const externalAuthorityAnchor = currentExternalAuthorityAnchor();
   const authorityRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-closed-graph-"));
   const privateRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-closed-graph-private-"));
   const hiddenPath = resolve(privateRoot, "hidden-tests.mjs");
@@ -1764,11 +1916,13 @@ function runClosedGraphImportRegression(evaluatorRevision) {
       candidateWorkspace: workspace,
       evaluationInputRoot: evidence,
       evaluatorRevision,
+      externalAuthorityAnchor,
       executionDirectoryName: "closed-linker",
       label: "closed graph import regression",
     });
     assert.throws(() => executeSealedEvaluator({
       execution,
+      externalAuthorityAnchor,
       repositoryRoot: root,
       normalized: {},
       normalizedBytes: Buffer.from("{}\n"),
@@ -1953,6 +2107,7 @@ async function runPrivatePortabilityChecks(privateRoot) {
   const alternate = mkdtempSync(resolve(tmpdir(), "ask-mn-r7-repository-copy-"));
   rmSync(alternate, { recursive: true, force: true });
   execFileSync("git", ["clone", "--local", root, alternate], { stdio: "ignore" });
+  copyCurrentFixtureAuthority(alternate);
   const evaluator = await import(pathToFileURL(hiddenTestsPath).href);
   const commandContract = readJson(resolve(alternate, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/verification-command-contract.json"));
   const identity = {
@@ -1997,6 +2152,7 @@ async function runPrivatePortabilityChecks(privateRoot) {
   const symlinkRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-r7-symlink-copy-"));
   rmSync(symlinkRoot, { recursive: true, force: true });
   execFileSync("git", ["clone", "--local", root, symlinkRoot], { stdio: "ignore" });
+  copyCurrentFixtureAuthority(symlinkRoot);
   const symlinkTarget = resolve(symlinkRoot, "scripts/ask-benchmark-scoring-contract.mjs");
   rmSync(symlinkTarget);
   symlinkSync(resolve(root, "scripts/ask-benchmark-scoring-contract.mjs"), symlinkTarget);
