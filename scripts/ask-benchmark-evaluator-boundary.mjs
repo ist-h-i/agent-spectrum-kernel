@@ -48,6 +48,10 @@ import {
   validateScoringInputBindings,
 } from "./ask-benchmark-scoring-contract.mjs";
 
+const AUTHORITY_SPAWN_SYNC = spawnSync;
+const AUTHORITY_JSON_STRINGIFY = JSON.stringify;
+const AUTHORITY_NODE_EXECUTABLE = process.execPath;
+
 export const EVALUATOR_REFERENCE_SCHEMA_PATH = "benchmarks/schemas/evaluator-reference.schema.json";
 export const PRIVATE_EVALUATOR_BUNDLE_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-bundle.schema.json";
 export const PRIVATE_EVALUATOR_INDEPENDENCE_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-independence-statement.schema.json";
@@ -489,10 +493,16 @@ function assertExternalEvaluatorAuthorityAnchor(anchor, label) {
   for (const entry of anchor.file_inventory) {
     if (!Number.isInteger(entry.bytes) || entry.bytes < 1 || !/^sha256:[a-f0-9]{64}$/u.test(entry.raw_sha256 ?? "")) throw new Error(`${label} external evaluator authority file identity is invalid at ${entry.path}`);
   }
+  const reference = anchor.evaluator_reference;
+  if (!reference || typeof reference !== "object" || Array.isArray(reference)) throw new Error(`${label} external evaluator public reference is missing`);
+  if (reference.public_metadata_digest !== computeEvaluatorReferenceDigest(reference)) throw new Error(`${label} external evaluator public reference digest closure is invalid`);
+  if (reference.evaluator_revision !== anchor.evaluator_revision || reference.evaluator_authority_manifest_path !== anchor.evaluator_authority_manifest_path || reference.evaluator_authority_manifest_raw_sha256 !== anchor.evaluator_authority_manifest_raw_sha256 || reference.evaluator_authority_manifest_digest !== anchor.evaluator_authority_manifest_digest) throw new Error(`${label} external evaluator public reference authority closure is invalid`);
+  if (!/^evaluator-[a-f0-9]{64}$/u.test(reference.evaluator_bundle_id ?? "") || !/^sha256:[a-f0-9]{64}$/u.test(reference.evaluator_bundle_digest ?? "")) throw new Error(`${label} external evaluator public reference bundle identity is invalid`);
+  if (!reference.evaluator_source_identity || reference.evaluator_source_identity.base_git_revision !== anchor.evaluator_revision) throw new Error(`${label} external evaluator public reference source identity is invalid`);
   return structuredClone(anchor);
 }
 
-function buildVerifiedEvaluatorAuthorityAnchor({ evaluatorRevision, manifestReference, manifestSource, buffers, root, label }) {
+function buildVerifiedEvaluatorAuthorityAnchor({ evaluatorRevision, evaluatorReference, manifestReference, manifestSource, buffers, root, label }) {
   if (!manifestReference || manifestReference.path !== EVALUATOR_AUTHORITY_MANIFEST_PATH) throw new Error(`${label} evaluator authority manifest freeze reference path drift`);
   if (!manifestSource || !(buffers instanceof Map)) throw new Error(`${label} evaluator authority verified bytes are missing`);
   if (manifestSource.rawByteDigest !== manifestReference.raw_byte_digest) throw new Error(`${label} evaluator authority manifest raw bytes do not match the freeze authority`);
@@ -506,6 +516,7 @@ function buildVerifiedEvaluatorAuthorityAnchor({ evaluatorRevision, manifestRefe
     evaluator_authority_manifest_raw_sha256: manifestReference.raw_byte_digest,
     evaluator_authority_manifest_digest: manifestReference.semantic_digest,
     file_inventory: fileInventory,
+    evaluator_reference: structuredClone(evaluatorReference),
   }, label);
 }
 
@@ -980,6 +991,7 @@ export function readEvaluatorAuthorityAnchorFromFreeze({
   }));
   const anchor = buildVerifiedEvaluatorAuthorityAnchor({
     evaluatorRevision: evaluatorReferenceSource.value.evaluator_revision,
+    evaluatorReference: evaluatorReferenceSource.value,
     manifestReference,
     manifestSource,
     buffers,
@@ -1556,6 +1568,32 @@ function assertSourceBytesAtRevision(root, revision, relativePath, bytes, label)
   return { bytes: committed.length, sha256: rawByteDigest(committed) };
 }
 
+function validatePrivateBundleByteMap({ inventory, evaluatorRevision, hiddenAsset, externalAuthorityAnchor, root, label }) {
+  if (!inventory || !(inventory.buffers instanceof Map)) throw new Error(`${label} private bundle byte map is missing`);
+  const manifestPath = "private-evaluator-bundle.json";
+  const manifestBytes = inventory.buffers.get(manifestPath);
+  if (!Buffer.isBuffer(manifestBytes)) throw new Error(`${label} private bundle manifest is missing`);
+  const manifest = jsonValueFromVerifiedBytes(manifestBytes, `${label} private bundle manifest`);
+  assertBenchmarkSchemaInstance(manifest, { schemaPath: resolve(root, PRIVATE_EVALUATOR_BUNDLE_SCHEMA_PATH), label: `${label} private bundle manifest` });
+  const sortedAssets = [...manifest.asset_inventory].sort((left, right) => left.role.localeCompare(right.role) || left.path.localeCompare(right.path));
+  if (stableCanonicalJson(manifest.asset_inventory) !== stableCanonicalJson(sortedAssets)) throw new Error(`${label} private bundle asset inventory is not deterministically ordered`);
+  assertUniqueValues(manifest.asset_inventory.map(({ role }) => role), `${label} private bundle asset roles`);
+  assertUniqueValues(manifest.asset_inventory.map(({ path }) => path), `${label} private bundle asset paths`);
+  const expectedPaths = [manifestPath, ...manifest.asset_inventory.map(({ path }) => path)].sort();
+  const actualPaths = inventory.portableEntries.filter(({ file_type }) => file_type === "file").map(({ path }) => path).sort();
+  if (stableCanonicalJson(actualPaths) !== stableCanonicalJson(expectedPaths)) throw new Error(`${label} private bundle byte-map inventory is not closed`);
+  for (const asset of manifest.asset_inventory) {
+    const bytes = inventory.buffers.get(asset.path);
+    if (!Buffer.isBuffer(bytes) || bytes.length !== asset.bytes || rawByteDigest(bytes) !== asset.sha256) throw new Error(`${label} private bundle asset bytes are inconsistent for ${asset.role}`);
+  }
+  if (manifest.evaluator_revision !== evaluatorRevision || manifest.evaluator_bundle_id !== computeEvaluatorBundleId(manifest) || manifest.evaluator_bundle_digest !== computeEvaluatorBundleDigest(manifest)) throw new Error(`${label} private bundle identity closure is invalid`);
+  const reference = assertExternalEvaluatorAuthorityAnchor(externalAuthorityAnchor, label).evaluator_reference;
+  if (manifest.evaluator_bundle_id !== reference.evaluator_bundle_id || manifest.evaluator_bundle_digest !== reference.evaluator_bundle_digest || manifest.evaluator_revision !== reference.evaluator_revision || stableCanonicalJson(manifest.evaluator_source_identity) !== stableCanonicalJson(reference.evaluator_source_identity) || stableCanonicalJson(manifest.dependency_graph) !== stableCanonicalJson(reference.evaluator_source_identity.dependency_graph)) throw new Error(`${label} private bundle does not match the external evaluator public reference`);
+  const manifestHiddenAsset = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
+  if (!manifestHiddenAsset || (hiddenAsset && stableCanonicalJson({ path: hiddenAsset.path, bytes: hiddenAsset.bytes, sha256: hiddenAsset.sha256 }) !== stableCanonicalJson({ path: manifestHiddenAsset.path, bytes: manifestHiddenAsset.bytes, sha256: manifestHiddenAsset.sha256 }))) throw new Error(`${label} hidden evaluator manifest authority is inconsistent`);
+  return { manifest, manifestPath, manifestBytes, hiddenAsset: manifestHiddenAsset };
+}
+
 export function createSealedEvaluatorExecution({
   root,
   privateEvaluationRoot,
@@ -1578,6 +1616,7 @@ export function createSealedEvaluatorExecution({
   const hiddenRead = readStableFile(hiddenPath, `${label} hidden evaluator`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
   if (hiddenRead.rawByteDigest !== hiddenAsset.sha256 || hiddenRead.bytes.length !== hiddenAsset.bytes) throw new Error(`${label} hidden evaluator source identity is inconsistent`);
   const privateBundleSource = readStableWorkspaceInventory(staticRoot, `${label} static private bundle`);
+  const privateBundleAuthority = validatePrivateBundleByteMap({ inventory: privateBundleSource, evaluatorRevision, hiddenAsset, externalAuthorityAnchor: anchor, root: realpathSync(root), label });
   const runnerRelativePath = "scripts/ask-benchmark-private-evaluator-runner.mjs";
   const repositoryRoot = assertRealDirectory(root, `${label} repository root`);
   const repositoryAuthority = buildRepositoryAuthoritySource({ root: repositoryRoot, evaluatorRevision, externalAuthorityAnchor: anchor, label });
@@ -1633,6 +1672,11 @@ export function createSealedEvaluatorExecution({
     privateBundle: {
       path: privateBundle.root,
       relativePath: relativeAuthorityPath(evaluationRoot, privateBundle.root, `${label} private bundle sealed snapshot`),
+      manifestPath: privateBundleAuthority.manifestPath,
+      manifestBytes: privateBundleAuthority.manifestBytes.length,
+      manifestSha256: rawByteDigest(privateBundleAuthority.manifestBytes),
+      evaluatorBundleId: privateBundleAuthority.manifest.evaluator_bundle_id,
+      evaluatorBundleDigest: privateBundleAuthority.manifest.evaluator_bundle_digest,
       source: sealedSnapshotBinding(privateBundleSource),
       sealed: sealedSnapshotBinding(privateBundle),
     },
@@ -1680,21 +1724,6 @@ export function createSealedEvaluatorExecution({
       identityAfter: sealedSnapshotBinding(evidence),
     },
   };
-  Object.defineProperty(execution, "verifiedAuthority", {
-    enumerable: false,
-    value: {
-      runnerBytes: Buffer.from(runnerRead.bytes),
-      hiddenEvaluatorPath: hiddenAsset.path,
-      sourceGraph: structuredClone(repositoryAuthority.graph),
-      roots: {
-        repository: repository.sealed,
-        private_bundle: privateBundle,
-        frozen,
-        candidate,
-        evidence,
-      },
-    },
-  });
   return execution;
 }
 
@@ -1710,55 +1739,55 @@ function parseRunnerFragment(stdout, label) {
 }
 
 function stableFragmentBytes(fragment) {
-  return Buffer.from(`${JSON.stringify(fragment, null, 2)}\n`);
+  return Buffer.from(`${AUTHORITY_JSON_STRINGIFY(fragment, null, 2)}\n`);
 }
 
-function captureVerifiedExecutionAuthority(execution, externalAuthorityAnchor, label) {
+function captureVerifiedExecutionAuthority(execution, externalAuthorityAnchor, repositoryRoot, label) {
   const anchor = assertExternalEvaluatorAuthorityAnchor(externalAuthorityAnchor, label);
-  let captured;
-  let descriptor;
-  if (execution.verifiedAuthority) {
-    const repository = execution.verifiedAuthority.roots?.repository;
-    const descriptorBytes = repository?.buffers?.get(EVALUATOR_REPOSITORY_DESCRIPTOR_PATH);
-    if (!Buffer.isBuffer(descriptorBytes)) throw new Error(`${label} verified repository descriptor bytes are missing`);
-    descriptor = jsonValueFromVerifiedBytes(descriptorBytes, `${label} verified repository descriptor`);
-    validateSealedRepositoryAuthorityBytes({
-      descriptor,
-      buffers: repository.buffers,
-      expectedSourceGraphDigest: execution.repository.sourceGraphDigest ?? null,
-      expectedEvaluatorRevision: execution.evaluatorRevision ?? null,
-      label: `${label} verified repository authority`,
-    });
-    captured = {
-      runnerBytes: Buffer.from(execution.verifiedAuthority.runnerBytes),
-      hiddenEvaluatorPath: execution.verifiedAuthority.hiddenEvaluatorPath,
-      sourceGraph: structuredClone(execution.verifiedAuthority.sourceGraph),
-      roots: execution.verifiedAuthority.roots,
-    };
-  } else {
-    const runner = readStableFile(execution.runner.path, `${label} runner verified bytes`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
-    const hidden = readStableFile(execution.hidden.path, `${label} hidden evaluator verified bytes`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
-    const privateBundle = readStableWorkspaceInventory(execution.privateBundle.path, `${label} private bundle verified bytes`);
-    const frozen = readStableWorkspaceInventory(execution.frozen.path, `${label} frozen workspace verified bytes`);
-    const candidate = readStableWorkspaceInventory(execution.candidate.path, `${label} candidate workspace verified bytes`);
-    const evidence = readStableWorkspaceInventory(execution.evidence.path, `${label} evaluation-input verified bytes`);
-    for (const [kind, inventory] of [["private bundle", privateBundle], ["frozen workspace", frozen], ["candidate workspace", candidate], ["evaluation-input evidence", evidence]]) assertSealedSnapshotModes(inventory, { label: `${label} ${kind}` });
-    const repository = readSealedRepositoryDescriptor(execution.repository.path, `${label} repository verified bytes`, {
-      expectedSourceGraphDigest: execution.repository.sourceGraphDigest ?? null,
-      expectedEvaluatorRevision: execution.evaluatorRevision ?? null,
-    });
-    descriptor = repository.descriptor;
-    const descriptorSha256 = repository.descriptorRead.rawByteDigest;
-    if (execution.repository.descriptorSha256 && execution.repository.descriptorSha256 !== descriptorSha256) throw new Error(`${label} repository descriptor does not match its recorded execution authority`);
-    if (execution.runner.sha256 && execution.runner.sha256 !== runner.rawByteDigest) throw new Error(`${label} runner verified bytes do not match the execution record`);
-    if (execution.hidden.sha256 && execution.hidden.sha256 !== hidden.rawByteDigest) throw new Error(`${label} hidden evaluator verified bytes do not match the execution record`);
-    captured = {
-      runnerBytes: Buffer.from(runner.bytes),
-      hiddenEvaluatorPath: relative(execution.privateBundle.path, execution.hidden.path).split(sep).join("/"),
-      sourceGraph: structuredClone(descriptor.source_graph),
-      roots: { repository: repository.inventory, private_bundle: privateBundle, frozen, candidate, evidence },
-    };
-  }
+  const immutableRoot = assertRealDirectory(repositoryRoot, `${label} immutable repository root`);
+  const runner = readStableFile(execution.runner.path, `${label} runner verified bytes`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
+  const hidden = readStableFile(execution.hidden.path, `${label} hidden evaluator verified bytes`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
+  const privateBundle = readStableWorkspaceInventory(execution.privateBundle.path, `${label} private bundle verified bytes`);
+  const frozen = readStableWorkspaceInventory(execution.frozen.path, `${label} frozen workspace verified bytes`);
+  const candidate = readStableWorkspaceInventory(execution.candidate.path, `${label} candidate workspace verified bytes`);
+  const evidence = readStableWorkspaceInventory(execution.evidence.path, `${label} evaluation-input verified bytes`);
+  for (const [kind, inventory] of [["private bundle", privateBundle], ["frozen workspace", frozen], ["candidate workspace", candidate], ["evaluation-input evidence", evidence]]) assertSealedSnapshotModes(inventory, { label: `${label} ${kind}` });
+  const repository = readSealedRepositoryDescriptor(execution.repository.path, `${label} repository verified bytes`, {
+    expectedSourceGraphDigest: execution.repository.sourceGraphDigest ?? null,
+    expectedEvaluatorRevision: execution.evaluatorRevision ?? null,
+  });
+  const descriptor = repository.descriptor;
+  if (execution.repository.descriptorSha256 !== repository.descriptorRead.rawByteDigest || execution.repository.descriptorBytes !== repository.descriptorRead.bytes.length) throw new Error(`${label} repository descriptor does not match its recorded execution authority`);
+  const assertPortableRecord = (inventory, expected, kind) => {
+    if (!expected || inventory.digest !== expected.portable_digest || (inventory.rootIdentity.mode & 0o777) !== (expected.root.mode & 0o777)) throw new Error(`${label} ${kind} does not match its recorded sealed authority`);
+  };
+  for (const [inventory, expected, kind] of [[repository.inventory, execution.repository.sealed, "repository"], [privateBundle, execution.privateBundle.sealed, "private bundle"], [frozen, execution.frozen.sealed, "frozen workspace"], [candidate, execution.candidate.sealed, "candidate workspace"], [evidence, execution.evidence.sealed, "evaluation-input evidence"]]) assertPortableRecord(inventory, expected, kind);
+  const runnerIdentity = runtimeIdentityFromStableRead(runner);
+  const runnerRecordedIdentity = execution.runner.identityBefore;
+  const runnerStableInodeMatches = runnerRecordedIdentity && ["dev", "ino", "nlink", "mode"].every((field) => runnerIdentity[field] === runnerRecordedIdentity[field]);
+  if ((runnerIdentity.mode & 0o777) !== SEALED_REGULAR_FILE_MODE || runner.rawByteDigest !== execution.runner.sha256 || runner.bytes.length !== execution.runner.bytes || !runnerStableInodeMatches) throw new Error(`${label} runner verified bytes, mode, or inode do not match the execution record`);
+  const runnerRevision = assertSourceBytesAtRevision(immutableRoot, execution.evaluatorRevision, execution.runner.sourcePath, runner.bytes, `${label} runner source`);
+  if (execution.runner.sourceSha256 !== runner.rawByteDigest || execution.runner.sourceBytes !== runner.bytes.length || execution.runner.baseGitRevisionSha256 !== runnerRevision.sha256 || execution.runner.baseGitRevisionBytes !== runnerRevision.bytes) throw new Error(`${label} runner immutable revision identity is inconsistent`);
+  const immutableSourceGraph = deriveEvaluatorDependencyGraph({ root: immutableRoot, baseRevision: execution.evaluatorRevision });
+  if (stableCanonicalJson(descriptor.source_graph) !== stableCanonicalJson(immutableSourceGraph)) throw new Error(`${label} sealed source graph does not match the immutable evaluator revision`);
+  const runnerNode = descriptor.source_graph.node_inventory.find(({ path }) => path === execution.runner.sourcePath);
+  if (!runnerNode || runnerNode.bytes !== runner.bytes.length || runnerNode.sha256 !== runner.rawByteDigest || runnerNode.file_type !== "module") throw new Error(`${label} runner bytes are detached from the sealed dependency graph`);
+  const privateAuthority = validatePrivateBundleByteMap({ inventory: privateBundle, evaluatorRevision: execution.evaluatorRevision, hiddenAsset: { path: execution.hidden.sourcePath, bytes: execution.hidden.sourceBytes, sha256: execution.hidden.sourceSha256 }, externalAuthorityAnchor: anchor, root: immutableRoot, label });
+  if (execution.privateBundle.manifestPath !== privateAuthority.manifestPath || execution.privateBundle.manifestBytes !== privateAuthority.manifestBytes.length || execution.privateBundle.manifestSha256 !== rawByteDigest(privateAuthority.manifestBytes) || execution.privateBundle.evaluatorBundleId !== privateAuthority.manifest.evaluator_bundle_id || execution.privateBundle.evaluatorBundleDigest !== privateAuthority.manifest.evaluator_bundle_digest) throw new Error(`${label} private bundle manifest does not match the execution record`);
+  const hiddenEvaluatorPath = privateAuthority.hiddenAsset.path;
+  const expectedHiddenPath = resolveAuthorityArtifactPath(execution.privateBundle.path, hiddenEvaluatorPath, `${label} hidden evaluator sealed path`);
+  if (expectedHiddenPath !== execution.hidden.path) throw new Error(`${label} hidden evaluator path is detached from the sealed private bundle`);
+  const hiddenBytes = privateBundle.buffers.get(hiddenEvaluatorPath);
+  const hiddenIdentity = runtimeIdentityFromStableRead(hidden);
+  const hiddenRecordedIdentity = execution.hidden.identityBefore;
+  const hiddenStableInodeMatches = hiddenRecordedIdentity && ["dev", "ino", "nlink", "mode"].every((field) => hiddenIdentity[field] === hiddenRecordedIdentity[field]);
+  if ((hiddenIdentity.mode & 0o777) !== SEALED_REGULAR_FILE_MODE || !Buffer.isBuffer(hiddenBytes) || Buffer.compare(hidden.bytes, hiddenBytes) !== 0 || hidden.rawByteDigest !== privateAuthority.hiddenAsset.sha256 || hidden.bytes.length !== privateAuthority.hiddenAsset.bytes || !hiddenStableInodeMatches) throw new Error(`${label} hidden evaluator bytes, mode, or inode do not match the sealed private bundle authority`);
+  const captured = {
+    runnerBytes: Buffer.from(runner.bytes),
+    hiddenEvaluatorPath,
+    sourceGraph: structuredClone(descriptor.source_graph),
+    roots: { repository: repository.inventory, private_bundle: privateBundle, frozen, candidate, evidence },
+  };
   const expectedAuthority = verifySealedEvaluatorExternalAuthority({
     descriptor,
     buffers: captured.roots.repository.buffers,
@@ -1783,7 +1812,7 @@ function serializedAuthorityRoot(kind, inventory, helperRoot = null) {
 }
 
 function normalizedAuthorityBytes(normalized, verifiedBytes, label) {
-  const bytes = verifiedBytes ? Buffer.from(verifiedBytes) : Buffer.from(`${JSON.stringify(normalized)}\n`);
+  const bytes = verifiedBytes ? Buffer.from(verifiedBytes) : Buffer.from(`${AUTHORITY_JSON_STRINGIFY(normalized)}\n`);
   let parsed;
   try {
     assertNoDuplicateJsonObjectKeys(bytes.toString("utf8"), `${label} normalized result`);
@@ -1870,9 +1899,9 @@ function assertPortableSealedExecutionStatesEqual(states, label) {
   assertSealedExecutionStatesEqual(states.map(portableSealedExecutionState), `${label} portable`);
 }
 
-export function prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthorityAnchor, normalized, normalizedBytes = null, barrier = null, label = "private evaluator sealed execution preflight" } = {}) {
+export function prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthorityAnchor, repositoryRoot, normalized, normalizedBytes = null, barrier = null, label = "private evaluator sealed execution preflight" } = {}) {
   if (!execution?.runner?.path || !execution?.hidden?.path || !execution?.repository?.path || !execution?.frozen?.path || !execution?.candidate?.path || !execution?.evidence?.path) throw new Error(`${label} is incomplete`);
-  const verifiedAuthority = captureVerifiedExecutionAuthority(execution, externalAuthorityAnchor, label);
+  const verifiedAuthority = captureVerifiedExecutionAuthority(execution, externalAuthorityAnchor, repositoryRoot, label);
   const runnerSource = verifiedAuthority.runnerBytes.toString("utf8");
   return {
     runnerSource,
@@ -1882,9 +1911,9 @@ export function prepareSealedEvaluatorExecutionAuthority({ execution, externalAu
 }
 
 function executeAuthorityOwnedEvaluatorChild({ runnerSource, payload, timeout, label }) {
-  const child = spawnSync(process.execPath, ["--experimental-vm-modules", "--input-type=module", "--eval", runnerSource], {
+  const child = AUTHORITY_SPAWN_SYNC(AUTHORITY_NODE_EXECUTABLE, ["--experimental-vm-modules", "--input-type=module", "--eval", runnerSource], {
     encoding: "utf8",
-    input: `${JSON.stringify(payload)}\n`,
+    input: `${AUTHORITY_JSON_STRINGIFY(payload)}\n`,
     maxBuffer: MAX_BOUNDARY_FILE_BYTES,
     timeout,
   });
@@ -1892,21 +1921,17 @@ function executeAuthorityOwnedEvaluatorChild({ runnerSource, payload, timeout, l
   return parseRunnerFragment(child.stdout, `${label} child output`);
 }
 
-export function executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot: _repositoryRoot, normalized, normalizedBytes = null, timeout = 30_000, beforeRun = null, afterRun = null, barrier = null, label = "private evaluator sealed execution" } = {}) {
-  const prepared = prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthorityAnchor, normalized, normalizedBytes, barrier, label });
+export function executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot, normalized, normalizedBytes = null, timeout = 30_000, barrier = null, label = "private evaluator sealed execution" } = {}) {
+  const prepared = prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthorityAnchor, repositoryRoot, normalized, normalizedBytes, barrier, label });
   const run = (runIndex) => {
     const payload = runIndex === 1 ? prepared.firstPayload : prepared.secondPayload;
     return executeAuthorityOwnedEvaluatorChild({ runnerSource: prepared.runnerSource, payload, timeout, label });
   };
   const stateA = captureSealedExecutionState(execution, `${label} before run`);
-  if (beforeRun) beforeRun({ index: 1, execution, state: stateA });
   const firstFragment = run(1);
   const stateB = captureSealedExecutionState(execution, `${label} after first run`);
-  if (afterRun) afterRun({ index: 1, execution, state: stateB });
-  if (beforeRun) beforeRun({ index: 2, execution, state: stateB });
   const secondFragment = run(2);
   const stateC = captureSealedExecutionState(execution, `${label} after second run`);
-  if (afterRun) afterRun({ index: 2, execution, state: stateC });
   if (barrier) assertPortableSealedExecutionStatesEqual([stateA, stateB, stateC], label);
   else assertSealedExecutionStatesEqual([stateA, stateB, stateC], label);
   if (stableCanonicalJson(firstFragment) !== stableCanonicalJson(secondFragment)) throw new Error(`${label} fragment is nondeterministic`);
@@ -2597,24 +2622,46 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
     evaluatorRevision: bundle.manifest.evaluator_revision,
     runner: {
       path: sealedRunnerPath,
+      sourcePath: record.evaluator_runner_source_identity.path,
+      sourceBytes: record.evaluator_runner_source_identity.source_bytes,
+      sourceSha256: record.evaluator_runner_source_identity.source_sha256,
+      baseGitRevisionBytes: record.evaluator_runner_source_identity.base_git_revision_bytes,
+      baseGitRevisionSha256: record.evaluator_runner_source_identity.base_git_revision_sha256,
+      bytes: record.evaluator_runner_sealed_bytes,
       sha256: record.evaluator_runner_sealed_sha256,
+      identityBefore: record.evaluator_runner_sealed_execution_identity_before,
     },
     hidden: {
       path: sealedHiddenPath,
+      sourcePath: record.hidden_evaluator_path,
+      sourceBytes: record.hidden_evaluator_bytes,
+      sourceSha256: record.hidden_evaluator_sha256,
+      bytes: record.hidden_evaluator_sealed_bytes,
       sha256: record.hidden_evaluator_sealed_sha256,
+      identityBefore: record.hidden_evaluator_sealed_execution_identity_before,
     },
     repository: {
       path: sealedRepositoryRoot,
       descriptorSha256: record.sealed_repository_descriptor_sha256,
+      descriptorBytes: record.sealed_repository_descriptor_bytes,
       sourceGraphDigest: record.sealed_repository_source_graph_digest,
       evaluatorAuthorityManifestPath: sealedRepository.descriptor.evaluator_authority_manifest_path,
       evaluatorAuthorityManifestRawSha256: sealedRepository.descriptor.evaluator_authority_manifest_raw_sha256,
       evaluatorAuthorityManifestDigest: sealedRepository.descriptor.evaluator_authority_manifest_digest,
+      sealed: sealedRepositoryBinding,
     },
-    privateBundle: { path: sealedPrivateBundleRoot },
-    frozen: { path: sealedFrozenWorkspace },
-    candidate: { path: sealedCandidateWorkspace },
-    evidence: { path: sealedEvaluationInputRoot },
+    privateBundle: {
+      path: sealedPrivateBundleRoot,
+      manifestPath: "private-evaluator-bundle.json",
+      manifestBytes: sealedPrivateBundleInventory.buffers.get("private-evaluator-bundle.json").length,
+      manifestSha256: rawByteDigest(sealedPrivateBundleInventory.buffers.get("private-evaluator-bundle.json")),
+      evaluatorBundleId: bundle.manifest.evaluator_bundle_id,
+      evaluatorBundleDigest: bundle.manifest.evaluator_bundle_digest,
+      sealed: sealedSnapshotBinding(sealedPrivateBundleInventory),
+    },
+    frozen: { path: sealedFrozenWorkspace, sealed: sealedSnapshotBinding(frozenInventory) },
+    candidate: { path: sealedCandidateWorkspace, sealed: sealedSnapshotBinding(candidateInventory) },
+    evidence: { path: sealedEvaluationInputRoot, sealed: sealedSnapshotBinding(evidenceInventory) },
   };
   const executed = executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, label: "private hidden evaluator" });
   const actualFragment = executed.firstFragment;
@@ -2726,6 +2773,7 @@ function readScoringInputSources({
     validateEvaluatorAuthorityManifest({ manifest: evaluatorAuthorityManifest, buffers: evaluatorAuthorityBuffers, evaluatorRevision: evaluatorReference.evaluator_revision, root, label: "authoritative evaluator authority manifest" });
     evaluatorAuthorityAnchor = buildVerifiedEvaluatorAuthorityAnchor({
       evaluatorRevision: evaluatorReference.evaluator_revision,
+      evaluatorReference,
       manifestReference: freezeManifest.evaluator_authority_manifest,
       manifestSource: evaluatorAuthorityManifestSource,
       buffers: evaluatorAuthorityBuffers,

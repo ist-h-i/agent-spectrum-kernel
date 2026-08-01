@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { createRequire, syncBuiltinESMExports } from "node:module";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
@@ -98,6 +99,11 @@ function readJson(path) {
 
 function sha256(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function runtimeFileIdentity(path) {
+  const status = lstatSync(path);
+  return { dev: status.dev, ino: status.ino, nlink: status.nlink, mode: status.mode, size: status.size, mtimeMs: status.mtimeMs, ctimeMs: status.ctimeMs };
 }
 
 function writeJson(path, value) {
@@ -1136,7 +1142,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   };
   mkdirSync(common.publicArtifactRoot);
   const before = chain.snapshot();
-  const fakeExecutorCalls = { sealedEvaluatorChildExecutor: 0, childExecutor: 0, executor: 0 };
+  const fakeExecutorCalls = { beforeRun: 0, afterRun: 0, sealedEvaluatorChildExecutor: 0, childExecutor: 0, executor: 0 };
   const fakeExecutorOptions = Object.fromEntries(Object.keys(fakeExecutorCalls).map((property) => [property, () => {
     fakeExecutorCalls[property] += 1;
     return {
@@ -1264,69 +1270,6 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     const originalFrozenConfig = resolve(originalFrozenPath, "build.config.json");
     const originalFrozenBytes = readFileSync(originalFrozenConfig);
     expectPathFailure("original frozen workspace mutation", () => writeFileSync(originalFrozenConfig, Buffer.concat([originalFrozenBytes, Buffer.from("\n")])), () => writeFileSync(originalFrozenConfig, originalFrozenBytes), /original private evaluation workspace|workspace identity|workspace/u);
-    const repositoryRaceExecution = createSealedEvaluatorExecution({
-      root,
-      privateEvaluationRoot: authorityRoot,
-      privateRoot,
-      hiddenAsset: bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests"),
-      frozenWorkspace: bootstrap.frozenWorkspace,
-      candidateWorkspace: bootstrap.candidateWorkspace,
-      evaluationInputRoot: bootstrap.evaluationInputRoot,
-      evaluatorRevision: bundleManifest.evaluator_revision,
-      externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor,
-      executionDirectoryName: "sealed-repository-race",
-      label: "private evaluator repository race",
-    });
-    let liveRepositoryMutated = false;
-    const liveRepositorySourcePath = resolve(root, "scripts/ask-benchmark-scoring-contract.mjs");
-    const liveRepositorySourceBytes = readFileSync(liveRepositorySourcePath);
-    const repositoryRace = executeSealedEvaluator({
-      execution: repositoryRaceExecution,
-      externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor,
-      repositoryRoot: root,
-      normalized: normalizedAuthority.normalized,
-      beforeRun: () => {
-        if (!liveRepositoryMutated) {
-          writeFileSync(liveRepositorySourcePath, Buffer.concat([liveRepositorySourceBytes, Buffer.from("\n// live repository mutation must not affect sealed execution\n")]));
-          liveRepositoryMutated = true;
-        }
-      },
-      afterRun: ({ index }) => { if (index === 1 && liveRepositoryMutated) writeFileSync(liveRepositorySourcePath, liveRepositorySourceBytes); },
-      label: "private evaluator live repository isolation",
-    });
-    writeFileSync(liveRepositorySourcePath, liveRepositorySourceBytes);
-    assert.deepEqual(repositoryRace.firstFragment, finalExecuted.firstFragment, "live repository mutation must not change sealed evaluation");
-    assert.throws(() => executeSealedEvaluator({
-      execution: repositoryRaceExecution,
-      externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor,
-      repositoryRoot: root,
-      normalized: normalizedAuthority.normalized,
-      afterRun: ({ index }) => { if (index === 1) overwriteSealedFile(resolve(repositoryRaceExecution.repository.path, "scripts/ask-benchmark-scoring-contract.mjs"), Buffer.concat([sealedRepositoryModuleBytes, Buffer.from("\n// between-run sealed mutation\n")])); },
-      label: "private evaluator sealed repository race",
-    }), /authority changed|sealed repository|inventory|digest/u, "sealed repository mutation between runs must fail closed");
-    removeTree(resolve(authorityRoot, "sealed-repository-race"));
-    const childRaceExecution = createSealedEvaluatorExecution({
-      root,
-      privateEvaluationRoot: authorityRoot,
-      privateRoot,
-      hiddenAsset: bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests"),
-      frozenWorkspace: bootstrap.frozenWorkspace,
-      candidateWorkspace: bootstrap.candidateWorkspace,
-      evaluationInputRoot: bootstrap.evaluationInputRoot,
-      evaluatorRevision: bundleManifest.evaluator_revision,
-      externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor,
-      executionDirectoryName: "sealed-child-race",
-      label: "private evaluator child race",
-    });
-    assert.throws(() => executeSealedEvaluator({
-      execution: childRaceExecution,
-      externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor,
-      repositoryRoot: root,
-      normalized: normalizedAuthority.normalized,
-      beforeRun: () => addSealedFile(resolve(childRaceExecution.candidate.path, "r12-child-race.txt"), "child mutation\n"),
-      label: "private evaluator child race",
-    }), /authority changed|workspace|inventory|deterministic/u, "sealed evaluator must reject child mutation between snapshot and execution");
-    removeTree(resolve(authorityRoot, "sealed-child-race"));
     const fragmentBackup = resolve(authorityRoot, ".private-fragment-backup");
     expectPathFailure("fragment missing", () => renameSync(chain.privateFragmentPath, fragmentBackup), () => renameSync(fragmentBackup, chain.privateFragmentPath), /missing|private evaluator fragment/u);
     expectPathFailure("fragment symlink", () => { renameSync(chain.privateFragmentPath, fragmentBackup); symlinkSync(resolve(root, "scripts/ask-benchmark-evaluator-boundary.mjs"), chain.privateFragmentPath); }, () => { rmSync(chain.privateFragmentPath); renameSync(fragmentBackup, chain.privateFragmentPath); }, /symlink|private evaluator fragment/u);
@@ -1623,6 +1566,22 @@ function simulatedSealedInventory(descriptor, descriptorBytes) {
   ].sort((left, right) => left.path.localeCompare(right.path));
 }
 
+function materializeSimulatedSealedRepository({ descriptor, buffers, destination }) {
+  mkdirSync(destination, { mode: 0o755 });
+  const directories = descriptor.inventory.filter(({ file_type }) => file_type === "directory").sort((left, right) => left.path.split("/").length - right.path.split("/").length || left.path.localeCompare(right.path));
+  for (const entry of directories) mkdirSync(resolve(destination, entry.path), { mode: 0o755 });
+  for (const entry of descriptor.inventory.filter(({ file_type }) => file_type === "file")) {
+    const bytes = buffers.get(entry.path);
+    writeFileSync(resolve(destination, entry.path), bytes);
+    chmodSync(resolve(destination, entry.path), entry.mode);
+  }
+  const descriptorBytes = buffers.get(EVALUATOR_REPOSITORY_DESCRIPTOR_PATH);
+  writeFileSync(resolve(destination, EVALUATOR_REPOSITORY_DESCRIPTOR_PATH), descriptorBytes);
+  chmodSync(resolve(destination, EVALUATOR_REPOSITORY_DESCRIPTOR_PATH), SEALED_REGULAR_FILE_MODE);
+  for (const entry of directories.reverse()) chmodSync(resolve(destination, entry.path), SEALED_DIRECTORY_MODE);
+  chmodSync(destination, SEALED_DIRECTORY_MODE);
+}
+
 function assertCrossBindingFailure({ baseDescriptor, baseBuffers, evaluatorRevision, label, mutate }) {
   const descriptor = structuredClone(baseDescriptor);
   const buffers = new Map([...baseBuffers].map(([path, bytes]) => [path, Buffer.from(bytes)]));
@@ -1649,7 +1608,7 @@ function assertCrossBindingFailure({ baseDescriptor, baseBuffers, evaluatorRevis
 }
 
 function runSealedCrossBindingChecks(execution) {
-  const repository = execution.verifiedAuthority.roots.repository;
+  const repository = readStableWorkspaceInventory(execution.repository.path, "cross-binding sealed repository");
   const descriptor = JSON.parse(repository.buffers.get(EVALUATOR_REPOSITORY_DESCRIPTOR_PATH).toString("utf8"));
   const moduleNodes = descriptor.source_graph.node_inventory.filter(({ file_type }) => file_type === "module");
   assert.ok(moduleNodes.length >= 2, "cross-binding tests require at least two source modules");
@@ -1729,8 +1688,7 @@ function runSealedCrossBindingChecks(execution) {
 }
 
 function resealedFixtureAuthorityExecution(execution, changedPaths) {
-  const originalAuthority = execution.verifiedAuthority;
-  const originalRepository = originalAuthority.roots.repository;
+  const originalRepository = readStableWorkspaceInventory(execution.repository.path, "external freeze reseal source repository");
   const buffers = new Map([...originalRepository.buffers].map(([path, bytes]) => [path, Buffer.from(bytes)]));
   for (const changedPath of changedPaths) buffers.set(changedPath, Buffer.concat([buffers.get(changedPath), Buffer.from("\n")]));
   const manifest = deriveEvaluatorAuthorityManifest({ buffers, evaluatorRevision: execution.evaluatorRevision });
@@ -1749,15 +1707,16 @@ function resealedFixtureAuthorityExecution(execution, changedPaths) {
   descriptor.evaluator_authority_manifest_raw_sha256 = sha256(manifestBytes);
   descriptor.evaluator_authority_manifest_digest = manifest.manifest_digest;
   closeRepositoryDescriptor(descriptor, buffers);
-  const changedExecution = { ...execution };
-  Object.defineProperty(changedExecution, "verifiedAuthority", {
-    enumerable: false,
-    value: {
-      ...originalAuthority,
-      sourceGraph: structuredClone(descriptor.source_graph),
-      roots: { ...originalAuthority.roots, repository: { ...originalRepository, buffers } },
-    },
-  });
+  const changedRoot = resolve(execution.evaluationRoot, `resealed-${createHash("sha256").update(changedPaths.join("\n")).digest("hex").slice(0, 12)}`);
+  materializeSimulatedSealedRepository({ descriptor, buffers, destination: changedRoot });
+  const changedInventory = readStableWorkspaceInventory(changedRoot, "external freeze resealed repository");
+  const descriptorPath = resolve(changedRoot, EVALUATOR_REPOSITORY_DESCRIPTOR_PATH);
+  const changedExecution = structuredClone(execution);
+  changedExecution.repository.path = changedRoot;
+  changedExecution.repository.descriptorPath = descriptorPath;
+  changedExecution.repository.descriptorSha256 = sha256(readFileSync(descriptorPath));
+  changedExecution.repository.descriptorBytes = readFileSync(descriptorPath).length;
+  changedExecution.repository.sealed = { portable_digest: changedInventory.digest, runtime_digest: changedInventory.runtimeDigest, root: changedInventory.rootIdentity };
   return changedExecution;
 }
 
@@ -1766,6 +1725,7 @@ function runExternalFreezeAnchorNegativeChecks({ execution, externalAuthorityAnc
     assert.throws(() => prepareSealedEvaluatorExecutionAuthority({
       execution: candidateExecution,
       externalAuthorityAnchor: candidateAnchor,
+      repositoryRoot: root,
       normalized,
       normalizedBytes,
       label: `R16 external freeze negative ${label}`,
@@ -1888,21 +1848,151 @@ async function runSealedAuthorityAndRaceChecks(privateRoot) {
     label: "R16 sealed authority regression",
   });
   try {
-    for (const [kind, inventory] of Object.entries(execution.verifiedAuthority.roots)) {
-      assertSealedSnapshotModes(inventory, { label: `R16 ${kind} mode regression` });
+    assert.equal(Object.hasOwn(execution, "verifiedAuthority"), false, "sealed execution must not expose cached verified authority to callers");
+    for (const authority of [execution.repository, execution.privateBundle, execution.frozen, execution.candidate, execution.evidence]) {
+      assert.equal(Object.hasOwn(authority, "buffers"), false, "sealed execution must not expose cached authority buffers");
+      assert.equal(Object.hasOwn(authority, "portableEntries"), false, "sealed execution must not expose cached portable inventory entries");
     }
+    for (const [kind, path] of [["repository", execution.repository.path], ["private bundle", execution.privateBundle.path], ["frozen", execution.frozen.path], ["candidate", execution.candidate.path], ["evidence", execution.evidence.path]]) assertSealedSnapshotModes(readStableWorkspaceInventory(path, `R17 ${kind} mode regression`), { label: `R17 ${kind} mode regression` });
     assert.equal(lstatSync(execution.runner.path).mode & 0o777, SEALED_REGULAR_FILE_MODE, "sealed runner must be read-only and non-executable");
     runSealedCrossBindingChecks(execution);
     const normalized = normalizedAuthority.normalized;
     const normalizedBytes = Buffer.from(`${JSON.stringify(normalized, null, 2)}\n`);
+    const preparedBaseline = prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, label: "R17 caller-inaccessible authority baseline" });
+    const forgedRunnerBytes = Buffer.from("process.stdout.write(JSON.stringify({ forged: true }));\n");
+    execution.verifiedAuthority = { runnerBytes: forgedRunnerBytes, roots: new Map(), sourceGraph: [] };
+    const preparedWithForgedRunnerCache = prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, label: "R17 forged caller runner cache" });
+    assert.equal(preparedWithForgedRunnerCache.runnerSource, preparedBaseline.runnerSource, "caller-added runner cache must not change executable runner bytes");
+    delete execution.verifiedAuthority;
+    const cachedAuthorityAttacks = [
+      [execution.hidden, "cachedBuffer", Buffer.from("export const forged = true;\n"), "hidden evaluator cached Buffer"],
+      [execution.privateBundle, "buffers", new Map([["hidden-tests.mjs", Buffer.from("export const forged = true;\n")]]), "private bundle buffers Map"],
+      [execution.privateBundle, "portableEntries", [{ path: "hidden-tests.mjs", file_type: "file", bytes: 1, sha256: `sha256:${"0".repeat(64)}` }], "private bundle portable entries"],
+      [execution.privateBundle, "manifest", { evaluator_bundle_id: `evaluator-${"0".repeat(64)}` }, "private bundle manifest cache"],
+      [execution.repository, "buffers", new Map([["forged.mjs", forgedRunnerBytes]]), "repository cached authority"],
+      [execution.frozen, "buffers", new Map([["build.config.json", Buffer.from("{}\n")]]), "frozen cached authority"],
+      [execution.candidate, "buffers", new Map([["build.config.json", Buffer.from("{}\n")]]), "candidate cached authority"],
+      [execution.evidence, "buffers", new Map([["evaluation-input-seed.json", Buffer.from("{}\n")]]), "evidence cached authority"],
+    ];
+    for (const [target, property, forgedValue, attackLabel] of cachedAuthorityAttacks) {
+      target[property] = forgedValue;
+      const prepared = prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, label: `R17 ${attackLabel}` });
+      assert.deepEqual(prepared, preparedBaseline, `${attackLabel} must not change the verified execution payload`);
+      delete target[property];
+    }
+    const productionOverrideCalls = { beforeRun: 0, afterRun: 0, childExecutor: 0, sealedEvaluatorChildExecutor: 0, executor: 0 };
+    const productionOverrides = Object.fromEntries(Object.keys(productionOverrideCalls).map((property) => [property, () => { productionOverrideCalls[property] += 1; }]));
     const baseline = executeSealedEvaluator({
       execution,
       externalAuthorityAnchor,
       repositoryRoot: root,
       normalized,
       normalizedBytes,
+      ...productionOverrides,
       label: "R16 external authority baseline",
     });
+    for (const [property, calls] of Object.entries(productionOverrideCalls)) assert.equal(calls, 0, `production execution must not invoke caller-supplied ${property}`);
+    const require = createRequire(import.meta.url);
+    const mutableChildProcess = require("node:child_process");
+    const originalSpawnSync = mutableChildProcess.spawnSync;
+    let synchronizedBuiltinFakeCalls = 0;
+    try {
+      mutableChildProcess.spawnSync = () => {
+        synchronizedBuiltinFakeCalls += 1;
+        return { status: 0, error: null, stdout: `${JSON.stringify({ ...baseline.firstFragment, evaluator_rerun: { role: "candidate_correctness_only", contributes_to_agent_verification_requirement: false, results: [{ command_id: "forged-synchronized-builtin", outcome: "succeeded", exit_code: 0, evidence_role: "candidate_correctness_only" }] } })}\n`, stderr: "" };
+      };
+      syncBuiltinESMExports();
+      const synchronizedBuiltinAttack = executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, label: "R17 synchronized builtin spawn attack" });
+      assert.equal(synchronizedBuiltinFakeCalls, 0, "authority-owned spawnSync snapshot must ignore synchronized builtin replacement");
+      assert.deepEqual(synchronizedBuiltinAttack.firstFragment, baseline.firstFragment, "synchronized builtin replacement must not change evaluator output");
+      assert.deepEqual(synchronizedBuiltinAttack.secondFragment, baseline.secondFragment, "synchronized builtin replacement must not change deterministic rerun output");
+    } finally {
+      mutableChildProcess.spawnSync = originalSpawnSync;
+      syncBuiltinESMExports();
+    }
+    const forgedRunnerExecution = createSealedEvaluatorExecution({
+      root,
+      privateEvaluationRoot: authorityRoot,
+      privateRoot,
+      hiddenAsset,
+      frozenWorkspace,
+      candidateWorkspace,
+      evaluationInputRoot: evidenceRoot,
+      evaluatorRevision: manifest.evaluator_revision,
+      externalAuthorityAnchor,
+      executionDirectoryName: "forged-runner-authority",
+      label: "R17 forged sealed runner",
+    });
+    try {
+      overwriteSealedFile(forgedRunnerExecution.runner.path, forgedRunnerBytes);
+      const forgedIdentity = runtimeFileIdentity(forgedRunnerExecution.runner.path);
+      forgedRunnerExecution.runner.bytes = forgedRunnerBytes.length;
+      forgedRunnerExecution.runner.sha256 = sha256(forgedRunnerBytes);
+      forgedRunnerExecution.runner.sourceBytes = forgedRunnerBytes.length;
+      forgedRunnerExecution.runner.sourceSha256 = sha256(forgedRunnerBytes);
+      forgedRunnerExecution.runner.baseGitRevisionBytes = forgedRunnerBytes.length;
+      forgedRunnerExecution.runner.baseGitRevisionSha256 = sha256(forgedRunnerBytes);
+      forgedRunnerExecution.runner.identityBefore = forgedIdentity;
+      assert.throws(() => prepareSealedEvaluatorExecutionAuthority({ execution: forgedRunnerExecution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, label: "R17 forged sealed runner preflight" }), /immutable base Git revision|immutable evaluator revision|dependency graph|runner/u, "self-consistent forged runner record must fail before child execution");
+    } finally {
+      removeTree(forgedRunnerExecution.executionRoot);
+    }
+    let privateTamperIndex = 0;
+    const expectPrivateBundlePreflightFailure = (attackLabel, mutate, pattern) => {
+      privateTamperIndex += 1;
+      const tamperedExecution = createSealedEvaluatorExecution({
+        root,
+        privateEvaluationRoot: authorityRoot,
+        privateRoot,
+        hiddenAsset,
+        frozenWorkspace,
+        candidateWorkspace,
+        evaluationInputRoot: evidenceRoot,
+        evaluatorRevision: manifest.evaluator_revision,
+        externalAuthorityAnchor,
+        executionDirectoryName: `private-authority-tamper-${privateTamperIndex}`,
+        label: `R17 ${attackLabel}`,
+      });
+      try {
+        mutate(tamperedExecution);
+        assert.throws(() => prepareSealedEvaluatorExecutionAuthority({ execution: tamperedExecution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, label: `R17 ${attackLabel} preflight` }), pattern, `${attackLabel} must fail before child execution`);
+      } finally {
+        removeTree(tamperedExecution.executionRoot);
+      }
+    };
+    expectPrivateBundlePreflightFailure("sealed hidden evaluator replacement", (tamperedExecution) => {
+      overwriteSealedFile(tamperedExecution.hidden.path, Buffer.from("export async function evaluateCandidateSafe() { return { forged: true }; }\n"));
+    }, /private bundle asset bytes|hidden evaluator|recorded sealed authority/u);
+    expectPrivateBundlePreflightFailure("private bundle manifest asset digest replacement", (tamperedExecution) => {
+      const bundlePath = resolve(tamperedExecution.privateBundle.path, "private-evaluator-bundle.json");
+      const changed = readJson(bundlePath);
+      changed.asset_inventory.find(({ role }) => role === "hidden_tests").sha256 = `sha256:${"0".repeat(64)}`;
+      overwriteSealedFile(bundlePath, Buffer.from(`${JSON.stringify(changed, null, 2)}\n`));
+    }, /private bundle asset bytes|bundle identity|recorded sealed authority/u);
+    expectPrivateBundlePreflightFailure("consistent private bundle and hidden evaluator reseal", (tamperedExecution) => {
+      const bundlePath = resolve(tamperedExecution.privateBundle.path, "private-evaluator-bundle.json");
+      const changedHidden = Buffer.from("export async function evaluateCandidateSafe() { return { forged: true }; }\n");
+      overwriteSealedFile(tamperedExecution.hidden.path, changedHidden);
+      const changed = readJson(bundlePath);
+      const hiddenEntry = changed.asset_inventory.find(({ role }) => role === "hidden_tests");
+      hiddenEntry.bytes = changedHidden.length;
+      hiddenEntry.sha256 = sha256(changedHidden);
+      changed.evaluator_bundle_id = computeEvaluatorBundleId(changed);
+      changed.evaluator_bundle_digest = computeEvaluatorBundleDigest(changed);
+      const changedManifestBytes = Buffer.from(`${JSON.stringify(changed, null, 2)}\n`);
+      overwriteSealedFile(bundlePath, changedManifestBytes);
+      const changedInventory = readStableWorkspaceInventory(tamperedExecution.privateBundle.path, "consistent resealed private bundle");
+      tamperedExecution.privateBundle.sealed = { portable_digest: changedInventory.digest, runtime_digest: changedInventory.runtimeDigest, root: changedInventory.rootIdentity };
+      tamperedExecution.privateBundle.manifestBytes = changedManifestBytes.length;
+      tamperedExecution.privateBundle.manifestSha256 = sha256(changedManifestBytes);
+      tamperedExecution.privateBundle.evaluatorBundleId = changed.evaluator_bundle_id;
+      tamperedExecution.privateBundle.evaluatorBundleDigest = changed.evaluator_bundle_digest;
+      tamperedExecution.hidden.bytes = changedHidden.length;
+      tamperedExecution.hidden.sha256 = sha256(changedHidden);
+      tamperedExecution.hidden.sourceBytes = changedHidden.length;
+      tamperedExecution.hidden.sourceSha256 = sha256(changedHidden);
+      tamperedExecution.hidden.identityBefore = runtimeFileIdentity(tamperedExecution.hidden.path);
+    }, /external evaluator public reference|private bundle does not match/u);
     assert.deepEqual(baseline.before, baseline.afterFirst, "sealed mode and identity must be invariant across A/B");
     assert.deepEqual(baseline.afterFirst, baseline.afterSecond, "sealed mode and identity must be invariant across B/C");
     runExternalFreezeAnchorNegativeChecks({ execution, externalAuthorityAnchor, normalized, normalizedBytes });
@@ -1983,6 +2073,30 @@ function runClosedGraphImportRegression(evaluatorRevision) {
   const hiddenPath = resolve(privateRoot, "hidden-tests.mjs");
   const hiddenBytes = Buffer.from("export async function evaluateCandidateSafe({ repositoryRoot }) { await import(`${repositoryRoot}/scripts/graph-external-authority.mjs`); return {}; }\n");
   writeFileSync(hiddenPath, hiddenBytes);
+  const publicReference = readJson(resolve(fixtureRoot, "evaluator-reference.json"));
+  const manifest = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/private-evaluator-bundle.schema.json",
+    program: "adaptive_ask_private_evaluator_bundle",
+    fixture_identity: { fixture_id: "mn-build-option-update", task_class: "configuration", suite: "mechanism_negative" },
+    input_identity: { fixture_input_digest: publicReference.fixture_input_digest },
+    evaluator_revision: evaluatorRevision,
+    evaluator_source_identity: publicReference.evaluator_source_identity,
+    dependency_graph: publicReference.evaluator_source_identity.dependency_graph,
+    generator: { id: "closed-graph-regression", version: "1.0.0", source_digest: publicReference.evaluator_source_identity.generator_source_digest },
+    independence: { statement_digest: `sha256:${"1".repeat(64)}`, generated_without_agent_output: true, public_answer_sources_used: false, measured_agent_access_allowed: false },
+    review: { record_digest: `sha256:${"2".repeat(64)}`, status: "pending", reviewer_count: 1 },
+    asset_inventory: [{ role: "hidden_tests", path: "hidden-tests.mjs", bytes: hiddenBytes.length, sha256: sha256(hiddenBytes), media_type: "text/javascript", required: true }],
+    capabilities: { automated_evaluation: true, manual_evaluation: false },
+    boundaries: { private_evaluator_bundle: true, public_repository_allowed: false, public_ci_artifact_allowed: false, contains_answer_bearing_content: true },
+  };
+  manifest.evaluator_bundle_id = computeEvaluatorBundleId(manifest);
+  manifest.evaluator_bundle_digest = computeEvaluatorBundleDigest(manifest);
+  writeJson(resolve(privateRoot, "private-evaluator-bundle.json"), manifest);
+  publicReference.evaluator_bundle_id = manifest.evaluator_bundle_id;
+  publicReference.evaluator_bundle_digest = manifest.evaluator_bundle_digest;
+  publicReference.public_metadata_digest = computeEvaluatorReferenceDigest(publicReference);
+  externalAuthorityAnchor.evaluator_reference = publicReference;
   const workspace = resolve(fixtureRoot, "workspace");
   const evidence = resolve(authorityRoot, "evidence");
   mkdirSync(evidence);
