@@ -1870,21 +1870,33 @@ function assertPortableSealedExecutionStatesEqual(states, label) {
   assertSealedExecutionStatesEqual(states.map(portableSealedExecutionState), `${label} portable`);
 }
 
-export function executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot: _repositoryRoot, normalized, normalizedBytes = null, timeout = 30_000, beforeRun = null, afterRun = null, barrier = null, childExecutor = spawnSync, label = "private evaluator sealed execution" } = {}) {
+export function prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthorityAnchor, normalized, normalizedBytes = null, barrier = null, label = "private evaluator sealed execution preflight" } = {}) {
   if (!execution?.runner?.path || !execution?.hidden?.path || !execution?.repository?.path || !execution?.frozen?.path || !execution?.candidate?.path || !execution?.evidence?.path) throw new Error(`${label} is incomplete`);
-  if (typeof childExecutor !== "function") throw new Error(`${label} child executor is invalid`);
   const verifiedAuthority = captureVerifiedExecutionAuthority(execution, externalAuthorityAnchor, label);
   const runnerSource = verifiedAuthority.runnerBytes.toString("utf8");
+  return {
+    runnerSource,
+    firstPayload: buildInMemoryEvaluatorPayload({ verifiedAuthority, execution, normalized, normalizedBytes, runIndex: 1, barrier, label }),
+    secondPayload: buildInMemoryEvaluatorPayload({ verifiedAuthority, execution, normalized, normalizedBytes, runIndex: 2, barrier, label }),
+  };
+}
+
+function executeAuthorityOwnedEvaluatorChild({ runnerSource, payload, timeout, label }) {
+  const child = spawnSync(process.execPath, ["--experimental-vm-modules", "--input-type=module", "--eval", runnerSource], {
+    encoding: "utf8",
+    input: `${JSON.stringify(payload)}\n`,
+    maxBuffer: MAX_BOUNDARY_FILE_BYTES,
+    timeout,
+  });
+  if (child.status !== 0 || child.error) throw new Error(`${label} child execution failed${child.error ? `: ${child.error.message}` : child.stderr ? `: ${child.stderr.trim().slice(0, 512)}` : ""}`);
+  return parseRunnerFragment(child.stdout, `${label} child output`);
+}
+
+export function executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot: _repositoryRoot, normalized, normalizedBytes = null, timeout = 30_000, beforeRun = null, afterRun = null, barrier = null, label = "private evaluator sealed execution" } = {}) {
+  const prepared = prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthorityAnchor, normalized, normalizedBytes, barrier, label });
   const run = (runIndex) => {
-    const payload = buildInMemoryEvaluatorPayload({ verifiedAuthority, execution, normalized, normalizedBytes, runIndex, barrier, label });
-    const child = childExecutor(process.execPath, ["--experimental-vm-modules", "--input-type=module", "--eval", runnerSource], {
-      encoding: "utf8",
-      input: `${JSON.stringify(payload)}\n`,
-      maxBuffer: MAX_BOUNDARY_FILE_BYTES,
-      timeout,
-    });
-    if (child.status !== 0 || child.error) throw new Error(`${label} child execution failed${child.error ? `: ${child.error.message}` : child.stderr ? `: ${child.stderr.trim().slice(0, 512)}` : ""}`);
-    return parseRunnerFragment(child.stdout, `${label} child output`);
+    const payload = runIndex === 1 ? prepared.firstPayload : prepared.secondPayload;
+    return executeAuthorityOwnedEvaluatorChild({ runnerSource: prepared.runnerSource, payload, timeout, label });
   };
   const stateA = captureSealedExecutionState(execution, `${label} before run`);
   if (beforeRun) beforeRun({ index: 1, execution, state: stateA });
@@ -2435,7 +2447,7 @@ function validatePrivateEvaluationEvidenceArtifacts({ root, privateEvaluationRoo
   return { canonicalEvaluationRoot, artifacts, repositoryDiffArtifact };
 }
 
-function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, normalized, normalizedBytes, result, scoringInputs, childExecutor = spawnSync }) {
+function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, normalized, normalizedBytes, result, scoringInputs }) {
   if (!privateEvaluationRoot || !privateEvaluationRecordPath || !privateFragmentPath) throw new Error("private evaluation record, root, and fragment paths are required for durable evaluator verification");
   const canonicalEvaluationRoot = assertRealDirectory(privateEvaluationRoot, "private evaluation authority root");
   if (pathsOverlap(canonicalEvaluationRoot, bundle.canonicalPrivateRoot)) throw new Error("private evaluation authority root must not overlap the static evaluator bundle");
@@ -2604,7 +2616,7 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
     candidate: { path: sealedCandidateWorkspace },
     evidence: { path: sealedEvaluationInputRoot },
   };
-  const executed = executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, childExecutor, label: "private hidden evaluator" });
+  const executed = executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, label: "private hidden evaluator" });
   const actualFragment = executed.firstFragment;
   const repeatedFragment = executed.secondFragment;
   const firstBytes = executed.firstBytes;
@@ -2821,7 +2833,6 @@ export function verifyEvaluatorResult({
   runDir,
   normalizedResultsPath,
   publicArtifactRoot = null,
-  sealedEvaluatorChildExecutor = spawnSync,
 }) {
   const bundle = verifyPrivateEvaluatorBundle({ root, referencePath, privateRoot, manifestPath, materializedPath, selectionState, runDir, normalizedResultsPath, publicArtifactRoot });
   if (!resultPath || pathsOverlap(resultPath, privateRoot)) throw new Error("public evaluator result must not overlap the private evaluator root");
@@ -2892,7 +2903,7 @@ export function verifyEvaluatorResult({
     throw new Error("private evaluation root, record, and fragment paths must be supplied together");
   }
   if (requiresPrivateAuthority) {
-    verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, normalized, normalizedBytes: normalizedSource.bytes, result, scoringInputs, childExecutor: sealedEvaluatorChildExecutor });
+    verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEvaluationRecordPath, privateFragmentPath, bundle, normalized, normalizedBytes: normalizedSource.bytes, result, scoringInputs });
   }
   return { bundle, normalized, result, verified, scoringInputs, scoringReady: scoring.scoringReady };
 }

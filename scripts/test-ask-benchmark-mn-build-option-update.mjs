@@ -36,6 +36,7 @@ import {
   EVALUATOR_AUTHORITY_MANIFEST_PATH,
   EVALUATOR_REPOSITORY_DESCRIPTOR_PATH,
   executeSealedEvaluator,
+  prepareSealedEvaluatorExecutionAuthority,
   readEvaluatorAuthorityAnchorFromFreeze,
   readStableWorkspaceInventory,
   SEALED_DIRECTORY_MODE,
@@ -1135,8 +1136,21 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   };
   mkdirSync(common.publicArtifactRoot);
   const before = chain.snapshot();
-  const verifiedResult = verifyEvaluatorBoundary(common);
+  const fakeExecutorCalls = { sealedEvaluatorChildExecutor: 0, childExecutor: 0, executor: 0 };
+  const fakeExecutorOptions = Object.fromEntries(Object.keys(fakeExecutorCalls).map((property) => [property, () => {
+    fakeExecutorCalls[property] += 1;
+    return {
+      status: 0,
+      error: null,
+      stdout: `${JSON.stringify(finalExecuted.firstFragment)}\n`,
+      stderr: "",
+    };
+  }]));
+  const verifiedResult = verifyEvaluatorBoundary({ ...common, ...fakeExecutorOptions });
   assert.deepEqual(chain.snapshot(), before, `full evaluator authority must be read-only for ${state}`);
+  if (state === "executed_success" && !candidateMutator) {
+    for (const property of Object.keys(fakeExecutorCalls)) assert.equal(fakeExecutorCalls[property], 0, `production verifier must not invoke caller-supplied ${property}`);
+  }
   const originalResultBytes = readFileSync(chain.evaluatorResultPath);
   const expectPersistentFailure = (label, mutate, pattern) => {
     const changed = JSON.parse(originalResultBytes.toString("utf8"));
@@ -1334,35 +1348,106 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       writeFileSync(evaluatorCheckPath, originalEvaluatorCheckBytes);
       assert.deepEqual(chain.snapshot(), before, `private authority tamper must restore ${label}`);
     };
-    const expectZeroChildFailure = (label, options, pattern) => {
-      let childExecutions = 0;
-      assert.throws(() => verifyEvaluatorBoundary({
-        ...options,
-        sealedEvaluatorChildExecutor() { childExecutions += 1; throw new Error("hidden evaluator child must not run"); },
-      }), pattern, `${label} must fail before hidden evaluator execution`);
-      assert.equal(childExecutions, 0, `${label} must invoke the hidden evaluator child zero times`);
+    const expectPreExecutionFailure = (label, options, pattern) => {
+      assert.throws(() => verifyEvaluatorBoundary(options), pattern, `${label} must fail in verifier preflight before hidden evaluator execution`);
     };
+    const forgedFragment = JSON.parse(originalFragmentBytes.toString("utf8"));
+    const forgedRerun = forgedFragment.evaluator_rerun ?? {
+      role: "candidate_correctness_only",
+      contributes_to_agent_verification_requirement: false,
+      results: [],
+    };
+    forgedFragment.evaluator_rerun = {
+      ...forgedRerun,
+      results: [
+        ...forgedRerun.results,
+        {
+          command_id: "forged-fragment-bypass",
+          outcome: "succeeded",
+          exit_code: 0,
+          evidence_role: "candidate_correctness_only",
+        },
+      ],
+    };
+    const forgedFragmentBytes = Buffer.from(`${JSON.stringify(forgedFragment, null, 2)}\n`);
+    const forgedFragmentDigest = sha256(forgedFragmentBytes);
+    const forgedAdapterAuthority = {
+      ...finalAdapterAuthority,
+      privateFragmentDigest: forgedFragmentDigest,
+      privateFragmentBytes: forgedFragmentBytes.length,
+    };
+    const forgedDraftResult = adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: forgedFragment, authority: forgedAdapterAuthority });
+    const forgedRecord = JSON.parse(originalRecordBytes.toString("utf8"));
+    forgedRecord.first_run_fragment_sha256 = forgedFragmentDigest;
+    forgedRecord.first_run_fragment_bytes = forgedFragmentBytes.length;
+    forgedRecord.second_run_fragment_sha256 = forgedFragmentDigest;
+    forgedRecord.second_run_fragment_bytes = forgedFragmentBytes.length;
+    forgedRecord.private_fragment_sha256 = forgedFragmentDigest;
+    forgedRecord.private_fragment_bytes = forgedFragmentBytes.length;
+    const forgedFrozenInventory = readStableWorkspaceInventory(resolve(authorityRoot, "frozen-workspace"), "forged record original frozen workspace");
+    const forgedCandidateInventory = readStableWorkspaceInventory(resolve(authorityRoot, "candidate-workspace"), "forged record original candidate workspace");
+    forgedRecord.frozen_workspace_original_identity = { portable_digest: forgedFrozenInventory.digest, runtime_digest: forgedFrozenInventory.runtimeDigest, root: forgedFrozenInventory.rootIdentity };
+    forgedRecord.candidate_workspace_original_identity = { portable_digest: forgedCandidateInventory.digest, runtime_digest: forgedCandidateInventory.runtimeDigest, root: forgedCandidateInventory.rootIdentity };
+    forgedRecord.frozen_workspace_inventory_digest = forgedFrozenInventory.digest;
+    forgedRecord.candidate_workspace_inventory_digest = forgedCandidateInventory.digest;
+    const forgedSealedRepository = readStableWorkspaceInventory(finalExecution.repository.path, "forged record sealed repository");
+    const forgedSealedFrozen = readStableWorkspaceInventory(finalExecution.frozen.path, "forged record sealed frozen workspace");
+    const forgedSealedCandidate = readStableWorkspaceInventory(finalExecution.candidate.path, "forged record sealed candidate workspace");
+    const forgedSealedEvidence = readStableWorkspaceInventory(finalExecution.evidence.path, "forged record sealed evidence workspace");
+    forgedRecord.sealed_repository_portable_digest = forgedSealedRepository.digest;
+    forgedRecord.sealed_repository_runtime_digest = forgedSealedRepository.runtimeDigest;
+    forgedRecord.sealed_repository_root_identity_before = forgedSealedRepository.rootIdentity;
+    forgedRecord.frozen_workspace_sealed_inventory_digest = forgedSealedFrozen.digest;
+    forgedRecord.frozen_workspace_sealed_runtime_digest = forgedSealedFrozen.runtimeDigest;
+    forgedRecord.candidate_workspace_sealed_inventory_digest = forgedSealedCandidate.digest;
+    forgedRecord.candidate_workspace_sealed_runtime_digest = forgedSealedCandidate.runtimeDigest;
+    forgedRecord.evaluation_input_evidence_sealed_inventory_digest = forgedSealedEvidence.digest;
+    forgedRecord.evaluation_input_evidence_sealed_runtime_digest = forgedSealedEvidence.runtimeDigest;
+    forgedRecord.adapter_result_envelope_digest = computeAdapterResultEnvelopeDigest(forgedDraftResult);
+    forgedRecord.evaluation_record_digest = computePrivateEvaluationRecordDigest(forgedRecord);
+    const forgedResult = adaptPrivateEvaluatorFragmentToEnvelope({
+      root,
+      fragment: forgedFragment,
+      authority: { ...forgedAdapterAuthority, privateEvaluationRecordDigest: forgedRecord.evaluation_record_digest },
+    });
+    writeJson(chain.privateFragmentPath, forgedFragment);
+    writeJson(privateRecord.recordPath, forgedRecord);
+    writeJson(chain.evaluatorResultPath, forgedResult);
+    let forgedExecutorCalls = 0;
+    const forgedExecutor = () => {
+      forgedExecutorCalls += 1;
+      return { status: 0, error: null, stdout: forgedFragmentBytes.toString("utf8"), stderr: "" };
+    };
+    assert.throws(() => verifyEvaluatorBoundary({
+      ...common,
+      sealedEvaluatorChildExecutor: forgedExecutor,
+    }), /persisted private fragment bytes do not match the sealed hidden evaluator output|unauthorized.*executor/u, "full production verifier must reject a self-consistent forged fragment instead of using caller output");
+    assert.equal(forgedExecutorCalls, 0, "forged-fragment executor must never be invoked by the production verifier");
+    writeFileSync(chain.evaluatorResultPath, originalResultBytes);
+    writeFileSync(privateRecord.recordPath, originalRecordBytes);
+    writeFileSync(chain.privateFragmentPath, originalFragmentBytes);
+    assert.deepEqual(chain.snapshot(), before, "forged-fragment bypass negative must restore the persistent authority chain");
     const recordAuthorityDrift = JSON.parse(originalRecordBytes.toString("utf8"));
     recordAuthorityDrift.sealed_repository_evaluator_authority_manifest_path = "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/drifted-authority-manifest.json";
     recordAuthorityDrift.sealed_repository_evaluator_authority_manifest_raw_sha256 = `sha256:${"3".repeat(64)}`;
     recordAuthorityDrift.sealed_repository_evaluator_authority_manifest_digest = `sha256:${"4".repeat(64)}`;
     recordAuthorityDrift.evaluation_record_digest = computePrivateEvaluationRecordDigest(recordAuthorityDrift);
     writeJson(privateRecord.recordPath, recordAuthorityDrift);
-    expectZeroChildFailure("private record-only authority reseal", common, /private evaluation record evaluator authority manifest closure.*external freeze authority/u);
+    expectPreExecutionFailure("private record-only authority reseal", common, /private evaluation record evaluator authority manifest closure.*external freeze authority/u);
     writeFileSync(privateRecord.recordPath, originalRecordBytes);
     const originalReferenceBytes = readFileSync(scoringAuthority.referencePath);
     const replacedReference = JSON.parse(originalReferenceBytes.toString("utf8"));
     replacedReference.evaluator_authority_manifest_raw_sha256 = `sha256:${"5".repeat(64)}`;
     replacedReference.public_metadata_digest = computeEvaluatorReferenceDigest(replacedReference);
     writeJson(scoringAuthority.referencePath, replacedReference);
-    expectZeroChildFailure("public reference-only replacement", common, /raw-byte digest.*freeze manifest|public reference.*closure/u);
+    expectPreExecutionFailure("public reference-only replacement", common, /raw-byte digest.*freeze manifest|public reference.*closure/u);
     writeFileSync(scoringAuthority.referencePath, originalReferenceBytes);
     const originalFreezeBytes = readFileSync(scoringAuthority.freezeManifestPath);
     const staleFreeze = JSON.parse(originalFreezeBytes.toString("utf8"));
     staleFreeze.evaluator_authority_manifest.raw_byte_digest = `sha256:${"6".repeat(64)}`;
     staleFreeze.manifest_digest = computeScoringInputFreezeManifestDigest(staleFreeze);
     writeJson(scoringAuthority.freezeManifestPath, staleFreeze);
-    expectZeroChildFailure("stale scoring freeze manifest", { ...common, scoringInputFreezeManifestSourceDigest: authorityFileDigest(scoringAuthority.freezeManifestPath) }, /evaluator authority manifest raw-byte digest.*freeze manifest|raw-byte digest does not match/u);
+    expectPreExecutionFailure("stale scoring freeze manifest", { ...common, scoringInputFreezeManifestSourceDigest: authorityFileDigest(scoringAuthority.freezeManifestPath) }, /evaluator authority manifest raw-byte digest.*freeze manifest|raw-byte digest does not match/u);
     writeFileSync(scoringAuthority.freezeManifestPath, originalFreezeBytes);
     assert.deepEqual(chain.snapshot(), before, "external authority closure negatives must restore the persistent authority chain");
     expectPrivateFailure("runner source identity missing", ({ record }) => { delete record.evaluator_runner_source_identity; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /Schema|runner source identity|record/u);
@@ -1677,32 +1762,28 @@ function resealedFixtureAuthorityExecution(execution, changedPaths) {
 }
 
 function runExternalFreezeAnchorNegativeChecks({ execution, externalAuthorityAnchor, normalized, normalizedBytes }) {
-  const expectNoChild = (label, candidateExecution, candidateAnchor, pattern = /external|freeze authority|anchor|manifest|fixture/u) => {
-    let childExecutions = 0;
-    assert.throws(() => executeSealedEvaluator({
+  const expectPreflightFailure = (label, candidateExecution, candidateAnchor, pattern = /external|freeze authority|anchor|manifest|fixture/u) => {
+    assert.throws(() => prepareSealedEvaluatorExecutionAuthority({
       execution: candidateExecution,
       externalAuthorityAnchor: candidateAnchor,
-      repositoryRoot: root,
       normalized,
       normalizedBytes,
-      childExecutor() { childExecutions += 1; throw new Error("child executor must not run"); },
       label: `R16 external freeze negative ${label}`,
-    }), pattern, `${label} must fail before hidden evaluator execution`);
-    assert.equal(childExecutions, 0, `${label} must invoke the hidden evaluator child zero times`);
+    }), pattern, `${label} must fail in read-only preflight before hidden evaluator execution`);
   };
-  expectNoChild("missing anchor", execution, null, /external evaluator authority anchor is required/u);
+  expectPreflightFailure("missing anchor", execution, null, /external evaluator authority anchor is required/u);
   for (const changedPath of EVALUATOR_AUTHORITY_FILE_PATHS) {
-    expectNoChild(`single-file reseal ${changedPath}`, resealedFixtureAuthorityExecution(execution, [changedPath]), externalAuthorityAnchor);
+    expectPreflightFailure(`single-file reseal ${changedPath}`, resealedFixtureAuthorityExecution(execution, [changedPath]), externalAuthorityAnchor);
   }
-  expectNoChild("five-file authority transplant", resealedFixtureAuthorityExecution(execution, EVALUATOR_AUTHORITY_FILE_PATHS), externalAuthorityAnchor);
+  expectPreflightFailure("five-file authority transplant", resealedFixtureAuthorityExecution(execution, EVALUATOR_AUTHORITY_FILE_PATHS), externalAuthorityAnchor);
   const mutateAnchor = (mutate) => { const changed = structuredClone(externalAuthorityAnchor); mutate(changed); return changed; };
-  expectNoChild("manifest path drift", execution, mutateAnchor((anchor) => { anchor.evaluator_authority_manifest_path = "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/drifted-authority-manifest.json"; }));
-  expectNoChild("manifest raw-byte digest drift", execution, mutateAnchor((anchor) => { anchor.evaluator_authority_manifest_raw_sha256 = `sha256:${"0".repeat(64)}`; }));
-  expectNoChild("manifest semantic digest drift", execution, mutateAnchor((anchor) => { anchor.evaluator_authority_manifest_digest = `sha256:${"1".repeat(64)}`; }));
-  expectNoChild("evaluator revision drift", execution, mutateAnchor((anchor) => { anchor.evaluator_revision = "0".repeat(40); }));
-  expectNoChild("manifest inventory omission", execution, mutateAnchor((anchor) => { anchor.file_inventory.pop(); }));
-  expectNoChild("manifest inventory addition", execution, mutateAnchor((anchor) => { anchor.file_inventory.push({ path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/added.json", bytes: 1, raw_sha256: `sha256:${"2".repeat(64)}` }); }));
-  expectNoChild("manifest inventory duplicate", execution, mutateAnchor((anchor) => { anchor.file_inventory[1] = structuredClone(anchor.file_inventory[0]); }));
+  expectPreflightFailure("manifest path drift", execution, mutateAnchor((anchor) => { anchor.evaluator_authority_manifest_path = "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/drifted-authority-manifest.json"; }));
+  expectPreflightFailure("manifest raw-byte digest drift", execution, mutateAnchor((anchor) => { anchor.evaluator_authority_manifest_raw_sha256 = `sha256:${"0".repeat(64)}`; }));
+  expectPreflightFailure("manifest semantic digest drift", execution, mutateAnchor((anchor) => { anchor.evaluator_authority_manifest_digest = `sha256:${"1".repeat(64)}`; }));
+  expectPreflightFailure("evaluator revision drift", execution, mutateAnchor((anchor) => { anchor.evaluator_revision = "0".repeat(40); }));
+  expectPreflightFailure("manifest inventory omission", execution, mutateAnchor((anchor) => { anchor.file_inventory.pop(); }));
+  expectPreflightFailure("manifest inventory addition", execution, mutateAnchor((anchor) => { anchor.file_inventory.push({ path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/added.json", bytes: 1, raw_sha256: `sha256:${"2".repeat(64)}` }); }));
+  expectPreflightFailure("manifest inventory duplicate", execution, mutateAnchor((anchor) => { anchor.file_inventory[1] = structuredClone(anchor.file_inventory[0]); }));
 }
 
 function barrierPrefix({ directory, run_index, stage, authority_kind, path }) {
