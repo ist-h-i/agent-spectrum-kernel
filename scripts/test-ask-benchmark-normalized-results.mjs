@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
@@ -245,6 +245,37 @@ try {
   writeJson(normalizedOnlyPath, normalizedOnlyRecord);
   assert.match(run(["verify-normalized-results", ...common(completedRun), "--output", normalizedOnlyReseal], { expectedStatus: 1 }).stderr, /inventory evidence|normalized attempt reference|source attempt evidence/u, "normalized-result-only workspace authority reseal must be rejected by full verification");
 
+  const coordinatedNormalizedReseal = resolve(work, "coordinated-normalized-result-reseal");
+  cpSync(normalized, coordinatedNormalizedReseal, { recursive: true });
+  const coordinatedGeneration = readGeneration(coordinatedNormalizedReseal);
+  const coordinatedManifestPath = resolve(coordinatedGeneration.path, "normalized-run.json");
+  const coordinatedManifest = coordinatedGeneration.manifest;
+  const coordinatedCase = coordinatedManifest.cases.find((entry) => entry.case_id === completedPlain.case_id);
+  const coordinatedReference = coordinatedCase.normalized_attempts[0];
+  const coordinatedPath = resolve(coordinatedGeneration.path, coordinatedReference.path);
+  const coordinatedRecord = JSON.parse(readFileSync(coordinatedPath, "utf8"));
+  coordinatedRecord.lineage.terminal_workspace_tree_digest = `sha256:${"0".repeat(64)}`;
+  const { normalized_result_id: coordinatedOldId, normalized_result_digest: coordinatedOldDigest, ...coordinatedRecordBase } = coordinatedRecord;
+  coordinatedRecord.normalized_result_digest = canonicalDigest(coordinatedRecordBase);
+  coordinatedRecord.normalized_result_id = `normalized-${canonicalDigest({ run_instance_id: coordinatedRecordBase.lineage.run_instance_id, case_id: coordinatedRecordBase.lineage.case_id, attempt: coordinatedRecordBase.lineage.attempt, normalized_result_digest: coordinatedRecord.normalized_result_digest }).slice("sha256:".length, "sha256:".length + 32)}`;
+  writeJson(coordinatedPath, coordinatedRecord);
+  coordinatedReference.normalized_result_id = coordinatedRecord.normalized_result_id;
+  coordinatedReference.normalized_result_digest = coordinatedRecord.normalized_result_digest;
+  const coordinatedInventory = coordinatedManifest.inventory.find((entry) => entry.path === coordinatedReference.path);
+  coordinatedInventory.sha256 = fileDigest(coordinatedPath);
+  coordinatedInventory.bytes = statSync(coordinatedPath).size;
+  const coordinatedSnapshotCase = coordinatedManifest.source_snapshot.cases.find((entry) => entry.case_id === completedPlain.case_id);
+  coordinatedSnapshotCase.committed_attempts[0].terminal_workspace_tree_digest = coordinatedRecord.lineage.terminal_workspace_tree_digest;
+  coordinatedManifest.source_snapshot_digest = canonicalDigest(coordinatedManifest.source_snapshot);
+  coordinatedManifest.output_root_identity = canonicalDigest({ run_instance_id: coordinatedManifest.source.run_instance_id, plan_id: coordinatedManifest.source.plan_id, normalizer_version: coordinatedManifest.normalizer.version, source_snapshot_digest: coordinatedManifest.source_snapshot_digest });
+  coordinatedManifest.publication_digest = canonicalDigest({ source_snapshot_digest: coordinatedManifest.source_snapshot_digest, inventory: coordinatedManifest.inventory });
+  const { normalized_run_digest: coordinatedOldRunDigest, ...coordinatedManifestBase } = coordinatedManifest;
+  coordinatedManifest.normalized_run_digest = canonicalDigest(coordinatedManifestBase);
+  writeJson(coordinatedManifestPath, coordinatedManifest);
+  const coordinatedRenamedGeneration = resolve(dirname(coordinatedGeneration.path), `snapshot-${coordinatedManifest.source_snapshot_digest.slice("sha256:".length)}`);
+  renameSync(coordinatedGeneration.path, coordinatedRenamedGeneration);
+  assert.match(run(["verify-normalized-results", ...common(completedRun), "--output", coordinatedNormalizedReseal], { expectedStatus: 1 }).stderr, /source snapshot|generation|current normalized|publication/u, "coordinated normalized result reseal must be rejected against verified attempt authority");
+
   const failedRun = resolve(work, "failed-run");
   const failedCase = caseFor("codex", "kernel_only", 1);
   execute(failedRun, failedCase, codexRuntime, codexBin, { FAKE_MODE: "fail" });
@@ -320,7 +351,7 @@ try {
   invalidCommit.status = "invalid";
   invalidCommit.result_sha256 = fileDigest(invalidResultPath);
   writeJson(invalidCommitPath, invalidCommit);
-  writeJson(invalidStatePath, { ...invalidState, status: "invalid" });
+  writeJson(invalidStatePath, { ...invalidState, status: "invalid", terminal_commit_digest: fileDigest(invalidCommitPath) });
   const invalidOutput = resolve(work, "normalized-invalid");
   normalize(invalidRun, invalidOutput);
   const invalidManifest = readGeneration(invalidOutput).manifest;
@@ -363,6 +394,12 @@ try {
         const commit = JSON.parse(readFileSync(commitPath, "utf8"));
         commit.result_sha256 = fileDigest(resultPath);
         writeJson(commitPath, commit);
+      }
+      const statePath = resolve(target, "cases", caseName, "state.json");
+      const state = JSON.parse(readFileSync(statePath, "utf8"));
+      if (state.terminal_attempt) {
+        state.terminal_commit_digest = fileDigest(resolve(attemptsRoot, state.terminal_attempt, "commit.json"));
+        writeJson(statePath, state);
       }
     }
     return target;

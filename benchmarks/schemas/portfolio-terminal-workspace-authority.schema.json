@@ -41,15 +41,18 @@
     "terminal_candidate_tree_digest": { "$ref": "#/$defs/digest" },
     "base_inventory": {
       "type": "array",
+      "maxItems": 20000,
       "items": { "$ref": "#/$defs/inventoryEntry" }
     },
     "managed_asset_paths": {
       "type": "array",
+      "maxItems": 20000,
       "uniqueItems": true,
       "items": { "$ref": "#/$defs/relativePath" }
     },
     "delta_inventory": {
       "type": "array",
+      "maxItems": 20000,
       "items": { "$ref": "#/$defs/deltaEntry" }
     },
     "authority_digest": { "$ref": "#/$defs/digest" },
@@ -61,7 +64,8 @@
     "relativePath": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)(?!.*(?:^|/)\\.(?:/|$)).+$"
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*:)(?!.*\\\\)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)[^\\u0000]+$"
     },
     "fileMetadata": {
       "type": "object",

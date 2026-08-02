@@ -4,13 +4,12 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
   realpathSync,
-  statSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, parse, relative, resolve, sep } from "node:path";
+import { dirname, parse, resolve, sep } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { assertStableFileEvidence, readStableFile } from "./ask-benchmark-stable-file.mjs";
@@ -18,8 +17,15 @@ import { assertStableFileEvidence, readStableFile } from "./ask-benchmark-stable
 export const TERMINAL_WORKSPACE_AUTHORITY_SCHEMA_PATH = "benchmarks/schemas/portfolio-terminal-workspace-authority.schema.json";
 export const TERMINAL_WORKSPACE_AUTHORITY_PATH = "terminal-workspace-authority.json";
 export const TERMINAL_WORKSPACE_AUTHORITY_VERSION = "1.0.0";
-const MAX_AUTHORITY_BYTES = 64 * 1024 * 1024;
-const MAX_INVENTORY_ENTRIES = 20_000;
+export const TERMINAL_WORKSPACE_LIMITS = Object.freeze({
+  maximum_file_count: 20_000,
+  maximum_per_file_bytes: 8 * 1024 * 1024,
+  maximum_workspace_total_bytes: 128 * 1024 * 1024,
+  maximum_changed_content_bytes: 6 * 1024 * 1024,
+  maximum_serialized_authority_bytes: 8 * 1024 * 1024,
+  maximum_portable_path_length: 240,
+});
+const MAX_AUTHORITY_BYTES = TERMINAL_WORKSPACE_LIMITS.maximum_serialized_authority_bytes;
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -41,28 +47,56 @@ function assertNoSymlinkSegments(path, label) {
 }
 
 export function assertTerminalWorkspaceRelativePath(value, label = "terminal workspace path") {
-  if (typeof value !== "string" || value.length === 0 || value.includes("\\") || value.startsWith("/") || value.split("/").some((part) => part === "" || part === "." || part === "..")) {
+  if (
+    typeof value !== "string"
+    || value.length === 0
+    || value.length > TERMINAL_WORKSPACE_LIMITS.maximum_portable_path_length
+    || value !== value.normalize("NFC")
+    || value.includes("\\")
+    || value.includes(":")
+    || value.includes("\0")
+    || value.startsWith("/")
+    || value.split("/").some((part) => part === "" || part === "." || part === "..")
+  ) {
     throw new Error(`${label} is not a portable relative path`);
   }
   return value;
 }
 
-function assertCanonicalInventory(entries, label) {
-  if (!Array.isArray(entries) || entries.length > MAX_INVENTORY_ENTRIES) throw new Error(`${label} exceeds the inventory limit`);
+function comparePaths(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function assertCanonicalPaths(entries, label) {
+  if (!Array.isArray(entries) || entries.length > TERMINAL_WORKSPACE_LIMITS.maximum_file_count) throw new Error(`${label} exceeds the inventory limit`);
   const paths = entries.map((entry) => assertTerminalWorkspaceRelativePath(entry?.path, `${label} path`));
   if (new Set(paths).size !== paths.length) throw new Error(`${label} contains a duplicate path`);
   const folded = paths.map((path) => path.normalize("NFC").toLowerCase());
   if (new Set(folded).size !== folded.length) throw new Error(`${label} contains a case-colliding path`);
-  const sorted = [...paths].sort((left, right) => left.localeCompare(right));
+  const sorted = [...paths].sort(comparePaths);
   if (stableCanonicalJson(paths) !== stableCanonicalJson(sorted)) throw new Error(`${label} is not canonically ordered`);
+  return paths;
+}
+
+export function validateTerminalWorkspaceTreeInventory(entries, label = "terminal workspace tree inventory") {
+  const paths = assertCanonicalPaths(entries, label);
   const byPath = new Map(entries.map((entry) => [entry.path, entry]));
   for (const path of paths) {
+    const entry = byPath.get(path);
+    if (!entry || !["regular_file", "directory"].includes(entry.file_type) || !/^0[0-7]{3}$/u.test(entry.mode)) throw new Error(`${label} contains invalid entry metadata: ${path}`);
+    if (entry.file_type === "regular_file") {
+      if (!Number.isInteger(entry.bytes) || entry.bytes < 0 || !/^[a-f0-9]{64}$/u.test(entry.sha256 ?? "")) throw new Error(`${label} contains invalid regular file metadata: ${path}`);
+    } else if (entry.bytes !== null || entry.sha256 !== null) {
+      throw new Error(`${label} directory contains file metadata: ${path}`);
+    }
     const segments = path.split("/");
     for (let index = 1; index < segments.length; index += 1) {
       const ancestor = byPath.get(segments.slice(0, index).join("/"));
-      if (ancestor?.file_type === "regular_file") throw new Error(`${label} places an entry below a regular file`);
+      if (!ancestor) throw new Error(`${label} omits a parent directory for ${path}`);
+      if (ancestor.file_type !== "directory") throw new Error(`${label} places an entry below a regular file`);
     }
   }
+  return entries;
 }
 
 function portableEntry(path, status, bytes = null) {
@@ -73,35 +107,109 @@ function portableEntry(path, status, bytes = null) {
   return { path, file_type: "regular_file", mode: modeOf(status), bytes: content.length, sha256: sha256(content) };
 }
 
-export function captureTerminalWorkspaceInventory(workspaceRoot) {
-  const root = resolve(workspaceRoot);
-  assertNoSymlinkSegments(root, "terminal workspace root");
-  if (!existsSync(root) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) throw new Error("terminal workspace root must be a real directory");
+function statusIdentity(status, canonicalPath) {
+  return {
+    canonical_path: canonicalPath,
+    dev: status.dev,
+    ino: status.ino,
+    nlink: status.nlink,
+    mode: status.mode & 0o777,
+    size: status.size,
+    mtime_ms: status.mtimeMs,
+    ctime_ms: status.ctimeMs,
+  };
+}
+
+function assertSameIdentity(before, after, label) {
+  if (stableCanonicalJson(before) !== stableCanonicalJson(after)) throw new Error(`${label} changed during terminal workspace capture`);
+}
+
+function scanTerminalWorkspace(root, scan, inspectionHook) {
   const inventory = [];
   const contents = new Map();
-  const visit = (directory) => {
-    for (const item of readdirSync(directory, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
-      const absolute = resolve(directory, item.name);
-      const path = relative(root, absolute).split(sep).join("/");
+  const identities = new Map();
+  let totalBytes = 0;
+  const observe = (event) => {
+    if (inspectionHook !== null) inspectionHook({ ...event, scan });
+  };
+  const visit = (directory, directoryPath = null) => {
+    assertNoSymlinkSegments(directory, `terminal workspace directory ${directoryPath ?? "."}`);
+    const initialStatus = lstatSync(directory);
+    if (initialStatus.isSymbolicLink() || !initialStatus.isDirectory()) throw new Error(`terminal workspace directory changed type: ${directoryPath ?? "."}`);
+    const initialCanonicalPath = realpathSync(directory);
+    const initialIdentity = statusIdentity(initialStatus, initialCanonicalPath);
+    observe({ phase: "directory_inspected", path: directoryPath });
+    const beforeReadStatus = lstatSync(directory);
+    const beforeReadCanonicalPath = realpathSync(directory);
+    assertSameIdentity(initialIdentity, statusIdentity(beforeReadStatus, beforeReadCanonicalPath), `terminal workspace directory ${directoryPath ?? "."}`);
+    const names = readdirSync(directory).sort(comparePaths);
+    observe({ phase: "directory_entries_read", path: directoryPath, names: [...names] });
+    for (const name of names) {
+      const absolute = resolve(directory, name);
+      const path = directoryPath === null ? name : `${directoryPath}/${name}`;
       assertTerminalWorkspaceRelativePath(path);
+      assertNoSymlinkSegments(absolute, `terminal workspace entry ${path}`);
       const status = lstatSync(absolute);
       if (status.isSymbolicLink()) throw new Error(`terminal workspace contains a symlink: ${path}`);
       if (status.isDirectory()) {
         inventory.push(portableEntry(path, status));
-        visit(absolute);
+        visit(absolute, path);
       } else if (status.isFile()) {
-        const bytes = readFileSync(absolute);
-        inventory.push(portableEntry(path, status, bytes));
-        contents.set(path, bytes);
+        const file = readStableFile(absolute, `terminal workspace file ${path}`, TERMINAL_WORKSPACE_LIMITS.maximum_per_file_bytes, {
+          afterOpen: () => observe({ phase: "file_descriptor_opened", path }),
+        });
+        const finalStatus = lstatSync(absolute);
+        if (finalStatus.nlink !== 1 || (finalStatus.mode & 0o777) !== file.evidence.finalPath.mode || finalStatus.dev !== file.evidence.finalPath.dev || finalStatus.ino !== file.evidence.finalPath.ino) throw new Error(`terminal workspace file identity changed: ${path}`);
+        inventory.push(portableEntry(path, finalStatus, file.bytes));
+        contents.set(path, file.bytes);
+        identities.set(path, { canonical_path: file.canonicalPath, evidence: file.evidence, raw_digest: file.rawByteDigest });
+        totalBytes += file.bytes.length;
+        if (totalBytes > TERMINAL_WORKSPACE_LIMITS.maximum_workspace_total_bytes) throw new Error("terminal workspace exceeds the total byte limit");
       } else {
         throw new Error(`terminal workspace contains a special file: ${path}`);
       }
+      if (inventory.length > TERMINAL_WORKSPACE_LIMITS.maximum_file_count) throw new Error("terminal workspace exceeds the file count limit");
     }
+    const finalStatus = lstatSync(directory);
+    if (finalStatus.isSymbolicLink() || !finalStatus.isDirectory()) throw new Error(`terminal workspace directory changed type: ${directoryPath ?? "."}`);
+    const finalCanonicalPath = realpathSync(directory);
+    const finalIdentity = statusIdentity(finalStatus, finalCanonicalPath);
+    assertSameIdentity(initialIdentity, finalIdentity, `terminal workspace directory ${directoryPath ?? "."}`);
+    identities.set(directoryPath ?? "", { ...finalIdentity, entries: names });
   };
   visit(root);
-  inventory.sort((left, right) => left.path.localeCompare(right.path));
-  assertCanonicalInventory(inventory, "terminal workspace inventory");
-  return { inventory, contents };
+  inventory.sort((left, right) => comparePaths(left.path, right.path));
+  validateTerminalWorkspaceTreeInventory(inventory, "terminal workspace inventory");
+  return { inventory, contents, identities, totalBytes };
+}
+
+function captureTerminalWorkspaceInventoryUnchecked(workspaceRoot, { inspectionHook = null } = {}) {
+  const root = resolve(workspaceRoot);
+  assertNoSymlinkSegments(root, "terminal workspace root");
+  if (!existsSync(root)) throw new Error("terminal workspace root must be a real directory");
+  const rootStatus = lstatSync(root);
+  if (!rootStatus.isDirectory() || rootStatus.isSymbolicLink()) throw new Error("terminal workspace root must be a real directory");
+  const rootIdentity = statusIdentity(rootStatus, realpathSync(root));
+  const first = scanTerminalWorkspace(root, 1, inspectionHook);
+  if (inspectionHook !== null) inspectionHook({ phase: "scan_completed", scan: 1, path: null });
+  const second = scanTerminalWorkspace(root, 2, inspectionHook);
+  if (inspectionHook !== null) inspectionHook({ phase: "scan_completed", scan: 2, path: null });
+  const finalStatus = lstatSync(root);
+  if (!finalStatus.isDirectory() || finalStatus.isSymbolicLink()) throw new Error("terminal workspace root changed type during capture");
+  assertSameIdentity(rootIdentity, statusIdentity(finalStatus, realpathSync(root)), "terminal workspace root");
+  if (stableCanonicalJson(first.inventory) !== stableCanonicalJson(second.inventory) || stableCanonicalJson([...first.identities]) !== stableCanonicalJson([...second.identities])) throw new Error("terminal workspace changed between canonical scans");
+  for (const [path, bytes] of first.contents) if (!second.contents.get(path)?.equals(bytes)) throw new Error(`terminal workspace content changed between scans: ${path}`);
+  return { inventory: second.inventory, contents: second.contents };
+}
+
+export function captureTerminalWorkspaceInventory(workspaceRoot, options = {}) {
+  try {
+    return captureTerminalWorkspaceInventoryUnchecked(workspaceRoot, options);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/terminal workspace/u.test(message)) throw error;
+    throw new Error(`terminal workspace capture failed: ${message}`);
+  }
 }
 
 function metadata(entry, content = null) {
@@ -123,9 +231,24 @@ function inventoryDigest(inventory) {
   return canonicalDigest(inventory.map((entry) => ({ path: entry.path, ...comparable(entry) })));
 }
 
-function candidateInventory(inventory, managedAssetPaths) {
+function candidateInventory(inventory, managedAssetPaths, baseInventory) {
   const managed = new Set(managedAssetPaths);
-  return inventory.filter((entry) => entry.path !== "BENCHMARK_TASK.md" && !managed.has(entry.path));
+  const basePaths = new Set(baseInventory.map((entry) => entry.path));
+  const managedAncestors = new Set();
+  for (const path of [...managed, "BENCHMARK_TASK.md"]) {
+    const segments = path.split("/");
+    for (let index = 1; index < segments.length; index += 1) managedAncestors.add(segments.slice(0, index).join("/"));
+  }
+  const retained = inventory.filter((entry) => entry.path !== "BENCHMARK_TASK.md" && !managed.has(entry.path));
+  const retainedNonManaged = retained.filter((entry) => entry.file_type === "regular_file" || !managedAncestors.has(entry.path) || !basePaths.has(entry.path));
+  const requiredDirectories = new Set(retainedNonManaged.filter((entry) => entry.file_type === "directory" && !basePaths.has(entry.path)).map((entry) => entry.path));
+  for (const entry of retainedNonManaged) {
+    const segments = entry.path.split("/");
+    for (let index = 1; index < segments.length; index += 1) requiredDirectories.add(segments.slice(0, index).join("/"));
+  }
+  const candidate = retained.filter((entry) => entry.file_type === "regular_file" || !managedAncestors.has(entry.path) || requiredDirectories.has(entry.path));
+  validateTerminalWorkspaceTreeInventory(candidate, "terminal candidate inventory");
+  return candidate;
 }
 
 function authoritySemanticBase(authority) {
@@ -137,6 +260,7 @@ export function terminalWorkspaceAuthorityBytes(authority) {
   let value = { ...authority, authority_bytes: 0 };
   for (let index = 0; index < 8; index += 1) {
     const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
+    if (bytes.length > MAX_AUTHORITY_BYTES) throw new Error("terminal workspace authority exceeds the serialized byte limit");
     if (value.authority_bytes === bytes.length) return bytes;
     value = { ...value, authority_bytes: bytes.length };
   }
@@ -145,20 +269,27 @@ export function terminalWorkspaceAuthorityBytes(authority) {
 
 export function buildTerminalWorkspaceAuthority({ root, baseSnapshot, terminalWorkspaceRoot, identity, managedAssetPaths }) {
   const terminal = captureTerminalWorkspaceInventory(terminalWorkspaceRoot);
-  const managed = [...new Set(managedAssetPaths.map((path) => assertTerminalWorkspaceRelativePath(path, "managed asset path")))].sort((left, right) => left.localeCompare(right));
-  assertCanonicalInventory(baseSnapshot.inventory, "base workspace inventory");
+  const managed = [...new Set(managedAssetPaths.map((path) => assertTerminalWorkspaceRelativePath(path, "managed asset path")))].sort(comparePaths);
+  validateTerminalWorkspaceTreeInventory(baseSnapshot.inventory, "base workspace inventory");
   const baseByPath = new Map(baseSnapshot.inventory.map((entry) => [entry.path, entry]));
   const terminalByPath = new Map(terminal.inventory.map((entry) => [entry.path, entry]));
-  const paths = [...new Set([...baseByPath.keys(), ...terminalByPath.keys()])].sort((left, right) => left.localeCompare(right));
+  const paths = [...new Set([...baseByPath.keys(), ...terminalByPath.keys()])].sort(comparePaths);
   const delta = [];
+  let changedContentBytes = 0;
   for (const path of paths) {
     const before = baseByPath.get(path) ?? null;
     const after = terminalByPath.get(path) ?? null;
     if (stableCanonicalJson(comparable(before)) === stableCanonicalJson(comparable(after))) continue;
     const changeType = before === null ? "addition" : after === null ? "deletion" : "modification";
     const afterContent = after?.file_type === "regular_file" ? terminal.contents.get(path) : null;
+    if (afterContent !== null) {
+      changedContentBytes += afterContent.length;
+      if (changedContentBytes > TERMINAL_WORKSPACE_LIMITS.maximum_changed_content_bytes) throw new Error("terminal workspace exceeds the changed content byte limit");
+    }
     delta.push({ path, change_type: changeType, before: metadata(before), after: metadata(after, afterContent) });
   }
+  assertCanonicalPaths(delta, "terminal workspace delta inventory");
+  const candidate = candidateInventory(terminal.inventory, managed, baseSnapshot.inventory);
   const authority = {
     schema_version: TERMINAL_WORKSPACE_AUTHORITY_VERSION,
     schema_path: TERMINAL_WORKSPACE_AUTHORITY_SCHEMA_PATH,
@@ -166,7 +297,7 @@ export function buildTerminalWorkspaceAuthority({ root, baseSnapshot, terminalWo
     ...identity,
     base_workspace_portable_digest: inventoryDigest(baseSnapshot.inventory),
     terminal_workspace_portable_digest: inventoryDigest(terminal.inventory),
-    terminal_candidate_tree_digest: inventoryDigest(candidateInventory(terminal.inventory, managed)),
+    terminal_candidate_tree_digest: inventoryDigest(candidate),
     base_inventory: structuredClone(baseSnapshot.inventory),
     managed_asset_paths: managed,
     delta_inventory: delta,
@@ -177,18 +308,34 @@ export function buildTerminalWorkspaceAuthority({ root, baseSnapshot, terminalWo
   const bytes = terminalWorkspaceAuthorityBytes(authority);
   authority.authority_bytes = bytes.length;
   assertBenchmarkSchemaInstance(authority, { schemaPath: resolve(root, TERMINAL_WORKSPACE_AUTHORITY_SCHEMA_PATH), label: "terminal workspace authority" });
-  return { authority, bytes: terminalWorkspaceAuthorityBytes(authority) };
+  const finalizedBytes = terminalWorkspaceAuthorityBytes(authority);
+  if (finalizedBytes.length > MAX_AUTHORITY_BYTES) throw new Error("terminal workspace authority exceeds the serialized byte limit");
+  return { authority, bytes: finalizedBytes };
 }
 
 function applyDelta(authority) {
-  assertCanonicalInventory(authority.base_inventory, "terminal workspace base inventory");
-  assertCanonicalInventory(authority.delta_inventory, "terminal workspace delta inventory");
+  validateTerminalWorkspaceTreeInventory(authority.base_inventory, "terminal workspace base inventory");
+  assertCanonicalPaths(authority.delta_inventory, "terminal workspace delta inventory");
   const inventory = new Map(authority.base_inventory.map((entry) => [entry.path, structuredClone(entry)]));
   const contents = new Map();
   for (const entry of authority.delta_inventory) {
+    for (const [side, value] of [["before", entry.before], ["after", entry.after]]) {
+      if (value === null) continue;
+      if (!["regular_file", "directory"].includes(value.file_type) || !/^0[0-7]{3}$/u.test(value.mode)) throw new Error(`terminal workspace delta ${side} metadata is invalid: ${entry.path}`);
+      if (value.file_type === "directory") {
+        if (value.bytes !== null || value.sha256 !== null || value.content_base64 !== null) throw new Error(`terminal workspace delta ${side} directory metadata is invalid: ${entry.path}`);
+      } else if (!Number.isInteger(value.bytes) || value.bytes < 0 || !/^[a-f0-9]{64}$/u.test(value.sha256 ?? "")) {
+        throw new Error(`terminal workspace delta ${side} regular metadata is invalid: ${entry.path}`);
+      }
+    }
+    if (entry.before?.file_type === "regular_file" && entry.before.content_base64 !== null) throw new Error(`terminal workspace delta before content must be null: ${entry.path}`);
     const existing = inventory.get(entry.path) ?? null;
     if (stableCanonicalJson(comparable(existing)) !== stableCanonicalJson(entry.before === null ? null : { file_type: entry.before.file_type, mode: entry.before.mode, bytes: entry.before.bytes, sha256: entry.before.sha256 })) throw new Error(`terminal workspace delta before metadata mismatch: ${entry.path}`);
-    if ((entry.change_type === "addition") !== (existing === null) || (entry.change_type === "deletion") !== (entry.after === null)) throw new Error(`terminal workspace delta change type mismatch: ${entry.path}`);
+    if (
+      (entry.change_type === "addition" && (existing !== null || entry.before !== null || entry.after === null))
+      || (entry.change_type === "deletion" && (existing === null || entry.before === null || entry.after !== null))
+      || (entry.change_type === "modification" && (existing === null || entry.before === null || entry.after === null))
+    ) throw new Error(`terminal workspace delta change type mismatch: ${entry.path}`);
     if (entry.after === null) {
       inventory.delete(entry.path);
       continue;
@@ -204,7 +351,8 @@ function applyDelta(authority) {
     }
     inventory.set(entry.path, next);
   }
-  const terminal = [...inventory.values()].sort((left, right) => left.path.localeCompare(right.path));
+  const terminal = [...inventory.values()].sort((left, right) => comparePaths(left.path, right.path));
+  validateTerminalWorkspaceTreeInventory(terminal, "terminal workspace terminal inventory");
   return { inventory: terminal, contents };
 }
 
@@ -252,31 +400,56 @@ export function readVerifiedTerminalWorkspaceAuthority({ root, authorityPath, re
     const authorityRegular = authority.base_inventory.filter((entry) => entry.file_type === "regular_file");
     if (stableCanonicalJson(authorityRegular) !== stableCanonicalJson(expectedBaseInventory)) throw new Error("terminal workspace base inventory mismatch");
   }
-  if (expectedManagedAssetPaths && stableCanonicalJson(authority.managed_asset_paths) !== stableCanonicalJson([...new Set(expectedManagedAssetPaths)].sort((left, right) => left.localeCompare(right)))) throw new Error("terminal workspace managed asset inventory mismatch");
+  if (expectedManagedAssetPaths && stableCanonicalJson(authority.managed_asset_paths) !== stableCanonicalJson([...new Set(expectedManagedAssetPaths)].sort(comparePaths))) throw new Error("terminal workspace managed asset inventory mismatch");
   const terminal = applyDelta(authority);
   if (authority.base_workspace_portable_digest !== inventoryDigest(authority.base_inventory)) throw new Error("terminal workspace base digest mismatch");
   if (authority.terminal_workspace_portable_digest !== inventoryDigest(terminal.inventory)) throw new Error("terminal workspace terminal digest mismatch");
-  if (authority.terminal_candidate_tree_digest !== inventoryDigest(candidateInventory(terminal.inventory, authority.managed_asset_paths))) throw new Error("terminal workspace candidate tree digest mismatch");
+  if (authority.terminal_candidate_tree_digest !== inventoryDigest(candidateInventory(terminal.inventory, authority.managed_asset_paths, authority.base_inventory))) throw new Error("terminal workspace candidate tree digest mismatch");
   const after = readStableFile(authorityPath, "terminal workspace authority", MAX_AUTHORITY_BYTES, { allowEmpty: false });
   assertStableFileEvidence(file, after, "terminal workspace authority");
   return { authority, file, terminal };
 }
 
-function assertFreshOutputRoot(outputRoot) {
+function pathsOverlap(left, right) {
+  return left === right || left.startsWith(`${right}${sep}`) || right.startsWith(`${left}${sep}`);
+}
+
+function assertFreshOutputRoot(outputRoot, forbiddenRoots) {
   const output = resolve(outputRoot);
   assertNoSymlinkSegments(dirname(output), "terminal candidate output parent");
   if (existsSync(output)) throw new Error("terminal candidate output root must be fresh");
+  const canonicalOutput = resolve(realpathSync(dirname(output)), parse(output).base);
+  for (const forbiddenRoot of forbiddenRoots) {
+    if (!forbiddenRoot) continue;
+    const forbidden = existsSync(forbiddenRoot) ? realpathSync(forbiddenRoot) : resolve(forbiddenRoot);
+    if (pathsOverlap(canonicalOutput, forbidden)) throw new Error("terminal candidate output root overlaps an authority input root");
+  }
   mkdirSync(output, { recursive: false, mode: 0o700 });
+  chmodSync(output, 0o700);
   return output;
 }
 
-export function materializeTerminalCandidateFromVerifiedAuthority({ verified, materializedCaseRoot, outputRoot }) {
-  const output = assertFreshOutputRoot(outputRoot);
+function removePartialOutput(output) {
+  if (!existsSync(output)) return;
+  const visit = (directory) => {
+    chmodSync(directory, 0o700);
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) visit(path);
+      else chmodSync(path, 0o600);
+    }
+  };
+  visit(output);
+  rmSync(output, { recursive: true, force: true });
+}
+
+export function materializeTerminalCandidateFromVerifiedAuthority({ verified, materializedCaseRoot, outputRoot, forbiddenRoots = [] }) {
+  const output = assertFreshOutputRoot(outputRoot, [materializedCaseRoot, ...forbiddenRoots]);
   const baseRoot = resolve(materializedCaseRoot);
   const managed = new Set(verified.authority.managed_asset_paths);
   const baseByPath = new Map(verified.authority.base_inventory.map((entry) => [entry.path, entry]));
   const deltaByPath = new Map(verified.authority.delta_inventory.map((entry) => [entry.path, entry]));
-  const candidate = candidateInventory(verified.terminal.inventory, verified.authority.managed_asset_paths);
+  const candidate = candidateInventory(verified.terminal.inventory, verified.authority.managed_asset_paths, verified.authority.base_inventory);
   try {
     for (const entry of candidate) {
       const path = assertTerminalWorkspaceRelativePath(entry.path, "terminal candidate path");
@@ -296,11 +469,13 @@ export function materializeTerminalCandidateFromVerifiedAuthority({ verified, ma
         if (!base || base.file_type !== "regular_file") throw new Error(`terminal candidate base content is unavailable: ${path}`);
         const source = resolve(baseRoot, path);
         assertNoSymlinkSegments(source, `terminal candidate base ${path}`);
+        const file = readStableFile(source, `terminal candidate base ${path}`, TERMINAL_WORKSPACE_LIMITS.maximum_per_file_bytes);
         const status = lstatSync(source);
         if (!status.isFile() || status.isSymbolicLink() || status.nlink !== 1) throw new Error(`terminal candidate base is not a standalone regular file: ${path}`);
-        bytes = readFileSync(source);
+        bytes = file.bytes;
         if (bytes.length !== base.bytes || sha256(bytes) !== base.sha256 || modeOf(status) !== base.mode) throw new Error(`terminal candidate base identity mismatch: ${path}`);
       }
+      if (!Buffer.isBuffer(bytes) || bytes.length !== entry.bytes || sha256(bytes) !== entry.sha256) throw new Error(`terminal candidate content authority is unavailable: ${path}`);
       writeFileSync(destination, bytes, { flag: "wx", mode: 0o444 });
       chmodSync(destination, 0o444);
     }
@@ -308,9 +483,11 @@ export function materializeTerminalCandidateFromVerifiedAuthority({ verified, ma
     for (const directory of directories) chmodSync(directory, 0o555);
     const reconstructed = captureTerminalWorkspaceInventory(output);
     const expected = candidate.map((entry) => ({ ...entry, mode: entry.file_type === "regular_file" ? "0444" : "0555" }));
+    validateTerminalWorkspaceTreeInventory(reconstructed.inventory, "reconstructed terminal candidate inventory");
     if (inventoryDigest(reconstructed.inventory) !== inventoryDigest(expected)) throw new Error("terminal candidate reconstruction mismatch");
     return { output_root: realpathSync(output), terminal_workspace_tree_digest: verified.authority.terminal_candidate_tree_digest };
   } catch (error) {
+    removePartialOutput(output);
     throw error;
   }
 }

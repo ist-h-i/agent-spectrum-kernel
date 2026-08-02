@@ -529,7 +529,7 @@
       "atomic_publication_implementation_path": "scripts/ask-benchmark-atomic-publication.mjs",
       "atomic_publication_implementation_file_sha256": "1227b73efd9bcfe254fa8f448acb9aed5078c8f42fa4273ec1f71ab609fdb67a",
       "stable_file_implementation_path": "scripts/ask-benchmark-stable-file.mjs",
-      "stable_file_implementation_file_sha256": "ccfad4185ef3720dda5e10e1c1479f18916402b990ff7224aab9eb7293ae577b",
+      "stable_file_implementation_file_sha256": "09ff7093dc8785c6a36c6723750b8d6afc0b56196521800008ba59bfbe8d2482",
       "engineering_result_source_manifest_schema_path": "benchmarks/schemas/portfolio-engineering-result-source-manifest.schema.json",
       "engineering_result_source_manifest_schema_file_sha256": "c51e91d31a014788e055741743003304b9d4ca2c89b8b6705fa56cd57cff2938",
       "engineering_result_set_schema_path": "benchmarks/schemas/portfolio-engineering-result-set.schema.json",
