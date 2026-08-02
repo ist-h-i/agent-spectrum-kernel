@@ -17,7 +17,7 @@ import { inspectVerifiedPortfolioExecution } from "./ask-benchmark-execution.mjs
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { projectVerifiedCommandEvidence } from "./ask-benchmark-command-evidence.mjs";
 
-export const NORMALIZER_VERSION = "1.2.0";
+export const NORMALIZER_VERSION = "1.3.0";
 export const NORMALIZED_RESULT_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-result.schema.json";
 export const NORMALIZED_RUN_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-run.schema.json";
 export const NORMALIZED_ROOT_SCHEMA_PATH = "benchmarks/schemas/normalized-portfolio-root.schema.json";
@@ -191,7 +191,7 @@ function normalizedResultBase({ inspection, inspectedCase, attempt, adapterIdent
   const { entry } = inspectedCase;
   const telemetry = telemetryFor(attempt, adapterIdentity);
   return {
-    schema_version: "1.2.0",
+    schema_version: "1.3.0",
     schema_path: NORMALIZED_RESULT_SCHEMA_PATH,
     program: "adaptive_ask_normalized_execution_result",
     lineage: {
@@ -222,6 +222,11 @@ function normalizedResultBase({ inspection, inspectedCase, attempt, adapterIdent
       terminal_commit_digest: attempt.evidence.commit_digest,
       final_output_digest: attempt.evidence.final_output_digest,
       final_output_bytes: attempt.evidence.final_output_bytes,
+      terminal_workspace_authority_availability: attempt.evidence.terminal_workspace_authority_availability,
+      terminal_workspace_authority_support: attempt.evidence.terminal_workspace_authority_support,
+      terminal_workspace_authority_digest: attempt.evidence.terminal_workspace_authority_digest,
+      terminal_workspace_tree_digest: attempt.evidence.terminal_workspace_tree_digest,
+      terminal_workspace_authority_bytes: attempt.evidence.terminal_workspace_authority_bytes,
       adaptive_selection_digest: attempt.request.selection ? `sha256:${attempt.request.selection.digest}` : null,
     },
     outcome: attempt.result.status,
@@ -389,6 +394,11 @@ function sourceSnapshotFor(inspection, cases) {
         terminal_commit_digest: attempt.evidence.commit_digest,
         final_output_digest: attempt.evidence.final_output_digest,
         final_output_bytes: attempt.evidence.final_output_bytes,
+        terminal_workspace_authority_availability: attempt.evidence.terminal_workspace_authority_availability,
+        terminal_workspace_authority_support: attempt.evidence.terminal_workspace_authority_support,
+        terminal_workspace_authority_digest: attempt.evidence.terminal_workspace_authority_digest,
+        terminal_workspace_tree_digest: attempt.evidence.terminal_workspace_tree_digest,
+        terminal_workspace_authority_bytes: attempt.evidence.terminal_workspace_authority_bytes,
       })),
     })),
   };
@@ -481,7 +491,7 @@ function buildNormalizedArtifacts({ root, inspection }) {
   const sourceSnapshot = sourceSnapshotFor(inspection, cases);
   const sourceSnapshotDigest = canonicalDigest(sourceSnapshot);
   const manifestWithoutDigest = {
-    schema_version: "1.2.0",
+    schema_version: "1.3.0",
     schema_path: NORMALIZED_RUN_SCHEMA_PATH,
     program: "adaptive_ask_normalized_execution_run",
     artifact_role: "derived_execution_evidence",
@@ -822,7 +832,7 @@ function assertSelfContainedGeneration({ root, collection, generation, requested
       if (!record || reference.attempt !== snapshotAttempt.attempt || reference.normalized_result_id !== record.normalized_result_id || reference.normalized_result_digest !== record.normalized_result_digest) throw new Error(`${caseRecord.case_id}/${reference.attempt} normalized attempt reference is invalid`);
       if (record.lineage.run_instance_id !== manifest.source.run_instance_id || record.lineage.plan_id !== manifest.source.plan_id || record.lineage.plan_digest !== manifest.source.plan_digest || record.lineage.repository_revision !== manifest.source.repository_revision || record.lineage.materialization_manifest_digest !== manifest.source.materialization_manifest_digest || record.lineage.case_id !== caseRecord.case_id || record.lineage.attempt !== reference.attempt || record.lineage.adapter_track !== caseRecord.adapter_track || record.lineage.condition !== caseRecord.condition || record.lineage.fixture_id !== caseRecord.fixture_id || record.lineage.repetition !== caseRecord.repetition || record.lineage.condition_order_position !== caseRecord.condition_order_position || record.lineage.block_id !== caseRecord.block_id) throw new Error(`${caseRecord.case_id}/${reference.attempt} normalized lineage is inconsistent`);
       if (record.lineage.runtime_identity_digest !== adapterIdentities.get(caseRecord.adapter_track)) throw new Error(`${caseRecord.case_id}/${reference.attempt} runtime identity is inconsistent`);
-      if (record.lineage.request_digest !== snapshotAttempt.request_digest || record.lineage.raw_result_digest !== snapshotAttempt.raw_result_digest || record.lineage.terminal_commit_digest !== snapshotAttempt.terminal_commit_digest || record.lineage.final_output_digest !== snapshotAttempt.final_output_digest || record.lineage.final_output_bytes !== snapshotAttempt.final_output_bytes) throw new Error(`${caseRecord.case_id}/${reference.attempt} source attempt evidence is inconsistent`);
+      if (record.lineage.request_digest !== snapshotAttempt.request_digest || record.lineage.raw_result_digest !== snapshotAttempt.raw_result_digest || record.lineage.terminal_commit_digest !== snapshotAttempt.terminal_commit_digest || record.lineage.final_output_digest !== snapshotAttempt.final_output_digest || record.lineage.final_output_bytes !== snapshotAttempt.final_output_bytes || record.lineage.terminal_workspace_authority_availability !== snapshotAttempt.terminal_workspace_authority_availability || record.lineage.terminal_workspace_authority_support !== snapshotAttempt.terminal_workspace_authority_support || record.lineage.terminal_workspace_authority_digest !== snapshotAttempt.terminal_workspace_authority_digest || record.lineage.terminal_workspace_tree_digest !== snapshotAttempt.terminal_workspace_tree_digest || record.lineage.terminal_workspace_authority_bytes !== snapshotAttempt.terminal_workspace_authority_bytes) throw new Error(`${caseRecord.case_id}/${reference.attempt} source attempt evidence is inconsistent`);
       referencedPaths.push(reference.path);
     }
   }
