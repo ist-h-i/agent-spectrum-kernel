@@ -1267,8 +1267,12 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       const candidate = authority.candidate_inventory.find(({ path }) => path === "build.config.json");
       candidate.mode = 0o777;
       authority.candidate_workspace_portable_digest = canonicalDigest(authority.candidate_inventory);
-      const diff = authority.diff_entries.find(({ path }) => path === "build.config.json");
-      diff.after = structuredClone(candidate);
+      let diff = authority.diff_entries.find(({ path }) => path === "build.config.json");
+      if (!diff) {
+        diff = { path: "build.config.json", change_type: "modification", before: structuredClone(authority.frozen_inventory.find(({ path }) => path === "build.config.json")), after: structuredClone(candidate) };
+        authority.diff_entries.push(diff);
+        authority.diff_entries.sort((left, right) => left.path.localeCompare(right.path));
+      } else diff.after = structuredClone(candidate);
       repositoryDiff.candidate_workspace_tree_digest = authority.candidate_workspace_portable_digest;
       repositoryDiff.diff_entries = structuredClone(authority.diff_entries);
       repositoryDiff.artifact_digest = canonicalDigest(repositoryDiff.diff_entries);
