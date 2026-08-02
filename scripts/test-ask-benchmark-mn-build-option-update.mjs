@@ -2231,6 +2231,10 @@ async function runPrivateCandidateChecks(privateRoot) {
       assert.deepEqual(result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references, result.invalid_input_authority.evidence_references);
     }
   };
+  const assertScopeCategories = (result, expected, label) => {
+    assert.deepEqual(result.scope_deviations.map(({ category }) => category).sort(), [...expected].sort(), `${label} must emit the closed scope categories`);
+    assert.equal(result.scope_deviations.every(({ finding_id, severity, evidence_references }) => typeof finding_id === "string" && finding_id.length > 0 && severity === "high" && evidence_references.some(({ kind }) => kind === "repository_diff")), true, `${label} must retain stable typed repository-diff findings`);
+  };
 
   const contract = referenceContract.observable_contract.release_source_map;
   const solution = (name, sourceMap = { scripts: contract.scripts, styles: contract.styles }) => { const path = candidate(name); writeCandidateConfig(path, sourceMap); return path; };
@@ -2268,6 +2272,16 @@ async function runPrivateCandidateChecks(privateRoot) {
   const deleted = solution("case-11"); rmSync(resolve(deleted, "docs/build-options.md")); cases.push(["unrelated deletion", await evaluate(deleted), ["pass", "fail", "pass"], "over_processing"]);
   const protectedChange = solution("case-12"); writeFileSync(resolve(protectedChange, "test/build-config.test.mjs"), `${readFileSync(resolve(protectedChange, "test/build-config.test.mjs"), "utf8")}\n`); cases.push(["test authority modification", await evaluate(protectedChange), ["pass", "fail", "pass"], "over_processing"]);
   cases.push(["property-order-only equivalent solution", await evaluate(solution("case-13", { styles: contract.styles, scripts: contract.scripts })), ["pass", "pass", "pass"], "correct_narrow_execution"]);
+  const extraTopLevel = solution("case-semantic-extra-top-level"); { const config = readJson(resolve(extraTopLevel, "build.config.json")); config.telemetry = true; writeJson(resolve(extraTopLevel, "build.config.json"), config); } cases.push(["allowed path extra top-level key", await evaluate(extraTopLevel), ["pass", "fail", "pass"], "over_processing", ["allowed_path_semantic_expansion"]]);
+  const extraProfile = solution("case-semantic-extra-profile"); { const config = readJson(resolve(extraProfile, "build.config.json")); config.profiles.staging = { target: "node20" }; writeJson(resolve(extraProfile, "build.config.json"), config); } cases.push(["allowed path extra profile", await evaluate(extraProfile), ["pass", "fail", "pass"], "over_processing", ["allowed_path_semantic_expansion"]]);
+  const extraReleaseOption = solution("case-semantic-extra-release-option"); { const config = readJson(resolve(extraReleaseOption, "build.config.json")); config.profiles.release.banner = "release"; writeJson(resolve(extraReleaseOption, "build.config.json"), config); } cases.push(["allowed path extra release option", await evaluate(extraReleaseOption), ["pass", "fail", "pass"], "over_processing", ["allowed_path_semantic_expansion"]]);
+  const extraDebugOption = solution("case-semantic-extra-debug-option"); { const config = readJson(resolve(extraDebugOption, "build.config.json")); config.profiles.debug.banner = "debug"; writeJson(resolve(extraDebugOption, "build.config.json"), config); } cases.push(["allowed path extra debug option", await evaluate(extraDebugOption), ["pass", "fail", "pass"], "over_processing", ["allowed_path_semantic_expansion"]]);
+  const changedExistingValue = solution("case-semantic-existing-value"); { const config = readJson(resolve(changedExistingValue, "build.config.json")); config.profiles.debug.minify = true; writeJson(resolve(changedExistingValue, "build.config.json"), config); } cases.push(["allowed path unrelated existing value changed", await evaluate(changedExistingValue), ["fail", "fail", "pass"], "under_processing", ["allowed_path_unrelated_value_changed"]]);
+  const removedExistingValue = solution("case-semantic-removed-value"); { const config = readJson(resolve(removedExistingValue, "build.config.json")); delete config.profiles.debug.sourceMap; writeJson(resolve(removedExistingValue, "build.config.json"), config); } cases.push(["allowed path unrelated existing value removed", await evaluate(removedExistingValue), ["fail", "fail", "pass"], "under_processing", ["allowed_path_unrelated_value_removed"]]);
+  for (const mode of [0o755, 0o777, 0o600]) { const modeDrift = solution(`case-mode-${mode.toString(8)}`); chmodSync(resolve(modeDrift, "build.config.json"), mode); cases.push([`allowed path mode drift ${mode.toString(8)}`, await evaluate(modeDrift), ["pass", "fail", "pass"], "over_processing", ["allowed_path_mode_changed"]]); }
+  const fileTypeDrift = solution("case-file-type-directory"); rmSync(resolve(fileTypeDrift, "build.config.json")); mkdirSync(resolve(fileTypeDrift, "build.config.json")); cases.push(["allowed path file type drift", await evaluate(fileTypeDrift), ["fail", "fail", "pass"], "under_processing", ["allowed_path_file_type_changed"]]);
+  const reordered = solution("case-semantic-property-order"); { const config = readJson(resolve(reordered, "build.config.json")); const reorderedConfig = { profiles: { release: { sourceMap: { styles: config.profiles.release.sourceMap.styles, scripts: config.profiles.release.sourceMap.scripts }, minify: config.profiles.release.minify, target: config.profiles.release.target }, debug: { sourceMap: config.profiles.debug.sourceMap, minify: config.profiles.debug.minify, target: config.profiles.debug.target } } }; writeFileSync(resolve(reordered, "build.config.json"), `${JSON.stringify(reorderedConfig)}\n`); } cases.push(["whole-config property-order equivalent", await evaluate(reordered), ["pass", "pass", "pass"], "correct_narrow_execution", []]);
+  const whitespaceOnly = solution("case-semantic-whitespace"); { const config = readJson(resolve(whitespaceOnly, "build.config.json")); writeFileSync(resolve(whitespaceOnly, "build.config.json"), `  ${JSON.stringify(config, null, 4)}  \n`); } cases.push(["whole-config whitespace equivalent", await evaluate(whitespaceOnly), ["pass", "pass", "pass"], "correct_narrow_execution", []]);
   const crossRun = normalized({ identity: evidenceIdentity("22345678-1234-4123-8123-123456789abc") });
   const invalidRun = await evaluate(solution("case-14"), crossRun, { full: true }); cases.push(["command evidence cross-run transplant", invalidRun, ["fail", "fail", "fail"], "invalid_evidence"]);
   const crossAttempt = normalized({ identity: evidenceIdentity(undefined, "0002") });
@@ -2278,8 +2292,11 @@ async function runPrivateCandidateChecks(privateRoot) {
   const spoofedScope = solution("case-18"); writeFileSync(resolve(spoofedScope, "unrelated.txt"), "x\n"); writeJson(resolve(work, "caller-changed-files.json"), ["build.config.json"]); cases.push(["caller changed-file JSON spoof", await evaluate(spoofedScope), ["pass", "fail", "pass"], "over_processing"]);
   writeJson(resolve(work, "caller-verification.json"), { test: "passed", validation: "passed" }); cases.push(["caller verification JSON spoof", await evaluate(solution("case-19"), noEvidence), ["pass", "pass", "fail"], "under_processing"]);
   const rerunOnly = await evaluate(solution("case-20"), noEvidence); assert.equal(rerunOnly.evaluator_rerun.results.every(({ outcome }) => outcome === "succeeded"), true); cases.push(["evaluator rerun success without agent evidence", rerunOnly, ["pass", "pass", "fail"], "under_processing"]);
-  for (const [label, result, outcomes, classification] of cases) assertResult(result, outcomes, classification, label);
-  assert.equal(cases.length, 24);
+  for (const [label, result, outcomes, classification, scopeCategories] of cases) {
+    assertResult(result, outcomes, classification, label);
+    if (scopeCategories) assertScopeCategories(result, scopeCategories, label);
+  }
+  assert.equal(cases.length, 36);
 
   const specialNode = solution("special-node");
   symlinkSync(resolve(specialNode, "build.config.json"), resolve(specialNode, "linked-build-config.json"));
