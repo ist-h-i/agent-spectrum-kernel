@@ -2,21 +2,21 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-c54b346ebcb82b1c6c1df81d81e0be3cb9d52de544192741b603d4a56cea65cb",
-  "evaluator_bundle_digest": "sha256:43d4b2fbd7217e78a77c1d77b88514bc73fbe9f0d3409a38060fc89d14cf78b1",
+  "evaluator_bundle_id": "evaluator-dafc9d47f9b8818dcd218ba6159ca2c843c32ea1b6182ef971598851efa79ce3",
+  "evaluator_bundle_digest": "sha256:0b226f29f1c24351eae71cd84bd0c64907ef6934f846e5c6e747447b72086d66",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mn-build-option-update",
   "fixture_input_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
   "task_class": "configuration",
   "suite": "mechanism_negative",
-  "evaluator_revision": "9dcfb2acb0a72ac0e30923314f2582ed03c60fd7",
-  "generator_identity": "sha256:a2f2ad4a7faae93ccb48df2a59bd300f9e61fcd8f6944beff5c81281745e62f7",
-  "independence_statement_digest": "sha256:9fa204f3fd6f8eff2bc6e349d7a185a8f4a866d23dc9757b637d6879c7469eb2",
+  "evaluator_revision": "84f8686795d3ab109e20d2f7a24af96b673da8f2",
+  "generator_identity": "sha256:be76ca9eef21d25ff111e01a2552f60512d0ebde2febed1fc92ae69ce7b7a5be",
+  "independence_statement_digest": "sha256:0b524260ec462a5ce52439865d56751c912411eb5f963d1576753ccadba9bac6",
   "review_record_digest": "sha256:2c68bfa2808be77476fd03ba5ad71f5bf0a0c09e0011f9d07711e257a2457cfb",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:1168574f2dce8fe54e468a26ee97a9872813aaecf8f717ee49308c5fee1a2f41",
+  "public_metadata_digest": "sha256:f2862ec0699612a21f0ae47c3b87427ccc1d372607ada34e623d37fbbfb8c1ea",
   "evaluator_source_identity": {
-    "base_git_revision": "9dcfb2acb0a72ac0e30923314f2582ed03c60fd7",
+    "base_git_revision": "84f8686795d3ab109e20d2f7a24af96b673da8f2",
     "source_tree_digest": "sha256:01c3fc2b91712666f86ef5f3c16359dbe7fb304f92fddc9eefc6b0c904595d92",
     "generator_source_digest": "sha256:dc22218e3ebb5dcf7294fb3c2f53f3dfb5ff3358987a97427bc8e48ced2bc338",
     "source_files": [
@@ -1160,6 +1160,6 @@
     }
   },
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:5bbd33a525710832cff6643a86d76aacf7feaaea41508635bd672d8d327f5588",
-  "evaluator_authority_manifest_digest": "sha256:4dd552d17f116393e6f5f71041799da3efbdd357123f483250d03d879379cbcb"
+  "evaluator_authority_manifest_raw_sha256": "sha256:95f0db7340c60b06fa843d090111c5e65d4cb194d6f651ab64fc47a828ce2756",
+  "evaluator_authority_manifest_digest": "sha256:297bb28b1cb7ec4209e962fea2459752ce2e0ad314407a51c63eb87d80101fa4"
 }
