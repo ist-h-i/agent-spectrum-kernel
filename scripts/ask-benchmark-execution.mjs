@@ -39,7 +39,6 @@ import {
 import {
   buildTerminalWorkspaceAuthority,
   captureTerminalWorkspaceInventory,
-  materializeTerminalCandidateFromVerifiedAuthority,
   readVerifiedTerminalWorkspaceAuthority,
   TERMINAL_WORKSPACE_AUTHORITY_PATH,
   terminalWorkspaceAuthorityReference,
@@ -1852,20 +1851,15 @@ export function inspectVerifiedPortfolioExecution({ root, config, planPath, mate
   };
 }
 
-export function verifyTerminalWorkspaceAuthority({ root, config, planPath, materializedPath, selectionState, runDir, caseId, attempt, normalizedResult = null }) {
+export function verifyExecutionTerminalWorkspaceAuthority({ root, config, planPath, materializedPath, selectionState, runDir, caseId, attempt }) {
   const inspection = inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir });
   const inspectedCase = inspection.cases.find((item) => item.entry.case_id === caseId);
   if (!inspectedCase) throw new Error("terminal workspace authority case is absent from the verified execution");
   const inspectedAttempt = inspectedCase.attempts.find((item) => item.attempt === attempt);
   if (!inspectedAttempt || !inspectedAttempt.terminalWorkspaceAuthority) throw new Error("terminal workspace authority is unavailable for the requested attempt");
   const result = inspectedAttempt.result;
-  if (normalizedResult) {
-    const lineage = normalizedResult.lineage;
-    if (lineage.run_instance_id !== inspection.identity.run_instance_id || lineage.case_id !== caseId || lineage.attempt !== attempt || lineage.adapter_track !== inspectedCase.entry.adapter_track || lineage.condition !== inspectedCase.entry.condition || lineage.fixture_id !== inspectedCase.entry.fixture_id || lineage.fixture_input_digest !== `sha256:${inspectedCase.entry.input_manifest_sha256}` || lineage.materialization_manifest_digest !== inspection.materialization.manifestDigest) throw new Error("normalized lineage does not match terminal workspace authority");
-    if (lineage.terminal_workspace_authority_digest !== result.terminal_workspace_authority_digest || lineage.terminal_workspace_tree_digest !== result.terminal_workspace_tree_digest || lineage.terminal_workspace_authority_bytes !== result.terminal_workspace_authority_bytes || lineage.terminal_workspace_authority_availability !== result.terminal_workspace_authority_availability || lineage.terminal_workspace_authority_support !== result.terminal_workspace_authority_support) throw new Error("normalized terminal workspace authority identity mismatch");
-  }
   const attemptRoot = attemptRootPath(resolve(runDir), caseId, attempt);
-  return readVerifiedTerminalWorkspaceAuthority({
+  const verified = readVerifiedTerminalWorkspaceAuthority({
     root,
     authorityPath: terminalWorkspaceAuthorityPath(attemptRoot),
     reference: terminalWorkspaceReferenceFromResult(result),
@@ -1882,19 +1876,27 @@ export function verifyTerminalWorkspaceAuthority({ root, config, planPath, mater
     expectedBaseInventory: expectedBaseRegularInventory(inspection.materialization.casesById.get(caseId), inspectedAttempt.request.projection),
     expectedManagedAssetPaths: managedAssetPaths(inspection.materialization.casesById.get(caseId), inspectedAttempt.request.projection),
   });
-}
-
-export function materializeVerifiedTerminalCandidate({ root, config, planPath, materializedPath, selectionState, runDir, caseId, attempt, normalizedResult, normalizedResultRoot, outputRoot }) {
-  if (!normalizedResult) throw new Error("terminal candidate materialization requires verified normalized lineage");
-  if (!normalizedResultRoot) throw new Error("terminal candidate materialization requires the normalized result root boundary");
-  const verified = verifyTerminalWorkspaceAuthority({ root, config, planPath, materializedPath, selectionState, runDir, caseId, attempt, normalizedResult });
-  const materializedCaseRoot = resolve(materializedPath, caseId);
-  return materializeTerminalCandidateFromVerifiedAuthority({
-    verified,
-    materializedCaseRoot,
-    outputRoot,
-    forbiddenRoots: [root, materializedPath, selectionState, runDir, normalizedResultRoot],
-  });
+  return {
+    ...verified,
+    execution: {
+      run_instance_id: inspection.identity.run_instance_id,
+      case_id: caseId,
+      attempt,
+      adapter: inspectedCase.entry.adapter_track,
+      condition: inspectedCase.entry.condition,
+      fixture_id: inspectedCase.entry.fixture_id,
+      fixture_input_digest: `sha256:${inspectedCase.entry.input_manifest_sha256}`,
+      materialization_manifest_digest: inspection.materialization.manifestDigest,
+      request_digest: inspectedAttempt.evidence.request_digest,
+      raw_result_digest: inspectedAttempt.evidence.result_digest,
+      terminal_commit_digest: inspectedAttempt.evidence.commit_digest,
+      terminal_workspace_authority_availability: result.terminal_workspace_authority_availability,
+      terminal_workspace_authority_support: result.terminal_workspace_authority_support,
+      terminal_workspace_authority_digest: result.terminal_workspace_authority_digest,
+      terminal_workspace_tree_digest: result.terminal_workspace_tree_digest,
+      terminal_workspace_authority_bytes: result.terminal_workspace_authority_bytes,
+    },
+  };
 }
 
 export function verifyPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir }) {
