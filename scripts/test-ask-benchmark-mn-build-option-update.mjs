@@ -1260,7 +1260,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       overwriteSealedFile(sealedOriginalAuthorityPath, sealedOriginalAuthorityBytes);
       overwriteSealedFile(sealedPreExecutionDiffPath, sealedPreExecutionDiffBytes);
     };
-    expectPathFailure("original mode metadata mutation", () => { const authority = JSON.parse(sealedOriginalAuthorityBytes); authority.candidate_inventory.find(({ path }) => path === "build.config.json").mode = 0o777; writeSealedOriginalAuthority(authority); }, restoreSealedOriginalAuthority, /original workspace authority|recorded sealed authority|digest/u);
+    expectPathFailure("original mode metadata mutation", () => { const authority = JSON.parse(sealedOriginalAuthorityBytes); authority.candidate_inventory.find(({ path }) => path === "build.config.json").mode = 0o777; writeSealedOriginalAuthority(authority); }, restoreSealedOriginalAuthority, /original workspace authority|recorded sealed authority|digest|snapshot identity|sealed repository/u);
     expectPathFailure("self-consistent original mode authority reseal", () => {
       const authority = JSON.parse(sealedOriginalAuthorityBytes);
       const repositoryDiff = JSON.parse(sealedPreExecutionDiffBytes);
@@ -1281,7 +1281,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       authority.authority_digest = canonicalDigest(closure);
       authority.authority_bytes = Buffer.byteLength(stableCanonicalJson(closure)) || 1;
       writeSealedOriginalAuthority(authority, repositoryDiff);
-    }, restoreSealedOriginalAuthority, /module-owned source metadata|recorded sealed authority|original workspace authority/u);
+    }, restoreSealedOriginalAuthority, /module-owned source metadata|recorded sealed authority|original workspace authority|snapshot identity|sealed repository/u);
     for (const [label, mutate] of [
       ["original authority entry omission", (authority) => { authority.candidate_inventory.pop(); }],
       ["original authority entry addition", (authority) => { authority.candidate_inventory.push({ path: "zz-added.txt", file_type: "file", mode: 0o644, bytes: 1, sha256: `sha256:${"0".repeat(64)}` }); }],
@@ -1290,8 +1290,8 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       ["original authority bytes mismatch", (authority) => { authority.candidate_inventory.find(({ path }) => path === "build.config.json").sha256 = `sha256:${"1".repeat(64)}`; }],
       ["original authority file type mismatch", (authority) => { authority.candidate_inventory.find(({ path }) => path === "build.config.json").file_type = "directory"; }],
       ["frozen candidate authority transplant", (authority) => { authority.candidate_inventory = structuredClone(authority.frozen_inventory); authority.candidate_workspace_portable_digest = authority.frozen_workspace_portable_digest; }],
-    ]) expectPathFailure(label, () => { const authority = JSON.parse(sealedOriginalAuthorityBytes); mutate(authority); writeSealedOriginalAuthority(authority); }, restoreSealedOriginalAuthority, /original workspace authority|inventory|digest|module-owned|recorded sealed authority/u);
-    expectPathFailure("stale child pre-execution repository diff artifact", () => { const artifact = JSON.parse(sealedPreExecutionDiffBytes); artifact.candidate_workspace_tree_digest = `sha256:${"2".repeat(64)}`; overwriteSealedFile(sealedPreExecutionDiffPath, Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`)); }, restoreSealedOriginalAuthority, /repository diff|original workspace authority|recorded sealed authority|digest/u);
+    ]) expectPathFailure(label, () => { const authority = JSON.parse(sealedOriginalAuthorityBytes); mutate(authority); writeSealedOriginalAuthority(authority); }, restoreSealedOriginalAuthority, /original workspace authority|inventory|digest|module-owned|recorded sealed authority|snapshot identity|sealed repository/u);
+    expectPathFailure("stale child pre-execution repository diff artifact", () => { const artifact = JSON.parse(sealedPreExecutionDiffBytes); artifact.candidate_workspace_tree_digest = `sha256:${"2".repeat(64)}`; overwriteSealedFile(sealedPreExecutionDiffPath, Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`)); }, restoreSealedOriginalAuthority, /repository diff|original workspace authority|recorded sealed authority|digest|snapshot identity|sealed repository/u);
     const originalCandidatePath = resolve(authorityRoot, privateRecord.record.candidate_workspace_path);
     const originalCandidateConfig = resolve(originalCandidatePath, "build.config.json");
     const originalCandidateBytes = readFileSync(originalCandidateConfig);
