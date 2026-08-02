@@ -51,6 +51,7 @@ import {
 const AUTHORITY_SPAWN_SYNC = spawnSync;
 const AUTHORITY_JSON_STRINGIFY = JSON.stringify;
 const AUTHORITY_NODE_EXECUTABLE = process.execPath;
+const ORIGINAL_EXECUTION_AUTHORITIES = new WeakMap();
 
 export const EVALUATOR_REFERENCE_SCHEMA_PATH = "benchmarks/schemas/evaluator-reference.schema.json";
 export const PRIVATE_EVALUATOR_BUNDLE_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-bundle.schema.json";
@@ -58,6 +59,7 @@ export const PRIVATE_EVALUATOR_INDEPENDENCE_SCHEMA_PATH = "benchmarks/schemas/pr
 export const PRIVATE_EVALUATOR_FRAGMENT_SCHEMA_PATH = "benchmarks/schemas/private-evaluator-fragment.schema.json";
 export const PRIVATE_EVALUATION_RECORD_SCHEMA_PATH = "benchmarks/schemas/private-evaluation-record.schema.json";
 export const REPOSITORY_DIFF_ARTIFACT_SCHEMA_PATH = "benchmarks/schemas/repository-diff-artifact.schema.json";
+export const ORIGINAL_WORKSPACE_AUTHORITY_SCHEMA_PATH = "benchmarks/schemas/original-workspace-authority.schema.json";
 export const EVALUATION_INPUT_FAILURE_ARTIFACT_SCHEMA_PATH = "benchmarks/schemas/evaluation-input-failure-artifact.schema.json";
 export const EVALUATOR_CHECK_ARTIFACT_SCHEMA_PATH = "benchmarks/schemas/evaluator-check-artifact.schema.json";
 export const EVALUATOR_RESULT_SCHEMA_PATH = "benchmarks/schemas/evaluator-result-envelope.schema.json";
@@ -84,6 +86,7 @@ export const EVALUATOR_AUTHORITY_PATHS = Object.freeze([
   "benchmarks/schemas/repository-diff-artifact.schema.json",
   "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
   "benchmarks/schemas/normalized-portfolio-result.schema.json",
+  "benchmarks/schemas/original-workspace-authority.schema.json",
 ]);
 export const EVALUATOR_FIXTURE_AUTHORITY_PATHS = Object.freeze([
   "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-authority-manifest.json",
@@ -103,6 +106,8 @@ export const SEALED_EXECUTABLE_FILE_MODE = 0o555;
 export const SEALED_DIRECTORY_MODE = 0o555;
 export const SEALED_EXECUTABLE_PATHS = Object.freeze([]);
 const PRIVATE_EVALUATOR_VIRTUAL_PATH = "private/hidden-evaluator.mjs";
+const ORIGINAL_WORKSPACE_AUTHORITY_PATH = "original-workspace-authority.json";
+const SEALED_REPOSITORY_DIFF_ARTIFACT_PATH = "repository-diff-artifact.json";
 const EVALUATOR_PRIVATE_ENTRY_PATHS = Object.freeze([
   "scripts/ask-benchmark-scoring-contract.mjs",
   "scripts/ask-benchmark-materialize.mjs",
@@ -1555,6 +1560,131 @@ function sealedSnapshotBinding(inventory) {
   };
 }
 
+function workspaceDiffEntries(frozenEntries, candidateEntries) {
+  const frozen = new Map(frozenEntries.map((entry) => [entry.path, entry]));
+  const candidate = new Map(candidateEntries.map((entry) => [entry.path, entry]));
+  return [...new Set([...frozen.keys(), ...candidate.keys()])].sort().flatMap((path) => {
+    const before = frozen.get(path) ?? null;
+    const after = candidate.get(path) ?? null;
+    if (!before) return [{ path, change_type: "addition", before, after }];
+    if (!after) return [{ path, change_type: "deletion", before, after }];
+    if (stableCanonicalJson(before) !== stableCanonicalJson(after)) return [{ path, change_type: "modification", before, after }];
+    return [];
+  });
+}
+
+function buildOriginalWorkspaceAuthority({ frozen, candidate, lineage }) {
+  if (!lineage?.run_instance_id || !lineage?.case_id || !lineage?.attempt) throw new Error("original workspace authority requires closed evaluation lineage");
+  const diffEntries = workspaceDiffEntries(frozen.portableEntries, candidate.portableEntries);
+  const repositoryDiffClosure = {
+    schema_version: "1.0.0",
+    schema_path: REPOSITORY_DIFF_ARTIFACT_SCHEMA_PATH,
+    program: "adaptive_ask_repository_diff_artifact",
+    run_instance_id: lineage.run_instance_id,
+    case_id: lineage.case_id,
+    attempt: lineage.attempt,
+    frozen_workspace_tree_digest: frozen.digest,
+    candidate_workspace_tree_digest: candidate.digest,
+    diff_entries: diffEntries,
+  };
+  const repositoryDiffArtifact = {
+    ...repositoryDiffClosure,
+    artifact_digest: canonicalDigest(diffEntries),
+    artifact_bytes: Buffer.byteLength(stableCanonicalJson(diffEntries)) || 1,
+  };
+  const closure = {
+    schema_version: "1.0.0",
+    schema_path: ORIGINAL_WORKSPACE_AUTHORITY_SCHEMA_PATH,
+    program: "adaptive_ask_original_workspace_authority",
+    frozen_workspace_portable_digest: frozen.digest,
+    candidate_workspace_portable_digest: candidate.digest,
+    frozen_inventory: frozen.portableEntries,
+    candidate_inventory: candidate.portableEntries,
+    diff_entries: diffEntries,
+    repository_diff_artifact: {
+      path: SEALED_REPOSITORY_DIFF_ARTIFACT_PATH,
+      digest: repositoryDiffArtifact.artifact_digest,
+      bytes: repositoryDiffArtifact.artifact_bytes,
+    },
+  };
+  return {
+    authority: {
+      ...closure,
+      authority_digest: canonicalDigest(closure),
+      authority_bytes: Buffer.byteLength(stableCanonicalJson(closure)) || 1,
+    },
+    repositoryDiffArtifact,
+  };
+}
+
+function privateOriginalWorkspaceSnapshot(frozen, candidate, lineage) {
+  const snapshot = (inventory) => ({
+    portableEntries: structuredClone(inventory.portableEntries),
+    digest: inventory.digest,
+    buffers: new Map([...inventory.buffers].map(([path, bytes]) => [path, Buffer.from(bytes)])),
+  });
+  return { frozen: snapshot(frozen), candidate: snapshot(candidate), lineage: structuredClone(lineage) };
+}
+
+function materializeOriginalWorkspaceAuthority({ executionRoot, frozen, candidate, lineage, label }) {
+  const values = buildOriginalWorkspaceAuthority({ frozen, candidate, lineage });
+  const destination = resolve(executionRoot, "original-workspace-authority");
+  assertFreshPath(destination, `${label} original workspace authority root`);
+  mkdirSync(destination, 0o700);
+  for (const [path, value] of [
+    [ORIGINAL_WORKSPACE_AUTHORITY_PATH, values.authority],
+    [SEALED_REPOSITORY_DIFF_ARTIFACT_PATH, values.repositoryDiffArtifact],
+  ]) materializeSealedFile({
+    bytes: Buffer.from(`${AUTHORITY_JSON_STRINGIFY(value, null, 2)}\n`),
+    destination: resolve(destination, path),
+    label: `${label} ${path}`,
+    allowEmpty: false,
+  });
+  chmodSync(destination, SEALED_DIRECTORY_MODE);
+  const inventory = readStableWorkspaceInventory(destination, `${label} original workspace authority`);
+  assertSealedSnapshotModes(inventory, { label: `${label} original workspace authority` });
+  return { ...values, inventory };
+}
+
+function validateOriginalWorkspaceAuthority({ inventory, frozen, candidate, lineage, root, label, originalSource = null }) {
+  assertSealedSnapshotModes(inventory, { label: `${label} original workspace authority` });
+  const paths = inventory.portableEntries.map(({ path }) => path);
+  if (stableCanonicalJson(paths) !== stableCanonicalJson([ORIGINAL_WORKSPACE_AUTHORITY_PATH, SEALED_REPOSITORY_DIFF_ARTIFACT_PATH])) throw new Error(`${label} original workspace authority inventory is not closed`);
+  const authorityBytes = inventory.buffers.get(ORIGINAL_WORKSPACE_AUTHORITY_PATH);
+  const repositoryDiffBytes = inventory.buffers.get(SEALED_REPOSITORY_DIFF_ARTIFACT_PATH);
+  if (!authorityBytes || !repositoryDiffBytes) throw new Error(`${label} original workspace authority bytes are incomplete`);
+  const authority = jsonValueFromVerifiedBytes(authorityBytes, `${label} original workspace authority`);
+  const repositoryDiffArtifact = jsonValueFromVerifiedBytes(repositoryDiffBytes, `${label} repository diff artifact`);
+  assertBenchmarkSchemaInstance(authority, { schemaPath: resolve(root, ORIGINAL_WORKSPACE_AUTHORITY_SCHEMA_PATH), label: `${label} original workspace authority` });
+  assertBenchmarkSchemaInstance(repositoryDiffArtifact, { schemaPath: resolve(root, REPOSITORY_DIFF_ARTIFACT_SCHEMA_PATH), label: `${label} repository diff artifact` });
+  const { authority_digest: authorityDigest, authority_bytes: authorityByteCount, ...closure } = authority;
+  if (authorityDigest !== canonicalDigest(closure) || authorityByteCount !== (Buffer.byteLength(stableCanonicalJson(closure)) || 1)) throw new Error(`${label} original workspace authority digest or byte closure is invalid`);
+  for (const [entries, expected, kind] of [[authority.frozen_inventory, frozen, "frozen"], [authority.candidate_inventory, candidate, "candidate"]]) {
+    assertSortedUniquePaths(entries, `${label} original ${kind} inventory`);
+    if (canonicalDigest(entries) !== authority[`${kind}_workspace_portable_digest`]) throw new Error(`${label} original ${kind} portable digest is invalid`);
+    if (stableCanonicalJson(entries.map(({ path, file_type, bytes, sha256 }) => ({ path, file_type, bytes, sha256 }))) !== stableCanonicalJson(expected.portableEntries.map(({ path, file_type, bytes, sha256 }) => ({ path, file_type, bytes, sha256 })))) throw new Error(`${label} original ${kind} bytes or file types do not match the sealed workspace`);
+    for (const entry of expected.portableEntries) {
+      const sealedMode = entry.file_type === "file" ? SEALED_REGULAR_FILE_MODE : SEALED_DIRECTORY_MODE;
+      if (entry.mode !== sealedMode) throw new Error(`${label} sealed ${kind} execution mode is invalid`);
+    }
+  }
+  const expected = buildOriginalWorkspaceAuthority({
+    frozen: { portableEntries: authority.frozen_inventory, digest: authority.frozen_workspace_portable_digest },
+    candidate: { portableEntries: authority.candidate_inventory, digest: authority.candidate_workspace_portable_digest },
+    lineage,
+  });
+  if (stableCanonicalJson(authority) !== stableCanonicalJson(expected.authority) || stableCanonicalJson(repositoryDiffArtifact) !== stableCanonicalJson(expected.repositoryDiffArtifact)) throw new Error(`${label} original workspace authority or repository diff artifact is stale`);
+  if (originalSource) {
+    if (stableCanonicalJson(originalSource.lineage) !== stableCanonicalJson(lineage) || stableCanonicalJson(authority.frozen_inventory) !== stableCanonicalJson(originalSource.frozen.portableEntries) || stableCanonicalJson(authority.candidate_inventory) !== stableCanonicalJson(originalSource.candidate.portableEntries) || authority.frozen_workspace_portable_digest !== originalSource.frozen.digest || authority.candidate_workspace_portable_digest !== originalSource.candidate.digest) throw new Error(`${label} original workspace authority is detached from module-owned source metadata`);
+    for (const [kind, source, sealed] of [["frozen", originalSource.frozen, frozen], ["candidate", originalSource.candidate, candidate]]) for (const [path, bytes] of source.buffers) {
+      const sealedBytes = sealed.buffers.get(path);
+      if (!sealedBytes || Buffer.compare(bytes, sealedBytes) !== 0) throw new Error(`${label} original ${kind} bytes are detached from sealed content: ${path}`);
+    }
+  }
+  if (authority.repository_diff_artifact.digest !== repositoryDiffArtifact.artifact_digest || authority.repository_diff_artifact.bytes !== repositoryDiffArtifact.artifact_bytes) throw new Error(`${label} repository diff artifact is detached from original workspace authority`);
+  return { authority, authorityBytes, repositoryDiffArtifact, repositoryDiffBytes };
+}
+
 function relativeAuthorityPath(root, path, label) {
   const value = relative(root, path).split(sep).join("/");
   assertPortableRelativePath(value, `${label} relative path`);
@@ -1602,6 +1732,7 @@ export function createSealedEvaluatorExecution({
   frozenWorkspace,
   candidateWorkspace,
   evaluationInputRoot,
+  evaluationLineage,
   evaluatorRevision,
   externalAuthorityAnchor,
   executionDirectoryName = "sealed-execution",
@@ -1638,6 +1769,7 @@ export function createSealedEvaluatorExecution({
   const frozen = materializeSealedWorkspaceSnapshot({ inventory: frozenSource, destination: resolve(executionRoot, "frozen-workspace"), label: `${label} frozen workspace sealed snapshot` });
   const candidate = materializeSealedWorkspaceSnapshot({ inventory: candidateSource, destination: resolve(executionRoot, "candidate-workspace"), label: `${label} candidate workspace sealed snapshot` });
   const evidence = materializeSealedWorkspaceSnapshot({ inventory: evidenceSource, destination: resolve(executionRoot, "evaluation-input-evidence"), label: `${label} evaluation-input evidence sealed snapshot` });
+  const originalWorkspaceAuthority = materializeOriginalWorkspaceAuthority({ executionRoot, frozen: frozenSource, candidate: candidateSource, lineage: evaluationLineage, label });
   const repository = materializeSealedRepositorySnapshot({ authority: repositoryAuthority, destination: resolve(executionRoot, "repository"), label: `${label} repository authority sealed snapshot` });
   verifySealedEvaluatorExternalAuthority({ descriptor: repositoryAuthority.descriptor, buffers: repository.sealed.buffers, externalAuthorityAnchor: anchor, label });
   const execution = {
@@ -1723,7 +1855,22 @@ export function createSealedEvaluatorExecution({
       identityBefore: sealedSnapshotBinding(evidence),
       identityAfter: sealedSnapshotBinding(evidence),
     },
+    originalWorkspaceAuthority: {
+      path: originalWorkspaceAuthority.inventory.root,
+      relativePath: relativeAuthorityPath(evaluationRoot, originalWorkspaceAuthority.inventory.root, `${label} original workspace authority`),
+      authorityPath: ORIGINAL_WORKSPACE_AUTHORITY_PATH,
+      authoritySha256: rawByteDigest(originalWorkspaceAuthority.inventory.buffers.get(ORIGINAL_WORKSPACE_AUTHORITY_PATH)),
+      authorityBytes: originalWorkspaceAuthority.inventory.buffers.get(ORIGINAL_WORKSPACE_AUTHORITY_PATH).length,
+      authorityDigest: originalWorkspaceAuthority.authority.authority_digest,
+      repositoryDiffPath: SEALED_REPOSITORY_DIFF_ARTIFACT_PATH,
+      repositoryDiffSha256: rawByteDigest(originalWorkspaceAuthority.inventory.buffers.get(SEALED_REPOSITORY_DIFF_ARTIFACT_PATH)),
+      repositoryDiffBytes: originalWorkspaceAuthority.inventory.buffers.get(SEALED_REPOSITORY_DIFF_ARTIFACT_PATH).length,
+      repositoryDiffDigest: originalWorkspaceAuthority.repositoryDiffArtifact.artifact_digest,
+      sealed: sealedSnapshotBinding(originalWorkspaceAuthority.inventory),
+      lineage: structuredClone(evaluationLineage),
+    },
   };
+  ORIGINAL_EXECUTION_AUTHORITIES.set(execution, privateOriginalWorkspaceSnapshot(frozenSource, candidateSource, evaluationLineage));
   return execution;
 }
 
@@ -1751,7 +1898,8 @@ function captureVerifiedExecutionAuthority(execution, externalAuthorityAnchor, r
   const frozen = readStableWorkspaceInventory(execution.frozen.path, `${label} frozen workspace verified bytes`);
   const candidate = readStableWorkspaceInventory(execution.candidate.path, `${label} candidate workspace verified bytes`);
   const evidence = readStableWorkspaceInventory(execution.evidence.path, `${label} evaluation-input verified bytes`);
-  for (const [kind, inventory] of [["private bundle", privateBundle], ["frozen workspace", frozen], ["candidate workspace", candidate], ["evaluation-input evidence", evidence]]) assertSealedSnapshotModes(inventory, { label: `${label} ${kind}` });
+  const originalWorkspaceAuthority = readStableWorkspaceInventory(execution.originalWorkspaceAuthority.path, `${label} original workspace authority verified bytes`);
+  for (const [kind, inventory] of [["private bundle", privateBundle], ["frozen workspace", frozen], ["candidate workspace", candidate], ["evaluation-input evidence", evidence], ["original workspace authority", originalWorkspaceAuthority]]) assertSealedSnapshotModes(inventory, { label: `${label} ${kind}` });
   const repository = readSealedRepositoryDescriptor(execution.repository.path, `${label} repository verified bytes`, {
     expectedSourceGraphDigest: execution.repository.sourceGraphDigest ?? null,
     expectedEvaluatorRevision: execution.evaluatorRevision ?? null,
@@ -1761,7 +1909,11 @@ function captureVerifiedExecutionAuthority(execution, externalAuthorityAnchor, r
   const assertPortableRecord = (inventory, expected, kind) => {
     if (!expected || inventory.digest !== expected.portable_digest || (inventory.rootIdentity.mode & 0o777) !== (expected.root.mode & 0o777)) throw new Error(`${label} ${kind} does not match its recorded sealed authority`);
   };
-  for (const [inventory, expected, kind] of [[repository.inventory, execution.repository.sealed, "repository"], [privateBundle, execution.privateBundle.sealed, "private bundle"], [frozen, execution.frozen.sealed, "frozen workspace"], [candidate, execution.candidate.sealed, "candidate workspace"], [evidence, execution.evidence.sealed, "evaluation-input evidence"]]) assertPortableRecord(inventory, expected, kind);
+  for (const [inventory, expected, kind] of [[repository.inventory, execution.repository.sealed, "repository"], [privateBundle, execution.privateBundle.sealed, "private bundle"], [frozen, execution.frozen.sealed, "frozen workspace"], [candidate, execution.candidate.sealed, "candidate workspace"], [evidence, execution.evidence.sealed, "evaluation-input evidence"], [originalWorkspaceAuthority, execution.originalWorkspaceAuthority.sealed, "original workspace authority"]]) assertPortableRecord(inventory, expected, kind);
+  const originalSource = ORIGINAL_EXECUTION_AUTHORITIES.get(execution);
+  if (!originalSource) throw new Error(`${label} module-owned original workspace authority is missing`);
+  const originalAuthority = validateOriginalWorkspaceAuthority({ inventory: originalWorkspaceAuthority, frozen, candidate, lineage: execution.originalWorkspaceAuthority.lineage, root: immutableRoot, label, originalSource });
+  if (execution.originalWorkspaceAuthority.authorityPath !== ORIGINAL_WORKSPACE_AUTHORITY_PATH || execution.originalWorkspaceAuthority.authoritySha256 !== rawByteDigest(originalAuthority.authorityBytes) || execution.originalWorkspaceAuthority.authorityBytes !== originalAuthority.authorityBytes.length || execution.originalWorkspaceAuthority.authorityDigest !== originalAuthority.authority.authority_digest || execution.originalWorkspaceAuthority.repositoryDiffPath !== SEALED_REPOSITORY_DIFF_ARTIFACT_PATH || execution.originalWorkspaceAuthority.repositoryDiffSha256 !== rawByteDigest(originalAuthority.repositoryDiffBytes) || execution.originalWorkspaceAuthority.repositoryDiffBytes !== originalAuthority.repositoryDiffBytes.length || execution.originalWorkspaceAuthority.repositoryDiffDigest !== originalAuthority.repositoryDiffArtifact.artifact_digest) throw new Error(`${label} original workspace authority does not match the execution record`);
   const runnerIdentity = runtimeIdentityFromStableRead(runner);
   const runnerRecordedIdentity = execution.runner.identityBefore;
   const runnerStableInodeMatches = runnerRecordedIdentity && ["dev", "ino", "nlink", "mode"].every((field) => runnerIdentity[field] === runnerRecordedIdentity[field]);
@@ -1786,7 +1938,8 @@ function captureVerifiedExecutionAuthority(execution, externalAuthorityAnchor, r
     runnerBytes: Buffer.from(runner.bytes),
     hiddenEvaluatorPath,
     sourceGraph: structuredClone(descriptor.source_graph),
-    roots: { repository: repository.inventory, private_bundle: privateBundle, frozen, candidate, evidence },
+    roots: { repository: repository.inventory, private_bundle: privateBundle, frozen, candidate, evidence, original_workspace_authority: originalWorkspaceAuthority },
+    originalWorkspaceAuthority: originalAuthority,
   };
   const expectedAuthority = verifySealedEvaluatorExternalAuthority({
     descriptor,
@@ -1849,6 +2002,7 @@ function buildInMemoryEvaluatorPayload({ verifiedAuthority, execution, normalize
       serializedAuthorityRoot("frozen", verifiedAuthority.roots.frozen),
       serializedAuthorityRoot("candidate", verifiedAuthority.roots.candidate, execution.candidate.path),
       serializedAuthorityRoot("evidence", verifiedAuthority.roots.evidence),
+      serializedAuthorityRoot("original_workspace_authority", verifiedAuthority.roots.original_workspace_authority),
     ],
     normalized_result: { bytes: normalizedSource.length, sha256: rawByteDigest(normalizedSource), source_base64: normalizedSource.toString("base64") },
     expected_authority: verifiedAuthority.expectedAuthority,
@@ -1864,8 +2018,9 @@ function captureSealedExecutionState(execution, label) {
   const frozen = readStableWorkspaceInventory(execution.frozen.path, `${label} frozen sealed snapshot`);
   const candidate = readStableWorkspaceInventory(execution.candidate.path, `${label} candidate sealed snapshot`);
   const evidence = readStableWorkspaceInventory(execution.evidence.path, `${label} evidence sealed snapshot`);
+  const originalWorkspaceAuthority = readStableWorkspaceInventory(execution.originalWorkspaceAuthority.path, `${label} original workspace authority sealed snapshot`);
   const repository = readStableWorkspaceInventory(execution.repository.path, `${label} repository authority sealed snapshot`);
-  for (const [kind, inventory] of [["private bundle", privateBundle], ["frozen workspace", frozen], ["candidate workspace", candidate], ["evaluation-input evidence", evidence], ["repository authority", repository]]) if (inventory) assertSealedSnapshotModes(inventory, { label: `${label} ${kind}` });
+  for (const [kind, inventory] of [["private bundle", privateBundle], ["frozen workspace", frozen], ["candidate workspace", candidate], ["evaluation-input evidence", evidence], ["original workspace authority", originalWorkspaceAuthority], ["repository authority", repository]]) if (inventory) assertSealedSnapshotModes(inventory, { label: `${label} ${kind}` });
   return {
     runner: { bytes: runner.bytes.length, sha256: runner.rawByteDigest, identity: runtimeIdentityFromStableRead(runner) },
     hidden: { bytes: hidden.bytes.length, sha256: hidden.rawByteDigest, identity: runtimeIdentityFromStableRead(hidden) },
@@ -1874,6 +2029,7 @@ function captureSealedExecutionState(execution, label) {
     frozen: sealedSnapshotBinding(frozen),
     candidate: sealedSnapshotBinding(candidate),
     evidence: sealedSnapshotBinding(evidence),
+    originalWorkspaceAuthority: sealedSnapshotBinding(originalWorkspaceAuthority),
   };
 }
 
@@ -1892,6 +2048,7 @@ function portableSealedExecutionState(state) {
     frozen: snapshot(state.frozen),
     candidate: snapshot(state.candidate),
     evidence: snapshot(state.evidence),
+    originalWorkspaceAuthority: snapshot(state.originalWorkspaceAuthority),
   };
 }
 
@@ -1900,7 +2057,8 @@ function assertPortableSealedExecutionStatesEqual(states, label) {
 }
 
 export function prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthorityAnchor, repositoryRoot, normalized, normalizedBytes = null, barrier = null, label = "private evaluator sealed execution preflight" } = {}) {
-  if (!execution?.runner?.path || !execution?.hidden?.path || !execution?.repository?.path || !execution?.frozen?.path || !execution?.candidate?.path || !execution?.evidence?.path) throw new Error(`${label} is incomplete`);
+  if (!execution?.runner?.path || !execution?.hidden?.path || !execution?.repository?.path || !execution?.frozen?.path || !execution?.candidate?.path || !execution?.evidence?.path || !execution?.originalWorkspaceAuthority?.path) throw new Error(`${label} is incomplete`);
+  if (stableCanonicalJson(execution.originalWorkspaceAuthority.lineage) !== stableCanonicalJson(normalized?.lineage && { run_instance_id: normalized.lineage.run_instance_id, case_id: normalized.lineage.case_id, attempt: normalized.lineage.attempt })) throw new Error(`${label} normalized lineage does not match original workspace authority`);
   const verifiedAuthority = captureVerifiedExecutionAuthority(execution, externalAuthorityAnchor, repositoryRoot, label);
   const runnerSource = verifiedAuthority.runnerBytes.toString("utf8");
   return {
@@ -2460,7 +2618,7 @@ function validatePrivateEvaluationEvidenceArtifacts({ root, privateEvaluationRoo
         assertBenchmarkSchemaInstance(artifact, { schemaPath: resolve(root, EVALUATOR_CHECK_ARTIFACT_SCHEMA_PATH), label: "evaluator check artifact" });
       } else throw new Error("private test-result artifact schema is not authorized");
     }
-    artifacts.set(`${entry.kind}:${entry.digest}:${entry.bytes}`, entry);
+    artifacts.set(`${entry.kind}:${entry.digest}:${entry.bytes}`, { entry, read: artifactRead });
   }
   const references = evidenceReferencesIn(result);
   for (const reference of references) {
@@ -2555,6 +2713,7 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const sealedFrozenWorkspace = resolveSealedWorkspace(record.frozen_workspace_sealed_execution_path, "sealed frozen workspace");
   const sealedCandidateWorkspace = resolveSealedWorkspace(record.candidate_workspace_sealed_execution_path, "sealed candidate workspace");
   const sealedEvaluationInputRoot = resolveSealedWorkspace(record.evaluation_input_evidence_sealed_execution_path, "sealed evaluation-input evidence root");
+  const sealedOriginalWorkspaceAuthorityRoot = resolveSealedWorkspace(record.original_workspace_authority_sealed_execution_path, "sealed original workspace authority root");
   const sealedRepositoryRoot = resolveSealedWorkspace(record.sealed_repository_root_relative_path, "sealed repository authority root");
   if (pathsOverlap(sealedFrozenWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(sealedCandidateWorkspace, bundle.canonicalPrivateRoot) || pathsOverlap(sealedEvaluationInputRoot, bundle.canonicalPrivateRoot)) throw new Error("sealed private evaluation workspaces overlap the static evaluator bundle");
   if (!isInside(canonicalEvaluationRoot, sealedRepositoryRoot)) throw new Error("sealed repository authority must stay inside the private evaluation root");
@@ -2615,8 +2774,15 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const frozenInventory = readStableWorkspaceInventory(sealedFrozenWorkspace, "sealed frozen workspace");
   const candidateInventory = readStableWorkspaceInventory(sealedCandidateWorkspace, "sealed candidate workspace");
   const evidenceInventory = readStableWorkspaceInventory(sealedEvaluationInputRoot, "sealed evaluation-input evidence root");
+  const originalWorkspaceAuthorityInventory = readStableWorkspaceInventory(sealedOriginalWorkspaceAuthorityRoot, "sealed original workspace authority root");
   if (record.frozen_workspace_sealed_inventory_digest !== frozenInventory.digest || record.candidate_workspace_sealed_inventory_digest !== candidateInventory.digest || record.evaluation_input_evidence_sealed_inventory_digest !== evidenceInventory.digest || record.frozen_workspace_sealed_runtime_digest !== frozenInventory.runtimeDigest || record.candidate_workspace_sealed_runtime_digest !== candidateInventory.runtimeDigest || record.evaluation_input_evidence_sealed_runtime_digest !== evidenceInventory.runtimeDigest) throw new Error("sealed private evaluation workspace identity is inconsistent");
   if (!evidence.repositoryDiffArtifact || evidence.repositoryDiffArtifact.frozen_workspace_tree_digest !== originalFrozenInventory.digest || evidence.repositoryDiffArtifact.candidate_workspace_tree_digest !== originalCandidateInventory.digest) throw new Error("repository diff workspace authority does not match the original workspace inventory");
+  const originalWorkspaceAuthority = validateOriginalWorkspaceAuthority({ inventory: originalWorkspaceAuthorityInventory, frozen: frozenInventory, candidate: candidateInventory, lineage: { run_instance_id: record.run_instance_id, case_id: record.case_id, attempt: record.attempt }, root: realpathSync(root), label: "private evaluation record" });
+  if (stableCanonicalJson(originalWorkspaceAuthority.authority.frozen_inventory) !== stableCanonicalJson(originalFrozenInventory.portableEntries) || stableCanonicalJson(originalWorkspaceAuthority.authority.candidate_inventory) !== stableCanonicalJson(originalCandidateInventory.portableEntries)) throw new Error("original workspace authority does not match the immutable original workspace inventories");
+  if (record.original_workspace_authority_path !== ORIGINAL_WORKSPACE_AUTHORITY_PATH || record.original_workspace_authority_raw_sha256 !== rawByteDigest(originalWorkspaceAuthority.authorityBytes) || record.original_workspace_authority_digest !== originalWorkspaceAuthority.authority.authority_digest || record.original_workspace_authority_bytes !== originalWorkspaceAuthority.authorityBytes.length || record.repository_diff_sealed_authority_path !== SEALED_REPOSITORY_DIFF_ARTIFACT_PATH || record.repository_diff_sealed_authority_raw_sha256 !== rawByteDigest(originalWorkspaceAuthority.repositoryDiffBytes)) throw new Error("private evaluation record original workspace authority binding is inconsistent");
+  if (stableCanonicalJson(evidence.repositoryDiffArtifact) !== stableCanonicalJson(originalWorkspaceAuthority.repositoryDiffArtifact)) throw new Error("persisted repository diff artifact does not match the child pre-execution authority");
+  const persistedRepositoryDiffEntry = [...evidence.artifacts.values()].find(({ entry }) => entry.kind === "repository_diff");
+  if (!persistedRepositoryDiffEntry || persistedRepositoryDiffEntry.read.rawByteDigest !== rawByteDigest(originalWorkspaceAuthority.repositoryDiffBytes) || Buffer.compare(persistedRepositoryDiffEntry.read.bytes, originalWorkspaceAuthority.repositoryDiffBytes) !== 0) throw new Error("persisted repository diff artifact bytes do not match the child pre-execution authority");
   const validatedFragment = validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy: scoringInputs.scoringPolicy, requirementRecord: scoringInputs.requirementRecord, normalizedResult: normalized });
   const execution = {
     evaluatorRevision: bundle.manifest.evaluator_revision,
@@ -2662,7 +2828,21 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
     frozen: { path: sealedFrozenWorkspace, sealed: sealedSnapshotBinding(frozenInventory) },
     candidate: { path: sealedCandidateWorkspace, sealed: sealedSnapshotBinding(candidateInventory) },
     evidence: { path: sealedEvaluationInputRoot, sealed: sealedSnapshotBinding(evidenceInventory) },
+    originalWorkspaceAuthority: {
+      path: sealedOriginalWorkspaceAuthorityRoot,
+      authorityPath: record.original_workspace_authority_path,
+      authoritySha256: record.original_workspace_authority_raw_sha256,
+      authorityBytes: record.original_workspace_authority_bytes,
+      authorityDigest: record.original_workspace_authority_digest,
+      repositoryDiffPath: record.repository_diff_sealed_authority_path,
+      repositoryDiffSha256: record.repository_diff_sealed_authority_raw_sha256,
+      repositoryDiffBytes: originalWorkspaceAuthority.repositoryDiffBytes.length,
+      repositoryDiffDigest: record.repository_diff_artifact_digest,
+      sealed: sealedSnapshotBinding(originalWorkspaceAuthorityInventory),
+      lineage: { run_instance_id: record.run_instance_id, case_id: record.case_id, attempt: record.attempt },
+    },
   };
+  ORIGINAL_EXECUTION_AUTHORITIES.set(execution, privateOriginalWorkspaceSnapshot(originalFrozenInventory, originalCandidateInventory, { run_instance_id: record.run_instance_id, case_id: record.case_id, attempt: record.attempt }));
   const executed = executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized, normalizedBytes, label: "private hidden evaluator" });
   const actualFragment = executed.firstFragment;
   const repeatedFragment = executed.secondFragment;

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK original workspace metadata authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schema_path", "program", "frozen_workspace_portable_digest", "candidate_workspace_portable_digest", "frozen_inventory", "candidate_inventory", "diff_entries", "repository_diff_artifact", "authority_digest", "authority_bytes"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/original-workspace-authority.schema.json" },
+    "program": { "const": "adaptive_ask_original_workspace_authority" },
+    "frozen_workspace_portable_digest": { "$ref": "#/$defs/digest" },
+    "candidate_workspace_portable_digest": { "$ref": "#/$defs/digest" },
+    "frozen_inventory": { "$ref": "#/$defs/inventory" },
+    "candidate_inventory": { "$ref": "#/$defs/inventory" },
+    "diff_entries": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/diffEntry" } },
+    "repository_diff_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest", "bytes"],
+      "properties": {
+        "path": { "const": "repository-diff-artifact.json" },
+        "digest": { "$ref": "#/$defs/digest" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "authority_digest": { "$ref": "#/$defs/digest" },
+    "authority_bytes": { "type": "integer", "minimum": 1 }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "file_type", "mode", "bytes", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!\\./)[a-zA-Z0-9._/-]+$" },
+        "file_type": { "enum": ["file", "directory"] },
+        "mode": { "type": "integer", "minimum": 0, "maximum": 511 },
+        "bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "sha256": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "inventory": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/entry" } },
+    "fileState": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["path", "file_type", "mode", "bytes", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!\\./)[a-zA-Z0-9._/-]+$" },
+        "file_type": { "enum": ["file", "directory", "missing"] },
+        "mode": { "type": ["integer", "null"], "minimum": 0 },
+        "bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "sha256": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "diffEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "change_type", "before", "after"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!\\./)[a-zA-Z0-9._/-]+$" },
+        "change_type": { "enum": ["addition", "deletion", "modification"] },
+        "before": { "$ref": "#/$defs/fileState" },
+        "after": { "$ref": "#/$defs/fileState" }
+      }
+    }
+  }
+}

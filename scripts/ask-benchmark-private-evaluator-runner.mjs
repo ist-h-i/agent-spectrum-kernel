@@ -443,6 +443,14 @@ async function execute(payload, authority) {
   let normalized;
   try { normalized = JSON.parse(normalizedBytes.toString("utf8")); }
   catch { fail("normalized result verified bytes are invalid JSON"); }
+  const originalAuthorityRoot = authority.roots.get("original_workspace_authority")?.virtual;
+  if (!originalAuthorityRoot) fail("original workspace authority root is missing");
+  let originalWorkspaceAuthority;
+  let repositoryDiffArtifact;
+  try {
+    originalWorkspaceAuthority = JSON.parse(fsNamespace.readFileSync(path.resolve(originalAuthorityRoot, "original-workspace-authority.json"), "utf8"));
+    repositoryDiffArtifact = JSON.parse(fsNamespace.readFileSync(path.resolve(originalAuthorityRoot, "repository-diff-artifact.json"), "utf8"));
+  } catch { fail("original workspace authority payload is invalid JSON"); }
   const fragment = await hidden.namespace.evaluateCandidateSafe({
     repositoryRoot,
     frozenWorkspace: authority.roots.get("frozen")?.virtual,
@@ -450,6 +458,8 @@ async function execute(payload, authority) {
     normalizedResult: normalized,
     evaluationInputEvidenceRoot: authority.roots.get("evidence")?.virtual,
     evaluatorAuthority: payload.expected_authority,
+    originalWorkspaceAuthority,
+    repositoryDiffArtifact,
   });
   process.stdout.write(`${JSON.stringify(fragment)}\n`);
 }
