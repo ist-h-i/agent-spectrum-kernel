@@ -1757,6 +1757,7 @@ export function createSealedEvaluatorExecution({
   const frozenSource = readStableWorkspaceInventory(frozenWorkspace, `${label} frozen workspace source`);
   const candidateSource = readStableWorkspaceInventory(candidateWorkspace, `${label} candidate workspace source`);
   const evidenceSource = readStableWorkspaceInventory(evaluationInputRoot, `${label} evaluation-input evidence source`);
+  const closedEvaluationLineage = evaluationLineage && { run_instance_id: evaluationLineage.run_instance_id, case_id: evaluationLineage.case_id, attempt: evaluationLineage.attempt };
   assertPortableRelativePath(executionDirectoryName, `${label} execution directory`);
   const executionRoot = resolve(evaluationRoot, executionDirectoryName);
   assertFreshPath(executionRoot, `${label} root`);
@@ -1769,7 +1770,7 @@ export function createSealedEvaluatorExecution({
   const frozen = materializeSealedWorkspaceSnapshot({ inventory: frozenSource, destination: resolve(executionRoot, "frozen-workspace"), label: `${label} frozen workspace sealed snapshot` });
   const candidate = materializeSealedWorkspaceSnapshot({ inventory: candidateSource, destination: resolve(executionRoot, "candidate-workspace"), label: `${label} candidate workspace sealed snapshot` });
   const evidence = materializeSealedWorkspaceSnapshot({ inventory: evidenceSource, destination: resolve(executionRoot, "evaluation-input-evidence"), label: `${label} evaluation-input evidence sealed snapshot` });
-  const originalWorkspaceAuthority = materializeOriginalWorkspaceAuthority({ executionRoot, frozen: frozenSource, candidate: candidateSource, lineage: evaluationLineage, label });
+  const originalWorkspaceAuthority = materializeOriginalWorkspaceAuthority({ executionRoot, frozen: frozenSource, candidate: candidateSource, lineage: closedEvaluationLineage, label });
   const repository = materializeSealedRepositorySnapshot({ authority: repositoryAuthority, destination: resolve(executionRoot, "repository"), label: `${label} repository authority sealed snapshot` });
   verifySealedEvaluatorExternalAuthority({ descriptor: repositoryAuthority.descriptor, buffers: repository.sealed.buffers, externalAuthorityAnchor: anchor, label });
   const execution = {
@@ -1867,10 +1868,10 @@ export function createSealedEvaluatorExecution({
       repositoryDiffBytes: originalWorkspaceAuthority.inventory.buffers.get(SEALED_REPOSITORY_DIFF_ARTIFACT_PATH).length,
       repositoryDiffDigest: originalWorkspaceAuthority.repositoryDiffArtifact.artifact_digest,
       sealed: sealedSnapshotBinding(originalWorkspaceAuthority.inventory),
-      lineage: structuredClone(evaluationLineage),
+      lineage: structuredClone(closedEvaluationLineage),
     },
   };
-  ORIGINAL_EXECUTION_AUTHORITIES.set(execution, privateOriginalWorkspaceSnapshot(frozenSource, candidateSource, evaluationLineage));
+  ORIGINAL_EXECUTION_AUTHORITIES.set(execution, privateOriginalWorkspaceSnapshot(frozenSource, candidateSource, closedEvaluationLineage));
   return execution;
 }
 
