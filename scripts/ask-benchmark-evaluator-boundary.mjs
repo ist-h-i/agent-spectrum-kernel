@@ -2045,13 +2045,7 @@ export function createProductionSealedEvaluatorExecution(options = {}) {
   const candidateAuthorityWorkspace = materializeTerminalCandidateAuthorityWorkspace({ evaluationRoot, terminal });
   terminal.binding.candidate_authority_portable_digest = candidateAuthorityWorkspace.digest;
   const evidenceRoot = mkdtempSync(resolve(evaluationRoot, ".production-evaluation-input-"));
-  const frozenAuthorityParent = mkdtempSync(resolve(evaluationRoot, ".production-frozen-authority-"));
   const verifiedFrozenSource = readStableWorkspaceInventory(resolve(options.materializedPath, terminal.binding.case_id, "workspace"), "verified frozen fixture workspace");
-  const frozenAuthority = materializeSealedWorkspaceSnapshot({
-    inventory: verifiedFrozenSource,
-    destination: resolve(frozenAuthorityParent, "workspace"),
-    label: "verified frozen fixture workspace authority",
-  });
   const evidence = {
     schema_version: "1.0.0",
     program: "adaptive_ask_verified_terminal_evaluation_input",
@@ -2063,7 +2057,7 @@ export function createProductionSealedEvaluatorExecution(options = {}) {
     privateEvaluationRoot: evaluationRoot,
     privateRoot: options.privateRoot,
     hiddenAsset: options.hiddenAsset,
-    frozenWorkspace: frozenAuthority.root,
+    frozenWorkspace: verifiedFrozenSource.root,
     candidateWorkspace: candidateAuthorityWorkspace.root,
     evaluationInputRoot: evidenceRoot,
     evaluationLineage: terminal.binding,
