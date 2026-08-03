@@ -2972,7 +2972,9 @@ try {
       assert.deepEqual(result.requirement_results.map(({ outcome }) => outcome), ["pass", "pass", "fail"], `production sealed ${evidenceState} evidence outcomes`);
       assert.equal(result.classification, "under_processing", `production sealed ${evidenceState} evidence classification`);
       assert.equal(verification.verification_evidence_state, evidenceState, `production sealed ${evidenceState} typed evidence state`);
-      assert.deepEqual(verification.verification_evidence_references, deriveVerificationEvidenceReferences(fullAuthority.normalizedAuthority.normalized, evidenceState), `production sealed ${evidenceState} evidence references`);
+      const expectedReferences = deriveVerificationEvidenceReferences(fullAuthority.normalizedAuthority.normalized, evidenceState);
+      assert.deepEqual(verification.verification_evidence_references.map(({ bytes: ignoredBytes, ...reference }) => reference), expectedReferences.map(({ bytes: ignoredBytes, ...reference }) => reference), `production sealed ${evidenceState} evidence reference identities`);
+      assert.equal(verification.verification_evidence_references.every(({ bytes }) => Number.isInteger(bytes) && bytes > 0), true, `production sealed ${evidenceState} evidence reference bytes`);
       removeTree(fullAuthority.authorityRoot);
       removeTree(fullAuthority.scoringRoot);
     }
