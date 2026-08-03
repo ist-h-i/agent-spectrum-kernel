@@ -54,6 +54,9 @@ jobs:
       - name: Run evaluator isolation boundary tests
         run: node scripts/test-ask-benchmark-evaluator-boundary.mjs
 
+      - name: Run lifecycle-neutral evaluator-result verification tests
+        run: node scripts/test-ask-benchmark-portfolio-evaluator-result.mjs
+
       - name: Run portfolio raw engineering result score tests
         run: node scripts/test-ask-benchmark-portfolio-score.mjs
 

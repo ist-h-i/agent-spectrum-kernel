@@ -26,7 +26,16 @@ import {
   computeEvaluatorReferenceDigest,
   verifyEvaluatorResult,
 } from "./ask-benchmark-evaluator-boundary.mjs";
+import {
+  computeAdmissionDecisionDigest,
+  computeAdmissionDecisionId,
+  computeAdmissionReviewAuthorityDigest,
+  computeAdmissionReviewAuthorityId,
+  resolveEffectiveAdmissionAuthority,
+  resolveEffectiveAdmissionAuthorityFromFiles,
+} from "./ask-benchmark-admission-decision.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import { verifyLifecycleNeutralEvaluatorResult } from "./ask-benchmark-portfolio-evaluator-result.mjs";
 import {
   computeFinalAdmissionRecordDigest,
   computeOutputContractDigest,
@@ -95,6 +104,18 @@ function writeJson(path, value) {
 
 function clone(value) {
   return structuredClone(value);
+}
+
+function computeSyntheticRequirementAuthorityDigest(record) {
+  const {
+    admission_digest: _admissionDigest,
+    evaluator_authority_manifest_path: _authorityManifestPath,
+    evaluator_authority_manifest_raw_sha256: _authorityManifestRawSha256,
+    evaluator_authority_manifest_digest: _authorityManifestDigest,
+    requirement_authority_digest: _requirementAuthorityDigest,
+    ...requirementAuthority
+  } = record;
+  return canonicalDigest(requirementAuthority);
 }
 
 function snapshot(path) {
@@ -439,7 +460,7 @@ function defaultRequirements() {
   ];
 }
 
-function createScoringInputs(path, reference, referencePath, requirementDefinitions = defaultRequirements()) {
+function createScoringInputs(path, reference, referencePath, requirementDefinitions = defaultRequirements(), { admissionStatus = "admitted", distinctRequirementAuthority = false } = {}) {
   mkdirSync(path, { recursive: true });
   const requirements = clone(requirementDefinitions);
   for (const requirement of requirements) requirement.requirement_digest = computeRequirementDigest(requirement);
@@ -456,10 +477,12 @@ function createScoringInputs(path, reference, referencePath, requirementDefiniti
     mutation_set_ids: requirements.flatMap(({ mutation_ids: ids }) => ids),
     reviewer_record_id: "synthetic-reviewer-record",
     admission_revision: 1,
-    admission_status: "admitted",
+    admission_status: admissionStatus,
     admission_digest: digest("placeholder"),
   };
+  if (distinctRequirementAuthority) admissionRecord.requirement_authority_digest = computeSyntheticRequirementAuthorityDigest(admissionRecord);
   admissionRecord.admission_digest = computeFinalAdmissionRecordDigest(admissionRecord);
+  if (distinctRequirementAuthority) assert.notEqual(admissionRecord.admission_digest, admissionRecord.requirement_authority_digest);
   const admissionRecordPath = resolve(path, "admission-record.json");
   writeJson(admissionRecordPath, admissionRecord);
   const requirementRecordPath = resolve(path, "requirement-record.json");
@@ -471,7 +494,7 @@ function createScoringInputs(path, reference, referencePath, requirementDefiniti
     catalog_digest: catalog.catalog_digest,
     policy_manifest_digest: policyManifest.manifest_digest,
     scoring_policy_digest: scoringPolicy.policy_digest,
-    admission_record_digest: admissionRecord.admission_digest,
+    admission_record_digest: admissionRecord.requirement_authority_digest ?? admissionRecord.admission_digest,
     requirements,
     requirement_set_digest: digest("placeholder"),
     requirement_record_digest: digest("placeholder"),
@@ -629,7 +652,7 @@ function evaluatorResultFor(normalized, sourceSnapshotDigest, manifest, referenc
   return closeResult(result);
 }
 
-function createFixture(name, { normalizedOutcome = "completed", requirements = defaultRequirements() } = {}) {
+function createFixture(name, { normalizedOutcome = "completed", requirements = defaultRequirements(), admissionStatus = "admitted", distinctRequirementAuthority = false } = {}) {
   const path = resolve(work, name);
   const materialized = resolve(path, "materialized");
   const selectionState = resolve(path, "selection-state");
@@ -643,7 +666,7 @@ function createFixture(name, { normalizedOutcome = "completed", requirements = d
   const referencePath = resolve(path, "evaluator-reference.json");
   const reference = referenceFor(manifest);
   writeJson(referencePath, reference);
-  const scoringInputs = createScoringInputs(resolve(path, "scoring-inputs"), reference, referencePath, requirements);
+  const scoringInputs = createScoringInputs(resolve(path, "scoring-inputs"), reference, referencePath, requirements, { admissionStatus, distinctRequirementAuthority });
   const commonCli = [
     "--reference", referencePath,
     "--private-root", privateRoot,
@@ -659,6 +682,100 @@ function createFixture(name, { normalizedOutcome = "completed", requirements = d
     "--scoring-input-freeze-source-digest", scoringInputs.freezeManifestSourceDigest,
   ];
   return { path, materialized, selectionState, runDir, normalizedResults, publicArtifactRoot, normalized, privateRoot, manifest, manifestPath, reference, referencePath, scoringInputs, commonCli };
+}
+
+function createAdmissionDecisionEvidence(fixtureContext, status, revision = 1) {
+  const reviewArchivePath = resolve(fixtureContext.path, `admission-review-${status}-r${revision}.archive`);
+  const reviewArchiveBytes = Buffer.from(`synthetic independent ${status} admission review revision ${revision}\n`);
+  writeFileSync(reviewArchivePath, reviewArchiveBytes);
+  const reviewStatus = status === "admitted" ? "approved" : status;
+  const blockingFindingCount = status === "admitted" ? 0 : 1;
+  const reviewBase = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/portfolio-admission-review-authority.schema.json",
+    program: "adaptive_ask_portfolio_admission_review_authority",
+    authority_revision: revision,
+    fixture_id: FIXTURE_ID,
+    review_status: reviewStatus,
+    author_self_approval: false,
+    reviewer_type: "independent_panel",
+    reviewer_record_id: `synthetic-independent-review-r${revision}`,
+    reviewer_count: 2,
+    reviewed_at: `2026-08-03T00:00:0${Math.min(revision, 9)}Z`,
+    reviewed_repository: "ist-h-i/agent-spectrum-kernel",
+    reviewed_pull_request: 224,
+    reviewed_head_revision: REVISION,
+    blocking_finding_count: blockingFindingCount,
+    review_evidence: { archive_sha256: fileDigest(reviewArchivePath), archive_bytes: reviewArchiveBytes.length },
+  };
+  reviewBase.authority_id = computeAdmissionReviewAuthorityId(reviewBase);
+  const reviewAuthority = { ...reviewBase, authority_digest: computeAdmissionReviewAuthorityDigest(reviewBase) };
+  const reviewAuthorityPath = resolve(fixtureContext.path, `admission-review-authority-${status}-r${revision}.json`);
+  writeJson(reviewAuthorityPath, reviewAuthority);
+  const admission = fixtureContext.scoringInputs.admissionRecord;
+  const requirement = fixtureContext.scoringInputs.requirementRecord;
+  const freeze = fixtureContext.scoringInputs.freezeManifest;
+  const decisionBase = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/portfolio-admission-decision.schema.json",
+    program: "adaptive_ask_portfolio_admission_decision",
+    decision_revision: revision,
+    fixture_id: FIXTURE_ID,
+    decision_status: status,
+    review_status: reviewStatus,
+    author_self_approval: false,
+    reviewer_type: reviewAuthority.reviewer_type,
+    reviewer_record_id: reviewAuthority.reviewer_record_id,
+    reviewer_count: reviewAuthority.reviewer_count,
+    reviewed_at: reviewAuthority.reviewed_at,
+    reviewed_repository: reviewAuthority.reviewed_repository,
+    reviewed_pull_request: reviewAuthority.reviewed_pull_request,
+    reviewed_head_revision: reviewAuthority.reviewed_head_revision,
+    blocking_finding_count: blockingFindingCount,
+    review_evidence: clone(reviewAuthority.review_evidence),
+    evaluator: {
+      evaluator_revision: fixtureContext.reference.evaluator_revision,
+      evaluator_bundle_id: fixtureContext.reference.evaluator_bundle_id,
+      evaluator_bundle_digest: fixtureContext.reference.evaluator_bundle_digest,
+      evaluator_bundle_bytes: admission.evaluator_byte_count,
+    },
+    evaluator_public_reference_digest: fixtureContext.reference.public_metadata_digest,
+    frozen_admission_authority: {
+      path: repoPath(fixtureContext.scoringInputs.admissionRecordPath),
+      raw_byte_digest: freeze.admission_record.raw_byte_digest,
+      semantic_digest: admission.admission_digest,
+      requirement_authority_digest: admission.requirement_authority_digest ?? admission.admission_digest,
+    },
+    frozen_requirement_record: {
+      path: repoPath(fixtureContext.scoringInputs.requirementRecordPath),
+      raw_byte_digest: freeze.requirement_record.raw_byte_digest,
+      record_digest: requirement.requirement_record_digest,
+      set_digest: requirement.requirement_set_digest,
+    },
+    frozen_scoring_input_manifest: {
+      path: repoPath(fixtureContext.scoringInputs.freezeManifestPath),
+      raw_byte_digest: fixtureContext.scoringInputs.freezeManifestSourceDigest,
+      semantic_digest: freeze.manifest_digest,
+    },
+  };
+  decisionBase.decision_id = computeAdmissionDecisionId(decisionBase);
+  const decision = { ...decisionBase, decision_digest: computeAdmissionDecisionDigest(decisionBase) };
+  const decisionPath = resolve(fixtureContext.path, `admission-decision-${status}-r${revision}.json`);
+  writeJson(decisionPath, decision);
+  return {
+    decision,
+    decisionPath,
+    reviewAuthority,
+    reviewAuthorityPath,
+    reviewAuthoritySourceDigest: fileDigest(reviewAuthorityPath),
+    reviewArchivePath,
+    cli: [
+      "--admission-decision", decisionPath,
+      "--admission-review-authority", reviewAuthorityPath,
+      "--admission-review-authority-source-digest", fileDigest(reviewAuthorityPath),
+      "--admission-review-archive", reviewArchivePath,
+    ],
+  };
 }
 
 function writeResult(fixtureContext, name, evaluationStatus = "completed", outcomes = {}) {
@@ -768,7 +885,7 @@ try {
   assert.equal(engineering.normalized_outcome, "completed");
   assert.notEqual(computeEngineeringResultId({ ...engineering, normalized_outcome: "failed" }), engineering.engineering_result_id, "normalized outcome must participate explicitly in engineering result identity");
 
-  const verified = verifyEvaluatorResult({
+  const legacyVerificationOptions = {
     root,
     catalogPath: resolve(root, "benchmarks/portfolio-catalog.json"),
     policyManifestPath: resolve(root, "benchmarks/portfolio-policy-manifest.json"),
@@ -786,56 +903,145 @@ try {
     selectionState: base.selectionState,
     runDir: base.runDir,
     normalizedResultsPath: base.normalizedResults,
-  });
-  const admittedOverlayAuthority = {
-    authority_mode: "admitted_overlay",
-    effective_admission_status: "admitted",
-    frozen_admission_record_digest: completed.result.admission_record_digest,
-    requirement_authority_digest: completed.result.admission_record_digest,
-    requirement_record_digest: completed.result.requirement_record_digest,
-    admission_decision_digest: digest("admission-decision-r1"),
-    admission_decision_revision: 1,
-    evaluator_bundle_id: completed.result.evaluator_bundle_id,
-    evaluator_bundle_digest: completed.result.evaluator_bundle_digest,
-    evaluator_revision: completed.result.evaluator_revision,
-    evaluator_public_reference_digest: completed.result.evaluator_public_reference_digest,
-    fixture_id: completed.result.fixture_id,
   };
-  const overlayEngineering = buildPortfolioEngineeringResult(verified, { root, admissionAuthority: admittedOverlayAuthority });
-  assert.equal(overlayEngineering.scoring_status, "complete");
-  assert.equal(overlayEngineering.effective_admission_mode, "admitted_overlay");
-  assert.equal(overlayEngineering.admission_decision_digest, admittedOverlayAuthority.admission_decision_digest);
-  assert.equal(overlayEngineering.admission_decision_revision, 1);
-  const falselyNonReadyOverlay = clone(overlayEngineering);
-  falselyNonReadyOverlay.scoring_status = "not_scoring_ready";
-  falselyNonReadyOverlay.scoring_reason = "admission_not_admitted";
-  falselyNonReadyOverlay.requirement_score = Object.fromEntries(Object.keys(falselyNonReadyOverlay.requirement_score).map((field) => [field, null]));
-  falselyNonReadyOverlay.blockers.gate_status = "not_scoring_ready";
-  falselyNonReadyOverlay.engineering_result_digest = computeEngineeringResultDigest(falselyNonReadyOverlay);
-  assert.throws(() => validatePortfolioEngineeringResult(falselyNonReadyOverlay, { root }), /cannot remain not-scoring-ready/);
-  const replacedOverlay = clone(overlayEngineering);
-  replacedOverlay.admission_decision_digest = digest("different-admission-decision");
-  replacedOverlay.engineering_result_id = computeEngineeringResultId(replacedOverlay);
-  replacedOverlay.engineering_result_digest = computeEngineeringResultDigest(replacedOverlay);
-  validatePortfolioEngineeringResult(replacedOverlay, { root });
-  assert.throws(() => assertEngineeringResultAdmissionAuthority(replacedOverlay, admittedOverlayAuthority), /decision frozen at scoring time/);
-  for (const [status, decisionDigest, revision] of [
-    ["admission_pending", null, null],
-    ["changes_requested", digest("changes-requested-decision"), 2],
-    ["rejected", digest("rejected-decision"), 3],
-  ]) {
-    const notAdmittedAuthority = {
-      ...admittedOverlayAuthority,
-      authority_mode: "not_admitted",
-      effective_admission_status: status,
-      admission_decision_digest: decisionDigest,
-      admission_decision_revision: revision,
-    };
-    const nonReady = buildPortfolioEngineeringResult(verified, { root, admissionAuthority: notAdmittedAuthority });
-    assert.equal(nonReady.scoring_status, "not_scoring_ready");
-    assert.equal(nonReady.scoring_reason, "admission_not_admitted");
-    assert.equal(nonReady.requirement_score.normalized_requirement_score, null);
+  const legacyVerified = verifyEvaluatorResult(legacyVerificationOptions);
+  const lifecycleNeutralVerified = verifyLifecycleNeutralEvaluatorResult(legacyVerificationOptions);
+  assert.equal(lifecycleNeutralVerified.evaluationReady, legacyVerified.scoringReady);
+  for (const field of ["normalized", "result"]) assert.deepEqual(lifecycleNeutralVerified[field], legacyVerified[field], `legacy lifecycle-neutral verifier parity: ${field}`);
+  for (const field of ["freezeManifest", "freezeManifestSourceDigest", "catalog", "policyManifest", "scoringPolicy", "admissionRecord", "requirementRecord", "outputContract", "evaluatorReference"]) {
+    assert.deepEqual(lifecycleNeutralVerified.scoringInputs[field], legacyVerified.scoringInputs[field], `legacy lifecycle-neutral scoring-input parity: ${field}`);
   }
+  const legacyAuthority = resolveEffectiveAdmissionAuthority({
+    frozenAdmissionRecord: lifecycleNeutralVerified.scoringInputs.admissionRecord,
+    requirementRecord: lifecycleNeutralVerified.scoringInputs.requirementRecord,
+    evaluatorReference: lifecycleNeutralVerified.scoringInputs.evaluatorReference,
+    root,
+  });
+  const rebuiltLegacy = buildPortfolioEngineeringResult({ ...lifecycleNeutralVerified, effectiveAdmissionAuthority: legacyAuthority }, { root });
+  assert.deepEqual(rebuiltLegacy, engineering);
+
+  const pendingFixture = createFixture("pending-overlay-production", { admissionStatus: "admission_pending", distinctRequirementAuthority: true });
+  const pendingCompleted = writeResult(pendingFixture, "pending-completed");
+  assert.notEqual(pendingFixture.scoringInputs.admissionRecord.admission_digest, pendingFixture.scoringInputs.admissionRecord.requirement_authority_digest);
+  assert.equal(pendingFixture.scoringInputs.requirementRecord.admission_record_digest, pendingFixture.scoringInputs.admissionRecord.requirement_authority_digest);
+
+  const pendingWithoutOverlayPath = resolve(pendingFixture.path, "pending-without-overlay-engineering-result.json");
+  runScore(pendingFixture, { resultPath: pendingCompleted.path, outputPath: pendingWithoutOverlayPath });
+  const pendingWithoutOverlay = JSON.parse(readFileSync(pendingWithoutOverlayPath, "utf8"));
+  assert.equal(pendingWithoutOverlay.scoring_status, "not_scoring_ready");
+  assert.equal(pendingWithoutOverlay.effective_admission_status, "admission_pending");
+  assert.ok(Object.values(pendingWithoutOverlay.requirement_score).every((value) => value === null));
+
+  const admittedEvidence = createAdmissionDecisionEvidence(pendingFixture, "admitted", 1);
+  const admittedOverlayPath = resolve(pendingFixture.path, "admitted-overlay-engineering-result.json");
+  runScore(pendingFixture, { resultPath: pendingCompleted.path, outputPath: admittedOverlayPath, cliOverrides: admittedEvidence.cli });
+  const admittedOverlayEngineering = JSON.parse(readFileSync(admittedOverlayPath, "utf8"));
+  assert.equal(admittedOverlayEngineering.scoring_status, "complete");
+  assert.equal(admittedOverlayEngineering.effective_admission_mode, "admitted_overlay");
+  assert.equal(admittedOverlayEngineering.admission_decision_digest, admittedEvidence.decision.decision_digest);
+  assert.equal(admittedOverlayEngineering.admission_decision_revision, 1);
+  assert.equal(admittedOverlayEngineering.admission_record_digest, pendingFixture.scoringInputs.admissionRecord.admission_digest);
+  assert.equal(admittedOverlayEngineering.requirement_authority_digest, pendingFixture.scoringInputs.admissionRecord.requirement_authority_digest);
+
+  for (const [status, revision] of [["changes_requested", 2], ["rejected", 3]]) {
+    const evidence = createAdmissionDecisionEvidence(pendingFixture, status, revision);
+    const outputPath = resolve(pendingFixture.path, `${status}-overlay-engineering-result.json`);
+    runScore(pendingFixture, { resultPath: pendingCompleted.path, outputPath, cliOverrides: evidence.cli });
+    const artifact = JSON.parse(readFileSync(outputPath, "utf8"));
+    assert.equal(artifact.scoring_status, "not_scoring_ready");
+    assert.equal(artifact.effective_admission_status, status);
+    assert.ok(Object.values(artifact.requirement_score).every((value) => value === null));
+  }
+
+  expectScoreFailure(pendingFixture, {
+    resultPath: pendingCompleted.path,
+    name: "partial-decision-evidence",
+    pattern: /requires decision, sealed review authority, external authority digest, and review archive evidence together/,
+    cliOverrides: ["--admission-decision", admittedEvidence.decisionPath],
+  });
+
+  const wrongDecisionDigest = clone(admittedEvidence.decision);
+  wrongDecisionDigest.decision_digest = digest("wrong-decision-digest");
+  const wrongDecisionDigestPath = resolve(pendingFixture.path, "wrong-decision-digest.json");
+  writeJson(wrongDecisionDigestPath, wrongDecisionDigest);
+  expectScoreFailure(pendingFixture, {
+    resultPath: pendingCompleted.path,
+    name: "wrong-decision-digest",
+    pattern: /decision canonical digest is invalid/,
+    cliOverrides: ["--admission-decision", wrongDecisionDigestPath, ...admittedEvidence.cli.slice(2)],
+  });
+
+  const forgedAuthority = clone(admittedEvidence.reviewAuthority);
+  forgedAuthority.reviewer_record_id = "forged-independent-review";
+  forgedAuthority.authority_digest = computeAdmissionReviewAuthorityDigest(forgedAuthority);
+  const forgedAuthorityPath = resolve(pendingFixture.path, "forged-review-authority.json");
+  writeJson(forgedAuthorityPath, forgedAuthority);
+  expectScoreFailure(pendingFixture, {
+    resultPath: pendingCompleted.path,
+    name: "forged-review-authority",
+    pattern: /external immutable source digest/,
+    cliOverrides: admittedEvidence.cli.flatMap((value, index, values) => values[index - 1] === "--admission-review-authority" ? [forgedAuthorityPath] : index > 0 && values[index - 1] === "--admission-review-authority" ? [] : [value]),
+  });
+
+  const driftedArchivePath = resolve(pendingFixture.path, "drifted-review.archive");
+  writeFileSync(driftedArchivePath, "drifted review archive bytes\n");
+  expectScoreFailure(pendingFixture, {
+    resultPath: pendingCompleted.path,
+    name: "review-archive-drift",
+    pattern: /archive raw identity/,
+    cliOverrides: [...admittedEvidence.cli.slice(0, -1), driftedArchivePath],
+  });
+
+  const laterEvidence = createAdmissionDecisionEvidence(pendingFixture, "admitted", 2);
+  const pendingVerified = verifyLifecycleNeutralEvaluatorResult({
+    ...legacyVerificationOptions,
+    admissionRecordPath: pendingFixture.scoringInputs.admissionRecordPath,
+    requirementRecordPath: pendingFixture.scoringInputs.requirementRecordPath,
+    outputContractPath: pendingFixture.scoringInputs.outputContractPath,
+    scoringInputFreezeManifestPath: pendingFixture.scoringInputs.freezeManifestPath,
+    scoringInputFreezeManifestSourceDigest: pendingFixture.scoringInputs.freezeManifestSourceDigest,
+    referencePath: pendingFixture.referencePath,
+    privateRoot: pendingFixture.privateRoot,
+    manifestPath: pendingFixture.manifestPath,
+    resultPath: pendingCompleted.path,
+    materializedPath: pendingFixture.materialized,
+    selectionState: pendingFixture.selectionState,
+    runDir: pendingFixture.runDir,
+    normalizedResultsPath: pendingFixture.normalizedResults,
+  });
+  const laterAuthority = resolveEffectiveAdmissionAuthorityFromFiles({
+    root,
+    frozenAdmissionRecord: pendingVerified.scoringInputs.admissionRecord,
+    frozenAdmissionSource: { path: repoPath(pendingFixture.scoringInputs.admissionRecordPath), bytes: readFileSync(pendingFixture.scoringInputs.admissionRecordPath) },
+    requirementRecord: pendingVerified.scoringInputs.requirementRecord,
+    requirementRecordSource: { path: repoPath(pendingFixture.scoringInputs.requirementRecordPath), bytes: readFileSync(pendingFixture.scoringInputs.requirementRecordPath) },
+    evaluatorReference: pendingVerified.scoringInputs.evaluatorReference,
+    scoringInputFreezeManifest: pendingVerified.scoringInputs.freezeManifest,
+    scoringInputFreezeManifestSource: { path: repoPath(pendingFixture.scoringInputs.freezeManifestPath), bytes: readFileSync(pendingFixture.scoringInputs.freezeManifestPath) },
+    decisionPath: laterEvidence.decisionPath,
+    reviewAuthorityPath: laterEvidence.reviewAuthorityPath,
+    reviewAuthoritySourceDigest: laterEvidence.reviewAuthoritySourceDigest,
+    reviewArchivePath: laterEvidence.reviewArchivePath,
+  });
+  assert.throws(() => assertEngineeringResultAdmissionAuthority(admittedOverlayEngineering, laterAuthority), /decision frozen at scoring time/);
+
+  const otherAdmissionResultPath = mutateResult(pendingFixture, pendingCompleted.result, "other-frozen-admission", (value) => {
+    value.admission_record_digest = digest("another-frozen-admission");
+  });
+  expectScoreFailure(pendingFixture, { resultPath: otherAdmissionResultPath, name: "other-frozen-admission", pattern: /binding mismatch at admission_record_digest/ });
+
+  const requirementAuthorityDriftFixture = createFixture("distinct-requirement-authority-drift", { admissionStatus: "admission_pending", distinctRequirementAuthority: true });
+  requirementAuthorityDriftFixture.scoringInputs.admissionRecord.requirement_authority_digest = digest("drifted-requirement-authority");
+  requirementAuthorityDriftFixture.scoringInputs.admissionRecord.admission_digest = computeFinalAdmissionRecordDigest(requirementAuthorityDriftFixture.scoringInputs.admissionRecord);
+  writeJson(requirementAuthorityDriftFixture.scoringInputs.admissionRecordPath, requirementAuthorityDriftFixture.scoringInputs.admissionRecord);
+  requirementAuthorityDriftFixture.scoringInputs.freezeManifest.admission_record.raw_byte_digest = fileDigest(requirementAuthorityDriftFixture.scoringInputs.admissionRecordPath);
+  requirementAuthorityDriftFixture.scoringInputs.freezeManifest.admission_record.semantic_digest = requirementAuthorityDriftFixture.scoringInputs.admissionRecord.admission_digest;
+  requirementAuthorityDriftFixture.scoringInputs.freezeManifest.manifest_digest = computeScoringInputFreezeManifestDigest(requirementAuthorityDriftFixture.scoringInputs.freezeManifest);
+  writeJson(requirementAuthorityDriftFixture.scoringInputs.freezeManifestPath, requirementAuthorityDriftFixture.scoringInputs.freezeManifest);
+  requirementAuthorityDriftFixture.scoringInputs.freezeManifestSourceDigest = fileDigest(requirementAuthorityDriftFixture.scoringInputs.freezeManifestPath);
+  requirementAuthorityDriftFixture.commonCli[requirementAuthorityDriftFixture.commonCli.indexOf("--scoring-input-freeze-source-digest") + 1] = requirementAuthorityDriftFixture.scoringInputs.freezeManifestSourceDigest;
+  const requirementAuthorityDriftResult = writeResult(requirementAuthorityDriftFixture, "distinct-requirement-authority-drift");
+  expectScoreFailure(requirementAuthorityDriftFixture, { resultPath: requirementAuthorityDriftResult.path, name: "distinct-requirement-authority-drift", pattern: /requirement-authority digest is invalid|does not bind the frozen admission requirement authority/ });
 
   const blockerFailPath = mutateResult(base, completed.result, "blocker-fail", (value) => {
     const blocker = value.requirement_results.find(({ requirement_id: requirementId }) => requirementId === "blocker-requirement");
@@ -995,6 +1201,11 @@ try {
 
   const evaluatorDigestDrift = mutateResult(base, completed.result, "evaluator-digest-drift", (value) => { value.quality.state = "mixed"; }, { close: false });
   expectScoreFailure(base, { resultPath: evaluatorDigestDrift, name: "evaluator-digest-drift", pattern: /identity|digest/u });
+
+  const transplantedNormalizedEvidence = mutateResult(base, completed.result, "transplanted-normalized-evidence", (value) => {
+    value.quality.evidence_references[0].digest = digest("other-normalized-result");
+  });
+  expectScoreFailure(base, { resultPath: transplantedNormalizedEvidence, name: "transplanted-normalized-evidence", pattern: /transplanted normalized-result evidence reference/ });
 
   const driftNormalizedRoot = resolve(base.path, "drift-normalized-results");
   cpSync(base.normalizedResults, driftNormalizedRoot, { recursive: true });

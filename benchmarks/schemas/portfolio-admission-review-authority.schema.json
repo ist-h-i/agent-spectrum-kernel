@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio admission independent-review authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "authority_id",
+    "authority_revision",
+    "fixture_id",
+    "review_status",
+    "author_self_approval",
+    "reviewer_type",
+    "reviewer_record_id",
+    "reviewer_count",
+    "reviewed_at",
+    "reviewed_repository",
+    "reviewed_pull_request",
+    "reviewed_head_revision",
+    "blocking_finding_count",
+    "review_evidence",
+    "authority_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-admission-review-authority.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio_admission_review_authority" },
+    "authority_id": { "type": "string", "pattern": "^admission-review-authority-[a-f0-9]{32}$" },
+    "authority_revision": { "type": "integer", "minimum": 1 },
+    "fixture_id": { "$ref": "#/$defs/token" },
+    "review_status": { "enum": ["approved", "changes_requested", "rejected", "pending", "unknown"] },
+    "author_self_approval": { "const": false },
+    "reviewer_type": { "enum": ["independent_human", "independent_agent", "independent_panel"] },
+    "reviewer_record_id": { "$ref": "#/$defs/token" },
+    "reviewer_count": { "type": "integer", "minimum": 1 },
+    "reviewed_at": { "type": "string", "format": "date-time" },
+    "reviewed_repository": { "type": "string", "minLength": 3, "maxLength": 200, "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+    "reviewed_pull_request": { "type": "integer", "minimum": 1 },
+    "reviewed_head_revision": { "$ref": "#/$defs/revision" },
+    "blocking_finding_count": { "type": "integer", "minimum": 0 },
+    "review_evidence": { "$ref": "#/$defs/archiveEvidence" },
+    "authority_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "archiveEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["archive_sha256", "archive_bytes"],
+      "properties": {
+        "archive_sha256": { "$ref": "#/$defs/digest" },
+        "archive_bytes": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

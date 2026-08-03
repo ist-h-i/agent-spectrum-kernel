@@ -1,18 +1,26 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, resolve } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   assertAdmissionDecisionAppendOnly,
-  assertImmutablePathInventoryUnchanged,
+  assertImmutableGitDiffUnchanged,
   computeAdmissionDecisionDigest,
   computeAdmissionDecisionId,
   resolveEffectiveAdmissionAuthority,
+  validatePortfolioAdmissionDecision,
 } from "./ask-benchmark-admission-decision.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const digest = (value) => canonicalDigest({ value });
 const bytes = (value, space = 2) => Buffer.from(`${JSON.stringify(value, null, space)}\n`);
 const rawDigest = (value) => `sha256:${createHash("sha256").update(value).digest("hex")}`;
+const REVIEW_ARCHIVE_BYTES = Buffer.from("synthetic independent admission review archive\n");
 
 function frozenAdmission(status = "admission_pending", fixtureId = "synthetic-fixture") {
   const base = {
@@ -94,7 +102,7 @@ function reviewAuthority() {
     reviewed_pull_request: 224,
     reviewed_head_revision: "c".repeat(40),
     blocking_finding_count: 0,
-    review_evidence: { archive_sha256: digest("review-archive"), archive_bytes: 8192 },
+    review_evidence: { archive_sha256: rawDigest(REVIEW_ARCHIVE_BYTES), archive_bytes: REVIEW_ARCHIVE_BYTES.length },
   };
 }
 
@@ -140,6 +148,7 @@ function fixture(status = "admission_pending") {
     scoringInputFreezeManifest: freeze,
     scoringInputFreezeManifestSource: { path: "benchmarks/fixtures/synthetic/scoring-input-freeze-manifest.json", bytes: bytes(freeze) },
     reviewAuthority: reviewAuthority(),
+    reviewArchiveSource: { bytes: REVIEW_ARCHIVE_BYTES },
   };
   const decisionBase = {
     schema_version: "1.0.0",
@@ -229,7 +238,7 @@ rejectsMutation("admitted overlay rejects pending review", ({ decision }) => { d
 rejectsMutation("admitted overlay rejects unknown review", ({ decision }) => { decision.review_status = "unknown"; reseal(decision); }, /approved/);
 rejectsMutation("admitted overlay rejects author self-approval", ({ decision }) => { decision.author_self_approval = true; reseal(decision); }, /equal false|self-approval/i);
 rejectsMutation("admitted overlay rejects blockers", ({ decision }) => { decision.blocking_finding_count = 1; reseal(decision); }, /zero blocking/);
-rejectsMutation("admitted overlay rejects wrong fixture", ({ decision }) => { decision.fixture_id = "other-fixture"; reseal(decision); });
+rejectsMutation("cross-fixture overlay transplant is rejected", ({ decision }) => { decision.fixture_id = "other-fixture"; reseal(decision); });
 rejectsMutation("admitted overlay rejects wrong reviewed head", ({ decision }) => { decision.reviewed_head_revision = "d".repeat(40); reseal(decision); });
 rejectsMutation("admitted overlay rejects wrong evaluator revision", ({ decision }) => { decision.evaluator.evaluator_revision = "d".repeat(40); reseal(decision); });
 rejectsMutation("admitted overlay rejects wrong bundle ID", ({ decision }) => { decision.evaluator.evaluator_bundle_id = `evaluator-${"d".repeat(64)}`; reseal(decision); });
@@ -237,6 +246,7 @@ rejectsMutation("admitted overlay rejects wrong bundle digest", ({ decision }) =
 rejectsMutation("admitted overlay rejects wrong bundle bytes", ({ decision }) => { decision.evaluator.evaluator_bundle_bytes += 1; reseal(decision); });
 rejectsMutation("admitted overlay rejects wrong archive SHA", ({ decision }) => { decision.review_evidence.archive_sha256 = digest("other-archive"); reseal(decision); });
 rejectsMutation("admitted overlay rejects wrong archive bytes", ({ decision }) => { decision.review_evidence.archive_bytes += 1; reseal(decision); });
+rejectsMutation("admitted overlay rejects review archive raw-byte drift", ({ options }) => { options.reviewArchiveSource.bytes = Buffer.from("drifted review archive\n"); }, /archive raw identity/);
 rejectsMutation("admitted overlay rejects frozen admission raw drift", ({ options }) => { options.frozenAdmissionSource.bytes = bytes(options.frozenAdmissionRecord, 0); });
 rejectsMutation("admitted overlay rejects frozen admission semantic drift", ({ options }) => {
   options.frozenAdmissionRecord.admission_revision += 1;
@@ -300,76 +310,49 @@ test("a later decision revision has a new digest and cannot rewrite the consumed
   assert.throws(() => assertAdmissionDecisionAppendOnly(next, decision), /increase/);
 });
 
-test("immutable path inventory rejects any changed frozen source path", () => {
-  const immutablePaths = [
-    "benchmarks/schemas/evaluation-input-failure-artifact.schema.json",
-    "benchmarks/schemas/evaluator-authority-manifest.schema.json",
-    "benchmarks/schemas/evaluator-check-artifact.schema.json",
-    "benchmarks/schemas/evaluator-reference.schema.json",
-    "benchmarks/schemas/evaluator-result-envelope.schema.json",
-    "benchmarks/schemas/normalized-portfolio-result.schema.json",
-    "benchmarks/schemas/original-workspace-authority.schema.json",
-    "benchmarks/schemas/portfolio-final-admission-record.schema.json",
-    "benchmarks/schemas/portfolio-output-contract.schema.json",
-    "benchmarks/schemas/portfolio-requirement-record.schema.json",
-    "benchmarks/schemas/private-evaluation-record.schema.json",
-    "benchmarks/schemas/private-evaluator-bundle.schema.json",
-    "benchmarks/schemas/private-evaluator-fragment.schema.json",
-    "benchmarks/schemas/private-evaluator-independence-statement.schema.json",
-    "benchmarks/schemas/repository-diff-artifact.schema.json",
-    "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
-    "scripts/adapter-runtime-inventory.mjs",
-    "scripts/ask-benchmark-atomic-publication.mjs",
-    "scripts/ask-benchmark-command-evidence.mjs",
-    "scripts/ask-benchmark-evaluator-boundary.mjs",
-    "scripts/ask-benchmark-execution.mjs",
-    "scripts/ask-benchmark-materialize.mjs",
-    "scripts/ask-benchmark-normalized-results.mjs",
-    "scripts/ask-benchmark-plan.mjs",
-    "scripts/ask-benchmark-portfolio-catalog.mjs",
-    "scripts/ask-benchmark-portfolio-policy.mjs",
-    "scripts/ask-benchmark-private-evaluator-runner.mjs",
-    "scripts/ask-benchmark-schema.mjs",
-    "scripts/ask-benchmark-scoring-contract.mjs",
-    "scripts/ask-benchmark-selection.mjs",
-    "scripts/ask-benchmark-stable-file.mjs",
-    "scripts/ask-benchmark-terminal-candidate.mjs",
-    "scripts/ask-benchmark-terminal-workspace.mjs",
-    "scripts/ask-shared.mjs",
-    "scripts/codex-runtime-profile.mjs",
-    "scripts/execution-envelope.mjs",
-    "scripts/install-claude-adapter.mjs",
-    "scripts/install-codex-adapter.mjs",
-    "scripts/installer-lifecycle.mjs",
-  ];
-  const sharedChangePaths = [
-    ".github/workflows/validate.yml",
-    "benchmarks/README.md",
-    "benchmarks/admission-decision-overlay.md",
-    "benchmarks/schemas/portfolio-admission-decision.schema.json",
-    "benchmarks/schemas/portfolio-directional-outcome-report.schema.json",
-    "benchmarks/schemas/portfolio-engineering-result-set.schema.json",
-    "benchmarks/schemas/portfolio-engineering-result-source-manifest.schema.json",
-    "benchmarks/schemas/portfolio-engineering-result.schema.json",
-    "benchmarks/schemas/portfolio-mechanism-scorecard.schema.json",
-    "benchmarks/schemas/portfolio-paired-comparison-report.schema.json",
-    "benchmarks/schemas/portfolio-repetition-report.schema.json",
-    "docs/fixtures/adapter-runtime-bundle.json",
-    "scripts/ask-benchmark-admission-decision.mjs",
-    "scripts/ask-benchmark-portfolio-directional-outcome-report.mjs",
-    "scripts/ask-benchmark-portfolio-mechanism-scorecard.mjs",
-    "scripts/ask-benchmark-portfolio-paired-comparison-report.mjs",
-    "scripts/ask-benchmark-portfolio-repetition-report.mjs",
-    "scripts/ask-benchmark-portfolio-result-set.mjs",
-    "scripts/ask-benchmark-portfolio-score.mjs",
-    "scripts/test-ask-benchmark-admission-decision.mjs",
-    "scripts/test-ask-benchmark-portfolio-directional-outcome-report.mjs",
-    "scripts/test-ask-benchmark-portfolio-mechanism-scorecard.mjs",
-    "scripts/test-ask-benchmark-portfolio-paired-comparison-report.mjs",
-    "scripts/test-ask-benchmark-portfolio-repetition-report.mjs",
-    "scripts/test-ask-benchmark-portfolio-result-set.mjs",
-    "scripts/test-ask-benchmark-portfolio-score.mjs",
-  ];
-  assertImmutablePathInventoryUnchanged({ immutablePaths, changedPaths: sharedChangePaths });
-  assert.throws(() => assertImmutablePathInventoryUnchanged({ immutablePaths, changedPaths: [immutablePaths[0]] }), /immutable source paths changed/);
+test("caller-supplied empty or partial expected authority cannot validate an admitted decision", () => {
+  const { decision } = fixture();
+  for (const expectedAuthority of [{}, { fixture_id: decision.fixture_id }, { reviewed_head_revision: decision.reviewed_head_revision }]) {
+    assert.throws(() => validatePortfolioAdmissionDecision(decision, { expectedAuthority }), /caller-supplied expected admission authority is prohibited/);
+  }
+});
+
+test("complete authority sources reject missing review, archive, evaluator, or head identity", () => {
+  for (const field of ["review_evidence", "reviewed_head_revision"]) {
+    const { options, decision } = fixture();
+    delete options.reviewAuthority[field];
+    assert.throws(() => validatePortfolioAdmissionDecision(decision, { authoritySources: options }), /missing fields|archive/i);
+  }
+  const { options, decision } = fixture();
+  delete options.evaluatorReference.evaluator_revision;
+  assert.throws(() => validatePortfolioAdmissionDecision(decision, { authoritySources: options }), /evaluator|digest/i);
+});
+
+test("actual Git diff is checked against the fixed approved R21 inventory", () => {
+  const inventory = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/admission-decision/approved-r21-immutable-paths.json"), "utf8"));
+  assert.equal(inventory.authority_source.reviewed_head_revision, "7db95b7a33878aa327192648d5ffc191d22c005e");
+  assert.equal(inventory.authority_source.evaluator_public_reference_digest, "sha256:186111ffa02586e36c86b1e375e4d62aa74e0c9da9b51ab2d08c8cd5d4a27839");
+  assert.equal(inventory.inventory_digest, canonicalDigest(inventory.paths));
+  assert.equal(inventory.paths.length, 44);
+  assertImmutableGitDiffUnchanged({ root, immutablePaths: inventory.paths });
+});
+
+test("actual protected-path commit is rejected without a caller-maintained changed-path list", () => {
+  const repository = mkdtempSync(resolve(tmpdir(), "ask-admission-immutable-diff-"));
+  const protectedPath = "scripts/ask-benchmark-evaluator-boundary.mjs";
+  const git = (...args) => spawnSync("git", args, { cwd: repository, encoding: "utf8" });
+  try {
+    mkdirSync(resolve(repository, "scripts"), { recursive: true });
+    writeFileSync(resolve(repository, protectedPath), "export const frozen = true;\n");
+    assert.equal(git("init", "-q").status, 0);
+    assert.equal(git("add", "--", protectedPath).status, 0);
+    assert.equal(git("-c", "user.name=ASK Test", "-c", "user.email=ask-test@example.invalid", "commit", "-qm", "base").status, 0);
+    const baseRevision = git("rev-parse", "HEAD").stdout.trim();
+    writeFileSync(resolve(repository, protectedPath), "export const frozen = false;\n");
+    assert.equal(git("add", "--", protectedPath).status, 0);
+    assert.equal(git("-c", "user.name=ASK Test", "-c", "user.email=ask-test@example.invalid", "commit", "-qm", "mutate protected path").status, 0);
+    assert.throws(() => assertImmutableGitDiffUnchanged({ root: repository, baseRevision, immutablePaths: [protectedPath] }), /immutable source paths changed/);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
 });

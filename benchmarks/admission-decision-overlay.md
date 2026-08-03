@@ -12,6 +12,8 @@ Rewriting an `admission_pending` record after evaluator review changes the requi
 
 An admitted decision is not accepted from its self-digest alone. Validation re-derives the frozen admission, requirement, scoring-input manifest, and evaluator-reference identities from supplied artifact bytes and compares the decision against separate review/archive authority. Changing an inner identity and resealing only the outer decision therefore fails closed.
 
+The independent-review authority is a separate closed artifact. Production scoring requires its externally supplied raw-byte digest and reads the referenced review archive bytes directly. The authority's canonical digest is therefore not a self-authorizing fallback: a forged authority, an archive replacement, or a partial authority fails before an engineering result is published.
+
 ## Compatibility and scoring lineage
 
 Legacy fixtures keep their existing path: an admitted frozen final-admission record with no overlay resolves as `legacy_admitted_record`. Its `admission_decision_digest` and revision remain `null`.
@@ -28,6 +30,19 @@ Raw engineering results bind:
 
 The result-set source manifest and result-set inventory retain that lineage. Repetition and paired reports propagate the same decision identity from each raw result; directional outcomes retain both paired decision identities; mechanism scorecards retain it in each run-authority entry. The evaluator result envelope does not contain the overlay digest and continues to bind the frozen pre-admission authority.
 
+## Production scoring entry
+
+`score-evaluator-result` uses the downstream lifecycle-neutral evaluator-result verifier. It rechecks the private bundle/public reference boundary, normalized result, result envelope, requirement coverage, and the raw and semantic frozen scoring inputs without treating the frozen admission lifecycle status as evaluator-result validity. Evaluation readiness and effective admission are composed only after both have been verified.
+
+With no decision evidence, a pending frozen admission produces `not_scoring_ready` and null numeric fields. To consume an overlay, supply all four inputs together:
+
+- `--admission-decision <decision.json>`;
+- `--admission-review-authority <authority.json>`;
+- `--admission-review-authority-source-digest <sha256:digest>`;
+- `--admission-review-archive <archive>`.
+
+Partial evidence is rejected. `buildPortfolioEngineeringResult()` accepts only an effective authority returned directly by the resolver; callers cannot inject a manufactured admitted authority object.
+
 ## Append-only lifecycle
 
 An already consumed decision record is never edited in place. A later decision uses a greater revision and a different canonical digest. Existing score and report artifacts retain the exact revision/digest used when they were created; a later decision cannot retroactively validate or rewrite them.
@@ -38,8 +53,8 @@ After this shared contract is merged to `main`:
 
 1. merge the shared change into `feat/issue-207-mn-build-option-update`;
 2. create the R21 admission decision overlay outside the private evaluator source/bundle graph;
-3. pass the byte-frozen R21 admission record, requirement record, scoring-input manifest, evaluator reference, and external independent-review archive authority to `resolveEffectiveAdmissionAuthority()`;
-4. retain the R21 evaluator result binding to the frozen pre-admission authority and bind the resolved decision only when building the raw engineering result;
+3. invoke the production scorer with the byte-frozen R21 admission record, requirement record, scoring-input manifest, evaluator reference, decision, externally sealed review authority digest, and review archive;
+4. let the lifecycle-neutral verifier retain the R21 evaluator result binding to the frozen pre-admission authority and bind the resolved decision only when building the raw engineering result;
 5. verify result-set and report lineage against that exact decision revision/digest;
 6. obtain the separately required human/independent lifecycle decisions before any Ready or merge transition.
 

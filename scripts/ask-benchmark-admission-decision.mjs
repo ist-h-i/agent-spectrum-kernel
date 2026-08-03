@@ -1,15 +1,21 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
+import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 
 export const ADMISSION_DECISION_SCHEMA_PATH = "benchmarks/schemas/portfolio-admission-decision.schema.json";
+export const ADMISSION_REVIEW_AUTHORITY_SCHEMA_PATH = "benchmarks/schemas/portfolio-admission-review-authority.schema.json";
 
 const DEFAULT_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const MAX_PUBLIC_JSON_BYTES = 1024 * 1024;
+const MAX_REVIEW_ARCHIVE_BYTES = 256 * 1024 * 1024;
 const AUTHORITY_MODES = new Set(["legacy_admitted_record", "admitted_overlay", "not_admitted"]);
 const EFFECTIVE_STATUSES = new Set(["admitted", "admission_pending", "changes_requested", "rejected"]);
+const RESOLVED_AUTHORITIES = new WeakSet();
 const REVIEW_AUTHORITY_FIELDS = Object.freeze([
   "review_status",
   "author_self_approval",
@@ -23,6 +29,16 @@ const REVIEW_AUTHORITY_FIELDS = Object.freeze([
   "blocking_finding_count",
   "review_evidence",
 ]);
+const REVIEW_AUTHORITY_ARTIFACT_FIELDS = Object.freeze([
+  "schema_version",
+  "schema_path",
+  "program",
+  "authority_id",
+  "authority_revision",
+  "fixture_id",
+  ...REVIEW_AUTHORITY_FIELDS,
+  "authority_digest",
+]);
 
 function withoutField(value, field) {
   const { [field]: _ignored, ...rest } = value;
@@ -31,6 +47,14 @@ function withoutField(value, field) {
 
 function sha256(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function parseJsonBytes(bytes, label) {
+  try {
+    return JSON.parse(bytes.toString("utf8"));
+  } catch {
+    throw new Error(`${label} bytes must contain valid JSON`);
+  }
 }
 
 function assertClosedObject(value, fields, label) {
@@ -69,12 +93,7 @@ function normalizeBytes(value, label) {
 function artifactEvidence(source, expectedValue, label) {
   assertClosedObject(source, ["path", "bytes"], label);
   const bytes = normalizeBytes(source.bytes, label);
-  let parsed;
-  try {
-    parsed = JSON.parse(bytes.toString("utf8"));
-  } catch {
-    throw new Error(`${label} bytes must contain valid JSON`);
-  }
+  const parsed = parseJsonBytes(bytes, label);
   if (stableCanonicalJson(parsed) !== stableCanonicalJson(expectedValue)) throw new Error(`${label} bytes do not encode the supplied frozen artifact`);
   return { path: assertPortablePath(source.path, `${label} path`), raw_byte_digest: sha256(bytes) };
 }
@@ -131,6 +150,7 @@ function expectedDecisionAuthority({
   scoringInputFreezeManifest = null,
   scoringInputFreezeManifestSource = null,
   reviewAuthority,
+  reviewArchiveSource,
 }) {
   const admission = validateFrozenAdmissionRecord(frozenAdmissionRecord);
   const requirement = validateRequirementRecord(requirementRecord, admission.requirementAuthorityDigest);
@@ -160,6 +180,12 @@ function expectedDecisionAuthority({
     }
   }
   assertClosedObject(reviewAuthority, REVIEW_AUTHORITY_FIELDS, "external review authority");
+  const reviewArchiveBytes = normalizeBytes(reviewArchiveSource?.bytes, "external review archive");
+  if (reviewArchiveBytes.length === 0) throw new Error("external review archive must be non-empty");
+  if (
+    reviewAuthority.review_evidence.archive_sha256 !== sha256(reviewArchiveBytes)
+    || reviewAuthority.review_evidence.archive_bytes !== reviewArchiveBytes.length
+  ) throw new Error("external review archive raw identity differs from the sealed review authority");
   return {
     fixture_id: frozenAdmissionRecord.fixture_id,
     ...reviewAuthority,
@@ -196,25 +222,54 @@ export function computeAdmissionDecisionDigest(value) {
   return canonicalDigest(withoutField(value, "decision_digest"));
 }
 
+export function computeAdmissionReviewAuthorityId(value) {
+  return `admission-review-authority-${canonicalDigest({
+    fixture_id: value.fixture_id,
+    reviewed_repository: value.reviewed_repository,
+    reviewed_pull_request: value.reviewed_pull_request,
+  }).slice("sha256:".length, "sha256:".length + 32)}`;
+}
+
+export function computeAdmissionReviewAuthorityDigest(value) {
+  return canonicalDigest(withoutField(value, "authority_digest"));
+}
+
+function validateAdmissionReviewAuthority(value, { root = DEFAULT_ROOT } = {}) {
+  assertClosedObject(value, REVIEW_AUTHORITY_ARTIFACT_FIELDS, "sealed admission review authority");
+  assertBenchmarkSchemaInstance(value, { schemaPath: resolve(root, ADMISSION_REVIEW_AUTHORITY_SCHEMA_PATH), label: "sealed admission review authority" });
+  if (value.authority_id !== computeAdmissionReviewAuthorityId(value)) throw new Error("sealed admission review authority ID is invalid");
+  if (value.authority_digest !== computeAdmissionReviewAuthorityDigest(value)) throw new Error("sealed admission review authority digest is invalid");
+  return value;
+}
+
+function reviewAuthorityProjection(value) {
+  return Object.fromEntries(REVIEW_AUTHORITY_FIELDS.map((field) => [field, structuredClone(value[field])]));
+}
+
 function validateDecisionClosure(value, root) {
   assertBenchmarkSchemaInstance(value, { schemaPath: resolve(root, ADMISSION_DECISION_SCHEMA_PATH), label: "portfolio admission decision" });
   if (value.decision_id !== computeAdmissionDecisionId(value)) throw new Error("admission decision ID is invalid");
   if (value.decision_digest !== computeAdmissionDecisionDigest(value)) throw new Error("admission decision canonical digest is invalid");
 }
 
-export function validatePortfolioAdmissionDecision(value, { root = DEFAULT_ROOT, expectedAuthority = null } = {}) {
+export function validatePortfolioAdmissionDecision(value, options = {}) {
+  if (Object.hasOwn(options, "expectedAuthority")) throw new Error("caller-supplied expected admission authority is prohibited");
+  const { root = DEFAULT_ROOT, authoritySources = null } = options;
+  const unknownOptions = Object.keys(options).filter((field) => !["root", "authoritySources"].includes(field));
+  if (unknownOptions.length > 0) throw new Error(`admission decision validation has unknown options: ${unknownOptions.join(", ")}`);
   validateDecisionClosure(value, root);
   if (value.decision_status === "admitted") {
     if (value.review_status !== "approved") throw new Error("admitted decision requires approved review status");
     if (value.author_self_approval !== false) throw new Error("admitted decision prohibits author self-approval");
     if (value.blocking_finding_count !== 0) throw new Error("admitted decision requires zero blocking findings");
-    if (!expectedAuthority) throw new Error("admitted decision requires external frozen and review authority");
+    if (!authoritySources) throw new Error("admitted decision requires complete external frozen and review authority sources");
   } else if (value.decision_status === "changes_requested" && value.review_status !== "changes_requested") {
     throw new Error("changes-requested decision requires changes-requested review status");
   } else if (value.decision_status === "rejected" && value.review_status !== "rejected") {
     throw new Error("rejected decision requires rejected review status");
   }
-  if (expectedAuthority) {
+  if (authoritySources) {
+    const expectedAuthority = expectedDecisionAuthority(authoritySources);
     const actual = Object.fromEntries(Object.keys(expectedAuthority).map((field) => [field, value[field]]));
     if (stableCanonicalJson(actual) !== stableCanonicalJson(expectedAuthority)) throw new Error("admission decision differs from external frozen or review authority");
   }
@@ -240,8 +295,7 @@ export function resolveEffectiveAdmissionAuthority(options) {
   let decisionDigest = null;
   let decisionRevision = null;
   if (decisionOverlay) {
-    const expectedAuthority = expectedDecisionAuthority(options);
-    validatePortfolioAdmissionDecision(decisionOverlay, { root: options.root ?? DEFAULT_ROOT, expectedAuthority });
+    validatePortfolioAdmissionDecision(decisionOverlay, { root: options.root ?? DEFAULT_ROOT, authoritySources: options });
     decisionDigest = decisionOverlay.decision_digest;
     decisionRevision = decisionOverlay.decision_revision;
     if (decisionOverlay.decision_status === "admitted") {
@@ -273,7 +327,65 @@ export function resolveEffectiveAdmissionAuthority(options) {
     fixture_id: frozenAdmissionRecord.fixture_id,
   };
   if (!AUTHORITY_MODES.has(resolved.authority_mode) || !EFFECTIVE_STATUSES.has(resolved.effective_admission_status)) throw new Error("effective admission resolver produced an unsupported state");
-  return Object.freeze(resolved);
+  const frozen = Object.freeze(resolved);
+  RESOLVED_AUTHORITIES.add(frozen);
+  return frozen;
+}
+
+export function assertResolvedEffectiveAdmissionAuthority(value) {
+  if (!value || typeof value !== "object" || !RESOLVED_AUTHORITIES.has(value)) throw new Error("effective admission authority must come directly from the verified resolver");
+  return value;
+}
+
+export function resolveEffectiveAdmissionAuthorityFromFiles({
+  root = DEFAULT_ROOT,
+  decisionPath,
+  reviewAuthorityPath,
+  reviewAuthoritySourceDigest,
+  reviewArchivePath,
+  ...frozenAuthority
+}) {
+  if (!decisionPath) throw new Error("admission decision path is required");
+  if (!reviewAuthorityPath || !reviewArchivePath) throw new Error("admission decision requires sealed review-authority and review-archive paths");
+  if (!/^sha256:[a-f0-9]{64}$/u.test(reviewAuthoritySourceDigest ?? "")) throw new Error("admission review authority requires an external immutable source digest");
+  const decisionSource = readStableFile(decisionPath, "admission decision", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
+  const reviewSource = readStableFile(reviewAuthorityPath, "sealed admission review authority", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
+  const reviewArchiveSource = readStableFile(reviewArchivePath, "external admission review archive", MAX_REVIEW_ARCHIVE_BYTES, { allowEmpty: false });
+  if (reviewSource.rawByteDigest !== reviewAuthoritySourceDigest) throw new Error("sealed admission review authority raw digest differs from the external immutable source digest");
+  const decisionOverlay = parseJsonBytes(decisionSource.bytes, "admission decision");
+  const reviewAuthorityArtifact = validateAdmissionReviewAuthority(parseJsonBytes(reviewSource.bytes, "sealed admission review authority"), { root });
+  if (reviewAuthorityArtifact.fixture_id !== decisionOverlay.fixture_id) throw new Error("sealed review authority and admission decision fixture identities differ");
+  return resolveEffectiveAdmissionAuthority({
+    root,
+    ...frozenAuthority,
+    decisionOverlay,
+    reviewAuthority: reviewAuthorityProjection(reviewAuthorityArtifact),
+    reviewArchiveSource: { bytes: reviewArchiveSource.bytes },
+  });
+}
+
+export function changedPathsFromGitDiff({ root = DEFAULT_ROOT, baseRevision = null } = {}) {
+  let effectiveBase = baseRevision;
+  if (!effectiveBase) {
+    const configuredBase = process.env.ADMISSION_IMMUTABLE_BASE_REVISION;
+    const candidate = configuredBase || "origin/main";
+    try {
+      effectiveBase = execFileSync("git", ["-C", root, "merge-base", "HEAD", candidate], { encoding: "utf8", maxBuffer: 1024 * 1024 }).trim();
+    } catch {
+      throw new Error("immutable-path verification requires an explicit base revision or a fetch-complete origin/main");
+    }
+  }
+  let output;
+  try {
+    output = execFileSync("git", ["-C", root, "diff", "--name-only", "--diff-filter=ACMR", effectiveBase, "--"], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
+  } catch {
+    throw new Error("immutable-path verification could not derive the actual Git diff");
+  }
+  return output.split("\n").filter(Boolean).map((path) => assertPortablePath(path, "changed Git path"));
+}
+
+export function assertImmutableGitDiffUnchanged({ root = DEFAULT_ROOT, baseRevision = null, immutablePaths }) {
+  return assertImmutablePathInventoryUnchanged({ immutablePaths, changedPaths: changedPathsFromGitDiff({ root, baseRevision }) });
 }
 
 export function assertAdmissionDecisionAppendOnly(previousDecision, nextDecision, { root = DEFAULT_ROOT } = {}) {

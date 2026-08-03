@@ -1,10 +1,14 @@
 import { resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertAtomicOutputAbsent, publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
-import { resolveEffectiveAdmissionAuthority } from "./ask-benchmark-admission-decision.mjs";
+import {
+  assertResolvedEffectiveAdmissionAuthority,
+  resolveEffectiveAdmissionAuthority,
+  resolveEffectiveAdmissionAuthorityFromFiles,
+} from "./ask-benchmark-admission-decision.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
-import { verifyEvaluatorResult } from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
+import { verifyLifecycleNeutralEvaluatorResult } from "./ask-benchmark-portfolio-evaluator-result.mjs";
 
 export const ENGINEERING_RESULT_SCHEMA_PATH = "benchmarks/schemas/portfolio-engineering-result.schema.json";
 
@@ -341,15 +345,10 @@ export function validatePortfolioEngineeringResult(value, { root = DEFAULT_ROOT 
   return value;
 }
 
-export function buildPortfolioEngineeringResult(verified, { root = DEFAULT_ROOT, admissionAuthority = null } = {}) {
-  const { normalized, result, scoringReady, scoringInputs } = verified ?? {};
+export function buildPortfolioEngineeringResult(verified, { root = DEFAULT_ROOT } = {}) {
+  const { normalized, result, evaluationReady, scoringInputs } = verified ?? {};
   if (!normalized || !result || !scoringInputs?.scoringPolicy || !scoringInputs?.requirementRecord) throw new Error("verified evaluator scoring inputs are unavailable");
-  const effectiveAdmission = admissionAuthority ?? resolveEffectiveAdmissionAuthority({
-    frozenAdmissionRecord: scoringInputs.admissionRecord,
-    requirementRecord: scoringInputs.requirementRecord,
-    evaluatorReference: scoringInputs.evaluatorReference,
-    root,
-  });
+  const effectiveAdmission = assertResolvedEffectiveAdmissionAuthority(verified.effectiveAdmissionAuthority);
   if (
     effectiveAdmission.fixture_id !== normalized.lineage.fixture_id
     || effectiveAdmission.frozen_admission_record_digest !== result.admission_record_digest
@@ -360,7 +359,7 @@ export function buildPortfolioEngineeringResult(verified, { root = DEFAULT_ROOT,
     || effectiveAdmission.evaluator_public_reference_digest !== result.evaluator_public_reference_digest
   ) throw new Error("effective admission authority differs from verified evaluator-result lineage");
   const evaluatorReady = result.evaluation_status === "completed";
-  if (evaluatorReady !== (scoringReady === true)) throw new Error("evaluator scoring readiness is inconsistent with evaluation status");
+  if (evaluatorReady !== (evaluationReady === true)) throw new Error("evaluator readiness is inconsistent with evaluation status");
   const complete = normalized.outcome === "completed" && evaluatorReady && effectiveAdmission.effective_admission_status === "admitted";
   const scoringStatus = complete ? "complete" : "not_scoring_ready";
   const scoringReason = complete
@@ -493,10 +492,41 @@ export function scoreEvaluatorResult(options) {
       options.referencePath,
       options.manifestPath,
       options.resultPath,
+      options.admissionDecisionPath,
+      options.admissionReviewAuthorityPath,
+      options.admissionReviewArchivePath,
     ],
   });
-  const verified = verifyEvaluatorResult(options);
-  const artifact = buildPortfolioEngineeringResult(verified, { root: options.root });
+  const verified = verifyLifecycleNeutralEvaluatorResult(options);
+  const scoringInputs = verified.scoringInputs;
+  const frozenAuthority = {
+    frozenAdmissionRecord: scoringInputs.admissionRecord,
+    frozenAdmissionSource: { path: scoringInputs.sources.admissionRecord.relativePath, bytes: scoringInputs.sources.admissionRecord.bytes },
+    requirementRecord: scoringInputs.requirementRecord,
+    requirementRecordSource: { path: scoringInputs.sources.requirementRecord.relativePath, bytes: scoringInputs.sources.requirementRecord.bytes },
+    evaluatorReference: scoringInputs.evaluatorReference,
+    scoringInputFreezeManifest: scoringInputs.freezeManifest,
+    scoringInputFreezeManifestSource: { path: scoringInputs.freezeManifestSource.relativePath, bytes: scoringInputs.freezeManifestSource.bytes },
+    root: options.root,
+  };
+  const hasDecisionEvidence = [options.admissionDecisionPath, options.admissionReviewAuthorityPath, options.admissionReviewAuthoritySourceDigest, options.admissionReviewArchivePath].some(Boolean);
+  const completeDecisionEvidence = [options.admissionDecisionPath, options.admissionReviewAuthorityPath, options.admissionReviewAuthoritySourceDigest, options.admissionReviewArchivePath].every(Boolean);
+  if (hasDecisionEvidence && !completeDecisionEvidence) throw new Error("admission decision scoring requires decision, sealed review authority, external authority digest, and review archive evidence together");
+  const effectiveAdmissionAuthority = completeDecisionEvidence
+    ? resolveEffectiveAdmissionAuthorityFromFiles({
+      ...frozenAuthority,
+      decisionPath: options.admissionDecisionPath,
+      reviewAuthorityPath: options.admissionReviewAuthorityPath,
+      reviewAuthoritySourceDigest: options.admissionReviewAuthoritySourceDigest,
+      reviewArchivePath: options.admissionReviewArchivePath,
+    })
+    : resolveEffectiveAdmissionAuthority({
+      frozenAdmissionRecord: scoringInputs.admissionRecord,
+      requirementRecord: scoringInputs.requirementRecord,
+      evaluatorReference: scoringInputs.evaluatorReference,
+      root: options.root,
+    });
+  const artifact = buildPortfolioEngineeringResult({ ...verified, effectiveAdmissionAuthority }, { root: options.root });
   const { bytes } = publishJsonAtomicNoReplace({
     outputPath: output,
     artifact,
