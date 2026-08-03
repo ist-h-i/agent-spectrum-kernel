@@ -2,22 +2,22 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-7dc7ddbc87d8505ad15caaf1ebabf00be5c620fdc77c84f4b8b6dab8a1f9a1c4",
-  "evaluator_bundle_digest": "sha256:2a9bcd248912f0e8d4c65e5dfe0f1aa587cc4888962584c7759e87b0d0fbbe10",
+  "evaluator_bundle_id": "evaluator-d4fda24eb02b415b4824b582e8c874b4d68f6a0e308f0e73228ed3b45228fc15",
+  "evaluator_bundle_digest": "sha256:4dabbcb3659fd00720816a8145f1a55349b0de90c7fe4d33cbaf399543339e22",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mn-build-option-update",
   "fixture_input_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
   "task_class": "configuration",
   "suite": "mechanism_negative",
-  "evaluator_revision": "8b5a52172fc7bfa66b73827174c5316a618931dc",
+  "evaluator_revision": "3a149c059ac5f6ce55999eeed5392611e2303ea0",
   "generator_identity": "sha256:3659e9f77ac58edafc43618f45c2ea5d9ad1b36e578325585bc55cd08668c77b",
-  "independence_statement_digest": "sha256:f33806c482e07e862d48f3e1fbd7b1aab7f99db31de5bda12223f56450d45f66",
+  "independence_statement_digest": "sha256:3953daba6af990abf8d70deff0bd308c723b0fecc7a57fb33db969be24d75f64",
   "review_record_digest": "sha256:2c68bfa2808be77476fd03ba5ad71f5bf0a0c09e0011f9d07711e257a2457cfb",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:a4ef4d1a1c47d6dca523c0352dab1cb19dd8792d9388234528c4a32bda9341d8",
+  "public_metadata_digest": "sha256:6fc8be6a2451a974495863e0965989599c90874fee544aeefcc288590e74741f",
   "evaluator_source_identity": {
-    "base_git_revision": "8b5a52172fc7bfa66b73827174c5316a618931dc",
-    "source_tree_digest": "sha256:824823729292c4888b8b25813452341efbed25de18983829e5be71fef43bb7d0",
+    "base_git_revision": "3a149c059ac5f6ce55999eeed5392611e2303ea0",
+    "source_tree_digest": "sha256:65ceaeb7069b047368a0894de575672eed1c3bbed24d116d6d07f19227cb6f95",
     "generator_source_digest": "sha256:d1be7df7b5919f9f06b960c366b4bfd37aba1809fccc87eb64e9dfbb4eb5ae8a",
     "source_files": [
       {
@@ -117,8 +117,8 @@
       },
       {
         "path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-        "bytes": 240424,
-        "sha256": "sha256:ac5203833a7605ef5ca98c17de18e745500b2e5f7299b08d6670a65924603db9"
+        "bytes": 240467,
+        "sha256": "sha256:9511539c43def5249fbea91b8a95c29d68adcde9e1a36ccd71d60138f7834244"
       },
       {
         "path": "scripts/ask-benchmark-execution.mjs",
@@ -379,11 +379,11 @@
         },
         {
           "path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-          "bytes": 240424,
-          "sha256": "sha256:ac5203833a7605ef5ca98c17de18e745500b2e5f7299b08d6670a65924603db9",
+          "bytes": 240467,
+          "sha256": "sha256:9511539c43def5249fbea91b8a95c29d68adcde9e1a36ccd71d60138f7834244",
           "file_type": "module",
-          "base_git_revision_bytes": 240424,
-          "base_git_revision_sha256": "sha256:ac5203833a7605ef5ca98c17de18e745500b2e5f7299b08d6670a65924603db9"
+          "base_git_revision_bytes": 240467,
+          "base_git_revision_sha256": "sha256:9511539c43def5249fbea91b8a95c29d68adcde9e1a36ccd71d60138f7834244"
         },
         {
           "path": "scripts/ask-benchmark-execution.mjs",
@@ -1324,10 +1324,10 @@
           "edge_digest": "sha256:ff45f573a8a3f06f47d87bf8f97b368814713c28d4c572e3b4845a7a640618f8"
         }
       ],
-      "graph_digest": "sha256:a2b05d23c2f00c24fbbbae5db6a47122c8c6ed02d7ff25eb739c3f7e11438f3f"
+      "graph_digest": "sha256:59d0e5bade742445840a5a583d34ec8c703289f2db2468ad14b0183b0d7bf878"
     }
   },
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:4b54895334b7c4aaafde895ace28ccd95ae2adb923c4326b56dd710e77e9f59c",
-  "evaluator_authority_manifest_digest": "sha256:c45da236abf6fad58a148d2b0eb4963e332baa9b6a557a6c0c5e1d1bc79ce019"
+  "evaluator_authority_manifest_raw_sha256": "sha256:90b686f202d7dd89f6e59ccaac1677387e2779a537c64258552644a5f8af169b",
+  "evaluator_authority_manifest_digest": "sha256:cfe802beb066118302cf6018f230a44b1bc7944024a60c8a987877d2cb137d03"
 }
