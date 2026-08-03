@@ -1235,7 +1235,7 @@ async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAut
 }
 
 async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candidateMutator = null } = {}) {
-  const authorityRoot = mkdtempSync(resolve(root, `.ask-mn-r6-${state}-`));
+  const authorityRoot = mkdtempSync(`/private/tmp/ask-mn-r21-${state}-`);
   const productionMutation = typeof candidateMutator === "string" ? candidateMutator : null;
   const normalizedAuthority = productionMutation
     ? actualNormalizedAuthority({ authorityRoot, mutation: productionMutation, evidenceState: state })
