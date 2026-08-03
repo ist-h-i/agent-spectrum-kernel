@@ -188,14 +188,20 @@ export function validateFinalAdmissionContractSchemaParity({ admissionPolicy, fi
   return true;
 }
 
-export function validateFinalAdmissionRecordContract({ admissionPolicy, admissionRecord, finalAdmissionRecordSchema = null }) {
+export function validateFrozenFinalAdmissionRecordContract({ admissionPolicy, admissionRecord, finalAdmissionRecordSchema = null }) {
   if (finalAdmissionRecordSchema) validateFinalAdmissionContractSchemaParity({ admissionPolicy, finalAdmissionRecordSchema });
   assertClosedKeys(admissionRecord, FINAL_ADMISSION_RECORD_FIELD_IDS, "authoritative final admission record");
   assertUniqueStrings(admissionRecord.evidence_map_ids, "final admission evidence-map IDs");
   assertUniqueStrings(admissionRecord.mutation_set_ids, "final admission mutation-set IDs");
-  if (admissionRecord.evidence_map_ids.length === 0 || admissionRecord.mutation_set_ids.length === 0) throw new Error("admitted final admission record requires evidence-map and mutation-set IDs");
-  if (admissionRecord.admission_status !== "admitted") throw new Error("scoring input freeze requires an admitted final admission record");
+  if (admissionRecord.evidence_map_ids.length === 0 || admissionRecord.mutation_set_ids.length === 0) throw new Error("frozen final admission record requires evidence-map and mutation-set IDs");
+  if (!["admission_pending", "admitted"].includes(admissionRecord.admission_status)) throw new Error("evaluator authority requires an admission_pending or admitted final admission record");
   assertDigestClosure(admissionRecord.admission_digest, computeFinalAdmissionRecordDigest(admissionRecord), "final admission record digest");
+  return admissionRecord;
+}
+
+export function validateFinalAdmissionRecordContract(options) {
+  const admissionRecord = validateFrozenFinalAdmissionRecordContract(options);
+  if (admissionRecord.admission_status !== "admitted") throw new Error("scoring input freeze requires an admitted final admission record");
   return admissionRecord;
 }
 

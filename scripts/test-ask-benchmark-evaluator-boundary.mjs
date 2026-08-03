@@ -26,6 +26,7 @@ import {
   computeEvaluatorBundleId,
   computeEvaluatorReferenceDigest,
   validateExecutionEventEvidenceReferences,
+  verifyEvaluatorAuthority,
   verifyEvaluatorBoundary,
   verifyPrivateEvaluatorBundle,
   verifyPublicEvaluatorReference,
@@ -465,7 +466,7 @@ function referenceFor(manifest) {
   return reference;
 }
 
-function createScoringInputs(path, reference, referencePath) {
+function createScoringInputs(path, reference, referencePath, { admissionStatus = "admitted" } = {}) {
   mkdirSync(path);
   const requirements = [
     {
@@ -519,7 +520,7 @@ function createScoringInputs(path, reference, referencePath) {
     mutation_set_ids: requirements.flatMap(({ mutation_ids }) => mutation_ids),
     reviewer_record_id: "synthetic-reviewer-record",
     admission_revision: 1,
-    admission_status: "admitted",
+    admission_status: admissionStatus,
     admission_digest: digest("placeholder"),
   };
   admissionRecord.admission_digest = computeFinalAdmissionRecordDigest(admissionRecord);
@@ -853,6 +854,40 @@ try {
   assert.equal(verifyEvaluatorBoundary(baseOptions).scoringReady, true, "completed evaluation with closed requirement coverage must be scoring-ready");
   assert.equal(verifyEvaluatorBoundary({ ...baseOptions, resultPath: resultPaths.get("manual") }).scoringReady, false, "manual-review evaluation must not be scoring-ready");
   assert.equal(verifyEvaluatorBoundary({ ...baseOptions, resultPath: resultPaths.get("unavailable") }).scoringReady, false, "unavailable evaluation must not be scoring-ready");
+  const pendingScoringInputs = createScoringInputs(resolve(work, "pending-scoring-inputs"), reference, referencePath, { admissionStatus: "admission_pending" });
+  const pendingResultPath = resolve(work, "pending-authority-evaluator-result.json");
+  writeJson(pendingResultPath, evaluatorResultFor(completedCodex, normalized.sourceSnapshotDigest, manifest, reference, pendingScoringInputs, "completed"));
+  const pendingOptions = {
+    ...baseOptions,
+    admissionRecordPath: pendingScoringInputs.admissionRecordPath,
+    requirementRecordPath: pendingScoringInputs.requirementRecordPath,
+    outputContractPath: pendingScoringInputs.outputContractPath,
+    scoringInputFreezeManifestPath: pendingScoringInputs.freezeManifestPath,
+    scoringInputFreezeManifestSourceDigest: pendingScoringInputs.freezeManifestSourceDigest,
+    resultPath: pendingResultPath,
+  };
+  const beforePendingAuthority = snapshot(pendingScoringInputs.path);
+  const pendingAuthority = verifyEvaluatorAuthority(pendingOptions);
+  assert.equal(pendingAuthority.scoringReady, false, "frozen pending evaluator authority verification must not produce scoring readiness");
+  assert.equal(pendingAuthority.scoringInputs.admissionRecord.admission_status, "admission_pending", "frozen pending evaluator authority verification must preserve admission state");
+  assert.deepEqual(snapshot(pendingScoringInputs.path), beforePendingAuthority, "frozen pending evaluator authority verification must be read-only");
+  assert.throws(() => verifyEvaluatorBoundary(pendingOptions), /requires an admitted final admission record/u, "the existing scoring boundary must remain admitted-only");
+  const rejectedScoringInputs = createScoringInputs(resolve(work, "rejected-scoring-inputs"), reference, referencePath, { admissionStatus: "rejected" });
+  const rejectedResultPath = resolve(work, "rejected-authority-evaluator-result.json");
+  writeJson(rejectedResultPath, evaluatorResultFor(completedCodex, normalized.sourceSnapshotDigest, manifest, reference, rejectedScoringInputs, "completed"));
+  assert.throws(
+    () => verifyEvaluatorAuthority({
+      ...baseOptions,
+      admissionRecordPath: rejectedScoringInputs.admissionRecordPath,
+      requirementRecordPath: rejectedScoringInputs.requirementRecordPath,
+      outputContractPath: rejectedScoringInputs.outputContractPath,
+      scoringInputFreezeManifestPath: rejectedScoringInputs.freezeManifestPath,
+      scoringInputFreezeManifestSourceDigest: rejectedScoringInputs.freezeManifestSourceDigest,
+      resultPath: rejectedResultPath,
+    }),
+    /requires an admission_pending or admitted final admission record/u,
+    "evaluator authority verification must not accept a rejected lifecycle state",
+  );
   const beforeScoringInputs = snapshot(scoringInputs.path);
   const beforeMaterialized = snapshot(materialized);
   const beforeSelectionState = snapshot(selectionState);

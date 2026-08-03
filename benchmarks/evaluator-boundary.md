@@ -43,6 +43,8 @@ All three evaluator commands are read-only, but they do not make the same claim:
 - `verify-evaluator-result` additionally verifies normalized-result lineage, authoritative requirement/output sources, requirement-level outcome semantics, and the complete scoring-input identity closure. It binds the supplied materialized, selection-state, run, and normalized roots to that lineage. Staged publication remains unverified unless `--public-artifact-root` is supplied.
 - `verify-evaluator-boundary` is the full boundary check. It requires `--public-artifact-root`; omission is an error and cannot report full verification success.
 
+The module-level `verifyEvaluatorAuthority()` API reuses the same frozen bundle, result, normalized-lineage, requirement, output, and freeze-manifest closure while accepting only `admission_pending` or `admitted` final-admission states. It always returns `scoringReady: false`; verifying evaluator authority does not admit a fixture or authorize scoring. The existing `verifyEvaluatorResult()` and `verifyEvaluatorBoundary()` APIs remain admitted-only and retain their scoring-readiness behavior.
+
 ```bash
 node scripts/ask-benchmark.mjs verify-evaluator-bundle \
   --reference /path/to/public-evaluator-reference.json \

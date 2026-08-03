@@ -28,6 +28,7 @@ import {
   FINAL_ADMISSION_RECORD_SCHEMA_PATH,
   SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH,
   validateFinalAdmissionRecordContract,
+  validateFrozenFinalAdmissionRecordContract,
   validateRequirementRecordContract,
   validateScoringContractSchemaParity,
   validateScoringInputBindings,
@@ -690,6 +691,7 @@ function readScoringInputSources({
   referencePath,
   freezeManifestPath,
   freezeManifestSourceDigest,
+  requireAdmitted,
 }) {
   for (const [path, label] of [
     [catalogPath, "portfolio catalog"],
@@ -734,7 +736,8 @@ function readScoringInputSources({
   if (freezeManifest.output_contract.semantic_digest !== computeOutputContractDigest(outputContract)) throw new Error("output contract semantic digest does not match the scoring input freeze manifest");
   if (freezeManifest.evaluator_public_reference.semantic_digest !== computeEvaluatorReferenceDigest(evaluatorReference)) throw new Error("evaluator public reference semantic digest does not match the scoring input freeze manifest");
   validateScoringContractSchemaParity({ scoringPolicy, requirementRecordSchema, evaluatorResultSchema });
-  validateFinalAdmissionRecordContract({
+  const admissionValidation = requireAdmitted ? validateFinalAdmissionRecordContract : validateFrozenFinalAdmissionRecordContract;
+  admissionValidation({
     admissionPolicy,
     admissionRecord,
     finalAdmissionRecordSchema: readJsonArtifact(resolve(root, FINAL_ADMISSION_RECORD_SCHEMA_PATH), "final admission record Schema").value,
@@ -783,7 +786,7 @@ function assertBoundaryRootLineage(bundle, verified) {
   }
 }
 
-export function verifyEvaluatorResult({
+function verifyEvaluatorAuthorityCore({
   root,
   catalogPath,
   policyManifestPath,
@@ -802,7 +805,7 @@ export function verifyEvaluatorResult({
   runDir,
   normalizedResultsPath,
   publicArtifactRoot = null,
-}) {
+}, { requireAdmitted }) {
   const bundle = verifyPrivateEvaluatorBundle({ root, referencePath, privateRoot, manifestPath, materializedPath, selectionState, runDir, normalizedResultsPath, publicArtifactRoot });
   if (!resultPath || pathsOverlap(resultPath, privateRoot)) throw new Error("public evaluator result must not overlap the private evaluator root");
   const { value: result } = readJsonArtifact(resultPath, "evaluator result envelope", { publicArtifact: true });
@@ -820,6 +823,7 @@ export function verifyEvaluatorResult({
     referencePath,
     freezeManifestPath: scoringInputFreezeManifestPath,
     freezeManifestSourceDigest: scoringInputFreezeManifestSourceDigest,
+    requireAdmitted,
   });
   if (stableCanonicalJson(scoringInputs.evaluatorReference) !== stableCanonicalJson(bundle.reference)) throw new Error("private bundle evaluator reference does not match the scoring input freeze authority reference");
 
@@ -861,7 +865,15 @@ export function verifyEvaluatorResult({
     normalizedResult: normalized,
     evaluatorResult: result,
   });
-  return { bundle, normalized, result, verified, scoringInputs, scoringReady: scoring.scoringReady };
+  return { bundle, normalized, result, verified, scoringInputs, scoringReady: requireAdmitted && scoring.scoringReady };
+}
+
+export function verifyEvaluatorAuthority(options) {
+  return verifyEvaluatorAuthorityCore(options, { requireAdmitted: false });
+}
+
+export function verifyEvaluatorResult(options) {
+  return verifyEvaluatorAuthorityCore(options, { requireAdmitted: true });
 }
 
 export function assertNoPrivateBundlePublication(publicArtifactRoot, bundle) {
