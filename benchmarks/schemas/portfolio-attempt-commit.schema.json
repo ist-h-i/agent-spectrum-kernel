@@ -3,9 +3,9 @@
   "title": "Adaptive ASK portfolio terminal attempt commit",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "kind", "run_instance_id", "claim_id", "claim_lease_expires_at", "case_id", "attempt", "adapter", "condition", "status", "runtime_identity_digest", "effective_command_digest", "request_sha256", "command_evidence_sha256", "result_sha256"],
+  "required": ["schema_version", "kind", "run_instance_id", "claim_id", "claim_lease_expires_at", "case_id", "attempt", "adapter", "condition", "status", "runtime_identity_digest", "effective_command_digest", "request_sha256", "command_evidence_sha256", "result_sha256", "terminal_workspace_authority_path", "terminal_workspace_authority_sha256", "terminal_workspace_authority_bytes", "terminal_workspace_authority_digest", "terminal_workspace_tree_digest"],
   "properties": {
-    "schema_version": { "const": "1.1.0" },
+    "schema_version": { "const": "1.2.0" },
     "kind": { "const": "terminal_commit" },
     "run_instance_id": { "type": "string", "format": "uuid" },
     "claim_id": { "type": "string", "format": "uuid" },
@@ -19,7 +19,12 @@
     "effective_command_digest": { "$ref": "#/$defs/digest" },
     "request_sha256": { "$ref": "#/$defs/digest" },
     "command_evidence_sha256": { "$ref": "#/$defs/digest" },
-    "result_sha256": { "$ref": "#/$defs/digest" }
+    "result_sha256": { "$ref": "#/$defs/digest" },
+    "terminal_workspace_authority_path": { "type": ["string", "null"], "pattern": "^terminal-workspace-authority\\.json$" },
+    "terminal_workspace_authority_sha256": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" },
+    "terminal_workspace_authority_bytes": { "type": ["integer", "null"], "minimum": 1 },
+    "terminal_workspace_authority_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" },
+    "terminal_workspace_tree_digest": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" }
   },
   "$defs": { "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" } }
 }

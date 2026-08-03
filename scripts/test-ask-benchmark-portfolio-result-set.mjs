@@ -158,7 +158,7 @@ function normalizedRecord({ adapter, fixture, repetitions, condition, repetition
   const attempt = "0001";
   const telemetry = Object.fromEntries(TELEMETRY_FIELDS.map((field) => [field, missingMetric(outcome)]));
   const base = {
-    schema_version: "1.2.0",
+    schema_version: "1.3.0",
     schema_path: "benchmarks/schemas/normalized-portfolio-result.schema.json",
     program: "adaptive_ask_normalized_execution_result",
     lineage: {
@@ -190,6 +190,11 @@ function normalizedRecord({ adapter, fixture, repetitions, condition, repetition
       final_output_digest: null,
       final_output_bytes: null,
       adaptive_selection_digest: condition === "adaptive_ask" ? digest(`selection:${case_id}`) : null,
+      terminal_workspace_authority_availability: "unavailable",
+      terminal_workspace_authority_support: "supported",
+      terminal_workspace_authority_digest: null,
+      terminal_workspace_tree_digest: null,
+      terminal_workspace_authority_bytes: null,
     },
     outcome,
     command_evidence: {
@@ -258,6 +263,11 @@ function buildNormalizedRoot(target) {
       terminal_commit_digest: record.lineage.terminal_commit_digest,
       final_output_digest: null,
       final_output_bytes: null,
+      terminal_workspace_authority_availability: record.lineage.terminal_workspace_authority_availability,
+      terminal_workspace_authority_support: record.lineage.terminal_workspace_authority_support,
+      terminal_workspace_authority_digest: record.lineage.terminal_workspace_authority_digest,
+      terminal_workspace_tree_digest: record.lineage.terminal_workspace_tree_digest,
+      terminal_workspace_authority_bytes: record.lineage.terminal_workspace_authority_bytes,
     }],
   }));
   const source_snapshot = {
@@ -315,11 +325,11 @@ function buildNormalizedRoot(target) {
     };
   });
   const manifestBase = {
-    schema_version: "1.2.0",
+    schema_version: "1.3.0",
     schema_path: "benchmarks/schemas/normalized-portfolio-run.schema.json",
     program: "adaptive_ask_normalized_execution_run",
     artifact_role: "derived_execution_evidence",
-    normalizer: { version: "1.2.0", source_revision: SOURCE_REVISION },
+    normalizer: { version: "1.3.0", source_revision: SOURCE_REVISION },
     source: {
       run_instance_id: RUN_INSTANCE_ID,
       run_identity_digest: digest("run-identity"),
@@ -331,7 +341,7 @@ function buildNormalizedRoot(target) {
     },
     source_snapshot,
     source_snapshot_digest,
-    output_root_identity: canonicalDigest({ run_instance_id: RUN_INSTANCE_ID, plan_id: PLAN_ID, normalizer_version: "1.2.0", source_snapshot_digest }),
+    output_root_identity: canonicalDigest({ run_instance_id: RUN_INSTANCE_ID, plan_id: PLAN_ID, normalizer_version: "1.3.0", source_snapshot_digest }),
     pool_adapter_results: false,
     completeness,
     telemetry_coverage,
@@ -354,7 +364,7 @@ function buildNormalizedRoot(target) {
     schema_path: "benchmarks/schemas/normalized-portfolio-root.schema.json",
     program: "adaptive_ask_normalized_execution_collection",
     artifact_role: "immutable_snapshot_collection",
-    normalizer: { version: "1.2.0", source_revision: SOURCE_REVISION },
+    normalizer: { version: "1.3.0", source_revision: SOURCE_REVISION },
     source: { run_instance_id: RUN_INSTANCE_ID, run_identity_digest: digest("run-identity"), plan_id: PLAN_ID, plan_digest: PLAN_DIGEST, repository_revision: SOURCE_REVISION },
     generations_directory: "generations",
   };

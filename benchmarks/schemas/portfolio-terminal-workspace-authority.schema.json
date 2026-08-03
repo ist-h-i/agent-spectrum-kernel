@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK terminal workspace authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "run_instance_id",
+    "case_id",
+    "attempt",
+    "adapter",
+    "condition",
+    "fixture_id",
+    "fixture_input_digest",
+    "materialization_manifest_digest",
+    "base_workspace_portable_digest",
+    "terminal_workspace_portable_digest",
+    "terminal_candidate_tree_digest",
+    "base_inventory",
+    "managed_asset_paths",
+    "delta_inventory",
+    "authority_digest",
+    "authority_bytes"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-terminal-workspace-authority.schema.json" },
+    "program": { "const": "adaptive_ask_terminal_workspace_authority" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
+    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "adapter": { "enum": ["codex", "claude"] },
+    "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+    "fixture_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "fixture_input_digest": { "$ref": "#/$defs/digest" },
+    "materialization_manifest_digest": { "$ref": "#/$defs/digest" },
+    "base_workspace_portable_digest": { "$ref": "#/$defs/digest" },
+    "terminal_workspace_portable_digest": { "$ref": "#/$defs/digest" },
+    "terminal_candidate_tree_digest": { "$ref": "#/$defs/digest" },
+    "base_inventory": {
+      "type": "array",
+      "maxItems": 20000,
+      "items": { "$ref": "#/$defs/inventoryEntry" }
+    },
+    "managed_asset_paths": {
+      "type": "array",
+      "maxItems": 20000,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/relativePath" }
+    },
+    "delta_inventory": {
+      "type": "array",
+      "maxItems": 20000,
+      "items": { "$ref": "#/$defs/deltaEntry" }
+    },
+    "authority_digest": { "$ref": "#/$defs/digest" },
+    "authority_bytes": { "type": "integer", "minimum": 1 }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "rawDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*:)(?!.*\\\\)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*//)[^\\u0000]+$"
+    },
+    "fileMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_type", "mode", "bytes", "sha256", "content_base64"],
+      "properties": {
+        "file_type": { "enum": ["regular_file", "directory"] },
+        "mode": { "type": "string", "pattern": "^0[0-7]{3}$" },
+        "bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "content_base64": { "type": ["string", "null"], "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "file_type": { "const": "regular_file" } }, "required": ["file_type"] },
+          "then": { "properties": { "bytes": { "type": "integer", "minimum": 0 }, "sha256": { "$ref": "#/$defs/rawDigest" } } },
+          "else": { "properties": { "bytes": { "type": "null" }, "sha256": { "type": "null" }, "content_base64": { "type": "null" } } }
+        }
+      ]
+    },
+    "inventoryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "file_type", "mode", "bytes", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "file_type": { "enum": ["regular_file", "directory"] },
+        "mode": { "type": "string", "pattern": "^0[0-7]{3}$" },
+        "bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "file_type": { "const": "regular_file" } }, "required": ["file_type"] },
+          "then": { "properties": { "bytes": { "type": "integer", "minimum": 0 }, "sha256": { "$ref": "#/$defs/rawDigest" } } },
+          "else": { "properties": { "bytes": { "type": "null" }, "sha256": { "type": "null" } } }
+        }
+      ]
+    },
+    "deltaEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "change_type", "before", "after"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "change_type": { "enum": ["addition", "deletion", "modification"] },
+        "before": { "oneOf": [{ "$ref": "#/$defs/fileMetadata" }, { "type": "null" }] },
+        "after": { "oneOf": [{ "$ref": "#/$defs/fileMetadata" }, { "type": "null" }] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "change_type": { "const": "addition" } }, "required": ["change_type"] },
+          "then": { "properties": { "before": { "type": "null" }, "after": { "$ref": "#/$defs/fileMetadata" } } }
+        },
+        {
+          "if": { "properties": { "change_type": { "const": "deletion" } }, "required": ["change_type"] },
+          "then": { "properties": { "before": { "$ref": "#/$defs/fileMetadata" }, "after": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "change_type": { "const": "modification" } }, "required": ["change_type"] },
+          "then": { "properties": { "before": { "$ref": "#/$defs/fileMetadata" }, "after": { "$ref": "#/$defs/fileMetadata" } } }
+        }
+      ]
+    }
+  }
+}
