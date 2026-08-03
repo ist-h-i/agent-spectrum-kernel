@@ -2018,7 +2018,7 @@ function materializeTerminalCandidateAuthorityWorkspace({ evaluationRoot, termin
   for (const entry of inventory.filter(({ file_type: fileType }) => fileType === "directory").sort((left, right) => right.path.length - left.path.length)) chmodSync(resolve(destination, entry.path), Number.parseInt(entry.mode, 8));
   chmodSync(destination, workspaceRoot ? Number.parseInt(workspaceRoot.mode, 8) : 0o755);
   const materialized = readStableWorkspaceInventory(destination, "verified terminal candidate metadata authority workspace");
-  const expected = inventory.map((entry) => ({ path: entry.path, file_type: entry.file_type === "regular_file" ? "file" : "directory", mode: Number.parseInt(entry.mode, 8), bytes: entry.bytes, sha256: entry.sha256 }));
+  const expected = inventory.map((entry) => ({ path: entry.path, file_type: entry.file_type === "regular_file" ? "file" : "directory", mode: Number.parseInt(entry.mode, 8), bytes: entry.bytes, sha256: entry.sha256 === null ? null : `sha256:${entry.sha256}` }));
   if (stableCanonicalJson(materialized.portableEntries) !== stableCanonicalJson(expected) || materialized.digest !== canonicalDigest(expected)) throw new Error("terminal candidate metadata authority workspace is inconsistent");
   return materialized;
 }
