@@ -702,27 +702,29 @@ writeFileSync(output, JSON.stringify({ task_type: "implementation", decision: "n
 }
 
 function actualNormalizedAuthority({ authorityRoot, mutation, evidenceState = "executed_success" }) {
+  const executionAuthorityRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-production-source-"));
+  temporaryAuthorityRoots.add(executionAuthorityRoot);
   const config = readJson(resolve(root, "benchmarks/adaptive-portfolio.config.json"));
   config.fixtures = config.fixtures.filter(({ id }) => id === "mn-build-option-update");
-  const configPath = resolve(authorityRoot, "actual-config.json");
-  const planPath = resolve(authorityRoot, "actual-plan.json");
-  const materializedPath = resolve(authorityRoot, "actual-materialized");
-  const selectionState = resolve(authorityRoot, "actual-selection-state");
-  const runDir = resolve(authorityRoot, "actual-execution-run");
-  const normalizedResultsPath = resolve(authorityRoot, "actual-normalized-results");
-  const runtimeConfigPath = resolve(authorityRoot, "actual-runtime.json");
+  const configPath = resolve(executionAuthorityRoot, "actual-config.json");
+  const planPath = resolve(executionAuthorityRoot, "actual-plan.json");
+  const materializedPath = resolve(executionAuthorityRoot, "actual-materialized");
+  const selectionState = resolve(executionAuthorityRoot, "actual-selection-state");
+  const runDir = resolve(executionAuthorityRoot, "actual-execution-run");
+  const normalizedResultsPath = resolve(executionAuthorityRoot, "actual-normalized-results");
+  const runtimeConfigPath = resolve(executionAuthorityRoot, "actual-runtime.json");
   mkdirSync(selectionState, { recursive: true });
   writeJson(configPath, config);
   writeJson(runtimeConfigPath, productionRuntimeConfig());
   const commandContract = readJson(resolve(fixtureRoot, "verification-command-contract.json"));
-  const agentBin = productionFakeExecutable(authorityRoot, commandContract);
+  const agentBin = productionFakeExecutable(executionAuthorityRoot, commandContract);
   runBenchmarkCommand(["plan", "--config", configPath, "--output", planPath, "--seed", `mn-production-${mutation}-${evidenceState}`]);
   runBenchmarkCommand(["materialize", "--config", configPath, "--plan", planPath, "--output", materializedPath]);
   const plan = readJson(planPath);
   const materialized = readJson(resolve(materializedPath, "materialization-manifest.json"));
   for (const entry of materialized.cases.filter(({ condition }) => condition === "adaptive_ask")) {
     const planCase = plan.cases.find(({ case_id: caseId }) => caseId === entry.case_id);
-    const selectionInputPath = resolve(authorityRoot, `${entry.case_id}-selection.json`);
+    const selectionInputPath = resolve(executionAuthorityRoot, `${entry.case_id}-selection.json`);
     writeJson(selectionInputPath, {
       task_class: planCase.task_class,
       observed_signals: ["localized configuration change"],
