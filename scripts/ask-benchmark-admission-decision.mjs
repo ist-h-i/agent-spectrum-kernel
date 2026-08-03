@@ -1,14 +1,16 @@
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { parseJsonRejectDuplicateKeys, readStableJsonFile } from "./ask-benchmark-duplicate-key-json.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 
 export const ADMISSION_DECISION_SCHEMA_PATH = "benchmarks/schemas/portfolio-admission-decision.schema.json";
 export const ADMISSION_REVIEW_AUTHORITY_SCHEMA_PATH = "benchmarks/schemas/portfolio-admission-review-authority.schema.json";
+export const APPROVED_R21_IMMUTABLE_PATH_INVENTORY = "benchmarks/fixtures/admission-decision/approved-r21-immutable-paths.json";
 
 const DEFAULT_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const MAX_PUBLIC_JSON_BYTES = 1024 * 1024;
@@ -50,11 +52,7 @@ function sha256(bytes) {
 }
 
 function parseJsonBytes(bytes, label) {
-  try {
-    return JSON.parse(bytes.toString("utf8"));
-  } catch {
-    throw new Error(`${label} bytes must contain valid JSON`);
-  }
+  return parseJsonRejectDuplicateKeys(bytes, label);
 }
 
 function assertClosedObject(value, fields, label) {
@@ -348,12 +346,12 @@ export function resolveEffectiveAdmissionAuthorityFromFiles({
   if (!decisionPath) throw new Error("admission decision path is required");
   if (!reviewAuthorityPath || !reviewArchivePath) throw new Error("admission decision requires sealed review-authority and review-archive paths");
   if (!/^sha256:[a-f0-9]{64}$/u.test(reviewAuthoritySourceDigest ?? "")) throw new Error("admission review authority requires an external immutable source digest");
-  const decisionSource = readStableFile(decisionPath, "admission decision", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
-  const reviewSource = readStableFile(reviewAuthorityPath, "sealed admission review authority", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
+  const decisionSource = readStableJsonFile(decisionPath, "admission decision", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
+  const reviewSource = readStableJsonFile(reviewAuthorityPath, "sealed admission review authority", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
   const reviewArchiveSource = readStableFile(reviewArchivePath, "external admission review archive", MAX_REVIEW_ARCHIVE_BYTES, { allowEmpty: false });
   if (reviewSource.rawByteDigest !== reviewAuthoritySourceDigest) throw new Error("sealed admission review authority raw digest differs from the external immutable source digest");
-  const decisionOverlay = parseJsonBytes(decisionSource.bytes, "admission decision");
-  const reviewAuthorityArtifact = validateAdmissionReviewAuthority(parseJsonBytes(reviewSource.bytes, "sealed admission review authority"), { root });
+  const decisionOverlay = decisionSource.value;
+  const reviewAuthorityArtifact = validateAdmissionReviewAuthority(reviewSource.value, { root });
   if (reviewAuthorityArtifact.fixture_id !== decisionOverlay.fixture_id) throw new Error("sealed review authority and admission decision fixture identities differ");
   return resolveEffectiveAdmissionAuthority({
     root,
@@ -364,28 +362,122 @@ export function resolveEffectiveAdmissionAuthorityFromFiles({
   });
 }
 
-export function changedPathsFromGitDiff({ root = DEFAULT_ROOT, baseRevision = null } = {}) {
-  let effectiveBase = baseRevision;
-  if (!effectiveBase) {
-    const configuredBase = process.env.ADMISSION_IMMUTABLE_BASE_REVISION;
-    const candidate = configuredBase || "origin/main";
-    try {
-      effectiveBase = execFileSync("git", ["-C", root, "merge-base", "HEAD", candidate], { encoding: "utf8", maxBuffer: 1024 * 1024 }).trim();
-    } catch {
-      throw new Error("immutable-path verification requires an explicit base revision or a fetch-complete origin/main");
-    }
+export class ImmutableAuthorityRevisionUnavailableError extends Error {
+  constructor(revision) {
+    super(`approved R21 reviewed head is unavailable in the required repository context: ${revision}`);
+    this.name = "ImmutableAuthorityRevisionUnavailableError";
+    this.code = "APPROVED_R21_REVIEWED_HEAD_UNAVAILABLE";
+    this.revision = revision;
   }
+}
+
+function validateImmutableInventory(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("approved immutable path inventory must be an object");
+  const reviewedHead = value.authority_source?.reviewed_head_revision;
+  if (!/^[a-f0-9]{40}$/u.test(reviewedHead ?? "")) throw new Error("approved immutable path inventory requires a full reviewed-head revision");
+  if (!Array.isArray(value.paths) || value.paths.length === 0) throw new Error("approved immutable path inventory requires protected paths");
+  const paths = value.paths.map((path) => assertPortablePath(path, "approved immutable inventory path"));
+  if (new Set(paths).size !== paths.length) throw new Error("approved immutable path inventory contains duplicate paths");
+  if (value.inventory_digest !== canonicalDigest(paths)) throw new Error("approved immutable path inventory digest is invalid");
+  return value;
+}
+
+export function readApprovedImmutablePathInventory({ root = DEFAULT_ROOT, inventoryPath = APPROVED_R21_IMMUTABLE_PATH_INVENTORY } = {}) {
+  const path = resolve(root, assertPortablePath(inventoryPath, "approved immutable inventory path"));
+  return validateImmutableInventory(readStableJsonFile(path, "approved R21 immutable path inventory", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false }).value);
+}
+
+function gitStatus(root, args) {
+  return spawnSync("git", ["-C", root, ...args], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
+}
+
+function revisionExists(root, revision) {
+  return gitStatus(root, ["cat-file", "-e", `${revision}^{commit}`]).status === 0;
+}
+
+function isAncestor(root, ancestor, descendant) {
+  const result = gitStatus(root, ["merge-base", "--is-ancestor", ancestor, descendant]);
+  if (result.status === 0) return true;
+  if (result.status === 1) return false;
+  throw new Error("immutable-path verification could not determine reviewed-head ancestry");
+}
+
+function repositoryRequiresReviewedHead(root, inventory) {
+  const fixtureId = inventory.authority_source.fixture_id;
+  if (typeof fixtureId !== "string" || fixtureId.length === 0) return false;
+  const fixturePrefix = `benchmarks/fixtures/checkpoint-b2/${fixtureId}/`;
+  return inventory.paths
+    .filter((path) => path.startsWith(fixturePrefix))
+    .some((path) => {
+      if (gitStatus(root, ["cat-file", "-e", `HEAD:${path}`]).status === 0) return true;
+      const history = gitStatus(root, ["log", "-1", "--format=%H", "HEAD", "--", path]);
+      return history.status === 0 && history.stdout.trim().length > 0;
+    });
+}
+
+function sharedPullRequestBase(root) {
+  try {
+    return execFileSync("git", ["-C", root, "merge-base", "HEAD", "origin/main"], { encoding: "utf8", maxBuffer: 1024 * 1024 }).trim();
+  } catch {
+    throw new Error("immutable-path verification requires a fetch-complete origin/main for the shared pull request context");
+  }
+}
+
+function selectImmutableDiffBase({ root, baseRevision, inventory }) {
+  if (baseRevision) {
+    if (!revisionExists(root, baseRevision)) throw new Error(`explicit immutable-path base revision is unavailable: ${baseRevision}`);
+    return baseRevision;
+  }
+  const reviewedHead = inventory.authority_source.reviewed_head_revision;
+  if (revisionExists(root, reviewedHead)) {
+    if (isAncestor(root, reviewedHead, "HEAD")) return reviewedHead;
+    return sharedPullRequestBase(root);
+  }
+  if (repositoryRequiresReviewedHead(root, inventory)) throw new ImmutableAuthorityRevisionUnavailableError(reviewedHead);
+  return sharedPullRequestBase(root);
+}
+
+function parseNameStatus(output) {
+  const fields = output.split("\0");
+  if (fields.at(-1) === "") fields.pop();
+  const paths = [];
+  for (let index = 0; index < fields.length;) {
+    const status = fields[index++];
+    if (!/^[A-Z][0-9]*$/u.test(status)) throw new Error(`immutable-path verification received an unknown Git status: ${status}`);
+    const pathCount = status.startsWith("R") || status.startsWith("C") ? 2 : 1;
+    if (index + pathCount > fields.length) throw new Error("immutable-path verification received a truncated Git status record");
+    for (let pathIndex = 0; pathIndex < pathCount; pathIndex += 1) paths.push(assertPortablePath(fields[index++], "changed Git path"));
+  }
+  return [...new Set(paths)];
+}
+
+export function changedPathsFromGitDiff({ root = DEFAULT_ROOT, baseRevision = null, inventory = null, inventoryPath = APPROVED_R21_IMMUTABLE_PATH_INVENTORY } = {}) {
+  const authority = inventory ? validateImmutableInventory(inventory) : baseRevision ? null : readApprovedImmutablePathInventory({ root, inventoryPath });
+  const effectiveBase = selectImmutableDiffBase({ root, baseRevision, inventory: authority });
   let output;
   try {
-    output = execFileSync("git", ["-C", root, "diff", "--name-only", "--diff-filter=ACMR", effectiveBase, "--"], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
+    output = execFileSync("git", [
+      "-C", root, "diff", "--name-status", "-z", "--find-renames", "--find-copies", "--find-copies-harder", effectiveBase, "HEAD", "--",
+    ], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
   } catch {
     throw new Error("immutable-path verification could not derive the actual Git diff");
   }
-  return output.split("\n").filter(Boolean).map((path) => assertPortablePath(path, "changed Git path"));
+  return parseNameStatus(output);
 }
 
-export function assertImmutableGitDiffUnchanged({ root = DEFAULT_ROOT, baseRevision = null, immutablePaths }) {
-  return assertImmutablePathInventoryUnchanged({ immutablePaths, changedPaths: changedPathsFromGitDiff({ root, baseRevision }) });
+export function assertImmutableGitDiffUnchanged({
+  root = DEFAULT_ROOT,
+  baseRevision = null,
+  immutablePaths = null,
+  inventory = null,
+  inventoryPath = APPROVED_R21_IMMUTABLE_PATH_INVENTORY,
+} = {}) {
+  const authority = inventory ? validateImmutableInventory(inventory) : immutablePaths ? null : readApprovedImmutablePathInventory({ root, inventoryPath });
+  const protectedPaths = immutablePaths ?? authority.paths;
+  return assertImmutablePathInventoryUnchanged({
+    immutablePaths: protectedPaths,
+    changedPaths: changedPathsFromGitDiff({ root, baseRevision, inventory: authority, inventoryPath }),
+  });
 }
 
 export function assertAdmissionDecisionAppendOnly(previousDecision, nextDecision, { root = DEFAULT_ROOT } = {}) {

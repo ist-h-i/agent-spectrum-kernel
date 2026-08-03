@@ -824,7 +824,30 @@ function mutateResult(fixtureContext, source, name, mutate, { close = true } = {
   return path;
 }
 
-function expectScoreFailure(fixtureContext, { resultPath, name, pattern, cliOverrides = [] }) {
+function writeDuplicateKeyJson(sourcePath, targetPath, key, occurrence = 0) {
+  const lines = readFileSync(sourcePath, "utf8").split("\n");
+  const candidates = lines.map((line, index) => line.includes(`"${key}":`) ? index : -1).filter((index) => index >= 0);
+  assert.ok(candidates.length > occurrence, `missing JSON key for duplicate mutation: ${key}`);
+  const index = candidates[occurrence];
+  const line = lines[index];
+  if (line.trimEnd().endsWith(",")) lines.splice(index + 1, 0, line);
+  else {
+    lines[index] = `${line},`;
+    lines.splice(index + 1, 0, line);
+  }
+  writeFileSync(targetPath, lines.join("\n"));
+  return targetPath;
+}
+
+function replaceCliValue(values, flag, value) {
+  const updated = [...values];
+  const index = updated.indexOf(flag);
+  assert.ok(index >= 0 && index + 1 < updated.length, `missing CLI flag ${flag}`);
+  updated[index + 1] = value;
+  return updated;
+}
+
+function expectScoreFailure(fixtureContext, { resultPath, name, pattern, cliOverrides = [], extraInputPaths = [] }) {
   const outputPath = resolve(fixtureContext.path, `${name}-engineering-result.json`);
   const before = {
     privateRoot: snapshot(fixtureContext.privateRoot),
@@ -834,6 +857,7 @@ function expectScoreFailure(fixtureContext, { resultPath, name, pattern, cliOver
     normalizedResults: snapshot(fixtureContext.normalizedResults),
     scoringInputs: snapshot(fixtureContext.scoringInputs.path),
     result: snapshot(resultPath),
+    extraInputs: extraInputPaths.map((path) => [path, snapshot(path)]),
   };
   const execution = runScore(fixtureContext, { resultPath, outputPath, expectedStatus: 1, cliOverrides });
   assert.match(execution.stderr, pattern, name);
@@ -845,6 +869,7 @@ function expectScoreFailure(fixtureContext, { resultPath, name, pattern, cliOver
   assert.deepEqual(snapshot(fixtureContext.normalizedResults), before.normalizedResults, `${name} must not modify normalized results`);
   assert.deepEqual(snapshot(fixtureContext.scoringInputs.path), before.scoringInputs, `${name} must not modify scoring inputs`);
   assert.deepEqual(snapshot(resultPath), before.result, `${name} must not modify evaluator result`);
+  for (const [path, state] of before.extraInputs) assert.deepEqual(snapshot(path), state, `${name} must not modify ${path}`);
 }
 
 try {
@@ -991,6 +1016,57 @@ try {
     pattern: /archive raw identity/,
     cliOverrides: [...admittedEvidence.cli.slice(0, -1), driftedArchivePath],
   });
+
+  for (const key of ["evaluation_status", "outcome", "earned_points"]) {
+    const duplicateResultPath = resolve(base.path, `duplicate-${key}-evaluator-result.json`);
+    writeDuplicateKeyJson(completed.path, duplicateResultPath, key);
+    expectScoreFailure(base, {
+      resultPath: duplicateResultPath,
+      name: `duplicate-${key}`,
+      pattern: new RegExp(`duplicate JSON object key: ${key}`, "u"),
+    });
+  }
+
+  for (const [name, artifact, key] of [
+    ["duplicate-freeze-path", "freeze", "path"],
+    ["duplicate-freeze-digest", "freeze", "raw_byte_digest"],
+    ["duplicate-admission-status", "admission", "admission_status"],
+    ["duplicate-admission-digest", "admission", "admission_digest"],
+  ]) {
+    const duplicateFixture = createFixture(name, { admissionStatus: "admission_pending", distinctRequirementAuthority: true });
+    const duplicateResult = writeResult(duplicateFixture, name);
+    const target = artifact === "freeze" ? duplicateFixture.scoringInputs.freezeManifestPath : duplicateFixture.scoringInputs.admissionRecordPath;
+    writeDuplicateKeyJson(target, target, key);
+    expectScoreFailure(duplicateFixture, {
+      resultPath: duplicateResult.path,
+      name,
+      pattern: new RegExp(`duplicate JSON object key: ${key}`, "u"),
+    });
+  }
+
+  const duplicateDecisionPath = resolve(pendingFixture.path, "duplicate-decision-status.json");
+  writeDuplicateKeyJson(admittedEvidence.decisionPath, duplicateDecisionPath, "decision_status");
+  expectScoreFailure(pendingFixture, {
+    resultPath: pendingCompleted.path,
+    name: "duplicate-decision-status",
+    pattern: /duplicate JSON object key: decision_status/u,
+    cliOverrides: replaceCliValue(admittedEvidence.cli, "--admission-decision", duplicateDecisionPath),
+    extraInputPaths: [duplicateDecisionPath],
+  });
+
+  for (const key of ["review_status", "archive_sha256"]) {
+    const duplicateReviewPath = resolve(pendingFixture.path, `duplicate-${key}-review-authority.json`);
+    writeDuplicateKeyJson(admittedEvidence.reviewAuthorityPath, duplicateReviewPath, key);
+    let duplicateReviewCli = replaceCliValue(admittedEvidence.cli, "--admission-review-authority", duplicateReviewPath);
+    duplicateReviewCli = replaceCliValue(duplicateReviewCli, "--admission-review-authority-source-digest", fileDigest(duplicateReviewPath));
+    expectScoreFailure(pendingFixture, {
+      resultPath: pendingCompleted.path,
+      name: `duplicate-${key}`,
+      pattern: new RegExp(`duplicate JSON object key: ${key}`, "u"),
+      cliOverrides: duplicateReviewCli,
+      extraInputPaths: [duplicateReviewPath],
+    });
+  }
 
   const laterEvidence = createAdmissionDecisionEvidence(pendingFixture, "admitted", 2);
   const pendingVerified = verifyLifecycleNeutralEvaluatorResult({

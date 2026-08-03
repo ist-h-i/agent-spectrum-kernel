@@ -15,7 +15,9 @@ import {
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
+import { readStableJsonFile } from "./ask-benchmark-duplicate-key-json.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
+import { validateLifecycleNeutralResultProfile } from "./ask-benchmark-portfolio-result-profile.mjs";
 import {
   computeFinalAdmissionRecordDigest,
   computeOutputContractDigest,
@@ -80,19 +82,8 @@ function assertPortableRelativePath(value, label) {
   return value;
 }
 
-function parseJson(source, label) {
-  let value;
-  try {
-    value = JSON.parse(source.bytes.toString("utf8"));
-  } catch {
-    throw new Error(`${label} is invalid JSON`);
-  }
-  return value;
-}
-
 function readJson(path, label) {
-  const source = readStableFile(path, label, MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
-  return { ...source, value: parseJson(source, label) };
+  return readStableJsonFile(path, label, MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
 }
 
 function looksLikePrivatePathOrUri(value) {
@@ -332,10 +323,13 @@ function validateLifecycleNeutralBindings({ scoringInputs, normalized, result })
   };
   for (const [field, value] of Object.entries(expected)) if (result[field] !== value) throw new Error(`evaluator scoring-input binding mismatch at ${field}`);
   if (evaluatorReference.fixture_id !== normalized.lineage.fixture_id || evaluatorReference.fixture_input_digest !== normalized.lineage.fixture_input_digest) throw new Error("evaluator reference normalized lineage is invalid");
-  return validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult: result });
+  const evaluation = validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult: result });
+  validateLifecycleNeutralResultProfile({ outputContract, freezeManifest, evaluatorResult: result, requirementRecord, normalizedResult: normalized });
+  return evaluation;
 }
 
 export function verifyLifecycleNeutralEvaluatorResult(options) {
+  readStableJsonFile(resolve(options.normalizedResultsPath, "normalized-results-root.json"), "normalized result collection root", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
   const bundle = verifyPrivateEvaluatorBundle(options);
   if (!options.resultPath || isInside(options.privateRoot, options.resultPath)) throw new Error("public evaluator result must not overlap the private evaluator root");
   const resultSource = readJson(options.resultPath, "evaluator result envelope");
@@ -345,6 +339,7 @@ export function verifyLifecycleNeutralEvaluatorResult(options) {
   assertEvaluatorResultIdentity(result);
   const scoringInputs = readLifecycleNeutralScoringInputs(options, bundle);
   const verified = verifyNormalizedPortfolioResults({ root: options.root, outputPath: options.normalizedResultsPath, sourceSnapshotDigest: result.source_snapshot_digest });
+  readStableJsonFile(resolve(verified.generationPath, "normalized-run.json"), "normalized run manifest", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
   if (result.source_snapshot_digest !== verified.manifest.source_snapshot_digest) throw new Error("evaluator result source snapshot lineage is invalid");
   assertBoundaryLineage(bundle, verified);
   const normalized = normalizedRecordFor(verified, result);

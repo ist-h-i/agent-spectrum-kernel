@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { test } from "node:test";
@@ -9,14 +9,17 @@ import { fileURLToPath } from "node:url";
 import {
   assertAdmissionDecisionAppendOnly,
   assertImmutableGitDiffUnchanged,
+  changedPathsFromGitDiff,
   computeAdmissionDecisionDigest,
   computeAdmissionDecisionId,
+  ImmutableAuthorityRevisionUnavailableError,
   resolveEffectiveAdmissionAuthority,
   validatePortfolioAdmissionDecision,
 } from "./ask-benchmark-admission-decision.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const stableTmp = realpathSync(tmpdir());
 const digest = (value) => canonicalDigest({ value });
 const bytes = (value, space = 2) => Buffer.from(`${JSON.stringify(value, null, space)}\n`);
 const rawDigest = (value) => `sha256:${createHash("sha256").update(value).digest("hex")}`;
@@ -338,7 +341,7 @@ test("actual Git diff is checked against the fixed approved R21 inventory", () =
 });
 
 test("actual protected-path commit is rejected without a caller-maintained changed-path list", () => {
-  const repository = mkdtempSync(resolve(tmpdir(), "ask-admission-immutable-diff-"));
+  const repository = mkdtempSync(resolve(stableTmp, "ask-admission-immutable-diff-"));
   const protectedPath = "scripts/ask-benchmark-evaluator-boundary.mjs";
   const git = (...args) => spawnSync("git", args, { cwd: repository, encoding: "utf8" });
   try {
@@ -354,5 +357,127 @@ test("actual protected-path commit is rejected without a caller-maintained chang
     assert.throws(() => assertImmutableGitDiffUnchanged({ root: repository, baseRevision, immutablePaths: [protectedPath] }), /immutable source paths changed/);
   } finally {
     rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+function gitOk(repository, ...args) {
+  const result = spawnSync("git", args, { cwd: repository, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout || args.join(" "));
+  return result.stdout.trim();
+}
+
+function commitAll(repository, message) {
+  gitOk(repository, "add", "-A");
+  gitOk(repository, "-c", "user.name=ASK Test", "-c", "user.email=ask-test@example.invalid", "commit", "-qm", message);
+  return gitOk(repository, "rev-parse", "HEAD");
+}
+
+test("reviewed R21 head is the normal immutable base after the shared-contract merge", () => {
+  const repository = mkdtempSync(resolve(stableTmp, "ask-admission-r21-dag-"));
+  const protectedPath = "scripts/ask-benchmark-evaluator-boundary.mjs";
+  const inventoryPath = "benchmarks/fixtures/admission-decision/approved-r21-immutable-paths.json";
+  try {
+    gitOk(repository, "init", "-q", "-b", "main");
+    mkdirSync(resolve(repository, "scripts"), { recursive: true });
+    writeFileSync(resolve(repository, protectedPath), "export const frozen = 'main-base';\n");
+    commitAll(repository, "main base");
+
+    gitOk(repository, "checkout", "-qb", "r21");
+    writeFileSync(resolve(repository, protectedPath), "export const frozen = 'approved-r21';\n");
+    const reviewedHead = commitAll(repository, "approved R21 head");
+
+    gitOk(repository, "checkout", "-q", "main");
+    writeFileSync(resolve(repository, "shared-contract.mjs"), "export const shared = true;\n");
+    const inventory = {
+      schema_version: "1.0.0",
+      program: "adaptive_ask_approved_immutable_path_inventory",
+      authority_source: { fixture_id: "mn-build-option-update", reviewed_head_revision: reviewedHead },
+      inventory_digest: canonicalDigest([protectedPath]),
+      paths: [protectedPath],
+    };
+    mkdirSync(resolve(repository, dirname(inventoryPath)), { recursive: true });
+    writeFileSync(resolve(repository, inventoryPath), `${JSON.stringify(inventory, null, 2)}\n`);
+    commitAll(repository, "shared admission contract");
+
+    gitOk(repository, "checkout", "-q", "r21");
+    gitOk(repository, "-c", "user.name=ASK Test", "-c", "user.email=ask-test@example.invalid", "merge", "--no-ff", "-qm", "merge shared contract", "main");
+    assert.equal(assertImmutableGitDiffUnchanged({ root: repository }), true);
+    assert.equal(changedPathsFromGitDiff({ root: repository }).includes(protectedPath), false);
+
+    writeFileSync(resolve(repository, protectedPath), "export const frozen = 'post-review-mutation';\n");
+    commitAll(repository, "mutate protected path after review");
+    assert.throws(() => assertImmutableGitDiffUnchanged({ root: repository }), /immutable source paths changed/);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("missing reviewed head fails closed with a typed error in an R21 repository context", () => {
+  const repository = mkdtempSync(resolve(stableTmp, "ask-admission-missing-reviewed-head-"));
+  const protectedPath = "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/final-admission-record.json";
+  const inventoryPath = "benchmarks/fixtures/admission-decision/approved-r21-immutable-paths.json";
+  try {
+    gitOk(repository, "init", "-q", "-b", "main");
+    mkdirSync(resolve(repository, dirname(protectedPath)), { recursive: true });
+    writeFileSync(resolve(repository, protectedPath), "{}\n");
+    const inventory = {
+      schema_version: "1.0.0",
+      program: "adaptive_ask_approved_immutable_path_inventory",
+      authority_source: { fixture_id: "mn-build-option-update", reviewed_head_revision: "f".repeat(40) },
+      inventory_digest: canonicalDigest([protectedPath]),
+      paths: [protectedPath],
+    };
+    mkdirSync(resolve(repository, dirname(inventoryPath)), { recursive: true });
+    writeFileSync(resolve(repository, inventoryPath), `${JSON.stringify(inventory, null, 2)}\n`);
+    commitAll(repository, "R21 context without reviewed object");
+    assert.throws(
+      () => changedPathsFromGitDiff({ root: repository }),
+      (error) => error instanceof ImmutableAuthorityRevisionUnavailableError && error.code === "APPROVED_R21_REVIEWED_HEAD_UNAVAILABLE",
+    );
+    rmSync(resolve(repository, protectedPath));
+    commitAll(repository, "delete R21 authority while reviewed object remains unavailable");
+    assert.throws(
+      () => changedPathsFromGitDiff({ root: repository }),
+      (error) => error instanceof ImmutableAuthorityRevisionUnavailableError && error.code === "APPROVED_R21_REVIEWED_HEAD_UNAVAILABLE",
+    );
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("immutable proof rejects modification, deletion, rename, copy, and symlink type change", () => {
+  const scenarios = {
+    modification(repository, protectedPath) {
+      writeFileSync(resolve(repository, protectedPath), "export const frozen = 'modified';\n");
+    },
+    deletion(repository, protectedPath) {
+      rmSync(resolve(repository, protectedPath));
+    },
+    rename(repository, protectedPath) {
+      gitOk(repository, "mv", protectedPath, "scripts/renamed-evaluator-boundary.mjs");
+    },
+    copy(repository, protectedPath) {
+      writeFileSync(resolve(repository, "scripts/copied-evaluator-boundary.mjs"), readFileSync(resolve(repository, protectedPath)));
+    },
+    type_change(repository, protectedPath) {
+      rmSync(resolve(repository, protectedPath));
+      symlinkSync("replacement-evaluator-boundary.mjs", resolve(repository, protectedPath));
+    },
+  };
+  for (const [name, mutate] of Object.entries(scenarios)) {
+    const repository = mkdtempSync(resolve(stableTmp, `ask-admission-status-${name}-`));
+    const protectedPath = "scripts/ask-benchmark-evaluator-boundary.mjs";
+    try {
+      gitOk(repository, "init", "-q", "-b", "main");
+      mkdirSync(resolve(repository, "scripts"), { recursive: true });
+      writeFileSync(resolve(repository, protectedPath), "export const frozen = true;\n");
+      const baseRevision = commitAll(repository, "base");
+      mutate(repository, protectedPath);
+      commitAll(repository, name);
+      assert.ok(changedPathsFromGitDiff({ root: repository, baseRevision }).includes(protectedPath), `${name} must include the protected path`);
+      assert.throws(() => assertImmutableGitDiffUnchanged({ root: repository, baseRevision, immutablePaths: [protectedPath] }), /immutable source paths changed/, name);
+    } finally {
+      rmSync(repository, { recursive: true, force: true });
+    }
   }
 });
