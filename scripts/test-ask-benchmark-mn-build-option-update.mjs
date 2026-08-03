@@ -1663,6 +1663,44 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     expectPrivateFailure("evaluator check replacement", ({ record }) => { const entry = record.evidence_artifacts.find(({ path }) => path.endsWith("evaluator-check-artifact.json")); entry.path = "repository-diff-artifact.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /repository diff artifact|artifact|schema|record/u);
     expectPrivateFailure("public repository-diff reference transplant", ({ result }) => { const reference = result.findings.flatMap(({ evidence_references }) => evidence_references).find(({ kind }) => kind === "repository_diff"); assert.ok(reference); reference.digest = `sha256:${"f".repeat(64)}`; }, /sealed private artifact|artifact|authority-owned adapter/u);
   }
+  if (productionMutation === "valid-baseline" && state === "executed_success") {
+    for (const forbidden of ["candidateWorkspace", "candidateMutator", "evaluationInputRoot", "normalizedResult", "caseId", "attempt"]) {
+      assert.throws(() => createProductionSealedEvaluatorExecution({ [forbidden]: forbidden }), new RegExp(forbidden, "u"), `production call graph must reject caller-supplied ${forbidden}`);
+    }
+    assert.throws(() => executeProductionSealedEvaluator({ execution: {} }), /module-owned verified terminal candidate authority/u, "production execution must reject a caller-created execution object");
+    const originalRecordBytes = readFileSync(privateRecord.recordPath);
+    const candidateAuthorityMutations = [
+      ["source snapshot", (authority) => { authority.source_snapshot_digest = `sha256:${"0".repeat(64)}`; }],
+      ["normalized result id", (authority) => { authority.normalized_result_id = `normalized-${"0".repeat(32)}`; }],
+      ["normalized result digest", (authority) => { authority.normalized_result_digest = `sha256:${"0".repeat(64)}`; }],
+      ["run", (authority) => { authority.run_instance_id = "00000000-0000-4000-8000-000000000208"; }],
+      ["case", (authority) => { authority.case_id = `case-${"0".repeat(16)}-${"1".repeat(16)}`; }],
+      ["attempt", (authority) => { authority.attempt = "0002"; }],
+      ["adapter", (authority) => { authority.adapter = "claude"; }],
+      ["condition", (authority) => { authority.condition = "kernel_only"; }],
+      ["fixture", (authority) => { authority.fixture_id = "foreign-fixture"; }],
+      ["fixture input", (authority) => { authority.fixture_input_digest = `sha256:${"0".repeat(64)}`; }],
+      ["materialization", (authority) => { authority.materialization_manifest_digest = `sha256:${"0".repeat(64)}`; }],
+      ["request", (authority) => { authority.request_digest = `sha256:${"0".repeat(64)}`; }],
+      ["raw result", (authority) => { authority.raw_result_digest = `sha256:${"0".repeat(64)}`; }],
+      ["terminal commit", (authority) => { authority.terminal_commit_digest = `sha256:${"0".repeat(64)}`; }],
+      ["terminal state", (authority) => { authority.terminal_case_state_digest = `sha256:${"0".repeat(64)}`; }],
+      ["workspace authority", (authority) => { authority.terminal_workspace_authority_digest = `sha256:${"0".repeat(64)}`; }],
+      ["candidate tree", (authority) => { authority.terminal_candidate_tree_digest = `sha256:${"0".repeat(64)}`; }],
+      ["reconstructed candidate", (authority) => { authority.reconstructed_candidate_portable_digest = `sha256:${"0".repeat(64)}`; }],
+      ["candidate metadata", (authority) => { authority.candidate_authority_portable_digest = `sha256:${"0".repeat(64)}`; }],
+      ["workspace authority bytes", (authority) => { authority.terminal_workspace_authority_bytes += 1; }],
+    ];
+    for (const [label, mutate] of candidateAuthorityMutations) {
+      const record = JSON.parse(originalRecordBytes.toString("utf8"));
+      mutate(record.candidate_authority);
+      record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record);
+      writeJson(privateRecord.recordPath, record);
+      assert.throws(() => verifyEvaluatorBoundary(common), /candidate|terminal|normalized|lineage|authority|record|workspace/u, `production private record-only ${label} reseal must fail closed`);
+      writeFileSync(privateRecord.recordPath, originalRecordBytes);
+    }
+    assert.deepEqual(chain.snapshot(), before, "production candidate authority negative matrix must restore the persistent authority chain");
+  }
   return { authorityRoot, scoringRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, privateRecord, chain, verifiedResult };
 }
 
