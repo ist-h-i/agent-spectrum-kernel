@@ -2023,6 +2023,15 @@ function materializeTerminalCandidateAuthorityWorkspace({ evaluationRoot, termin
   return materialized;
 }
 
+function materializeVerifiedFrozenAuthorityWorkspace({ evaluationRoot, source }) {
+  const parent = mkdtempSync(resolve(evaluationRoot, ".production-frozen-authority-"));
+  const destination = resolve(parent, "workspace");
+  cpSync(source.root, destination, { recursive: true, errorOnExist: true, force: false });
+  const materialized = readStableWorkspaceInventory(destination, "verified frozen fixture metadata authority workspace");
+  if (stableCanonicalJson(materialized.portableEntries) !== stableCanonicalJson(source.portableEntries) || materialized.digest !== source.digest) throw new Error("verified frozen fixture metadata authority workspace is inconsistent");
+  return materialized;
+}
+
 export function createProductionSealedEvaluatorExecution(options = {}) {
   for (const forbidden of ["candidateWorkspace", "candidateMutator", "evaluationInputRoot", "normalizedResult", "caseId", "attempt"]) {
     if (Object.hasOwn(options, forbidden)) throw new Error(`production sealed evaluator rejects caller-supplied ${forbidden}`);
@@ -2046,6 +2055,7 @@ export function createProductionSealedEvaluatorExecution(options = {}) {
   terminal.binding.candidate_authority_portable_digest = candidateAuthorityWorkspace.digest;
   const evidenceRoot = mkdtempSync(resolve(evaluationRoot, ".production-evaluation-input-"));
   const verifiedFrozenSource = readStableWorkspaceInventory(resolve(options.materializedPath, terminal.binding.case_id, "workspace"), "verified frozen fixture workspace");
+  const frozenAuthorityWorkspace = materializeVerifiedFrozenAuthorityWorkspace({ evaluationRoot, source: verifiedFrozenSource });
   const evidence = {
     schema_version: "1.0.0",
     program: "adaptive_ask_verified_terminal_evaluation_input",
@@ -2057,7 +2067,7 @@ export function createProductionSealedEvaluatorExecution(options = {}) {
     privateEvaluationRoot: evaluationRoot,
     privateRoot: options.privateRoot,
     hiddenAsset: options.hiddenAsset,
-    frozenWorkspace: verifiedFrozenSource.root,
+    frozenWorkspace: frozenAuthorityWorkspace.root,
     candidateWorkspace: candidateAuthorityWorkspace.root,
     evaluationInputRoot: evidenceRoot,
     evaluationLineage: terminal.binding,
