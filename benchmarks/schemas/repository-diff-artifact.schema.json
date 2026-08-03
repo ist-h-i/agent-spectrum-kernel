@@ -3,7 +3,7 @@
   "title": "Adaptive ASK sealed repository diff artifact",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "schema_path", "program", "run_instance_id", "case_id", "attempt", "frozen_workspace_tree_digest", "candidate_workspace_tree_digest", "diff_entries", "artifact_digest", "artifact_bytes"],
+  "required": ["schema_version", "schema_path", "program", "run_instance_id", "case_id", "attempt", "candidate_authority", "frozen_workspace_tree_digest", "candidate_workspace_tree_digest", "diff_entries", "artifact_digest", "artifact_bytes"],
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "schema_path": { "const": "benchmarks/schemas/repository-diff-artifact.schema.json" },
@@ -11,6 +11,7 @@
     "run_instance_id": { "type": "string", "format": "uuid" },
     "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
     "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "candidate_authority": { "$ref": "#/$defs/candidateAuthority" },
     "frozen_workspace_tree_digest": { "$ref": "#/$defs/digest" },
     "candidate_workspace_tree_digest": { "$ref": "#/$defs/digest" },
     "diff_entries": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/diffEntry" } },
@@ -19,6 +20,35 @@
   },
   "$defs": {
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "candidateAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["direct_test_workspace", "verified_terminal_candidate"] },
+        "source_snapshot_digest": { "$ref": "#/$defs/digest" },
+        "normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },
+        "normalized_result_digest": { "$ref": "#/$defs/digest" },
+        "run_instance_id": { "type": "string", "format": "uuid" },
+        "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+        "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+        "adapter": { "enum": ["codex", "claude"] },
+        "condition": { "enum": ["plain", "kernel_only", "adaptive_ask", "full_ask"] },
+        "fixture_id": { "type": "string", "minLength": 1 },
+        "fixture_input_digest": { "$ref": "#/$defs/digest" },
+        "materialization_manifest_digest": { "$ref": "#/$defs/digest" },
+        "request_digest": { "$ref": "#/$defs/digest" },
+        "raw_result_digest": { "$ref": "#/$defs/digest" },
+        "terminal_commit_digest": { "$ref": "#/$defs/digest" },
+        "terminal_case_state_digest": { "$ref": "#/$defs/digest" },
+        "terminal_workspace_authority_digest": { "$ref": "#/$defs/digest" },
+        "terminal_workspace_authority_raw_sha256": { "$ref": "#/$defs/digest" },
+        "terminal_workspace_authority_bytes": { "type": "integer", "minimum": 1 },
+        "terminal_workspace_authority_base64": { "type": "string", "minLength": 4 },
+        "terminal_candidate_tree_digest": { "$ref": "#/$defs/digest" },
+        "reconstructed_candidate_portable_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
     "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!\\./)[a-zA-Z0-9._/-]+$" },
     "fileState": {
       "type": ["object", "null"],

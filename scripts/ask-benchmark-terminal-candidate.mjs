@@ -133,6 +133,8 @@ export function verifyTerminalWorkspaceAuthority({
   if (stableRecord.file.bytes.length !== inventory.bytes || prefixedSha256(stableRecord.file) !== inventory.sha256) throw new Error("normalized result record inventory identity mismatch");
   const record = validateNormalizedPortfolioResult(stableRecord.value, { root });
   if (record.normalized_result_id !== normalizedResultId || record.normalized_result_digest !== reference.normalized_result_digest) throw new Error("normalized result identity does not match its verified generation reference");
+  const normalizedCaseState = normalized.manifest.source_snapshot.cases.find((entry) => entry.case_id === record.lineage.case_id);
+  if (!normalizedCaseState?.state_digest) throw new Error("normalized result case state authority is missing");
   const execution = verifyExecutionTerminalWorkspaceAuthority({
     root,
     config,
@@ -157,6 +159,7 @@ export function verifyTerminalWorkspaceAuthority({
       collection_root: collectionRoot,
       generation_root: generationRoot,
       source_snapshot_digest: sourceSnapshotDigest,
+      terminal_case_state_digest: normalizedCaseState.state_digest,
     },
   };
 }
@@ -383,11 +386,23 @@ export function materializeVerifiedTerminalCandidate(options) {
   const verified = verifyTerminalWorkspaceAuthority(options);
   const boundary = createAuthorityOwnedOutputBoundary(options.outputParent, candidateForbiddenRoots(options, verified));
   try {
-    return materializeResolvedTerminalCandidate({
+    const materialized = materializeResolvedTerminalCandidate({
       verified,
       materializedCaseRoot: resolve(options.materializedPath, verified.execution.case_id),
       outputBoundary: boundary,
     });
+    return {
+      ...materialized,
+      verified_authority: {
+        normalized_result: structuredClone(verified.normalized.record),
+        normalized_result_bytes: Buffer.from(verified.normalized.record_file.bytes),
+        source_snapshot_digest: verified.normalized.source_snapshot_digest,
+        terminal_case_state_digest: verified.normalized.terminal_case_state_digest,
+        execution: structuredClone(verified.execution),
+        terminal_workspace_authority: structuredClone(verified.authority),
+        terminal_workspace_authority_bytes: Buffer.from(verified.file.bytes),
+      },
+    };
   } finally {
     try {
       closeSync(boundary.parent_descriptor);
