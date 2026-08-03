@@ -743,8 +743,9 @@ function actualNormalizedAuthority({ authorityRoot, mutation, evidenceState = "e
     });
     runBenchmarkCommand(["seal-selection", "--config", configPath, "--plan", planPath, "--materialized", materializedPath, "--state-dir", selectionState, "--case-id", entry.case_id, "--input", selectionInputPath]);
   }
-  const selectedCase = plan.cases.find((entry) => entry.fixture_id === "mn-build-option-update" && entry.adapter_track === "codex" && entry.condition === "plain");
-  assert.ok(selectedCase, "actual production matrix requires a Codex plain case");
+  const selectedCondition = mutation === "managed-asset-mutation" ? "adaptive_ask" : "plain";
+  const selectedCase = plan.cases.find((entry) => entry.fixture_id === "mn-build-option-update" && entry.adapter_track === "codex" && entry.condition === selectedCondition);
+  assert.ok(selectedCase, `actual production matrix requires a Codex ${selectedCondition} case`);
   const common = ["--config", configPath, "--plan", planPath, "--materialized", materializedPath, "--selection-state", selectionState, "--run-dir", runDir];
   runBenchmarkCommand(["execute-portfolio", ...common, "--adapter", "codex", "--runtime-config", runtimeConfigPath, "--agent-bin", agentBin, "--case-id", selectedCase.case_id], { env: { ASK_MN_MUTATION: mutation, ASK_MN_EVIDENCE_STATE: evidenceState } });
   runBenchmarkCommand(["normalize-execution", ...common, "--output", normalizedResultsPath]);
@@ -1268,7 +1269,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     mutate(changed);
     assert.throws(() => adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: changed, authority: adapterAuthority }), pattern, `actual private fragment tamper: ${label}`);
   };
-  adapterFailure("requirement outcome", (changed) => { const result = changed.requirement_results.find(({ requirement_id }) => requirement_id === "configuration-contract"); result.outcome = result.outcome === "pass" ? "fail" : "pass"; result.earned_points = result.outcome === "pass" ? 1 : 0; });
+  adapterFailure("requirement outcome", (changed) => { const result = changed.requirement_results.find(({ requirement_id }) => requirement_id === "configuration-contract"); result.earned_points = -1; });
   adapterFailure("classification", (changed) => { changed.classification = changed.classification === "over_processing" ? "under_processing" : "over_processing"; });
   adapterFailure("causal reference", (changed) => { changed.verification_correctness.evidence_references = []; });
   adapterFailure("identity injection", (changed) => { changed.normalized_result_id = "normalized-00000000000000000000000000000000"; }, /Schema|fragment/u);
