@@ -1240,7 +1240,9 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   const normalizedAuthority = productionMutation
     ? actualNormalizedAuthority({ authorityRoot, mutation: productionMutation, evidenceState: state })
     : persistentNormalizedAuthority({ authorityRoot, state });
-  const scoringAuthority = persistentScoringAuthorities(authorityRoot);
+  const scoringRoot = mkdtempSync(resolve(root, `.ask-mn-r21-scoring-${state}-`));
+  temporaryAuthorityRoots.add(scoringRoot);
+  const scoringAuthority = persistentScoringAuthorities(scoringRoot);
   const bundleManifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
   const bootstrap = await actualPrivateFragment({ privateRoot, authorityRoot, normalizedAuthority, externalAuthorityAnchor: scoringAuthority.evaluatorAuthorityAnchor });
   const actual = bootstrap;
@@ -1660,7 +1662,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     expectPrivateFailure("evaluator check replacement", ({ record }) => { const entry = record.evidence_artifacts.find(({ path }) => path.endsWith("evaluator-check-artifact.json")); entry.path = "repository-diff-artifact.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /repository diff artifact|artifact|schema|record/u);
     expectPrivateFailure("public repository-diff reference transplant", ({ result }) => { const reference = result.findings.flatMap(({ evidence_references }) => evidence_references).find(({ kind }) => kind === "repository_diff"); assert.ok(reference); reference.digest = `sha256:${"f".repeat(64)}`; }, /sealed private artifact|artifact|authority-owned adapter/u);
   }
-  return { authorityRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, privateRecord, chain, verifiedResult };
+  return { authorityRoot, scoringRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, privateRecord, chain, verifiedResult };
 }
 
 function privateSemanticAuthority(privateRoot) {
@@ -2932,6 +2934,7 @@ try {
       const fullAuthority = await runPersistentFullEvaluatorAuthority(privateRoot, state);
       assert.equal(fullAuthority.verifiedResult.result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state, deriveVerificationEvidenceState(fullAuthority.normalizedAuthority.normalized), `full verifier must preserve the typed state for ${state}`);
       removeTree(fullAuthority.authorityRoot);
+      removeTree(fullAuthority.scoringRoot);
     }
     const productionCases = [
       ["mode-0755", "mode-0755", ["pass", "fail", "pass"], "over_processing", ["allowed_path_mode_changed"]],
@@ -2959,6 +2962,7 @@ try {
       assert.deepEqual(result.scope_deviations.map(({ category }) => category).sort(), categories, `production sealed ${name} scope categories`);
       if (name === "file-type-drift") assert.equal(result.scope_deviations.some(({ category }) => category === "allowed_path_mode_changed"), false, "file type drift must not duplicate a mode finding");
       removeTree(fullAuthority.authorityRoot);
+      removeTree(fullAuthority.scoringRoot);
     }
     const invalidAuthority = await runPersistentFullEvaluatorAuthority(privateRoot, "executed_success", {
       candidateMutator: "malformed",
@@ -2968,6 +2972,7 @@ try {
     assert.equal(invalidAuthority.evaluatorResult.invalid_input_authority.category, "candidate_source_invalid");
     assert.ok(existsSync(resolve(invalidAuthority.authorityRoot, "evaluation-input-failure-artifact.json")), "evaluation-input failure artifact must be persisted");
     removeTree(invalidAuthority.authorityRoot);
+    removeTree(invalidAuthority.scoringRoot);
 
     const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
     const privateAsset = manifest.asset_inventory[0];
