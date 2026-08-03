@@ -453,7 +453,7 @@ function syntheticNormalizedResult({ state, contract, materializedDigest, runIde
     adaptive_selection_digest: null,
   };
   const base = {
-    schema_version: "1.2.0",
+    schema_version: "1.3.0",
     schema_path: "benchmarks/schemas/normalized-portfolio-result.schema.json",
     program: "adaptive_ask_normalized_execution_result",
     lineage,
@@ -544,15 +544,15 @@ function persistentNormalizedAuthority({ authorityRoot, state }) {
   const { _sealedCommandEvidence: sealedCommandEvidence, _runtimeIdentity: _runtimeIdentity, ...normalizedRecord } = normalized;
   const normalizedBytes = Buffer.from(`${JSON.stringify(normalizedRecord, null, 2)}\n`);
   const generationManifestWithoutDigest = {
-    schema_version: "1.2.0",
+    schema_version: "1.3.0",
     schema_path: "benchmarks/schemas/normalized-portfolio-run.schema.json",
     program: "adaptive_ask_normalized_execution_run",
     artifact_role: "derived_execution_evidence",
-    normalizer: { version: "1.2.0", source_revision: source.repository_revision },
+    normalizer: { version: "1.3.0", source_revision: source.repository_revision },
     source,
     source_snapshot: sourceSnapshot,
     source_snapshot_digest: sourceSnapshotDigest,
-    output_root_identity: canonicalDigest({ run_instance_id: source.run_instance_id, plan_id: source.plan_id, normalizer_version: "1.2.0", source_snapshot_digest: sourceSnapshotDigest }),
+    output_root_identity: canonicalDigest({ run_instance_id: source.run_instance_id, plan_id: source.plan_id, normalizer_version: "1.3.0", source_snapshot_digest: sourceSnapshotDigest }),
     pool_adapter_results: false,
     completeness: {
       partial: false,
@@ -580,7 +580,7 @@ function persistentNormalizedAuthority({ authorityRoot, state }) {
     schema_path: "benchmarks/schemas/normalized-portfolio-root.schema.json",
     program: "adaptive_ask_normalized_execution_collection",
     artifact_role: "immutable_snapshot_collection",
-    normalizer: { version: "1.2.0", source_revision: source.repository_revision },
+    normalizer: { version: "1.3.0", source_revision: source.repository_revision },
     source: { run_instance_id: source.run_instance_id, run_identity_digest: source.run_identity_digest, plan_id: source.plan_id, plan_digest: source.plan_digest, repository_revision: source.repository_revision },
     generations_directory: "generations",
   };
