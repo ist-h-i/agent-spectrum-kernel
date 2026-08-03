@@ -2951,7 +2951,7 @@ try {
       ["file-type-drift", "file-type-drift", ["fail", "fail", "pass"], "under_processing", ["allowed_path_file_type_changed"]],
       ["unrelated-addition", "unrelated-addition", ["pass", "fail", "pass"], "over_processing", ["unrelated_addition"]],
       ["unrelated-deletion", "unrelated-deletion", ["pass", "fail", "pass"], "over_processing", ["unrelated_deletion"]],
-      ["unrelated-modification", "unrelated-modification", ["pass", "fail", "pass"], "over_processing", ["unrelated_modification"]],
+      ["unrelated-modification", "unrelated-modification", ["pass", "fail", "pass"], "over_processing", ["dependency_or_workflow_modified"]],
       ["managed-asset-mutation", "managed-asset-mutation", ["pass", "pass", "pass"], "correct_narrow_execution", []],
     ];
     for (const [name, candidateMutator, outcomes, classification, categories] of productionCases) {
