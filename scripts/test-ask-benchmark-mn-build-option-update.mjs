@@ -2946,8 +2946,8 @@ try {
       ["staging-profile-expansion", "staging-profile-expansion", ["pass", "fail", "pass"], "over_processing", ["allowed_path_semantic_expansion"]],
       ["release-banner-expansion", "release-banner-expansion", ["pass", "fail", "pass"], "over_processing", ["allowed_path_semantic_expansion"]],
       ["debug-option-expansion", "debug-option-expansion", ["pass", "fail", "pass"], "over_processing", ["allowed_path_semantic_expansion"]],
-      ["unrelated-existing-value", "unrelated-existing-value", ["pass", "fail", "pass"], "under_processing", ["allowed_path_unrelated_value_changed"]],
-      ["required-key-removal", "required-key-removal", ["pass", "fail", "pass"], "under_processing", ["allowed_path_unrelated_value_removed"]],
+      ["unrelated-existing-value", "unrelated-existing-value", ["fail", "fail", "pass"], "under_processing", ["allowed_path_unrelated_value_changed"]],
+      ["required-key-removal", "required-key-removal", ["fail", "fail", "pass"], "under_processing", ["allowed_path_unrelated_value_removed"]],
       ["file-type-drift", "file-type-drift", ["fail", "fail", "pass"], "under_processing", ["allowed_path_file_type_changed"]],
       ["unrelated-addition", "unrelated-addition", ["pass", "fail", "pass"], "over_processing", ["unrelated_addition"]],
       ["unrelated-deletion", "unrelated-deletion", ["pass", "fail", "pass"], "over_processing", ["unrelated_deletion"]],
@@ -2961,6 +2961,17 @@ try {
       assert.equal(result.classification, classification, `production sealed ${name} classification`);
       assert.deepEqual(result.scope_deviations.map(({ category }) => category).sort(), categories, `production sealed ${name} scope categories`);
       if (name === "file-type-drift") assert.equal(result.scope_deviations.some(({ category }) => category === "allowed_path_mode_changed"), false, "file type drift must not duplicate a mode finding");
+      removeTree(fullAuthority.authorityRoot);
+      removeTree(fullAuthority.scoringRoot);
+    }
+    for (const evidenceState of ["missing", "executed_failure", "declined"]) {
+      const fullAuthority = await runPersistentFullEvaluatorAuthority(privateRoot, evidenceState, { candidateMutator: "valid-baseline" });
+      const result = fullAuthority.verifiedResult.result;
+      const verification = result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence");
+      assert.deepEqual(result.requirement_results.map(({ outcome }) => outcome), ["pass", "pass", "fail"], `production sealed ${evidenceState} evidence outcomes`);
+      assert.equal(result.classification, "under_processing", `production sealed ${evidenceState} evidence classification`);
+      assert.equal(verification.verification_evidence_state, evidenceState, `production sealed ${evidenceState} typed evidence state`);
+      assert.deepEqual(verification.verification_evidence_references, deriveVerificationEvidenceReferences(fullAuthority.normalizedAuthority.normalized, evidenceState), `production sealed ${evidenceState} evidence references`);
       removeTree(fullAuthority.authorityRoot);
       removeTree(fullAuthority.scoringRoot);
     }
