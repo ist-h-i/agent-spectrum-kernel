@@ -704,8 +704,8 @@ writeFileSync(output, JSON.stringify({ task_type: "implementation", decision: "n
 function actualNormalizedAuthority({ authorityRoot, mutation, evidenceState = "executed_success" }) {
   const executionAuthorityRoot = mkdtempSync("/private/tmp/ask-mn-production-source-");
   temporaryAuthorityRoots.add(executionAuthorityRoot);
-  const config = readJson(resolve(root, "benchmarks/adaptive-portfolio.config.json"));
-  const configPath = resolve(root, "benchmarks/adaptive-portfolio.config.json");
+  const configPath = resolve(root, "benchmarks/mn-build-option-update.config.json");
+  const config = readJson(configPath);
   const planPath = resolve(executionAuthorityRoot, "actual-plan.json");
   const materializedPath = resolve(executionAuthorityRoot, "actual-materialized");
   const selectionState = resolve(executionAuthorityRoot, "actual-selection-state");
