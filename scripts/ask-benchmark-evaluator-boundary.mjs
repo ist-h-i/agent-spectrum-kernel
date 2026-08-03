@@ -2286,7 +2286,7 @@ function executeAuthorityOwnedEvaluatorChild({ runnerSource, payload, timeout, l
   return parseRunnerFragment(child.stdout, `${label} child output`);
 }
 
-function executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot, normalized, normalizedBytes = null, timeout = 30_000, barrier = null, label = "private evaluator sealed execution" } = {}) {
+function executeSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot, normalized, normalizedBytes = null, timeout = 60_000, barrier = null, label = "private evaluator sealed execution" } = {}) {
   const prepared = prepareSealedEvaluatorExecutionAuthority({ execution, externalAuthorityAnchor, repositoryRoot, normalized, normalizedBytes, barrier, label });
   const run = (runIndex) => {
     const payload = runIndex === 1 ? prepared.firstPayload : prepared.secondPayload;
@@ -2319,7 +2319,7 @@ export function executeSealedEvaluatorForTest(options = {}) {
   return executeSealedEvaluator(options);
 }
 
-export function executeProductionSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot, timeout = 30_000, barrier = null, label = "production private evaluator sealed execution" } = {}) {
+export function executeProductionSealedEvaluator({ execution, externalAuthorityAnchor, repositoryRoot, timeout = 60_000, barrier = null, label = "production private evaluator sealed execution" } = {}) {
   const authority = PRODUCTION_EXECUTION_AUTHORITIES.get(execution);
   if (!authority) throw new Error(`${label} requires a module-owned verified terminal candidate authority`);
   if (stableCanonicalJson(execution.originalWorkspaceAuthority?.candidateAuthority) !== stableCanonicalJson(authority.candidateAuthority)) throw new Error(`${label} terminal candidate authority is detached from the sealed execution`);
