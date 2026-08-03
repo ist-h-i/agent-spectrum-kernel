@@ -1,6 +1,7 @@
 import { resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertAtomicOutputAbsent, publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
+import { resolveEffectiveAdmissionAuthority } from "./ask-benchmark-admission-decision.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { verifyEvaluatorResult } from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
@@ -35,6 +36,12 @@ const ENGINEERING_IDENTITY_FIELDS = Object.freeze([
   "policy_manifest_digest",
   "scoring_policy_digest",
   "admission_record_digest",
+  "effective_admission_mode",
+  "effective_admission_status",
+  "frozen_admission_record_digest",
+  "requirement_authority_digest",
+  "admission_decision_digest",
+  "admission_decision_revision",
   "requirement_record_digest",
   "requirement_set_digest",
   "output_contract_digest",
@@ -237,19 +244,53 @@ export function computeEngineeringResultDigest(value) {
   return canonicalDigest(withoutField(value, "engineering_result_digest"));
 }
 
+export function assertEngineeringResultAdmissionAuthority(value, authority) {
+  const expected = {
+    effective_admission_mode: authority.authority_mode,
+    effective_admission_status: authority.effective_admission_status,
+    frozen_admission_record_digest: authority.frozen_admission_record_digest,
+    requirement_authority_digest: authority.requirement_authority_digest,
+    admission_decision_digest: authority.admission_decision_digest,
+    admission_decision_revision: authority.admission_decision_revision,
+    requirement_record_digest: authority.requirement_record_digest,
+    evaluator_bundle_id: authority.evaluator_bundle_id,
+    evaluator_bundle_digest: authority.evaluator_bundle_digest,
+    evaluator_revision: authority.evaluator_revision,
+    evaluator_public_reference_digest: authority.evaluator_public_reference_digest,
+    fixture_id: authority.fixture_id,
+  };
+  const actual = Object.fromEntries(Object.keys(expected).map((field) => [field, value[field]]));
+  if (stableCanonicalJson(actual) !== stableCanonicalJson(expected)) throw new Error("engineering result admission authority differs from the decision frozen at scoring time");
+  return true;
+}
+
 export function validatePortfolioEngineeringResult(value, { root = DEFAULT_ROOT } = {}) {
   assertBenchmarkSchemaInstance(value, { schemaPath: resolve(root, ENGINEERING_RESULT_SCHEMA_PATH), label: "portfolio engineering result" });
   if (value.engineering_result_id !== computeEngineeringResultId(value)) throw new Error("engineering result ID does not match its verified input identity");
   if (value.engineering_result_digest !== computeEngineeringResultDigest(value)) throw new Error("engineering result digest does not match its complete canonical closure");
+  if (value.frozen_admission_record_digest !== value.admission_record_digest) throw new Error("engineering result frozen admission digest differs from evaluator-result lineage");
+  if (value.effective_admission_mode === "legacy_admitted_record") {
+    if (value.effective_admission_status !== "admitted" || value.admission_decision_digest !== null || value.admission_decision_revision !== null) throw new Error("legacy admission lineage must retain admitted status without a decision overlay");
+  } else if (value.effective_admission_mode === "admitted_overlay") {
+    if (value.effective_admission_status !== "admitted" || value.admission_decision_digest === null || value.admission_decision_revision === null) throw new Error("overlay admission lineage must bind an admitted decision revision and digest");
+  } else if (value.effective_admission_status === "admitted") {
+    throw new Error("non-admitted authority mode cannot claim admitted status");
+  }
   const score = value.requirement_score;
   if (value.scoring_status === "complete") {
     if (value.normalized_outcome !== "completed" || value.evaluation_status !== "completed" || value.scoring_reason !== "completed_evaluation_scoring_ready") throw new Error("complete engineering result must come from completed normalized execution and a completed scoring-ready evaluation");
+    if (value.effective_admission_status !== "admitted") throw new Error("complete engineering result requires effective admission");
     if (![score.scored_requirement_count, score.requirement_points_earned, score.requirement_points_possible, score.normalized_requirement_score].every(Number.isFinite)) throw new Error("complete requirement score fields must be finite");
     if (!(score.requirement_points_possible > 0)) throw new Error("complete requirement score denominator must be positive");
     if (score.normalized_requirement_score !== score.requirement_points_earned / score.requirement_points_possible) throw new Error("normalized requirement score formula is invalid");
     if (value.blockers.gate_status === "not_scoring_ready") throw new Error("complete engineering result cannot have a not-scoring-ready blocker gate");
   } else {
-    const expectedReason = value.normalized_outcome === "completed" ? NON_READY_REASONS[value.evaluation_status] : NORMALIZED_NON_READY_REASONS[value.normalized_outcome];
+    if (value.normalized_outcome === "completed" && value.evaluation_status === "completed" && value.effective_admission_status === "admitted") throw new Error("completed admitted engineering result cannot remain not-scoring-ready");
+    const expectedReason = value.normalized_outcome === "completed" && value.evaluation_status === "completed"
+      ? "admission_not_admitted"
+      : value.normalized_outcome === "completed"
+      ? NON_READY_REASONS[value.evaluation_status]
+      : NORMALIZED_NON_READY_REASONS[value.normalized_outcome];
     if (!expectedReason || value.scoring_reason !== expectedReason) throw new Error("not-scoring-ready reason does not match normalized execution and evaluation status");
     if (Object.values(score).some((entry) => entry !== null)) throw new Error("not-scoring-ready numeric requirement score fields must remain null");
     if (value.blockers.gate_status !== "not_scoring_ready") throw new Error("not-scoring-ready engineering result must retain a not-scoring-ready blocker gate");
@@ -300,17 +341,34 @@ export function validatePortfolioEngineeringResult(value, { root = DEFAULT_ROOT 
   return value;
 }
 
-export function buildPortfolioEngineeringResult(verified, { root = DEFAULT_ROOT } = {}) {
+export function buildPortfolioEngineeringResult(verified, { root = DEFAULT_ROOT, admissionAuthority = null } = {}) {
   const { normalized, result, scoringReady, scoringInputs } = verified ?? {};
   if (!normalized || !result || !scoringInputs?.scoringPolicy || !scoringInputs?.requirementRecord) throw new Error("verified evaluator scoring inputs are unavailable");
+  const effectiveAdmission = admissionAuthority ?? resolveEffectiveAdmissionAuthority({
+    frozenAdmissionRecord: scoringInputs.admissionRecord,
+    requirementRecord: scoringInputs.requirementRecord,
+    evaluatorReference: scoringInputs.evaluatorReference,
+    root,
+  });
+  if (
+    effectiveAdmission.fixture_id !== normalized.lineage.fixture_id
+    || effectiveAdmission.frozen_admission_record_digest !== result.admission_record_digest
+    || effectiveAdmission.requirement_record_digest !== result.requirement_record_digest
+    || effectiveAdmission.evaluator_bundle_id !== result.evaluator_bundle_id
+    || effectiveAdmission.evaluator_bundle_digest !== result.evaluator_bundle_digest
+    || effectiveAdmission.evaluator_revision !== result.evaluator_revision
+    || effectiveAdmission.evaluator_public_reference_digest !== result.evaluator_public_reference_digest
+  ) throw new Error("effective admission authority differs from verified evaluator-result lineage");
   const evaluatorReady = result.evaluation_status === "completed";
   if (evaluatorReady !== (scoringReady === true)) throw new Error("evaluator scoring readiness is inconsistent with evaluation status");
-  const complete = normalized.outcome === "completed" && evaluatorReady;
+  const complete = normalized.outcome === "completed" && evaluatorReady && effectiveAdmission.effective_admission_status === "admitted";
   const scoringStatus = complete ? "complete" : "not_scoring_ready";
   const scoringReason = complete
     ? "completed_evaluation_scoring_ready"
     : normalized.outcome === "completed"
-    ? NON_READY_REASONS[result.evaluation_status]
+    ? result.evaluation_status === "completed"
+      ? "admission_not_admitted"
+      : NON_READY_REASONS[result.evaluation_status]
     : NORMALIZED_NON_READY_REASONS[normalized.outcome];
   if (!scoringReason) throw new Error(`unsupported evaluator scoring status: ${result.evaluation_status}`);
   const unsafe = unsafeComponents({ scoringPolicy: scoringInputs.scoringPolicy, evaluatorResult: result, scoringReady: complete, scoringReason });
@@ -326,6 +384,12 @@ export function buildPortfolioEngineeringResult(verified, { root = DEFAULT_ROOT 
     policy_manifest_digest: result.policy_manifest_digest,
     scoring_policy_digest: result.scoring_policy_digest,
     admission_record_digest: result.admission_record_digest,
+    effective_admission_mode: effectiveAdmission.authority_mode,
+    effective_admission_status: effectiveAdmission.effective_admission_status,
+    frozen_admission_record_digest: effectiveAdmission.frozen_admission_record_digest,
+    requirement_authority_digest: effectiveAdmission.requirement_authority_digest,
+    admission_decision_digest: effectiveAdmission.admission_decision_digest,
+    admission_decision_revision: effectiveAdmission.admission_decision_revision,
     requirement_record_digest: result.requirement_record_digest,
     requirement_set_digest: result.requirement_set_digest,
     output_contract_digest: result.output_contract_digest,
@@ -405,7 +469,9 @@ export function buildPortfolioEngineeringResult(verified, { root = DEFAULT_ROOT 
   };
   const withId = { ...base, engineering_result_id: computeEngineeringResultId(base) };
   const artifact = { ...withId, engineering_result_digest: computeEngineeringResultDigest(withId) };
-  return validatePortfolioEngineeringResult(artifact, { root });
+  validatePortfolioEngineeringResult(artifact, { root });
+  assertEngineeringResultAdmissionAuthority(artifact, effectiveAdmission);
+  return artifact;
 }
 
 export function scoreEvaluatorResult(options) {

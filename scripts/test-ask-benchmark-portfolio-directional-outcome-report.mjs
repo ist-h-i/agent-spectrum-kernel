@@ -39,6 +39,7 @@ function result(fixture, repetitions, condition, repetition) {
     fixture_id: fixture, fixture_input_digest: digest(`fixture:${fixture}`), suite: fixture === "fixture-three" ? "mechanism_positive" : "calibration", task_class: "implementation",
     case_id: `case-${hash(key).slice(0, 16)}-${hash(`case:${key}`).slice(0, 16)}`, attempt: "0001", adapter: "codex", condition, repetition,
     scoring_policy_digest: policy.policy_digest, requirement_record_digest: digest(`requirements:${fixture}`), scoring_input_freeze_manifest_digest: digest(`freeze:${fixture}`),
+    effective_admission_mode: "legacy_admitted_record", effective_admission_status: "admitted", frozen_admission_record_digest: digest(`admission:${fixture}`), requirement_authority_digest: digest(`admission:${fixture}`), admission_decision_digest: null, admission_decision_revision: null,
     engineering_result_id: `engineering-result-${hash(`engineering:${key}`).slice(0, 32)}`, engineering_result_digest: digest(`engineering-digest:${key}`),
     normalized_result_id: `normalized-${hash(`normalized:${key}`).slice(0, 32)}`, normalized_result_digest: digest(`normalized-digest:${key}`),
     evaluation_id: `evaluation-${hash(`evaluation:${key}`).slice(0, 32)}`, evaluation_digest: digest(`evaluation-digest:${key}`),
@@ -135,6 +136,13 @@ check("exactly three B1 views", () => assert.equal(report.comparison_view_defini
 check("B1 policy order", () => assert.deepEqual(report.comparison_view_definitions.map(({ view_id }) => view_id), ["kernel_vs_plain", "adaptive_vs_kernel", "full_vs_kernel_diagnostic"]));
 check("diagnostic role preserved", () => assert.equal(report.comparison_view_definitions[2].view_role, "diagnostic_only"));
 check("one adapter only", () => assert.equal(report.authority.adapter_track, "codex"));
+check("directional outcomes retain paired admission decision lineage", () => {
+  const item = pair(report);
+  assert.equal(item.baseline_admission_decision_digest, null);
+  assert.equal(item.baseline_admission_decision_revision, null);
+  assert.equal(item.comparison_admission_decision_digest, null);
+  assert.equal(item.comparison_admission_decision_revision, null);
+});
 check("exact 3-pair inventory", () => assert.equal(view(report).pair_outcomes.length, 3));
 check("exact 5-pair inventory", () => assert.equal(view(report, "kernel_vs_plain", "fixture-five").pair_outcomes.length, 5));
 check("positive delta is comparison win", () => assert.equal(pair(report).directional_outcome, "comparison_win"));
@@ -214,6 +222,6 @@ check("majority winner remains false", () => assert.equal(report.boundaries.majo
 check("outcome perspective is comparison condition", () => assert.ok(report.fixture_outcomes.every((item) => item.comparison_views.every((itemView) => itemView.pair_outcomes.every((itemPair) => itemPair.outcome_perspective === "comparison_condition")))));
 check("serialized artifact excludes runtime verifier body", () => assert.equal(Object.hasOwn(report, "verified_comparison_report"), false));
 
-const EXPECTED_DIRECTIONAL_CLOSURE_COUNT = 82;
+const EXPECTED_DIRECTIONAL_CLOSURE_COUNT = 83;
 assert.equal(covered.size, EXPECTED_DIRECTIONAL_CLOSURE_COUNT, `expected ${EXPECTED_DIRECTIONAL_CLOSURE_COUNT} focused closures, received ${covered.size}`);
 console.log(`Portfolio directional outcome report contract test passed (${covered.size} closures).`);

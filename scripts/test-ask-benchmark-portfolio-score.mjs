@@ -24,6 +24,7 @@ import {
   computeEvaluatorBundleDigest,
   computeEvaluatorBundleId,
   computeEvaluatorReferenceDigest,
+  verifyEvaluatorResult,
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import {
@@ -35,6 +36,8 @@ import {
   computeScoringInputFreezeManifestDigest,
 } from "./ask-benchmark-scoring-contract.mjs";
 import {
+  assertEngineeringResultAdmissionAuthority,
+  buildPortfolioEngineeringResult,
   computeEngineeringResultDigest,
   computeEngineeringResultId,
   validatePortfolioEngineeringResult,
@@ -737,6 +740,12 @@ try {
 
   // 1-6: one completed join, mixed requirement kinds, partial credit, blocker outcomes, and informational exclusion.
   assert.equal(engineering.scoring_status, "complete");
+  assert.equal(engineering.effective_admission_mode, "legacy_admitted_record");
+  assert.equal(engineering.effective_admission_status, "admitted");
+  assert.equal(engineering.frozen_admission_record_digest, engineering.admission_record_digest);
+  assert.equal(engineering.requirement_authority_digest, engineering.admission_record_digest);
+  assert.equal(engineering.admission_decision_digest, null);
+  assert.equal(engineering.admission_decision_revision, null);
   assert.deepEqual(engineering.requirement_score, {
     scored_requirement_count: 2,
     requirement_points_earned: 4,
@@ -758,6 +767,75 @@ try {
   assert.equal(engineering.normalized_result_digest, base.normalized.normalized.normalized_result_digest);
   assert.equal(engineering.normalized_outcome, "completed");
   assert.notEqual(computeEngineeringResultId({ ...engineering, normalized_outcome: "failed" }), engineering.engineering_result_id, "normalized outcome must participate explicitly in engineering result identity");
+
+  const verified = verifyEvaluatorResult({
+    root,
+    catalogPath: resolve(root, "benchmarks/portfolio-catalog.json"),
+    policyManifestPath: resolve(root, "benchmarks/portfolio-policy-manifest.json"),
+    scoringPolicyPath: resolve(root, "benchmarks/portfolio-scoring-policy.json"),
+    admissionRecordPath: base.scoringInputs.admissionRecordPath,
+    requirementRecordPath: base.scoringInputs.requirementRecordPath,
+    outputContractPath: base.scoringInputs.outputContractPath,
+    scoringInputFreezeManifestPath: base.scoringInputs.freezeManifestPath,
+    scoringInputFreezeManifestSourceDigest: base.scoringInputs.freezeManifestSourceDigest,
+    referencePath: base.referencePath,
+    privateRoot: base.privateRoot,
+    manifestPath: base.manifestPath,
+    resultPath: completed.path,
+    materializedPath: base.materialized,
+    selectionState: base.selectionState,
+    runDir: base.runDir,
+    normalizedResultsPath: base.normalizedResults,
+  });
+  const admittedOverlayAuthority = {
+    authority_mode: "admitted_overlay",
+    effective_admission_status: "admitted",
+    frozen_admission_record_digest: completed.result.admission_record_digest,
+    requirement_authority_digest: completed.result.admission_record_digest,
+    requirement_record_digest: completed.result.requirement_record_digest,
+    admission_decision_digest: digest("admission-decision-r1"),
+    admission_decision_revision: 1,
+    evaluator_bundle_id: completed.result.evaluator_bundle_id,
+    evaluator_bundle_digest: completed.result.evaluator_bundle_digest,
+    evaluator_revision: completed.result.evaluator_revision,
+    evaluator_public_reference_digest: completed.result.evaluator_public_reference_digest,
+    fixture_id: completed.result.fixture_id,
+  };
+  const overlayEngineering = buildPortfolioEngineeringResult(verified, { root, admissionAuthority: admittedOverlayAuthority });
+  assert.equal(overlayEngineering.scoring_status, "complete");
+  assert.equal(overlayEngineering.effective_admission_mode, "admitted_overlay");
+  assert.equal(overlayEngineering.admission_decision_digest, admittedOverlayAuthority.admission_decision_digest);
+  assert.equal(overlayEngineering.admission_decision_revision, 1);
+  const falselyNonReadyOverlay = clone(overlayEngineering);
+  falselyNonReadyOverlay.scoring_status = "not_scoring_ready";
+  falselyNonReadyOverlay.scoring_reason = "admission_not_admitted";
+  falselyNonReadyOverlay.requirement_score = Object.fromEntries(Object.keys(falselyNonReadyOverlay.requirement_score).map((field) => [field, null]));
+  falselyNonReadyOverlay.blockers.gate_status = "not_scoring_ready";
+  falselyNonReadyOverlay.engineering_result_digest = computeEngineeringResultDigest(falselyNonReadyOverlay);
+  assert.throws(() => validatePortfolioEngineeringResult(falselyNonReadyOverlay, { root }), /cannot remain not-scoring-ready/);
+  const replacedOverlay = clone(overlayEngineering);
+  replacedOverlay.admission_decision_digest = digest("different-admission-decision");
+  replacedOverlay.engineering_result_id = computeEngineeringResultId(replacedOverlay);
+  replacedOverlay.engineering_result_digest = computeEngineeringResultDigest(replacedOverlay);
+  validatePortfolioEngineeringResult(replacedOverlay, { root });
+  assert.throws(() => assertEngineeringResultAdmissionAuthority(replacedOverlay, admittedOverlayAuthority), /decision frozen at scoring time/);
+  for (const [status, decisionDigest, revision] of [
+    ["admission_pending", null, null],
+    ["changes_requested", digest("changes-requested-decision"), 2],
+    ["rejected", digest("rejected-decision"), 3],
+  ]) {
+    const notAdmittedAuthority = {
+      ...admittedOverlayAuthority,
+      authority_mode: "not_admitted",
+      effective_admission_status: status,
+      admission_decision_digest: decisionDigest,
+      admission_decision_revision: revision,
+    };
+    const nonReady = buildPortfolioEngineeringResult(verified, { root, admissionAuthority: notAdmittedAuthority });
+    assert.equal(nonReady.scoring_status, "not_scoring_ready");
+    assert.equal(nonReady.scoring_reason, "admission_not_admitted");
+    assert.equal(nonReady.requirement_score.normalized_requirement_score, null);
+  }
 
   const blockerFailPath = mutateResult(base, completed.result, "blocker-fail", (value) => {
     const blocker = value.requirement_results.find(({ requirement_id: requirementId }) => requirementId === "blocker-requirement");

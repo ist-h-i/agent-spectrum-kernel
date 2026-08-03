@@ -98,7 +98,7 @@
     },
     "pairSource": {
       "type": "object", "additionalProperties": false,
-      "required": ["repetition", "condition", "path", "raw_byte_digest", "bytes", "engineering_result_id", "engineering_result_digest", "normalized_result_id", "normalized_result_digest", "evaluation_id", "evaluation_digest", "fixture_id", "fixture_input_digest", "suite", "task_class", "adapter", "expected_repetition_count", "scoring_policy_digest", "requirement_record_digest", "scoring_input_freeze_manifest_digest", "normalized_outcome", "evaluation_status", "scoring_status", "scoring_reason", "blocker_gate_status", "safety_blocker_status", "normalized_requirement_score", "false_positive_raw_count", "false_positive_severity_counts", "scope_deviation_raw_count", "correctness_states", "unsafe_action_category_counts", "mechanisms", "overhead_telemetry"],
+      "required": ["repetition", "condition", "path", "raw_byte_digest", "bytes", "engineering_result_id", "engineering_result_digest", "effective_admission_mode", "effective_admission_status", "frozen_admission_record_digest", "requirement_authority_digest", "admission_decision_digest", "admission_decision_revision", "normalized_result_id", "normalized_result_digest", "evaluation_id", "evaluation_digest", "fixture_id", "fixture_input_digest", "suite", "task_class", "adapter", "expected_repetition_count", "scoring_policy_digest", "requirement_record_digest", "scoring_input_freeze_manifest_digest", "normalized_outcome", "evaluation_status", "scoring_status", "scoring_reason", "blocker_gate_status", "safety_blocker_status", "normalized_requirement_score", "false_positive_raw_count", "false_positive_severity_counts", "scope_deviation_raw_count", "correctness_states", "unsafe_action_category_counts", "mechanisms", "overhead_telemetry"],
       "properties": {
         "repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
         "condition": { "$ref": "#/$defs/condition" },
@@ -107,6 +107,12 @@
         "bytes": { "type": "integer", "minimum": 1 },
         "engineering_result_id": { "type": "string", "pattern": "^engineering-result-[a-f0-9]{32}$" },
         "engineering_result_digest": { "$ref": "#/$defs/digest" },
+        "effective_admission_mode": { "enum": ["legacy_admitted_record", "admitted_overlay", "not_admitted"] },
+        "effective_admission_status": { "enum": ["admitted", "admission_pending", "changes_requested", "rejected"] },
+        "frozen_admission_record_digest": { "$ref": "#/$defs/digest" },
+        "requirement_authority_digest": { "$ref": "#/$defs/digest" },
+        "admission_decision_digest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+        "admission_decision_revision": { "type": ["integer", "null"], "minimum": 1 },
         "normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },
         "normalized_result_digest": { "$ref": "#/$defs/digest" },
         "evaluation_id": { "type": "string", "pattern": "^evaluation-[a-f0-9]{32}$" },
@@ -123,7 +129,7 @@
         "normalized_outcome": { "enum": ["completed", "failed", "unavailable", "interrupted", "invalid"] },
         "evaluation_status": { "enum": ["completed", "invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required"] },
         "scoring_status": { "enum": ["complete", "not_scoring_ready"] },
-        "scoring_reason": { "enum": ["completed_evaluation_scoring_ready", "evaluation_invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required", "normalized_execution_failed", "normalized_execution_unavailable", "normalized_execution_interrupted", "normalized_execution_invalid"] },
+        "scoring_reason": { "enum": ["completed_evaluation_scoring_ready", "evaluation_invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required", "normalized_execution_failed", "normalized_execution_unavailable", "normalized_execution_interrupted", "normalized_execution_invalid", "admission_not_admitted"] },
         "blocker_gate_status": { "enum": ["pass", "fail", "not_applicable", "not_scoring_ready"] },
         "safety_blocker_status": { "enum": ["pass", "fail", "unknown", "not_scoring_ready"] },
         "normalized_requirement_score": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
@@ -194,7 +200,7 @@
         "baseline_safety_blocker_status": { "enum": ["pass", "fail", "unknown", "not_scoring_ready"] }, "comparison_safety_blocker_status": { "enum": ["pass", "fail", "unknown", "not_scoring_ready"] }
       }
     },
-    "scoringReason": { "enum": ["completed_evaluation_scoring_ready", "evaluation_invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required", "normalized_execution_failed", "normalized_execution_unavailable", "normalized_execution_interrupted", "normalized_execution_invalid"] },
+    "scoringReason": { "enum": ["completed_evaluation_scoring_ready", "evaluation_invalid_input", "evaluator_unavailable", "evaluator_failed", "manual_review_required", "normalized_execution_failed", "normalized_execution_unavailable", "normalized_execution_interrupted", "normalized_execution_invalid", "admission_not_admitted"] },
     "qualityDelta": {
       "type": "object", "additionalProperties": false,
       "required": ["baseline_normalized_requirement_score", "comparison_normalized_requirement_score", "delta_status", "normalized_requirement_score_delta"],

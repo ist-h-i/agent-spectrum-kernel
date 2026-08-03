@@ -396,6 +396,12 @@ function engineeringResult(record, index) {
     policy_manifest_digest: digest("policy-manifest"),
     scoring_policy_digest: SCORING_POLICY_DIGEST,
     admission_record_digest: digest(`admission:${record.lineage.fixture_id}`),
+    effective_admission_mode: "legacy_admitted_record",
+    effective_admission_status: "admitted",
+    frozen_admission_record_digest: digest(`admission:${record.lineage.fixture_id}`),
+    requirement_authority_digest: digest(`admission:${record.lineage.fixture_id}`),
+    admission_decision_digest: null,
+    admission_decision_revision: null,
     requirement_record_digest: digest(`requirements:${record.lineage.fixture_id}`),
     requirement_set_digest: digest(`requirement-set:${record.lineage.fixture_id}`),
     output_contract_digest: digest(`output-contract:${record.lineage.fixture_id}`),
@@ -465,6 +471,12 @@ function sourceEntry(path, resultPath, result) {
     bytes: bytes.length,
     engineering_result_id: result.engineering_result_id,
     engineering_result_digest: result.engineering_result_digest,
+    effective_admission_mode: result.effective_admission_mode,
+    effective_admission_status: result.effective_admission_status,
+    frozen_admission_record_digest: result.frozen_admission_record_digest,
+    requirement_authority_digest: result.requirement_authority_digest,
+    admission_decision_digest: result.admission_decision_digest,
+    admission_decision_revision: result.admission_decision_revision,
     normalized_result_id: result.normalized_result_id,
     normalized_result_digest: result.normalized_result_digest,
     case_id: result.case_id,
@@ -1737,6 +1749,28 @@ try {
   digestDrift.result_set_digest = digest("wrong-result-set-digest");
   assert.throws(() => validatePortfolioEngineeringResultSet(digestDrift, { root }), /digest is invalid/u);
   covered.add("result-set-digest-drift");
+  const overlayRemoval = structuredClone(collected.artifact);
+  delete overlayRemoval.inventory[0].admission_decision_digest;
+  overlayRemoval.result_set_id = computeEngineeringResultSetId(overlayRemoval);
+  overlayRemoval.result_set_digest = computeEngineeringResultSetDigest(overlayRemoval);
+  assert.throws(() => validatePortfolioEngineeringResultSet(overlayRemoval, { root }), /Schema validation/u);
+  covered.add("result-set-overlay-removal");
+  const overlayReplacementFixture = cloneFixture("result-set-overlay-replacement");
+  const overlayReplacementSet = collectEngineeringResults(options(overlayReplacementFixture));
+  const overlayReplacement = structuredClone(overlayReplacementSet.artifact);
+  overlayReplacement.inventory[0].effective_admission_mode = "admitted_overlay";
+  overlayReplacement.inventory[0].admission_decision_digest = digest("replacement-overlay");
+  overlayReplacement.inventory[0].admission_decision_revision = 1;
+  overlayReplacement.result_set_id = computeEngineeringResultSetId(overlayReplacement);
+  overlayReplacement.result_set_digest = computeEngineeringResultSetDigest(overlayReplacement);
+  validatePortfolioEngineeringResultSet(overlayReplacement, { root });
+  const overlayReplacementPath = resolve(overlayReplacementFixture.target, "overlay-replacement-result-set.json");
+  writeJson(overlayReplacementPath, overlayReplacement);
+  assert.throws(
+    () => verifyEngineeringResultSet(options(overlayReplacementFixture, { inputPath: overlayReplacementPath, outputPath: undefined })),
+    /does not match the re-derived authoritative complete inventory/u,
+  );
+  covered.add("result-set-overlay-replacement");
   const revisionIdentityDrift = structuredClone(collected.artifact);
   revisionIdentityDrift.source_revision = "2".repeat(40);
   const changedRevisionId = computeEngineeringResultSetId(revisionIdentityDrift);
@@ -1876,7 +1910,7 @@ try {
     "source-revision-arbitrary-valid-hex", "source-revision-missing", "checked-in-source-revision-mismatch",
     "result-file-raw-byte-drift", "result-file-byte-count-drift", "source-manifest-subset-cherry-pick", "source-directory-inventory-mismatch",
     "unexpected-file", "missing-file", "source-root-symlink", "child-path-symlink", "path-escape", "windows-path", "non-regular-entry",
-    "unordered-inventory", "count-drift", "result-set-id-drift", "result-set-digest-drift", "pre-existing-output", "output-symlink",
+    "unordered-inventory", "count-drift", "result-set-id-drift", "result-set-digest-drift", "result-set-overlay-removal", "result-set-overlay-replacement", "pre-existing-output", "output-symlink",
     "concurrent-output-publication", "failure-inputs-unchanged", "byte-identical-regeneration", "unknown-unavailable-not-zero",
     "result-set-id-binds-source-revision", "result-set-revision-drift", "bare-validator-is-not-full-authority-verification",
     "concurrent-verify-input-replacement", "same-byte-inode-replacement", "successful-external-output-inputs-unchanged",
