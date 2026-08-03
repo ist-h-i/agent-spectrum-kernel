@@ -281,7 +281,7 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
   return { scoringReady: false };
 }
 
-export function validateScoringInputBindings({ freezeManifest, freezeManifestSourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult }) {
+export function validateEvaluatorAuthorityBindings({ freezeManifest, freezeManifestSourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult }) {
   assertDigestClosure(policyManifest.manifest_digest, computePolicyManifestDigest(policyManifest), "policy manifest digest");
   assertDigestClosure(scoringPolicy.policy_digest, computeScoringPolicyDigest(scoringPolicy), "scoring policy digest");
   assertDigestClosure(outputContract.output_contract_digest, computeOutputContractDigest(outputContract), "output contract digest");
@@ -317,6 +317,11 @@ export function validateScoringInputBindings({ freezeManifest, freezeManifestSou
   }
   if (evaluatorReference.fixture_id !== normalizedResult.lineage.fixture_id || evaluatorReference.fixture_input_digest !== normalizedResult.lineage.fixture_input_digest) throw new Error("evaluator public reference fixture or input binding does not match normalized result");
   return validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult });
+}
+
+export function validateScoringInputBindings(options) {
+  if (options.admissionRecord?.admission_status !== "admitted") throw new Error("scoring input binding requires an admitted final admission record");
+  return validateEvaluatorAuthorityBindings(options);
 }
 
 export function scoringContractFingerprint({ scoringPolicy, requirementRecordSchema, evaluatorResultSchema }) {

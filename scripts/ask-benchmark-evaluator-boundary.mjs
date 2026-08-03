@@ -29,6 +29,7 @@ import {
   SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH,
   validateFinalAdmissionRecordContract,
   validateFrozenFinalAdmissionRecordContract,
+  validateEvaluatorAuthorityBindings,
   validateRequirementRecordContract,
   validateScoringContractSchemaParity,
   validateScoringInputBindings,
@@ -860,7 +861,8 @@ function verifyEvaluatorAuthorityCore({
   if (bundle.reference.fixture_id !== lineage.fixture_id || bundle.reference.fixture_input_digest !== lineage.fixture_input_digest || bundle.reference.task_class !== lineage.task_class || bundle.reference.suite !== lineage.suite) {
     throw new Error("evaluator reference is transplanted across normalized fixture or input identity");
   }
-  const scoring = validateScoringInputBindings({
+  const validateBindings = requireAdmitted ? validateScoringInputBindings : validateEvaluatorAuthorityBindings;
+  const scoring = validateBindings({
     ...scoringInputs,
     normalizedResult: normalized,
     evaluatorResult: result,
