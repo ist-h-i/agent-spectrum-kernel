@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -107,6 +107,37 @@ test("duplicate-key-aware reader rejects every new authority shadow before publi
       assert.deepEqual(readFileSync(input), before, `${label} input must remain unchanged`);
       assert.equal(existsSync(output), false, `${label} must not create a partial engineering result`);
     }
+    for (const [label, raw] of [
+      ["materialization marker", '{"program":'],
+      ["selection-state marker", '{"program":"selection"}\ntrailing'],
+    ]) {
+      const input = resolve(directory, `${label.replaceAll(" ", "-")}.json`);
+      const output = resolve(directory, `${label.replaceAll(" ", "-")}.engineering-result.json`);
+      writeFileSync(input, raw);
+      const before = readFileSync(input);
+      assert.throws(() => readStableJsonFile(input, label, 1024, { allowEmpty: false }), /invalid JSON/u);
+      assert.deepEqual(readFileSync(input), before, `${label} input must remain unchanged`);
+      assert.equal(existsSync(output), false, `${label} must not create a partial engineering result`);
+    }
+
+    const marker = resolve(directory, "concurrent-materialization-marker.json");
+    const markerBackup = resolve(directory, "concurrent-materialization-marker.backup.json");
+    const replacement = resolve(directory, "concurrent-materialization-marker.replacement.json");
+    const output = resolve(directory, "concurrent-materialization-marker.engineering-result.json");
+    writeFileSync(marker, '{"program":"materialization"}\n');
+    copyFileSync(marker, markerBackup);
+    writeFileSync(replacement, '{"program":"replacement"}\n');
+    const markerBefore = readFileSync(marker);
+    const replacementBefore = readFileSync(replacement);
+    assert.throws(
+      () => readStableJsonFile(marker, "materialization marker", 1024, { allowEmpty: false, afterOpen: () => renameSync(replacement, marker) }),
+      /replaced|changed/u,
+    );
+    renameSync(markerBackup, marker);
+    writeFileSync(replacement, replacementBefore);
+    assert.deepEqual(readFileSync(marker), markerBefore, "concurrent marker rejection must leave the authority input unchanged after the test actor restores it");
+    assert.deepEqual(readFileSync(replacement), replacementBefore, "concurrent marker rejection must not modify the replacement input");
+    assert.equal(existsSync(output), false, "concurrent marker replacement must not create a partial engineering result");
     assert.throws(() => parseJsonRejectDuplicateKeys('{"a":1,"\\u0061":2}', "escaped key authority"), /duplicate JSON object key: a/u);
   } finally {
     rmSync(directory, { recursive: true, force: true });

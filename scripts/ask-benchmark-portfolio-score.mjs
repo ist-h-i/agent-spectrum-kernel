@@ -89,11 +89,12 @@ function isInside(root, path) {
   return resolvedPath === resolvedRoot || resolvedPath.startsWith(`${resolvedRoot}${sep}`);
 }
 
-function assertOutputBoundary({ outputPath, privateRoot, materializedPath, selectionState, runDir, normalizedResultsPath, inputPaths }) {
+function assertOutputBoundary({ outputPath, privateRoot, privateEvaluationRoot, materializedPath, selectionState, runDir, normalizedResultsPath, inputPaths }) {
   if (!outputPath) throw new Error("score-evaluator-result requires --output");
   const output = assertAtomicOutputAbsent(outputPath, "engineering result output");
   for (const [path, label] of [
     [privateRoot, "private evaluator root"],
+    [privateEvaluationRoot, "private evaluation authority root"],
     [materializedPath, "materialized root"],
     [selectionState, "selection state"],
     [runDir, "execution run root"],
@@ -477,6 +478,7 @@ export function scoreEvaluatorResult(options) {
   const output = assertOutputBoundary({
     outputPath: options.outputPath,
     privateRoot: options.privateRoot,
+    privateEvaluationRoot: options.privateEvaluationRoot,
     materializedPath: options.materializedPath,
     selectionState: options.selectionState,
     runDir: options.runDir,
@@ -492,6 +494,8 @@ export function scoreEvaluatorResult(options) {
       options.referencePath,
       options.manifestPath,
       options.resultPath,
+      options.privateEvaluationRecordPath,
+      options.privateFragmentPath,
       options.admissionDecisionPath,
       options.admissionReviewAuthorityPath,
       options.admissionReviewArchivePath,
@@ -531,7 +535,7 @@ export function scoreEvaluatorResult(options) {
     outputPath: output,
     artifact,
     label: "engineering result output",
-    forbiddenByteValues: [options.privateRoot, options.manifestPath].filter(Boolean).map((path) => resolve(path)),
+    forbiddenByteValues: [options.privateRoot, options.privateEvaluationRoot, options.manifestPath].filter(Boolean).map((path) => resolve(path)),
   });
   return { artifact, bytes, outputPath: output };
 }

@@ -37,6 +37,10 @@ import {
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { verifyLifecycleNeutralEvaluatorResult } from "./ask-benchmark-portfolio-evaluator-result.mjs";
 import {
+  computeLifecycleNeutralResultProfileDigest,
+  LIFECYCLE_NEUTRAL_BINARY_PROFILE_NAME,
+} from "./ask-benchmark-portfolio-result-profile.mjs";
+import {
   computeFinalAdmissionRecordDigest,
   computeOutputContractDigest,
   computeRequirementDigest,
@@ -165,10 +169,14 @@ function coverage(cases, values, keyName, selector) {
   });
 }
 
-function buildNormalizedCollection(path, { materialized, selectionState, runDir, outcome = "completed" }) {
+function buildNormalizedCollection(path, { materialized, selectionState, runDir, outcome = "completed", markerBytes = {} }) {
   const runInstanceId = "00000000-0000-4000-8000-000000000197";
-  writeJson(resolve(materialized, "materialization-manifest.json"), { program: "synthetic_score_materialization" });
-  writeJson(resolve(selectionState, "selection-state.json"), { program: "synthetic_score_selection" });
+  const materializationMarkerPath = resolve(materialized, "materialization-manifest.json");
+  const selectionMarkerPath = resolve(selectionState, "selection-state.json");
+  if (markerBytes.materialization === undefined) writeJson(materializationMarkerPath, { program: "synthetic_score_materialization" });
+  else writeFileSync(materializationMarkerPath, markerBytes.materialization);
+  if (markerBytes.selection === undefined) writeJson(selectionMarkerPath, { program: "synthetic_score_selection" });
+  else writeFileSync(selectionMarkerPath, markerBytes.selection);
   const runIdentity = { program: "synthetic_score_execution", run_instance_id: runInstanceId };
   writeJson(resolve(runDir, "run-identity.json"), runIdentity);
   const source = {
@@ -177,8 +185,8 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir,
     plan_id: `plan-${"2".repeat(64)}`,
     plan_digest: digest("synthetic-score-plan"),
     repository_revision: REVISION,
-    materialization_manifest_digest: fileDigest(resolve(materialized, "materialization-manifest.json")),
-    selection_state_digest: fileDigest(resolve(selectionState, "selection-state.json")),
+    materialization_manifest_digest: fileDigest(materializationMarkerPath),
+    selection_state_digest: fileDigest(selectionMarkerPath),
   };
   const evidence = {
     request_digest: digest("score-request"),
@@ -652,7 +660,7 @@ function evaluatorResultFor(normalized, sourceSnapshotDigest, manifest, referenc
   return closeResult(result);
 }
 
-function createFixture(name, { normalizedOutcome = "completed", requirements = defaultRequirements(), admissionStatus = "admitted", distinctRequirementAuthority = false } = {}) {
+function createFixture(name, { normalizedOutcome = "completed", requirements = defaultRequirements(), admissionStatus = "admitted", distinctRequirementAuthority = false, markerBytes = {} } = {}) {
   const path = resolve(work, name);
   const materialized = resolve(path, "materialized");
   const selectionState = resolve(path, "selection-state");
@@ -660,7 +668,7 @@ function createFixture(name, { normalizedOutcome = "completed", requirements = d
   const normalizedResults = resolve(path, "normalized-results");
   const publicArtifactRoot = resolve(path, "public-artifact");
   for (const directory of [materialized, selectionState, runDir, publicArtifactRoot]) mkdirSync(directory, { recursive: true });
-  const normalized = buildNormalizedCollection(normalizedResults, { materialized, selectionState, runDir, outcome: normalizedOutcome });
+  const normalized = buildNormalizedCollection(normalizedResults, { materialized, selectionState, runDir, outcome: normalizedOutcome, markerBytes });
   const privateRoot = resolve(privateWork, name);
   const { manifest, manifestPath } = createPrivateBundle(privateRoot, normalized.normalized);
   const referencePath = resolve(path, "evaluator-reference.json");
@@ -793,8 +801,8 @@ function writeResult(fixtureContext, name, evaluationStatus = "completed", outco
   return { result, path };
 }
 
-function runScore(fixtureContext, { resultPath, outputPath, expectedStatus = 0, cliOverrides = [] }) {
-  const args = ["score-evaluator-result", ...fixtureContext.commonCli, "--result", resultPath, "--output", outputPath, ...cliOverrides];
+function runScore(fixtureContext, { resultPath, outputPath, expectedStatus = 0, cli = fixtureContext.commonCli, cliOverrides = [] }) {
+  const args = ["score-evaluator-result", ...cli, "--result", resultPath, "--output", outputPath, ...cliOverrides];
   const result = spawnSync(process.execPath, [runner, ...args], { cwd: root, encoding: "utf8", maxBuffer: 40 * 1024 * 1024 });
   assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
   return result;
@@ -847,7 +855,15 @@ function replaceCliValue(values, flag, value) {
   return updated;
 }
 
-function expectScoreFailure(fixtureContext, { resultPath, name, pattern, cliOverrides = [], extraInputPaths = [] }) {
+function removeCliValue(values, flag) {
+  const updated = [...values];
+  const index = updated.indexOf(flag);
+  assert.ok(index >= 0 && index + 1 < updated.length, `missing CLI flag ${flag}`);
+  updated.splice(index, 2);
+  return updated;
+}
+
+function expectScoreFailure(fixtureContext, { resultPath, name, pattern, cli = fixtureContext.commonCli, cliOverrides = [], extraInputPaths = [] }) {
   const outputPath = resolve(fixtureContext.path, `${name}-engineering-result.json`);
   const before = {
     privateRoot: snapshot(fixtureContext.privateRoot),
@@ -859,7 +875,7 @@ function expectScoreFailure(fixtureContext, { resultPath, name, pattern, cliOver
     result: snapshot(resultPath),
     extraInputs: extraInputPaths.map((path) => [path, snapshot(path)]),
   };
-  const execution = runScore(fixtureContext, { resultPath, outputPath, expectedStatus: 1, cliOverrides });
+  const execution = runScore(fixtureContext, { resultPath, outputPath, expectedStatus: 1, cli, cliOverrides });
   assert.match(execution.stderr, pattern, name);
   assert.equal(existsSync(outputPath), false, `${name} must not publish an output`);
   assert.deepEqual(snapshot(fixtureContext.privateRoot), before.privateRoot, `${name} must not modify private input`);
@@ -879,6 +895,39 @@ try {
   const completedRun = runScore(base, { resultPath: completed.path, outputPath: completedOutput });
   const engineering = JSON.parse(readFileSync(completedOutput, "utf8"));
   validatePortfolioEngineeringResult(engineering, { root });
+
+  const evaluatorResultSchema = JSON.parse(readFileSync(resolve(root, "benchmarks/schemas/evaluator-result-envelope.schema.json"), "utf8"));
+  if (Object.hasOwn(evaluatorResultSchema.properties ?? {}, "result_profile")) {
+    const binaryProfile = { name: LIFECYCLE_NEUTRAL_BINARY_PROFILE_NAME };
+    binaryProfile.digest = computeLifecycleNeutralResultProfileDigest(binaryProfile);
+    const binaryPrivateInputResult = mutateResult(base, completed.result, "binary-private-input-contract", (value) => {
+      value.result_profile = binaryProfile;
+      value.classification = "correct_narrow_execution";
+      value.private_fragment_digest = digest("synthetic-private-fragment");
+      value.private_fragment_bytes = 1;
+      value.private_evaluation_record_digest = digest("synthetic-private-evaluation-record");
+    });
+    const privateAuthorityFlags = ["--private-evaluation-root", "--private-evaluation-record", "--private-fragment"];
+    expectScoreFailure(base, {
+      resultPath: binaryPrivateInputResult,
+      name: "missing-all-private-evaluation-inputs",
+      pattern: /binary scope verification requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together/u,
+    });
+    const completePrivateCli = [
+      ...base.commonCli,
+      "--private-evaluation-root", base.privateRoot,
+      "--private-evaluation-record", base.manifestPath,
+      "--private-fragment", base.manifestPath,
+    ];
+    for (const flag of privateAuthorityFlags) {
+      expectScoreFailure(base, {
+        resultPath: binaryPrivateInputResult,
+        name: `missing-${flag.slice(2)}`,
+        pattern: /binary scope verification requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together/u,
+        cli: removeCliValue(completePrivateCli, flag),
+      });
+    }
+  }
 
   // 1-6: one completed join, mixed requirement kinds, partial credit, blocker outcomes, and informational exclusion.
   assert.equal(engineering.scoring_status, "complete");
@@ -1025,6 +1074,24 @@ try {
       name: `duplicate-${key}`,
       pattern: new RegExp(`duplicate JSON object key: ${key}`, "u"),
     });
+  }
+
+  for (const [name, marker, raw, pattern] of [
+    ["invalid-materialization-marker", "materialization", '{"program":', /materialized root manifest.*invalid JSON/u],
+    ["duplicate-materialization-marker", "materialization", '{"program":"first","program":"second"}\n', /duplicate JSON object key/u],
+    ["invalid-selection-state-marker", "selection", '{"program":', /selection-state root index.*invalid JSON/u],
+    ["duplicate-selection-state-marker", "selection", '{"program":"first","program":"second"}\n', /duplicate JSON object key/u],
+  ]) {
+    const markerFixture = createFixture(name, { markerBytes: { [marker]: raw } });
+    const markerResult = writeResult(markerFixture, name);
+    const markerPath = marker === "materialization"
+      ? resolve(markerFixture.materialized, "materialization-manifest.json")
+      : resolve(markerFixture.selectionState, "selection-state.json");
+    const normalizedDigest = marker === "materialization"
+      ? markerFixture.normalized.manifest.source.materialization_manifest_digest
+      : markerFixture.normalized.manifest.source.selection_state_digest;
+    assert.equal(normalizedDigest, fileDigest(markerPath), `${name} must reseal normalized lineage to the exact invalid marker bytes`);
+    expectScoreFailure(markerFixture, { resultPath: markerResult.path, name, pattern });
   }
 
   for (const [name, artifact, key] of [

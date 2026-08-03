@@ -17,7 +17,10 @@ import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materializ
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { readStableJsonFile } from "./ask-benchmark-duplicate-key-json.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
-import { validateLifecycleNeutralResultProfile } from "./ask-benchmark-portfolio-result-profile.mjs";
+import {
+  LIFECYCLE_NEUTRAL_BINARY_PROFILE_NAME,
+  validateLifecycleNeutralResultProfile,
+} from "./ask-benchmark-portfolio-result-profile.mjs";
 import {
   computeFinalAdmissionRecordDigest,
   computeOutputContractDigest,
@@ -32,7 +35,6 @@ import {
   validateRequirementResultObservations,
   validateScoringContractSchemaParity,
 } from "./ask-benchmark-scoring-contract.mjs";
-import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 
 const MAX_PUBLIC_JSON_BYTES = 1024 * 1024;
 const CATALOG_SCHEMA_PATH = "benchmarks/schemas/portfolio-catalog.schema.json";
@@ -294,8 +296,8 @@ function normalizedRecordFor(verified, result) {
 
 function assertBoundaryLineage(bundle, verified) {
   const source = verified.manifest.source;
-  const materialized = readStableFile(bundle.markerPaths.materializedPath, "materialized root manifest", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
-  const selection = readStableFile(bundle.markerPaths.selectionState, "selection-state root index", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
+  const materialized = readStableJsonFile(bundle.markerPaths.materializedPath, "materialized root manifest", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
+  const selection = readStableJsonFile(bundle.markerPaths.selectionState, "selection-state root index", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
   const runIdentity = readJson(bundle.markerPaths.runDir, "execution run identity").value;
   if (materialized.rawByteDigest !== source.materialization_manifest_digest || selection.rawByteDigest !== source.selection_state_digest) throw new Error("evaluator boundary root digest lineage is invalid");
   if (canonicalDigest(runIdentity) !== source.run_identity_digest || runIdentity.run_instance_id !== source.run_instance_id) throw new Error("evaluator boundary run identity is invalid");
@@ -337,6 +339,13 @@ export function verifyLifecycleNeutralEvaluatorResult(options) {
   assertBenchmarkSchemaInstance(result, { schemaPath: resolve(options.root, EVALUATOR_RESULT_SCHEMA_PATH), label: "evaluator result envelope" });
   assertPublicArtifactTree(result, "evaluator result envelope");
   assertEvaluatorResultIdentity(result);
+  const requiresCompletePrivateAuthority = result.result_profile?.name === LIFECYCLE_NEUTRAL_BINARY_PROFILE_NAME;
+  if (requiresCompletePrivateAuthority) {
+    const privateAuthorityPaths = [options.privateEvaluationRoot, options.privateEvaluationRecordPath, options.privateFragmentPath];
+    if (privateAuthorityPaths.filter(Boolean).length !== privateAuthorityPaths.length) {
+      throw new Error("binary scope verification requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together");
+    }
+  }
   const scoringInputs = readLifecycleNeutralScoringInputs(options, bundle);
   const verified = verifyNormalizedPortfolioResults({ root: options.root, outputPath: options.normalizedResultsPath, sourceSnapshotDigest: result.source_snapshot_digest });
   readStableJsonFile(resolve(verified.generationPath, "normalized-run.json"), "normalized run manifest", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
@@ -365,7 +374,7 @@ export function verifyLifecycleNeutralEvaluatorResult(options) {
   for (const [field, value] of Object.entries(expectedLineage)) if (result[field] !== value) throw new Error(`evaluator result lineage mismatch at ${field}`);
   if (bundle.reference.fixture_id !== lineage.fixture_id || bundle.reference.fixture_input_digest !== lineage.fixture_input_digest || bundle.reference.task_class !== lineage.task_class || bundle.reference.suite !== lineage.suite) throw new Error("evaluator reference is transplanted across normalized authority");
   const evaluation = validateLifecycleNeutralBindings({ scoringInputs, normalized, result });
-  if (scoringInputs.admissionRecord.admission_status === "admitted") {
+  if (scoringInputs.admissionRecord.admission_status === "admitted" || requiresCompletePrivateAuthority) {
     const legacy = verifyEvaluatorResult(options);
     if (
       stableCanonicalJson(legacy.result) !== stableCanonicalJson(result)
