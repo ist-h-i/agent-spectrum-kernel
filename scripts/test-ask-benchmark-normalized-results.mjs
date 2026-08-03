@@ -2,9 +2,10 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
@@ -225,6 +226,55 @@ try {
   assert.equal(plainRecord.telemetry.runtime_agent_count.status, "unknown", "unobserved runtime agent activity must not be normalized as known zero");
   assert.equal(plainRecord.telemetry.subagent_activity.status, "unknown", "unobserved subagent activity must remain unknown");
   assert.equal(plainRecord.lineage.suite, "calibration", "normalized lineage must retain the plan-owned suite without evaluator data");
+  assert.equal(plainRecord.lineage.terminal_workspace_authority_availability, "captured", "completed normalized attempts must retain captured terminal workspace availability");
+  assert.equal(plainRecord.lineage.terminal_workspace_authority_support, "supported", "terminal workspace capture support must remain explicit");
+  assert.match(plainRecord.lineage.terminal_workspace_authority_digest, /^sha256:[a-f0-9]{64}$/u, "normalized lineage must retain the verified terminal authority digest");
+  assert.match(plainRecord.lineage.terminal_workspace_tree_digest, /^sha256:[a-f0-9]{64}$/u, "normalized lineage must retain the terminal candidate tree digest");
+  assert.ok(plainRecord.lineage.terminal_workspace_authority_bytes > 0, "normalized lineage must retain terminal authority bytes");
+
+  const normalizedOnlyReseal = resolve(work, "normalized-result-only-reseal");
+  cpSync(normalized, normalizedOnlyReseal, { recursive: true });
+  const normalizedOnlyGeneration = readGeneration(normalizedOnlyReseal);
+  const normalizedOnlyReference = normalizedOnlyGeneration.manifest.cases.find((entry) => entry.case_id === completedPlain.case_id).normalized_attempts[0];
+  const normalizedOnlyPath = resolve(normalizedOnlyGeneration.path, normalizedOnlyReference.path);
+  const normalizedOnlyRecord = JSON.parse(readFileSync(normalizedOnlyPath, "utf8"));
+  normalizedOnlyRecord.lineage.terminal_workspace_tree_digest = `sha256:${"0".repeat(64)}`;
+  const { normalized_result_id: ignoredId, normalized_result_digest: ignoredDigest, ...normalizedOnlyBase } = normalizedOnlyRecord;
+  normalizedOnlyRecord.normalized_result_digest = canonicalDigest(normalizedOnlyBase);
+  normalizedOnlyRecord.normalized_result_id = `normalized-${canonicalDigest({ run_instance_id: normalizedOnlyBase.lineage.run_instance_id, case_id: normalizedOnlyBase.lineage.case_id, attempt: normalizedOnlyBase.lineage.attempt, normalized_result_digest: normalizedOnlyRecord.normalized_result_digest }).slice("sha256:".length, "sha256:".length + 32)}`;
+  writeJson(normalizedOnlyPath, normalizedOnlyRecord);
+  assert.match(run(["verify-normalized-results", ...common(completedRun), "--output", normalizedOnlyReseal], { expectedStatus: 1 }).stderr, /inventory evidence|normalized attempt reference|source attempt evidence/u, "normalized-result-only workspace authority reseal must be rejected by full verification");
+
+  const coordinatedNormalizedReseal = resolve(work, "coordinated-normalized-result-reseal");
+  cpSync(normalized, coordinatedNormalizedReseal, { recursive: true });
+  const coordinatedGeneration = readGeneration(coordinatedNormalizedReseal);
+  const coordinatedManifestPath = resolve(coordinatedGeneration.path, "normalized-run.json");
+  const coordinatedManifest = coordinatedGeneration.manifest;
+  const coordinatedCase = coordinatedManifest.cases.find((entry) => entry.case_id === completedPlain.case_id);
+  const coordinatedReference = coordinatedCase.normalized_attempts[0];
+  const coordinatedPath = resolve(coordinatedGeneration.path, coordinatedReference.path);
+  const coordinatedRecord = JSON.parse(readFileSync(coordinatedPath, "utf8"));
+  coordinatedRecord.lineage.terminal_workspace_tree_digest = `sha256:${"0".repeat(64)}`;
+  const { normalized_result_id: coordinatedOldId, normalized_result_digest: coordinatedOldDigest, ...coordinatedRecordBase } = coordinatedRecord;
+  coordinatedRecord.normalized_result_digest = canonicalDigest(coordinatedRecordBase);
+  coordinatedRecord.normalized_result_id = `normalized-${canonicalDigest({ run_instance_id: coordinatedRecordBase.lineage.run_instance_id, case_id: coordinatedRecordBase.lineage.case_id, attempt: coordinatedRecordBase.lineage.attempt, normalized_result_digest: coordinatedRecord.normalized_result_digest }).slice("sha256:".length, "sha256:".length + 32)}`;
+  writeJson(coordinatedPath, coordinatedRecord);
+  coordinatedReference.normalized_result_id = coordinatedRecord.normalized_result_id;
+  coordinatedReference.normalized_result_digest = coordinatedRecord.normalized_result_digest;
+  const coordinatedInventory = coordinatedManifest.inventory.find((entry) => entry.path === coordinatedReference.path);
+  coordinatedInventory.sha256 = fileDigest(coordinatedPath);
+  coordinatedInventory.bytes = statSync(coordinatedPath).size;
+  const coordinatedSnapshotCase = coordinatedManifest.source_snapshot.cases.find((entry) => entry.case_id === completedPlain.case_id);
+  coordinatedSnapshotCase.committed_attempts[0].terminal_workspace_tree_digest = coordinatedRecord.lineage.terminal_workspace_tree_digest;
+  coordinatedManifest.source_snapshot_digest = canonicalDigest(coordinatedManifest.source_snapshot);
+  coordinatedManifest.output_root_identity = canonicalDigest({ run_instance_id: coordinatedManifest.source.run_instance_id, plan_id: coordinatedManifest.source.plan_id, normalizer_version: coordinatedManifest.normalizer.version, source_snapshot_digest: coordinatedManifest.source_snapshot_digest });
+  coordinatedManifest.publication_digest = canonicalDigest({ source_snapshot_digest: coordinatedManifest.source_snapshot_digest, inventory: coordinatedManifest.inventory });
+  const { normalized_run_digest: coordinatedOldRunDigest, ...coordinatedManifestBase } = coordinatedManifest;
+  coordinatedManifest.normalized_run_digest = canonicalDigest(coordinatedManifestBase);
+  writeJson(coordinatedManifestPath, coordinatedManifest);
+  const coordinatedRenamedGeneration = resolve(dirname(coordinatedGeneration.path), `snapshot-${coordinatedManifest.source_snapshot_digest.slice("sha256:".length)}`);
+  renameSync(coordinatedGeneration.path, coordinatedRenamedGeneration);
+  assert.match(run(["verify-normalized-results", ...common(completedRun), "--output", coordinatedNormalizedReseal], { expectedStatus: 1 }).stderr, /source snapshot|generation|current normalized|publication/u, "coordinated normalized result reseal must be rejected against verified attempt authority");
 
   const failedRun = resolve(work, "failed-run");
   const failedCase = caseFor("codex", "kernel_only", 1);
@@ -293,6 +343,7 @@ try {
   const invalidCommitPath = resolve(invalidAttemptRoot, "commit.json");
   const invalidResult = JSON.parse(readFileSync(invalidResultPath, "utf8"));
   invalidResult.command_evidence.file_identity = commandEvidenceFileIdentity(resolve(invalidAttemptRoot, "command-evidence.json"));
+  invalidResult.terminal_workspace_authority_file_identity = commandEvidenceFileIdentity(resolve(invalidAttemptRoot, "terminal-workspace-authority.json"));
   invalidResult.status = "invalid";
   invalidResult.failure_kind = "invalid_input_or_selection";
   writeJson(invalidResultPath, invalidResult);
@@ -300,7 +351,7 @@ try {
   invalidCommit.status = "invalid";
   invalidCommit.result_sha256 = fileDigest(invalidResultPath);
   writeJson(invalidCommitPath, invalidCommit);
-  writeJson(invalidStatePath, { ...invalidState, status: "invalid" });
+  writeJson(invalidStatePath, { ...invalidState, status: "invalid", terminal_commit_digest: fileDigest(invalidCommitPath) });
   const invalidOutput = resolve(work, "normalized-invalid");
   normalize(invalidRun, invalidOutput);
   const invalidManifest = readGeneration(invalidOutput).manifest;
@@ -337,10 +388,18 @@ try {
         if (!existsSync(commandPath) || !existsSync(resultPath) || !existsSync(commitPath)) continue;
         const result = JSON.parse(readFileSync(resultPath, "utf8"));
         result.command_evidence.file_identity = commandEvidenceFileIdentity(commandPath);
+        const terminalWorkspacePath = resolve(attemptRoot, "terminal-workspace-authority.json");
+        if (existsSync(terminalWorkspacePath)) result.terminal_workspace_authority_file_identity = commandEvidenceFileIdentity(terminalWorkspacePath);
         writeJson(resultPath, result);
         const commit = JSON.parse(readFileSync(commitPath, "utf8"));
         commit.result_sha256 = fileDigest(resultPath);
         writeJson(commitPath, commit);
+      }
+      const statePath = resolve(target, "cases", caseName, "state.json");
+      const state = JSON.parse(readFileSync(statePath, "utf8"));
+      if (state.terminal_attempt) {
+        state.terminal_commit_digest = fileDigest(resolve(attemptsRoot, state.terminal_attempt, "commit.json"));
+        writeJson(statePath, state);
       }
     }
     return target;
@@ -376,6 +435,20 @@ try {
   expectNormalizationFailure(completedRun, "final-tamper", (target) => {
     writeFileSync(resolve(completedAttemptRoot(target), "final.json"), "{\"tampered\":true}\n");
   }, /final output digest mismatch/u);
+  expectNormalizationFailure(completedRun, "terminal-workspace-authority-tamper", (target) => {
+    const path = resolve(completedAttemptRoot(target), "terminal-workspace-authority.json");
+    chmodSync(path, 0o644);
+    const value = JSON.parse(readFileSync(path, "utf8"));
+    value.base_inventory[0].mode = value.base_inventory[0].mode === "0644" ? "0600" : "0644";
+    writeJson(path, value);
+  }, /terminal workspace authority/u);
+  expectNormalizationFailure(completedRun, "terminal-workspace-authority-same-bytes-replacement", (target) => {
+    const path = resolve(completedAttemptRoot(target), "terminal-workspace-authority.json");
+    const bytes = readFileSync(path);
+    chmodSync(path, 0o644);
+    rmSync(path);
+    writeFileSync(path, bytes, { mode: 0o444 });
+  }, /terminal workspace authority/u);
   expectNormalizationFailure(completedRun, "runtime-identity-tamper", (target) => {
     const path = resolve(target, "adapters", "codex.json");
     const value = JSON.parse(readFileSync(path, "utf8"));

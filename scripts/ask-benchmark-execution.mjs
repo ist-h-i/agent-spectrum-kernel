@@ -36,6 +36,13 @@ import {
   validateCommandEvidenceManifest,
   validateVerificationCommandContract,
 } from "./ask-benchmark-command-evidence.mjs";
+import {
+  buildTerminalWorkspaceAuthority,
+  captureTerminalWorkspaceInventory,
+  readVerifiedTerminalWorkspaceAuthority,
+  TERMINAL_WORKSPACE_AUTHORITY_PATH,
+  terminalWorkspaceAuthorityReference,
+} from "./ask-benchmark-terminal-workspace.mjs";
 
 export const EXECUTION_RUNNER_VERSION = "1.0.0";
 export const RUNTIME_CONFIG_SCHEMA_PATH = "benchmarks/schemas/portfolio-runtime-config.schema.json";
@@ -47,6 +54,7 @@ export const ATTEMPT_COMMIT_SCHEMA_PATH = "benchmarks/schemas/portfolio-attempt-
 export const CLAIM_SCHEMA_PATH = "benchmarks/schemas/portfolio-claim.schema.json";
 export const ADAPTER_IDENTITY_SCHEMA_PATH = "benchmarks/schemas/portfolio-adapter-identity.schema.json";
 export const OUTPUT_SCHEMA_PATH = "benchmarks/schemas/agent-output.schema.json";
+export const TERMINAL_WORKSPACE_AUTHORITY_SCHEMA_PATH = "benchmarks/schemas/portfolio-terminal-workspace-authority.schema.json";
 
 const CLAIM_GRACE_MS = 30_000;
 const MAX_PROCESS_OUTPUT_BYTES = 20 * 1024 * 1024;
@@ -554,7 +562,7 @@ function runIdentity({ root, plan, materialized, selections, repositoryRevision,
 
 function initialCaseState(entry, selection) {
   return {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
     case_id: entry.case_id,
     adapter: entry.adapter_track,
     condition: entry.condition,
@@ -562,6 +570,7 @@ function initialCaseState(entry, selection) {
     attempt_count: 0,
     active_claim_id: null,
     terminal_attempt: null,
+    terminal_commit_digest: null,
     selection_digest: selection?.selection_digest?.value ?? null,
   };
 }
@@ -979,13 +988,48 @@ function materializeCommand(root, command, runtime, outputTemporary) {
     .replaceAll("{permission_policy}", runtime.permission_policy));
 }
 
+function terminateResidualAgentProcessGroup(pid) {
+  if (process.platform === "win32" || !Number.isInteger(pid) || pid < 1) return false;
+  let present = false;
+  try {
+    process.kill(-pid, 0);
+    present = true;
+  } catch (error) {
+    if (error?.code !== "ESRCH") throw error;
+    return false;
+  }
+  for (const signal of ["SIGTERM", "SIGKILL"]) {
+    try {
+      process.kill(-pid, signal);
+    } catch (error) {
+      if (error?.code === "ESRCH") return present;
+      throw error;
+    }
+    for (let index = 0; index < 50; index += 1) {
+      try {
+        process.kill(-pid, 0);
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+      } catch (error) {
+        if (error?.code === "ESRCH") return present;
+        throw error;
+      }
+    }
+  }
+  throw new Error("terminal workspace residual agent process group could not be terminated");
+}
+
+function executeContainedAgent(executable, args, options) {
+  const result = spawnSync(executable, args, { ...options, detached: process.platform !== "win32" });
+  return { ...result, workspace_descendants_detected: terminateResidualAgentProcessGroup(result.pid) };
+}
+
 function executeAgent({ root, runtime, executable, workspace, outputTemporary, command, environmentSnapshot }) {
   const task = readFileSync(resolve(workspace, "BENCHMARK_TASK.md"), "utf8");
   const environment = environmentFor(environmentSnapshot);
   if (runtime.adapter === "codex") {
     const codexHome = isolatedCodexHome(environment);
     try {
-      return spawnSync(executable, materializeCommand(root, command, runtime, outputTemporary), {
+      return executeContainedAgent(executable, materializeCommand(root, command, runtime, outputTemporary), {
         cwd: workspace,
         encoding: "utf8",
         input: task,
@@ -998,7 +1042,7 @@ function executeAgent({ root, runtime, executable, workspace, outputTemporary, c
     }
   }
   const args = materializeCommand(root, command, runtime, outputTemporary);
-  return spawnSync(executable, args, {
+  return executeContainedAgent(executable, args, {
     cwd: workspace,
     encoding: "utf8",
     env: environment,
@@ -1051,6 +1095,118 @@ function normalizedProjection(projection) {
     source_digests: projection.source_digests ?? [],
     projection_fingerprint: projection.projection_fingerprint ?? null,
     capability_downgrades: projection.capability_downgrades ?? [],
+  };
+}
+
+function terminalWorkspaceIdentity(entry, claim) {
+  return {
+    run_instance_id: claim.run_instance_id,
+    case_id: entry.case_id,
+    attempt: claim.attempt,
+    adapter: entry.adapter_track,
+    condition: entry.condition,
+    fixture_id: claim.input_identity.fixture_id,
+    fixture_input_digest: claim.input_identity.fixture_input_digest,
+    materialization_manifest_digest: claim.input_identity.materialization_manifest_digest,
+  };
+}
+
+function managedAssetPaths(record, projection) {
+  return [...new Set([
+    ...record.projected_asset_inventory.map((entry) => entry.path),
+    ...(projection.inventory ?? []).map((entry) => entry.path),
+  ])].sort((left, right) => left.localeCompare(right));
+}
+
+function expectedBaseRegularInventory(record, projection) {
+  const byPath = new Map();
+  for (const entry of [...record.agent_visible_files, ...record.projected_asset_inventory, ...(projection.inventory ?? [])]) {
+    const normalized = { path: entry.path, file_type: "regular_file", mode: entry.mode, bytes: entry.bytes, sha256: entry.sha256 };
+    const existing = byPath.get(entry.path);
+    if (existing && stableCanonicalJson(existing) !== stableCanonicalJson(normalized)) throw new Error(`terminal workspace base inventory conflicts at ${entry.path}`);
+    byPath.set(entry.path, normalized);
+  }
+  return [...byPath.values()].sort((left, right) => left.path.localeCompare(right.path));
+}
+
+function terminalWorkspaceAuthorityPath(attemptRoot) {
+  const path = resolve(attemptRoot, TERMINAL_WORKSPACE_AUTHORITY_PATH);
+  assertInside(attemptRoot, path, "terminal workspace authority");
+  assertNoSymlinkSegments(path, "terminal workspace authority");
+  return path;
+}
+
+function terminalWorkspaceStagingPrefix(claimId) {
+  return `.${TERMINAL_WORKSPACE_AUTHORITY_PATH}.${assertClaimId(claimId)}.`;
+}
+
+function publishTerminalWorkspaceAuthority({ root, attemptRoot, entry, claim, baseSnapshot, workspace, record, projection }) {
+  const destination = terminalWorkspaceAuthorityPath(attemptRoot);
+  const identity = terminalWorkspaceIdentity(entry, claim);
+  const managedPaths = managedAssetPaths(record, projection);
+  const expectedBase = expectedBaseRegularInventory(record, projection);
+  let staging = null;
+  let publishedHere = false;
+  try {
+    if (!existsSync(destination)) {
+      const built = buildTerminalWorkspaceAuthority({ root, baseSnapshot, terminalWorkspaceRoot: workspace, identity, managedAssetPaths: managedPaths });
+      staging = resolve(attemptRoot, `${terminalWorkspaceStagingPrefix(claim.claim_id)}${randomUUID()}.staging`);
+      assertInside(attemptRoot, staging, "terminal workspace authority staging");
+      writeFileSync(staging, built.bytes, { flag: "wx", mode: 0o444 });
+      chmodSync(staging, 0o444);
+      fault("after_terminal_workspace_authority_staged");
+      renameSync(staging, destination);
+      staging = null;
+      publishedHere = true;
+      chmodSync(destination, 0o444);
+    }
+    fault("after_terminal_workspace_authority_published");
+    const verified = readVerifiedTerminalWorkspaceAuthority({ root, authorityPath: destination, expected: identity, expectedBaseInventory: expectedBase, expectedManagedAssetPaths: managedPaths });
+    return terminalWorkspaceAuthorityReference(verified.file, verified.authority);
+  } catch (error) {
+    if (staging && existsSync(staging)) {
+      chmodSync(staging, 0o600);
+      rmSync(staging, { force: true });
+    }
+    if (publishedHere && existsSync(destination)) {
+      chmodSync(destination, 0o600);
+      rmSync(destination, { force: true });
+    }
+    throw error;
+  }
+}
+
+function terminalWorkspaceReferenceFromResult(result) {
+  if (result.terminal_workspace_authority_availability !== "captured") return null;
+  return {
+    path: result.terminal_workspace_authority_path,
+    sha256: result.terminal_workspace_authority_sha256,
+    bytes: result.terminal_workspace_authority_bytes,
+    digest: result.terminal_workspace_authority_digest,
+    tree_digest: result.terminal_workspace_tree_digest,
+    file_identity: result.terminal_workspace_authority_file_identity,
+  };
+}
+
+function terminalWorkspaceResultFields(reference) {
+  return reference ? {
+    terminal_workspace_authority_availability: "captured",
+    terminal_workspace_authority_support: "supported",
+    terminal_workspace_authority_path: reference.path,
+    terminal_workspace_authority_sha256: reference.sha256,
+    terminal_workspace_authority_bytes: reference.bytes,
+    terminal_workspace_authority_digest: reference.digest,
+    terminal_workspace_tree_digest: reference.tree_digest,
+    terminal_workspace_authority_file_identity: reference.file_identity,
+  } : {
+    terminal_workspace_authority_availability: "unavailable",
+    terminal_workspace_authority_support: "supported",
+    terminal_workspace_authority_path: null,
+    terminal_workspace_authority_sha256: null,
+    terminal_workspace_authority_bytes: null,
+    terminal_workspace_authority_digest: null,
+    terminal_workspace_tree_digest: null,
+    terminal_workspace_authority_file_identity: null,
   };
 }
 
@@ -1144,11 +1300,11 @@ function sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity,
   };
 }
 
-function resultRecord({ entry, attempt, claim, requestPath, commandEvidence, status, processResult = null, finalOutput = null, failureKind = null, recoveryReason = null }) {
+function resultRecord({ entry, attempt, claim, requestPath, commandEvidence, status, processResult = null, finalOutput = null, failureKind = null, recoveryReason = null, terminalWorkspaceAuthority = null }) {
   const stdout = streamEvidence(processResult?.stdout ?? "");
   const stderr = streamEvidence(processResult?.stderr ?? "");
   return {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     kind: "result",
     run_instance_id: claim.run_instance_id,
     case_id: entry.case_id,
@@ -1159,6 +1315,7 @@ function resultRecord({ entry, attempt, claim, requestPath, commandEvidence, sta
     effective_command_digest: claim.effective_command_digest,
     request_sha256: prefixedFileDigest(requestPath),
     command_evidence: commandEvidence,
+    ...terminalWorkspaceResultFields(terminalWorkspaceAuthority),
     status,
     exit_code: processResult?.status ?? null,
     duration_ms: processResult?.duration_ms ?? null,
@@ -1173,7 +1330,7 @@ function resultRecord({ entry, attempt, claim, requestPath, commandEvidence, sta
 
 function commitRecord({ claim, result, requestPath, commandEvidenceReference, resultPath }) {
   return {
-    schema_version: "1.1.0",
+    schema_version: "1.2.0",
     kind: "terminal_commit",
     run_instance_id: claim.run_instance_id,
     claim_id: claim.claim_id,
@@ -1188,6 +1345,11 @@ function commitRecord({ claim, result, requestPath, commandEvidenceReference, re
     request_sha256: prefixedFileDigest(requestPath),
     command_evidence_sha256: commandEvidenceReference.digest,
     result_sha256: prefixedFileDigest(resultPath),
+    terminal_workspace_authority_path: result.terminal_workspace_authority_path,
+    terminal_workspace_authority_sha256: result.terminal_workspace_authority_sha256,
+    terminal_workspace_authority_bytes: result.terminal_workspace_authority_bytes,
+    terminal_workspace_authority_digest: result.terminal_workspace_authority_digest,
+    terminal_workspace_tree_digest: result.terminal_workspace_tree_digest,
   };
 }
 
@@ -1200,6 +1362,15 @@ function completeCase({ root, runDir, entry, state, claim, attempt, attemptRoot,
   const stableCommandEvidence = readStableCommandEvidence(commandEvidencePath, `${entry.case_id} terminal command evidence`);
   const observedCommandEvidenceReference = commandEvidenceReference(stableCommandEvidence.file, stableCommandEvidence.manifest);
   if (!sameCommandEvidenceReference(result.command_evidence, observedCommandEvidenceReference)) throw new Error("terminal result command evidence reference mismatch");
+  const terminalWorkspaceReference = terminalWorkspaceReferenceFromResult(result);
+  if (terminalWorkspaceReference) {
+    const authorityPath = terminalWorkspaceAuthorityPath(attemptRoot);
+    readVerifiedTerminalWorkspaceAuthority({ root, authorityPath, reference: terminalWorkspaceReference, expected: terminalWorkspaceIdentity(entry, claim) });
+  } else if (result.status === "completed") {
+    throw new Error("completed terminal result is missing terminal workspace authority");
+  } else if (existsSync(terminalWorkspaceAuthorityPath(attemptRoot))) {
+    throw new Error("terminal result omits a published terminal workspace authority");
+  }
   validate(root, result, ATTEMPT_RESULT_SCHEMA_PATH, `${entry.case_id} attempt result`);
   const resultPath = resolve(attemptRoot, "result.json");
   assertNoSymlinkSegments(resultPath, `${entry.case_id} attempt result`);
@@ -1233,6 +1404,7 @@ function completeCase({ root, runDir, entry, state, claim, attempt, attemptRoot,
     attempt_count: Math.max(state.attempt_count, Number(attempt)),
     active_claim_id: null,
     terminal_attempt: attempt,
+    terminal_commit_digest: prefixedFileDigest(commitPath),
     selection_digest: claim.selection?.digest ?? null,
   };
   validate(root, terminalState, CASE_STATE_SCHEMA_PATH, `${entry.case_id} terminal state`);
@@ -1254,7 +1426,7 @@ function recursivelyFreeze(value) {
   return value;
 }
 
-function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, attempt, expectedInput, expectedSelection, claim = null }) {
+function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, attempt, expectedInput, expectedSelection, claim = null, materializedRecord = null }) {
   const runInstanceId = runIdentity.run_instance_id;
   const attemptRoot = attemptRootPath(runDir, entry.case_id, attempt);
   const requestPath = resolve(attemptRoot, "request.json");
@@ -1294,6 +1466,36 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
   if (!sameCommandEvidenceReference(result.command_evidence, observedCommandEvidenceReference)) throw new Error(`${entry.case_id} result command evidence binding mismatch`);
   if (commit.run_instance_id !== runInstanceId || commit.case_id !== entry.case_id || commit.attempt !== attempt || commit.adapter !== entry.adapter_track || commit.condition !== entry.condition || commit.status !== result.status) throw new Error(`${entry.case_id} terminal commit identity mismatch`);
   if (commit.runtime_identity_digest !== runtimeIdentityDigest || commit.effective_command_digest !== adapterIdentity.effective_command_digest || commit.request_sha256 !== prefixedFileDigest(requestPath) || commit.command_evidence_sha256 !== stableCommandEvidence.file.rawByteDigest || commit.result_sha256 !== prefixedFileDigest(resultPath)) throw new Error(`${entry.case_id} terminal commit evidence mismatch`);
+  const terminalWorkspaceReference = terminalWorkspaceReferenceFromResult(result);
+  let terminalWorkspaceAuthority = null;
+  if (terminalWorkspaceReference) {
+    const authorityPath = terminalWorkspaceAuthorityPath(attemptRoot);
+    const expectedAuthorityIdentity = {
+      run_instance_id: runInstanceId,
+      case_id: entry.case_id,
+      attempt,
+      adapter: entry.adapter_track,
+      condition: entry.condition,
+      fixture_id: request.input_identity.fixture_id,
+      fixture_input_digest: request.input_identity.fixture_input_digest,
+      materialization_manifest_digest: request.input_identity.materialization_manifest_digest,
+    };
+    terminalWorkspaceAuthority = readVerifiedTerminalWorkspaceAuthority({
+      root,
+      authorityPath,
+      reference: terminalWorkspaceReference,
+      expected: expectedAuthorityIdentity,
+      expectedBaseInventory: materializedRecord ? expectedBaseRegularInventory(materializedRecord, request.projection) : null,
+      expectedManagedAssetPaths: materializedRecord ? managedAssetPaths(materializedRecord, request.projection) : null,
+    });
+  } else if (result.status === "completed") {
+    throw new Error(`${entry.case_id} completed attempt lacks terminal workspace authority`);
+  } else if (existsSync(terminalWorkspaceAuthorityPath(attemptRoot))) {
+    throw new Error(`${entry.case_id} result omits terminal workspace authority`);
+  }
+  for (const field of ["terminal_workspace_authority_path", "terminal_workspace_authority_sha256", "terminal_workspace_authority_bytes", "terminal_workspace_authority_digest", "terminal_workspace_tree_digest"]) {
+    if (commit[field] !== result[field]) throw new Error(`${entry.case_id} terminal commit workspace authority mismatch`);
+  }
   if (claim) {
     if (claim.run_instance_id !== runInstanceId || claim.case_id !== entry.case_id || claim.adapter !== entry.adapter_track || claim.condition !== entry.condition || claim.runtime_identity_digest !== runtimeIdentityDigest || claim.effective_command_digest !== adapterIdentity.effective_command_digest || claim.environment_snapshot_digest !== adapterIdentity.environment_snapshot.digest) throw new Error(`${entry.case_id} recovery claim identity mismatch`);
     if (claim.input_identity.plan_id !== runIdentity.plan.id || claim.input_identity.plan_digest !== runIdentity.plan.digest || claim.input_identity.materialization_manifest_digest !== runIdentity.materialization.manifest_digest) throw new Error(`${entry.case_id} recovery claim run input mismatch`);
@@ -1301,7 +1503,10 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
     assertCanonicalEqual(request.selection, claim.selection, `${entry.case_id} recovery claim selection`);
     if (claim.attempt === attempt) assertCanonicalEqual(request.claim, requestClaimRecord(claim), `${entry.case_id} recovery request claim`);
   }
-  const expectedInventory = result.status === "completed" ? ["command-evidence.json", "commit.json", "final.json", "request.json", "result.json"] : ["command-evidence.json", "commit.json", "request.json", "result.json"];
+  const expectedInventory = ["command-evidence.json", "commit.json", "request.json", "result.json"];
+  if (result.status === "completed") expectedInventory.push("final.json");
+  if (terminalWorkspaceReference) expectedInventory.push(TERMINAL_WORKSPACE_AUTHORITY_PATH);
+  expectedInventory.sort();
   const inventory = readdirSync(attemptRoot).sort();
   assertCanonicalEqual(inventory, expectedInventory, `${entry.case_id} terminal attempt inventory`);
   if (result.status === "completed") {
@@ -1320,6 +1525,7 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
     commit,
     verificationCommandContract: contract ? recursivelyFreeze(structuredClone(contract)) : null,
     commandEvidence: recursivelyFreeze(structuredClone(verifiedCommandEvidence)),
+    terminalWorkspaceAuthority: terminalWorkspaceAuthority ? recursivelyFreeze(structuredClone(terminalWorkspaceAuthority.authority)) : null,
     evidence: {
       request_digest: prefixedFileDigest(requestPath),
       result_digest: prefixedFileDigest(resultPath),
@@ -1327,6 +1533,11 @@ function validateTerminalAttemptEvidence({ root, runDir, runIdentity, entry, att
       command_evidence_digest: stableCommandEvidence.file.rawByteDigest,
       final_output_digest: result.final_output ? `sha256:${result.final_output.sha256}` : null,
       final_output_bytes: result.final_output?.bytes ?? null,
+      terminal_workspace_authority_digest: result.terminal_workspace_authority_digest,
+      terminal_workspace_tree_digest: result.terminal_workspace_tree_digest,
+      terminal_workspace_authority_bytes: result.terminal_workspace_authority_bytes,
+      terminal_workspace_authority_availability: result.terminal_workspace_authority_availability,
+      terminal_workspace_authority_support: result.terminal_workspace_authority_support,
     },
   };
 }
@@ -1340,6 +1551,7 @@ function validateTerminalAttempt({ root, context, entry, attempt }) {
     attempt,
     expectedInput: inputIdentityFor(context, entry),
     expectedSelection: selectionIdentityFor(context, entry),
+    materializedRecord: context.materialized.casesById.get(entry.case_id),
   });
 }
 
@@ -1350,7 +1562,7 @@ function validateTerminalCase({ root, context, entry, state }) {
   for (let number = 1; number <= state.attempt_count; number += 1) {
     const attempt = String(number).padStart(4, "0");
     const artifacts = validateTerminalAttempt({ root, context, entry, attempt });
-    if (attempt === state.terminal_attempt && artifacts.result.status !== state.status) throw new Error(`${entry.case_id} terminal status mismatch`);
+    if (attempt === state.terminal_attempt && (artifacts.result.status !== state.status || artifacts.evidence.commit_digest !== state.terminal_commit_digest)) throw new Error(`${entry.case_id} terminal state binding mismatch`);
   }
   const expectedSelection = selectionIdentityFor(context, entry)?.digest ?? null;
   if (state.selection_digest !== expectedSelection) throw new Error(`${entry.case_id} state selection digest mismatch`);
@@ -1439,7 +1651,7 @@ function markUnavailable({ root, context, entry, state, runtime, adapter }) {
   const attempt = nextAttempt(context.runDir, entry);
   const claim = acquireClaim({ root, context, entry, attempt, runtime, adapter });
   if (!claim) return "active";
-  const activeState = { ...state, status: "active", attempt_count: Number(attempt), active_claim_id: claim.claim_id, terminal_attempt: null };
+  const activeState = { ...state, status: "active", attempt_count: Number(attempt), active_claim_id: claim.claim_id, terminal_attempt: null, terminal_commit_digest: null };
   writeCaseState(context.runDir, entry, activeState);
   const attemptRoot = attemptRootPath(context.runDir, entry.case_id, attempt);
   mkdirSync(attemptRoot, { recursive: false });
@@ -1462,13 +1674,18 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
   const attempt = nextAttempt(context.runDir, entry);
   const claim = acquireClaim({ root, context, entry, attempt, runtime, adapter });
   if (!claim) return "active";
-  const activeState = { ...state, status: "active", attempt_count: Number(attempt), active_claim_id: claim.claim_id, terminal_attempt: null };
+  const activeState = { ...state, status: "active", attempt_count: Number(attempt), active_claim_id: claim.claim_id, terminal_attempt: null, terminal_commit_digest: null };
   writeCaseState(context.runDir, entry, activeState);
   const attemptRoot = attemptRootPath(context.runDir, entry.case_id, attempt);
   let processResult = null;
   let ephemeralRoot = null;
   let projection = { status: "attempt_setup_failed" };
   let sealedCommandEvidence = null;
+  let terminalWorkspaceBase = null;
+  let terminalWorkspaceAuthority = null;
+  let materializedRecord = null;
+  let workspace = null;
+  let terminalWorkspaceCaptureAllowed = true;
   const contract = loadVerificationCommandContract(root, entry);
   try {
     mkdirSync(attemptRoot, { recursive: false });
@@ -1478,11 +1695,14 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
       const expected = context.selections.selections.get(entry.case_id)?.selection_digest.value;
       if (observed.selection_digest.value !== expected) throw new Error("Adaptive selection changed before execution");
     }
-    const copied = copyWorkspace({ materializedRoot: context.materializedPath, record: context.materialized.casesById.get(entry.case_id), claim, runIdentity: context.identity });
+    materializedRecord = context.materialized.casesById.get(entry.case_id);
+    const copied = copyWorkspace({ materializedRoot: context.materializedPath, record: materializedRecord, claim, runIdentity: context.identity });
     ephemeralRoot = copied.ephemeralRoot;
-    const workspace = copied.workspace;
+    workspace = copied.workspace;
     fault("after_workspace_created");
     projection = selection ? applyAdaptiveSelection({ root, adapter: entry.adapter_track, selection, workspace }) : { status: "materialized" };
+    terminalWorkspaceBase = captureTerminalWorkspaceInventory(workspace);
+    if (stableCanonicalJson(terminalWorkspaceBase.inventory.filter((item) => item.file_type === "regular_file")) !== stableCanonicalJson(expectedBaseRegularInventory(materializedRecord, projection))) throw new Error("terminal workspace base does not match verified materialization");
     if (selection) {
       const beforeSpawn = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision });
       if (beforeSpawn.selection_digest.value !== claim.selection.digest) throw new Error("Adaptive selection changed before process spawn");
@@ -1496,6 +1716,11 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     const started = process.hrtime.bigint();
     const raw = executeVerifiedAgent({ root, runtime, verifiedExecutable, workspace, outputTemporary: temporaryOutput, command: adapter.identity.effective_command, environmentSnapshot });
     processResult = { ...raw, duration_ms: Math.round(Number(process.hrtime.bigint() - started) / 1_000_000) };
+    if (processResult.workspace_descendants_detected) {
+      terminalWorkspaceCaptureAllowed = false;
+      throw new Error("terminal workspace capture rejected residual agent descendants");
+    }
+    terminalWorkspaceAuthority = publishTerminalWorkspaceAuthority({ root, attemptRoot, entry, claim, baseSnapshot: terminalWorkspaceBase, workspace, record: materializedRecord, projection });
     sealedCommandEvidence = sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity: adapter.identity, processResult, contract, workspaceRoot: workspace });
     if (selection) {
       const afterSpawn = verifyAdaptiveSelection({ root, config, planPath: context.planPath, materializedPath: context.materializedPath, stateDir: context.selectionState, caseId: entry.case_id, repositoryRevision: context.repositoryRevision });
@@ -1505,12 +1730,12 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
     if (processResult.error?.code === "ETIMEDOUT") throw new Error("case timeout");
     if (processResult.status !== 0) throw new Error(`agent exited ${processResult.status}`);
     const finalOutput = inspectFinal(root, temporaryOutput).record;
-    completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, commandEvidence: sealedCommandEvidence.reference, status: "completed", processResult, finalOutput }), finalSource: temporaryOutput });
+    completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result: resultRecord({ entry, attempt, claim, requestPath, commandEvidence: sealedCommandEvidence.reference, status: "completed", processResult, finalOutput, terminalWorkspaceAuthority }), finalSource: temporaryOutput });
     return "completed";
   } catch (error) {
     if (error instanceof RuntimeIntegrityError) throw error;
     const message = error instanceof Error ? error.message : String(error);
-    const invalid = /Adaptive selection|projection|materialized source|selection changed|command evidence invalid/u.test(message);
+    const invalid = /Adaptive selection|projection|materialized source|selection changed|command evidence invalid|terminal workspace/u.test(message);
     const temporaryOutput = ephemeralRoot ? resolve(ephemeralRoot, "agent-final.json") : null;
     if (temporaryOutput && existsSync(temporaryOutput)) rmSync(temporaryOutput, { force: true });
     const requestPath = resolve(attemptRoot, "request.json");
@@ -1520,6 +1745,13 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
       writeJsonAtomic(requestPath, request, { stagingOwner: claim.claim_id, faultName: "after_request_staged" });
     }
     if (existsSync(attemptRoot) && !sealedCommandEvidence) sealedCommandEvidence = sealCommandEvidence({ root, attemptRoot, entry, claim, adapterIdentity: adapter.identity, processResult, contract, forceUnavailable: { probe: "capture_invalid", reason: "attempt_failed_before_command_capture" } });
+    if (terminalWorkspaceCaptureAllowed && !terminalWorkspaceAuthority && workspace && terminalWorkspaceBase && materializedRecord) {
+      try {
+        terminalWorkspaceAuthority = publishTerminalWorkspaceAuthority({ root, attemptRoot, entry, claim, baseSnapshot: terminalWorkspaceBase, workspace, record: materializedRecord, projection });
+      } catch {
+        terminalWorkspaceAuthority = null;
+      }
+    }
     const result = resultRecord({
       entry,
       attempt,
@@ -1529,6 +1761,7 @@ function executeCase({ root, config, context, entry, runtime, verifiedExecutable
       status: invalid ? "invalid" : "failed",
       processResult,
       failureKind: /timeout/u.test(message) ? "timeout" : invalid ? "invalid_input_or_selection" : "agent_failure",
+      terminalWorkspaceAuthority,
     });
     if (existsSync(attemptRoot)) completeCase({ root, runDir: context.runDir, entry, state: activeState, claim, attempt, attemptRoot, result });
     else releaseClaim(root, context.runDir, entry.case_id, claim.claim_id);
@@ -1618,6 +1851,54 @@ export function inspectVerifiedPortfolioExecution({ root, config, planPath, mate
   };
 }
 
+export function verifyExecutionTerminalWorkspaceAuthority({ root, config, planPath, materializedPath, selectionState, runDir, caseId, attempt }) {
+  const inspection = inspectVerifiedPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir });
+  const inspectedCase = inspection.cases.find((item) => item.entry.case_id === caseId);
+  if (!inspectedCase) throw new Error("terminal workspace authority case is absent from the verified execution");
+  const inspectedAttempt = inspectedCase.attempts.find((item) => item.attempt === attempt);
+  if (!inspectedAttempt || !inspectedAttempt.terminalWorkspaceAuthority) throw new Error("terminal workspace authority is unavailable for the requested attempt");
+  const result = inspectedAttempt.result;
+  const attemptRoot = attemptRootPath(resolve(runDir), caseId, attempt);
+  const verified = readVerifiedTerminalWorkspaceAuthority({
+    root,
+    authorityPath: terminalWorkspaceAuthorityPath(attemptRoot),
+    reference: terminalWorkspaceReferenceFromResult(result),
+    expected: {
+      run_instance_id: inspection.identity.run_instance_id,
+      case_id: caseId,
+      attempt,
+      adapter: inspectedCase.entry.adapter_track,
+      condition: inspectedCase.entry.condition,
+      fixture_id: inspectedCase.entry.fixture_id,
+      fixture_input_digest: `sha256:${inspectedCase.entry.input_manifest_sha256}`,
+      materialization_manifest_digest: inspection.materialization.manifestDigest,
+    },
+    expectedBaseInventory: expectedBaseRegularInventory(inspection.materialization.casesById.get(caseId), inspectedAttempt.request.projection),
+    expectedManagedAssetPaths: managedAssetPaths(inspection.materialization.casesById.get(caseId), inspectedAttempt.request.projection),
+  });
+  return {
+    ...verified,
+    execution: {
+      run_instance_id: inspection.identity.run_instance_id,
+      case_id: caseId,
+      attempt,
+      adapter: inspectedCase.entry.adapter_track,
+      condition: inspectedCase.entry.condition,
+      fixture_id: inspectedCase.entry.fixture_id,
+      fixture_input_digest: `sha256:${inspectedCase.entry.input_manifest_sha256}`,
+      materialization_manifest_digest: inspection.materialization.manifestDigest,
+      request_digest: inspectedAttempt.evidence.request_digest,
+      raw_result_digest: inspectedAttempt.evidence.result_digest,
+      terminal_commit_digest: inspectedAttempt.evidence.commit_digest,
+      terminal_workspace_authority_availability: result.terminal_workspace_authority_availability,
+      terminal_workspace_authority_support: result.terminal_workspace_authority_support,
+      terminal_workspace_authority_digest: result.terminal_workspace_authority_digest,
+      terminal_workspace_tree_digest: result.terminal_workspace_tree_digest,
+      terminal_workspace_authority_bytes: result.terminal_workspace_authority_bytes,
+    },
+  };
+}
+
 export function verifyPortfolioExecution({ root, config, planPath, materializedPath, selectionState, runDir }) {
   const context = loadExecutionContext({ root, config, planPath, materializedPath, selectionState, runDir, initialize: false });
   return {
@@ -1668,7 +1949,7 @@ function recoveryCommandEvidence({ root, run, attemptRoot, entry, claim }) {
   };
 }
 
-function recoveryResult({ root, attemptRoot, entry, claim, requestPath, commandEvidence, reason }) {
+function recoveryResult({ root, attemptRoot, entry, claim, requestPath, commandEvidence, reason, terminalWorkspaceAuthority = null }) {
   const resultPath = resolve(attemptRoot, "result.json");
   assertNoSymlinkSegments(resultPath, `${entry.case_id} recovery result`);
   if (existsSync(resultPath)) return readJson(resultPath);
@@ -1691,7 +1972,32 @@ function recoveryResult({ root, attemptRoot, entry, claim, requestPath, commandE
     status: "interrupted",
     failureKind: "stale_claim_recovered",
     recoveryReason: durableScalarEvidence(reason, reason, "operator_recovery"),
+    terminalWorkspaceAuthority,
   });
+}
+
+function recoverTerminalWorkspaceAuthorityPublication({ root, attemptRoot, entry, claim }) {
+  const destination = terminalWorkspaceAuthorityPath(attemptRoot);
+  const prefix = terminalWorkspaceStagingPrefix(claim.claim_id);
+  const stagingNames = readdirSync(attemptRoot).filter((name) => name.startsWith(prefix) && name.endsWith(".staging"));
+  if (stagingNames.length > 1) throw new Error("attempt contains multiple terminal workspace authority staging files");
+  if (stagingNames.length === 1) {
+    const staging = resolve(attemptRoot, stagingNames[0]);
+    const token = stagingNames[0].slice(prefix.length, -".staging".length);
+    if (!UUID_PATTERN.test(token)) throw new Error("attempt contains malformed terminal workspace authority staging evidence");
+    const staged = readVerifiedTerminalWorkspaceAuthority({ root, authorityPath: staging, expected: terminalWorkspaceIdentity(entry, claim) });
+    if (existsSync(destination)) {
+      const published = readVerifiedTerminalWorkspaceAuthority({ root, authorityPath: destination, expected: terminalWorkspaceIdentity(entry, claim) });
+      if (!staged.file.bytes.equals(published.file.bytes)) throw new Error("published terminal workspace authority conflicts with staged authority");
+      rmSync(staging, { force: true });
+    } else {
+      renameSync(staging, destination);
+      chmodSync(destination, 0o444);
+    }
+  }
+  if (!existsSync(destination)) return null;
+  const verified = readVerifiedTerminalWorkspaceAuthority({ root, authorityPath: destination, expected: terminalWorkspaceIdentity(entry, claim) });
+  return terminalWorkspaceAuthorityReference(verified.file, verified.authority);
 }
 
 function reconcileAttemptStaging(attemptRoot, claimId) {
@@ -1715,6 +2021,8 @@ function assertCommittedRecoveryEvidence({ root, run, state, commit, claim = nul
   const runIdentity = readJson(runIdentityPath(run));
   validate(root, runIdentity, RUN_IDENTITY_SCHEMA_PATH, "committed run identity");
   if (!TERMINAL_STATUSES.has(state.status) || !state.terminal_attempt || state.terminal_attempt !== String(state.attempt_count).padStart(4, "0")) throw new Error("terminal state is invalid for committed recovery");
+  const commitPath = resolve(attemptRootPath(run, state.case_id, state.terminal_attempt), "commit.json");
+  if (state.terminal_commit_digest !== prefixedFileDigest(commitPath)) throw new Error("terminal state commit digest mismatch");
   const entry = { case_id: state.case_id, adapter_track: state.adapter, condition: state.condition };
   const artifacts = validateTerminalAttemptEvidence({
     root,
@@ -1791,8 +2099,9 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     };
     assertEphemeralWorkspaceOwnership(recoveredClaim, identity);
     const entry = { case_id: caseId, adapter_track: state.adapter, condition: state.condition };
+    const terminalWorkspaceAuthority = recoverTerminalWorkspaceAuthorityPublication({ root, attemptRoot, entry, claim: recoveredClaim });
     const commandEvidence = recoveryCommandEvidence({ root, run, attemptRoot, entry, claim: recoveredClaim });
-    const result = recoveryResult({ root, attemptRoot, entry, claim: recoveredClaim, requestPath, commandEvidence: commandEvidence.reference, reason });
+    const result = recoveryResult({ root, attemptRoot, entry, claim: recoveredClaim, requestPath, commandEvidence: commandEvidence.reference, reason, terminalWorkspaceAuthority });
     assertRecoveryEvidence({ root, run, state, claim: recoveredClaim, request, result, requestPath });
     const terminalState = completeCase({ root, runDir: run, entry, state, claim: recoveredClaim, attempt, attemptRoot, result });
     removeEphemeralWorkspace(recoveredClaim, identity);
@@ -1825,7 +2134,7 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     if (!claimIsExpired(claim)) throw new Error("claim lease has not expired");
     const identity = readAdapterIdentity(root, run, claim.adapter);
     if (claim.runtime_identity_digest !== canonicalDigest(identity) || claim.effective_command_digest !== identity.effective_command_digest || claim.environment_snapshot_digest !== identity.environment_snapshot.digest) throw new Error("published claim runtime identity mismatch");
-    state = { ...state, status: "active", attempt_count: Number(claim.attempt), active_claim_id: claimId, terminal_attempt: null };
+    state = { ...state, status: "active", attempt_count: Number(claim.attempt), active_claim_id: claimId, terminal_attempt: null, terminal_commit_digest: null };
     validate(root, state, CASE_STATE_SCHEMA_PATH, `${caseId} reconciled active state`);
     writeCaseState(run, { case_id: caseId }, state);
   } else if (state.status !== "active" || state.active_claim_id !== claimId) {
@@ -1834,6 +2143,8 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
   if (!claimIsExpired(claim)) throw new Error("claim lease has not expired");
   const attemptRoot = attemptRootPath(run, caseId, claim.attempt);
   mkdirSync(attemptRoot, { recursive: true });
+  const entry = { case_id: caseId, adapter_track: state.adapter, condition: state.condition };
+  const terminalWorkspaceAuthority = recoverTerminalWorkspaceAuthorityPublication({ root, attemptRoot, entry, claim });
   reconcileAttemptStaging(attemptRoot, claimId);
   const requestPath = resolve(attemptRoot, "request.json");
   if (!existsSync(requestPath)) {
@@ -1841,9 +2152,8 @@ export function recoverPortfolioCase({ root, runDir, caseId, claimId, reason }) 
     validate(root, recoveryRequest, ATTEMPT_REQUEST_SCHEMA_PATH, `${caseId} recovered request`);
     writeJsonAtomic(requestPath, recoveryRequest, { stagingOwner: claim.claim_id, faultName: "after_request_staged" });
   }
-  const entry = { case_id: caseId, adapter_track: state.adapter, condition: state.condition };
   const commandEvidence = recoveryCommandEvidence({ root, run, attemptRoot, entry, claim });
-  const result = recoveryResult({ root, attemptRoot, entry, claim, requestPath, commandEvidence: commandEvidence.reference, reason });
+  const result = recoveryResult({ root, attemptRoot, entry, claim, requestPath, commandEvidence: commandEvidence.reference, reason, terminalWorkspaceAuthority });
   const request = readJson(requestPath);
   assertRecoveryEvidence({ root, run, state, claim, request, result, requestPath });
   const terminalState = completeCase({ root, runDir: run, entry, state, claim, attempt: claim.attempt, attemptRoot, result });

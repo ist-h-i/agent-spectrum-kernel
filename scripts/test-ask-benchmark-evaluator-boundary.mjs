@@ -186,9 +186,14 @@ function normalizedResult({ source, adapterDigests, caseRecord, attempt, outcome
     terminal_commit_digest: digest(`${caseRecord.case_id}:${attempt}:commit`),
     final_output_digest: finalOutput.digest,
     final_output_bytes: finalOutput.bytes,
+    terminal_workspace_authority_availability: "captured",
+    terminal_workspace_authority_support: "supported",
+    terminal_workspace_authority_digest: digest(`${caseRecord.case_id}:${attempt}:terminal-workspace-authority`),
+    terminal_workspace_tree_digest: digest(`${caseRecord.case_id}:${attempt}:terminal-workspace-tree`),
+    terminal_workspace_authority_bytes: 512,
   };
   const base = {
-    schema_version: "1.2.0",
+    schema_version: "1.3.0",
     schema_path: "benchmarks/schemas/normalized-portfolio-result.schema.json",
     program: "adaptive_ask_normalized_execution_result",
     lineage: {
@@ -344,6 +349,11 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir 
           terminal_commit_digest: normalized.lineage.terminal_commit_digest,
           final_output_digest: normalized.lineage.final_output_digest,
           final_output_bytes: normalized.lineage.final_output_bytes,
+          terminal_workspace_authority_availability: normalized.lineage.terminal_workspace_authority_availability,
+          terminal_workspace_authority_support: normalized.lineage.terminal_workspace_authority_support,
+          terminal_workspace_authority_digest: normalized.lineage.terminal_workspace_authority_digest,
+          terminal_workspace_tree_digest: normalized.lineage.terminal_workspace_tree_digest,
+          terminal_workspace_authority_bytes: normalized.lineage.terminal_workspace_authority_bytes,
         };
       }),
     })),
@@ -362,15 +372,15 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir 
     };
   });
   const manifestWithoutDigest = {
-    schema_version: "1.2.0",
+    schema_version: "1.3.0",
     schema_path: "benchmarks/schemas/normalized-portfolio-run.schema.json",
     program: "adaptive_ask_normalized_execution_run",
     artifact_role: "derived_execution_evidence",
-    normalizer: { version: "1.2.0", source_revision: source.repository_revision },
+    normalizer: { version: "1.3.0", source_revision: source.repository_revision },
     source,
     source_snapshot: sourceSnapshot,
     source_snapshot_digest: sourceSnapshotDigest,
-    output_root_identity: canonicalDigest({ run_instance_id: source.run_instance_id, plan_id: source.plan_id, normalizer_version: "1.2.0", source_snapshot_digest: sourceSnapshotDigest }),
+    output_root_identity: canonicalDigest({ run_instance_id: source.run_instance_id, plan_id: source.plan_id, normalizer_version: "1.3.0", source_snapshot_digest: sourceSnapshotDigest }),
     pool_adapter_results: false,
     completeness: {
       partial: false,
@@ -405,7 +415,7 @@ function buildNormalizedCollection(path, { materialized, selectionState, runDir 
     schema_path: "benchmarks/schemas/normalized-portfolio-root.schema.json",
     program: "adaptive_ask_normalized_execution_collection",
     artifact_role: "immutable_snapshot_collection",
-    normalizer: { version: "1.2.0", source_revision: source.repository_revision },
+    normalizer: { version: "1.3.0", source_revision: source.repository_revision },
     source: {
       run_instance_id: source.run_instance_id,
       run_identity_digest: source.run_identity_digest,

@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { effectiveCommand } from "./ask-benchmark-execution.mjs";
+import { effectiveCommand, verifyExecutionTerminalWorkspaceAuthority } from "./ask-benchmark-execution.mjs";
+import { createTerminalCandidateOutputBoundaryForTest, materializeVerifiedTerminalCandidate, materializeVerifiedTerminalCandidateForTest, verifyTerminalWorkspaceAuthority } from "./ask-benchmark-terminal-candidate.mjs";
 import {
   computeCommandContractDigest,
   computeVerificationCommandContractDigest,
@@ -14,11 +15,21 @@ import {
   renderedEventCommandDigest,
 } from "./ask-benchmark-command-evidence.mjs";
 import { validateJsonSchema } from "./execution-envelope.mjs";
+import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import {
+  assertTerminalWorkspaceRelativePath,
+  captureTerminalWorkspaceInventory,
+  collectBoundedDirectoryEntryNames,
+  terminalWorkspaceAuthorityBytes,
+  TERMINAL_WORKSPACE_LIMITS,
+  validateTerminalWorkspaceTreeInventory,
+} from "./ask-benchmark-terminal-workspace.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
 const baseConfig = resolve(root, "benchmarks/adaptive-portfolio.config.json");
 const work = mkdtempSync(resolve(root, ".ask-benchmark-execution-test-"));
+const candidateOutputs = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-terminal-candidate-test-")));
 
 function run(args, { expectedStatus = 0, env = {} } = {}) {
   const result = spawnSync(process.execPath, [runner, ...args], { cwd: root, encoding: "utf8", env: { ...process.env, ...env }, maxBuffer: 40 * 1024 * 1024 });
@@ -66,6 +77,15 @@ function directorySnapshot(path) {
     path: absolute.slice(path.length + 1),
     bytes: readFileSync(absolute).toString("base64"),
   })).sort((left, right) => left.path.localeCompare(right.path));
+}
+
+function makeTreeWritable(path) {
+  chmodSync(path, 0o700);
+  for (const entry of readdirSync(path, { withFileTypes: true })) {
+    const child = resolve(path, entry.name);
+    if (entry.isDirectory()) makeTreeWritable(child);
+    else chmodSync(child, 0o600);
+  }
 }
 
 function terminalInventory(runDir, caseId, attempt) {
@@ -120,8 +140,8 @@ function runtimeConfig(adapter, availability = "available") {
     sandbox_policy: "workspace-write",
     permission_policy: adapter === "codex" ? "never" : "strict",
     executor: { id: `fixture-${adapter}`, version: "1.0.0" },
-    environment_allowlist: ["PATH", "FAKE_EXEC_LOG", "FAKE_FAIL", "FAKE_FAIL_ONCE", "FAKE_DELAY", "FAKE_MUTATE_EXECUTABLE", "FAKE_OVERSIZED_FINAL", "FAKE_PUBLIC_MODE", "FAKE_SHELL_MODE", "FAKE_EVENT_MODE"],
-    environment_value_allowlist: ["FAKE_PUBLIC_MODE", "FAKE_SHELL_MODE", "FAKE_EVENT_MODE"],
+    environment_allowlist: ["PATH", "FAKE_EXEC_LOG", "FAKE_FAIL", "FAKE_FAIL_ONCE", "FAKE_DELAY", "FAKE_MUTATE_EXECUTABLE", "FAKE_OVERSIZED_FINAL", "FAKE_PUBLIC_MODE", "FAKE_SHELL_MODE", "FAKE_EVENT_MODE", "FAKE_WORKSPACE_MUTATION"],
+    environment_value_allowlist: ["FAKE_PUBLIC_MODE", "FAKE_SHELL_MODE", "FAKE_EVENT_MODE", "FAKE_WORKSPACE_MUTATION"],
     thermal_state: "cold",
     claude_cli: adapter === "claude" && availability === "available"
       ? {
@@ -180,6 +200,49 @@ if [ -n "\${FAKE_FAIL_ONCE:-}" ] && [ ! -e "$FAKE_FAIL_ONCE" ]; then
 fi
 if [ "\${FAKE_OVERSIZED_FINAL:-}" = "1" ]; then dd if=/dev/zero of="$output" bs=1048577 count=1 2>/dev/null; exit 0; fi
 printf '%s\\n' '{"claimed":"passed","authority":false}' > verification-report.json
+case "\${FAKE_WORKSPACE_MUTATION:-none}" in
+  modify) printf '%s\\n' 'terminal modification' >> workspace/package.json ;;
+  add-delete-modify)
+    rm workspace/docs/session.schema.json
+    printf '%s\\n' 'agent-created content' > workspace/agent-created.txt
+    printf '%s\\n' 'terminal modification' >> workspace/package.json
+    ;;
+  mode-0755) chmod 0755 workspace/package.json ;;
+  mode-0777) chmod 0777 workspace/package.json ;;
+  mode-0600) chmod 0600 workspace/package.json ;;
+  file-type)
+    rm workspace/package.json
+    mkdir workspace/package.json
+    ;;
+  managed)
+    managed_file="$(find .agents .claude -type f 2>/dev/null | head -n 1)"
+    if [ -z "$managed_file" ]; then exit 74; fi
+    printf '%s\\n' 'managed asset mutation' >> "$managed_file"
+    ;;
+  managed-with-agent-content)
+    managed_file="$(find .agents .claude -type f 2>/dev/null | head -n 1)"
+    if [ -z "$managed_file" ]; then exit 74; fi
+    managed_parent="$(dirname "$managed_file")"
+    printf '%s\\n' 'agent-created under managed directory' > "$managed_parent/agent-created.txt"
+    mkdir "$managed_parent/agent-empty"
+    ;;
+  symlink) ln -s package.json workspace/terminal-link ;;
+  hardlink) ln workspace/package.json workspace/terminal-hardlink ;;
+  special) mkfifo workspace/terminal-fifo ;;
+  detached-child)
+    descendant_barrier="$FAKE_EXEC_LOG.detached-ready"
+    (
+      printf '%s\n' ready > "$descendant_barrier"
+      while :; do printf '%s\n' descendant >> workspace/package.json; sleep 0.01; done
+    ) </dev/null >/dev/null 2>&1 &
+    while [ ! -e "$descendant_barrier" ]; do :; done
+    ;;
+  oversized-changed) dd if=/dev/zero of=workspace/oversized.bin bs=$((8 * 1024 * 1024 + 1)) count=1 2>/dev/null ;;
+  oversized-authority) dd if=/dev/zero of=workspace/authority-limit.bin bs=$((6 * 1024 * 1024)) count=1 2>/dev/null ;;
+  file-count-overflow)
+    node -e 'const fs = require("node:fs"); for (let index = 0; index <= ${TERMINAL_WORKSPACE_LIMITS.maximum_file_count}; index += 1) fs.mkdirSync("workspace/count-" + index)'
+    ;;
+esac
 printf '%s\\n' '{"task_type":"implementation","decision":"not_applicable","findings":[],"requirement_status":[],"verification_commands":[{"command":"node forged-report.mjs","result":"passed"}],"completion_claim":"complete","route":null,"summary":"fixture final"}' > "$output"
 if [ "${adapter}" = "codex" ]; then
   case "\${FAKE_EVENT_MODE:-complete}" in
@@ -220,6 +283,121 @@ fi
 }
 
 try {
+  function freshCaptureTree(name) {
+    const captureRoot = resolve(work, `capture-${name}`);
+    mkdirSync(resolve(captureRoot, "workspace", "docs"), { recursive: true });
+    writeFileSync(resolve(captureRoot, "workspace", "package.json"), "same bytes\n");
+    writeFileSync(resolve(captureRoot, "workspace", "docs", "entry.txt"), "entry\n");
+    return captureRoot;
+  }
+
+  function assertCaptureRaceRejected(name, mutate) {
+    const captureRoot = freshCaptureTree(name);
+    let triggered = false;
+    assert.throws(() => captureTerminalWorkspaceInventory(captureRoot, {
+      inspectionHook(event) {
+        if (triggered || !mutate(event, captureRoot)) return;
+        triggered = true;
+      },
+    }), /terminal workspace|symlink|changed/u, `${name} must fail closed`);
+    assert.equal(triggered, true, `${name} must cross its deterministic capture barrier`);
+  }
+
+  assertCaptureRaceRejected("regular-to-outside-symlink", (event, captureRoot) => {
+    if (event.phase !== "file_descriptor_opened" || event.path !== "workspace/package.json" || event.scan !== 1) return false;
+    const outside = resolve(work, "outside-secret.txt");
+    writeFileSync(outside, "outside bytes must not be captured\n");
+    renameSync(resolve(captureRoot, "workspace/package.json"), resolve(captureRoot, "workspace/package.original"));
+    symlinkSync(outside, resolve(captureRoot, "workspace/package.json"));
+    return true;
+  });
+  assertCaptureRaceRejected("directory-to-outside-symlink", (event, captureRoot) => {
+    if (event.phase !== "directory_inspected" || event.path !== "workspace/docs" || event.scan !== 1) return false;
+    const outside = resolve(work, "outside-directory");
+    mkdirSync(outside);
+    writeFileSync(resolve(outside, "secret.txt"), "outside directory bytes\n");
+    renameSync(resolve(captureRoot, "workspace/docs"), resolve(captureRoot, "workspace/docs.original"));
+    symlinkSync(outside, resolve(captureRoot, "workspace/docs"));
+    return true;
+  });
+  assertCaptureRaceRejected("same-bytes-different-inode", (event, captureRoot) => {
+    if (event.phase !== "scan_completed" || event.scan !== 1) return false;
+    const path = resolve(captureRoot, "workspace/package.json");
+    const bytes = readFileSync(path);
+    renameSync(path, `${path}.original`);
+    writeFileSync(path, bytes);
+    return true;
+  });
+  assertCaptureRaceRejected("concurrent-content", (event, captureRoot) => {
+    if (event.phase !== "file_descriptor_opened" || event.path !== "workspace/package.json" || event.scan !== 1) return false;
+    writeFileSync(resolve(captureRoot, "workspace/package.json"), "mutated bytes\n");
+    return true;
+  });
+  assertCaptureRaceRejected("concurrent-mode", (event, captureRoot) => {
+    if (event.phase !== "file_descriptor_opened" || event.path !== "workspace/package.json" || event.scan !== 1) return false;
+    chmodSync(resolve(captureRoot, "workspace/package.json"), 0o755);
+    return true;
+  });
+  for (const operation of ["addition", "deletion"]) {
+    assertCaptureRaceRejected(`concurrent-${operation}`, (event, captureRoot) => {
+      if (event.phase !== "directory_entries_read" || event.path !== "workspace" || event.scan !== 1) return false;
+      if (operation === "addition") writeFileSync(resolve(captureRoot, "workspace/added.txt"), "added\n");
+      else rmSync(resolve(captureRoot, "workspace/package.json"));
+      return true;
+    });
+  }
+
+  function fakeDirectory(totalEntries) {
+    let reads = 0;
+    let closed = false;
+    return {
+      readSync() {
+        reads += 1;
+        return reads <= totalEntries ? { name: `entry-${String(reads).padStart(6, "0")}` } : null;
+      },
+      closeSync() { closed = true; },
+      evidence() { return { reads, closed }; },
+    };
+  }
+  const exactLimitDirectory = fakeDirectory(TERMINAL_WORKSPACE_LIMITS.maximum_file_count);
+  assert.equal(collectBoundedDirectoryEntryNames(exactLimitDirectory, TERMINAL_WORKSPACE_LIMITS.maximum_file_count).length, TERMINAL_WORKSPACE_LIMITS.maximum_file_count, "exact file-count limit must be accepted");
+  assert.equal(exactLimitDirectory.evidence().closed, true, "bounded enumeration must close an exact-limit directory handle");
+  const overLimitDirectory = fakeDirectory(TERMINAL_WORKSPACE_LIMITS.maximum_file_count + 1);
+  assert.throws(() => collectBoundedDirectoryEntryNames(overLimitDirectory, TERMINAL_WORKSPACE_LIMITS.maximum_file_count), /file count limit/u, "maximum file count plus one must stop enumeration");
+  assert.deepEqual(overLimitDirectory.evidence(), { reads: TERMINAL_WORKSPACE_LIMITS.maximum_file_count + 1, closed: true }, "bounded enumeration must stop at limit plus one without consuming the remaining source");
+  const simulatedLargeDirectory = fakeDirectory(100_001);
+  assert.throws(() => collectBoundedDirectoryEntryNames(simulatedLargeDirectory, TERMINAL_WORKSPACE_LIMITS.maximum_file_count), /file count limit/u, "a simulated 100,000-entry source must remain bounded");
+  assert.equal(simulatedLargeDirectory.evidence().reads, TERMINAL_WORKSPACE_LIMITS.maximum_file_count + 1, "large streaming enumeration must not allocate or consume beyond limit plus one");
+  const nestedFirst = fakeDirectory(TERMINAL_WORKSPACE_LIMITS.maximum_file_count - 1);
+  const nestedCount = collectBoundedDirectoryEntryNames(nestedFirst, TERMINAL_WORKSPACE_LIMITS.maximum_file_count).length;
+  const nestedSecond = fakeDirectory(2);
+  assert.throws(() => collectBoundedDirectoryEntryNames(nestedSecond, TERMINAL_WORKSPACE_LIMITS.maximum_file_count - nestedCount), /file count limit/u, "nested directories must share the global scan budget");
+  const firstScan = fakeDirectory(TERMINAL_WORKSPACE_LIMITS.maximum_file_count);
+  collectBoundedDirectoryEntryNames(firstScan, TERMINAL_WORKSPACE_LIMITS.maximum_file_count);
+  const secondScanWithAddition = fakeDirectory(TERMINAL_WORKSPACE_LIMITS.maximum_file_count + 1);
+  assert.throws(() => collectBoundedDirectoryEntryNames(secondScanWithAddition, TERMINAL_WORKSPACE_LIMITS.maximum_file_count), /file count limit/u, "an addition during the second scan must exceed its independent global budget");
+
+  const directoryEntry = (path) => ({ path, file_type: "directory", mode: "0755", bytes: null, sha256: null });
+  const regularEntry = (path) => ({ path, file_type: "regular_file", mode: "0644", bytes: 1, sha256: "0".repeat(64) });
+  assert.throws(() => validateTerminalWorkspaceTreeInventory([regularEntry("a"), regularEntry("a/b")]), /below a regular file/u, "regular files must not own descendants");
+  assert.throws(() => validateTerminalWorkspaceTreeInventory([regularEntry("a/b")]), /omits a parent directory/u, "nested entries must include their parent directory");
+  assert.throws(() => validateTerminalWorkspaceTreeInventory([directoryEntry("a"), regularEntry("a/b"), regularEntry("orphan/c")]), /omits a parent directory/u, "orphan nested additions must be rejected");
+
+  for (const invalidPath of [
+    "C:/Windows/System32/config/SAM",
+    "C:relative/path",
+    "\\\\server\\share",
+    "//server/share",
+    "file:///tmp/x",
+    "a:b",
+    "../x",
+    "./x",
+    "a//b",
+    `nul\0path`,
+    "x".repeat(TERMINAL_WORKSPACE_LIMITS.maximum_portable_path_length + 1),
+    "cafe\u0301.txt",
+  ]) assert.throws(() => assertTerminalWorkspaceRelativePath(invalidPath), /portable relative path/u, `invalid portable path must be rejected: ${JSON.stringify(invalidPath)}`);
+
   const config = JSON.parse(readFileSync(baseConfig, "utf8"));
   config.fixtures = [config.fixtures[0]];
   const command = {
@@ -311,8 +489,273 @@ try {
   assert.equal(recursivePaths(runDir).some((path) => path.endsWith("verification-report.json")), false, "workspace-created verification reports must not enter durable attempt authority");
   for (const entry of codexCases) {
     const state = JSON.parse(readFileSync(resolve(runDir, "cases", entry.case_id, "state.json"), "utf8"));
-    assert.deepEqual(terminalInventory(runDir, entry.case_id, state.terminal_attempt), ["command-evidence.json", "commit.json", "final.json", "request.json", "result.json"], "completed attempts must contain only approved durable artifacts");
+    assert.deepEqual(terminalInventory(runDir, entry.case_id, state.terminal_attempt), ["command-evidence.json", "commit.json", "final.json", "request.json", "result.json", "terminal-workspace-authority.json"], "completed attempts must include the approved terminal workspace authority");
   }
+
+  const noOpByCondition = new Map();
+  for (const entry of codexCases) {
+    if (noOpByCondition.has(entry.condition)) continue;
+    const state = JSON.parse(readFileSync(resolve(runDir, "cases", entry.case_id, "state.json"), "utf8"));
+    const authority = JSON.parse(readFileSync(resolve(runDir, "cases", entry.case_id, "attempts", state.terminal_attempt, "terminal-workspace-authority.json"), "utf8"));
+    noOpByCondition.set(entry.condition, { entry, state, authority });
+  }
+  assert.deepEqual([...noOpByCondition.keys()].sort(), ["adaptive_ask", "full_ask", "kernel_only", "plain"], "no-op projection comparison must cover all four conditions");
+  assert.equal(new Set([...noOpByCondition.values()].map(({ authority }) => authority.terminal_candidate_tree_digest)).size, 1, "managed projection residue must not alter the no-op terminal candidate digest");
+  const noOpNormalizedRoot = resolve(work, "no-op-normalized");
+  run(["normalize-execution", ...common, "--output", noOpNormalizedRoot]);
+  const noOpGeneration = resolve(noOpNormalizedRoot, "generations", readdirSync(resolve(noOpNormalizedRoot, "generations"))[0]);
+  const noOpManifest = JSON.parse(readFileSync(resolve(noOpGeneration, "normalized-run.json"), "utf8"));
+  for (const { entry, state, authority } of noOpByCondition.values()) {
+    const normalizedReference = noOpManifest.cases.find((item) => item.case_id === entry.case_id).normalized_attempts[0];
+    const materializedCandidate = materializeVerifiedTerminalCandidate({ root, config: { ...config, _kind: "portfolio", _configPath: configPath, _protocolPath: resolve(root, config.protocol_path) }, planPath, materializedPath: materialized, selectionState, runDir, normalizedResultsPath: noOpNormalizedRoot, sourceSnapshotDigest: noOpManifest.source_snapshot_digest, normalizedResultId: normalizedReference.normalized_result_id, outputParent: candidateOutputs });
+    const outputRoot = materializedCandidate.output_root;
+    for (const managedPath of authority.managed_asset_paths) assert.equal(existsSync(resolve(outputRoot, managedPath)), false, `managed file ${managedPath} must not enter no-op candidate`);
+    for (const managedRoot of [".agents", ".claude"]) {
+      if (authority.managed_asset_paths.some((path) => path.startsWith(`${managedRoot}/`))) assert.equal(existsSync(resolve(outputRoot, managedRoot)), false, `${managedRoot} managed-only directory residue must be pruned`);
+    }
+    makeTreeWritable(outputRoot);
+  }
+
+  const verifiedConfig = { ...config, _kind: "portfolio", _configPath: configPath, _protocolPath: resolve(root, config.protocol_path) };
+  function terminalMutationRun(name, mutation, entry = codexCases[0]) {
+    const mutationRun = resolve(work, `terminal-${name}-run`);
+    const mutationCommon = ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", mutationRun];
+    run(["execute-portfolio", ...mutationCommon, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", entry.case_id], { env: { ...env, FAKE_WORKSPACE_MUTATION: mutation } });
+    const state = JSON.parse(readFileSync(resolve(mutationRun, "cases", entry.case_id, "state.json"), "utf8"));
+    const attemptRoot = resolve(mutationRun, "cases", entry.case_id, "attempts", state.terminal_attempt);
+    const result = JSON.parse(readFileSync(resolve(attemptRoot, "result.json"), "utf8"));
+    const authority = existsSync(resolve(attemptRoot, "terminal-workspace-authority.json")) ? JSON.parse(readFileSync(resolve(attemptRoot, "terminal-workspace-authority.json"), "utf8")) : null;
+    return { mutationRun, mutationCommon, entry, state, attemptRoot, result, authority };
+  }
+
+  const modifiedTerminal = terminalMutationRun("modified", "modify");
+  assert.equal(modifiedTerminal.state.status, "completed", "actual terminal workspace modification must remain a completed engineering attempt");
+  assert.ok(modifiedTerminal.authority.delta_inventory.some((item) => item.path === "workspace/package.json" && item.change_type === "modification" && typeof item.after.content_base64 === "string"), "actual terminal modification must retain content authority");
+  const verifiedModified = verifyExecutionTerminalWorkspaceAuthority({ root, config: verifiedConfig, planPath, materializedPath: materialized, selectionState, runDir: modifiedTerminal.mutationRun, caseId: modifiedTerminal.entry.case_id, attempt: modifiedTerminal.state.terminal_attempt });
+  assert.equal(verifiedModified.authority.authority_digest, modifiedTerminal.result.terminal_workspace_authority_digest, "verified authority must match the committed result");
+  assert.equal(statSync(resolve(modifiedTerminal.attemptRoot, "terminal-workspace-authority.json")).mode & 0o777, 0o444, "durable terminal workspace authority must be read-only");
+  const modifiedNormalizedRoot = resolve(work, "terminal-modified-normalized");
+  run(["normalize-execution", ...modifiedTerminal.mutationCommon, "--output", modifiedNormalizedRoot]);
+  const modifiedGeneration = resolve(modifiedNormalizedRoot, "generations", readdirSync(resolve(modifiedNormalizedRoot, "generations"))[0]);
+  const modifiedManifest = JSON.parse(readFileSync(resolve(modifiedGeneration, "normalized-run.json"), "utf8"));
+  const modifiedReference = modifiedManifest.cases.find((item) => item.case_id === modifiedTerminal.entry.case_id).normalized_attempts[0];
+  const modifiedNormalized = JSON.parse(readFileSync(resolve(modifiedGeneration, modifiedReference.path), "utf8"));
+  assert.equal(modifiedNormalized.lineage.terminal_workspace_authority_digest, modifiedTerminal.authority.authority_digest, "normalized lineage must project the verified authority digest");
+  assert.equal(modifiedNormalized.lineage.terminal_workspace_tree_digest, modifiedTerminal.authority.terminal_candidate_tree_digest, "normalized lineage must project the terminal candidate tree digest");
+  const candidateAuthorityOptions = {
+    root,
+    config: verifiedConfig,
+    planPath,
+    materializedPath: materialized,
+    selectionState,
+    runDir: modifiedTerminal.mutationRun,
+    normalizedResultsPath: modifiedNormalizedRoot,
+    sourceSnapshotDigest: modifiedManifest.source_snapshot_digest,
+    normalizedResultId: modifiedReference.normalized_result_id,
+    outputParent: candidateOutputs,
+  };
+  const candidateInventoryBeforeRejections = readdirSync(candidateOutputs).sort();
+  const assertCandidateRejectedBeforeOutput = (options, pattern, message) => {
+    assert.throws(() => materializeVerifiedTerminalCandidate(options), pattern, message);
+    assert.deepEqual(readdirSync(candidateOutputs).sort(), candidateInventoryBeforeRejections, `${message}: output must not be created`);
+  };
+  assertCandidateRejectedBeforeOutput({ ...candidateAuthorityOptions, normalizedResult: { lineage: structuredClone(modifiedNormalized.lineage) } }, /rejects caller-asserted normalizedResult/u, "caller-created matching-subset normalized objects must be rejected");
+  assertCandidateRejectedBeforeOutput({ ...candidateAuthorityOptions, normalizedResultsPath: modifiedGeneration }, /normalized output|collection|managed/u, "a valid record with a decoy normalized root must be rejected");
+  assertCandidateRejectedBeforeOutput({ ...candidateAuthorityOptions, normalizedResultsPath: noOpNormalizedRoot }, /source snapshot|result ID|generation|collection/u, "cross-generation normalized record and root transplants must be rejected");
+  function mutatedNormalizedCollection(name, mutate) {
+    const target = resolve(work, name);
+    cpSync(modifiedNormalizedRoot, target, { recursive: true });
+    const generation = resolve(target, "generations", readdirSync(resolve(target, "generations"))[0]);
+    const manifestPath = resolve(generation, "normalized-run.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    const reference = manifest.cases.find((item) => item.case_id === modifiedTerminal.entry.case_id).normalized_attempts[0];
+    mutate({ target, generation, manifestPath, manifest, reference, recordPath: resolve(generation, reference.path) });
+    return target;
+  }
+  const recordOnlyRoot = mutatedNormalizedCollection("candidate-record-only-reseal", ({ recordPath }) => writeFileSync(recordPath, `${readFileSync(recordPath, "utf8")} `));
+  assertCandidateRejectedBeforeOutput({ ...candidateAuthorityOptions, normalizedResultsPath: recordOnlyRoot }, /inventory|normalized|generation/u, "normalized record-only reseal must be rejected");
+  const inventoryOnlyRoot = mutatedNormalizedCollection("candidate-inventory-only-reseal", ({ manifestPath, manifest }) => {
+    manifest.inventory[0].bytes += 1;
+    writeJson(manifestPath, manifest);
+  });
+  assertCandidateRejectedBeforeOutput({ ...candidateAuthorityOptions, normalizedResultsPath: inventoryOnlyRoot }, /digest|inventory|normalized/u, "generation inventory-only reseal must be rejected");
+  const snapshotOnlyRoot = mutatedNormalizedCollection("candidate-source-snapshot-only-reseal", ({ manifestPath, manifest }) => {
+    manifest.source_snapshot_digest = `sha256:${"0".repeat(64)}`;
+    writeJson(manifestPath, manifest);
+  });
+  assertCandidateRejectedBeforeOutput({ ...candidateAuthorityOptions, normalizedResultsPath: snapshotOnlyRoot }, /snapshot|identity|normalized/u, "source snapshot-only reseal must be rejected");
+  const commitDriftRoot = mutatedNormalizedCollection("candidate-terminal-commit-drift", ({ recordPath }) => {
+    const record = JSON.parse(readFileSync(recordPath, "utf8"));
+    record.lineage.terminal_commit_digest = `sha256:${"0".repeat(64)}`;
+    writeJson(recordPath, record);
+  });
+  assertCandidateRejectedBeforeOutput({ ...candidateAuthorityOptions, normalizedResultsPath: commitDriftRoot }, /normalized|inventory|identity|digest/u, "terminal commit digest drift must be rejected");
+  assert.throws(() => materializeVerifiedTerminalCandidate({ ...candidateAuthorityOptions, outputParent: modifiedNormalizedRoot }), /overlaps an authority input root/u, "output inside the normalized collection must be rejected");
+  assert.throws(() => materializeVerifiedTerminalCandidate({ ...candidateAuthorityOptions, outputParent: modifiedGeneration }), /overlaps an authority input root/u, "output inside the normalized generation must be rejected");
+  const resolvedAuthority = verifyTerminalWorkspaceAuthority(candidateAuthorityOptions);
+  assert.equal(resolvedAuthority.normalized.record.normalized_result_id, modifiedReference.normalized_result_id, "resolver must return only the record selected from the verified generation inventory");
+  assert.throws(() => materializeVerifiedTerminalCandidate({ root, config: verifiedConfig, planPath, materializedPath: materialized, selectionState, runDir: modifiedTerminal.mutationRun, normalizedResultsPath: modifiedNormalizedRoot, sourceSnapshotDigest: modifiedManifest.source_snapshot_digest, normalizedResultId: modifiedReference.normalized_result_id, outputParent: modifiedTerminal.mutationRun }), /overlaps an authority input root/u, "candidate output must be disjoint from its run authority");
+  const reconstructed = materializeVerifiedTerminalCandidate({ root, config: verifiedConfig, planPath, materializedPath: materialized, selectionState, runDir: modifiedTerminal.mutationRun, normalizedResultsPath: modifiedNormalizedRoot, sourceSnapshotDigest: modifiedManifest.source_snapshot_digest, normalizedResultId: modifiedReference.normalized_result_id, outputParent: candidateOutputs }).output_root;
+  assert.match(readFileSync(resolve(reconstructed, "workspace/package.json"), "utf8"), /terminal modification/u, "cleanup-safe reconstruction must retain terminal bytes");
+  assert.equal(statSync(resolve(reconstructed, "workspace/package.json")).mode & 0o777, 0o444, "reconstructed candidate files must be read-only");
+  assert.equal(statSync(resolve(reconstructed, "workspace")).mode & 0o777, 0o555, "reconstructed candidate directories must be read-only");
+  makeTreeWritable(reconstructed);
+
+  const authorityInputBeforeRaces = readFileSync(resolve(modifiedTerminal.attemptRoot, "terminal-workspace-authority.json"));
+  const normalizedInputBeforeRaces = readFileSync(resolve(modifiedGeneration, modifiedReference.path));
+  function freshOutputRace(name) {
+    const parent = mkdtempSync(resolve(tmpdir(), `ask-output-race-${name}-`));
+    const outside = mkdtempSync(resolve(tmpdir(), `ask-output-race-outside-${name}-`));
+    writeFileSync(resolve(outside, "sentinel"), "foreign target\n");
+    return { parent: realpathSync(parent), outside: realpathSync(outside) };
+  }
+  for (const [name, target] of [["outside-parent", null], ["authority-parent", root]]) {
+    const race = freshOutputRace(name);
+    const replacementTarget = target ?? race.outside;
+    const moved = `${race.parent}.moved`;
+    assert.throws(() => createTerminalCandidateOutputBoundaryForTest(race.parent, [root, modifiedTerminal.mutationRun], ({ phase }) => {
+      if (phase !== "parent_inspected") return;
+      renameSync(race.parent, moved);
+      symlinkSync(replacementTarget, race.parent);
+    }), /symlink|changed/u, `${name} replacement after parent inspection must fail closed`);
+    assert.deepEqual(readdirSync(race.outside), ["sentinel"], `${name} replacement must not write into the foreign target`);
+    rmSync(race.parent);
+    rmSync(moved, { recursive: true, force: true });
+    rmSync(race.outside, { recursive: true, force: true });
+  }
+  {
+    const race = freshOutputRace("child-inode");
+    let foreignPath;
+    let originalPath;
+    assert.throws(() => createTerminalCandidateOutputBoundaryForTest(race.parent, [root], ({ phase, output_path: outputPath }) => {
+      if (phase !== "output_created") return;
+      originalPath = `${outputPath}.original`;
+      renameSync(outputPath, originalPath);
+      mkdirSync(outputPath);
+      foreignPath = outputPath;
+      writeFileSync(resolve(foreignPath, "sentinel"), "foreign child\n");
+    }), /output|changed/u, "same-name different-inode child replacement must fail closed");
+    assert.equal(readFileSync(resolve(foreignPath, "sentinel"), "utf8"), "foreign child\n", "failed creation must not chmod or remove a foreign child inode");
+    rmSync(race.parent, { recursive: true, force: true });
+    rmSync(race.outside, { recursive: true, force: true });
+  }
+  {
+    const race = freshOutputRace("partial-replacement");
+    let moved;
+    let replaced = false;
+    assert.throws(() => materializeVerifiedTerminalCandidateForTest({ ...candidateAuthorityOptions, outputParent: race.parent }, { inspectionHook({ phase, output_path: outputPath }) {
+      if (replaced || phase !== "entry_materialized") return;
+      replaced = true;
+      moved = `${outputPath}.original`;
+      renameSync(outputPath, moved);
+      mkdirSync(outputPath);
+      writeFileSync(resolve(outputPath, "sentinel"), "foreign child\n");
+    } }), /replaced|changed/u, "partial materialization output replacement must fail closed");
+    const foreignOutput = readdirSync(race.parent).map((name) => resolve(race.parent, name)).find((path) => existsSync(resolve(path, "sentinel")));
+    assert.equal(readFileSync(resolve(foreignOutput, "sentinel"), "utf8"), "foreign child\n", "partial materialization cleanup must not touch a foreign replacement");
+    rmSync(race.parent, { recursive: true, force: true });
+    rmSync(race.outside, { recursive: true, force: true });
+  }
+  for (const replacement of ["output", "parent"]) {
+    const race = freshOutputRace(`cleanup-${replacement}`);
+    let moved;
+    assert.throws(() => materializeVerifiedTerminalCandidateForTest({ ...candidateAuthorityOptions, outputParent: race.parent }, { missingChangedContentPath: "workspace/package.json", inspectionHook({ phase, output_path: outputPath }) {
+      if (phase !== "before_cleanup" || moved) return;
+      if (replacement === "output") {
+        moved = `${outputPath}.original`;
+        renameSync(outputPath, moved);
+        symlinkSync(race.outside, outputPath);
+      } else {
+        moved = `${race.parent}.original`;
+        renameSync(race.parent, moved);
+        symlinkSync(race.outside, race.parent);
+      }
+    } }), /content|reconstruction/u, `${replacement} replacement immediately before cleanup must fail closed`);
+    assert.equal(readFileSync(resolve(race.outside, "sentinel"), "utf8"), "foreign target\n", `${replacement} cleanup replacement must not modify the foreign target`);
+    if (existsSync(race.parent)) rmSync(race.parent, { recursive: true, force: true });
+    if (moved && existsSync(moved)) rmSync(moved, { recursive: true, force: true });
+    if (existsSync(race.outside)) rmSync(race.outside, { recursive: true, force: true });
+  }
+  assert.deepEqual(readFileSync(resolve(modifiedTerminal.attemptRoot, "terminal-workspace-authority.json")), authorityInputBeforeRaces, "output race tests must leave execution authority byte-identical");
+  assert.deepEqual(readFileSync(resolve(modifiedGeneration, modifiedReference.path)), normalizedInputBeforeRaces, "output race tests must leave normalized authority byte-identical");
+
+  const combinedTerminal = terminalMutationRun("combined-delta", "add-delete-modify");
+  const combinedByPath = new Map(combinedTerminal.authority.delta_inventory.map((item) => [item.path, item]));
+  assert.equal(combinedByPath.get("workspace/agent-created.txt")?.change_type, "addition", "agent-created files must be retained as additions");
+  assert.equal(combinedByPath.get("workspace/docs/session.schema.json")?.change_type, "deletion", "terminal deletions must retain before metadata");
+  assert.equal(combinedByPath.get("workspace/package.json")?.change_type, "modification", "terminal modifications must retain before and after metadata");
+
+  const modeDigests = new Set();
+  for (const mode of ["0755", "0777", "0600"]) {
+    const changedMode = terminalMutationRun(`mode-${mode}`, `mode-${mode}`);
+    const delta = changedMode.authority.delta_inventory.find((item) => item.path === "workspace/package.json");
+    assert.equal(delta?.before.mode, "0644", `${mode} mode authority must retain the original mode`);
+    assert.equal(delta?.after.mode, mode, `${mode} mode authority must retain the terminal mode`);
+    modeDigests.add(changedMode.authority.terminal_candidate_tree_digest);
+  }
+  assert.equal(modeDigests.size, 3, "mode-only terminal changes must produce distinct terminal tree digests");
+
+  const fileTypeTerminal = terminalMutationRun("file-type", "file-type");
+  const fileTypeDelta = fileTypeTerminal.authority.delta_inventory.find((item) => item.path === "workspace/package.json");
+  assert.equal(fileTypeDelta?.before.file_type, "regular_file");
+  assert.equal(fileTypeDelta?.after.file_type, "directory", "file-type drift must be retained without inventing file bytes");
+
+  const managedCase = codexCases.find((entry) => entry.condition === "adaptive_ask" && entry.case_id !== adaptiveCases[0].case_id);
+  const managedTerminal = terminalMutationRun("managed-asset", "managed", managedCase);
+  const managedDelta = managedTerminal.authority.delta_inventory.find((item) => managedTerminal.authority.managed_asset_paths.includes(item.path));
+  assert.ok(managedDelta, "agent changes to projected managed assets must remain visible in terminal authority");
+  assert.equal(managedTerminal.authority.terminal_candidate_tree_digest === managedTerminal.authority.terminal_workspace_portable_digest, false, "managed assets must remain outside the evaluator candidate tree");
+  const managedBaselineAuthority = noOpByCondition.get(managedCase.condition).authority;
+  assert.notEqual(managedTerminal.authority.authority_digest, managedBaselineAuthority.authority_digest, "managed asset mutation must change terminal authority identity");
+  assert.equal(managedTerminal.authority.terminal_candidate_tree_digest, managedBaselineAuthority.terminal_candidate_tree_digest, "managed asset mutation must not change evaluator candidate identity");
+  const managedNormalizedRoot = resolve(work, "terminal-managed-normalized");
+  run(["normalize-execution", ...managedTerminal.mutationCommon, "--output", managedNormalizedRoot]);
+  const managedGeneration = resolve(managedNormalizedRoot, "generations", readdirSync(resolve(managedNormalizedRoot, "generations"))[0]);
+  const managedManifest = JSON.parse(readFileSync(resolve(managedGeneration, "normalized-run.json"), "utf8"));
+  const managedReference = managedManifest.cases.find((item) => item.case_id === managedTerminal.entry.case_id).normalized_attempts[0];
+  const managedNormalized = JSON.parse(readFileSync(resolve(managedGeneration, managedReference.path), "utf8"));
+  const managedCandidate = materializeVerifiedTerminalCandidate({ root, config: verifiedConfig, planPath, materializedPath: materialized, selectionState, runDir: managedTerminal.mutationRun, normalizedResultsPath: managedNormalizedRoot, sourceSnapshotDigest: managedManifest.source_snapshot_digest, normalizedResultId: managedReference.normalized_result_id, outputParent: candidateOutputs }).output_root;
+  for (const path of managedTerminal.authority.managed_asset_paths) assert.equal(existsSync(resolve(managedCandidate, path)), false, `managed asset ${path} must not enter the evaluator candidate tree`);
+  assert.ok(managedDelta && managedTerminal.authority.delta_inventory.some((item) => item.path === managedDelta.path), "managed asset mutation evidence must survive candidate filtering");
+  makeTreeWritable(managedCandidate);
+
+  const managedAgentContent = terminalMutationRun("managed-agent-content", "managed-with-agent-content", managedCase);
+  const managedAgentNormalizedRoot = resolve(work, "terminal-managed-agent-normalized");
+  run(["normalize-execution", ...managedAgentContent.mutationCommon, "--output", managedAgentNormalizedRoot]);
+  const managedAgentGeneration = resolve(managedAgentNormalizedRoot, "generations", readdirSync(resolve(managedAgentNormalizedRoot, "generations"))[0]);
+  const managedAgentManifest = JSON.parse(readFileSync(resolve(managedAgentGeneration, "normalized-run.json"), "utf8"));
+  const managedAgentReference = managedAgentManifest.cases.find((item) => item.case_id === managedAgentContent.entry.case_id).normalized_attempts[0];
+  const managedAgentNormalized = JSON.parse(readFileSync(resolve(managedAgentGeneration, managedAgentReference.path), "utf8"));
+  const managedAgentCandidate = materializeVerifiedTerminalCandidate({ root, config: verifiedConfig, planPath, materializedPath: materialized, selectionState, runDir: managedAgentContent.mutationRun, normalizedResultsPath: managedAgentNormalizedRoot, sourceSnapshotDigest: managedAgentManifest.source_snapshot_digest, normalizedResultId: managedAgentReference.normalized_result_id, outputParent: candidateOutputs }).output_root;
+  const managedAgentFile = managedAgentContent.authority.delta_inventory.find((item) => item.path.endsWith("/agent-created.txt"));
+  const managedAgentEmpty = managedAgentContent.authority.delta_inventory.find((item) => item.path.endsWith("/agent-empty"));
+  assert.ok(managedAgentFile && existsSync(resolve(managedAgentCandidate, managedAgentFile.path)), "agent-created content under a managed directory must remain in the candidate");
+  assert.ok(managedAgentEmpty && existsSync(resolve(managedAgentCandidate, managedAgentEmpty.path)), "agent-created empty directories must remain in the candidate");
+  makeTreeWritable(managedAgentCandidate);
+
+  for (const mutation of ["symlink", "hardlink", "special"]) {
+    const rejected = terminalMutationRun(`rejected-${mutation}`, mutation);
+    assert.equal(rejected.state.status, "invalid", `${mutation} terminal workspace must fail closed`);
+    assert.equal(rejected.result.terminal_workspace_authority_availability, "unavailable", `${mutation} rejection must not publish an unverified candidate authority`);
+  }
+  const descendantRejected = terminalMutationRun("rejected-detached-child", "detached-child");
+  assert.equal(descendantRejected.state.status, "invalid", "a residual child process must invalidate terminal capture");
+  assert.equal(descendantRejected.result.terminal_workspace_authority_availability, "unavailable", "residual child rejection must not publish terminal authority");
+  assert.equal(existsSync(resolve(descendantRejected.attemptRoot, "terminal-workspace-authority.json")), false, "residual child rejection must not leave a published authority");
+  for (const [mutation, label] of [["oversized-changed", "per-file"], ["oversized-authority", "serialized authority"]]) {
+    const oversized = terminalMutationRun(`rejected-${mutation}`, mutation);
+    assert.equal(oversized.state.status, "invalid", `${label} limit overflow must invalidate terminal capture`);
+    assert.equal(oversized.result.terminal_workspace_authority_availability, "unavailable", `${label} overflow must not publish authority`);
+    assert.equal(readdirSync(oversized.attemptRoot).some((name) => name.includes("terminal-workspace-authority")), false, `${label} overflow must leave no authority or staging residue`);
+    assert.equal(existsSync(resolve(oversized.mutationRun, "cases", oversized.entry.case_id, "claim")), false, `${label} overflow must release the active claim`);
+  }
+  const ephemeralBeforeFileCountOverflow = ephemeralInventory();
+  const fileCountOverflow = terminalMutationRun("rejected-file-count-overflow", "file-count-overflow");
+  assert.equal(fileCountOverflow.state.status, "invalid", "workspace file-count overflow must converge to typed invalid state");
+  assert.equal(fileCountOverflow.result.terminal_workspace_authority_availability, "unavailable", "workspace file-count overflow must not publish authority");
+  assert.equal(readdirSync(fileCountOverflow.attemptRoot).some((name) => name.includes("terminal-workspace-authority")), false, "workspace file-count overflow must leave no authority or staging residue");
+  assert.equal(existsSync(resolve(fileCountOverflow.mutationRun, "cases", fileCountOverflow.entry.case_id, "claim")), false, "workspace file-count overflow must release the active claim");
+  assert.deepEqual(ephemeralInventory(), ephemeralBeforeFileCountOverflow, "workspace file-count overflow must clean its ephemeral workspace");
   const commandContractBytes = readFileSync(contractPath);
   try {
     const driftedContract = JSON.parse(commandContractBytes);
@@ -874,6 +1317,8 @@ exit 64
 
   const atomicFaults = [
     { faultName: "after_request_staged", expectedStatus: "interrupted", removeTemp: true, suffix: "lost-temp" },
+    { faultName: "after_terminal_workspace_authority_staged", expectedStatus: "interrupted", removeTemp: true, suffix: "lost-temp" },
+    { faultName: "after_terminal_workspace_authority_published", expectedStatus: "interrupted", removeTemp: true, suffix: "lost-temp" },
     { faultName: "after_pending_result_staged", expectedStatus: "interrupted", removeTemp: true, suffix: "lost-temp" },
     { faultName: "after_final_staged", expectedStatus: "interrupted", removeTemp: false, suffix: "retained-temp" },
     { faultName: "after_final_staged", expectedStatus: "interrupted", removeTemp: true, suffix: "lost-temp" },
@@ -883,16 +1328,30 @@ exit 64
     const atomicRun = resolve(work, `${faultName}-${suffix}-run`);
     const atomicCase = codexCases[10];
     const atomicExecute = ["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", atomicRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", atomicCase.case_id];
-    run(atomicExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: faultName, ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+    const restrictiveUmask = faultName === "after_terminal_workspace_authority_staged" && suffix === "lost-temp";
+    const previousUmask = restrictiveUmask ? process.umask(0o077) : null;
+    try {
+      run(atomicExecute, { expectedStatus: 86, env: { ...env, ASK_BENCHMARK_FAULT: faultName, ASK_BENCHMARK_FAULT_LEASE_MS: "-1000" } });
+    } finally {
+      if (previousUmask !== null) process.umask(previousUmask);
+    }
     const atomicClaim = JSON.parse(readFileSync(resolve(atomicRun, "cases", atomicCase.case_id, "claim", "claim.json"), "utf8"));
     const atomicAttemptRoot = resolve(atomicRun, "cases", atomicCase.case_id, "attempts", atomicClaim.attempt);
-    assert.ok(readdirSync(atomicAttemptRoot).some((name) => name.endsWith(".staging")), `${faultName} must reproduce an orphan atomic staging artifact`);
+    if (faultName === "after_terminal_workspace_authority_published") assert.ok(existsSync(resolve(atomicAttemptRoot, "terminal-workspace-authority.json")), `${faultName} must stop after authority publication`);
+    else assert.ok(readdirSync(atomicAttemptRoot).some((name) => name.endsWith(".staging")), `${faultName} must reproduce an orphan atomic staging artifact`);
+    if (restrictiveUmask) {
+      const authorityStaging = readdirSync(atomicAttemptRoot).find((name) => name.includes("terminal-workspace-authority") && name.endsWith(".staging"));
+      assert.equal(statSync(resolve(atomicAttemptRoot, authorityStaging)).mode & 0o777, 0o444, "terminal authority staging must be explicitly read-only under restrictive umask");
+    }
     if (removeTemp) rmSync(resolve(tmpdir(), atomicClaim.workspace_parent), { recursive: true, force: true });
     run(["recover-case", "--run-dir", atomicRun, "--case-id", atomicCase.case_id, "--claim-id", atomicClaim.claim_id, "--reason", `${faultName} recovery`]);
     assert.equal(existsSync(resolve(tmpdir(), atomicClaim.workspace_parent)), false, `${faultName} recovery must remove its private temporary root`);
     const atomicState = JSON.parse(readFileSync(resolve(atomicRun, "cases", atomicCase.case_id, "state.json"), "utf8"));
     assert.equal(atomicState.status, expectedStatus, `${faultName} recovery must publish the expected terminal state`);
-    const expectedInventory = expectedStatus === "completed" ? ["command-evidence.json", "commit.json", "final.json", "request.json", "result.json"] : ["command-evidence.json", "commit.json", "request.json", "result.json"];
+    const expectedInventory = ["command-evidence.json", "commit.json", "request.json", "result.json"];
+    if (expectedStatus === "completed") expectedInventory.push("final.json");
+    if (existsSync(resolve(atomicAttemptRoot, "terminal-workspace-authority.json"))) expectedInventory.push("terminal-workspace-authority.json");
+    expectedInventory.sort();
     assert.deepEqual(terminalInventory(atomicRun, atomicCase.case_id, atomicClaim.attempt), expectedInventory, `${faultName} recovery must remove all atomic staging residue`);
   }
 
@@ -946,7 +1405,7 @@ exit 64
   run(["execute-portfolio", "--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", failureRun, "--adapter", "codex", "--runtime-config", codexRuntime, "--agent-bin", codexBin, "--case-id", failureCase.case_id], { env: { ...env, FAKE_FAIL: "1" } });
   assert.deepEqual(ephemeralInventory(), cleanupBaseline, "agent failure must clean its ephemeral workspace");
   const failureState = JSON.parse(readFileSync(resolve(failureRun, "cases", failureCase.case_id, "state.json"), "utf8"));
-  assert.deepEqual(terminalInventory(failureRun, failureCase.case_id, failureState.terminal_attempt), ["command-evidence.json", "commit.json", "request.json", "result.json"], "failed attempts must retain only approved durable artifacts");
+  assert.deepEqual(terminalInventory(failureRun, failureCase.case_id, failureState.terminal_attempt), ["command-evidence.json", "commit.json", "request.json", "result.json", "terminal-workspace-authority.json"], "failed attempts after agent execution must retain terminal workspace authority");
 
   const oversizedRun = resolve(work, "oversized-final-run");
   const oversizedCase = codexCases[9];
@@ -957,7 +1416,7 @@ exit 64
   const oversizedResult = JSON.parse(readFileSync(resolve(oversizedAttemptRoot, "result.json"), "utf8"));
   assert.equal(oversizedState.status, "invalid", "truncated command capture before oversized final output must fail closed");
   assert.equal(oversizedResult.failure_kind, "invalid_input_or_selection", "invalid command capture must not be downgraded to an ordinary agent failure");
-  assert.deepEqual(readdirSync(oversizedAttemptRoot).sort(), ["command-evidence.json", "commit.json", "request.json", "result.json"], "oversized final failure must leave no final or staging artifact");
+  assert.deepEqual(readdirSync(oversizedAttemptRoot).sort(), ["command-evidence.json", "commit.json", "request.json", "result.json", "terminal-workspace-authority.json"], "oversized final failure must leave no final or staging artifact while retaining terminal workspace authority");
 
   const timeoutRuntime = resolve(work, "timeout-runtime.json");
   const timeoutConfig = runtimeConfig("codex");
@@ -983,14 +1442,127 @@ exit 64
         if (!existsSync(commandPath) || !existsSync(resultPath) || !existsSync(commitPath)) continue;
         const result = JSON.parse(readFileSync(resultPath, "utf8"));
         result.command_evidence.file_identity = commandEvidenceFileIdentity(commandPath);
+        const terminalWorkspacePath = resolve(attemptRoot, "terminal-workspace-authority.json");
+        if (existsSync(terminalWorkspacePath)) result.terminal_workspace_authority_file_identity = commandEvidenceFileIdentity(terminalWorkspacePath);
         writeJson(resultPath, result);
         const commit = JSON.parse(readFileSync(commitPath, "utf8"));
         commit.result_sha256 = prefixedFileDigest(resultPath);
         writeJson(commitPath, commit);
       }
+      const statePath = resolve(target, "cases", caseName, "state.json");
+      const state = JSON.parse(readFileSync(statePath, "utf8"));
+      if (state.terminal_attempt) {
+        state.terminal_commit_digest = prefixedFileDigest(resolve(attemptsRoot, state.terminal_attempt, "commit.json"));
+        writeJson(statePath, state);
+      }
     }
     return { target, common: ["--config", configPath, "--plan", planPath, "--materialized", materialized, "--selection-state", selectionState, "--run-dir", target] };
   }
+
+  function resealTerminalAuthority(source, name, mutate) {
+    const cloned = cloneRun(source.mutationRun, name);
+    const attemptRoot = resolve(cloned.target, "cases", source.entry.case_id, "attempts", source.state.terminal_attempt);
+    const authorityPath = resolve(attemptRoot, "terminal-workspace-authority.json");
+    const authority = JSON.parse(readFileSync(authorityPath, "utf8"));
+    mutate(authority);
+    const { authority_digest: ignoredDigest, authority_bytes: ignoredBytes, ...semanticBase } = authority;
+    authority.authority_digest = canonicalDigest(semanticBase);
+    authority.authority_bytes = 0;
+    const bytes = terminalWorkspaceAuthorityBytes(authority);
+    authority.authority_bytes = bytes.length;
+    chmodSync(authorityPath, 0o644);
+    writeFileSync(authorityPath, terminalWorkspaceAuthorityBytes(authority));
+    chmodSync(authorityPath, 0o444);
+    const resultPath = resolve(attemptRoot, "result.json");
+    const result = JSON.parse(readFileSync(resultPath, "utf8"));
+    result.terminal_workspace_authority_sha256 = prefixedFileDigest(authorityPath);
+    result.terminal_workspace_authority_bytes = statSync(authorityPath).size;
+    result.terminal_workspace_authority_digest = authority.authority_digest;
+    result.terminal_workspace_tree_digest = authority.terminal_candidate_tree_digest;
+    result.terminal_workspace_authority_file_identity = commandEvidenceFileIdentity(authorityPath);
+    writeJson(resultPath, result);
+    const commitPath = resolve(attemptRoot, "commit.json");
+    const commit = JSON.parse(readFileSync(commitPath, "utf8"));
+    commit.result_sha256 = prefixedFileDigest(resultPath);
+    commit.terminal_workspace_authority_sha256 = result.terminal_workspace_authority_sha256;
+    commit.terminal_workspace_authority_bytes = result.terminal_workspace_authority_bytes;
+    commit.terminal_workspace_authority_digest = result.terminal_workspace_authority_digest;
+    commit.terminal_workspace_tree_digest = result.terminal_workspace_tree_digest;
+    writeJson(commitPath, commit);
+    return cloned;
+  }
+
+  const sameBytesAuthority = cloneRun(modifiedTerminal.mutationRun, "same-bytes-terminal-authority-replaced-run");
+  const sameBytesAuthorityPath = resolve(sameBytesAuthority.target, "cases", modifiedTerminal.entry.case_id, "attempts", modifiedTerminal.state.terminal_attempt, "terminal-workspace-authority.json");
+  const sameAuthorityBytes = readFileSync(sameBytesAuthorityPath);
+  chmodSync(sameBytesAuthorityPath, 0o644);
+  rmSync(sameBytesAuthorityPath);
+  writeFileSync(sameBytesAuthorityPath, sameAuthorityBytes, { mode: 0o444 });
+  assertCaseStatus(sameBytesAuthority.common, modifiedTerminal.entry.case_id, "invalid", "same-byte different-inode terminal authority replacement must be rejected");
+
+  const authorityReseals = [
+    ["terminal-authority-mode-reseal-run", (authority) => { authority.delta_inventory.find((item) => item.path === "workspace/package.json").after.mode = "0777"; }],
+    ["terminal-authority-content-reseal-run", (authority) => { authority.delta_inventory.find((item) => item.path === "workspace/package.json").after.content_base64 = Buffer.from("forged terminal bytes").toString("base64"); }],
+    ["terminal-authority-entry-omission-run", (authority) => { authority.delta_inventory.shift(); }],
+    ["terminal-authority-entry-addition-run", (authority) => { authority.delta_inventory.push(structuredClone(authority.delta_inventory.at(-1))); authority.delta_inventory.at(-1).path = "workspace/zz-forged.txt"; }],
+    ["terminal-authority-entry-duplicate-run", (authority) => { authority.delta_inventory.push(structuredClone(authority.delta_inventory.at(-1))); }],
+    ["terminal-authority-entry-reorder-run", (authority) => { authority.delta_inventory.reverse(); }],
+    ["terminal-authority-before-type-drift-run", (authority) => { authority.delta_inventory.find((item) => item.path === "workspace/package.json").before.file_type = "directory"; }],
+    ["terminal-authority-path-escape-run", (authority) => { authority.delta_inventory[0].path = "../escape"; }],
+    ["terminal-authority-coordinated-result-commit-reseal-run", (authority) => { authority.terminal_workspace_portable_digest = `sha256:${"0".repeat(64)}`; }],
+    ["terminal-authority-before-content-injection-run", (authority) => { authority.delta_inventory.find((item) => item.path === "workspace/package.json").before.content_base64 = Buffer.from("forged before bytes").toString("base64"); }],
+    ["terminal-authority-parent-omission-run", (authority) => { authority.base_inventory = authority.base_inventory.filter((item) => item.path !== "workspace/docs"); }],
+    ["terminal-authority-directory-deletion-with-child-run", (authority) => {
+      const before = authority.base_inventory.find((item) => item.path === "workspace/docs");
+      authority.delta_inventory.push({ path: before.path, change_type: "deletion", before: { ...before, content_base64: null, path: undefined }, after: null });
+      delete authority.delta_inventory.at(-1).before.path;
+      authority.delta_inventory.sort((left, right) => left.path.localeCompare(right.path));
+    }],
+    ["terminal-authority-directory-to-file-with-child-run", (authority) => {
+      const before = authority.base_inventory.find((item) => item.path === "workspace/docs");
+      const content = Buffer.from("replacement directory file");
+      authority.delta_inventory.push({ path: before.path, change_type: "modification", before: { file_type: before.file_type, mode: before.mode, bytes: before.bytes, sha256: before.sha256, content_base64: null }, after: { file_type: "regular_file", mode: "0644", bytes: content.length, sha256: createHash("sha256").update(content).digest("hex"), content_base64: content.toString("base64") } });
+      authority.delta_inventory.sort((left, right) => left.path.localeCompare(right.path));
+    }],
+    ["terminal-authority-orphan-addition-run", (authority) => {
+      const content = Buffer.from("orphan");
+      authority.delta_inventory.push({ path: "workspace/missing-parent/orphan.txt", change_type: "addition", before: null, after: { file_type: "regular_file", mode: "0644", bytes: content.length, sha256: createHash("sha256").update(content).digest("hex"), content_base64: content.toString("base64") } });
+      authority.delta_inventory.sort((left, right) => left.path.localeCompare(right.path));
+    }],
+    ["terminal-authority-regular-descendant-run", (authority) => {
+      for (const [path, content] of [["workspace/a", Buffer.from("a")], ["workspace/a/b", Buffer.from("b")]]) authority.delta_inventory.push({ path, change_type: "addition", before: null, after: { file_type: "regular_file", mode: "0644", bytes: content.length, sha256: createHash("sha256").update(content).digest("hex"), content_base64: content.toString("base64") } });
+      authority.delta_inventory.sort((left, right) => left.path.localeCompare(right.path));
+    }],
+    ...["C:/Windows/System32/config/SAM", "C:relative/path", "\\\\server\\share", "//server/share", "file:///tmp/x", "a:b", "./x", "a//b", `nul\0path`, "x".repeat(TERMINAL_WORKSPACE_LIMITS.maximum_portable_path_length + 1), "cafe\u0301.txt"].map((path, index) => [`terminal-authority-invalid-portable-path-${index}-run`, (authority) => { authority.delta_inventory[0].path = path; }]),
+    ["terminal-authority-case-collision-run", (authority) => {
+      const content = Buffer.from("collision");
+      authority.delta_inventory.push({ path: "workspace/PACKAGE.json", change_type: "addition", before: null, after: { file_type: "regular_file", mode: "0644", bytes: content.length, sha256: createHash("sha256").update(content).digest("hex"), content_base64: content.toString("base64") } });
+      authority.delta_inventory.sort((left, right) => left.path.localeCompare(right.path));
+    }],
+  ];
+  for (const [name, mutate] of authorityReseals) {
+    const resealed = resealTerminalAuthority(modifiedTerminal, name, mutate);
+    assertCaseStatus(resealed.common, modifiedTerminal.entry.case_id, "invalid", `${name} must fail closed after self-consistent outer reseal`);
+  }
+
+  const resultOnlyReseal = cloneRun(modifiedTerminal.mutationRun, "terminal-authority-result-only-reseal-run");
+  const resultOnlyAttempt = resolve(resultOnlyReseal.target, "cases", modifiedTerminal.entry.case_id, "attempts", modifiedTerminal.state.terminal_attempt);
+  const resultOnlyPath = resolve(resultOnlyAttempt, "result.json");
+  const resultOnly = JSON.parse(readFileSync(resultOnlyPath, "utf8"));
+  resultOnly.terminal_workspace_tree_digest = `sha256:${"0".repeat(64)}`;
+  writeJson(resultOnlyPath, resultOnly);
+  const resultOnlyCommitPath = resolve(resultOnlyAttempt, "commit.json");
+  const resultOnlyCommit = JSON.parse(readFileSync(resultOnlyCommitPath, "utf8"));
+  resultOnlyCommit.result_sha256 = prefixedFileDigest(resultOnlyPath);
+  writeJson(resultOnlyCommitPath, resultOnlyCommit);
+  assertCaseStatus(resultOnlyReseal.common, modifiedTerminal.entry.case_id, "invalid", "result-only workspace authority reseal must be rejected");
+
+  const commitOnlyReseal = cloneRun(modifiedTerminal.mutationRun, "terminal-authority-commit-only-reseal-run");
+  const commitOnlyPath = resolve(commitOnlyReseal.target, "cases", modifiedTerminal.entry.case_id, "attempts", modifiedTerminal.state.terminal_attempt, "commit.json");
+  const commitOnly = JSON.parse(readFileSync(commitOnlyPath, "utf8"));
+  commitOnly.terminal_workspace_tree_digest = `sha256:${"0".repeat(64)}`;
+  writeJson(commitOnlyPath, commitOnly);
+  assertCaseStatus(commitOnlyReseal.common, modifiedTerminal.entry.case_id, "invalid", "commit-only workspace authority reseal must be rejected");
 
   const unsupportedPromotedInvalid = cloneRun(unsupportedShellRuns.get("zsh"), "unsupported-shell-promoted-invalid-run");
   const unsupportedAttemptRoot = resolve(unsupportedPromotedInvalid.target, "cases", codexCases[0].case_id, "attempts", "0001");
@@ -1200,4 +1772,5 @@ exit 64
   console.log("ASK benchmark execution tests passed");
 } finally {
   rmSync(work, { recursive: true, force: true });
+  rmSync(candidateOutputs, { recursive: true, force: true });
 }
