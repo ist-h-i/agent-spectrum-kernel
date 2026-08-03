@@ -46,7 +46,8 @@
         "terminal_workspace_authority_bytes": { "type": "integer", "minimum": 1 },
         "terminal_workspace_authority_base64": { "type": "string", "minLength": 4 },
         "terminal_candidate_tree_digest": { "$ref": "#/$defs/digest" },
-        "reconstructed_candidate_portable_digest": { "$ref": "#/$defs/digest" }
+        "reconstructed_candidate_portable_digest": { "$ref": "#/$defs/digest" },
+        "candidate_authority_portable_digest": { "$ref": "#/$defs/digest" }
       }
     },
     "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!\\./)[a-zA-Z0-9._/-]+$" },

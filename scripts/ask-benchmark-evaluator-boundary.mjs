@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
   closeSync,
+  cpSync,
   existsSync,
   fstatSync,
   fsyncSync,
@@ -27,6 +28,7 @@ import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { materializeVerifiedTerminalCandidate } from "./ask-benchmark-terminal-candidate.mjs";
+import { deriveTerminalCandidateInventory, terminalWorkspaceInventoryDigest } from "./ask-benchmark-terminal-workspace.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { computeVerificationCommandContractDigest } from "./ask-benchmark-command-evidence.mjs";
 import {
@@ -1578,7 +1580,7 @@ function workspaceDiffEntries(frozenEntries, candidateEntries) {
 }
 
 const VERIFIED_TERMINAL_CANDIDATE_AUTHORITY_FIELDS = Object.freeze([
-  "kind", "source_snapshot_digest", "normalized_result_id", "normalized_result_digest", "run_instance_id", "case_id", "attempt", "adapter", "condition", "fixture_id", "fixture_input_digest", "materialization_manifest_digest", "request_digest", "raw_result_digest", "terminal_commit_digest", "terminal_case_state_digest", "terminal_workspace_authority_digest", "terminal_workspace_authority_raw_sha256", "terminal_workspace_authority_bytes", "terminal_workspace_authority_base64", "terminal_candidate_tree_digest", "reconstructed_candidate_portable_digest",
+  "kind", "source_snapshot_digest", "normalized_result_id", "normalized_result_digest", "run_instance_id", "case_id", "attempt", "adapter", "condition", "fixture_id", "fixture_input_digest", "materialization_manifest_digest", "request_digest", "raw_result_digest", "terminal_commit_digest", "terminal_case_state_digest", "terminal_workspace_authority_digest", "terminal_workspace_authority_raw_sha256", "terminal_workspace_authority_bytes", "terminal_workspace_authority_base64", "terminal_candidate_tree_digest", "reconstructed_candidate_portable_digest", "candidate_authority_portable_digest",
 ]);
 
 function validateCandidateAuthorityBinding(candidateAuthority, candidate, lineage, label) {
@@ -1591,7 +1593,7 @@ function validateCandidateAuthorityBinding(candidateAuthority, candidate, lineag
   const expectedKeys = [...VERIFIED_TERMINAL_CANDIDATE_AUTHORITY_FIELDS].sort();
   if (stableCanonicalJson(keys) !== stableCanonicalJson(expectedKeys)) throw new Error(`${label} verified terminal candidate authority is incomplete`);
   if (candidateAuthority.run_instance_id !== lineage.run_instance_id || candidateAuthority.case_id !== lineage.case_id || candidateAuthority.attempt !== lineage.attempt) throw new Error(`${label} verified terminal candidate lineage is inconsistent`);
-  if (candidateAuthority.reconstructed_candidate_portable_digest !== candidate.digest) throw new Error(`${label} reconstructed candidate portable digest is inconsistent`);
+  if (candidateAuthority.candidate_authority_portable_digest !== candidate.digest) throw new Error(`${label} candidate authority portable digest is inconsistent`);
   const bytes = Buffer.from(candidateAuthority.terminal_workspace_authority_base64, "base64");
   if (bytes.length !== candidateAuthority.terminal_workspace_authority_bytes || bytes.toString("base64") !== candidateAuthority.terminal_workspace_authority_base64 || rawByteDigest(bytes) !== candidateAuthority.terminal_workspace_authority_raw_sha256) throw new Error(`${label} terminal workspace authority byte binding is invalid`);
   let terminalAuthority;
@@ -1964,6 +1966,7 @@ function terminalCandidateAuthorityBinding(materialized) {
     terminal_workspace_authority_base64: authorityBytes.toString("base64"),
     terminal_candidate_tree_digest: authority.terminal_candidate_tree_digest,
     reconstructed_candidate_portable_digest: reconstructed.digest,
+    candidate_authority_portable_digest: null,
   };
   for (const [field, value] of Object.entries({
     run_instance_id: execution.run_instance_id,
@@ -1985,7 +1988,37 @@ function terminalCandidateAuthorityBinding(materialized) {
   try { parsedAuthority = JSON.parse(authorityBytes.toString("utf8")); }
   catch { throw new Error("verified terminal workspace authority bytes are invalid JSON"); }
   if (stableCanonicalJson(parsedAuthority) !== stableCanonicalJson(authority)) throw new Error("verified terminal workspace authority object is detached from its bytes");
-  return { binding, reconstructedWorkspace, reconstructed };
+  return { binding, reconstructedWorkspace, reconstructed, authority };
+}
+
+function terminalCandidateInventoryFromAuthority(authority) {
+  const terminal = new Map(authority.base_inventory.map((entry) => [entry.path, structuredClone(entry)]));
+  for (const delta of authority.delta_inventory) {
+    if (delta.change_type === "deletion") terminal.delete(delta.path);
+    else {
+      const { content_base64: ignoredContent, ...after } = delta.after;
+      terminal.set(delta.path, { path: delta.path, ...after });
+    }
+  }
+  const inventory = [...terminal.values()].sort((left, right) => left.path.localeCompare(right.path));
+  if (terminalWorkspaceInventoryDigest(inventory) !== authority.terminal_workspace_portable_digest) throw new Error("terminal workspace authority inventory closure is inconsistent");
+  const candidate = deriveTerminalCandidateInventory(inventory, authority.managed_asset_paths, authority.base_inventory);
+  if (terminalWorkspaceInventoryDigest(candidate) !== authority.terminal_candidate_tree_digest) throw new Error("terminal candidate original metadata closure is inconsistent");
+  return candidate;
+}
+
+function materializeTerminalCandidateAuthorityWorkspace({ evaluationRoot, terminal }) {
+  const parent = mkdtempSync(resolve(evaluationRoot, ".production-candidate-authority-"));
+  const destination = resolve(parent, "workspace");
+  cpSync(terminal.reconstructedWorkspace, destination, { recursive: true, errorOnExist: true, force: false });
+  const inventory = terminalCandidateInventoryFromAuthority(terminal.authority);
+  for (const entry of inventory.filter(({ file_type: fileType }) => fileType === "regular_file")) chmodSync(resolve(destination, entry.path), Number.parseInt(entry.mode, 8));
+  for (const entry of inventory.filter(({ file_type: fileType }) => fileType === "directory").sort((left, right) => right.path.length - left.path.length)) chmodSync(resolve(destination, entry.path), Number.parseInt(entry.mode, 8));
+  chmodSync(destination, 0o755);
+  const materialized = readStableWorkspaceInventory(destination, "verified terminal candidate metadata authority workspace");
+  const expected = inventory.map((entry) => ({ path: entry.path, file_type: entry.file_type === "regular_file" ? "file" : "directory", mode: Number.parseInt(entry.mode, 8), bytes: entry.bytes, sha256: entry.sha256 }));
+  if (stableCanonicalJson(materialized.portableEntries) !== stableCanonicalJson(expected) || materialized.digest !== canonicalDigest(expected)) throw new Error("terminal candidate metadata authority workspace is inconsistent");
+  return materialized;
 }
 
 export function createProductionSealedEvaluatorExecution(options = {}) {
@@ -2007,6 +2040,8 @@ export function createProductionSealedEvaluatorExecution(options = {}) {
     privateEvaluatorRoot: options.privateRoot,
   });
   const terminal = terminalCandidateAuthorityBinding(materialized);
+  const candidateAuthorityWorkspace = materializeTerminalCandidateAuthorityWorkspace({ evaluationRoot, terminal });
+  terminal.binding.candidate_authority_portable_digest = candidateAuthorityWorkspace.digest;
   const evidenceRoot = mkdtempSync(resolve(evaluationRoot, ".production-evaluation-input-"));
   const frozenAuthorityParent = mkdtempSync(resolve(evaluationRoot, ".production-frozen-authority-"));
   const verifiedFrozenSource = readStableWorkspaceInventory(resolve(options.materializedPath, terminal.binding.case_id, "workspace"), "verified frozen fixture workspace");
@@ -2027,7 +2062,7 @@ export function createProductionSealedEvaluatorExecution(options = {}) {
     privateRoot: options.privateRoot,
     hiddenAsset: options.hiddenAsset,
     frozenWorkspace: frozenAuthority.root,
-    candidateWorkspace: terminal.reconstructedWorkspace,
+    candidateWorkspace: candidateAuthorityWorkspace.root,
     evaluationInputRoot: evidenceRoot,
     evaluationLineage: terminal.binding,
     candidateAuthority: terminal.binding,
