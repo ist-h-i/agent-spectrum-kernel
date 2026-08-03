@@ -705,8 +705,7 @@ function actualNormalizedAuthority({ authorityRoot, mutation, evidenceState = "e
   const executionAuthorityRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-production-source-"));
   temporaryAuthorityRoots.add(executionAuthorityRoot);
   const config = readJson(resolve(root, "benchmarks/adaptive-portfolio.config.json"));
-  config.fixtures = config.fixtures.filter(({ id }) => id === "mn-build-option-update");
-  const configPath = resolve(executionAuthorityRoot, "actual-config.json");
+  const configPath = resolve(root, "benchmarks/adaptive-portfolio.config.json");
   const planPath = resolve(executionAuthorityRoot, "actual-plan.json");
   const materializedPath = resolve(executionAuthorityRoot, "actual-materialized");
   const selectionState = resolve(executionAuthorityRoot, "actual-selection-state");
@@ -714,7 +713,6 @@ function actualNormalizedAuthority({ authorityRoot, mutation, evidenceState = "e
   const normalizedResultsPath = resolve(executionAuthorityRoot, "actual-normalized-results");
   const runtimeConfigPath = resolve(executionAuthorityRoot, "actual-runtime.json");
   mkdirSync(selectionState, { recursive: true });
-  writeJson(configPath, config);
   writeJson(runtimeConfigPath, productionRuntimeConfig());
   const commandContract = readJson(resolve(fixtureRoot, "verification-command-contract.json"));
   const agentBin = productionFakeExecutable(executionAuthorityRoot, commandContract);
