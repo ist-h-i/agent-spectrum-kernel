@@ -862,12 +862,12 @@ function verifyEvaluatorAuthorityCore({
     throw new Error("evaluator reference is transplanted across normalized fixture or input identity");
   }
   const validateBindings = requireAdmitted ? validateScoringInputBindings : validateEvaluatorAuthorityBindings;
-  const scoring = validateBindings({
+  const readiness = validateBindings({
     ...scoringInputs,
     normalizedResult: normalized,
     evaluatorResult: result,
   });
-  return { bundle, normalized, result, verified, scoringInputs, scoringReady: requireAdmitted && scoring.scoringReady };
+  return { bundle, normalized, result, verified, scoringInputs, ...readiness };
 }
 
 export function verifyEvaluatorAuthority(options) {

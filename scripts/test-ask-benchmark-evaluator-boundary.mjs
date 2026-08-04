@@ -41,7 +41,9 @@ import {
   computeRequirementSetDigest,
   computeScoringInputFreezeManifestDigest,
   computeScoringPolicyDigest,
+  validateEvaluatorAuthorityBindings,
   validateRequirementResultObservations,
+  validateScoringInputBindings,
 } from "./ask-benchmark-scoring-contract.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -851,9 +853,36 @@ try {
     normalizedResultsPath: normalizedResults,
     publicArtifactRoot,
   };
-  assert.equal(verifyEvaluatorBoundary(baseOptions).scoringReady, true, "completed evaluation with closed requirement coverage must be scoring-ready");
+  const completedBoundary = verifyEvaluatorBoundary(baseOptions);
+  assert.equal(completedBoundary.scoringReady, true, "completed evaluation with closed requirement coverage must be scoring-ready");
   assert.equal(verifyEvaluatorBoundary({ ...baseOptions, resultPath: resultPaths.get("manual") }).scoringReady, false, "manual-review evaluation must not be scoring-ready");
   assert.equal(verifyEvaluatorBoundary({ ...baseOptions, resultPath: resultPaths.get("unavailable") }).scoringReady, false, "unavailable evaluation must not be scoring-ready");
+  const completedBindingInputs = {
+    ...completedBoundary.scoringInputs,
+    normalizedResult: completedBoundary.normalized,
+    evaluatorResult: completedBoundary.result,
+  };
+  assert.deepEqual(
+    validateRequirementResultObservations({ scoringPolicy, requirementRecord: scoringInputs.requirementRecord, evaluatorResult: completedBoundary.result }),
+    { evaluationReady: true },
+    "completed requirement observations must report evaluation completeness without scoring eligibility",
+  );
+  assert.deepEqual(
+    validateEvaluatorAuthorityBindings(completedBindingInputs),
+    { evaluationReady: true },
+    "admission-neutral evaluator bindings must report only evaluation completeness",
+  );
+  assert.deepEqual(
+    validateScoringInputBindings(completedBindingInputs),
+    { scoringReady: true },
+    "admitted scoring bindings must convert evaluation completeness into scoring readiness",
+  );
+  const completedAuthority = verifyEvaluatorAuthority(baseOptions);
+  assert.equal(completedAuthority.evaluationReady, true, "completed evaluator authority must report evaluation completeness");
+  assert.equal(Object.hasOwn(completedAuthority, "scoringReady"), false, "evaluator authority must not expose scoring readiness for admitted records");
+  const manualAuthority = verifyEvaluatorAuthority({ ...baseOptions, resultPath: resultPaths.get("manual") });
+  assert.equal(manualAuthority.evaluationReady, false, "manual-review evaluator authority must remain evaluation-incomplete");
+  assert.equal(Object.hasOwn(manualAuthority, "scoringReady"), false, "incomplete evaluator authority must not expose scoring readiness");
   const pendingScoringInputs = createScoringInputs(resolve(work, "pending-scoring-inputs"), reference, referencePath, { admissionStatus: "admission_pending" });
   const pendingResultPath = resolve(work, "pending-authority-evaluator-result.json");
   writeJson(pendingResultPath, evaluatorResultFor(completedCodex, normalized.sourceSnapshotDigest, manifest, reference, pendingScoringInputs, "completed"));
@@ -868,7 +897,8 @@ try {
   };
   const beforePendingAuthority = snapshot(pendingScoringInputs.path);
   const pendingAuthority = verifyEvaluatorAuthority(pendingOptions);
-  assert.equal(pendingAuthority.scoringReady, false, "frozen pending evaluator authority verification must not produce scoring readiness");
+  assert.equal(pendingAuthority.evaluationReady, true, "frozen pending evaluator authority verification must report completed evaluation authority");
+  assert.equal(Object.hasOwn(pendingAuthority, "scoringReady"), false, "frozen pending evaluator authority verification must not expose scoring readiness");
   assert.equal(pendingAuthority.scoringInputs.admissionRecord.admission_status, "admission_pending", "frozen pending evaluator authority verification must preserve admission state");
   assert.deepEqual(snapshot(pendingScoringInputs.path), beforePendingAuthority, "frozen pending evaluator authority verification must be read-only");
   assert.throws(() => verifyEvaluatorBoundary(pendingOptions), /requires an admitted final admission record/u, "the existing scoring boundary must remain admitted-only");

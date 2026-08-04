@@ -276,9 +276,9 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
     const expectedIds = [...requirements.keys()];
     if (resultIds.length !== expectedIds.length || expectedIds.some((id) => !resultIds.includes(id))) throw new Error("completed evaluation must exactly cover the authoritative requirement set");
     if (evaluatorResult.requirement_results.some(({ outcome }) => !SCORED_OUTCOMES.has(outcome))) throw new Error("completed evaluation contains a non-scoring requirement outcome");
-    return { scoringReady: true };
+    return { evaluationReady: true };
   }
-  return { scoringReady: false };
+  return { evaluationReady: false };
 }
 
 export function validateEvaluatorAuthorityBindings({ freezeManifest, freezeManifestSourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult }) {
@@ -321,7 +321,8 @@ export function validateEvaluatorAuthorityBindings({ freezeManifest, freezeManif
 
 export function validateScoringInputBindings(options) {
   if (options.admissionRecord?.admission_status !== "admitted") throw new Error("scoring input binding requires an admitted final admission record");
-  return validateEvaluatorAuthorityBindings(options);
+  const { evaluationReady } = validateEvaluatorAuthorityBindings(options);
+  return { scoringReady: evaluationReady };
 }
 
 export function scoringContractFingerprint({ scoringPolicy, requirementRecordSchema, evaluatorResultSchema }) {
