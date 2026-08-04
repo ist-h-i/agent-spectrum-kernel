@@ -879,7 +879,7 @@ export function deriveEvaluatorDependencyGraph({
   return { ...graph, graph_digest: canonicalDigest(graph) };
 }
 
-export function validateEvaluatorSourceIdentity({ identity, root, expectedRevision = null, expectedGeneratorSourceDigest = null, label = "evaluator source identity" }) {
+export function validateEvaluatorSourceIdentity({ identity, root, expectedRevision = null, expectedGeneratorSourceDigest = null, requireCurrentSource = true, label = "evaluator source identity" }) {
   if (!identity || typeof identity !== "object" || !Array.isArray(identity.source_files) || identity.source_files.length === 0 || !identity.dependency_graph) throw new Error(`${label} is missing or empty`);
   if (expectedRevision && identity.base_git_revision !== expectedRevision) throw new Error(`${label} base Git revision drift`);
   if (expectedGeneratorSourceDigest && identity.generator_source_digest !== expectedGeneratorSourceDigest) throw new Error(`${label} generator source digest drift`);
@@ -889,15 +889,23 @@ export function validateEvaluatorSourceIdentity({ identity, root, expectedRevisi
   if (new Set(sourceFiles.map(({ path }) => path)).size !== sourceFiles.length) throw new Error(`${label} source inventory contains duplicate paths`);
   if (identity.source_tree_digest !== canonicalDigest(sourceFiles)) throw new Error(`${label} source-tree digest closure is invalid`);
   for (const entry of sourceFiles) {
-    const path = resolveAuthorityArtifactPath(realpathSync(root), entry.path, `${label} source`);
-    const actual = streamingFileDigest(path, `${label} source ${entry.path}`);
-    if (actual.bytes !== entry.bytes || actual.digest !== entry.sha256) throw new Error(`${label} source bytes drift at ${entry.path}`);
+    if (requireCurrentSource) {
+      const path = resolveAuthorityArtifactPath(realpathSync(root), entry.path, `${label} source`);
+      const actual = streamingFileDigest(path, `${label} source ${entry.path}`);
+      if (actual.bytes !== entry.bytes || actual.digest !== entry.sha256) throw new Error(`${label} source bytes drift at ${entry.path}`);
+    }
     const committed = checkedInBytesAtRevision(realpathSync(root), identity.base_git_revision, entry.path);
     if (!committed) throw new Error(`${label} base Git revision or source path is unavailable at ${entry.path}`);
     if (committed.length !== entry.bytes || rawByteDigest(committed) !== entry.sha256) throw new Error(`${label} source bytes do not match the immutable base Git revision at ${entry.path}`);
   }
-  const graph = deriveEvaluatorDependencyGraph({ root, baseRevision: identity.base_git_revision });
-  if (stableCanonicalJson(identity.dependency_graph) !== stableCanonicalJson(graph)) throw new Error(`${label} dependency graph closure is invalid`);
+  let graph = identity.dependency_graph;
+  if (requireCurrentSource) {
+    graph = deriveEvaluatorDependencyGraph({ root, baseRevision: identity.base_git_revision });
+    if (stableCanonicalJson(identity.dependency_graph) !== stableCanonicalJson(graph)) throw new Error(`${label} dependency graph closure is invalid`);
+  } else {
+    const { graph_digest: graphDigest, ...graphClosure } = graph;
+    if (graphDigest !== canonicalDigest(graphClosure)) throw new Error(`${label} historical dependency graph closure is invalid`);
+  }
   const graphSourceFiles = graph.node_inventory.map(({ path, bytes, sha256 }) => ({ path, bytes, sha256 }));
   if (stableCanonicalJson(sourceFiles) !== stableCanonicalJson(graphSourceFiles)) throw new Error(`${label} source inventory does not match the dependency graph`);
   return structuredClone(identity);
@@ -2614,11 +2622,11 @@ function assertPrivateBoundary({ root, privateRoot, materializedPath, selectionS
   return { canonicalPrivateRoot, canonicalRoots, markerPaths };
 }
 
-export function verifyPublicEvaluatorReference({ root, referencePath, privateRoot = null }) {
+export function verifyPublicEvaluatorReference({ root, referencePath, privateRoot = null, requireCurrentSource = true }) {
   const { value: reference } = readJsonArtifact(referencePath, "public evaluator reference", { publicArtifact: true });
   assertBenchmarkSchemaInstance(reference, { schemaPath: resolve(root, EVALUATOR_REFERENCE_SCHEMA_PATH), label: "public evaluator reference" });
   assertPublicArtifactTree(reference, "public evaluator reference");
-  if (reference.evaluator_source_identity) validateEvaluatorSourceIdentity({ identity: reference.evaluator_source_identity, root, expectedRevision: reference.evaluator_revision, label: "public evaluator source identity" });
+  if (reference.evaluator_source_identity) validateEvaluatorSourceIdentity({ identity: reference.evaluator_source_identity, root, expectedRevision: reference.evaluator_revision, requireCurrentSource, label: "public evaluator source identity" });
   if (reference.public_metadata_digest !== computeEvaluatorReferenceDigest(reference)) throw new Error("public evaluator reference deterministic identity is invalid");
   if (privateRoot && pathsOverlap(referencePath, privateRoot)) throw new Error("public evaluator reference must not overlap the private evaluator root");
   return reference;

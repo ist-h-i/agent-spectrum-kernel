@@ -519,13 +519,13 @@
       "scoring_contract_validator_path": "scripts/ask-benchmark-scoring-contract.mjs",
       "scoring_contract_validator_file_sha256": "77db56d111664d5f0f25d1296adf2f5af3554aab60b080a22985b0483500eeaa",
       "scoring_authority_validator_path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-      "scoring_authority_validator_file_sha256": "b47f81d6346476f9171147d4562df87cd737081f8ad56a06daff092287d58042",
+      "scoring_authority_validator_file_sha256": "3972c2f1fa303b52570d5dea6cab0fc33d95f3460ab58df45f77e3dc47769021",
       "engineering_result_schema_path": "benchmarks/schemas/portfolio-engineering-result.schema.json",
       "engineering_result_schema_file_sha256": "af1ea7698d3981705c64f184dcddb418b80ec75ab2917c7991f2f574802db76f",
       "scoring_implementation_path": "scripts/ask-benchmark-portfolio-score.mjs",
       "scoring_implementation_file_sha256": "fa8a4b1de313ceeff447bd344e6168bb9b8fc02dfff86864297a83358785667b",
       "scoring_test_path": "scripts/test-ask-benchmark-portfolio-score.mjs",
-      "scoring_test_file_sha256": "2ed07b7f95e34caffb944d30ad4ff5ff0e117fddbe590c22b19044325852634c",
+      "scoring_test_file_sha256": "a0f49ab568a31a3c624fab72b1dde7e61ab92e200d9295a03f42be361b51524f",
       "atomic_publication_implementation_path": "scripts/ask-benchmark-atomic-publication.mjs",
       "atomic_publication_implementation_file_sha256": "1227b73efd9bcfe254fa8f448acb9aed5078c8f42fa4273ec1f71ab609fdb67a",
       "stable_file_implementation_path": "scripts/ask-benchmark-stable-file.mjs",
@@ -682,9 +682,9 @@
       "measured_execution_performed": false,
       "private_evaluator_included": false,
       "validator_path": "scripts/ask-benchmark-mn-build-option-update.mjs",
-      "validator_file_sha256": "7c1a9142b5d10b9bfb1d8603d23ee9392a98d8d705a20846dbc246c98395a60e",
+      "validator_file_sha256": "6ed846bfd40c745022a64a51dd4f807cb86a995130c45b8577062e0cf96989c1",
       "focused_test_path": "scripts/test-ask-benchmark-mn-build-option-update.mjs",
-      "focused_test_file_sha256": "58cdf4844cc1a3ae56a5fb8d137429173c5d183f9e5a0563fb04d6190098524e"
+      "focused_test_file_sha256": "8591f0994145aa33be84e7d4ba9e9a1a5d60af54b92f81856f7964f5c7de0204"
     }
   }
 }

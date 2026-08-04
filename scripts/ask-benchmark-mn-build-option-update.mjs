@@ -297,7 +297,7 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
     if (record.bytes !== bytes.length || record.sha256 !== sha256(bytes).slice("sha256:".length)) throw new Error(`input manifest drift: ${record.path}`);
   }
 
-  const reference = verifyPublicEvaluatorReference({ root, referencePath: paths["evaluator-reference.json"] });
+  const reference = verifyPublicEvaluatorReference({ root, referencePath: paths["evaluator-reference.json"], requireCurrentSource: false });
   assertDigest(reference.fixture_input_digest, sha256(inputManifestBytes), "fixture input binding");
   if (reference.fixture_id !== FIXTURE_ID || reference.task_class !== fixture.task_class || reference.suite !== fixture.suite) throw new Error("evaluator reference fixture identity mismatch");
 

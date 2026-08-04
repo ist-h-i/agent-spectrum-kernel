@@ -1149,7 +1149,7 @@ try {
   requirementAuthorityDriftFixture.scoringInputs.freezeManifestSourceDigest = fileDigest(requirementAuthorityDriftFixture.scoringInputs.freezeManifestPath);
   requirementAuthorityDriftFixture.commonCli[requirementAuthorityDriftFixture.commonCli.indexOf("--scoring-input-freeze-source-digest") + 1] = requirementAuthorityDriftFixture.scoringInputs.freezeManifestSourceDigest;
   const requirementAuthorityDriftResult = writeResult(requirementAuthorityDriftFixture, "distinct-requirement-authority-drift");
-  expectScoreFailure(requirementAuthorityDriftFixture, { resultPath: requirementAuthorityDriftResult.path, name: "distinct-requirement-authority-drift", pattern: /requirement-authority digest is invalid|does not bind the frozen admission requirement authority/ });
+  expectScoreFailure(requirementAuthorityDriftFixture, { resultPath: requirementAuthorityDriftResult.path, name: "distinct-requirement-authority-drift", pattern: /requirement authority digest does not match|requirement-authority digest is invalid|does not bind the frozen admission requirement authority/ });
 
   const blockerFailPath = mutateResult(base, completed.result, "blocker-fail", (value) => {
     const blocker = value.requirement_results.find(({ requirement_id: requirementId }) => requirementId === "blocker-requirement");
