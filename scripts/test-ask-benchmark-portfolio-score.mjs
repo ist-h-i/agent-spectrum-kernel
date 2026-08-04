@@ -24,6 +24,7 @@ import {
   computeEvaluatorBundleDigest,
   computeEvaluatorBundleId,
   computeEvaluatorReferenceDigest,
+  verifyEvaluatorAuthority,
   verifyEvaluatorResult,
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import {
@@ -35,11 +36,6 @@ import {
   resolveEffectiveAdmissionAuthorityFromFiles,
 } from "./ask-benchmark-admission-decision.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
-import { verifyLifecycleNeutralEvaluatorResult } from "./ask-benchmark-portfolio-evaluator-result.mjs";
-import {
-  computeLifecycleNeutralResultProfileDigest,
-  LIFECYCLE_NEUTRAL_BINARY_PROFILE_NAME,
-} from "./ask-benchmark-portfolio-result-profile.mjs";
 import {
   computeFinalAdmissionRecordDigest,
   computeOutputContractDigest,
@@ -855,14 +851,6 @@ function replaceCliValue(values, flag, value) {
   return updated;
 }
 
-function removeCliValue(values, flag) {
-  const updated = [...values];
-  const index = updated.indexOf(flag);
-  assert.ok(index >= 0 && index + 1 < updated.length, `missing CLI flag ${flag}`);
-  updated.splice(index, 2);
-  return updated;
-}
-
 function expectScoreFailure(fixtureContext, { resultPath, name, pattern, cli = fixtureContext.commonCli, cliOverrides = [], extraInputPaths = [] }) {
   const outputPath = resolve(fixtureContext.path, `${name}-engineering-result.json`);
   const before = {
@@ -895,39 +883,6 @@ try {
   const completedRun = runScore(base, { resultPath: completed.path, outputPath: completedOutput });
   const engineering = JSON.parse(readFileSync(completedOutput, "utf8"));
   validatePortfolioEngineeringResult(engineering, { root });
-
-  const evaluatorResultSchema = JSON.parse(readFileSync(resolve(root, "benchmarks/schemas/evaluator-result-envelope.schema.json"), "utf8"));
-  if (Object.hasOwn(evaluatorResultSchema.properties ?? {}, "result_profile")) {
-    const binaryProfile = { name: LIFECYCLE_NEUTRAL_BINARY_PROFILE_NAME };
-    binaryProfile.digest = computeLifecycleNeutralResultProfileDigest(binaryProfile);
-    const binaryPrivateInputResult = mutateResult(base, completed.result, "binary-private-input-contract", (value) => {
-      value.result_profile = binaryProfile;
-      value.classification = "correct_narrow_execution";
-      value.private_fragment_digest = digest("synthetic-private-fragment");
-      value.private_fragment_bytes = 1;
-      value.private_evaluation_record_digest = digest("synthetic-private-evaluation-record");
-    });
-    const privateAuthorityFlags = ["--private-evaluation-root", "--private-evaluation-record", "--private-fragment"];
-    expectScoreFailure(base, {
-      resultPath: binaryPrivateInputResult,
-      name: "missing-all-private-evaluation-inputs",
-      pattern: /binary scope verification requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together/u,
-    });
-    const completePrivateCli = [
-      ...base.commonCli,
-      "--private-evaluation-root", base.privateRoot,
-      "--private-evaluation-record", base.manifestPath,
-      "--private-fragment", base.manifestPath,
-    ];
-    for (const flag of privateAuthorityFlags) {
-      expectScoreFailure(base, {
-        resultPath: binaryPrivateInputResult,
-        name: `missing-${flag.slice(2)}`,
-        pattern: /binary scope verification requires --private-evaluation-root, --private-evaluation-record, and --private-fragment together/u,
-        cli: removeCliValue(completePrivateCli, flag),
-      });
-    }
-  }
 
   // 1-6: one completed join, mixed requirement kinds, partial credit, blocker outcomes, and informational exclusion.
   assert.equal(engineering.scoring_status, "complete");
@@ -979,19 +934,20 @@ try {
     normalizedResultsPath: base.normalizedResults,
   };
   const legacyVerified = verifyEvaluatorResult(legacyVerificationOptions);
-  const lifecycleNeutralVerified = verifyLifecycleNeutralEvaluatorResult(legacyVerificationOptions);
-  assert.equal(lifecycleNeutralVerified.evaluationReady, legacyVerified.scoringReady);
-  for (const field of ["normalized", "result"]) assert.deepEqual(lifecycleNeutralVerified[field], legacyVerified[field], `legacy lifecycle-neutral verifier parity: ${field}`);
+  const evaluatorAuthority = verifyEvaluatorAuthority(legacyVerificationOptions);
+  assert.equal(evaluatorAuthority.evaluationReady, legacyVerified.scoringReady);
+  assert.equal(Object.hasOwn(evaluatorAuthority, "scoringReady"), false);
+  for (const field of ["normalized", "result"]) assert.deepEqual(evaluatorAuthority[field], legacyVerified[field], `legacy evaluator-authority parity: ${field}`);
   for (const field of ["freezeManifest", "freezeManifestSourceDigest", "catalog", "policyManifest", "scoringPolicy", "admissionRecord", "requirementRecord", "outputContract", "evaluatorReference"]) {
-    assert.deepEqual(lifecycleNeutralVerified.scoringInputs[field], legacyVerified.scoringInputs[field], `legacy lifecycle-neutral scoring-input parity: ${field}`);
+    assert.deepEqual(evaluatorAuthority.scoringInputs[field], legacyVerified.scoringInputs[field], `legacy evaluator-authority scoring-input parity: ${field}`);
   }
   const legacyAuthority = resolveEffectiveAdmissionAuthority({
-    frozenAdmissionRecord: lifecycleNeutralVerified.scoringInputs.admissionRecord,
-    requirementRecord: lifecycleNeutralVerified.scoringInputs.requirementRecord,
-    evaluatorReference: lifecycleNeutralVerified.scoringInputs.evaluatorReference,
+    frozenAdmissionRecord: evaluatorAuthority.scoringInputs.admissionRecord,
+    requirementRecord: evaluatorAuthority.scoringInputs.requirementRecord,
+    evaluatorReference: evaluatorAuthority.scoringInputs.evaluatorReference,
     root,
   });
-  const rebuiltLegacy = buildPortfolioEngineeringResult({ ...lifecycleNeutralVerified, effectiveAdmissionAuthority: legacyAuthority }, { root });
+  const rebuiltLegacy = buildPortfolioEngineeringResult({ ...evaluatorAuthority, effectiveAdmissionAuthority: legacyAuthority }, { root });
   assert.deepEqual(rebuiltLegacy, engineering);
 
   const pendingFixture = createFixture("pending-overlay-production", { admissionStatus: "admission_pending", distinctRequirementAuthority: true });
@@ -1136,7 +1092,7 @@ try {
   }
 
   const laterEvidence = createAdmissionDecisionEvidence(pendingFixture, "admitted", 2);
-  const pendingVerified = verifyLifecycleNeutralEvaluatorResult({
+  const pendingVerified = verifyEvaluatorAuthority({
     ...legacyVerificationOptions,
     admissionRecordPath: pendingFixture.scoringInputs.admissionRecordPath,
     requirementRecordPath: pendingFixture.scoringInputs.requirementRecordPath,

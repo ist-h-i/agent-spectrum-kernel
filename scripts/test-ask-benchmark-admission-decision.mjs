@@ -331,13 +331,30 @@ test("complete authority sources reject missing review, archive, evaluator, or h
   assert.throws(() => validatePortfolioAdmissionDecision(decision, { authoritySources: options }), /evaluator|digest/i);
 });
 
-test("actual Git diff is checked against the fixed approved R21 inventory", () => {
+test("actual Git diff closes the historical R21 to required R22 transition", () => {
   const inventory = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/admission-decision/approved-r21-immutable-paths.json"), "utf8"));
   assert.equal(inventory.authority_source.reviewed_head_revision, "7db95b7a33878aa327192648d5ffc191d22c005e");
   assert.equal(inventory.authority_source.evaluator_public_reference_digest, "sha256:186111ffa02586e36c86b1e375e4d62aa74e0c9da9b51ab2d08c8cd5d4a27839");
   assert.equal(inventory.inventory_digest, canonicalDigest(inventory.paths));
   assert.equal(inventory.paths.length, 44);
-  assertImmutableGitDiffUnchanged({ root, immutablePaths: inventory.paths });
+  assert.deepEqual(inventory.lifecycle_transition, {
+    r21_status: "historical_reviewed_authority",
+    post_pr_238_evaluator_revision: "R22",
+    required_generation_count_after_pr_238_merge: 1,
+    r22_frozen_admission_status: "admission_pending",
+    later_admission_authority: "append_only_admission_decision_overlay",
+    later_admission_requires_r23: false,
+  });
+  const fixturePrefix = `benchmarks/fixtures/checkpoint-b2/${inventory.authority_source.fixture_id}/`;
+  const frozenFixturePaths = inventory.paths.filter((path) => path.startsWith(fixturePrefix));
+  const historicalSourcePaths = inventory.paths.filter((path) => !path.startsWith(fixturePrefix));
+  assert.equal(frozenFixturePaths.length, inventory.path_partition.frozen_fixture_authority_count);
+  assert.equal(historicalSourcePaths.length, inventory.path_partition.historical_evaluator_source_count);
+  const diff = spawnSync("git", ["diff", "--name-only", "origin/main", "--"], { cwd: root, encoding: "utf8" });
+  assert.equal(diff.status, 0, diff.stderr || diff.stdout);
+  const changedPaths = diff.stdout.trim().split("\n").filter(Boolean);
+  assert.equal(changedPaths.some((path) => frozenFixturePaths.includes(path)), false, "PR #238 must not rewrite historical R21 frozen fixture authority");
+  assert.equal(changedPaths.some((path) => historicalSourcePaths.includes(path)), true, "the post-PR #238 evaluator source must require R22 instead of claiming R21 reuse");
 });
 
 test("actual protected-path commit is rejected without a caller-maintained changed-path list", () => {
@@ -372,14 +389,16 @@ function commitAll(repository, message) {
   return gitOk(repository, "rev-parse", "HEAD");
 }
 
-test("reviewed R21 head is the normal immutable base after the shared-contract merge", () => {
+test("R22 is required once after the R21 source transition and the later overlay does not require R23", () => {
   const repository = mkdtempSync(resolve(stableTmp, "ask-admission-r21-dag-"));
   const protectedPath = "scripts/ask-benchmark-evaluator-boundary.mjs";
+  const successorSourcePath = "scripts/ask-benchmark-scoring-contract.mjs";
   const inventoryPath = "benchmarks/fixtures/admission-decision/approved-r21-immutable-paths.json";
   try {
     gitOk(repository, "init", "-q", "-b", "main");
     mkdirSync(resolve(repository, "scripts"), { recursive: true });
     writeFileSync(resolve(repository, protectedPath), "export const frozen = 'main-base';\n");
+    writeFileSync(resolve(repository, successorSourcePath), "export const api = 'legacy';\n");
     commitAll(repository, "main base");
 
     gitOk(repository, "checkout", "-qb", "r21");
@@ -387,13 +406,13 @@ test("reviewed R21 head is the normal immutable base after the shared-contract m
     const reviewedHead = commitAll(repository, "approved R21 head");
 
     gitOk(repository, "checkout", "-q", "main");
-    writeFileSync(resolve(repository, "shared-contract.mjs"), "export const shared = true;\n");
+    writeFileSync(resolve(repository, successorSourcePath), "export const api = 'post-pr-238-r22-source';\n");
     const inventory = {
       schema_version: "1.0.0",
       program: "adaptive_ask_approved_immutable_path_inventory",
       authority_source: { fixture_id: "mn-build-option-update", reviewed_head_revision: reviewedHead },
-      inventory_digest: canonicalDigest([protectedPath]),
-      paths: [protectedPath],
+      inventory_digest: canonicalDigest([protectedPath, successorSourcePath]),
+      paths: [protectedPath, successorSourcePath],
     };
     mkdirSync(resolve(repository, dirname(inventoryPath)), { recursive: true });
     writeFileSync(resolve(repository, inventoryPath), `${JSON.stringify(inventory, null, 2)}\n`);
@@ -401,12 +420,18 @@ test("reviewed R21 head is the normal immutable base after the shared-contract m
 
     gitOk(repository, "checkout", "-q", "r21");
     gitOk(repository, "-c", "user.name=ASK Test", "-c", "user.email=ask-test@example.invalid", "merge", "--no-ff", "-qm", "merge shared contract", "main");
-    assert.equal(assertImmutableGitDiffUnchanged({ root: repository }), true);
-    assert.equal(changedPathsFromGitDiff({ root: repository }).includes(protectedPath), false);
+    assert.throws(() => assertImmutableGitDiffUnchanged({ root: repository }), /immutable source paths changed/);
+    assert.equal(changedPathsFromGitDiff({ root: repository }).includes(successorSourcePath), true);
+
+    const r22SourceRevision = gitOk(repository, "rev-parse", "HEAD");
+    writeFileSync(resolve(repository, "admission-decision-overlay.json"), "{\"decision_status\":\"admitted\"}\n");
+    commitAll(repository, "append admission decision overlay");
+    assert.equal(assertImmutableGitDiffUnchanged({ root: repository, baseRevision: r22SourceRevision, immutablePaths: [protectedPath, successorSourcePath] }), true);
+    assert.equal(changedPathsFromGitDiff({ root: repository, baseRevision: r22SourceRevision }).some((path) => [protectedPath, successorSourcePath].includes(path)), false);
 
     writeFileSync(resolve(repository, protectedPath), "export const frozen = 'post-review-mutation';\n");
     commitAll(repository, "mutate protected path after review");
-    assert.throws(() => assertImmutableGitDiffUnchanged({ root: repository }), /immutable source paths changed/);
+    assert.throws(() => assertImmutableGitDiffUnchanged({ root: repository, baseRevision: r22SourceRevision, immutablePaths: [protectedPath, successorSourcePath] }), /immutable source paths changed/);
   } finally {
     rmSync(repository, { recursive: true, force: true });
   }

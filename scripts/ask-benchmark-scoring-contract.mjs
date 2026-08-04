@@ -58,6 +58,10 @@ export const FINAL_ADMISSION_RECORD_FIELD_IDS = Object.freeze([
   "admission_digest",
 ]);
 
+export const FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS = Object.freeze([
+  "requirement_authority_digest",
+]);
+
 const REQUIREMENT_RECORD_FIELD_IDS = Object.freeze([
   "requirement_record_id",
   "requirement_record_schema_path",
@@ -84,11 +88,11 @@ function arraysEqual(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function assertClosedKeys(value, allowedKeys, label) {
+function assertClosedKeys(value, allowedKeys, label, requiredKeys = allowedKeys) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object`);
   const keys = Object.keys(value);
   const unknown = keys.filter((key) => !allowedKeys.includes(key));
-  const missing = allowedKeys.filter((key) => !keys.includes(key));
+  const missing = requiredKeys.filter((key) => !keys.includes(key));
   if (unknown.length > 0) throw new Error(`${label} has unknown fields: ${unknown.join(", ")}`);
   if (missing.length > 0) throw new Error(`${label} is missing fields: ${missing.join(", ")}`);
 }
@@ -131,6 +135,19 @@ export function computeOutputContractDigest(outputContract) {
 
 export function computeFinalAdmissionRecordDigest(admissionRecord) {
   return canonicalDigest(withoutField(admissionRecord, "admission_digest"));
+}
+
+export function computeFrozenAdmissionRequirementAuthorityDigest(admissionRecord) {
+  if (!Object.hasOwn(admissionRecord, "requirement_authority_digest")) return admissionRecord.admission_digest;
+  const {
+    admission_digest: _admissionDigest,
+    evaluator_authority_manifest_path: _authorityManifestPath,
+    evaluator_authority_manifest_raw_sha256: _authorityManifestRawSha256,
+    evaluator_authority_manifest_digest: _authorityManifestDigest,
+    requirement_authority_digest: _requirementAuthorityDigest,
+    ...requirementAuthority
+  } = admissionRecord;
+  return canonicalDigest(requirementAuthority);
 }
 
 export function computeScoringInputFreezeManifestDigest(freezeManifest) {
@@ -184,18 +201,19 @@ export function validateFinalAdmissionContractSchemaParity({ admissionPolicy, fi
   const policyFields = admissionPolicy?.final_admission_record_contract?.required_fields?.map(({ field_id }) => field_id) ?? [];
   assertExactFieldList(policyFields, FINAL_ADMISSION_RECORD_FIELD_IDS, "final admission policy fields");
   assertExactFieldList(finalAdmissionRecordSchema?.required ?? [], policyFields, "final admission record Schema required fields");
-  assertExactFieldList(Object.keys(finalAdmissionRecordSchema?.properties ?? {}), policyFields, "final admission record Schema allowed fields");
+  assertExactFieldList(Object.keys(finalAdmissionRecordSchema?.properties ?? {}), [...policyFields, ...FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS], "final admission record Schema allowed fields");
   return true;
 }
 
 export function validateFrozenFinalAdmissionRecordContract({ admissionPolicy, admissionRecord, finalAdmissionRecordSchema = null }) {
   if (finalAdmissionRecordSchema) validateFinalAdmissionContractSchemaParity({ admissionPolicy, finalAdmissionRecordSchema });
-  assertClosedKeys(admissionRecord, FINAL_ADMISSION_RECORD_FIELD_IDS, "authoritative final admission record");
+  assertClosedKeys(admissionRecord, [...FINAL_ADMISSION_RECORD_FIELD_IDS, ...FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS], "authoritative final admission record", FINAL_ADMISSION_RECORD_FIELD_IDS);
   assertUniqueStrings(admissionRecord.evidence_map_ids, "final admission evidence-map IDs");
   assertUniqueStrings(admissionRecord.mutation_set_ids, "final admission mutation-set IDs");
   if (admissionRecord.evidence_map_ids.length === 0 || admissionRecord.mutation_set_ids.length === 0) throw new Error("frozen final admission record requires evidence-map and mutation-set IDs");
   if (!["admission_pending", "admitted"].includes(admissionRecord.admission_status)) throw new Error("evaluator authority requires an admission_pending or admitted final admission record");
   assertDigestClosure(admissionRecord.admission_digest, computeFinalAdmissionRecordDigest(admissionRecord), "final admission record digest");
+  if (admissionRecord.requirement_authority_digest !== undefined && admissionRecord.requirement_authority_digest !== computeFrozenAdmissionRequirementAuthorityDigest(admissionRecord)) throw new Error("frozen admission requirement-authority digest is invalid");
   return admissionRecord;
 }
 
@@ -291,7 +309,7 @@ export function validateEvaluatorAuthorityBindings({ freezeManifest, freezeManif
   if (requirementRecord.catalog_digest !== catalog.catalog_digest) throw new Error("requirement record catalog binding does not match");
   if (requirementRecord.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("requirement record policy manifest binding does not match");
   if (requirementRecord.scoring_policy_digest !== scoringPolicy.policy_digest) throw new Error("requirement record scoring policy binding does not match");
-  if (requirementRecord.admission_record_digest !== admissionRecord.admission_digest) throw new Error("requirement record admission binding does not match the authoritative final admission record");
+  if (requirementRecord.admission_record_digest !== computeFrozenAdmissionRequirementAuthorityDigest(admissionRecord)) throw new Error("requirement record admission binding does not match the authoritative frozen admission authority");
   if (outputContract.fixture_id !== normalizedResult.lineage.fixture_id) throw new Error("output contract fixture binding does not match normalized result");
   if (outputContract.catalog_digest !== catalog.catalog_digest || outputContract.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("output contract policy or catalog binding does not match");
   if (outputContract.evaluator_public_reference_digest !== evaluatorReference.public_metadata_digest) throw new Error("output contract evaluator public reference binding does not match");

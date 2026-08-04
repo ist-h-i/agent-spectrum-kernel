@@ -32,7 +32,7 @@ The result-set source manifest and result-set inventory retain that lineage. Rep
 
 ## Production scoring entry
 
-`score-evaluator-result` uses the downstream lifecycle-neutral evaluator-result verifier. It rechecks the private bundle/public reference boundary, normalized result, result envelope, requirement coverage, and the raw and semantic frozen scoring inputs without treating the frozen admission lifecycle status as evaluator-result validity. Evaluation readiness and effective admission are composed only after both have been verified.
+`score-evaluator-result` uses `verifyEvaluatorAuthority()` as its sole source of complete evaluator authority. The shared verifier closes the private bundle/public reference boundary, normalized result, result envelope, requirement coverage, profile/private authority supplied by the evaluator revision, and the raw and semantic frozen scoring inputs without treating the frozen admission lifecycle status as scoring eligibility. It also returns the verified frozen admission, requirement-record, and freeze-manifest source bytes needed to bind the later overlay. The downstream scorer verifies only the append-only decision authority and composes evaluation readiness with effective admission; it does not repeat evaluator, private-authority, or profile verification.
 
 With no decision evidence, a pending frozen admission produces `not_scoring_ready` and null numeric fields. To consume an overlay, supply all four inputs together:
 
@@ -47,15 +47,22 @@ Partial evidence is rejected. `buildPortfolioEngineeringResult()` accepts only a
 
 An already consumed decision record is never edited in place. A later decision uses a greater revision and a different canonical digest. Existing score and report artifacts retain the exact revision/digest used when they were created; a later decision cannot retroactively validate or rewrite them.
 
+## R21 historical authority and the R22 transition
+
+R21 remains an immutable historical reviewed authority at PR #224 head `7db95b7a33878aa327192648d5ffc191d22c005e`. It is not reusable with the evaluator source produced by merged PR #239 plus this integration. After PR #238 is merged and incorporated into PR #224, the final evaluator source requires one R22 generation and independent review. R22 freezes `admission_pending` together with the final shared evaluator-authority API and source graph.
+
+The later admission transition does not change the R22 evaluator result, private bundle, requirement record, frozen admission record, scoring-input manifest, or evaluator source. It adds only the append-only admission-decision overlay outside that graph. Therefore the transition binds the reviewed R22 authority at the first scoring artifact and does not require R23.
+
 ## PR #224 migration sequence
 
 After this shared contract is merged to `main`:
 
-1. merge the shared change into `feat/issue-207-mn-build-option-update`;
-2. create the R21 admission decision overlay outside the private evaluator source/bundle graph;
-3. invoke the production scorer with the byte-frozen R21 admission record, requirement record, scoring-input manifest, evaluator reference, decision, externally sealed review authority digest, and review archive;
-4. let the lifecycle-neutral verifier retain the R21 evaluator result binding to the frozen pre-admission authority and bind the resolved decision only when building the raw engineering result;
-5. verify result-set and report lineage against that exact decision revision/digest;
-6. obtain the separately required human/independent lifecycle decisions before any Ready or merge transition.
+1. merge the shared change into `feat/issue-207-mn-build-option-update` and resolve the evaluator-authority API on the final shared source;
+2. generate R22 exactly once with `admission_pending` frozen, then obtain its independent review;
+3. create the admission decision overlay outside the R22 private evaluator source/bundle graph;
+4. invoke the production scorer with the byte-frozen R22 admission record, requirement record, scoring-input manifest, evaluator reference, decision, externally sealed review authority digest, and review archive;
+5. let `verifyEvaluatorAuthority()` retain the R22 evaluator result binding to frozen pre-admission authority and bind the resolved decision only when building the raw engineering result;
+6. verify result-set and report lineage against that exact decision revision/digest;
+7. obtain the separately required human/independent lifecycle decisions before any Ready or merge transition.
 
-This contract does not approve the R21 evaluator, admit a fixture by itself, authorize measured execution, calculate a measured score, mark any pull request Ready, or authorize merge.
+This contract does not generate or approve R22, admit a fixture by itself, authorize measured execution, calculate a measured score, mark any pull request Ready, or authorize merge.

@@ -379,6 +379,21 @@ function validateImmutableInventory(value) {
   const paths = value.paths.map((path) => assertPortablePath(path, "approved immutable inventory path"));
   if (new Set(paths).size !== paths.length) throw new Error("approved immutable path inventory contains duplicate paths");
   if (value.inventory_digest !== canonicalDigest(paths)) throw new Error("approved immutable path inventory digest is invalid");
+  if (value.lifecycle_transition) {
+    const expectedTransition = {
+      r21_status: "historical_reviewed_authority",
+      post_pr_238_evaluator_revision: "R22",
+      required_generation_count_after_pr_238_merge: 1,
+      r22_frozen_admission_status: "admission_pending",
+      later_admission_authority: "append_only_admission_decision_overlay",
+      later_admission_requires_r23: false,
+    };
+    if (stableCanonicalJson(value.lifecycle_transition) !== stableCanonicalJson(expectedTransition)) throw new Error("historical R21 to required R22 transition contract is invalid");
+    const fixturePrefix = `benchmarks/fixtures/checkpoint-b2/${value.authority_source.fixture_id}/`;
+    const frozenCount = paths.filter((path) => path.startsWith(fixturePrefix)).length;
+    const expectedPartition = { frozen_fixture_authority_count: frozenCount, historical_evaluator_source_count: paths.length - frozenCount };
+    if (stableCanonicalJson(value.path_partition) !== stableCanonicalJson(expectedPartition)) throw new Error("historical R21 path partition is invalid");
+  }
   return value;
 }
 

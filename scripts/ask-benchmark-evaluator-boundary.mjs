@@ -13,12 +13,14 @@ import {
 } from "node:fs";
 import { posix, relative, resolve, sep, win32 } from "node:path";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { readStableJsonFile } from "./ask-benchmark-duplicate-key-json.mjs";
 import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import {
   computeFinalAdmissionRecordDigest,
+  computeFrozenAdmissionRequirementAuthorityDigest,
   computeOutputContractDigest,
   computePolicyManifestDigest,
   computeRequirementRecordDigest,
@@ -204,22 +206,7 @@ function assertPathInsideRootWithoutSymlinks(root, path, label) {
 function readJsonArtifact(path, label, { publicArtifact = false } = {}) {
   assertRegularFile(path, label);
   const byteLimit = publicArtifact ? MAX_PUBLIC_ARTIFACT_BYTES : MAX_JSON_ARTIFACT_BYTES;
-  if (lstatSync(path).size > byteLimit) throw new Error(`${label} exceeds the raw JSON size limit`);
-  let bytes;
-  try {
-    bytes = readFileSync(path);
-  } catch {
-    throw new Error(`${label} could not be read`);
-  }
-  if (bytes.length > byteLimit) throw new Error(`${label} exceeds the raw JSON size limit`);
-  let value;
-  try {
-    value = JSON.parse(bytes.toString("utf8"));
-  } catch {
-    throw new Error(`${label} is invalid JSON`);
-  }
-  assertNoDuplicateJsonObjectKeys(bytes.toString("utf8"), label);
-  return { bytes, value };
+  return readStableJsonFile(realpathSync(path), label, byteLimit, { allowEmpty: false });
 }
 
 function assertNoDuplicateJsonObjectKeys(source, label) {
@@ -270,7 +257,7 @@ function assertNoDuplicateJsonObjectKeys(source, label) {
     while (offset < source.length) {
       skipWhitespace();
       const key = parseString();
-      if (keys.has(key)) throw new Error(`${label} contains a duplicate JSON object key`);
+      if (keys.has(key)) throw new Error(`${label} contains a duplicate JSON object key: ${key}`);
       keys.add(key);
       skipWhitespace();
       if (source[offset] !== ":") throw new Error(`${label} has invalid JSON object syntax`);
@@ -364,7 +351,7 @@ function readAnchoredFreezeManifest({ root, freezeManifestPath, freezeManifestSo
   assertBenchmarkSchemaInstance(source.value, { schemaPath: resolve(root, SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH), label: "scoring input freeze manifest" });
   assertPublicArtifactTree(source.value, "scoring input freeze manifest");
   if (source.value.manifest_digest !== computeScoringInputFreezeManifestDigest(source.value)) throw new Error("scoring input freeze manifest digest closure is invalid");
-  return { authorityRoot, manifest: source.value, manifestPath: authoritativePath, manifestRelativePath: relativePath, sourceDigest };
+  return { authorityRoot, manifest: source.value, manifestPath: authoritativePath, manifestRelativePath: relativePath, sourceDigest, source };
 }
 
 function readFrozenJsonArtifact({ authorityRoot, root, reference, suppliedPath, schemaPath, label, publicArtifact = false }) {
@@ -641,7 +628,7 @@ function assertResultCollectionIdentity(result) {
   }
   collect(result);
   for (const reference of evidenceReferences.filter((entry) => entry.kind === "normalized_result")) {
-    if (reference.digest !== result.normalized_result_digest) throw new Error("evaluator result contains a mismatched normalized-result evidence reference");
+    if (reference.digest !== result.normalized_result_digest) throw new Error("evaluator result contains a transplanted normalized-result evidence reference");
   }
 }
 
@@ -759,8 +746,23 @@ function readScoringInputSources({
   const expectedMutationSetIds = requirementRecord.requirements.flatMap(({ mutation_ids }) => mutation_ids).sort();
   if (stableCanonicalJson([...admissionRecord.evidence_map_ids].sort()) !== stableCanonicalJson(expectedEvidenceMapIds)) throw new Error("final admission evidence-map inventory does not match the authoritative requirement record");
   if (stableCanonicalJson([...admissionRecord.mutation_set_ids].sort()) !== stableCanonicalJson(expectedMutationSetIds)) throw new Error("final admission mutation-set inventory does not match the authoritative requirement record");
-  if (requirementRecord.admission_record_digest !== admissionRecord.admission_digest) throw new Error("requirement record admission digest was not re-derived from the authoritative final admission record");
-  return { freezeManifest, freezeManifestSourceDigest: freeze.sourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference };
+  if (requirementRecord.admission_record_digest !== computeFrozenAdmissionRequirementAuthorityDigest(admissionRecord)) throw new Error("requirement record admission digest was not re-derived from the authoritative frozen admission authority");
+  return {
+    freezeManifest,
+    freezeManifestSource: { path: freeze.manifestRelativePath, bytes: Buffer.from(freeze.source.bytes) },
+    freezeManifestSourceDigest: freeze.sourceDigest,
+    catalog,
+    policyManifest,
+    scoringPolicy,
+    admissionRecord,
+    requirementRecord,
+    outputContract,
+    evaluatorReference,
+    sources: {
+      admissionRecord: { path: freezeManifest.admission_record.path, bytes: Buffer.from(admissionRecordSource.bytes) },
+      requirementRecord: { path: freezeManifest.requirement_record.path, bytes: Buffer.from(requirementRecordSource.bytes) },
+    },
+  };
 }
 
 function assertBoundaryRootLineage(bundle, verified) {

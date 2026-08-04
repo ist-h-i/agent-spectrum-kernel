@@ -33,7 +33,8 @@
     "reviewer_record_id": { "$ref": "#/$defs/token" },
     "admission_revision": { "type": "integer", "minimum": 1 },
     "admission_status": { "enum": ["design_pending", "design_reviewed", "implementation_pending", "admission_pending", "admitted", "rejected"] },
-    "admission_digest": { "$ref": "#/$defs/digest" }
+    "admission_digest": { "$ref": "#/$defs/digest" },
+    "requirement_authority_digest": { "$ref": "#/$defs/digest" }
   },
   "$defs": {
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },

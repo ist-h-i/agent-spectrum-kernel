@@ -9,6 +9,18 @@
     "evaluator_public_reference_digest": "sha256:186111ffa02586e36c86b1e375e4d62aa74e0c9da9b51ab2d08c8cd5d4a27839",
     "inventory_kind": "approved_evaluator_source_and_frozen_fixture_authority"
   },
+  "lifecycle_transition": {
+    "r21_status": "historical_reviewed_authority",
+    "post_pr_238_evaluator_revision": "R22",
+    "required_generation_count_after_pr_238_merge": 1,
+    "r22_frozen_admission_status": "admission_pending",
+    "later_admission_authority": "append_only_admission_decision_overlay",
+    "later_admission_requires_r23": false
+  },
+  "path_partition": {
+    "frozen_fixture_authority_count": 5,
+    "historical_evaluator_source_count": 39
+  },
   "inventory_digest": "sha256:ea816e573b664d581acc82d5137717a9b5a1b6cec19509a1121fe1d97c4b49eb",
   "paths": [
     "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-authority-manifest.json",

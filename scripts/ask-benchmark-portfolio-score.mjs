@@ -8,7 +8,7 @@ import {
 } from "./ask-benchmark-admission-decision.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
-import { verifyLifecycleNeutralEvaluatorResult } from "./ask-benchmark-portfolio-evaluator-result.mjs";
+import { verifyEvaluatorAuthority } from "./ask-benchmark-evaluator-boundary.mjs";
 
 export const ENGINEERING_RESULT_SCHEMA_PATH = "benchmarks/schemas/portfolio-engineering-result.schema.json";
 
@@ -501,16 +501,16 @@ export function scoreEvaluatorResult(options) {
       options.admissionReviewArchivePath,
     ],
   });
-  const verified = verifyLifecycleNeutralEvaluatorResult(options);
+  const verified = verifyEvaluatorAuthority(options);
   const scoringInputs = verified.scoringInputs;
   const frozenAuthority = {
     frozenAdmissionRecord: scoringInputs.admissionRecord,
-    frozenAdmissionSource: { path: scoringInputs.sources.admissionRecord.relativePath, bytes: scoringInputs.sources.admissionRecord.bytes },
+    frozenAdmissionSource: scoringInputs.sources.admissionRecord,
     requirementRecord: scoringInputs.requirementRecord,
-    requirementRecordSource: { path: scoringInputs.sources.requirementRecord.relativePath, bytes: scoringInputs.sources.requirementRecord.bytes },
+    requirementRecordSource: scoringInputs.sources.requirementRecord,
     evaluatorReference: scoringInputs.evaluatorReference,
     scoringInputFreezeManifest: scoringInputs.freezeManifest,
-    scoringInputFreezeManifestSource: { path: scoringInputs.freezeManifestSource.relativePath, bytes: scoringInputs.freezeManifestSource.bytes },
+    scoringInputFreezeManifestSource: scoringInputs.freezeManifestSource,
     root: options.root,
   };
   const hasDecisionEvidence = [options.admissionDecisionPath, options.admissionReviewAuthorityPath, options.admissionReviewAuthoritySourceDigest, options.admissionReviewArchivePath].some(Boolean);
