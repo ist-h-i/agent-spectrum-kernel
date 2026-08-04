@@ -116,6 +116,12 @@ function result(fixture, repetitions, condition, repetition, mode = "complete") 
     scoring_policy_digest: policy.policy_digest,
     requirement_record_digest: digest(`requirements:${fixture}`),
     scoring_input_freeze_manifest_digest: digest(`freeze:${fixture}`),
+    effective_admission_mode: "legacy_admitted_record",
+    effective_admission_status: "admitted",
+    frozen_admission_record_digest: digest(`admission:${fixture}`),
+    requirement_authority_digest: digest(`admission:${fixture}`),
+    admission_decision_digest: null,
+    admission_decision_revision: null,
     engineering_result_id: `engineering-result-${hash(`engineering:${key}`).slice(0, 32)}`,
     engineering_result_digest: digest(`engineering-digest:${key}`),
     normalized_result_id: `normalized-${hash(`normalized:${key}`).slice(0, 32)}`,
@@ -211,6 +217,12 @@ const scorecard = build();
 validatePortfolioMechanismScorecard(scorecard, { root });
 
 check("one adapter only", () => assert.equal(scorecard.authority.adapter_track, "codex"));
+check("mechanism run inventory retains admission decision lineage", () => {
+  const item = runEntry(scorecard);
+  assert.equal(item.effective_admission_mode, "legacy_admitted_record");
+  assert.equal(item.admission_decision_digest, null);
+  assert.equal(item.admission_decision_revision, null);
+});
 check("fixture run inventory exact count", () => assert.equal(fixture(scorecard).run_inventory.length, CONDITIONS.length * 3));
 check("fixture run inventory condition order", () => assert.deepEqual(fixture(scorecard).run_inventory.filter(({ repetition }) => repetition === 1).map(({ condition: name }) => name), CONDITIONS));
 check("fixture run inventory repetition order", () => assert.deepEqual(fixture(scorecard).run_inventory.filter(({ condition: name }) => name === "plain").map(({ repetition }) => repetition), [1, 2, 3]));
@@ -324,5 +336,5 @@ check("measured execution remains false", () => assert.equal(scorecard.boundarie
 check("product claim remains false", () => assert.equal(scorecard.boundaries.product_value_claim, false));
 check("Issue #198 remains false", () => assert.equal(scorecard.boundaries.issue_198_stage_0_authorized, false));
 
-assert.equal(covered.size, 98, `expected 98 focused closures, received ${covered.size}`);
+assert.equal(covered.size, 99, `expected 99 focused closures, received ${covered.size}`);
 console.log(`Portfolio mechanism observation scorecard contract test passed (${covered.size} closures).`);

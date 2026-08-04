@@ -941,6 +941,10 @@ try {
   const completedAuthority = verifyEvaluatorAuthority(baseOptions);
   assert.equal(completedAuthority.evaluationReady, true, "completed evaluator authority must report evaluation completeness");
   assert.equal(Object.hasOwn(completedAuthority, "scoringReady"), false, "evaluator authority must not expose scoring readiness for admitted records");
+  assert.deepEqual(completedAuthority.scoringInputs.sources.admissionRecord.bytes, readFileSync(scoringInputs.admissionRecordPath), "evaluator authority must return verified frozen-admission bytes");
+  assert.deepEqual(completedAuthority.scoringInputs.sources.requirementRecord.bytes, readFileSync(scoringInputs.requirementRecordPath), "evaluator authority must return verified requirement-record bytes");
+  assert.deepEqual(completedAuthority.scoringInputs.freezeManifestSource.bytes, readFileSync(scoringInputs.freezeManifestPath), "evaluator authority must return verified freeze-manifest bytes");
+  assert.equal(completedAuthority.scoringInputs.sources.admissionRecord.path, relative(root, scoringInputs.admissionRecordPath).split(sep).join("/"), "evaluator authority must return the portable frozen-admission path");
   const manualAuthority = verifyEvaluatorAuthority({ ...baseOptions, resultPath: resultPaths.get("manual") });
   assert.equal(manualAuthority.evaluationReady, false, "manual-review evaluator authority must remain evaluation-incomplete");
   assert.equal(Object.hasOwn(manualAuthority, "scoringReady"), false, "incomplete evaluator authority must not expose scoring readiness");
@@ -1293,7 +1297,7 @@ try {
     value.normalized_result_id = otherNormalized.normalized_result_id;
     value.normalized_result_digest = otherNormalized.normalized_result_digest;
   });
-  expectBoundaryFailure({ resultPath: normalizedTransplant }, /lineage mismatch|normalized result digest|mismatched normalized-result/u, "normalized-result transplant must be rejected");
+  expectBoundaryFailure({ resultPath: normalizedTransplant }, /lineage mismatch|normalized result digest|transplanted normalized-result/u, "normalized-result transplant must be rejected");
   const crossRun = resultMutation("cross-run", (value) => { value.run_instance_id = "00000000-0000-4000-8000-000000000999"; });
   expectBoundaryFailure({ resultPath: crossRun }, /run_instance_id/u, "cross-run transplant must be rejected");
   const crossCase = resultMutation("cross-case", (value) => { value.case_id = otherNormalized.lineage.case_id; });

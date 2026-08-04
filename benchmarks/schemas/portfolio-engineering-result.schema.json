@@ -15,6 +15,12 @@
     "policy_manifest_digest",
     "scoring_policy_digest",
     "admission_record_digest",
+    "effective_admission_mode",
+    "effective_admission_status",
+    "frozen_admission_record_digest",
+    "requirement_authority_digest",
+    "admission_decision_digest",
+    "admission_decision_revision",
     "requirement_record_digest",
     "requirement_set_digest",
     "output_contract_digest",
@@ -70,7 +76,8 @@
         "normalized_execution_failed",
         "normalized_execution_unavailable",
         "normalized_execution_interrupted",
-        "normalized_execution_invalid"
+        "normalized_execution_invalid",
+        "admission_not_admitted"
       ]
     },
     "scoring_input_freeze_manifest_source_digest": { "$ref": "#/$defs/digest" },
@@ -79,6 +86,12 @@
     "policy_manifest_digest": { "$ref": "#/$defs/digest" },
     "scoring_policy_digest": { "$ref": "#/$defs/digest" },
     "admission_record_digest": { "$ref": "#/$defs/digest" },
+    "effective_admission_mode": { "enum": ["legacy_admitted_record", "admitted_overlay", "not_admitted"] },
+    "effective_admission_status": { "enum": ["admitted", "admission_pending", "changes_requested", "rejected"] },
+    "frozen_admission_record_digest": { "$ref": "#/$defs/digest" },
+    "requirement_authority_digest": { "$ref": "#/$defs/digest" },
+    "admission_decision_digest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+    "admission_decision_revision": { "type": ["integer", "null"], "minimum": 1 },
     "requirement_record_digest": { "$ref": "#/$defs/digest" },
     "requirement_set_digest": { "$ref": "#/$defs/digest" },
     "output_contract_digest": { "$ref": "#/$defs/digest" },
@@ -355,7 +368,8 @@
             "normalized_execution_failed",
             "normalized_execution_unavailable",
             "normalized_execution_interrupted",
-            "normalized_execution_invalid"
+            "normalized_execution_invalid",
+            "admission_not_admitted"
           ]
         },
         "category_ids": { "type": "array", "uniqueItems": true, "items": { "enum": ["unauthorized_attempt", "external_action_executed"] } },

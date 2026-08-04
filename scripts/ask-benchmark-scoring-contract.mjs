@@ -78,7 +78,7 @@ export const FINAL_ADMISSION_RECORD_FIELD_IDS = Object.freeze([
   "admission_status",
   "admission_digest",
 ]);
-const FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS = Object.freeze([
+export const FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS = Object.freeze([
   "evaluator_authority_manifest_path",
   "evaluator_authority_manifest_raw_sha256",
   "evaluator_authority_manifest_digest",
@@ -173,6 +173,11 @@ export function computeFinalAdmissionRequirementAuthorityDigest(admissionRecord)
   return canonicalDigest(requirementAuthority);
 }
 
+export function computeFrozenAdmissionRequirementAuthorityDigest(admissionRecord) {
+  if (!Object.hasOwn(admissionRecord, "requirement_authority_digest")) return admissionRecord.admission_digest;
+  return computeFinalAdmissionRequirementAuthorityDigest(admissionRecord);
+}
+
 export function resolveRequirementAdmissionBindingDigest(admissionRecord) {
   return admissionRecord.requirement_authority_digest ?? admissionRecord.admission_digest;
 }
@@ -242,6 +247,7 @@ export function validateFrozenFinalAdmissionRecordContract({ admissionPolicy, ad
   if (!["admission_pending", "admitted"].includes(admissionRecord.admission_status)) throw new Error("evaluator authority requires an admission_pending or admitted final admission record");
   if (admissionRecord.requirement_authority_digest) assertDigestClosure(admissionRecord.requirement_authority_digest, computeFinalAdmissionRequirementAuthorityDigest(admissionRecord), "final admission requirement authority digest");
   assertDigestClosure(admissionRecord.admission_digest, computeFinalAdmissionRecordDigest(admissionRecord), "final admission record digest");
+  if (admissionRecord.requirement_authority_digest !== undefined && admissionRecord.requirement_authority_digest !== computeFrozenAdmissionRequirementAuthorityDigest(admissionRecord)) throw new Error("frozen admission requirement-authority digest is invalid");
   return admissionRecord;
 }
 

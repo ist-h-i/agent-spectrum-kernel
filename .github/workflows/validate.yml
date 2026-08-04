@@ -36,6 +36,9 @@ jobs:
       - name: Run portfolio independent design review tests
         run: node scripts/test-ask-benchmark-design-review.mjs
 
+      - name: Run portfolio admission decision overlay tests
+        run: node scripts/test-ask-benchmark-admission-decision.mjs
+
       - name: Run general benchmark tests
         run: node scripts/test-ask-benchmark.mjs
 
@@ -53,6 +56,9 @@ jobs:
 
       - name: Run build-option fixture contract tests
         run: node scripts/test-ask-benchmark-mn-build-option-update.mjs
+
+      - name: Run evaluator-authority integration contract tests
+        run: node scripts/test-ask-benchmark-portfolio-evaluator-result.mjs
 
       - name: Run portfolio raw engineering result score tests
         run: node scripts/test-ask-benchmark-portfolio-score.mjs
