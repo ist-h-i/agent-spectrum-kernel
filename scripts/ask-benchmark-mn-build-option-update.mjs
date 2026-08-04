@@ -387,7 +387,7 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
     [outputContract.evaluator_public_reference_path, paths["evaluator-reference.json"]],
   ].map(([path, absolute]) => [path, sha256(readFileSync(absolute))]));
   const predicateEvidence = { requirement_record: requirementRecord, output_contract: outputContract };
-  const selectorContext = buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId: FIXTURE_ID, predicateEvidence, artifactRoot: root, immutableArtifactDigests });
+  const selectorContext = buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId: FIXTURE_ID, predicateEvidence, artifactRoot: root, immutableArtifactDigests, requireCurrentEvaluatorSource: false });
   const review = artifacts["admission-review.json"];
   assertDigest(review.review_package_digest, canonicalDigest(withoutField(review, "review_package_digest")), "admission review package");
   const reviewByGate = new Map(review.gates.map((entry) => [entry.gate_id, entry]));
