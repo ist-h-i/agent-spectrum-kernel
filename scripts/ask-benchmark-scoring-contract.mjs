@@ -188,14 +188,20 @@ export function validateFinalAdmissionContractSchemaParity({ admissionPolicy, fi
   return true;
 }
 
-export function validateFinalAdmissionRecordContract({ admissionPolicy, admissionRecord, finalAdmissionRecordSchema = null }) {
+export function validateFrozenFinalAdmissionRecordContract({ admissionPolicy, admissionRecord, finalAdmissionRecordSchema = null }) {
   if (finalAdmissionRecordSchema) validateFinalAdmissionContractSchemaParity({ admissionPolicy, finalAdmissionRecordSchema });
   assertClosedKeys(admissionRecord, FINAL_ADMISSION_RECORD_FIELD_IDS, "authoritative final admission record");
   assertUniqueStrings(admissionRecord.evidence_map_ids, "final admission evidence-map IDs");
   assertUniqueStrings(admissionRecord.mutation_set_ids, "final admission mutation-set IDs");
-  if (admissionRecord.evidence_map_ids.length === 0 || admissionRecord.mutation_set_ids.length === 0) throw new Error("admitted final admission record requires evidence-map and mutation-set IDs");
-  if (admissionRecord.admission_status !== "admitted") throw new Error("scoring input freeze requires an admitted final admission record");
+  if (admissionRecord.evidence_map_ids.length === 0 || admissionRecord.mutation_set_ids.length === 0) throw new Error("frozen final admission record requires evidence-map and mutation-set IDs");
+  if (!["admission_pending", "admitted"].includes(admissionRecord.admission_status)) throw new Error("evaluator authority requires an admission_pending or admitted final admission record");
   assertDigestClosure(admissionRecord.admission_digest, computeFinalAdmissionRecordDigest(admissionRecord), "final admission record digest");
+  return admissionRecord;
+}
+
+export function validateFinalAdmissionRecordContract(options) {
+  const admissionRecord = validateFrozenFinalAdmissionRecordContract(options);
+  if (admissionRecord.admission_status !== "admitted") throw new Error("scoring input freeze requires an admitted final admission record");
   return admissionRecord;
 }
 
@@ -270,12 +276,12 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
     const expectedIds = [...requirements.keys()];
     if (resultIds.length !== expectedIds.length || expectedIds.some((id) => !resultIds.includes(id))) throw new Error("completed evaluation must exactly cover the authoritative requirement set");
     if (evaluatorResult.requirement_results.some(({ outcome }) => !SCORED_OUTCOMES.has(outcome))) throw new Error("completed evaluation contains a non-scoring requirement outcome");
-    return { scoringReady: true };
+    return { evaluationReady: true };
   }
-  return { scoringReady: false };
+  return { evaluationReady: false };
 }
 
-export function validateScoringInputBindings({ freezeManifest, freezeManifestSourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult }) {
+export function validateEvaluatorAuthorityBindings({ freezeManifest, freezeManifestSourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult }) {
   assertDigestClosure(policyManifest.manifest_digest, computePolicyManifestDigest(policyManifest), "policy manifest digest");
   assertDigestClosure(scoringPolicy.policy_digest, computeScoringPolicyDigest(scoringPolicy), "scoring policy digest");
   assertDigestClosure(outputContract.output_contract_digest, computeOutputContractDigest(outputContract), "output contract digest");
@@ -311,6 +317,12 @@ export function validateScoringInputBindings({ freezeManifest, freezeManifestSou
   }
   if (evaluatorReference.fixture_id !== normalizedResult.lineage.fixture_id || evaluatorReference.fixture_input_digest !== normalizedResult.lineage.fixture_input_digest) throw new Error("evaluator public reference fixture or input binding does not match normalized result");
   return validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult });
+}
+
+export function validateScoringInputBindings(options) {
+  if (options.admissionRecord?.admission_status !== "admitted") throw new Error("scoring input binding requires an admitted final admission record");
+  const { evaluationReady } = validateEvaluatorAuthorityBindings(options);
+  return { scoringReady: evaluationReady };
 }
 
 export function scoringContractFingerprint({ scoringPolicy, requirementRecordSchema, evaluatorResultSchema }) {
