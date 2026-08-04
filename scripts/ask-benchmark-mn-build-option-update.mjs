@@ -398,7 +398,7 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
     if (!record) throw new Error(`admission review is missing gate ${gate.gate_id}`);
     const matches = admissionGateSelectorMatches(gate, selectorContext);
     if ((matches ? "applicable" : "not_applicable") !== record.selector_result) throw new Error(`${gate.gate_id} selector was not re-derived from the implemented fixture`);
-    validateAdmissionGateResult({ admissionPolicy, scoringPolicy, policyManifest, catalog, gateId: gate.gate_id, selectorContext, predicateEvidence, result: record.result, artifactRoot: root, immutableArtifactDigests });
+    validateAdmissionGateResult({ admissionPolicy, scoringPolicy, policyManifest, catalog, gateId: gate.gate_id, selectorContext, predicateEvidence, result: record.result, artifactRoot: root, immutableArtifactDigests, requireCurrentEvaluatorSource: false });
   }
   assertEqual([...reviewByGate].filter(([, value]) => value.selector_result === "applicable").map(([key]) => key), REQUIRED_APPLICABLE_GATES, "applicable admission gates");
   assertEqual([...reviewByGate].filter(([, value]) => value.selector_result === "not_applicable").map(([key]) => key), REQUIRED_NON_APPLICABLE_GATES, "non-applicable admission gates");

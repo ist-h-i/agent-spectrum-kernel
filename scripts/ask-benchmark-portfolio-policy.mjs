@@ -460,11 +460,11 @@ export function buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, p
   return context;
 }
 
-export function validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, selectorContext, predicateEvidence, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {} }) {
+export function validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, selectorContext, predicateEvidence, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {}, requireCurrentEvaluatorSource = true }) {
   const requiredFields = admissionPolicy.selector_context_contract.required_fields.map(({ field_id }) => field_id);
   assertClosedKeys(selectorContext, requiredFields, "selector context");
   if (selectorContext.selector_context_digest !== computeSelectorContextDigest(selectorContext)) throw new Error("selector context digest drift");
-  const expected = buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId: selectorContext.fixture_id, predicateEvidence, artifactRoot, immutableArtifactDigests });
+  const expected = buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId: selectorContext.fixture_id, predicateEvidence, artifactRoot, immutableArtifactDigests, requireCurrentEvaluatorSource });
   if (selectorContext.predicate_evidence_digest !== expected.predicate_evidence_digest) throw new Error("predicate evidence digest drift");
   if (selectorContext.requirement_record_digest !== expected.requirement_record_digest) throw new Error("selector context authoritative requirement record digest drift");
   for (const field of ["catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary"]) {
@@ -488,12 +488,12 @@ export function admissionGateSelectorMatches(gate, fixtureContext) {
 }
 
 export function validateAdmissionGateResult(options) {
-  assertClosedKeys(options, ["admissionPolicy", "scoringPolicy", "policyManifest", "catalog", "gateId", "selectorContext", "predicateEvidence", "result", "artifactRoot", "immutableArtifactDigests"], "admission gate validation input", { requiredKeys: ["admissionPolicy", "scoringPolicy", "policyManifest", "catalog", "gateId", "selectorContext", "predicateEvidence", "result"] });
-  const { admissionPolicy, scoringPolicy, policyManifest, catalog, gateId, selectorContext, predicateEvidence, result, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {} } = options;
+  assertClosedKeys(options, ["admissionPolicy", "scoringPolicy", "policyManifest", "catalog", "gateId", "selectorContext", "predicateEvidence", "result", "artifactRoot", "immutableArtifactDigests", "requireCurrentEvaluatorSource"], "admission gate validation input", { requiredKeys: ["admissionPolicy", "scoringPolicy", "policyManifest", "catalog", "gateId", "selectorContext", "predicateEvidence", "result"] });
+  const { admissionPolicy, scoringPolicy, policyManifest, catalog, gateId, selectorContext, predicateEvidence, result, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {}, requireCurrentEvaluatorSource = true } = options;
   const gate = admissionPolicy.admission_gates.find((entry) => entry.gate_id === gateId);
   if (!gate) throw new Error(`unknown admission gate: ${gateId}`);
   if (!gate.allowed_results.includes(result)) throw new Error(`${gateId} result is not allowed: ${result}`);
-  const validatedContext = validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, selectorContext, predicateEvidence, artifactRoot, immutableArtifactDigests });
+  const validatedContext = validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, selectorContext, predicateEvidence, artifactRoot, immutableArtifactDigests, requireCurrentEvaluatorSource });
   const selectorMatches = admissionGateSelectorMatches(gate, validatedContext);
   if (selectorMatches && result === "not_applicable") throw new Error(`${gateId} not_applicable is prohibited when selector matches`);
   if (!selectorMatches && result !== "not_applicable") throw new Error(`${gateId} must be not_applicable when selector does not match`);
