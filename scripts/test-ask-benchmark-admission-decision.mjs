@@ -350,11 +350,12 @@ test("actual Git diff closes the historical R21 to required R22 transition", () 
   const historicalSourcePaths = inventory.paths.filter((path) => !path.startsWith(fixturePrefix));
   assert.equal(frozenFixturePaths.length, inventory.path_partition.frozen_fixture_authority_count);
   assert.equal(historicalSourcePaths.length, inventory.path_partition.historical_evaluator_source_count);
-  const diff = spawnSync("git", ["diff", "--name-only", "origin/main", "--"], { cwd: root, encoding: "utf8" });
-  assert.equal(diff.status, 0, diff.stderr || diff.stdout);
-  const changedPaths = diff.stdout.trim().split("\n").filter(Boolean);
-  assert.equal(changedPaths.some((path) => frozenFixturePaths.includes(path)), false, "PR #238 must not rewrite historical R21 frozen fixture authority");
-  assert.equal(changedPaths.some((path) => historicalSourcePaths.includes(path)), true, "the post-PR #238 evaluator source must require R22 instead of claiming R21 reuse");
+  const frozenDiff = spawnSync("git", ["diff", "--name-only", inventory.authority_source.reviewed_head_revision, "--", ...frozenFixturePaths], { cwd: root, encoding: "utf8" });
+  assert.equal(frozenDiff.status, 0, frozenDiff.stderr || frozenDiff.stdout);
+  assert.equal(frozenDiff.stdout.trim(), "", "the integrated branch must not rewrite historical R21 frozen fixture authority");
+  const sourceDiff = spawnSync("git", ["diff", "--name-only", "origin/main", "--", ...historicalSourcePaths], { cwd: root, encoding: "utf8" });
+  assert.equal(sourceDiff.status, 0, sourceDiff.stderr || sourceDiff.stdout);
+  assert.notEqual(sourceDiff.stdout.trim(), "", "the post-PR #238 evaluator source must require R22 instead of claiming R21 reuse");
 });
 
 test("actual protected-path commit is rejected without a caller-maintained changed-path list", () => {

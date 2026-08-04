@@ -47,6 +47,7 @@ import {
   validateSealedRepositoryAuthorityBytes,
   validatePrivateEvaluatorFragment,
   validateEvaluatorSourceIdentity,
+  verifyEvaluatorAuthority,
   verifyEvaluatorBoundary,
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import {
@@ -1365,6 +1366,17 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     };
   }]));
   const verifiedResult = verifyEvaluatorBoundary({ ...common, ...fakeExecutorOptions });
+  const verifiedAuthority = verifyEvaluatorAuthority(common);
+  assert.equal(verifiedAuthority.evaluationReady, verifiedResult.scoringReady, `binary evaluation completeness must match the admitted compatibility boundary for ${state}`);
+  assert.equal(Object.hasOwn(verifiedAuthority, "scoringReady"), false, `binary evaluator authority must not expose scoring readiness for ${state}`);
+  if (state === "executed_success" && !candidateMutator) {
+    for (const missingField of ["privateEvaluationRoot", "privateEvaluationRecordPath", "privateFragmentPath"]) {
+      const incompleteAuthority = { ...common };
+      delete incompleteAuthority[missingField];
+      assert.throws(() => verifyEvaluatorAuthority(incompleteAuthority), /binary scope verification requires .*private-evaluation/u, `binary authority missing ${missingField} must not become evaluation-ready`);
+      assert.throws(() => verifyEvaluatorBoundary(incompleteAuthority), /binary scope verification requires .*private-evaluation/u, `an admitted boundary must not make binary authority missing ${missingField} scoring-ready`);
+    }
+  }
   assert.deepEqual(chain.snapshot(), before, `full evaluator authority must be read-only for ${state}`);
   if (state === "executed_success" && !candidateMutator) {
     for (const property of Object.keys(fakeExecutorCalls)) assert.equal(fakeExecutorCalls[property], 0, `production verifier must not invoke caller-supplied ${property}`);
@@ -2910,6 +2922,8 @@ try {
   profileRequiredNegative("verification command reference incomplete", ({ evaluatorResult }) => { evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references.pop(); });
   profileRequiredNegative("profile drift in output", ({ outputContract, evaluatorResult }) => { outputContract.result_profile.name = "other_profile"; outputContract.output_contract_digest = computeOutputContractDigest(outputContract); evaluatorResult.output_contract_digest = outputContract.output_contract_digest; });
   profileRequiredNegative("profile drift in freeze", (changed) => { changed.freezeManifest.result_profile.name = "other_profile"; changed.freezeManifest.manifest_digest = computeScoringInputFreezeManifestDigest(changed.freezeManifest); changed.evaluatorResult.scoring_input_freeze_manifest_digest = changed.freezeManifest.manifest_digest; });
+  profileRequiredNegative("profile digest drift", ({ evaluatorResult }) => { evaluatorResult.result_profile.digest = `sha256:${"0".repeat(64)}`; });
+  profileRequiredNegative("profile result binding drift", ({ evaluatorResult }) => { evaluatorResult.result_profile.name = "other_profile"; });
   const underProcessedResult = structuredClone(scoring);
   const underConfig = underProcessedResult.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "configuration-contract");
   underConfig.outcome = "fail"; underConfig.earned_points = 0; underProcessedResult.evaluatorResult.classification = "under_processing";
@@ -2938,6 +2952,15 @@ try {
   invalidVerificationRequirement.evidence_references = [invalidAuthorityReference];
   invalidVerificationRequirement.verification_evidence_references = [invalidAuthorityReference];
   assert.equal(validateScoringInputBindings(invalidEvidenceResult).scoringReady, false, "invalid evidence classification must rederive fail-closed");
+  for (const [label, mutate] of [
+    ["invalid-input layer drift", (changed) => { changed.evaluatorResult.invalid_input_authority.layer = "evaluator_source"; }],
+    ["invalid-input category drift", (changed) => { changed.evaluatorResult.invalid_input_authority.category = "normalized_result_authority_failure"; }],
+    ["invalid-input reference drift", (changed) => { changed.evaluatorResult.invalid_input_authority.evidence_references = [{ kind: "test_result", digest: `sha256:${"7".repeat(64)}`, bytes: 1 }]; }],
+  ]) {
+    const changed = structuredClone(invalidEvidenceResult);
+    mutate(changed);
+    expectFailure(() => validateScoringInputBindings(changed), /invalid|authority|reference|layer|category/u, label);
+  }
   profileRequiredNegative("invalid evidence forged as under-processing", (changed) => { changed.evaluatorResult.evaluation_status = "invalid_input"; changed.evaluatorResult.evidence_correctness = { state: "fail", evidence_references: [{ kind: "test_result", digest: `sha256:${"8".repeat(64)}`, bytes: 1 }] }; changed.evaluatorResult.classification = "under_processing"; });
   profileRequiredNegative("execution reference transplant", ({ evaluatorResult }) => { evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_references[0].digest = `sha256:${"7".repeat(64)}`; });
   profileRequiredNegative("scope deviation transplant", (changed) => { const result = changed.evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary"); result.outcome = "fail"; result.earned_points = 0; result.scope_deviation_references = ["foreign-scope-id"]; changed.evaluatorResult.scope_deviations = [overScope]; changed.evaluatorResult.classification = "over_processing"; });
@@ -2950,6 +2973,12 @@ try {
   const unknownRequirement = structuredClone(scoring);
   unknownRequirement.evaluatorResult.requirement_results[0].requirement_id = "unknown-requirement";
   expectFailure(() => validateScoringInputBindings(unknownRequirement), /unknown requirement/u, "unknown evaluator requirement must fail closed");
+  const duplicateRequirement = structuredClone(scoring);
+  duplicateRequirement.evaluatorResult.requirement_results.push(structuredClone(duplicateRequirement.evaluatorResult.requirement_results[0]));
+  expectFailure(() => validateScoringInputBindings(duplicateRequirement), /unique|exactly cover/u, "duplicate evaluator requirement must fail closed");
+  const addedRequirement = structuredClone(scoring);
+  addedRequirement.evaluatorResult.requirement_results.push({ ...structuredClone(addedRequirement.evaluatorResult.requirement_results[0]), requirement_id: "added-requirement" });
+  expectFailure(() => validateScoringInputBindings(addedRequirement), /unknown requirement|exactly cover/u, "added evaluator requirement must fail closed");
   const missingRequirement = structuredClone(scoring);
   missingRequirement.evaluatorResult.requirement_results.pop();
   expectFailure(() => validateScoringInputBindings(missingRequirement), /exactly cover/u, "missing evaluator requirement must fail closed");

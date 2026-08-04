@@ -24,6 +24,7 @@ import { basename, dirname, extname, posix, relative, resolve, sep, win32 } from
 import { tmpdir } from "node:os";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { readStableJsonFile } from "./ask-benchmark-duplicate-key-json.mjs";
+import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { computePortfolioCatalogDigest } from "./ask-benchmark-portfolio-catalog.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { verifyNormalizedPortfolioResults } from "./ask-benchmark-normalized-results.mjs";
@@ -45,14 +46,12 @@ import {
   deriveEffectiveVerificationEvidenceState,
   FINAL_ADMISSION_RECORD_SCHEMA_PATH,
   SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH,
-  validateFinalAdmissionRecordContract,
   validateBinaryScopeVerificationResult,
   validateFrozenFinalAdmissionRecordContract,
   validateEvaluatorAuthorityBindings,
   validateRequirementRecordContract,
   validateRequirementResultObservations,
   validateScoringContractSchemaParity,
-  validateScoringInputBindings,
 } from "./ask-benchmark-scoring-contract.mjs";
 
 const AUTHORITY_SPAWN_SYNC = spawnSync;
@@ -3164,7 +3163,6 @@ function readScoringInputSources({
   referencePath,
   freezeManifestPath,
   freezeManifestSourceDigest,
-  requireAdmitted,
 }) {
   for (const [path, label] of [
     [catalogPath, "portfolio catalog"],
@@ -3233,8 +3231,7 @@ function readScoringInputSources({
   if (freezeManifest.evaluator_public_reference.semantic_digest !== computeEvaluatorReferenceDigest(evaluatorReference)) throw new Error("evaluator public reference semantic digest does not match the scoring input freeze manifest");
   if (evaluatorAuthorityManifest && freezeManifest.evaluator_authority_manifest.semantic_digest !== evaluatorAuthorityManifest.manifest_digest) throw new Error("evaluator authority manifest semantic digest does not match the scoring input freeze manifest");
   validateScoringContractSchemaParity({ scoringPolicy, requirementRecordSchema, evaluatorResultSchema });
-  const admissionValidation = requireAdmitted ? validateFinalAdmissionRecordContract : validateFrozenFinalAdmissionRecordContract;
-  admissionValidation({
+  validateFrozenFinalAdmissionRecordContract({
     admissionPolicy,
     admissionRecord,
     finalAdmissionRecordSchema: readJsonArtifact(resolve(root, FINAL_ADMISSION_RECORD_SCHEMA_PATH), "final admission record Schema").value,
@@ -3335,7 +3332,7 @@ function verifyEvaluatorAuthorityCore({
   runDir,
   normalizedResultsPath,
   publicArtifactRoot = null,
-}, { requireAdmitted }) {
+}) {
   const bundle = verifyPrivateEvaluatorBundle({ root, referencePath, privateRoot, manifestPath, materializedPath, selectionState, runDir, normalizedResultsPath, publicArtifactRoot });
   if (!resultPath || pathsOverlap(resultPath, privateRoot)) throw new Error("public evaluator result must not overlap the private evaluator root");
   const { value: result } = readJsonArtifact(resultPath, "evaluator result envelope", { publicArtifact: true });
@@ -3353,7 +3350,6 @@ function verifyEvaluatorAuthorityCore({
     referencePath,
     freezeManifestPath: scoringInputFreezeManifestPath,
     freezeManifestSourceDigest: scoringInputFreezeManifestSourceDigest,
-    requireAdmitted,
   });
   if (stableCanonicalJson(scoringInputs.evaluatorReference) !== stableCanonicalJson(bundle.reference)) throw new Error("private bundle evaluator reference does not match the scoring input freeze authority reference");
 
@@ -3391,8 +3387,7 @@ function verifyEvaluatorAuthorityCore({
   if (bundle.reference.fixture_id !== lineage.fixture_id || bundle.reference.fixture_input_digest !== lineage.fixture_input_digest || bundle.reference.task_class !== lineage.task_class || bundle.reference.suite !== lineage.suite) {
     throw new Error("evaluator reference is transplanted across normalized fixture or input identity");
   }
-  const validateBindings = requireAdmitted ? validateScoringInputBindings : validateEvaluatorAuthorityBindings;
-  const readiness = validateBindings({
+  const readiness = validateEvaluatorAuthorityBindings({
     ...scoringInputs,
     normalizedResult: normalized,
     evaluatorResult: result,
@@ -3413,11 +3408,13 @@ function verifyEvaluatorAuthorityCore({
 }
 
 export function verifyEvaluatorAuthority(options) {
-  return verifyEvaluatorAuthorityCore(options, { requireAdmitted: false });
+  return verifyEvaluatorAuthorityCore(options);
 }
 
 export function verifyEvaluatorResult(options) {
-  return verifyEvaluatorAuthorityCore(options, { requireAdmitted: true });
+  const verified = verifyEvaluatorAuthority(options);
+  if (verified.scoringInputs.admissionRecord.admission_status !== "admitted") throw new Error("scoring input freeze requires an admitted final admission record");
+  return { ...verified, scoringReady: verified.evaluationReady };
 }
 
 export function assertNoPrivateBundlePublication(publicArtifactRoot, bundle) {
