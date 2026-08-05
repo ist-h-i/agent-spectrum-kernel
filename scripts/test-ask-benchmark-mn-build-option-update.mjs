@@ -1764,14 +1764,6 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       ["frozen candidate authority transplant", (authority) => { authority.candidate_inventory = structuredClone(authority.frozen_inventory); authority.candidate_workspace_portable_digest = authority.frozen_workspace_portable_digest; }],
     ]) expectPathFailure(label, () => { const authority = JSON.parse(sealedOriginalAuthorityBytes); mutate(authority); writeSealedOriginalAuthority(authority); }, restoreSealedOriginalAuthority, /original workspace authority|inventory|digest|module-owned|recorded sealed authority|snapshot identity|sealed repository/u);
     expectPathFailure("stale child pre-execution repository diff artifact", () => { const artifact = JSON.parse(sealedPreExecutionDiffBytes); artifact.candidate_workspace_tree_digest = `sha256:${"2".repeat(64)}`; overwriteSealedFile(sealedPreExecutionDiffPath, Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`)); }, restoreSealedOriginalAuthority, /repository diff|original workspace authority|recorded sealed authority|digest|snapshot identity|sealed repository/u);
-    const originalCandidatePath = resolve(authorityRoot, privateRecord.record.candidate_workspace_path);
-    const originalCandidateConfig = resolve(originalCandidatePath, "build.config.json");
-    const originalCandidateBytes = readFileSync(originalCandidateConfig);
-    expectPathFailure("original candidate workspace mutation", () => writeFileSync(originalCandidateConfig, Buffer.concat([originalCandidateBytes, Buffer.from("\n")])), () => writeFileSync(originalCandidateConfig, originalCandidateBytes), /original private evaluation workspace|workspace identity|workspace/u);
-    const originalFrozenPath = resolve(authorityRoot, privateRecord.record.frozen_workspace_path);
-    const originalFrozenConfig = resolve(originalFrozenPath, "build.config.json");
-    const originalFrozenBytes = readFileSync(originalFrozenConfig);
-    expectPathFailure("original frozen workspace mutation", () => writeFileSync(originalFrozenConfig, Buffer.concat([originalFrozenBytes, Buffer.from("\n")])), () => writeFileSync(originalFrozenConfig, originalFrozenBytes), /original private evaluation workspace|workspace identity|workspace/u);
     expectPathFailure("private record raw-byte modification", () => writeFileSync(privateRecord.recordPath, Buffer.concat([originalRecordBytes, Buffer.from(" \n")])), () => writeFileSync(privateRecord.recordPath, originalRecordBytes), /private evaluation record|raw|digest|byte/u);
     const fragmentBackup = resolve(authorityRoot, ".private-fragment-backup");
     expectPathFailure("fragment missing", () => renameSync(chain.privateFragmentPath, fragmentBackup), () => renameSync(fragmentBackup, chain.privateFragmentPath), /missing|private evaluator fragment/u);
@@ -1963,6 +1955,13 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       writeFileSync(privateRecord.recordPath, originalRecordBytes);
     }
     assert.deepEqual(chain.snapshot(), before, "production candidate authority negative matrix must restore the persistent authority chain");
+  }
+  if (state === "executed_success" && !candidateMutator) {
+    const originalCandidateConfig = resolve(authorityRoot, privateRecord.record.candidate_workspace_path, "build.config.json");
+    const originalFrozenConfig = resolve(authorityRoot, privateRecord.record.frozen_workspace_path, "build.config.json");
+    writeFileSync(originalCandidateConfig, Buffer.concat([readFileSync(originalCandidateConfig), Buffer.from("\n")]));
+    writeFileSync(originalFrozenConfig, Buffer.concat([readFileSync(originalFrozenConfig), Buffer.from("\n")]));
+    assert.throws(() => verifyEvaluatorBoundary(common), /original private evaluation workspace|workspace identity|workspace/u, "original private evaluation workspace mutations must fail closed after the independent negative matrix");
   }
   return { authorityRoot, scoringRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, privateRecord, chain, verifiedResult };
 }

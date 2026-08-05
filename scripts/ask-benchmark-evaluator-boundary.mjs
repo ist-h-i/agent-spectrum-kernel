@@ -2865,6 +2865,8 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   const recordRead = readJsonArtifact(recordInfo.authoritativePath, "private evaluation record");
   const record = recordRead.value;
   assertBenchmarkSchemaInstance(record, { schemaPath: resolve(root, PRIVATE_EVALUATION_RECORD_SCHEMA_PATH), label: "private evaluation record" });
+  const canonicalRecordBytes = Buffer.from(`${JSON.stringify(record, null, 2)}\n`);
+  if (!recordRead.bytes.equals(canonicalRecordBytes)) throw new Error("private evaluation record raw-byte identity is invalid");
   if (record.evaluation_record_digest !== computePrivateEvaluationRecordDigest(record)) throw new Error("private evaluation record digest closure is invalid");
   if (record.evaluator_bundle_id !== bundle.manifest.evaluator_bundle_id || record.evaluator_bundle_digest !== bundle.manifest.evaluator_bundle_digest || record.evaluator_revision !== bundle.manifest.evaluator_revision) throw new Error("private evaluation record bundle identity is inconsistent");
   const recordExternalAuthority = assertExternalEvaluatorAuthorityAnchor(scoringInputs.evaluatorAuthorityAnchor, "private evaluation record");

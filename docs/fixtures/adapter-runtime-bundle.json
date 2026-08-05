@@ -519,7 +519,7 @@
       "scoring_contract_validator_path": "scripts/ask-benchmark-scoring-contract.mjs",
       "scoring_contract_validator_file_sha256": "77db56d111664d5f0f25d1296adf2f5af3554aab60b080a22985b0483500eeaa",
       "scoring_authority_validator_path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-      "scoring_authority_validator_file_sha256": "b47f81d6346476f9171147d4562df87cd737081f8ad56a06daff092287d58042",
+      "scoring_authority_validator_file_sha256": "d08c221bf04cefdd5031c03ab5e57fde4766020349fb3eb83b8428ecce67f037",
       "engineering_result_schema_path": "benchmarks/schemas/portfolio-engineering-result.schema.json",
       "engineering_result_schema_file_sha256": "af1ea7698d3981705c64f184dcddb418b80ec75ab2917c7991f2f574802db76f",
       "scoring_implementation_path": "scripts/ask-benchmark-portfolio-score.mjs",
@@ -684,7 +684,7 @@
       "validator_path": "scripts/ask-benchmark-mn-build-option-update.mjs",
       "validator_file_sha256": "d51640759283df4171b685fbb349caee18e97496928a3498f41a707c2c4e47da",
       "focused_test_path": "scripts/test-ask-benchmark-mn-build-option-update.mjs",
-      "focused_test_file_sha256": "13a239f3880cf2274b8ca6e670ec9cb507a5732df713062838539d20c3d57f86"
+      "focused_test_file_sha256": "9809e7f458eafe4f920a9a396dd5fe180f99d99014f9c8ad035e66368a318c2e"
     }
   }
 }
