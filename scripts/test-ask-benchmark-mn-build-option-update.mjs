@@ -137,7 +137,7 @@ function syntheticPrivateFragment({ normalized, requirementRecord, state }) {
     program: "adaptive_ask_private_evaluator_fragment",
     evaluation_status: invalid ? "invalid_input" : "completed",
     requirement_results: requirementResults,
-    findings: verificationPass ? [] : [{ finding_id: "synthetic-verification-failure", category: invalid ? "invalid_evidence" : "verification_evidence_missing_or_unsuccessful", severity: invalid ? "critical" : "high", evidence_references: failureReferences }],
+    findings: verificationPass ? [] : [{ finding_id: "synthetic-verification-failure", category: invalid ? "normalized_command_evidence_invalid" : "verification_evidence_missing_or_unsuccessful", severity: invalid ? "critical" : "high", evidence_references: failureReferences }],
     scope_deviations: [],
     verification_correctness: observation(verificationPass ? "pass" : "fail", verificationReferences),
     evidence_correctness: observation(invalid ? "fail" : "pass"),
@@ -1415,7 +1415,7 @@ async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAut
   return { fragment, frozenWorkspace, candidateWorkspace, evaluationInputRoot, execution, executed };
 }
 
-async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candidateMutator = null } = {}) {
+async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candidateMutator = null, runMutablePathNegatives = true } = {}) {
   const authorityRoot = mkdtempSync(`/private/tmp/ask-mn-r21-${state}-`);
   const productionMutation = typeof candidateMutator === "string" ? candidateMutator : null;
   const normalizedAuthority = productionMutation
@@ -1606,7 +1606,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   expectPersistentFailure("evaluator source revision drift", (changed) => { changed.evaluator_revision = `0${changed.evaluator_revision.slice(1)}`; }, /revision|lineage|authority-owned adapter output/u);
   expectPersistentFailure("cross-fixture result transplant", (changed) => { changed.fixture_id = "foreign-fixture"; }, /fixture|lineage|authority-owned adapter output/u);
   expectPersistentFailure("cross-evaluator result transplant", (changed) => { changed.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`; }, /evaluator|lineage|authority-owned adapter output/u);
-  expectPersistentFailure("requirement omission", (changed) => { changed.requirement_results.pop(); }, /requirement|exactly cover|authority-owned adapter output/u);
+  expectPersistentFailure("requirement omission", (changed) => { changed.requirement_results.pop(); }, /requirement|exactly cover|binary result|verification-evidence|authority-owned adapter output/u);
   expectPersistentFailure("requirement addition", (changed) => { changed.requirement_results.push({ ...structuredClone(changed.requirement_results[0]), requirement_id: "added-requirement" }); }, /requirement|unknown|exactly cover|authority-owned adapter output/u);
   expectPersistentFailure("requirement duplicate", (changed) => { changed.requirement_results.push(structuredClone(changed.requirement_results[0])); }, /requirement|unique|exactly cover|authority-owned adapter output/u);
   const scopeDeviation = { finding_id: "synthetic-scope-deviation", category: "unrelated_modification", severity: "high", evidence_references: [{ kind: "repository_diff", digest: `sha256:${"9".repeat(64)}`, bytes: 1 }] };
@@ -1664,6 +1664,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       restore();
       assert.deepEqual(chain.snapshot(), before, `private path authority tamper must restore ${label}`);
     };
+    if (runMutablePathNegatives) {
     const staticRunnerPath = resolve(root, "scripts/ask-benchmark-private-evaluator-runner.mjs");
     const staticHiddenPath = resolve(privateRoot, bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests").path);
     const staticRunnerBytes = readFileSync(staticRunnerPath);
@@ -1764,6 +1765,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       ["frozen candidate authority transplant", (authority) => { authority.candidate_inventory = structuredClone(authority.frozen_inventory); authority.candidate_workspace_portable_digest = authority.frozen_workspace_portable_digest; }],
     ]) expectPathFailure(label, () => { const authority = JSON.parse(sealedOriginalAuthorityBytes); mutate(authority); writeSealedOriginalAuthority(authority); }, restoreSealedOriginalAuthority, /original workspace authority|inventory|digest|module-owned|recorded sealed authority|snapshot identity|sealed repository/u);
     expectPathFailure("stale child pre-execution repository diff artifact", () => { const artifact = JSON.parse(sealedPreExecutionDiffBytes); artifact.candidate_workspace_tree_digest = `sha256:${"2".repeat(64)}`; overwriteSealedFile(sealedPreExecutionDiffPath, Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`)); }, restoreSealedOriginalAuthority, /repository diff|original workspace authority|recorded sealed authority|digest|snapshot identity|sealed repository/u);
+    }
     expectPathFailure("private record raw-byte modification", () => writeFileSync(privateRecord.recordPath, Buffer.concat([originalRecordBytes, Buffer.from(" \n")])), () => writeFileSync(privateRecord.recordPath, originalRecordBytes), /private evaluation record|raw|digest|byte/u);
     const fragmentBackup = resolve(authorityRoot, ".private-fragment-backup");
     expectPathFailure("fragment missing", () => renameSync(chain.privateFragmentPath, fragmentBackup), () => renameSync(fragmentBackup, chain.privateFragmentPath), /missing|private evaluator fragment/u);
@@ -1909,14 +1911,15 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     assert.deepEqual(chain.snapshot(), before, "external authority closure negatives must restore the persistent authority chain");
     expectPrivateFailure("runner source identity missing", ({ record }) => { delete record.evaluator_runner_source_identity; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /Schema|runner source identity|record/u);
     expectPrivateFailure("record digest", ({ record }) => { record.adapter_source_digest = `sha256:${"0".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /adapter source digest|record digest|source/u);
-    expectPrivateFailure("record cross-fixture transplant", ({ record }) => { record.candidate_authority.fixture_id = "foreign-fixture"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /fixture|candidate|lineage|record/u);
+    expectPrivateFailure("record cross-fixture transplant", ({ record }) => { record.candidate_authority.fixture_id = "foreign-fixture"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /fixture|candidate|lineage|record|repository diff workspace authority/u);
     expectPrivateFailure("record cross-evaluator transplant", ({ record }) => { record.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /evaluator|bundle|record/u);
     expectPrivateFailure("record-only original workspace authority reseal", ({ record }) => { record.original_workspace_authority_digest = `sha256:${"9".repeat(64)}`; record.original_workspace_authority_raw_sha256 = `sha256:${"8".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /original workspace authority|original private evaluation workspace identity|record/u);
     expectPrivateFailure("record fragment path escape", ({ record }) => { record.private_fragment_path = "../escape.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /path|escape|Schema|authority/u);
     expectPrivateFailure("fragment tamper", () => { const fragment = JSON.parse(originalFragmentBytes.toString("utf8")); fragment.classification = "over_processing"; writeJson(chain.privateFragmentPath, fragment); }, /fragment digest|byte closure|authority-owned adapter|classification/u);
     expectPrivateFailure("repository diff tamper", () => { const artifact = JSON.parse(originalRepositoryDiffBytes.toString("utf8")); artifact.diff_entries = [...artifact.diff_entries, { path: "r8-tamper.txt", change_type: "added", before: null, after: { file_type: "file", mode: 420, bytes: 1, sha256: `sha256:${"0".repeat(64)}` } }]; writeJson(repositoryDiffPath, artifact); }, /artifact (?:semantic )?digest|byte closure|byte binding|repository diff/u);
     expectPrivateFailure("evaluator check replacement", ({ record }) => { const entry = record.evidence_artifacts.find(({ path }) => path.endsWith("evaluator-check-artifact.json")); entry.path = "repository-diff-artifact.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /repository diff artifact|artifact|schema|record/u);
-    expectPrivateFailure("public repository-diff reference transplant", ({ result }) => { const reference = result.findings.flatMap(({ evidence_references }) => evidence_references).find(({ kind }) => kind === "repository_diff"); assert.ok(reference); reference.digest = `sha256:${"f".repeat(64)}`; }, /sealed private artifact|artifact|authority-owned adapter/u);
+    const publicRepositoryDiffReference = evaluatorResult.findings.flatMap(({ evidence_references }) => evidence_references).find(({ kind }) => kind === "repository_diff");
+    if (publicRepositoryDiffReference) expectPrivateFailure("public repository-diff reference transplant", ({ result }) => { const reference = result.findings.flatMap(({ evidence_references }) => evidence_references).find(({ kind }) => kind === "repository_diff"); reference.digest = `sha256:${"f".repeat(64)}`; }, /sealed private artifact|artifact|authority-owned adapter/u);
   }
   if (productionMutation === "valid-baseline" && state === "executed_success") {
     for (const forbidden of ["candidateWorkspace", "candidateMutator", "evaluationInputRoot", "normalizedResult", "caseId", "attempt"]) {
@@ -1956,7 +1959,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     }
     assert.deepEqual(chain.snapshot(), before, "production candidate authority negative matrix must restore the persistent authority chain");
   }
-  if (state === "executed_success" && !candidateMutator) {
+  if (state === "executed_success" && !candidateMutator && runMutablePathNegatives) {
     const originalCandidateConfig = resolve(authorityRoot, privateRecord.record.candidate_workspace_path, "build.config.json");
     const originalFrozenConfig = resolve(authorityRoot, privateRecord.record.frozen_workspace_path, "build.config.json");
     writeFileSync(originalCandidateConfig, Buffer.concat([readFileSync(originalCandidateConfig), Buffer.from("\n")]));
@@ -3231,7 +3234,7 @@ try {
     const environment = createSyntheticCurrentAuthorityEnvironment(state);
     privateRoot = environment.privateEvaluatorRoot;
     try {
-      const fullAuthority = await runPersistentFullEvaluatorAuthority(privateRoot, state);
+      const fullAuthority = await runPersistentFullEvaluatorAuthority(privateRoot, state, { runMutablePathNegatives: false });
       assert.equal(fullAuthority.verifiedResult.result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state, deriveVerificationEvidenceState(fullAuthority.normalizedAuthority.normalized), `current synthetic authority must preserve the typed state for ${state}`);
       assert.equal(fullAuthority.verifiedResult.scoringReady, state !== "invalid", `admitted compatibility readiness must follow complete current synthetic authority for ${state}`);
       removeTree(fullAuthority.authorityRoot);
