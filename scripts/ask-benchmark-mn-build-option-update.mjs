@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +11,6 @@ import {
   EVALUATOR_AUTHORITY_MANIFEST_PATH,
   validateEvaluatorAuthorityManifest,
   verifyPrivateEvaluatorBundle,
-  verifyPublicEvaluatorReference,
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import {
   computeFinalAdmissionRecordDigest,
@@ -83,6 +83,35 @@ function readJson(path, label) {
   } catch (error) {
     throw new Error(`${label} is invalid JSON: ${error.message}`);
   }
+}
+
+function auditHistoricalEvaluatorReference({ root, referencePath }) {
+  const reference = readJson(referencePath, "historical evaluator reference");
+  assertBenchmarkSchemaInstance(reference, { schemaPath: resolve(root, "benchmarks/schemas/evaluator-reference.schema.json"), label: "historical evaluator reference" });
+  if (reference.public_metadata_digest !== computeEvaluatorReferenceDigest(reference)) throw new Error("historical evaluator reference deterministic identity is invalid");
+  const identity = reference.evaluator_source_identity;
+  if (!identity || identity.base_git_revision !== reference.evaluator_revision || !Array.isArray(identity.source_files) || identity.source_files.length === 0 || !identity.dependency_graph) throw new Error("historical evaluator source identity is missing or inconsistent");
+  const sourceFiles = identity.source_files.map((entry) => {
+    if (typeof entry.path !== "string" || entry.path.length === 0 || entry.path.startsWith("/") || entry.path.includes("\\") || entry.path.split("/").some((segment) => segment === "" || segment === "." || segment === "..")) throw new Error("historical evaluator source path is not portable");
+    return { path: entry.path, bytes: entry.bytes, sha256: entry.sha256 };
+  });
+  const sorted = [...sourceFiles].sort((left, right) => left.path.localeCompare(right.path));
+  if (stableCanonicalJson(sourceFiles) !== stableCanonicalJson(sorted) || new Set(sourceFiles.map(({ path }) => path)).size !== sourceFiles.length) throw new Error("historical evaluator source inventory is not closed");
+  if (identity.source_tree_digest !== canonicalDigest(sourceFiles)) throw new Error("historical evaluator source-tree digest closure is invalid");
+  const { graph_digest: graphDigest, ...graphClosure } = identity.dependency_graph;
+  if (graphDigest !== canonicalDigest(graphClosure)) throw new Error("historical evaluator dependency graph digest closure is invalid");
+  const graphSourceFiles = identity.dependency_graph.node_inventory.map(({ path, bytes, sha256: digest }) => ({ path, bytes, sha256: digest }));
+  if (stableCanonicalJson(sourceFiles) !== stableCanonicalJson(graphSourceFiles)) throw new Error("historical evaluator source inventory does not match its dependency graph");
+  for (const entry of sourceFiles) {
+    let committed;
+    try {
+      committed = execFileSync("git", ["-C", realpathSync(root), "show", `${identity.base_git_revision}:${entry.path}`], { encoding: null, maxBuffer: 4 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+    } catch {
+      throw new Error(`historical evaluator source is unavailable at ${entry.path}`);
+    }
+    if (committed.length !== entry.bytes || sha256(committed) !== entry.sha256) throw new Error(`historical evaluator source bytes drift at ${entry.path}`);
+  }
+  return reference;
 }
 
 function withoutField(value, field) {
@@ -297,7 +326,7 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
     if (record.bytes !== bytes.length || record.sha256 !== sha256(bytes).slice("sha256:".length)) throw new Error(`input manifest drift: ${record.path}`);
   }
 
-  const reference = verifyPublicEvaluatorReference({ root, referencePath: paths["evaluator-reference.json"], requireCurrentSource: false });
+  const reference = auditHistoricalEvaluatorReference({ root, referencePath: paths["evaluator-reference.json"] });
   assertDigest(reference.fixture_input_digest, sha256(inputManifestBytes), "fixture input binding");
   if (reference.fixture_id !== FIXTURE_ID || reference.task_class !== fixture.task_class || reference.suite !== fixture.suite) throw new Error("evaluator reference fixture identity mismatch");
 
@@ -386,8 +415,8 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
     [outputContract.output_contract_path, paths["output-contract.json"]],
     [outputContract.evaluator_public_reference_path, paths["evaluator-reference.json"]],
   ].map(([path, absolute]) => [path, sha256(readFileSync(absolute))]));
-  const predicateEvidence = { requirement_record: requirementRecord, output_contract: outputContract };
-  const selectorContext = buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId: FIXTURE_ID, predicateEvidence, artifactRoot: root, immutableArtifactDigests, requireCurrentEvaluatorSource: false });
+  const predicateEvidence = { requirement_record: requirementRecord };
+  const selectorContext = buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId: FIXTURE_ID, predicateEvidence, artifactRoot: root, immutableArtifactDigests });
   const review = artifacts["admission-review.json"];
   assertDigest(review.review_package_digest, canonicalDigest(withoutField(review, "review_package_digest")), "admission review package");
   const reviewByGate = new Map(review.gates.map((entry) => [entry.gate_id, entry]));
@@ -398,7 +427,7 @@ export function validateMnBuildOptionUpdatePublicFixture({ root = ROOT } = {}) {
     if (!record) throw new Error(`admission review is missing gate ${gate.gate_id}`);
     const matches = admissionGateSelectorMatches(gate, selectorContext);
     if ((matches ? "applicable" : "not_applicable") !== record.selector_result) throw new Error(`${gate.gate_id} selector was not re-derived from the implemented fixture`);
-    validateAdmissionGateResult({ admissionPolicy, scoringPolicy, policyManifest, catalog, gateId: gate.gate_id, selectorContext, predicateEvidence, result: record.result, artifactRoot: root, immutableArtifactDigests, requireCurrentEvaluatorSource: false });
+    validateAdmissionGateResult({ admissionPolicy, scoringPolicy, policyManifest, catalog, gateId: gate.gate_id, selectorContext, predicateEvidence, result: record.result, artifactRoot: root, immutableArtifactDigests });
   }
   assertEqual([...reviewByGate].filter(([, value]) => value.selector_result === "applicable").map(([key]) => key), REQUIRED_APPLICABLE_GATES, "applicable admission gates");
   assertEqual([...reviewByGate].filter(([, value]) => value.selector_result === "not_applicable").map(([key]) => key), REQUIRED_NON_APPLICABLE_GATES, "non-applicable admission gates");

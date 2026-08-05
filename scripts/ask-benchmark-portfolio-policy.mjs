@@ -368,7 +368,7 @@ function validateRequirementRecordSource({ scoringPolicy, policyManifest, catalo
   return source;
 }
 
-function validateOutputContractSource({ policyManifest, catalog, fixture, reference, artifactRoot, immutableArtifactDigests, requireCurrentEvaluatorSource }) {
+function validateOutputContractSource({ policyManifest, catalog, fixture, reference, artifactRoot, immutableArtifactDigests }) {
   const requiredKeys = [
     "output_contract_id", "output_contract_schema_path", "output_contract_path", "fixture_id", "catalog_digest", "policy_manifest_digest",
     "evaluator_public_reference_path", "evaluator_public_reference_digest", "declares_findings", "output_contract_digest",
@@ -404,14 +404,14 @@ function validateOutputContractSource({ policyManifest, catalog, fixture, refere
     schemaPath: EVALUATOR_REFERENCE_SCHEMA_PATH,
     label: "authoritative evaluator public reference",
   });
-  const evaluatorReference = verifyPublicEvaluatorReference({ root: DEFAULT_ROOT, referencePath: evaluatorSource.absolutePath, requireCurrentSource: requireCurrentEvaluatorSource });
+  const evaluatorReference = verifyPublicEvaluatorReference({ root: DEFAULT_ROOT, referencePath: evaluatorSource.absolutePath });
   if (source.evaluator_public_reference_digest !== evaluatorReference.public_metadata_digest) throw new Error("output contract evaluator public reference digest binding does not match authoritative reference");
   if (evaluatorReference.fixture_id !== fixture.fixture_id) throw new Error("evaluator public reference fixture binding does not match output contract");
   if (evaluatorReference.suite !== fixture.suite || evaluatorReference.task_class !== fixture.task_class) throw new Error("evaluator public reference suite or task class binding does not match catalog");
   return source;
 }
 
-function deriveFixturePredicates(admissionPolicy, scoringPolicy, policyManifest, catalog, fixture, predicateEvidence, artifactRoot, immutableArtifactDigests, requireCurrentEvaluatorSource) {
+function deriveFixturePredicates(admissionPolicy, scoringPolicy, policyManifest, catalog, fixture, predicateEvidence, artifactRoot, immutableArtifactDigests) {
   assertClosedKeys(predicateEvidence, ["requirement_record", "output_contract"], "predicate evidence", { requiredKeys: ["requirement_record"] });
   const requirementRecord = validateRequirementRecordSource({ scoringPolicy, policyManifest, catalog, fixture, reference: predicateEvidence.requirement_record, artifactRoot, immutableArtifactDigests });
   const scoredRequirements = requirementRecord.requirements.filter(({ requirement_kind }) => requirement_kind === "blocker" || requirement_kind === "weighted");
@@ -422,7 +422,7 @@ function deriveFixturePredicates(admissionPolicy, scoringPolicy, policyManifest,
   let outputContractDeclaresFindings = false;
   let outputContract = null;
   if (predicateEvidence.output_contract) {
-    outputContract = validateOutputContractSource({ policyManifest, catalog, fixture, reference: predicateEvidence.output_contract, artifactRoot, immutableArtifactDigests, requireCurrentEvaluatorSource });
+    outputContract = validateOutputContractSource({ policyManifest, catalog, fixture, reference: predicateEvidence.output_contract, artifactRoot, immutableArtifactDigests });
     outputContractDeclaresFindings = outputContract.declares_findings;
   }
 
@@ -434,7 +434,7 @@ function deriveFixturePredicates(admissionPolicy, scoringPolicy, policyManifest,
   return { predicates: predicates.sort(compareAscii), requirementRecord, verifiedPredicateEvidence };
 }
 
-export function buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId, predicateEvidence, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {}, requireCurrentEvaluatorSource = true }) {
+export function buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId, predicateEvidence, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {} }) {
   if (catalog.catalog_digest !== admissionPolicy.catalog_digest || catalog.catalog_digest !== scoringPolicy.catalog_digest) throw new Error("selector context catalog digest binding does not match policy");
   if (admissionPolicy.policy_digest !== computePortfolioPolicyDigest(admissionPolicy) || scoringPolicy.policy_digest !== computePortfolioPolicyDigest(scoringPolicy)) throw new Error("selector context policy digest does not match deterministic closure");
   if (policyManifest.catalog_digest !== catalog.catalog_digest || policyManifest.manifest_digest !== computePortfolioPolicyManifestDigest(policyManifest)) throw new Error("selector context policy manifest binding does not match catalog or digest closure");
@@ -442,7 +442,7 @@ export function buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, p
   const fixture = catalog.fixtures.find(({ fixture_id }) => fixture_id === fixtureId);
   if (!fixture) throw new Error(`unknown fixture ID: ${fixtureId}`);
   if (fixture.fixture_metadata_digest !== computeFixtureMetadataDigest(fixture)) throw new Error("catalog fixture metadata digest does not match recomputation");
-  const derived = deriveFixturePredicates(admissionPolicy, scoringPolicy, policyManifest, catalog, fixture, predicateEvidence, artifactRoot, immutableArtifactDigests, requireCurrentEvaluatorSource);
+  const derived = deriveFixturePredicates(admissionPolicy, scoringPolicy, policyManifest, catalog, fixture, predicateEvidence, artifactRoot, immutableArtifactDigests);
   const context = {
     fixture_id: fixture.fixture_id,
     catalog_digest: catalog.catalog_digest,
@@ -460,11 +460,11 @@ export function buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, p
   return context;
 }
 
-export function validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, selectorContext, predicateEvidence, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {}, requireCurrentEvaluatorSource = true }) {
+export function validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, selectorContext, predicateEvidence, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {} }) {
   const requiredFields = admissionPolicy.selector_context_contract.required_fields.map(({ field_id }) => field_id);
   assertClosedKeys(selectorContext, requiredFields, "selector context");
   if (selectorContext.selector_context_digest !== computeSelectorContextDigest(selectorContext)) throw new Error("selector context digest drift");
-  const expected = buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId: selectorContext.fixture_id, predicateEvidence, artifactRoot, immutableArtifactDigests, requireCurrentEvaluatorSource });
+  const expected = buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId: selectorContext.fixture_id, predicateEvidence, artifactRoot, immutableArtifactDigests });
   if (selectorContext.predicate_evidence_digest !== expected.predicate_evidence_digest) throw new Error("predicate evidence digest drift");
   if (selectorContext.requirement_record_digest !== expected.requirement_record_digest) throw new Error("selector context authoritative requirement record digest drift");
   for (const field of ["catalog_digest", "fixture_metadata_digest", "fixture_role", "suite", "task_class", "risk_boundary"]) {
@@ -488,12 +488,12 @@ export function admissionGateSelectorMatches(gate, fixtureContext) {
 }
 
 export function validateAdmissionGateResult(options) {
-  assertClosedKeys(options, ["admissionPolicy", "scoringPolicy", "policyManifest", "catalog", "gateId", "selectorContext", "predicateEvidence", "result", "artifactRoot", "immutableArtifactDigests", "requireCurrentEvaluatorSource"], "admission gate validation input", { requiredKeys: ["admissionPolicy", "scoringPolicy", "policyManifest", "catalog", "gateId", "selectorContext", "predicateEvidence", "result"] });
-  const { admissionPolicy, scoringPolicy, policyManifest, catalog, gateId, selectorContext, predicateEvidence, result, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {}, requireCurrentEvaluatorSource = true } = options;
+  assertClosedKeys(options, ["admissionPolicy", "scoringPolicy", "policyManifest", "catalog", "gateId", "selectorContext", "predicateEvidence", "result", "artifactRoot", "immutableArtifactDigests"], "admission gate validation input", { requiredKeys: ["admissionPolicy", "scoringPolicy", "policyManifest", "catalog", "gateId", "selectorContext", "predicateEvidence", "result"] });
+  const { admissionPolicy, scoringPolicy, policyManifest, catalog, gateId, selectorContext, predicateEvidence, result, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {} } = options;
   const gate = admissionPolicy.admission_gates.find((entry) => entry.gate_id === gateId);
   if (!gate) throw new Error(`unknown admission gate: ${gateId}`);
   if (!gate.allowed_results.includes(result)) throw new Error(`${gateId} result is not allowed: ${result}`);
-  const validatedContext = validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, selectorContext, predicateEvidence, artifactRoot, immutableArtifactDigests, requireCurrentEvaluatorSource });
+  const validatedContext = validateSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, selectorContext, predicateEvidence, artifactRoot, immutableArtifactDigests });
   const selectorMatches = admissionGateSelectorMatches(gate, validatedContext);
   if (selectorMatches && result === "not_applicable") throw new Error(`${gateId} not_applicable is prohibited when selector matches`);
   if (!selectorMatches && result !== "not_applicable") throw new Error(`${gateId} must be not_applicable when selector does not match`);

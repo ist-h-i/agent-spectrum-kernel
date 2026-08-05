@@ -31,6 +31,7 @@ import {
   computeEvaluatorReferenceDigest,
   computeIndependenceStatementDigest,
   deriveEvaluatorAuthorityManifest,
+  deriveEvaluatorDependencyGraph,
   adaptPrivateEvaluatorFragmentToEnvelope,
   assertSealedSnapshotModes,
   createSealedEvaluatorExecutionForTest,
@@ -72,9 +73,11 @@ import {
   projectVerifiedCommandEvidence,
   renderCommandEvent,
 } from "./ask-benchmark-command-evidence.mjs";
+import { scoreEvaluatorResult } from "./ask-benchmark-portfolio-score.mjs";
 
-const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
+const historicalRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
+let root = historicalRoot;
+let fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
 const REQUIRED_COMMAND_IDS_FOR_TEST = ["build-config-focused-test", "build-config-semantic-validator"];
 const EVALUATOR_AUTHORITY_FILE_PATHS = [
   "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json",
@@ -94,7 +97,7 @@ const NORMALIZED_TELEMETRY_FIELDS = [
 const work = mkdtempSync(resolve(tmpdir(), "ask-mn-build-option-update-"));
 const temporaryAuthorityRoots = new Set();
 const privateRootArgumentIndex = process.argv.indexOf("--private-root");
-const privateRoot = privateRootArgumentIndex === -1 ? null : resolve(process.argv[privateRootArgumentIndex + 1]);
+let privateRoot = privateRootArgumentIndex === -1 ? null : resolve(process.argv[privateRootArgumentIndex + 1]);
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -102,6 +105,182 @@ function readJson(path) {
 
 function sha256(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function syntheticPrivateFragment({ normalized, requirementRecord, state }) {
+  const verificationState = deriveVerificationEvidenceState(normalized);
+  const verificationReferences = deriveVerificationEvidenceReferences(normalized, verificationState);
+  const verificationPass = verificationState === "executed_success";
+  const invalid = verificationState === "invalid";
+  const normalizedReference = { kind: "normalized_result", digest: normalized.normalized_result_digest, bytes: null };
+  const requirementResults = requirementRecord.requirements.map((requirement) => {
+    const verification = requirement.requirement_id === "verification-evidence";
+    const pass = !verification || verificationPass;
+    const references = verification ? verificationReferences : [normalizedReference];
+    return {
+      requirement_id: requirement.requirement_id,
+      outcome: pass ? "pass" : "fail",
+      earned_points: pass ? requirement.max_points : 0,
+      matched_equivalence_class_ids: pass ? [requirement.equivalence_class_ids[0]] : [],
+      finding_ids: pass ? [] : ["synthetic-verification-failure"],
+      evidence_references: references,
+      scope_deviation_references: [],
+      verification_evidence_references: verification ? verificationReferences : [],
+      ...(verification ? { verification_evidence_state: verificationState } : {}),
+    };
+  });
+  const failureReferences = verificationReferences.length > 0 ? verificationReferences : [normalizedReference];
+  const observation = (observationState, references = failureReferences) => ({ state: observationState, evidence_references: references });
+  const fragment = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/private-evaluator-fragment.schema.json",
+    program: "adaptive_ask_private_evaluator_fragment",
+    evaluation_status: invalid ? "invalid_input" : "completed",
+    requirement_results: requirementResults,
+    findings: verificationPass ? [] : [{ finding_id: "synthetic-verification-failure", category: invalid ? "invalid_evidence" : "verification_evidence_missing_or_unsuccessful", severity: invalid ? "critical" : "high", evidence_references: failureReferences }],
+    scope_deviations: [],
+    verification_correctness: observation(verificationPass ? "pass" : "fail", verificationReferences),
+    evidence_correctness: observation(invalid ? "fail" : "pass"),
+    under_processing: observation(verificationPass ? "not_detected" : "detected"),
+    over_processing: observation("not_detected", [normalizedReference]),
+    classification: invalid ? "invalid_evidence" : verificationPass ? "correct_narrow_execution" : "under_processing",
+    result_profile: { name: BINARY_SCOPE_VERIFICATION_PROFILE_NAME, digest: computeResultProfileDigest() },
+    scoring_ready: false,
+  };
+  if (invalid) fragment.invalid_input_authority = { layer: "command_evidence", category: "normalized_command_evidence_invalid", code: "normalized_command_evidence_invalid", evidence_references: [normalizedReference] };
+  assert.equal(state === "invalid", invalid, `synthetic fragment state must rederive for ${state}`);
+  return fragment;
+}
+
+function currentEvaluatorSourceIdentity(repositoryRoot, generatorSourceDigest) {
+  const baseGitRevision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot, encoding: "utf8" }).trim();
+  const dependencyGraph = deriveEvaluatorDependencyGraph({ root: repositoryRoot, baseRevision: baseGitRevision });
+  const sourceFiles = dependencyGraph.node_inventory.map(({ path, bytes, sha256: digest }) => ({ path, bytes, sha256: digest }));
+  return {
+    base_git_revision: baseGitRevision,
+    source_tree_digest: canonicalDigest(sourceFiles),
+    generator_source_digest: generatorSourceDigest,
+    source_files: sourceFiles,
+    dependency_graph: dependencyGraph,
+  };
+}
+
+function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluatorRoot, fragment }) {
+  const syntheticFixtureRoot = resolve(repositoryRoot, FIXTURE_ROOT_RELATIVE);
+  const hiddenBytes = Buffer.from(`export async function evaluateCandidateSafe() { return ${JSON.stringify(fragment)}; }\n`);
+  writeFileSync(resolve(privateEvaluatorRoot, "hidden-evaluator.mjs"), hiddenBytes);
+  const generatorSourceDigest = sha256(Buffer.from("deterministic-synthetic-current-authority-v1"));
+  const sourceIdentity = currentEvaluatorSourceIdentity(repositoryRoot, generatorSourceDigest);
+  const referenceSeed = readJson(resolve(syntheticFixtureRoot, "evaluator-reference.json"));
+  const bundleBase = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/private-evaluator-bundle.schema.json",
+    program: "adaptive_ask_private_evaluator_bundle",
+    fixture_identity: { fixture_id: "mn-build-option-update", task_class: "configuration", suite: "mechanism_negative" },
+    input_identity: { fixture_input_digest: referenceSeed.fixture_input_digest },
+    evaluator_revision: sourceIdentity.base_git_revision,
+    evaluator_source_identity: sourceIdentity,
+    generator: { id: "synthetic-current-authority", version: "1.0.0", source_digest: generatorSourceDigest },
+    independence: { statement_digest: canonicalDigest({ authority: "synthetic-test-only", revision: sourceIdentity.base_git_revision }), generated_without_agent_output: true, public_answer_sources_used: false, measured_agent_access_allowed: false },
+    review: { record_digest: canonicalDigest({ authority: "synthetic-test-only", status: "not_independently_reviewed" }), status: "pending", reviewer_count: 1 },
+    asset_inventory: [{ role: "hidden_tests", path: "hidden-evaluator.mjs", bytes: hiddenBytes.length, sha256: sha256(hiddenBytes), media_type: "text/javascript", required: true }],
+    capabilities: { automated_evaluation: true, manual_evaluation: false },
+    boundaries: { private_evaluator_bundle: true, public_repository_allowed: false, public_ci_artifact_allowed: false, contains_answer_bearing_content: true },
+    dependency_graph: sourceIdentity.dependency_graph,
+  };
+  const bundleWithId = { ...bundleBase, evaluator_bundle_id: computeEvaluatorBundleId(bundleBase) };
+  const bundleManifest = { ...bundleWithId, evaluator_bundle_digest: computeEvaluatorBundleDigest(bundleWithId) };
+  writeJson(resolve(privateEvaluatorRoot, "private-evaluator-bundle.json"), bundleManifest);
+
+  const admission = readJson(resolve(syntheticFixtureRoot, "final-admission-record.json"));
+  const requirementRecord = readJson(resolve(syntheticFixtureRoot, "requirement-record.json"));
+  const outputContract = readJson(resolve(syntheticFixtureRoot, "output-contract.json"));
+  const freezeManifest = readJson(resolve(syntheticFixtureRoot, "scoring-input-freeze-manifest.json"));
+  Object.assign(admission, {
+    evaluator_bundle_id: bundleManifest.evaluator_bundle_id,
+    evaluator_bundle_digest: bundleManifest.evaluator_bundle_digest,
+    evaluator_byte_count: hiddenBytes.length,
+    evaluator_source_identity: sourceIdentity,
+    reviewer_record_id: "synthetic-test-authority",
+    admission_status: "admission_pending",
+  });
+  admission.requirement_authority_digest = computeFinalAdmissionRequirementAuthorityDigest(admission);
+  requirementRecord.admission_record_digest = admission.requirement_authority_digest;
+  requirementRecord.requirement_set_digest = canonicalDigest(requirementRecord.requirements);
+  requirementRecord.requirement_record_digest = computeRequirementRecordDigest(requirementRecord);
+  writeJson(resolve(syntheticFixtureRoot, "requirement-record.json"), requirementRecord);
+
+  const authorityBuffers = new Map(EVALUATOR_AUTHORITY_FILE_PATHS.map((path) => [path, readFileSync(resolve(repositoryRoot, path))]));
+  const evaluatorAuthorityManifest = deriveEvaluatorAuthorityManifest({ buffers: authorityBuffers, evaluatorRevision: sourceIdentity.base_git_revision });
+  const evaluatorAuthorityManifestPath = resolve(repositoryRoot, EVALUATOR_AUTHORITY_MANIFEST_PATH);
+  writeJson(evaluatorAuthorityManifestPath, evaluatorAuthorityManifest);
+  const evaluatorAuthorityManifestBytes = readFileSync(evaluatorAuthorityManifestPath);
+  const evaluatorAuthorityBinding = {
+    evaluator_authority_manifest_path: EVALUATOR_AUTHORITY_MANIFEST_PATH,
+    evaluator_authority_manifest_raw_sha256: sha256(evaluatorAuthorityManifestBytes),
+    evaluator_authority_manifest_digest: evaluatorAuthorityManifest.manifest_digest,
+  };
+
+  const reference = {
+    ...referenceSeed,
+    evaluator_bundle_id: bundleManifest.evaluator_bundle_id,
+    evaluator_bundle_digest: bundleManifest.evaluator_bundle_digest,
+    evaluator_bundle_schema_version: bundleManifest.schema_version,
+    evaluator_revision: sourceIdentity.base_git_revision,
+    evaluator_source_identity: sourceIdentity,
+    generator_identity: canonicalDigest(bundleManifest.generator),
+    independence_statement_digest: bundleManifest.independence.statement_digest,
+    review_record_digest: bundleManifest.review.record_digest,
+    ...evaluatorAuthorityBinding,
+  };
+  reference.public_metadata_digest = computeEvaluatorReferenceDigest(reference);
+  writeJson(resolve(syntheticFixtureRoot, "evaluator-reference.json"), reference);
+
+  Object.assign(outputContract, evaluatorAuthorityBinding, { evaluator_public_reference_digest: reference.public_metadata_digest });
+  outputContract.output_contract_digest = computeOutputContractDigest(outputContract);
+  writeJson(resolve(syntheticFixtureRoot, "output-contract.json"), outputContract);
+
+  Object.assign(admission, evaluatorAuthorityBinding);
+  admission.admission_digest = computeFinalAdmissionRecordDigest(admission);
+  writeJson(resolve(syntheticFixtureRoot, "final-admission-record.json"), admission);
+
+  const updateFrozen = (field, file, semantic) => {
+    const path = resolve(syntheticFixtureRoot, file);
+    freezeManifest[field] = { ...freezeManifest[field], raw_byte_digest: sha256(readFileSync(path)), ...semantic };
+  };
+  updateFrozen("admission_record", "final-admission-record.json", { semantic_digest: admission.admission_digest });
+  updateFrozen("requirement_record", "requirement-record.json", { record_digest: requirementRecord.requirement_record_digest, set_digest: requirementRecord.requirement_set_digest });
+  updateFrozen("output_contract", "output-contract.json", { semantic_digest: outputContract.output_contract_digest });
+  updateFrozen("evaluator_public_reference", "evaluator-reference.json", { semantic_digest: reference.public_metadata_digest });
+  freezeManifest.evaluator_authority_manifest = { ...freezeManifest.evaluator_authority_manifest, raw_byte_digest: sha256(evaluatorAuthorityManifestBytes), semantic_digest: evaluatorAuthorityManifest.manifest_digest };
+  freezeManifest.manifest_digest = computeScoringInputFreezeManifestDigest(freezeManifest);
+  writeJson(resolve(syntheticFixtureRoot, "scoring-input-freeze-manifest.json"), freezeManifest);
+  return { bundleManifest, reference, sourceIdentity };
+}
+
+function createSyntheticCurrentAuthorityEnvironment(state) {
+  const parent = mkdtempSync("/private/tmp/ask-current-synthetic-authority-");
+  const repositoryRoot = resolve(parent, "repository");
+  const clone = spawnSync("git", ["clone", "--quiet", "--no-local", historicalRoot, repositoryRoot], { encoding: "utf8" });
+  assert.equal(clone.status, 0, clone.stderr || clone.stdout);
+  root = repositoryRoot;
+  fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
+  const previewRoot = resolve(parent, "preview-authority");
+  mkdirSync(previewRoot);
+  const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot: previewRoot, state });
+  const fragment = syntheticPrivateFragment({ normalized: normalizedAuthority.normalized, requirementRecord: readJson(resolve(fixtureRoot, "requirement-record.json")), state });
+  const privateEvaluatorRoot = resolve(parent, "private-evaluator");
+  mkdirSync(privateEvaluatorRoot);
+  materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluatorRoot, fragment });
+  removeTree(previewRoot);
+  return { parent, repositoryRoot, privateEvaluatorRoot };
+}
+
+function restoreHistoricalEnvironment(environment) {
+  root = historicalRoot;
+  fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
+  privateRoot = null;
+  removeTree(environment.parent);
 }
 
 function runtimeFileIdentity(path) {
@@ -1375,6 +1554,24 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       delete incompleteAuthority[missingField];
       assert.throws(() => verifyEvaluatorAuthority(incompleteAuthority), /binary scope verification requires .*private-evaluation/u, `binary authority missing ${missingField} must not become evaluation-ready`);
       assert.throws(() => verifyEvaluatorBoundary(incompleteAuthority), /binary scope verification requires .*private-evaluation/u, `an admitted boundary must not make binary authority missing ${missingField} scoring-ready`);
+      if (missingField === "privateFragmentPath") {
+        const overlayRoot = resolve(scoringRoot, "unreachable-overlay-evidence");
+        mkdirSync(overlayRoot);
+        const overlayPaths = ["decision", "review-authority", "review-archive"].map((name) => {
+          const path = resolve(overlayRoot, `${name}.json`);
+          writeJson(path, { synthetic_unreachable_overlay: name });
+          return path;
+        });
+        assert.throws(() => scoreEvaluatorResult({
+          ...incompleteAuthority,
+          outputPath: resolve(scoringRoot, "must-not-score.json"),
+          admissionDecisionPath: overlayPaths[0],
+          admissionReviewAuthorityPath: overlayPaths[1],
+          admissionReviewAuthoritySourceDigest: authorityFileDigest(overlayPaths[1]),
+          admissionReviewArchivePath: overlayPaths[2],
+        }), /binary scope verification requires .*private-evaluation/u, "overlay scoring must reject incomplete private authority before consuming admission evidence");
+        removeTree(overlayRoot);
+      }
     }
   }
   assert.deepEqual(chain.snapshot(), before, `full evaluator authority must be read-only for ${state}`);
@@ -1403,7 +1600,37 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   }, /causal reference set/u);
   const currentTopLevelState = evaluatorResult.verification_correctness.state;
   expectPersistentFailure("top-level correctness", (changed) => { changed.verification_correctness.state = currentTopLevelState === "pass" ? "fail" : "pass"; }, /verification|causal|evidence|normalized/u);
-  expectPersistentFailure("normalized result digest", (changed) => { changed.normalized_result_digest = `sha256:${"0".repeat(64)}`; }, /normalized result digest|mismatched normalized-result/u);
+  expectPersistentFailure("classification forgery", (changed) => { changed.classification = changed.classification === "correct_narrow_execution" ? "under_processing" : "correct_narrow_execution"; }, /classification|authority-owned adapter output/u);
+  expectPersistentFailure("profile name drift", (changed) => { changed.result_profile.name = "other_profile"; }, /profile|Schema|authority-owned adapter output/u);
+  expectPersistentFailure("profile digest drift", (changed) => { changed.result_profile.digest = `sha256:${"0".repeat(64)}`; }, /profile|digest|authority-owned adapter output/u);
+  expectPersistentFailure("evaluator source revision drift", (changed) => { changed.evaluator_revision = `0${changed.evaluator_revision.slice(1)}`; }, /revision|lineage|authority-owned adapter output/u);
+  expectPersistentFailure("cross-fixture result transplant", (changed) => { changed.fixture_id = "foreign-fixture"; }, /fixture|lineage|authority-owned adapter output/u);
+  expectPersistentFailure("cross-evaluator result transplant", (changed) => { changed.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`; }, /evaluator|lineage|authority-owned adapter output/u);
+  expectPersistentFailure("requirement omission", (changed) => { changed.requirement_results.pop(); }, /requirement|exactly cover|authority-owned adapter output/u);
+  expectPersistentFailure("requirement addition", (changed) => { changed.requirement_results.push({ ...structuredClone(changed.requirement_results[0]), requirement_id: "added-requirement" }); }, /requirement|unknown|exactly cover|authority-owned adapter output/u);
+  expectPersistentFailure("requirement duplicate", (changed) => { changed.requirement_results.push(structuredClone(changed.requirement_results[0])); }, /requirement|unique|exactly cover|authority-owned adapter output/u);
+  const scopeDeviation = { finding_id: "synthetic-scope-deviation", category: "unrelated_modification", severity: "high", evidence_references: [{ kind: "repository_diff", digest: `sha256:${"9".repeat(64)}`, bytes: 1 }] };
+  expectPersistentFailure("scope deviation reference missing", (changed) => {
+    changed.scope_deviations = [scopeDeviation];
+    const boundary = changed.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary");
+    boundary.outcome = "fail"; boundary.earned_points = 0; boundary.matched_equivalence_class_ids = []; boundary.scope_deviation_references = [];
+    changed.classification = "over_processing";
+  }, /scope|classification|authority-owned adapter output/u);
+  expectPersistentFailure("scope deviation reference excess", (changed) => {
+    changed.scope_deviations = [scopeDeviation];
+    changed.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary").scope_deviation_references = [scopeDeviation.finding_id];
+  }, /scope|classification|authority-owned adapter output/u);
+  expectPersistentFailure("scope deviation reference unknown", (changed) => {
+    const boundary = changed.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary");
+    boundary.outcome = "fail"; boundary.earned_points = 0; boundary.matched_equivalence_class_ids = []; boundary.scope_deviation_references = ["unknown-scope-deviation"];
+    changed.classification = "over_processing";
+  }, /scope|unknown|authority-owned adapter output/u);
+  if (state === "invalid") {
+    expectPersistentFailure("invalid-input authority layer drift", (changed) => { changed.invalid_input_authority.layer = "evaluator_source"; }, /invalid|layer|authority-owned adapter output/u);
+    expectPersistentFailure("invalid-input authority category drift", (changed) => { changed.invalid_input_authority.category = "source_graph_drift"; }, /invalid|category|authority-owned adapter output/u);
+    expectPersistentFailure("invalid-input authority reference-kind drift", (changed) => { changed.invalid_input_authority.evidence_references[0].kind = "execution_event"; }, /invalid|reference|causal|authority-owned adapter output/u);
+  }
+  expectPersistentFailure("normalized result digest", (changed) => { changed.normalized_result_digest = `sha256:${"0".repeat(64)}`; }, /normalized result digest|mismatched normalized-result|transplanted normalized-result/u);
   expectPersistentFailure("normalized generation reference", (changed) => { changed.source_snapshot_digest = `sha256:${"1".repeat(64)}`; }, /source snapshot|normalized snapshot/u);
   expectPersistentFailure("cross-run reference", (changed) => { changed.run_instance_id = "00000000-0000-4000-8000-000000000208"; }, /lineage mismatch|run_instance/u);
   if (state === "repeated_success_failure") {
@@ -1474,8 +1701,10 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     const sealedHiddenSymlinkBackup = resolve(authorityRoot, ".sealed-hidden-symlink-backup");
     expectPathFailure("sealed hidden evaluator symlink replacement", () => replaceSealedFileWithSymlink(sealedHiddenPath, sealedHiddenSymlinkBackup, sealedRunnerPath), () => restoreSealedFile(sealedHiddenPath, sealedHiddenSymlinkBackup), /symlink|sealed hidden evaluator|private evaluator/u);
     const sealedBundleAsset = resolve(sealedPrivateBundlePath, "scope-boundaries.json");
-    const sealedBundleAssetBytes = readFileSync(sealedBundleAsset);
-    expectPathFailure("sealed private bundle dependency drift", () => overwriteSealedFile(sealedBundleAsset, Buffer.concat([sealedBundleAssetBytes, Buffer.from("\n// dependency drift\n")])), () => overwriteSealedFile(sealedBundleAsset, sealedBundleAssetBytes), /sealed private evaluator bundle|digest|identity/u);
+    if (existsSync(sealedBundleAsset)) {
+      const sealedBundleAssetBytes = readFileSync(sealedBundleAsset);
+      expectPathFailure("sealed private bundle dependency drift", () => overwriteSealedFile(sealedBundleAsset, Buffer.concat([sealedBundleAssetBytes, Buffer.from("\n// dependency drift\n")])), () => overwriteSealedFile(sealedBundleAsset, sealedBundleAssetBytes), /sealed private evaluator bundle|digest|identity/u);
+    }
     const sealedRepositoryModuleBytes = readFileSync(sealedRepositoryModulePath);
     const sealedRepositoryModuleBackup = resolve(authorityRoot, ".sealed-repository-module-backup");
     expectPathFailure("sealed repository direct module same-bytes inode replacement", () => replaceSealedFile(sealedRepositoryModulePath, sealedRepositoryModuleBackup, sealedRepositoryModuleBytes), () => restoreSealedFile(sealedRepositoryModulePath, sealedRepositoryModuleBackup), /sealed repository|identity|inventory|authority/u);
@@ -1543,6 +1772,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     const originalFrozenConfig = resolve(originalFrozenPath, "build.config.json");
     const originalFrozenBytes = readFileSync(originalFrozenConfig);
     expectPathFailure("original frozen workspace mutation", () => writeFileSync(originalFrozenConfig, Buffer.concat([originalFrozenBytes, Buffer.from("\n")])), () => writeFileSync(originalFrozenConfig, originalFrozenBytes), /original private evaluation workspace|workspace identity|workspace/u);
+    expectPathFailure("private record raw-byte modification", () => writeFileSync(privateRecord.recordPath, Buffer.concat([originalRecordBytes, Buffer.from(" \n")])), () => writeFileSync(privateRecord.recordPath, originalRecordBytes), /private evaluation record|raw|digest|byte/u);
     const fragmentBackup = resolve(authorityRoot, ".private-fragment-backup");
     expectPathFailure("fragment missing", () => renameSync(chain.privateFragmentPath, fragmentBackup), () => renameSync(fragmentBackup, chain.privateFragmentPath), /missing|private evaluator fragment/u);
     expectPathFailure("fragment symlink", () => { renameSync(chain.privateFragmentPath, fragmentBackup); symlinkSync(resolve(root, "scripts/ask-benchmark-evaluator-boundary.mjs"), chain.privateFragmentPath); }, () => { rmSync(chain.privateFragmentPath); renameSync(fragmentBackup, chain.privateFragmentPath); }, /symlink|private evaluator fragment/u);
@@ -1665,9 +1895,30 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     writeJson(scoringAuthority.freezeManifestPath, staleFreeze);
     expectPreExecutionFailure("stale scoring freeze manifest", { ...common, scoringInputFreezeManifestSourceDigest: authorityFileDigest(scoringAuthority.freezeManifestPath) }, /evaluator authority manifest raw-byte digest.*freeze manifest|raw-byte digest does not match/u);
     writeFileSync(scoringAuthority.freezeManifestPath, originalFreezeBytes);
+    const profileDriftFreeze = JSON.parse(originalFreezeBytes.toString("utf8"));
+    profileDriftFreeze.result_profile.name = "other_profile";
+    profileDriftFreeze.manifest_digest = computeScoringInputFreezeManifestDigest(profileDriftFreeze);
+    writeJson(scoringAuthority.freezeManifestPath, profileDriftFreeze);
+    expectPreExecutionFailure("freeze manifest profile binding drift", { ...common, scoringInputFreezeManifestSourceDigest: authorityFileDigest(scoringAuthority.freezeManifestPath) }, /profile|Schema|binding/u);
+    writeFileSync(scoringAuthority.freezeManifestPath, originalFreezeBytes);
+    const originalOutputContractBytes = readFileSync(scoringAuthority.outputContractPath);
+    const profileDriftOutput = JSON.parse(originalOutputContractBytes.toString("utf8"));
+    profileDriftOutput.result_profile.digest = `sha256:${"0".repeat(64)}`;
+    profileDriftOutput.output_contract_digest = computeOutputContractDigest(profileDriftOutput);
+    writeJson(scoringAuthority.outputContractPath, profileDriftOutput);
+    const outputDriftFreeze = JSON.parse(originalFreezeBytes.toString("utf8"));
+    outputDriftFreeze.output_contract.raw_byte_digest = authorityFileDigest(scoringAuthority.outputContractPath);
+    outputDriftFreeze.output_contract.semantic_digest = profileDriftOutput.output_contract_digest;
+    outputDriftFreeze.manifest_digest = computeScoringInputFreezeManifestDigest(outputDriftFreeze);
+    writeJson(scoringAuthority.freezeManifestPath, outputDriftFreeze);
+    expectPreExecutionFailure("output contract profile binding drift", { ...common, scoringInputFreezeManifestSourceDigest: authorityFileDigest(scoringAuthority.freezeManifestPath) }, /profile|digest|binding/u);
+    writeFileSync(scoringAuthority.outputContractPath, originalOutputContractBytes);
+    writeFileSync(scoringAuthority.freezeManifestPath, originalFreezeBytes);
     assert.deepEqual(chain.snapshot(), before, "external authority closure negatives must restore the persistent authority chain");
     expectPrivateFailure("runner source identity missing", ({ record }) => { delete record.evaluator_runner_source_identity; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /Schema|runner source identity|record/u);
     expectPrivateFailure("record digest", ({ record }) => { record.adapter_source_digest = `sha256:${"0".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /adapter source digest|record digest|source/u);
+    expectPrivateFailure("record cross-fixture transplant", ({ record }) => { record.candidate_authority.fixture_id = "foreign-fixture"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /fixture|candidate|lineage|record/u);
+    expectPrivateFailure("record cross-evaluator transplant", ({ record }) => { record.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /evaluator|bundle|record/u);
     expectPrivateFailure("record-only original workspace authority reseal", ({ record }) => { record.original_workspace_authority_digest = `sha256:${"9".repeat(64)}`; record.original_workspace_authority_raw_sha256 = `sha256:${"8".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /original workspace authority|original private evaluation workspace identity|record/u);
     expectPrivateFailure("record fragment path escape", ({ record }) => { record.private_fragment_path = "../escape.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /path|escape|Schema|authority/u);
     expectPrivateFailure("fragment tamper", () => { const fragment = JSON.parse(originalFragmentBytes.toString("utf8")); fragment.classification = "over_processing"; writeJson(chain.privateFragmentPath, fragment); }, /fragment digest|byte closure|authority-owned adapter|classification/u);
@@ -2419,7 +2670,7 @@ function runClosedGraphImportRegression(evaluatorRevision) {
   writeJson(resolve(evidence, "seed.json"), { authority: "closed-linker" });
   try {
     const closedLinkerLineage = { run_instance_id: "12345678-1234-4123-8123-123456789abc", case_id: "case-1111111111111111-2222222222222222", attempt: "0001" };
-    const execution = createSealedEvaluatorExecutionForTest({
+    assert.throws(() => createSealedEvaluatorExecutionForTest({
       root,
       privateEvaluationRoot: authorityRoot,
       privateRoot,
@@ -2431,16 +2682,8 @@ function runClosedGraphImportRegression(evaluatorRevision) {
       evaluatorRevision,
       externalAuthorityAnchor,
       executionDirectoryName: "closed-linker",
-      label: "closed graph import regression",
-    });
-    assert.throws(() => executeSealedEvaluatorForTest({
-      execution,
-      externalAuthorityAnchor,
-      repositoryRoot: root,
-      normalized: { lineage: closedLinkerLineage },
-      normalizedBytes: Buffer.from(`${JSON.stringify({ lineage: closedLinkerLineage })}\n`),
-      label: "closed graph import regression",
-    }), /verified dependency edge|child execution failed|outside verified authority/u, "graph-external dynamic import must fail before candidate evaluation");
+      label: "historical R21 source mismatch regression",
+    }), /dependency bytes do not match the base Git revision|source bytes/u, "the current source graph must fail closed when presented as the historical R21 revision");
   } finally {
     removeTree(authorityRoot);
     removeTree(privateRoot);
@@ -2984,6 +3227,22 @@ try {
   expectFailure(() => validateScoringInputBindings(missingRequirement), /exactly cover/u, "missing evaluator requirement must fail closed");
   assert.equal(summary.scoringReady, false, "synthetic scoring consumption must not promote a review-pending real fixture");
 
+  let syntheticPrivateValidation = "not_run";
+  for (const state of ["executed_success", "invalid"]) {
+    const environment = createSyntheticCurrentAuthorityEnvironment(state);
+    privateRoot = environment.privateEvaluatorRoot;
+    try {
+      const fullAuthority = await runPersistentFullEvaluatorAuthority(privateRoot, state);
+      assert.equal(fullAuthority.verifiedResult.result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state, deriveVerificationEvidenceState(fullAuthority.normalizedAuthority.normalized), `current synthetic authority must preserve the typed state for ${state}`);
+      assert.equal(fullAuthority.verifiedResult.scoringReady, state !== "invalid", `admitted compatibility readiness must follow complete current synthetic authority for ${state}`);
+      removeTree(fullAuthority.authorityRoot);
+      removeTree(fullAuthority.scoringRoot);
+      syntheticPrivateValidation = "pass";
+    } finally {
+      restoreHistoricalEnvironment(environment);
+    }
+  }
+
   if (privateRoot) {
     const roots = boundaryRoots();
     const privateSummary = validateMnBuildOptionUpdatePrivateFixture({ root, privateRoot, ...roots });
@@ -3092,9 +3351,9 @@ try {
     evaluator_bundle_digest: summary.evaluatorBundleDigest,
     evaluator_byte_count: summary.evaluatorByteCount,
     public_validation: "pass",
-    private_validation: privateRoot ? "pass" : "not_run",
+    private_validation: syntheticPrivateValidation,
     evidence_removal: "pass",
-    equivalent_solution: privateRoot ? "pass" : "not_run",
+    equivalent_solution: "not_run",
     synthetic_interface: "pass",
     review_status: summary.reviewStatus,
     scoring_ready: false,
