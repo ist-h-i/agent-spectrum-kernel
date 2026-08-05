@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createRequire, syncBuiltinESMExports } from "node:module";
-import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -259,7 +259,7 @@ function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluator
 }
 
 function createSyntheticCurrentAuthorityEnvironment(state) {
-  const parent = mkdtempSync("/private/tmp/ask-current-synthetic-authority-");
+  const parent = mkdtempSync(resolve(realpathSync(tmpdir()), "ask-current-synthetic-authority-"));
   const repositoryRoot = resolve(parent, "repository");
   const clone = spawnSync("git", ["clone", "--quiet", "--no-local", historicalRoot, repositoryRoot], { encoding: "utf8" });
   assert.equal(clone.status, 0, clone.stderr || clone.stdout);
