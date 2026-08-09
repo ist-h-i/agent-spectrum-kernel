@@ -100,7 +100,7 @@ const canonicalTempRoot = realpathSync(tmpdir());
 const work = mkdtempSync(resolve(tmpdir(), "ask-mn-build-option-update-"));
 const temporaryAuthorityRoots = new Set();
 const privateRootArgumentIndex = process.argv.indexOf("--private-root");
-let privateRoot = privateRootArgumentIndex === -1 ? null : resolve(process.argv[privateRootArgumentIndex + 1]);
+const requestedPrivateRoot = privateRootArgumentIndex === -1 ? null : resolve(process.argv[privateRootArgumentIndex + 1]);
 
 function createPortableAuthorityRoot(prefix) {
   return mkdtempSync(resolve(canonicalTempRoot, prefix));
@@ -293,9 +293,9 @@ function currentEvaluatorSourceIdentity(repositoryRoot, generatorSourceDigest) {
   };
 }
 
-function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluatorRoot, fragment }) {
+function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluatorRoot, fragment, hiddenEvaluatorSource = null }) {
   const syntheticFixtureRoot = resolve(repositoryRoot, FIXTURE_ROOT_RELATIVE);
-  const hiddenBytes = Buffer.from(`export async function evaluateCandidateSafe() { return ${JSON.stringify(fragment)}; }\n`);
+  const hiddenBytes = hiddenEvaluatorSource ?? Buffer.from(`export async function evaluateCandidateSafe() { return ${JSON.stringify(fragment)}; }\n`);
   writeFileSync(resolve(privateEvaluatorRoot, "hidden-evaluator.mjs"), hiddenBytes);
   const generatorSourceDigest = sha256(Buffer.from("deterministic-synthetic-current-authority-v1"));
   const sourceIdentity = currentEvaluatorSourceIdentity(repositoryRoot, generatorSourceDigest);
@@ -386,7 +386,7 @@ function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluator
   return { bundleManifest, reference, sourceIdentity };
 }
 
-function createSyntheticCurrentAuthorityEnvironment(state) {
+function createSyntheticCurrentAuthorityEnvironment(state, { hiddenEvaluatorSource = null } = {}) {
   const parent = createPortableAuthorityRoot("ask-current-synthetic-authority-");
   const repositoryRoot = resolve(parent, "repository");
   const clone = spawnSync("git", ["clone", "--quiet", "--no-local", historicalRoot, repositoryRoot], { encoding: "utf8" });
@@ -399,7 +399,7 @@ function createSyntheticCurrentAuthorityEnvironment(state) {
   const fragment = syntheticPrivateFragment({ normalized: normalizedAuthority.normalized, requirementRecord: readJson(resolve(fixtureRoot, "requirement-record.json")), state });
   const privateEvaluatorRoot = resolve(parent, "private-evaluator");
   mkdirSync(privateEvaluatorRoot);
-  materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluatorRoot, fragment });
+  materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluatorRoot, fragment, hiddenEvaluatorSource });
   removeTree(previewRoot);
   return { parent, repositoryRoot, privateEvaluatorRoot };
 }
@@ -407,8 +407,17 @@ function createSyntheticCurrentAuthorityEnvironment(state) {
 function restoreHistoricalEnvironment(environment) {
   root = historicalRoot;
   fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
-  privateRoot = null;
   removeTree(environment.parent);
+}
+
+async function completeRequestedPrivateValidation(requestedRoot, validate) {
+  let status = requestedRoot ? "not_run" : "not_supplied";
+  if (requestedRoot) {
+    await validate(requestedRoot);
+    status = "pass";
+  }
+  if (requestedRoot && status !== "pass") throw new Error("requested private validation did not complete");
+  return status;
 }
 
 function runtimeFileIdentity(path) {
@@ -2763,60 +2772,50 @@ async function runSealedAuthorityAndRaceChecks(privateRoot) {
   }
 }
 
-function runClosedGraphImportRegression(evaluatorRevision) {
+function runHistoricalR21SourceMismatchRegression(evaluatorRevision) {
+  assert.throws(
+    () => deriveEvaluatorDependencyGraph({ root, baseRevision: evaluatorRevision }),
+    /dependency bytes do not match the base Git revision|base Git revision is unavailable/u,
+    "the current source graph must fail closed when presented as the historical R21 revision",
+  );
+}
+
+function runCurrentClosedModuleLinkerRegression() {
+  const hiddenBytes = Buffer.from("export async function evaluateCandidateSafe({ repositoryRoot }) { await import(`${repositoryRoot}/scripts/graph-external-authority.mjs`); return {}; }\n");
+  const environment = createSyntheticCurrentAuthorityEnvironment("executed_success", { hiddenEvaluatorSource: hiddenBytes });
   const externalAuthorityAnchor = currentExternalAuthorityAnchor();
   const authorityRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-closed-graph-"));
-  const privateRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-closed-graph-private-"));
-  const hiddenPath = resolve(privateRoot, "hidden-tests.mjs");
-  const hiddenBytes = Buffer.from("export async function evaluateCandidateSafe({ repositoryRoot }) { await import(`${repositoryRoot}/scripts/graph-external-authority.mjs`); return {}; }\n");
-  writeFileSync(hiddenPath, hiddenBytes);
-  const publicReference = readJson(resolve(fixtureRoot, "evaluator-reference.json"));
-  const manifest = {
-    schema_version: "1.0.0",
-    schema_path: "benchmarks/schemas/private-evaluator-bundle.schema.json",
-    program: "adaptive_ask_private_evaluator_bundle",
-    fixture_identity: { fixture_id: "mn-build-option-update", task_class: "configuration", suite: "mechanism_negative" },
-    input_identity: { fixture_input_digest: publicReference.fixture_input_digest },
-    evaluator_revision: evaluatorRevision,
-    evaluator_source_identity: publicReference.evaluator_source_identity,
-    dependency_graph: publicReference.evaluator_source_identity.dependency_graph,
-    generator: { id: "closed-graph-regression", version: "1.0.0", source_digest: publicReference.evaluator_source_identity.generator_source_digest },
-    independence: { statement_digest: `sha256:${"1".repeat(64)}`, generated_without_agent_output: true, public_answer_sources_used: false, measured_agent_access_allowed: false },
-    review: { record_digest: `sha256:${"2".repeat(64)}`, status: "pending", reviewer_count: 1 },
-    asset_inventory: [{ role: "hidden_tests", path: "hidden-tests.mjs", bytes: hiddenBytes.length, sha256: sha256(hiddenBytes), media_type: "text/javascript", required: true }],
-    capabilities: { automated_evaluation: true, manual_evaluation: false },
-    boundaries: { private_evaluator_bundle: true, public_repository_allowed: false, public_ci_artifact_allowed: false, contains_answer_bearing_content: true },
-  };
-  manifest.evaluator_bundle_id = computeEvaluatorBundleId(manifest);
-  manifest.evaluator_bundle_digest = computeEvaluatorBundleDigest(manifest);
-  writeJson(resolve(privateRoot, "private-evaluator-bundle.json"), manifest);
-  publicReference.evaluator_bundle_id = manifest.evaluator_bundle_id;
-  publicReference.evaluator_bundle_digest = manifest.evaluator_bundle_digest;
-  publicReference.public_metadata_digest = computeEvaluatorReferenceDigest(publicReference);
-  externalAuthorityAnchor.evaluator_reference = publicReference;
+  const privateRoot = environment.privateEvaluatorRoot;
+  const manifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
+  const hiddenAsset = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
   const workspace = resolve(fixtureRoot, "workspace");
   const evidence = resolve(authorityRoot, "evidence");
   mkdirSync(evidence);
   writeJson(resolve(evidence, "seed.json"), { authority: "closed-linker" });
+  const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot, state: "executed_success" });
   try {
-    const closedLinkerLineage = { run_instance_id: "12345678-1234-4123-8123-123456789abc", case_id: "case-1111111111111111-2222222222222222", attempt: "0001" };
-    assert.throws(() => createSealedEvaluatorExecutionForTest({
+    const execution = createSealedEvaluatorExecutionForTest({
       root,
       privateEvaluationRoot: authorityRoot,
       privateRoot,
-      hiddenAsset: { path: "hidden-tests.mjs", bytes: hiddenBytes.length, sha256: sha256(hiddenBytes) },
+      hiddenAsset,
       frozenWorkspace: workspace,
       candidateWorkspace: workspace,
       evaluationInputRoot: evidence,
-      evaluationLineage: closedLinkerLineage,
-      evaluatorRevision,
+      evaluationLineage: normalizedAuthority.normalized.lineage,
+      evaluatorRevision: manifest.evaluator_revision,
       externalAuthorityAnchor,
       executionDirectoryName: "closed-linker",
-      label: "historical R21 source mismatch regression",
-    }), /dependency bytes do not match the base Git revision|source bytes/u, "the current source graph must fail closed when presented as the historical R21 revision");
+      label: "current closed-module-linker regression",
+    });
+    assert.throws(
+      () => executeSealedEvaluatorForTest({ execution, externalAuthorityAnchor, repositoryRoot: root, normalized: normalizedAuthority.normalized, label: "current closed-module-linker regression" }),
+      /module resolution is outside the verified dependency edge/u,
+      "the hidden evaluator must not import a module outside the verified dependency edge",
+    );
   } finally {
     removeTree(authorityRoot);
-    removeTree(privateRoot);
+    restoreHistoricalEnvironment(environment);
   }
 }
 
@@ -3132,7 +3131,9 @@ try {
   assert.equal(summary.scoringReady, false);
   assert.equal(summary.applicableGateCount, 12);
   assert.equal(summary.nonApplicableGateCount, 3);
-  runClosedGraphImportRegression(runHistoricalR21AuthorityResolutionRegressions());
+  const historicalR21EvaluatorRevision = runHistoricalR21AuthorityResolutionRegressions();
+  runHistoricalR21SourceMismatchRegression(historicalR21EvaluatorRevision);
+  runCurrentClosedModuleLinkerRegression();
 
   expectFailure(() => assertAnswerNeutralPublicValue({ hidden_answer: "x" }), /answer-bearing field/u, "public answer-bearing fields must fail closed");
   expectFailure(() => assertPrivateRootOutsideRepository(root, fixtureRoot), /outside the repository/u, "repository-local private bundles must be rejected");
@@ -3357,23 +3358,40 @@ try {
   expectFailure(() => validateScoringInputBindings(missingRequirement), /exactly cover/u, "missing evaluator requirement must fail closed");
   assert.equal(summary.scoringReady, false, "synthetic scoring consumption must not promote a review-pending real fixture");
 
+  const requestedPrivateRootBeforeSyntheticValidation = requestedPrivateRoot;
   let syntheticPrivateValidation = "not_run";
   for (const state of ["executed_success", "invalid"]) {
     const environment = createSyntheticCurrentAuthorityEnvironment(state);
-    privateRoot = environment.privateEvaluatorRoot;
+    const syntheticPrivateRoot = environment.privateEvaluatorRoot;
     try {
-      const fullAuthority = await runPersistentFullEvaluatorAuthority(privateRoot, state, { runMutablePathNegatives: false });
-      assert.equal(fullAuthority.verifiedResult.result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state, deriveVerificationEvidenceState(fullAuthority.normalizedAuthority.normalized), `current synthetic authority must preserve the typed state for ${state}`);
-      assert.equal(fullAuthority.verifiedResult.scoringReady, state !== "invalid", `admitted compatibility readiness must follow complete current synthetic authority for ${state}`);
-      removeTree(fullAuthority.authorityRoot);
-      removeTree(fullAuthority.scoringRoot);
-      syntheticPrivateValidation = "pass";
+      let observedSyntheticPrivateRoot = null;
+      const stateValidation = await completeRequestedPrivateValidation(syntheticPrivateRoot, async (validatedPrivateRoot) => {
+        observedSyntheticPrivateRoot = validatedPrivateRoot;
+        const fullAuthority = await runPersistentFullEvaluatorAuthority(validatedPrivateRoot, state, { runMutablePathNegatives: false });
+        assert.equal(fullAuthority.verifiedResult.result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state, deriveVerificationEvidenceState(fullAuthority.normalizedAuthority.normalized), `current synthetic authority must preserve the typed state for ${state}`);
+        assert.equal(fullAuthority.verifiedResult.scoringReady, state !== "invalid", `admitted compatibility readiness must follow complete current synthetic authority for ${state}`);
+        removeTree(fullAuthority.authorityRoot);
+        removeTree(fullAuthority.scoringRoot);
+      });
+      assert.equal(stateValidation, "pass", `valid test-only supplied private root must complete for ${state}`);
+      assert.equal(observedSyntheticPrivateRoot, syntheticPrivateRoot, `synthetic private-root identity must be preserved for ${state}`);
+      syntheticPrivateValidation = stateValidation;
     } finally {
       restoreHistoricalEnvironment(environment);
     }
   }
 
-  if (privateRoot) {
+  assert.equal(requestedPrivateRoot, requestedPrivateRootBeforeSyntheticValidation, "synthetic environment restoration must preserve caller-supplied private-root identity");
+  assert.equal(await completeRequestedPrivateValidation(null, async () => assert.fail("no-root validation callback must not run")), "not_supplied", "no --private-root must not report actual private validation as passed");
+  const requestedRootSentinel = resolve(work, "requested-private-root-sentinel");
+  await assert.rejects(
+    completeRequestedPrivateValidation(requestedRootSentinel, async () => { throw new Error("invalid supplied private root"); }),
+    /invalid supplied private root/u,
+    "synthetic validation success must not turn an invalid supplied private root green",
+  );
+  assert.equal(syntheticPrivateValidation, "pass", "private-root false-green regression must run after synthetic authority succeeds");
+
+  const actualPrivateValidation = await completeRequestedPrivateValidation(requestedPrivateRoot, async (privateRoot) => {
     const roots = boundaryRoots();
     const privateSummary = validateMnBuildOptionUpdatePrivateFixture({ root, privateRoot, ...roots });
     assert.equal(privateSummary.evaluatorBundleDigest, summary.evaluatorBundleDigest);
@@ -3473,7 +3491,7 @@ try {
     assert.equal(cli.status, 1, "CLI private validation without explicit boundary roots must fail closed");
     assert.equal(`${cli.stdout}${cli.stderr}`.includes(privateRoot), false, "CLI output must not disclose the private root");
     assert.equal(`${cli.stdout}${cli.stderr}`.includes("observable_contract"), false, "CLI output must not disclose private evaluator content");
-  }
+  });
 
   console.log(JSON.stringify({
     fixture_id: summary.fixtureId,
@@ -3481,7 +3499,8 @@ try {
     evaluator_bundle_digest: summary.evaluatorBundleDigest,
     evaluator_byte_count: summary.evaluatorByteCount,
     public_validation: "pass",
-    private_validation: syntheticPrivateValidation,
+    synthetic_private_validation: syntheticPrivateValidation,
+    private_validation: actualPrivateValidation,
     evidence_removal: "pass",
     equivalent_solution: "not_run",
     synthetic_interface: "pass",
