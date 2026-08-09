@@ -94,10 +94,15 @@ const NORMALIZED_TELEMETRY_FIELDS = [
   "monetary_cost", "tool_call_count", "file_read_count", "human_effort", "unsafe_attempted_actions",
   "subagent_activity", "evaluator_quality_metrics",
 ];
+const canonicalTempRoot = realpathSync(tmpdir());
 const work = mkdtempSync(resolve(tmpdir(), "ask-mn-build-option-update-"));
 const temporaryAuthorityRoots = new Set();
 const privateRootArgumentIndex = process.argv.indexOf("--private-root");
 let privateRoot = privateRootArgumentIndex === -1 ? null : resolve(process.argv[privateRootArgumentIndex + 1]);
+
+function createPortableAuthorityRoot(prefix) {
+  return mkdtempSync(resolve(canonicalTempRoot, prefix));
+}
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -259,7 +264,7 @@ function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluator
 }
 
 function createSyntheticCurrentAuthorityEnvironment(state) {
-  const parent = mkdtempSync(resolve(realpathSync(tmpdir()), "ask-current-synthetic-authority-"));
+  const parent = createPortableAuthorityRoot("ask-current-synthetic-authority-");
   const repositoryRoot = resolve(parent, "repository");
   const clone = spawnSync("git", ["clone", "--quiet", "--no-local", historicalRoot, repositoryRoot], { encoding: "utf8" });
   assert.equal(clone.status, 0, clone.stderr || clone.stdout);
@@ -882,7 +887,7 @@ writeFileSync(output, JSON.stringify({ task_type: "implementation", decision: "n
 }
 
 function actualNormalizedAuthority({ authorityRoot, mutation, evidenceState = "executed_success" }) {
-  const executionAuthorityRoot = mkdtempSync("/private/tmp/ask-mn-production-source-");
+  const executionAuthorityRoot = createPortableAuthorityRoot("ask-mn-production-source-");
   temporaryAuthorityRoots.add(executionAuthorityRoot);
   const configPath = resolve(root, "benchmarks/mn-build-option-update.config.json");
   const config = readJson(configPath);
@@ -1416,7 +1421,7 @@ async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAut
 }
 
 async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candidateMutator = null, runMutablePathNegatives = true } = {}) {
-  const authorityRoot = mkdtempSync(`/private/tmp/ask-mn-r21-${state}-`);
+  const authorityRoot = createPortableAuthorityRoot(`ask-mn-r21-${state}-`);
   const productionMutation = typeof candidateMutator === "string" ? candidateMutator : null;
   const normalizedAuthority = productionMutation
     ? actualNormalizedAuthority({ authorityRoot, mutation: productionMutation, evidenceState: state })
