@@ -114,6 +114,37 @@ function sha256(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
+function differentGitRevision(value) {
+  assert.match(value, /^[0-9a-f]{40}$/u, "Git revision test vector must be lowercase hexadecimal");
+  const replacement = value[0] === "0" ? "1" : "0";
+  const changed = `${replacement}${value.slice(1)}`;
+  assert.match(changed, /^[0-9a-f]{40}$/u, "changed Git revision must remain lowercase hexadecimal");
+  assert.notEqual(changed, value, "changed Git revision must differ from its input");
+  return changed;
+}
+
+function applyPersistentAuthorityMutation(value, label, mutate) {
+  const beforeMutation = stableCanonicalJson(value);
+  mutate(value);
+  assert.notEqual(stableCanonicalJson(value), beforeMutation, `persistent authority tamper must modify input: ${label}`);
+}
+
+function runPersistentMutationRegressions() {
+  for (const revision of [
+    "0e06bd241db7d46c5d304eebbb132123ef425cb0",
+    "bf6d8bc30751b49f35d0dcd0066ff0627b557c99",
+  ]) {
+    const changed = differentGitRevision(revision);
+    assert.match(changed, /^[0-9a-f]{40}$/u, `changed revision must remain lowercase hexadecimal for ${revision}`);
+    assert.notEqual(changed, revision, `changed revision must differ for ${revision}`);
+  }
+  assert.throws(
+    () => applyPersistentAuthorityMutation({ revision: "unchanged" }, "generic no-op guard regression", () => {}),
+    /persistent authority tamper must modify input: generic no-op guard regression/u,
+    "generic persistent authority tamper guard must reject a no-op mutation",
+  );
+}
+
 function resolveHistoricalR21EvaluatorAuthority(repositoryRoot = root) {
   const inventory = readJson(resolve(repositoryRoot, APPROVED_R21_IMMUTABLE_INVENTORY_PATH));
   const reviewedHeadRevision = inventory?.authority_source?.reviewed_head_revision;
@@ -1718,7 +1749,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   const originalResultBytes = readFileSync(chain.evaluatorResultPath);
   const expectPersistentFailure = (label, mutate, pattern) => {
     const changed = JSON.parse(originalResultBytes.toString("utf8"));
-    mutate(changed);
+    applyPersistentAuthorityMutation(changed, label, mutate);
     changed.evaluation_id = computeEvaluationId(changed);
     changed.evaluation_digest = computeEvaluationDigest(changed);
     writeJson(chain.evaluatorResultPath, changed);
@@ -1740,7 +1771,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   expectPersistentFailure("classification forgery", (changed) => { changed.classification = changed.classification === "correct_narrow_execution" ? "under_processing" : "correct_narrow_execution"; }, /classification|authority-owned adapter output/u);
   expectPersistentFailure("profile name drift", (changed) => { changed.result_profile.name = "other_profile"; }, /profile|Schema|authority-owned adapter output/u);
   expectPersistentFailure("profile digest drift", (changed) => { changed.result_profile.digest = `sha256:${"0".repeat(64)}`; }, /profile|digest|authority-owned adapter output/u);
-  expectPersistentFailure("evaluator source revision drift", (changed) => { changed.evaluator_revision = `0${changed.evaluator_revision.slice(1)}`; }, /revision|lineage|authority-owned adapter output/u);
+  expectPersistentFailure("evaluator source revision drift", (changed) => { changed.evaluator_revision = differentGitRevision(changed.evaluator_revision); }, /revision|lineage|authority-owned adapter output/u);
   expectPersistentFailure("cross-fixture result transplant", (changed) => { changed.fixture_id = "foreign-fixture"; }, /fixture|lineage|authority-owned adapter output/u);
   expectPersistentFailure("cross-evaluator result transplant", (changed) => { changed.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`; }, /evaluator|lineage|authority-owned adapter output/u);
   expectPersistentFailure("requirement omission", (changed) => { changed.requirement_results.pop(); }, /requirement|exactly cover|binary result|verification-evidence|authority-owned adapter output/u);
@@ -3126,6 +3157,7 @@ async function runTypedPrivateErrorChecks(privateRoot) {
 }
 
 try {
+  runPersistentMutationRegressions();
   const summary = validateMnBuildOptionUpdatePublicFixture({ root });
   assert.equal(summary.reviewStatus, "pending_independent_review");
   assert.equal(summary.scoringReady, false);
