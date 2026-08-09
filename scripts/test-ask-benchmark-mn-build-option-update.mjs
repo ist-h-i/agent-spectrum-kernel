@@ -85,6 +85,8 @@ const EVALUATOR_AUTHORITY_FILE_PATHS = [
   "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/verification-command-contract.json",
   "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/requirement-record.json",
 ];
+const APPROVED_R21_IMMUTABLE_INVENTORY_PATH = "benchmarks/fixtures/admission-decision/approved-r21-immutable-paths.json";
+const HISTORICAL_EVALUATOR_REFERENCE_PATH = "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json";
 const NORMALIZED_TELEMETRY_FIELDS = [
   "duration_ms", "exit_code", "final_output_bytes", "stdout_bytes", "stdout_digest", "stderr_bytes", "stderr_digest",
   "json_event_line_count", "harness_spawned_secondary_agent_count", "runtime_agent_count", "failure_kind",
@@ -110,6 +112,127 @@ function readJson(path) {
 
 function sha256(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function resolveHistoricalR21EvaluatorAuthority(repositoryRoot = root) {
+  const inventory = readJson(resolve(repositoryRoot, APPROVED_R21_IMMUTABLE_INVENTORY_PATH));
+  const reviewedHeadRevision = inventory?.authority_source?.reviewed_head_revision;
+  const expectedReferenceDigest = inventory?.authority_source?.evaluator_public_reference_digest;
+  if (typeof reviewedHeadRevision !== "string" || !/^[0-9a-f]{40}$/u.test(reviewedHeadRevision)) throw new Error("historical R21 reviewed HEAD is invalid");
+  if (typeof expectedReferenceDigest !== "string" || !/^sha256:[0-9a-f]{64}$/u.test(expectedReferenceDigest)) throw new Error("historical R21 public-reference digest is invalid");
+
+  let referenceBytes;
+  try {
+    referenceBytes = execFileSync("git", ["show", `${reviewedHeadRevision}:${HISTORICAL_EVALUATOR_REFERENCE_PATH}`], {
+      cwd: repositoryRoot,
+      encoding: null,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch {
+    throw new Error("historical R21 evaluator reference is unavailable at the reviewed HEAD");
+  }
+
+  let reference;
+  try {
+    reference = JSON.parse(referenceBytes.toString("utf8"));
+  } catch {
+    throw new Error("historical R21 evaluator reference is malformed JSON");
+  }
+  const canonicalReferenceDigest = computeEvaluatorReferenceDigest(reference);
+  if (reference.public_metadata_digest !== canonicalReferenceDigest) throw new Error("historical R21 evaluator reference canonical digest closure is invalid");
+  if (reference.public_metadata_digest !== expectedReferenceDigest) throw new Error("historical R21 inventory digest/reference mismatch");
+  if (typeof reference.evaluator_revision !== "string" || !/^[0-9a-f]{40}$/u.test(reference.evaluator_revision)) throw new Error("historical R21 evaluator revision is invalid");
+  return { reviewedHeadRevision, referenceDigest: canonicalReferenceDigest, evaluatorRevision: reference.evaluator_revision };
+}
+
+function commitHistoricalResolverFixture(repositoryRoot, message) {
+  execFileSync("git", ["add", "-A"], { cwd: repositoryRoot, stdio: "ignore" });
+  execFileSync("git", ["-c", "user.name=ASK Test", "-c", "user.email=ask-test@example.invalid", "commit", "-qm", message], { cwd: repositoryRoot, stdio: "ignore" });
+  return execFileSync("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot, encoding: "utf8" }).trim();
+}
+
+function withHistoricalResolverClone(label, callback) {
+  const repositoryRoot = mkdtempSync(resolve(tmpdir(), `ask-mn-r21-${label}-`));
+  removeTree(repositoryRoot);
+  execFileSync("git", ["clone", "--local", root, repositoryRoot], { stdio: "ignore" });
+  try {
+    callback(repositoryRoot);
+  } finally {
+    removeTree(repositoryRoot);
+  }
+}
+
+function runHistoricalR21AuthorityResolutionRegressions() {
+  const historical = resolveHistoricalR21EvaluatorAuthority();
+  assert.equal(historical.referenceDigest, readJson(resolve(root, APPROVED_R21_IMMUTABLE_INVENTORY_PATH)).authority_source.evaluator_public_reference_digest);
+  assert.match(historical.evaluatorRevision, /^[0-9a-f]{40}$/u, "historical R21 evaluator revision must resolve from reviewed authority");
+
+  withHistoricalResolverClone("current-reference-independence", (repositoryRoot) => {
+    const currentReferencePath = resolve(repositoryRoot, HISTORICAL_EVALUATOR_REFERENCE_PATH);
+    const currentReference = readJson(currentReferencePath);
+    currentReference.evaluator_revision = "f".repeat(40);
+    currentReference.public_metadata_digest = computeEvaluatorReferenceDigest(currentReference);
+    writeJson(currentReferencePath, currentReference);
+    assert.deepEqual(resolveHistoricalR21EvaluatorAuthority(repositoryRoot), historical, "current evaluator reference must not change historical R21 authority");
+  });
+
+  withHistoricalResolverClone("reviewed-head-drift", (repositoryRoot) => {
+    const inventoryPath = resolve(repositoryRoot, APPROVED_R21_IMMUTABLE_INVENTORY_PATH);
+    const inventory = readJson(inventoryPath);
+    inventory.authority_source.reviewed_head_revision = "f".repeat(40);
+    writeJson(inventoryPath, inventory);
+    assert.throws(() => resolveHistoricalR21EvaluatorAuthority(repositoryRoot), /unavailable at the reviewed HEAD/u, "reviewed HEAD drift must fail closed");
+  });
+
+  withHistoricalResolverClone("reference-digest-drift", (repositoryRoot) => {
+    const referencePath = resolve(repositoryRoot, HISTORICAL_EVALUATOR_REFERENCE_PATH);
+    const reference = readJson(referencePath);
+    reference.public_metadata_digest = `sha256:${"0".repeat(64)}`;
+    writeJson(referencePath, reference);
+    const revision = commitHistoricalResolverFixture(repositoryRoot, "drift historical reference digest");
+    const inventoryPath = resolve(repositoryRoot, APPROVED_R21_IMMUTABLE_INVENTORY_PATH);
+    const inventory = readJson(inventoryPath);
+    inventory.authority_source.reviewed_head_revision = revision;
+    inventory.authority_source.evaluator_public_reference_digest = reference.public_metadata_digest;
+    writeJson(inventoryPath, inventory);
+    assert.throws(() => resolveHistoricalR21EvaluatorAuthority(repositoryRoot), /canonical digest closure is invalid/u, "historical public-reference digest drift must fail closed");
+  });
+
+  withHistoricalResolverClone("reference-missing", (repositoryRoot) => {
+    rmSync(resolve(repositoryRoot, HISTORICAL_EVALUATOR_REFERENCE_PATH));
+    const revision = commitHistoricalResolverFixture(repositoryRoot, "remove historical reference");
+    const inventoryPath = resolve(repositoryRoot, APPROVED_R21_IMMUTABLE_INVENTORY_PATH);
+    const inventory = readJson(inventoryPath);
+    inventory.authority_source.reviewed_head_revision = revision;
+    writeJson(inventoryPath, inventory);
+    assert.throws(() => resolveHistoricalR21EvaluatorAuthority(repositoryRoot), /unavailable at the reviewed HEAD/u, "missing historical reference must fail closed");
+  });
+
+  withHistoricalResolverClone("reference-malformed", (repositoryRoot) => {
+    writeFileSync(resolve(repositoryRoot, HISTORICAL_EVALUATOR_REFERENCE_PATH), "{ malformed\n");
+    const revision = commitHistoricalResolverFixture(repositoryRoot, "malform historical reference");
+    const inventoryPath = resolve(repositoryRoot, APPROVED_R21_IMMUTABLE_INVENTORY_PATH);
+    const inventory = readJson(inventoryPath);
+    inventory.authority_source.reviewed_head_revision = revision;
+    writeJson(inventoryPath, inventory);
+    assert.throws(() => resolveHistoricalR21EvaluatorAuthority(repositoryRoot), /malformed JSON/u, "malformed historical reference must fail closed");
+  });
+
+  withHistoricalResolverClone("inventory-reference-mismatch", (repositoryRoot) => {
+    const referencePath = resolve(repositoryRoot, HISTORICAL_EVALUATOR_REFERENCE_PATH);
+    const reference = readJson(referencePath);
+    reference.evaluator_revision = "e".repeat(40);
+    reference.public_metadata_digest = computeEvaluatorReferenceDigest(reference);
+    writeJson(referencePath, reference);
+    const revision = commitHistoricalResolverFixture(repositoryRoot, "replace historical reference");
+    const inventoryPath = resolve(repositoryRoot, APPROVED_R21_IMMUTABLE_INVENTORY_PATH);
+    const inventory = readJson(inventoryPath);
+    inventory.authority_source.reviewed_head_revision = revision;
+    writeJson(inventoryPath, inventory);
+    assert.throws(() => resolveHistoricalR21EvaluatorAuthority(repositoryRoot), /inventory digest\/reference mismatch/u, "inventory digest/reference mismatch must fail closed");
+  });
+
+  return historical.evaluatorRevision;
 }
 
 function syntheticPrivateFragment({ normalized, requirementRecord, state }) {
@@ -3009,7 +3132,7 @@ try {
   assert.equal(summary.scoringReady, false);
   assert.equal(summary.applicableGateCount, 12);
   assert.equal(summary.nonApplicableGateCount, 3);
-  runClosedGraphImportRegression(readJson(resolve(fixtureRoot, "evaluator-reference.json")).evaluator_revision);
+  runClosedGraphImportRegression(runHistoricalR21AuthorityResolutionRegressions());
 
   expectFailure(() => assertAnswerNeutralPublicValue({ hidden_answer: "x" }), /answer-bearing field/u, "public answer-bearing fields must fail closed");
   expectFailure(() => assertPrivateRootOutsideRepository(root, fixtureRoot), /outside the repository/u, "repository-local private bundles must be rejected");
