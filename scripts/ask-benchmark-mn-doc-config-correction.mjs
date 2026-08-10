@@ -13,6 +13,7 @@ import {
   validateVerificationCommandContract,
 } from "./ask-benchmark-command-evidence.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
+import { validateMnDocConfigCorrectionProductionAuthority } from "./ask-benchmark-mn-doc-config-correction-authority.mjs";
 
 export const FIXTURE_ID = "mn-doc-config-correction";
 export const FIXTURE_ROOT_RELATIVE = `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`;
@@ -212,6 +213,9 @@ function validateInputClosure({ fixtureRoot, manifest }) {
 
 export function validateMnDocConfigCorrectionPublicFixture({ root = ROOT } = {}) {
   const fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
+  if (existsSync(resolve(fixtureRoot, "evaluator-reference.json"))) {
+    return validateMnDocConfigCorrectionProductionAuthority({ root });
+  }
   const artifacts = Object.fromEntries(PUBLIC_ARTIFACT_NAMES.map((name) => [name, readJson(resolve(fixtureRoot, name), `${FIXTURE_ID} ${name}`)]));
   for (const [name, value] of Object.entries(artifacts)) publicValueIsAnswerNeutral(value, name);
   const task = readFileSync(resolve(fixtureRoot, "task.md"), "utf8");
@@ -237,36 +241,14 @@ export function validateMnDocConfigCorrectionPublicFixture({ root = ROOT } = {})
   return { fixtureId: FIXTURE_ID, inputDigest: sha256(inputBytes), candidateDigest: artifacts["source-freeze-candidate.json"].candidate_digest, reviewStatus: "pending_independent_review", scoringReady: false };
 }
 
-export async function validateActualPrivateEvaluator({ root = ROOT, privateRoot, frozenWorkspace, candidateWorkspace, verificationExecuted = true, investigatedPaths = [] }) {
+export async function validateActualPrivateEvaluator({ root = ROOT, privateRoot, boundaryRoots, frozenWorkspace, candidateWorkspace, verificationExecuted = true, investigatedPaths = [] }) {
   const repository = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
   if (privateDirectory === repository || privateDirectory.startsWith(`${repository}${sep}`)) throw new Error("private evaluator root must stay outside the repository");
-  const manifest = readJson(resolve(privateDirectory, "private-evaluator-candidate.json"), "private evaluator candidate manifest");
-  const sourceCandidate = readJson(resolve(root, FIXTURE_ROOT_RELATIVE, "source-freeze-candidate.json"), "public source-freeze candidate");
-  if (manifest.fixture_id !== FIXTURE_ID || manifest.public_candidate_digest !== sourceCandidate.candidate_digest || manifest.private_validation_state !== "candidate_not_admitted" || manifest.scoring_ready !== false) throw new Error("private evaluator candidate identity is invalid");
-  if (!/^[a-f0-9]{40}$/u.test(manifest.source_freeze_revision ?? "")) throw new Error("private evaluator source-freeze revision is invalid");
-  const actualFiles = walkFiles(privateDirectory);
-  const expectedFiles = ["private-evaluator-candidate.json", ...manifest.assets.map(({ path }) => path)].sort();
-  if (stableCanonicalJson(actualFiles) !== stableCanonicalJson(expectedFiles)) throw new Error("private evaluator inventory is not closed");
-  const roles = manifest.assets.map(({ role }) => role);
-  const requiredRoles = ["equivalent_solution_rules", "evaluator_dependency_graph", "evidence_removal_mutations", "hidden_tests", "human_evaluation_instructions", "independence_provenance", "oracle", "rubric", "scope_boundaries"];
-  if (stableCanonicalJson(roles) !== stableCanonicalJson(requiredRoles)) throw new Error("private evaluator role inventory is invalid");
-  for (const asset of manifest.assets) {
-    const bytes = readFileSync(resolve(privateDirectory, asset.path));
-    if (bytes.length !== asset.bytes || sha256(bytes) !== asset.sha256) throw new Error(`private evaluator asset identity drift at ${asset.role}`);
-    if (asset.path.endsWith(".json")) {
-      const value = readJson(resolve(privateDirectory, asset.path), `private evaluator ${asset.role}`);
-      if (value.fixture_id && value.fixture_id !== FIXTURE_ID) throw new Error(`private evaluator cross-fixture transplant at ${asset.role}`);
-    }
-  }
-  if (manifest.manifest_digest !== canonicalDigest(withoutField(manifest, "manifest_digest"))) throw new Error("private evaluator manifest digest closure is invalid");
-  const graphAsset = manifest.assets.find(({ role }) => role === "evaluator_dependency_graph");
-  const graph = readJson(resolve(privateDirectory, graphAsset.path), "private evaluator dependency graph");
-  if (graph.base_git_revision !== manifest.source_freeze_revision || graph.graph_digest !== canonicalDigest(withoutField(graph, "graph_digest"))) throw new Error("private evaluator source/dependency identity drift");
-  const independenceAsset = manifest.assets.find(({ role }) => role === "independence_provenance");
-  const independence = readJson(resolve(privateDirectory, independenceAsset.path), "private evaluator independence statement");
-  if (independence.source_freeze_revision !== manifest.source_freeze_revision || independence.measured_output_used !== false || independence.measured_result_used !== false || independence.contaminated_issues_193_196_as_oracle_source !== "not_used") throw new Error("private evaluator independence authority is invalid");
-  const hidden = manifest.assets.find(({ role }) => role === "hidden_tests");
+  const production = validateMnDocConfigCorrectionProductionAuthority({ root, privateRoot: privateDirectory, boundaryRoots });
+  if (production.scoringReady !== false) throw new Error("private evaluator production authority must remain pre-review and non-scoring");
+  const manifest = readJson(resolve(privateDirectory, "private-evaluator-bundle.json"), "private evaluator bundle manifest");
+  const hidden = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
   const module = await import(`${pathToFileURL(resolve(privateDirectory, hidden.path)).href}?digest=${hidden.sha256}`);
   if (typeof module.evaluateCandidate !== "function") throw new Error("private hidden evaluator entry point is missing");
   const options = { frozenWorkspace: realpathSync(frozenWorkspace), candidateWorkspace: realpathSync(candidateWorkspace), verificationExecuted, investigatedPaths };

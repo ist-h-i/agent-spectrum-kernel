@@ -16,7 +16,7 @@
     "schema_version": { "const": "1.0.0" },
     "schema_path": { "const": "benchmarks/schemas/evaluator-authority-manifest.schema.json" },
     "program": { "const": "adaptive_ask_evaluator_authority_manifest" },
-    "fixture_id": { "const": "mn-build-option-update" },
+    "fixture_id": { "$ref": "#/$defs/token" },
     "evaluator_revision": { "$ref": "#/$defs/revision" },
     "file_inventory": {
       "type": "array",

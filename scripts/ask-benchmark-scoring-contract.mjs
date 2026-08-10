@@ -531,16 +531,23 @@ export function deriveVerificationEvidenceReferences(normalizedResult, state = d
   return [normalizedResultReference(normalizedResult)];
 }
 
-export function deriveBinaryScopeVerificationClassification({ evaluatorResult }) {
+export function deriveBinaryScopeVerificationClassification({ evaluatorResult, requirementRecord = null }) {
   const invalidEvidence = evaluatorResult.evaluation_status === "invalid_input"
     || evaluatorResult.evidence_correctness?.state === "fail"
     || evaluatorResult.invalid_input_authority
     || evaluatorResult.findings?.some(({ category }) => category === "invalid_evidence" || [...INVALID_TYPED_AUTHORITY_CATEGORIES.values()].some((categories) => categories.has(category)) || category === "normalized_command_evidence_invalid");
   if (invalidEvidence) return "invalid_evidence";
   const results = new Map(evaluatorResult.requirement_results.map(({ requirement_id, outcome }) => [requirement_id, outcome]));
-  const configurationPass = results.get("configuration-contract") === "pass";
-  const scopePass = results.get("change-boundary") === "pass";
-  const verificationPass = results.get("verification-evidence") === "pass";
+  const requirements = requirementRecord?.requirements ?? [];
+  const scopeRequirement = requirements.find(({ requirement_id, finding_group_id }) => requirement_id === "change-boundary" || requirement_id === "request-scope-discipline" || finding_group_id === "scope-outcome");
+  const verificationRequirement = requirements.find(({ requirement_id }) => requirement_id === "verification-evidence");
+  const correctnessRequirement = requirements.find(({ requirement_id }) => requirement_id !== scopeRequirement?.requirement_id && requirement_id !== verificationRequirement?.requirement_id);
+  const correctnessId = correctnessRequirement?.requirement_id ?? "configuration-contract";
+  const scopeId = scopeRequirement?.requirement_id ?? "change-boundary";
+  const verificationId = verificationRequirement?.requirement_id ?? "verification-evidence";
+  const configurationPass = results.get(correctnessId) === "pass";
+  const scopePass = results.get(scopeId) === "pass";
+  const verificationPass = results.get(verificationId) === "pass";
   if (configurationPass && scopePass && verificationPass) return "correct_narrow_execution";
   if (configurationPass && !scopePass) return "over_processing";
   return "under_processing";
@@ -550,12 +557,13 @@ export function validateBinaryScopeVerificationResult({ evaluatorResult, require
   if (evaluatorResult.result_profile?.name !== BINARY_SCOPE_VERIFICATION_PROFILE_NAME || evaluatorResult.result_profile?.digest !== computeResultProfileDigest()) throw new Error("binary scope verification result profile is missing or invalid");
   const byId = new Map(evaluatorResult.requirement_results.map((result) => [result.requirement_id, result]));
   const scopeIds = new Set(evaluatorResult.scope_deviations.map(({ finding_id }) => finding_id));
+  const scopeRequirementId = requirementRecord.requirements.find(({ requirement_id, finding_group_id }) => requirement_id === "change-boundary" || requirement_id === "request-scope-discipline" || finding_group_id === "scope-outcome")?.requirement_id ?? "change-boundary";
   for (const requirement of requirementRecord.requirements) {
     const result = byId.get(requirement.requirement_id);
     if (!result || !Array.isArray(result.scope_deviation_references) || !Array.isArray(result.verification_evidence_references)) throw new Error(`binary result ${requirement.requirement_id} must include closed scope and verification reference arrays`);
     if (new Set(result.scope_deviation_references).size !== result.scope_deviation_references.length || result.scope_deviation_references.some((id) => !scopeIds.has(id))) throw new Error(`binary result ${requirement.requirement_id} has an invalid scope-deviation reference`);
     for (const reference of result.verification_evidence_references) assertProfileReference(reference, normalizedResult, `binary result ${requirement.requirement_id} verification evidence`);
-    if (requirement.requirement_id === "change-boundary") {
+    if (requirement.requirement_id === scopeRequirementId) {
       if (result.outcome === "pass" && result.scope_deviation_references.length !== 0) throw new Error("passing change-boundary result must have no scope deviations");
       if (result.outcome === "fail" && result.scope_deviation_references.length !== scopeIds.size) throw new Error("failing change-boundary result must reference every scope deviation");
     } else if (result.scope_deviation_references.length !== 0) throw new Error(`${requirement.requirement_id} must not carry scope-deviation references`);
@@ -583,7 +591,7 @@ export function validateBinaryScopeVerificationResult({ evaluatorResult, require
       }
     } else if (result.verification_evidence_references.length !== 0) throw new Error(`${requirement.requirement_id} must not carry verification evidence references`);
   }
-  const derived = deriveBinaryScopeVerificationClassification({ evaluatorResult });
+  const derived = deriveBinaryScopeVerificationClassification({ evaluatorResult, requirementRecord });
   if (evaluatorResult.classification !== derived) throw new Error(`classification does not rederive to ${derived}`);
   return derived;
 }
