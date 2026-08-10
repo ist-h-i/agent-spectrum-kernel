@@ -86,6 +86,41 @@ const EVALUATOR_AUTHORITY_FILE_PATHS = [
   "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/verification-command-contract.json",
   "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/requirement-record.json",
 ];
+const MUTABLE_AUTHORITY_NEGATIVE_LABELS = [
+  "runner same-bytes inode replacement",
+  "runner source revision transplant",
+  "runner source symlink replacement",
+  "hidden evaluator same-bytes inode replacement",
+  "hidden evaluator different bytes",
+  "hidden evaluator symlink replacement",
+  "sealed runner same-bytes inode replacement",
+  "sealed hidden evaluator same-bytes inode replacement",
+  "sealed hidden evaluator symlink replacement",
+  "sealed private bundle dependency drift",
+  "sealed repository direct module same-bytes inode replacement",
+  "sealed repository transitive module replacement",
+  "sealed repository fixture input replacement",
+  "sealed repository transitive module symlink",
+  "sealed candidate snapshot addition",
+  "sealed frozen snapshot mutation",
+  "sealed evaluation-input snapshot addition",
+  "original mode metadata mutation",
+  "self-consistent original mode authority reseal",
+  "original authority entry omission",
+  "original authority entry addition",
+  "original authority entry duplicate",
+  "original authority path reorder",
+  "original authority bytes mismatch",
+  "original authority file type mismatch",
+  "frozen candidate authority transplant",
+  "stale child pre-execution repository diff artifact",
+  "private record raw-byte modification",
+  "fragment missing",
+  "fragment symlink",
+  "fragment inode replacement",
+  "artifact replacement race",
+  "original private evaluation workspace mutations",
+];
 const APPROVED_R21_IMMUTABLE_INVENTORY_PATH = "benchmarks/fixtures/admission-decision/approved-r21-immutable-paths.json";
 const HISTORICAL_EVALUATOR_REFERENCE_PATH = "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json";
 const NORMALIZED_TELEMETRY_FIELDS = [
@@ -413,6 +448,8 @@ function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluator
   const syntheticFixtureRoot = resolve(repositoryRoot, FIXTURE_ROOT_RELATIVE);
   const hiddenBytes = hiddenEvaluatorSource ?? Buffer.from(`export async function evaluateCandidateSafe() { return ${JSON.stringify(fragment)}; }\n`);
   writeFileSync(resolve(privateEvaluatorRoot, "hidden-evaluator.mjs"), hiddenBytes);
+  const scopeBoundaryBytes = Buffer.from(`${JSON.stringify({ test_only_synthetic_scope_boundary: true }, null, 2)}\n`);
+  writeFileSync(resolve(privateEvaluatorRoot, "scope-boundaries.json"), scopeBoundaryBytes);
   const generatorSourceDigest = sha256(Buffer.from("deterministic-synthetic-current-authority-v1"));
   const sourceIdentity = currentEvaluatorSourceIdentity(repositoryRoot, generatorSourceDigest);
   const referenceSeed = readJson(resolve(syntheticFixtureRoot, "evaluator-reference.json"));
@@ -427,7 +464,10 @@ function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluator
     generator: { id: "synthetic-current-authority", version: "1.0.0", source_digest: generatorSourceDigest },
     independence: { statement_digest: canonicalDigest({ authority: "synthetic-test-only", revision: sourceIdentity.base_git_revision }), generated_without_agent_output: true, public_answer_sources_used: false, measured_agent_access_allowed: false },
     review: { record_digest: canonicalDigest({ authority: "synthetic-test-only", status: "not_independently_reviewed" }), status: "pending", reviewer_count: 1 },
-    asset_inventory: [{ role: "hidden_tests", path: "hidden-evaluator.mjs", bytes: hiddenBytes.length, sha256: sha256(hiddenBytes), media_type: "text/javascript", required: true }],
+    asset_inventory: [
+      { role: "hidden_tests", path: "hidden-evaluator.mjs", bytes: hiddenBytes.length, sha256: sha256(hiddenBytes), media_type: "text/javascript", required: true },
+      { role: "scope_boundaries", path: "scope-boundaries.json", bytes: scopeBoundaryBytes.length, sha256: sha256(scopeBoundaryBytes), media_type: "application/json", required: true },
+    ],
     capabilities: { automated_evaluation: true, manual_evaluation: false },
     boundaries: { private_evaluator_bundle: true, public_repository_allowed: false, public_ci_artifact_allowed: false, contains_answer_bearing_content: true },
     dependency_graph: sourceIdentity.dependency_graph,
@@ -1668,7 +1708,7 @@ async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAut
   return { fragment, frozenWorkspace, candidateWorkspace, evaluationInputRoot, execution, executed };
 }
 
-async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candidateMutator = null, runMutablePathNegatives = true } = {}) {
+async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candidateMutator = null, isolatedPathNegativeLabel = null } = {}) {
   const authorityRoot = createPortableAuthorityRoot(`ask-mn-r21-${state}-`);
   const productionMutation = typeof candidateMutator === "string" ? candidateMutator : null;
   const normalizedAuthority = productionMutation
@@ -1832,6 +1872,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     for (const property of Object.keys(fakeExecutorCalls)) assert.equal(fakeExecutorCalls[property], 0, `production verifier must not invoke caller-supplied ${property}`);
   }
   const originalResultBytes = readFileSync(chain.evaluatorResultPath);
+  if (!isolatedPathNegativeLabel) {
   const expectPersistentFailure = (label, mutate, pattern, { allowAdapterOutput = true } = {}) => {
     const changed = JSON.parse(originalResultBytes.toString("utf8"));
     applyPersistentAuthorityMutation(changed, label, mutate);
@@ -1891,6 +1932,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   assert.throws(() => verifyEvaluatorBoundary(common), /normalized result identity|digest|inventory|summary|inconsistent/u, "persistent authority tamper: command summary");
   writeFileSync(normalizedPath, originalNormalizedBytes);
   assert.deepEqual(chain.snapshot(), before, "persistent authority tamper must restore command summary");
+  }
   if (state === "executed_success" && !candidateMutator) {
     const originalRecordBytes = readFileSync(privateRecord.recordPath);
     const originalFragmentBytes = readFileSync(chain.privateFragmentPath);
@@ -1898,13 +1940,27 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     const evaluatorCheckPath = resolve(authorityRoot, "evaluator-check-artifact.json");
     const originalRepositoryDiffBytes = readFileSync(repositoryDiffPath);
     const originalEvaluatorCheckBytes = readFileSync(evaluatorCheckPath);
-    const expectPathFailure = (label, mutate, restore, pattern = /private evaluation|private evaluator|inode|symlink|missing|path|artifact/u) => {
-      mutate();
-      assert.throws(() => verifyEvaluatorBoundary(common), pattern, `private path authority tamper: ${label}`);
-      restore();
-      assert.deepEqual(chain.snapshot(), before, `private path authority tamper must restore ${label}`);
+    let matchedIsolatedPathNegative = false;
+    const expectPathFailure = (label, mutate, restore, pattern = /private evaluation|private evaluator|inode|symlink|missing|path|artifact/u, postRestore = () => {}) => {
+      if (isolatedPathNegativeLabel !== label) return;
+      assert.equal(matchedIsolatedPathNegative, false, `isolated private path authority negative must select exactly one case: ${label}`);
+      assert.doesNotThrow(() => verifyEvaluatorBoundary(common), `isolated private path authority baseline must pass admitted verifier before ${label}`);
+      assert.doesNotThrow(() => verifyEvaluatorAuthority(common), `isolated private path authority baseline must pass authority verifier before ${label}`);
+      const repositoryStatusBefore = spawnSync("git", ["status", "--porcelain=v1"], { cwd: root, encoding: "utf8" });
+      assert.equal(repositoryStatusBefore.status, 0, `repository status must be readable before ${label}`);
+      try {
+        mutate();
+        assert.throws(() => verifyEvaluatorBoundary(common), pattern, `private path authority tamper must fail admitted verifier: ${label}`);
+      } finally {
+        restore();
+      }
+      postRestore();
+      const repositoryStatusAfter = spawnSync("git", ["status", "--porcelain=v1"], { cwd: root, encoding: "utf8" });
+      assert.equal(repositoryStatusAfter.status, 0, `repository status must be readable after ${label}`);
+      assert.equal(repositoryStatusAfter.stdout, repositoryStatusBefore.stdout, `shared repository state must be restored after ${label}`);
+      matchedIsolatedPathNegative = true;
     };
-    if (runMutablePathNegatives) {
+    if (isolatedPathNegativeLabel) {
     const staticRunnerPath = resolve(root, "scripts/ask-benchmark-private-evaluator-runner.mjs");
     const staticHiddenPath = resolve(privateRoot, bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests").path);
     const staticRunnerBytes = readFileSync(staticRunnerPath);
@@ -1912,15 +1968,21 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     const replaceStaticFile = (path, backup, bytes) => { renameSync(path, backup); writeFileSync(path, bytes); };
     const restoreStaticFile = (path, backup) => { rmSync(path); renameSync(backup, path); };
     const runnerBackup = resolve(authorityRoot, ".runner-source-backup");
-    expectPathFailure("runner same-bytes inode replacement", () => replaceStaticFile(staticRunnerPath, runnerBackup, staticRunnerBytes), () => restoreStaticFile(staticRunnerPath, runnerBackup), /inode|runner source|private evaluator/u);
-    expectPathFailure("runner source revision transplant", () => writeFileSync(staticRunnerPath, Buffer.concat([staticRunnerBytes, Buffer.from("\n// source transplant\n")])), () => writeFileSync(staticRunnerPath, staticRunnerBytes), /source|revision|dependency graph|private evaluator/u);
+    const assertStaticPathRestored = (path, bytes, label) => {
+      const status = lstatSync(path);
+      assert.equal(status.isFile(), true, `${label} must restore a regular file`);
+      assert.equal(status.isSymbolicLink(), false, `${label} must not leave a symlink`);
+      assert.deepEqual(readFileSync(path), bytes, `${label} must restore exact bytes`);
+    };
+    expectPathFailure("runner same-bytes inode replacement", () => replaceStaticFile(staticRunnerPath, runnerBackup, staticRunnerBytes), () => restoreStaticFile(staticRunnerPath, runnerBackup), /inode|runner source|private evaluator/u, () => assertStaticPathRestored(staticRunnerPath, staticRunnerBytes, "runner source"));
+    expectPathFailure("runner source revision transplant", () => writeFileSync(staticRunnerPath, Buffer.concat([staticRunnerBytes, Buffer.from("\n// source transplant\n")])), () => writeFileSync(staticRunnerPath, staticRunnerBytes), /source|revision|dependency graph|private evaluator/u, () => assertStaticPathRestored(staticRunnerPath, staticRunnerBytes, "runner source"));
     const runnerSymlinkBackup = resolve(authorityRoot, ".runner-source-symlink-backup");
-    expectPathFailure("runner source symlink replacement", () => { renameSync(staticRunnerPath, runnerSymlinkBackup); symlinkSync(staticHiddenPath, staticRunnerPath); }, () => { rmSync(staticRunnerPath); renameSync(runnerSymlinkBackup, staticRunnerPath); }, /symlink|runner source|private evaluator/u);
+    expectPathFailure("runner source symlink replacement", () => { renameSync(staticRunnerPath, runnerSymlinkBackup); symlinkSync(staticHiddenPath, staticRunnerPath); }, () => { rmSync(staticRunnerPath); renameSync(runnerSymlinkBackup, staticRunnerPath); }, /symlink|runner source|private evaluator/u, () => assertStaticPathRestored(staticRunnerPath, staticRunnerBytes, "runner source"));
     const hiddenBackup = resolve(authorityRoot, ".hidden-source-backup");
-    expectPathFailure("hidden evaluator same-bytes inode replacement", () => replaceStaticFile(staticHiddenPath, hiddenBackup, staticHiddenBytes), () => restoreStaticFile(staticHiddenPath, hiddenBackup), /inode|hidden evaluator|private evaluator/u);
-    expectPathFailure("hidden evaluator different bytes", () => writeFileSync(staticHiddenPath, Buffer.concat([staticHiddenBytes, Buffer.from("\n// hidden source transplant\n")])), () => writeFileSync(staticHiddenPath, staticHiddenBytes), /digest|bytes|hidden evaluator|private evaluator/u);
+    expectPathFailure("hidden evaluator same-bytes inode replacement", () => replaceStaticFile(staticHiddenPath, hiddenBackup, staticHiddenBytes), () => restoreStaticFile(staticHiddenPath, hiddenBackup), /inode|hidden evaluator|private evaluator/u, () => assertStaticPathRestored(staticHiddenPath, staticHiddenBytes, "hidden evaluator"));
+    expectPathFailure("hidden evaluator different bytes", () => writeFileSync(staticHiddenPath, Buffer.concat([staticHiddenBytes, Buffer.from("\n// hidden source transplant\n")])), () => writeFileSync(staticHiddenPath, staticHiddenBytes), /digest|bytes|hidden evaluator|private evaluator/u, () => assertStaticPathRestored(staticHiddenPath, staticHiddenBytes, "hidden evaluator"));
     const hiddenSymlinkBackup = resolve(authorityRoot, ".hidden-source-symlink-backup");
-    expectPathFailure("hidden evaluator symlink replacement", () => { renameSync(staticHiddenPath, hiddenSymlinkBackup); symlinkSync(staticRunnerPath, staticHiddenPath); }, () => { rmSync(staticHiddenPath); renameSync(hiddenSymlinkBackup, staticHiddenPath); }, /symlink|hidden evaluator|private evaluator/u);
+    expectPathFailure("hidden evaluator symlink replacement", () => { renameSync(staticHiddenPath, hiddenSymlinkBackup); symlinkSync(staticRunnerPath, staticHiddenPath); }, () => { rmSync(staticHiddenPath); renameSync(hiddenSymlinkBackup, staticHiddenPath); }, /symlink|hidden evaluator|private evaluator/u, () => assertStaticPathRestored(staticHiddenPath, staticHiddenBytes, "hidden evaluator"));
     const sealedRunnerPath = resolve(authorityRoot, privateRecord.record.evaluator_runner_sealed_execution_path);
     const sealedHiddenPath = resolve(authorityRoot, privateRecord.record.hidden_evaluator_sealed_execution_path);
     const sealedCandidatePath = resolve(authorityRoot, privateRecord.record.candidate_workspace_sealed_execution_path);
@@ -2002,10 +2064,15 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
       ["original authority path reorder", (authority) => { [authority.candidate_inventory[0], authority.candidate_inventory[1]] = [authority.candidate_inventory[1], authority.candidate_inventory[0]]; }],
       ["original authority bytes mismatch", (authority) => { authority.candidate_inventory.find(({ path }) => path === "build.config.json").sha256 = `sha256:${"1".repeat(64)}`; }],
       ["original authority file type mismatch", (authority) => { authority.candidate_inventory.find(({ path }) => path === "build.config.json").file_type = "directory"; }],
-      ["frozen candidate authority transplant", (authority) => { authority.candidate_inventory = structuredClone(authority.frozen_inventory); authority.candidate_workspace_portable_digest = authority.frozen_workspace_portable_digest; }],
+      ["frozen candidate authority transplant", (authority) => {
+        authority.candidate_inventory = structuredClone(authority.frozen_inventory);
+        if (canonicalDigest(authority.candidate_inventory) === canonicalDigest(JSON.parse(sealedOriginalAuthorityBytes).candidate_inventory)) {
+          authority.candidate_inventory[0].sha256 = `sha256:${"0".repeat(64)}`;
+        }
+        authority.candidate_workspace_portable_digest = canonicalDigest(authority.candidate_inventory);
+      }],
     ]) expectPathFailure(label, () => { const authority = JSON.parse(sealedOriginalAuthorityBytes); mutate(authority); writeSealedOriginalAuthority(authority); }, restoreSealedOriginalAuthority, /original workspace authority|inventory|digest|module-owned|recorded sealed authority|snapshot identity|sealed repository/u);
     expectPathFailure("stale child pre-execution repository diff artifact", () => { const artifact = JSON.parse(sealedPreExecutionDiffBytes); artifact.candidate_workspace_tree_digest = `sha256:${"2".repeat(64)}`; overwriteSealedFile(sealedPreExecutionDiffPath, Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`)); }, restoreSealedOriginalAuthority, /repository diff|original workspace authority|recorded sealed authority|digest|snapshot identity|sealed repository/u);
-    }
     expectPathFailure("private record raw-byte modification", () => writeFileSync(privateRecord.recordPath, Buffer.concat([originalRecordBytes, Buffer.from(" \n")])), () => writeFileSync(privateRecord.recordPath, originalRecordBytes), /private evaluation record|raw|digest|byte/u);
     const fragmentBackup = resolve(authorityRoot, ".private-fragment-backup");
     expectPathFailure("fragment missing", () => renameSync(chain.privateFragmentPath, fragmentBackup), () => renameSync(fragmentBackup, chain.privateFragmentPath), /missing|private evaluator fragment/u);
@@ -2013,6 +2080,15 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     expectPathFailure("fragment inode replacement", () => { renameSync(chain.privateFragmentPath, fragmentBackup); writeFileSync(chain.privateFragmentPath, originalFragmentBytes); }, () => { rmSync(chain.privateFragmentPath); renameSync(fragmentBackup, chain.privateFragmentPath); }, /inode|private evaluator fragment/u);
     const repositoryBackup = resolve(authorityRoot, ".repository-diff-backup");
     expectPathFailure("artifact replacement race", () => { renameSync(repositoryDiffPath, repositoryBackup); writeFileSync(repositoryDiffPath, originalRepositoryDiffBytes); }, () => { rmSync(repositoryDiffPath); renameSync(repositoryBackup, repositoryDiffPath); }, /inode|repository diff artifact/u);
+    const originalCandidateConfig = resolve(authorityRoot, privateRecord.record.candidate_workspace_path, "build.config.json");
+    const originalFrozenConfig = resolve(authorityRoot, privateRecord.record.frozen_workspace_path, "build.config.json");
+    expectPathFailure("original private evaluation workspace mutations", () => {
+      writeFileSync(originalCandidateConfig, Buffer.concat([readFileSync(originalCandidateConfig), Buffer.from("\n")]));
+      writeFileSync(originalFrozenConfig, Buffer.concat([readFileSync(originalFrozenConfig), Buffer.from("\n")]));
+    }, () => {}, /original private evaluation workspace|workspace identity|workspace/u);
+    assert.equal(matchedIsolatedPathNegative, true, `unknown isolated private path authority negative: ${isolatedPathNegativeLabel}`);
+    return { authorityRoot, scoringRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, privateRecord, chain, verifiedResult };
+    }
     const expectPrivateFailure = (label, mutate, pattern = /private evaluation|private evaluator|authority-owned adapter|artifact|record|fragment|lineage|path|digest/u) => {
       const changedResult = JSON.parse(originalResultBytes.toString("utf8"));
       const changedRecord = JSON.parse(originalRecordBytes.toString("utf8"));
@@ -2151,7 +2227,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     assert.deepEqual(chain.snapshot(), before, "external authority closure negatives must restore the persistent authority chain");
     expectPrivateFailure("runner source identity missing", ({ record }) => { delete record.evaluator_runner_source_identity; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /Schema|runner source identity|record/u);
     expectPrivateFailure("record digest", ({ record }) => { record.adapter_source_digest = `sha256:${"0".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /adapter source digest|record digest|source/u);
-    expectPrivateFailure("record cross-fixture transplant", ({ record }) => { record.candidate_authority.fixture_id = "foreign-fixture"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /fixture|candidate|lineage|record|repository diff workspace authority/u);
+    expectPrivateFailure("record cross-fixture transplant", ({ record }) => { record.candidate_authority.fixture_id = "foreign-fixture"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /repository diff workspace authority does not match the original workspace inventory/u);
     expectPrivateFailure("record cross-evaluator transplant", ({ record }) => { record.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /evaluator|bundle|record/u);
     expectPrivateFailure("record-only original workspace authority reseal", ({ record }) => { record.original_workspace_authority_digest = `sha256:${"9".repeat(64)}`; record.original_workspace_authority_raw_sha256 = `sha256:${"8".repeat(64)}`; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /original workspace authority|original private evaluation workspace identity|record/u);
     expectPrivateFailure("record fragment path escape", ({ record }) => { record.private_fragment_path = "../escape.json"; record.evaluation_record_digest = computePrivateEvaluationRecordDigest(record); writeJson(privateRecord.recordPath, record); }, /path|escape|Schema|authority/u);
@@ -2199,14 +2275,22 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     }
     assert.deepEqual(chain.snapshot(), before, "production candidate authority negative matrix must restore the persistent authority chain");
   }
-  if (state === "executed_success" && !candidateMutator && runMutablePathNegatives) {
-    const originalCandidateConfig = resolve(authorityRoot, privateRecord.record.candidate_workspace_path, "build.config.json");
-    const originalFrozenConfig = resolve(authorityRoot, privateRecord.record.frozen_workspace_path, "build.config.json");
-    writeFileSync(originalCandidateConfig, Buffer.concat([readFileSync(originalCandidateConfig), Buffer.from("\n")]));
-    writeFileSync(originalFrozenConfig, Buffer.concat([readFileSync(originalFrozenConfig), Buffer.from("\n")]));
-    assert.throws(() => verifyEvaluatorBoundary(common), /original private evaluation workspace|workspace identity|workspace/u, "original private evaluation workspace mutations must fail closed after the independent negative matrix");
-  }
   return { authorityRoot, scoringRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, privateRecord, chain, verifiedResult };
+}
+
+async function runIsolatedMutableAuthorityNegatives(privateRoot) {
+  const authorityRoots = new Set();
+  for (const label of MUTABLE_AUTHORITY_NEGATIVE_LABELS) {
+    const fullAuthority = await runPersistentFullEvaluatorAuthority(privateRoot, "executed_success", { isolatedPathNegativeLabel: label });
+    try {
+      assert.equal(authorityRoots.has(fullAuthority.authorityRoot), false, `mutable authority negative must use a fresh authority root: ${label}`);
+      authorityRoots.add(fullAuthority.authorityRoot);
+    } finally {
+      removeTree(fullAuthority.authorityRoot);
+      removeTree(fullAuthority.scoringRoot);
+    }
+  }
+  assert.equal(authorityRoots.size, MUTABLE_AUTHORITY_NEGATIVE_LABELS.length, "every mutable authority negative must consume one distinct fresh baseline");
 }
 
 function privateSemanticAuthority(privateRoot) {
@@ -3477,11 +3561,12 @@ try {
       let observedSyntheticPrivateRoot = null;
       const stateValidation = await completeRequestedPrivateValidation(syntheticPrivateRoot, async (validatedPrivateRoot) => {
         observedSyntheticPrivateRoot = validatedPrivateRoot;
-        const fullAuthority = await runPersistentFullEvaluatorAuthority(validatedPrivateRoot, state, { runMutablePathNegatives: false });
+        const fullAuthority = await runPersistentFullEvaluatorAuthority(validatedPrivateRoot, state);
         assert.equal(fullAuthority.verifiedResult.result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state, deriveVerificationEvidenceState(fullAuthority.normalizedAuthority.normalized), `current synthetic authority must preserve the typed state for ${state}`);
         assert.equal(fullAuthority.verifiedResult.scoringReady, state !== "invalid", `admitted compatibility readiness must follow complete current synthetic authority for ${state}`);
         removeTree(fullAuthority.authorityRoot);
         removeTree(fullAuthority.scoringRoot);
+        if (state === "executed_success") await runIsolatedMutableAuthorityNegatives(validatedPrivateRoot);
       });
       assert.equal(stateValidation, "pass", `valid test-only supplied private root must complete for ${state}`);
       assert.equal(observedSyntheticPrivateRoot, syntheticPrivateRoot, `synthetic private-root identity must be preserved for ${state}`);
@@ -3521,6 +3606,7 @@ try {
       removeTree(fullAuthority.authorityRoot);
       removeTree(fullAuthority.scoringRoot);
     }
+    await runIsolatedMutableAuthorityNegatives(privateRoot);
     const productionCases = [
       ["mode-0755", "mode-0755", ["pass", "fail", "pass"], "over_processing", ["allowed_path_mode_changed"]],
       ["mode-0777", "mode-0777", ["pass", "fail", "pass"], "over_processing", ["allowed_path_mode_changed"]],
