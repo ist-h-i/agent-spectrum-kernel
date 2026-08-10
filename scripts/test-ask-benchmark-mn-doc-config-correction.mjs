@@ -2,9 +2,9 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   FIXTURE_ROOT_RELATIVE,
@@ -39,6 +39,16 @@ function readJson(path) {
 
 function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function makeTreeRemovable(path) {
+  if (!existsSync(path)) return;
+  const status = lstatSync(path);
+  if (status.isSymbolicLink()) return;
+  if (status.isDirectory()) {
+    chmodSync(path, 0o700);
+    for (const name of readdirSync(path)) makeTreeRemovable(resolve(path, name));
+  } else if (status.isFile()) chmodSync(path, 0o600);
 }
 
 function validationRoot(name) {
@@ -184,7 +194,9 @@ try {
       for (const [name, mutate, pattern] of [
         ["mutation omission", (value) => value.mutations.pop(), /inventory/u],
         ["mutation addition", (value) => value.mutations.push({ ...value.mutations[0], mutation_id: "extra-mutation" }), /inventory/u],
+        ["mutation duplicate", (value) => value.mutations.push(structuredClone(value.mutations[0])), /duplicate|inventory/u],
         ["mutation transplant", (value) => { value.mutations[0].requirement_id = "configuration-contract"; }, /transplanted/u],
+        ["mutation unknown target", (value) => { value.mutations[0].target_evidence_map_id = "unknown-evidence-map"; }, /unknown public evidence map/u],
         ["mutation wrong target", (value) => { value.mutations[0].target_evidence_map_id = value.mutations[1].target_evidence_map_id; }, /another requirement/u],
         ["mutation digest drift", (value) => { value.mutations[0].mutation_digest = `sha256:${"0".repeat(64)}`; }, /digest mismatch/u],
       ]) {
@@ -217,6 +229,8 @@ try {
       privateMutation.evaluator_private_binding.source_tree_digest = `sha256:${"0".repeat(64)}`;
       assert.notEqual(canonicalDigest(Object.fromEntries(Object.entries(privateMutation).filter(([key]) => key !== "candidate_digest"))), candidate.candidate_digest, "candidate digest must bind private source identity");
       const reference = readJson(resolve(fixtureRoot, "evaluator-reference.json"));
+      const bundleManifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
+      const hiddenAsset = bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests");
       const transplantedReference = structuredClone(reference);
       transplantedReference.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`;
       transplantedReference.public_metadata_digest = computeEvaluatorReferenceDigest(transplantedReference);
@@ -261,6 +275,35 @@ try {
         value.public_metadata_digest = computeEvaluatorReferenceDigest(value);
       }, /frozen evaluator_public_reference|authority binding|bundle transplant/u);
 
+      const mutableReferencePath = resolve(mutableFixtureRoot, "evaluator-reference.json");
+      const mutableReferenceBytes = readFileSync(mutableReferencePath);
+      try {
+        const value = JSON.parse(mutableReferenceBytes);
+        value.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`;
+        value.public_metadata_digest = computeEvaluatorReferenceDigest(value);
+        writeJson(mutableReferencePath, value);
+        assert.throws(() => verifyPrivateEvaluatorBundle({
+          root: mutableRoot,
+          referencePath: mutableReferencePath,
+          privateRoot,
+          manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"),
+          ...productionBoundaries,
+        }), /public\/private evaluator identity mismatch/u, "public reference/private bundle transplant must be rejected");
+      } finally {
+        writeFileSync(mutableReferencePath, mutableReferenceBytes);
+      }
+
+      const privateMaterialLeakPath = resolve(mutableFixtureRoot, "private-material-leak.mjs");
+      writeFileSync(privateMaterialLeakPath, readFileSync(resolve(privateRoot, hiddenAsset?.path ?? "hidden-evaluator.mjs")));
+      execFileSync("git", ["add", relative(mutableRoot, privateMaterialLeakPath)], { cwd: mutableRoot });
+      assert.throws(() => verifyPrivateEvaluatorBundle({
+        root: mutableRoot,
+        referencePath: mutableReferencePath,
+        privateRoot,
+        manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"),
+        ...productionBoundaries,
+      }), /byte-identical private evaluator material/u, "managed private material publication must be rejected");
+
       const wrongRepositoryRoot = resolve(work, "wrong-repository-bytes");
       cpSync(root, wrongRepositoryRoot, { recursive: true });
       writeFileSync(resolve(wrongRepositoryRoot, "scripts/ask-benchmark-scoring-contract.mjs"), `${readFileSync(resolve(wrongRepositoryRoot, "scripts/ask-benchmark-scoring-contract.mjs"), "utf8")}\n`);
@@ -273,8 +316,6 @@ try {
         referencePath: resolve(fixtureRoot, "evaluator-reference.json"),
         label: "mn-doc pre-review external authority",
       });
-      const bundleManifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
-      const hiddenAsset = bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests");
       const sealedAuthorityRoot = resolve(work, "sealed-pre-review-authority");
       const evaluationInputRoot = resolve(work, "sealed-pre-review-input");
       mkdirSync(sealedAuthorityRoot);
@@ -323,5 +364,6 @@ try {
 
   console.log(JSON.stringify({ fixture_id: "mn-doc-config-correction", public_validation: "pass", synthetic_private_validation: "not_run", actual_private_validation: privateValidation, fixture_one_regression: "pass", scoring_ready: false }));
 } finally {
-  rmSync(work, { recursive: true, force: true });
+  makeTreeRemovable(work);
+  rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 }
