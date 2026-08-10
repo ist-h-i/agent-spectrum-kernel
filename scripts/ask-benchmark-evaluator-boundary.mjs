@@ -381,12 +381,30 @@ function rawByteDigest(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
-const EVALUATOR_AUTHORITY_BINDING_PATHS = Object.freeze([
-  "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json",
-  "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evidence-map.json",
-  "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/verification-command-contract.json",
-  "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/requirement-record.json",
-]);
+export function evaluatorAuthorityPathsForFixture(fixtureId) {
+  if (typeof fixtureId !== "string" || !/^[a-z0-9][a-z0-9-]*$/u.test(fixtureId)) throw new Error("evaluator authority fixture ID is invalid");
+  const fixtureRoot = `benchmarks/fixtures/checkpoint-b2/${fixtureId}`;
+  const bindingPaths = [
+    `${fixtureRoot}/input-manifest.json`,
+    `${fixtureRoot}/evidence-map.json`,
+    `${fixtureRoot}/verification-command-contract.json`,
+    `${fixtureRoot}/requirement-record.json`,
+  ];
+  const manifestPath = `${fixtureRoot}/evaluator-authority-manifest.json`;
+  return { fixtureId, fixtureRoot, bindingPaths, manifestPath, fixturePaths: [manifestPath, ...bindingPaths] };
+}
+
+function resolveEvaluatorAuthorityLayout({ buffers, fixtureId = null } = {}) {
+  if (!(buffers instanceof Map)) throw new Error("evaluator authority requires a verified byte map");
+  const inputPaths = [...buffers.keys()].filter((path) => path.endsWith("/input-manifest.json"));
+  if (inputPaths.length !== 1) throw new Error("evaluator authority input manifest inventory is ambiguous");
+  const input = jsonValueFromVerifiedBytes(buffers.get(inputPaths[0]), `evaluator authority ${inputPaths[0]}`);
+  const manifestFixtureIds = Object.keys(input.fixtures ?? {});
+  const resolvedFixtureId = fixtureId ?? (manifestFixtureIds.length === 1 ? manifestFixtureIds[0] : null);
+  const layout = evaluatorAuthorityPathsForFixture(resolvedFixtureId);
+  if (stableCanonicalJson([...buffers.keys()]) !== stableCanonicalJson(layout.bindingPaths)) throw new Error("evaluator authority binding path inventory has an omission, addition, or ordering drift");
+  return { ...layout, input };
+}
 
 function jsonValueFromVerifiedBytes(bytes, label) {
   if (!Buffer.isBuffer(bytes) || bytes.length === 0) throw new Error(`${label} verified bytes are missing`);
@@ -404,18 +422,19 @@ export function computeEvaluatorAuthorityManifestDigest(manifest) {
   return canonicalDigest(base);
 }
 
-export function deriveEvaluatorAuthorityManifest({ buffers, evaluatorRevision } = {}) {
+export function deriveEvaluatorAuthorityManifest({ buffers, evaluatorRevision, fixtureId = null } = {}) {
   if (!(buffers instanceof Map)) throw new Error("evaluator authority manifest requires a verified byte map");
   if (!/^[a-f0-9]{40}$/u.test(evaluatorRevision ?? "")) throw new Error("evaluator authority manifest revision is invalid");
-  const values = new Map(EVALUATOR_AUTHORITY_BINDING_PATHS.map((path) => [path, jsonValueFromVerifiedBytes(buffers.get(path), `evaluator authority ${path}`)]));
-  const [inputPath, evidencePath, commandPath, requirementPath] = EVALUATOR_AUTHORITY_BINDING_PATHS;
-  const input = values.get(inputPath);
+  const layout = resolveEvaluatorAuthorityLayout({ buffers, fixtureId });
+  const values = new Map(layout.bindingPaths.map((path) => [path, jsonValueFromVerifiedBytes(buffers.get(path), `evaluator authority ${path}`)]));
+  const [inputPath, evidencePath, commandPath, requirementPath] = layout.bindingPaths;
+  const input = layout.input;
   const evidence = values.get(evidencePath);
   const command = values.get(commandPath);
   const requirement = values.get(requirementPath);
-  const fixtureEntry = input.fixtures?.["mn-build-option-update"];
+  const fixtureEntry = input.fixtures?.[layout.fixtureId];
   if (!fixtureEntry) throw new Error("evaluator authority input manifest is missing the fixture entry");
-  if (evidence.fixture_id !== "mn-build-option-update" || command.fixture_id !== "mn-build-option-update" || requirement.fixture_id !== "mn-build-option-update") throw new Error("evaluator authority fixture identity is inconsistent");
+  if (evidence.fixture_id !== layout.fixtureId || command.fixture_id !== layout.fixtureId || requirement.fixture_id !== layout.fixtureId) throw new Error("evaluator authority fixture identity is inconsistent");
   if (command.contract_digest !== computeVerificationCommandContractDigest(command)) throw new Error("evaluator authority verification command contract digest is invalid");
   if (requirement.requirement_record_digest !== computeRequirementRecordDigest(requirement) || requirement.requirement_set_digest !== computeRequirementSetDigest(requirement)) throw new Error("evaluator authority requirement record digest is invalid");
   const requirementMapClosure = requirement.requirements.map(({ requirement_id, evidence_map_ids }) => ({ requirement_id, evidence_map_ids }));
@@ -463,7 +482,7 @@ export function deriveEvaluatorAuthorityManifest({ buffers, evaluatorRevision } 
     schema_version: "1.0.0",
     schema_path: EVALUATOR_AUTHORITY_MANIFEST_SCHEMA_PATH,
     program: "adaptive_ask_evaluator_authority_manifest",
-    fixture_id: "mn-build-option-update",
+    fixture_id: layout.fixtureId,
     evaluator_revision: evaluatorRevision,
     file_inventory: fileInventory,
   };
@@ -474,7 +493,7 @@ export function validateEvaluatorAuthorityManifest({ manifest, buffers, evaluato
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) throw new Error(`${label} is missing`);
   if (manifest.manifest_digest !== computeEvaluatorAuthorityManifestDigest(manifest)) throw new Error(`${label} digest closure is invalid`);
   if (root) assertBenchmarkSchemaInstance(manifest, { schemaPath: resolve(root, EVALUATOR_AUTHORITY_MANIFEST_SCHEMA_PATH), label });
-  const expected = deriveEvaluatorAuthorityManifest({ buffers, evaluatorRevision });
+  const expected = deriveEvaluatorAuthorityManifest({ buffers, evaluatorRevision, fixtureId: manifest.fixture_id });
   if (stableCanonicalJson(manifest) !== stableCanonicalJson(expected)) throw new Error(`${label} does not match the immutable fixture authority bytes`);
   return structuredClone(manifest);
 }
@@ -482,7 +501,10 @@ export function validateEvaluatorAuthorityManifest({ manifest, buffers, evaluato
 function assertExternalEvaluatorAuthorityAnchor(anchor, label) {
   if (!anchor || typeof anchor !== "object" || Array.isArray(anchor)) throw new Error(`${label} external evaluator authority anchor is required`);
   if (!/^[a-f0-9]{40}$/u.test(anchor.evaluator_revision ?? "")) throw new Error(`${label} external evaluator authority revision is invalid`);
-  if (anchor.evaluator_authority_manifest_path !== EVALUATOR_AUTHORITY_MANIFEST_PATH) throw new Error(`${label} external evaluator authority manifest path drift`);
+  const reference = anchor.evaluator_reference;
+  if (!reference || typeof reference !== "object" || Array.isArray(reference)) throw new Error(`${label} external evaluator public reference is missing`);
+  const layout = evaluatorAuthorityPathsForFixture(reference.fixture_id);
+  if (anchor.evaluator_authority_manifest_path !== layout.manifestPath) throw new Error(`${label} external evaluator authority manifest path drift`);
   if (!Number.isInteger(anchor.evaluator_authority_manifest_bytes) || anchor.evaluator_authority_manifest_bytes < 1) throw new Error(`${label} external evaluator authority manifest byte count is invalid`);
   for (const [field, value] of [
     ["raw-byte digest", anchor.evaluator_authority_manifest_raw_sha256],
@@ -491,12 +513,10 @@ function assertExternalEvaluatorAuthorityAnchor(anchor, label) {
   if (!Array.isArray(anchor.file_inventory)) throw new Error(`${label} external evaluator authority file inventory is missing`);
   const paths = anchor.file_inventory.map((entry) => entry?.path);
   if (new Set(paths).size !== paths.length) throw new Error(`${label} external evaluator authority file inventory contains duplicates`);
-  if (stableCanonicalJson(paths) !== stableCanonicalJson(EVALUATOR_AUTHORITY_BINDING_PATHS)) throw new Error(`${label} external evaluator authority file inventory has an omission, addition, or ordering drift`);
+  if (stableCanonicalJson(paths) !== stableCanonicalJson(layout.bindingPaths)) throw new Error(`${label} external evaluator authority file inventory has an omission, addition, or ordering drift`);
   for (const entry of anchor.file_inventory) {
     if (!Number.isInteger(entry.bytes) || entry.bytes < 1 || !/^sha256:[a-f0-9]{64}$/u.test(entry.raw_sha256 ?? "")) throw new Error(`${label} external evaluator authority file identity is invalid at ${entry.path}`);
   }
-  const reference = anchor.evaluator_reference;
-  if (!reference || typeof reference !== "object" || Array.isArray(reference)) throw new Error(`${label} external evaluator public reference is missing`);
   if (reference.public_metadata_digest !== computeEvaluatorReferenceDigest(reference)) throw new Error(`${label} external evaluator public reference digest closure is invalid`);
   if (reference.evaluator_revision !== anchor.evaluator_revision || reference.evaluator_authority_manifest_path !== anchor.evaluator_authority_manifest_path || reference.evaluator_authority_manifest_raw_sha256 !== anchor.evaluator_authority_manifest_raw_sha256 || reference.evaluator_authority_manifest_digest !== anchor.evaluator_authority_manifest_digest) throw new Error(`${label} external evaluator public reference authority closure is invalid`);
   if (!/^evaluator-[a-f0-9]{64}$/u.test(reference.evaluator_bundle_id ?? "") || !/^sha256:[a-f0-9]{64}$/u.test(reference.evaluator_bundle_digest ?? "")) throw new Error(`${label} external evaluator public reference bundle identity is invalid`);
@@ -505,7 +525,8 @@ function assertExternalEvaluatorAuthorityAnchor(anchor, label) {
 }
 
 function buildVerifiedEvaluatorAuthorityAnchor({ evaluatorRevision, evaluatorReference, manifestReference, manifestSource, buffers, root, label }) {
-  if (!manifestReference || manifestReference.path !== EVALUATOR_AUTHORITY_MANIFEST_PATH) throw new Error(`${label} evaluator authority manifest freeze reference path drift`);
+  const layout = evaluatorAuthorityPathsForFixture(evaluatorReference?.fixture_id);
+  if (!manifestReference || manifestReference.path !== layout.manifestPath) throw new Error(`${label} evaluator authority manifest freeze reference path drift`);
   if (!manifestSource || !(buffers instanceof Map)) throw new Error(`${label} evaluator authority verified bytes are missing`);
   if (manifestSource.rawByteDigest !== manifestReference.raw_byte_digest) throw new Error(`${label} evaluator authority manifest raw bytes do not match the freeze authority`);
   if (manifestSource.value.manifest_digest !== manifestReference.semantic_digest) throw new Error(`${label} evaluator authority manifest semantic digest does not match the freeze authority`);
@@ -528,6 +549,11 @@ function externalAuthorityIdentityForPath(anchor, path) {
     raw_sha256: anchor.evaluator_authority_manifest_raw_sha256,
   };
   return anchor.file_inventory.find((entry) => entry.path === path) ?? null;
+}
+
+function fixtureAuthorityPathsFromAnchor(anchor, label) {
+  const validated = assertExternalEvaluatorAuthorityAnchor(anchor, label);
+  return [validated.evaluator_authority_manifest_path, ...validated.file_inventory.map(({ path }) => path)];
 }
 
 export function verifySealedEvaluatorExternalAuthority({ descriptor, buffers, externalAuthorityAnchor, label = "sealed evaluator external authority" } = {}) {
@@ -987,7 +1013,7 @@ export function readEvaluatorAuthorityAnchorFromFreeze({
     label: `${label} evaluator authority manifest`,
     publicArtifact: true,
   });
-  const buffers = new Map(EVALUATOR_AUTHORITY_BINDING_PATHS.map((path) => {
+  const buffers = new Map(manifestSource.value.file_inventory.map(({ path }) => {
     const absolute = resolveAuthorityArtifactPath(authorityRoot, path, `${label} evaluator authority binding ${path}`);
     return [path, Buffer.from(readStableFile(absolute, `${label} evaluator authority binding ${path}`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false }).bytes)];
   }));
@@ -1342,7 +1368,12 @@ export function validateSealedRepositoryAuthorityBytes({
   if (fileEntries.length + directoryEntries.length !== descriptorInventory.length) throw new Error(`${label} descriptor inventory contains an invalid file type`);
   const fileByPath = new Map(fileEntries.map((entry) => [entry.path, entry]));
   const fixturePaths = (descriptor.fixture_authority ?? []).map(({ path }) => path);
-  if (stableCanonicalJson(fixturePaths) !== stableCanonicalJson(EVALUATOR_FIXTURE_AUTHORITY_PATHS)) throw new Error(`${label} fixture authority path inventory is not closed`);
+  if (!(buffers instanceof Map)) throw new Error(`${label} requires a descriptor-stable verified byte map`);
+  const manifestPath = assertPortableRelativePath(descriptor.evaluator_authority_manifest_path, `${label} evaluator authority manifest path`);
+  const manifestBytes = buffers.get(manifestPath);
+  const manifest = jsonValueFromVerifiedBytes(manifestBytes, `${label} evaluator authority manifest`);
+  const expectedFixturePaths = evaluatorAuthorityPathsForFixture(manifest.fixture_id).fixturePaths;
+  if (stableCanonicalJson(fixturePaths) !== stableCanonicalJson(expectedFixturePaths)) throw new Error(`${label} fixture authority path inventory is not closed`);
   if (descriptor.fixture_authority_digest !== canonicalDigest(descriptor.fixture_authority)) throw new Error(`${label} fixture authority digest closure is invalid`);
   if (stableCanonicalJson(descriptor.runtime_authority_paths) !== stableCanonicalJson(EVALUATOR_RUNTIME_AUTHORITY_PATHS)) throw new Error(`${label} runtime authority path inventory is not closed`);
   const expectedFilePaths = [...new Set([...graphPaths, ...fixturePaths, ...EVALUATOR_RUNTIME_AUTHORITY_PATHS])].sort();
@@ -1369,7 +1400,6 @@ export function validateSealedRepositoryAuthorityBytes({
     if (!inventoryEntry || stableCanonicalJson(fixture) !== stableCanonicalJson(inventoryEntry)) throw new Error(`${label} fixture authority is not cross-bound to sealed bytes at ${fixture.path}`);
   }
 
-  if (!(buffers instanceof Map)) throw new Error(`${label} requires a descriptor-stable verified byte map`);
   const expectedBufferPaths = [...expectedFilePaths, EVALUATOR_REPOSITORY_DESCRIPTOR_PATH].sort();
   if (stableCanonicalJson([...buffers.keys()].sort()) !== stableCanonicalJson(expectedBufferPaths)) throw new Error(`${label} verified byte map is not closed`);
   for (const entry of fileEntries) {
@@ -1381,10 +1411,7 @@ export function validateSealedRepositoryAuthorityBytes({
   const parsedDescriptor = jsonValueFromVerifiedBytes(descriptorBytes, `${label} descriptor bytes`);
   if (stableCanonicalJson(parsedDescriptor) !== stableCanonicalJson(descriptor)) throw new Error(`${label} parsed descriptor does not match the verified descriptor bytes`);
 
-  if (descriptor.evaluator_authority_manifest_path !== EVALUATOR_AUTHORITY_MANIFEST_PATH) throw new Error(`${label} evaluator authority manifest path is invalid`);
-  const manifestBytes = buffers.get(EVALUATOR_AUTHORITY_MANIFEST_PATH);
   if (descriptor.evaluator_authority_manifest_raw_sha256 !== rawByteDigest(manifestBytes)) throw new Error(`${label} evaluator authority manifest raw binding is invalid`);
-  const manifest = jsonValueFromVerifiedBytes(manifestBytes, `${label} evaluator authority manifest`);
   if (descriptor.evaluator_authority_manifest_digest !== manifest.manifest_digest) throw new Error(`${label} evaluator authority manifest semantic binding is invalid`);
   validateEvaluatorAuthorityManifest({ manifest, buffers, evaluatorRevision: descriptor.evaluator_revision, root: rootForSchema, label: `${label} evaluator authority manifest` });
 
@@ -1404,7 +1431,7 @@ function buildRepositoryAuthoritySource({ root, evaluatorRevision, externalAutho
   const rootBefore = filesystemIdentity(lstatSync(repositoryRoot));
   const graph = deriveEvaluatorDependencyGraph({ root: repositoryRoot, baseRevision: evaluatorRevision });
   const graphPaths = graph.node_inventory.map(({ path }) => path);
-  const fixturePaths = [...EVALUATOR_FIXTURE_AUTHORITY_PATHS];
+  const fixturePaths = fixtureAuthorityPathsFromAnchor(anchor, label);
   const runtimePaths = [...EVALUATOR_RUNTIME_AUTHORITY_PATHS];
   const allPaths = [...new Set([...graphPaths, ...fixturePaths, ...runtimePaths])].sort();
   const pathSet = new Set(allPaths);
@@ -1430,7 +1457,7 @@ function buildRepositoryAuthoritySource({ root, evaluatorRevision, externalAutho
     records.set(path, descriptorFileRecord(path, read));
   }
   if (pathSet.size !== buffers.size) throw new Error(`${label} source authority inventory contains duplicate paths`);
-  const evaluatorAuthorityManifest = jsonValueFromVerifiedBytes(buffers.get(EVALUATOR_AUTHORITY_MANIFEST_PATH), `${label} evaluator authority manifest`);
+  const evaluatorAuthorityManifest = jsonValueFromVerifiedBytes(buffers.get(anchor.evaluator_authority_manifest_path), `${label} evaluator authority manifest`);
   validateEvaluatorAuthorityManifest({ manifest: evaluatorAuthorityManifest, buffers, evaluatorRevision, root: repositoryRoot, label: `${label} evaluator authority manifest` });
   const fileEntries = [...records.values()].sort((left, right) => left.path.localeCompare(right.path));
   const expectedPortableEntries = [...descriptorDirectoryEntries(allPaths), ...fileEntries].sort((left, right) => left.path.localeCompare(right.path));
@@ -1450,8 +1477,8 @@ function buildRepositoryAuthoritySource({ root, evaluatorRevision, externalAutho
     source_graph: graph,
     fixture_authority_digest: fixtureAuthorityDigest,
     fixture_authority: fixtureEntries,
-    evaluator_authority_manifest_path: EVALUATOR_AUTHORITY_MANIFEST_PATH,
-    evaluator_authority_manifest_raw_sha256: rawByteDigest(buffers.get(EVALUATOR_AUTHORITY_MANIFEST_PATH)),
+    evaluator_authority_manifest_path: anchor.evaluator_authority_manifest_path,
+    evaluator_authority_manifest_raw_sha256: rawByteDigest(buffers.get(anchor.evaluator_authority_manifest_path)),
     evaluator_authority_manifest_digest: evaluatorAuthorityManifest.manifest_digest,
     runtime_authority_paths: runtimePaths,
     sealed_mode_policy: {
@@ -2981,7 +3008,8 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   if (record.sealed_repository_descriptor_relative_path !== relativeAuthorityPath(canonicalEvaluationRoot, sealedRepository.descriptorPath, "sealed repository authority descriptor") || record.sealed_repository_descriptor_sha256 !== sealedRepository.descriptorRead.rawByteDigest || record.sealed_repository_descriptor_bytes !== sealedRepository.descriptorRead.bytes.length) throw new Error("sealed repository descriptor identity is inconsistent");
   if (record.sealed_repository_source_graph_digest !== bundle.manifest.dependency_graph.graph_digest || record.sealed_repository_fixture_authority_digest !== sealedRepository.descriptor.fixture_authority_digest) throw new Error("sealed repository source or fixture authority digest is inconsistent");
   if (sealedRepository.descriptor.evaluator_revision !== bundle.manifest.evaluator_revision || sealedRepository.descriptor.source_graph_digest !== bundle.manifest.dependency_graph.graph_digest || stableCanonicalJson(sealedRepository.descriptor.source_graph) !== stableCanonicalJson(bundle.manifest.dependency_graph)) throw new Error("sealed repository source graph authority is inconsistent");
-  if (sealedRepository.descriptor.fixture_authority_digest !== record.sealed_repository_fixture_authority_digest || stableCanonicalJson(sealedRepository.descriptor.fixture_authority.map(({ path }) => path).sort()) !== stableCanonicalJson([...EVALUATOR_FIXTURE_AUTHORITY_PATHS].sort())) throw new Error("sealed repository fixture authority inventory is inconsistent");
+  const expectedSealedFixturePaths = evaluatorAuthorityPathsForFixture(sealedRepository.manifest.fixture_id).fixturePaths;
+  if (sealedRepository.descriptor.fixture_authority_digest !== record.sealed_repository_fixture_authority_digest || stableCanonicalJson(sealedRepository.descriptor.fixture_authority.map(({ path }) => path).sort()) !== stableCanonicalJson([...expectedSealedFixturePaths].sort())) throw new Error("sealed repository fixture authority inventory is inconsistent");
   if (stableCanonicalJson(sealedRepository.descriptor.runtime_authority_paths) !== stableCanonicalJson([...EVALUATOR_RUNTIME_AUTHORITY_PATHS])) throw new Error("sealed repository runtime authority inventory is inconsistent");
   const externalAuthorityAnchor = assertExternalEvaluatorAuthorityAnchor(scoringInputs.evaluatorAuthorityAnchor, "private evaluation record");
   const expectedManifestClosure = {
@@ -3187,7 +3215,7 @@ function readScoringInputSources({
   const requirementRecordSource = readFrozenJsonArtifact({ authorityRoot, root, reference: freezeManifest.requirement_record, suppliedPath: requirementRecordPath, schemaPath: REQUIREMENT_RECORD_SCHEMA_PATH, label: "authoritative requirement record", publicArtifact: true });
   const outputContractSource = readFrozenJsonArtifact({ authorityRoot, root, reference: freezeManifest.output_contract, suppliedPath: outputContractPath, schemaPath: OUTPUT_CONTRACT_SCHEMA_PATH, label: "authoritative output contract", publicArtifact: true });
   const evaluatorReferenceSource = readFrozenJsonArtifact({ authorityRoot, root, reference: freezeManifest.evaluator_public_reference, suppliedPath: referencePath, schemaPath: EVALUATOR_REFERENCE_SCHEMA_PATH, label: "authoritative evaluator public reference", publicArtifact: true });
-  const requiresEvaluatorAuthorityManifest = freezeManifest.fixture_id === "mn-build-option-update";
+  const requiresEvaluatorAuthorityManifest = Boolean(outputContractSource.value.evaluator_authority_manifest_path || evaluatorReferenceSource.value.evaluator_authority_manifest_path);
   if (requiresEvaluatorAuthorityManifest && !freezeManifest.evaluator_authority_manifest) throw new Error("scoring input freeze evaluator authority manifest is missing");
   const evaluatorAuthorityManifestSource = freezeManifest.evaluator_authority_manifest
     ? readFrozenJsonArtifact({ authorityRoot, root, reference: freezeManifest.evaluator_authority_manifest, suppliedPath: resolve(authorityRoot, freezeManifest.evaluator_authority_manifest.path), schemaPath: EVALUATOR_AUTHORITY_MANIFEST_SCHEMA_PATH, label: "authoritative evaluator authority manifest", publicArtifact: true })
@@ -3202,7 +3230,7 @@ function readScoringInputSources({
   const evaluatorAuthorityManifest = evaluatorAuthorityManifestSource?.value ?? null;
   let evaluatorAuthorityAnchor = null;
   if (evaluatorAuthorityManifest) {
-    const evaluatorAuthorityBuffers = new Map(EVALUATOR_AUTHORITY_BINDING_PATHS.map((path) => {
+    const evaluatorAuthorityBuffers = new Map(evaluatorAuthorityManifest.file_inventory.map(({ path }) => {
       const absolute = resolveAuthorityArtifactPath(authorityRoot, path, `evaluator authority binding ${path}`);
       return [path, Buffer.from(readStableFile(absolute, `evaluator authority binding ${path}`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false }).bytes)];
     }));

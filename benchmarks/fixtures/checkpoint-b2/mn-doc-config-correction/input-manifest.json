@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "mn-doc-config-correction": {
+      "class": "documentation",
+      "difficulty": "easy",
+      "target_minutes": 5,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "f3e064f9588b58e558b8c30ce35a979021f604b34fac40c2eff60207ad0d4e3d",
+          "bytes": 398
+        },
+        {
+          "path": "workspace/config/retry-policy.json",
+          "sha256": "bd0186d9f96bf146211954f696a4bb51fa286e1089777971a057219dc98d9f3f",
+          "bytes": 72
+        },
+        {
+          "path": "workspace/docs/worker-retries.md",
+          "sha256": "c41bf6d79095077a7069c14548d21c064d661a9ede8fe9a8c29ceb8fb02b02d0",
+          "bytes": 236
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "5f52338838590b48ddf7f2c71f52c8eda54b1f70df1a06f9c98e07540b99aba8",
+          "bytes": 156
+        },
+        {
+          "path": "workspace/test/worker-retries.test.mjs",
+          "sha256": "f8bcfadde1dd8298bf4a4a93e29a4299e3192f4e1b69890d066e1de9ee09e56f",
+          "bytes": 712
+        }
+      ]
+    }
+  }
+}

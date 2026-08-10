@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mn-doc-config-correction",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/docs/worker-retries.md"
+    ],
+    "required_candidate_paths": [
+      "workspace/docs/worker-retries.md"
+    ],
+    "protected_candidate_paths": [
+      "workspace/config/retry-policy.json",
+      "workspace/package.json",
+      "workspace/test/worker-retries.test.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "authority_digest": "sha256:4225ff59a65ef229cd3b0b27758a01a57ba60caec4ceacfa743cce6557670ffe"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "documentation-config-contract",
+      "agent_visible_paths": [
+        "workspace/config/retry-policy.json",
+        "workspace/docs/worker-retries.md"
+      ]
+    },
+    {
+      "evidence_map_id": "focused-change-boundary",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/docs/worker-retries.md"
+      ]
+    },
+    {
+      "evidence_map_id": "repository-verification-route",
+      "agent_visible_paths": [
+        "workspace/package.json",
+        "workspace/test/worker-retries.test.mjs"
+      ]
+    }
+  ],
+  "evidence_map_digest": "sha256:9e2ce4e39d6d625e1183667553170672f3d2fddf41b5a8f3359d3b4e534c754a"
+}

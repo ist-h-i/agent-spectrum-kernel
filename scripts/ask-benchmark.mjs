@@ -249,8 +249,18 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
     if (fixture.aggregate_eligible !== (fixture.suite !== "calibration")) errors.push(`${fixture.id} aggregate eligibility must exclude calibration only`);
     if (fixture.id === "impl-transfer-hard" && fixture.suite === "calibration" && fixture.repetitions !== 5) errors.push("concurrent transfer calibration requires 5 repetitions");
     const root = resolve(fixtureRoot(config), fixture.id);
+    const sourceFreezeCandidatePath = resolve(root, "source-freeze-candidate.json");
+    const sourceFreezeCandidate = existsSync(sourceFreezeCandidatePath) ? readJson(sourceFreezeCandidatePath) : null;
+    const isPendingSourceFreezeCandidate = sourceFreezeCandidate?.fixture_id === fixture.id
+      && sourceFreezeCandidate?.candidate_state === "source_freeze_candidate"
+      && sourceFreezeCandidate?.reviewer_state === "pending"
+      && sourceFreezeCandidate?.admission_state === "admission_pending"
+      && sourceFreezeCandidate?.measured_execution === false
+      && sourceFreezeCandidate?.scoring_published === false;
     const requiredFixturePaths = fixture.suite === "calibration"
       ? ["task.md", "workspace/package.json", "evaluator/expected.json"]
+      : isPendingSourceFreezeCandidate
+        ? ["task.md", "workspace/package.json", "metadata.json", "requirement-record.json", "output-contract.json", "source-freeze-candidate.json", "verification-command-contract.json"]
       : ["task.md", "workspace/package.json", "metadata.json", "evaluator-reference.json", "requirement-record.json", "output-contract.json", "final-admission-record.json", "scoring-input-freeze-manifest.json", "admission-review.json"];
     for (const path of requiredFixturePaths) {
       if (!existsSync(resolve(root, path))) errors.push(`${fixture.id}/${path} is missing`);

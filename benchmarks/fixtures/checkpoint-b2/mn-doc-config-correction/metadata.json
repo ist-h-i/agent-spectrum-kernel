@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mn-doc-config-correction",
+  "fixture_role": "primary",
+  "suite": "mechanism_negative",
+  "task_class": "documentation",
+  "domain": "docs_config",
+  "difficulty": "easy",
+  "repetitions": 3,
+  "risk_boundary": "none",
+  "capability_families": [
+    "documentation_accuracy",
+    "focused_implementation"
+  ],
+  "evidence_topologies": [
+    "documentation_and_config",
+    "single_file_spec"
+  ],
+  "outcome_dimensions": [
+    "configuration_accuracy",
+    "scope_discipline"
+  ],
+  "source_freeze_state": "candidate",
+  "reviewer_status": "pending_independent_review",
+  "admission_status": "admission_pending",
+  "measured_execution_performed": false,
+  "scoring_published": false,
+  "metadata_digest": "sha256:ad63326700f215fa2a339819e70ff80fb9aa071757343d745177030be68b9c57"
+}

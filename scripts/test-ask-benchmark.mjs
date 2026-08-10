@@ -123,8 +123,9 @@ assert.ok(portfolioPlan.adapter_tracks.every((entry) => entry.runtime_status ===
 assert.equal(portfolioPlan.pool_adapter_results, false);
 assert.deepEqual(new Set(portfolioPlan.conditions), new Set(["plain", "kernel_only", "adaptive_ask", "full_ask"]));
 assert.equal(portfolioPlan.schema_path, "benchmarks/schemas/execution-plan.schema.json");
-assert.ok(portfolioPlan.cases.filter((entry) => entry.fixture_id !== "mn-build-option-update").every((entry) => entry.suite === "calibration" && entry.aggregate_eligible === false));
+assert.ok(portfolioPlan.cases.filter((entry) => !["mn-build-option-update", "mn-doc-config-correction"].includes(entry.fixture_id)).every((entry) => entry.suite === "calibration" && entry.aggregate_eligible === false));
 assert.ok(portfolioPlan.cases.filter((entry) => entry.fixture_id === "mn-build-option-update").every((entry) => entry.suite === "mechanism_negative" && entry.task_class === "configuration" && entry.aggregate_eligible === true));
+assert.ok(portfolioPlan.cases.filter((entry) => entry.fixture_id === "mn-doc-config-correction").every((entry) => entry.suite === "mechanism_negative" && entry.task_class === "documentation" && entry.aggregate_eligible === true));
 assert.equal(new Set(portfolioPlan.cases.map((entry) => entry.case_id)).size, portfolioPlan.cases.length);
 
 const casesByBlock = groupBy(portfolioPlan.cases, (entry) => entry.block_id);

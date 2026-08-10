@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mn-doc-config-correction",
+  "requirement_record_digest": "sha256:45e5f576a30b996f2bb0e3f38f08d9e3f0ce2ab849c6adcb0493a30c2b9bd403",
+  "evidence_map_digest": "sha256:9e2ce4e39d6d625e1183667553170672f3d2fddf41b5a8f3359d3b4e534c754a",
+  "verification_command_contract_digest": "sha256:4ffd33f6e70d6f6daad7e61c3a71c4cd161ccc3448d25fa37aad3dcd25faa4f8",
+  "result_profile": {
+    "name": "binary_scope_verification_v1",
+    "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
+  },
+  "declares_findings": false,
+  "output_contract_digest": "sha256:66b813eb3c01a3bddecc331e4fddffb32534956c911e5cffecc4a9190287ebe4"
+}
