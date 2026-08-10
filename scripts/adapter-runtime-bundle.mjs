@@ -67,6 +67,13 @@ export function buildAdapterRuntimeBundle() {
   const portfolioDesignReviewPackage = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-review-package.json"), "utf8"));
   const portfolioIndependentDesignReview = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-independent-review.json"), "utf8"));
   const portfolioDesignReviewedState = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-reviewed-state.json"), "utf8"));
+  const mnBuildOptionMetadata = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/metadata.json"), "utf8"));
+  const mnBuildOptionReference = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json"), "utf8"));
+  const mnBuildOptionRequirement = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/requirement-record.json"), "utf8"));
+  const mnBuildOptionOutput = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/output-contract.json"), "utf8"));
+  const mnBuildOptionAdmission = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/final-admission-record.json"), "utf8"));
+  const mnBuildOptionFreeze = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/scoring-input-freeze-manifest.json"), "utf8"));
+  const mnBuildOptionReview = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/admission-review.json"), "utf8"));
   const profiles = [];
   const canonicalPaths = new Set(["AGENTS.md", "manifest.json"]);
   for (const profile of commonProfiles) {
@@ -239,6 +246,51 @@ export function buildAdapterRuntimeBundle() {
         projected_state: portfolioDesignReviewedState.projected_state,
         final_admission_implied: portfolioDesignReviewedState.final_admission_implied,
         implementation_authorized: portfolioDesignReviewedState.implementation_authorized,
+      },
+      portfolio_fixture_admission: {
+        issue: 207,
+        checkpoint: "first_vertical_fixture",
+        fixture_id: mnBuildOptionMetadata.fixture_id,
+        fixture_root: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update",
+        runtime_config_path: "benchmarks/adaptive-portfolio.config.json",
+        runtime_config_file_sha256: fileSha256("benchmarks/adaptive-portfolio.config.json"),
+        input_manifest_path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json",
+        input_manifest_file_sha256: fileSha256("benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json"),
+        fixture_input_digest: mnBuildOptionReference.fixture_input_digest,
+        metadata_path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/metadata.json",
+        metadata_file_sha256: fileSha256("benchmarks/fixtures/checkpoint-b2/mn-build-option-update/metadata.json"),
+        metadata_digest: mnBuildOptionMetadata.metadata_digest,
+        evaluator_reference_path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json",
+        evaluator_reference_file_sha256: fileSha256("benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json"),
+        evaluator_reference_digest: mnBuildOptionReference.public_metadata_digest,
+        evaluator_bundle_id: mnBuildOptionReference.evaluator_bundle_id,
+        evaluator_bundle_digest: mnBuildOptionReference.evaluator_bundle_digest,
+        evaluator_byte_count: mnBuildOptionMetadata.evaluator_byte_count,
+        requirement_record_path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/requirement-record.json",
+        requirement_record_file_sha256: fileSha256("benchmarks/fixtures/checkpoint-b2/mn-build-option-update/requirement-record.json"),
+        requirement_record_id: mnBuildOptionRequirement.requirement_record_id,
+        requirement_record_digest: mnBuildOptionRequirement.requirement_record_digest,
+        output_contract_path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/output-contract.json",
+        output_contract_file_sha256: fileSha256("benchmarks/fixtures/checkpoint-b2/mn-build-option-update/output-contract.json"),
+        output_contract_id: mnBuildOptionOutput.output_contract_id,
+        output_contract_digest: mnBuildOptionOutput.output_contract_digest,
+        final_admission_record_path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/final-admission-record.json",
+        final_admission_record_file_sha256: fileSha256("benchmarks/fixtures/checkpoint-b2/mn-build-option-update/final-admission-record.json"),
+        final_admission_record_digest: mnBuildOptionAdmission.admission_digest,
+        scoring_input_freeze_path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/scoring-input-freeze-manifest.json",
+        scoring_input_freeze_file_sha256: fileSha256("benchmarks/fixtures/checkpoint-b2/mn-build-option-update/scoring-input-freeze-manifest.json"),
+        scoring_input_freeze_digest: mnBuildOptionFreeze.manifest_digest,
+        admission_review_path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/admission-review.json",
+        admission_review_file_sha256: fileSha256("benchmarks/fixtures/checkpoint-b2/mn-build-option-update/admission-review.json"),
+        admission_review_digest: mnBuildOptionReview.review_package_digest,
+        reviewer_status: mnBuildOptionReview.reviewer_status,
+        scoring_ready: false,
+        measured_execution_performed: false,
+        private_evaluator_included: false,
+        validator_path: "scripts/ask-benchmark-mn-build-option-update.mjs",
+        validator_file_sha256: fileSha256("scripts/ask-benchmark-mn-build-option-update.mjs"),
+        focused_test_path: "scripts/test-ask-benchmark-mn-build-option-update.mjs",
+        focused_test_file_sha256: fileSha256("scripts/test-ask-benchmark-mn-build-option-update.mjs"),
       },
     },
   };

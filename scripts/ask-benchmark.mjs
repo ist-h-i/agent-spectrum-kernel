@@ -81,7 +81,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, source: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, pairedComparisonReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, source: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, pairedComparisonReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, privateEvaluationRoot: null, privateEvaluationRecordPath: null, privateFragmentPath: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, admissionDecision: null, admissionReviewAuthority: null, admissionReviewAuthoritySourceDigest: null, admissionReviewArchive: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -107,9 +107,19 @@ function parseArgs(argv) {
     else if (flag === "--snapshot-digest") args.snapshotDigest = argv.shift();
     else if (flag === "--reference") args.reference = resolve(argv.shift());
     else if (flag === "--private-root") args.privateRoot = resolve(argv.shift());
+    else if (flag === "--private-evaluation-root") args.privateEvaluationRoot = resolve(argv.shift());
+    else if (flag === "--private-evaluation-record") args.privateEvaluationRecordPath = resolve(argv.shift());
+    else if (flag === "--private-fragment") args.privateFragmentPath = resolve(argv.shift());
     else if (flag === "--manifest" || flag === "--evaluator-manifest") args.evaluatorManifest = resolve(argv.shift());
     else if (flag === "--result" || flag === "--evaluator-result") args.evaluatorResult = resolve(argv.shift());
+    else if (flag === "--private-evaluation-root") args.privateEvaluationRoot = resolve(argv.shift());
+    else if (flag === "--private-evaluation-record") args.privateEvaluationRecordPath = resolve(argv.shift());
+    else if (flag === "--private-fragment") args.privateFragmentPath = resolve(argv.shift());
     else if (flag === "--admission-record") args.admissionRecord = resolve(argv.shift());
+    else if (flag === "--admission-decision") args.admissionDecision = resolve(argv.shift());
+    else if (flag === "--admission-review-authority") args.admissionReviewAuthority = resolve(argv.shift());
+    else if (flag === "--admission-review-authority-source-digest") args.admissionReviewAuthoritySourceDigest = argv.shift();
+    else if (flag === "--admission-review-archive") args.admissionReviewArchive = resolve(argv.shift());
     else if (flag === "--requirement-record") args.requirementRecord = resolve(argv.shift());
     else if (flag === "--output-contract") args.outputContract = resolve(argv.shift());
     else if (flag === "--scoring-input-freeze") args.scoringInputFreezeManifest = resolve(argv.shift());
@@ -157,9 +167,9 @@ Commands:
   verify-normalized-results --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --output <normalized-results-directory>
   verify-normalized-results --output <normalized-results-directory> --snapshot-digest <sha256:digest>
   verify-evaluator-bundle --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> [--public-artifact-root <staged-public-artifact-directory>]
-  verify-evaluator-result --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> [--catalog <catalog.json>] [--policy-manifest <manifest.json>] [--scoring-policy <policy.json>] [--public-artifact-root <staged-public-artifact-directory>]
-  verify-evaluator-boundary --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> --public-artifact-root <staged-public-artifact-directory>
-  score-evaluator-result --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> --output <engineering-result.json> [--public-artifact-root <staged-public-artifact-directory>]
+  verify-evaluator-result --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --private-evaluation-root <private-evaluation-directory> --private-evaluation-record <private-evaluation-record.json> --private-fragment <private-fragment.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> [--catalog <catalog.json>] [--policy-manifest <manifest.json>] [--scoring-policy <policy.json>] [--public-artifact-root <staged-public-artifact-directory>]
+  verify-evaluator-boundary --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --private-evaluation-root <private-evaluation-directory> --private-evaluation-record <private-evaluation-record.json> --private-fragment <private-fragment.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> --public-artifact-root <staged-public-artifact-directory>
+  score-evaluator-result --reference <public-reference.json> --private-root <private-directory> --manifest <private-manifest.json> --result <evaluator-result.json> --private-evaluation-root <private-evaluation-directory> --private-evaluation-record <private-evaluation-record.json> --private-fragment <private-fragment.json> --admission-record <admission-record.json> --requirement-record <requirement-record.json> --output-contract <output-contract.json> --scoring-input-freeze <freeze-manifest.json> [--scoring-input-freeze-source-digest <sha256:digest>] --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --normalized-results <normalized-results-directory> --output <engineering-result.json> [--admission-decision <decision.json> --admission-review-authority <authority.json> --admission-review-authority-source-digest <sha256:digest> --admission-review-archive <archive>] [--public-artifact-root <staged-public-artifact-directory>]
   collect-engineering-results --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --output <engineering-result-set.json>
   verify-engineering-result-set --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --input <engineering-result-set.json>
   report-engineering-result-repetitions --normalized-results <normalized-results-directory> --snapshot-digest <sha256:digest> --engineering-results <engineering-result-directory> --engineering-result-source-manifest <source-manifest.json> [--engineering-result-source-manifest-source-digest <sha256:digest>] --adapter <codex|claude> --input <engineering-result-set.json> --output <repetition-report.json>
@@ -239,7 +249,10 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
     if (fixture.aggregate_eligible !== (fixture.suite !== "calibration")) errors.push(`${fixture.id} aggregate eligibility must exclude calibration only`);
     if (fixture.id === "impl-transfer-hard" && fixture.suite === "calibration" && fixture.repetitions !== 5) errors.push("concurrent transfer calibration requires 5 repetitions");
     const root = resolve(fixtureRoot(config), fixture.id);
-    for (const path of ["task.md", "workspace/package.json", "evaluator/expected.json"]) {
+    const requiredFixturePaths = fixture.suite === "calibration"
+      ? ["task.md", "workspace/package.json", "evaluator/expected.json"]
+      : ["task.md", "workspace/package.json", "metadata.json", "evaluator-reference.json", "requirement-record.json", "output-contract.json", "final-admission-record.json", "scoring-input-freeze-manifest.json", "admission-review.json"];
+    for (const path of requiredFixturePaths) {
       if (!existsSync(resolve(root, path))) errors.push(`${fixture.id}/${path} is missing`);
     }
     if (!fixture.input_manifest_path) {
@@ -538,6 +551,9 @@ function evaluatorBoundaryOptions(args) {
     privateRoot: args.privateRoot,
     manifestPath: args.evaluatorManifest,
     resultPath: args.evaluatorResult,
+    privateEvaluationRoot: args.privateEvaluationRoot,
+    privateEvaluationRecordPath: args.privateEvaluationRecordPath,
+    privateFragmentPath: args.privateFragmentPath,
     materializedPath: args.materialized,
     selectionState: args.stateDir,
     runDir: args.runDir,
@@ -554,6 +570,7 @@ function verifyEvaluatorBundleCommand(args) {
 
 function verifyEvaluatorResultCommand(args) {
   if (!args.evaluatorResult) throw new Error("verify-evaluator-result requires --result");
+  if (!args.privateEvaluationRoot || !args.privateEvaluationRecordPath || !args.privateFragmentPath) throw new Error("verify-evaluator-result requires --private-evaluation-root, --private-evaluation-record, and --private-fragment");
   if (!args.admissionRecord || !args.requirementRecord || !args.outputContract || !args.scoringInputFreezeManifest) throw new Error("verify-evaluator-result requires --admission-record, --requirement-record, --output-contract, and --scoring-input-freeze");
   const result = verifyEvaluatorResult(evaluatorBoundaryOptions(args));
   const publicationStatus = args.publicArtifactRoot ? "including the staged publication scan" : "without staged public artifact publication verification";
@@ -562,6 +579,7 @@ function verifyEvaluatorResultCommand(args) {
 
 function verifyEvaluatorBoundaryCommand(args) {
   if (!args.evaluatorResult) throw new Error("verify-evaluator-boundary requires --result");
+  if (!args.privateEvaluationRoot || !args.privateEvaluationRecordPath || !args.privateFragmentPath) throw new Error("verify-evaluator-boundary requires --private-evaluation-root, --private-evaluation-record, and --private-fragment");
   if (!args.admissionRecord || !args.requirementRecord || !args.outputContract || !args.scoringInputFreezeManifest) throw new Error("verify-evaluator-boundary requires --admission-record, --requirement-record, --output-contract, and --scoring-input-freeze");
   if (!args.publicArtifactRoot) throw new Error("verify-evaluator-boundary requires --public-artifact-root for full boundary verification");
   const result = verifyEvaluatorBoundary(evaluatorBoundaryOptions(args));
@@ -570,8 +588,16 @@ function verifyEvaluatorBoundaryCommand(args) {
 
 function scoreEvaluatorResultCommand(args) {
   if (!args.evaluatorResult || !args.output) throw new Error("score-evaluator-result requires --result and --output");
+  if (!args.privateEvaluationRoot || !args.privateEvaluationRecordPath || !args.privateFragmentPath) throw new Error("score-evaluator-result requires --private-evaluation-root, --private-evaluation-record, and --private-fragment");
   if (!args.admissionRecord || !args.requirementRecord || !args.outputContract || !args.scoringInputFreezeManifest) throw new Error("score-evaluator-result requires --admission-record, --requirement-record, --output-contract, and --scoring-input-freeze");
-  const result = scoreEvaluatorResult({ ...evaluatorBoundaryOptions(args), outputPath: args.output });
+  const result = scoreEvaluatorResult({
+    ...evaluatorBoundaryOptions(args),
+    outputPath: args.output,
+    admissionDecisionPath: args.admissionDecision,
+    admissionReviewAuthorityPath: args.admissionReviewAuthority,
+    admissionReviewAuthoritySourceDigest: args.admissionReviewAuthoritySourceDigest,
+    admissionReviewArchivePath: args.admissionReviewArchive,
+  });
   console.log(`Published raw engineering result ${result.artifact.engineering_result_id} with status ${result.artifact.scoring_status}`);
 }
 

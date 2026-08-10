@@ -95,6 +95,9 @@ function observation(entry) {
   return {
     repetition: result.repetition, path: entry.path, raw_byte_digest: entry.raw_byte_digest, bytes: entry.bytes,
     engineering_result_id: result.engineering_result_id, engineering_result_digest: result.engineering_result_digest,
+    effective_admission_mode: result.effective_admission_mode, effective_admission_status: result.effective_admission_status,
+    frozen_admission_record_digest: result.frozen_admission_record_digest, requirement_authority_digest: result.requirement_authority_digest,
+    admission_decision_digest: result.admission_decision_digest, admission_decision_revision: result.admission_decision_revision,
     normalized_result_id: result.normalized_result_id, normalized_result_digest: result.normalized_result_digest,
     evaluation_id: result.evaluation_id, evaluation_digest: result.evaluation_digest,
     normalized_outcome: result.normalized_outcome, evaluation_status: result.evaluation_status, scoring_status: result.scoring_status,
@@ -157,7 +160,7 @@ function conditionReport(condition, entries, expectedRepetitions) {
 }
 
 function assertGroupIdentity(entries, fixtureId, condition, adapter) {
-  const fields = ["fixture_id", "fixture_input_digest", "suite", "task_class", "adapter", "condition", "scoring_policy_digest", "requirement_record_digest", "scoring_input_freeze_manifest_digest"];
+  const fields = ["fixture_id", "fixture_input_digest", "suite", "task_class", "adapter", "condition", "scoring_policy_digest", "requirement_record_digest", "scoring_input_freeze_manifest_digest", "effective_admission_mode", "effective_admission_status", "frozen_admission_record_digest", "requirement_authority_digest", "admission_decision_digest", "admission_decision_revision"];
   for (const field of fields) {
     const values = new Set(entries.map(({ result }) => stableCanonicalJson(result[field])));
     if (values.size !== 1) throw new Error(`${fixtureId}/${condition} group identity drift: ${field}`);
@@ -185,7 +188,7 @@ export function buildPortfolioRepetitionReport({ verified, policyRevision, scori
   const fixture_reports = fixtureIds.map((fixture_id) => {
     const fixtureEntries = entries.filter(({ result }) => result.fixture_id === fixture_id);
     const first = fixtureEntries[0].result;
-    for (const field of ["fixture_input_digest", "suite", "task_class", "requirement_record_digest", "scoring_input_freeze_manifest_digest"]) {
+    for (const field of ["fixture_input_digest", "suite", "task_class", "requirement_record_digest", "scoring_input_freeze_manifest_digest", "effective_admission_mode", "effective_admission_status", "frozen_admission_record_digest", "requirement_authority_digest", "admission_decision_digest", "admission_decision_revision"]) {
       if (new Set(fixtureEntries.map(({ result }) => result[field])).size !== 1) throw new Error(`${fixture_id} identity changes across conditions: ${field}`);
     }
     const expectedRepetitions = [...new Set(fixtureEntries.map(({ result }) => result.repetition))].sort((left, right) => left - right);

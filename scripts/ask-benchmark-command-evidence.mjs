@@ -48,7 +48,16 @@ function assertSafeContractPath(value, label) {
 }
 
 function assertSafeScript(script, label) {
-  if (typeof script !== "string" || script.length === 0 || script.trim() !== script || UNSAFE_SCRIPT.test(script) || /(?:^|\/)\.\.(?:\/|$)/u.test(script)) throw new Error(`${label} is unsafe`);
+  if (typeof script !== "string" || script.length === 0 || script.trim() !== script || /(?:^|\/)\.\.(?:\/|$)/u.test(script)) throw new Error(`${label} is unsafe`);
+  const inlineNode = script.match(/^node -e '([^']*)'(.*)$/u);
+  if (inlineNode) {
+    const code = inlineNode[1];
+    const suffix = inlineNode[2];
+    if (!code.includes("node:fs") || !code.includes("node:crypto") || /(?:child_process|node:net|node:http|node:https|fetch|process\.env|writeFile|unlink|rename|rmSync|exec|spawn|eval|Function)/u.test(code)) throw new Error(`${label} contains an unsafe inline Node authority`);
+    if (UNSAFE_SCRIPT.test(suffix) || /(?:^|\/)\.\.(?:\/|$)/u.test(suffix)) throw new Error(`${label} is unsafe`);
+    return;
+  }
+  if (UNSAFE_SCRIPT.test(script)) throw new Error(`${label} is unsafe`);
 }
 
 function quotePosixShellWord(value) {
@@ -129,11 +138,12 @@ function decodePosixSingleQuotedWord(value) {
 }
 
 function classifyRuntimeCommand(rawCommand, contract) {
-  if (typeof rawCommand !== "string" || rawCommand.length === 0 || SENSITIVE_VALUE.test(rawCommand.replace(SHELL_PREFIX, ""))) throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified");
+  if (typeof rawCommand !== "string" || rawCommand.length === 0) throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified");
   const direct = contract?.commands.filter(({ execution_form }) => execution_form === "direct_argv").find((command) => renderCommandEvent(command) === rawCommand);
   if (direct) return { execution_form: "direct_argv", logical_digest: direct.logical_command_digest, rendered_digest: sha256(Buffer.from(rawCommand)), script: null };
   if (!rawCommand.startsWith(SHELL_PREFIX)) throw new CommandEvidenceError("unsupported_shell", "runtime command uses an unsupported shell envelope");
   const script = decodePosixSingleQuotedWord(rawCommand.slice(SHELL_PREFIX.length));
+  if (/(?:^|[;,])\s*(?:token|secret|password|credential)[A-Za-z0-9_-]*\s*=/iu.test(script)) throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified");
   try { assertSafeScript(script, "runtime canonical script"); } catch { throw new CommandEvidenceError("unsafe_command", "runtime command cannot be safely classified"); }
   return { execution_form: "codex_shell_command", logical_digest: canonicalDigest({ execution_form: "codex_shell_command", canonical_script: script }), rendered_digest: sha256(Buffer.from(rawCommand)), script };
 }

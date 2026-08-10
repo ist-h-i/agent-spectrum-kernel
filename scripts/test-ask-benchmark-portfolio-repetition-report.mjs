@@ -29,6 +29,7 @@ function result(fixture, repetitions, condition, repetition, adapter = "codex") 
     fixture_id: fixture, fixture_input_digest: digest(`input:${fixture}`), suite: fixture === "fixture-three" ? "mechanism_positive" : "calibration", task_class: "implementation",
     adapter, condition, repetition, case_id: `case-${hash(key).slice(0, 16)}-${hash(`case:${key}`).slice(0, 16)}`, attempt: "0001",
     scoring_policy_digest: policy.policy_digest, requirement_record_digest: digest(`requirements:${fixture}`), scoring_input_freeze_manifest_digest: digest(`freeze:${fixture}`),
+    effective_admission_mode: "legacy_admitted_record", effective_admission_status: "admitted", frozen_admission_record_digest: digest(`admission:${fixture}`), requirement_authority_digest: digest(`admission:${fixture}`), admission_decision_digest: null, admission_decision_revision: null,
     engineering_result_id: `engineering-result-${hash(`engineering:${key}`).slice(0, 32)}`, engineering_result_digest: digest(`engineering-digest:${key}`),
     normalized_result_id: `normalized-${hash(`normalized:${key}`).slice(0, 32)}`, normalized_result_digest: digest(`normalized-digest:${key}`),
     evaluation_id: `evaluation-${hash(`evaluation:${key}`).slice(0, 32)}`, evaluation_digest: digest(`evaluation-digest:${key}`),
@@ -90,6 +91,18 @@ check("complete 3-repetition score distribution", () => assert.equal(reportGroup
 check("complete 5-repetition score distribution", () => assert.equal(reportGroup(report, "fixture-five").score_distribution.sample_count, 5));
 check("all four conditions", () => assert.deepEqual(report.fixture_reports[0].condition_reports.map(({ condition }) => condition), CONDITIONS));
 check("one adapter only", () => assert.equal(report.authority.adapter_track, "codex"));
+check("admission overlay lineage propagates through repetition observations", () => {
+  const input = verified();
+  for (const entry of input.verified_results) {
+    entry.result.effective_admission_mode = "admitted_overlay";
+    entry.result.admission_decision_digest = digest(`decision:${entry.result.fixture_id}`);
+    entry.result.admission_decision_revision = 2;
+  }
+  const item = reportGroup(build(input)).repetition_observations[0];
+  assert.equal(item.effective_admission_mode, "admitted_overlay");
+  assert.equal(item.admission_decision_digest, digest("decision:fixture-three"));
+  assert.equal(item.admission_decision_revision, 2);
+});
 check("exact mean", () => assert.equal(reportGroup(report).score_distribution.mean, 2 / 3));
 check("exact median", () => assert.equal(reportGroup(report).score_distribution.median, 2 / 3));
 check("exact minimum/maximum", () => assert.deepEqual([reportGroup(report).score_distribution.minimum, reportGroup(report).score_distribution.maximum], [1 / 3, 1]));
@@ -183,5 +196,5 @@ check("absolute path leakage rejection", () => assert.throws(() => { const chang
 check("private path leakage rejection", () => assert.equal(JSON.stringify(report).includes(root), false));
 check("serialized report does not contain full raw result bodies", () => assert.equal(JSON.stringify(report).includes("raw_evaluator_prompt"), false));
 
-assert.equal(covered.size, 79, `expected 79 focused closures, received ${covered.size}`);
+assert.equal(covered.size, 80, `expected 80 focused closures, received ${covered.size}`);
 console.log(`Portfolio repetition report contract test passed (${covered.size} closures).`);

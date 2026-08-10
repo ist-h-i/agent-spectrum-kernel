@@ -96,6 +96,9 @@ function sourceProjection(observation, rawResult, fixture) {
     ["repetition", observation.repetition], ["condition", rawResult.condition], ["engineering_result_id", observation.engineering_result_id],
     ["engineering_result_digest", observation.engineering_result_digest], ["normalized_result_id", observation.normalized_result_id],
     ["normalized_result_digest", observation.normalized_result_digest], ["evaluation_id", observation.evaluation_id], ["evaluation_digest", observation.evaluation_digest],
+    ["effective_admission_mode", observation.effective_admission_mode], ["effective_admission_status", observation.effective_admission_status],
+    ["frozen_admission_record_digest", observation.frozen_admission_record_digest], ["requirement_authority_digest", observation.requirement_authority_digest],
+    ["admission_decision_digest", observation.admission_decision_digest], ["admission_decision_revision", observation.admission_decision_revision],
   ]) if (rawResult[field] !== observed) throw new Error(`verified repetition observation and result-set authority disagree on ${field}`);
   const correctness_states = Object.fromEntries(CORRECTNESS_KEYS.map((key) => [key, observation.correctness_observations[key].state]));
   return {
@@ -106,6 +109,12 @@ function sourceProjection(observation, rawResult, fixture) {
     bytes: observation.bytes,
     engineering_result_id: observation.engineering_result_id,
     engineering_result_digest: observation.engineering_result_digest,
+    effective_admission_mode: observation.effective_admission_mode,
+    effective_admission_status: observation.effective_admission_status,
+    frozen_admission_record_digest: observation.frozen_admission_record_digest,
+    requirement_authority_digest: observation.requirement_authority_digest,
+    admission_decision_digest: observation.admission_decision_digest,
+    admission_decision_revision: observation.admission_decision_revision,
     normalized_result_id: observation.normalized_result_id,
     normalized_result_digest: observation.normalized_result_digest,
     evaluation_id: observation.evaluation_id,
@@ -140,7 +149,8 @@ function assertPairIdentity(baseline, comparison, view) {
   if (baseline.condition !== view.baseline_condition || comparison.condition !== view.comparison_condition) throw new Error(`${view.view_id} baseline/comparison condition reversal or drift`);
   const fields = [
     "fixture_id", "fixture_input_digest", "suite", "task_class", "adapter", "repetition", "expected_repetition_count", "scoring_policy_digest",
-    "requirement_record_digest", "scoring_input_freeze_manifest_digest",
+    "requirement_record_digest", "scoring_input_freeze_manifest_digest", "effective_admission_mode", "effective_admission_status",
+    "frozen_admission_record_digest", "requirement_authority_digest", "admission_decision_digest", "admission_decision_revision",
   ];
   for (const field of fields) if (stableCanonicalJson(baseline[field]) !== stableCanonicalJson(comparison[field])) throw new Error(`${view.view_id} pair identity drift: ${field}`);
   if (baseline.engineering_result_id === comparison.engineering_result_id) throw new Error(`${view.view_id} pair must use distinct engineering results`);

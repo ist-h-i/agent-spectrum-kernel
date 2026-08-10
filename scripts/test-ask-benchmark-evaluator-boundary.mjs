@@ -25,6 +25,7 @@ import {
   computeEvaluatorBundleDigest,
   computeEvaluatorBundleId,
   computeEvaluatorReferenceDigest,
+  deriveEvaluatorDependencyGraph,
   validateExecutionEventEvidenceReferences,
   verifyEvaluatorAuthority,
   verifyEvaluatorBoundary,
@@ -50,6 +51,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
 const work = mkdtempSync(resolve(root, ".ask-benchmark-evaluator-boundary-test-"));
 const privateWork = mkdtempSync(resolve(tmpdir(), "ask-private-evaluator-boundary-test-"));
+const graphWork = mkdtempSync(resolve(tmpdir(), "ask-evaluator-dependency-graph-test-"));
 const REVISION = "b".repeat(40);
 const FIXTURE_ID = "cal-atomic-rule-batch";
 const ADAPTERS = ["codex", "claude"];
@@ -98,8 +100,8 @@ const ASSET_ROLES = [
   "scope_boundaries",
   "unsafe_action_rules",
   "evidence_removal_mutations",
+  "evaluator_dependency_graph",
   "human_evaluation_instructions",
-  "reference_outcome",
 ].sort();
 const catalog = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-catalog.json"), "utf8"));
 const policyManifest = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-policy-manifest.json"), "utf8"));
@@ -157,6 +159,21 @@ function run(args, expectedStatus = 0) {
   const result = spawnSync(process.execPath, [runner, ...args], { cwd: root, encoding: "utf8", maxBuffer: 40 * 1024 * 1024 });
   assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
   return result;
+}
+
+function writeDependencyGraphFixture(name, source) {
+  const fixtureRoot = resolve(graphWork, name);
+  mkdirSync(fixtureRoot, { recursive: true });
+  writeFileSync(resolve(fixtureRoot, "entry.mjs"), source);
+  for (const path of ["command-evidence.mjs", "nested.mjs", "scoring-contract.mjs", "static.mjs", "options.mjs"]) {
+    writeFileSync(resolve(fixtureRoot, path), "export const value = true;\n");
+  }
+  for (const args of [["init"], ["add", "."], ["-c", "user.name=ASK test", "-c", "user.email=ask-test@example.invalid", "commit", "-m", "dependency graph fixture"], ["rev-parse", "HEAD"]]) {
+    const result = spawnSync("git", args, { cwd: fixtureRoot, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    if (args[0] === "rev-parse") return { root: fixtureRoot, revision: result.stdout.trim() };
+  }
+  throw new Error("dependency graph fixture did not produce a Git revision");
 }
 
 function missing(status, reason) {
@@ -653,6 +670,12 @@ function createPrivateBundle(path, normalized) {
       public_ci_artifact_allowed: false,
       contains_answer_bearing_content: true,
     },
+    dependency_graph: {
+      entry_paths: ["scripts/synthetic-entry.mjs"],
+      node_inventory: [{ path: "scripts/synthetic-entry.mjs", bytes: 1, sha256: digest("synthetic-node"), file_type: "module", base_git_revision_bytes: 1, base_git_revision_sha256: digest("synthetic-node") }],
+      edge_inventory: [],
+      graph_digest: digest("synthetic-dependency-graph"),
+    },
   });
   const manifestPath = resolve(path, "private-evaluator-bundle.json");
   writeJson(manifestPath, manifest);
@@ -775,6 +798,41 @@ function closeResult(result) {
 }
 
 try {
+  const currentRevision = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
+  assert.equal(currentRevision.status, 0, currentRevision.stderr || currentRevision.stdout);
+  const currentDependencyGraph = deriveEvaluatorDependencyGraph({ root, baseRevision: currentRevision.stdout.trim() });
+  assert.ok(currentDependencyGraph.edge_inventory.some(({ from, to }) => from === "scripts/ask-benchmark-execution.mjs" && to === "scripts/ask-benchmark-command-evidence.mjs"), "current evaluator graph must include execution command-evidence authority");
+  assert.ok(currentDependencyGraph.edge_inventory.some(({ from, to }) => from === "scripts/ask-benchmark-evaluator-boundary.mjs" && to === "scripts/ask-benchmark-scoring-contract.mjs"), "current evaluator graph must include evaluator scoring-contract authority");
+  const dependencyFixture = writeDependencyGraphFixture("template-interpolation", [
+    'const ignored = `quasi import("./ignored.mjs")`; ',
+    'const evidence = `${import("./command-evidence.mjs")}`;',
+    'const nested = `${`nested ${import("./nested.mjs")}`}`;',
+    'export { value } from "./scoring-contract.mjs";',
+    'import {\n  value,\n} from "./static.mjs" with { type: "json" }',
+    'await import("./options.mjs", { with: { type: "json" } });',
+  ].join("\n"));
+  const dependencyGraph = deriveEvaluatorDependencyGraph({
+    root: dependencyFixture.root,
+    baseRevision: dependencyFixture.revision,
+    entryPaths: ["entry.mjs"],
+    authorityPaths: [],
+  });
+  assert.deepEqual(dependencyGraph.edge_inventory.map(({ from, to, kind, specifier }) => ({ from, to, kind, specifier })).sort((left, right) => left.to.localeCompare(right.to)), [
+    { from: "entry.mjs", to: "command-evidence.mjs", kind: "dynamic_import", specifier: "./command-evidence.mjs" },
+    { from: "entry.mjs", to: "nested.mjs", kind: "dynamic_import", specifier: "./nested.mjs" },
+    { from: "entry.mjs", to: "options.mjs", kind: "dynamic_import", specifier: "./options.mjs" },
+    { from: "entry.mjs", to: "scoring-contract.mjs", kind: "export_from", specifier: "./scoring-contract.mjs" },
+    { from: "entry.mjs", to: "static.mjs", kind: "static_import", specifier: "./static.mjs" },
+  ], "dependency graph must include only real template interpolation imports and preserve exact local edges");
+  assert.ok(dependencyGraph.edge_inventory.every((edge) => /^sha256:[a-f0-9]{64}$/u.test(edge.edge_digest)), "dependency graph edges must each have a canonical digest");
+  const commandEvidenceEdge = dependencyGraph.edge_inventory.find((edge) => edge.to === "command-evidence.mjs");
+  assert.deepEqual(commandEvidenceEdge.source_location, { line: 2, column: 28 }, "template interpolation import source location must identify the string specifier");
+
+  const computedTemplateFixture = writeDependencyGraphFixture("computed-template", 'const value = `${import(dynamicSpecifier)}`;\n');
+  assert.throws(() => deriveEvaluatorDependencyGraph({ root: computedTemplateFixture.root, baseRevision: computedTemplateFixture.revision, entryPaths: ["entry.mjs"], authorityPaths: [] }), /unsupported computed dynamic import/u, "computed import in a template interpolation must fail closed");
+  const unsafeTemplateFixture = writeDependencyGraphFixture("unsafe-template", 'const value = `${require("./command-evidence.mjs")}`;\n');
+  assert.throws(() => deriveEvaluatorDependencyGraph({ root: unsafeTemplateFixture.root, baseRevision: unsafeTemplateFixture.revision, entryPaths: ["entry.mjs"], authorityPaths: [] }), /unsupported local module loading via require/u, "unsupported loaders in a template interpolation must fail closed");
+
   const materialized = resolve(work, "materialized");
   const selectionState = resolve(work, "selection-state");
   const runDir = resolve(work, "execution-run");
@@ -812,6 +870,9 @@ try {
     "--reference", referencePath,
     "--private-root", privateRoot,
     "--manifest", manifestPath,
+    "--private-evaluation-root", privateRoot,
+    "--private-evaluation-record", manifestPath,
+    "--private-fragment", manifestPath,
     "--materialized", materialized,
     "--selection-state", selectionState,
     "--run-dir", runDir,
@@ -880,6 +941,10 @@ try {
   const completedAuthority = verifyEvaluatorAuthority(baseOptions);
   assert.equal(completedAuthority.evaluationReady, true, "completed evaluator authority must report evaluation completeness");
   assert.equal(Object.hasOwn(completedAuthority, "scoringReady"), false, "evaluator authority must not expose scoring readiness for admitted records");
+  assert.deepEqual(completedAuthority.scoringInputs.sources.admissionRecord.bytes, readFileSync(scoringInputs.admissionRecordPath), "evaluator authority must return verified frozen-admission bytes");
+  assert.deepEqual(completedAuthority.scoringInputs.sources.requirementRecord.bytes, readFileSync(scoringInputs.requirementRecordPath), "evaluator authority must return verified requirement-record bytes");
+  assert.deepEqual(completedAuthority.scoringInputs.freezeManifestSource.bytes, readFileSync(scoringInputs.freezeManifestPath), "evaluator authority must return verified freeze-manifest bytes");
+  assert.equal(completedAuthority.scoringInputs.sources.admissionRecord.path, relative(root, scoringInputs.admissionRecordPath).split(sep).join("/"), "evaluator authority must return the portable frozen-admission path");
   const manualAuthority = verifyEvaluatorAuthority({ ...baseOptions, resultPath: resultPaths.get("manual") });
   assert.equal(manualAuthority.evaluationReady, false, "manual-review evaluator authority must remain evaluation-incomplete");
   assert.equal(Object.hasOwn(manualAuthority, "scoringReady"), false, "incomplete evaluator authority must not expose scoring readiness");
@@ -960,6 +1025,52 @@ try {
     assert.deepEqual(suppliedRoots.map(snapshotPath), suppliedRootSnapshots, `${message}: failure must not modify supplied boundary roots`);
     assert.deepEqual(inputPaths.map((path) => readFileSync(path)), inputBytes, `${message}: failure must not modify supplied public inputs`);
   };
+
+  const pendingAuthorityRoot = resolve(work, "pending-full-authority");
+  const pendingAdmissionPath = resolve(pendingAuthorityRoot, "admission-record.json");
+  const pendingAdmission = clone(scoringInputs.admissionRecord);
+  pendingAdmission.admission_status = "admission_pending";
+  pendingAdmission.admission_digest = computeFinalAdmissionRecordDigest(pendingAdmission);
+  writeJson(pendingAdmissionPath, pendingAdmission);
+  const pendingRequirementPath = resolve(pendingAuthorityRoot, "requirement-record.json");
+  const pendingRequirement = clone(scoringInputs.requirementRecord);
+  pendingRequirement.requirement_record_path = repoPath(pendingRequirementPath);
+  pendingRequirement.admission_record_digest = pendingAdmission.admission_digest;
+  pendingRequirement.requirement_set_digest = computeRequirementSetDigest(pendingRequirement);
+  pendingRequirement.requirement_record_digest = computeRequirementRecordDigest(pendingRequirement);
+  writeJson(pendingRequirementPath, pendingRequirement);
+  const pendingFreezePath = resolve(pendingAuthorityRoot, "scoring-input-freeze.json");
+  const pendingFreeze = clone(scoringInputs.freezeManifest);
+  pendingFreeze.admission_record = {
+    path: repoPath(pendingAdmissionPath),
+    raw_byte_digest: fileDigest(pendingAdmissionPath),
+    semantic_digest: pendingAdmission.admission_digest,
+  };
+  pendingFreeze.requirement_record = {
+    path: repoPath(pendingRequirementPath),
+    raw_byte_digest: fileDigest(pendingRequirementPath),
+    record_digest: pendingRequirement.requirement_record_digest,
+    set_digest: pendingRequirement.requirement_set_digest,
+  };
+  pendingFreeze.manifest_digest = computeScoringInputFreezeManifestDigest(pendingFreeze);
+  writeJson(pendingFreezePath, pendingFreeze);
+  const pendingFreezeSourceDigest = fileDigest(pendingFreezePath);
+  const legacyPendingResultPath = resolve(pendingAuthorityRoot, "evaluator-result.json");
+  const pendingResult = JSON.parse(readFileSync(resultPaths.get("completed"), "utf8"));
+  pendingResult.scoring_input_freeze_manifest_source_digest = pendingFreezeSourceDigest;
+  pendingResult.scoring_input_freeze_manifest_digest = pendingFreeze.manifest_digest;
+  pendingResult.admission_record_digest = pendingAdmission.admission_digest;
+  pendingResult.requirement_record_digest = pendingRequirement.requirement_record_digest;
+  pendingResult.requirement_set_digest = pendingRequirement.requirement_set_digest;
+  closeResult(pendingResult);
+  writeJson(legacyPendingResultPath, pendingResult);
+  expectBoundaryFailure({
+    admissionRecordPath: pendingAdmissionPath,
+    requirementRecordPath: pendingRequirementPath,
+    scoringInputFreezeManifestPath: pendingFreezePath,
+    scoringInputFreezeManifestSourceDigest: pendingFreezeSourceDigest,
+    resultPath: legacyPendingResultPath,
+  }, /requires an admitted final admission record/u, "admitted-only evaluator boundary must reject pending admission even when every downstream binding is re-derived");
 
   const privateAssetPath = resolve(privateRoot, manifest.asset_inventory[0].path);
   function clonedBoundaryRoot(name, source) {
@@ -1186,7 +1297,7 @@ try {
     value.normalized_result_id = otherNormalized.normalized_result_id;
     value.normalized_result_digest = otherNormalized.normalized_result_digest;
   });
-  expectBoundaryFailure({ resultPath: normalizedTransplant }, /lineage mismatch|normalized result digest|mismatched normalized-result/u, "normalized-result transplant must be rejected");
+  expectBoundaryFailure({ resultPath: normalizedTransplant }, /lineage mismatch|normalized result digest|transplanted normalized-result/u, "normalized-result transplant must be rejected");
   const crossRun = resultMutation("cross-run", (value) => { value.run_instance_id = "00000000-0000-4000-8000-000000000999"; });
   expectBoundaryFailure({ resultPath: crossRun }, /run_instance_id/u, "cross-run transplant must be rejected");
   const crossCase = resultMutation("cross-case", (value) => { value.case_id = otherNormalized.lineage.case_id; });
@@ -1444,13 +1555,23 @@ try {
   };
   const evaluatorExecutionReference = { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 321 }] } };
   assert.equal(validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: evaluatorExecutionReference }).length, 1, "verified normalized execution evidence must be referenceable by the evaluator");
-  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [] } } }), /cannot pass without verified execution-event/u, "verification pass without execution evidence must fail closed");
-  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 322 }] } } }), /unverified or transplanted/u, "execution evidence byte drift must be rejected");
+  const repeatedSuccessThenFailure = structuredClone(normalizedExecutionEvidence);
+  const failedExecutionDigest = digest("synthetic-latest-failure");
+  repeatedSuccessThenFailure.command_evidence.references.push({ command_id: "fixture-test", match_state: "matched", command_evidence_id: `command-evidence-${"c".repeat(32)}`, digest: failedExecutionDigest, bytes: 321, outcome: "failed", exit_code: 2 });
+  repeatedSuccessThenFailure.command_evidence.succeeded_command_ids = [];
+  repeatedSuccessThenFailure.command_evidence.failed_command_ids = ["fixture-test"];
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: repeatedSuccessThenFailure, result: evaluatorExecutionReference }), /required command evidence|latest successful|causal reference set/u, "verification pass must not retain an earlier success after a later failure");
+  const repeatedSuccess = structuredClone(normalizedExecutionEvidence);
+  const latestSuccessDigest = digest("synthetic-latest-success");
+  repeatedSuccess.command_evidence.references.push({ command_id: "fixture-test", match_state: "matched", command_evidence_id: `command-evidence-${"d".repeat(32)}`, digest: latestSuccessDigest, bytes: 321, outcome: "succeeded", exit_code: 0 });
+  assert.equal(validateExecutionEventEvidenceReferences({ normalized: repeatedSuccess, result: { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: latestSuccessDigest, bytes: 321 }] } } }).length, 1, "verification pass must cite the latest success event");
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [] } } }), /cannot pass without verified execution-event|causal reference set/u, "verification pass without execution evidence must fail closed");
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: normalizedExecutionEvidence, result: { verification_correctness: { state: "pass", evidence_references: [{ kind: "execution_event", digest: executionEvidenceDigest, bytes: 322 }] } } }), /unverified or transplanted|causal reference set/u, "execution evidence byte drift must be rejected");
   const cwdUnverifiedExecutionEvidence = structuredClone(normalizedExecutionEvidence);
   cwdUnverifiedExecutionEvidence.command_evidence.succeeded_command_ids = [];
   cwdUnverifiedExecutionEvidence.command_evidence.references[0].command_id = null;
   cwdUnverifiedExecutionEvidence.command_evidence.references[0].match_state = "cwd_unverified";
-  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: cwdUnverifiedExecutionEvidence, result: evaluatorExecutionReference }), /required command evidence is absent or unsuccessful/u, "evaluator verification pass must reject cwd-dependent command evidence without runtime cwd authority");
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: cwdUnverifiedExecutionEvidence, result: evaluatorExecutionReference }), /required command evidence is absent or unsuccessful|causal reference set/u, "evaluator verification pass must reject cwd-dependent command evidence without runtime cwd authority");
   const declinedExecutionEvidence = structuredClone(normalizedExecutionEvidence);
   declinedExecutionEvidence.command_evidence.succeeded_command_ids = [];
   declinedExecutionEvidence.command_evidence.declined_command_ids = ["fixture-test"];
@@ -1478,7 +1599,7 @@ try {
   declinedAlternativeEvidence.command_evidence.required_alternative_groups[0].succeeded_ids = [];
   declinedAlternativeEvidence.command_evidence.references[0].outcome = "declined";
   declinedAlternativeEvidence.command_evidence.references[0].exit_code = null;
-  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: declinedAlternativeEvidence, result: evaluatorExecutionReference }), /alternative command group/u, "evaluator verification pass must reject a declined-only alternative group");
+  assert.throws(() => validateExecutionEventEvidenceReferences({ normalized: declinedAlternativeEvidence, result: evaluatorExecutionReference }), /alternative command group|causal reference set/u, "evaluator verification pass must reject a declined-only alternative group");
 
   assert.deepEqual(snapshot(privateRoot), beforePrivate, "all evaluator failure paths must keep the private bundle byte-identical");
   assert.deepEqual(snapshot(materialized), beforeMaterialized, "all evaluator failure paths must keep materialized inputs byte-identical");
@@ -1492,4 +1613,5 @@ try {
 } finally {
   rmSync(work, { recursive: true, force: true });
   rmSync(privateWork, { recursive: true, force: true });
+  rmSync(graphWork, { recursive: true, force: true });
 }

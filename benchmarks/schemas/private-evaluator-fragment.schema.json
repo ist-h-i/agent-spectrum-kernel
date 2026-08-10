@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK private evaluator result fragment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "evaluation_status",
+    "requirement_results",
+    "findings",
+    "scope_deviations",
+    "verification_correctness",
+    "evidence_correctness",
+    "under_processing",
+    "over_processing",
+    "classification",
+    "result_profile",
+    "scoring_ready"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/private-evaluator-fragment.schema.json" },
+    "program": { "const": "adaptive_ask_private_evaluator_fragment" },
+    "evaluation_status": { "enum": ["completed", "invalid_input"] },
+    "requirement_results": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/requirementResult" } },
+    "findings": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/finding" } },
+    "scope_deviations": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/finding" } },
+    "verification_correctness": { "$ref": "#/$defs/observation" },
+    "evidence_correctness": { "$ref": "#/$defs/observation" },
+    "under_processing": { "$ref": "#/$defs/observation" },
+    "over_processing": { "$ref": "#/$defs/observation" },
+    "classification": { "enum": ["correct_narrow_execution", "under_processing", "over_processing", "invalid_evidence"] },
+    "result_profile": { "$ref": "#/$defs/resultProfile" },
+    "scoring_ready": { "const": false },
+    "invalid_input_authority": { "$ref": "#/$defs/invalidInputAuthority" },
+    "evaluator_rerun": { "$ref": "#/$defs/evaluatorRerun" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 96, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "resultProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "digest"],
+      "properties": { "name": { "const": "binary_scope_verification_v1" }, "digest": { "$ref": "#/$defs/digest" } }
+    },
+    "evidenceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "digest", "bytes"],
+      "properties": {
+        "kind": { "enum": ["normalized_result", "final_output", "repository_diff", "test_result", "execution_event"] },
+        "digest": { "$ref": "#/$defs/digest" },
+        "bytes": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "evidence_references"],
+      "properties": {
+        "state": { "enum": ["pass", "fail", "mixed", "detected", "not_detected", "unknown", "unavailable", "not_applicable", "not_evaluated", "manual_review_required"] },
+        "evidence_references": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } }
+      }
+    },
+    "requirementResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requirement_id", "outcome", "earned_points", "matched_equivalence_class_ids", "finding_ids", "evidence_references", "scope_deviation_references", "verification_evidence_references"],
+      "properties": {
+        "requirement_id": { "$ref": "#/$defs/token" },
+        "outcome": { "enum": ["pass", "fail", "partial", "not_evaluated", "manual_review_required", "unavailable"] },
+        "earned_points": { "type": ["number", "null"], "minimum": 0 },
+        "matched_equivalence_class_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "finding_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "evidence_references": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } },
+        "scope_deviation_references": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "verification_evidence_references": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } },
+        "verification_evidence_state": { "enum": ["executed_success", "executed_failure", "declined", "cwd_unverified", "missing", "unavailable", "adapter_unsupported", "invalid"] }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finding_id", "category", "severity", "evidence_references"],
+      "properties": {
+        "finding_id": { "$ref": "#/$defs/token" },
+        "category": { "$ref": "#/$defs/token" },
+        "severity": { "enum": ["critical", "high", "medium", "low", "informational"] },
+        "evidence_references": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } }
+      }
+    },
+    "invalidInputAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layer", "category", "code", "evidence_references"],
+      "properties": {
+        "layer": { "enum": ["evaluation_input", "evaluator_source", "command_evidence", "private_fragment", "adapter_authority"] },
+        "category": { "$ref": "#/$defs/token" },
+        "code": { "$ref": "#/$defs/token" },
+        "evidence_references": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/evidenceReference" } }
+      }
+    },
+    "evaluatorRerun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "contributes_to_agent_verification_requirement", "results"],
+      "properties": {
+        "role": { "const": "candidate_correctness_only" },
+        "contributes_to_agent_verification_requirement": { "const": false },
+        "results": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["command_id", "outcome", "exit_code", "evidence_role"],
+            "properties": {
+              "command_id": { "$ref": "#/$defs/token" },
+              "outcome": { "enum": ["succeeded", "failed"] },
+              "exit_code": { "type": ["integer", "null"] },
+              "evidence_role": { "const": "candidate_correctness_only" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

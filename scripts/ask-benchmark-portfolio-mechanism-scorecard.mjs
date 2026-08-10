@@ -90,6 +90,12 @@ function runAuthority(result) {
     repetition: result.repetition,
     engineering_result_id: result.engineering_result_id,
     engineering_result_digest: result.engineering_result_digest,
+    effective_admission_mode: result.effective_admission_mode,
+    effective_admission_status: result.effective_admission_status,
+    frozen_admission_record_digest: result.frozen_admission_record_digest,
+    requirement_authority_digest: result.requirement_authority_digest,
+    admission_decision_digest: result.admission_decision_digest,
+    admission_decision_revision: result.admission_decision_revision,
     normalized_result_id: result.normalized_result_id,
     normalized_result_digest: result.normalized_result_digest,
     evaluation_id: result.evaluation_id,
@@ -109,7 +115,7 @@ function assertRunInventory(fixture) {
   if (stableCanonicalJson(actualKeys) !== stableCanonicalJson(expectedKeys)) throw new Error(`${fixture.fixture_id} run inventory must contain each condition/repetition exactly once in canonical order`);
   if (new Set(actualKeys.map(({ condition, repetition }) => `${condition}:${repetition}`)).size !== fixture.run_inventory.length) throw new Error(`${fixture.fixture_id} run inventory contains a duplicate condition/repetition`);
   for (const entry of fixture.run_inventory) {
-    const sourceCompleted = entry.evaluation_status === "completed" && entry.normalized_outcome === "completed";
+    const sourceCompleted = entry.evaluation_status === "completed" && entry.normalized_outcome === "completed" && entry.effective_admission_status === "admitted";
     if ((entry.scoring_status === "complete") !== sourceCompleted) throw new Error(`${fixture.fixture_id}/${entry.condition}/${entry.repetition} scoring readiness must exactly match completed evaluation and normalized sources`);
   }
 }

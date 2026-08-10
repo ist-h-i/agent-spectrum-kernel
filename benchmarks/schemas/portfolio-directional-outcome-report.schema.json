@@ -91,7 +91,7 @@
     "pairOutcome": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repetition", "view_id", "baseline_condition", "comparison_condition", "baseline_engineering_result_id", "baseline_engineering_result_digest", "comparison_engineering_result_id", "comparison_engineering_result_digest", "baseline_normalized_result_id", "baseline_normalized_result_digest", "comparison_normalized_result_id", "comparison_normalized_result_digest", "paired_quality_delta_status", "paired_normalized_quality_delta", "directional_outcome", "outcome_perspective"],
+      "required": ["repetition", "view_id", "baseline_condition", "comparison_condition", "baseline_engineering_result_id", "baseline_engineering_result_digest", "baseline_admission_decision_digest", "baseline_admission_decision_revision", "comparison_engineering_result_id", "comparison_engineering_result_digest", "comparison_admission_decision_digest", "comparison_admission_decision_revision", "baseline_normalized_result_id", "baseline_normalized_result_digest", "comparison_normalized_result_id", "comparison_normalized_result_digest", "paired_quality_delta_status", "paired_normalized_quality_delta", "directional_outcome", "outcome_perspective"],
       "properties": {
         "repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
         "view_id": { "enum": ["kernel_vs_plain", "adaptive_vs_kernel", "full_vs_kernel_diagnostic"] },
@@ -99,8 +99,12 @@
         "comparison_condition": { "$ref": "#/$defs/condition" },
         "baseline_engineering_result_id": { "type": "string", "pattern": "^engineering-result-[a-f0-9]{32}$" },
         "baseline_engineering_result_digest": { "$ref": "#/$defs/digest" },
+        "baseline_admission_decision_digest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+        "baseline_admission_decision_revision": { "type": ["integer", "null"], "minimum": 1 },
         "comparison_engineering_result_id": { "type": "string", "pattern": "^engineering-result-[a-f0-9]{32}$" },
         "comparison_engineering_result_digest": { "$ref": "#/$defs/digest" },
+        "comparison_admission_decision_digest": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }] },
+        "comparison_admission_decision_revision": { "type": ["integer", "null"], "minimum": 1 },
         "baseline_normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },
         "baseline_normalized_result_digest": { "$ref": "#/$defs/digest" },
         "comparison_normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },

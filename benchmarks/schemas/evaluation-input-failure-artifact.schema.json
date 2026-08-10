@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK sealed evaluation-input failure artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schema_path", "program", "layer", "category", "stage", "run_instance_id", "case_id", "attempt", "normalized_result_id", "normalized_result_digest", "evaluator_bundle_id", "evaluator_bundle_digest", "evaluator_revision", "source_tree_digest", "dependency_graph_digest", "structured_failure_code", "details_digest", "details_bytes", "artifact_digest", "artifact_bytes"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/evaluation-input-failure-artifact.schema.json" },
+    "program": { "const": "adaptive_ask_evaluation_input_failure_artifact" },
+    "layer": { "enum": ["evaluation_input", "evaluator_source", "command_evidence", "private_fragment", "adapter_authority"] },
+    "category": { "$ref": "#/$defs/token" },
+    "stage": { "$ref": "#/$defs/token" },
+    "run_instance_id": { "type": "string", "format": "uuid" },
+    "case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+    "attempt": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "normalized_result_id": { "type": "string", "pattern": "^normalized-[a-f0-9]{32}$" },
+    "normalized_result_digest": { "$ref": "#/$defs/digest" },
+    "evaluator_bundle_id": { "$ref": "#/$defs/bundleId" },
+    "evaluator_bundle_digest": { "$ref": "#/$defs/digest" },
+    "evaluator_revision": { "$ref": "#/$defs/revision" },
+    "source_tree_digest": { "$ref": "#/$defs/digest" },
+    "dependency_graph_digest": { "$ref": "#/$defs/digest" },
+    "structured_failure_code": { "$ref": "#/$defs/token" },
+    "details_digest": { "$ref": "#/$defs/digest" },
+    "details_bytes": { "type": "integer", "minimum": 1 },
+    "artifact_digest": { "$ref": "#/$defs/digest" },
+    "artifact_bytes": { "type": "integer", "minimum": 1 }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "bundleId": { "type": "string", "pattern": "^evaluator-[a-f0-9]{64}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9_-]*$" }
+  }
+}

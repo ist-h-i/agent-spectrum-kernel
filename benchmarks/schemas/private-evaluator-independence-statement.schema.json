@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK private evaluator independence provenance statement",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "generator_role_identity",
+    "generation_date",
+    "generation_revision",
+    "frozen_candidate_input",
+    "source_classification",
+    "excluded_source_classification",
+    "measured_output_used",
+    "measured_result_used",
+    "author_scratch",
+    "contaminated_issues_193_196_as_oracle_source",
+    "issue_194_body_used",
+    "issue_194_edit_history_used",
+    "issue_194_legacy_answer_structure_used",
+    "statement_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.1.0" },
+    "fixture_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "generator_role_identity": { "$ref": "#/$defs/generator" },
+    "generation_date": { "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "generation_revision": { "$ref": "#/$defs/revision" },
+    "evaluator_source_identity": { "$ref": "#/$defs/sourceIdentity" },
+    "frozen_candidate_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["public_source_path", "raw_byte_digest", "digest"],
+      "properties": {
+        "public_source_path": { "$ref": "#/$defs/path" },
+        "raw_byte_digest": { "$ref": "#/$defs/digest" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "source_classification": { "$ref": "#/$defs/stringSet" },
+    "excluded_source_classification": { "$ref": "#/$defs/stringSet" },
+    "measured_output_used": { "const": false },
+    "measured_result_used": { "const": false },
+    "author_scratch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["used", "scope", "contamination_assessment"],
+      "properties": {
+        "used": { "type": "boolean" },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "contamination_assessment": { "$ref": "#/$defs/contamination" }
+      }
+    },
+    "contaminated_issues_193_196_as_oracle_source": { "$ref": "#/$defs/contamination" },
+    "issue_194_body_used": { "$ref": "#/$defs/contamination" },
+    "issue_194_edit_history_used": { "$ref": "#/$defs/contamination" },
+    "issue_194_legacy_answer_structure_used": { "$ref": "#/$defs/contamination" },
+    "statement_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!\\./)[a-zA-Z0-9._/-]+$" },
+    "sourceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_git_revision", "source_tree_digest", "generator_source_digest", "source_files", "dependency_graph"],
+      "properties": {
+        "base_git_revision": { "$ref": "#/$defs/revision" },
+        "source_tree_digest": { "$ref": "#/$defs/digest" },
+        "generator_source_digest": { "$ref": "#/$defs/digest" },
+        "source_files": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "bytes", "sha256"],
+            "properties": {
+              "path": { "$ref": "#/$defs/path" },
+              "bytes": { "type": "integer", "minimum": 1 },
+              "sha256": { "$ref": "#/$defs/digest" }
+            }
+          }
+        },
+        "dependency_graph": { "$ref": "#/$defs/dependencyGraph" }
+      }
+    },
+    "dependencyGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry_paths", "node_inventory", "edge_inventory", "graph_digest"],
+      "properties": {
+        "entry_paths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/path" } },
+        "node_inventory": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/dependencyNode" } },
+        "edge_inventory": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/dependencyEdge" } },
+        "graph_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "dependencyNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "bytes", "sha256", "file_type", "base_git_revision_bytes", "base_git_revision_sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/digest" },
+        "file_type": { "enum": ["module", "json", "authority_data"] },
+        "base_git_revision_bytes": { "type": "integer", "minimum": 1 },
+        "base_git_revision_sha256": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "dependencyEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "kind", "specifier", "edge_digest"],
+      "properties": {
+        "from": { "$ref": "#/$defs/path" },
+        "to": { "$ref": "#/$defs/path" },
+        "kind": { "enum": ["static_import", "export_from", "dynamic_import", "runtime_private_import", "private_entry_import", "authority_read"] },
+        "specifier": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "source_location": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["line", "column"],
+          "properties": {
+            "line": { "type": "integer", "minimum": 1 },
+            "column": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "syntax_identity": { "type": "string", "minLength": 1, "maxLength": 480 },
+        "edge_digest": { "$ref": "#/$defs/digest" }
+      },
+      "anyOf": [
+        { "required": ["source_location"] },
+        { "required": ["syntax_identity"] }
+      ]
+    },
+    "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!\\./)[a-zA-Z0-9._/-]+$" },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "source_digest"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "source_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "stringSet": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 96 }
+    },
+    "contamination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "evidence_basis"],
+      "properties": {
+        "state": { "enum": ["not_used", "used", "unknown"] },
+        "evidence_basis": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    }
+  }
+}

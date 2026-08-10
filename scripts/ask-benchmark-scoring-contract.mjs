@@ -1,4 +1,4 @@
-import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 
 export const REQUIREMENT_RECORD_SCHEMA_PATH = "benchmarks/schemas/portfolio-requirement-record.schema.json";
 export const OUTPUT_CONTRACT_SCHEMA_PATH = "benchmarks/schemas/portfolio-output-contract.schema.json";
@@ -27,6 +27,27 @@ export const REQUIREMENT_RESULT_FIELD_IDS = Object.freeze([
   "finding_ids",
   "evidence_references",
 ]);
+export const REQUIREMENT_RESULT_OPTIONAL_FIELD_IDS = Object.freeze([
+  "scope_deviation_references",
+  "verification_evidence_references",
+  "verification_evidence_state",
+]);
+export const BINARY_SCOPE_VERIFICATION_PROFILE_NAME = "binary_scope_verification_v1";
+export const BINARY_SCOPE_VERIFICATION_PROFILE = Object.freeze({ name: BINARY_SCOPE_VERIFICATION_PROFILE_NAME });
+export const VERIFICATION_EVIDENCE_STATES = Object.freeze([
+  "executed_success",
+  "executed_failure",
+  "declined",
+  "cwd_unverified",
+  "missing",
+  "unavailable",
+  "adapter_unsupported",
+  "invalid",
+]);
+
+export function computeResultProfileDigest(profile = BINARY_SCOPE_VERIFICATION_PROFILE) {
+  return canonicalDigest({ name: profile.name });
+}
 
 export const SCORING_IDENTITY_FIELD_IDS = Object.freeze([
   "scoring_input_freeze_manifest_source_digest",
@@ -57,6 +78,13 @@ export const FINAL_ADMISSION_RECORD_FIELD_IDS = Object.freeze([
   "admission_status",
   "admission_digest",
 ]);
+export const FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS = Object.freeze([
+  "evaluator_authority_manifest_path",
+  "evaluator_authority_manifest_raw_sha256",
+  "evaluator_authority_manifest_digest",
+  "evaluator_source_identity",
+  "requirement_authority_digest",
+]);
 
 const REQUIREMENT_RECORD_FIELD_IDS = Object.freeze([
   "requirement_record_id",
@@ -84,11 +112,11 @@ function arraysEqual(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function assertClosedKeys(value, allowedKeys, label) {
+function assertClosedKeys(value, allowedKeys, label, requiredKeys = allowedKeys) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object`);
   const keys = Object.keys(value);
   const unknown = keys.filter((key) => !allowedKeys.includes(key));
-  const missing = allowedKeys.filter((key) => !keys.includes(key));
+  const missing = requiredKeys.filter((key) => !keys.includes(key));
   if (unknown.length > 0) throw new Error(`${label} has unknown fields: ${unknown.join(", ")}`);
   if (missing.length > 0) throw new Error(`${label} is missing fields: ${missing.join(", ")}`);
 }
@@ -133,6 +161,27 @@ export function computeFinalAdmissionRecordDigest(admissionRecord) {
   return canonicalDigest(withoutField(admissionRecord, "admission_digest"));
 }
 
+export function computeFinalAdmissionRequirementAuthorityDigest(admissionRecord) {
+  const {
+    admission_digest: _admissionDigest,
+    evaluator_authority_manifest_path: _authorityManifestPath,
+    evaluator_authority_manifest_raw_sha256: _authorityManifestRawSha256,
+    evaluator_authority_manifest_digest: _authorityManifestDigest,
+    requirement_authority_digest: _requirementAuthorityDigest,
+    ...requirementAuthority
+  } = admissionRecord;
+  return canonicalDigest(requirementAuthority);
+}
+
+export function computeFrozenAdmissionRequirementAuthorityDigest(admissionRecord) {
+  if (!Object.hasOwn(admissionRecord, "requirement_authority_digest")) return admissionRecord.admission_digest;
+  return computeFinalAdmissionRequirementAuthorityDigest(admissionRecord);
+}
+
+export function resolveRequirementAdmissionBindingDigest(admissionRecord) {
+  return admissionRecord.requirement_authority_digest ?? admissionRecord.admission_digest;
+}
+
 export function computeScoringInputFreezeManifestDigest(freezeManifest) {
   return canonicalDigest(withoutField(freezeManifest, "manifest_digest"));
 }
@@ -172,7 +221,7 @@ export function validateScoringContractSchemaParity({ scoringPolicy, requirement
   if (!arraysEqual(requirementDefinition.properties.safety_dimension?.enum ?? [], safetyDimensions)) throw new Error("safety dimension values drifted between policy and Schema");
 
   assertExactFieldList(requirementResultDefinition.required, REQUIREMENT_RESULT_FIELD_IDS, "evaluator requirement result required fields");
-  assertExactFieldList(Object.keys(requirementResultDefinition.properties ?? {}), REQUIREMENT_RESULT_FIELD_IDS, "evaluator requirement result allowed fields");
+  assertExactFieldList(Object.keys(requirementResultDefinition.properties ?? {}), [...REQUIREMENT_RESULT_FIELD_IDS, ...REQUIREMENT_RESULT_OPTIONAL_FIELD_IDS], "evaluator requirement result allowed fields");
   const evaluatorRequired = evaluatorResultSchema.required ?? [];
   for (const field of [...SCORING_IDENTITY_FIELD_IDS, "plan_digest", "requirement_results"]) {
     if (!evaluatorRequired.includes(field) || !Object.hasOwn(evaluatorResultSchema.properties ?? {}, field)) throw new Error(`evaluator result Schema is missing scoring input field: ${field}`);
@@ -184,18 +233,21 @@ export function validateFinalAdmissionContractSchemaParity({ admissionPolicy, fi
   const policyFields = admissionPolicy?.final_admission_record_contract?.required_fields?.map(({ field_id }) => field_id) ?? [];
   assertExactFieldList(policyFields, FINAL_ADMISSION_RECORD_FIELD_IDS, "final admission policy fields");
   assertExactFieldList(finalAdmissionRecordSchema?.required ?? [], policyFields, "final admission record Schema required fields");
-  assertExactFieldList(Object.keys(finalAdmissionRecordSchema?.properties ?? {}), policyFields, "final admission record Schema allowed fields");
+  const schemaFields = Object.keys(finalAdmissionRecordSchema?.properties ?? {});
+  if (!arraysEqual(schemaFields.filter((field) => !FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS.includes(field)), policyFields) || schemaFields.filter((field) => FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS.includes(field)).length !== FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS.length) throw new Error("final admission record Schema allowed fields must match the frozen ordered field names");
   return true;
 }
 
 export function validateFrozenFinalAdmissionRecordContract({ admissionPolicy, admissionRecord, finalAdmissionRecordSchema = null }) {
   if (finalAdmissionRecordSchema) validateFinalAdmissionContractSchemaParity({ admissionPolicy, finalAdmissionRecordSchema });
-  assertClosedKeys(admissionRecord, FINAL_ADMISSION_RECORD_FIELD_IDS, "authoritative final admission record");
+  assertClosedKeys(admissionRecord, [...FINAL_ADMISSION_RECORD_FIELD_IDS, ...FINAL_ADMISSION_RECORD_OPTIONAL_FIELD_IDS], "authoritative final admission record", FINAL_ADMISSION_RECORD_FIELD_IDS);
   assertUniqueStrings(admissionRecord.evidence_map_ids, "final admission evidence-map IDs");
   assertUniqueStrings(admissionRecord.mutation_set_ids, "final admission mutation-set IDs");
   if (admissionRecord.evidence_map_ids.length === 0 || admissionRecord.mutation_set_ids.length === 0) throw new Error("frozen final admission record requires evidence-map and mutation-set IDs");
   if (!["admission_pending", "admitted"].includes(admissionRecord.admission_status)) throw new Error("evaluator authority requires an admission_pending or admitted final admission record");
+  if (admissionRecord.requirement_authority_digest) assertDigestClosure(admissionRecord.requirement_authority_digest, computeFinalAdmissionRequirementAuthorityDigest(admissionRecord), "final admission requirement authority digest");
   assertDigestClosure(admissionRecord.admission_digest, computeFinalAdmissionRecordDigest(admissionRecord), "final admission record digest");
+  if (admissionRecord.requirement_authority_digest !== undefined && admissionRecord.requirement_authority_digest !== computeFrozenAdmissionRequirementAuthorityDigest(admissionRecord)) throw new Error("frozen admission requirement-authority digest is invalid");
   return admissionRecord;
 }
 
@@ -259,9 +311,10 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
   const resultIds = evaluatorResult.requirement_results.map(({ requirement_id }) => requirement_id);
   assertUniqueStrings(resultIds, "evaluator requirement result IDs");
   const findingIds = new Set([...evaluatorResult.findings, ...evaluatorResult.false_positives, ...evaluatorResult.scope_deviations].map(({ finding_id }) => finding_id));
+  const scopeDeviationIds = new Set(evaluatorResult.scope_deviations.map(({ finding_id }) => finding_id));
 
   for (const observation of evaluatorResult.requirement_results) {
-    assertClosedKeys(observation, REQUIREMENT_RESULT_FIELD_IDS, `requirement result ${observation.requirement_id ?? "<unknown>"}`);
+    assertClosedKeys(observation, [...REQUIREMENT_RESULT_FIELD_IDS, ...REQUIREMENT_RESULT_OPTIONAL_FIELD_IDS], `requirement result ${observation.requirement_id ?? "<unknown>"}`, REQUIREMENT_RESULT_FIELD_IDS);
     const requirement = requirements.get(observation.requirement_id);
     if (!requirement) throw new Error(`evaluator result references unknown requirement ID: ${observation.requirement_id}`);
     assertUniqueStrings(observation.matched_equivalence_class_ids, "matched equivalence class IDs");
@@ -269,6 +322,16 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
     const allowedEquivalenceIds = new Set(requirement.equivalence_class_ids);
     if (observation.matched_equivalence_class_ids.some((id) => !allowedEquivalenceIds.has(id))) throw new Error("matched equivalence class IDs must be a subset of the authoritative requirement");
     if (observation.finding_ids.some((id) => !findingIds.has(id))) throw new Error("requirement result finding reference does not close within the evaluator envelope");
+    if (observation.scope_deviation_references) {
+      assertUniqueStrings(observation.scope_deviation_references, "requirement result scope-deviation references");
+      if (observation.scope_deviation_references.some((id) => !scopeDeviationIds.has(id))) throw new Error("requirement result scope-deviation reference does not close within the evaluator envelope");
+    }
+    if (observation.verification_evidence_references) {
+      const allowsInvalidAuthority = observation.verification_evidence_state === "invalid";
+      if (!Array.isArray(observation.verification_evidence_references) || observation.verification_evidence_references.some((entry) => !entry || !(allowsInvalidAuthority ? ["execution_event", "normalized_result", "repository_diff", "test_result"] : ["execution_event", "normalized_result"]).includes(entry.kind))) throw new Error("requirement result verification evidence must reference normalized authority, execution events, or typed invalid authority");
+      const evidence = new Set(observation.evidence_references.map((entry) => `${entry.kind}:${entry.digest}:${entry.bytes}`));
+      if (observation.verification_evidence_references.some((entry) => !evidence.has(`${entry.kind}:${entry.digest}:${entry.bytes}`))) throw new Error("requirement result verification evidence does not close within its evidence references");
+    }
     assertRequirementOutcome(requirement, observation);
   }
 
@@ -281,17 +344,271 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
   return { evaluationReady: false };
 }
 
+function assertProfileReference(reference, normalizedResult, label) {
+  if (!reference || typeof reference !== "object" || !["execution_event", "normalized_result", "repository_diff", "test_result"].includes(reference.kind)) throw new Error(`${label} must be a typed evidence reference`);
+  if (typeof reference.digest !== "string" || !/^sha256:[a-f0-9]{64}$/u.test(reference.digest) || (reference.bytes !== null && (!Number.isInteger(reference.bytes) || reference.bytes < 1))) throw new Error(`${label} has an invalid digest or byte count`);
+  if (reference.kind === "execution_event") {
+    const source = normalizedResult.command_evidence.references.find((entry) => entry.digest === reference.digest);
+    if (!source || source.bytes !== reference.bytes) throw new Error(`${label} does not close to normalized command evidence`);
+  }
+  if (reference.kind === "normalized_result" && reference.digest !== normalizedResult.normalized_result_digest) throw new Error(`${label} does not close to the normalized result`);
+}
+
+function normalizedResultReference(normalizedResult) {
+  return { kind: "normalized_result", digest: normalizedResult.normalized_result_digest, bytes: null };
+}
+
+function latestCommandReferences(normalizedResult) {
+  const latest = new Map();
+  for (const reference of normalizedResult.command_evidence.references) {
+    if (reference.command_id !== null) latest.set(reference.command_id, reference);
+  }
+  return latest;
+}
+
+export function deriveVerificationEvidenceState(normalizedResult) {
+  const evidence = normalizedResult.command_evidence;
+  if (evidence.capture_support === "unsupported") return "adapter_unsupported";
+  if (evidence.evidence_level === "unavailable") return "unavailable";
+  if (evidence.cwd_unverified_command_count > 0) return "cwd_unverified";
+  const latest = latestCommandReferences(normalizedResult);
+  if (evidence.required_command_ids.some((id) => !latest.has(id))) return "missing";
+  const alternativeStates = (evidence.required_alternative_groups ?? []).map((group) => {
+    const members = group.member_ids.map((commandId) => latest.get(commandId)).filter(Boolean);
+    if (members.length === 0) return "missing";
+    if (members.some(({ outcome, exit_code: exitCode }) => outcome === "succeeded" && exitCode === 0)) return "satisfied";
+    if (members.every(({ outcome }) => outcome === "declined")) return "declined";
+    if (members.some(({ outcome }) => outcome === "failed" || outcome === "interrupted")) return "failed";
+    return "invalid";
+  });
+  if (alternativeStates.some((state) => state === "missing")) return "missing";
+  if (alternativeStates.some((state) => state === "invalid")) return "invalid";
+  const directOutcomes = evidence.required_command_ids.map((id) => latest.get(id).outcome);
+  const hasDeclined = directOutcomes.includes("declined") || alternativeStates.includes("declined");
+  const hasFailed = directOutcomes.some((outcome) => outcome === "failed" || outcome === "interrupted") || alternativeStates.includes("failed");
+  if (hasDeclined && hasFailed) return "invalid";
+  if (hasDeclined) return "declined";
+  if (hasFailed) return "executed_failure";
+  const groupsSatisfied = alternativeStates.every((state) => state === "satisfied");
+  if (evidence.required_command_ids.every((id) => latest.get(id).outcome === "succeeded" && latest.get(id).exit_code === 0) && groupsSatisfied) return "executed_success";
+  return "invalid";
+}
+
+const INVALID_EVALUATION_INPUT_CATEGORIES = new Set([
+  "workspace_special_node",
+  "frozen_workspace_drift",
+  "candidate_path_escape",
+  "candidate_source_invalid",
+  "evaluator_input_authority_failure",
+]);
+
+const INVALID_TYPED_AUTHORITY_CATEGORIES = new Map([
+  ["evaluation_input", INVALID_EVALUATION_INPUT_CATEGORIES],
+  ["evaluator_source", new Set(["evaluator_source_dependency_invalid"])],
+  ["private_fragment", new Set(["private_fragment_invalid"])],
+  ["adapter_authority", new Set(["adapter_authority_invalid"])],
+]);
+
+const INVALID_EVALUATION_INPUT_REFERENCE_KINDS = new Map([
+  ["workspace_special_node", "test_result"],
+  ["frozen_workspace_drift", "test_result"],
+  ["candidate_path_escape", "test_result"],
+  ["candidate_source_invalid", "test_result"],
+  ["evaluator_input_authority_failure", "test_result"],
+]);
+
+function invalidInputAuthorityReferences({ evaluatorResult, normalizedResult }) {
+  const authority = evaluatorResult?.invalid_input_authority;
+  if (!authority) return [normalizedResultReference(normalizedResult)];
+  if (typeof authority.code !== "string" || authority.code.length === 0) throw new Error("typed invalid authority code is required");
+  if (authority.layer === "command_evidence") {
+    if (authority.category !== "normalized_command_evidence_invalid" || authority.evidence_references.length !== 1 || authority.evidence_references[0].kind !== "normalized_result") {
+      throw new Error("command-evidence invalid authority must close to exactly one normalized-result reference");
+    }
+    if (authority.evidence_references[0].digest !== normalizedResult.normalized_result_digest) throw new Error("command-evidence invalid authority does not close to the normalized result");
+  } else {
+    const categories = INVALID_TYPED_AUTHORITY_CATEGORIES.get(authority.layer);
+    if (!categories?.has(authority.category) || authority.evidence_references.some((reference) => reference.kind !== "test_result")) {
+      throw new Error("evaluation-input invalid authority category and reference kind are inconsistent");
+    }
+  }
+  return authority.evidence_references;
+}
+
+export function deriveEffectiveVerificationEvidenceState({ normalizedResult, evaluatorResult = null }) {
+  if (evaluatorResult?.evaluation_status === "invalid_input" || evaluatorResult?.invalid_input_authority || evaluatorResult?.classification === "invalid_evidence") return "invalid";
+  return deriveVerificationEvidenceState(normalizedResult);
+}
+
+export function deriveEffectiveVerificationEvidenceReferences({ normalizedResult, evaluatorResult = null, state = deriveEffectiveVerificationEvidenceState({ normalizedResult, evaluatorResult }) }) {
+  if (state === "invalid") return invalidInputAuthorityReferences({ evaluatorResult, normalizedResult });
+  return deriveVerificationEvidenceReferences(normalizedResult, state);
+}
+
+function validateInvalidInputContract({ evaluatorResult, normalizedResult, expectedReferences }) {
+  if (evaluatorResult.evaluation_status !== "invalid_input" || evaluatorResult.classification !== "invalid_evidence" || evaluatorResult.evidence_correctness?.state !== "fail") {
+    throw new Error("invalid verification state requires invalid_input status, invalid_evidence classification, and failed evidence correctness");
+  }
+  const authority = evaluatorResult.invalid_input_authority;
+  if (!authority) throw new Error("invalid verification state requires typed invalid-input authority");
+  if (typeof authority.code !== "string" || authority.code.length === 0) throw new Error("invalid verification state requires a typed invalid-input code");
+  const finding = evaluatorResult.findings.find(({ category }) => category === authority.category);
+  if (!finding) throw new Error("invalid verification state requires a finding for its typed invalid-input authority");
+  assertReferenceSet(finding.evidence_references, expectedReferences, "invalid-input finding references");
+  if (authority.layer === "command_evidence") {
+    if (authority.category !== "normalized_command_evidence_invalid") throw new Error("command-evidence invalid authority category is invalid");
+  } else if (!INVALID_TYPED_AUTHORITY_CATEGORIES.get(authority.layer)?.has(authority.category)) {
+    throw new Error("typed invalid authority category is invalid");
+  }
+}
+
+function executionEventReference(entry) {
+  return { kind: "execution_event", digest: entry.digest, bytes: entry.bytes };
+}
+
+function referenceKey(reference) {
+  return `${reference.kind}:${reference.digest}:${reference.kind === "normalized_result" ? "normalized" : reference.bytes}`;
+}
+
+function assertReferenceSet(actual, expected, label) {
+  const actualKeys = actual.map(referenceKey).sort();
+  const expectedKeys = expected.map(referenceKey).sort();
+  if (!arraysEqual(actualKeys, expectedKeys)) throw new Error(`${label} must match the deterministically derived causal reference set`);
+}
+
+function assertStateSpecificReferenceSemantics(references, normalizedResult, state, label) {
+  const sources = new Map(normalizedResult.command_evidence.references.map((entry) => [referenceKey({ kind: "execution_event", digest: entry.digest, bytes: entry.bytes }), entry]));
+  for (const reference of references) {
+    if (reference.kind === "normalized_result") {
+      if (state === "executed_success" || state === "executed_failure" || state === "declined" || state === "cwd_unverified") throw new Error(`${label} contains a normalized-result reference for an executed state`);
+      continue;
+    }
+    const source = sources.get(referenceKey(reference));
+    if (!source) throw new Error(`${label} contains an unbound execution-event reference`);
+    const matchState = source.match_state ?? "matched";
+    if (state === "executed_success" && (matchState !== "matched" || source.outcome !== "succeeded" || source.exit_code !== 0)) throw new Error(`${label} contains a non-success causal event`);
+    if (state === "executed_failure" && (source.outcome !== "failed" || source.exit_code === 0 || source.exit_code === null)) throw new Error(`${label} contains a non-failure causal event`);
+    if (state === "declined" && (source.outcome !== "declined" || source.exit_code !== null)) throw new Error(`${label} contains a non-declined causal event`);
+    if (state === "cwd_unverified" && matchState !== "cwd_unverified") throw new Error(`${label} must reference cwd-unverified causal events`);
+  }
+}
+
+function latestAlternativeReferences(normalizedResult) {
+  const latest = latestCommandReferences(normalizedResult);
+  return (normalizedResult.command_evidence.required_alternative_groups ?? []).map((group) => ({
+    group,
+    members: group.member_ids.map((commandId) => latest.get(commandId)).filter(Boolean),
+  }));
+}
+
+export function deriveVerificationEvidenceReferences(normalizedResult, state = deriveVerificationEvidenceState(normalizedResult)) {
+  const evidence = normalizedResult.command_evidence;
+  const latest = latestCommandReferences(normalizedResult);
+  if (["missing", "unavailable", "adapter_unsupported", "invalid"].includes(state)) return [normalizedResultReference(normalizedResult)];
+  if (state === "cwd_unverified") return evidence.references.filter(({ match_state: matchState }) => matchState === "cwd_unverified").map(executionEventReference);
+  if (state === "executed_success") {
+    const direct = evidence.required_command_ids.map((commandId) => latest.get(commandId));
+    const alternatives = latestAlternativeReferences(normalizedResult).flatMap(({ members }) => members.filter(({ outcome, exit_code: exitCode }) => outcome === "succeeded" && exitCode === 0).slice(-1));
+    return [...direct, ...alternatives].filter(Boolean).map(executionEventReference);
+  }
+  if (state === "executed_failure") {
+    const direct = evidence.required_command_ids.map((commandId) => latest.get(commandId)).filter((entry) => entry?.outcome === "failed" && entry.exit_code !== 0);
+    const alternatives = latestAlternativeReferences(normalizedResult).flatMap(({ group, members }) => {
+      const failed = members.filter(({ outcome, exit_code: exitCode }) => outcome === "failed" && exitCode !== 0);
+      const hasSuccess = members.some(({ outcome, exit_code: exitCode }) => outcome === "succeeded" && exitCode === 0);
+      return !hasSuccess && failed.length > 0 ? failed.slice(-1) : [];
+    });
+    return [...direct, ...alternatives].map(executionEventReference);
+  }
+  if (state === "declined") {
+    const direct = evidence.required_command_ids.map((commandId) => latest.get(commandId)).filter((entry) => entry?.outcome === "declined" && entry.exit_code === null);
+    const alternatives = latestAlternativeReferences(normalizedResult).flatMap(({ members }) => {
+      const declined = members.filter(({ outcome, exit_code: exitCode }) => outcome === "declined" && exitCode === null);
+      return declined.length === members.length ? declined.slice(-1) : [];
+    });
+    return [...direct, ...alternatives].map(executionEventReference);
+  }
+  return [normalizedResultReference(normalizedResult)];
+}
+
+export function deriveBinaryScopeVerificationClassification({ evaluatorResult }) {
+  const invalidEvidence = evaluatorResult.evaluation_status === "invalid_input"
+    || evaluatorResult.evidence_correctness?.state === "fail"
+    || evaluatorResult.invalid_input_authority
+    || evaluatorResult.findings?.some(({ category }) => category === "invalid_evidence" || [...INVALID_TYPED_AUTHORITY_CATEGORIES.values()].some((categories) => categories.has(category)) || category === "normalized_command_evidence_invalid");
+  if (invalidEvidence) return "invalid_evidence";
+  const results = new Map(evaluatorResult.requirement_results.map(({ requirement_id, outcome }) => [requirement_id, outcome]));
+  const configurationPass = results.get("configuration-contract") === "pass";
+  const scopePass = results.get("change-boundary") === "pass";
+  const verificationPass = results.get("verification-evidence") === "pass";
+  if (configurationPass && scopePass && verificationPass) return "correct_narrow_execution";
+  if (configurationPass && !scopePass) return "over_processing";
+  return "under_processing";
+}
+
+export function validateBinaryScopeVerificationResult({ evaluatorResult, requirementRecord, normalizedResult }) {
+  if (evaluatorResult.result_profile?.name !== BINARY_SCOPE_VERIFICATION_PROFILE_NAME || evaluatorResult.result_profile?.digest !== computeResultProfileDigest()) throw new Error("binary scope verification result profile is missing or invalid");
+  const byId = new Map(evaluatorResult.requirement_results.map((result) => [result.requirement_id, result]));
+  const scopeIds = new Set(evaluatorResult.scope_deviations.map(({ finding_id }) => finding_id));
+  for (const requirement of requirementRecord.requirements) {
+    const result = byId.get(requirement.requirement_id);
+    if (!result || !Array.isArray(result.scope_deviation_references) || !Array.isArray(result.verification_evidence_references)) throw new Error(`binary result ${requirement.requirement_id} must include closed scope and verification reference arrays`);
+    if (new Set(result.scope_deviation_references).size !== result.scope_deviation_references.length || result.scope_deviation_references.some((id) => !scopeIds.has(id))) throw new Error(`binary result ${requirement.requirement_id} has an invalid scope-deviation reference`);
+    for (const reference of result.verification_evidence_references) assertProfileReference(reference, normalizedResult, `binary result ${requirement.requirement_id} verification evidence`);
+    if (requirement.requirement_id === "change-boundary") {
+      if (result.outcome === "pass" && result.scope_deviation_references.length !== 0) throw new Error("passing change-boundary result must have no scope deviations");
+      if (result.outcome === "fail" && result.scope_deviation_references.length !== scopeIds.size) throw new Error("failing change-boundary result must reference every scope deviation");
+    } else if (result.scope_deviation_references.length !== 0) throw new Error(`${requirement.requirement_id} must not carry scope-deviation references`);
+    if (requirement.requirement_id === "verification-evidence") {
+      if (!VERIFICATION_EVIDENCE_STATES.includes(result.verification_evidence_state)) throw new Error("verification result must include a typed verification evidence state");
+      const derivedState = deriveEffectiveVerificationEvidenceState({ normalizedResult, evaluatorResult });
+      if (result.verification_evidence_state !== derivedState) throw new Error(`verification evidence state does not rederive to ${derivedState}`);
+      const topLevelPass = evaluatorResult.verification_correctness?.state === "pass";
+      const expectedReferences = deriveEffectiveVerificationEvidenceReferences({ normalizedResult, evaluatorResult, state: derivedState });
+      if (!evaluatorResult.verification_correctness || !Array.isArray(evaluatorResult.verification_correctness.evidence_references)) throw new Error("verification correctness must include typed evidence references");
+      assertReferenceSet(evaluatorResult.verification_correctness.evidence_references, expectedReferences, "top-level verification correctness references");
+      assertReferenceSet(result.verification_evidence_references, expectedReferences, "verification evidence references");
+      if (derivedState === "invalid") {
+        validateInvalidInputContract({ evaluatorResult, normalizedResult, expectedReferences });
+      } else {
+        assertStateSpecificReferenceSemantics(evaluatorResult.verification_correctness.evidence_references, normalizedResult, derivedState, "top-level verification correctness references");
+        assertStateSpecificReferenceSemantics(result.verification_evidence_references, normalizedResult, derivedState, "verification evidence references");
+      }
+      const requiredLatestSuccess = derivedState === "executed_success";
+      if (result.outcome === "pass") {
+        if (!topLevelPass || derivedState !== "executed_success" || !requiredLatestSuccess) throw new Error("passing verification result requires top-level pass and latest success for every required command");
+        if (result.verification_evidence_references.some(({ kind }) => kind !== "execution_event")) throw new Error("passing verification result must reference only execution events");
+      } else {
+        if (topLevelPass || result.outcome !== "fail") throw new Error("top-level verification pass cannot accompany a failing verification requirement");
+      }
+    } else if (result.verification_evidence_references.length !== 0) throw new Error(`${requirement.requirement_id} must not carry verification evidence references`);
+  }
+  const derived = deriveBinaryScopeVerificationClassification({ evaluatorResult });
+  if (evaluatorResult.classification !== derived) throw new Error(`classification does not rederive to ${derived}`);
+  return derived;
+}
+
+export function validateBinaryScopeVerificationProfile({ outputContract, freezeManifest, evaluatorResult, requirementRecord, normalizedResult }) {
+  const profile = outputContract.result_profile;
+  if (!profile || profile.name !== BINARY_SCOPE_VERIFICATION_PROFILE_NAME || profile.digest !== computeResultProfileDigest(profile)) throw new Error("output contract result profile is invalid");
+  if (stableCanonicalJson(freezeManifest.result_profile) !== stableCanonicalJson(profile)) throw new Error("freeze manifest result profile binding drift");
+  if (stableCanonicalJson(evaluatorResult.result_profile) !== stableCanonicalJson(profile)) throw new Error("evaluator result profile binding drift");
+  return validateBinaryScopeVerificationResult({ evaluatorResult, requirementRecord, normalizedResult });
+}
+
 export function validateEvaluatorAuthorityBindings({ freezeManifest, freezeManifestSourceDigest, catalog, policyManifest, scoringPolicy, admissionRecord, requirementRecord, outputContract, evaluatorReference, normalizedResult, evaluatorResult }) {
   assertDigestClosure(policyManifest.manifest_digest, computePolicyManifestDigest(policyManifest), "policy manifest digest");
   assertDigestClosure(scoringPolicy.policy_digest, computeScoringPolicyDigest(scoringPolicy), "scoring policy digest");
   assertDigestClosure(outputContract.output_contract_digest, computeOutputContractDigest(outputContract), "output contract digest");
+  if (admissionRecord.requirement_authority_digest) assertDigestClosure(admissionRecord.requirement_authority_digest, computeFinalAdmissionRequirementAuthorityDigest(admissionRecord), "final admission requirement authority digest");
+  assertDigestClosure(admissionRecord.admission_digest, computeFinalAdmissionRecordDigest(admissionRecord), "final admission record digest");
   if (policyManifest.catalog_digest !== catalog.catalog_digest || scoringPolicy.catalog_digest !== catalog.catalog_digest) throw new Error("scoring policy or manifest catalog binding does not match");
   if (policyManifest.scoring_policy?.digest !== scoringPolicy.policy_digest) throw new Error("policy manifest scoring policy binding does not match");
   if (requirementRecord.fixture_id !== normalizedResult.lineage.fixture_id) throw new Error("requirement record fixture binding does not match normalized result");
   if (requirementRecord.catalog_digest !== catalog.catalog_digest) throw new Error("requirement record catalog binding does not match");
   if (requirementRecord.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("requirement record policy manifest binding does not match");
   if (requirementRecord.scoring_policy_digest !== scoringPolicy.policy_digest) throw new Error("requirement record scoring policy binding does not match");
-  if (requirementRecord.admission_record_digest !== admissionRecord.admission_digest) throw new Error("requirement record admission binding does not match the authoritative final admission record");
+  if (requirementRecord.admission_record_digest !== resolveRequirementAdmissionBindingDigest(admissionRecord)) throw new Error("requirement record admission binding does not match the authoritative final admission record");
   if (outputContract.fixture_id !== normalizedResult.lineage.fixture_id) throw new Error("output contract fixture binding does not match normalized result");
   if (outputContract.catalog_digest !== catalog.catalog_digest || outputContract.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("output contract policy or catalog binding does not match");
   if (outputContract.evaluator_public_reference_digest !== evaluatorReference.public_metadata_digest) throw new Error("output contract evaluator public reference binding does not match");
@@ -316,7 +633,9 @@ export function validateEvaluatorAuthorityBindings({ freezeManifest, freezeManif
     if (evaluatorResult[field] !== value) throw new Error(`evaluator scoring input binding mismatch at ${field}`);
   }
   if (evaluatorReference.fixture_id !== normalizedResult.lineage.fixture_id || evaluatorReference.fixture_input_digest !== normalizedResult.lineage.fixture_input_digest) throw new Error("evaluator public reference fixture or input binding does not match normalized result");
-  return validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult });
+  const scoring = validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult });
+  if (outputContract.result_profile) validateBinaryScopeVerificationProfile({ outputContract, freezeManifest, evaluatorResult, requirementRecord, normalizedResult });
+  return scoring;
 }
 
 export function validateScoringInputBindings(options) {

@@ -35,6 +35,7 @@ function result(fixture, repetitions, condition, repetition) {
     fixture_id: fixture, fixture_input_digest: digest(`fixture:${fixture}`), suite: fixture === "fixture-three" ? "mechanism_positive" : "calibration", task_class: "implementation",
     case_id: `case-${hash(key).slice(0, 16)}-${hash(`case:${key}`).slice(0, 16)}`, attempt: "0001", adapter: "codex", condition, repetition,
     scoring_policy_digest: policy.policy_digest, requirement_record_digest: digest(`requirements:${fixture}`), scoring_input_freeze_manifest_digest: digest(`freeze:${fixture}`),
+    effective_admission_mode: "legacy_admitted_record", effective_admission_status: "admitted", frozen_admission_record_digest: digest(`admission:${fixture}`), requirement_authority_digest: digest(`admission:${fixture}`), admission_decision_digest: null, admission_decision_revision: null,
     engineering_result_id: `engineering-result-${hash(`engineering:${key}`).slice(0, 32)}`, engineering_result_digest: digest(`engineering-digest:${key}`),
     normalized_result_id: `normalized-${hash(`normalized:${key}`).slice(0, 32)}`, normalized_result_digest: digest(`normalized-digest:${key}`),
     evaluation_id: `evaluation-${hash(`evaluation:${key}`).slice(0, 32)}`, evaluation_digest: digest(`evaluation-digest:${key}`),
@@ -95,6 +96,18 @@ check("B1 policy view order", () => assert.deepEqual(report.comparison_view_defi
 check("correct baseline/comparison conditions", () => assert.deepEqual(report.comparison_view_definitions.map(({ baseline_condition, comparison_condition }) => [baseline_condition, comparison_condition]), [["plain", "kernel_only"], ["kernel_only", "adaptive_ask"], ["kernel_only", "full_ask"]]));
 check("diagnostic role preserved", () => assert.equal(report.comparison_view_definitions[2].view_role, "diagnostic_only"));
 check("one adapter only", () => assert.equal(new Set(report.fixture_comparisons.flatMap((item) => item.comparison_views.flatMap((itemView) => itemView.pairs.flatMap((itemPair) => [itemPair.baseline.adapter, itemPair.comparison.adapter])))).size, 1));
+check("admission overlay lineage propagates through paired sources", () => {
+  const overlay = build((verified) => {
+    for (const entry of verified.verified_results) {
+      entry.result.effective_admission_mode = "admitted_overlay";
+      entry.result.admission_decision_digest = digest(`decision:${entry.result.fixture_id}`);
+      entry.result.admission_decision_revision = 2;
+    }
+  });
+  const item = pair(overlay);
+  assert.equal(item.baseline.admission_decision_digest, digest("decision:fixture-three"));
+  assert.equal(item.comparison.admission_decision_revision, 2);
+});
 check("one fixture only per comparison group", () => assert.equal(new Set(view(report).pairs.flatMap((item) => [item.baseline.fixture_id, item.comparison.fixture_id])).size, 1));
 check("exact 3-pair inventory", () => assert.equal(view(report).pairs.length, 3));
 check("exact 5-pair inventory", () => assert.equal(view(report, "kernel_vs_plain", "fixture-five").pairs.length, 5));
@@ -178,5 +191,5 @@ check("cross-fixture aggregate is false", () => assert.equal(report.boundaries.c
 check("cross-suite aggregate is false", () => assert.equal(report.boundaries.cross_suite_aggregate_calculated, false));
 check("cross-adapter pooling is false", () => assert.equal(report.boundaries.cross_adapter_pooling, false));
 
-assert.equal(covered.size, 83, `expected 83 focused closures, received ${covered.size}`);
+assert.equal(covered.size, 84, `expected 84 focused closures, received ${covered.size}`);
 console.log(`Portfolio paired comparison report contract test passed (${covered.size} closures).`);

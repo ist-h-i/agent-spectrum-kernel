@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Adaptive ASK portfolio admission decision overlay",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "decision_id",
+    "decision_revision",
+    "fixture_id",
+    "decision_status",
+    "review_status",
+    "author_self_approval",
+    "reviewer_type",
+    "reviewer_record_id",
+    "reviewer_count",
+    "reviewed_at",
+    "reviewed_repository",
+    "reviewed_pull_request",
+    "reviewed_head_revision",
+    "blocking_finding_count",
+    "review_evidence",
+    "evaluator",
+    "evaluator_public_reference_digest",
+    "frozen_admission_authority",
+    "frozen_requirement_record",
+    "frozen_scoring_input_manifest",
+    "decision_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/portfolio-admission-decision.schema.json" },
+    "program": { "const": "adaptive_ask_portfolio_admission_decision" },
+    "decision_id": { "type": "string", "pattern": "^admission-decision-[a-f0-9]{32}$" },
+    "decision_revision": { "type": "integer", "minimum": 1 },
+    "fixture_id": { "$ref": "#/$defs/token" },
+    "decision_status": { "enum": ["admitted", "changes_requested", "rejected"] },
+    "review_status": { "enum": ["approved", "changes_requested", "rejected", "pending", "unknown"] },
+    "author_self_approval": { "const": false },
+    "reviewer_type": { "enum": ["independent_human", "independent_agent", "independent_panel"] },
+    "reviewer_record_id": { "$ref": "#/$defs/token" },
+    "reviewer_count": { "type": "integer", "minimum": 1 },
+    "reviewed_at": { "type": "string", "format": "date-time" },
+    "reviewed_repository": { "type": "string", "minLength": 3, "maxLength": 200, "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+    "reviewed_pull_request": { "type": "integer", "minimum": 1 },
+    "reviewed_head_revision": { "$ref": "#/$defs/revision" },
+    "blocking_finding_count": { "type": "integer", "minimum": 0 },
+    "review_evidence": { "$ref": "#/$defs/archiveEvidence" },
+    "evaluator": { "$ref": "#/$defs/evaluatorIdentity" },
+    "evaluator_public_reference_digest": { "$ref": "#/$defs/digest" },
+    "frozen_admission_authority": { "$ref": "#/$defs/frozenAdmission" },
+    "frozen_requirement_record": { "$ref": "#/$defs/frozenRequirement" },
+    "frozen_scoring_input_manifest": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/frozenSemanticArtifact" }
+      ]
+    },
+    "decision_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "portablePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000]+$"
+    },
+    "archiveEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["archive_sha256", "archive_bytes"],
+      "properties": {
+        "archive_sha256": { "$ref": "#/$defs/digest" },
+        "archive_bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "evaluatorIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evaluator_revision", "evaluator_bundle_id", "evaluator_bundle_digest", "evaluator_bundle_bytes"],
+      "properties": {
+        "evaluator_revision": { "$ref": "#/$defs/revision" },
+        "evaluator_bundle_id": { "type": "string", "pattern": "^evaluator-[a-f0-9]{64}$" },
+        "evaluator_bundle_digest": { "$ref": "#/$defs/digest" },
+        "evaluator_bundle_bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "frozenSemanticArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "raw_byte_digest", "semantic_digest"],
+      "properties": {
+        "path": { "$ref": "#/$defs/portablePath" },
+        "raw_byte_digest": { "$ref": "#/$defs/digest" },
+        "semantic_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "frozenAdmission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "raw_byte_digest", "semantic_digest", "requirement_authority_digest"],
+      "properties": {
+        "path": { "$ref": "#/$defs/portablePath" },
+        "raw_byte_digest": { "$ref": "#/$defs/digest" },
+        "semantic_digest": { "$ref": "#/$defs/digest" },
+        "requirement_authority_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "frozenRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "raw_byte_digest", "record_digest", "set_digest"],
+      "properties": {
+        "path": { "$ref": "#/$defs/portablePath" },
+        "raw_byte_digest": { "$ref": "#/$defs/digest" },
+        "record_digest": { "$ref": "#/$defs/digest" },
+        "set_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

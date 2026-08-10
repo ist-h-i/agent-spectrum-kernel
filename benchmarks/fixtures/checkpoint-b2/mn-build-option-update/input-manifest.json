@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "mn-build-option-update": {
+      "class": "configuration",
+      "difficulty": "medium",
+      "target_minutes": 10,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "e4f7f7b74f2f10d68ffa29ba32fde96687bf7b157224cb3e86c3ebc4b966fd60",
+          "bytes": 501
+        },
+        {
+          "path": "workspace/build.config.json",
+          "sha256": "e680dc0a5efa8daaa3dd63c06ce12fd2c8c9d2f8a24246f5a96462cfe1b715f0",
+          "bytes": 214
+        },
+        {
+          "path": "workspace/ci/release-build.log",
+          "sha256": "897fa262a51db0844805841456332745592b3e45c8bbd5fb705c10a8c90269c9",
+          "bytes": 251
+        },
+        {
+          "path": "workspace/docs/build-options.md",
+          "sha256": "765541869cdc553e6566c905fabf81f1843b4aea4c10e1f4e4989f52f317b2c2",
+          "bytes": 565
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "50844c248aa736d57768a926544720b56914396bdc7b997f310897b4456aa5ed",
+          "bytes": 193
+        },
+        {
+          "path": "workspace/scripts/validate-build-config.mjs",
+          "sha256": "884155195e0ad532a29ab1dc6122b343fea1bc6f285d54a55edd09653d447c2a",
+          "bytes": 790
+        },
+        {
+          "path": "workspace/test/build-config.test.mjs",
+          "sha256": "641fcf626c4a06509058e3d4ee49cefcd7166182f75ee26a3ab3c8d87190f6ff",
+          "bytes": 520
+        }
+      ]
+    }
+  }
+}

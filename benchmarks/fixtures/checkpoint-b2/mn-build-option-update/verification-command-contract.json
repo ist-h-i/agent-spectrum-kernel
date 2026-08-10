@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "mn-build-option-update",
+  "fixture_input_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
+  "commands": [
+    {
+      "command_id": "build-config-focused-test",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"ci/release-build.log\":\"897fa262a51db0844805841456332745592b3e45c8bbd5fb705c10a8c90269c9\",\"docs/build-options.md\":\"765541869cdc553e6566c905fabf81f1843b4aea4c10e1f4e4989f52f317b2c2\",\"package.json\":\"50844c248aa736d57768a926544720b56914396bdc7b997f310897b4456aa5ed\",\"test/build-config.test.mjs\":\"641fcf626c4a06509058e3d4ee49cefcd7166182f75ee26a3ab3c8d87190f6ff\",\"scripts/validate-build-config.mjs\":\"884155195e0ad532a29ab1dc6122b343fea1bc6f285d54a55edd09653d447c2a\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest) process.exit(41)}' && [ -f build.config.json ] && node test/build-config.test.mjs",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:2c1766d83f1897903fa72473bc19ab3fe52072065f5d2e7a2b0674d1bb5f05b0",
+      "rendered_event_command_digest": "sha256:44cff2bc6155184912693d5f15b8f75f6b0f6fd14b255de91dd6f9dcda4d165d",
+      "command_contract_digest": "sha256:3a74ea4d20207c9cd83bc9ccf3378d6b2e0059c3615fc934ceaabdf0b29ff281"
+    },
+    {
+      "command_id": "build-config-semantic-validator",
+      "purpose": "validation",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"ci/release-build.log\":\"897fa262a51db0844805841456332745592b3e45c8bbd5fb705c10a8c90269c9\",\"docs/build-options.md\":\"765541869cdc553e6566c905fabf81f1843b4aea4c10e1f4e4989f52f317b2c2\",\"package.json\":\"50844c248aa736d57768a926544720b56914396bdc7b997f310897b4456aa5ed\",\"test/build-config.test.mjs\":\"641fcf626c4a06509058e3d4ee49cefcd7166182f75ee26a3ab3c8d87190f6ff\",\"scripts/validate-build-config.mjs\":\"884155195e0ad532a29ab1dc6122b343fea1bc6f285d54a55edd09653d447c2a\"}; for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest) process.exit(41)}' && [ -f build.config.json ] && node scripts/validate-build-config.mjs",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:91146340cc2b006b8f94b0459f37e95113f07f7bab53ce8f7932bc9dc93ad18d",
+      "rendered_event_command_digest": "sha256:472855a21b44c7784ed28163de786028a92cbcea32934e4582ab97bb10dec0f9",
+      "command_contract_digest": "sha256:24aa1870716be09ba7cdd0c46bc253cf50f596d4a946ac746609aa7f39540534"
+    }
+  ],
+  "contract_digest": "sha256:0740d194553ec7915ecace749c5442a3e1fee6a35fb0213b5739397a08a1d118"
+}
