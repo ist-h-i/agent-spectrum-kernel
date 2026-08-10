@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -12,14 +13,21 @@ import {
 } from "./ask-benchmark-mn-doc-config-correction.mjs";
 import {
   computeEvaluatorReferenceDigest,
+  createSealedEvaluatorExecutionForTest,
   deriveEvaluatorAuthorityManifest,
   evaluatorAuthorityPathsForFixture,
+  executeSealedEvaluatorForTest,
+  readEvaluatorAuthorityAnchorFromFreeze,
+  validateEvaluatorSourceIdentity,
   validateEvaluatorAuthorityManifest,
+  validatePrivateEvaluatorFragment,
+  verifyPrivateEvaluatorBundle,
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import { buildPortfolioPlan, resolvePortfolioExecutionAdmission } from "./ask-benchmark-plan.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { validateEquivalenceAuthority, validateMutationAuthority } from "./ask-benchmark-mn-build-option-update.mjs";
+import { validateMnDocConfigCorrectionProductionAuthority } from "./ask-benchmark-mn-doc-config-correction-authority.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
@@ -134,12 +142,12 @@ try {
       value.requirements[0].evidence_map_ids = ["unknown-evidence"];
       writeJson(path, value);
     }, /deterministic source-freeze contract/u);
-  rejectsPublicMutation("cross-fixture-config-transplant", (target) => {
-    const path = resolve(target, "benchmarks/adaptive-portfolio.config.json");
-    const value = readJson(path);
-    value.fixtures.find(({ id }) => id === "mn-doc-config-correction").id = "mn-build-option-update-copy";
-    writeJson(path, value);
-  }, /not registered/u);
+  if (!productionAuthority) rejectsPublicMutation("cross-fixture-config-transplant", (target) => {
+      const path = resolve(target, "benchmarks/adaptive-portfolio.config.json");
+      const value = readJson(path);
+      value.fixtures.find(({ id }) => id === "mn-doc-config-correction").id = "mn-build-option-update-copy";
+      writeJson(path, value);
+    }, /not registered/u);
   rejectsPublicMutation("symlink-traversal", (target) => {
     const path = resolve(target, FIXTURE_ROOT_RELATIVE, "workspace/docs/worker-retries.md");
     rmSync(path);
@@ -213,6 +221,89 @@ try {
       transplantedReference.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`;
       transplantedReference.public_metadata_digest = computeEvaluatorReferenceDigest(transplantedReference);
       assert.notEqual(transplantedReference.public_metadata_digest, reference.public_metadata_digest, "public reference digest must bind the private bundle identity");
+
+      const staleRevision = structuredClone(reference.evaluator_source_identity);
+      assert.throws(() => validateEvaluatorSourceIdentity({ identity: staleRevision, root, expectedRevision: "0".repeat(40) }), /revision drift/u, "stale evaluator revision must be rejected");
+      const mismatchedGraph = structuredClone(reference.evaluator_source_identity);
+      mismatchedGraph.dependency_graph.graph_digest = `sha256:${"0".repeat(64)}`;
+      assert.throws(() => validateEvaluatorSourceIdentity({ identity: mismatchedGraph, root, expectedRevision: reference.evaluator_revision }), /dependency graph closure/u, "dependency graph mismatch must be rejected");
+      const fakeGraph = structuredClone(reference.evaluator_source_identity);
+      fakeGraph.dependency_graph.edge_inventory[0].specifier = "./self-consistent-fake.mjs";
+      const { graph_digest: _oldGraphDigest, ...fakeGraphClosure } = fakeGraph.dependency_graph;
+      fakeGraph.dependency_graph.graph_digest = canonicalDigest(fakeGraphClosure);
+      assert.throws(() => validateEvaluatorSourceIdentity({ identity: fakeGraph, root, expectedRevision: reference.evaluator_revision }), /dependency graph closure/u, "self-consistent fake dependency graph must be rejected");
+
+      const mutableRoot = resolve(work, "production-authority-mutations");
+      cpSync(root, mutableRoot, { recursive: true });
+      const mutableFixtureRoot = resolve(mutableRoot, FIXTURE_ROOT_RELATIVE);
+      const rejectsArtifactMutation = (name, fileName, mutate, pattern) => {
+        const path = resolve(mutableFixtureRoot, fileName);
+        const original = readFileSync(path);
+        try {
+          const value = JSON.parse(original);
+          mutate(value);
+          writeJson(path, value);
+          assert.throws(() => validateMnDocConfigCorrectionProductionAuthority({ root: mutableRoot }), pattern, name);
+        } finally {
+          writeFileSync(path, original);
+        }
+      };
+      rejectsArtifactMutation("evaluator revision mismatch", "evaluator-reference.json", (value) => {
+        value.evaluator_revision = "0".repeat(40);
+        value.public_metadata_digest = computeEvaluatorReferenceDigest(value);
+      }, /revision drift/u);
+      rejectsArtifactMutation("evaluator authority manifest path transplant", "evaluator-reference.json", (value) => {
+        value.evaluator_authority_manifest_path = "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-authority-manifest.json";
+        value.public_metadata_digest = computeEvaluatorReferenceDigest(value);
+      }, /manifest path transplant/u);
+      rejectsArtifactMutation("public reference bundle transplant", "evaluator-reference.json", (value) => {
+        value.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`;
+        value.public_metadata_digest = computeEvaluatorReferenceDigest(value);
+      }, /frozen evaluator_public_reference|authority binding|bundle transplant/u);
+
+      const wrongRepositoryRoot = resolve(work, "wrong-repository-bytes");
+      cpSync(root, wrongRepositoryRoot, { recursive: true });
+      writeFileSync(resolve(wrongRepositoryRoot, "scripts/ask-benchmark-scoring-contract.mjs"), `${readFileSync(resolve(wrongRepositoryRoot, "scripts/ask-benchmark-scoring-contract.mjs"), "utf8")}\n`);
+      assert.throws(() => validateEvaluatorSourceIdentity({ identity: reference.evaluator_source_identity, root: wrongRepositoryRoot, expectedRevision: reference.evaluator_revision }), /source bytes drift/u, "wrong repository bytes must be rejected");
+
+      const externalAuthorityAnchor = readEvaluatorAuthorityAnchorFromFreeze({
+        root,
+        freezeManifestPath: resolve(fixtureRoot, "scoring-input-freeze-manifest.json"),
+        freezeManifestSourceDigest: `sha256:${createHash("sha256").update(readFileSync(resolve(fixtureRoot, "scoring-input-freeze-manifest.json"))).digest("hex")}`,
+        referencePath: resolve(fixtureRoot, "evaluator-reference.json"),
+        label: "mn-doc pre-review external authority",
+      });
+      const bundleManifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
+      const hiddenAsset = bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests");
+      const sealedAuthorityRoot = resolve(work, "sealed-pre-review-authority");
+      const evaluationInputRoot = resolve(work, "sealed-pre-review-input");
+      mkdirSync(sealedAuthorityRoot);
+      mkdirSync(evaluationInputRoot);
+      writeJson(resolve(evaluationInputRoot, "pre-review-authority.json"), { measured_execution: false, scoring_ready: false });
+      const sealedLineage = { run_instance_id: "24124124-1241-4241-8241-241241241241", case_id: "case-2412412412412412-4242424242424242", attempt: "0001" };
+      const sealedExecution = createSealedEvaluatorExecutionForTest({
+        root,
+        privateEvaluationRoot: sealedAuthorityRoot,
+        privateRoot,
+        hiddenAsset,
+        frozenWorkspace: resolve(caseRoot, "frozen"),
+        candidateWorkspace: resolve(caseRoot, "correct"),
+        evaluationInputRoot,
+        evaluationLineage: sealedLineage,
+        evaluatorRevision: reference.evaluator_revision,
+        externalAuthorityAnchor,
+        executionDirectoryName: "sealed-pre-review",
+        label: "mn-doc sealed pre-review evaluator",
+      });
+      const eventReference = { command_id: "worker-retry-doc-test", digest: `sha256:${"2".repeat(64)}`, bytes: 64, outcome: "succeeded", exit_code: 0, match_state: "matched" };
+      const normalized = {
+        normalized_result_digest: `sha256:${"3".repeat(64)}`,
+        lineage: sealedLineage,
+        command_evidence: { capture_support: "supported", evidence_level: "complete", required_command_ids: ["worker-retry-doc-test"], required_alternative_groups: [], references: [eventReference], cwd_unverified_command_count: 0 },
+      };
+      const sealedResult = executeSealedEvaluatorForTest({ execution: sealedExecution, externalAuthorityAnchor, repositoryRoot: root, normalized, label: "mn-doc sealed pre-review evaluator" });
+      assert.equal(sealedResult.firstFragment.classification, "correct_narrow_execution");
+      validatePrivateEvaluatorFragment({ root, fragment: sealedResult.firstFragment, scoringPolicy: readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json")), requirementRecord, normalizedResult: normalized });
     }
     const expectations = readJson(resolve(caseRoot, "expectations.json"));
     for (const entry of expectations.cases) {

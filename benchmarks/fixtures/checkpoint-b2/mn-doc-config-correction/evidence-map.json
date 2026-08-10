@@ -40,5 +40,27 @@
       ]
     }
   ],
-  "evidence_map_digest": "sha256:9e2ce4e39d6d625e1183667553170672f3d2fddf41b5a8f3359d3b4e534c754a"
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-documentation-config-evidence",
+      "target_evidence_map_id": "documentation-config-contract",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:0688f119680fcb0317ce155dd1e470b625520983e936fa1469ac8fcee032911d"
+    },
+    {
+      "mutation_id": "remove-focused-scope-evidence",
+      "target_evidence_map_id": "focused-change-boundary",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:2130ae23494c38c47f783528ddecd3ff362f1523d43ca958a932dde3c98d7b71"
+    },
+    {
+      "mutation_id": "remove-verification-route",
+      "target_evidence_map_id": "repository-verification-route",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:c393d1e478c88f5d2513ce78d017d73440d8455c99fb28f81001f34bee2c0723"
+    }
+  ]
 }
