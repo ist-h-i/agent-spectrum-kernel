@@ -17,6 +17,7 @@ import {
   validatePortfolioAdmissionDecision,
 } from "./ask-benchmark-admission-decision.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import { validateMnBuildOptionUpdatePublicFixture } from "./ask-benchmark-mn-build-option-update.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const stableTmp = realpathSync(tmpdir());
@@ -350,9 +351,44 @@ test("actual Git diff closes the historical R21 to required R22 transition", () 
   const historicalSourcePaths = inventory.paths.filter((path) => !path.startsWith(fixturePrefix));
   assert.equal(frozenFixturePaths.length, inventory.path_partition.frozen_fixture_authority_count);
   assert.equal(historicalSourcePaths.length, inventory.path_partition.historical_evaluator_source_count);
-  const frozenDiff = spawnSync("git", ["diff", "--name-only", inventory.authority_source.reviewed_head_revision, "--", ...frozenFixturePaths], { cwd: root, encoding: "utf8" });
-  assert.equal(frozenDiff.status, 0, frozenDiff.stderr || frozenDiff.stdout);
-  assert.equal(frozenDiff.stdout.trim(), "", "the integrated branch must not rewrite historical R21 frozen fixture authority");
+  const reviewedHead = inventory.authority_source.reviewed_head_revision;
+  const reviewedCommit = spawnSync("git", ["cat-file", "-e", `${reviewedHead}^{commit}`], { cwd: root, encoding: "utf8" });
+  assert.equal(reviewedCommit.status, 0, reviewedCommit.stderr || `historical R21 reviewed HEAD is unavailable: ${reviewedHead}`);
+  const historicalFixtureBytes = new Map(frozenFixturePaths.map((path) => {
+    const historical = spawnSync("git", ["show", `${reviewedHead}:${path}`], { cwd: root, encoding: null, maxBuffer: 8 * 1024 * 1024 });
+    assert.equal(historical.status, 0, historical.stderr?.toString("utf8") || `historical R21 path is unavailable: ${path}`);
+    return [path, historical.stdout];
+  }));
+  const referencePath = frozenFixturePaths.find((path) => path.endsWith("/evaluator-reference.json"));
+  assert.ok(referencePath, "historical R21 inventory must include the evaluator reference");
+  const historicalReference = JSON.parse(historicalFixtureBytes.get(referencePath).toString("utf8"));
+  const historicalReferenceAuthority = { ...historicalReference };
+  delete historicalReferenceAuthority.public_metadata_digest;
+  assert.equal(historicalReference.fixture_id, inventory.authority_source.fixture_id);
+  assert.match(historicalReference.evaluator_revision, /^[0-9a-f]{40}$/u);
+  assert.equal(historicalReference.public_metadata_digest, canonicalDigest(historicalReferenceAuthority));
+  assert.equal(historicalReference.public_metadata_digest, inventory.authority_source.evaluator_public_reference_digest);
+
+  const currentReference = JSON.parse(readFileSync(resolve(root, referencePath), "utf8"));
+  if (currentReference.public_metadata_digest === historicalReference.public_metadata_digest) {
+    for (const [path, historicalBytes] of historicalFixtureBytes) assert.deepEqual(readFileSync(resolve(root, path)), historicalBytes, `pre-R22 fixture path must retain historical bytes: ${path}`);
+  } else {
+    assert.equal(currentReference.evaluator_revision, "166ac26fbc58035ed00114e4035d202ace758433");
+    assert.notEqual(currentReference.evaluator_revision, historicalReference.evaluator_revision);
+    const frozenDiff = spawnSync("git", ["diff", "--name-only", reviewedHead, "HEAD", "--", ...frozenFixturePaths], { cwd: root, encoding: "utf8" });
+    assert.equal(frozenDiff.status, 0, frozenDiff.stderr || frozenDiff.stdout);
+    assert.deepEqual(frozenDiff.stdout.trim().split("\n").sort(), [...frozenFixturePaths].sort(), "R22 successor projection must replace all five current fixture authority paths");
+    const publicSummary = validateMnBuildOptionUpdatePublicFixture({ root });
+    const currentAdmission = JSON.parse(readFileSync(resolve(root, fixturePrefix, "final-admission-record.json"), "utf8"));
+    const currentReview = JSON.parse(readFileSync(resolve(root, fixturePrefix, "admission-review.json"), "utf8"));
+    const currentMetadata = JSON.parse(readFileSync(resolve(root, fixturePrefix, "metadata.json"), "utf8"));
+    assert.equal(currentAdmission.admission_status, "admission_pending");
+    assert.equal(currentReview.reviewer_status, "pending_independent_review");
+    assert.equal(currentReview.admission_status, "admission_pending");
+    assert.equal(currentMetadata.measured_execution_performed, false);
+    assert.equal(publicSummary.reviewStatus, "pending_independent_review");
+    assert.equal(publicSummary.scoringReady, false);
+  }
   const sourceDiff = spawnSync("git", ["diff", "--name-only", "origin/main", "--", ...historicalSourcePaths], { cwd: root, encoding: "utf8" });
   assert.equal(sourceDiff.status, 0, sourceDiff.stderr || sourceDiff.stdout);
   assert.notEqual(sourceDiff.stdout.trim(), "", "the post-PR #238 evaluator source must require R22 instead of claiming R21 reuse");
