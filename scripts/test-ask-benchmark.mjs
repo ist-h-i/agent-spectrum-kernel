@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { computePortfolioPlanId, validateAdaptiveSelectionRecord, validateBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { resolvePortfolioExecutionAdmission } from "./ask-benchmark-plan.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
@@ -116,7 +117,8 @@ assert.equal(portfolioPlan.randomization_seed.sha256, createHash("sha256").updat
 assert.match(portfolioPlan.plan_id, /^plan-[a-f0-9]{64}$/);
 run(["plan", "--config", portfolioConfig, "--output", portfolioPlanFromRecordedSeedPath, "--seed", portfolioPlan.randomization_seed.value]);
 assert.deepEqual(JSON.parse(readFileSync(portfolioPlanFromRecordedSeedPath, "utf8")), portfolioPlan);
-const expectedPortfolioCaseCount = portfolioRuntimeConfig.fixtures.reduce((sum, fixture) => sum + fixture.repetitions * portfolioRuntimeConfig.adapter_tracks.length * portfolioRuntimeConfig.conditions.length, 0);
+const executionEligibleFixtures = portfolioRuntimeConfig.fixtures.filter((fixture) => resolvePortfolioExecutionAdmission({ root, fixture }).execution_eligible);
+const expectedPortfolioCaseCount = executionEligibleFixtures.reduce((sum, fixture) => sum + fixture.repetitions * portfolioRuntimeConfig.adapter_tracks.length * portfolioRuntimeConfig.conditions.length, 0);
 assert.equal(portfolioPlan.cases.length, expectedPortfolioCaseCount);
 assert.deepEqual(new Set(portfolioPlan.adapter_tracks.map((entry) => entry.id)), new Set(["codex", "claude"]));
 assert.ok(portfolioPlan.adapter_tracks.every((entry) => entry.runtime_status === "unverified"));
@@ -125,7 +127,7 @@ assert.deepEqual(new Set(portfolioPlan.conditions), new Set(["plain", "kernel_on
 assert.equal(portfolioPlan.schema_path, "benchmarks/schemas/execution-plan.schema.json");
 assert.ok(portfolioPlan.cases.filter((entry) => !["mn-build-option-update", "mn-doc-config-correction"].includes(entry.fixture_id)).every((entry) => entry.suite === "calibration" && entry.aggregate_eligible === false));
 assert.ok(portfolioPlan.cases.filter((entry) => entry.fixture_id === "mn-build-option-update").every((entry) => entry.suite === "mechanism_negative" && entry.task_class === "configuration" && entry.aggregate_eligible === true));
-assert.ok(portfolioPlan.cases.filter((entry) => entry.fixture_id === "mn-doc-config-correction").every((entry) => entry.suite === "mechanism_negative" && entry.task_class === "documentation" && entry.aggregate_eligible === true));
+assert.equal(portfolioPlan.cases.filter((entry) => entry.fixture_id === "mn-doc-config-correction").length, 0, "admission-pending fixture must not enter the execution plan");
 assert.equal(new Set(portfolioPlan.cases.map((entry) => entry.case_id)).size, portfolioPlan.cases.length);
 
 const casesByBlock = groupBy(portfolioPlan.cases, (entry) => entry.block_id);
