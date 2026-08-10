@@ -59,6 +59,7 @@ import {
   computeScoringInputFreezeManifestDigest,
   computeResultProfileDigest,
   BINARY_SCOPE_VERIFICATION_PROFILE_NAME,
+  deriveBinaryScopeVerificationClassification,
   deriveVerificationEvidenceReferences,
   deriveEffectiveVerificationEvidenceReferences,
   deriveEffectiveVerificationEvidenceState,
@@ -127,6 +128,90 @@ function applyPersistentAuthorityMutation(value, label, mutate) {
   const beforeMutation = stableCanonicalJson(value);
   mutate(value);
   assert.notEqual(stableCanonicalJson(value), beforeMutation, `persistent authority tamper must modify input: ${label}`);
+}
+
+function appendSyntheticScopeDeviation(evaluatorResult) {
+  const deviation = {
+    finding_id: "synthetic-scope-deviation",
+    category: "unrelated_modification",
+    severity: "high",
+    evidence_references: [{ kind: "repository_diff", digest: `sha256:${"9".repeat(64)}`, bytes: 1 }],
+  };
+  const existing = structuredClone(evaluatorResult.scope_deviations);
+  assert.equal(existing.some(({ finding_id }) => finding_id === deviation.finding_id), false, "synthetic scope deviation ID must be fresh");
+  evaluatorResult.scope_deviations = [...evaluatorResult.scope_deviations, deviation];
+  assert.deepEqual(evaluatorResult.scope_deviations.slice(0, -1), existing, "synthetic scope mutation must preserve existing scope deviations");
+  return deviation;
+}
+
+function scopeAuthoritySnapshot(evaluatorResult) {
+  return {
+    scopeDeviations: structuredClone(evaluatorResult.scope_deviations),
+    findingIds: Object.fromEntries(evaluatorResult.requirement_results.map(({ requirement_id, finding_ids }) => [requirement_id, [...finding_ids]])),
+    scopeReferences: Object.fromEntries(evaluatorResult.requirement_results.map(({ requirement_id, scope_deviation_references }) => [requirement_id, [...scope_deviation_references]])),
+  };
+}
+
+function assertExistingScopeAuthorityPreserved(evaluatorResult, before) {
+  assert.deepEqual(evaluatorResult.scope_deviations.slice(0, before.scopeDeviations.length), before.scopeDeviations, "scope mutation must preserve existing deviations");
+  for (const result of evaluatorResult.requirement_results) {
+    assert.deepEqual(result.finding_ids, before.findingIds[result.requirement_id], `scope mutation must preserve ${result.requirement_id} finding IDs`);
+    for (const reference of before.scopeReferences[result.requirement_id]) {
+      assert.equal(result.scope_deviation_references.includes(reference), true, `scope mutation must preserve ${result.requirement_id} scope reference ${reference}`);
+    }
+  }
+}
+
+function mutateMissingScopeDeviationReference(evaluatorResult) {
+  const before = scopeAuthoritySnapshot(evaluatorResult);
+  appendSyntheticScopeDeviation(evaluatorResult);
+  const boundary = evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary");
+  boundary.outcome = "fail";
+  boundary.earned_points = 0;
+  boundary.matched_equivalence_class_ids = [];
+  boundary.scope_deviation_references = [...before.scopeReferences[boundary.requirement_id]];
+  evaluatorResult.classification = deriveBinaryScopeVerificationClassification({ evaluatorResult });
+  assertExistingScopeAuthorityPreserved(evaluatorResult, before);
+}
+
+function mutateExcessScopeDeviationReference(evaluatorResult) {
+  const before = scopeAuthoritySnapshot(evaluatorResult);
+  const deviation = appendSyntheticScopeDeviation(evaluatorResult);
+  const allScopeIds = evaluatorResult.scope_deviations.map(({ finding_id }) => finding_id);
+  const boundary = evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary");
+  boundary.outcome = "fail";
+  boundary.earned_points = 0;
+  boundary.matched_equivalence_class_ids = [];
+  boundary.scope_deviation_references = allScopeIds;
+  const configuration = evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "configuration-contract");
+  configuration.scope_deviation_references = [...configuration.scope_deviation_references, deviation.finding_id];
+  evaluatorResult.classification = deriveBinaryScopeVerificationClassification({ evaluatorResult });
+  assertExistingScopeAuthorityPreserved(evaluatorResult, before);
+}
+
+function mutateUnknownScopeDeviationReference(evaluatorResult) {
+  const before = scopeAuthoritySnapshot(evaluatorResult);
+  const unknownFindingId = "unknown-scope-deviation";
+  assert.equal(evaluatorResult.scope_deviations.some(({ finding_id }) => finding_id === unknownFindingId), false, "unknown scope deviation ID must remain outside authority");
+  const boundary = evaluatorResult.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary");
+  boundary.scope_deviation_references = [...boundary.scope_deviation_references, unknownFindingId];
+  assert.deepEqual(evaluatorResult.scope_deviations, before.scopeDeviations, "unknown scope mutation must preserve the scope-deviation inventory");
+  assertExistingScopeAuthorityPreserved(evaluatorResult, before);
+}
+
+function assertScopeDeviationNegativeBaselines(baselines) {
+  const cases = [
+    ["missing", mutateMissingScopeDeviationReference, /failing change-boundary result must reference every scope deviation/u],
+    ["excess", mutateExcessScopeDeviationReference, /configuration-contract must not carry scope-deviation references/u],
+    ["unknown", mutateUnknownScopeDeviationReference, /requirement result scope-deviation reference does not close within the evaluator envelope/u],
+  ];
+  for (const [baseline, scoring] of Object.entries(baselines)) {
+    for (const [label, mutate, pattern] of cases) {
+      const changed = structuredClone(scoring);
+      mutate(changed.evaluatorResult);
+      assert.throws(() => validateScoringInputBindings(changed), pattern, `${baseline} baseline must isolate the ${label} scope-deviation boundary`);
+    }
+  }
 }
 
 function runPersistentMutationRegressions() {
@@ -1747,13 +1832,13 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     for (const property of Object.keys(fakeExecutorCalls)) assert.equal(fakeExecutorCalls[property], 0, `production verifier must not invoke caller-supplied ${property}`);
   }
   const originalResultBytes = readFileSync(chain.evaluatorResultPath);
-  const expectPersistentFailure = (label, mutate, pattern) => {
+  const expectPersistentFailure = (label, mutate, pattern, { allowAdapterOutput = true } = {}) => {
     const changed = JSON.parse(originalResultBytes.toString("utf8"));
     applyPersistentAuthorityMutation(changed, label, mutate);
     changed.evaluation_id = computeEvaluationId(changed);
     changed.evaluation_digest = computeEvaluationDigest(changed);
     writeJson(chain.evaluatorResultPath, changed);
-    const authorityPattern = new RegExp(`${pattern.source}|authority-owned adapter output`, pattern.flags);
+    const authorityPattern = allowAdapterOutput ? new RegExp(`${pattern.source}|authority-owned adapter output`, pattern.flags) : pattern;
     assert.throws(() => verifyEvaluatorBoundary(common), authorityPattern, `persistent authority tamper: ${label}`);
     writeFileSync(chain.evaluatorResultPath, originalResultBytes);
     assert.deepEqual(chain.snapshot(), before, `persistent authority tamper must restore ${label}`);
@@ -1777,22 +1862,9 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   expectPersistentFailure("requirement omission", (changed) => { changed.requirement_results.pop(); }, /requirement|exactly cover|binary result|verification-evidence|authority-owned adapter output/u);
   expectPersistentFailure("requirement addition", (changed) => { changed.requirement_results.push({ ...structuredClone(changed.requirement_results[0]), requirement_id: "added-requirement" }); }, /requirement|unknown|exactly cover|authority-owned adapter output/u);
   expectPersistentFailure("requirement duplicate", (changed) => { changed.requirement_results.push(structuredClone(changed.requirement_results[0])); }, /requirement|unique|exactly cover|authority-owned adapter output/u);
-  const scopeDeviation = { finding_id: "synthetic-scope-deviation", category: "unrelated_modification", severity: "high", evidence_references: [{ kind: "repository_diff", digest: `sha256:${"9".repeat(64)}`, bytes: 1 }] };
-  expectPersistentFailure("scope deviation reference missing", (changed) => {
-    changed.scope_deviations = [scopeDeviation];
-    const boundary = changed.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary");
-    boundary.outcome = "fail"; boundary.earned_points = 0; boundary.matched_equivalence_class_ids = []; boundary.scope_deviation_references = [];
-    changed.classification = "over_processing";
-  }, /scope|classification|authority-owned adapter output/u);
-  expectPersistentFailure("scope deviation reference excess", (changed) => {
-    changed.scope_deviations = [scopeDeviation];
-    changed.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary").scope_deviation_references = [scopeDeviation.finding_id];
-  }, /scope|classification|authority-owned adapter output/u);
-  expectPersistentFailure("scope deviation reference unknown", (changed) => {
-    const boundary = changed.requirement_results.find(({ requirement_id }) => requirement_id === "change-boundary");
-    boundary.outcome = "fail"; boundary.earned_points = 0; boundary.matched_equivalence_class_ids = []; boundary.scope_deviation_references = ["unknown-scope-deviation"];
-    changed.classification = "over_processing";
-  }, /scope|unknown|authority-owned adapter output/u);
+  expectPersistentFailure("scope deviation reference missing", mutateMissingScopeDeviationReference, /failing change-boundary result must reference every scope deviation/u, { allowAdapterOutput: false });
+  expectPersistentFailure("scope deviation reference excess", mutateExcessScopeDeviationReference, /configuration-contract must not carry scope-deviation references/u, { allowAdapterOutput: false });
+  expectPersistentFailure("scope deviation reference unknown", mutateUnknownScopeDeviationReference, /requirement result scope-deviation reference does not close within the evaluator envelope/u, { allowAdapterOutput: false });
   if (state === "invalid") {
     expectPersistentFailure("invalid-input authority layer drift", (changed) => { changed.invalid_input_authority.layer = "evaluator_source"; }, /invalid|layer|authority-owned adapter output/u);
     expectPersistentFailure("invalid-input authority category drift", (changed) => { changed.invalid_input_authority.category = "source_graph_drift"; }, /invalid|category|authority-owned adapter output/u);
@@ -3358,6 +3430,12 @@ try {
   invalidVerificationRequirement.evidence_references = [invalidAuthorityReference];
   invalidVerificationRequirement.verification_evidence_references = [invalidAuthorityReference];
   assert.equal(validateScoringInputBindings(invalidEvidenceResult).scoringReady, false, "invalid evidence classification must rederive fail-closed");
+  assertScopeDeviationNegativeBaselines({
+    correct_narrow: scoring,
+    existing_over_processing: overProcessedResult,
+    under_processing: underProcessedResult,
+    invalid_evidence: invalidEvidenceResult,
+  });
   for (const [label, mutate] of [
     ["invalid-input layer drift", (changed) => { changed.evaluatorResult.invalid_input_authority.layer = "evaluator_source"; }],
     ["invalid-input category drift", (changed) => { changed.evaluatorResult.invalid_input_authority.category = "normalized_result_authority_failure"; }],
