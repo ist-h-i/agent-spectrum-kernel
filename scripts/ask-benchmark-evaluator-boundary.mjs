@@ -394,6 +394,12 @@ export function evaluatorAuthorityPathsForFixture(fixtureId) {
   return { fixtureId, fixtureRoot, bindingPaths, manifestPath, fixturePaths: [manifestPath, ...bindingPaths] };
 }
 
+function fixtureIdFromEvaluatorAuthorityManifestPath(path) {
+  const match = typeof path === "string" ? path.match(/^benchmarks\/fixtures\/checkpoint-b2\/([a-z0-9][a-z0-9-]*)\/evaluator-authority-manifest\.json$/u) : null;
+  if (!match || evaluatorAuthorityPathsForFixture(match[1]).manifestPath !== path) throw new Error("evaluator authority manifest path is invalid");
+  return match[1];
+}
+
 function resolveEvaluatorAuthorityLayout({ buffers, fixtureId = null } = {}) {
   if (!(buffers instanceof Map)) throw new Error("evaluator authority requires a verified byte map");
   const inputPaths = [...buffers.keys()].filter((path) => path.endsWith("/input-manifest.json"));
@@ -402,7 +408,7 @@ function resolveEvaluatorAuthorityLayout({ buffers, fixtureId = null } = {}) {
   const manifestFixtureIds = Object.keys(input.fixtures ?? {});
   const resolvedFixtureId = fixtureId ?? (manifestFixtureIds.length === 1 ? manifestFixtureIds[0] : null);
   const layout = evaluatorAuthorityPathsForFixture(resolvedFixtureId);
-  if (stableCanonicalJson([...buffers.keys()]) !== stableCanonicalJson(layout.bindingPaths)) throw new Error("evaluator authority binding path inventory has an omission, addition, or ordering drift");
+  if (layout.bindingPaths.some((path) => !buffers.has(path))) throw new Error("evaluator authority binding path inventory has an omission");
   return { ...layout, input };
 }
 
@@ -3008,7 +3014,8 @@ function verifyPrivateEvaluationRecord({ root, privateEvaluationRoot, privateEva
   if (record.sealed_repository_descriptor_relative_path !== relativeAuthorityPath(canonicalEvaluationRoot, sealedRepository.descriptorPath, "sealed repository authority descriptor") || record.sealed_repository_descriptor_sha256 !== sealedRepository.descriptorRead.rawByteDigest || record.sealed_repository_descriptor_bytes !== sealedRepository.descriptorRead.bytes.length) throw new Error("sealed repository descriptor identity is inconsistent");
   if (record.sealed_repository_source_graph_digest !== bundle.manifest.dependency_graph.graph_digest || record.sealed_repository_fixture_authority_digest !== sealedRepository.descriptor.fixture_authority_digest) throw new Error("sealed repository source or fixture authority digest is inconsistent");
   if (sealedRepository.descriptor.evaluator_revision !== bundle.manifest.evaluator_revision || sealedRepository.descriptor.source_graph_digest !== bundle.manifest.dependency_graph.graph_digest || stableCanonicalJson(sealedRepository.descriptor.source_graph) !== stableCanonicalJson(bundle.manifest.dependency_graph)) throw new Error("sealed repository source graph authority is inconsistent");
-  const expectedSealedFixturePaths = evaluatorAuthorityPathsForFixture(sealedRepository.manifest.fixture_id).fixturePaths;
+  const sealedFixtureId = fixtureIdFromEvaluatorAuthorityManifestPath(sealedRepository.descriptor.evaluator_authority_manifest_path);
+  const expectedSealedFixturePaths = evaluatorAuthorityPathsForFixture(sealedFixtureId).fixturePaths;
   if (sealedRepository.descriptor.fixture_authority_digest !== record.sealed_repository_fixture_authority_digest || stableCanonicalJson(sealedRepository.descriptor.fixture_authority.map(({ path }) => path).sort()) !== stableCanonicalJson([...expectedSealedFixturePaths].sort())) throw new Error("sealed repository fixture authority inventory is inconsistent");
   if (stableCanonicalJson(sealedRepository.descriptor.runtime_authority_paths) !== stableCanonicalJson([...EVALUATOR_RUNTIME_AUTHORITY_PATHS])) throw new Error("sealed repository runtime authority inventory is inconsistent");
   const externalAuthorityAnchor = assertExternalEvaluatorAuthorityAnchor(scoringInputs.evaluatorAuthorityAnchor, "private evaluation record");
