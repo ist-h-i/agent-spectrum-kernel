@@ -139,9 +139,14 @@ function assertExact(left, right, label) {
 
 function buildEvidenceMap() {
   const scopeBase = {
-    allowed_candidate_paths: ["workspace/docs/worker-retries.md"],
+    allowed_candidate_paths: ["workspace/docs/worker-retries.md#json-block"],
     required_candidate_paths: ["workspace/docs/worker-retries.md"],
     protected_candidate_paths: ["workspace/config/retry-policy.json", "workspace/package.json", "workspace/test/worker-retries.test.mjs"],
+    target_file_type: "regular",
+    target_mode: "frozen",
+    target_outside_json_block_bytes: "frozen",
+    equivalent_json_formatting: ["property_order", "indentation", "insignificant_whitespace"],
+    scope_states: ["scope_pass", "required_change_missing", "unrelated_content_change", "unrelated_path_change", "target_mode_change", "protected_path_change", "unmanaged_addition", "unmanaged_deletion"],
     unmanaged_additions: "forbidden",
     unmanaged_deletions: "forbidden",
   };
@@ -164,7 +169,7 @@ function buildEvidenceMap() {
 
 function buildEquivalenceAsset() {
   const rules = [
-    { equivalence_class_id: "observable-documentation-contract", requirement_id: "documentation-correctness", match_basis: ["parsed_json_value", "observable_behavior"], property_order_only: false },
+    { equivalence_class_id: "observable-documentation-contract", requirement_id: "documentation-correctness", match_basis: ["parsed_json_value", "property_order", "indentation", "insignificant_whitespace", "observable_behavior"], property_order_only: false },
     { equivalence_class_id: "equivalent-focused-change", requirement_id: "request-scope-discipline", match_basis: ["changed_path_set", "observable_behavior"], property_order_only: false },
     { equivalence_class_id: "equivalent-focused-verification", requirement_id: "verification-evidence", match_basis: ["repository_command_evidence", "observable_behavior"], property_order_only: false },
   ].map((rule) => ({ ...rule, rule_digest: canonicalDigest(rule) }));

@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   FIXTURE_ROOT_RELATIVE,
   validateActualPrivateEvaluator,
@@ -138,6 +138,28 @@ function treeSnapshot(path) {
   };
   visit(path);
   return inventory;
+}
+
+function privateFragmentProjection(fragment) {
+  return {
+    classification: fragment.classification,
+    scoring_ready: fragment.scoring_ready,
+    requirement_results: fragment.requirement_results.map((result) => [
+      result.requirement_id,
+      result.outcome,
+      result.finding_ids,
+      result.scope_deviation_references,
+      result.verification_evidence_state ?? null,
+    ]),
+    findings: fragment.findings.map(({ finding_id, category, severity }) => [finding_id, category, severity]),
+    scope_deviations: fragment.scope_deviations.map(({ finding_id, category, severity }) => [finding_id, category, severity]),
+    observations: {
+      verification_correctness: fragment.verification_correctness.state,
+      evidence_correctness: fragment.evidence_correctness.state,
+      under_processing: fragment.under_processing.state,
+      over_processing: fragment.over_processing.state,
+    },
+  };
 }
 
 const REVIEW_PROJECTION_FIELDS = Object.freeze([
@@ -617,6 +639,7 @@ try {
     const privateRoot = resolve(process.argv[privateRootIndex + 1]);
     const caseRoot = resolve(process.argv[caseRootIndex + 1]);
     const productionBoundaries = boundaryRoots("actual-private");
+    const expectations = readJson(resolve(caseRoot, "expectations.json"));
     if (productionAuthority) {
       const requirementRecord = readJson(resolve(fixtureRoot, "requirement-record.json"));
       const admissionRecord = readJson(resolve(fixtureRoot, "final-admission-record.json"));
@@ -795,6 +818,32 @@ try {
       assert.equal(sealedResult.firstFragment.classification, "correct_narrow_execution");
       validatePrivateEvaluatorFragment({ root, fragment: sealedResult.firstFragment, scoringPolicy: readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json")), requirementRecord, normalizedResult: normalized });
 
+      for (const entry of [
+        { name: "executed-failure", expected_projection: "failed_verification", event: { command_id: "worker-retry-doc-test", digest: `sha256:${"4".repeat(64)}`, bytes: 64, outcome: "failed", exit_code: 1, match_state: "matched" }, evidence_level: "complete" },
+        { name: "missing", expected_projection: "missing_verification", event: null, evidence_level: "partial" },
+      ]) {
+        const lineage = { run_instance_id: entry.name === "missing" ? "24124124-1241-4241-8241-241241241243" : "24124124-1241-4241-8241-241241241242", case_id: entry.name === "missing" ? "case-2412412412412412-4242424242424244" : "case-2412412412412412-4242424242424243", attempt: "0001" };
+        const commandEvidence = { capture_support: "supported", evidence_level: entry.evidence_level, required_command_ids: ["worker-retry-doc-test"], required_alternative_groups: [], references: entry.event ? [entry.event] : [], cwd_unverified_command_count: 0 };
+        const typedNormalized = { normalized_result_digest: entry.name === "missing" ? `sha256:${"6".repeat(64)}` : `sha256:${"5".repeat(64)}`, lineage, command_evidence: commandEvidence };
+        const typedExecution = createSealedEvaluatorExecutionForTest({
+          root,
+          privateEvaluationRoot: sealedAuthorityRoot,
+          privateRoot,
+          hiddenAsset,
+          frozenWorkspace: resolve(caseRoot, "frozen"),
+          candidateWorkspace: resolve(caseRoot, "correct"),
+          evaluationInputRoot,
+          evaluationLineage: lineage,
+          evaluatorRevision: reference.evaluator_revision,
+          externalAuthorityAnchor,
+          executionDirectoryName: `sealed-pre-review-${entry.name}`,
+          label: `mn-doc sealed ${entry.name} evaluator`,
+        });
+        const typedResult = executeSealedEvaluatorForTest({ execution: typedExecution, externalAuthorityAnchor, repositoryRoot: root, normalized: typedNormalized, label: `mn-doc sealed ${entry.name} evaluator` });
+        validatePrivateEvaluatorFragment({ root, fragment: typedResult.firstFragment, scoringPolicy: readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json")), requirementRecord, normalizedResult: typedNormalized });
+        assert.deepEqual(privateFragmentProjection(typedResult.firstFragment), expectations.fragment_projections[entry.expected_projection], `sealed ${entry.name} command evidence`);
+      }
+
       if (process.argv.includes("--verify-production-regeneration")) {
         const regenerationBefore = {
           public: treeSnapshot(fixtureRoot),
@@ -816,18 +865,46 @@ try {
         }, regenerationBefore, "exact production regeneration must preserve public bytes, private inventory, digests, and git diff");
       }
     }
-    const expectations = readJson(resolve(caseRoot, "expectations.json"));
+    const privateRequirementAuthority = new Map(readJson(resolve(fixtureRoot, "requirement-record.json")).requirements.map((requirement) => [requirement.requirement_id, requirement]));
+    assert.equal(expectations.cases.length, 15, "private authority must cover the exact 15-case review inventory");
     for (const entry of expectations.cases) {
       const fragment = await validateActualPrivateEvaluator({
         root,
         privateRoot,
         boundaryRoots: productionBoundaries,
-        frozenWorkspace: resolve(caseRoot, entry.frozen_workspace),
+        frozenWorkspace: resolve(caseRoot, entry.frozen_workspace ?? expectations.frozen_workspace),
         candidateWorkspace: resolve(caseRoot, entry.candidate_workspace),
-        verificationExecuted: entry.verification_executed,
-        investigatedPaths: entry.investigated_paths,
+        verificationState: entry.verification_state,
+        investigatedPaths: entry.investigated_paths ?? [],
       });
-      assert.equal(fragment.classification, entry.expected_classification, `actual private case ${entry.case_id}`);
+      for (const result of fragment.requirement_results) {
+        const authority = privateRequirementAuthority.get(result.requirement_id);
+        assert.ok(authority, `actual private case ${entry.case_id} returned an unknown requirement`);
+        assert.equal(result.earned_points, result.outcome === "pass" ? authority.max_points : 0, `actual private case ${entry.case_id} requirement points`);
+        assert.deepEqual(result.matched_equivalence_class_ids, result.outcome === "pass" ? authority.equivalence_class_ids : [], `actual private case ${entry.case_id} equivalence identity`);
+      }
+      assert.deepEqual(privateFragmentProjection(fragment), expectations.fragment_projections[entry.expected_projection], `actual private case ${entry.case_id}`);
+    }
+    const totalityEvaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?totality=${Date.now()}`);
+    for (const entry of expectations.totality_cases) {
+      const candidate = resolve(work, `totality-${entry.state}`);
+      cpSync(resolve(caseRoot, "correct"), candidate, { recursive: true });
+      const target = resolve(candidate, "docs/worker-retries.md");
+      if (entry.state === "symlink") {
+        rmSync(target);
+        symlinkSync(resolve(candidate, "config/retry-policy.json"), target);
+      } else if (entry.state === "non_regular") {
+        rmSync(target);
+        execFileSync("mkfifo", [target]);
+      } else if (entry.state === "unreadable") chmodSync(target, 0o000);
+      else if (entry.state === "json_block_missing") writeFileSync(target, "# Worker retry policy\n\nNo example is present.\n");
+      const fragment = await totalityEvaluator.evaluateCandidate({ frozenWorkspace: resolve(caseRoot, "frozen"), candidateWorkspace: candidate, verificationState: "executed_success", investigatedPaths: [] });
+      assertBenchmarkSchemaInstance(fragment, { schemaPath: resolve(root, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `total candidate state ${entry.state}` });
+      assert.equal(fragment.classification, "under_processing", `${entry.state} must be a candidate-quality result`);
+      assert.equal(fragment.scoring_ready, false, `${entry.state} must stay non-scoring`);
+      assert.deepEqual(fragment.scope_deviations, [], `${entry.state} must not create a false scope-expansion finding`);
+      assert.deepEqual(fragment.requirement_results.slice(0, 2).map(({ outcome }) => outcome), ["fail", "fail"], `${entry.state} must fail documentation correctness and scope`);
+      assert.deepEqual(fragment.findings.slice(0, 2).map(({ finding_id, category }) => [finding_id, category]), entry.expected_findings, `${entry.state} candidate finding authority`);
     }
     privateValidation = "pass";
   }

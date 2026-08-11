@@ -242,7 +242,7 @@ export function validateMnDocConfigCorrectionPublicFixture({ root = ROOT } = {})
   return { fixtureId: FIXTURE_ID, inputDigest: sha256(inputBytes), candidateDigest: artifacts["source-freeze-candidate.json"].candidate_digest, reviewStatus: "pending_independent_review", scoringReady: false };
 }
 
-export async function validateActualPrivateEvaluator({ root = ROOT, privateRoot, boundaryRoots, frozenWorkspace, candidateWorkspace, verificationExecuted = true, investigatedPaths = [] }) {
+export async function validateActualPrivateEvaluator({ root = ROOT, privateRoot, boundaryRoots, frozenWorkspace, candidateWorkspace, verificationState = "executed_success", investigatedPaths = [] }) {
   const repository = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
   if (privateDirectory === repository || privateDirectory.startsWith(`${repository}${sep}`)) throw new Error("private evaluator root must stay outside the repository");
@@ -252,7 +252,7 @@ export async function validateActualPrivateEvaluator({ root = ROOT, privateRoot,
   const hidden = manifest.asset_inventory.find(({ role }) => role === "hidden_tests");
   const module = await import(`${pathToFileURL(resolve(privateDirectory, hidden.path)).href}?digest=${hidden.sha256}`);
   if (typeof module.evaluateCandidate !== "function") throw new Error("private hidden evaluator entry point is missing");
-  const options = { frozenWorkspace: realpathSync(frozenWorkspace), candidateWorkspace: realpathSync(candidateWorkspace), verificationExecuted, investigatedPaths };
+  const options = { frozenWorkspace: realpathSync(frozenWorkspace), candidateWorkspace: realpathSync(candidateWorkspace), verificationState, investigatedPaths };
   const first = await module.evaluateCandidate(options);
   const second = await module.evaluateCandidate(options);
   if (stableCanonicalJson(first) !== stableCanonicalJson(second)) throw new Error("private hidden evaluator is not deterministic");
