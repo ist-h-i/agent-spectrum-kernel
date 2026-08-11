@@ -2939,6 +2939,8 @@ function assertCoreInstallerScripts() {
     throw new Error("kernel installer should project the canonical signal registry");
   }
 
+  assertExecutionEnvelopeSchemaProjection({ installer, freshTarget });
+
   const beforeRerunAgents = readFileSync(resolve(freshTarget, "AGENTS.md"), "utf8");
   const beforeRerunState = readFileSync(resolve(freshTarget, ".agent-spectrum-kernel/install-state.json"), "utf8");
   assertRuntimePass("kernel installer rerun", runRepoScript([installer, "--target", freshTarget]));
@@ -3093,6 +3095,169 @@ function assertCoreInstallerScripts() {
   );
   if (existsSync(resolve(overwriteTarget, ".agent-spectrum-kernel/install-state.json"))) {
     throw new Error("kernel installer no-overwrite failure should not write state");
+  }
+}
+
+function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
+  const schemaPath = "schemas/execution-envelope.schema.json";
+  const statePath = ".agent-spectrum-kernel/install-state.json";
+  const canonicalBytes = readFileSync(resolve(repoRoot, schemaPath), "utf8");
+  const canonicalDigest = hashText(canonicalBytes);
+  const projectedPath = resolve(freshTarget, schemaPath);
+  const freshStatePath = resolve(freshTarget, statePath);
+  const freshState = JSON.parse(readFileSync(freshStatePath, "utf8"));
+  const schemaRecord = freshState.managed_files?.[schemaPath];
+
+  if (
+    !existsSync(projectedPath) ||
+    readFileSync(projectedPath, "utf8") !== canonicalBytes ||
+    schemaRecord?.kind !== "immutable_contract" ||
+    schemaRecord?.asset !== schemaPath ||
+    schemaRecord?.sha256 !== canonicalDigest ||
+    schemaRecord?.canonical_sha256 !== canonicalDigest
+  ) {
+    throw new Error("fresh core installation must project and exactly identify the canonical Execution Envelope schema");
+  }
+  const canonicalExample = inspectExecutionEnvelope(readFileSync(resolve(freshTarget, "docs/execution-envelope-contract.md"), "utf8"), {
+    schemaPath: projectedPath,
+  });
+  if (canonicalExample.status !== "parsed") {
+    throw new Error(`projected Execution Envelope schema must validate the canonical contract example\n${canonicalExample.errors.join("\n")}`);
+  }
+  assertRuntimePass("kernel installer Execution Envelope schema check", runRepoScript([installer, "--target", freshTarget, "--check"]));
+
+  rmSync(projectedPath);
+  assertRuntimeFail(
+    "kernel installer check missing Execution Envelope schema",
+    runRepoScript([installer, "--target", freshTarget, "--check"]),
+    "core immutable contract is missing",
+  );
+  assertRuntimePass("kernel installer update repairs missing Execution Envelope schema", runRepoScript([installer, "--target", freshTarget]));
+
+  writeFileSync(projectedPath, "{\"schema_version\":\"drifted\"}\n");
+  assertRuntimeFail(
+    "kernel installer check drifted Execution Envelope schema",
+    runRepoScript([installer, "--target", freshTarget, "--check"]),
+    "core immutable contract bytes do not match install state",
+  );
+  assertRuntimeFail(
+    "kernel installer update preserves drifted Execution Envelope schema",
+    runRepoScript([installer, "--target", freshTarget]),
+    "managed file conflict",
+  );
+  assertRuntimePass("kernel installer force repairs drifted Execution Envelope schema", runRepoScript([installer, "--target", freshTarget, "--force"]));
+
+  const staleDigestState = JSON.parse(readFileSync(freshStatePath, "utf8"));
+  staleDigestState.managed_files[schemaPath].sha256 = "0".repeat(64);
+  writeFileSync(freshStatePath, `${JSON.stringify(staleDigestState, null, 2)}\n`);
+  assertRuntimeFail(
+    "kernel installer check stale Execution Envelope schema digest",
+    runRepoScript([installer, "--target", freshTarget, "--check"]),
+    "core immutable contract state digest mismatch",
+  );
+  assertRuntimePass("kernel installer update repairs stale Execution Envelope schema digest", runRepoScript([installer, "--target", freshTarget]));
+
+  const omittedSchemaState = JSON.parse(readFileSync(freshStatePath, "utf8"));
+  delete omittedSchemaState.managed_files[schemaPath];
+  writeFileSync(freshStatePath, `${JSON.stringify(omittedSchemaState, null, 2)}\n`);
+  assertRuntimeFail(
+    "kernel installer check omitted Execution Envelope schema state",
+    runRepoScript([installer, "--target", freshTarget, "--check"]),
+    "core immutable contract ownership mismatch",
+  );
+  assertRuntimePass("kernel installer update restores omitted Execution Envelope schema state", runRepoScript([installer, "--target", freshTarget]));
+
+  const ownershipMismatchState = JSON.parse(readFileSync(freshStatePath, "utf8"));
+  ownershipMismatchState.managed_files[schemaPath].kind = "project_file";
+  writeFileSync(freshStatePath, `${JSON.stringify(ownershipMismatchState, null, 2)}\n`);
+  assertRuntimeFail(
+    "kernel installer check Execution Envelope schema ownership mismatch",
+    runRepoScript([installer, "--target", freshTarget, "--check"]),
+    "core immutable contract ownership mismatch",
+  );
+  assertRuntimePass("kernel installer update repairs Execution Envelope schema ownership state", runRepoScript([installer, "--target", freshTarget]));
+
+  const rollbackTarget = resolve(fixtureRoot, "kernel-execution-envelope-schema-rollback");
+  assertRuntimePass("kernel schema legacy core setup", runRepoScript([installer, "--target", rollbackTarget]));
+  const rollbackStatePath = resolve(rollbackTarget, statePath);
+  const legacyState = JSON.parse(readFileSync(rollbackStatePath, "utf8"));
+  delete legacyState.managed_files[schemaPath];
+  writeFileSync(rollbackStatePath, `${JSON.stringify(legacyState, null, 2)}\n`);
+  rmSync(resolve(rollbackTarget, schemaPath));
+  assertRuntimePass("kernel schema update from legacy state", runRepoScript([installer, "--target", rollbackTarget]));
+  assertRuntimePass("kernel schema rollback to legacy state", runRepoScript([installer, "--target", rollbackTarget, "--rollback"]));
+  if (existsSync(resolve(rollbackTarget, schemaPath))) {
+    throw new Error("kernel rollback must remove a newly managed Execution Envelope schema absent from the previous state");
+  }
+
+  const detachTarget = resolve(fixtureRoot, "kernel-execution-envelope-schema-detach");
+  assertRuntimePass("kernel schema detach setup", runRepoScript([installer, "--target", detachTarget]));
+  assertRuntimePass("kernel schema detach", runRepoScript([installer, "--target", detachTarget, "--detach"]));
+  if (existsSync(resolve(detachTarget, schemaPath))) {
+    throw new Error("kernel detach must remove the ASK-managed Execution Envelope schema");
+  }
+
+  const detachConflictTarget = resolve(fixtureRoot, "kernel-execution-envelope-schema-detach-conflict");
+  assertRuntimePass("kernel schema detach conflict setup", runRepoScript([installer, "--target", detachConflictTarget]));
+  const detachConflictPath = resolve(detachConflictTarget, schemaPath);
+  writeFileSync(detachConflictPath, "{\"project_owned\":true}\n");
+  assertRuntimeFail(
+    "kernel schema detach preserves drifted project content",
+    runRepoScript([installer, "--target", detachConflictTarget, "--detach"]),
+    "modified managed file; refusing to prune/delete",
+  );
+  if (readFileSync(detachConflictPath, "utf8") !== "{\"project_owned\":true}\n") {
+    throw new Error("kernel detach must not delete a project-modified Execution Envelope schema");
+  }
+
+  const projectOwnedTarget = resolve(fixtureRoot, "kernel-execution-envelope-schema-project-owned");
+  mkdirSync(resolve(projectOwnedTarget, "schemas"), { recursive: true });
+  const projectOwnedBytes = "{\"project_owned\":true}\n";
+  writeFileSync(resolve(projectOwnedTarget, schemaPath), projectOwnedBytes);
+  assertRuntimeFail(
+    "kernel schema project-owned conflict",
+    runRepoScript([installer, "--target", projectOwnedTarget]),
+    "unmanaged target file would be overwritten",
+  );
+  if (
+    readFileSync(resolve(projectOwnedTarget, schemaPath), "utf8") !== projectOwnedBytes ||
+    existsSync(resolve(projectOwnedTarget, statePath))
+  ) {
+    throw new Error("kernel install must preserve a project-owned Execution Envelope schema and avoid partial state");
+  }
+
+  for (const [label, adapter] of [
+    ["Codex", resolve(repoRoot, "scripts/install-codex-adapter.mjs")],
+    ["Claude", resolve(repoRoot, "scripts/install-claude-adapter.mjs")],
+  ]) {
+    const adapterTarget = resolve(fixtureRoot, `kernel-execution-envelope-schema-${label.toLowerCase()}`);
+    assertRuntimePass(`${label} schema core setup`, runRepoScript([installer, "--target", adapterTarget]));
+    assertRuntimePass(`${label} schema adapter install`, runRepoScript([adapter, "--target", adapterTarget]));
+    const canonicalPath = resolve(adapterTarget, schemaPath);
+    const runtimePath = resolve(adapterTarget, "scripts/execution-envelope.schema.json");
+    if (readFileSync(canonicalPath, "utf8") !== readFileSync(runtimePath, "utf8")) {
+      throw new Error(`${label} runtime Execution Envelope schema must be byte-identical to the core canonical projection`);
+    }
+    const runtimeSchema = JSON.parse(readFileSync(runtimePath, "utf8"));
+    runtimeSchema.properties.schema_version.const = "9.9.9";
+    writeFileSync(runtimePath, `${JSON.stringify(runtimeSchema, null, 2)}\n`);
+    assertRuntimeFail(
+      `${label} adapter rejects Execution Envelope runtime schema version drift`,
+      runRepoScript([adapter, "--target", adapterTarget, "--check"]),
+      "managed file conflict",
+    );
+    writeFileSync(runtimePath, canonicalBytes);
+    rmSync(canonicalPath);
+    assertRuntimeFail(
+      `${label} adapter rejects runtime-only Execution Envelope schema`,
+      runRepoScript([adapter, "--target", adapterTarget]),
+      "ASK core immutable contract is missing or stale: schemas/execution-envelope.schema.json",
+    );
+    assertRuntimeFail(
+      `${label} core check rejects runtime-only Execution Envelope schema`,
+      runRepoScript([installer, "--target", adapterTarget, "--check"]),
+      "core immutable contract is missing",
+    );
   }
 }
 

@@ -18,6 +18,7 @@ export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "docs/stack-implementation-overlay-contract.md",
   "schemas/adapter-runtime-event.schema.json",
   "schemas/compact-profile-control-map.json",
+  "schemas/execution-envelope.schema.json",
   "schemas/normalized-event-schema-registry.json",
 ]);
 

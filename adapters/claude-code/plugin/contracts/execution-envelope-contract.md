@@ -2,7 +2,7 @@
 
 The Execution Envelope is the shared control record for one meaningful workflow boundary. It keeps routing, evidence state, stopping conditions, and the next action together so chained skills do not repeat the same control metadata in every skill-specific artifact.
 
-This document is the human-readable source of truth. The machine-readable shape is mirrored by `schemas/execution-envelope.schema.json`; the schema does not replace the workflow rules in this document.
+This document is the human-readable source of truth. The machine-readable shape is mirrored by `schemas/execution-envelope.schema.json`; the schema does not replace the workflow rules in this document. The core installer projects that canonical schema as an ASK-managed immutable contract into adopting repositories. Adapter runtime copies are copied deterministically from the same canonical file and must remain byte-identical; they do not become independent schema sources.
 
 ## Ownership and emission boundary
 
