@@ -335,6 +335,18 @@ export function assertResolvedEffectiveAdmissionAuthority(value) {
   return value;
 }
 
+export function computeEffectiveAdmissionAuthorityDigest(value) {
+  return canonicalDigest(assertResolvedEffectiveAdmissionAuthority(value));
+}
+
+export function computeEffectiveAdmissionAuthoritySetDigest(values) {
+  if (!Array.isArray(values)) throw new Error("effective admission authority set must be an array");
+  const authorities = values.map((value) => assertResolvedEffectiveAdmissionAuthority(value));
+  const fixtureIds = authorities.map(({ fixture_id }) => fixture_id);
+  if (new Set(fixtureIds).size !== fixtureIds.length) throw new Error("effective admission authority set contains duplicate fixture identities");
+  return canonicalDigest([...authorities].sort((left, right) => left.fixture_id.localeCompare(right.fixture_id)));
+}
+
 export function resolveEffectiveAdmissionAuthorityFromFiles({
   root = DEFAULT_ROOT,
   decisionPath,

@@ -647,7 +647,7 @@
       "fixture_id": "mn-build-option-update",
       "fixture_root": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update",
       "runtime_config_path": "benchmarks/adaptive-portfolio.config.json",
-      "runtime_config_file_sha256": "f3c118e7e1729a64fea5e8097b05719f0c783294fc56d2482f7cc20d7ba37e76",
+      "runtime_config_file_sha256": "87fde970becbf6cfa59852fe116c0c2ba34701e6c00b8acdb53219a98612470d",
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json",
       "input_manifest_file_sha256": "9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
       "fixture_input_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",

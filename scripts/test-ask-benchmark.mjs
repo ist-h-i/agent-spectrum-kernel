@@ -115,6 +115,7 @@ assert.equal(portfolioPlan.randomization_seed.value, "portfolio-seed-2026");
 assert.match(portfolioPlan.randomization_seed.sha256, /^[a-f0-9]{64}$/);
 assert.equal(portfolioPlan.randomization_seed.sha256, createHash("sha256").update(portfolioPlan.randomization_seed.value).digest("hex"));
 assert.match(portfolioPlan.plan_id, /^plan-[a-f0-9]{64}$/);
+assert.match(portfolioPlan.execution_admission_authority_digest, /^sha256:[a-f0-9]{64}$/);
 run(["plan", "--config", portfolioConfig, "--output", portfolioPlanFromRecordedSeedPath, "--seed", portfolioPlan.randomization_seed.value]);
 assert.deepEqual(JSON.parse(readFileSync(portfolioPlanFromRecordedSeedPath, "utf8")), portfolioPlan);
 const executionEligibleFixtures = portfolioRuntimeConfig.fixtures.filter((fixture) => resolvePortfolioExecutionAdmission({ root, fixture }).execution_eligible);
@@ -231,6 +232,7 @@ const planIdentityInputs = {
   protocolSha256: portfolioPlan.protocol_sha256,
   repositoryRevision: portfolioPlan.repository_revision,
   seed: portfolioPlan.randomization_seed.value,
+  executionAdmissionAuthorityDigest: portfolioPlan.execution_admission_authority_digest,
 };
 assert.equal(computePortfolioPlanId(planIdentityInputs), portfolioPlan.plan_id);
 const differentHex = (value) => `${value[0] === "a" ? "b" : "a"}${value.slice(1)}`;
@@ -239,6 +241,7 @@ for (const changed of [
   { ...planIdentityInputs, protocolSha256: differentHex(planIdentityInputs.protocolSha256) },
   { ...planIdentityInputs, repositoryRevision: differentHex(planIdentityInputs.repositoryRevision) },
   { ...planIdentityInputs, seed: `${planIdentityInputs.seed}-changed` },
+  { ...planIdentityInputs, executionAdmissionAuthorityDigest: `sha256:${differentHex(planIdentityInputs.executionAdmissionAuthorityDigest.slice("sha256:".length))}` },
 ]) {
   assert.notEqual(computePortfolioPlanId(changed), portfolioPlan.plan_id);
 }

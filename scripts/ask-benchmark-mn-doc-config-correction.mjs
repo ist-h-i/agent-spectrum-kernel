@@ -13,7 +13,7 @@ import {
   validateVerificationCommandContract,
 } from "./ask-benchmark-command-evidence.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
-import { validateMnDocConfigCorrectionProductionAuthority } from "./ask-benchmark-mn-doc-config-correction-authority.mjs";
+import { validateMnDocConfigCorrectionProductionAuthority, writeMnDocConfigCorrectionProductionAuthority } from "./ask-benchmark-mn-doc-config-correction-authority.mjs";
 
 export const FIXTURE_ID = "mn-doc-config-correction";
 export const FIXTURE_ROOT_RELATIVE = `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`;
@@ -193,6 +193,7 @@ function buildArtifacts(root = ROOT) {
 
 export function writeMnDocConfigCorrectionArtifacts({ root = ROOT } = {}) {
   const fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
+  if (existsSync(resolve(fixtureRoot, "evaluator-reference.json"))) throw new Error("legacy mn-doc candidate write is prohibited after production evaluator authority exists; use explicit write-production with complete private authority inputs");
   const artifacts = buildArtifacts(root);
   for (const [name, value] of [
     ["input-manifest.json", artifacts.inputManifest], ["verification-command-contract.json", artifacts.verification], ["evidence-map.json", artifacts.evidenceMap], ["requirement-record.json", artifacts.requirementRecord], ["output-contract.json", artifacts.outputContract], ["metadata.json", artifacts.metadata], ["source-freeze-candidate.json", artifacts.candidate],
@@ -263,10 +264,17 @@ export async function validateActualPrivateEvaluator({ root = ROOT, privateRoot,
 }
 
 function parseArgs(argv) {
-  const args = { root: ROOT, write: false };
+  const args = { root: ROOT, command: "validate", privateRoot: null, evaluatorRevision: null, generationDate: null, boundaryRoots: {} };
   for (let index = 0; index < argv.length; index += 1) {
-    if (argv[index] === "write") args.write = true;
+    if (["write", "write-production"].includes(argv[index])) args.command = argv[index];
     else if (argv[index] === "--root") args.root = resolve(argv[++index]);
+    else if (argv[index] === "--private-root") args.privateRoot = resolve(argv[++index]);
+    else if (argv[index] === "--evaluator-revision") args.evaluatorRevision = argv[++index];
+    else if (argv[index] === "--generation-date") args.generationDate = argv[++index];
+    else if (argv[index] === "--materialized") args.boundaryRoots.materializedPath = resolve(argv[++index]);
+    else if (argv[index] === "--selection-state") args.boundaryRoots.selectionState = resolve(argv[++index]);
+    else if (argv[index] === "--run-dir") args.boundaryRoots.runDir = resolve(argv[++index]);
+    else if (argv[index] === "--normalized-results") args.boundaryRoots.normalizedResultsPath = resolve(argv[++index]);
     else throw new Error(`unknown argument: ${argv[index]}`);
   }
   return args;
@@ -274,6 +282,10 @@ function parseArgs(argv) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = parseArgs(process.argv.slice(2));
-  const summary = args.write ? writeMnDocConfigCorrectionArtifacts(args) : validateMnDocConfigCorrectionPublicFixture(args);
+  const summary = args.command === "write"
+    ? writeMnDocConfigCorrectionArtifacts(args)
+    : args.command === "write-production"
+      ? writeMnDocConfigCorrectionProductionAuthority(args)
+      : validateMnDocConfigCorrectionPublicFixture(args);
   console.log(JSON.stringify({ fixture_id: summary.fixtureId, input_digest: summary.inputDigest, source_freeze_candidate_digest: summary.candidateDigest, review_status: summary.reviewStatus, public_validation: "pass", scoring_ready: summary.scoringReady }));
 }

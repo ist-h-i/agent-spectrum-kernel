@@ -12,6 +12,12 @@ import {
   validateMnDocConfigCorrectionPublicFixture,
 } from "./ask-benchmark-mn-doc-config-correction.mjs";
 import {
+  computeAdmissionDecisionDigest,
+  computeAdmissionDecisionId,
+  computeAdmissionReviewAuthorityDigest,
+  computeAdmissionReviewAuthorityId,
+} from "./ask-benchmark-admission-decision.mjs";
+import {
   computeEvaluatorReferenceDigest,
   createSealedEvaluatorExecutionForTest,
   deriveEvaluatorAuthorityManifest,
@@ -27,7 +33,7 @@ import { buildPortfolioPlan, resolvePortfolioExecutionAdmission } from "./ask-be
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { validateEquivalenceAuthority, validateMutationAuthority } from "./ask-benchmark-mn-build-option-update.mjs";
-import { validateMnDocConfigCorrectionProductionAuthority } from "./ask-benchmark-mn-doc-config-correction-authority.mjs";
+import { validateMnDocConfigCorrectionProductionAuthority, writeMnDocConfigCorrectionProductionAuthority } from "./ask-benchmark-mn-doc-config-correction-authority.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
@@ -99,19 +105,113 @@ function boundaryRoots(name) {
   return roots;
 }
 
+function digestBytes(bytes) {
+  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function treeSnapshot(path) {
+  const inventory = [];
+  const visit = (directory, prefix = "") => {
+    for (const name of readdirSync(directory).sort()) {
+      const absolute = resolve(directory, name);
+      const relativePath = prefix ? `${prefix}/${name}` : name;
+      const status = lstatSync(absolute);
+      if (status.isDirectory()) visit(absolute, relativePath);
+      else if (status.isFile()) inventory.push({ path: relativePath, bytes: status.size, digest: digestBytes(readFileSync(absolute)) });
+      else inventory.push({ path: relativePath, type: status.isSymbolicLink() ? "symlink" : "other" });
+    }
+  };
+  visit(path);
+  return inventory;
+}
+
+const REVIEW_PROJECTION_FIELDS = Object.freeze([
+  "review_status",
+  "author_self_approval",
+  "reviewer_type",
+  "reviewer_record_id",
+  "reviewer_count",
+  "reviewed_at",
+  "reviewed_repository",
+  "reviewed_pull_request",
+  "reviewed_head_revision",
+  "blocking_finding_count",
+  "review_evidence",
+]);
+
+function externalAdmissionEvidence(name, { archiveBytes, authorityMutate = null, decisionMutate = null } = {}) {
+  const directory = resolve(work, `external-admission-${name}`);
+  mkdirSync(directory);
+  const archivePath = resolve(directory, "review.archive");
+  writeFileSync(archivePath, archiveBytes ?? Buffer.from(`independent execution admission review ${name}\n`));
+  const checkedDecision = readJson(resolve(root, "benchmarks/fixtures/admission-decision/mn-build-option-update-r22-admission-decision.json"));
+  const authorityDraft = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/portfolio-admission-review-authority.schema.json",
+    program: "adaptive_ask_portfolio_admission_review_authority",
+    authority_id: "",
+    authority_revision: checkedDecision.decision_revision,
+    fixture_id: checkedDecision.fixture_id,
+    ...Object.fromEntries(REVIEW_PROJECTION_FIELDS.map((field) => [field, structuredClone(checkedDecision[field])])),
+  };
+  authorityDraft.review_evidence = { archive_sha256: digestBytes(readFileSync(archivePath)), archive_bytes: readFileSync(archivePath).length };
+  authorityMutate?.(authorityDraft);
+  authorityDraft.authority_id = computeAdmissionReviewAuthorityId(authorityDraft);
+  const authority = { ...authorityDraft, authority_digest: computeAdmissionReviewAuthorityDigest(authorityDraft) };
+  const authorityPath = resolve(directory, "review-authority.json");
+  writeJson(authorityPath, authority);
+
+  const decision = structuredClone(checkedDecision);
+  for (const field of REVIEW_PROJECTION_FIELDS) decision[field] = structuredClone(authority[field]);
+  decision.decision_revision = authority.authority_revision;
+  decision.decision_id = computeAdmissionDecisionId(decision);
+  decisionMutate?.(decision);
+  decision.decision_id = computeAdmissionDecisionId(decision);
+  decision.decision_digest = computeAdmissionDecisionDigest(decision);
+  const decisionPath = resolve(directory, "decision.json");
+  writeJson(decisionPath, decision);
+  return {
+    decisionPath,
+    reviewAuthorityPath: authorityPath,
+    reviewAuthoritySourceDigest: digestBytes(readFileSync(authorityPath)),
+    reviewArchivePath: archivePath,
+  };
+}
+
 try {
   const productionAuthority = existsSync(resolve(fixtureRoot, "evaluator-reference.json"));
   const summary = validateMnDocConfigCorrectionPublicFixture({ root });
   assert.equal(summary.scoringReady, false);
 
+  if (productionAuthority) {
+    const beforeLegacyWrite = {
+      fixture: treeSnapshot(fixtureRoot),
+      status: execFileSync("git", ["status", "--porcelain=v1"], { cwd: root, encoding: "utf8" }),
+    };
+    const legacyWrite = spawnSync(process.execPath, [resolve(root, "scripts/ask-benchmark-mn-doc-config-correction.mjs"), "write"], { cwd: root, encoding: "utf8" });
+    assert.notEqual(legacyWrite.status, 0, "legacy writer must reject a production authority tree");
+    assert.match(`${legacyWrite.stderr}\n${legacyWrite.stdout}`, /legacy mn-doc candidate write is prohibited/u);
+    assert.deepEqual({ fixture: treeSnapshot(fixtureRoot), status: execFileSync("git", ["status", "--porcelain=v1"], { cwd: root, encoding: "utf8" }) }, beforeLegacyWrite, "legacy writer rejection must not change repository bytes");
+
+    const invalidWriterBoundaries = boundaryRoots("invalid-writer-inputs");
+    const dummyPrivateRoot = resolve(work, "dummy-private-root");
+    mkdirSync(dummyPrivateRoot);
+    const publicBeforeInvalidWriter = treeSnapshot(fixtureRoot);
+    assert.throws(() => writeMnDocConfigCorrectionProductionAuthority({ root, privateRoot: resolve(work, "missing-private-root"), evaluatorRevision: "0".repeat(40), generationDate: "2026-08-11", boundaryRoots: invalidWriterBoundaries }), /private root/u, "missing private root must fail before generation");
+    assert.throws(() => writeMnDocConfigCorrectionProductionAuthority({ root, privateRoot: dummyPrivateRoot, evaluatorRevision: "not-a-revision", generationDate: "2026-08-11", boundaryRoots: invalidWriterBoundaries }), /evaluator revision is invalid/u, "invalid evaluator revision must fail before generation");
+    assert.deepEqual(treeSnapshot(fixtureRoot), publicBeforeInvalidWriter, "invalid production writer inputs must not change frozen public bytes");
+  }
+
   const config = readJson(resolve(root, "benchmarks/adaptive-portfolio.config.json"));
+  const planConfig = { ...config, _configPath: resolve(root, "benchmarks/adaptive-portfolio.config.json"), _protocolPath: resolve(root, config.protocol_path) };
   const candidateFixture = config.fixtures.find(({ id }) => id === "mn-doc-config-correction");
   const fixtureOne = config.fixtures.find(({ id }) => id === "mn-build-option-update");
   assert.equal(resolvePortfolioExecutionAdmission({ root, fixture: candidateFixture }).execution_eligible, false, "source-freeze candidate must remain outside measured execution");
-  assert.equal(resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne }).execution_eligible, true, "admitted fixture #1 must remain execution-eligible");
-  const focusedPlan = buildPortfolioPlan({ root, config: { ...config, _configPath: resolve(root, "benchmarks/adaptive-portfolio.config.json"), _protocolPath: resolve(root, config.protocol_path) }, repositoryRevision: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), seed: "mn-doc-pre-admission-gate" });
+  assert.equal(resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne }).execution_eligible, false, "repository overlay without external review authority must not make fixture #1 execution-eligible");
+  const repositoryRevision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const focusedPlan = buildPortfolioPlan({ root, config: planConfig, repositoryRevision, seed: "mn-doc-pre-admission-gate" });
   assert.equal(focusedPlan.cases.some(({ fixture_id }) => fixture_id === "mn-doc-config-correction"), false, "source-freeze candidate must not enter the execution plan");
-  assert.equal(focusedPlan.cases.some(({ fixture_id }) => fixture_id === "mn-build-option-update"), true, "admitted fixture #1 must remain in the execution plan");
+  assert.equal(focusedPlan.cases.some(({ fixture_id }) => fixture_id === "mn-build-option-update"), false, "overlay fixture without external authority must not enter the execution plan");
 
   const forgedMarkerRoot = executionAdmissionRoot("forged-marker");
   const forgedMarkerPath = resolve(forgedMarkerRoot, FIXTURE_ROOT_RELATIVE, "source-freeze-candidate.json");
@@ -120,6 +220,72 @@ try {
   forgedMarker.candidate_state = "source_frozen";
   writeJson(forgedMarkerPath, forgedMarker);
   assert.equal(resolvePortfolioExecutionAdmission({ root: forgedMarkerRoot, fixture: candidateFixture }).execution_eligible, false, "marker-only admission forgery must not enable execution");
+
+  const forgedOverlayRoot = executionAdmissionRoot("forged-self-consistent-overlay");
+  const forgedOverlayPath = resolve(forgedOverlayRoot, "benchmarks/fixtures/admission-decision/mn-build-option-update-r22-admission-decision.json");
+  const forgedOverlay = readJson(forgedOverlayPath);
+  forgedOverlay.review_evidence = { archive_sha256: `sha256:${"4".repeat(64)}`, archive_bytes: 4242 };
+  forgedOverlay.decision_digest = computeAdmissionDecisionDigest(forgedOverlay);
+  writeJson(forgedOverlayPath, forgedOverlay);
+  assert.equal(resolvePortfolioExecutionAdmission({ root: forgedOverlayRoot, fixture: fixtureOne }).execution_eligible, false, "schema-valid self-consistent repository overlay without external review authority must remain excluded");
+
+  const syntheticEvidenceA = externalAdmissionEvidence("synthetic-a", { archiveBytes: Buffer.from("synthetic exact review archive A\n") });
+  const admittedA = resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: syntheticEvidenceA });
+  assert.equal(admittedA.execution_eligible, true, "complete production-resolver evidence must admit fixture #1");
+  assert.equal(admittedA.authority_mode, "admitted_overlay");
+  const syntheticEvidenceB = externalAdmissionEvidence("synthetic-b", {
+    archiveBytes: Buffer.from("synthetic exact review archive B\n"),
+    authorityMutate: (authority) => {
+      authority.authority_revision = 2;
+      authority.reviewer_record_id = `${authority.reviewer_record_id}-revision-2`;
+      authority.reviewed_at = "2026-08-11T00:00:00+09:00";
+    },
+  });
+  const admittedB = resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: syntheticEvidenceB });
+  assert.equal(admittedB.execution_eligible, true);
+  assert.notEqual(admittedA.authority_identity_digest, admittedB.authority_identity_digest, "external authority identity must change when review authority changes");
+  const planA = buildPortfolioPlan({ root, config: planConfig, repositoryRevision, seed: "mn-doc-authority-plan", executionAdmissionEvidenceByFixture: { [fixtureOne.id]: syntheticEvidenceA } });
+  const planB = buildPortfolioPlan({ root, config: planConfig, repositoryRevision, seed: "mn-doc-authority-plan", executionAdmissionEvidenceByFixture: { [fixtureOne.id]: syntheticEvidenceB } });
+  assert.equal(planA.cases.some(({ fixture_id }) => fixture_id === fixtureOne.id), true);
+  assert.equal(planB.cases.some(({ fixture_id }) => fixture_id === fixtureOne.id), true);
+  assert.notEqual(planA.execution_admission_authority_digest, planB.execution_admission_authority_digest, "plan authority digest must bind external admission identity");
+  assert.notEqual(planA.plan_id, planB.plan_id, "plan ID must change when external admission identity changes");
+
+  for (const [name, mutate, pattern] of [
+    ["missing review authority", (value) => { delete value.reviewAuthorityPath; }, /partial.*reviewAuthorityPath/u],
+    ["missing review authority source digest", (value) => { delete value.reviewAuthoritySourceDigest; }, /partial.*reviewAuthoritySourceDigest/u],
+    ["missing archive", (value) => { delete value.reviewArchivePath; }, /partial.*reviewArchivePath/u],
+    ["partial evidence", (value) => { delete value.decisionPath; }, /partial.*decisionPath/u],
+    ["caller-created admitted object injection", (value) => { value.resolvedAuthority = { authority_mode: "admitted_overlay", effective_admission_status: "admitted" }; }, /unknown fields.*resolvedAuthority/u],
+  ]) {
+    const evidence = { ...syntheticEvidenceA };
+    mutate(evidence);
+    assert.throws(() => resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: evidence }), pattern, name);
+  }
+
+  const archiveReplacementPath = resolve(work, "replacement-review.archive");
+  writeFileSync(archiveReplacementPath, "replacement archive bytes\n");
+  assert.throws(() => resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: { ...syntheticEvidenceA, reviewArchivePath: archiveReplacementPath } }), /archive raw identity differs/u, "review archive replacement must be rejected");
+  for (const [name, mutate] of [
+    ["wrong reviewed repository", (decision) => { decision.reviewed_repository = "wrong/repository"; }],
+    ["wrong reviewed PR", (decision) => { decision.reviewed_pull_request += 1; }],
+    ["wrong reviewed HEAD", (decision) => { decision.reviewed_head_revision = "0".repeat(40); }],
+  ]) {
+    const evidence = externalAdmissionEvidence(name.replaceAll(" ", "-"), { decisionMutate: mutate });
+    assert.throws(() => resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: evidence }), /differs from external frozen or review authority/u, name);
+  }
+
+  const r22ArchiveIndex = process.argv.indexOf("--r22-review-archive");
+  if (r22ArchiveIndex !== -1) {
+    const r22ArchiveBytes = readFileSync(resolve(process.argv[r22ArchiveIndex + 1]));
+    assert.equal(r22ArchiveBytes.length, 65010, "exact R22 review archive byte count");
+    assert.equal(digestBytes(r22ArchiveBytes), "sha256:5ce11995836830f7925aa8ede6f6961b48bc78abf567d7ab42165ea1f7e10fd0", "exact R22 review archive digest");
+    const exactR22Evidence = externalAdmissionEvidence("exact-r22", { archiveBytes: r22ArchiveBytes });
+    assert.equal(digestBytes(readFileSync(exactR22Evidence.reviewAuthorityPath)), "sha256:389d2094bdb4497f47abbc388b33c4942d3dfac39d4404455c21031a9ce32624", "exact R22 review-authority raw source digest");
+    const exactR22 = resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: exactR22Evidence });
+    assert.equal(exactR22.execution_eligible, true, "fixture #1 exact R22 external review authority and archive must be eligible");
+    assert.equal(exactR22.resolved_authority.admission_decision_digest, "sha256:3877018309e29a15330d6bbe396ec777dbef3a46a3ea883fd5d8a26c7de273d9");
+  }
 
   for (const [name, missing] of [["missing-reference", "evaluator-reference.json"], ["missing-final-admission", "final-admission-record.json"]]) {
     const target = executionAdmissionRoot(name);
@@ -231,6 +397,20 @@ try {
       const reference = readJson(resolve(fixtureRoot, "evaluator-reference.json"));
       const bundleManifest = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
       const hiddenAsset = bundleManifest.asset_inventory.find(({ role }) => role === "hidden_tests");
+
+      const invalidPrivateRoot = resolve(work, "invalid-private-publication-source");
+      cpSync(privateRoot, invalidPrivateRoot, { recursive: true });
+      rmSync(resolve(invalidPrivateRoot, hiddenAsset.path));
+      const beforeFailedPublication = { public: treeSnapshot(fixtureRoot), private: treeSnapshot(invalidPrivateRoot) };
+      assert.throws(() => writeMnDocConfigCorrectionProductionAuthority({
+        root,
+        privateRoot: invalidPrivateRoot,
+        evaluatorRevision: reference.evaluator_revision,
+        generationDate: readJson(resolve(privateRoot, "independence.json")).generation_date,
+        boundaryRoots: productionBoundaries,
+      }), /missing|ENOENT|hidden/u, "staged production validation failure must reject before publication");
+      assert.deepEqual({ public: treeSnapshot(fixtureRoot), private: treeSnapshot(invalidPrivateRoot) }, beforeFailedPublication, "staged validation failure must leave public and private production roots unchanged");
+
       const transplantedReference = structuredClone(reference);
       transplantedReference.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`;
       transplantedReference.public_metadata_digest = computeEvaluatorReferenceDigest(transplantedReference);
@@ -345,6 +525,27 @@ try {
       const sealedResult = executeSealedEvaluatorForTest({ execution: sealedExecution, externalAuthorityAnchor, repositoryRoot: root, normalized, label: "mn-doc sealed pre-review evaluator" });
       assert.equal(sealedResult.firstFragment.classification, "correct_narrow_execution");
       validatePrivateEvaluatorFragment({ root, fragment: sealedResult.firstFragment, scoringPolicy: readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json")), requirementRecord, normalizedResult: normalized });
+
+      if (process.argv.includes("--verify-production-regeneration")) {
+        const regenerationBefore = {
+          public: treeSnapshot(fixtureRoot),
+          private: treeSnapshot(privateRoot),
+          status: execFileSync("git", ["status", "--porcelain=v1"], { cwd: root, encoding: "utf8" }),
+        };
+        const regenerated = writeMnDocConfigCorrectionProductionAuthority({
+          root,
+          privateRoot,
+          evaluatorRevision: reference.evaluator_revision,
+          generationDate: readJson(resolve(privateRoot, "independence.json")).generation_date,
+          boundaryRoots: productionBoundaries,
+        });
+        assert.equal(regenerated.candidateDigest, summary.candidateDigest);
+        assert.deepEqual({
+          public: treeSnapshot(fixtureRoot),
+          private: treeSnapshot(privateRoot),
+          status: execFileSync("git", ["status", "--porcelain=v1"], { cwd: root, encoding: "utf8" }),
+        }, regenerationBefore, "exact production regeneration must preserve public bytes, private inventory, digests, and git diff");
+      }
     }
     const expectations = readJson(resolve(caseRoot, "expectations.json"));
     for (const entry of expectations.cases) {

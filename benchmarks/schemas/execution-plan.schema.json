@@ -13,6 +13,7 @@
     "config_path",
     "config_sha256",
     "repository_revision",
+    "execution_admission_authority_digest",
     "randomization_seed",
     "ordering_strategy",
     "conditions",
@@ -21,7 +22,7 @@
     "cases"
   ],
   "properties": {
-    "schema_version": { "const": "1.1.0" },
+    "schema_version": { "const": "1.2.0" },
     "schema_path": { "const": "benchmarks/schemas/execution-plan.schema.json" },
     "program": { "const": "adaptive_ask_portfolio" },
     "plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" },
@@ -29,6 +30,7 @@
     "protocol_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "config_path": { "type": "string", "minLength": 1 },
     "config_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "execution_admission_authority_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "repository_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
     "randomization_seed": {
       "type": "object",

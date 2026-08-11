@@ -1,6 +1,8 @@
-import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
-import { dirname, relative, resolve, sep } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { constants, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import {
@@ -77,6 +79,14 @@ const PRODUCTION_PUBLIC_ARTIFACTS = Object.freeze([
   "scoring-input-freeze-manifest.json",
   "source-freeze-candidate.json",
   "verification-command-contract.json",
+]);
+const GENERATED_PUBLIC_ARTIFACTS = Object.freeze(PRODUCTION_PUBLIC_ARTIFACTS.filter((name) => !["input-manifest.json", "verification-command-contract.json"].includes(name)));
+const GENERATED_PRIVATE_ARTIFACTS = Object.freeze([
+  "dependency-graph.json",
+  "equivalent-solutions.json",
+  "evidence-removal-mutations.json",
+  "independence.json",
+  "private-evaluator-bundle.json",
 ]);
 
 function sha256(bytes) {
@@ -289,7 +299,7 @@ function candidateBinding(root, path, semanticDigest) {
   return { path, raw_sha256: sha256(readFileSync(resolve(root, path))), semantic_digest: semanticDigest };
 }
 
-export function writeMnDocConfigCorrectionProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate = "2026-08-11" }) {
+function generateMnDocConfigCorrectionProductionAuthorityInPlace({ root, privateRoot, evaluatorRevision, generationDate }) {
   if (!/^[a-f0-9]{40}$/u.test(evaluatorRevision ?? "")) throw new Error("mn-doc evaluator revision is invalid");
   const fixtureRoot = resolve(root, MN_DOC_FIXTURE_ROOT);
   const inputPath = `${MN_DOC_FIXTURE_ROOT}/input-manifest.json`;
@@ -404,6 +414,108 @@ export function writeMnDocConfigCorrectionProductionAuthority({ root = ROOT, pri
   const candidate = { ...candidateBase, candidate_digest: canonicalDigest(candidateBase) };
   writeJson(resolve(fixtureRoot, "source-freeze-candidate.json"), candidate);
   return validateMnDocConfigCorrectionProductionAuthority({ root });
+}
+
+function runGit(root, args, label) {
+  const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+  if (result.status !== 0) throw new Error(`${label} failed: ${result.stderr || result.stdout}`);
+  return result.stdout.trim();
+}
+
+function assertProductionWriterInputs({ root, privateRoot, evaluatorRevision, generationDate, boundaryRoots }) {
+  if (!existsSync(root) || !lstatSync(root).isDirectory()) throw new Error("mn-doc production writer repository root is missing");
+  if (!privateRoot || !existsSync(privateRoot) || !lstatSync(privateRoot).isDirectory() || lstatSync(privateRoot).isSymbolicLink()) throw new Error("mn-doc production writer requires an existing non-symlink private root");
+  assertPrivateRootOutsideRepository(root, privateRoot);
+  if (!/^[a-f0-9]{40}$/u.test(evaluatorRevision ?? "")) throw new Error("mn-doc evaluator revision is invalid");
+  runGit(root, ["cat-file", "-e", `${evaluatorRevision}^{commit}`], "mn-doc evaluator revision lookup");
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(generationDate ?? "")) throw new Error("mn-doc production generation date must be YYYY-MM-DD");
+  const requiredBoundaryFields = ["materializedPath", "selectionState", "runDir", "normalizedResultsPath"];
+  if (!boundaryRoots || typeof boundaryRoots !== "object" || Array.isArray(boundaryRoots)) throw new Error("mn-doc production writer requires complete private boundary roots");
+  const unknownBoundaryFields = Object.keys(boundaryRoots).filter((field) => !requiredBoundaryFields.includes(field));
+  const missingBoundaryFields = requiredBoundaryFields.filter((field) => !boundaryRoots[field] || !existsSync(boundaryRoots[field]) || !lstatSync(boundaryRoots[field]).isDirectory());
+  if (unknownBoundaryFields.length > 0 || missingBoundaryFields.length > 0) throw new Error(`mn-doc production writer boundary roots are invalid${unknownBoundaryFields.length > 0 ? `; unknown: ${unknownBoundaryFields.join(", ")}` : ""}${missingBoundaryFields.length > 0 ? `; missing: ${missingBoundaryFields.join(", ")}` : ""}`);
+}
+
+function assertFrozenInputsUnchanged(sourceRoot, stagedRoot) {
+  const sourceFixture = resolve(sourceRoot, MN_DOC_FIXTURE_ROOT);
+  const stagedFixture = resolve(stagedRoot, MN_DOC_FIXTURE_ROOT);
+  if (stableCanonicalJson(agentVisibleInventory(sourceFixture)) !== stableCanonicalJson(agentVisibleInventory(stagedFixture))) throw new Error("mn-doc production regeneration would change frozen agent-visible inputs");
+  for (const name of ["input-manifest.json", "verification-command-contract.json"]) {
+    if (!readFileSync(resolve(sourceFixture, name)).equals(readFileSync(resolve(stagedFixture, name)))) throw new Error(`mn-doc production regeneration would change frozen ${name}`);
+  }
+}
+
+function preparePublication(pairs) {
+  const prepared = [];
+  try {
+    for (const { source, target, label } of pairs) {
+      if (!existsSync(source) || !lstatSync(source).isFile() || lstatSync(source).isSymbolicLink()) throw new Error(`${label} staged source is missing or invalid`);
+      if (!existsSync(target) || !lstatSync(target).isFile() || lstatSync(target).isSymbolicLink()) throw new Error(`${label} publication target is missing or invalid`);
+      if (readFileSync(source).equals(readFileSync(target))) continue;
+      const suffix = randomUUID();
+      const staged = resolve(dirname(target), `.${basename(target)}.${suffix}.staging`);
+      const backup = resolve(dirname(target), `.${basename(target)}.${suffix}.backup`);
+      copyFileSync(source, staged, constants.COPYFILE_EXCL);
+      copyFileSync(target, backup, constants.COPYFILE_EXCL);
+      if (!readFileSync(staged).equals(readFileSync(source)) || !readFileSync(backup).equals(readFileSync(target))) throw new Error(`${label} publication staging identity differs`);
+      prepared.push({ target, staged, backup, label, published: false });
+    }
+    return prepared;
+  } catch (error) {
+    for (const record of prepared) {
+      rmSync(record.staged, { force: true });
+      rmSync(record.backup, { force: true });
+    }
+    throw error;
+  }
+}
+
+function publishPrepared(prepared, validatePublished) {
+  try {
+    for (const record of prepared) {
+      renameSync(record.staged, record.target);
+      record.published = true;
+    }
+    const result = validatePublished();
+    for (const record of prepared) rmSync(record.backup, { force: true });
+    return result;
+  } catch (error) {
+    for (const record of [...prepared].reverse()) {
+      if (record.published && existsSync(record.backup)) renameSync(record.backup, record.target);
+      rmSync(record.staged, { force: true });
+      rmSync(record.backup, { force: true });
+    }
+    throw error;
+  }
+}
+
+export function writeMnDocConfigCorrectionProductionAuthority({ root = ROOT, privateRoot, evaluatorRevision, generationDate, boundaryRoots }) {
+  assertProductionWriterInputs({ root, privateRoot, evaluatorRevision, generationDate, boundaryRoots });
+  const repositoryRoot = realpathSync(root);
+  const privateDirectory = realpathSync(privateRoot);
+  const staging = resolve(tmpdir(), `ask-mn-doc-production-authority-${randomUUID()}`);
+  const stagedRepository = resolve(staging, "repository");
+  const stagedPrivate = resolve(staging, "private");
+  mkdirSync(staging, { recursive: false });
+  let worktreeAdded = false;
+  try {
+    runGit(repositoryRoot, ["worktree", "add", "--detach", stagedRepository, evaluatorRevision], "mn-doc production staging worktree creation");
+    worktreeAdded = true;
+    cpSync(privateDirectory, stagedPrivate, { recursive: true, force: false, errorOnExist: true });
+    generateMnDocConfigCorrectionProductionAuthorityInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate });
+    validateMnDocConfigCorrectionProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots });
+    assertFrozenInputsUnchanged(repositoryRoot, stagedRepository);
+    const publicPairs = GENERATED_PUBLIC_ARTIFACTS.map((name) => ({ source: resolve(stagedRepository, MN_DOC_FIXTURE_ROOT, name), target: resolve(repositoryRoot, MN_DOC_FIXTURE_ROOT, name), label: `mn-doc public ${name}` }));
+    const privatePairs = GENERATED_PRIVATE_ARTIFACTS.map((name) => ({ source: resolve(stagedPrivate, name), target: resolve(privateDirectory, name), label: `mn-doc private ${name}` }));
+    const prepared = preparePublication([...publicPairs, ...privatePairs]);
+    return publishPrepared(prepared, () => validateMnDocConfigCorrectionProductionAuthority({ root: repositoryRoot, privateRoot: privateDirectory, boundaryRoots }));
+  } finally {
+    if (worktreeAdded) {
+      const removal = spawnSync("git", ["-C", repositoryRoot, "worktree", "remove", "--force", stagedRepository], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+      if (removal.status !== 0 && existsSync(stagedRepository)) rmSync(stagedRepository, { recursive: true, force: true });
+    }
+    rmSync(staging, { recursive: true, force: true });
+  }
 }
 
 export function validateMnDocConfigCorrectionProductionAuthority({ root = ROOT, privateRoot = null, boundaryRoots = null } = {}) {
