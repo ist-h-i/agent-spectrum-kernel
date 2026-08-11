@@ -13,7 +13,6 @@ import {
   realpathSync,
   rmSync,
   statSync,
-  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
@@ -29,7 +28,15 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE_ID = "mn-doc-config-correction";
 const FIXTURE_ROOT = `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}`;
 const REVIEW_MANIFEST_PATH = "REVIEW-MANIFEST.json";
-const FIXED_ARCHIVE_TIME = new Date("1980-01-01T00:00:00.000Z");
+const ZIP_GENERATOR_SOURCE_PATH = "scripts/ask-benchmark-mn-doc-config-correction-review-archive.mjs";
+const ZIP_FORMAT_REVISION = "pr242-node-store-zip.v1";
+const FIXED_DOS_TIMESTAMP = "1980-01-01T00:00:00";
+const FIXED_DOS_TIME = 0;
+const FIXED_DOS_DATE = 0x0021;
+const ZIP_UTF8_FLAG = 0x0800;
+const ZIP_STORE_METHOD = 0;
+const ZIP_VERSION = 20;
+const ZIP_VERSION_MADE_BY_UNIX = (3 << 8) | ZIP_VERSION;
 const PUBLIC_PATHS = Object.freeze([
   "admission-review.json",
   "evaluator-authority-manifest.json",
@@ -57,6 +64,44 @@ const REQUIRED_FILESYSTEM_CASE_PATHS = Object.freeze([
 
 function sha256(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+const CRC32_TABLE = Object.freeze(Array.from({ length: 256 }, (_, index) => {
+  let value = index;
+  for (let bit = 0; bit < 8; bit += 1) value = (value & 1) === 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  return value >>> 0;
+}));
+
+function crc32(bytes) {
+  let value = 0xffffffff;
+  for (const byte of bytes) value = CRC32_TABLE[(value ^ byte) & 0xff] ^ (value >>> 8);
+  return (value ^ 0xffffffff) >>> 0;
+}
+
+function zipFormatAuthority(root) {
+  return {
+    revision: ZIP_FORMAT_REVISION,
+    fixed_dos_timestamp: FIXED_DOS_TIMESTAMP,
+    compression_method: { name: "store", code: ZIP_STORE_METHOD },
+    utf8_flag_policy: { name: "set_for_all_entries", general_purpose_bit_flag: ZIP_UTF8_FLAG },
+    entry_metadata_policy: {
+      unix_external_mode: true,
+      local_header_extra_fields: false,
+      central_directory_extra_fields: false,
+      file_comments: false,
+      archive_comment: false,
+      encryption: false,
+      data_descriptors: false,
+    },
+    generator: {
+      source_path: ZIP_GENERATOR_SOURCE_PATH,
+      source_digest: sha256(readFileSync(resolve(root, ZIP_GENERATOR_SOURCE_PATH))),
+    },
+  };
+}
+
+function validateZipFormatAuthority(authority, root) {
+  if (JSON.stringify(authority) !== JSON.stringify(zipFormatAuthority(root))) throw new Error("review archive ZIP format authority differs");
 }
 
 function readJson(path, label) {
@@ -235,8 +280,9 @@ function reviewManifest({ root, privateRoot, caseRoot, reviewedHead, pullRequest
   const expectedArchiveEntries = [REVIEW_MANIFEST_PATH, ...entries.map(({ archive_path }) => archive_path)];
   validateReviewArchiveInventory(entries, expectedArchiveEntries);
   return {
-    schema_version: "pr242-exact-private-review-manifest.v2",
+    schema_version: "pr242-exact-private-review-manifest.v3",
     package_kind: "independent_private_review_archive",
+    archive_format: zipFormatAuthority(root),
     review_target: { repository: "ist-h-i/agent-spectrum-kernel", pull_request: pullRequest, reviewed_head: reviewedHead, evaluator_revision: reference.evaluator_revision },
     authority: {
       requirement_record_digest: requirement.requirement_record_digest,
@@ -292,13 +338,91 @@ function materializeStage(stage, manifest, sources) {
     }
   }
   writeFileSync(resolve(stage, REVIEW_MANIFEST_PATH), `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o644 });
-  for (const path of [...manifest.inventory.expected_archive_entries].reverse()) utimesSync(resolve(stage, path.replace(/\/$/u, "")), FIXED_ARCHIVE_TIME, FIXED_ARCHIVE_TIME);
 }
 
-function archiveStage(stage, outputPath, expectedArchiveEntries) {
+function localFileHeader({ nameBytes, content, checksum }) {
+  const header = Buffer.alloc(30);
+  header.writeUInt32LE(0x04034b50, 0);
+  header.writeUInt16LE(ZIP_VERSION, 4);
+  header.writeUInt16LE(ZIP_UTF8_FLAG, 6);
+  header.writeUInt16LE(ZIP_STORE_METHOD, 8);
+  header.writeUInt16LE(FIXED_DOS_TIME, 10);
+  header.writeUInt16LE(FIXED_DOS_DATE, 12);
+  header.writeUInt32LE(checksum, 14);
+  header.writeUInt32LE(content.length, 18);
+  header.writeUInt32LE(content.length, 22);
+  header.writeUInt16LE(nameBytes.length, 26);
+  header.writeUInt16LE(0, 28);
+  return header;
+}
+
+function centralDirectoryHeader({ nameBytes, content, checksum, mode, entryType, localOffset }) {
+  const header = Buffer.alloc(46);
+  const unixMode = ((entryType === "directory" ? 0o040000 : 0o100000) | mode) & 0xffff;
+  const externalAttributes = (((unixMode << 16) >>> 0) | (entryType === "directory" ? 0x10 : 0)) >>> 0;
+  header.writeUInt32LE(0x02014b50, 0);
+  header.writeUInt16LE(ZIP_VERSION_MADE_BY_UNIX, 4);
+  header.writeUInt16LE(ZIP_VERSION, 6);
+  header.writeUInt16LE(ZIP_UTF8_FLAG, 8);
+  header.writeUInt16LE(ZIP_STORE_METHOD, 10);
+  header.writeUInt16LE(FIXED_DOS_TIME, 12);
+  header.writeUInt16LE(FIXED_DOS_DATE, 14);
+  header.writeUInt32LE(checksum, 16);
+  header.writeUInt32LE(content.length, 20);
+  header.writeUInt32LE(content.length, 24);
+  header.writeUInt16LE(nameBytes.length, 28);
+  header.writeUInt16LE(0, 30);
+  header.writeUInt16LE(0, 32);
+  header.writeUInt16LE(0, 34);
+  header.writeUInt16LE(0, 36);
+  header.writeUInt32LE(externalAttributes, 38);
+  header.writeUInt32LE(localOffset, 42);
+  return header;
+}
+
+function endOfCentralDirectory({ entryCount, centralSize, centralOffset }) {
+  const record = Buffer.alloc(22);
+  record.writeUInt32LE(0x06054b50, 0);
+  record.writeUInt16LE(0, 4);
+  record.writeUInt16LE(0, 6);
+  record.writeUInt16LE(entryCount, 8);
+  record.writeUInt16LE(entryCount, 10);
+  record.writeUInt32LE(centralSize, 12);
+  record.writeUInt32LE(centralOffset, 16);
+  record.writeUInt16LE(0, 20);
+  return record;
+}
+
+function archiveStage(stage, outputPath, manifest) {
   if (existsSync(outputPath)) throw new Error("review archive output already exists");
   mkdirSync(dirname(outputPath), { recursive: true });
-  execFileSync("zip", ["-X", "-q", outputPath, ...expectedArchiveEntries], { cwd: stage });
+  const inventoryByPath = new Map(manifest.inventory.entries.map((entry) => [entry.archive_path, entry]));
+  const localRecords = [];
+  const centralRecords = [];
+  let localOffset = 0;
+  for (const archivePath of manifest.inventory.expected_archive_entries) {
+    const inventory = archivePath === REVIEW_MANIFEST_PATH
+      ? { entry_type: "file", mode: 0o644 }
+      : inventoryByPath.get(archivePath);
+    if (!inventory) throw new Error(`review archive ZIP entry is absent from inventory: ${archivePath}`);
+    const nameBytes = Buffer.from(archivePath, "utf8");
+    const content = inventory.entry_type === "directory" ? Buffer.alloc(0) : readFileSync(resolve(stage, archivePath));
+    if (nameBytes.length > 0xffff || content.length > 0xffffffff || localOffset > 0xffffffff) throw new Error("review archive exceeds deterministic ZIP32 limits");
+    const checksum = crc32(content);
+    const localHeader = localFileHeader({ nameBytes, content, checksum });
+    localRecords.push(localHeader, nameBytes, content);
+    centralRecords.push(centralDirectoryHeader({ nameBytes, content, checksum, mode: inventory.mode, entryType: inventory.entry_type, localOffset }), nameBytes);
+    localOffset += localHeader.length + nameBytes.length + content.length;
+  }
+  if (manifest.inventory.expected_archive_entries.length > 0xffff) throw new Error("review archive entry count exceeds deterministic ZIP32 limits");
+  const centralDirectory = Buffer.concat(centralRecords);
+  if (centralDirectory.length > 0xffffffff) throw new Error("review archive central directory exceeds deterministic ZIP32 limits");
+  const archive = Buffer.concat([
+    ...localRecords,
+    centralDirectory,
+    endOfCentralDirectory({ entryCount: manifest.inventory.expected_archive_entries.length, centralSize: centralDirectory.length, centralOffset: localOffset }),
+  ]);
+  writeFileSync(outputPath, archive, { mode: 0o644, flag: "wx" });
 }
 
 export function verifyMnDocConfigCorrectionReviewArchive({ archivePath, root = ROOT, privateRoot, caseRoot }) {
@@ -306,6 +430,8 @@ export function verifyMnDocConfigCorrectionReviewArchive({ archivePath, root = R
   try {
     execFileSync("unzip", ["-q", archivePath, "-d", extraction]);
     const manifest = readJson(resolve(extraction, REVIEW_MANIFEST_PATH), "review archive manifest");
+    if (manifest.schema_version !== "pr242-exact-private-review-manifest.v3") throw new Error("review archive manifest revision differs");
+    validateZipFormatAuthority(manifest.archive_format, realpathSync(root));
     validateReviewArchiveInventory(manifest.inventory?.entries, manifest.inventory?.expected_archive_entries);
     const zipEntries = execFileSync("unzip", ["-Z1", archivePath], { encoding: "utf8" }).trim().split("\n");
     if (zipEntries.length !== manifest.inventory.expected_archive_entries.length || zipEntries.some((path, index) => path !== manifest.inventory.expected_archive_entries[index])) throw new Error("review archive ZIP entry order or closure differs");
@@ -347,7 +473,7 @@ export function generateMnDocConfigCorrectionReviewArchive({ root = ROOT, privat
   const stage = resolve(stagingRoot, "package");
   try {
     materializeStage(stage, manifest, sources);
-    archiveStage(stage, resolve(outputPath), manifest.inventory.expected_archive_entries);
+    archiveStage(stage, resolve(outputPath), manifest);
     return { archive_path: resolve(outputPath), raw_sha256: sha256(readFileSync(resolve(outputPath))), raw_bytes: statSync(resolve(outputPath)).size, manifest };
   } finally {
     rmSync(stagingRoot, { recursive: true, force: true });

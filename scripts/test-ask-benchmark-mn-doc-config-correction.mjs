@@ -146,6 +146,24 @@ function treeSnapshot(path) {
   return inventory;
 }
 
+function filesystemTreeProjection(path) {
+  const inventory = [];
+  const visit = (directory, prefix = "") => {
+    for (const name of readdirSync(directory).sort()) {
+      const absolute = resolve(directory, name);
+      const relativePath = prefix ? `${prefix}/${name}` : name;
+      const status = lstatSync(absolute);
+      if (status.isDirectory()) {
+        inventory.push({ path: `${relativePath}/`, type: "directory", mode: status.mode & 0o777 });
+        visit(absolute, relativePath);
+      } else if (status.isFile()) inventory.push({ path: relativePath, type: "file", mode: status.mode & 0o777, bytes: status.size, digest: digestBytes(readFileSync(absolute)) });
+      else inventory.push({ path: relativePath, type: status.isSymbolicLink() ? "symlink" : "other", mode: status.mode & 0o777 });
+    }
+  };
+  visit(path);
+  return inventory;
+}
+
 function privateFragmentProjection(fragment) {
   return {
     classification: fragment.classification,
@@ -968,6 +986,39 @@ try {
     const secondArchive = generateMnDocConfigCorrectionReviewArchive({ root, privateRoot, caseRoot, outputPath: repeatedReviewArchivePath, reviewedHead, pullRequest: 242 });
     assert.deepEqual(readFileSync(reviewArchivePath), readFileSync(repeatedReviewArchivePath), "exact review archive regeneration must preserve raw ZIP bytes");
     assert.equal(firstArchive.raw_sha256, secondArchive.raw_sha256, "exact review archive regeneration digest");
+    assert.equal(firstArchive.manifest.schema_version, "pr242-exact-private-review-manifest.v3", "review archive manifest revision");
+    assert.equal(firstArchive.manifest.archive_format.revision, "pr242-node-store-zip.v1", "review archive format revision");
+    assert.equal(firstArchive.manifest.archive_format.fixed_dos_timestamp, "1980-01-01T00:00:00", "review archive fixed DOS timestamp");
+    assert.deepEqual(firstArchive.manifest.archive_format.compression_method, { name: "store", code: 0 }, "review archive compression authority");
+    assert.match(firstArchive.manifest.archive_format.generator.source_digest, /^sha256:[a-f0-9]{64}$/u, "review archive generator source digest");
+    const timezoneIdentities = [];
+    let extractedTimezoneProjection = null;
+    for (const [timezone, filename] of [["UTC", "mn-doc-review-utc.zip"], ["Asia/Tokyo", "mn-doc-review-tokyo.zip"], ["America/Los_Angeles", "mn-doc-review-los-angeles.zip"]]) {
+      const timezoneArchivePath = resolve(work, filename);
+      const generated = spawnSync(process.execPath, [
+        resolve(root, "scripts/ask-benchmark-mn-doc-config-correction-review-archive.mjs"),
+        "generate",
+        "--private-root", privateRoot,
+        "--case-root", caseRoot,
+        "--output", timezoneArchivePath,
+        "--reviewed-head", reviewedHead,
+        "--pull-request", "242",
+      ], { cwd: root, env: { ...process.env, TZ: timezone }, encoding: "utf8" });
+      assert.equal(generated.status, 0, `fresh-process ${timezone} review archive generation: ${generated.stderr}`);
+      const timezoneBytes = readFileSync(timezoneArchivePath);
+      assert.deepEqual(timezoneBytes, readFileSync(reviewArchivePath), `raw review archive bytes must not depend on ${timezone}`);
+      timezoneIdentities.push({ timezone, bytes: timezoneBytes.length, digest: digestBytes(timezoneBytes) });
+      const timezoneVerification = verifyMnDocConfigCorrectionReviewArchive({ archivePath: timezoneArchivePath, root, privateRoot, caseRoot });
+      try {
+        const projection = filesystemTreeProjection(timezoneVerification.extraction_root);
+        if (extractedTimezoneProjection === null) extractedTimezoneProjection = projection;
+        else assert.deepEqual(projection, extractedTimezoneProjection, `ordinary extraction must not depend on ${timezone}`);
+      } finally {
+        timezoneVerification.cleanup();
+      }
+    }
+    assert.equal(new Set(timezoneIdentities.map(({ digest }) => digest)).size, 1, "timezone archive SHA-256 identities");
+    assert.equal(new Set(timezoneIdentities.map(({ bytes }) => bytes)).size, 1, "timezone archive byte counts");
     const verifiedArchive = verifyMnDocConfigCorrectionReviewArchive({ archivePath: reviewArchivePath, root, privateRoot, caseRoot });
     try {
       assert.equal(verifiedArchive.manifest.review_cases.count, 15, "review archive must retain the exact base 15-case inventory");
