@@ -461,7 +461,7 @@ try {
 
     const duplicateKeyManifestPath = resolve(work, "duplicate-fixture-evidence.json");
     writeFileSync(duplicateKeyManifestPath, `{"${multiFixtureOne.id}":{},"${multiFixtureOne.id}":{}}\n`);
-    assert.throws(() => readExecutionAdmissionEvidenceManifest(duplicateKeyManifestPath), /duplicate object key/u, "duplicate fixture identity in the evidence manifest must be rejected");
+    assert.throws(() => readExecutionAdmissionEvidenceManifest(duplicateKeyManifestPath), /duplicate JSON object key/u, "duplicate fixture identity in the evidence manifest must be rejected");
     const partialManifestPath = resolve(work, "partial-fixture-evidence.json");
     writeJson(partialManifestPath, { [multiFixtureOne.id]: { review_authority_path: exactR22Evidence.reviewAuthorityPath } });
     assert.throws(() => readExecutionAdmissionEvidenceManifest(partialManifestPath), /partial/u, "partial fixture evidence manifest entry must be rejected");
