@@ -3,7 +3,7 @@
   "fixture_id": "mn-doc-config-correction",
   "scope_boundary_authority": {
     "allowed_candidate_paths": [
-      "workspace/docs/worker-retries.md"
+      "workspace/docs/worker-retries.md#json-block"
     ],
     "required_candidate_paths": [
       "workspace/docs/worker-retries.md"
@@ -13,9 +13,27 @@
       "workspace/package.json",
       "workspace/test/worker-retries.test.mjs"
     ],
+    "target_file_type": "regular",
+    "target_mode": "frozen",
+    "target_outside_json_block_bytes": "frozen",
+    "equivalent_json_formatting": [
+      "property_order",
+      "indentation",
+      "insignificant_whitespace"
+    ],
+    "scope_states": [
+      "scope_pass",
+      "required_change_missing",
+      "unrelated_content_change",
+      "unrelated_path_change",
+      "target_mode_change",
+      "protected_path_change",
+      "unmanaged_addition",
+      "unmanaged_deletion"
+    ],
     "unmanaged_additions": "forbidden",
     "unmanaged_deletions": "forbidden",
-    "authority_digest": "sha256:4225ff59a65ef229cd3b0b27758a01a57ba60caec4ceacfa743cce6557670ffe"
+    "authority_digest": "sha256:edb3c4ad0258cff31cf90e2b8ee122acbfffabf389229843d648eeb39346db99"
   },
   "maps": [
     {

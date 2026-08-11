@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/evaluator-authority-manifest.schema.json",
   "program": "adaptive_ask_evaluator_authority_manifest",
   "fixture_id": "mn-doc-config-correction",
-  "evaluator_revision": "b76b3d8dd96f19cecb7d4dfeb504a98838e38d5d",
+  "evaluator_revision": "e311a5255a2689e3904cc99c2b25585b0d1d6fc0",
   "file_inventory": [
     {
       "path": "benchmarks/fixtures/checkpoint-b2/mn-doc-config-correction/input-manifest.json",
@@ -16,9 +16,9 @@
     },
     {
       "path": "benchmarks/fixtures/checkpoint-b2/mn-doc-config-correction/evidence-map.json",
-      "bytes": 2216,
-      "raw_sha256": "sha256:43fd00e796188da077bc048908d910f17eb981dafbd26364b30ba0a0cf41d3ba",
-      "semantic_digest": "sha256:4c71f38bd972b287ce1cc7b2447b58c36e4d99a2d41af187c1ce1e2ee3c7b097",
+      "bytes": 2722,
+      "raw_sha256": "sha256:4057f5c3199ce22447f8c4816d9cf528b6fd8ea11d1569e00ec1eb5ff874e021",
+      "semantic_digest": "sha256:c0873f862badae9bbc8b7977cfd01186eb6b3e4df52f5edc346312802305cac0",
       "authority_role": "evidence_map",
       "evidence_map_set_digest": "sha256:bb32c0f4c2757d504896ce8c2d706b19629bf62c2e6326259d338912e09dafae",
       "requirement_ids": [
@@ -45,12 +45,12 @@
     {
       "path": "benchmarks/fixtures/checkpoint-b2/mn-doc-config-correction/requirement-record.json",
       "bytes": 2806,
-      "raw_sha256": "sha256:97531b3f76217b4ebac54dcc8b2e4b864bf5f9a98a09f8b9fdf4592b386d9bdf",
-      "semantic_digest": "sha256:3637856b58e326ff05114b8c50e5015f5b62ce8e552b33f0dbfe1d3f2848ff47",
+      "raw_sha256": "sha256:a3f2e44dac9dd8b9356c9567b8a66b67fe28e0fcaf5c422a31902cbbde0d484e",
+      "semantic_digest": "sha256:0ea171a251b4a6996b1c229ef9fa7cbd5e85861f0f68ab24cbf5747dfabecd66",
       "authority_role": "requirement_record",
-      "requirement_record_digest": "sha256:3637856b58e326ff05114b8c50e5015f5b62ce8e552b33f0dbfe1d3f2848ff47",
+      "requirement_record_digest": "sha256:0ea171a251b4a6996b1c229ef9fa7cbd5e85861f0f68ab24cbf5747dfabecd66",
       "requirement_set_digest": "sha256:47a29cffb2df08713bf674de69c66c267e17cb9dc7154f5028bd530a40158b2a"
     }
   ],
-  "manifest_digest": "sha256:b8a26a275f934f7db8795c1b04bc20bd61b0d460fd4f6cdac86b9f41b5f3bffa"
+  "manifest_digest": "sha256:f320d971d13017b6fdd9741193cbe33b4cafe203e1b1417febc23d48f2041b9f"
 }
