@@ -447,30 +447,34 @@ function assertFrozenInputsUnchanged(sourceRoot, stagedRoot) {
 
 function preparePublication(pairs) {
   const prepared = [];
+  const transactionDirectories = new Set();
   try {
-    for (const { source, target, label } of pairs) {
+    for (const { source, target, label, transactionDirectory } of pairs) {
       if (!existsSync(source) || !lstatSync(source).isFile() || lstatSync(source).isSymbolicLink()) throw new Error(`${label} staged source is missing or invalid`);
       if (!existsSync(target) || !lstatSync(target).isFile() || lstatSync(target).isSymbolicLink()) throw new Error(`${label} publication target is missing or invalid`);
       if (readFileSync(source).equals(readFileSync(target))) continue;
+      if (!existsSync(transactionDirectory)) mkdirSync(transactionDirectory, { recursive: false });
+      transactionDirectories.add(transactionDirectory);
       const suffix = randomUUID();
-      const staged = resolve(dirname(target), `.${basename(target)}.${suffix}.staging`);
-      const backup = resolve(dirname(target), `.${basename(target)}.${suffix}.backup`);
+      const staged = resolve(transactionDirectory, `${basename(target)}.${suffix}.staging`);
+      const backup = resolve(transactionDirectory, `${basename(target)}.${suffix}.backup`);
       copyFileSync(source, staged, constants.COPYFILE_EXCL);
       copyFileSync(target, backup, constants.COPYFILE_EXCL);
       if (!readFileSync(staged).equals(readFileSync(source)) || !readFileSync(backup).equals(readFileSync(target))) throw new Error(`${label} publication staging identity differs`);
       prepared.push({ target, staged, backup, label, published: false });
     }
-    return prepared;
+    return { prepared, transactionDirectories: [...transactionDirectories] };
   } catch (error) {
     for (const record of prepared) {
       rmSync(record.staged, { force: true });
       rmSync(record.backup, { force: true });
     }
+    for (const directory of transactionDirectories) rmSync(directory, { recursive: true, force: true });
     throw error;
   }
 }
 
-function publishPrepared(prepared, validatePublished) {
+function publishPrepared({ prepared, transactionDirectories }, validatePublished) {
   try {
     for (const record of prepared) {
       renameSync(record.staged, record.target);
@@ -478,6 +482,7 @@ function publishPrepared(prepared, validatePublished) {
     }
     const result = validatePublished();
     for (const record of prepared) rmSync(record.backup, { force: true });
+    for (const directory of transactionDirectories) rmSync(directory, { recursive: true, force: true });
     return result;
   } catch (error) {
     for (const record of [...prepared].reverse()) {
@@ -485,6 +490,7 @@ function publishPrepared(prepared, validatePublished) {
       rmSync(record.staged, { force: true });
       rmSync(record.backup, { force: true });
     }
+    for (const directory of transactionDirectories) rmSync(directory, { recursive: true, force: true });
     throw error;
   }
 }
@@ -505,8 +511,11 @@ export function writeMnDocConfigCorrectionProductionAuthority({ root = ROOT, pri
     generateMnDocConfigCorrectionProductionAuthorityInPlace({ root: stagedRepository, privateRoot: stagedPrivate, evaluatorRevision, generationDate });
     validateMnDocConfigCorrectionProductionAuthority({ root: stagedRepository, privateRoot: stagedPrivate, boundaryRoots });
     assertFrozenInputsUnchanged(repositoryRoot, stagedRepository);
-    const publicPairs = GENERATED_PUBLIC_ARTIFACTS.map((name) => ({ source: resolve(stagedRepository, MN_DOC_FIXTURE_ROOT, name), target: resolve(repositoryRoot, MN_DOC_FIXTURE_ROOT, name), label: `mn-doc public ${name}` }));
-    const privatePairs = GENERATED_PRIVATE_ARTIFACTS.map((name) => ({ source: resolve(stagedPrivate, name), target: resolve(privateDirectory, name), label: `mn-doc private ${name}` }));
+    const transactionId = randomUUID();
+    const publicTransactionDirectory = resolve(repositoryRoot, "benchmarks/fixtures/checkpoint-b2", `.mn-doc-authority-transaction-${transactionId}`);
+    const privateTransactionDirectory = resolve(dirname(privateDirectory), `.mn-doc-authority-transaction-${transactionId}`);
+    const publicPairs = GENERATED_PUBLIC_ARTIFACTS.map((name) => ({ source: resolve(stagedRepository, MN_DOC_FIXTURE_ROOT, name), target: resolve(repositoryRoot, MN_DOC_FIXTURE_ROOT, name), transactionDirectory: publicTransactionDirectory, label: `mn-doc public ${name}` }));
+    const privatePairs = GENERATED_PRIVATE_ARTIFACTS.map((name) => ({ source: resolve(stagedPrivate, name), target: resolve(privateDirectory, name), transactionDirectory: privateTransactionDirectory, label: `mn-doc private ${name}` }));
     const prepared = preparePublication([...publicPairs, ...privatePairs]);
     return publishPrepared(prepared, () => validateMnDocConfigCorrectionProductionAuthority({ root: repositoryRoot, privateRoot: privateDirectory, boundaryRoots }));
   } finally {
