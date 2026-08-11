@@ -169,7 +169,7 @@ function buildEvidenceMap() {
 
 function buildEquivalenceAsset() {
   const rules = [
-    { equivalence_class_id: "observable-documentation-contract", requirement_id: "documentation-correctness", match_basis: ["parsed_json_value", "property_order", "indentation", "insignificant_whitespace", "observable_behavior"], property_order_only: false },
+    { equivalence_class_id: "observable-documentation-contract", requirement_id: "documentation-correctness", match_basis: ["parsed_json_value", "unique_object_names", "property_order", "indentation", "insignificant_whitespace", "observable_behavior"], property_order_only: false },
     { equivalence_class_id: "equivalent-focused-change", requirement_id: "request-scope-discipline", match_basis: ["changed_path_set", "observable_behavior"], property_order_only: false },
     { equivalence_class_id: "equivalent-focused-verification", requirement_id: "verification-evidence", match_basis: ["repository_command_evidence", "observable_behavior"], property_order_only: false },
   ].map((rule) => ({ ...rule, rule_digest: canonicalDigest(rule) }));

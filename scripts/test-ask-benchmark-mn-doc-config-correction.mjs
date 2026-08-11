@@ -34,6 +34,12 @@ import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { canonicalDigest, materializePortfolio } from "./ask-benchmark-materialize.mjs";
 import { validateEquivalenceAuthority, validateMutationAuthority } from "./ask-benchmark-mn-build-option-update.mjs";
 import { validateMnDocConfigCorrectionProductionAuthority, writeMnDocConfigCorrectionProductionAuthority } from "./ask-benchmark-mn-doc-config-correction-authority.mjs";
+import {
+  generateMnDocConfigCorrectionReviewArchive,
+  validateReviewArchiveInventory,
+  validateReviewArchiveInventoryAgainstSources,
+  verifyMnDocConfigCorrectionReviewArchive,
+} from "./ask-benchmark-mn-doc-config-correction-review-archive.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
@@ -160,6 +166,38 @@ function privateFragmentProjection(fragment) {
       over_processing: fragment.over_processing.state,
     },
   };
+}
+
+function archiveInventoryNegativeTests() {
+  const sourceRoot = resolve(work, "archive-inventory-sources");
+  const privateRoot = resolve(sourceRoot, "private-source");
+  const caseRoot = resolve(sourceRoot, "case-source");
+  mkdirSync(privateRoot, { recursive: true });
+  mkdirSync(resolve(caseRoot, "target-deletion/docs"), { recursive: true });
+  mkdirSync(resolve(caseRoot, "target-directory/docs/worker-retries.md"), { recursive: true });
+  writeFileSync(resolve(privateRoot, "asset.json"), "{}\n");
+  const fileBytes = readFileSync(resolve(privateRoot, "asset.json"));
+  const entries = [
+    { archive_path: "cases/", entry_type: "directory", mode: 0o755, category: "package", source_scope: "package", source_path: "cases" },
+    { archive_path: "cases/target-deletion/", entry_type: "directory", mode: 0o755, category: "case", source_scope: "private_case_root", source_path: "target-deletion" },
+    { archive_path: "cases/target-deletion/docs/", entry_type: "directory", mode: 0o755, category: "case", source_scope: "private_case_root", source_path: "target-deletion/docs" },
+    { archive_path: "cases/target-directory/", entry_type: "directory", mode: 0o755, category: "case", source_scope: "private_case_root", source_path: "target-directory" },
+    { archive_path: "cases/target-directory/docs/", entry_type: "directory", mode: 0o755, category: "case", source_scope: "private_case_root", source_path: "target-directory/docs" },
+    { archive_path: "cases/target-directory/docs/worker-retries.md/", entry_type: "directory", mode: 0o755, category: "case", source_scope: "private_case_root", source_path: "target-directory/docs/worker-retries.md" },
+    { archive_path: "private/", entry_type: "directory", mode: 0o755, category: "package", source_scope: "package", source_path: "private" },
+    { archive_path: "private/asset.json", entry_type: "file", mode: 0o644, category: "private", source_scope: "private_evaluator_root", source_path: "asset.json", bytes: fileBytes.length, sha256: digestBytes(fileBytes) },
+  ];
+  const expected = ["REVIEW-MANIFEST.json", ...entries.map(({ archive_path }) => archive_path)];
+  assert.doesNotThrow(() => validateReviewArchiveInventory(entries, expected));
+  assert.doesNotThrow(() => validateReviewArchiveInventoryAgainstSources(entries, { root: sourceRoot, privateRoot, caseRoot }));
+  const mutation = (mutate) => { const value = structuredClone(entries); mutate(value); return value; };
+  assert.throws(() => validateReviewArchiveInventory(mutation((value) => value.splice(2, 1)), expected), /missing|required|differs/u, "missing directory inventory entry must be rejected");
+  assert.throws(() => validateReviewArchiveInventory(mutation((value) => value.splice(3, 0, structuredClone(value[2]))), ["REVIEW-MANIFEST.json", ...mutation((value) => value.splice(3, 0, structuredClone(value[2]))).map(({ archive_path }) => archive_path)]), /duplicate/u, "duplicate directory inventory entry must be rejected");
+  assert.throws(() => validateReviewArchiveInventory(mutation((value) => { [value[0], value[1]] = [value[1], value[0]]; }), expected), /reordered/u, "reordered inventory must be rejected");
+  assert.throws(() => validateReviewArchiveInventory(entries, [...expected].reverse()), /expected entry inventory differs/u, "reordered expected archive entries must be rejected");
+  assert.throws(() => validateReviewArchiveInventoryAgainstSources(mutation((value) => { value[2].mode = 0o700; }), { root: sourceRoot, privateRoot, caseRoot }), /mode drift/u, "wrong directory mode must be rejected");
+  assert.throws(() => validateReviewArchiveInventoryAgainstSources(mutation((value) => { value[2] = { ...value[2], archive_path: "cases/target-deletion/docs", entry_type: "file", bytes: 0, sha256: digestBytes(Buffer.alloc(0)) }; }), { root: sourceRoot, privateRoot, caseRoot }), /file-for-directory/u, "file-for-directory inventory entry must be rejected");
+  assert.throws(() => validateReviewArchiveInventoryAgainstSources(mutation((value) => { value[7] = { archive_path: "private/asset.json/", entry_type: "directory", mode: 0o644, category: "private", source_scope: "private_evaluator_root", source_path: "asset.json" }; }), { root: sourceRoot, privateRoot, caseRoot }), /directory-for-file/u, "directory-for-file inventory entry must be rejected");
 }
 
 const REVIEW_PROJECTION_FIELDS = Object.freeze([
@@ -309,6 +347,7 @@ function syntheticRepositoryAdmission(repository, name, { archiveBytes, reviewed
 }
 
 try {
+  archiveInventoryNegativeTests();
   const productionAuthority = existsSync(resolve(fixtureRoot, "evaluator-reference.json"));
   const summary = validateMnDocConfigCorrectionPublicFixture({ root });
   assert.equal(summary.scoringReady, false);
@@ -844,6 +883,29 @@ try {
         assert.deepEqual(privateFragmentProjection(typedResult.firstFragment), expectations.fragment_projections[entry.expected_projection], `sealed ${entry.name} command evidence`);
       }
 
+      for (const [index, entry] of (expectations.adversarial_cases ?? []).entries()) {
+        const lineage = { run_instance_id: `24124124-1241-4241-8241-24124124125${index}`, case_id: `case-2412412412412412-424242424242425${index}`, attempt: "0001" };
+        const adversarialNormalized = { normalized_result_digest: `sha256:${String(index + 7).repeat(64)}`, lineage, command_evidence: { capture_support: "supported", evidence_level: "complete", required_command_ids: ["worker-retry-doc-test"], required_alternative_groups: [], references: [eventReference], cwd_unverified_command_count: 0 } };
+        const adversarialExecution = createSealedEvaluatorExecutionForTest({
+          root,
+          privateEvaluationRoot: sealedAuthorityRoot,
+          privateRoot,
+          hiddenAsset,
+          frozenWorkspace: resolve(caseRoot, expectations.frozen_workspace),
+          candidateWorkspace: resolve(caseRoot, entry.candidate_workspace),
+          evaluationInputRoot,
+          evaluationLineage: lineage,
+          evaluatorRevision: reference.evaluator_revision,
+          externalAuthorityAnchor,
+          executionDirectoryName: `sealed-pre-review-${entry.case_id}`,
+          label: `mn-doc sealed ${entry.case_id} evaluator`,
+        });
+        const sealedAdversarial = executeSealedEvaluatorForTest({ execution: adversarialExecution, externalAuthorityAnchor, repositoryRoot: root, normalized: adversarialNormalized, label: `mn-doc sealed ${entry.case_id} evaluator` });
+        validatePrivateEvaluatorFragment({ root, fragment: sealedAdversarial.firstFragment, scoringPolicy: readJson(resolve(root, "benchmarks/portfolio-scoring-policy.json")), requirementRecord, normalizedResult: adversarialNormalized });
+        assert.deepEqual(privateFragmentProjection(sealedAdversarial.firstFragment), expectations.fragment_projections[entry.expected_projection], `production-safe adversarial case ${entry.case_id}`);
+        assert.deepEqual(sealedAdversarial.firstFragment.requirement_results.map(({ earned_points, matched_equivalence_class_ids }) => [earned_points, matched_equivalence_class_ids]), [[0, []], [0, []], [2, ["equivalent-focused-verification"]]], `production-safe adversarial authority ${entry.case_id}`);
+      }
+
       if (process.argv.includes("--verify-production-regeneration")) {
         const regenerationBefore = {
           public: treeSnapshot(fixtureRoot),
@@ -884,6 +946,53 @@ try {
         assert.deepEqual(result.matched_equivalence_class_ids, result.outcome === "pass" ? authority.equivalence_class_ids : [], `actual private case ${entry.case_id} equivalence identity`);
       }
       assert.deepEqual(privateFragmentProjection(fragment), expectations.fragment_projections[entry.expected_projection], `actual private case ${entry.case_id}`);
+    }
+    for (const entry of expectations.adversarial_cases ?? []) {
+      const fragment = await validateActualPrivateEvaluator({
+        root,
+        privateRoot,
+        boundaryRoots: productionBoundaries,
+        frozenWorkspace: resolve(caseRoot, expectations.frozen_workspace),
+        candidateWorkspace: resolve(caseRoot, entry.candidate_workspace),
+        verificationState: entry.verification_state,
+      });
+      assert.deepEqual(privateFragmentProjection(fragment), expectations.fragment_projections[entry.expected_projection], `direct adversarial case ${entry.case_id}`);
+      assert.deepEqual(fragment.requirement_results.map(({ earned_points, matched_equivalence_class_ids }) => [earned_points, matched_equivalence_class_ids]), [[0, []], [0, []], [2, ["equivalent-focused-verification"]]], `direct adversarial authority ${entry.case_id}`);
+    }
+
+    const reviewArchiveOutputIndex = process.argv.indexOf("--review-archive-output");
+    const reviewArchivePath = reviewArchiveOutputIndex === -1 ? resolve(work, "mn-doc-review-a.zip") : resolve(process.argv[reviewArchiveOutputIndex + 1]);
+    const repeatedReviewArchivePath = resolve(work, "mn-doc-review-b.zip");
+    const reviewedHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const firstArchive = generateMnDocConfigCorrectionReviewArchive({ root, privateRoot, caseRoot, outputPath: reviewArchivePath, reviewedHead, pullRequest: 242 });
+    const secondArchive = generateMnDocConfigCorrectionReviewArchive({ root, privateRoot, caseRoot, outputPath: repeatedReviewArchivePath, reviewedHead, pullRequest: 242 });
+    assert.deepEqual(readFileSync(reviewArchivePath), readFileSync(repeatedReviewArchivePath), "exact review archive regeneration must preserve raw ZIP bytes");
+    assert.equal(firstArchive.raw_sha256, secondArchive.raw_sha256, "exact review archive regeneration digest");
+    const verifiedArchive = verifyMnDocConfigCorrectionReviewArchive({ archivePath: reviewArchivePath, root, privateRoot, caseRoot });
+    try {
+      assert.equal(verifiedArchive.manifest.review_cases.count, 15, "review archive must retain the exact base 15-case inventory");
+      assert.equal(verifiedArchive.manifest.adversarial_cases.count, 3, "review archive must include three duplicate-name adversarial cases");
+      assert.equal(readdirSync(resolve(verifiedArchive.extraction_root, "cases/target-deletion/docs")).length, 0, "extracted target-deletion docs directory must be empty");
+      assert.equal(lstatSync(resolve(verifiedArchive.extraction_root, "cases/target-directory/docs/worker-retries.md")).isDirectory(), true, "extracted target-document target must be a directory");
+      const extractedPrivateRoot = resolve(verifiedArchive.extraction_root, "private");
+      const extractedCaseRoot = resolve(verifiedArchive.extraction_root, "cases");
+      const extractedBoundaries = boundaryRoots("extracted-review-archive");
+      for (const entry of [...expectations.cases, ...(expectations.adversarial_cases ?? [])]) {
+        const fragment = await validateActualPrivateEvaluator({
+          root,
+          privateRoot: extractedPrivateRoot,
+          boundaryRoots: extractedBoundaries,
+          frozenWorkspace: resolve(extractedCaseRoot, entry.frozen_workspace ?? expectations.frozen_workspace),
+          candidateWorkspace: resolve(extractedCaseRoot, entry.candidate_workspace),
+          verificationState: entry.verification_state,
+          investigatedPaths: entry.investigated_paths ?? [],
+        });
+        assert.deepEqual(privateFragmentProjection(fragment), expectations.fragment_projections[entry.expected_projection], `extracted review archive full projection ${entry.case_id}`);
+        const expectedPoints = fragment.requirement_results.map(({ outcome }, index) => outcome === "pass" ? [5, 3, 2][index] : 0);
+        assert.deepEqual(fragment.requirement_results.map(({ earned_points }) => earned_points), expectedPoints, `extracted review archive requirement points ${entry.case_id}`);
+      }
+    } finally {
+      verifiedArchive.cleanup();
     }
     const totalityEvaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?totality=${Date.now()}`);
     for (const entry of expectations.totality_cases) {
