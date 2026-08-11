@@ -85,7 +85,7 @@ export function resolvePortfolioExecutionAdmission({ root, fixture, externalAdmi
   const resolved = evidence
     ? resolveEffectiveAdmissionAuthorityFromFiles({ ...authoritySources, ...evidence })
     : resolveEffectiveAdmissionAuthority(authoritySources);
-  if (resolved.fixture_id !== fixture.id) throw new Error(`${fixture.id} effective execution authority resolved another fixture`);
+  if (resolved.fixture_id !== fixture.id) throw new Error(`${fixture.id} effective execution authority contains a cross-fixture transplant`);
   const executionEligible = resolved.authority_mode === "legacy_admitted_record" || resolved.authority_mode === "admitted_overlay"
     ? resolved.effective_admission_status === "admitted"
     : false;
