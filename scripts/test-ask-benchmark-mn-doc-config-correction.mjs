@@ -29,9 +29,9 @@ import {
   validatePrivateEvaluatorFragment,
   verifyPrivateEvaluatorBundle,
 } from "./ask-benchmark-evaluator-boundary.mjs";
-import { buildPortfolioPlan, resolvePortfolioExecutionAdmission } from "./ask-benchmark-plan.mjs";
+import { buildPortfolioPlan, readExecutionAdmissionEvidenceManifest, resolvePortfolioExecutionAdmission } from "./ask-benchmark-plan.mjs";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
-import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import { canonicalDigest, materializePortfolio } from "./ask-benchmark-materialize.mjs";
 import { validateEquivalenceAuthority, validateMutationAuthority } from "./ask-benchmark-mn-build-option-update.mjs";
 import { validateMnDocConfigCorrectionProductionAuthority, writeMnDocConfigCorrectionProductionAuthority } from "./ask-benchmark-mn-doc-config-correction-authority.mjs";
 
@@ -86,7 +86,22 @@ function executionAdmissionRoot(name) {
   cpSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update"), resolve(target, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update"), { recursive: true });
   cpSync(fixtureRoot, resolve(target, FIXTURE_ROOT_RELATIVE), { recursive: true });
   cpSync(resolve(root, "benchmarks/fixtures/admission-decision/mn-build-option-update-r22-admission-decision.json"), resolve(target, "benchmarks/fixtures/admission-decision/mn-build-option-update-r22-admission-decision.json"));
+  execFileSync("git", ["init", "--quiet"], { cwd: target });
+  execFileSync("git", ["add", "."], { cwd: target });
+  execFileSync("git", ["-c", "user.name=ASK Test", "-c", "user.email=ask-test@example.invalid", "commit", "--quiet", "-m", "Initialize execution admission test repository"], { cwd: target });
   return target;
+}
+
+function fullRepositoryClone(name) {
+  const target = resolve(work, `repository-${name}`);
+  execFileSync("git", ["clone", "--quiet", "--no-local", root, target]);
+  return target;
+}
+
+function commitRepository(target, message) {
+  execFileSync("git", ["add", "-A"], { cwd: target });
+  execFileSync("git", ["-c", "user.name=ASK Test", "-c", "user.email=ask-test@example.invalid", "commit", "--quiet", "-m", message], { cwd: target });
+  return execFileSync("git", ["rev-parse", "HEAD"], { cwd: target, encoding: "utf8" }).trim();
 }
 
 function boundaryRoots(name) {
@@ -171,10 +186,103 @@ function externalAdmissionEvidence(name, { archiveBytes, authorityMutate = null,
   const decisionPath = resolve(directory, "decision.json");
   writeJson(decisionPath, decision);
   return {
-    decisionPath,
     reviewAuthorityPath: authorityPath,
     reviewAuthoritySourceDigest: digestBytes(readFileSync(authorityPath)),
     reviewArchivePath: archivePath,
+    callerDecisionPath: decisionPath,
+  };
+}
+
+function syntheticRepositoryAdmission(repository, name, { archiveBytes, reviewedAt, reviewerRecordId }) {
+  const fixtureId = "mn-doc-config-correction";
+  const fixtureDirectory = resolve(repository, "benchmarks/fixtures/checkpoint-b2", fixtureId);
+  const admissionPath = resolve(fixtureDirectory, "final-admission-record.json");
+  const requirementPath = resolve(fixtureDirectory, "requirement-record.json");
+  const referencePath = resolve(fixtureDirectory, "evaluator-reference.json");
+  const freezePath = resolve(fixtureDirectory, "scoring-input-freeze-manifest.json");
+  const admission = readJson(admissionPath);
+  const requirement = readJson(requirementPath);
+  const reference = readJson(referencePath);
+  const freeze = readJson(freezePath);
+  const directory = resolve(work, `synthetic-repository-admission-${name}`);
+  mkdirSync(directory);
+  const archivePath = resolve(directory, "review.archive");
+  writeFileSync(archivePath, archiveBytes);
+  const reviewProjection = {
+    review_status: "approved",
+    author_self_approval: false,
+    reviewer_type: "independent_agent",
+    reviewer_record_id: reviewerRecordId,
+    reviewer_count: 1,
+    reviewed_at: reviewedAt,
+    reviewed_repository: "test/repository",
+    reviewed_pull_request: 999,
+    reviewed_head_revision: execFileSync("git", ["rev-parse", "HEAD"], { cwd: repository, encoding: "utf8" }).trim(),
+    blocking_finding_count: 0,
+    review_evidence: {
+      archive_sha256: digestBytes(archiveBytes),
+      archive_bytes: archiveBytes.length,
+    },
+  };
+  const authorityDraft = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/portfolio-admission-review-authority.schema.json",
+    program: "adaptive_ask_portfolio_admission_review_authority",
+    authority_id: "",
+    authority_revision: 1,
+    fixture_id: fixtureId,
+    ...reviewProjection,
+  };
+  authorityDraft.authority_id = computeAdmissionReviewAuthorityId(authorityDraft);
+  const authority = { ...authorityDraft, authority_digest: computeAdmissionReviewAuthorityDigest(authorityDraft) };
+  const authorityPath = resolve(directory, "review-authority.json");
+  writeJson(authorityPath, authority);
+  const decision = {
+    schema_version: "1.0.0",
+    schema_path: "benchmarks/schemas/portfolio-admission-decision.schema.json",
+    program: "adaptive_ask_portfolio_admission_decision",
+    decision_id: "",
+    decision_revision: 1,
+    fixture_id: fixtureId,
+    decision_status: "admitted",
+    ...reviewProjection,
+    evaluator: {
+      evaluator_revision: reference.evaluator_revision,
+      evaluator_bundle_id: reference.evaluator_bundle_id,
+      evaluator_bundle_digest: reference.evaluator_bundle_digest,
+      evaluator_bundle_bytes: admission.evaluator_byte_count,
+    },
+    evaluator_public_reference_digest: reference.public_metadata_digest,
+    frozen_admission_authority: {
+      path: relative(repository, admissionPath),
+      raw_byte_digest: digestBytes(readFileSync(admissionPath)),
+      semantic_digest: admission.admission_digest,
+      requirement_authority_digest: admission.requirement_authority_digest,
+    },
+    frozen_requirement_record: {
+      path: relative(repository, requirementPath),
+      raw_byte_digest: digestBytes(readFileSync(requirementPath)),
+      record_digest: requirement.requirement_record_digest,
+      set_digest: requirement.requirement_set_digest,
+    },
+    frozen_scoring_input_manifest: {
+      path: relative(repository, freezePath),
+      raw_byte_digest: digestBytes(readFileSync(freezePath)),
+      semantic_digest: freeze.manifest_digest,
+    },
+  };
+  decision.decision_id = computeAdmissionDecisionId(decision);
+  decision.decision_digest = computeAdmissionDecisionDigest(decision);
+  const overlayPath = resolve(repository, "benchmarks/fixtures/admission-decision/mn-doc-config-correction-test-admission-decision.json");
+  writeJson(overlayPath, decision);
+  return {
+    decision,
+    overlayPath,
+    evidence: {
+      reviewAuthorityPath: authorityPath,
+      reviewAuthoritySourceDigest: digestBytes(readFileSync(authorityPath)),
+      reviewArchivePath: archivePath,
+    },
   };
 }
 
@@ -227,52 +335,44 @@ try {
   forgedOverlay.review_evidence = { archive_sha256: `sha256:${"4".repeat(64)}`, archive_bytes: 4242 };
   forgedOverlay.decision_digest = computeAdmissionDecisionDigest(forgedOverlay);
   writeJson(forgedOverlayPath, forgedOverlay);
-  assert.equal(resolvePortfolioExecutionAdmission({ root: forgedOverlayRoot, fixture: fixtureOne }).execution_eligible, false, "schema-valid self-consistent repository overlay without external review authority must remain excluded");
+  assert.throws(() => resolvePortfolioExecutionAdmission({ root: forgedOverlayRoot, fixture: fixtureOne }), /working-tree bytes differ/u, "repository overlay working-tree byte drift must be rejected");
 
   const syntheticEvidenceA = externalAdmissionEvidence("synthetic-a", { archiveBytes: Buffer.from("synthetic exact review archive A\n") });
-  const admittedA = resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: syntheticEvidenceA });
-  assert.equal(admittedA.execution_eligible, true, "complete production-resolver evidence must admit fixture #1");
-  assert.equal(admittedA.authority_mode, "admitted_overlay");
-  const syntheticEvidenceB = externalAdmissionEvidence("synthetic-b", {
-    archiveBytes: Buffer.from("synthetic exact review archive B\n"),
-    authorityMutate: (authority) => {
-      authority.authority_revision = 2;
-      authority.reviewer_record_id = `${authority.reviewer_record_id}-revision-2`;
-      authority.reviewed_at = "2026-08-11T00:00:00+09:00";
-    },
-  });
-  const admittedB = resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: syntheticEvidenceB });
-  assert.equal(admittedB.execution_eligible, true);
-  assert.notEqual(admittedA.authority_identity_digest, admittedB.authority_identity_digest, "external authority identity must change when review authority changes");
-  const planA = buildPortfolioPlan({ root, config: planConfig, repositoryRevision, seed: "mn-doc-authority-plan", executionAdmissionEvidenceByFixture: { [fixtureOne.id]: syntheticEvidenceA } });
-  const planB = buildPortfolioPlan({ root, config: planConfig, repositoryRevision, seed: "mn-doc-authority-plan", executionAdmissionEvidenceByFixture: { [fixtureOne.id]: syntheticEvidenceB } });
-  assert.equal(planA.cases.some(({ fixture_id }) => fixture_id === fixtureOne.id), true);
-  assert.equal(planB.cases.some(({ fixture_id }) => fixture_id === fixtureOne.id), true);
-  assert.notEqual(planA.execution_admission_authority_digest, planB.execution_admission_authority_digest, "plan authority digest must bind external admission identity");
-  assert.notEqual(planA.plan_id, planB.plan_id, "plan ID must change when external admission identity changes");
+  assert.throws(
+    () => resolvePortfolioExecutionAdmission({
+      root,
+      fixture: candidateFixture,
+      externalAdmissionEvidence: {
+        ...syntheticEvidenceA,
+        decisionPath: syntheticEvidenceA.callerDecisionPath,
+      },
+    }),
+    /decisionPath|repository.*overlay|unknown fields/u,
+    "caller-created admitted decision must not create execution authority for a fixture without a repository overlay",
+  );
 
   for (const [name, mutate, pattern] of [
     ["missing review authority", (value) => { delete value.reviewAuthorityPath; }, /partial.*reviewAuthorityPath/u],
     ["missing review authority source digest", (value) => { delete value.reviewAuthoritySourceDigest; }, /partial.*reviewAuthoritySourceDigest/u],
     ["missing archive", (value) => { delete value.reviewArchivePath; }, /partial.*reviewArchivePath/u],
-    ["partial evidence", (value) => { delete value.decisionPath; }, /partial.*decisionPath/u],
     ["caller-created admitted object injection", (value) => { value.resolvedAuthority = { authority_mode: "admitted_overlay", effective_admission_status: "admitted" }; }, /unknown fields.*resolvedAuthority/u],
   ]) {
-    const evidence = { ...syntheticEvidenceA };
+    const { callerDecisionPath: _callerDecisionPath, ...evidence } = syntheticEvidenceA;
     mutate(evidence);
     assert.throws(() => resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: evidence }), pattern, name);
   }
 
   const archiveReplacementPath = resolve(work, "replacement-review.archive");
   writeFileSync(archiveReplacementPath, "replacement archive bytes\n");
-  assert.throws(() => resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: { ...syntheticEvidenceA, reviewArchivePath: archiveReplacementPath } }), /archive raw identity differs/u, "review archive replacement must be rejected");
+  const { callerDecisionPath: _callerDecisionPath, ...syntheticReviewEvidence } = syntheticEvidenceA;
+  assert.throws(() => resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: { ...syntheticReviewEvidence, reviewArchivePath: archiveReplacementPath } }), /archive raw identity differs/u, "review archive replacement must be rejected");
   for (const [name, mutate] of [
     ["wrong reviewed repository", (decision) => { decision.reviewed_repository = "wrong/repository"; }],
     ["wrong reviewed PR", (decision) => { decision.reviewed_pull_request += 1; }],
     ["wrong reviewed HEAD", (decision) => { decision.reviewed_head_revision = "0".repeat(40); }],
   ]) {
     const evidence = externalAdmissionEvidence(name.replaceAll(" ", "-"), { decisionMutate: mutate });
-    assert.throws(() => resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: evidence }), /differs from external frozen or review authority/u, name);
+    assert.throws(() => resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: { ...evidence, decisionPath: evidence.callerDecisionPath } }), /decisionPath|repository.*overlay|unknown fields/u, name);
   }
 
   const r22ArchiveIndex = process.argv.indexOf("--r22-review-archive");
@@ -280,11 +380,180 @@ try {
     const r22ArchiveBytes = readFileSync(resolve(process.argv[r22ArchiveIndex + 1]));
     assert.equal(r22ArchiveBytes.length, 65010, "exact R22 review archive byte count");
     assert.equal(digestBytes(r22ArchiveBytes), "sha256:5ce11995836830f7925aa8ede6f6961b48bc78abf567d7ab42165ea1f7e10fd0", "exact R22 review archive digest");
-    const exactR22Evidence = externalAdmissionEvidence("exact-r22", { archiveBytes: r22ArchiveBytes });
+    const exactR22EvidenceWithCallerDecision = externalAdmissionEvidence("exact-r22", { archiveBytes: r22ArchiveBytes });
+    const { callerDecisionPath: _exactR22CallerDecisionPath, ...exactR22Evidence } = exactR22EvidenceWithCallerDecision;
     assert.equal(digestBytes(readFileSync(exactR22Evidence.reviewAuthorityPath)), "sha256:389d2094bdb4497f47abbc388b33c4942d3dfac39d4404455c21031a9ce32624", "exact R22 review-authority raw source digest");
     const exactR22 = resolvePortfolioExecutionAdmission({ root, fixture: fixtureOne, externalAdmissionEvidence: exactR22Evidence });
     assert.equal(exactR22.execution_eligible, true, "fixture #1 exact R22 external review authority and archive must be eligible");
     assert.equal(exactR22.resolved_authority.admission_decision_digest, "sha256:3877018309e29a15330d6bbe396ec777dbef3a46a3ea883fd5d8a26c7de273d9");
+
+    const multiRepository = fullRepositoryClone("multi-fixture-admission");
+    const multiConfigValue = readJson(resolve(multiRepository, "benchmarks/adaptive-portfolio.config.json"));
+    const multiConfig = {
+      ...multiConfigValue,
+      _configPath: resolve(multiRepository, "benchmarks/adaptive-portfolio.config.json"),
+      _protocolPath: resolve(multiRepository, multiConfigValue.protocol_path),
+    };
+    const multiFixtureOne = multiConfig.fixtures.find(({ id }) => id === "mn-build-option-update");
+    const multiFixtureTwo = multiConfig.fixtures.find(({ id }) => id === "mn-doc-config-correction");
+    const repositoryBaseRevision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: multiRepository, encoding: "utf8" }).trim();
+    const untrackedAdmission = syntheticRepositoryAdmission(multiRepository, "untracked", {
+      archiveBytes: Buffer.from("synthetic repository review archive A\n"),
+      reviewedAt: "2026-08-12T00:00:00+09:00",
+      reviewerRecordId: "synthetic-independent-review-a",
+    });
+    assert.throws(
+      () => resolvePortfolioExecutionAdmission({ root: multiRepository, fixture: multiFixtureTwo, repositoryRevision: repositoryBaseRevision, externalAdmissionEvidence: untrackedAdmission.evidence }),
+      /cannot create admission without a repository-managed overlay/u,
+      "untracked admission decision must not create execution authority",
+    );
+    const callerDecisionPath = resolve(work, "caller-created-admitted-decision.json");
+    writeJson(callerDecisionPath, untrackedAdmission.decision);
+    assert.throws(
+      () => resolvePortfolioExecutionAdmission({ root: multiRepository, fixture: multiFixtureTwo, repositoryRevision: repositoryBaseRevision, externalAdmissionEvidence: { ...untrackedAdmission.evidence, decisionPath: callerDecisionPath } }),
+      /unknown fields.*decisionPath/u,
+      "caller-created admitted decision must be rejected even when its digests are self-consistent",
+    );
+    writeJson(untrackedAdmission.overlayPath, readJson(resolve(multiRepository, "benchmarks/fixtures/admission-decision/mn-build-option-update-r22-admission-decision.json")));
+    const wrongFixtureRevision = commitRepository(multiRepository, "Add wrong-fixture test overlay");
+    assert.throws(
+      () => resolvePortfolioExecutionAdmission({ root: multiRepository, fixture: multiFixtureTwo, repositoryRevision: wrongFixtureRevision, externalAdmissionEvidence: untrackedAdmission.evidence }),
+      /cannot create admission without a repository-managed overlay/u,
+      "wrong-fixture repository overlay must not authorize the target fixture",
+    );
+    rmSync(untrackedAdmission.overlayPath);
+    const beforeSecondOverlayRevision = commitRepository(multiRepository, "Remove wrong-fixture test overlay");
+
+    const admittedSecondA = syntheticRepositoryAdmission(multiRepository, "multi-a", {
+      archiveBytes: Buffer.from("synthetic repository review archive A\n"),
+      reviewedAt: "2026-08-12T00:00:00+09:00",
+      reviewerRecordId: "synthetic-independent-review-a",
+    });
+    const admittedSecondRevisionA = commitRepository(multiRepository, "Add test-only second admitted overlay A");
+    assert.throws(
+      () => resolvePortfolioExecutionAdmission({ root: multiRepository, fixture: multiFixtureTwo, repositoryRevision: beforeSecondOverlayRevision, externalAdmissionEvidence: admittedSecondA.evidence }),
+      /cannot create admission without a repository-managed overlay/u,
+      "overlay from another repository revision must not authorize execution",
+    );
+
+    const evidenceManifestPathA = resolve(work, "multi-fixture-execution-admission-a.json");
+    writeJson(evidenceManifestPathA, {
+      [multiFixtureOne.id]: {
+        review_authority_path: exactR22Evidence.reviewAuthorityPath,
+        review_authority_source_digest: exactR22Evidence.reviewAuthoritySourceDigest,
+        review_archive_path: exactR22Evidence.reviewArchivePath,
+      },
+      [multiFixtureTwo.id]: {
+        review_authority_path: admittedSecondA.evidence.reviewAuthorityPath,
+        review_authority_source_digest: admittedSecondA.evidence.reviewAuthoritySourceDigest,
+        review_archive_path: admittedSecondA.evidence.reviewArchivePath,
+      },
+    });
+    const evidenceInventoryA = readExecutionAdmissionEvidenceManifest(evidenceManifestPathA);
+    const multiPlanA = buildPortfolioPlan({ root: multiRepository, config: multiConfig, repositoryRevision: admittedSecondRevisionA, seed: "multi-fixture-admission", executionAdmissionEvidenceByFixture: evidenceInventoryA });
+    assert.equal(multiPlanA.cases.some(({ fixture_id }) => fixture_id === multiFixtureOne.id), true, "fixture #1 must enter the authenticated multi-fixture plan");
+    assert.equal(multiPlanA.cases.some(({ fixture_id }) => fixture_id === multiFixtureTwo.id), true, "test-only second admitted fixture must enter the same plan");
+    const multiPlanPathA = resolve(work, "multi-fixture-plan-a.json");
+    const multiMaterializedA = resolve(work, "multi-fixture-materialized-a");
+    writeJson(multiPlanPathA, multiPlanA);
+    const multiManifestA = materializePortfolio({ root: multiRepository, config: multiConfig, planPath: multiPlanPathA, outputPath: multiMaterializedA, repositoryRevision: admittedSecondRevisionA, executionAdmissionEvidenceByFixture: evidenceInventoryA });
+    assert.equal(multiManifestA.case_count, multiPlanA.cases.length, "plan and materialize must use the same multi-fixture evidence manifest");
+
+    const duplicateKeyManifestPath = resolve(work, "duplicate-fixture-evidence.json");
+    writeFileSync(duplicateKeyManifestPath, `{"${multiFixtureOne.id}":{},"${multiFixtureOne.id}":{}}\n`);
+    assert.throws(() => readExecutionAdmissionEvidenceManifest(duplicateKeyManifestPath), /duplicate object key/u, "duplicate fixture identity in the evidence manifest must be rejected");
+    const partialManifestPath = resolve(work, "partial-fixture-evidence.json");
+    writeJson(partialManifestPath, { [multiFixtureOne.id]: { review_authority_path: exactR22Evidence.reviewAuthorityPath } });
+    assert.throws(() => readExecutionAdmissionEvidenceManifest(partialManifestPath), /partial/u, "partial fixture evidence manifest entry must be rejected");
+    const unknownManifestPath = resolve(work, "unknown-fixture-evidence.json");
+    writeJson(unknownManifestPath, {
+      unknown_fixture: {
+        review_authority_path: exactR22Evidence.reviewAuthorityPath,
+        review_authority_source_digest: exactR22Evidence.reviewAuthoritySourceDigest,
+        review_archive_path: exactR22Evidence.reviewArchivePath,
+      },
+    });
+    assert.throws(
+      () => buildPortfolioPlan({ root: multiRepository, config: multiConfig, repositoryRevision: admittedSecondRevisionA, seed: "unknown-fixture-admission", executionAdmissionEvidenceByFixture: readExecutionAdmissionEvidenceManifest(unknownManifestPath) }),
+      /unknown fixture identities/u,
+      "unknown fixture evidence must be rejected",
+    );
+
+    const overlayBytesA = readFileSync(admittedSecondA.overlayPath);
+    writeFileSync(admittedSecondA.overlayPath, Buffer.concat([overlayBytesA, Buffer.from("\n")]));
+    assert.throws(
+      () => resolvePortfolioExecutionAdmission({ root: multiRepository, fixture: multiFixtureTwo, repositoryRevision: admittedSecondRevisionA, externalAdmissionEvidence: admittedSecondA.evidence }),
+      /working-tree bytes differ/u,
+      "repository overlay working-tree drift must be rejected",
+    );
+    writeFileSync(admittedSecondA.overlayPath, overlayBytesA);
+
+    const replacementArchivePath = resolve(work, "multi-fixture-replacement.archive");
+    writeFileSync(replacementArchivePath, "replacement archive\n");
+    assert.throws(
+      () => resolvePortfolioExecutionAdmission({ root: multiRepository, fixture: multiFixtureTwo, repositoryRevision: admittedSecondRevisionA, externalAdmissionEvidence: { ...admittedSecondA.evidence, reviewArchivePath: replacementArchivePath } }),
+      /archive raw identity differs/u,
+      "archive digest mismatch must be rejected",
+    );
+    const mismatchedAuthority = readJson(admittedSecondA.evidence.reviewAuthorityPath);
+    mismatchedAuthority.reviewer_record_id = "projection-mismatch";
+    mismatchedAuthority.authority_id = computeAdmissionReviewAuthorityId(mismatchedAuthority);
+    mismatchedAuthority.authority_digest = computeAdmissionReviewAuthorityDigest(mismatchedAuthority);
+    const mismatchedAuthorityPath = resolve(work, "projection-mismatch-authority.json");
+    writeJson(mismatchedAuthorityPath, mismatchedAuthority);
+    assert.throws(
+      () => resolvePortfolioExecutionAdmission({ root: multiRepository, fixture: multiFixtureTwo, repositoryRevision: admittedSecondRevisionA, externalAdmissionEvidence: { ...admittedSecondA.evidence, reviewAuthorityPath: mismatchedAuthorityPath, reviewAuthoritySourceDigest: digestBytes(readFileSync(mismatchedAuthorityPath)) } }),
+      /differs from external frozen or review authority/u,
+      "review authority projection mismatch must be rejected",
+    );
+
+    const duplicateOverlayPath = resolve(multiRepository, "benchmarks/fixtures/admission-decision/mn-doc-config-correction-test-admission-decision-duplicate.json");
+    writeFileSync(duplicateOverlayPath, overlayBytesA);
+    const duplicateOverlayRevision = commitRepository(multiRepository, "Add duplicate test-only admission overlay");
+    assert.throws(
+      () => resolvePortfolioExecutionAdmission({ root: multiRepository, fixture: multiFixtureTwo, repositoryRevision: duplicateOverlayRevision, externalAdmissionEvidence: admittedSecondA.evidence }),
+      /multiple managed overlays/u,
+      "duplicate repository overlays for one fixture must be rejected",
+    );
+    rmSync(duplicateOverlayPath);
+    commitRepository(multiRepository, "Remove duplicate test-only admission overlay");
+
+    const admittedSecondB = syntheticRepositoryAdmission(multiRepository, "multi-b", {
+      archiveBytes: Buffer.from("synthetic repository review archive B\n"),
+      reviewedAt: "2026-08-12T00:01:00+09:00",
+      reviewerRecordId: "synthetic-independent-review-b",
+    });
+    const admittedSecondRevisionB = commitRepository(multiRepository, "Update test-only second admitted overlay identity");
+    const evidenceManifestPathB = resolve(work, "multi-fixture-execution-admission-b.json");
+    writeJson(evidenceManifestPathB, {
+      [multiFixtureOne.id]: {
+        review_authority_path: exactR22Evidence.reviewAuthorityPath,
+        review_authority_source_digest: exactR22Evidence.reviewAuthoritySourceDigest,
+        review_archive_path: exactR22Evidence.reviewArchivePath,
+      },
+      [multiFixtureTwo.id]: {
+        review_authority_path: admittedSecondB.evidence.reviewAuthorityPath,
+        review_authority_source_digest: admittedSecondB.evidence.reviewAuthoritySourceDigest,
+        review_archive_path: admittedSecondB.evidence.reviewArchivePath,
+      },
+    });
+    const multiPlanB = buildPortfolioPlan({ root: multiRepository, config: multiConfig, repositoryRevision: admittedSecondRevisionB, seed: "multi-fixture-admission", executionAdmissionEvidenceByFixture: readExecutionAdmissionEvidenceManifest(evidenceManifestPathB) });
+    assert.notEqual(multiPlanA.execution_admission_authority_digest, multiPlanB.execution_admission_authority_digest, "changing one fixture review authority/archive identity must change the execution admission authority digest");
+    assert.notEqual(multiPlanA.plan_id, multiPlanB.plan_id, "changing one fixture review authority/archive identity must change the plan ID");
+    assert.notDeepEqual(multiPlanA.cases.map(({ case_id }) => case_id), multiPlanB.cases.map(({ case_id }) => case_id), "case IDs must follow the changed plan identity");
+
+    const nonAdmittedOverlay = structuredClone(admittedSecondB.decision);
+    nonAdmittedOverlay.decision_status = "changes_requested";
+    nonAdmittedOverlay.review_status = "changes_requested";
+    nonAdmittedOverlay.blocking_finding_count = 1;
+    nonAdmittedOverlay.decision_digest = computeAdmissionDecisionDigest(nonAdmittedOverlay);
+    writeJson(admittedSecondB.overlayPath, nonAdmittedOverlay);
+    const nonAdmittedRevision = commitRepository(multiRepository, "Record non-admitted test-only overlay status");
+    assert.throws(
+      () => resolvePortfolioExecutionAdmission({ root: multiRepository, fixture: multiFixtureTwo, repositoryRevision: nonAdmittedRevision, externalAdmissionEvidence: admittedSecondB.evidence }),
+      /does not record admitted status/u,
+      "repository overlay with a non-admitted decision status must not authorize execution",
+    );
   }
 
   for (const [name, missing] of [["missing-reference", "evaluator-reference.json"], ["missing-final-admission", "final-admission-record.json"]]) {
@@ -294,7 +563,7 @@ try {
   }
   const pendingRoot = executionAdmissionRoot("admission-pending");
   rmSync(resolve(pendingRoot, "benchmarks/fixtures/admission-decision/mn-build-option-update-r22-admission-decision.json"));
-  assert.equal(resolvePortfolioExecutionAdmission({ root: pendingRoot, fixture: fixtureOne }).execution_eligible, false, "admission_pending without an effective overlay must fail closed");
+  assert.throws(() => resolvePortfolioExecutionAdmission({ root: pendingRoot, fixture: fixtureOne }), /working-tree file is missing/u, "missing tracked admission overlay must fail closed");
 
   const transplantRoot = executionAdmissionRoot("cross-fixture-transplant");
   const transplantFixtureRoot = resolve(transplantRoot, FIXTURE_ROOT_RELATIVE);

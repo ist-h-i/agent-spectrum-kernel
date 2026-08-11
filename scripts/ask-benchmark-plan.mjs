@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { relative, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { computePortfolioPlanId } from "./ask-benchmark-schema.mjs";
 import {
   computeEffectiveAdmissionAuthorityDigest,
   computeEffectiveAdmissionAuthoritySetDigest,
   resolveEffectiveAdmissionAuthority,
-  resolveEffectiveAdmissionAuthorityFromFiles,
+  resolveEffectiveAdmissionAuthorityFromRepositoryOverlayFiles,
+  resolveRepositoryAdmissionDecision,
 } from "./ask-benchmark-admission-decision.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { readStableJsonFile } from "./ask-benchmark-duplicate-key-json.mjs";
@@ -39,10 +41,15 @@ function fixtureAuthorityPaths(root, fixtureId) {
 }
 
 const EXTERNAL_ADMISSION_EVIDENCE_FIELDS = Object.freeze([
-  "decisionPath",
   "reviewAuthorityPath",
   "reviewAuthoritySourceDigest",
   "reviewArchivePath",
+]);
+
+const EXTERNAL_ADMISSION_MANIFEST_FIELDS = Object.freeze([
+  "review_authority_path",
+  "review_authority_source_digest",
+  "review_archive_path",
 ]);
 
 function normalizeExternalAdmissionEvidence(value, fixtureId) {
@@ -54,6 +61,28 @@ function normalizeExternalAdmissionEvidence(value, fixtureId) {
   const missing = EXTERNAL_ADMISSION_EVIDENCE_FIELDS.filter((key) => !Object.hasOwn(value, key) || value[key] === null || value[key] === undefined || value[key] === "");
   if (missing.length > 0) throw new Error(`${fixtureId} execution admission evidence is partial; missing: ${missing.join(", ")}`);
   return Object.freeze(Object.fromEntries(EXTERNAL_ADMISSION_EVIDENCE_FIELDS.map((field) => [field, value[field]])));
+}
+
+export function readExecutionAdmissionEvidenceManifest(manifestPath) {
+  const source = readStableJsonFile(manifestPath, "execution admission evidence manifest", 1024 * 1024, { allowEmpty: false });
+  const manifest = source.value;
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) throw new Error("execution admission evidence manifest must be a fixture-keyed object");
+  const base = dirname(resolve(manifestPath));
+  return Object.freeze(Object.fromEntries(Object.entries(manifest).map(([fixtureId, evidence]) => {
+    if (!fixtureId) throw new Error("execution admission evidence manifest contains an empty fixture identity");
+    if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) throw new Error(`${fixtureId} execution admission manifest entry must be a closed object`);
+    const keys = Object.keys(evidence);
+    const unknown = keys.filter((key) => !EXTERNAL_ADMISSION_MANIFEST_FIELDS.includes(key));
+    const missing = EXTERNAL_ADMISSION_MANIFEST_FIELDS.filter((key) => !Object.hasOwn(evidence, key) || typeof evidence[key] !== "string" || evidence[key].length === 0);
+    if (unknown.length > 0) throw new Error(`${fixtureId} execution admission manifest entry has unknown fields: ${unknown.join(", ")}`);
+    if (missing.length > 0) throw new Error(`${fixtureId} execution admission manifest entry is partial; missing: ${missing.join(", ")}`);
+    if (!/^sha256:[a-f0-9]{64}$/u.test(evidence.review_authority_source_digest)) throw new Error(`${fixtureId} execution admission manifest source digest is invalid`);
+    return [fixtureId, Object.freeze({
+      reviewAuthorityPath: resolve(base, evidence.review_authority_path),
+      reviewAuthoritySourceDigest: evidence.review_authority_source_digest,
+      reviewArchivePath: resolve(base, evidence.review_archive_path),
+    })];
+  })));
 }
 
 function frozenAuthoritySources(root, fixtureId, paths) {
@@ -73,7 +102,15 @@ function frozenAuthoritySources(root, fixtureId, paths) {
   };
 }
 
-export function resolvePortfolioExecutionAdmission({ root, fixture, externalAdmissionEvidence = null }) {
+function readRepositoryRevision(root) {
+  try {
+    return execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  } catch (error) {
+    throw new Error(`portfolio execution admission requires a Git repository revision: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+export function resolvePortfolioExecutionAdmission({ root, fixture, repositoryRevision = readRepositoryRevision(root), externalAdmissionEvidence = null }) {
   if (fixture.suite === "calibration") return Object.freeze({ fixture_id: fixture.id, authority_mode: "calibration", effective_admission_status: "calibration_only", execution_eligible: true });
   const evidence = normalizeExternalAdmissionEvidence(externalAdmissionEvidence, fixture.id);
   const paths = fixtureAuthorityPaths(root, fixture.id);
@@ -82,9 +119,56 @@ export function resolvePortfolioExecutionAdmission({ root, fixture, externalAdmi
     return Object.freeze({ fixture_id: fixture.id, authority_mode: "not_admitted", effective_admission_status: "authority_missing", execution_eligible: false, authority_identity_digest: canonicalDigest({ fixture_id: fixture.id, status: "authority_missing" }) });
   }
   const authoritySources = frozenAuthoritySources(root, fixture.id, paths);
-  const resolved = evidence
-    ? resolveEffectiveAdmissionAuthorityFromFiles({ ...authoritySources, ...evidence })
-    : resolveEffectiveAdmissionAuthority(authoritySources);
+  const repositoryOverlay = resolveRepositoryAdmissionDecision({ root, repositoryRevision, fixtureId: fixture.id });
+  if (!repositoryOverlay) {
+    if (evidence) throw new Error(`${fixture.id} external review evidence cannot create admission without a repository-managed overlay`);
+    const resolved = resolveEffectiveAdmissionAuthority(authoritySources);
+    const executionEligible = resolved.authority_mode === "legacy_admitted_record" && resolved.effective_admission_status === "admitted";
+    return Object.freeze({
+      fixture_id: fixture.id,
+      authority_mode: resolved.authority_mode,
+      effective_admission_status: resolved.effective_admission_status,
+      execution_eligible: executionEligible,
+      authority_identity_digest: computeEffectiveAdmissionAuthorityDigest(resolved),
+      resolved_authority: resolved,
+    });
+  }
+  if (repositoryOverlay.decision.fixture_id !== fixture.id) throw new Error(`${fixture.id} repository admission overlay contains a cross-fixture transplant`);
+  if (repositoryOverlay.decision.decision_status !== "admitted") {
+    if (evidence) throw new Error(`${fixture.id} repository admission overlay does not record admitted status`);
+    const resolved = resolveEffectiveAdmissionAuthority({ ...authoritySources, decisionOverlay: repositoryOverlay.decision });
+    return Object.freeze({
+      fixture_id: fixture.id,
+      authority_mode: resolved.authority_mode,
+      effective_admission_status: resolved.effective_admission_status,
+      execution_eligible: false,
+      authority_identity_digest: computeEffectiveAdmissionAuthorityDigest(resolved),
+      resolved_authority: resolved,
+    });
+  }
+  if (!evidence) {
+    const resolved = resolveEffectiveAdmissionAuthority(authoritySources);
+    return Object.freeze({
+      fixture_id: fixture.id,
+      authority_mode: "not_admitted",
+      effective_admission_status: "review_evidence_missing",
+      execution_eligible: false,
+      authority_identity_digest: canonicalDigest({
+        fixture_id: fixture.id,
+        repository_overlay_path: repositoryOverlay.path,
+        repository_overlay_raw_digest: repositoryOverlay.raw_byte_digest,
+        repository_revision: repositoryOverlay.repository_revision,
+        frozen_authority_digest: computeEffectiveAdmissionAuthorityDigest(resolved),
+        status: "review_evidence_missing",
+      }),
+      resolved_authority: resolved,
+    });
+  }
+  const resolved = resolveEffectiveAdmissionAuthorityFromRepositoryOverlayFiles({
+    ...authoritySources,
+    repositoryDecision: repositoryOverlay.decision,
+    ...evidence,
+  });
   if (resolved.fixture_id !== fixture.id) throw new Error(`${fixture.id} effective execution authority contains a cross-fixture transplant`);
   const executionEligible = resolved.authority_mode === "legacy_admitted_record" || resolved.authority_mode === "admitted_overlay"
     ? resolved.effective_admission_status === "admitted"
@@ -108,9 +192,9 @@ function validateEvidenceInventory(config, executionAdmissionEvidenceByFixture) 
   return executionAdmissionEvidenceByFixture;
 }
 
-function resolvePortfolioExecutionContext({ root, config, executionAdmissionEvidenceByFixture = null }) {
+function resolvePortfolioExecutionContext({ root, config, repositoryRevision, executionAdmissionEvidenceByFixture = null }) {
   const evidenceInventory = validateEvidenceInventory(config, executionAdmissionEvidenceByFixture);
-  const admissions = config.fixtures.map((fixture) => resolvePortfolioExecutionAdmission({ root, fixture, externalAdmissionEvidence: evidenceInventory[fixture.id] ?? null }));
+  const admissions = config.fixtures.map((fixture) => resolvePortfolioExecutionAdmission({ root, fixture, repositoryRevision, externalAdmissionEvidence: evidenceInventory[fixture.id] ?? null }));
   const resolvedAuthorities = admissions.map(({ resolved_authority }) => resolved_authority).filter(Boolean);
   const resolvedAuthoritySetDigest = computeEffectiveAdmissionAuthoritySetDigest(resolvedAuthorities);
   const authoritySetDigest = canonicalDigest({
@@ -120,8 +204,8 @@ function resolvePortfolioExecutionContext({ root, config, executionAdmissionEvid
   return { admissions, authoritySetDigest };
 }
 
-export function resolvePortfolioExecutionFixtures({ root, config, executionAdmissionEvidenceByFixture = null }) {
-  const context = resolvePortfolioExecutionContext({ root, config, executionAdmissionEvidenceByFixture });
+export function resolvePortfolioExecutionFixtures({ root, config, repositoryRevision = readRepositoryRevision(root), executionAdmissionEvidenceByFixture = null }) {
+  const context = resolvePortfolioExecutionContext({ root, config, repositoryRevision, executionAdmissionEvidenceByFixture });
   const eligibleIds = new Set(context.admissions.filter(({ execution_eligible }) => execution_eligible).map(({ fixture_id }) => fixture_id));
   return config.fixtures.filter(({ id }) => eligibleIds.has(id));
 }
@@ -130,7 +214,7 @@ export function buildPortfolioPlan({ root, config, repositoryRevision, seed, exe
   const configSha256 = sha256(readFileSync(config._configPath));
   const protocolSha256 = sha256(readFileSync(config._protocolPath));
   const seedSha256 = sha256(seed);
-  const executionContext = resolvePortfolioExecutionContext({ root, config, executionAdmissionEvidenceByFixture });
+  const executionContext = resolvePortfolioExecutionContext({ root, config, repositoryRevision, executionAdmissionEvidenceByFixture });
   const executionAdmissionAuthorityDigest = executionContext.authoritySetDigest;
   const planId = computePortfolioPlanId({ configSha256, protocolSha256, repositoryRevision, seed, executionAdmissionAuthorityDigest });
   const planDigest = planId.slice("plan-".length);

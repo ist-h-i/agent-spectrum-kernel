@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -63,7 +63,7 @@ try {
   rmSync(invalidCheckpointCConfigPath, { force: true });
 }
 
-const portfolioWork = mkdtempSync(resolve(tmpdir(), "ask-benchmark-portfolio-test-"));
+const portfolioWork = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-benchmark-portfolio-test-")));
 const invalidPortfolioConfigPath = resolve(root, "benchmarks", `.adaptive-portfolio-invalid-${process.pid}.json`);
 const invalidPortfolioPlanPath = resolve(portfolioWork, "invalid-plan.json");
 const basePortfolioConfig = JSON.parse(readFileSync(portfolioConfig, "utf8"));
@@ -97,10 +97,16 @@ const portfolioPlanPath = resolve(portfolioWork, "plan.json");
 const portfolioPlanRepeatPath = resolve(portfolioWork, "plan-repeat.json");
 const portfolioPlanAlternatePath = resolve(portfolioWork, "plan-alternate.json");
 const portfolioPlanFromRecordedSeedPath = resolve(portfolioWork, "plan-from-recorded-seed.json");
+const portfolioPlanFromEvidenceManifestPath = resolve(portfolioWork, "plan-from-evidence-manifest.json");
+const emptyExecutionAdmissionEvidencePath = resolve(portfolioWork, "execution-admission-evidence.json");
 const invalidEmittedPlanPath = resolve(portfolioWork, "invalid-emitted-plan.json");
+writeFileSync(emptyExecutionAdmissionEvidencePath, "{}\n");
 run(["plan", "--config", portfolioConfig, "--output", portfolioPlanPath, "--seed", "portfolio-seed-2026"]);
 run(["plan", "--config", portfolioConfig, "--output", portfolioPlanRepeatPath, "--seed", "portfolio-seed-2026"]);
+run(["plan", "--config", portfolioConfig, "--output", portfolioPlanFromEvidenceManifestPath, "--seed", "portfolio-seed-2026", "--execution-admission-evidence", emptyExecutionAdmissionEvidencePath]);
 run(["plan", "--config", portfolioConfig, "--output", portfolioPlanAlternatePath, "--seed", "alternate-portfolio-seed-2026"]);
+const legacyExecutionAdmission = run(["plan", "--config", portfolioConfig, "--output", resolve(portfolioWork, "legacy-execution-admission-plan.json"), "--seed", "legacy-execution-admission", "--execution-admission-fixture", "mn-build-option-update", "--admission-decision", resolve(root, "benchmarks/fixtures/admission-decision/mn-build-option-update-r22-admission-decision.json")], 1);
+assert.match(`${legacyExecutionAdmission.stderr}\n${legacyExecutionAdmission.stdout}`, /no longer accepts caller decision or single-fixture flags/u);
 const invalidEmittedPlan = run(["plan", "--config", portfolioConfig, "--output", invalidEmittedPlanPath, "--seed", "s".repeat(257)], 1);
 assert.match(`${invalidEmittedPlan.stderr}\n${invalidEmittedPlan.stdout}`, /execution plan failed JSON Schema validation/);
 assert.equal(existsSync(invalidEmittedPlanPath), false);
@@ -108,8 +114,10 @@ assert.equal(existsSync(invalidEmittedPlanPath), false);
 const portfolioPlan = JSON.parse(readFileSync(portfolioPlanPath, "utf8"));
 const portfolioRuntimeConfig = JSON.parse(readFileSync(portfolioConfig, "utf8"));
 const repeatedPortfolioPlan = JSON.parse(readFileSync(portfolioPlanRepeatPath, "utf8"));
+const evidenceManifestPortfolioPlan = JSON.parse(readFileSync(portfolioPlanFromEvidenceManifestPath, "utf8"));
 const alternatePortfolioPlan = JSON.parse(readFileSync(portfolioPlanAlternatePath, "utf8"));
 assert.deepEqual(repeatedPortfolioPlan, portfolioPlan);
+assert.deepEqual(evidenceManifestPortfolioPlan, portfolioPlan, "empty closed evidence manifest must preserve the default fail-closed plan");
 assert.match(portfolioPlan.randomization_seed.seed_id, /^seed-[a-f0-9]{16}$/);
 assert.equal(portfolioPlan.randomization_seed.value, "portfolio-seed-2026");
 assert.match(portfolioPlan.randomization_seed.sha256, /^[a-f0-9]{64}$/);
