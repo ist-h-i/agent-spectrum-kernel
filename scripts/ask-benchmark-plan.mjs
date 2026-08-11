@@ -110,6 +110,11 @@ function readRepositoryRevision(root) {
   }
 }
 
+function assertResolvedFixtureIdentity(resolved, fixtureId) {
+  if (resolved.fixture_id !== fixtureId) throw new Error(`${fixtureId} effective execution authority contains a cross-fixture transplant`);
+  return resolved;
+}
+
 export function resolvePortfolioExecutionAdmission({ root, fixture, repositoryRevision = readRepositoryRevision(root), externalAdmissionEvidence = null }) {
   if (fixture.suite === "calibration") return Object.freeze({ fixture_id: fixture.id, authority_mode: "calibration", effective_admission_status: "calibration_only", execution_eligible: true });
   const evidence = normalizeExternalAdmissionEvidence(externalAdmissionEvidence, fixture.id);
@@ -122,7 +127,7 @@ export function resolvePortfolioExecutionAdmission({ root, fixture, repositoryRe
   const repositoryOverlay = resolveRepositoryAdmissionDecision({ root, repositoryRevision, fixtureId: fixture.id });
   if (!repositoryOverlay) {
     if (evidence) throw new Error(`${fixture.id} external review evidence cannot create admission without a repository-managed overlay`);
-    const resolved = resolveEffectiveAdmissionAuthority(authoritySources);
+    const resolved = assertResolvedFixtureIdentity(resolveEffectiveAdmissionAuthority(authoritySources), fixture.id);
     const executionEligible = resolved.authority_mode === "legacy_admitted_record" && resolved.effective_admission_status === "admitted";
     return Object.freeze({
       fixture_id: fixture.id,
@@ -136,7 +141,7 @@ export function resolvePortfolioExecutionAdmission({ root, fixture, repositoryRe
   if (repositoryOverlay.decision.fixture_id !== fixture.id) throw new Error(`${fixture.id} repository admission overlay contains a cross-fixture transplant`);
   if (repositoryOverlay.decision.decision_status !== "admitted") {
     if (evidence) throw new Error(`${fixture.id} repository admission overlay does not record admitted status`);
-    const resolved = resolveEffectiveAdmissionAuthority({ ...authoritySources, decisionOverlay: repositoryOverlay.decision });
+    const resolved = assertResolvedFixtureIdentity(resolveEffectiveAdmissionAuthority({ ...authoritySources, decisionOverlay: repositoryOverlay.decision }), fixture.id);
     return Object.freeze({
       fixture_id: fixture.id,
       authority_mode: resolved.authority_mode,
@@ -147,7 +152,7 @@ export function resolvePortfolioExecutionAdmission({ root, fixture, repositoryRe
     });
   }
   if (!evidence) {
-    const resolved = resolveEffectiveAdmissionAuthority(authoritySources);
+    const resolved = assertResolvedFixtureIdentity(resolveEffectiveAdmissionAuthority(authoritySources), fixture.id);
     return Object.freeze({
       fixture_id: fixture.id,
       authority_mode: "not_admitted",
@@ -169,7 +174,7 @@ export function resolvePortfolioExecutionAdmission({ root, fixture, repositoryRe
     repositoryDecision: repositoryOverlay.decision,
     ...evidence,
   });
-  if (resolved.fixture_id !== fixture.id) throw new Error(`${fixture.id} effective execution authority contains a cross-fixture transplant`);
+  assertResolvedFixtureIdentity(resolved, fixture.id);
   const executionEligible = resolved.authority_mode === "legacy_admitted_record" || resolved.authority_mode === "admitted_overlay"
     ? resolved.effective_admission_status === "admitted"
     : false;
