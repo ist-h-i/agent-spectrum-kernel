@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,7 +37,7 @@ import { validateMnDocConfigCorrectionProductionAuthority, writeMnDocConfigCorre
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
-const work = mkdtempSync(resolve(tmpdir(), "ask-mn-doc-config-correction-"));
+const work = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-mn-doc-config-correction-")));
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
