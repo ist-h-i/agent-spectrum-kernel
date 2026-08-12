@@ -539,7 +539,7 @@ try {
       writeJson(exactPlanPath, exactPlan);
       const exactMaterialization = materializePortfolio({ root, config: planConfig, planPath: exactPlanPath, outputPath: exactMaterializedPath, repositoryRevision, executionAdmissionEvidenceByFixture: exactEvidenceInventory });
       assert.equal(exactMaterialization.case_count, 160, "materialization must preserve the exact two-fixture admission inventory");
-      assert.equal(exactMaterialization.execution_admission_authority_digest, exactPlan.execution_admission_authority_digest, "plan and materialization must bind the same effective admission authority");
+      assert.equal(exactMaterialization.plan.digest, canonicalDigest(exactPlan), "materialization must bind the exact plan containing the effective admission authority");
 
       assert.throws(
         () => resolvePortfolioExecutionAdmission({ root, fixture: candidateFixture, repositoryRevision, externalAdmissionEvidence: { ...exactMnDocEvidence, reviewAuthoritySourceDigest: `sha256:${"0".repeat(64)}` } }),
