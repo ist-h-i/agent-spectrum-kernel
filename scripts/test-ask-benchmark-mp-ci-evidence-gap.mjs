@@ -1,0 +1,173 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, resolve } from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
+import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
+import { resolvePortfolioExecutionAdmission, resolvePortfolioExecutionFixtures } from "./ask-benchmark-plan.mjs";
+import { validateEquivalenceAuthority, validateMatchedEquivalenceIds, validateMutationAuthority } from "./ask-benchmark-mn-build-option-update.mjs";
+import { validateMpCiEvidenceGapInputClosure } from "./ask-benchmark-mp-ci-evidence-gap.mjs";
+import { buildMpCiEvidenceAuthority, validateMpCiEvidenceGapProductionAuthority } from "./ask-benchmark-mp-ci-evidence-gap-authority.mjs";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const FIXTURE_ROOT = resolve(ROOT, "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap");
+
+function readJson(path) {
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function clone(value) {
+  return structuredClone(value);
+}
+
+function expectFailure(operation, pattern, label) {
+  assert.throws(operation, pattern, label);
+}
+
+function privateArgs(argv) {
+  const privateIndex = argv.indexOf("--private-root");
+  const casesIndex = argv.indexOf("--private-case-root");
+  if ((privateIndex === -1) !== (casesIndex === -1)) throw new Error("--private-root and --private-case-root must be supplied together");
+  return privateIndex === -1 ? null : { privateRoot: resolve(argv[privateIndex + 1]), caseRoot: resolve(argv[casesIndex + 1]) };
+}
+
+function createBoundaryRoots(work) {
+  const fields = {
+    materializedPath: ["materialized", "materialization-manifest.json"],
+    selectionState: ["selection", "selection-state.json"],
+    runDir: ["run", "run-identity.json"],
+    normalizedResultsPath: ["normalized", "normalized-results-root.json"],
+  };
+  return Object.fromEntries(Object.entries(fields).map(([field, [directory, marker]]) => {
+    const root = resolve(work, directory);
+    mkdirSync(root);
+    writeFileSync(resolve(root, marker), "{}\n");
+    return [field, root];
+  }));
+}
+
+function validateFrozenDesign() {
+  const record = readJson(resolve(ROOT, "benchmarks/portfolio-design-admission-records/mp-ci-evidence-gap.json"));
+  assert.deepEqual(record.catalog_metadata, {
+    suite: "mechanism_positive",
+    task_class: "review_verification",
+    domain: "ci_build",
+    difficulty: "medium_hard",
+    repetitions: 3,
+    capability_families: ["evidence_synthesis", "verification_discipline"],
+    evidence_topologies: ["ci_logs_and_config", "implementation_and_tests"],
+    outcome_dimensions: ["evidence_completeness", "review_precision"],
+    risk_boundary: "none",
+  });
+  assert.equal(record.answer_neutral_design.output_contract_type, "findings_producing");
+  assert.equal(record.answer_neutral_design.evidence_removal_mutation_topology, "ci_logs_and_config");
+  assert.equal(record.answer_neutral_design.suspicious_but_correct_control_required, true);
+}
+
+function validateVisibleScenario() {
+  const workspace = resolve(FIXTURE_ROOT, "workspace");
+  const unit = spawnSync(process.execPath, ["--test", "test/unit/quote-order.test.mjs"], { cwd: workspace, encoding: "utf8" });
+  assert.equal(unit.status, 0, unit.stderr || unit.stdout);
+  const checkout = spawnSync(process.execPath, ["--test", "test/checkout/quote-order-contract.test.mjs"], { cwd: workspace, encoding: "utf8" });
+  assert.notEqual(checkout.status, 0, "checkout contract must expose the agent-visible proposed defect");
+  assert.match(`${checkout.stdout}${checkout.stderr}`, /Missing expected exception|RangeError/u);
+}
+
+function validateSharedNegativeCoverage() {
+  const boundary = readFileSync(resolve(ROOT, "scripts/test-ask-benchmark-evaluator-boundary.mjs"), "utf8");
+  const fixtureOne = readFileSync(resolve(ROOT, "scripts/test-ask-benchmark-mn-build-option-update.mjs"), "utf8");
+  const fixtureTwo = readFileSync(resolve(ROOT, "scripts/test-ask-benchmark-mn-doc-config-correction.mjs"), "utf8");
+  const shared = `${boundary}\n${fixtureOne}\n${fixtureTwo}`;
+  for (const pattern of [/public artifact root/u, /byte-identical private evaluator material/u, /symlink/u, /path escape/u, /cross-fixture transplant/u]) assert.match(shared, pattern);
+  for (const pattern of [/caller-created admitted object injection/u, /admission_pending/u, /public reference bundle transplant/u, /private material in the public artifact root/u]) assert.match(shared, pattern);
+}
+
+async function validatePrivateCases({ privateRoot, caseRoot }) {
+  const work = mkdtempSync(resolve(tmpdir(), "mp-ci-private-test-"));
+  try {
+    const boundaryRoots = createBoundaryRoots(work);
+    const production = validateMpCiEvidenceGapProductionAuthority({ root: ROOT, privateRoot, boundaryRoots });
+    assert.equal(production.scoringReady, false);
+    assert.equal(production.admissionState, "admission_pending");
+    const evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${production.evaluatorBundleDigest}`);
+    const cases = readJson(resolve(caseRoot, "cases.json"));
+    for (const entry of cases.cases) {
+      const frozen = resolve(work, `${entry.case_id}-frozen`);
+      const candidate = resolve(work, `${entry.case_id}-candidate`);
+      cpSync(resolve(FIXTURE_ROOT, "workspace"), frozen, { recursive: true });
+      cpSync(frozen, candidate, { recursive: true });
+      cpSync(resolve(caseRoot, entry.case_id, "review.json"), resolve(candidate, "review.json"));
+      if (entry.mutate_source) writeFileSync(resolve(candidate, "src/quote-order.mjs"), `${readFileSync(resolve(candidate, "src/quote-order.mjs"), "utf8")}\n// unrelated candidate edit\n`);
+      const first = await evaluator.evaluateCandidate({ frozenWorkspace: frozen, candidateWorkspace: candidate, verificationState: "executed_success" });
+      const second = await evaluator.evaluateCandidate({ frozenWorkspace: frozen, candidateWorkspace: candidate, verificationState: "executed_success" });
+      assert.deepEqual(first, second, `${entry.case_id} evaluator determinism`);
+      assertBenchmarkSchemaInstance(first, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} private fragment` });
+      assert.deepEqual(first.requirement_results.map(({ earned_points }) => earned_points), entry.expected_points, `${entry.case_id} requirement points`);
+      assert.equal(first.classification, entry.expected_classification, `${entry.case_id} classification`);
+      assert.equal(first.scoring_ready, false);
+    }
+
+    const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
+    const admission = readJson(resolve(FIXTURE_ROOT, "final-admission-record.json"));
+    const evidenceMap = readJson(resolve(FIXTURE_ROOT, "evidence-map.json"));
+    const inputRecord = readJson(resolve(FIXTURE_ROOT, "input-manifest.json")).fixtures["mp-ci-evidence-gap"];
+    const mutationAsset = readJson(resolve(privateRoot, "evidence-removal-mutations.json"));
+    const equivalenceAsset = readJson(resolve(privateRoot, "equivalent-solutions.json"));
+    assert.doesNotThrow(() => validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset }));
+    assert.doesNotThrow(() => validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset }));
+    assert.doesNotThrow(() => validateMatchedEquivalenceIds({ requirementRecord: requirement, equivalenceAsset, matchedEquivalenceClassIds: equivalenceAsset.rules.map(({ equivalence_class_id }) => equivalence_class_id) }));
+    expectFailure(() => validateMatchedEquivalenceIds({ requirementRecord: requirement, equivalenceAsset, matchedEquivalenceClassIds: ["undeclared-equivalence"] }), /undeclared/u, "undeclared equivalence must fail");
+    for (const [label, mutate, pattern] of [
+      ["mutation omission", (value) => value.mutations.pop(), /inventory/u],
+      ["mutation duplication", (value) => value.mutations.push(clone(value.mutations[0])), /duplicate/u],
+      ["extra mutation", (value) => value.mutations.push({ ...clone(value.mutations[0]), mutation_id: "extra-mutation" }), /inventory/u],
+      ["wrong requirement binding", (value) => { value.mutations[0].requirement_id = requirement.requirements[1].requirement_id; }, /transplanted/u],
+      ["wrong removal path", (value) => { value.mutations[0].remove_paths = [value.mutations[0].remove_paths[0]]; }, /inventory/u],
+      ["mutation digest drift", (value) => { value.mutations[0].mutation_digest = `sha256:${"0".repeat(64)}`; }, /digest/u],
+    ]) {
+      const mutated = clone(mutationAsset); mutate(mutated);
+      expectFailure(() => validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset: mutated }), pattern, label);
+    }
+    for (const [label, mutate, pattern] of [
+      ["equivalence omission", (value) => value.rules.pop(), /inventory/u],
+      ["cross-requirement equivalence", (value) => { value.rules[0].requirement_id = requirement.requirements[1].requirement_id; }, /transplanted/u],
+      ["cross-fixture equivalence", (value) => { value.fixture_id = "foreign-fixture"; }, /fixture/u],
+      ["property-order-only equivalence", (value) => { value.rules[0].property_order_only = true; value.rules[0].rule_digest = canonicalDigest(Object.fromEntries(Object.entries(value.rules[0]).filter(([key]) => key !== "rule_digest"))); }, /observable-contract/u],
+    ]) {
+      const mutated = clone(equivalenceAsset); mutate(mutated);
+      expectFailure(() => {
+        if (mutated.fixture_id !== requirement.fixture_id) throw new Error("private equivalence fixture transplant");
+        validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: mutated });
+      }, pattern, label);
+    }
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+validateFrozenDesign();
+validateMpCiEvidenceGapInputClosure({ root: ROOT });
+validateVisibleScenario();
+validateSharedNegativeCoverage();
+
+const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
+if (productionExists) {
+  const production = validateMpCiEvidenceGapProductionAuthority({ root: ROOT });
+  assert.equal(production.scoringReady, false);
+  const config = readJson(resolve(ROOT, "benchmarks/adaptive-portfolio.config.json"));
+  config._configPath = resolve(ROOT, "benchmarks/adaptive-portfolio.config.json");
+  config._protocolPath = resolve(ROOT, config.protocol_path);
+  const fixture = config.fixtures.find(({ id }) => id === "mp-ci-evidence-gap");
+  const admission = resolvePortfolioExecutionAdmission({ root: ROOT, fixture });
+  assert.equal(admission.execution_eligible, false);
+  assert.equal(admission.effective_admission_status, "admission_pending");
+  assert.equal(resolvePortfolioExecutionFixtures({ root: ROOT, config }).some(({ id }) => id === "mp-ci-evidence-gap"), false);
+  expectFailure(() => resolvePortfolioExecutionAdmission({ root: ROOT, fixture, externalAdmissionEvidence: { reviewAuthorityPath: "/tmp/fake", reviewAuthoritySourceDigest: `sha256:${"0".repeat(64)}`, reviewArchivePath: "/tmp/fake.zip" } }), /cannot create admission|overlay/u, "caller-supplied fake admission must fail");
+}
+
+const requested = privateArgs(process.argv.slice(2));
+if (requested) await validatePrivateCases(requested);
+
+console.log(JSON.stringify({ fixture_id: "mp-ci-evidence-gap", input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", admission: "pending", scoring_ready: false }));

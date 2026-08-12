@@ -60,6 +60,9 @@ jobs:
       - name: Run documentation/config fixture source-freeze tests
         run: node scripts/test-ask-benchmark-mn-doc-config-correction.mjs
 
+      - name: Run CI-evidence review fixture source-freeze tests
+        run: node scripts/test-ask-benchmark-mp-ci-evidence-gap.mjs
+
       - name: Run evaluator-authority integration contract tests
         run: node scripts/test-ask-benchmark-portfolio-evaluator-result.mjs
 

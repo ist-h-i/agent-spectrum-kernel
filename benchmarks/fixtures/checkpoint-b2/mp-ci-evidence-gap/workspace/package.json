@@ -1,0 +1,14 @@
+{
+  "name": "order-quote-review-fixture",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test test/unit/*.test.mjs",
+    "test:checkout": "node --test test/checkout/*.test.mjs",
+    "test:all": "npm test && npm run test:checkout",
+    "validate:review": "node scripts/validate-review.mjs review.json"
+  }
+}

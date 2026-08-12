@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "mp-ci-evidence-gap": {
+      "class": "review_verification",
+      "difficulty": "medium_hard",
+      "target_minutes": 15,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "4247670f22a882a630aadc8688e6ed9a7c7040fb31aad17bbab7a6bb831fa435",
+          "bytes": 437
+        },
+        {
+          "path": "workspace/.github/workflows/pull-request.yml",
+          "sha256": "d1a079e6bf8aea15c532c1ee06e9f505e92e40f6492be626dc8fd24f86eb382c",
+          "bytes": 431
+        },
+        {
+          "path": "workspace/ci/pull-request-314.log",
+          "sha256": "8cdd6705480e8b6a859bf40098fe0e3c358564c1e775acd14d8bb8c55ec98fd6",
+          "bytes": 403
+        },
+        {
+          "path": "workspace/docs/verification.md",
+          "sha256": "04b970363da50dd818517c0be65bd5e832e791d98d420bc978e9d1b5da702639",
+          "bytes": 529
+        },
+        {
+          "path": "workspace/package-lock.json",
+          "sha256": "1441bbf380d78c27f1604d32ba6c31806099a8d1e533877cd058c462e2b77723",
+          "bytes": 218
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "849ad5e187dfe0a542479aef8411203d606559ab0f140865601913e165a88fe7",
+          "bytes": 373
+        },
+        {
+          "path": "workspace/pr.diff",
+          "sha256": "903d8a715665c7091aa7b7a0dba214235079abed3b09faa20510e46c64fbe834",
+          "bytes": 541
+        },
+        {
+          "path": "workspace/review.schema.json",
+          "sha256": "22e7984d1a6b3c8e92177500b7a566d5f0cc06fa5325acc55dc6c4dc6e91a62a",
+          "bytes": 1849
+        },
+        {
+          "path": "workspace/scripts/upload-diagnostics.mjs",
+          "sha256": "4f82ac80e4c5622d0e33bdd44c8e01628ed63eee9a2d313a1cd0c6e73857dd2c",
+          "bytes": 138
+        },
+        {
+          "path": "workspace/scripts/validate-review.mjs",
+          "sha256": "008cd831c8e38041af31be0cbbdc8fcb3b42ba45006492fbf32b870814882422",
+          "bytes": 2210
+        },
+        {
+          "path": "workspace/src/quote-order.mjs",
+          "sha256": "9b74bbd8aebbce93ccaca984dee24dcdef2161e219c6bb9f609381a46a7a43f4",
+          "bytes": 398
+        },
+        {
+          "path": "workspace/test/checkout/quote-order-contract.test.mjs",
+          "sha256": "92ec6bc43700ff64ae2c6d83725a3f71c1c871a5d9545a228f41f452f237f1fa",
+          "bytes": 381
+        },
+        {
+          "path": "workspace/test/unit/quote-order.test.mjs",
+          "sha256": "d82815c4131eb7fe5d42b83d88658bd6c3814b542203c15566848b2d4150e0c5",
+          "bytes": 664
+        }
+      ]
+    }
+  }
+}

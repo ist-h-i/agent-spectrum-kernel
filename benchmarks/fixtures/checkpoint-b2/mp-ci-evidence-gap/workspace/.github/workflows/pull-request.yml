@@ -1,0 +1,20 @@
+name: Pull request checks
+
+on:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - name: Run unit tests
+        run: npm test
+      - name: Upload unit-test diagnostics
+        continue-on-error: true
+        run: node scripts/upload-diagnostics.mjs

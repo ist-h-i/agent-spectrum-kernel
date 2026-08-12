@@ -106,6 +106,20 @@
         "path": "benchmarks/fixtures/checkpoint-b2/mn-doc-config-correction/verification-command-contract.json",
         "sha256": "01d654f88a042f9f38aff0c78f48381bf1bba0899dda4c9a9184783b0a26f3df"
       }
+    },
+    {
+      "id": "mp-ci-evidence-gap",
+      "suite": "mechanism_positive",
+      "task_class": "review_verification",
+      "difficulty": "medium_hard",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/input-manifest.json",
+      "input_manifest_sha256": "13e5d0c70feffed4db0bdf68b2b89b9b15005c53525a8e5b10d9198775d7ac25",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/verification-command-contract.json",
+        "sha256": "5426f0f2b1f82047f23cc6a76bd7689a2c22d7165d67af72a56df90072b78e78"
+      }
     }
   ],
   "ordering": {
