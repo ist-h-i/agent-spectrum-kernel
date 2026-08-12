@@ -256,7 +256,7 @@ export function validateReviewArchiveInventoryAgainstSources(entries, sources) {
   return true;
 }
 
-function reviewManifest({ root, privateRoot, caseRoot, reviewedHead, pullRequest, entries }) {
+function reviewManifest({ root, privateRoot, caseRoot, reviewedHead, pullRequest, issue, entries }) {
   const fixtureRoot = resolve(root, FIXTURE_ROOT);
   const requirement = readJson(resolve(fixtureRoot, "requirement-record.json"), "mn-doc requirement record");
   const output = readJson(resolve(fixtureRoot, "output-contract.json"), "mn-doc output contract");
@@ -280,10 +280,10 @@ function reviewManifest({ root, privateRoot, caseRoot, reviewedHead, pullRequest
   const expectedArchiveEntries = [REVIEW_MANIFEST_PATH, ...entries.map(({ archive_path }) => archive_path)];
   validateReviewArchiveInventory(entries, expectedArchiveEntries);
   return {
-    schema_version: "pr242-exact-private-review-manifest.v3",
+    schema_version: issue === null ? "pr242-exact-private-review-manifest.v3" : "mn-doc-exact-private-review-manifest.v4",
     package_kind: "independent_private_review_archive",
     archive_format: zipFormatAuthority(root),
-    review_target: { repository: "ist-h-i/agent-spectrum-kernel", pull_request: pullRequest, reviewed_head: reviewedHead, evaluator_revision: reference.evaluator_revision },
+    review_target: { repository: "ist-h-i/agent-spectrum-kernel", ...(issue === null ? { pull_request: pullRequest } : { issue }), reviewed_head: reviewedHead, evaluator_revision: reference.evaluator_revision },
     authority: {
       requirement_record_digest: requirement.requirement_record_digest,
       requirement_set_digest: requirement.requirement_set_digest,
@@ -430,7 +430,10 @@ export function verifyMnDocConfigCorrectionReviewArchive({ archivePath, root = R
   try {
     execFileSync("unzip", ["-q", archivePath, "-d", extraction]);
     const manifest = readJson(resolve(extraction, REVIEW_MANIFEST_PATH), "review archive manifest");
-    if (manifest.schema_version !== "pr242-exact-private-review-manifest.v3") throw new Error("review archive manifest revision differs");
+    if (!new Set(["pr242-exact-private-review-manifest.v3", "mn-doc-exact-private-review-manifest.v4"]).has(manifest.schema_version)) throw new Error("review archive manifest revision differs");
+    const targetNumberField = manifest.schema_version === "pr242-exact-private-review-manifest.v3" ? "pull_request" : "issue";
+    const unexpectedTargetNumberField = targetNumberField === "pull_request" ? "issue" : "pull_request";
+    if (!Number.isInteger(manifest.review_target?.[targetNumberField]) || manifest.review_target[targetNumberField] < 1 || Object.hasOwn(manifest.review_target, unexpectedTargetNumberField)) throw new Error("review archive target identity differs");
     validateZipFormatAuthority(manifest.archive_format, realpathSync(root));
     validateReviewArchiveInventory(manifest.inventory?.entries, manifest.inventory?.expected_archive_entries);
     const zipEntries = execFileSync("unzip", ["-Z1", archivePath], { encoding: "utf8" }).trim().split("\n");
@@ -458,17 +461,20 @@ export function verifyMnDocConfigCorrectionReviewArchive({ archivePath, root = R
   }
 }
 
-export function generateMnDocConfigCorrectionReviewArchive({ root = ROOT, privateRoot, caseRoot, outputPath, reviewedHead, pullRequest = 242 }) {
+export function generateMnDocConfigCorrectionReviewArchive({ root = ROOT, privateRoot, caseRoot, outputPath, reviewedHead, pullRequest = null, issue = null }) {
   const repository = realpathSync(root);
   const privateDirectory = realpathSync(privateRoot);
   const caseDirectory = realpathSync(caseRoot);
   const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repository, encoding: "utf8" }).trim();
   if (reviewedHead !== head || !/^[a-f0-9]{40}$/u.test(reviewedHead)) throw new Error("review archive reviewed HEAD differs from repository HEAD");
-  if (!Number.isInteger(pullRequest) || pullRequest < 1) throw new Error("review archive pull request is invalid");
+  const effectivePullRequest = pullRequest ?? (issue === null ? 242 : null);
+  if ((issue === null) === (effectivePullRequest === null)) throw new Error("review archive requires exactly one review target");
+  if (issue !== null && (!Number.isInteger(issue) || issue < 1)) throw new Error("review archive issue is invalid");
+  if (effectivePullRequest !== null && (!Number.isInteger(effectivePullRequest) || effectivePullRequest < 1)) throw new Error("review archive pull request is invalid");
   const sources = { root: repository, privateRoot: privateDirectory, caseRoot: caseDirectory };
   const entries = inventorySources(sources);
   assertInventoryMatchesSources(entries, sources);
-  const manifest = reviewManifest({ ...sources, reviewedHead, pullRequest, entries });
+  const manifest = reviewManifest({ ...sources, reviewedHead, pullRequest: effectivePullRequest, issue, entries });
   const stagingRoot = mkdtempSync(resolve(tmpdir(), "ask-mn-doc-review-stage-"));
   const stage = resolve(stagingRoot, "package");
   try {
@@ -484,7 +490,7 @@ function parseArgs(argv) {
   const args = {};
   while (argv.length > 0) {
     const flag = argv.shift();
-    if (!["--private-root", "--case-root", "--output", "--reviewed-head", "--pull-request"].includes(flag) || argv.length === 0) throw new Error(`unknown or incomplete review archive argument: ${flag}`);
+    if (!["--private-root", "--case-root", "--output", "--reviewed-head", "--pull-request", "--issue"].includes(flag) || argv.length === 0) throw new Error(`unknown or incomplete review archive argument: ${flag}`);
     args[flag.slice(2).replaceAll("-", "_")] = argv.shift();
   }
   return args;
@@ -492,8 +498,8 @@ function parseArgs(argv) {
 
 if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const command = process.argv[2];
-  if (command !== "generate") throw new Error("usage: generate --private-root <dir> --case-root <dir> --output <zip> --reviewed-head <sha> [--pull-request <number>]");
+  if (command !== "generate") throw new Error("usage: generate --private-root <dir> --case-root <dir> --output <zip> --reviewed-head <sha> [--pull-request <number> | --issue <number>]");
   const args = parseArgs(process.argv.slice(3));
-  const result = generateMnDocConfigCorrectionReviewArchive({ privateRoot: args.private_root, caseRoot: args.case_root, outputPath: args.output, reviewedHead: args.reviewed_head, pullRequest: args.pull_request ? Number(args.pull_request) : 242 });
+  const result = generateMnDocConfigCorrectionReviewArchive({ privateRoot: args.private_root, caseRoot: args.case_root, outputPath: args.output, reviewedHead: args.reviewed_head, pullRequest: args.pull_request ? Number(args.pull_request) : null, issue: args.issue ? Number(args.issue) : null });
   console.log(JSON.stringify({ archive_path: result.archive_path, raw_sha256: result.raw_sha256, raw_bytes: result.raw_bytes, entry_count: result.manifest.inventory.final_archive_entry_count }));
 }

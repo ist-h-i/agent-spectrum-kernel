@@ -697,7 +697,7 @@ function createFixture(name, { normalizedOutcome = "completed", requirements = d
   return { path, materialized, selectionState, runDir, normalizedResults, publicArtifactRoot, normalized, privateRoot, manifest, manifestPath, reference, referencePath, scoringInputs, commonCli };
 }
 
-function createAdmissionDecisionEvidence(fixtureContext, status, revision = 1) {
+function createAdmissionDecisionEvidence(fixtureContext, status, revision = 1, { predecessorEvidence = null } = {}) {
   const reviewArchivePath = resolve(fixtureContext.path, `admission-review-${status}-r${revision}.archive`);
   const reviewArchiveBytes = Buffer.from(`synthetic independent ${status} admission review revision ${revision}\n`);
   writeFileSync(reviewArchivePath, reviewArchiveBytes);
@@ -771,7 +771,19 @@ function createAdmissionDecisionEvidence(fixtureContext, status, revision = 1) {
       semantic_digest: freeze.manifest_digest,
     },
   };
-  decisionBase.decision_id = computeAdmissionDecisionId(decisionBase);
+  let predecessorDecisionBytes = null;
+  if (predecessorEvidence) {
+    predecessorDecisionBytes = readFileSync(predecessorEvidence.decisionPath);
+    decisionBase.predecessor_decision = {
+      path: `benchmarks/fixtures/admission-decision/synthetic-${status}-r${revision - 1}.json`,
+      raw_byte_digest: fileDigest(predecessorEvidence.decisionPath),
+      decision_id: predecessorEvidence.decision.decision_id,
+      decision_revision: predecessorEvidence.decision.decision_revision,
+      fixture_id: predecessorEvidence.decision.fixture_id,
+      decision_digest: predecessorEvidence.decision.decision_digest,
+    };
+    decisionBase.decision_id = predecessorEvidence.decision.decision_id;
+  } else decisionBase.decision_id = computeAdmissionDecisionId(decisionBase);
   const decision = { ...decisionBase, decision_digest: computeAdmissionDecisionDigest(decisionBase) };
   const decisionPath = resolve(fixtureContext.path, `admission-decision-${status}-r${revision}.json`);
   writeJson(decisionPath, decision);
@@ -782,6 +794,7 @@ function createAdmissionDecisionEvidence(fixtureContext, status, revision = 1) {
     reviewAuthorityPath,
     reviewAuthoritySourceDigest: fileDigest(reviewAuthorityPath),
     reviewArchivePath,
+    predecessorDecisionSource: predecessorEvidence ? { path: decision.predecessor_decision.path, bytes: predecessorDecisionBytes } : null,
     cli: [
       "--admission-decision", decisionPath,
       "--admission-review-authority", reviewAuthorityPath,
@@ -982,8 +995,8 @@ try {
   assert.equal(admittedOverlayEngineering.admission_record_digest, pendingFixture.scoringInputs.admissionRecord.admission_digest);
   assert.equal(admittedOverlayEngineering.requirement_authority_digest, pendingFixture.scoringInputs.admissionRecord.requirement_authority_digest);
 
-  for (const [status, revision] of [["changes_requested", 2], ["rejected", 3]]) {
-    const evidence = createAdmissionDecisionEvidence(pendingFixture, status, revision);
+  for (const status of ["changes_requested", "rejected"]) {
+    const evidence = createAdmissionDecisionEvidence(pendingFixture, status, 1);
     const outputPath = resolve(pendingFixture.path, `${status}-overlay-engineering-result.json`);
     runScore(pendingFixture, { resultPath: pendingCompleted.path, outputPath, cliOverrides: evidence.cli });
     const artifact = JSON.parse(readFileSync(outputPath, "utf8"));
@@ -1100,7 +1113,7 @@ try {
     });
   }
 
-  const laterEvidence = createAdmissionDecisionEvidence(pendingFixture, "admitted", 2);
+  const laterEvidence = createAdmissionDecisionEvidence(pendingFixture, "admitted", 2, { predecessorEvidence: admittedEvidence });
   const pendingVerified = verifyEvaluatorAuthority({
     ...legacyVerificationOptions,
     admissionRecordPath: pendingFixture.scoringInputs.admissionRecordPath,
@@ -1130,6 +1143,7 @@ try {
     reviewAuthorityPath: laterEvidence.reviewAuthorityPath,
     reviewAuthoritySourceDigest: laterEvidence.reviewAuthoritySourceDigest,
     reviewArchivePath: laterEvidence.reviewArchivePath,
+    predecessorDecisionSource: laterEvidence.predecessorDecisionSource,
   });
   assert.throws(() => assertEngineeringResultAdmissionAuthority(admittedOverlayEngineering, laterAuthority), /decision frozen at scoring time/);
 

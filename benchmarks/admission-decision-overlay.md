@@ -47,6 +47,10 @@ Partial evidence is rejected. `buildPortfolioEngineeringResult()` accepts only a
 
 An already consumed decision record is never edited in place. A later decision uses a greater revision and a different canonical digest. Existing score and report artifacts retain the exact revision/digest used when they were created; a later decision cannot retroactively validate or rewrite them.
 
+A successor reviewed on a different pull request keeps the original decision ID by adding a closed `predecessor_decision` reference. That reference binds the predecessor's repository-relative path, raw-byte digest, decision ID, revision, fixture, and canonical digest. The successor's own review fields still record its actual reviewed pull request and head, so historical review metadata is never projected onto new evaluator bytes.
+
+Repository resolution validates every tracked decision file against both the selected Git revision and current working-tree bytes, requires one lineage root, follows exactly one successor at each step, and returns only the latest decision. Missing, rewritten, orphaned, duplicate, conflicting, cyclic, cross-fixture, or digest-mismatched predecessor links fail closed. A single legacy revision-1 overlay remains valid without a predecessor reference.
+
 ## R21 historical authority and the R22 transition
 
 R21 remains an immutable historical reviewed authority at PR #224 head `7db95b7a33878aa327192648d5ffc191d22c005e`. It is not reusable with the evaluator source produced by merged PR #239 plus this integration. After PR #238 is merged and incorporated into PR #224, the final evaluator source requires one R22 generation and independent review. R22 freezes `admission_pending` together with the final shared evaluator-authority API and source graph.
