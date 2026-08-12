@@ -146,7 +146,7 @@ export function validateMpCiEvidenceGapInputClosure({ root = ROOT } = {}) {
 function parseArgs(argv) {
   const args = { root: ROOT, command: "validate", privateRoot: null, evaluatorRevision: null, generationDate: null, boundaryRoots: {} };
   for (let index = 0; index < argv.length; index += 1) {
-    if (["write", "write-production"].includes(argv[index])) args.command = argv[index];
+    if (argv[index] === "write") args.command = argv[index];
     else if (argv[index] === "--root") args.root = resolve(argv[++index]);
     else if (argv[index] === "--private-root") args.privateRoot = resolve(argv[++index]);
     else if (argv[index] === "--evaluator-revision") args.evaluatorRevision = argv[++index];
@@ -163,11 +163,5 @@ function parseArgs(argv) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = parseArgs(process.argv.slice(2));
   if (args.command === "write") console.log(JSON.stringify(writeMpCiEvidenceGapInputArtifacts(args)));
-  else if (args.command === "write-production") {
-    const { writeMpCiEvidenceGapProductionAuthority } = await import("./ask-benchmark-mp-ci-evidence-gap-authority.mjs");
-    console.log(JSON.stringify(writeMpCiEvidenceGapProductionAuthority(args)));
-  } else if (existsSync(resolve(args.root, MP_CI_FIXTURE_ROOT, "evaluator-reference.json")) && readJson(resolve(args.root, MP_CI_FIXTURE_ROOT, "evaluator-reference.json"), "mp-ci evaluator reference").schema_version === "1.0.0") {
-    const { validateMpCiEvidenceGapProductionAuthority } = await import("./ask-benchmark-mp-ci-evidence-gap-authority.mjs");
-    console.log(JSON.stringify(validateMpCiEvidenceGapProductionAuthority(args)));
-  } else console.log(JSON.stringify(validateMpCiEvidenceGapInputClosure(args)));
+  else console.log(JSON.stringify(validateMpCiEvidenceGapInputClosure(args)));
 }

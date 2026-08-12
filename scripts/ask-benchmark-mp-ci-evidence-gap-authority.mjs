@@ -537,3 +537,27 @@ export function validateMpCiEvidenceGapProductionAuthority({ root = ROOT, privat
   }
   return { fixtureId: MP_CI_FIXTURE_ID, inputDigest: reference.fixture_input_digest, candidateDigest: candidate.candidate_digest, requirementRecordDigest: requirement.requirement_record_digest, requirementSetDigest: requirement.requirement_set_digest, outputContractDigest: output.output_contract_digest, evaluatorBundleId: reference.evaluator_bundle_id, evaluatorBundleDigest: reference.evaluator_bundle_digest, evaluatorRevision: reference.evaluator_revision, evaluatorAuthorityDigest: manifest.manifest_digest, admissionState: admission.admission_status, reviewStatus: review.reviewer_status, scoringReady: false };
 }
+
+function parseProductionArgs(argv) {
+  const args = { root: ROOT, boundaryRoots: {} };
+  for (let index = 0; index < argv.length; index += 1) {
+    const name = argv[index];
+    if (name === "write-production") continue;
+    if (name === "--root") args.root = resolve(argv[++index]);
+    else if (name === "--private-root") args.privateRoot = resolve(argv[++index]);
+    else if (name === "--evaluator-revision") args.evaluatorRevision = argv[++index];
+    else if (name === "--generation-date") args.generationDate = argv[++index];
+    else if (name === "--materialized") args.boundaryRoots.materializedPath = resolve(argv[++index]);
+    else if (name === "--selection-state") args.boundaryRoots.selectionState = resolve(argv[++index]);
+    else if (name === "--run-dir") args.boundaryRoots.runDir = resolve(argv[++index]);
+    else if (name === "--normalized-results") args.boundaryRoots.normalizedResultsPath = resolve(argv[++index]);
+    else throw new Error(`unknown argument: ${name}`);
+  }
+  return args;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const argv = process.argv.slice(2);
+  const args = parseProductionArgs(argv);
+  console.log(JSON.stringify(argv.includes("write-production") ? writeMpCiEvidenceGapProductionAuthority(args) : validateMpCiEvidenceGapProductionAuthority(args)));
+}
