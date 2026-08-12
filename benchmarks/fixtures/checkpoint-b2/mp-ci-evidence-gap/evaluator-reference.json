@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-553e9d8164a4849917eecf8ae53534d89e84239da2eb7505c212ec42bb01cb9a",
-  "evaluator_bundle_digest": "sha256:4d19dd72f272469fc8e3243d1e568b9303369f47af76ce79058696e2de5f1cc0",
+  "evaluator_bundle_id": "evaluator-19ba056498ecb6d42470b151caad3da05f82cce2d69ca9a56d4b6c30ac46ccae",
+  "evaluator_bundle_digest": "sha256:7f55d64c2cad72fed6bea2bee19af473f68913f0215b76b5a84e777eef8cb747",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mp-ci-evidence-gap",
   "fixture_input_digest": "sha256:13e5d0c70feffed4db0bdf68b2b89b9b15005c53525a8e5b10d9198775d7ac25",
   "task_class": "review_verification",
   "suite": "mechanism_positive",
-  "evaluator_revision": "cadf63e1ace9abcba6d763b32f55c954e3a8ba87",
+  "evaluator_revision": "6db483b42094e25199d6d0082029fa49cc23b3a2",
   "evaluator_source_identity": {
-    "base_git_revision": "cadf63e1ace9abcba6d763b32f55c954e3a8ba87",
+    "base_git_revision": "6db483b42094e25199d6d0082029fa49cc23b3a2",
     "source_tree_digest": "sha256:8949715a23232a788247a076abb96011c98f162feda3a6198d7293709daff70e",
     "generator_source_digest": "sha256:d1be7df7b5919f9f06b960c366b4bfd37aba1809fccc87eb64e9dfbb4eb5ae8a",
     "source_files": [
@@ -1448,11 +1448,11 @@
     }
   },
   "generator_identity": "sha256:810e2b9b21eec31f95855a96dbf64ca176f45ec97cdc3d682f0778ddc10eea07",
-  "independence_statement_digest": "sha256:119e548a52ee2dea4b1a1255c966c2946a5012e9dcfbe1e723d50b0f15a009dc",
-  "review_record_digest": "sha256:c61bb602d946d270c4ad29fb73bcde68578dcae7a4da19409224d260f910755f",
+  "independence_statement_digest": "sha256:9585446437aac59193af5d4894611e3e1c94d2a580fd587fcc1a79564817771c",
+  "review_record_digest": "sha256:53f7fdef6af7d84f5d9f7466b9df4628de059c1b7c86a7a6325cd825254f25b1",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:c13f3e930eca4f1712a0d877c4031c4aa01ef814860728861fbd19d0000a8e76",
-  "evaluator_authority_manifest_digest": "sha256:d525b4dc169c194f3b289e002d78d7d1ae8ee67c3abb6001ac0f9ad93fcafd74",
+  "evaluator_authority_manifest_raw_sha256": "sha256:2ee4bf32b80a91f027c358b421fc73bd74dd23480cba5961b01d708b8943f794",
+  "evaluator_authority_manifest_digest": "sha256:3ba12ef898475a0773620f7a2349f44c219539d0da28e97a52d92858c1c051e6",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:40e29e566c9b40e52e384d293278b08b5442708fbdb0c04fa047859f8933a2b5"
+  "public_metadata_digest": "sha256:8117d1353acb503cd7d7e10a45f8eb75c072e99ba006474782ba71c9359ef04f"
 }
