@@ -21,6 +21,7 @@ const AUTHORITY_MODES = new Set(["legacy_admitted_record", "admitted_overlay", "
 const EFFECTIVE_STATUSES = new Set(["admitted", "admission_pending", "changes_requested", "rejected"]);
 const RESOLVED_AUTHORITIES = new WeakSet();
 const REPOSITORY_ADMISSION_DECISIONS = new WeakSet();
+const REPOSITORY_ADMISSION_PREDECESSOR_SOURCES = new WeakMap();
 const REVIEW_AUTHORITY_FIELDS = Object.freeze([
   "review_status",
   "author_self_approval",
@@ -212,6 +213,7 @@ function expectedDecisionAuthority({
 }
 
 export function computeAdmissionDecisionId(value) {
+  if (value?.predecessor_decision?.decision_id) return value.predecessor_decision.decision_id;
   return `admission-decision-${canonicalDigest({
     fixture_id: value.fixture_id,
     reviewed_repository: value.reviewed_repository,
@@ -267,11 +269,37 @@ export function resolveRepositoryAdmissionDecision({ root = DEFAULT_ROOT, reposi
     if (parsed.fixture_id !== fixtureId) continue;
     validateDecisionClosure(parsed, root);
     const decision = Object.freeze(parsed);
-    REPOSITORY_ADMISSION_DECISIONS.add(decision);
-    matches.push(Object.freeze({ decision, path, raw_byte_digest: sha256(repositoryBytes), repository_revision: revision }));
+    matches.push(Object.freeze({ decision, path, raw_byte_digest: sha256(repositoryBytes), repository_revision: revision, bytes: repositoryBytes }));
   }
-  if (matches.length > 1) throw new Error(`${fixtureId} repository admission authority has multiple managed overlays`);
-  return matches[0] ?? null;
+  if (matches.length === 0) return null;
+  const roots = matches.filter(({ decision }) => !decision.predecessor_decision);
+  if (roots.length !== 1) throw new Error(`${fixtureId} repository admission authority has multiple managed overlays or no unique lineage root`);
+  const consumed = new Set();
+  let current = roots[0];
+  while (current) {
+    consumed.add(current.path);
+    const successors = matches.filter(({ decision }) => decision.predecessor_decision?.path === current.path);
+    if (successors.length > 1) throw new Error(`${fixtureId} repository admission authority has conflicting successor overlays`);
+    if (successors.length === 0) break;
+    const successor = successors[0];
+    assertAdmissionDecisionAppendOnly(current.decision, successor.decision, {
+      previousDecisionSource: { path: current.path, bytes: current.bytes },
+    });
+    current = successor;
+  }
+  if (consumed.size !== matches.length) throw new Error(`${fixtureId} repository admission authority has multiple managed overlays or an orphaned successor`);
+  validateDecisionLineage(current.decision, {
+    root,
+    predecessorDecisionSource: current.decision.predecessor_decision
+      ? { path: matches.find(({ path }) => path === current.decision.predecessor_decision.path).path, bytes: matches.find(({ path }) => path === current.decision.predecessor_decision.path).bytes }
+      : null,
+  });
+  REPOSITORY_ADMISSION_DECISIONS.add(current.decision);
+  if (current.decision.predecessor_decision) {
+    const predecessor = matches.find(({ path }) => path === current.decision.predecessor_decision.path);
+    REPOSITORY_ADMISSION_PREDECESSOR_SOURCES.set(current.decision, Object.freeze({ path: predecessor.path, bytes: predecessor.bytes }));
+  }
+  return Object.freeze({ decision: current.decision, path: current.path, raw_byte_digest: current.raw_byte_digest, repository_revision: revision });
 }
 
 function validateAdmissionReviewAuthority(value, { root = DEFAULT_ROOT } = {}) {
@@ -292,12 +320,42 @@ function validateDecisionClosure(value, root) {
   if (value.decision_digest !== computeAdmissionDecisionDigest(value)) throw new Error("admission decision canonical digest is invalid");
 }
 
+function validateDecisionLineage(value, {
+  root = DEFAULT_ROOT,
+  predecessorDecisionSource = null,
+  visitedPaths = new Set(),
+} = {}) {
+  const predecessor = value.predecessor_decision;
+  if (!predecessor) {
+    if (predecessorDecisionSource) throw new Error("root admission decision cannot consume predecessor source evidence");
+    if (value.decision_revision !== 1) throw new Error("root admission decision must use decision revision 1");
+    return true;
+  }
+  const source = predecessorDecisionSource ?? (() => {
+    const path = resolve(root, assertPortablePath(predecessor.path, "admission predecessor decision path"));
+    const stable = readStableFile(path, "admission predecessor decision", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
+    return { path: predecessor.path, bytes: stable.bytes };
+  })();
+  assertClosedObject(source, ["path", "bytes"], "admission predecessor decision source");
+  if (source.path !== predecessor.path) throw new Error("admission predecessor decision source path differs from the successor lineage");
+  if (visitedPaths.has(source.path)) throw new Error("admission decision lineage contains a cycle");
+  visitedPaths.add(source.path);
+  const sourceBytes = normalizeBytes(source.bytes, "admission predecessor decision source");
+  if (sha256(sourceBytes) !== predecessor.raw_byte_digest) throw new Error("admission predecessor decision raw identity differs from the successor lineage");
+  const previousDecision = parseJsonBytes(sourceBytes, "admission predecessor decision");
+  validateDecisionClosure(previousDecision, root);
+  assertAdmissionDecisionAppendOnly(previousDecision, value, { root, previousDecisionSource: source });
+  validateDecisionLineage(previousDecision, { root, visitedPaths });
+  return true;
+}
+
 export function validatePortfolioAdmissionDecision(value, options = {}) {
   if (Object.hasOwn(options, "expectedAuthority")) throw new Error("caller-supplied expected admission authority is prohibited");
-  const { root = DEFAULT_ROOT, authoritySources = null } = options;
-  const unknownOptions = Object.keys(options).filter((field) => !["root", "authoritySources"].includes(field));
+  const { root = DEFAULT_ROOT, authoritySources = null, predecessorDecisionSource = null } = options;
+  const unknownOptions = Object.keys(options).filter((field) => !["root", "authoritySources", "predecessorDecisionSource"].includes(field));
   if (unknownOptions.length > 0) throw new Error(`admission decision validation has unknown options: ${unknownOptions.join(", ")}`);
   validateDecisionClosure(value, root);
+  validateDecisionLineage(value, { root, predecessorDecisionSource });
   if (value.decision_status === "admitted") {
     if (value.review_status !== "approved") throw new Error("admitted decision requires approved review status");
     if (value.author_self_approval !== false) throw new Error("admitted decision prohibits author self-approval");
@@ -335,7 +393,11 @@ export function resolveEffectiveAdmissionAuthority(options) {
   let decisionDigest = null;
   let decisionRevision = null;
   if (decisionOverlay) {
-    validatePortfolioAdmissionDecision(decisionOverlay, { root: options.root ?? DEFAULT_ROOT, authoritySources: options });
+    validatePortfolioAdmissionDecision(decisionOverlay, {
+      root: options.root ?? DEFAULT_ROOT,
+      authoritySources: options,
+      predecessorDecisionSource: options.predecessorDecisionSource ?? null,
+    });
     decisionDigest = decisionOverlay.decision_digest;
     decisionRevision = decisionOverlay.decision_revision;
     if (decisionOverlay.decision_status === "admitted") {
@@ -436,6 +498,7 @@ export function resolveEffectiveAdmissionAuthorityFromRepositoryOverlayFiles({
     root,
     ...frozenAuthority,
     decisionOverlay: repositoryDecision,
+    predecessorDecisionSource: REPOSITORY_ADMISSION_PREDECESSOR_SOURCES.get(repositoryDecision) ?? null,
     reviewAuthority: reviewAuthorityProjection(reviewAuthorityArtifact),
     reviewArchiveSource: { bytes: reviewArchiveSource.bytes },
   });
@@ -574,11 +637,27 @@ export function assertImmutableGitDiffUnchanged({
   });
 }
 
-export function assertAdmissionDecisionAppendOnly(previousDecision, nextDecision, { root = DEFAULT_ROOT } = {}) {
+export function assertAdmissionDecisionAppendOnly(previousDecision, nextDecision, { root = DEFAULT_ROOT, previousDecisionSource = null } = {}) {
   validateDecisionClosure(previousDecision, root);
   validateDecisionClosure(nextDecision, root);
+  const predecessor = nextDecision.predecessor_decision;
+  if (!predecessor) throw new Error("admission decision successor must bind its predecessor decision");
   if (nextDecision.decision_id !== previousDecision.decision_id) throw new Error("admission decision revision must retain its decision ID");
   if (nextDecision.fixture_id !== previousDecision.fixture_id) throw new Error("admission decision revision cannot change fixture identity");
+  const expectedPredecessor = {
+    decision_id: previousDecision.decision_id,
+    decision_revision: previousDecision.decision_revision,
+    fixture_id: previousDecision.fixture_id,
+    decision_digest: previousDecision.decision_digest,
+  };
+  for (const [field, expected] of Object.entries(expectedPredecessor)) {
+    if (predecessor[field] !== expected) throw new Error(`admission decision predecessor ${field} differs from the previous decision`);
+  }
+  if (previousDecisionSource) {
+    assertClosedObject(previousDecisionSource, ["path", "bytes"], "previous admission decision source");
+    if (predecessor.path !== previousDecisionSource.path) throw new Error("admission decision predecessor path differs from the previous decision source");
+    if (predecessor.raw_byte_digest !== sha256(normalizeBytes(previousDecisionSource.bytes, "previous admission decision source"))) throw new Error("admission decision predecessor raw identity differs from the previous decision source");
+  }
   if (nextDecision.decision_revision <= previousDecision.decision_revision) throw new Error("admission decision revision must increase");
   if (nextDecision.decision_digest === previousDecision.decision_digest) throw new Error("a new admission decision revision must have a new digest");
   return true;

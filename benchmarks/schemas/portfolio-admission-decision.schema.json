@@ -35,6 +35,7 @@
     "program": { "const": "adaptive_ask_portfolio_admission_decision" },
     "decision_id": { "type": "string", "pattern": "^admission-decision-[a-f0-9]{32}$" },
     "decision_revision": { "type": "integer", "minimum": 1 },
+    "predecessor_decision": { "$ref": "#/$defs/predecessorDecision" },
     "fixture_id": { "$ref": "#/$defs/token" },
     "decision_status": { "enum": ["admitted", "changes_requested", "rejected"] },
     "review_status": { "enum": ["approved", "changes_requested", "rejected", "pending", "unknown"] },
@@ -88,6 +89,19 @@
         "evaluator_bundle_id": { "type": "string", "pattern": "^evaluator-[a-f0-9]{64}$" },
         "evaluator_bundle_digest": { "$ref": "#/$defs/digest" },
         "evaluator_bundle_bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "predecessorDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "raw_byte_digest", "decision_id", "decision_revision", "fixture_id", "decision_digest"],
+      "properties": {
+        "path": { "$ref": "#/$defs/portablePath" },
+        "raw_byte_digest": { "$ref": "#/$defs/digest" },
+        "decision_id": { "type": "string", "pattern": "^admission-decision-[a-f0-9]{32}$" },
+        "decision_revision": { "type": "integer", "minimum": 1 },
+        "fixture_id": { "$ref": "#/$defs/token" },
+        "decision_digest": { "$ref": "#/$defs/digest" }
       }
     },
     "frozenSemanticArtifact": {

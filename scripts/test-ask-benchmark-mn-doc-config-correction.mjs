@@ -1106,6 +1106,16 @@ try {
     assert.deepEqual(readFileSync(reviewArchivePath), readFileSync(repeatedReviewArchivePath), "exact review archive regeneration must preserve raw ZIP bytes");
     assert.equal(firstArchive.raw_sha256, secondArchive.raw_sha256, "exact review archive regeneration digest");
     assert.equal(firstArchive.manifest.schema_version, "pr242-exact-private-review-manifest.v3", "review archive manifest revision");
+    const issueArchivePath = resolve(work, "mn-doc-review-issue-245.zip");
+    const issueArchive = generateMnDocConfigCorrectionReviewArchive({ root, privateRoot, caseRoot, outputPath: issueArchivePath, reviewedHead, issue: 245 });
+    assert.equal(issueArchive.manifest.schema_version, "mn-doc-exact-private-review-manifest.v4", "successor review archive manifest revision");
+    assert.deepEqual(issueArchive.manifest.review_target, { repository: "ist-h-i/agent-spectrum-kernel", issue: 245, reviewed_head: reviewedHead, evaluator_revision: issueArchive.manifest.review_target.evaluator_revision }, "successor review archive issue target");
+    const verifiedIssueArchive = verifyMnDocConfigCorrectionReviewArchive({ archivePath: issueArchivePath, root, privateRoot, caseRoot });
+    try {
+      assert.equal(verifiedIssueArchive.manifest.review_target.issue, 245, "verified successor archive issue target");
+    } finally {
+      verifiedIssueArchive.cleanup();
+    }
     assert.equal(firstArchive.manifest.archive_format.revision, "pr242-node-store-zip.v1", "review archive format revision");
     assert.equal(firstArchive.manifest.archive_format.fixed_dos_timestamp, "1980-01-01T00:00:00", "review archive fixed DOS timestamp");
     assert.deepEqual(firstArchive.manifest.archive_format.compression_method, { name: "store", code: 0 }, "review archive compression authority");
