@@ -108,6 +108,14 @@ function candidateBinding(root, path, semanticDigest) {
   return { path, raw_sha256: sha256(readFileSync(resolve(root, path))), semantic_digest: semanticDigest };
 }
 
+function validateCandidateBinding(root, record, expectedPath, expectedSemanticDigest, label) {
+  if (record?.path !== expectedPath || record.raw_sha256 !== sha256(readFileSync(resolve(root, expectedPath))) || record.semantic_digest !== expectedSemanticDigest) throw new Error(`${label} source-freeze binding is invalid`);
+}
+
+function validateRawBinding(root, record, expectedPath, expectedSemanticDigest, label) {
+  if (record?.path !== expectedPath || record.raw_byte_digest !== sha256(readFileSync(resolve(root, expectedPath))) || record.semantic_digest !== expectedSemanticDigest) throw new Error(`${label} scoring-input freeze binding is invalid`);
+}
+
 export function buildMpCiEvidenceAuthority() {
   const scopeBase = {
     allowed_candidate_paths: ["workspace/review.json"],
@@ -522,6 +530,31 @@ export function validateMpCiEvidenceGapProductionAuthority({ root = ROOT, privat
   validatePendingIndependentReview(review, admission);
   const candidate = artifacts["source-freeze-candidate.json"];
   if (candidate.candidate_digest !== canonicalDigest(withoutField(candidate, "candidate_digest")) || candidate.admission_state !== "admission_pending" || candidate.measured_execution !== false || candidate.scoring_published !== false) throw new Error("mp-ci source-freeze candidate state is invalid");
+  validateRawBinding(root, freeze.catalog, "benchmarks/portfolio-catalog.json", catalog.catalog_digest, "mp-ci catalog");
+  validateRawBinding(root, freeze.policy_manifest, "benchmarks/portfolio-policy-manifest.json", policyManifest.manifest_digest, "mp-ci policy manifest");
+  validateRawBinding(root, freeze.scoring_policy, "benchmarks/portfolio-scoring-policy.json", scoringPolicy.policy_digest, "mp-ci scoring policy");
+  validateRawBinding(root, freeze.admission_record, `${MP_CI_FIXTURE_ROOT}/final-admission-record.json`, admission.admission_digest, "mp-ci admission record");
+  validateRawBinding(root, freeze.output_contract, output.output_contract_path, output.output_contract_digest, "mp-ci output contract");
+  validateRawBinding(root, freeze.evaluator_public_reference, output.evaluator_public_reference_path, reference.public_metadata_digest, "mp-ci evaluator reference");
+  validateRawBinding(root, freeze.verification_command_contract, output.verification_command_contract_path, verification.contract_digest, "mp-ci verification contract");
+  validateRawBinding(root, freeze.evidence_map, `${MP_CI_FIXTURE_ROOT}/evidence-map.json`, canonicalDigest(evidenceMap), "mp-ci evidence map");
+  validateRawBinding(root, freeze.evaluator_authority_manifest, layout.manifestPath, manifest.manifest_digest, "mp-ci evaluator authority manifest");
+  if (freeze.requirement_record.path !== requirement.requirement_record_path || freeze.requirement_record.raw_byte_digest !== sha256(readFileSync(resolve(root, requirement.requirement_record_path))) || freeze.requirement_record.record_digest !== requirement.requirement_record_digest || freeze.requirement_record.set_digest !== requirement.requirement_set_digest) throw new Error("mp-ci requirement scoring-input freeze binding is invalid");
+  const candidateBindings = [
+    ["input_manifest", `${MP_CI_FIXTURE_ROOT}/input-manifest.json`, canonicalDigest(inputRecord)],
+    ["evidence_map", `${MP_CI_FIXTURE_ROOT}/evidence-map.json`, canonicalDigest(evidenceMap)],
+    ["requirement_record", requirement.requirement_record_path, requirement.requirement_record_digest],
+    ["output_contract", output.output_contract_path, output.output_contract_digest],
+    ["verification_command_contract", output.verification_command_contract_path, verification.contract_digest],
+    ["metadata", `${MP_CI_FIXTURE_ROOT}/metadata.json`, metadata.metadata_digest],
+    ["evaluator_public_reference", output.evaluator_public_reference_path, reference.public_metadata_digest],
+    ["evaluator_authority_manifest", layout.manifestPath, manifest.manifest_digest],
+    ["final_admission_record", `${MP_CI_FIXTURE_ROOT}/final-admission-record.json`, admission.admission_digest],
+    ["scoring_input_freeze_manifest", `${MP_CI_FIXTURE_ROOT}/scoring-input-freeze-manifest.json`, freeze.manifest_digest],
+    ["admission_review", `${MP_CI_FIXTURE_ROOT}/admission-review.json`, review.review_package_digest],
+  ];
+  for (const [key, path, semanticDigest] of candidateBindings) validateCandidateBinding(root, candidate.public_bindings?.[key], path, semanticDigest, `mp-ci ${key}`);
+  if (candidate.evaluator_private_binding.evaluator_revision !== reference.evaluator_revision || candidate.evaluator_private_binding.evaluator_bundle_id !== reference.evaluator_bundle_id || candidate.evaluator_private_binding.evaluator_bundle_digest !== reference.evaluator_bundle_digest || candidate.evaluator_private_binding.source_tree_digest !== reference.evaluator_source_identity.source_tree_digest || candidate.evaluator_private_binding.dependency_graph_digest !== reference.evaluator_source_identity.dependency_graph.graph_digest) throw new Error("mp-ci private source-freeze binding is invalid");
   const config = readJson(resolve(root, "benchmarks/adaptive-portfolio.config.json"), "adaptive portfolio config");
   const runtime = config.fixtures.find(({ id }) => id === MP_CI_FIXTURE_ID);
   const expectedRuntime = { id: MP_CI_FIXTURE_ID, suite: "mechanism_positive", task_class: "review_verification", difficulty: "medium_hard", repetitions: 3, aggregate_eligible: true, input_manifest_path: `${MP_CI_FIXTURE_ROOT}/input-manifest.json`, input_manifest_sha256: sha256(readFileSync(resolve(fixtureRoot, "input-manifest.json"))).slice(7), verification_command_contract: { path: `${MP_CI_FIXTURE_ROOT}/verification-command-contract.json`, sha256: sha256(readFileSync(resolve(fixtureRoot, "verification-command-contract.json"))).slice(7) } };

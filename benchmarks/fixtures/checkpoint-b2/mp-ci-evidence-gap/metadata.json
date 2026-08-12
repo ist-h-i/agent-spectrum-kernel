@@ -1,4 +1,32 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "mp-ci-evidence-gap",
-  "candidate_state": "generation_pending"
+  "fixture_role": "primary",
+  "suite": "mechanism_positive",
+  "task_class": "review_verification",
+  "domain": "ci_build",
+  "difficulty": "medium_hard",
+  "repetitions": 3,
+  "risk_boundary": "none",
+  "capability_families": [
+    "evidence_synthesis",
+    "verification_discipline"
+  ],
+  "evidence_topologies": [
+    "ci_logs_and_config",
+    "implementation_and_tests"
+  ],
+  "outcome_dimensions": [
+    "evidence_completeness",
+    "review_precision"
+  ],
+  "output_contract_type": "findings_producing",
+  "requirement_record_id": "requirement-record-mp-ci-evidence-gap",
+  "output_contract_id": "output-contract-mp-ci-evidence-gap",
+  "evaluator_bundle_id": "evaluator-440e0738a8c79154246df0f75a716e1fd38ce7cb2aaaf4672eab0a30f0478c1d",
+  "evaluator_bundle_digest": "sha256:ba222c9e6e3e2c0fbb72639a832ebe91bd6b4573f0a53a9f891e3995da899f03",
+  "evaluator_byte_count": 140788,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:0de87590529f632dc5da86897c8c2ba4d51c2d08d544b077ab7a4db16af695ee"
 }
