@@ -20,8 +20,8 @@ export function validateAdaptiveSelectionRecord(value, { schemaPath = ADAPTIVE_S
   return validateBenchmarkSchemaInstance(value, { schemaPath });
 }
 
-export function computePortfolioPlanId({ configSha256, protocolSha256, repositoryRevision, seed }) {
-  const inputs = [configSha256, protocolSha256, repositoryRevision, seed];
+export function computePortfolioPlanId({ configSha256, protocolSha256, repositoryRevision, seed, executionAdmissionAuthorityDigest }) {
+  const inputs = [configSha256, protocolSha256, repositoryRevision, seed, executionAdmissionAuthorityDigest];
   if (inputs.some((value) => typeof value !== "string" || value.length === 0)) throw new Error("portfolio plan identity inputs must be non-empty strings");
   return `plan-${createHash("sha256").update(JSON.stringify(inputs)).digest("hex")}`;
 }

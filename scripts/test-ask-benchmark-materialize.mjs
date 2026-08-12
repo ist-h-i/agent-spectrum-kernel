@@ -260,7 +260,9 @@ try {
   expectFailure({ name: "manifest absolute path escape", configPath: absoluteEscape.configPath, planPath: absoluteEscape.planPath, pattern: /normalized relative path/u });
 
   const secondOutput = resolve(work, "materialized-b");
-  run(["materialize", "--config", portfolioConfig, "--plan", planPath, "--output", secondOutput]);
+  const emptyExecutionAdmissionEvidencePath = resolve(work, "execution-admission-evidence.json");
+  writeJson(emptyExecutionAdmissionEvidencePath, {});
+  run(["materialize", "--config", portfolioConfig, "--plan", planPath, "--output", secondOutput, "--execution-admission-evidence", emptyExecutionAdmissionEvidencePath]);
   const firstManifestBytes = readFileSync(resolve(firstOutput, MATERIALIZATION_MANIFEST_NAME));
   const secondManifestBytes = readFileSync(resolve(secondOutput, MATERIALIZATION_MANIFEST_NAME));
   assert.deepEqual(secondManifestBytes, firstManifestBytes, "same inputs must produce byte-identical manifests");
