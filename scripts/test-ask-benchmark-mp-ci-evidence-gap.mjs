@@ -107,6 +107,79 @@ function validateSharedNegativeCoverage() {
   for (const pattern of [/caller-created admitted object injection/u, /admission_pending/u, /public reference bundle transplant/u, /private material in the public artifact root/u]) assert.match(shared, pattern);
 }
 
+function interpolate(template, values) {
+  return Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{${key}}`, value), template);
+}
+
+function conceptMatrixEntries(matrix) {
+  const quantity = matrix.generation.quantity;
+  const ci = matrix.generation.ci;
+  const quantityCoverage = { subjects: new Set(), boundaries: new Set(), flows: new Set(), remediations: new Set() };
+  const ciCoverage = { contexts: new Set(), boundaries: new Set(), omissions: new Set(), remediations: new Set() };
+  const quantityEntries = Array.from({ length: quantity.combination_count }, (_, index) => {
+    const round = Math.floor(index / quantity.boundaries.length);
+    const subjectIndex = index % quantity.subjects.length;
+    const boundaryIndex = index % quantity.boundaries.length;
+    const flowIndex = (index * 3 + round) % quantity.flows.length;
+    const remediationIndex = (index * 7 + round) % quantity.remediations.length;
+    const subject = quantity.subjects[subjectIndex];
+    const boundary = quantity.boundaries[boundaryIndex];
+    quantityCoverage.subjects.add(subjectIndex);
+    quantityCoverage.boundaries.add(boundaryIndex);
+    quantityCoverage.flows.add(flowIndex);
+    quantityCoverage.remediations.add(remediationIndex);
+    return {
+      variant_id: `generated-quantity-${String(index + 1).padStart(2, "0")}`,
+      family: "quantity_positive",
+      finding_index: 1,
+      finding: {
+        title: `${subject} bypass the positive-domain contract`,
+        severity: "high",
+        evidence: [{ path: "src/quote-order.mjs", line: 2 }, { path: "test/checkout/quote-order-contract.test.mjs", line: 5 }],
+        impact: `${interpolate(quantity.flows[flowIndex], boundary)} even though the checkout contract requires ${subject} to be ${boundary.required}.`,
+        required_action: interpolate(quantity.remediations[remediationIndex], { subject, required: boundary.required }),
+      },
+      expected_points: [3, 3, 2, 1, 1],
+      expected_classification: "correct_narrow_execution",
+    };
+  });
+  const ciEntries = Array.from({ length: ci.combination_count }, (_, index) => {
+    const round = Math.floor(index / ci.boundaries.length);
+    const contextIndex = index % ci.contexts.length;
+    const boundaryIndex = index % ci.boundaries.length;
+    const omissionIndex = (index * 3 + round) % ci.omissions.length;
+    const remediationIndex = (index * 5 + round) % ci.remediations.length;
+    const context = ci.contexts[contextIndex];
+    const boundary = ci.boundaries[boundaryIndex];
+    ciCoverage.contexts.add(contextIndex);
+    ciCoverage.boundaries.add(boundaryIndex);
+    ciCoverage.omissions.add(omissionIndex);
+    ciCoverage.remediations.add(remediationIndex);
+    return {
+      variant_id: `generated-ci-${String(index + 1).padStart(2, "0")}`,
+      family: "ci_positive",
+      finding_index: 0,
+      finding: {
+        title: `${context} has an incomplete required-validation record`,
+        severity: "high",
+        evidence: [{ path: ".github/workflows/pull-request.yml", line: 17 }, { path: "ci/pull-request-314.log", line: 7 }, { path: "docs/verification.md", line: 5 }],
+        impact: `${context} ${interpolate(ci.omissions[omissionIndex], { boundary })}, so the evidence required for merge is incomplete.`,
+        required_action: interpolate(ci.remediations[remediationIndex], { boundary }),
+      },
+      expected_points: [3, 3, 2, 1, 1],
+      expected_classification: "correct_narrow_execution",
+    };
+  });
+  for (const [label, coverage, source] of [
+    ["quantity", quantityCoverage, quantity],
+    ["CI", ciCoverage, ci],
+  ]) {
+    for (const [dimension, seen] of Object.entries(coverage)) assert.equal(seen.size, source[dimension].length, `${label} ${dimension} lexicon coverage`);
+  }
+  const probes = matrix.independent_probes.map((entry) => ({ ...entry, expected_points: [3, 3, 2, 1, 1], expected_classification: "correct_narrow_execution" }));
+  return { entries: [...quantityEntries, ...ciEntries, ...probes, ...matrix.negative_controls], generated: { quantity: quantityEntries.length, ci: ciEntries.length }, probes: { quantity: probes.filter(({ family }) => family === "quantity_positive").length, ci: probes.filter(({ family }) => family === "ci_positive").length }, negatives: matrix.negative_controls.length };
+}
+
 async function validatePrivateCases({ privateRoot, caseRoot }) {
   const work = mkdtempSync(resolve(tmpdir(), "mp-ci-private-test-"));
   try {
@@ -147,11 +220,13 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       assert.equal(first.scoring_ready, false);
     }
 
-    const matrix = readJson(resolve(caseRoot, "paraphrase-matrix.json"));
+    const matrix = readJson(resolve(caseRoot, "concept-family-matrix.json"));
     assert.equal(matrix.fixture_id, "mp-ci-evidence-gap");
+    assert.equal(matrix.schema_version, "1.0.0");
     const baseReview = readJson(resolve(caseRoot, matrix.base_review));
+    const conceptMatrix = conceptMatrixEntries(matrix);
     const matrixPasses = { quantity_positive: 0, ci_positive: 0, negative: 0 };
-    for (const entry of matrix.entries) {
+    for (const entry of conceptMatrix.entries) {
       assert.ok(Object.hasOwn(matrixPasses, entry.family), `${entry.variant_id} matrix family`);
       const frozen = resolve(work, `${entry.variant_id}-frozen`);
       const candidate = resolve(work, `${entry.variant_id}-candidate`);
@@ -178,7 +253,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       if (entry.expected_finding_ids) assert.deepEqual(direct.findings.map(({ finding_id }) => finding_id), entry.expected_finding_ids, `${entry.variant_id} evaluator finding IDs`);
       matrixPasses[entry.family] += 1;
     }
-    assert.deepEqual(matrixPasses, { quantity_positive: 4, ci_positive: 4, negative: 5 });
+    assert.deepEqual(matrixPasses, { quantity_positive: 32, ci_positive: 29, negative: 5 });
 
     for (const [caseId, evidencePath, prepare] of [
       ["path-escape", "../outside.txt", () => {}],
@@ -255,7 +330,8 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
         validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: mutated });
       }, pattern, label);
     }
-    return { distinctCases: cases.cases.length, directPass: cases.cases.length + matrix.entries.length + 3, productionSafePass: cases.cases.length + matrix.entries.length + 3, matrixPasses, invalidEvidenceNegatives: 5 };
+    const evaluatedCases = cases.cases.length + conceptMatrix.entries.length + 3;
+    return { distinctCases: cases.cases.length, directPass: evaluatedCases, productionSafePass: evaluatedCases, matrixPasses, generatedCombinations: conceptMatrix.generated, independentProbes: conceptMatrix.probes, negativeControls: conceptMatrix.negatives, invalidEvidenceNegatives: 5 };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
