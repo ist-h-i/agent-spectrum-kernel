@@ -120,6 +120,32 @@ function readPreviousState(target) {
   return readJson(statePath);
 }
 
+function validateImmutableContractProjection(target, state) {
+  if (!state) {
+    throw new Error(`core install state is missing: ${STATE_PATH}`);
+  }
+  if (state.install_status !== "installed") {
+    throw new Error(`core install state is not active: ${STATE_PATH}`);
+  }
+  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
+    const record = state.managed_files?.[asset];
+    if (record?.kind !== "immutable_contract" || record.asset !== asset) {
+      throw new Error(`core immutable contract ownership mismatch: ${asset}`);
+    }
+    const sourceDigest = hashText(readText(resolve(REPO_ROOT, asset)));
+    if (record.sha256 !== sourceDigest || record.canonical_sha256 !== sourceDigest) {
+      throw new Error(`core immutable contract state digest mismatch: ${asset}`);
+    }
+    const targetPath = resolve(target, asset);
+    if (!existsSync(targetPath)) {
+      throw new Error(`core immutable contract is missing: ${asset}`);
+    }
+    if (hashText(readText(targetPath)) !== record.sha256) {
+      throw new Error(`core immutable contract bytes do not match install state: ${asset}`);
+    }
+  }
+}
+
 function validateSkillNames(skills, manifestSkills) {
   const manifestSkillSet = new Set(manifestSkills);
   const unknown = [];
@@ -331,6 +357,9 @@ function main() {
     console.log(`${args.dryRun || args.check ? "Kernel detach dry run" : "Kernel detached"}: ${args.target}`);
     printOperations(args.target, operations);
     return;
+  }
+  if (args.check) {
+    validateImmutableContractProjection(args.target, readPreviousState(args.target));
   }
   const plan = buildPlan(args);
   applyLifecyclePlan({ target: args.target, statePath: STATE_PATH, operations: plan.operations, state: plan.state, dryRun: args.dryRun || args.check });

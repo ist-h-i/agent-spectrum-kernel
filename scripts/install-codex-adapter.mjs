@@ -808,7 +808,11 @@ function resolveCodexProjectionSelection({ profileName, skills = null, skipPromp
   const selectedSkills = [...(skills ?? requiredSkills)].sort();
   validateSkillNames(selectedSkills, [...manifest.skills].sort());
   validateSkillClosure({ selectedSkills, requiredSkills, profileName });
-  const requiredAssets = [...new Set([...requiredAssetsForPrompts(prompts), ...requiredAssetsForSkills(selectedSkills)])].sort();
+  const requiredAssets = [...new Set([
+    "schemas/execution-envelope.schema.json",
+    ...requiredAssetsForPrompts(prompts),
+    ...requiredAssetsForSkills(selectedSkills),
+  ])].sort();
   return { manifest, resolvedProfile, prompts, commands, skills: selectedSkills, requiredSkills, requiredAssets, routingFixtures, routerReachableSkills: skillsForRoutingFixtures(routingFixtures) };
 }
 

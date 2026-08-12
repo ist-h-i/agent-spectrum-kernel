@@ -929,6 +929,7 @@ function resolveSelection(args) {
     throw new Error(`Selected Claude commands are not closed over installed skills: ${missingRequiredSkills.join(", ")}`);
   }
   const requiredAssets = [...new Set([
+    "schemas/execution-envelope.schema.json",
     ...selectedCommands.flatMap((command) => COMMAND_METADATA[command].requiredAssets),
     ...requiredAssetsForSkills(selectedSkills),
   ])].sort();
