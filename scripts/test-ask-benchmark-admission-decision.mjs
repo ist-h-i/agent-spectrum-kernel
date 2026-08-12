@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { test } from "node:test";
@@ -14,6 +14,7 @@ import {
   computeAdmissionDecisionId,
   ImmutableAuthorityRevisionUnavailableError,
   resolveEffectiveAdmissionAuthority,
+  resolveRepositoryAdmissionDecision,
   validatePortfolioAdmissionDecision,
 } from "./ask-benchmark-admission-decision.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
@@ -197,6 +198,62 @@ function reseal(decision) {
   decision.decision_digest = computeAdmissionDecisionDigest(decision);
 }
 
+function successorDecision(previous, predecessorPath, predecessorBytes, {
+  fixtureId = previous.fixture_id,
+  reviewedPullRequest = previous.reviewed_pull_request + 1,
+  reviewedHeadRevision = "d".repeat(40),
+  reviewerRecordId = "independent-successor-review",
+} = {}) {
+  const successor = structuredClone(previous);
+  successor.decision_revision = previous.decision_revision + 1;
+  successor.fixture_id = fixtureId;
+  successor.reviewed_pull_request = reviewedPullRequest;
+  successor.reviewed_head_revision = reviewedHeadRevision;
+  successor.reviewer_record_id = reviewerRecordId;
+  successor.predecessor_decision = {
+    path: predecessorPath,
+    raw_byte_digest: rawDigest(predecessorBytes),
+    decision_id: previous.decision_id,
+    decision_revision: previous.decision_revision,
+    fixture_id: previous.fixture_id,
+    decision_digest: previous.decision_digest,
+  };
+  reseal(successor);
+  return successor;
+}
+
+function successorAuthorityFixture(previousFixture, predecessorPath, predecessorBytes) {
+  const options = structuredClone(previousFixture.options);
+  const archiveBytes = Buffer.from("synthetic independent successor admission review archive\n");
+  options.reviewArchiveSource = { bytes: archiveBytes };
+  Object.assign(options.reviewAuthority, {
+    reviewer_record_id: "independent-successor-review",
+    reviewed_pull_request: 246,
+    reviewed_head_revision: "e".repeat(40),
+    review_evidence: { archive_sha256: rawDigest(archiveBytes), archive_bytes: archiveBytes.length },
+  });
+  options.evaluatorReference.evaluator_revision = "f".repeat(40);
+  const referenceBase = { ...options.evaluatorReference };
+  delete referenceBase.public_metadata_digest;
+  options.evaluatorReference.public_metadata_digest = canonicalDigest(referenceBase);
+  options.scoringInputFreezeManifest = null;
+  options.scoringInputFreezeManifestSource = null;
+
+  const decision = successorDecision(previousFixture.decision, predecessorPath, predecessorBytes, {
+    reviewedPullRequest: options.reviewAuthority.reviewed_pull_request,
+    reviewedHeadRevision: options.reviewAuthority.reviewed_head_revision,
+    reviewerRecordId: options.reviewAuthority.reviewer_record_id,
+  });
+  for (const field of ["review_status", "author_self_approval", "reviewer_type", "reviewer_record_id", "reviewer_count", "reviewed_at", "reviewed_repository", "reviewed_pull_request", "reviewed_head_revision", "blocking_finding_count", "review_evidence"]) {
+    decision[field] = structuredClone(options.reviewAuthority[field]);
+  }
+  decision.evaluator.evaluator_revision = options.evaluatorReference.evaluator_revision;
+  decision.evaluator_public_reference_digest = options.evaluatorReference.public_metadata_digest;
+  decision.frozen_scoring_input_manifest = null;
+  reseal(decision);
+  return { options, decision };
+}
+
 function rejectsMutation(label, mutate, pattern = /authority|identity|digest|fixture|evaluator|review/i) {
   test(label, () => {
     const { options, decision } = fixture();
@@ -306,12 +363,97 @@ test("changes-requested and rejected overlays remain non-scoring-ready", () => {
 
 test("a later decision revision has a new digest and cannot rewrite the consumed revision", () => {
   const { decision } = fixture();
-  const next = structuredClone(decision);
-  next.decision_revision += 1;
-  reseal(next);
+  const previousPath = "benchmarks/fixtures/admission-decision/synthetic-r1.json";
+  const next = successorDecision(decision, previousPath, bytes(decision));
   assertAdmissionDecisionAppendOnly(decision, next);
+  assert.equal(next.decision_id, decision.decision_id);
+  assert.equal(next.reviewed_pull_request, decision.reviewed_pull_request + 1);
+  assert.notEqual(next.reviewed_head_revision, decision.reviewed_head_revision);
   assert.notEqual(next.decision_digest, decision.decision_digest);
-  assert.throws(() => assertAdmissionDecisionAppendOnly(next, decision), /increase/);
+  assert.throws(() => assertAdmissionDecisionAppendOnly(next, decision), /increase|predecessor/);
+});
+
+test("repository admission resolver selects a unique successor reviewed on a different PR without rewriting revision 1", () => {
+  const repository = mkdtempSync(resolve(stableTmp, "ask-admission-successor-lineage-"));
+  const overlayRoot = resolve(repository, "benchmarks/fixtures/admission-decision");
+  const schemaRoot = resolve(repository, "benchmarks/schemas");
+  const previousPath = "benchmarks/fixtures/admission-decision/synthetic-r1.json";
+  const successorPath = "benchmarks/fixtures/admission-decision/synthetic-r2.json";
+  try {
+    mkdirSync(overlayRoot, { recursive: true });
+    mkdirSync(schemaRoot, { recursive: true });
+    cpSync(resolve(root, "benchmarks/schemas/portfolio-admission-decision.schema.json"), resolve(schemaRoot, "portfolio-admission-decision.schema.json"));
+    const { decision: previous } = fixture();
+    const previousBytes = bytes(previous);
+    writeFileSync(resolve(repository, previousPath), previousBytes);
+    const successor = successorDecision(previous, previousPath, previousBytes, {
+      reviewedPullRequest: 246,
+      reviewedHeadRevision: "e".repeat(40),
+    });
+    writeFileSync(resolve(repository, successorPath), bytes(successor));
+    gitOk(repository, "init", "-q", "-b", "main");
+    const revision = commitAll(repository, "add append-only successor admission lineage");
+
+    const resolved = resolveRepositoryAdmissionDecision({ root: repository, repositoryRevision: revision, fixtureId: previous.fixture_id });
+    assert.equal(resolved.path, successorPath);
+    assert.equal(resolved.decision.decision_revision, 2);
+    assert.equal(resolved.decision.reviewed_pull_request, 246);
+    assert.equal(resolved.decision.reviewed_head_revision, "e".repeat(40));
+    assert.deepEqual(JSON.parse(readFileSync(resolve(repository, previousPath), "utf8")), previous);
+
+    const rewrittenPrevious = structuredClone(previous);
+    rewrittenPrevious.reviewer_record_id = "rewritten-historical-review";
+    reseal(rewrittenPrevious);
+    writeFileSync(resolve(repository, previousPath), bytes(rewrittenPrevious));
+    const rewrittenRevision = commitAll(repository, "rewrite historical admission authority");
+    assert.throws(
+      () => resolveRepositoryAdmissionDecision({ root: repository, repositoryRevision: rewrittenRevision, fixtureId: previous.fixture_id }),
+      /predecessor.*(?:raw identity|decision_digest)|multiple managed overlays/u,
+    );
+    writeFileSync(resolve(repository, previousPath), previousBytes);
+    commitAll(repository, "restore historical admission authority");
+
+    const conflicting = successorDecision(previous, previousPath, previousBytes, {
+      reviewedPullRequest: 247,
+      reviewedHeadRevision: "f".repeat(40),
+      reviewerRecordId: "conflicting-successor-review",
+    });
+    writeFileSync(resolve(overlayRoot, "synthetic-conflicting-r2.json"), bytes(conflicting));
+    const conflictingRevision = commitAll(repository, "add conflicting successor admission");
+    assert.throws(
+      () => resolveRepositoryAdmissionDecision({ root: repository, repositoryRevision: conflictingRevision, fixtureId: previous.fixture_id }),
+      /multiple managed overlays|conflicting successor/u,
+    );
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("successor admission lineage rejects old review authority and cross-fixture predecessor transplants", () => {
+  const previousFixture = fixture();
+  const { options: previousOptions, decision: previous } = previousFixture;
+  const previousPath = "benchmarks/fixtures/admission-decision/synthetic-r1.json";
+  const previousBytes = bytes(previous);
+  const { options: successorOptions, decision: successor } = successorAuthorityFixture(previousFixture, previousPath, previousBytes);
+  const predecessorDecisionSource = { path: previousPath, bytes: previousBytes };
+  validatePortfolioAdmissionDecision(successor, {
+    authoritySources: successorOptions,
+    predecessorDecisionSource,
+  });
+  const resolved = resolveEffectiveAdmissionAuthority({ ...successorOptions, decisionOverlay: successor, predecessorDecisionSource });
+  assert.equal(resolved.authority_mode, "admitted_overlay");
+  assert.equal(resolved.admission_decision_revision, 2);
+  assert.equal(resolved.evaluator_revision, "f".repeat(40));
+  assert.throws(
+    () => validatePortfolioAdmissionDecision(successor, {
+      authoritySources: previousOptions,
+      predecessorDecisionSource,
+    }),
+    /external frozen or review authority/u,
+  );
+
+  const transplanted = successorDecision(previous, previousPath, previousBytes, { fixtureId: "other-fixture" });
+  assert.throws(() => assertAdmissionDecisionAppendOnly(previous, transplanted), /fixture|predecessor/u);
 });
 
 test("caller-supplied empty or partial expected authority cannot validate an admitted decision", () => {
