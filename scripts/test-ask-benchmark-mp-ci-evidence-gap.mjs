@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -147,6 +147,81 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       assert.equal(first.scoring_ready, false);
     }
 
+    const matrix = readJson(resolve(caseRoot, "paraphrase-matrix.json"));
+    assert.equal(matrix.fixture_id, "mp-ci-evidence-gap");
+    const baseReview = readJson(resolve(caseRoot, matrix.base_review));
+    const matrixPasses = { quantity_positive: 0, ci_positive: 0, negative: 0 };
+    for (const entry of matrix.entries) {
+      assert.ok(Object.hasOwn(matrixPasses, entry.family), `${entry.variant_id} matrix family`);
+      const frozen = resolve(work, `${entry.variant_id}-frozen`);
+      const candidate = resolve(work, `${entry.variant_id}-candidate`);
+      cpSync(resolve(FIXTURE_ROOT, "workspace"), frozen, { recursive: true });
+      cpSync(frozen, candidate, { recursive: true });
+      const review = clone(baseReview);
+      review.findings[entry.finding_index] = entry.finding;
+      writeFileSync(resolve(candidate, "review.json"), `${JSON.stringify(review, null, 2)}\n`);
+      const direct = await evaluator.evaluateCandidate({ frozenWorkspace: frozen, candidateWorkspace: candidate, verificationState: "executed_success" });
+      const normalizedResult = {
+        normalized_result_digest: canonicalDigest({ fixture_id: "mp-ci-evidence-gap", variant_id: entry.variant_id, authority: "paraphrase-matrix" }),
+        command_evidence: {
+          capture_support: "supported",
+          evidence_level: "verified",
+          references: [{ command_id: "review-contract-validation", match_state: "matched", outcome: "succeeded", exit_code: 0, digest: canonicalDigest({ variant_id: entry.variant_id, command_id: "review-contract-validation" }), bytes: 1 }],
+        },
+      };
+      const safe = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact: { artifact_digest: canonicalDigest({ variant_id: entry.variant_id, kind: "repository-diff" }), artifact_bytes: 1 } });
+      assertBenchmarkSchemaInstance(direct, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.variant_id} paraphrase fragment` });
+      assertBenchmarkSchemaInstance(safe, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.variant_id} safe paraphrase fragment` });
+      assert.deepEqual(evaluatorSemanticProjection(safe), evaluatorSemanticProjection(direct), `${entry.variant_id} direct/production-safe semantic projection`);
+      assert.deepEqual(direct.requirement_results.map(({ earned_points }) => earned_points), entry.expected_points, `${entry.variant_id} requirement points`);
+      assert.equal(direct.classification, entry.expected_classification, `${entry.variant_id} classification`);
+      if (entry.expected_finding_ids) assert.deepEqual(direct.findings.map(({ finding_id }) => finding_id), entry.expected_finding_ids, `${entry.variant_id} evaluator finding IDs`);
+      matrixPasses[entry.family] += 1;
+    }
+    assert.deepEqual(matrixPasses, { quantity_positive: 4, ci_positive: 4, negative: 5 });
+
+    for (const [caseId, evidencePath, prepare] of [
+      ["path-escape", "../outside.txt", () => {}],
+      ["symlink-evidence", ".github/workflows/pull-request.yml", (frozen, candidate) => {
+        for (const workspace of [frozen, candidate]) {
+          const target = resolve(workspace, ".github/workflows/pull-request.yml");
+          rmSync(target);
+          symlinkSync(resolve(workspace, "docs/verification.md"), target);
+        }
+      }],
+      ["non-regular-evidence", ".github/workflows/pull-request.yml", (frozen, candidate) => {
+        for (const workspace of [frozen, candidate]) {
+          const target = resolve(workspace, ".github/workflows/pull-request.yml");
+          rmSync(target);
+          const created = spawnSync("mkfifo", [target], { encoding: "utf8" });
+          assert.equal(created.status, 0, created.stderr || created.stdout);
+        }
+      }],
+    ]) {
+      const frozen = resolve(work, `${caseId}-frozen`);
+      const candidate = resolve(work, `${caseId}-candidate`);
+      cpSync(resolve(FIXTURE_ROOT, "workspace"), frozen, { recursive: true });
+      cpSync(frozen, candidate, { recursive: true });
+      prepare(frozen, candidate);
+      const review = clone(baseReview);
+      review.findings[0].evidence = [{ path: evidencePath, line: 1 }];
+      writeFileSync(resolve(candidate, "review.json"), `${JSON.stringify(review, null, 2)}\n`);
+      const direct = await evaluator.evaluateCandidate({ frozenWorkspace: frozen, candidateWorkspace: candidate, verificationState: "executed_success" });
+      const normalizedResult = {
+        normalized_result_digest: canonicalDigest({ fixture_id: "mp-ci-evidence-gap", case_id: caseId, authority: "invalid-evidence-test" }),
+        command_evidence: {
+          capture_support: "supported",
+          evidence_level: "verified",
+          references: [{ command_id: "review-contract-validation", match_state: "matched", outcome: "succeeded", exit_code: 0, digest: canonicalDigest({ case_id: caseId, command_id: "review-contract-validation" }), bytes: 1 }],
+        },
+      };
+      const safe = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact: { artifact_digest: canonicalDigest({ case_id: caseId, kind: "repository-diff" }), artifact_bytes: 1 } });
+      assert.deepEqual(evaluatorSemanticProjection(safe), evaluatorSemanticProjection(direct), `${caseId} direct/production-safe semantic projection`);
+      assert.equal(direct.requirement_results[0].earned_points, 0, `${caseId} CI evidence credit`);
+      assert.equal(direct.requirement_results[4].earned_points, 0, `${caseId} precision credit`);
+      assert.ok(direct.findings.some(({ finding_id }) => finding_id === "invalid-evidence-reference"), `${caseId} deterministic evaluator finding`);
+    }
+
     const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
     const admission = readJson(resolve(FIXTURE_ROOT, "final-admission-record.json"));
     const evidenceMap = readJson(resolve(FIXTURE_ROOT, "evidence-map.json"));
@@ -180,6 +255,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
         validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: mutated });
       }, pattern, label);
     }
+    return { distinctCases: cases.cases.length, directPass: cases.cases.length + matrix.entries.length + 3, productionSafePass: cases.cases.length + matrix.entries.length + 3, matrixPasses, invalidEvidenceNegatives: 5 };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -206,6 +282,6 @@ if (productionExists) {
 }
 
 const requested = privateArgs(process.argv.slice(2));
-if (requested) await validatePrivateCases(requested);
+const privateSummary = requested ? await validatePrivateCases(requested) : null;
 
-console.log(JSON.stringify({ fixture_id: "mp-ci-evidence-gap", input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", admission: "pending", scoring_ready: false }));
+console.log(JSON.stringify({ fixture_id: "mp-ci-evidence-gap", input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: "pending", scoring_ready: false }));
