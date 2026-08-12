@@ -1,0 +1,6 @@
+{
+  "retry": {
+    "maxAttempts": 3,
+    "backoff": "exponential"
+  }
+}

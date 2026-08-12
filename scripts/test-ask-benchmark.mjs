@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { computePortfolioPlanId, validateAdaptiveSelectionRecord, validateBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { resolvePortfolioExecutionAdmission } from "./ask-benchmark-plan.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const runner = resolve(root, "scripts/ask-benchmark.mjs");
@@ -62,7 +63,7 @@ try {
   rmSync(invalidCheckpointCConfigPath, { force: true });
 }
 
-const portfolioWork = mkdtempSync(resolve(tmpdir(), "ask-benchmark-portfolio-test-"));
+const portfolioWork = realpathSync(mkdtempSync(resolve(tmpdir(), "ask-benchmark-portfolio-test-")));
 const invalidPortfolioConfigPath = resolve(root, "benchmarks", `.adaptive-portfolio-invalid-${process.pid}.json`);
 const invalidPortfolioPlanPath = resolve(portfolioWork, "invalid-plan.json");
 const basePortfolioConfig = JSON.parse(readFileSync(portfolioConfig, "utf8"));
@@ -96,10 +97,16 @@ const portfolioPlanPath = resolve(portfolioWork, "plan.json");
 const portfolioPlanRepeatPath = resolve(portfolioWork, "plan-repeat.json");
 const portfolioPlanAlternatePath = resolve(portfolioWork, "plan-alternate.json");
 const portfolioPlanFromRecordedSeedPath = resolve(portfolioWork, "plan-from-recorded-seed.json");
+const portfolioPlanFromEvidenceManifestPath = resolve(portfolioWork, "plan-from-evidence-manifest.json");
+const emptyExecutionAdmissionEvidencePath = resolve(portfolioWork, "execution-admission-evidence.json");
 const invalidEmittedPlanPath = resolve(portfolioWork, "invalid-emitted-plan.json");
+writeFileSync(emptyExecutionAdmissionEvidencePath, "{}\n");
 run(["plan", "--config", portfolioConfig, "--output", portfolioPlanPath, "--seed", "portfolio-seed-2026"]);
 run(["plan", "--config", portfolioConfig, "--output", portfolioPlanRepeatPath, "--seed", "portfolio-seed-2026"]);
+run(["plan", "--config", portfolioConfig, "--output", portfolioPlanFromEvidenceManifestPath, "--seed", "portfolio-seed-2026", "--execution-admission-evidence", emptyExecutionAdmissionEvidencePath]);
 run(["plan", "--config", portfolioConfig, "--output", portfolioPlanAlternatePath, "--seed", "alternate-portfolio-seed-2026"]);
+const legacyExecutionAdmission = run(["plan", "--config", portfolioConfig, "--output", resolve(portfolioWork, "legacy-execution-admission-plan.json"), "--seed", "legacy-execution-admission", "--execution-admission-fixture", "mn-build-option-update", "--admission-decision", resolve(root, "benchmarks/fixtures/admission-decision/mn-build-option-update-r22-admission-decision.json")], 1);
+assert.match(`${legacyExecutionAdmission.stderr}\n${legacyExecutionAdmission.stdout}`, /no longer accepts caller decision or single-fixture flags/u);
 const invalidEmittedPlan = run(["plan", "--config", portfolioConfig, "--output", invalidEmittedPlanPath, "--seed", "s".repeat(257)], 1);
 assert.match(`${invalidEmittedPlan.stderr}\n${invalidEmittedPlan.stdout}`, /execution plan failed JSON Schema validation/);
 assert.equal(existsSync(invalidEmittedPlanPath), false);
@@ -107,24 +114,29 @@ assert.equal(existsSync(invalidEmittedPlanPath), false);
 const portfolioPlan = JSON.parse(readFileSync(portfolioPlanPath, "utf8"));
 const portfolioRuntimeConfig = JSON.parse(readFileSync(portfolioConfig, "utf8"));
 const repeatedPortfolioPlan = JSON.parse(readFileSync(portfolioPlanRepeatPath, "utf8"));
+const evidenceManifestPortfolioPlan = JSON.parse(readFileSync(portfolioPlanFromEvidenceManifestPath, "utf8"));
 const alternatePortfolioPlan = JSON.parse(readFileSync(portfolioPlanAlternatePath, "utf8"));
 assert.deepEqual(repeatedPortfolioPlan, portfolioPlan);
+assert.deepEqual(evidenceManifestPortfolioPlan, portfolioPlan, "empty closed evidence manifest must preserve the default fail-closed plan");
 assert.match(portfolioPlan.randomization_seed.seed_id, /^seed-[a-f0-9]{16}$/);
 assert.equal(portfolioPlan.randomization_seed.value, "portfolio-seed-2026");
 assert.match(portfolioPlan.randomization_seed.sha256, /^[a-f0-9]{64}$/);
 assert.equal(portfolioPlan.randomization_seed.sha256, createHash("sha256").update(portfolioPlan.randomization_seed.value).digest("hex"));
 assert.match(portfolioPlan.plan_id, /^plan-[a-f0-9]{64}$/);
+assert.match(portfolioPlan.execution_admission_authority_digest, /^sha256:[a-f0-9]{64}$/);
 run(["plan", "--config", portfolioConfig, "--output", portfolioPlanFromRecordedSeedPath, "--seed", portfolioPlan.randomization_seed.value]);
 assert.deepEqual(JSON.parse(readFileSync(portfolioPlanFromRecordedSeedPath, "utf8")), portfolioPlan);
-const expectedPortfolioCaseCount = portfolioRuntimeConfig.fixtures.reduce((sum, fixture) => sum + fixture.repetitions * portfolioRuntimeConfig.adapter_tracks.length * portfolioRuntimeConfig.conditions.length, 0);
+const executionEligibleFixtures = portfolioRuntimeConfig.fixtures.filter((fixture) => resolvePortfolioExecutionAdmission({ root, fixture }).execution_eligible);
+const expectedPortfolioCaseCount = executionEligibleFixtures.reduce((sum, fixture) => sum + fixture.repetitions * portfolioRuntimeConfig.adapter_tracks.length * portfolioRuntimeConfig.conditions.length, 0);
 assert.equal(portfolioPlan.cases.length, expectedPortfolioCaseCount);
 assert.deepEqual(new Set(portfolioPlan.adapter_tracks.map((entry) => entry.id)), new Set(["codex", "claude"]));
 assert.ok(portfolioPlan.adapter_tracks.every((entry) => entry.runtime_status === "unverified"));
 assert.equal(portfolioPlan.pool_adapter_results, false);
 assert.deepEqual(new Set(portfolioPlan.conditions), new Set(["plain", "kernel_only", "adaptive_ask", "full_ask"]));
 assert.equal(portfolioPlan.schema_path, "benchmarks/schemas/execution-plan.schema.json");
-assert.ok(portfolioPlan.cases.filter((entry) => entry.fixture_id !== "mn-build-option-update").every((entry) => entry.suite === "calibration" && entry.aggregate_eligible === false));
+assert.ok(portfolioPlan.cases.filter((entry) => !["mn-build-option-update", "mn-doc-config-correction"].includes(entry.fixture_id)).every((entry) => entry.suite === "calibration" && entry.aggregate_eligible === false));
 assert.ok(portfolioPlan.cases.filter((entry) => entry.fixture_id === "mn-build-option-update").every((entry) => entry.suite === "mechanism_negative" && entry.task_class === "configuration" && entry.aggregate_eligible === true));
+assert.equal(portfolioPlan.cases.filter((entry) => entry.fixture_id === "mn-doc-config-correction").length, 0, "admission-pending fixture must not enter the execution plan");
 assert.equal(new Set(portfolioPlan.cases.map((entry) => entry.case_id)).size, portfolioPlan.cases.length);
 
 const casesByBlock = groupBy(portfolioPlan.cases, (entry) => entry.block_id);
@@ -228,6 +240,7 @@ const planIdentityInputs = {
   protocolSha256: portfolioPlan.protocol_sha256,
   repositoryRevision: portfolioPlan.repository_revision,
   seed: portfolioPlan.randomization_seed.value,
+  executionAdmissionAuthorityDigest: portfolioPlan.execution_admission_authority_digest,
 };
 assert.equal(computePortfolioPlanId(planIdentityInputs), portfolioPlan.plan_id);
 const differentHex = (value) => `${value[0] === "a" ? "b" : "a"}${value.slice(1)}`;
@@ -236,6 +249,7 @@ for (const changed of [
   { ...planIdentityInputs, protocolSha256: differentHex(planIdentityInputs.protocolSha256) },
   { ...planIdentityInputs, repositoryRevision: differentHex(planIdentityInputs.repositoryRevision) },
   { ...planIdentityInputs, seed: `${planIdentityInputs.seed}-changed` },
+  { ...planIdentityInputs, executionAdmissionAuthorityDigest: `sha256:${differentHex(planIdentityInputs.executionAdmissionAuthorityDigest.slice("sha256:".length))}` },
 ]) {
   assert.notEqual(computePortfolioPlanId(changed), portfolioPlan.plan_id);
 }

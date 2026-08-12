@@ -170,7 +170,7 @@ function frozenFixtureInventory(records) {
   }));
 }
 
-export function assertExactPlanIdentity({ root, config, plan, repositoryRevision }) {
+export function assertExactPlanIdentity({ root, config, plan, repositoryRevision, executionAdmissionEvidenceByFixture = null }) {
   const schemaPath = assertInside(root, resolve(root, config.execution_plan.schema_path), "execution plan schema");
   assertNoSymlinkSegments(config._configPath, "portfolio config");
   assertNoSymlinkSegments(config._protocolPath, "portfolio protocol");
@@ -183,7 +183,7 @@ export function assertExactPlanIdentity({ root, config, plan, repositoryRevision
   if (plan.repository_revision !== repositoryRevision) throw new Error("execution plan repository revision mismatch");
   const seedDigest = sha256(plan.randomization_seed.value);
   if (plan.randomization_seed.sha256 !== seedDigest || plan.randomization_seed.seed_id !== `seed-${seedDigest.slice(0, 16)}`) throw new Error("execution plan seed digest mismatch");
-  const expected = buildPortfolioPlan({ root, config, repositoryRevision, seed: plan.randomization_seed.value });
+  const expected = buildPortfolioPlan({ root, config, repositoryRevision, seed: plan.randomization_seed.value, executionAdmissionEvidenceByFixture });
   for (const field of Object.keys(expected).filter((field) => field !== "cases")) {
     if (stableCanonicalJson(plan[field]) !== stableCanonicalJson(expected[field])) throw new Error(`execution plan identity mismatch: ${field}`);
   }
@@ -392,11 +392,11 @@ function assertAdaptiveProjectionBoundary({ caseRoot, record, projectedInventory
   }
 }
 
-export function validateMaterializedPortfolio({ root, config, plan, materializedRoot, repositoryRevision }) {
+export function validateMaterializedPortfolio({ root, config, plan, materializedRoot, repositoryRevision, executionAdmissionEvidenceByFixture = null }) {
   const materialized = resolve(materializedRoot);
   if (!existsSync(materialized) || !lstatSync(materialized).isDirectory()) throw new Error(`materialized root must be an existing directory: ${materialized}`);
   assertNoSymlinkSegments(materialized, "materialized root");
-  assertExactPlanIdentity({ root, config, plan, repositoryRevision });
+  assertExactPlanIdentity({ root, config, plan, repositoryRevision, executionAdmissionEvidenceByFixture });
   const fixtureInputs = validateFixtureInputs({ root, config, plan });
 
   const manifestPath = assertInside(materialized, resolve(materialized, MATERIALIZATION_MANIFEST_NAME), "materialization manifest");
@@ -476,11 +476,11 @@ export function validateMaterializedPortfolio({ root, config, plan, materialized
   return { manifest, manifestDigest, manifestPath, casesById: new Map(manifest.cases.map((entry) => [entry.case_id, entry])) };
 }
 
-export function materializePortfolio({ root, config, planPath, outputPath, repositoryRevision }) {
+export function materializePortfolio({ root, config, planPath, outputPath, repositoryRevision, executionAdmissionEvidenceByFixture = null }) {
   if (!planPath || !outputPath) throw new Error("materialize requires --plan and --output");
   assertTrackedRepositoryMatchesHead(root);
   const plan = readJson(planPath);
-  assertExactPlanIdentity({ root, config, plan, repositoryRevision });
+  assertExactPlanIdentity({ root, config, plan, repositoryRevision, executionAdmissionEvidenceByFixture });
   const fixtures = validateFixtureInputs({ root, config, plan });
   const outputBoundary = validateOutputBoundary(outputPath);
   const parent = dirname(outputPath);

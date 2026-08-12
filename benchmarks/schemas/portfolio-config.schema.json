@@ -108,7 +108,7 @@
       "required": ["schema_path", "schema_version"],
       "properties": {
         "schema_path": { "const": "benchmarks/schemas/execution-plan.schema.json" },
-        "schema_version": { "const": "1.1.0" }
+        "schema_version": { "const": "1.2.0" }
       }
     },
     "adaptive_selection": {

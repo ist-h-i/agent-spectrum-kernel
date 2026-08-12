@@ -20,7 +20,7 @@ import { dirname, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
-import { buildPortfolioPlan, PORTFOLIO_CONDITIONS } from "./ask-benchmark-plan.mjs";
+import { buildPortfolioPlan, PORTFOLIO_CONDITIONS, readExecutionAdmissionEvidenceManifest } from "./ask-benchmark-plan.mjs";
 import { validateVerificationCommandContract } from "./ask-benchmark-command-evidence.mjs";
 import { assertTrackedRepositoryMatchesHead, materializePortfolio } from "./ask-benchmark-materialize.mjs";
 import { sealAdaptiveSelection, verifyAdaptiveSelection } from "./ask-benchmark-selection.mjs";
@@ -81,7 +81,7 @@ function writeJson(path, value) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  const args = { command, output: null, source: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, pairedComparisonReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, privateEvaluationRoot: null, privateEvaluationRecordPath: null, privateFragmentPath: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, admissionDecision: null, admissionReviewAuthority: null, admissionReviewAuthoritySourceDigest: null, admissionReviewArchive: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
+  const args = { command, output: null, source: null, plan: null, materialized: null, stateDir: null, caseId: null, input: null, resultSet: null, repetitionReport: null, pairedComparisonReport: null, runDir: null, seed: null, agentBin: "codex", adapter: null, runtimeConfig: null, maxCases: null, retryFailed: false, claimId: null, reason: null, snapshotDigest: null, reference: null, privateRoot: null, privateEvaluationRoot: null, privateEvaluationRecordPath: null, privateFragmentPath: null, evaluatorManifest: null, evaluatorResult: null, admissionRecord: null, admissionDecision: null, admissionReviewAuthority: null, admissionReviewAuthoritySourceDigest: null, admissionReviewArchive: null, executionAdmissionFixture: null, executionAdmissionEvidence: null, requirementRecord: null, outputContract: null, scoringInputFreezeManifest: null, scoringInputFreezeManifestSourceDigest: null, normalizedResults: null, engineeringResults: null, engineeringResultSourceManifest: null, engineeringResultSourceManifestSourceDigest: null, publicArtifactRoot: null, catalogPath: DEFAULT_PORTFOLIO_CATALOG_PATH, similarityPath: DEFAULT_PORTFOLIO_SIMILARITY_PATH, policyManifestPath: DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, admissionPolicyPath: DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, scoringPolicyPath: DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, lineagePolicyPath: DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH, designManifestPath: DEFAULT_PORTFOLIO_DESIGN_ADMISSION_MANIFEST_PATH, designReviewPackagePath: DEFAULT_PORTFOLIO_DESIGN_REVIEW_PACKAGE_PATH, independentDesignReviewPath: DEFAULT_PORTFOLIO_DESIGN_INDEPENDENT_REVIEW_PATH, designReviewedStatePath: DEFAULT_PORTFOLIO_DESIGN_REVIEWED_STATE_PATH, configPath: DEFAULT_CONFIG_PATH };
   while (argv.length > 0) {
     const flag = argv.shift();
     if (flag === "--output") args.output = resolve(argv.shift());
@@ -120,6 +120,8 @@ function parseArgs(argv) {
     else if (flag === "--admission-review-authority") args.admissionReviewAuthority = resolve(argv.shift());
     else if (flag === "--admission-review-authority-source-digest") args.admissionReviewAuthoritySourceDigest = argv.shift();
     else if (flag === "--admission-review-archive") args.admissionReviewArchive = resolve(argv.shift());
+    else if (flag === "--execution-admission-fixture") args.executionAdmissionFixture = argv.shift();
+    else if (flag === "--execution-admission-evidence") args.executionAdmissionEvidence = resolve(argv.shift());
     else if (flag === "--requirement-record") args.requirementRecord = resolve(argv.shift());
     else if (flag === "--output-contract") args.outputContract = resolve(argv.shift());
     else if (flag === "--scoring-input-freeze") args.scoringInputFreezeManifest = resolve(argv.shift());
@@ -157,8 +159,8 @@ Commands:
   validate-portfolio-design-review [--independent-design-review <review.json>] [--design-reviewed-state <state.json>]
   migrate-legacy-calibration-result --input <legacy-result.json> --output <absent-migration.json>
   verify-legacy-calibration-migration --source <legacy-result.json> --input <migration.json>
-  plan --config <portfolio-config.json> --output <execution-plan.json> --seed <value>
-  materialize --config <portfolio-config.json> --plan <execution-plan.json> --output <absent-or-empty-directory>
+  plan --config <portfolio-config.json> --output <execution-plan.json> --seed <value> [--execution-admission-evidence <fixture-keyed-evidence-manifest.json>]
+  materialize --config <portfolio-config.json> --plan <execution-plan.json> --output <absent-or-empty-directory> [--execution-admission-evidence <fixture-keyed-evidence-manifest.json>]
   seal-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id> --input <selection-input.json>
   verify-selection --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --state-dir <external-state-directory> --case-id <adaptive-case-id>
   execute-portfolio --config <portfolio-config.json> --plan <execution-plan.json> --materialized <materialized-directory> --selection-state <external-state-directory> --run-dir <run-directory> --adapter <codex|claude> --runtime-config <runtime-config.json> --agent-bin <executable> [--case-id <case-id>] [--max-cases <count>] [--retry-failed]
@@ -249,8 +251,18 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
     if (fixture.aggregate_eligible !== (fixture.suite !== "calibration")) errors.push(`${fixture.id} aggregate eligibility must exclude calibration only`);
     if (fixture.id === "impl-transfer-hard" && fixture.suite === "calibration" && fixture.repetitions !== 5) errors.push("concurrent transfer calibration requires 5 repetitions");
     const root = resolve(fixtureRoot(config), fixture.id);
+    const sourceFreezeCandidatePath = resolve(root, "source-freeze-candidate.json");
+    const sourceFreezeCandidate = existsSync(sourceFreezeCandidatePath) ? readJson(sourceFreezeCandidatePath) : null;
+    const isPendingSourceFreezeCandidate = sourceFreezeCandidate?.fixture_id === fixture.id
+      && sourceFreezeCandidate?.candidate_state === "source_freeze_candidate"
+      && sourceFreezeCandidate?.reviewer_state === "pending"
+      && sourceFreezeCandidate?.admission_state === "admission_pending"
+      && sourceFreezeCandidate?.measured_execution === false
+      && sourceFreezeCandidate?.scoring_published === false;
     const requiredFixturePaths = fixture.suite === "calibration"
       ? ["task.md", "workspace/package.json", "evaluator/expected.json"]
+      : isPendingSourceFreezeCandidate
+        ? ["task.md", "workspace/package.json", "metadata.json", "requirement-record.json", "output-contract.json", "source-freeze-candidate.json", "verification-command-contract.json"]
       : ["task.md", "workspace/package.json", "metadata.json", "evaluator-reference.json", "requirement-record.json", "output-contract.json", "final-admission-record.json", "scoring-input-freeze-manifest.json", "admission-review.json"];
     for (const path of requiredFixturePaths) {
       if (!existsSync(resolve(root, path))) errors.push(`${fixture.id}/${path} is missing`);
@@ -283,7 +295,7 @@ function validatePortfolioFoundation(config, canonicalConfigPath) {
   }
 
   if (config.ordering?.strategy !== "seeded_balanced_rotation" || config.ordering?.condition_count !== PORTFOLIO_CONDITIONS.length) errors.push("portfolio ordering must use four-condition seeded_balanced_rotation");
-  if (config.execution_plan?.schema_version !== "1.1.0" || !config.execution_plan?.schema_path) errors.push("portfolio execution plan schema version and path are required");
+  if (config.execution_plan?.schema_version !== "1.2.0" || !config.execution_plan?.schema_path) errors.push("portfolio execution plan schema version and path are required");
   else {
     const planSchemaPath = resolveRepoPath(config.execution_plan.schema_path, "execution plan schema");
     if (!existsSync(planSchemaPath)) errors.push(`execution plan schema is missing: ${config.execution_plan.schema_path}`);
@@ -419,13 +431,19 @@ function requireLegacyConfig(config, command) {
   if (config._kind !== "legacy") throw new Error(`${command} does not execute portfolio configs; use plan/materialize because portfolio runtime execution and scoring remain out of scope`);
 }
 
+function executionAdmissionEvidenceByFixture(args) {
+  const legacySupplied = [args.executionAdmissionFixture, args.admissionDecision, args.admissionReviewAuthority, args.admissionReviewAuthoritySourceDigest, args.admissionReviewArchive].some((value) => value !== null);
+  if (legacySupplied) throw new Error("plan/materialize execution admission no longer accepts caller decision or single-fixture flags; use --execution-admission-evidence");
+  return args.executionAdmissionEvidence ? readExecutionAdmissionEvidenceManifest(args.executionAdmissionEvidence) : null;
+}
+
 function planPortfolio(args) {
   const config = validateProtocol(args.configPath);
   if (config._kind !== "portfolio") throw new Error("plan requires an Adaptive portfolio config");
   if (!args.output || !args.seed) throw new Error("plan requires --output and --seed");
   if (existsSync(args.output)) throw new Error(`plan output must not already exist: ${args.output}`);
   const repositoryRevision = git(ROOT, ["rev-parse", "HEAD"]);
-  const plan = buildPortfolioPlan({ root: ROOT, config, repositoryRevision, seed: args.seed });
+  const plan = buildPortfolioPlan({ root: ROOT, config, repositoryRevision, seed: args.seed, executionAdmissionEvidenceByFixture: executionAdmissionEvidenceByFixture(args) });
   const planSchemaPath = resolveRepoPath(config.execution_plan.schema_path, "execution plan schema");
   assertBenchmarkSchemaInstance(plan, { schemaPath: planSchemaPath, label: "execution plan" });
   writeJson(args.output, plan);
@@ -441,6 +459,7 @@ function materialize(args) {
     planPath: args.plan,
     outputPath: args.output,
     repositoryRevision: git(ROOT, ["rev-parse", "HEAD"]),
+    executionAdmissionEvidenceByFixture: executionAdmissionEvidenceByFixture(args),
   });
   console.log(`Materialized ${manifest.case_count} deterministic portfolio cases to ${args.output}`);
 }

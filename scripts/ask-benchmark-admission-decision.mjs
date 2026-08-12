@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, lstatSync } from "node:fs";
 import { posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -11,6 +12,7 @@ import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 export const ADMISSION_DECISION_SCHEMA_PATH = "benchmarks/schemas/portfolio-admission-decision.schema.json";
 export const ADMISSION_REVIEW_AUTHORITY_SCHEMA_PATH = "benchmarks/schemas/portfolio-admission-review-authority.schema.json";
 export const APPROVED_R21_IMMUTABLE_PATH_INVENTORY = "benchmarks/fixtures/admission-decision/approved-r21-immutable-paths.json";
+export const ADMISSION_DECISION_OVERLAY_ROOT = "benchmarks/fixtures/admission-decision";
 
 const DEFAULT_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const MAX_PUBLIC_JSON_BYTES = 1024 * 1024;
@@ -18,6 +20,7 @@ const MAX_REVIEW_ARCHIVE_BYTES = 256 * 1024 * 1024;
 const AUTHORITY_MODES = new Set(["legacy_admitted_record", "admitted_overlay", "not_admitted"]);
 const EFFECTIVE_STATUSES = new Set(["admitted", "admission_pending", "changes_requested", "rejected"]);
 const RESOLVED_AUTHORITIES = new WeakSet();
+const REPOSITORY_ADMISSION_DECISIONS = new WeakSet();
 const REVIEW_AUTHORITY_FIELDS = Object.freeze([
   "review_status",
   "author_self_approval",
@@ -232,6 +235,45 @@ export function computeAdmissionReviewAuthorityDigest(value) {
   return canonicalDigest(withoutField(value, "authority_digest"));
 }
 
+function gitOutput(root, args, label, { encoding = "utf8" } = {}) {
+  try {
+    return execFileSync("git", ["-C", root, ...args], { encoding, maxBuffer: 16 * 1024 * 1024 });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`${label} failed: ${detail}`);
+  }
+}
+
+function assertRepositoryRevision(root, repositoryRevision) {
+  if (!/^[a-f0-9]{40}$/u.test(repositoryRevision ?? "")) throw new Error("repository admission authority requires a full repository revision");
+  gitOutput(root, ["cat-file", "-e", `${repositoryRevision}^{commit}`], "repository admission revision lookup");
+  return repositoryRevision;
+}
+
+export function resolveRepositoryAdmissionDecision({ root = DEFAULT_ROOT, repositoryRevision, fixtureId }) {
+  if (typeof fixtureId !== "string" || fixtureId.length === 0) throw new Error("repository admission authority requires a fixture identity");
+  const revision = assertRepositoryRevision(root, repositoryRevision);
+  const trackedOutput = gitOutput(root, ["ls-tree", "-r", "--name-only", "-z", revision, "--", ADMISSION_DECISION_OVERLAY_ROOT], "repository admission overlay inventory", { encoding: null });
+  const trackedPaths = trackedOutput.toString("utf8").split("\0").filter((path) => path.endsWith(".json"));
+  const matches = [];
+  for (const path of trackedPaths) {
+    const repositoryBytes = gitOutput(root, ["show", `${revision}:${path}`], `repository admission overlay ${path}`, { encoding: null });
+    const parsed = parseJsonBytes(repositoryBytes, `repository admission overlay ${path}`);
+    if (parsed?.schema_path !== ADMISSION_DECISION_SCHEMA_PATH) continue;
+    const workingPath = resolve(root, assertPortablePath(path, "repository admission overlay path"));
+    if (!existsSync(workingPath) || !lstatSync(workingPath).isFile()) throw new Error(`repository admission overlay working-tree file is missing or not regular: ${path}`);
+    const workingSource = readStableFile(workingPath, `repository admission overlay working-tree file ${path}`, MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
+    if (!workingSource.bytes.equals(repositoryBytes)) throw new Error(`repository admission overlay working-tree bytes differ from ${revision}:${path}`);
+    if (parsed.fixture_id !== fixtureId) continue;
+    validateDecisionClosure(parsed, root);
+    const decision = Object.freeze(parsed);
+    REPOSITORY_ADMISSION_DECISIONS.add(decision);
+    matches.push(Object.freeze({ decision, path, raw_byte_digest: sha256(repositoryBytes), repository_revision: revision }));
+  }
+  if (matches.length > 1) throw new Error(`${fixtureId} repository admission authority has multiple managed overlays`);
+  return matches[0] ?? null;
+}
+
 function validateAdmissionReviewAuthority(value, { root = DEFAULT_ROOT } = {}) {
   assertClosedObject(value, REVIEW_AUTHORITY_ARTIFACT_FIELDS, "sealed admission review authority");
   assertBenchmarkSchemaInstance(value, { schemaPath: resolve(root, ADMISSION_REVIEW_AUTHORITY_SCHEMA_PATH), label: "sealed admission review authority" });
@@ -335,6 +377,18 @@ export function assertResolvedEffectiveAdmissionAuthority(value) {
   return value;
 }
 
+export function computeEffectiveAdmissionAuthorityDigest(value) {
+  return canonicalDigest(assertResolvedEffectiveAdmissionAuthority(value));
+}
+
+export function computeEffectiveAdmissionAuthoritySetDigest(values) {
+  if (!Array.isArray(values)) throw new Error("effective admission authority set must be an array");
+  const authorities = values.map((value) => assertResolvedEffectiveAdmissionAuthority(value));
+  const fixtureIds = authorities.map(({ fixture_id }) => fixture_id);
+  if (new Set(fixtureIds).size !== fixtureIds.length) throw new Error("effective admission authority set contains duplicate fixture identities");
+  return canonicalDigest([...authorities].sort((left, right) => left.fixture_id.localeCompare(right.fixture_id)));
+}
+
 export function resolveEffectiveAdmissionAuthorityFromFiles({
   root = DEFAULT_ROOT,
   decisionPath,
@@ -357,6 +411,31 @@ export function resolveEffectiveAdmissionAuthorityFromFiles({
     root,
     ...frozenAuthority,
     decisionOverlay,
+    reviewAuthority: reviewAuthorityProjection(reviewAuthorityArtifact),
+    reviewArchiveSource: { bytes: reviewArchiveSource.bytes },
+  });
+}
+
+export function resolveEffectiveAdmissionAuthorityFromRepositoryOverlayFiles({
+  root = DEFAULT_ROOT,
+  repositoryDecision,
+  reviewAuthorityPath,
+  reviewAuthoritySourceDigest,
+  reviewArchivePath,
+  ...frozenAuthority
+}) {
+  if (!repositoryDecision || !REPOSITORY_ADMISSION_DECISIONS.has(repositoryDecision)) throw new Error("execution admission decision must come from the repository overlay resolver");
+  if (!reviewAuthorityPath || !reviewArchivePath) throw new Error("repository admission decision requires sealed review-authority and review-archive paths");
+  if (!/^sha256:[a-f0-9]{64}$/u.test(reviewAuthoritySourceDigest ?? "")) throw new Error("admission review authority requires an external immutable source digest");
+  const reviewSource = readStableJsonFile(reviewAuthorityPath, "sealed admission review authority", MAX_PUBLIC_JSON_BYTES, { allowEmpty: false });
+  const reviewArchiveSource = readStableFile(reviewArchivePath, "external admission review archive", MAX_REVIEW_ARCHIVE_BYTES, { allowEmpty: false });
+  if (reviewSource.rawByteDigest !== reviewAuthoritySourceDigest) throw new Error("sealed admission review authority raw digest differs from the external immutable source digest");
+  const reviewAuthorityArtifact = validateAdmissionReviewAuthority(reviewSource.value, { root });
+  if (reviewAuthorityArtifact.fixture_id !== repositoryDecision.fixture_id) throw new Error("sealed review authority and repository admission decision fixture identities differ");
+  return resolveEffectiveAdmissionAuthority({
+    root,
+    ...frozenAuthority,
+    decisionOverlay: repositoryDecision,
     reviewAuthority: reviewAuthorityProjection(reviewAuthorityArtifact),
     reviewArchiveSource: { bytes: reviewArchiveSource.bytes },
   });

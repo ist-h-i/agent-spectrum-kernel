@@ -92,6 +92,20 @@
         "path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/verification-command-contract.json",
         "sha256": "eb2eee7170452eff1d0e131f4ac8a25a285f050a7e8e23ab23286376b31dc620"
       }
+    },
+    {
+      "id": "mn-doc-config-correction",
+      "suite": "mechanism_negative",
+      "task_class": "documentation",
+      "difficulty": "easy",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-doc-config-correction/input-manifest.json",
+      "input_manifest_sha256": "de997ed8e15305fc82f5b3ad7e876a7891d69bc7d5978a5b8d6e9ee5a7cec906",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/mn-doc-config-correction/verification-command-contract.json",
+        "sha256": "01d654f88a042f9f38aff0c78f48381bf1bba0899dda4c9a9184783b0a26f3df"
+      }
     }
   ],
   "ordering": {
@@ -100,7 +114,7 @@
   },
   "execution_plan": {
     "schema_path": "benchmarks/schemas/execution-plan.schema.json",
-    "schema_version": "1.1.0"
+    "schema_version": "1.2.0"
   },
   "adaptive_selection": {
     "schema_path": "benchmarks/schemas/adaptive-selection.schema.json",
