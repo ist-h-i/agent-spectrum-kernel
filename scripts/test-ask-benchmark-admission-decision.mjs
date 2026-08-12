@@ -389,9 +389,7 @@ test("actual Git diff closes the historical R21 to required R22 transition", () 
     assert.equal(publicSummary.reviewStatus, "pending_independent_review");
     assert.equal(publicSummary.scoringReady, false);
   }
-  const sourceDiff = spawnSync("git", ["diff", "--name-only", "origin/main", "--", ...historicalSourcePaths], { cwd: root, encoding: "utf8" });
-  assert.equal(sourceDiff.status, 0, sourceDiff.stderr || sourceDiff.stdout);
-  assert.notEqual(sourceDiff.stdout.trim(), "", "the post-PR #238 evaluator source must require R22 instead of claiming R21 reuse");
+  assertHistoricalEvaluatorSourceChanged({ repository: root, inventory, sourcePaths: historicalSourcePaths });
 });
 
 test("actual protected-path commit is rejected without a caller-maintained changed-path list", () => {
@@ -425,6 +423,73 @@ function commitAll(repository, message) {
   gitOk(repository, "-c", "user.name=ASK Test", "-c", "user.email=ask-test@example.invalid", "commit", "-qm", message);
   return gitOk(repository, "rev-parse", "HEAD");
 }
+
+function assertHistoricalEvaluatorSourceChanged({ repository, inventory, sourcePaths }) {
+  const changedPaths = new Set(changedPathsFromGitDiff({ root: repository, inventory }));
+  const changedSourcePaths = sourcePaths.filter((path) => changedPaths.has(path));
+  assert.notEqual(changedSourcePaths.length, 0, "historical evaluator source must differ from the approved R21 reviewed authority");
+  return changedSourcePaths;
+}
+
+test("historical source proof is stable on current main and an unrelated feature branch", () => {
+  const repository = mkdtempSync(resolve(stableTmp, "ask-admission-historical-source-proof-"));
+  const sourcePath = "scripts/ask-benchmark-evaluator-boundary.mjs";
+  const inventoryPath = "benchmarks/fixtures/admission-decision/approved-r21-immutable-paths.json";
+  try {
+    gitOk(repository, "init", "-q", "-b", "main");
+    mkdirSync(resolve(repository, dirname(sourcePath)), { recursive: true });
+    writeFileSync(resolve(repository, sourcePath), "export const authority = 'R21';\n");
+    const reviewedHead = commitAll(repository, "approved R21 source");
+    const inventory = {
+      schema_version: "1.0.0",
+      program: "adaptive_ask_approved_immutable_path_inventory",
+      authority_source: { fixture_id: "mn-build-option-update", reviewed_head_revision: reviewedHead },
+      inventory_digest: canonicalDigest([sourcePath]),
+      paths: [sourcePath],
+    };
+    mkdirSync(resolve(repository, dirname(inventoryPath)), { recursive: true });
+    writeFileSync(resolve(repository, inventoryPath), `${JSON.stringify(inventory, null, 2)}\n`);
+    writeFileSync(resolve(repository, sourcePath), "export const authority = 'R22';\n");
+    commitAll(repository, "current main R22 source");
+    assert.deepEqual(assertHistoricalEvaluatorSourceChanged({ repository, inventory, sourcePaths: [sourcePath] }), [sourcePath]);
+
+    gitOk(repository, "checkout", "-qb", "unrelated-feature");
+    writeFileSync(resolve(repository, "unrelated.md"), "unrelated feature\n");
+    commitAll(repository, "unrelated feature change");
+    assert.deepEqual(assertHistoricalEvaluatorSourceChanged({ repository, inventory, sourcePaths: [sourcePath] }), [sourcePath]);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("historical source proof rejects an unchanged R21 evaluator source", () => {
+  const repository = mkdtempSync(resolve(stableTmp, "ask-admission-unchanged-historical-source-"));
+  const sourcePath = "scripts/ask-benchmark-evaluator-boundary.mjs";
+  const inventoryPath = "benchmarks/fixtures/admission-decision/approved-r21-immutable-paths.json";
+  try {
+    gitOk(repository, "init", "-q", "-b", "main");
+    mkdirSync(resolve(repository, dirname(sourcePath)), { recursive: true });
+    writeFileSync(resolve(repository, sourcePath), "export const authority = 'R21';\n");
+    const reviewedHead = commitAll(repository, "approved R21 source");
+    const inventory = {
+      schema_version: "1.0.0",
+      program: "adaptive_ask_approved_immutable_path_inventory",
+      authority_source: { fixture_id: "mn-build-option-update", reviewed_head_revision: reviewedHead },
+      inventory_digest: canonicalDigest([sourcePath]),
+      paths: [sourcePath],
+    };
+    mkdirSync(resolve(repository, dirname(inventoryPath)), { recursive: true });
+    writeFileSync(resolve(repository, inventoryPath), `${JSON.stringify(inventory, null, 2)}\n`);
+    writeFileSync(resolve(repository, "unrelated.md"), "no evaluator source change\n");
+    commitAll(repository, "unrelated current main change");
+    assert.throws(
+      () => assertHistoricalEvaluatorSourceChanged({ repository, inventory, sourcePaths: [sourcePath] }),
+      /historical evaluator source must differ from the approved R21 reviewed authority/u,
+    );
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
 
 test("R22 is required once after the R21 source transition and the later overlay does not require R23", () => {
   const repository = mkdtempSync(resolve(stableTmp, "ask-admission-r21-dag-"));
