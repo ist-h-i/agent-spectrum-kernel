@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-admission-decision.schema.json",
+  "program": "adaptive_ask_portfolio_admission_decision",
+  "decision_revision": 2,
+  "predecessor_decision": {
+    "path": "benchmarks/fixtures/admission-decision/mn-doc-config-correction-admission-decision.json",
+    "raw_byte_digest": "sha256:70f58747c40733835d4957686f143745ec3d7ddf61a9b48656d7dab528be8219",
+    "decision_id": "admission-decision-7a73d7ef6c02d5cf5062f2809b68199c",
+    "decision_revision": 1,
+    "fixture_id": "mn-doc-config-correction",
+    "decision_digest": "sha256:4f8dad4972c432c9f9cff91a3a50596ae83b25030f079d95a778a9d93a1c9767"
+  },
+  "fixture_id": "mn-doc-config-correction",
+  "decision_status": "admitted",
+  "review_status": "approved",
+  "author_self_approval": false,
+  "reviewer_type": "independent_agent",
+  "reviewer_record_id": "chatgpt-independent-review-pr247-22c49cc-3c369321",
+  "reviewer_count": 1,
+  "reviewed_at": "2026-08-12T07:08:45Z",
+  "reviewed_repository": "ist-h-i/agent-spectrum-kernel",
+  "reviewed_pull_request": 247,
+  "reviewed_head_revision": "22c49cc8d7f12ae4ae7a9d7f22f53ed80718dd5f",
+  "blocking_finding_count": 0,
+  "review_evidence": {
+    "archive_sha256": "sha256:3c3693211b0ab32bb66cca3fa46b8cff574331c326a59ea2d6f97dc31d8287d1",
+    "archive_bytes": 566337
+  },
+  "evaluator": {
+    "evaluator_revision": "8a27c51b8daef25002b5b911ca51edfe446c56f0",
+    "evaluator_bundle_id": "evaluator-0a1b5f681f2c8ba06076c9461d502ad488f72b3601c7fe0a97f2d17ec1bcadd8",
+    "evaluator_bundle_digest": "sha256:a46d51c8c26cf3421a446693e38ab7fa02ebb79f40fc9125e5abb4c2b1b7627b",
+    "evaluator_bundle_bytes": 143617
+  },
+  "evaluator_public_reference_digest": "sha256:0cab683e379bce082fc32c6f1c6b0cfaef03945d8f925b89d499533797152339",
+  "frozen_admission_authority": {
+    "path": "benchmarks/fixtures/checkpoint-b2/mn-doc-config-correction/final-admission-record.json",
+    "raw_byte_digest": "sha256:dd73fa6a611ab47bba55f53346f8f750dd05e7f83f2b69efd23fdebd71cc82d6",
+    "semantic_digest": "sha256:0f1ec5933a7ac991f61487f7d86ff6f5248194c94e2d2c98bb9916dff589eaef",
+    "requirement_authority_digest": "sha256:40e96b8b12043844d26303ec830bca965a408ec40295c2b9ba8f1b6a2a2354d2"
+  },
+  "frozen_requirement_record": {
+    "path": "benchmarks/fixtures/checkpoint-b2/mn-doc-config-correction/requirement-record.json",
+    "raw_byte_digest": "sha256:22030433fabe250c25ca7c2689c33234b6c7e2690323af55a4a7962ddcda720a",
+    "record_digest": "sha256:7c4875795901c667e358c71604a34928136e74f1259fa55c2a61d5b952155989",
+    "set_digest": "sha256:47a29cffb2df08713bf674de69c66c267e17cb9dc7154f5028bd530a40158b2a"
+  },
+  "frozen_scoring_input_manifest": {
+    "path": "benchmarks/fixtures/checkpoint-b2/mn-doc-config-correction/scoring-input-freeze-manifest.json",
+    "raw_byte_digest": "sha256:bc64e4388638197d6144166663bc847a1e5635dc30353c9bffe75451d5e04df4",
+    "semantic_digest": "sha256:e7c8deb4bf10b38dc95fa2c18de4d4cf6ee5bd7b858962aedf193c6babffafe0"
+  },
+  "decision_id": "admission-decision-7a73d7ef6c02d5cf5062f2809b68199c",
+  "decision_digest": "sha256:23704465e191ea619d0e4aaf0ef35270f939bbccec97e152c10b7bc4c9e545a3"
+}
