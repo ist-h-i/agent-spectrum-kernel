@@ -22,6 +22,29 @@ function clone(value) {
   return structuredClone(value);
 }
 
+function evaluatorSemanticProjection(result) {
+  return {
+    requirement_results: result.requirement_results.map(({ requirement_id, outcome, earned_points, matched_equivalence_class_ids, finding_ids, scope_deviation_references, verification_evidence_state }) => ({
+      requirement_id,
+      outcome,
+      earned_points,
+      matched_equivalence_class_ids,
+      finding_ids,
+      scope_deviation_references,
+      ...(verification_evidence_state ? { verification_evidence_state } : {}),
+    })),
+    findings: result.findings.map(({ finding_id, category, severity }) => ({ finding_id, category, severity })),
+    scope_deviations: result.scope_deviations.map(({ finding_id, category, severity }) => ({ finding_id, category, severity })),
+    verification_correctness: result.verification_correctness.state,
+    evidence_correctness: result.evidence_correctness.state,
+    under_processing: result.under_processing.state,
+    over_processing: result.over_processing.state,
+    classification: result.classification,
+    result_profile: result.result_profile,
+    scoring_ready: result.scoring_ready,
+  };
+}
+
 function expectFailure(operation, pattern, label) {
   assert.throws(operation, pattern, label);
 }
@@ -103,9 +126,24 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       const first = await evaluator.evaluateCandidate({ frozenWorkspace: frozen, candidateWorkspace: candidate, verificationState: "executed_success" });
       const second = await evaluator.evaluateCandidate({ frozenWorkspace: frozen, candidateWorkspace: candidate, verificationState: "executed_success" });
       assert.deepEqual(first, second, `${entry.case_id} evaluator determinism`);
+      const normalizedResult = {
+        normalized_result_digest: canonicalDigest({ fixture_id: "mp-ci-evidence-gap", case_id: entry.case_id, authority: "private-test" }),
+        command_evidence: {
+          capture_support: "supported",
+          evidence_level: "verified",
+          references: [{ command_id: "review-contract-validation", match_state: "matched", outcome: "succeeded", exit_code: 0, digest: canonicalDigest({ case_id: entry.case_id, command_id: "review-contract-validation" }), bytes: 1 }],
+        },
+      };
+      const repositoryDiffArtifact = { artifact_digest: canonicalDigest({ case_id: entry.case_id, kind: "repository-diff" }), artifact_bytes: 1 };
+      const safeFirst = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
+      const safeSecond = await evaluator.evaluateCandidateSafe({ frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
+      assert.deepEqual(safeFirst, safeSecond, `${entry.case_id} production-safe evaluator determinism`);
       assertBenchmarkSchemaInstance(first, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} private fragment` });
+      assertBenchmarkSchemaInstance(safeFirst, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} production-safe private fragment` });
+      assert.deepEqual(evaluatorSemanticProjection(safeFirst), evaluatorSemanticProjection(first), `${entry.case_id} direct/production-safe semantic projection`);
       assert.deepEqual(first.requirement_results.map(({ earned_points }) => earned_points), entry.expected_points, `${entry.case_id} requirement points`);
       assert.equal(first.classification, entry.expected_classification, `${entry.case_id} classification`);
+      if (entry.expected_finding_ids) assert.deepEqual(first.findings.map(({ finding_id }) => finding_id), entry.expected_finding_ids, `${entry.case_id} evaluator finding IDs`);
       assert.equal(first.scoring_ready, false);
     }
 
