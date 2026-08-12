@@ -170,6 +170,60 @@ function conceptMatrixEntries(matrix) {
       expected_classification: "correct_narrow_execution",
     };
   });
+  const morphology = matrix.morphology_components;
+  const quantityMorphologyEntries = [];
+  for (const subject of morphology.quantity.subjects) {
+    for (const boundary of morphology.quantity.boundaries) {
+      for (const flow of morphology.quantity.flows) {
+        for (const remediation of morphology.quantity.remediations) {
+          quantityMorphologyEntries.push({
+            variant_id: `morphology-quantity-${String(quantityMorphologyEntries.length + 1).padStart(2, "0")}`,
+            family: "quantity_positive",
+            finding_index: 1,
+            finding: {
+              title: `${subject} ${boundary.title_predicate}`,
+              severity: "high",
+              evidence: [{ path: "src/quote-order.mjs", line: 2 }, { path: "test/checkout/quote-order-contract.test.mjs", line: 5 }],
+              impact: `${boundary.invalid_values} ${flow}, despite the positive checkout contract.`,
+              required_action: remediation,
+            },
+            expected_points: [3, 3, 2, 1, 1],
+            expected_classification: "correct_narrow_execution",
+          });
+        }
+      }
+    }
+  }
+  const ciMorphologyEntries = [];
+  for (const context of morphology.ci.contexts) {
+    for (const boundary of morphology.ci.boundaries) {
+      for (const omission of morphology.ci.omissions) {
+        for (const gating of morphology.ci.gating) {
+          ciMorphologyEntries.push({
+            variant_id: `morphology-ci-${String(ciMorphologyEntries.length + 1).padStart(2, "0")}`,
+            family: "ci_positive",
+            finding_index: 0,
+            finding: {
+              title: `${context} reports success`,
+              severity: "high",
+              evidence: [{ path: ".github/workflows/pull-request.yml", line: 17 }, { path: "ci/pull-request-314.log", line: 7 }, { path: "docs/verification.md", line: 5 }],
+              impact: `${context} ${interpolate(omission, { boundary })}, leaving the evidence required for merge incomplete.`,
+              required_action: interpolate(gating, { boundary }),
+            },
+            expected_points: [3, 3, 2, 1, 1],
+            expected_classification: "correct_narrow_execution",
+          });
+        }
+      }
+    }
+  }
+  assert.equal(quantityMorphologyEntries.length, morphology.quantity.subjects.length * morphology.quantity.boundaries.length * morphology.quantity.flows.length * morphology.quantity.remediations.length, "quantity morphology Cartesian coverage");
+  assert.equal(ciMorphologyEntries.length, morphology.ci.contexts.length * morphology.ci.boundaries.length * morphology.ci.omissions.length * morphology.ci.gating.length, "CI morphology Cartesian coverage");
+  assert.deepEqual(morphology.quantity.boundaries.map(({ form }) => form), ["exceed", "exceeds"]);
+  assert.deepEqual(morphology.ci.contexts, ["repository check", "repository checks"]);
+  assert.deepEqual(morphology.ci.boundaries, ["checkout test", "checkout tests", "complete check", "complete checks"]);
+  assert.deepEqual(morphology.ci.omissions, ["executed only unit tests while {boundary} remained outside the merge evidence", "executes only unit tests while {boundary} remains outside the approval evidence"]);
+  assert.deepEqual(morphology.ci.gating, ["The {boundary} is required for approval.", "Execute {boundary} before merging."]);
   for (const [label, coverage, source] of [
     ["quantity", quantityCoverage, quantity],
     ["CI", ciCoverage, ci],
@@ -177,7 +231,13 @@ function conceptMatrixEntries(matrix) {
     for (const [dimension, seen] of Object.entries(coverage)) assert.equal(seen.size, source[dimension].length, `${label} ${dimension} lexicon coverage`);
   }
   const probes = matrix.independent_probes.map((entry) => ({ ...entry, expected_points: [3, 3, 2, 1, 1], expected_classification: "correct_narrow_execution" }));
-  return { entries: [...quantityEntries, ...ciEntries, ...probes, ...matrix.negative_controls], generated: { quantity: quantityEntries.length, ci: ciEntries.length }, probes: { quantity: probes.filter(({ family }) => family === "quantity_positive").length, ci: probes.filter(({ family }) => family === "ci_positive").length }, negatives: matrix.negative_controls.length };
+  return {
+    entries: [...quantityEntries, ...ciEntries, ...quantityMorphologyEntries, ...ciMorphologyEntries, ...probes, ...matrix.negative_controls],
+    generated: { quantity: quantityEntries.length, ci: ciEntries.length },
+    morphology: { quantity: quantityMorphologyEntries.length, ci: ciMorphologyEntries.length },
+    probes: { quantity: probes.filter(({ family }) => family === "quantity_positive").length, ci: probes.filter(({ family }) => family === "ci_positive").length },
+    negatives: matrix.negative_controls.length,
+  };
 }
 
 async function validatePrivateCases({ privateRoot, caseRoot }) {
@@ -253,7 +313,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       if (entry.expected_finding_ids) assert.deepEqual(direct.findings.map(({ finding_id }) => finding_id), entry.expected_finding_ids, `${entry.variant_id} evaluator finding IDs`);
       matrixPasses[entry.family] += 1;
     }
-    assert.deepEqual(matrixPasses, { quantity_positive: 32, ci_positive: 29, negative: 5 });
+    assert.deepEqual(matrixPasses, { quantity_positive: 48, ci_positive: 61, negative: 9 });
 
     for (const [caseId, evidencePath, prepare] of [
       ["path-escape", "../outside.txt", () => {}],
@@ -331,7 +391,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       }, pattern, label);
     }
     const evaluatedCases = cases.cases.length + conceptMatrix.entries.length + 3;
-    return { distinctCases: cases.cases.length, directPass: evaluatedCases, productionSafePass: evaluatedCases, matrixPasses, generatedCombinations: conceptMatrix.generated, independentProbes: conceptMatrix.probes, negativeControls: conceptMatrix.negatives, invalidEvidenceNegatives: 5 };
+    return { distinctCases: cases.cases.length, directPass: evaluatedCases, productionSafePass: evaluatedCases, matrixPasses, generatedCombinations: conceptMatrix.generated, morphologyCombinations: conceptMatrix.morphology, independentProbes: conceptMatrix.probes, negativeControls: conceptMatrix.negatives, invalidEvidenceNegatives: 5 };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
