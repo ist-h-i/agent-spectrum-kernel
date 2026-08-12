@@ -328,6 +328,7 @@ function validateDecisionLineage(value, {
   const predecessor = value.predecessor_decision;
   if (!predecessor) {
     if (predecessorDecisionSource) throw new Error("root admission decision cannot consume predecessor source evidence");
+    if (value.decision_revision !== 1) throw new Error("root admission decision must use decision revision 1");
     return true;
   }
   const source = predecessorDecisionSource ?? (() => {

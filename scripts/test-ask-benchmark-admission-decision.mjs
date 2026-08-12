@@ -262,6 +262,17 @@ function rejectsMutation(label, mutate, pattern = /authority|identity|digest|fix
   });
 }
 
+function syntheticDecisionRepository(prefix) {
+  const repository = mkdtempSync(resolve(stableTmp, prefix));
+  const overlayRoot = resolve(repository, "benchmarks/fixtures/admission-decision");
+  const schemaRoot = resolve(repository, "benchmarks/schemas");
+  mkdirSync(overlayRoot, { recursive: true });
+  mkdirSync(schemaRoot, { recursive: true });
+  cpSync(resolve(root, "benchmarks/schemas/portfolio-admission-decision.schema.json"), resolve(schemaRoot, "portfolio-admission-decision.schema.json"));
+  gitOk(repository, "init", "-q", "-b", "main");
+  return { repository, overlayRoot };
+}
+
 test("admitted overlay resolves pending frozen authority without changing frozen bytes", () => {
   const { options, decision, admissionBytes, requirementBytes } = fixture();
   const resolved = resolveEffectiveAdmissionAuthority({ ...options, decisionOverlay: decision });
@@ -371,6 +382,65 @@ test("a later decision revision has a new digest and cannot rewrite the consumed
   assert.notEqual(next.reviewed_head_revision, decision.reviewed_head_revision);
   assert.notEqual(next.decision_digest, decision.decision_digest);
   assert.throws(() => assertAdmissionDecisionAppendOnly(next, decision), /increase|predecessor/);
+});
+
+test("repository admission resolver accepts a single legacy revision 1 root", () => {
+  const { repository, overlayRoot } = syntheticDecisionRepository("ask-admission-legacy-r1-");
+  const decisionPath = "benchmarks/fixtures/admission-decision/synthetic-r1.json";
+  try {
+    const { decision } = fixture();
+    writeFileSync(resolve(overlayRoot, "synthetic-r1.json"), bytes(decision));
+    const revision = commitAll(repository, "add legacy revision 1 admission");
+    const resolved = resolveRepositoryAdmissionDecision({ root: repository, repositoryRevision: revision, fixtureId: decision.fixture_id });
+    assert.equal(resolved.path, decisionPath);
+    assert.equal(resolved.decision.decision_revision, 1);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("repository admission resolver rejects predecessor-less revision 2 as the only tracked decision", () => {
+  const { repository, overlayRoot } = syntheticDecisionRepository("ask-admission-root-r2-");
+  try {
+    const { decision } = fixture();
+    decision.decision_revision = 2;
+    reseal(decision);
+    writeFileSync(resolve(overlayRoot, "synthetic-r2.json"), bytes(decision));
+    const revision = commitAll(repository, "add invalid revision 2 lineage root");
+    assert.throws(
+      () => resolveRepositoryAdmissionDecision({ root: repository, repositoryRevision: revision, fixtureId: decision.fixture_id }),
+      /root admission decision.*revision 1/u,
+    );
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("repository admission resolver rejects a reset revision 2 after deleting historical revision 1", () => {
+  const { repository, overlayRoot } = syntheticDecisionRepository("ask-admission-deleted-r1-");
+  const previousPath = "benchmarks/fixtures/admission-decision/synthetic-r1.json";
+  try {
+    const { decision: previous } = fixture();
+    const previousBytes = bytes(previous);
+    writeFileSync(resolve(repository, previousPath), previousBytes);
+    commitAll(repository, "add historical revision 1 admission");
+    const successor = successorDecision(previous, previousPath, previousBytes);
+    writeFileSync(resolve(overlayRoot, "synthetic-r2.json"), bytes(successor));
+    const successorRevision = commitAll(repository, "add valid revision 2 successor");
+    assert.equal(resolveRepositoryAdmissionDecision({ root: repository, repositoryRevision: successorRevision, fixtureId: previous.fixture_id }).decision.decision_revision, 2);
+
+    rmSync(resolve(repository, previousPath));
+    delete successor.predecessor_decision;
+    reseal(successor);
+    writeFileSync(resolve(overlayRoot, "synthetic-r2.json"), bytes(successor));
+    const resetRevision = commitAll(repository, "delete revision 1 and reset revision 2 lineage");
+    assert.throws(
+      () => resolveRepositoryAdmissionDecision({ root: repository, repositoryRevision: resetRevision, fixtureId: previous.fixture_id }),
+      /root admission decision.*revision 1/u,
+    );
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
 });
 
 test("repository admission resolver selects a unique successor reviewed on a different PR without rewriting revision 1", () => {
