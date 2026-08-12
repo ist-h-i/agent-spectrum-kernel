@@ -466,6 +466,120 @@ try {
     assert.equal(exactR22.execution_eligible, true, "fixture #1 exact R22 external review authority and archive must be eligible");
     assert.equal(exactR22.resolved_authority.admission_decision_digest, "sha256:3877018309e29a15330d6bbe396ec777dbef3a46a3ea883fd5d8a26c7de273d9");
 
+    const mnDocReviewAuthorityIndex = process.argv.indexOf("--mn-doc-review-authority");
+    const mnDocReviewAuthoritySourceDigestIndex = process.argv.indexOf("--mn-doc-review-authority-source-digest");
+    const mnDocReviewArchiveIndex = process.argv.indexOf("--mn-doc-review-archive");
+    const mnDocEvidenceArgumentCount = [mnDocReviewAuthorityIndex, mnDocReviewAuthoritySourceDigestIndex, mnDocReviewArchiveIndex].filter((index) => index !== -1).length;
+    assert.ok(mnDocEvidenceArgumentCount === 0 || mnDocEvidenceArgumentCount === 3, "mn-doc external review evidence arguments must be supplied together");
+    if (mnDocEvidenceArgumentCount === 3) {
+      const exactMnDocEvidence = {
+        reviewAuthorityPath: resolve(process.argv[mnDocReviewAuthorityIndex + 1]),
+        reviewAuthoritySourceDigest: process.argv[mnDocReviewAuthoritySourceDigestIndex + 1],
+        reviewArchivePath: resolve(process.argv[mnDocReviewArchiveIndex + 1]),
+      };
+      const exactMnDocAuthorityBytes = readFileSync(exactMnDocEvidence.reviewAuthorityPath);
+      const exactMnDocArchiveBytes = readFileSync(exactMnDocEvidence.reviewArchivePath);
+      assert.equal(exactMnDocAuthorityBytes.length, 1026, "exact mn-doc review-authority byte count");
+      assert.equal(digestBytes(exactMnDocAuthorityBytes), "sha256:015b177773e4d873543e2d77ca6a8adfc1994f07df42f483a88531bd7a6037f9", "exact mn-doc review-authority raw source digest");
+      assert.equal(exactMnDocEvidence.reviewAuthoritySourceDigest, digestBytes(exactMnDocAuthorityBytes), "mn-doc review-authority caller digest must bind the exact authority bytes");
+      assert.equal(exactMnDocArchiveBytes.length, 566343, "exact mn-doc review archive byte count");
+      assert.equal(digestBytes(exactMnDocArchiveBytes), "sha256:a249728845fe77216ed97e90630487c15766e51bddcd04aa0bfef3e3ab208a12", "exact mn-doc review archive digest");
+
+      const exactMnDoc = resolvePortfolioExecutionAdmission({ root, fixture: candidateFixture, repositoryRevision, externalAdmissionEvidence: exactMnDocEvidence });
+      assert.equal(exactMnDoc.execution_eligible, true, "fixture #2 exact review authority, archive, and committed repository overlay must be eligible");
+      assert.equal(exactMnDoc.authority_mode, "admitted_overlay");
+      assert.equal(exactMnDoc.effective_admission_status, "admitted");
+      assert.equal(exactMnDoc.resolved_authority.admission_decision_digest, "sha256:4f8dad4972c432c9f9cff91a3a50596ae83b25030f079d95a778a9d93a1c9767");
+      assert.equal(exactMnDoc.resolved_authority.evaluator_revision, "215b5465da0aaebd450c1b6c2053119683346004");
+      assert.equal(exactMnDoc.resolved_authority.evaluator_bundle_id, "evaluator-bbb00d2dbbd8f5a360dde843b2dde19f0c254adf0faa1673c023a7de1b65fc8b");
+      assert.equal(exactMnDoc.resolved_authority.evaluator_bundle_digest, "sha256:05518de2f6f00b7ad206243ee74839e860d9ce7d05303f402ec15a8547d0b8fc");
+      assert.equal(exactMnDoc.resolved_authority.requirement_record_digest, "sha256:c21e63ab89cf20659acbc4d966dbaa41ebfd41d99f8f33f60634c4bc1d526224");
+      assert.equal(exactMnDoc.resolved_authority.frozen_admission_record_digest, "sha256:d61d12c60ec2048c9c7cb2c9fd1e1c23e6bb659337efe6dc83ecb3bef1f33c0f");
+
+      const fixtureOneOnlyEvidenceManifestPath = resolve(work, "fixture-one-only-execution-admission.json");
+      writeJson(fixtureOneOnlyEvidenceManifestPath, {
+        [fixtureOne.id]: {
+          review_authority_path: exactR22Evidence.reviewAuthorityPath,
+          review_authority_source_digest: exactR22Evidence.reviewAuthoritySourceDigest,
+          review_archive_path: exactR22Evidence.reviewArchivePath,
+        },
+      });
+      const fixtureOneOnlyPlan = buildPortfolioPlan({
+        root,
+        config: planConfig,
+        repositoryRevision,
+        seed: "mn-doc-admission-without-fixture-two-evidence",
+        executionAdmissionEvidenceByFixture: readExecutionAdmissionEvidenceManifest(fixtureOneOnlyEvidenceManifestPath),
+      });
+      assert.equal(fixtureOneOnlyPlan.cases.filter(({ fixture_id }) => fixture_id === fixtureOne.id).length, 24, "fixture #1 must contribute 24 cases with exact R22 evidence");
+      assert.equal(fixtureOneOnlyPlan.cases.some(({ fixture_id }) => fixture_id === candidateFixture.id), false, "fixture #2 must remain excluded without its external evidence");
+      assert.equal(fixtureOneOnlyPlan.cases.length, 136, "fixture #1 plus calibration plan must contain 136 cases without fixture #2 evidence");
+
+      const exactEvidenceManifestPath = resolve(work, "exact-two-fixture-execution-admission.json");
+      writeJson(exactEvidenceManifestPath, {
+        [fixtureOne.id]: {
+          review_authority_path: exactR22Evidence.reviewAuthorityPath,
+          review_authority_source_digest: exactR22Evidence.reviewAuthoritySourceDigest,
+          review_archive_path: exactR22Evidence.reviewArchivePath,
+        },
+        [candidateFixture.id]: {
+          review_authority_path: exactMnDocEvidence.reviewAuthorityPath,
+          review_authority_source_digest: exactMnDocEvidence.reviewAuthoritySourceDigest,
+          review_archive_path: exactMnDocEvidence.reviewArchivePath,
+        },
+      });
+      const exactEvidenceInventory = readExecutionAdmissionEvidenceManifest(exactEvidenceManifestPath);
+      const exactPlan = buildPortfolioPlan({ root, config: planConfig, repositoryRevision, seed: "mn-doc-admitted-overlay", executionAdmissionEvidenceByFixture: exactEvidenceInventory });
+      assert.equal(exactPlan.cases.filter(({ fixture_id }) => fixtureOne.id === fixture_id).length, 24, "fixture #1 must contribute 24 exact-evidence cases");
+      assert.equal(exactPlan.cases.filter(({ fixture_id }) => candidateFixture.id === fixture_id).length, 24, "fixture #2 must contribute 24 exact-evidence cases");
+      assert.equal(exactPlan.cases.filter(({ fixture_id }) => config.fixtures.find((fixture) => fixture.id === fixture_id)?.suite === "calibration").length, 112, "calibration fixtures must contribute 112 cases");
+      assert.equal(exactPlan.cases.length, 160, "combined exact-evidence plan must contain 160 cases");
+      const exactPlanPath = resolve(work, "exact-two-fixture-plan.json");
+      const exactMaterializedPath = resolve(work, "exact-two-fixture-materialized");
+      writeJson(exactPlanPath, exactPlan);
+      const exactMaterialization = materializePortfolio({ root, config: planConfig, planPath: exactPlanPath, outputPath: exactMaterializedPath, repositoryRevision, executionAdmissionEvidenceByFixture: exactEvidenceInventory });
+      assert.equal(exactMaterialization.case_count, 160, "materialization must preserve the exact two-fixture admission inventory");
+      assert.equal(exactMaterialization.execution_admission_authority_digest, exactPlan.execution_admission_authority_digest, "plan and materialization must bind the same effective admission authority");
+
+      assert.throws(
+        () => resolvePortfolioExecutionAdmission({ root, fixture: candidateFixture, repositoryRevision, externalAdmissionEvidence: { ...exactMnDocEvidence, reviewAuthoritySourceDigest: `sha256:${"0".repeat(64)}` } }),
+        /raw digest differs/u,
+        "wrong mn-doc review-authority raw digest must be rejected",
+      );
+      assert.throws(
+        () => resolvePortfolioExecutionAdmission({ root, fixture: candidateFixture, repositoryRevision, externalAdmissionEvidence: { ...exactMnDocEvidence, reviewArchivePath: archiveReplacementPath } }),
+        /archive raw identity differs/u,
+        "mn-doc archive replacement must be rejected",
+      );
+      for (const [name, mutate] of [
+        ["repository", (authority) => { authority.reviewed_repository = "wrong/repository"; }],
+        ["pull-request", (authority) => { authority.reviewed_pull_request += 1; }],
+        ["reviewed-head", (authority) => { authority.reviewed_head_revision = "0".repeat(40); }],
+        ["projection", (authority) => { authority.reviewer_record_id = "projection-mismatch"; }],
+      ]) {
+        const authority = readJson(exactMnDocEvidence.reviewAuthorityPath);
+        mutate(authority);
+        authority.authority_id = computeAdmissionReviewAuthorityId(authority);
+        authority.authority_digest = computeAdmissionReviewAuthorityDigest(authority);
+        const authorityPath = resolve(work, `mn-doc-${name}-review-authority.json`);
+        writeJson(authorityPath, authority);
+        assert.throws(
+          () => resolvePortfolioExecutionAdmission({
+            root,
+            fixture: candidateFixture,
+            repositoryRevision,
+            externalAdmissionEvidence: {
+              ...exactMnDocEvidence,
+              reviewAuthorityPath: authorityPath,
+              reviewAuthoritySourceDigest: digestBytes(readFileSync(authorityPath)),
+            },
+          }),
+          /differs from external frozen or review authority/u,
+          `mn-doc ${name} review-authority mismatch must be rejected`,
+        );
+      }
+    }
+
     const multiRepository = fullRepositoryClone("multi-fixture-admission");
     const multiConfigValue = readJson(resolve(multiRepository, "benchmarks/adaptive-portfolio.config.json"));
     const multiConfig = {
@@ -475,6 +589,11 @@ try {
     };
     const multiFixtureOne = multiConfig.fixtures.find(({ id }) => id === "mn-build-option-update");
     const multiFixtureTwo = multiConfig.fixtures.find(({ id }) => id === "mn-doc-config-correction");
+    const productionFixtureTwoOverlayPath = resolve(multiRepository, "benchmarks/fixtures/admission-decision/mn-doc-config-correction-admission-decision.json");
+    if (existsSync(productionFixtureTwoOverlayPath)) {
+      rmSync(productionFixtureTwoOverlayPath);
+      commitRepository(multiRepository, "Remove production fixture-two overlay for synthetic authority tests");
+    }
     const repositoryBaseRevision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: multiRepository, encoding: "utf8" }).trim();
     const untrackedAdmission = syntheticRepositoryAdmission(multiRepository, "untracked", {
       archiveBytes: Buffer.from("synthetic repository review archive A\n"),
