@@ -231,11 +231,22 @@ function conceptMatrixEntries(matrix) {
     for (const [dimension, seen] of Object.entries(coverage)) assert.equal(seen.size, source[dimension].length, `${label} ${dimension} lexicon coverage`);
   }
   const probes = matrix.independent_probes.map((entry) => ({ ...entry, expected_points: [3, 3, 2, 1, 1], expected_classification: "correct_narrow_execution" }));
+  const polarityPairs = matrix.polarity_pairs;
+  const polarityByPair = Map.groupBy(polarityPairs, ({ pair_id }) => pair_id);
+  assert.equal(polarityPairs.length, 14, "signed-predicate polarity case count");
+  assert.equal(polarityByPair.size, 7, "signed-predicate polarity pair count");
+  for (const [pairId, entries] of polarityByPair) {
+    assert.deepEqual(entries.map(({ polarity_expectation }) => polarity_expectation).sort(), ["defect", "no_defect"], `${pairId} polarity pair closure`);
+  }
+  const representativeProbes = matrix.representative_positive_probes.map((entry) => ({ ...entry, expected_points: [3, 3, 2, 1, 1], expected_classification: "correct_narrow_execution" }));
+  assert.equal(representativeProbes.length, 6, "representative case-out positive count");
   return {
-    entries: [...quantityEntries, ...ciEntries, ...quantityMorphologyEntries, ...ciMorphologyEntries, ...probes, ...matrix.negative_controls],
+    entries: [...quantityEntries, ...ciEntries, ...quantityMorphologyEntries, ...ciMorphologyEntries, ...probes, ...polarityPairs, ...representativeProbes, ...matrix.negative_controls],
     generated: { quantity: quantityEntries.length, ci: ciEntries.length },
     morphology: { quantity: quantityMorphologyEntries.length, ci: ciMorphologyEntries.length },
     probes: { quantity: probes.filter(({ family }) => family === "quantity_positive").length, ci: probes.filter(({ family }) => family === "ci_positive").length },
+    polarity: { pairs: polarityByPair.size, positive: polarityPairs.filter(({ polarity_expectation }) => polarity_expectation === "defect").length, negative: polarityPairs.filter(({ polarity_expectation }) => polarity_expectation === "no_defect").length },
+    representative: { quantity: representativeProbes.filter(({ family }) => family === "quantity_positive").length, ci: representativeProbes.filter(({ family }) => family === "ci_positive").length },
     negatives: matrix.negative_controls.length,
   };
 }
@@ -313,7 +324,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       if (entry.expected_finding_ids) assert.deepEqual(direct.findings.map(({ finding_id }) => finding_id), entry.expected_finding_ids, `${entry.variant_id} evaluator finding IDs`);
       matrixPasses[entry.family] += 1;
     }
-    assert.deepEqual(matrixPasses, { quantity_positive: 48, ci_positive: 61, negative: 9 });
+    assert.deepEqual(matrixPasses, { quantity_positive: 55, ci_positive: 67, negative: 16 });
 
     for (const [caseId, evidencePath, prepare] of [
       ["path-escape", "../outside.txt", () => {}],
@@ -391,7 +402,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       }, pattern, label);
     }
     const evaluatedCases = cases.cases.length + conceptMatrix.entries.length + 3;
-    return { distinctCases: cases.cases.length, directPass: evaluatedCases, productionSafePass: evaluatedCases, matrixPasses, generatedCombinations: conceptMatrix.generated, morphologyCombinations: conceptMatrix.morphology, independentProbes: conceptMatrix.probes, negativeControls: conceptMatrix.negatives, invalidEvidenceNegatives: 5 };
+    return { distinctCases: cases.cases.length, directPass: evaluatedCases, productionSafePass: evaluatedCases, matrixPasses, generatedCombinations: conceptMatrix.generated, morphologyCombinations: conceptMatrix.morphology, independentProbes: conceptMatrix.probes, polarityPairs: conceptMatrix.polarity, representativePositiveProbes: conceptMatrix.representative, negativeControls: conceptMatrix.negatives, invalidEvidenceNegatives: 5 };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
