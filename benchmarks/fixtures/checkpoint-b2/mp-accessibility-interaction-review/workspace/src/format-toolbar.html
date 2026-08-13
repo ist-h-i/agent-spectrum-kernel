@@ -1,0 +1,10 @@
+<div class="format-toolbar" role="toolbar" aria-label="Text formatting">
+  <button type="button" data-format="bold" aria-pressed="false" tabindex="0">Bold</button>
+  <button type="button" data-format="italic" aria-pressed="false" tabindex="-1">Italic</button>
+  <button type="button" data-format="underline" aria-pressed="false" tabindex="-1">Underline</button>
+</div>
+
+<script type="module">
+  import { connectToolbar } from "./format-toolbar.mjs";
+  connectToolbar(document.querySelector(".format-toolbar"));
+</script>
