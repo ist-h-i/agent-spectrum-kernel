@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,15 +10,19 @@ import { basename, resolve } from "node:path";
 
 import {
   discoverAdmittedFixtureIds,
+  validateActualPrivateAdmittedFixtureSemantics,
+  validatePortfolioCaseIdentity,
   validatePublicAdmittedFixtureInvariance,
 } from "./ask-benchmark-admitted-fixture-invariance.mjs";
 import {
   computeAdmissionDecisionDigest,
   computeAdmissionDecisionId,
+  computeAdmissionReviewAuthorityDigest,
+  computeAdmissionReviewAuthorityId,
   resolveRepositoryAdmissionDecision,
 } from "./ask-benchmark-admission-decision.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
-import { resolvePortfolioExecutionAdmission } from "./ask-benchmark-plan.mjs";
+import { buildPortfolioPlan, resolvePortfolioExecutionAdmission } from "./ask-benchmark-plan.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
@@ -50,6 +55,10 @@ function readJson(path) {
 
 function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function digestBytes(bytes) {
+  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
 function currentDecisionHistories() {
@@ -123,16 +132,21 @@ function existsSourceFreeze(fixtureId) {
   }
 }
 
-test("implicit evaluator rebinding without an admitted successor is rejected", () => withClone((root) => {
-  const fixtureId = discoverAdmittedFixtureIds({ root, repositoryRevision: "HEAD" })[0];
-  const path = resolve(root, `benchmarks/fixtures/checkpoint-b2/${fixtureId}/evaluator-reference.json`);
-  const reference = readJson(path);
-  reference.evaluator_bundle_digest = `sha256:${"0".repeat(64)}`;
-  reference.public_metadata_digest = canonicalDigest(Object.fromEntries(Object.entries(reference).filter(([key]) => key !== "public_metadata_digest")));
-  writeJson(path, reference);
-  const revision = commitMutation(root, "synthetic implicit evaluator rebinding");
-  assert.throws(() => validatePublicAdmittedFixtureInvariance({ root, repositoryRevision: revision }), /evaluator reference|evaluator.*identity|source-freeze/u);
-}));
+test("implicit evaluator and source rebinding without an admitted successor are rejected", () => {
+  for (const [label, mutate] of [
+    ["evaluator", (reference) => { reference.evaluator_bundle_digest = `sha256:${"0".repeat(64)}`; }],
+    ["source", (reference) => { reference.evaluator_source_identity.source_tree_digest = `sha256:${"0".repeat(64)}`; }],
+  ]) withClone((root) => {
+    const fixtureId = discoverAdmittedFixtureIds({ root, repositoryRevision: "HEAD" })[0];
+    const path = resolve(root, `benchmarks/fixtures/checkpoint-b2/${fixtureId}/evaluator-reference.json`);
+    const reference = readJson(path);
+    mutate(reference);
+    reference.public_metadata_digest = canonicalDigest(Object.fromEntries(Object.entries(reference).filter(([key]) => key !== "public_metadata_digest")));
+    writeJson(path, reference);
+    const revision = commitMutation(root, `synthetic implicit ${label} rebinding`);
+    assert.throws(() => validatePublicAdmittedFixtureInvariance({ root, repositoryRevision: revision }), /evaluator reference|evaluator.*identity|source tree|source-freeze/u);
+  });
+});
 
 test("admission revision reset is rejected", () => {
   const history = [...currentDecisionHistories().values()].find((entries) => entries.length > 1);
@@ -188,19 +202,107 @@ test("partial and stale external review evidence remain fail-closed", () => {
   const fixtureId = discoverAdmittedFixtureIds({ root: ROOT, repositoryRevision: revision }).find((id) => resolveRepositoryAdmissionDecision({ root: ROOT, repositoryRevision: revision, fixtureId: id }));
   const fixture = readJson(resolve(ROOT, CONFIG_PATH_FOR_TEST)).fixtures.find(({ id }) => id === fixtureId);
   assert.throws(() => resolvePortfolioExecutionAdmission({ root: ROOT, repositoryRevision: revision, fixture, externalAdmissionEvidence: { reviewAuthorityPath: "/tmp/missing" } }), /partial/u);
-  assert.throws(() => resolvePortfolioExecutionAdmission({
-    root: ROOT,
-    repositoryRevision: revision,
-    fixture,
-    externalAdmissionEvidence: {
-      reviewAuthorityPath: "/tmp/issue-249-stale-review.json",
-      reviewAuthoritySourceDigest: `sha256:${"0".repeat(64)}`,
-      reviewArchivePath: "/tmp/issue-249-stale-review.zip",
-    },
-  }), /missing|digest|review/u);
+  const work = mkdtempSync(resolve(realpathSync(tmpdir()), "ask-issue-249-stale-review-"));
+  try {
+    const archivePath = resolve(work, "stale-review.zip");
+    const archiveBytes = Buffer.from("synthetic stale review evidence\n");
+    writeFileSync(archivePath, archiveBytes);
+    const decision = resolveRepositoryAdmissionDecision({ root: ROOT, repositoryRevision: revision, fixtureId }).decision;
+    const authority = {
+      schema_version: "1.0.0",
+      schema_path: "benchmarks/schemas/portfolio-admission-review-authority.schema.json",
+      program: "adaptive_ask_portfolio_admission_review_authority",
+      authority_id: "",
+      authority_revision: decision.decision_revision,
+      fixture_id: fixtureId,
+      review_status: decision.review_status,
+      author_self_approval: false,
+      reviewer_type: decision.reviewer_type,
+      reviewer_record_id: decision.reviewer_record_id,
+      reviewer_count: decision.reviewer_count,
+      reviewed_at: decision.reviewed_at,
+      reviewed_repository: decision.reviewed_repository,
+      reviewed_pull_request: decision.reviewed_pull_request,
+      reviewed_head_revision: decision.reviewed_head_revision === "0".repeat(40) ? "1".repeat(40) : "0".repeat(40),
+      blocking_finding_count: decision.blocking_finding_count,
+      review_evidence: { archive_sha256: digestBytes(archiveBytes), archive_bytes: archiveBytes.length },
+      authority_digest: "",
+    };
+    authority.authority_id = computeAdmissionReviewAuthorityId(authority);
+    authority.authority_digest = computeAdmissionReviewAuthorityDigest(authority);
+    const authorityPath = resolve(work, "stale-review-authority.json");
+    writeJson(authorityPath, authority);
+    const authorityBytes = readFileSync(authorityPath);
+    assert.throws(() => resolvePortfolioExecutionAdmission({
+      root: ROOT,
+      repositoryRevision: revision,
+      fixture,
+      externalAdmissionEvidence: {
+        reviewAuthorityPath: authorityPath,
+        reviewAuthoritySourceDigest: digestBytes(authorityBytes),
+        reviewArchivePath: archivePath,
+      },
+    }), /review|head|archive|authority/u);
+
+    const transplanted = structuredClone(authority);
+    transplanted.fixture_id = discoverAdmittedFixtureIds({ root: ROOT, repositoryRevision: revision }).find((id) => id !== fixtureId);
+    transplanted.authority_id = computeAdmissionReviewAuthorityId(transplanted);
+    transplanted.authority_digest = computeAdmissionReviewAuthorityDigest(transplanted);
+    const transplantedPath = resolve(work, "transplanted-review-authority.json");
+    writeJson(transplantedPath, transplanted);
+    const transplantedBytes = readFileSync(transplantedPath);
+    assert.throws(() => resolvePortfolioExecutionAdmission({
+      root: ROOT,
+      repositoryRevision: revision,
+      fixture,
+      externalAdmissionEvidence: {
+        reviewAuthorityPath: transplantedPath,
+        reviewAuthoritySourceDigest: digestBytes(transplantedBytes),
+        reviewArchivePath: archivePath,
+      },
+    }), /fixture|review|authority|transplant/u);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 });
 
 const CONFIG_PATH_FOR_TEST = "benchmarks/adaptive-portfolio.config.json";
+
+test("actual-private invariance rejects an incomplete admitted-fixture evidence inventory", () => {
+  const repositoryRevision = git(ROOT, ["rev-parse", "HEAD"]);
+  const [fixtureId] = discoverAdmittedFixtureIds({ root: ROOT, repositoryRevision });
+  const work = mkdtempSync(resolve(realpathSync(tmpdir()), "ask-issue-249-partial-private-"));
+  try {
+    const manifestPath = resolve(work, "execution-admission-evidence.json");
+    writeJson(manifestPath, {
+      [fixtureId]: {
+        review_authority_path: "missing-review-authority.json",
+        review_authority_source_digest: `sha256:${"0".repeat(64)}`,
+        review_archive_path: "missing-review.zip",
+      },
+    });
+    assert.throws(() => validateActualPrivateAdmittedFixtureSemantics({
+      root: ROOT,
+      repositoryRevision,
+      evidenceManifestPath: manifestPath,
+      privateRoots: { [fixtureId]: work },
+    }), /actual-private invariance evidence is partial/u);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test("portfolio case identity drift is rejected independently of plan construction", () => {
+  const repositoryRevision = git(ROOT, ["rev-parse", "HEAD"]);
+  const configValue = readJson(resolve(ROOT, CONFIG_PATH_FOR_TEST));
+  const config = { ...configValue, _configPath: resolve(ROOT, CONFIG_PATH_FOR_TEST), _protocolPath: resolve(ROOT, configValue.protocol_path) };
+  const plan = buildPortfolioPlan({ root: ROOT, config, repositoryRevision, seed: "issue-249-case-identity-test" });
+  const fixtureId = config.fixtures.find(({ suite }) => suite === "calibration").id;
+  assert.equal(validatePortfolioCaseIdentity({ root: ROOT, config, plan, fixtureIds: [fixtureId] }), true);
+  const drifted = structuredClone(plan);
+  drifted.cases.find(({ fixture_id: id }) => id === fixtureId).case_id = "case-0000000000000000-0000000000000000";
+  assert.throws(() => validatePortfolioCaseIdentity({ root: ROOT, config, plan: drifted, fixtureIds: [fixtureId] }), /case identity/u);
+});
 
 test("a valid append-only successor lineage is accepted", () => {
   const history = [...currentDecisionHistories().values()].find((entries) => entries.length > 1);

@@ -16,6 +16,7 @@ import {
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest, stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import {
+  balancedPortfolioConditionOrder,
   buildPortfolioPlan,
   readExecutionAdmissionEvidenceManifest,
   resolvePortfolioExecutionAdmission,
@@ -330,6 +331,67 @@ function validateFixture({ root, repositoryRevision, fixtureId, config, catalogS
   });
 }
 
+export function validatePortfolioCaseIdentity({ root = DEFAULT_ROOT, config, plan, fixtureIds }) {
+  const selectedIds = new Set(fixtureIds);
+  if (selectedIds.size !== fixtureIds.length) throw new Error("portfolio case identity fixture inventory contains duplicates");
+  const conditionIds = config.conditions.map(({ id }) => id);
+  const adapterIds = config.adapter_tracks.map(({ id }) => id);
+  const planDigest = plan.plan_id.slice("plan-".length);
+  const observedCaseIds = new Set();
+  for (const fixtureId of fixtureIds) {
+    const fixture = config.fixtures.find(({ id }) => id === fixtureId);
+    if (!fixture) throw new Error(`${fixtureId} portfolio case identity has no canonical runtime registration`);
+    const cases = plan.cases.filter(({ fixture_id: id }) => id === fixtureId);
+    const expectedCount = adapterIds.length * conditionIds.length * fixture.repetitions;
+    if (cases.length !== expectedCount) throw new Error(`${fixtureId} portfolio case identity count drift`);
+    const byCombination = new Map();
+    for (const entry of cases) {
+      if (observedCaseIds.has(entry.case_id)) throw new Error(`${fixtureId} portfolio case identity contains a duplicate case ID`);
+      observedCaseIds.add(entry.case_id);
+      const key = `${entry.adapter_track}:${entry.repetition}:${entry.condition}`;
+      if (byCombination.has(key)) throw new Error(`${fixtureId} portfolio case identity contains a duplicate execution combination`);
+      byCombination.set(key, entry);
+    }
+    const verificationCommandContract = fixture.verification_command_contract
+      ? {
+        path: fixture.verification_command_contract.path,
+        file_digest: `sha256:${fixture.verification_command_contract.sha256}`,
+        contract_digest: JSON.parse(readFileSync(resolve(root, fixture.verification_command_contract.path), "utf8")).contract_digest,
+      }
+      : null;
+    for (const adapterId of adapterIds) {
+      for (let repetition = 1; repetition <= fixture.repetitions; repetition += 1) {
+        const orderedConditions = balancedPortfolioConditionOrder(plan.randomization_seed.value, adapterId, fixtureId, repetition);
+        const blockId = `block-${planDigest.slice(0, 16)}-${sha256(`${plan.plan_id}:${adapterId}:${fixtureId}:${repetition}`).slice("sha256:".length, "sha256:".length + 12)}`;
+        for (const [index, condition] of orderedConditions.entries()) {
+          const key = `${adapterId}:${repetition}:${condition}`;
+          const entry = byCombination.get(key);
+          if (!entry) throw new Error(`${fixtureId} portfolio case identity is missing ${key}`);
+          const caseId = `case-${planDigest.slice(0, 16)}-${sha256(`${plan.plan_id}:${adapterId}:${fixtureId}:${repetition}:${condition}`).slice("sha256:".length, "sha256:".length + 16)}`;
+          assertEqual(entry, {
+            case_id: caseId,
+            block_id: blockId,
+            adapter_track: adapterId,
+            fixture_id: fixtureId,
+            suite: fixture.suite,
+            task_class: fixture.task_class,
+            difficulty: fixture.difficulty,
+            aggregate_eligible: fixture.aggregate_eligible,
+            repetition,
+            registered_repetitions: fixture.repetitions,
+            condition,
+            condition_order_position: index + 1,
+            input_manifest_path: fixture.input_manifest_path,
+            input_manifest_sha256: fixture.input_manifest_sha256,
+            verification_command_contract: verificationCommandContract,
+          }, `${fixtureId} portfolio case identity`);
+        }
+      }
+    }
+  }
+  return true;
+}
+
 export function validatePublicAdmittedFixtureInvariance({ root = DEFAULT_ROOT, repositoryRevision = "HEAD" } = {}) {
   repositoryRevision = git(root, ["rev-parse", repositoryRevision]).trim();
   const configSource = readTrackedJson(root, repositoryRevision, CONFIG_PATH);
@@ -350,6 +412,7 @@ export function validatePublicAdmittedFixtureInvariance({ root = DEFAULT_ROOT, r
   assertEqual(firstPlan, secondPlan, "public fail-closed portfolio plan determinism");
   const overlayIds = new Set(fixtures.filter(({ public_execution_status }) => public_execution_status === "review_evidence_missing").map(({ fixture_id }) => fixture_id));
   if (firstPlan.cases.some(({ fixture_id: fixtureId }) => overlayIds.has(fixtureId))) throw new Error("public portfolio plan admitted a fixture without exact external review evidence");
+  validatePortfolioCaseIdentity({ root, config, plan: firstPlan, fixtureIds: fixtures.filter(({ public_execution_status: status }) => status !== "review_evidence_missing").map(({ fixture_id }) => fixture_id) });
   return Object.freeze({ fixture_ids: fixtureIds, fixtures, public_invariance: "pass", private_semantics: "not_supplied", public_case_count: firstPlan.cases.length });
 }
 
@@ -406,6 +469,7 @@ export function validateActualPrivateAdmittedFixtureSemantics({ root = DEFAULT_R
   const secondPlan = buildPortfolioPlan({ root, config, repositoryRevision, seed: "issue-249-private-invariance", executionAdmissionEvidenceByFixture: evidence });
   assertEqual(firstPlan, secondPlan, "actual-private portfolio case identity determinism");
   for (const fixtureId of discovered) if (!firstPlan.cases.some(({ fixture_id: id }) => id === fixtureId)) throw new Error(`${fixtureId} exact admitted authority is missing from the private portfolio plan`);
+  validatePortfolioCaseIdentity({ root, config, plan: firstPlan, fixtureIds: [...discovered] });
   return Object.freeze({ fixture_ids: [...supplied].sort(compareAscii), public_invariance: "pass", private_semantics: "pass" });
 }
 
