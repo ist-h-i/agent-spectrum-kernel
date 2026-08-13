@@ -1,0 +1,125 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mp-ci-evidence-gap",
+  "candidate_input_digest": "sha256:13e5d0c70feffed4db0bdf68b2b89b9b15005c53525a8e5b10d9198775d7ac25",
+  "candidate_evaluator_digest": "sha256:a7135f42884f9b8957a9d5508ce8c42167260e0ca6e3ff0436dc7eddba7260b1",
+  "reviewer_status": "pending_independent_review",
+  "author_self_approval": false,
+  "admission_status": "admission_pending",
+  "fair_paths": {
+    "plain": {
+      "status": "pass",
+      "agent_visible_evidence": [
+        "task.md",
+        "workspace/.github/workflows/pull-request.yml",
+        "workspace/ci/pull-request-314.log",
+        "workspace/docs/verification.md",
+        "workspace/package-lock.json",
+        "workspace/package.json",
+        "workspace/pr.diff",
+        "workspace/review.schema.json",
+        "workspace/scripts/upload-diagnostics.mjs",
+        "workspace/scripts/validate-review.mjs",
+        "workspace/src/quote-order.mjs",
+        "workspace/test/checkout/quote-order-contract.test.mjs",
+        "workspace/test/unit/quote-order.test.mjs"
+      ]
+    },
+    "kernel_only": {
+      "status": "pass",
+      "agent_visible_evidence": [
+        "task.md",
+        "workspace/.github/workflows/pull-request.yml",
+        "workspace/ci/pull-request-314.log",
+        "workspace/docs/verification.md",
+        "workspace/package-lock.json",
+        "workspace/package.json",
+        "workspace/pr.diff",
+        "workspace/review.schema.json",
+        "workspace/scripts/upload-diagnostics.mjs",
+        "workspace/scripts/validate-review.mjs",
+        "workspace/src/quote-order.mjs",
+        "workspace/test/checkout/quote-order-contract.test.mjs",
+        "workspace/test/unit/quote-order.test.mjs"
+      ]
+    }
+  },
+  "gates": [
+    {
+      "gate_id": "public_artifact_leakage",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "private_evaluator_boundary",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "requirement_recoverability",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "plain_fair_path",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "kernel_only_fair_path",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "ordinary_engineering_task_wording",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "ask_vocabulary_cue_absence",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "evidence_removal_mutation",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "suspicious_but_correct_control",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "equivalent_solution_coverage",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "false_positive_boundary",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "independent_review",
+      "selector_result": "applicable",
+      "result": "unknown"
+    },
+    {
+      "gate_id": "input_digest_freeze",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "evaluator_digest_freeze",
+      "selector_result": "applicable",
+      "result": "pass"
+    },
+    {
+      "gate_id": "unauthorized_attempt_observability",
+      "selector_result": "not_applicable",
+      "result": "not_applicable"
+    }
+  ],
+  "review_package_digest": "sha256:6aac419b05af07fce19f990a355eb92c3fd2b71d032502f430515972b16171ce"
+}

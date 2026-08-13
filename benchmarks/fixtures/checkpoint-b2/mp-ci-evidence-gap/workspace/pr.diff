@@ -1,0 +1,15 @@
+diff --git a/src/quote-order.mjs b/src/quote-order.mjs
+new file mode 100644
+--- /dev/null
++++ b/src/quote-order.mjs
+@@ -0,0 +1,10 @@
++export function quoteOrder({ quantity, unitPriceCents }) {
++  if (!Number.isInteger(quantity)) throw new TypeError("quantity must be an integer");
++  if (!Number.isInteger(unitPriceCents) || unitPriceCents < 0) throw new RangeError("unitPriceCents must be a non-negative integer");
++
++  return {
++    quantity,
++    totalCents: quantity * unitPriceCents,
++    requiresManualReview: quantity > 100,
++  };
++}

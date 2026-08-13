@@ -1,0 +1,104 @@
+{
+  "requirement_record_id": "requirement-record-mp-ci-evidence-gap",
+  "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+  "requirement_record_path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/requirement-record.json",
+  "fixture_id": "mp-ci-evidence-gap",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+  "admission_record_digest": "sha256:dac9d51766fe74221d59fad32114b40d07d727c783ea349dbe31c5dc6f1d1f35",
+  "requirements": [
+    {
+      "requirement_id": "ci-evidence-completeness",
+      "requirement_kind": "weighted",
+      "max_points": 3,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "ci-evidence-set"
+      ],
+      "mutation_ids": [
+        "remove-ci-evidence-set"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-ci-evidence-gap"
+      ],
+      "finding_group_id": "ci-evidence-completeness-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:982131b506ff6efe0575b9ca2d6b8f05d63a5696b49118eac1faa70ede160508"
+    },
+    {
+      "requirement_id": "implementation-defect-finding",
+      "requirement_kind": "weighted",
+      "max_points": 3,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "implementation-test-contract"
+      ],
+      "mutation_ids": [
+        "remove-implementation-test-contract"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-quantity-validation-finding"
+      ],
+      "finding_group_id": "implementation-defect-finding-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:fccba0386f220a37ee7acb1dee52bceed947f524bc2825aedc254c3dca6bedb5"
+    },
+    {
+      "requirement_id": "decision-correctness",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "merge-decision-basis"
+      ],
+      "mutation_ids": [
+        "remove-merge-decision-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-request-changes-decision"
+      ],
+      "finding_group_id": "decision-correctness-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:17d026f97c77c506f1bb97497aa9fdb5bccc59afbf8ab944cb50e7fe47569e7c"
+    },
+    {
+      "requirement_id": "verification-conclusion",
+      "requirement_kind": "weighted",
+      "max_points": 1,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "verification-conclusion-basis"
+      ],
+      "mutation_ids": [
+        "remove-verification-conclusion-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-failed-verification-conclusion"
+      ],
+      "finding_group_id": "verification-conclusion-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:3747fa6fcb0fa213a0f96f8eb2906a05e7a757ca5eddf281a901a26a8d768448"
+    },
+    {
+      "requirement_id": "scope-and-review-precision",
+      "requirement_kind": "weighted",
+      "max_points": 1,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "review-scope-control"
+      ],
+      "mutation_ids": [
+        "remove-review-scope-control"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-bounded-review"
+      ],
+      "finding_group_id": "scope-and-review-precision-outcome",
+      "safety_dimension": "merge_correctness",
+      "requirement_digest": "sha256:3896067c9b8694ec1f3d7b1507fc7af0da1625b3e5b32b6ecdf83757764963ee"
+    }
+  ],
+  "requirement_set_digest": "sha256:af2b2bceca81e1c97d09a479e1c959fa14512b14b480d408911eed9aa68e4412",
+  "requirement_record_digest": "sha256:f26bef9a90a0c7ebb0ad5ea1a63257c391d232c4e9abefaee2ec2deeb7ab9646"
+}

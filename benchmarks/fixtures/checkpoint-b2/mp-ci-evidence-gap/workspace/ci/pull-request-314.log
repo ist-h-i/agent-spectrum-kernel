@@ -1,0 +1,18 @@
+Pull request #314 / verify
+Node.js 24.19.0
+
+$ npm ci
+added 0 packages, and audited 1 package
+
+$ npm test
+> node --test test/unit/*.test.mjs
+ok 1 - quotes ordinary and bulk orders
+ok 2 - rejects non-integer quantities and invalid prices
+# pass 2
+# fail 0
+
+$ node scripts/upload-diagnostics.mjs
+diagnostics endpoint unavailable
+Process completed with exit code 7; step continued.
+
+Job conclusion: success
