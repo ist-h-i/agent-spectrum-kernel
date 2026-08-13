@@ -423,12 +423,12 @@ if (productionExists) {
   const fixture = config.fixtures.find(({ id }) => id === "mp-ci-evidence-gap");
   const admission = resolvePortfolioExecutionAdmission({ root: ROOT, fixture });
   assert.equal(admission.execution_eligible, false);
-  assert.equal(admission.effective_admission_status, "admission_pending");
+  assert.equal(admission.effective_admission_status, "review_evidence_missing");
   assert.equal(resolvePortfolioExecutionFixtures({ root: ROOT, config }).some(({ id }) => id === "mp-ci-evidence-gap"), false);
-  expectFailure(() => resolvePortfolioExecutionAdmission({ root: ROOT, fixture, externalAdmissionEvidence: { reviewAuthorityPath: "/tmp/fake", reviewAuthoritySourceDigest: `sha256:${"0".repeat(64)}`, reviewArchivePath: "/tmp/fake.zip" } }), /cannot create admission|overlay/u, "caller-supplied fake admission must fail");
+  expectFailure(() => resolvePortfolioExecutionAdmission({ root: ROOT, fixture, externalAdmissionEvidence: { reviewAuthorityPath: resolve(ROOT, ".missing-mp-ci-review-authority.json"), reviewAuthoritySourceDigest: `sha256:${"0".repeat(64)}`, reviewArchivePath: resolve(ROOT, ".missing-mp-ci-review-archive.zip") } }), /authority/u, "caller-supplied fake admission must fail");
 }
 
 const requested = privateArgs(process.argv.slice(2));
 const privateSummary = requested ? await validatePrivateCases(requested) : null;
 
-console.log(JSON.stringify({ fixture_id: "mp-ci-evidence-gap", input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: "pending", scoring_ready: false }));
+console.log(JSON.stringify({ fixture_id: "mp-ci-evidence-gap", input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: "review_evidence_missing", scoring_ready: false }));
