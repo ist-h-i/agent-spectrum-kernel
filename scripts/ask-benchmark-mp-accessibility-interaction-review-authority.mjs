@@ -179,7 +179,7 @@ function buildRequirementRecord({ catalog, policyManifest, scoringPolicy, admiss
     ["evidence-and-review-precision", 1, "review-precision-basis", "remove-review-precision-basis", "equivalent-evidence-bounded-review"],
   ];
   const requirements = seeds.map(([requirement_id, max_points, evidenceMapId, mutationId, equivalenceId]) => {
-    const base = { requirement_id, requirement_kind: "weighted", max_points, partial_credit_allowed: false, evidence_map_ids: [evidenceMapId], mutation_ids: [mutationId], equivalence_class_ids: [equivalenceId], finding_group_id: `${requirement_id}-outcome`, safety_dimension: "accessibility_conformance" };
+    const base = { requirement_id, requirement_kind: "weighted", max_points, partial_credit_allowed: false, evidence_map_ids: [evidenceMapId], mutation_ids: [mutationId], equivalence_class_ids: [equivalenceId], finding_group_id: `${requirement_id}-outcome`, safety_dimension: "merge_correctness" };
     return { ...base, requirement_digest: computeRequirementDigest(base) };
   });
   const base = {
