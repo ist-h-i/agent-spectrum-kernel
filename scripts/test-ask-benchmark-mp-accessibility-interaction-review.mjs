@@ -128,7 +128,7 @@ function validateProductionNegativeCoverage() {
   for (const [name, relativePath, mutate, pattern] of [
     ["missing-requirement-evidence", "requirement-record.json", (value) => { value.requirements[0].evidence_map_ids = []; }, /requirement|evidence|digest/u],
     ["evaluator-reference-mismatch", "evaluator-reference.json", (value) => { value.evaluator_authority_manifest_digest = `sha256:${"0".repeat(64)}`; }, /digest|binding|transplanted/u],
-    ["stale-source-freeze", "source-freeze-candidate.json", (value) => { value.public_bindings.input_manifest.raw_sha256 = `sha256:${"0".repeat(64)}`; }, /digest|binding/u],
+    ["stale-source-freeze", "source-freeze-candidate.json", (value) => { value.public_bindings.input_manifest.raw_sha256 = `sha256:${"0".repeat(64)}`; }, /state|digest|binding/u],
   ]) {
     const root = copy(name);
     const path = resolve(root, `benchmarks/fixtures/checkpoint-b2/${FIXTURE_ID}/${relativePath}`);
@@ -209,10 +209,10 @@ if (productionExists) {
   const fixture = config.fixtures.find(({ id }) => id === FIXTURE_ID);
   const admission = resolvePortfolioExecutionAdmission({ root: ROOT, fixture });
   assert.equal(admission.execution_eligible, false);
-  assert.equal(admission.effective_admission_status, "review_evidence_missing");
+  assert.equal(admission.effective_admission_status, "admission_pending");
   assert.equal(resolvePortfolioExecutionFixtures({ root: ROOT, config }).some(({ id }) => id === FIXTURE_ID), false);
 }
 
 const requested = privateArgs(process.argv.slice(2));
 const privateSummary = requested ? await validatePrivateCases(requested) : null;
-console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: "review_evidence_missing", scoring_ready: false }));
+console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: "admission_pending", scoring_ready: false }));

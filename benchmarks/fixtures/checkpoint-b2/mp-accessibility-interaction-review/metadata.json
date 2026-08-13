@@ -1,4 +1,32 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "mp-accessibility-interaction-review",
-  "candidate_state": "generation_pending"
+  "fixture_role": "primary",
+  "suite": "mechanism_positive",
+  "task_class": "pr_review",
+  "domain": "accessibility",
+  "difficulty": "medium_hard",
+  "repetitions": 3,
+  "risk_boundary": "none",
+  "capability_families": [
+    "interaction_semantics",
+    "review_precision"
+  ],
+  "evidence_topologies": [
+    "review_diff_and_tests",
+    "ui_semantics_and_interactions"
+  ],
+  "outcome_dimensions": [
+    "accessibility_conformance",
+    "review_precision"
+  ],
+  "output_contract_type": "findings_producing",
+  "requirement_record_id": "requirement-record-mp-accessibility-interaction-review",
+  "output_contract_id": "output-contract-mp-accessibility-interaction-review",
+  "evaluator_bundle_id": "evaluator-6e22c434127490814a8a1666f440cb365643908bb7871925861f3835b9a138d9",
+  "evaluator_bundle_digest": "sha256:279cb6c2526a2257016c51156c0becbe24836b6ffdcc665f11562b13043c4bf0",
+  "evaluator_byte_count": 130664,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:86aecc3f9405a38e0a746ae1c547cc534562b1e28796bd9df9d9acb84fcad4ee"
 }
