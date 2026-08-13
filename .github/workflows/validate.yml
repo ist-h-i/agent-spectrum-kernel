@@ -39,6 +39,9 @@ jobs:
       - name: Run portfolio admission decision overlay tests
         run: node scripts/test-ask-benchmark-admission-decision.mjs
 
+      - name: Guard admitted fixture invariance
+        run: node scripts/test-ask-benchmark-admitted-fixture-invariance.mjs
+
       - name: Run general benchmark tests
         run: node scripts/test-ask-benchmark.mjs
 
