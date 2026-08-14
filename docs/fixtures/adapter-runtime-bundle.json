@@ -517,9 +517,9 @@
       "evaluator_result_schema_path": "benchmarks/schemas/evaluator-result-envelope.schema.json",
       "evaluator_result_schema_file_sha256": "5c4775b0e5495a47c2a89467e650a48ad228ee8df07ac50942d6c9e47de34de9",
       "scoring_contract_validator_path": "scripts/ask-benchmark-scoring-contract.mjs",
-      "scoring_contract_validator_file_sha256": "2384e2aaca19f58112d26b361f5c9b7c484ab1bfd7a9923a18fa510595540f8c",
+      "scoring_contract_validator_file_sha256": "1662d55f639519b5b27a1a397c584feec84fceabc43f39dea04a04c49b1f7ef6",
       "scoring_authority_validator_path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-      "scoring_authority_validator_file_sha256": "7ec7fe63eddb8743ccf10261a3caaf1decb9be5669475e81b30816b6df3c49c4",
+      "scoring_authority_validator_file_sha256": "dd2771600fc804f3e212d90a4718f5d7d711fb78c6bb90804ed3484bd9e285c3",
       "engineering_result_schema_path": "benchmarks/schemas/portfolio-engineering-result.schema.json",
       "engineering_result_schema_file_sha256": "af1ea7698d3981705c64f184dcddb418b80ec75ab2917c7991f2f574802db76f",
       "scoring_implementation_path": "scripts/ask-benchmark-portfolio-score.mjs",
@@ -537,7 +537,7 @@
       "engineering_result_set_implementation_path": "scripts/ask-benchmark-portfolio-result-set.mjs",
       "engineering_result_set_implementation_file_sha256": "ae7230381c39c413e4a4b3bb4afb7f07f2be03645dbbe66d5d9d987a6a8f9fda",
       "engineering_result_set_test_path": "scripts/test-ask-benchmark-portfolio-result-set.mjs",
-      "engineering_result_set_test_file_sha256": "b86d3dcec1d07e1a901aced1192a54ce232c8cf39be52b5b979ccd4acb15f258",
+      "engineering_result_set_test_file_sha256": "fbc95316045abe424a6c3a8316c98748c8faa354dde86d5534fdc0985e90a8a7",
       "repetition_report_schema_path": "benchmarks/schemas/portfolio-repetition-report.schema.json",
       "repetition_report_schema_file_sha256": "51c4d534782ba1c31497ecd2394d377fadcbe65d7e2f4ae92d63124dd772371e",
       "repetition_report_implementation_path": "scripts/ask-benchmark-portfolio-repetition-report.mjs",
@@ -684,7 +684,7 @@
       "validator_path": "scripts/ask-benchmark-mn-build-option-update.mjs",
       "validator_file_sha256": "d51640759283df4171b685fbb349caee18e97496928a3498f41a707c2c4e47da",
       "focused_test_path": "scripts/test-ask-benchmark-mn-build-option-update.mjs",
-      "focused_test_file_sha256": "e3b3bc5bbf35aef2df1956782bbb9827f487491eaaa4f93a8d783d5b651f383a"
+      "focused_test_file_sha256": "d5a9440a17e356c4754b8e6eba367bf7fe1fdf84b789be2ce5812bca53115a2e"
     }
   }
 }

@@ -80,6 +80,11 @@ const historicalRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 let root = historicalRoot;
 let fixtureRoot = resolve(root, FIXTURE_ROOT_RELATIVE);
 const REQUIRED_COMMAND_IDS_FOR_TEST = ["build-config-focused-test", "build-config-semantic-validator"];
+const MANUAL_SEMANTIC_CASES = [
+  ["remediation-polarity", "The finding reports a missing remediation, but the cited output says the remediation is already present."],
+  ["negated-failure", "The finding says the command did not fail, while also describing the failure as unresolved."],
+  ["compound-finding", "The primary configuration finding is supported, and the same sentence adds a secondary claim that is not closed by the evidence."],
+];
 const EVALUATOR_AUTHORITY_FILE_PATHS = [
   "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/input-manifest.json",
   "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evidence-map.json",
@@ -386,22 +391,25 @@ function runHistoricalR21AuthorityResolutionRegressions() {
   return historical.evaluatorRevision;
 }
 
-function syntheticPrivateFragment({ normalized, requirementRecord, state }) {
+function syntheticPrivateFragment({ normalized, requirementRecord, state, evaluationStatus = state === "invalid" ? "invalid_input" : "completed" }) {
   const verificationState = deriveVerificationEvidenceState(normalized);
   const verificationReferences = deriveVerificationEvidenceReferences(normalized, verificationState);
   const verificationPass = verificationState === "executed_success";
   const invalid = verificationState === "invalid";
+  const manual = evaluationStatus === "manual_review_required";
   const normalizedReference = { kind: "normalized_result", digest: normalized.normalized_result_digest, bytes: null };
+  const finalOutputReference = { kind: "final_output", digest: normalized.lineage.final_output_digest, bytes: normalized.lineage.final_output_bytes };
   const requirementResults = requirementRecord.requirements.map((requirement) => {
     const verification = requirement.requirement_id === "verification-evidence";
+    const semanticManual = manual && requirement.requirement_id === "configuration-contract";
     const pass = !verification || verificationPass;
-    const references = verification ? verificationReferences : [normalizedReference];
+    const references = verification ? verificationReferences : semanticManual ? [finalOutputReference] : [normalizedReference];
     return {
       requirement_id: requirement.requirement_id,
-      outcome: pass ? "pass" : "fail",
-      earned_points: pass ? requirement.max_points : 0,
-      matched_equivalence_class_ids: pass ? [requirement.equivalence_class_ids[0]] : [],
-      finding_ids: pass ? [] : ["synthetic-verification-failure"],
+      outcome: semanticManual ? "manual_review_required" : pass ? "pass" : "fail",
+      earned_points: semanticManual ? null : pass ? requirement.max_points : 0,
+      matched_equivalence_class_ids: semanticManual ? [] : pass ? [requirement.equivalence_class_ids[0]] : [],
+      finding_ids: semanticManual ? ["synthetic-semantic-review"] : pass ? [] : ["synthetic-verification-failure"],
       evidence_references: references,
       scope_deviation_references: [],
       verification_evidence_references: verification ? verificationReferences : [],
@@ -414,20 +422,23 @@ function syntheticPrivateFragment({ normalized, requirementRecord, state }) {
     schema_version: "1.0.0",
     schema_path: "benchmarks/schemas/private-evaluator-fragment.schema.json",
     program: "adaptive_ask_private_evaluator_fragment",
-    evaluation_status: invalid ? "invalid_input" : "completed",
+    evaluation_status: evaluationStatus,
     requirement_results: requirementResults,
-    findings: verificationPass ? [] : [{ finding_id: "synthetic-verification-failure", category: invalid ? "normalized_command_evidence_invalid" : "verification_evidence_missing_or_unsuccessful", severity: invalid ? "critical" : "high", evidence_references: failureReferences }],
+    findings: manual
+      ? [{ finding_id: "synthetic-semantic-review", category: "semantic_meaning_unresolved", severity: "high", evidence_references: [finalOutputReference] }]
+      : verificationPass ? [] : [{ finding_id: "synthetic-verification-failure", category: invalid ? "normalized_command_evidence_invalid" : "verification_evidence_missing_or_unsuccessful", severity: invalid ? "critical" : "high", evidence_references: failureReferences }],
     scope_deviations: [],
     verification_correctness: observation(verificationPass ? "pass" : "fail", verificationReferences),
     evidence_correctness: observation(invalid ? "fail" : "pass"),
-    under_processing: observation(verificationPass ? "not_detected" : "detected"),
-    over_processing: observation("not_detected", [normalizedReference]),
-    classification: invalid ? "invalid_evidence" : verificationPass ? "correct_narrow_execution" : "under_processing",
+    under_processing: observation(manual ? "manual_review_required" : verificationPass ? "not_detected" : "detected", manual ? [finalOutputReference] : [normalizedReference]),
+    over_processing: observation(manual ? "manual_review_required" : "not_detected", manual ? [finalOutputReference] : [normalizedReference]),
+    ...(manual ? {} : { classification: invalid ? "invalid_evidence" : verificationPass ? "correct_narrow_execution" : "under_processing" }),
     result_profile: { name: BINARY_SCOPE_VERIFICATION_PROFILE_NAME, digest: computeResultProfileDigest() },
     scoring_ready: false,
   };
   if (invalid) fragment.invalid_input_authority = { layer: "command_evidence", category: "normalized_command_evidence_invalid", code: "normalized_command_evidence_invalid", evidence_references: [normalizedReference] };
   assert.equal(state === "invalid", invalid, `synthetic fragment state must rederive for ${state}`);
+  if (manual) assert.equal(verificationState, "executed_success", "manual semantic review must remain distinct from command execution evidence");
   return fragment;
 }
 
@@ -542,7 +553,7 @@ function materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluator
   return { bundleManifest, reference, sourceIdentity };
 }
 
-function createSyntheticCurrentAuthorityEnvironment(state, { hiddenEvaluatorSource = null } = {}) {
+function createSyntheticCurrentAuthorityEnvironment(state, { hiddenEvaluatorSource = null, evaluationStatus = state === "invalid" ? "invalid_input" : "completed", semanticText = null } = {}) {
   const parent = createPortableAuthorityRoot("ask-current-synthetic-authority-");
   const repositoryRoot = resolve(parent, "repository");
   const clone = spawnSync("git", ["clone", "--quiet", "--no-local", historicalRoot, repositoryRoot], { encoding: "utf8" });
@@ -552,10 +563,13 @@ function createSyntheticCurrentAuthorityEnvironment(state, { hiddenEvaluatorSour
   const previewRoot = resolve(parent, "preview-authority");
   mkdirSync(previewRoot);
   const normalizedAuthority = persistentNormalizedAuthority({ authorityRoot: previewRoot, state });
-  const fragment = syntheticPrivateFragment({ normalized: normalizedAuthority.normalized, requirementRecord: readJson(resolve(fixtureRoot, "requirement-record.json")), state });
+  const fragment = syntheticPrivateFragment({ normalized: normalizedAuthority.normalized, requirementRecord: readJson(resolve(fixtureRoot, "requirement-record.json")), state, evaluationStatus });
+  const explicitHiddenEvaluatorSource = hiddenEvaluatorSource ?? (semanticText === null ? null : Buffer.from(
+    `const syntheticFindingText = ${JSON.stringify(semanticText)};\nexport async function evaluateCandidateSafe() { void syntheticFindingText; return ${JSON.stringify(fragment)}; }\n`,
+  ));
   const privateEvaluatorRoot = resolve(parent, "private-evaluator");
   mkdirSync(privateEvaluatorRoot);
-  materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluatorRoot, fragment, hiddenEvaluatorSource });
+  materializeSyntheticCurrentAuthority({ repositoryRoot, privateEvaluatorRoot, fragment, hiddenEvaluatorSource: explicitHiddenEvaluatorSource });
   removeTree(previewRoot);
   return { parent, repositoryRoot, privateEvaluatorRoot };
 }
@@ -1708,8 +1722,9 @@ async function actualPrivateFragment({ privateRoot, authorityRoot, normalizedAut
   return { fragment, frozenWorkspace, candidateWorkspace, evaluationInputRoot, execution, executed };
 }
 
-async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candidateMutator = null, isolatedPathNegativeLabel = null } = {}) {
+async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candidateMutator = null, isolatedPathNegativeLabel = null, expectedEvaluationStatus = state === "invalid" ? "invalid_input" : "completed" } = {}) {
   const authorityRoot = createPortableAuthorityRoot(`ask-mn-r21-${state}-`);
+  const standardCompletedSuccess = state === "executed_success" && expectedEvaluationStatus === "completed" && !candidateMutator;
   const productionMutation = typeof candidateMutator === "string" ? candidateMutator : null;
   const normalizedAuthority = productionMutation
     ? actualNormalizedAuthority({ authorityRoot, mutation: productionMutation, evidenceState: state })
@@ -1746,6 +1761,34 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   adapterFailure("classification", (changed) => { changed.classification = changed.classification === "over_processing" ? "under_processing" : "over_processing"; });
   adapterFailure("causal reference", (changed) => { changed.verification_correctness.evidence_references = []; });
   adapterFailure("identity injection", (changed) => { changed.normalized_result_id = "normalized-00000000000000000000000000000000"; }, /Schema|fragment/u);
+  if (expectedEvaluationStatus === "manual_review_required") {
+    adapterFailure("manual requirement missing", (changed) => {
+      const result = changed.requirement_results.find(({ requirement_id }) => requirement_id === "configuration-contract");
+      const requirement = adapterAuthority.requirementRecord.requirements.find(({ requirement_id }) => requirement_id === result.requirement_id);
+      result.outcome = "pass";
+      result.earned_points = requirement.max_points;
+      result.matched_equivalence_class_ids = [requirement.equivalence_class_ids[0]];
+      result.finding_ids = [];
+    }, /manual.*requirement|manual_review_required/u);
+    adapterFailure("manual observation missing", (changed) => {
+      changed.under_processing.state = "not_detected";
+      changed.over_processing.state = "not_detected";
+    }, /manual.*observation|manual_review_required/u);
+    adapterFailure("manual points converted to zero", (changed) => {
+      changed.requirement_results.find(({ outcome }) => outcome === "manual_review_required").earned_points = 0;
+    }, /null earned_points|converted to zero/u);
+    adapterFailure("manual invalid-input authority coexistence", (changed) => {
+      changed.invalid_input_authority = {
+        layer: "command_evidence",
+        category: "normalized_command_evidence_invalid",
+        code: "normalized_command_evidence_invalid",
+        evidence_references: [{ kind: "normalized_result", digest: normalizedAuthority.normalized.normalized_result_digest, bytes: null }],
+      };
+    }, /manual.*invalid-input authority|invalid_input_authority/u);
+    adapterFailure("manual evidence transplant", (changed) => {
+      changed.requirement_results.find(({ outcome }) => outcome === "manual_review_required").evidence_references[0].digest = `sha256:${"7".repeat(64)}`;
+    }, /transplant|normalized result|normalized-result|final output|evidence reference/u);
+  }
   const foreignAuthority = { ...adapterAuthority, normalizedResult: structuredClone(normalizedAuthority.normalized) };
   foreignAuthority.normalizedResult.lineage.run_instance_id = "00000000-0000-4000-8000-000000000208";
   assert.throws(() => adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment: actual.fragment, authority: foreignAuthority }), /reference|state|normalized|lineage/u, "adapter must reject a cross-run normalized result");
@@ -1841,7 +1884,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   const verifiedAuthority = verifyEvaluatorAuthority(common);
   assert.equal(verifiedAuthority.evaluationReady, verifiedResult.scoringReady, `binary evaluation completeness must match the admitted compatibility boundary for ${state}`);
   assert.equal(Object.hasOwn(verifiedAuthority, "scoringReady"), false, `binary evaluator authority must not expose scoring readiness for ${state}`);
-  if (state === "executed_success" && !candidateMutator) {
+  if (standardCompletedSuccess) {
     for (const missingField of ["privateEvaluationRoot", "privateEvaluationRecordPath", "privateFragmentPath"]) {
       const incompleteAuthority = { ...common };
       delete incompleteAuthority[missingField];
@@ -1868,7 +1911,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     }
   }
   assert.deepEqual(chain.snapshot(), before, `full evaluator authority must be read-only for ${state}`);
-  if (state === "executed_success" && !candidateMutator) {
+  if (standardCompletedSuccess) {
     for (const property of Object.keys(fakeExecutorCalls)) assert.equal(fakeExecutorCalls[property], 0, `production verifier must not invoke caller-supplied ${property}`);
   }
   const originalResultBytes = readFileSync(chain.evaluatorResultPath);
@@ -1903,9 +1946,11 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   expectPersistentFailure("requirement omission", (changed) => { changed.requirement_results.pop(); }, /requirement|exactly cover|binary result|verification-evidence|authority-owned adapter output/u);
   expectPersistentFailure("requirement addition", (changed) => { changed.requirement_results.push({ ...structuredClone(changed.requirement_results[0]), requirement_id: "added-requirement" }); }, /requirement|unknown|exactly cover|authority-owned adapter output/u);
   expectPersistentFailure("requirement duplicate", (changed) => { changed.requirement_results.push(structuredClone(changed.requirement_results[0])); }, /requirement|unique|exactly cover|authority-owned adapter output/u);
-  expectPersistentFailure("scope deviation reference missing", mutateMissingScopeDeviationReference, /failing change-boundary result must reference every scope deviation/u, { allowAdapterOutput: false });
-  expectPersistentFailure("scope deviation reference excess", mutateExcessScopeDeviationReference, /configuration-contract must not carry scope-deviation references/u, { allowAdapterOutput: false });
-  expectPersistentFailure("scope deviation reference unknown", mutateUnknownScopeDeviationReference, /requirement result scope-deviation reference does not close within the evaluator envelope/u, { allowAdapterOutput: false });
+  if (expectedEvaluationStatus !== "manual_review_required") {
+    expectPersistentFailure("scope deviation reference missing", mutateMissingScopeDeviationReference, /failing change-boundary result must reference every scope deviation/u, { allowAdapterOutput: false });
+    expectPersistentFailure("scope deviation reference excess", mutateExcessScopeDeviationReference, /configuration-contract must not carry scope-deviation references/u, { allowAdapterOutput: false });
+    expectPersistentFailure("scope deviation reference unknown", mutateUnknownScopeDeviationReference, /requirement result scope-deviation reference does not close within the evaluator envelope/u, { allowAdapterOutput: false });
+  }
   if (state === "invalid") {
     expectPersistentFailure("invalid-input authority layer drift", (changed) => { changed.invalid_input_authority.layer = "evaluator_source"; }, /invalid|layer|authority-owned adapter output/u);
     expectPersistentFailure("invalid-input authority category drift", (changed) => { changed.invalid_input_authority.category = "source_graph_drift"; }, /invalid|category|authority-owned adapter output/u);
@@ -1933,7 +1978,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
   writeFileSync(normalizedPath, originalNormalizedBytes);
   assert.deepEqual(chain.snapshot(), before, "persistent authority tamper must restore command summary");
   }
-  if (state === "executed_success" && !candidateMutator) {
+  if (standardCompletedSuccess) {
     const originalRecordBytes = readFileSync(privateRecord.recordPath);
     const originalFragmentBytes = readFileSync(chain.privateFragmentPath);
     const repositoryDiffPath = resolve(authorityRoot, "repository-diff-artifact.json");
@@ -2237,7 +2282,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     const publicRepositoryDiffReference = evaluatorResult.findings.flatMap(({ evidence_references }) => evidence_references).find(({ kind }) => kind === "repository_diff");
     if (publicRepositoryDiffReference) expectPrivateFailure("public repository-diff reference transplant", ({ result }) => { const reference = result.findings.flatMap(({ evidence_references }) => evidence_references).find(({ kind }) => kind === "repository_diff"); reference.digest = `sha256:${"f".repeat(64)}`; }, /sealed private artifact|artifact|authority-owned adapter/u);
   }
-  if (productionMutation === "valid-baseline" && state === "executed_success") {
+  if (productionMutation === "valid-baseline" && state === "executed_success" && expectedEvaluationStatus === "completed") {
     for (const forbidden of ["candidateWorkspace", "candidateMutator", "evaluationInputRoot", "normalizedResult", "caseId", "attempt"]) {
       assert.throws(() => createProductionSealedEvaluatorExecution({ [forbidden]: forbidden }), new RegExp(forbidden, "u"), `production call graph must reject caller-supplied ${forbidden}`);
     }
@@ -2275,7 +2320,17 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { candida
     }
     assert.deepEqual(chain.snapshot(), before, "production candidate authority negative matrix must restore the persistent authority chain");
   }
-  return { authorityRoot, scoringRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, privateRecord, chain, verifiedResult };
+  let engineeringResult = null;
+  if (expectedEvaluationStatus === "manual_review_required") {
+    const scored = scoreEvaluatorResult({ ...common, outputPath: resolve(scoringRoot, "manual-engineering-result.json") });
+    engineeringResult = scored.artifact;
+    assert.equal(engineeringResult.scoring_status, "not_scoring_ready", "manual semantic review must remain non-scoring");
+    assert.equal(engineeringResult.scoring_reason, "manual_review_required", "manual semantic review must retain its non-scoring reason");
+    assert.equal(Object.values(engineeringResult.requirement_score).every((value) => value === null), true, "manual semantic review must not produce numeric requirement scores");
+    assert.equal(engineeringResult.blockers.gate_status, "not_scoring_ready", "manual semantic review must not score blocker requirements");
+    assert.equal(engineeringResult.safety_blocker.status, "not_scoring_ready", "manual semantic review must not score safety blockers");
+  }
+  return { authorityRoot, scoringRoot, common, normalizedAuthority, scoringAuthority, evaluatorResult, privateRecord, chain, verifiedResult, engineeringResult };
 }
 
 async function runIsolatedMutableAuthorityNegatives(privateRoot) {
@@ -3554,27 +3609,68 @@ try {
 
   const requestedPrivateRootBeforeSyntheticValidation = requestedPrivateRoot;
   let syntheticPrivateValidation = "not_run";
-  for (const state of ["executed_success", "invalid"]) {
-    const environment = createSyntheticCurrentAuthorityEnvironment(state);
+  const manualSemanticProjections = [];
+  const syntheticCases = [
+    { label: "completed", state: "executed_success", evaluationStatus: "completed", semanticText: null },
+    { label: "invalid-input", state: "invalid", evaluationStatus: "invalid_input", semanticText: null },
+    ...MANUAL_SEMANTIC_CASES.map(([label, semanticText]) => ({ label, state: "executed_success", evaluationStatus: "manual_review_required", semanticText })),
+  ];
+  for (const { label, state, evaluationStatus, semanticText } of syntheticCases) {
+    const environment = createSyntheticCurrentAuthorityEnvironment(state, { evaluationStatus, semanticText });
     const syntheticPrivateRoot = environment.privateEvaluatorRoot;
     try {
       let observedSyntheticPrivateRoot = null;
       const stateValidation = await completeRequestedPrivateValidation(syntheticPrivateRoot, async (validatedPrivateRoot) => {
         observedSyntheticPrivateRoot = validatedPrivateRoot;
-        const fullAuthority = await runPersistentFullEvaluatorAuthority(validatedPrivateRoot, state);
-        assert.equal(fullAuthority.verifiedResult.result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state, deriveVerificationEvidenceState(fullAuthority.normalizedAuthority.normalized), `current synthetic authority must preserve the typed state for ${state}`);
-        assert.equal(fullAuthority.verifiedResult.scoringReady, state !== "invalid", `admitted compatibility readiness must follow complete current synthetic authority for ${state}`);
+        const fullAuthority = await runPersistentFullEvaluatorAuthority(validatedPrivateRoot, state, { expectedEvaluationStatus: evaluationStatus });
+        const result = fullAuthority.verifiedResult.result;
+        assert.equal(result.requirement_results.find(({ requirement_id }) => requirement_id === "verification-evidence").verification_evidence_state, deriveVerificationEvidenceState(fullAuthority.normalizedAuthority.normalized), `current synthetic authority must preserve the typed state for ${label}`);
+        assert.equal(fullAuthority.verifiedResult.scoringReady, evaluationStatus === "completed", `admitted compatibility readiness must follow the synthetic evaluation status for ${label}`);
+        assert.equal(result.evaluation_status, evaluationStatus, `public projection must preserve the synthetic evaluation status for ${label}`);
+        if (evaluationStatus === "manual_review_required") {
+          const fragment = readJson(fullAuthority.chain.privateFragmentPath);
+          const manualResult = result.requirement_results.find(({ outcome }) => outcome === "manual_review_required");
+          const expectedSemanticReference = { kind: "final_output", digest: fullAuthority.normalizedAuthority.normalized.lineage.final_output_digest, bytes: fullAuthority.normalizedAuthority.normalized.lineage.final_output_bytes };
+          assert.equal(deriveBinaryScopeVerificationClassification({ evaluatorResult: fragment, requirementRecord: fullAuthority.scoringAuthority.requirementRecord }), null, "manual semantic review must not derive a fifth classification");
+          assert.equal(Object.hasOwn(fragment, "classification"), false, "manual private fragment must omit classification");
+          assert.equal(Object.hasOwn(result, "classification"), false, "manual public envelope must omit classification");
+          assert.equal(Object.hasOwn(fragment, "invalid_input_authority"), false, "manual private fragment must not pretend to be invalid input");
+          assert.ok(manualResult, "manual public envelope must retain an unresolved requirement");
+          assert.equal(manualResult.earned_points, null, "manual requirement points must remain null");
+          assert.deepEqual(manualResult.evidence_references, [expectedSemanticReference], "manual requirement evidence must retain final-output authority");
+          assert.equal([result.under_processing.state, result.over_processing.state].includes("manual_review_required"), true, "manual public envelope must retain an affected observation");
+          assert.ok([result.under_processing, result.over_processing].filter(({ state: observationState }) => observationState === "manual_review_required").every(({ evidence_references: references }) => stableCanonicalJson(references) === stableCanonicalJson([expectedSemanticReference])), "manual observations must retain final-output authority");
+          assert.deepEqual(result.findings[0].evidence_references, [expectedSemanticReference], "manual finding evidence must retain final-output authority");
+          for (const field of ["evaluation_status", "requirement_results", "findings", "scope_deviations", "verification_correctness", "evidence_correctness", "under_processing", "over_processing", "result_profile"]) {
+            assert.deepEqual(result[field], fragment[field], `direct and durable projections must agree at ${field} for ${label}`);
+          }
+          assert.deepEqual(result, fullAuthority.evaluatorResult, `sealed and durable public projections must agree for ${label}`);
+          assert.equal(result.private_fragment_digest, fullAuthority.privateRecord.record.private_fragment_sha256, "manual public envelope must retain private fragment identity");
+          assert.equal(result.private_fragment_bytes, fullAuthority.privateRecord.record.private_fragment_bytes, "manual public envelope must retain private fragment byte authority");
+          assert.equal(result.private_evaluation_record_digest, fullAuthority.privateRecord.record.evaluation_record_digest, "manual public envelope must retain private record identity");
+          assert.equal(fullAuthority.engineeringResult.scoring_reason, "manual_review_required", "private-derived manual envelope must retain its scoring reason");
+          manualSemanticProjections.push({
+            requirement_results: fragment.requirement_results,
+            findings: fragment.findings,
+            verification_correctness: fragment.verification_correctness,
+            evidence_correctness: fragment.evidence_correctness,
+            under_processing: fragment.under_processing,
+            over_processing: fragment.over_processing,
+          });
+        }
         removeTree(fullAuthority.authorityRoot);
         removeTree(fullAuthority.scoringRoot);
-        if (state === "executed_success") await runIsolatedMutableAuthorityNegatives(validatedPrivateRoot);
+        if (evaluationStatus === "completed") await runIsolatedMutableAuthorityNegatives(validatedPrivateRoot);
       });
-      assert.equal(stateValidation, "pass", `valid test-only supplied private root must complete for ${state}`);
-      assert.equal(observedSyntheticPrivateRoot, syntheticPrivateRoot, `synthetic private-root identity must be preserved for ${state}`);
+      assert.equal(stateValidation, "pass", `valid test-only supplied private root must complete for ${label}`);
+      assert.equal(observedSyntheticPrivateRoot, syntheticPrivateRoot, `synthetic private-root identity must be preserved for ${label}`);
       syntheticPrivateValidation = stateValidation;
     } finally {
       restoreHistoricalEnvironment(environment);
     }
   }
+  assert.equal(manualSemanticProjections.length, MANUAL_SEMANTIC_CASES.length, "every ambiguity class must exercise the explicit manual path");
+  assert.equal(manualSemanticProjections.every((projection) => stableCanonicalJson(projection) === stableCanonicalJson(manualSemanticProjections[0])), true, "shared code must preserve the same explicit manual projection without parsing synthetic prose");
 
   assert.equal(requestedPrivateRoot, requestedPrivateRootBeforeSyntheticValidation, "synthetic environment restoration must preserve caller-supplied private-root identity");
   assert.equal(await completeRequestedPrivateValidation(null, async () => assert.fail("no-root validation callback must not run")), "not_supplied", "no --private-root must not report actual private validation as passed");
