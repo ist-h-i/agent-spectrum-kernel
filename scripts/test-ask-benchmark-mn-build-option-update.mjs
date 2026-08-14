@@ -74,6 +74,7 @@ import {
   projectVerifiedCommandEvidence,
   renderCommandEvent,
 } from "./ask-benchmark-command-evidence.mjs";
+import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
 import { scoreEvaluatorResult } from "./ask-benchmark-portfolio-score.mjs";
 
 const historicalRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -3374,6 +3375,16 @@ try {
   assert.equal(summary.scoringReady, false);
   assert.equal(summary.applicableGateCount, 12);
   assert.equal(summary.nonApplicableGateCount, 3);
+  const focusedConfig = readJson(resolve(root, "benchmarks/mn-build-option-update.config.json"));
+  const portfolioConfigSchemaPath = resolve(root, "benchmarks/schemas/portfolio-config.schema.json");
+  assert.doesNotThrow(() => assertBenchmarkSchemaInstance(focusedConfig, { schemaPath: portfolioConfigSchemaPath, label: "mn-build focused portfolio config" }));
+  const staleExecutionPlanConfig = structuredClone(focusedConfig);
+  staleExecutionPlanConfig.execution_plan.schema_version = "1.1.0";
+  assert.throws(
+    () => assertBenchmarkSchemaInstance(staleExecutionPlanConfig, { schemaPath: portfolioConfigSchemaPath, label: "mn-build stale focused portfolio config" }),
+    /execution_plan\.schema_version: must equal/u,
+    "focused config must reject a stale execution-plan schema version",
+  );
   const historicalR21EvaluatorRevision = runHistoricalR21AuthorityResolutionRegressions();
   runHistoricalR21SourceMismatchRegression(historicalR21EvaluatorRevision);
   runCurrentClosedModuleLinkerRegression();
