@@ -3,9 +3,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "input_manifest_digest": "sha256:9765a993fdc16fc48c96558e2d6ab7bddd157544757f176015e9e7d801be773e",
   "evaluator_reference_schema": "benchmarks/schemas/evaluator-reference.schema.json",
-  "evaluator_bundle_id": "evaluator-6f72a7a3ee7b4db2a551b2b252c0f9531673c710274c52954813d80cb57cfd6d",
-  "evaluator_bundle_digest": "sha256:240cf40f0b48d483c40d9728f20539e2d712b25480098a844c6e4b7947b20e56",
-  "evaluator_byte_count": 114056,
+  "evaluator_bundle_id": "evaluator-6fb3de75fa8062f46991882f7e2fd3c080c0f5f02b6d0b27e402d34b775df09e",
+  "evaluator_bundle_digest": "sha256:c292eb3928bf272c2c50994ee33a41d094b259765de0cbe58f442de313af8ac8",
+  "evaluator_byte_count": 120860,
   "evaluator_requirement_count": 3,
   "evidence_map_ids": [
     "ci-config-contract",
@@ -20,10 +20,10 @@
   "reviewer_record_id": "review-mn-build-option-update-pending",
   "admission_revision": 1,
   "admission_status": "admission_pending",
-  "admission_digest": "sha256:f24c1b64cdcaece0bbf38c0732ac02bf340272a7f74395d034d7ff273cfa267d",
+  "admission_digest": "sha256:69765d1fd534dcde9e851e26baa0f2d6d58305185eba53ff54d92a9bc1b31bb3",
   "evaluator_source_identity": {
-    "base_git_revision": "166ac26fbc58035ed00114e4035d202ace758433",
-    "source_tree_digest": "sha256:a2df59f210cd6ba06e49b2e2477c3b0fecf6a0b6081e3e60c9a468b4f5d13b11",
+    "base_git_revision": "33a2641ac13f1e9c2b5d7da6d3472ced4a202778",
+    "source_tree_digest": "sha256:11814720a7b993e4d54aca3ea14f41ca9f52c5c3b11d606f0df0d9ed1b33f5d3",
     "generator_source_digest": "sha256:d1be7df7b5919f9f06b960c366b4bfd37aba1809fccc87eb64e9dfbb4eb5ae8a",
     "source_files": [
       {
@@ -33,8 +33,8 @@
       },
       {
         "path": "benchmarks/schemas/evaluator-authority-manifest.schema.json",
-        "bytes": 3288,
-        "sha256": "sha256:c84afdd0fc0cd37903adac91f975422b806562fd06b33c98f6480fabbcf2d368"
+        "bytes": 3278,
+        "sha256": "sha256:4bf85e2cf893b3c9b8a2843da18be95bde864b719607f9b433cdf32dbb1db43a"
       },
       {
         "path": "benchmarks/schemas/evaluator-check-artifact.schema.json",
@@ -88,8 +88,8 @@
       },
       {
         "path": "benchmarks/schemas/private-evaluator-fragment.schema.json",
-        "bytes": 6408,
-        "sha256": "sha256:6064bbfcf1387a771b384a0433e5c1037f69cd20c004ed269fa86cbe1f1b5714"
+        "bytes": 6694,
+        "sha256": "sha256:20a82aff4f815dc000a45f22233e58e6e78292d30f6c7f8b40c2387c41e995af"
       },
       {
         "path": "benchmarks/schemas/private-evaluator-independence-statement.schema.json",
@@ -112,6 +112,11 @@
         "sha256": "sha256:1076c9b2cc4dec03d08ea4b9255137d693afcbb27aa62cfe36e246b106509de0"
       },
       {
+        "path": "scripts/ask-benchmark-admission-decision.mjs",
+        "bytes": 39164,
+        "sha256": "sha256:88d49709eee7754feeb94ef62b3a6c323e7e3db4221a07a923b02f62a15f08e5"
+      },
+      {
         "path": "scripts/ask-benchmark-atomic-publication.mjs",
         "bytes": 3179,
         "sha256": "sha256:1227b73efd9bcfe254fa8f448acb9aed5078c8f42fa4273ec1f71ab609fdb67a"
@@ -128,8 +133,8 @@
       },
       {
         "path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-        "bytes": 241848,
-        "sha256": "sha256:d08c221bf04cefdd5031c03ab5e57fde4766020349fb3eb83b8428ecce67f037"
+        "bytes": 244318,
+        "sha256": "sha256:dd2771600fc804f3e212d90a4718f5d7d711fb78c6bb90804ed3484bd9e285c3"
       },
       {
         "path": "scripts/ask-benchmark-execution.mjs",
@@ -138,8 +143,8 @@
       },
       {
         "path": "scripts/ask-benchmark-materialize.mjs",
-        "bytes": 35384,
-        "sha256": "sha256:3bf334a412f76b68ff873aff35d5122355a7de447233cb8b79b2d79c8d61b90f"
+        "bytes": 35627,
+        "sha256": "sha256:6aa8d2229a6995c6fee6d7693c013a8f09c12a177739a5df34a2ab9f0415ea07"
       },
       {
         "path": "scripts/ask-benchmark-normalized-results.mjs",
@@ -148,8 +153,8 @@
       },
       {
         "path": "scripts/ask-benchmark-plan.mjs",
-        "bytes": 3927,
-        "sha256": "sha256:9b950a99f790c326b19a935618ed62b615072665c72d6eeed5e5c29e85bde684"
+        "bytes": 17055,
+        "sha256": "sha256:d08ff9fc6b40ed82e05d1fea9fe98add221892d3d4f2c069f9ee2346d16ee1b9"
       },
       {
         "path": "scripts/ask-benchmark-portfolio-catalog.mjs",
@@ -168,13 +173,13 @@
       },
       {
         "path": "scripts/ask-benchmark-schema.mjs",
-        "bytes": 1408,
-        "sha256": "sha256:b04c70eda284ee9be0ba2c2ac35f42807ea7de280a6f77ee2850cc289d4d0051"
+        "bytes": 1478,
+        "sha256": "sha256:7c9f210aabbe251c6f0edb764131e3724e639ffae66efcd27c03269414eda4d7"
       },
       {
         "path": "scripts/ask-benchmark-scoring-contract.mjs",
-        "bytes": 46422,
-        "sha256": "sha256:77db56d111664d5f0f25d1296adf2f5af3554aab60b080a22985b0483500eeaa"
+        "bytes": 51200,
+        "sha256": "sha256:1662d55f639519b5b27a1a397c584feec84fceabc43f39dea04a04c49b1f7ef6"
       },
       {
         "path": "scripts/ask-benchmark-selection.mjs",
@@ -213,18 +218,18 @@
       },
       {
         "path": "scripts/install-claude-adapter.mjs",
-        "bytes": 57033,
-        "sha256": "sha256:2e81391d20ee7b274b93c4c82ff1a4ed42859bd8c4d8e0875f99f792f820dc62"
+        "bytes": 57079,
+        "sha256": "sha256:04cfec2521e6627455f173c2849b4cdf4649bf62dec5a68fb6a1afb83a44e959"
       },
       {
         "path": "scripts/install-codex-adapter.mjs",
-        "bytes": 64117,
-        "sha256": "sha256:b6b2e42e2f4131767ee65f71f58c6204ae6a72df5a222c6e30802028778b9dcf"
+        "bytes": 64176,
+        "sha256": "sha256:c8413accd1bfca7f1499fdf23589f8ab13e467c8eb5f447f462b4d3f2fcc417b"
       },
       {
         "path": "scripts/installer-lifecycle.mjs",
-        "bytes": 25082,
-        "sha256": "sha256:89409760297368e3baae0ebad3d582f6d9308b9acf9767ceef37cb107134c1a1"
+        "bytes": 25126,
+        "sha256": "sha256:d511c569410ab7a461e18ad25ddec3e6131a3a8574e6550167c4c662c82ddbb9"
       }
     ],
     "dependency_graph": {
@@ -246,11 +251,11 @@
         },
         {
           "path": "benchmarks/schemas/evaluator-authority-manifest.schema.json",
-          "bytes": 3288,
-          "sha256": "sha256:c84afdd0fc0cd37903adac91f975422b806562fd06b33c98f6480fabbcf2d368",
+          "bytes": 3278,
+          "sha256": "sha256:4bf85e2cf893b3c9b8a2843da18be95bde864b719607f9b433cdf32dbb1db43a",
           "file_type": "authority_data",
-          "base_git_revision_bytes": 3288,
-          "base_git_revision_sha256": "sha256:c84afdd0fc0cd37903adac91f975422b806562fd06b33c98f6480fabbcf2d368"
+          "base_git_revision_bytes": 3278,
+          "base_git_revision_sha256": "sha256:4bf85e2cf893b3c9b8a2843da18be95bde864b719607f9b433cdf32dbb1db43a"
         },
         {
           "path": "benchmarks/schemas/evaluator-check-artifact.schema.json",
@@ -334,11 +339,11 @@
         },
         {
           "path": "benchmarks/schemas/private-evaluator-fragment.schema.json",
-          "bytes": 6408,
-          "sha256": "sha256:6064bbfcf1387a771b384a0433e5c1037f69cd20c004ed269fa86cbe1f1b5714",
+          "bytes": 6694,
+          "sha256": "sha256:20a82aff4f815dc000a45f22233e58e6e78292d30f6c7f8b40c2387c41e995af",
           "file_type": "authority_data",
-          "base_git_revision_bytes": 6408,
-          "base_git_revision_sha256": "sha256:6064bbfcf1387a771b384a0433e5c1037f69cd20c004ed269fa86cbe1f1b5714"
+          "base_git_revision_bytes": 6694,
+          "base_git_revision_sha256": "sha256:20a82aff4f815dc000a45f22233e58e6e78292d30f6c7f8b40c2387c41e995af"
         },
         {
           "path": "benchmarks/schemas/private-evaluator-independence-statement.schema.json",
@@ -373,6 +378,14 @@
           "base_git_revision_sha256": "sha256:1076c9b2cc4dec03d08ea4b9255137d693afcbb27aa62cfe36e246b106509de0"
         },
         {
+          "path": "scripts/ask-benchmark-admission-decision.mjs",
+          "bytes": 39164,
+          "sha256": "sha256:88d49709eee7754feeb94ef62b3a6c323e7e3db4221a07a923b02f62a15f08e5",
+          "file_type": "module",
+          "base_git_revision_bytes": 39164,
+          "base_git_revision_sha256": "sha256:88d49709eee7754feeb94ef62b3a6c323e7e3db4221a07a923b02f62a15f08e5"
+        },
+        {
           "path": "scripts/ask-benchmark-atomic-publication.mjs",
           "bytes": 3179,
           "sha256": "sha256:1227b73efd9bcfe254fa8f448acb9aed5078c8f42fa4273ec1f71ab609fdb67a",
@@ -398,11 +411,11 @@
         },
         {
           "path": "scripts/ask-benchmark-evaluator-boundary.mjs",
-          "bytes": 241848,
-          "sha256": "sha256:d08c221bf04cefdd5031c03ab5e57fde4766020349fb3eb83b8428ecce67f037",
+          "bytes": 244318,
+          "sha256": "sha256:dd2771600fc804f3e212d90a4718f5d7d711fb78c6bb90804ed3484bd9e285c3",
           "file_type": "module",
-          "base_git_revision_bytes": 241848,
-          "base_git_revision_sha256": "sha256:d08c221bf04cefdd5031c03ab5e57fde4766020349fb3eb83b8428ecce67f037"
+          "base_git_revision_bytes": 244318,
+          "base_git_revision_sha256": "sha256:dd2771600fc804f3e212d90a4718f5d7d711fb78c6bb90804ed3484bd9e285c3"
         },
         {
           "path": "scripts/ask-benchmark-execution.mjs",
@@ -414,11 +427,11 @@
         },
         {
           "path": "scripts/ask-benchmark-materialize.mjs",
-          "bytes": 35384,
-          "sha256": "sha256:3bf334a412f76b68ff873aff35d5122355a7de447233cb8b79b2d79c8d61b90f",
+          "bytes": 35627,
+          "sha256": "sha256:6aa8d2229a6995c6fee6d7693c013a8f09c12a177739a5df34a2ab9f0415ea07",
           "file_type": "module",
-          "base_git_revision_bytes": 35384,
-          "base_git_revision_sha256": "sha256:3bf334a412f76b68ff873aff35d5122355a7de447233cb8b79b2d79c8d61b90f"
+          "base_git_revision_bytes": 35627,
+          "base_git_revision_sha256": "sha256:6aa8d2229a6995c6fee6d7693c013a8f09c12a177739a5df34a2ab9f0415ea07"
         },
         {
           "path": "scripts/ask-benchmark-normalized-results.mjs",
@@ -430,11 +443,11 @@
         },
         {
           "path": "scripts/ask-benchmark-plan.mjs",
-          "bytes": 3927,
-          "sha256": "sha256:9b950a99f790c326b19a935618ed62b615072665c72d6eeed5e5c29e85bde684",
+          "bytes": 17055,
+          "sha256": "sha256:d08ff9fc6b40ed82e05d1fea9fe98add221892d3d4f2c069f9ee2346d16ee1b9",
           "file_type": "module",
-          "base_git_revision_bytes": 3927,
-          "base_git_revision_sha256": "sha256:9b950a99f790c326b19a935618ed62b615072665c72d6eeed5e5c29e85bde684"
+          "base_git_revision_bytes": 17055,
+          "base_git_revision_sha256": "sha256:d08ff9fc6b40ed82e05d1fea9fe98add221892d3d4f2c069f9ee2346d16ee1b9"
         },
         {
           "path": "scripts/ask-benchmark-portfolio-catalog.mjs",
@@ -462,19 +475,19 @@
         },
         {
           "path": "scripts/ask-benchmark-schema.mjs",
-          "bytes": 1408,
-          "sha256": "sha256:b04c70eda284ee9be0ba2c2ac35f42807ea7de280a6f77ee2850cc289d4d0051",
+          "bytes": 1478,
+          "sha256": "sha256:7c9f210aabbe251c6f0edb764131e3724e639ffae66efcd27c03269414eda4d7",
           "file_type": "module",
-          "base_git_revision_bytes": 1408,
-          "base_git_revision_sha256": "sha256:b04c70eda284ee9be0ba2c2ac35f42807ea7de280a6f77ee2850cc289d4d0051"
+          "base_git_revision_bytes": 1478,
+          "base_git_revision_sha256": "sha256:7c9f210aabbe251c6f0edb764131e3724e639ffae66efcd27c03269414eda4d7"
         },
         {
           "path": "scripts/ask-benchmark-scoring-contract.mjs",
-          "bytes": 46422,
-          "sha256": "sha256:77db56d111664d5f0f25d1296adf2f5af3554aab60b080a22985b0483500eeaa",
+          "bytes": 51200,
+          "sha256": "sha256:1662d55f639519b5b27a1a397c584feec84fceabc43f39dea04a04c49b1f7ef6",
           "file_type": "module",
-          "base_git_revision_bytes": 46422,
-          "base_git_revision_sha256": "sha256:77db56d111664d5f0f25d1296adf2f5af3554aab60b080a22985b0483500eeaa"
+          "base_git_revision_bytes": 51200,
+          "base_git_revision_sha256": "sha256:1662d55f639519b5b27a1a397c584feec84fceabc43f39dea04a04c49b1f7ef6"
         },
         {
           "path": "scripts/ask-benchmark-selection.mjs",
@@ -534,27 +547,27 @@
         },
         {
           "path": "scripts/install-claude-adapter.mjs",
-          "bytes": 57033,
-          "sha256": "sha256:2e81391d20ee7b274b93c4c82ff1a4ed42859bd8c4d8e0875f99f792f820dc62",
+          "bytes": 57079,
+          "sha256": "sha256:04cfec2521e6627455f173c2849b4cdf4649bf62dec5a68fb6a1afb83a44e959",
           "file_type": "module",
-          "base_git_revision_bytes": 57033,
-          "base_git_revision_sha256": "sha256:2e81391d20ee7b274b93c4c82ff1a4ed42859bd8c4d8e0875f99f792f820dc62"
+          "base_git_revision_bytes": 57079,
+          "base_git_revision_sha256": "sha256:04cfec2521e6627455f173c2849b4cdf4649bf62dec5a68fb6a1afb83a44e959"
         },
         {
           "path": "scripts/install-codex-adapter.mjs",
-          "bytes": 64117,
-          "sha256": "sha256:b6b2e42e2f4131767ee65f71f58c6204ae6a72df5a222c6e30802028778b9dcf",
+          "bytes": 64176,
+          "sha256": "sha256:c8413accd1bfca7f1499fdf23589f8ab13e467c8eb5f447f462b4d3f2fcc417b",
           "file_type": "module",
-          "base_git_revision_bytes": 64117,
-          "base_git_revision_sha256": "sha256:b6b2e42e2f4131767ee65f71f58c6204ae6a72df5a222c6e30802028778b9dcf"
+          "base_git_revision_bytes": 64176,
+          "base_git_revision_sha256": "sha256:c8413accd1bfca7f1499fdf23589f8ab13e467c8eb5f447f462b4d3f2fcc417b"
         },
         {
           "path": "scripts/installer-lifecycle.mjs",
-          "bytes": 25082,
-          "sha256": "sha256:89409760297368e3baae0ebad3d582f6d9308b9acf9767ceef37cb107134c1a1",
+          "bytes": 25126,
+          "sha256": "sha256:d511c569410ab7a461e18ad25ddec3e6131a3a8574e6550167c4c662c82ddbb9",
           "file_type": "module",
-          "base_git_revision_bytes": 25082,
-          "base_git_revision_sha256": "sha256:89409760297368e3baae0ebad3d582f6d9308b9acf9767ceef37cb107134c1a1"
+          "base_git_revision_bytes": 25126,
+          "base_git_revision_sha256": "sha256:d511c569410ab7a461e18ad25ddec3e6131a3a8574e6550167c4c662c82ddbb9"
         }
       ],
       "edge_inventory": [
@@ -634,6 +647,17 @@
             "column": 42
           },
           "edge_digest": "sha256:06ab093a0db8c8263b596ade3b0aecc2ac56520f8d7de9a439e70a2a95835e00"
+        },
+        {
+          "from": "scripts/ask-benchmark-admission-decision.mjs",
+          "to": "scripts/ask-benchmark-schema.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-schema.mjs",
+          "source_location": {
+            "line": 7,
+            "column": 47
+          },
+          "edge_digest": "sha256:0774554eed552282fb9c0d248241d61baff801b8d536ad37205110dca6ce7367"
         },
         {
           "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
@@ -787,6 +811,28 @@
           "specifier": "scripts/ask-benchmark-normalized-results.mjs",
           "syntax_identity": "private_entry_import:private/hidden-evaluator.mjs:scripts/ask-benchmark-normalized-results.mjs",
           "edge_digest": "sha256:3e99381d93e36dd50c54feecccd356c05f4317ac73117a2987fae9c79cb2a9f4"
+        },
+        {
+          "from": "scripts/ask-benchmark-admission-decision.mjs",
+          "to": "scripts/ask-benchmark-stable-file.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-stable-file.mjs",
+          "source_location": {
+            "line": 10,
+            "column": 32
+          },
+          "edge_digest": "sha256:41aac8586880eddb948e105aa856c216c9b02feb3855993f1037647d8ca448a8"
+        },
+        {
+          "from": "scripts/ask-benchmark-plan.mjs",
+          "to": "scripts/ask-benchmark-materialize.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-materialize.mjs",
+          "source_location": {
+            "line": 13,
+            "column": 33
+          },
+          "edge_digest": "sha256:473e5e09aa36d60032a61fed62f8dfa2c34984a486051ca6127a82a69540ab84"
         },
         {
           "from": "scripts/ask-benchmark-evaluator-boundary.mjs",
@@ -993,6 +1039,17 @@
           "edge_digest": "sha256:6f437e17519beb4e92676dcb420dcc5e3c72149769fc3c0b56aef91e37919a3b"
         },
         {
+          "from": "scripts/ask-benchmark-plan.mjs",
+          "to": "scripts/ask-benchmark-schema.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-schema.mjs",
+          "source_location": {
+            "line": 5,
+            "column": 40
+          },
+          "edge_digest": "sha256:6f822f938423c724597a061f1906e8ba6fb3028bf4ae6c0118a95a565084c71d"
+        },
+        {
           "from": "scripts/ask-benchmark-command-evidence.mjs",
           "to": "scripts/ask-benchmark-schema.mjs",
           "kind": "static_import",
@@ -1103,6 +1160,17 @@
           "edge_digest": "sha256:86c784bf28ccae994db7c1be2eb6f84be95b5ed3a7eb6137db63a4bd3e3daf85"
         },
         {
+          "from": "scripts/ask-benchmark-admission-decision.mjs",
+          "to": "scripts/ask-benchmark-duplicate-key-json.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-duplicate-key-json.mjs",
+          "source_location": {
+            "line": 8,
+            "column": 66
+          },
+          "edge_digest": "sha256:9404d05593fc496bc844c067e39aef19640dbc9ed67bea20e4fa5ffd3ab6c189"
+        },
+        {
           "from": "scripts/ask-benchmark-portfolio-policy.mjs",
           "to": "scripts/ask-benchmark-evaluator-boundary.mjs",
           "kind": "static_import",
@@ -1144,6 +1212,17 @@
           "edge_digest": "sha256:ac2a14670ae04f7638521199961025e03426c9603a3da9de9344fa8150df85ab"
         },
         {
+          "from": "scripts/ask-benchmark-plan.mjs",
+          "to": "scripts/ask-benchmark-admission-decision.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-admission-decision.mjs",
+          "source_location": {
+            "line": 12,
+            "column": 8
+          },
+          "edge_digest": "sha256:ae6391b3ae45c7ce3296bc1aeea40e2d85ff7b215230e18f3d8f2f4abd018c3b"
+        },
+        {
           "from": "scripts/ask-benchmark-selection.mjs",
           "to": "scripts/ask-benchmark-materialize.mjs",
           "kind": "static_import",
@@ -1153,6 +1232,17 @@
             "column": 121
           },
           "edge_digest": "sha256:af83b2380879fe53da2b2b4fe781cec3ec97d3826fc08e4609c12b4f20584993"
+        },
+        {
+          "from": "scripts/ask-benchmark-plan.mjs",
+          "to": "scripts/ask-benchmark-duplicate-key-json.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-duplicate-key-json.mjs",
+          "source_location": {
+            "line": 14,
+            "column": 36
+          },
+          "edge_digest": "sha256:b10264fee4c019845a91eb09d3a0fc3e2b88624f0450fc7dce16f5641a001bbe"
         },
         {
           "from": "scripts/ask-benchmark-execution.mjs",
@@ -1226,17 +1316,6 @@
           "edge_digest": "sha256:d1de577c61b35b3c90c0915a3550cd4ff0f46e5888cb5f71d5584b2ab5a3f921"
         },
         {
-          "from": "scripts/ask-benchmark-plan.mjs",
-          "to": "scripts/ask-benchmark-schema.mjs",
-          "kind": "static_import",
-          "specifier": "./ask-benchmark-schema.mjs",
-          "source_location": {
-            "line": 4,
-            "column": 40
-          },
-          "edge_digest": "sha256:d3948f53cd2ffc9c8074292498b2faac38f0427186290a03358e06d4e118a39f"
-        },
-        {
           "from": "scripts/ask-benchmark-execution.mjs",
           "to": "scripts/ask-benchmark-terminal-workspace.mjs",
           "kind": "static_import",
@@ -1265,6 +1344,17 @@
             "column": 47
           },
           "edge_digest": "sha256:e6c67803529ea3ba249d389b60f065fa0dbeec99452c8f12934f5a9719e71e79"
+        },
+        {
+          "from": "scripts/ask-benchmark-admission-decision.mjs",
+          "to": "scripts/ask-benchmark-materialize.mjs",
+          "kind": "static_import",
+          "specifier": "./ask-benchmark-materialize.mjs",
+          "source_location": {
+            "line": 9,
+            "column": 54
+          },
+          "edge_digest": "sha256:e72e0ea86f00f83acdbda42548bdab6e50496132362d1146be9684ba97b64266"
         },
         {
           "from": "scripts/ask-benchmark-normalized-results.mjs",
@@ -1365,11 +1455,11 @@
           "edge_digest": "sha256:fe5afccacce85f1af999e1d2a5a4b9235274603aa8c27fffde8b16ca4ec9df74"
         }
       ],
-      "graph_digest": "sha256:6eaad363fd295813fb19fde412d25d7eb97d23f4238ad1160fec3e3c54a27208"
+      "graph_digest": "sha256:7b5b53f17772272484c0f35232f739f2f14694f2dde3726cb7d9ac98cb25714d"
     }
   },
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:c7288d8e8b67507a114a6653b24ce69510b330c19f0b0d1bfb55fcb1e49e18a3",
-  "evaluator_authority_manifest_digest": "sha256:6e511e8a9babe702289232e5ee802fa4f0ff613c365014e41279191d45d74332",
-  "requirement_authority_digest": "sha256:9616f4a074c0bae159cf84518ee1cd5dcf0146715a333e5b5a033df017f7edc4"
+  "evaluator_authority_manifest_raw_sha256": "sha256:28da3a91fd040220773589167b215b989c15f3ee7357b709c7b1e9d3837e8bd2",
+  "evaluator_authority_manifest_digest": "sha256:71b9b330db4e57a354f0f4eb2c2ed2517c8218fe6b2e72ac7113ce7f8f8127e3",
+  "requirement_authority_digest": "sha256:efab54e6d1625145f830e8dd866859b7a52bfa364c7d1755ce84a6c09746475d"
 }

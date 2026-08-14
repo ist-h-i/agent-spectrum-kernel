@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
-  "admission_record_digest": "sha256:dac9d51766fe74221d59fad32114b40d07d727c783ea349dbe31c5dc6f1d1f35",
+  "admission_record_digest": "sha256:a60c64a8caf3812f16227d467068c9ac51675a370af37fc34adcf0145aa2af95",
   "requirements": [
     {
       "requirement_id": "ci-evidence-completeness",
@@ -100,5 +100,5 @@
     }
   ],
   "requirement_set_digest": "sha256:af2b2bceca81e1c97d09a479e1c959fa14512b14b480d408911eed9aa68e4412",
-  "requirement_record_digest": "sha256:f26bef9a90a0c7ebb0ad5ea1a63257c391d232c4e9abefaee2ec2deeb7ab9646"
+  "requirement_record_digest": "sha256:dd034d636ff375b93a22678e2aa74c11624fa9c010b684d8d47ace3f6649d555"
 }
