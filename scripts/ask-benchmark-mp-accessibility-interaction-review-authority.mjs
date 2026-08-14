@@ -157,11 +157,11 @@ export function buildMpAccessibilityInteractionAuthority() {
   const publicMutations = mutations.map(({ mutation_id, target_evidence_map_id, expected_recoverability_state, expected_admission_result, mutation_digest }) => ({ mutation_id, target_evidence_map_id, expected_recoverability_state, expected_admission_result, mutation_digest }));
   const evidenceMap = { schema_version: "1.0.0", fixture_id: MP_ACCESSIBILITY_FIXTURE_ID, scope_boundary_authority: { ...scopeBase, authority_digest: canonicalDigest(scopeBase) }, maps, mutation_contracts: publicMutations };
   const equivalenceSeeds = [
-    ["equivalent-default-action-finding", "interaction-defect-finding", ["interaction", "browser_default", "focus_behavior", "defect_positive_semantics", "required_correction", "negation_aware", "synonymous_finding_expression", "observable_behavior"]],
+    ["equivalent-default-action-finding", "interaction-defect-finding", ["interaction", "browser_default_proposition", "focus_proposition", "defect_proposition", "remediation_proposition", "contraction_normalization", "synonymous_finding_expression", "observable_behavior"]],
     ["equivalent-request-changes-decision", "decision-correctness", ["merge_decision", "evidence_state", "observable_behavior"]],
-    ["equivalent-failed-interaction-verification", "verification-conclusion", ["verification_state", "command_evidence", "failure_proposition", "negated_failure_rejected", "observable_behavior"]],
-    ["equivalent-correct-restraint", "suspicious-control-restraint", ["false_positive_absence", "roving_tabindex_control", "native_aria_pressed_control", "interaction_contract", "observable_behavior"]],
-    ["equivalent-evidence-bounded-review", "evidence-and-review-precision", ["visible_evidence", "all_findings_classified", "unsupported_finding_absence", "observable_behavior"]],
+    ["equivalent-failed-interaction-verification", "verification-conclusion", ["verification_state", "command_evidence", "verification_failure_proposition", "success_proposition_rejected", "observable_behavior"]],
+    ["equivalent-correct-restraint", "suspicious-control-restraint", ["false_positive_absence", "per_assertion_classification", "roving_tabindex_control", "native_aria_pressed_control", "interaction_contract", "observable_behavior"]],
+    ["equivalent-evidence-bounded-review", "evidence-and-review-precision", ["visible_evidence", "every_material_assertion_classified", "embedded_unsupported_assertion_absence", "observable_behavior"]],
   ];
   const rules = equivalenceSeeds.map(([equivalence_class_id, requirement_id, match_basis]) => {
     const base = { equivalence_class_id, requirement_id, match_basis, property_order_only: false };
