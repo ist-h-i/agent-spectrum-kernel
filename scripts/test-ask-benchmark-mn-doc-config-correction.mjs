@@ -895,8 +895,7 @@ try {
       fakeGraph.dependency_graph.graph_digest = canonicalDigest(fakeGraphClosure);
       assert.throws(() => validateEvaluatorSourceIdentity({ identity: fakeGraph, root, expectedRevision: reference.evaluator_revision }), /dependency graph closure/u, "self-consistent fake dependency graph must be rejected");
 
-      const mutableRoot = resolve(work, "production-authority-mutations");
-      cpSync(root, mutableRoot, { recursive: true });
+      const mutableRoot = fullRepositoryClone("production-authority-mutations");
       const mutableFixtureRoot = resolve(mutableRoot, FIXTURE_ROOT_RELATIVE);
       const rejectsArtifactMutation = (name, fileName, mutate, pattern) => {
         const path = resolve(mutableFixtureRoot, fileName);
