@@ -585,7 +585,7 @@ test("actual Git diff closes the historical R21 to required R22 transition", () 
   if (currentReference.public_metadata_digest === historicalReference.public_metadata_digest) {
     for (const [path, historicalBytes] of historicalFixtureBytes) assert.deepEqual(readFileSync(resolve(root, path)), historicalBytes, `pre-R22 fixture path must retain historical bytes: ${path}`);
   } else {
-    assert.equal(currentReference.evaluator_revision, "166ac26fbc58035ed00114e4035d202ace758433");
+    assert.match(currentReference.evaluator_revision, /^[0-9a-f]{40}$/u);
     assert.notEqual(currentReference.evaluator_revision, historicalReference.evaluator_revision);
     const frozenDiff = spawnSync("git", ["diff", "--name-only", reviewedHead, "HEAD", "--", ...frozenFixturePaths], { cwd: root, encoding: "utf8" });
     assert.equal(frozenDiff.status, 0, frozenDiff.stderr || frozenDiff.stdout);

@@ -15,7 +15,6 @@
     "evidence_correctness",
     "under_processing",
     "over_processing",
-    "classification",
     "result_profile",
     "scoring_ready"
   ],
@@ -23,7 +22,7 @@
     "schema_version": { "const": "1.0.0" },
     "schema_path": { "const": "benchmarks/schemas/private-evaluator-fragment.schema.json" },
     "program": { "const": "adaptive_ask_private_evaluator_fragment" },
-    "evaluation_status": { "enum": ["completed", "invalid_input"] },
+    "evaluation_status": { "enum": ["completed", "invalid_input", "manual_review_required"] },
     "requirement_results": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/requirementResult" } },
     "findings": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/finding" } },
     "scope_deviations": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/finding" } },
@@ -37,6 +36,13 @@
     "invalid_input_authority": { "$ref": "#/$defs/invalidInputAuthority" },
     "evaluator_rerun": { "$ref": "#/$defs/evaluatorRerun" }
   },
+  "allOf": [
+    {
+      "if": { "properties": { "evaluation_status": { "const": "manual_review_required" } }, "required": ["evaluation_status"] },
+      "then": { "properties": { "classification": { "type": "null" } } },
+      "else": { "required": ["classification"] }
+    }
+  ],
   "$defs": {
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "token": { "type": "string", "minLength": 1, "maxLength": 96, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
