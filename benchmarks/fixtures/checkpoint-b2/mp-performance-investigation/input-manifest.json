@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "mp-performance-investigation": {
+      "class": "investigation",
+      "difficulty": "hard",
+      "target_minutes": 25,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "18b4f65f1c0d4bc8052c05cc26daf14d4116f524e4eece0f524b3b3a6bb33485",
+          "bytes": 570
+        },
+        {
+          "path": "workspace/docs/investigation-contract.md",
+          "sha256": "ae643b6c4d8e56b92c75211fb1c8986a27a230838a37d8cd65c5c5982cf5816c",
+          "bytes": 960
+        },
+        {
+          "path": "workspace/investigation.schema.json",
+          "sha256": "e5847738e2ee0268d6858dfab3e50932aa3a1ea08fb95f6739adb4ad6c25f18f",
+          "bytes": 2609
+        },
+        {
+          "path": "workspace/observability/cache-samples.csv",
+          "sha256": "7297c1571180430aea2960bb3ba8cd0036129186b32ca47912910d46edcb9dea",
+          "bytes": 437
+        },
+        {
+          "path": "workspace/observability/release-events.json",
+          "sha256": "cb5a2089e125a916aa8aa54b20aac7229bca4b7c919a483923336dcbb3be92ab",
+          "bytes": 329
+        },
+        {
+          "path": "workspace/observability/request-windows.csv",
+          "sha256": "ad7bf355676756e65f2dcf083342f19c2fd9154d0ee4197afa2d22f1a34dd586",
+          "bytes": 318
+        },
+        {
+          "path": "workspace/observability/runtime-profile.json",
+          "sha256": "c1d9fcfb5e07be1e3ca9fb99a82ca2013c441a7e533663f35f14001994a20e9f",
+          "bytes": 486
+        },
+        {
+          "path": "workspace/package-lock.json",
+          "sha256": "97fc14e0c5101f36d9f2a2d8bab661f6035a048673095e85e24bb01174cdf249",
+          "bytes": 288
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "44957dce8f4188fce24c7a9821749452aab47dcc729ea42b37dded0f267aa1a8",
+          "bytes": 461
+        },
+        {
+          "path": "workspace/scripts/replay-summary.mjs",
+          "sha256": "1b5857ac8ec3850c949f3b43c8bf10b1683ed8aeb51759a551a155326c2c9e7d",
+          "bytes": 180
+        },
+        {
+          "path": "workspace/scripts/validate-investigation.mjs",
+          "sha256": "2a66a4d9770d16d1fadac652cb931abaa83c156b04cfb25edd554c8540c69d86",
+          "bytes": 2986
+        },
+        {
+          "path": "workspace/src/cache-key.mjs",
+          "sha256": "9aceecf523cedd945f813818912fea2fa3a3599b8620caf0c45f058bd52eabc4",
+          "bytes": 300
+        },
+        {
+          "path": "workspace/src/summary-replay.mjs",
+          "sha256": "4ab87839f3de6f809e53b485c6b19e0d82ea90ec3d5b3dc3b9da0890a10b4813",
+          "bytes": 726
+        },
+        {
+          "path": "workspace/src/summary-service.mjs",
+          "sha256": "fdc8a4c6d57e67a01f1a91c7f9d5bc0c51d120562dbb02b29fc18400c45e4e62",
+          "bytes": 344
+        },
+        {
+          "path": "workspace/test/integration/summary-replay.test.mjs",
+          "sha256": "be4e26456aab01bf0d74430a551e0bc2d9ff6142c843af9ae6d690347ec7f1d7",
+          "bytes": 445
+        },
+        {
+          "path": "workspace/test/unit/cache-key.test.mjs",
+          "sha256": "6d00d1c70f6c595c6e3dcb7dd09ad8438c2802a3aa2ef8b32995c12a19853ce7",
+          "bytes": 452
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,6 @@
+observed_at,tenant_id,window_minutes,request_id,computed_key,result,build_ms
+2026-08-16T10:12:00Z,tenant-a,15,req-8101,tenant-a:15:req-8101,miss,603
+2026-08-16T10:12:01Z,tenant-a,15,req-8102,tenant-a:15:req-8102,miss,619
+2026-08-16T10:12:02Z,tenant-a,15,req-8103,tenant-a:15:req-8103,miss,611
+2026-08-16T10:12:03Z,tenant-b,15,req-9101,tenant-b:15:req-9101,miss,587
+2026-08-16T10:12:04Z,tenant-b,15,req-9102,tenant-b:15:req-9102,miss,594

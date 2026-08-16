@@ -1,0 +1,25 @@
+{
+  "capture": "summary-service-cpu-samples",
+  "windows": [
+    {
+      "release": "2026.08.15-3",
+      "samples": 1000,
+      "top_frames": {
+        "buildSummary": 82,
+        "databaseWait": 241,
+        "garbageCollection": 31,
+        "other": 646
+      }
+    },
+    {
+      "release": "2026.08.16-1",
+      "samples": 1000,
+      "top_frames": {
+        "buildSummary": 681,
+        "databaseWait": 54,
+        "garbageCollection": 39,
+        "other": 226
+      }
+    }
+  ]
+}

@@ -75,6 +75,9 @@ jobs:
       - name: Run frontend state review fixture source-freeze tests
         run: node scripts/test-ask-benchmark-mp-frontend-state-review.mjs
 
+      - name: Run performance investigation fixture source-freeze tests
+        run: node scripts/test-ask-benchmark-mp-performance-investigation.mjs
+
       - name: Run evaluator-authority integration contract tests
         run: node scripts/test-ask-benchmark-portfolio-evaluator-result.mjs
 

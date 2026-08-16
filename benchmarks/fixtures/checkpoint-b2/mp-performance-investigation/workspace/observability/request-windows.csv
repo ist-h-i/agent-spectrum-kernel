@@ -1,0 +1,4 @@
+window_start,release,requests_per_second,p95_ms,error_rate,cache_hit_rate,summary_build_cpu_ms,db_query_p95_ms,gc_pause_p95_ms
+2026-08-16T09:00:00Z,2026.08.15-3,201.7,118,0.002,0.91,18,42,5
+2026-08-16T10:00:00Z,2026.08.16-1,203.4,782,0.003,0.04,614,44,6
+2026-08-16T10:30:00Z,2026.08.16-1,199.8,795,0.002,0.03,628,43,5

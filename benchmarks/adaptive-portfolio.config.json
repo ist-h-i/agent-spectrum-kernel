@@ -162,6 +162,20 @@
         "path": "benchmarks/fixtures/checkpoint-b2/mp-frontend-state-review/verification-command-contract.json",
         "sha256": "2b1f6d41e21590aa37a9e172ac51db58a6d4d4a23a77b8d95f7975e92d6bddfe"
       }
+    },
+    {
+      "id": "mp-performance-investigation",
+      "suite": "mechanism_positive",
+      "task_class": "investigation",
+      "difficulty": "hard",
+      "repetitions": 5,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/input-manifest.json",
+      "input_manifest_sha256": "779cb721b8ac39599d5936327d28da39b4d4278224c2c2f03bacac749f1af60a",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/verification-command-contract.json",
+        "sha256": "b016a4d2ee0ec497212777070c09da9115dfd33aa7e1a9f0643fc6d4b1404de4"
+      }
     }
   ],
   "ordering": {

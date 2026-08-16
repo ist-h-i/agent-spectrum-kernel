@@ -1,0 +1,15 @@
+{
+  "name": "summary-latency-investigation-fixture",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test test/unit/*.test.mjs",
+    "test:replay": "node --test test/integration/*.test.mjs",
+    "test:all": "npm test && npm run test:replay",
+    "replay:summary": "node scripts/replay-summary.mjs",
+    "validate:investigation": "node scripts/validate-investigation.mjs investigation.json"
+  }
+}

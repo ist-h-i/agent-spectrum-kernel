@@ -1,0 +1,14 @@
+{
+  "service": "summary-service",
+  "events": [
+    {
+      "at": "2026-08-16T09:30:00Z",
+      "release": "2026.08.16-1",
+      "change_id": "summary-trace-context",
+      "changed_paths": ["src/cache-key.mjs", "src/summary-service.mjs"]
+    }
+  ],
+  "traffic_event": null,
+  "database_change": null,
+  "runtime_change": null
+}
