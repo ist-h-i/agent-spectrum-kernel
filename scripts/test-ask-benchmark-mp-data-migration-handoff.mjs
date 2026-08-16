@@ -6,7 +6,6 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
-import { resolveRepositoryAdmissionDecision } from "./ask-benchmark-admission-decision.mjs";
 import {
   createSealedEvaluatorExecutionForTest,
   executeSealedEvaluatorForTest,
@@ -387,7 +386,7 @@ if (productionExists) {
   const fixture = config.fixtures.find(({ id }) => id === FIXTURE_ID);
   const admission = resolvePortfolioExecutionAdmission({ root: ROOT, fixture });
   assert.equal(admission.execution_eligible, false);
-  assert.equal(admission.effective_admission_status, "review_evidence_missing");
+  assert.equal(admission.effective_admission_status, "admission_pending");
   effectiveAdmissionStatus = admission.effective_admission_status;
   assert.equal(resolvePortfolioExecutionFixtures({ root: ROOT, config }).some(({ id }) => id === FIXTURE_ID), false);
 }

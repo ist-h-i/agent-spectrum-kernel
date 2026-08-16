@@ -1,4 +1,34 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "mp-data-migration-handoff",
-  "candidate_state": "generation_pending"
+  "fixture_role": "primary",
+  "suite": "mechanism_positive",
+  "task_class": "handoff_resume",
+  "domain": "data_schema",
+  "difficulty": "hard",
+  "repetitions": 3,
+  "risk_boundary": "rollback_required",
+  "capability_families": [
+    "handoff_continuity",
+    "rollback_planning",
+    "state_consistency"
+  ],
+  "evidence_topologies": [
+    "operational_plan_and_state",
+    "schema_and_migration_plan",
+    "version_compatibility_matrix"
+  ],
+  "outcome_dimensions": [
+    "continuation_readiness",
+    "rollback_truthfulness"
+  ],
+  "output_contract_type": "design_or_operation_plan_producing",
+  "requirement_record_id": "requirement-record-mp-data-migration-handoff",
+  "output_contract_id": "output-contract-mp-data-migration-handoff",
+  "evaluator_bundle_id": "evaluator-9307a801b85e7e94dc73af8ed9db33b7d5c9decdc20eb0712d610e1e39c4118b",
+  "evaluator_bundle_digest": "sha256:03752265d3dd23837a22b89e387d8710ca3e17e99d55116f9f056bb1442b3aa8",
+  "evaluator_byte_count": 135314,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:9d949866d784457c362896b6d9c96b320d794bc6dd549beeb485abad93c5dce8"
 }
