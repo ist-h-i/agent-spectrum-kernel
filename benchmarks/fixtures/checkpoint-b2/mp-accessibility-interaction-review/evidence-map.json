@@ -1,0 +1,111 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mp-accessibility-interaction-review",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/review.json"
+    ],
+    "required_candidate_paths": [
+      "workspace/review.json"
+    ],
+    "protected_candidate_paths": [
+      "workspace/docs/interaction-notes.md",
+      "workspace/package-lock.json",
+      "workspace/package.json",
+      "workspace/pr.diff",
+      "workspace/review.schema.json",
+      "workspace/scripts/validate-review.mjs",
+      "workspace/src/format-toolbar.html",
+      "workspace/src/format-toolbar.mjs",
+      "workspace/test/helpers/toolbar-fixture.mjs",
+      "workspace/test/integration/format-toolbar.test.mjs",
+      "workspace/test/unit/format-toolbar.test.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "authority_digest": "sha256:41a99cc70e7381ece7bc1d7d5822976d98e5dc6fc1b8c410e2482e4e1f52fdbd"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "interaction-default-contract",
+      "agent_visible_paths": [
+        "workspace/pr.diff",
+        "workspace/src/format-toolbar.mjs",
+        "workspace/test/integration/format-toolbar.test.mjs",
+        "workspace/docs/interaction-notes.md"
+      ]
+    },
+    {
+      "evidence_map_id": "merge-decision-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/pr.diff",
+        "workspace/src/format-toolbar.mjs",
+        "workspace/test/integration/format-toolbar.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "verification-conclusion-basis",
+      "agent_visible_paths": [
+        "workspace/package.json",
+        "workspace/test/integration/format-toolbar.test.mjs",
+        "workspace/src/format-toolbar.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "toolbar-interaction-contract",
+      "agent_visible_paths": [
+        "workspace/src/format-toolbar.html",
+        "workspace/src/format-toolbar.mjs",
+        "workspace/test/unit/format-toolbar.test.mjs",
+        "workspace/docs/interaction-notes.md"
+      ]
+    },
+    {
+      "evidence_map_id": "review-precision-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/review.schema.json",
+        "workspace/pr.diff",
+        "workspace/docs/interaction-notes.md"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-interaction-default-contract",
+      "target_evidence_map_id": "interaction-default-contract",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:4bb5b7005721e15c37c1c259e570ad75899aa3a734db417ee48d4bf35b1483a4"
+    },
+    {
+      "mutation_id": "remove-merge-decision-basis",
+      "target_evidence_map_id": "merge-decision-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:99d48fddeec58bdb65520ce5604e0394c5b3e9c1de55795653ce63376e6e5e97"
+    },
+    {
+      "mutation_id": "remove-verification-conclusion-basis",
+      "target_evidence_map_id": "verification-conclusion-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:efe1b9aa292338b3559a462520b76a5572ad6d771c153632bf5dbd9f96ef4326"
+    },
+    {
+      "mutation_id": "remove-toolbar-interaction-contract",
+      "target_evidence_map_id": "toolbar-interaction-contract",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:ae168bddf6b3d0f7c22c968b63ebbdcc5b6020846e7d9fe96c3b290f318ca68d"
+    },
+    {
+      "mutation_id": "remove-review-precision-basis",
+      "target_evidence_map_id": "review-precision-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:a989cfecd0c1d847117cb52aebd2101e87736d7a11347ce55c2363e94067e1a3"
+    }
+  ]
+}

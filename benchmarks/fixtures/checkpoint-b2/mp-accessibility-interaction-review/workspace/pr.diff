@@ -1,0 +1,81 @@
+diff --git a/src/format-toolbar.html b/src/format-toolbar.html
+new file mode 100644
+--- /dev/null
++++ b/src/format-toolbar.html
+@@ -0,0 +1,10 @@
++<div class="format-toolbar" role="toolbar" aria-label="Text formatting">
++  <button type="button" data-format="bold" aria-pressed="false" tabindex="0">Bold</button>
++  <button type="button" data-format="italic" aria-pressed="false" tabindex="-1">Italic</button>
++  <button type="button" data-format="underline" aria-pressed="false" tabindex="-1">Underline</button>
++</div>
++
++<script type="module">
++  import { connectToolbar } from "./format-toolbar.mjs";
++  connectToolbar(document.querySelector(".format-toolbar"));
++</script>
+diff --git a/src/format-toolbar.mjs b/src/format-toolbar.mjs
+new file mode 100644
+--- /dev/null
++++ b/src/format-toolbar.mjs
+@@ -0,0 +1,39 @@
++export function setRovingTabStop(buttons, nextIndex) {
++  buttons.forEach((button, index) => {
++    button.tabIndex = index === nextIndex ? 0 : -1;
++  });
++}
++
++export function handleToolbarKeydown(event, buttons) {
++  const currentIndex = buttons.indexOf(event.currentTarget);
++  if (currentIndex < 0 || buttons.length === 0) return false;
++
++  let nextIndex;
++  switch (event.key) {
++    case "ArrowRight":
++      nextIndex = (currentIndex + 1) % buttons.length;
++      break;
++    case "ArrowLeft":
++      nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
++      break;
++    case "Home":
++      nextIndex = 0;
++      break;
++    case "End":
++      nextIndex = buttons.length - 1;
++      break;
++    default:
++      return false;
++  }
++
++  if (event.key.startsWith("Arrow")) event.preventDefault();
++  setRovingTabStop(buttons, nextIndex);
++  buttons[nextIndex].focus();
++  return true;
++}
++
++export function connectToolbar(toolbar) {
++  const buttons = [...toolbar.querySelectorAll("button")];
++  for (const button of buttons) {
++    button.addEventListener("keydown", (event) => handleToolbarKeydown(event, buttons));
++  }
++}
+diff --git a/test/integration/format-toolbar.test.mjs b/test/integration/format-toolbar.test.mjs
+new file mode 100644
+--- /dev/null
++++ b/test/integration/format-toolbar.test.mjs
+@@ -0,0 +1,17 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++import { handleToolbarKeydown } from "../../src/format-toolbar.mjs";
++import { keyboardEvent, toolbarButtons } from "../helpers/toolbar-fixture.mjs";
++
++for (const [key, focusedIndex] of [["Home", 0], ["End", 2]]) {
++  test(`${key} consumes the browser action and moves focus`, () => {
++    const buttons = toolbarButtons();
++    const event = keyboardEvent(key, buttons[1]);
++
++    assert.equal(handleToolbarKeydown(event, buttons), true);
++    assert.equal(event.defaultPrevented, true);
++    assert.equal(buttons[focusedIndex].focused, true);
++    assert.equal(buttons[focusedIndex].tabIndex, 0);
++  });
++}

@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "mp-accessibility-interaction-review": {
+      "class": "pr_review",
+      "difficulty": "medium_hard",
+      "target_minutes": 15,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "aa2cd52eeb1b3581fb914a6f157423e408b7bebdb73b6d19980cdf0fcc709cc8",
+          "bytes": 462
+        },
+        {
+          "path": "workspace/docs/interaction-notes.md",
+          "sha256": "7ad466f4c94e36eab22e582e000bcfc4c319bf7f114d898c0411c852678d6d6f",
+          "bytes": 699
+        },
+        {
+          "path": "workspace/package-lock.json",
+          "sha256": "c6b3a3cb44bf02b66312be43e3e7bc3bff0eb3968ef9e65c1a44de3163ed1588",
+          "bytes": 272
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "5744d8cb38e85ae586c4f71f61400fc7394b93cade8efc2bafa00e7996712a33",
+          "bytes": 385
+        },
+        {
+          "path": "workspace/pr.diff",
+          "sha256": "fbf9df8302ac97dbf8917340fa8b329d70ee71f53fef042189924a20838e9766",
+          "bytes": 2845
+        },
+        {
+          "path": "workspace/review.schema.json",
+          "sha256": "63574a07fb0ff2a67e8839c5356bfa30e777955596ad0309589f14767371cd81",
+          "bytes": 1856
+        },
+        {
+          "path": "workspace/scripts/validate-review.mjs",
+          "sha256": "008cd831c8e38041af31be0cbbdc8fcb3b42ba45006492fbf32b870814882422",
+          "bytes": 2210
+        },
+        {
+          "path": "workspace/src/format-toolbar.html",
+          "sha256": "18719ebf6c7e82dbf5953b9f214742ffa4ffab42ca1feef6872d2d2972e595c5",
+          "bytes": 521
+        },
+        {
+          "path": "workspace/src/format-toolbar.mjs",
+          "sha256": "c5378f1d4de5933fb5841961a69a3fae9eee9a9da4e21d5512607b7897d76fb2",
+          "bytes": 1107
+        },
+        {
+          "path": "workspace/test/helpers/toolbar-fixture.mjs",
+          "sha256": "9dd81fdbfa3d425c76976f34ccbd56404c48519d44b139f0e34ce8481f1752af",
+          "bytes": 540
+        },
+        {
+          "path": "workspace/test/integration/format-toolbar.test.mjs",
+          "sha256": "fb0d1a44160de4180098b35a6392068a85012f21e1180dbf32896717af52a256",
+          "bytes": 668
+        },
+        {
+          "path": "workspace/test/unit/format-toolbar.test.mjs",
+          "sha256": "e610d2250c51216e2b6c2f1be86d19ff4766e9440f75aff5b85cbe07550344fe",
+          "bytes": 986
+        }
+      ]
+    }
+  }
+}
