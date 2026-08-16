@@ -102,6 +102,12 @@ const REQUIREMENT_RECORD_FIELD_IDS = Object.freeze([
 
 const SCORED_OUTCOMES = new Set(["pass", "fail", "partial"]);
 const NON_SCORING_OUTCOMES = new Set(["not_evaluated", "manual_review_required", "unavailable"]);
+const MANUAL_REVIEW_OBSERVATION_FIELDS = Object.freeze([
+  "verification_correctness",
+  "evidence_correctness",
+  "under_processing",
+  "over_processing",
+]);
 
 function withoutField(value, field) {
   const { [field]: _ignored, ...rest } = value;
@@ -305,7 +311,7 @@ function assertRequirementOutcome(requirement, observation) {
   if (requirement.requirement_kind === "informational" && earnedPoints !== null && earnedPoints !== 0) throw new Error("informational requirement earned_points must be zero");
 }
 
-export function validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult }) {
+export function validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult, normalizedResult = null }) {
   if (!Array.isArray(evaluatorResult.requirement_results)) throw new Error("evaluator requirement_results must be an array");
   const requirements = new Map(requirementRecord.requirements.map((requirement) => [requirement.requirement_id, requirement]));
   const resultIds = evaluatorResult.requirement_results.map(({ requirement_id }) => requirement_id);
@@ -335,23 +341,44 @@ export function validateRequirementResultObservations({ scoringPolicy, requireme
     assertRequirementOutcome(requirement, observation);
   }
 
+  const expectedIds = [...requirements.keys()];
   if (evaluatorResult.evaluation_status === "completed") {
-    const expectedIds = [...requirements.keys()];
     if (resultIds.length !== expectedIds.length || expectedIds.some((id) => !resultIds.includes(id))) throw new Error("completed evaluation must exactly cover the authoritative requirement set");
     if (evaluatorResult.requirement_results.some(({ outcome }) => !SCORED_OUTCOMES.has(outcome))) throw new Error("completed evaluation contains a non-scoring requirement outcome");
     return { evaluationReady: true };
+  }
+  if (evaluatorResult.evaluation_status === "manual_review_required") {
+    if (resultIds.length !== expectedIds.length || expectedIds.some((id) => !resultIds.includes(id))) throw new Error("manual review evaluation must exactly cover the authoritative requirement set");
+    const manualResults = evaluatorResult.requirement_results.filter(({ outcome }) => outcome === "manual_review_required");
+    if (manualResults.length === 0) throw new Error("manual review evaluation requires at least one manual_review_required requirement outcome");
+    const manualObservations = MANUAL_REVIEW_OBSERVATION_FIELDS.map((field) => [field, evaluatorResult[field]]).filter(([, observation]) => observation?.state === "manual_review_required");
+    if (manualObservations.length === 0) throw new Error("manual review evaluation requires at least one manual_review_required observation");
+    if (Object.hasOwn(evaluatorResult, "classification")) throw new Error("manual review evaluation must not contain a normal classification");
+    if (Object.hasOwn(evaluatorResult, "invalid_input_authority")) throw new Error("manual review evaluation must not contain invalid_input_authority");
+    if (!normalizedResult) throw new Error("manual review evaluation requires normalized authority for evidence validation");
+    const manualFindingIds = new Set(manualResults.flatMap(({ finding_ids: findingIds, scope_deviation_references: scopeReferences = [] }) => [...findingIds, ...scopeReferences]));
+    const manualFindings = [...evaluatorResult.findings, ...evaluatorResult.false_positives, ...evaluatorResult.scope_deviations].filter(({ finding_id: findingId }) => manualFindingIds.has(findingId));
+    for (const [label, references] of [
+      ...manualResults.map((result) => [`manual requirement ${result.requirement_id} evidence`, result.evidence_references]),
+      ...manualObservations.map(([field, observation]) => [`manual observation ${field} evidence`, observation.evidence_references]),
+      ...manualFindings.map((finding) => [`manual finding ${finding.finding_id} evidence`, finding.evidence_references]),
+    ]) {
+      for (const reference of references) assertProfileReference(reference, normalizedResult, label);
+    }
+    return { evaluationReady: false };
   }
   return { evaluationReady: false };
 }
 
 function assertProfileReference(reference, normalizedResult, label) {
-  if (!reference || typeof reference !== "object" || !["execution_event", "normalized_result", "repository_diff", "test_result"].includes(reference.kind)) throw new Error(`${label} must be a typed evidence reference`);
+  if (!reference || typeof reference !== "object" || !["execution_event", "normalized_result", "final_output", "repository_diff", "test_result"].includes(reference.kind)) throw new Error(`${label} must be a typed evidence reference`);
   if (typeof reference.digest !== "string" || !/^sha256:[a-f0-9]{64}$/u.test(reference.digest) || (reference.bytes !== null && (!Number.isInteger(reference.bytes) || reference.bytes < 1))) throw new Error(`${label} has an invalid digest or byte count`);
   if (reference.kind === "execution_event") {
     const source = normalizedResult.command_evidence.references.find((entry) => entry.digest === reference.digest);
     if (!source || source.bytes !== reference.bytes) throw new Error(`${label} does not close to normalized command evidence`);
   }
   if (reference.kind === "normalized_result" && reference.digest !== normalizedResult.normalized_result_digest) throw new Error(`${label} does not close to the normalized result`);
+  if (reference.kind === "final_output" && (reference.digest !== normalizedResult.lineage.final_output_digest || reference.bytes !== normalizedResult.lineage.final_output_bytes)) throw new Error(`${label} does not close to the normalized final output`);
 }
 
 function normalizedResultReference(normalizedResult) {
@@ -532,6 +559,7 @@ export function deriveVerificationEvidenceReferences(normalizedResult, state = d
 }
 
 export function deriveBinaryScopeVerificationClassification({ evaluatorResult, requirementRecord = null }) {
+  if (evaluatorResult.evaluation_status === "manual_review_required") return null;
   const invalidEvidence = evaluatorResult.evaluation_status === "invalid_input"
     || evaluatorResult.evidence_correctness?.state === "fail"
     || evaluatorResult.invalid_input_authority
@@ -555,6 +583,9 @@ export function deriveBinaryScopeVerificationClassification({ evaluatorResult, r
 
 export function validateBinaryScopeVerificationResult({ evaluatorResult, requirementRecord, normalizedResult }) {
   if (evaluatorResult.result_profile?.name !== BINARY_SCOPE_VERIFICATION_PROFILE_NAME || evaluatorResult.result_profile?.digest !== computeResultProfileDigest()) throw new Error("binary scope verification result profile is missing or invalid");
+  const manualReview = evaluatorResult.evaluation_status === "manual_review_required";
+  if (manualReview && Object.hasOwn(evaluatorResult, "classification")) throw new Error("manual review binary result must not contain a normal classification");
+  if (manualReview && Object.hasOwn(evaluatorResult, "invalid_input_authority")) throw new Error("manual review binary result must not contain invalid-input authority");
   const byId = new Map(evaluatorResult.requirement_results.map((result) => [result.requirement_id, result]));
   const scopeIds = new Set(evaluatorResult.scope_deviations.map(({ finding_id }) => finding_id));
   const scopeRequirementId = requirementRecord.requirements.find(({ requirement_id, finding_group_id }) => requirement_id === "change-boundary" || requirement_id === "request-scope-discipline" || finding_group_id === "scope-outcome")?.requirement_id ?? "change-boundary";
@@ -586,13 +617,17 @@ export function validateBinaryScopeVerificationResult({ evaluatorResult, require
       if (result.outcome === "pass") {
         if (!topLevelPass || derivedState !== "executed_success" || !requiredLatestSuccess) throw new Error("passing verification result requires top-level pass and latest success for every required command");
         if (result.verification_evidence_references.some(({ kind }) => kind !== "execution_event")) throw new Error("passing verification result must reference only execution events");
+      } else if (result.outcome === "manual_review_required") {
+        if (!manualReview || evaluatorResult.verification_correctness?.state !== "manual_review_required") throw new Error("manual verification requirement requires a manual review evaluation and observation");
       } else {
         if (topLevelPass || result.outcome !== "fail") throw new Error("top-level verification pass cannot accompany a failing verification requirement");
       }
     } else if (result.verification_evidence_references.length !== 0) throw new Error(`${requirement.requirement_id} must not carry verification evidence references`);
   }
   const derived = deriveBinaryScopeVerificationClassification({ evaluatorResult, requirementRecord });
-  if (evaluatorResult.classification !== derived) throw new Error(`classification does not rederive to ${derived}`);
+  if (manualReview) {
+    if (derived !== null) throw new Error("manual review classification derivation must remain null");
+  } else if (evaluatorResult.classification !== derived) throw new Error(`classification does not rederive to ${derived}`);
   return derived;
 }
 
@@ -641,7 +676,7 @@ export function validateEvaluatorAuthorityBindings({ freezeManifest, freezeManif
     if (evaluatorResult[field] !== value) throw new Error(`evaluator scoring input binding mismatch at ${field}`);
   }
   if (evaluatorReference.fixture_id !== normalizedResult.lineage.fixture_id || evaluatorReference.fixture_input_digest !== normalizedResult.lineage.fixture_input_digest) throw new Error("evaluator public reference fixture or input binding does not match normalized result");
-  const scoring = validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult });
+  const scoring = validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult, normalizedResult });
   if (outputContract.result_profile) validateBinaryScopeVerificationProfile({ outputContract, freezeManifest, evaluatorResult, requirementRecord, normalizedResult });
   return scoring;
 }

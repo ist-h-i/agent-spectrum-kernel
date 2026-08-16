@@ -60,7 +60,7 @@
   },
   "execution_plan": {
     "schema_path": "benchmarks/schemas/execution-plan.schema.json",
-    "schema_version": "1.1.0"
+    "schema_version": "1.2.0"
   },
   "adaptive_selection": {
     "schema_path": "benchmarks/schemas/adaptive-selection.schema.json",

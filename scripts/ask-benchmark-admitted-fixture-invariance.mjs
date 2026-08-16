@@ -109,6 +109,11 @@ function readTrackedJson(root, repositoryRevision, path) {
   return { path, bytes, value: parseJson(bytes, path), raw: sha256(bytes) };
 }
 
+function readHistoricalJson(root, repositoryRevision, path) {
+  const bytes = git(root, ["show", `${repositoryRevision}:${path}`], { encoding: "buffer" });
+  return { path, bytes, value: parseJson(bytes, `${repositoryRevision}:${path}`), raw: sha256(bytes) };
+}
+
 function visibleInputInventory(root, fixtureRoot) {
   const paths = ["task.md"];
   const visit = (absolute, prefix) => {
@@ -208,6 +213,16 @@ function validateDecisionProjection({ fixtureId, resolved, admissionSource, requ
     raw_byte_digest: freezeSource.raw,
     semantic_digest: freezeSource.value.manifest_digest,
   } : null, `${fixtureId} frozen scoring-input authority`);
+}
+
+function validateHistoricalDecisionProjection({ root, fixtureId, resolved }) {
+  const decision = resolved.decision;
+  const revision = decision.reviewed_head_revision;
+  const admissionSource = readHistoricalJson(root, revision, decision.frozen_admission_authority.path);
+  const requirementSource = readHistoricalJson(root, revision, decision.frozen_requirement_record.path);
+  const freezeSource = decision.frozen_scoring_input_manifest === null ? null : readHistoricalJson(root, revision, decision.frozen_scoring_input_manifest.path);
+  const reference = readHistoricalJson(root, revision, `${FIXTURE_ROOT}/${fixtureId}/evaluator-reference.json`).value;
+  validateDecisionProjection({ fixtureId, resolved, admissionSource, requirementSource, freezeSource, reference });
 }
 
 export function discoverAdmittedFixtureIds({ root = DEFAULT_ROOT, repositoryRevision = "HEAD" } = {}) {
@@ -313,14 +328,17 @@ function validateFixture({ root, repositoryRevision, fixtureId, config, catalogS
     assertDigest(binding.semantic_digest, semantic, `${fixtureId} scoring freeze ${field} semantic identity`);
   }
 
+  const candidateDigest = validateSourceFreezeCandidate({ root, repositoryRevision, fixtureId, reference, admission });
   const resolved = resolveRepositoryAdmissionDecision({ root, repositoryRevision, fixtureId });
-  if (resolved) validateDecisionProjection({ fixtureId, resolved, admissionSource: sources.admission, requirementSource: sources.requirement, freezeSource: sources.freeze, reference });
+  if (resolved) {
+    if (admission.admission_status === "admission_pending" && candidateDigest) validateHistoricalDecisionProjection({ root, fixtureId, resolved });
+    else validateDecisionProjection({ fixtureId, resolved, admissionSource: sources.admission, requirementSource: sources.requirement, freezeSource: sources.freeze, reference });
+  }
   const admissionState = resolvePortfolioExecutionAdmission({ root, repositoryRevision, fixture: runtimeFixture });
   if (resolved?.decision.decision_status === "admitted") {
     if (admissionState.effective_admission_status !== "review_evidence_missing" || admissionState.execution_eligible !== false) throw new Error(`${fixtureId} missing external review evidence did not remain fail-closed`);
   } else if (!admissionState.execution_eligible) throw new Error(`${fixtureId} legacy admitted authority is not execution eligible`);
 
-  const candidateDigest = validateSourceFreezeCandidate({ root, repositoryRevision, fixtureId, reference, admission });
   return Object.freeze({
     fixture_id: fixtureId,
     admission_decision_id: resolved?.decision.decision_id ?? null,

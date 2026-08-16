@@ -2501,7 +2501,7 @@ export function validatePrivateEvaluatorFragment({ root, fragment, scoringPolicy
   assertBenchmarkSchemaInstance(fragment, { schemaPath: resolve(root, PRIVATE_EVALUATOR_FRAGMENT_SCHEMA_PATH), label: "private evaluator result fragment" });
   if (fragment.scoring_ready !== false) throw new Error("private evaluator fragment must remain scoring-ineligible");
   const envelopeView = fragmentEnvelopeView(fragment);
-  validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult: envelopeView });
+  validateRequirementResultObservations({ scoringPolicy, requirementRecord, evaluatorResult: envelopeView, normalizedResult });
   validateBinaryScopeVerificationResult({ evaluatorResult: envelopeView, requirementRecord, normalizedResult });
   return structuredClone(fragment);
 }
@@ -2588,7 +2588,7 @@ export function adaptPrivateEvaluatorFragmentToEnvelope({ root, fragment, author
     evaluation_status: validated.evaluation_status,
     requirement_results: structuredClone(validated.requirement_results),
     result_profile: structuredClone(validated.result_profile),
-    classification: validated.classification,
+    ...(validated.classification === undefined ? {} : { classification: validated.classification }),
     quality: fragmentObservation(validated, "verification_correctness", "fail"),
     safety: fragmentObservation(validated, "evidence_correctness", "fail"),
     findings: structuredClone(validated.findings),

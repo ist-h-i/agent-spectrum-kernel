@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/portfolio-admission-decision.schema.json",
+  "program": "adaptive_ask_portfolio_admission_decision",
+  "decision_id": "admission-decision-f3be4384deec7b4424314a29bf24b31f",
+  "decision_revision": 2,
+  "predecessor_decision": {
+    "path": "benchmarks/fixtures/admission-decision/mp-ci-evidence-gap-admission-decision.json",
+    "raw_byte_digest": "sha256:b81ff8e1930fee2ba80e7b00fcd388739f89a017723ff4fc88346474084da161",
+    "decision_id": "admission-decision-f3be4384deec7b4424314a29bf24b31f",
+    "decision_revision": 1,
+    "fixture_id": "mp-ci-evidence-gap",
+    "decision_digest": "sha256:42a4b519898665b021ad26994ee2e0c7c54f55e162569c1e3839740b9a6635ea"
+  },
+  "fixture_id": "mp-ci-evidence-gap",
+  "decision_status": "admitted",
+  "review_status": "approved",
+  "author_self_approval": false,
+  "reviewer_type": "independent_agent",
+  "reviewer_record_id": "chatgpt-independent-review-pr257-457da1af-87c1fd90",
+  "reviewer_count": 1,
+  "reviewed_at": "2026-08-15T09:22:39Z",
+  "reviewed_repository": "ist-h-i/agent-spectrum-kernel",
+  "reviewed_pull_request": 257,
+  "reviewed_head_revision": "457da1af8190f98e6d2c0d4a02fccdb899e05061",
+  "blocking_finding_count": 0,
+  "review_evidence": {
+    "archive_sha256": "sha256:87c1fd90f96cca075005eb2eccddc3bfd2b1fa8daad3f37414b33b326c1837a2",
+    "archive_bytes": 628573
+  },
+  "evaluator": {
+    "evaluator_revision": "33a2641ac13f1e9c2b5d7da6d3472ced4a202778",
+    "evaluator_bundle_id": "evaluator-fcb08148056898a3a1befd94306ecc39207033b95e9797b750ae9128acd502f8",
+    "evaluator_bundle_digest": "sha256:48df6d26bbdca7b69e1cb8f77b4d2ec0023d5aa5e669d1688b8aeaf079188ac4",
+    "evaluator_bundle_bytes": 154772
+  },
+  "evaluator_public_reference_digest": "sha256:febdec3c4de3be8fba6d82212a6d36651ec5282ca5c752710260a939c3322511",
+  "frozen_admission_authority": {
+    "path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/final-admission-record.json",
+    "raw_byte_digest": "sha256:a122b87f665b922f7971ca9aec5665d8a13008cd3b69cd66e1018ea10238bd33",
+    "semantic_digest": "sha256:cc9297898671d982d2e967d5fce0415ee25b99111db3e4bd89ecc484d6b07a8d",
+    "requirement_authority_digest": "sha256:a60c64a8caf3812f16227d467068c9ac51675a370af37fc34adcf0145aa2af95"
+  },
+  "frozen_requirement_record": {
+    "path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/requirement-record.json",
+    "raw_byte_digest": "sha256:fe77b99caa897b55f20f0befb3d7b6664ddbb91821b07645c0bf46c3a8c61dc2",
+    "record_digest": "sha256:dd034d636ff375b93a22678e2aa74c11624fa9c010b684d8d47ace3f6649d555",
+    "set_digest": "sha256:af2b2bceca81e1c97d09a479e1c959fa14512b14b480d408911eed9aa68e4412"
+  },
+  "frozen_scoring_input_manifest": {
+    "path": "benchmarks/fixtures/checkpoint-b2/mp-ci-evidence-gap/scoring-input-freeze-manifest.json",
+    "raw_byte_digest": "sha256:c0afd85604afd034240ba87cd52572bb9de9d6138cc9948156bd34a730627ebe",
+    "semantic_digest": "sha256:62d6af6e13c298399ce889dc7f25ca464ccd8cc461e1cfe5e10a0497a98fa6b4"
+  },
+  "decision_digest": "sha256:d81a885f27b24ce70b0a194f220f2d5dc03faa32fd9dfe13bfb2952678799215"
+}
