@@ -13,7 +13,7 @@ import {
 } from "./ask-benchmark-evaluator-boundary.mjs";
 import { canonicalDigest } from "./ask-benchmark-materialize.mjs";
 import { resolvePortfolioExecutionAdmission, resolvePortfolioExecutionFixtures } from "./ask-benchmark-plan.mjs";
-import { computeResultProfileDigest } from "./ask-benchmark-scoring-contract.mjs";
+import { computeResultProfileDigest, deriveBinaryScopeVerificationClassification } from "./ask-benchmark-scoring-contract.mjs";
 import { validateEquivalenceAuthority, validateMatchedEquivalenceIds, validateMutationAuthority } from "./ask-benchmark-mn-build-option-update.mjs";
 import { validateMpAccessibilityInteractionReviewInputClosure } from "./ask-benchmark-mp-accessibility-interaction-review.mjs";
 import { buildMpAccessibilityInteractionAuthority, validateMpAccessibilityInteractionReviewProductionAuthority } from "./ask-benchmark-mp-accessibility-interaction-review-authority.mjs";
@@ -32,28 +32,32 @@ function clone(value) {
 
 function evaluatorSemanticProjection(result) {
   return {
-    requirement_results: result.requirement_results.map(({ requirement_id, outcome, earned_points, matched_equivalence_class_ids, finding_ids, scope_deviation_references, verification_evidence_state }) => ({
+    evaluation_status: result.evaluation_status,
+    requirement_results: result.requirement_results.map(({ requirement_id, outcome, earned_points, matched_equivalence_class_ids, finding_ids, evidence_references, scope_deviation_references, verification_evidence_references, verification_evidence_state }) => ({
       requirement_id,
       outcome,
       earned_points,
       matched_equivalence_class_ids,
       finding_ids,
+      evidence_references,
       scope_deviation_references,
+      verification_evidence_references,
       verification_evidence_state,
     })),
-    findings: result.findings.map(({ finding_id, category, severity }) => ({ finding_id, category, severity })),
-    scope_deviations: result.scope_deviations.map(({ finding_id, category, severity }) => ({ finding_id, category, severity })),
-    verification_correctness: result.verification_correctness.state,
-    evidence_correctness: result.evidence_correctness.state,
-    under_processing: result.under_processing.state,
-    over_processing: result.over_processing.state,
-    classification: result.classification,
+    findings: result.findings.map(({ finding_id, category, severity, evidence_references }) => ({ finding_id, category, severity, evidence_references })),
+    scope_deviations: result.scope_deviations.map(({ finding_id, category, severity, evidence_references }) => ({ finding_id, category, severity, evidence_references })),
+    verification_correctness: result.verification_correctness,
+    evidence_correctness: result.evidence_correctness,
+    under_processing: result.under_processing,
+    over_processing: result.over_processing,
+    classification_present: Object.hasOwn(result, "classification"),
+    classification: result.classification ?? null,
     result_profile: result.result_profile,
     scoring_ready: result.scoring_ready,
   };
 }
 
-function expectedSemanticProjection(entry) {
+function expectedSemanticProjection(entry, { normalizedResult, repositoryDiffArtifact }) {
   const requirementIds = [
     "interaction-defect-finding",
     "decision-correctness",
@@ -62,22 +66,38 @@ function expectedSemanticProjection(entry) {
     "evidence-and-review-precision",
   ];
   const findingIds = entry.expected_findings.map(({ finding_id }) => finding_id);
+  const manual = entry.expected_evaluation_status === "manual_review_required";
+  const manualRequirementIds = new Set(entry.expected_manual_requirement_ids ?? []);
+  const normalizedReference = { kind: "normalized_result", digest: normalizedResult.normalized_result_digest, bytes: 1 };
+  const diffReference = { kind: "repository_diff", digest: repositoryDiffArtifact.artifact_digest, bytes: repositoryDiffArtifact.artifact_bytes };
+  const verificationSource = normalizedResult.command_evidence.references[0];
+  const verificationReference = { kind: "execution_event", digest: verificationSource.digest, bytes: verificationSource.bytes };
+  const standardReferences = [normalizedReference, diffReference, verificationReference];
+  const finalOutputReference = { kind: "final_output", digest: normalizedResult.lineage.final_output_digest, bytes: normalizedResult.lineage.final_output_bytes };
+  const observation = (state, manualObservation = false, verificationObservation = false) => ({
+    state,
+    evidence_references: manualObservation ? [finalOutputReference] : verificationObservation ? [verificationReference] : standardReferences,
+  });
   return {
+    evaluation_status: entry.expected_evaluation_status,
     requirement_results: requirementIds.map((requirement_id, index) => ({
       requirement_id,
       outcome: entry.expected_outcomes[index],
       earned_points: entry.expected_points[index],
       matched_equivalence_class_ids: entry.expected_equivalence_ids[index],
-      finding_ids: findingIds,
+      finding_ids: manual ? manualRequirementIds.has(requirement_id) ? findingIds : [] : findingIds,
+      evidence_references: manualRequirementIds.has(requirement_id) ? [finalOutputReference] : standardReferences,
       scope_deviation_references: [],
+      verification_evidence_references: manualRequirementIds.has(requirement_id) ? [] : [verificationReference],
       verification_evidence_state: "executed_success",
     })),
-    findings: entry.expected_findings,
+    findings: entry.expected_findings.map((finding) => ({ ...finding, evidence_references: manual ? [finalOutputReference] : standardReferences })),
     scope_deviations: [],
-    verification_correctness: entry.expected_verification_correctness,
-    evidence_correctness: entry.expected_evidence_correctness,
-    under_processing: entry.expected_under_processing,
-    over_processing: entry.expected_over_processing,
+    verification_correctness: observation(entry.expected_verification_correctness, entry.expected_verification_correctness === "manual_review_required", entry.expected_verification_correctness !== "manual_review_required"),
+    evidence_correctness: observation(entry.expected_evidence_correctness),
+    under_processing: observation(entry.expected_under_processing, entry.expected_under_processing === "manual_review_required"),
+    over_processing: observation(entry.expected_over_processing, entry.expected_over_processing === "manual_review_required"),
+    classification_present: !manual,
     classification: entry.expected_classification,
     result_profile: { name: "binary_scope_verification_v1", digest: computeResultProfileDigest() },
     scoring_ready: false,
@@ -208,6 +228,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
   assert.equal(production.admissionState, "admission_pending");
   const evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${production.evaluatorBundleDigest}`);
   const cases = readJson(resolve(caseRoot, "cases.json"));
+  const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
   const bundle = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
   const hiddenAsset = bundle.asset_inventory.find(({ role }) => role === "hidden_tests");
   assert.ok(hiddenAsset, "private bundle requires a hidden evaluator asset");
@@ -229,11 +250,15 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
     const candidate = resolve(work, `${entry.case_id}-candidate`);
     cpSync(resolve(FIXTURE_ROOT, "workspace"), frozen, { recursive: true });
     cpSync(frozen, candidate, { recursive: true });
-    cpSync(resolve(caseRoot, entry.case_id, "review.json"), resolve(candidate, "review.json"));
+    const reviewPath = resolve(caseRoot, entry.case_id, "review.json");
+    const reviewBytes = readFileSync(reviewPath);
+    cpSync(reviewPath, resolve(candidate, "review.json"));
     const lineage = {
       run_instance_id: `25125125-1251-4251-8251-${String(index + 1).padStart(12, "0")}`,
       case_id: `case-2512512512512512-${String(index + 101).padStart(16, "0")}`,
       attempt: "0001",
+      final_output_digest: `sha256:${createHash("sha256").update(reviewBytes).digest("hex")}`,
+      final_output_bytes: reviewBytes.length,
     };
     const normalizedResult = {
       normalized_result_digest: canonicalDigest({ fixture_id: FIXTURE_ID, case_id: entry.case_id }),
@@ -247,14 +272,6 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
         cwd_unverified_command_count: 0,
       },
     };
-    const repositoryDiffArtifact = { artifact_digest: canonicalDigest({ case_id: entry.case_id, kind: "repository-diff" }), artifact_bytes: 1 };
-    const first = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
-    const second = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
-    assert.deepEqual(first, second, `${entry.case_id} evaluator determinism`);
-    assertBenchmarkSchemaInstance(first, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} private fragment` });
-    const expected = expectedSemanticProjection(entry);
-    assert.deepEqual(evaluatorSemanticProjection(first), expected, `${entry.case_id} complete private evaluator projection`);
-
     const sealedExecution = createSealedEvaluatorExecutionForTest({
       root: ROOT,
       privateEvaluationRoot,
@@ -269,6 +286,26 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       executionDirectoryName: `sealed-${entry.case_id}`,
       label: `mp-accessibility sealed ${entry.case_id} evaluator`,
     });
+    const repositoryDiffArtifact = readJson(resolve(sealedExecution.originalWorkspaceAuthority.path, sealedExecution.originalWorkspaceAuthority.repositoryDiffPath));
+    const first = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
+    const second = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
+    assert.deepEqual(first, second, `${entry.case_id} evaluator determinism`);
+    assertBenchmarkSchemaInstance(first, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} private fragment` });
+    const expected = expectedSemanticProjection(entry, { normalizedResult, repositoryDiffArtifact });
+    assert.deepEqual(evaluatorSemanticProjection(first), expected, `${entry.case_id} complete private evaluator projection`);
+    if (entry.expected_evaluation_status === "manual_review_required") {
+      assert.equal(Object.hasOwn(first, "classification"), false, `${entry.case_id} manual fragment must omit classification`);
+      assert.equal(deriveBinaryScopeVerificationClassification({ evaluatorResult: first, requirementRecord: requirement }), null, `${entry.case_id} manual fragment must not derive a normal classification`);
+      assert.ok(first.requirement_results.some(({ outcome, earned_points }) => outcome === "manual_review_required" && earned_points === null), `${entry.case_id} manual fragment must retain null points`);
+      const transplanted = clone(normalizedResult);
+      transplanted.lineage.final_output_digest = `sha256:${"0".repeat(64)}`;
+      await assert.rejects(
+        evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult: transplanted, repositoryDiffArtifact }),
+        /final output authority/u,
+        `${entry.case_id} final-output authority transplant must fail closed`,
+      );
+    }
+
     const sealed = executeSealedEvaluatorForTest({
       execution: sealedExecution,
       externalAuthorityAnchor,
@@ -281,7 +318,6 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
     assert.deepEqual(evaluatorSemanticProjection(sealed.firstFragment), evaluatorSemanticProjection(first), `${entry.case_id} direct/production-safe evaluator agreement`);
   }
 
-  const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
   const admission = readJson(resolve(FIXTURE_ROOT, "final-admission-record.json"));
   const evidenceMap = readJson(resolve(FIXTURE_ROOT, "evidence-map.json"));
   const inputRecord = readJson(resolve(FIXTURE_ROOT, "input-manifest.json")).fixtures[FIXTURE_ID];
