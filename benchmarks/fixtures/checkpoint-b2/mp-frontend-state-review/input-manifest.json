@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "mp-frontend-state-review": {
+      "class": "pr_review",
+      "difficulty": "hard",
+      "target_minutes": 20,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "48998c1b9eda7a59e7034077d8e084baca41c2aab735b47b350ae00c924d3701",
+          "bytes": 423
+        },
+        {
+          "path": "workspace/docs/state-contract.md",
+          "sha256": "cacedf533bf4164824dfd04b29f64c4463c7d0f52089d5525f2bede79045e03b",
+          "bytes": 942
+        },
+        {
+          "path": "workspace/package-lock.json",
+          "sha256": "67318586eecc2a88f2766fb5b92c04503069cb0a64af7bf9ca7068d0fa17324e",
+          "bytes": 268
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "d4f5f9db28b7b1e36e5ec077d0be8653a8744e0333f979648344ab22b47bc3ba",
+          "bytes": 383
+        },
+        {
+          "path": "workspace/pr.diff",
+          "sha256": "65d7b06f14d4f57be54623d1c763faf292cfec8762d6abfe41d8f41d14d1ae74",
+          "bytes": 3560
+        },
+        {
+          "path": "workspace/review.schema.json",
+          "sha256": "bfdeb5af4a7e3df68fc9dd85b6c92e1cd0308c6225aa3abc0d4035a2ad6ec3b1",
+          "bytes": 1958
+        },
+        {
+          "path": "workspace/scripts/validate-review.mjs",
+          "sha256": "3a4a509dd4a4b79208e8c635616c21863eafcd1a9fc51d975928ebb736e15a3c",
+          "bytes": 2360
+        },
+        {
+          "path": "workspace/src/inbox-state.mjs",
+          "sha256": "394e26cbb243520b85593676a8ad91f3e7baab1040f24c3af18f2686bc0f02b5",
+          "bytes": 1420
+        },
+        {
+          "path": "workspace/src/inbox-view.mjs",
+          "sha256": "d4b432b88e32ed139c9f9b69b982639b1d6889ebbb85d8e5b96acafeaddefb25",
+          "bytes": 600
+        },
+        {
+          "path": "workspace/test/helpers/inbox-fixture.mjs",
+          "sha256": "7f4e7bb58e69ec68ff75d505a8219e667bcbbbcf464b1548e3f92be3dffef096",
+          "bytes": 259
+        },
+        {
+          "path": "workspace/test/integration/inbox-view.test.mjs",
+          "sha256": "a1abc20ed5db8e3b0a7e8f4d428a8357c6dcd7e4ad0d7adec76955ab305baee3",
+          "bytes": 953
+        },
+        {
+          "path": "workspace/test/unit/inbox-state.test.mjs",
+          "sha256": "4c95430c7a3f609a9c1b0e83c54b7f1b4da42c8979dd0c95a47897e01a79ef84",
+          "bytes": 917
+        }
+      ]
+    }
+  }
+}

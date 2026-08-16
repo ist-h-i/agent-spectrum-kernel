@@ -148,6 +148,20 @@
         "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/verification-command-contract.json",
         "sha256": "5f5e5b8dc6872228d55878762f57f4c808c51d82ce3954ca69ccc2a8400595dc"
       }
+    },
+    {
+      "id": "mp-frontend-state-review",
+      "suite": "mechanism_positive",
+      "task_class": "pr_review",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-frontend-state-review/input-manifest.json",
+      "input_manifest_sha256": "e6bf65ba00ea49cd18857c8e3390c9b3c9e3ef493f4935cbc816094cd90b7105",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/mp-frontend-state-review/verification-command-contract.json",
+        "sha256": "2b1f6d41e21590aa37a9e172ac51db58a6d4d4a23a77b8d95f7975e92d6bddfe"
+      }
     }
   ],
   "ordering": {

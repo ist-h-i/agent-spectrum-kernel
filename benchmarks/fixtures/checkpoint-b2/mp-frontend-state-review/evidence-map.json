@@ -1,0 +1,122 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mp-frontend-state-review",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/review.json"
+    ],
+    "required_candidate_paths": [
+      "workspace/review.json"
+    ],
+    "protected_candidate_paths": [
+      "workspace/docs/state-contract.md",
+      "workspace/package-lock.json",
+      "workspace/package.json",
+      "workspace/pr.diff",
+      "workspace/review.schema.json",
+      "workspace/scripts/validate-review.mjs",
+      "workspace/src/inbox-state.mjs",
+      "workspace/src/inbox-view.mjs",
+      "workspace/test/helpers/inbox-fixture.mjs",
+      "workspace/test/integration/inbox-view.test.mjs",
+      "workspace/test/unit/inbox-state.test.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "authority_digest": "sha256:9ae16c5b738c0cafd6eec8062f0d1efb77ad2ace081762c1619d95747677ff8a"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "selection-visibility-contract",
+      "agent_visible_paths": [
+        "workspace/pr.diff",
+        "workspace/src/inbox-state.mjs",
+        "workspace/src/inbox-view.mjs",
+        "workspace/docs/state-contract.md",
+        "workspace/test/integration/inbox-view.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "merge-decision-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/pr.diff",
+        "workspace/docs/state-contract.md",
+        "workspace/src/inbox-state.mjs",
+        "workspace/src/inbox-view.mjs",
+        "workspace/test/integration/inbox-view.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "verification-conclusion-basis",
+      "agent_visible_paths": [
+        "workspace/package.json",
+        "workspace/pr.diff",
+        "workspace/src/inbox-state.mjs",
+        "workspace/src/inbox-view.mjs",
+        "workspace/test/integration/inbox-view.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "expansion-history-contract",
+      "agent_visible_paths": [
+        "workspace/pr.diff",
+        "workspace/docs/state-contract.md",
+        "workspace/src/inbox-state.mjs",
+        "workspace/test/unit/inbox-state.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "review-precision-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/package.json",
+        "workspace/pr.diff",
+        "workspace/review.schema.json",
+        "workspace/scripts/validate-review.mjs",
+        "workspace/docs/state-contract.md",
+        "workspace/src/inbox-state.mjs",
+        "workspace/src/inbox-view.mjs",
+        "workspace/test/integration/inbox-view.test.mjs",
+        "workspace/test/unit/inbox-state.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-selection-visibility-contract",
+      "target_evidence_map_id": "selection-visibility-contract",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:721794da4c6b0aedaf1342f5a62c6594c696ec173d069fb1d12edabaabfe1a26"
+    },
+    {
+      "mutation_id": "remove-merge-decision-basis",
+      "target_evidence_map_id": "merge-decision-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:04757c4ebed947528024a998f0a5561874d9a4a7bac7177a882b14d4e70b0d31"
+    },
+    {
+      "mutation_id": "remove-verification-conclusion-basis",
+      "target_evidence_map_id": "verification-conclusion-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:5a745df77bf77a620494f8fbe046fa89ff388b9821321a76d0d475a5afd16481"
+    },
+    {
+      "mutation_id": "remove-expansion-history-contract",
+      "target_evidence_map_id": "expansion-history-contract",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:5cbf30d764a5a683796b3804a326d787f347b833577c4c3e44a8d47369768621"
+    },
+    {
+      "mutation_id": "remove-review-precision-basis",
+      "target_evidence_map_id": "review-precision-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:d5de34f3e9c48aaceb19fa5b04c9eda6567e5919d713be345714f573217f1507"
+    }
+  ]
+}
