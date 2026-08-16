@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "mp-performance-investigation",
   "candidate_input_digest": "sha256:779cb721b8ac39599d5936327d28da39b4d4278224c2c2f03bacac749f1af60a",
-  "candidate_evaluator_digest": "sha256:052ff33f795d5cabe4667205ba6658d3de594f71d6c1eb597b924bd7bbfacaff",
+  "candidate_evaluator_digest": "sha256:871152da8126a00d58020fc5b74003a49e16179497d8989216ba85c595cf7113",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -127,5 +127,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:1546e36fbe784577bc477a39ab90311da586102343e42af49dc98c1a349fedfe"
+  "review_package_digest": "sha256:15c9056426a80567251a9d9f3c8fc682d3ea088ee61499908bfeb56db5cd8c32"
 }
