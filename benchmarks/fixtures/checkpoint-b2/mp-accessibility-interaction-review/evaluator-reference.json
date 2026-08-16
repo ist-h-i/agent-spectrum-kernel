@@ -2,8 +2,8 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-80b0d437ab68e48bebda8d9944c391d711a7ae5121cd524a5724bdf593d4c6bc",
-  "evaluator_bundle_digest": "sha256:74834b5ec1081825da800807f9c365d256cb2f87add78ce313c42493683cdf2e",
+  "evaluator_bundle_id": "evaluator-1e8602e206e9639305b67b378884ed224a7d0e1c95c14b76670cab8a4344450d",
+  "evaluator_bundle_digest": "sha256:f375cc5b82f10c41d9736f966cd1ef27086f59ab275c8d2abbc9c43f1f68fc78",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mp-accessibility-interaction-review",
   "fixture_input_digest": "sha256:36b74950deefa7445136bfbc49859cbae10e06d502a316c8d2be3d33b6c1da33",
@@ -1451,8 +1451,8 @@
   "independence_statement_digest": "sha256:fceb6c6208febe453d7291763cfcd9662c8c98ac26dac81708ce6674db6eb177",
   "review_record_digest": "sha256:db3ed0a24a32f15c387196a3e3ee42142e398fa1db90cf524425a1fef240099c",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-accessibility-interaction-review/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:aea845e578ee80964c1bd26e528a6cca6234c1c4380e6f983143ad297abaa857",
-  "evaluator_authority_manifest_digest": "sha256:d03d88aec927b98edc0fbee4d51d5c3dbc0aa4842d5c2a80bc6f23bb9aa35e86",
+  "evaluator_authority_manifest_raw_sha256": "sha256:df9e4a53e0add3d1d58d827e428d8b0def26503b6ae85eeaa0818e7f575c1da0",
+  "evaluator_authority_manifest_digest": "sha256:632e704bcf4f1b596e326cde636295602512d343e60619699de1085f7c4825af",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:cb94647b41aee1736e96f34f2899e89c657d600f79d1b9a12d870a1295f89fa8"
+  "public_metadata_digest": "sha256:5ed7d4ec51a8c8c39e0904ed5c7cbe6df24d2c38cbfd98c93f749ab466c7502a"
 }

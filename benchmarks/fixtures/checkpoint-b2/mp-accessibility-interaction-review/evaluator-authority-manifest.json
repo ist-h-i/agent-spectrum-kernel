@@ -49,12 +49,12 @@
     {
       "path": "benchmarks/fixtures/checkpoint-b2/mp-accessibility-interaction-review/requirement-record.json",
       "bytes": 4083,
-      "raw_sha256": "sha256:710c1cc579ff349ab97bbd298f353f9371a5eb76f7e5cf40f132a62ac1beb845",
-      "semantic_digest": "sha256:978b68e455273ee4de70e688efea77e4054425ca918e631d079418e44e89053b",
+      "raw_sha256": "sha256:210911c2cef87372a5f3f0d67528ff85a4426125d4fbc5994f7048c6a636200f",
+      "semantic_digest": "sha256:e7d1f104f318bd6e6ef6b25aaa79d0a226ec9c2fef4b56fc0a70ed749f248c86",
       "authority_role": "requirement_record",
-      "requirement_record_digest": "sha256:978b68e455273ee4de70e688efea77e4054425ca918e631d079418e44e89053b",
+      "requirement_record_digest": "sha256:e7d1f104f318bd6e6ef6b25aaa79d0a226ec9c2fef4b56fc0a70ed749f248c86",
       "requirement_set_digest": "sha256:f6201a3252f6fed935af9fcec2e53b64ec3b410bd8e173e3dbccaba6da541b0f"
     }
   ],
-  "manifest_digest": "sha256:d03d88aec927b98edc0fbee4d51d5c3dbc0aa4842d5c2a80bc6f23bb9aa35e86"
+  "manifest_digest": "sha256:632e704bcf4f1b596e326cde636295602512d343e60619699de1085f7c4825af"
 }
