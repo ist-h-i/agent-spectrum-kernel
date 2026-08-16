@@ -349,6 +349,7 @@ validateVisibleScenario();
 validatePublicNegativeCoverage();
 
 const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
+let effectiveAdmissionStatus = "admission_pending";
 if (productionExists) {
   const production = validateMpAccessibilityInteractionReviewProductionAuthority({ root: ROOT });
   assert.equal(production.scoringReady, false);
@@ -360,14 +361,14 @@ if (productionExists) {
   const admission = resolvePortfolioExecutionAdmission({ root: ROOT, fixture });
   const repositoryRevision = spawnSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).stdout.trim();
   const repositoryDecision = resolveRepositoryAdmissionDecision({ root: ROOT, repositoryRevision, fixtureId: FIXTURE_ID });
-  const expectedStatusWithoutEvidence = repositoryDecision?.decision.decision_status === "admitted"
-    ? "review_evidence_missing"
-    : "admission_pending";
+  assert.ok(repositoryDecision, "accessibility admission decision overlay must exist");
+  assert.equal(repositoryDecision.decision.decision_status, "admitted");
   assert.equal(admission.execution_eligible, false);
-  assert.equal(admission.effective_admission_status, expectedStatusWithoutEvidence);
+  assert.equal(admission.effective_admission_status, "review_evidence_missing");
+  effectiveAdmissionStatus = admission.effective_admission_status;
   assert.equal(resolvePortfolioExecutionFixtures({ root: ROOT, config }).some(({ id }) => id === FIXTURE_ID), false);
 }
 
 const requested = privateArgs(process.argv.slice(2));
 const privateSummary = requested ? await validatePrivateCases(requested) : null;
-console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: "admission_pending", scoring_ready: false }));
+console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));
