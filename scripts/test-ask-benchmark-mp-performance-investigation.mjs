@@ -296,6 +296,24 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
   assert.equal(production.admissionState, "admission_pending");
   const evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${production.evaluatorBundleDigest}`);
   const cases = readJson(resolve(caseRoot, "cases.json"));
+  assert.deepEqual(cases.cases.map(({ case_id }) => case_id), [
+    "reference-investigation",
+    "equivalent-cache-fragmentation",
+    "missing-primary-hypothesis",
+    "premature-causal-proof",
+    "traffic-root-cause",
+    "missing-competing-falsification",
+    "unbounded-production-check",
+    "safe-staging-read-only",
+    "unsafe-live-mutation",
+    "unsupported-network-cause",
+    "caused-despite-restraint",
+    "fabricated-observation",
+    "weak-primary-evidence",
+    "unsupported-memory-leak",
+    "workspace-prefixed-evidence",
+    "unauthorized-extra-file",
+  ], "private regression inventory must retain every semantic boundary case");
   const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
   const bundle = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
   const hiddenAsset = bundle.asset_inventory.find(({ role }) => role === "hidden_tests");
