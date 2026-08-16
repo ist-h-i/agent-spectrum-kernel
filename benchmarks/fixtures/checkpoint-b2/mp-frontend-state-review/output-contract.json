@@ -6,9 +6,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mp-frontend-state-review/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:bc513cf02aa37498f4887dd61099fb36a32c5ec9855d26e06d921636927b2f12",
+  "evaluator_public_reference_digest": "sha256:78a194c92efd7d7ad350e4335eb4a36d4173eec106e214c94d0178424af9c8af",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mp-frontend-state-review/verification-command-contract.json",
-  "verification_command_contract_digest": "sha256:81893028fc26dd7d399e3bfcdff08caf6b0408b65049c83526434127e466386a",
+  "verification_command_contract_digest": "sha256:7e3d4033d868d5daa7974c133d1293d85c484b2060e14d05f236a15db0bedd88",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mp-frontend-state-review/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:9ae16c5b738c0cafd6eec8062f0d1efb77ad2ace081762c1619d95747677ff8a",
   "result_profile": {
@@ -17,7 +17,7 @@
   },
   "declares_findings": true,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-frontend-state-review/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:86b0575c347c7fd904a4b514ee01fe35146325bc9168d7d142dfee74dca60c70",
-  "evaluator_authority_manifest_digest": "sha256:a14181caaac3df9cca3017638d6fcd552a1b0783a47b65a50c2b6b238d1476ef",
-  "output_contract_digest": "sha256:0f4ca6cdb6378d6fe31434ada1cbd1665939ded2ad08c8f0036482281d23d814"
+  "evaluator_authority_manifest_raw_sha256": "sha256:3cb564b40bd474ec3b0dcf580c790d899b81e89671f42cb443ba7cc6889073fe",
+  "evaluator_authority_manifest_digest": "sha256:61a661909648312b074682ba39be4730c363b08170342d1f5b507b8af8fc2804",
+  "output_contract_digest": "sha256:1e6a559b87fab980e8b9d1e4bbe189e50a532f0a54e170ab582bf003ce576c16"
 }

@@ -41,6 +41,7 @@
       "agent_visible_paths": [
         "task.md",
         "workspace/pr.diff",
+        "workspace/docs/state-contract.md",
         "workspace/src/inbox-state.mjs",
         "workspace/src/inbox-view.mjs",
         "workspace/test/integration/inbox-view.test.mjs"
@@ -50,6 +51,7 @@
       "evidence_map_id": "verification-conclusion-basis",
       "agent_visible_paths": [
         "workspace/package.json",
+        "workspace/pr.diff",
         "workspace/src/inbox-state.mjs",
         "workspace/src/inbox-view.mjs",
         "workspace/test/integration/inbox-view.test.mjs"
@@ -58,6 +60,7 @@
     {
       "evidence_map_id": "expansion-history-contract",
       "agent_visible_paths": [
+        "workspace/pr.diff",
         "workspace/docs/state-contract.md",
         "workspace/src/inbox-state.mjs",
         "workspace/test/unit/inbox-state.test.mjs"
@@ -67,9 +70,15 @@
       "evidence_map_id": "review-precision-basis",
       "agent_visible_paths": [
         "task.md",
-        "workspace/review.schema.json",
+        "workspace/package.json",
         "workspace/pr.diff",
-        "workspace/docs/state-contract.md"
+        "workspace/review.schema.json",
+        "workspace/scripts/validate-review.mjs",
+        "workspace/docs/state-contract.md",
+        "workspace/src/inbox-state.mjs",
+        "workspace/src/inbox-view.mjs",
+        "workspace/test/integration/inbox-view.test.mjs",
+        "workspace/test/unit/inbox-state.test.mjs"
       ]
     }
   ],
@@ -86,28 +95,28 @@
       "target_evidence_map_id": "merge-decision-basis",
       "expected_recoverability_state": "not_recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:8b673a6361867a4455777c4013d4bc762a89feaff7ebaeb76d9829d0dae38855"
+      "mutation_digest": "sha256:04757c4ebed947528024a998f0a5561874d9a4a7bac7177a882b14d4e70b0d31"
     },
     {
       "mutation_id": "remove-verification-conclusion-basis",
       "target_evidence_map_id": "verification-conclusion-basis",
       "expected_recoverability_state": "not_recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:6f2ee3867543605582e84d16f45b846e98d2200629f17d5ff7e2e29cbec21537"
+      "mutation_digest": "sha256:5a745df77bf77a620494f8fbe046fa89ff388b9821321a76d0d475a5afd16481"
     },
     {
       "mutation_id": "remove-expansion-history-contract",
       "target_evidence_map_id": "expansion-history-contract",
       "expected_recoverability_state": "not_recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:1a768f55434f94987ed3d1cb81db9653365970e4fd0ed604e699039888033aca"
+      "mutation_digest": "sha256:5cbf30d764a5a683796b3804a326d787f347b833577c4c3e44a8d47369768621"
     },
     {
       "mutation_id": "remove-review-precision-basis",
       "target_evidence_map_id": "review-precision-basis",
       "expected_recoverability_state": "not_recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:55f07ddfa998998c864170953d9abd5a7c67d42c2fca97ac3083d0de8fb23031"
+      "mutation_digest": "sha256:d5de34f3e9c48aaceb19fa5b04c9eda6567e5919d713be345714f573217f1507"
     }
   ]
 }
