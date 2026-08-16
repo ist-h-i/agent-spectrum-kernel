@@ -19,8 +19,8 @@
             "additionalProperties": false,
             "required": ["path", "conclusion"],
             "properties": {
-              "path": { "type": "string", "minLength": 1 },
-              "conclusion": { "type": "string", "minLength": 1 }
+              "path": { "type": "string", "minLength": 1, "pattern": "\\S" },
+              "conclusion": { "type": "string", "minLength": 1, "pattern": "\\S" }
             }
           }
         }
@@ -33,7 +33,7 @@
         "additionalProperties": false,
         "required": ["title", "severity", "evidence", "impact", "required_action"],
         "properties": {
-          "title": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1, "pattern": "\\S" },
           "severity": { "enum": ["high", "medium", "low"] },
           "evidence": {
             "type": "array",
@@ -43,13 +43,13 @@
               "additionalProperties": false,
               "required": ["path", "line"],
               "properties": {
-                "path": { "type": "string", "minLength": 1 },
+                "path": { "type": "string", "minLength": 1, "pattern": "\\S" },
                 "line": { "type": "integer", "minimum": 1 }
               }
             }
           },
-          "impact": { "type": "string", "minLength": 1 },
-          "required_action": { "type": "string", "minLength": 1 }
+          "impact": { "type": "string", "minLength": 1, "pattern": "\\S" },
+          "required_action": { "type": "string", "minLength": 1, "pattern": "\\S" }
         }
       }
     }

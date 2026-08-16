@@ -138,10 +138,10 @@ export function buildMpFrontendStateAuthority() {
   };
   const maps = [
     { evidence_map_id: "selection-visibility-contract", agent_visible_paths: ["workspace/pr.diff", "workspace/src/inbox-state.mjs", "workspace/src/inbox-view.mjs", "workspace/docs/state-contract.md", "workspace/test/integration/inbox-view.test.mjs"] },
-    { evidence_map_id: "merge-decision-basis", agent_visible_paths: ["task.md", "workspace/pr.diff", "workspace/src/inbox-state.mjs", "workspace/src/inbox-view.mjs", "workspace/test/integration/inbox-view.test.mjs"] },
-    { evidence_map_id: "verification-conclusion-basis", agent_visible_paths: ["workspace/package.json", "workspace/src/inbox-state.mjs", "workspace/src/inbox-view.mjs", "workspace/test/integration/inbox-view.test.mjs"] },
-    { evidence_map_id: "expansion-history-contract", agent_visible_paths: ["workspace/docs/state-contract.md", "workspace/src/inbox-state.mjs", "workspace/test/unit/inbox-state.test.mjs"] },
-    { evidence_map_id: "review-precision-basis", agent_visible_paths: ["task.md", "workspace/review.schema.json", "workspace/pr.diff", "workspace/docs/state-contract.md"] },
+    { evidence_map_id: "merge-decision-basis", agent_visible_paths: ["task.md", "workspace/pr.diff", "workspace/docs/state-contract.md", "workspace/src/inbox-state.mjs", "workspace/src/inbox-view.mjs", "workspace/test/integration/inbox-view.test.mjs"] },
+    { evidence_map_id: "verification-conclusion-basis", agent_visible_paths: ["workspace/package.json", "workspace/pr.diff", "workspace/src/inbox-state.mjs", "workspace/src/inbox-view.mjs", "workspace/test/integration/inbox-view.test.mjs"] },
+    { evidence_map_id: "expansion-history-contract", agent_visible_paths: ["workspace/pr.diff", "workspace/docs/state-contract.md", "workspace/src/inbox-state.mjs", "workspace/test/unit/inbox-state.test.mjs"] },
+    { evidence_map_id: "review-precision-basis", agent_visible_paths: ["task.md", "workspace/package.json", "workspace/pr.diff", "workspace/review.schema.json", "workspace/scripts/validate-review.mjs", "workspace/docs/state-contract.md", "workspace/src/inbox-state.mjs", "workspace/src/inbox-view.mjs", "workspace/test/integration/inbox-view.test.mjs", "workspace/test/unit/inbox-state.test.mjs"] },
   ];
   const seeds = [
     ["remove-selection-visibility-contract", "state-consistency-finding", "selection-visibility-contract", maps[0].agent_visible_paths],

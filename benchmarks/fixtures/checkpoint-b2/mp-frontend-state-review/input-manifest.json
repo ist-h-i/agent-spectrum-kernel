@@ -30,18 +30,18 @@
         },
         {
           "path": "workspace/pr.diff",
-          "sha256": "145eb5438b6dff132eb07cde77948b199c93add489b33bac9208e20bf8b7b58a",
-          "bytes": 2376
+          "sha256": "65d7b06f14d4f57be54623d1c763faf292cfec8762d6abfe41d8f41d14d1ae74",
+          "bytes": 3560
         },
         {
           "path": "workspace/review.schema.json",
-          "sha256": "e7768516bb9ef1541c73ba9fdcc9f07a783f38a03e0a6627bb7b3a66aaaae7b9",
-          "bytes": 1850
+          "sha256": "bfdeb5af4a7e3df68fc9dd85b6c92e1cd0308c6225aa3abc0d4035a2ad6ec3b1",
+          "bytes": 1958
         },
         {
           "path": "workspace/scripts/validate-review.mjs",
-          "sha256": "008cd831c8e38041af31be0cbbdc8fcb3b42ba45006492fbf32b870814882422",
-          "bytes": 2210
+          "sha256": "3a4a509dd4a4b79208e8c635616c21863eafcd1a9fc51d975928ebb736e15a3c",
+          "bytes": 2360
         },
         {
           "path": "workspace/src/inbox-state.mjs",

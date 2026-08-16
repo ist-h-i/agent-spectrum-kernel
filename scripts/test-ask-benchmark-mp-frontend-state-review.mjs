@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -168,6 +168,62 @@ function validateVisibleScenario() {
   assert.match(`${interaction.stdout}${interaction.stderr}`, /message-read|null|filtering out the selection/u);
   const contract = readFileSync(resolve(workspace, "docs/state-contract.md"), "utf8");
   assert.match(contract, /expandedThreadIds.+retained|restore expansion/isu, "contract must preserve expansion history across visibility changes");
+}
+
+function validatePullRequestDiff() {
+  const work = mkdtempSync(resolve(tmpdir(), "mp-frontend-state-pr-diff-"));
+  const diffPath = resolve(FIXTURE_ROOT, "workspace/pr.diff");
+  const check = spawnSync("git", ["apply", "--check", diffPath], { cwd: work, encoding: "utf8" });
+  assert.equal(check.status, 0, check.stderr || check.stdout);
+  const apply = spawnSync("git", ["apply", diffPath], { cwd: work, encoding: "utf8" });
+  assert.equal(apply.status, 0, apply.stderr || apply.stdout);
+  for (const path of ["src/inbox-state.mjs", "src/inbox-view.mjs", "test/integration/inbox-view.test.mjs"]) {
+    assert.deepEqual(readFileSync(resolve(work, path)), readFileSync(resolve(FIXTURE_ROOT, "workspace", path)), `pr.diff must reconstruct ${path}`);
+  }
+}
+
+function validateWorkspaceValidatorParity() {
+  const work = mkdtempSync(resolve(tmpdir(), "mp-frontend-state-review-validator-"));
+  const workspace = resolve(FIXTURE_ROOT, "workspace");
+  const schemaPath = resolve(workspace, "review.schema.json");
+  const validatorPath = resolve(workspace, "scripts/validate-review.mjs");
+  const valid = {
+    decision: "request_changes",
+    verification: {
+      state: "failed",
+      evidence: [{ path: "test/integration/inbox-view.test.mjs", conclusion: "The interaction test fails." }],
+    },
+    findings: [{
+      title: "Hidden selection leaves stale details",
+      severity: "high",
+      evidence: [{ path: "src/inbox-view.mjs", line: 5 }],
+      impact: "A hidden selection still renders details.",
+      required_action: "Clear the selection or derive details from visible messages.",
+    }],
+  };
+  const validPath = resolve(work, "valid.json");
+  writeFileSync(validPath, `${JSON.stringify(valid, null, 2)}\n`);
+  assert.doesNotThrow(() => assertBenchmarkSchemaInstance(valid, { schemaPath, label: "valid frontend review" }));
+  const validResult = spawnSync(process.execPath, [validatorPath, validPath], { encoding: "utf8" });
+  assert.equal(validResult.status, 0, validResult.stderr || validResult.stdout);
+
+  const invalidCases = [
+    ["empty-finding-evidence", (value) => { value.findings[0].evidence = []; }],
+    ["blank-verification-evidence", (value) => { value.verification.evidence[0] = { path: " ", conclusion: " " }; }],
+    ["blank-finding-evidence-path", (value) => { value.findings[0].evidence[0].path = " "; }],
+    ["blank-finding-title", (value) => { value.findings[0].title = " "; }],
+    ["blank-finding-impact", (value) => { value.findings[0].impact = " "; }],
+    ["blank-finding-action", (value) => { value.findings[0].required_action = " "; }],
+  ];
+  for (const [name, mutate] of invalidCases) {
+    const value = clone(valid);
+    mutate(value);
+    const path = resolve(work, `${name}.json`);
+    writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+    assert.throws(() => assertBenchmarkSchemaInstance(value, { schemaPath, label: name }), /JSON Schema validation/u, `${name} schema rejection`);
+    const result = spawnSync(process.execPath, [validatorPath, path], { encoding: "utf8" });
+    assert.notEqual(result.status, 0, `${name} runtime validator rejection`);
+  }
 }
 
 function validatePublicNegativeCoverage() {
@@ -337,6 +393,75 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
   assert.doesNotThrow(() => validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset }));
   assert.doesNotThrow(() => validateMatchedEquivalenceIds({ requirementRecord: requirement, equivalenceAsset, matchedEquivalenceClassIds: equivalenceAsset.rules.map(({ equivalence_class_id }) => equivalence_class_id) }));
 
+  const referenceReviewPath = resolve(caseRoot, "reference-review/review.json");
+  const referenceReviewBytes = readFileSync(referenceReviewPath);
+  for (const [index, mutation] of mutationAsset.mutations.entries()) {
+    const frozen = resolve(work, `${mutation.mutation_id}-frozen`);
+    const candidate = resolve(work, `${mutation.mutation_id}-candidate`);
+    cpSync(resolve(FIXTURE_ROOT, "workspace"), frozen, { recursive: true });
+    for (const path of mutation.remove_paths) {
+      if (!path.startsWith("workspace/")) continue;
+      const absolute = resolve(frozen, path.slice("workspace/".length));
+      assert.ok(existsSync(absolute), `${mutation.mutation_id} removal source must exist: ${path}`);
+      rmSync(absolute);
+    }
+    cpSync(frozen, candidate, { recursive: true });
+    cpSync(referenceReviewPath, resolve(candidate, "review.json"));
+    const lineage = {
+      run_instance_id: `26426426-4264-4264-8264-${String(index + 201).padStart(12, "0")}`,
+      case_id: `case-2642642642642642-${String(index + 201).padStart(16, "0")}`,
+      attempt: "0001",
+      final_output_digest: `sha256:${createHash("sha256").update(referenceReviewBytes).digest("hex")}`,
+      final_output_bytes: referenceReviewBytes.length,
+    };
+    const normalizedResult = {
+      normalized_result_digest: canonicalDigest({ fixture_id: FIXTURE_ID, mutation_id: mutation.mutation_id }),
+      lineage,
+      command_evidence: {
+        references: [{ command_id: "review-contract-validation", match_state: "matched", outcome: "succeeded", exit_code: 0, digest: canonicalDigest({ mutation_id: mutation.mutation_id }), bytes: 1 }],
+      },
+    };
+    const repositoryDiffArtifact = { artifact_digest: canonicalDigest({ mutation_id: mutation.mutation_id, kind: "repository_diff" }), artifact_bytes: 1 };
+    const result = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
+    const target = result.requirement_results.find(({ requirement_id }) => requirement_id === mutation.requirement_id);
+    assert.equal(target?.outcome, "fail", `${mutation.mutation_id} must make ${mutation.requirement_id} unrecoverable`);
+    assert.notEqual(result.classification, "correct_narrow_execution", `${mutation.mutation_id} must not preserve the reference classification`);
+  }
+
+  const invalidReviewCases = [
+    ["empty-finding-evidence", (value) => { value.findings[0].evidence = []; }],
+    ["blank-verification-evidence", (value) => { value.verification.evidence[0] = { path: " ", conclusion: " " }; }],
+    ["blank-finding-evidence-path", (value) => { value.findings[0].evidence[0].path = " "; }],
+  ];
+  for (const [index, [name, mutate]] of invalidReviewCases.entries()) {
+    const frozen = resolve(work, `private-validator-${name}-frozen`);
+    const candidate = resolve(work, `private-validator-${name}-candidate`);
+    cpSync(resolve(FIXTURE_ROOT, "workspace"), frozen, { recursive: true });
+    cpSync(frozen, candidate, { recursive: true });
+    const review = readJson(referenceReviewPath);
+    mutate(review);
+    const bytes = Buffer.from(`${JSON.stringify(review, null, 2)}\n`);
+    writeFileSync(resolve(candidate, "review.json"), bytes);
+    const lineage = {
+      run_instance_id: `26426426-4264-4264-8264-${String(index + 301).padStart(12, "0")}`,
+      case_id: `case-2642642642642642-${String(index + 301).padStart(16, "0")}`,
+      attempt: "0001",
+      final_output_digest: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+      final_output_bytes: bytes.length,
+    };
+    const normalizedResult = {
+      normalized_result_digest: canonicalDigest({ fixture_id: FIXTURE_ID, private_validator_case: name }),
+      lineage,
+      command_evidence: {
+        references: [{ command_id: "review-contract-validation", match_state: "matched", outcome: "succeeded", exit_code: 0, digest: canonicalDigest({ private_validator_case: name }), bytes: 1 }],
+      },
+    };
+    const repositoryDiffArtifact = { artifact_digest: canonicalDigest({ private_validator_case: name, kind: "repository_diff" }), artifact_bytes: 1 };
+    const result = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
+    assert.ok(result.requirement_results.every(({ outcome }) => outcome === "fail"), `${name} private evaluator rejection`);
+    assert.equal(result.classification, "under_processing", `${name} private evaluator classification`);
+  }
+
   const missingMutation = clone(mutationAsset);
   missingMutation.mutations.pop();
   expectFailure(() => validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset: missingMutation }), /inventory/u, "evidence-removal violation");
@@ -349,12 +474,14 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
     if (transplantedEquivalence.fixture_id !== requirement.fixture_id) throw new Error("private equivalence fixture transplant");
     validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: transplantedEquivalence });
   }, /transplant/u, "cross-fixture transplant");
-  return { cases: cases.cases.length, directPass: cases.cases.length, productionSafePass: cases.cases.length, falsePositiveControls: cases.cases.filter(({ control }) => control === "suspicious_but_correct").length };
+  return { cases: cases.cases.length, directPass: cases.cases.length, productionSafePass: cases.cases.length, mutationBehaviorPass: mutationAsset.mutations.length, validatorParityPass: invalidReviewCases.length, falsePositiveControls: cases.cases.filter(({ control }) => control === "suspicious_but_correct").length };
 }
 
 validateFrozenDesign();
 validateMpFrontendStateReviewInputClosure({ root: ROOT });
 validateVisibleScenario();
+validatePullRequestDiff();
+validateWorkspaceValidatorParity();
 validatePublicNegativeCoverage();
 
 const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";
