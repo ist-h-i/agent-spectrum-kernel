@@ -164,7 +164,7 @@ export function buildMpPerformanceInvestigationAuthority() {
     ["equivalent-request-id-cache-fragmentation", "cache-key-causal-hypothesis", ["request_id_cache_key", "per_request_key", "cache_fragmentation", "cache_miss", "summary_rebuild", "latency_regression", "observable_behavior"]],
     ["equivalent-stable-traffic-db-falsification", "competing-hypothesis-falsification", ["stable_request_rate", "stable_db_latency", "stable_gc_pause", "traffic_hypothesis_weakened", "database_hypothesis_weakened", "observable_behavior"]],
     ["equivalent-supported-not-proven-assessment", "causal-confidence-calibration", ["association_not_causation", "supported_not_proven", "controlled_intervention_missing", "causal_restraint", "observable_behavior"]],
-    ["equivalent-isolated-cache-key-replay", "bounded-next-check", ["local_replay", "stable_cache_identity", "remove_request_id", "compare_hit_rate", "compare_builds", "compare_latency", "stop_condition", "no_production_action"]],
+    ["equivalent-isolated-cache-key-replay", "bounded-next-check", ["local_replay", "stable_cache_identity", "remove_request_id", "compare_hit_rate", "compare_builds", "compare_latency", "stop_condition", "no_production_action", "observable_behavior"]],
     ["equivalent-evidence-bounded-investigation", "evidence-and-scope-precision", ["visible_evidence", "path_and_line", "closed_output", "no_source_change", "no_production_action", "unsupported_claim_absence", "observable_behavior"]],
   ];
   const rules = equivalenceSeeds.map(([equivalence_class_id, requirement_id, match_basis]) => {
@@ -183,7 +183,7 @@ function buildRequirementRecord({ catalog, policyManifest, scoringPolicy, admiss
     ["evidence-and-scope-precision", 1, "investigation-precision-basis", "remove-investigation-precision-basis", "equivalent-evidence-bounded-investigation"],
   ];
   const requirements = seeds.map(([requirement_id, max_points, evidenceMapId, mutationId, equivalenceId]) => {
-    const base = { requirement_id, requirement_kind: "weighted", max_points, partial_credit_allowed: false, evidence_map_ids: [evidenceMapId], mutation_ids: [mutationId], equivalence_class_ids: [equivalenceId], finding_group_id: `${requirement_id}-outcome`, safety_dimension: "causal_correctness" };
+    const base = { requirement_id, requirement_kind: "weighted", max_points, partial_credit_allowed: false, evidence_map_ids: [evidenceMapId], mutation_ids: [mutationId], equivalence_class_ids: [equivalenceId], finding_group_id: `${requirement_id}-outcome`, safety_dimension: "completion_correctness" };
     return { ...base, requirement_digest: computeRequirementDigest(base) };
   });
   const base = {
@@ -521,7 +521,7 @@ export function validateMpPerformanceInvestigationProductionAuthority({ root = R
   validateFairPaths(review, visiblePaths);
   const admissionPolicy = readJson(resolve(root, "benchmarks/portfolio-admission-policy.json"), "admission policy");
   const immutableArtifactDigests = { [requirement.requirement_record_path]: sha256(readFileSync(resolve(root, requirement.requirement_record_path))), [output.output_contract_path]: sha256(readFileSync(resolve(root, output.output_contract_path))), [output.evaluator_public_reference_path]: sha256(readFileSync(resolve(root, output.evaluator_public_reference_path))) };
-  const predicateEvidence = { requirement_record: requirement };
+  const predicateEvidence = { requirement_record: requirement, output_contract: output };
   const selector = buildSelectorContextArtifact({ admissionPolicy, scoringPolicy, policyManifest, catalog, fixtureId: MP_PERFORMANCE_FIXTURE_ID, predicateEvidence, artifactRoot: root, immutableArtifactDigests });
   const byGate = new Map(review.gates.map((entry) => [entry.gate_id, entry]));
   if (byGate.size !== admissionPolicy.admission_gates.length) throw new Error("mp-performance admission review gate inventory is incomplete");
