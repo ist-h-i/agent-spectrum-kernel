@@ -40,6 +40,7 @@
       "agent_visible_paths": [
         "workspace/docs/migration-plan.md",
         "workspace/state/compatibility-matrix.json",
+        "workspace/state/handoff-policy.json",
         "workspace/operations/commands.json"
       ]
     },
@@ -82,7 +83,7 @@
       "target_evidence_map_id": "compatibility-resume-basis",
       "expected_recoverability_state": "not_recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:dc1645f17a6f468306f772942b4578307199f65448e9efacaccb5fa28735fd57"
+      "mutation_digest": "sha256:60386e852a4df5f7b9f699700fa94dbb4031950cff2fc3261efc75822dcb62c5"
     },
     {
       "mutation_id": "remove-approval-boundary-basis",
