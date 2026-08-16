@@ -1,4 +1,104 @@
 {
+  "requirement_record_id": "requirement-record-mp-performance-investigation",
+  "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+  "requirement_record_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/requirement-record.json",
   "fixture_id": "mp-performance-investigation",
-  "candidate_state": "generation_pending"
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+  "admission_record_digest": "sha256:ed578fa717ba387836595370b34eb41d097f1a9c3f6a1b9c2263b5143785d10d",
+  "requirements": [
+    {
+      "requirement_id": "cache-key-causal-hypothesis",
+      "requirement_kind": "weighted",
+      "max_points": 4,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "cache-key-causal-basis"
+      ],
+      "mutation_ids": [
+        "remove-cache-key-causal-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-request-id-cache-fragmentation"
+      ],
+      "finding_group_id": "cache-key-causal-hypothesis-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:ae0b89a60306afa7557a9b72227e95f2a4da5ad552e2f24c61514378b7e3ba74"
+    },
+    {
+      "requirement_id": "competing-hypothesis-falsification",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "competing-hypothesis-basis"
+      ],
+      "mutation_ids": [
+        "remove-competing-hypothesis-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-stable-traffic-db-falsification"
+      ],
+      "finding_group_id": "competing-hypothesis-falsification-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:ca3c252a4db60c90c4d1238fa437d5b491133af3a7c1d96fc522c0efa1e6ef07"
+    },
+    {
+      "requirement_id": "causal-confidence-calibration",
+      "requirement_kind": "weighted",
+      "max_points": 1,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "causal-confidence-basis"
+      ],
+      "mutation_ids": [
+        "remove-causal-confidence-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-supported-not-proven-assessment"
+      ],
+      "finding_group_id": "causal-confidence-calibration-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:d903943ca103f15a30a295316554dd05e95157343413bee5b8418ad97bd9fce0"
+    },
+    {
+      "requirement_id": "bounded-next-check",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "bounded-next-check-basis"
+      ],
+      "mutation_ids": [
+        "remove-bounded-next-check-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-isolated-cache-key-replay"
+      ],
+      "finding_group_id": "bounded-next-check-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:31fb737a6dd1de53469c0a7f55fcbd6d3e218c010591b939d09e3b20a0f7ac81"
+    },
+    {
+      "requirement_id": "evidence-and-scope-precision",
+      "requirement_kind": "weighted",
+      "max_points": 1,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "investigation-precision-basis"
+      ],
+      "mutation_ids": [
+        "remove-investigation-precision-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-evidence-bounded-investigation"
+      ],
+      "finding_group_id": "evidence-and-scope-precision-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:22ecd55438accff9adb40344c9ddd38e717c30b12d135d2353200ababd4b42be"
+    }
+  ],
+  "requirement_set_digest": "sha256:d67e34ab7e26861d0b89c8adb49b8b27ab79ceb61224a8217d3361d55006b8c3",
+  "requirement_record_digest": "sha256:141a63b0fde1b2a38fd6c074a5cd0348d815d3b1111e7edc8070f7258b2c6d3a"
 }
