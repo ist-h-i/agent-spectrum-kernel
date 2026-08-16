@@ -26,7 +26,8 @@ const traffic = (value, label) => {
 exactKeys(handoff, ["current_state", "safe_next_action", "resume_gate", "rollback", "continuation"], "handoff");
 exactKeys(handoff.current_state, ["phase", "last_completed_batch", "next_batch", "cursor", "write_traffic", "read_traffic", "blocking_condition_ids"], "current_state");
 string(handoff.current_state.phase, "current_state phase");
-for (const field of ["last_completed_batch", "next_batch", "cursor"]) if (!Number.isInteger(handoff.current_state[field]) || handoff.current_state[field] < 0) throw new Error(`current_state ${field} is invalid`);
+for (const field of ["last_completed_batch", "cursor"]) if (!Number.isInteger(handoff.current_state[field]) || handoff.current_state[field] < 0) throw new Error(`current_state ${field} is invalid`);
+if (!Number.isInteger(handoff.current_state.next_batch) || handoff.current_state.next_batch < 1) throw new Error("current_state next_batch is invalid");
 traffic(handoff.current_state.write_traffic, "write_traffic");
 traffic(handoff.current_state.read_traffic, "read_traffic");
 stringArray(handoff.current_state.blocking_condition_ids, "blocking_condition_ids");

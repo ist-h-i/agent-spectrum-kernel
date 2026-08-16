@@ -163,13 +163,73 @@ function validateVisibleScenario() {
   const workspace = resolve(FIXTURE_ROOT, "workspace");
   const operation = readJson(resolve(workspace, "state/operation-state.json"));
   const approval = readJson(resolve(workspace, "state/approval-state.json"));
+  const compatibility = readJson(resolve(workspace, "state/compatibility-matrix.json"));
   const verification = readJson(resolve(workspace, "evidence/batch-42-verification.json"));
   const commands = readJson(resolve(workspace, "operations/commands.json"));
   assert.equal(operation.phase, "backfill_paused");
   assert.equal(approval.resume_approval.status, "not_requested");
+  assert.equal(compatibility.evidence_id, "profile-v3-compatibility-matrix");
   assert.equal(verification.checksum.state, "failed");
   assert.equal(verification.unresolved_rows.state, "not_run");
   assert.equal(commands.commands.find(({ command_id }) => command_id === "resume-batch-42-write").allowed_before_resume_approval, false);
+}
+
+function validateSafeNextActionMutationCoverage() {
+  const { evidenceMap, mutationAsset } = buildMpDataMigrationHandoffAuthority();
+  const safeMap = evidenceMap.maps.find(({ evidence_map_id }) => evidence_map_id === "compatibility-resume-basis");
+  const mutation = mutationAsset.mutations.find(({ mutation_id }) => mutation_id === "remove-compatibility-resume-basis");
+  const directSources = [
+    "workspace/docs/migration-plan.md",
+    "workspace/state/compatibility-matrix.json",
+    "workspace/state/handoff-policy.json",
+    "workspace/operations/commands.json",
+  ];
+  assert.deepEqual(safeMap.agent_visible_paths, directSources, "safe-next-action evidence map must include every direct source");
+  assert.deepEqual(mutation.remove_paths, directSources, "safe-next-action mutation must remove every direct source");
+  assert.deepEqual(directSources.filter((path) => !mutation.remove_paths.includes(path)), [], "safe-next-action must not remain directly recoverable after mutation");
+  const policy = readJson(resolve(FIXTURE_ROOT, "workspace/state/handoff-policy.json"));
+  const compatibility = readJson(resolve(FIXTURE_ROOT, "workspace/state/compatibility-matrix.json"));
+  assert.ok(policy.safe_next_action.required_evidence_ids.includes(compatibility.evidence_id), "safe-next-action required evidence must be recoverable from its declared map");
+}
+
+function validateWorkspaceValidatorParity() {
+  const work = mkdtempSync(resolve(tmpdir(), "mp-data-migration-handoff-validator-"));
+  const validator = resolve(FIXTURE_ROOT, "workspace/scripts/validate-handoff.mjs");
+  const schema = resolve(FIXTURE_ROOT, "workspace/handoff.schema.json");
+  const valid = {
+    current_state: {
+      phase: "synthetic",
+      last_completed_batch: 0,
+      next_batch: 1,
+      cursor: 0,
+      write_traffic: { legacy: 100 },
+      read_traffic: { legacy: 100 },
+      blocking_condition_ids: ["synthetic-blocker"],
+    },
+    safe_next_action: { command_id: "synthetic-read", mode: "read_only", owner: "synthetic-owner", required_evidence_ids: ["synthetic-evidence"] },
+    resume_gate: { approval_role: "synthetic-approver", required_condition_ids: ["synthetic-condition"] },
+    rollback: { supported_action_ids: ["synthetic-containment"], forbidden_action_ids: ["synthetic-destruction"], data_preservation: "preserve-synthetic-data" },
+    continuation: {
+      stop_condition_ids: ["synthetic-stop"],
+      verification_states: [{ verification_id: "synthetic-verification", state: "not_run" }],
+      evidence_references: ["synthetic-evidence"],
+      open_questions: ["synthetic-question"],
+    },
+  };
+  const validPath = resolve(work, "valid.json");
+  writeFileSync(validPath, `${JSON.stringify(valid, null, 2)}\n`);
+  assert.doesNotThrow(() => assertBenchmarkSchemaInstance(valid, { schemaPath: schema, label: "synthetic valid handoff" }));
+  const validResult = spawnSync(process.execPath, [validator, validPath], { encoding: "utf8" });
+  assert.equal(validResult.status, 0, validResult.stderr || validResult.stdout);
+
+  const zeroNextBatch = clone(valid);
+  zeroNextBatch.current_state.next_batch = 0;
+  const invalidPath = resolve(work, "next-batch-zero.json");
+  writeFileSync(invalidPath, `${JSON.stringify(zeroNextBatch, null, 2)}\n`);
+  expectFailure(() => assertBenchmarkSchemaInstance(zeroNextBatch, { schemaPath: schema, label: "next_batch zero handoff" }), /next_batch|minimum|schema/u, "schema next_batch minimum");
+  const invalidResult = spawnSync(process.execPath, [validator, invalidPath], { encoding: "utf8" });
+  assert.notEqual(invalidResult.status, 0, "runtime validator must reject schema-invalid next_batch zero");
+  assert.match(invalidResult.stderr, /current_state next_batch is invalid/u);
 }
 
 function validatePublicNegativeCoverage() {
@@ -372,6 +432,8 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
 validateFrozenDesign();
 validateMpDataMigrationHandoffInputClosure({ root: ROOT });
 validateVisibleScenario();
+validateSafeNextActionMutationCoverage();
+validateWorkspaceValidatorParity();
 validatePublicNegativeCoverage();
 
 const productionExists = readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).schema_version === "1.0.0";

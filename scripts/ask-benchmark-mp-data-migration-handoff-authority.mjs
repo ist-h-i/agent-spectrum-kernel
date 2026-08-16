@@ -139,7 +139,7 @@ export function buildMpDataMigrationHandoffAuthority() {
   };
   const maps = [
     { evidence_map_id: "operation-state-basis", agent_visible_paths: ["task.md", "workspace/state/operation-state.json", "workspace/evidence/batch-42-verification.json"] },
-    { evidence_map_id: "compatibility-resume-basis", agent_visible_paths: ["workspace/docs/migration-plan.md", "workspace/state/compatibility-matrix.json", "workspace/operations/commands.json"] },
+    { evidence_map_id: "compatibility-resume-basis", agent_visible_paths: ["workspace/docs/migration-plan.md", "workspace/state/compatibility-matrix.json", "workspace/state/handoff-policy.json", "workspace/operations/commands.json"] },
     { evidence_map_id: "approval-boundary-basis", agent_visible_paths: ["task.md", "workspace/state/approval-state.json", "workspace/operations/commands.json"] },
     { evidence_map_id: "rollback-truth-basis", agent_visible_paths: ["workspace/docs/rollback-runbook.md", "workspace/state/handoff-policy.json", "workspace/state/operation-state.json"] },
     { evidence_map_id: "handoff-completeness-basis", agent_visible_paths: ["task.md", "workspace/handoff.schema.json", "workspace/state/handoff-policy.json", "workspace/evidence/batch-42-verification.json"] },

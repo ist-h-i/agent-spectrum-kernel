@@ -1,4 +1,5 @@
 {
+  "evidence_id": "profile-v3-compatibility-matrix",
   "schema_revision": "profile-v3-expand-r4",
   "clients": [
     {
