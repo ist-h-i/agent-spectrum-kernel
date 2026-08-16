@@ -1,0 +1,18 @@
+{
+  "commands": [
+    {
+      "command_id": "reconcile-batch-42-read-only",
+      "mode": "read_only",
+      "owner": "migration-operator",
+      "allowed_before_resume_approval": true,
+      "description": "Recompute batch 42 differences without changing persisted values or the durable cursor."
+    },
+    {
+      "command_id": "resume-batch-42-write",
+      "mode": "write",
+      "owner": "migration-operator",
+      "allowed_before_resume_approval": false,
+      "description": "Resume batch 42 writes only after every recorded condition and owner approval are satisfied."
+    }
+  ]
+}

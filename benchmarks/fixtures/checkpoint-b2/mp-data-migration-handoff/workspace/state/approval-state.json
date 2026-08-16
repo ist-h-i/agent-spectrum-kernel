@@ -1,0 +1,14 @@
+{
+  "resume_approval": {
+    "status": "not_requested",
+    "required_role": "data-migration-owner",
+    "approved_by": null,
+    "approved_at": null
+  },
+  "required_condition_ids": [
+    "batch-42-reconciliation-clean",
+    "rollback-drill-current",
+    "write-compatibility-confirmed",
+    "owner-approval-recorded"
+  ]
+}

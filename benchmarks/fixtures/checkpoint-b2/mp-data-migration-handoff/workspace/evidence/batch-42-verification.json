@@ -1,0 +1,31 @@
+{
+  "evidence_id": "batch-42-verification",
+  "batch": 42,
+  "checksum": {
+    "verification_id": "batch-42-checksum",
+    "state": "failed",
+    "expected": "7d2c4f",
+    "observed": "33ab90"
+  },
+  "unresolved_rows": {
+    "verification_id": "batch-42-unresolved-row-reconciliation",
+    "state": "not_run",
+    "count": 12
+  },
+  "rollback_drill": {
+    "verification_id": "rollback-drill",
+    "state": "passed",
+    "completed_at": "2026-08-14T16:40:00Z"
+  },
+  "compatibility_smoke": {
+    "verification_id": "compatibility-smoke",
+    "state": "passed",
+    "completed_at": "2026-08-15T08:55:00Z"
+  },
+  "open_questions": [
+    {
+      "id": "owner-for-row-773411",
+      "detail": "Confirm the source owner for the oldest unresolved row before proposing repair."
+    }
+  ]
+}

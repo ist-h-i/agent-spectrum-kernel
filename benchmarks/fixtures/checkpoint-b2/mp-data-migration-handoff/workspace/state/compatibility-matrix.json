@@ -1,0 +1,27 @@
+{
+  "schema_revision": "profile-v3-expand-r4",
+  "clients": [
+    {
+      "client": "legacy-writer",
+      "version": "2.18.7",
+      "read": "profile_v2",
+      "write": "profile_v2",
+      "compatible": true
+    },
+    {
+      "client": "dual-writer",
+      "version": "3.2.1",
+      "read": "profile_v2",
+      "write": "profile_v2+profile_v3",
+      "compatible": true
+    },
+    {
+      "client": "new-reader",
+      "version": "3.2.1",
+      "read": "profile_v3_with_v2_fallback",
+      "write": "none",
+      "compatible": true
+    }
+  ],
+  "contract_limit": "legacy read and write paths must remain available during this operation"
+}
