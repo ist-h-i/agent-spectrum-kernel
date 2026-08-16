@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "mp-data-migration-handoff": {
+      "class": "handoff_resume",
+      "difficulty": "hard",
+      "target_minutes": 25,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "5d4e6cc1abf852d065a6b65eed801adb61863fc2f4292c87450768ae3ddc0ab5",
+          "bytes": 833
+        },
+        {
+          "path": "workspace/docs/migration-plan.md",
+          "sha256": "0b23607d92c19e2be53aaf7d84e42325dce337bafb2fc1e67150a5ac103d3600",
+          "bytes": 775
+        },
+        {
+          "path": "workspace/docs/rollback-runbook.md",
+          "sha256": "38ab5b0be197f1e6e1a91c1854668ec2cb9c2dac3b03d478f26ba0ed376cdff1",
+          "bytes": 656
+        },
+        {
+          "path": "workspace/evidence/batch-42-verification.json",
+          "sha256": "3e72bfd2e6b0b1eec95c694d52789b2fae567bc84d4d215611f8ee8ec75558f5",
+          "bytes": 783
+        },
+        {
+          "path": "workspace/handoff.schema.json",
+          "sha256": "62d4f61b98636d656bc194fc0acbe3eb72c2865a147c9d5a08f27444152bb4c4",
+          "bytes": 3412
+        },
+        {
+          "path": "workspace/operations/commands.json",
+          "sha256": "33c43ca1ec45f8c5f18e11e0e53ea30e1e95c1187e73275a641145e674a39af8",
+          "bytes": 590
+        },
+        {
+          "path": "workspace/package-lock.json",
+          "sha256": "fb8961ce1a75139ebe444e732928f72b201f0d60bc773597f07d5fa6eb4c6097",
+          "bytes": 230
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "233184e58c48121ae9ff3b62f9975ff6fd8868650278692f9998a043497669d7",
+          "bytes": 220
+        },
+        {
+          "path": "workspace/scripts/validate-handoff.mjs",
+          "sha256": "d9726651b6333c80b07f2138a051ad45fde0cff34e42aed8cee62d5ea5b94664",
+          "bytes": 4375
+        },
+        {
+          "path": "workspace/state/approval-state.json",
+          "sha256": "5e12d5a62c2bb5ccaa61da5b39e277e6c74588e3907fc19644ae3117d3908707",
+          "bytes": 325
+        },
+        {
+          "path": "workspace/state/compatibility-matrix.json",
+          "sha256": "e8dbdc3c1677e0713d8a1203e25ab61e9bc25d8e09454075f882410ddedeebde",
+          "bytes": 694
+        },
+        {
+          "path": "workspace/state/handoff-policy.json",
+          "sha256": "02b6ac7da6360dbf8ef48068ee5f060a6bf4f0d77967c7231b9e0e3870777fc0",
+          "bytes": 899
+        },
+        {
+          "path": "workspace/state/operation-state.json",
+          "sha256": "b14cae8b9327736e01f7f34557656fdb922d45eaf66379bbc4e71e47439cee6d",
+          "bytes": 388
+        }
+      ]
+    }
+  }
+}

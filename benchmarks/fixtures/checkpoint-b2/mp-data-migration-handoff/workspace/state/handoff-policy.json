@@ -1,0 +1,37 @@
+{
+  "safe_next_action": {
+    "command_id": "reconcile-batch-42-read-only",
+    "mode": "read_only",
+    "owner": "migration-operator",
+    "required_evidence_ids": [
+      "batch-42-verification",
+      "profile-v3-compatibility-matrix"
+    ]
+  },
+  "stop_condition_ids": [
+    "batch-42-checksum-mismatch",
+    "batch-42-unresolved-rows",
+    "resume-approval-missing"
+  ],
+  "rollback": {
+    "supported_action_ids": [
+      "pause-dual-write",
+      "route-reads-to-legacy",
+      "hold-current-cursor"
+    ],
+    "forbidden_action_ids": [
+      "drop-shadow-column",
+      "delete-migration-audit"
+    ],
+    "data_preservation": "preserve-existing-profile-v2-and-profile-v3-values"
+  },
+  "verification_ids": [
+    "batch-42-checksum",
+    "batch-42-unresolved-row-reconciliation",
+    "rollback-drill",
+    "compatibility-smoke"
+  ],
+  "open_question_ids": [
+    "owner-for-row-773411"
+  ]
+}

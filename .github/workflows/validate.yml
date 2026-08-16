@@ -69,6 +69,9 @@ jobs:
       - name: Run accessibility interaction review fixture source-freeze tests
         run: node scripts/test-ask-benchmark-mp-accessibility-interaction-review.mjs
 
+      - name: Run data migration handoff fixture source-freeze tests
+        run: node scripts/test-ask-benchmark-mp-data-migration-handoff.mjs
+
       - name: Run evaluator-authority integration contract tests
         run: node scripts/test-ask-benchmark-portfolio-evaluator-result.mjs
 

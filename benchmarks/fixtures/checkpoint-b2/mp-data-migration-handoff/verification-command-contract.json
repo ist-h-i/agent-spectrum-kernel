@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "mp-data-migration-handoff",
+  "fixture_input_digest": "sha256:2f32cb0f0c3361a30223b02a243df9e0dc3193e2e70d3035675176b50d9b1033",
+  "commands": [
+    {
+      "command_id": "handoff-contract-validation",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"docs/migration-plan.md\":\"0b23607d92c19e2be53aaf7d84e42325dce337bafb2fc1e67150a5ac103d3600\",\"docs/rollback-runbook.md\":\"38ab5b0be197f1e6e1a91c1854668ec2cb9c2dac3b03d478f26ba0ed376cdff1\",\"evidence/batch-42-verification.json\":\"3e72bfd2e6b0b1eec95c694d52789b2fae567bc84d4d215611f8ee8ec75558f5\",\"handoff.schema.json\":\"62d4f61b98636d656bc194fc0acbe3eb72c2865a147c9d5a08f27444152bb4c4\",\"operations/commands.json\":\"33c43ca1ec45f8c5f18e11e0e53ea30e1e95c1187e73275a641145e674a39af8\",\"package-lock.json\":\"fb8961ce1a75139ebe444e732928f72b201f0d60bc773597f07d5fa6eb4c6097\",\"package.json\":\"233184e58c48121ae9ff3b62f9975ff6fd8868650278692f9998a043497669d7\",\"scripts/validate-handoff.mjs\":\"d9726651b6333c80b07f2138a051ad45fde0cff34e42aed8cee62d5ea5b94664\",\"state/approval-state.json\":\"5e12d5a62c2bb5ccaa61da5b39e277e6c74588e3907fc19644ae3117d3908707\",\"state/compatibility-matrix.json\":\"e8dbdc3c1677e0713d8a1203e25ab61e9bc25d8e09454075f882410ddedeebde\",\"state/handoff-policy.json\":\"02b6ac7da6360dbf8ef48068ee5f060a6bf4f0d77967c7231b9e0e3870777fc0\",\"state/operation-state.json\":\"b14cae8b9327736e01f7f34557656fdb922d45eaf66379bbc4e71e47439cee6d\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm run validate:handoff",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:9d36ff1cc052bdb1792db9169ba79cc11aad11a221948e9437b1fa76b35507c8",
+      "rendered_event_command_digest": "sha256:1b168bd601b6c876ea4c4fabd734c20ccfae152a9efbd957bad956cb6fd78281",
+      "command_contract_digest": "sha256:a089b26b0be583d71fc155148f3db2b153c85b807b8b79223011869a8b59ee04"
+    }
+  ],
+  "contract_digest": "sha256:c5f527b33a0bc43ceb823073b259ddfec67bbe29efba4c4cac018838c830378f"
+}

@@ -134,6 +134,20 @@
         "path": "benchmarks/fixtures/checkpoint-b2/mp-accessibility-interaction-review/verification-command-contract.json",
         "sha256": "1b29085dd6abb3c803773890f99ef71a37c0c1f787a88802aec4b840edec9602"
       }
+    },
+    {
+      "id": "mp-data-migration-handoff",
+      "suite": "mechanism_positive",
+      "task_class": "handoff_resume",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/input-manifest.json",
+      "input_manifest_sha256": "2f32cb0f0c3361a30223b02a243df9e0dc3193e2e70d3035675176b50d9b1033",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/mp-data-migration-handoff/verification-command-contract.json",
+        "sha256": "5f5e5b8dc6872228d55878762f57f4c808c51d82ce3954ca69ccc2a8400595dc"
+      }
     }
   ],
   "ordering": {
