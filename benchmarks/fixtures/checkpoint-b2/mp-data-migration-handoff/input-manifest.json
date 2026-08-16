@@ -50,8 +50,8 @@
         },
         {
           "path": "workspace/scripts/validate-handoff.mjs",
-          "sha256": "231edaf46cea977db7cea8aa5fff382674e1dcf65f000a7bad8faffe61cd2e4e",
-          "bytes": 4236
+          "sha256": "d9726651b6333c80b07f2138a051ad45fde0cff34e42aed8cee62d5ea5b94664",
+          "bytes": 4375
         },
         {
           "path": "workspace/state/approval-state.json",
@@ -60,8 +60,8 @@
         },
         {
           "path": "workspace/state/compatibility-matrix.json",
-          "sha256": "a60f8be402176575ee9044ff1426dc08578a0ac5745f3d0d503d5943d1f33cc2",
-          "bytes": 642
+          "sha256": "e8dbdc3c1677e0713d8a1203e25ab61e9bc25d8e09454075f882410ddedeebde",
+          "bytes": 694
         },
         {
           "path": "workspace/state/handoff-policy.json",
