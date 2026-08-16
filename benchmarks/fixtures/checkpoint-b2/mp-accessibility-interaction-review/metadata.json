@@ -23,10 +23,10 @@
   "output_contract_type": "findings_producing",
   "requirement_record_id": "requirement-record-mp-accessibility-interaction-review",
   "output_contract_id": "output-contract-mp-accessibility-interaction-review",
-  "evaluator_bundle_id": "evaluator-19b1581d6b7d7cebf4b17c107de4ffc8a5de50a602042bc44e6c5d7dbddeecd6",
-  "evaluator_bundle_digest": "sha256:7f1f153d7fbe6580028548f6a3cc997f8531bcc86a8ce179130c9ba911c8d15a",
-  "evaluator_byte_count": 154119,
+  "evaluator_bundle_id": "evaluator-ec4766528f51cff8515d18b3ea9d4c5f86315958c5656ed2af705266a12ecf3e",
+  "evaluator_bundle_digest": "sha256:8fcec242181cfb25c91a7e432c50c1d8328d130b0d7e9ce5c3b5a35dfcc1100f",
+  "evaluator_byte_count": 158994,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:b6e7a69fe3bbbaf946bbe2ada66b6936b89f9434208e92417b560cb5f2591db8"
+  "metadata_digest": "sha256:d382ec56be66ea5d1f55cabc70e156b53827d27be768fb66be4c3dc32ab3df23"
 }
