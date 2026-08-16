@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mp-frontend-state-review",
+  "fixture_role": "primary",
+  "suite": "mechanism_positive",
+  "task_class": "pr_review",
+  "domain": "frontend",
+  "difficulty": "hard",
+  "repetitions": 3,
+  "risk_boundary": "none",
+  "capability_families": [
+    "review_precision",
+    "state_consistency"
+  ],
+  "evidence_topologies": [
+    "cross_file_contract",
+    "review_diff_and_tests"
+  ],
+  "outcome_dimensions": [
+    "behavioral_consistency",
+    "review_precision"
+  ],
+  "output_contract_type": "findings_producing",
+  "requirement_record_id": "requirement-record-mp-frontend-state-review",
+  "output_contract_id": "output-contract-mp-frontend-state-review",
+  "evaluator_bundle_id": "evaluator-39fe9f653bd0eea9800c6da201304c55317b51cfb78e8743c2619cdbafa8a268",
+  "evaluator_bundle_digest": "sha256:3f6dcd935bba42ab0326995fe484866562122767c81022514f1700a518254920",
+  "evaluator_byte_count": 139335,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:6d1d940cf0d42b666580b5eaed19e2cfea492580325694b497a980309540a13d"
+}

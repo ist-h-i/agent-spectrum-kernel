@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Inbox filter pull request review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision", "verification", "findings"],
+  "properties": {
+    "decision": { "enum": ["approve", "request_changes", "insufficient_evidence"] },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "evidence"],
+      "properties": {
+        "state": { "enum": ["passed", "failed", "incomplete"] },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "conclusion"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "conclusion": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "severity", "evidence", "impact", "required_action"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "severity": { "enum": ["high", "medium", "low"] },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "line"],
+              "properties": {
+                "path": { "type": "string", "minLength": 1 },
+                "line": { "type": "integer", "minimum": 1 }
+              }
+            }
+          },
+          "impact": { "type": "string", "minLength": 1 },
+          "required_action": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}
