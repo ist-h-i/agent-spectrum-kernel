@@ -23,10 +23,10 @@
   "output_contract_type": "implementation_producing",
   "requirement_record_id": "requirement-record-mn-focused-regression-test",
   "output_contract_id": "output-contract-mn-focused-regression-test",
-  "evaluator_bundle_id": "evaluator-7fae658b6e14f63ae2961cc31a0ce59575a89c4c649500db928c6c8c4917a6cf",
-  "evaluator_bundle_digest": "sha256:5ddebd1024710585d1ab961489030f8d1d02f3812db563a43fd39d4a32707490",
-  "evaluator_byte_count": 143675,
+  "evaluator_bundle_id": "evaluator-25f8b50c72e640e63aed473af34050c8d831c7418a2eecbdb8b4bfb50279afd5",
+  "evaluator_bundle_digest": "sha256:bd98a68d2500c5f05804a2c5611bdf4f4a471c803b9aad61a316f53ba9e72072",
+  "evaluator_byte_count": 147811,
   "review_status": "pending_independent_review",
   "measured_execution_performed": false,
-  "metadata_digest": "sha256:1cc802a8ee95601eb547398fe9f07d46f937f8d35c4659895b0e1fa59d0e83d5"
+  "metadata_digest": "sha256:f9d17a05965e27ba8317091715ca8189f2b566488ff245cca4c48e1842d5006e"
 }
