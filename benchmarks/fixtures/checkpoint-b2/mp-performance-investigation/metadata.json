@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mp-performance-investigation",
+  "fixture_role": "primary",
+  "suite": "mechanism_positive",
+  "task_class": "investigation",
+  "domain": "performance",
+  "difficulty": "hard",
+  "repetitions": 5,
+  "risk_boundary": "none",
+  "capability_families": [
+    "hypothesis_testing",
+    "performance_diagnosis"
+  ],
+  "evidence_topologies": [
+    "observability_signals",
+    "runtime_measurements"
+  ],
+  "outcome_dimensions": [
+    "causal_confidence",
+    "performance_stability"
+  ],
+  "output_contract_type": "findings_producing",
+  "requirement_record_id": "requirement-record-mp-performance-investigation",
+  "output_contract_id": "output-contract-mp-performance-investigation",
+  "evaluator_bundle_id": "evaluator-3afa640c4024bb057555efb49f225a5bc9e10a08a9da869b1ddcc41736fb5370",
+  "evaluator_bundle_digest": "sha256:994a6493cc799b44f9a32d472d4545ef2c45cbc9a2b58d4157edc4091c25226f",
+  "evaluator_byte_count": 153198,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:6d4f9c4ae88cf323bc8d16c3e2ccebbf305868e1e328bfda65b30d91a5bb2521"
+}

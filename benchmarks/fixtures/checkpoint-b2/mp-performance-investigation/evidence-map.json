@@ -1,0 +1,137 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mp-performance-investigation",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/investigation.json"
+    ],
+    "required_candidate_paths": [
+      "workspace/investigation.json"
+    ],
+    "protected_candidate_paths": [
+      "workspace/docs/investigation-contract.md",
+      "workspace/investigation.schema.json",
+      "workspace/observability/cache-samples.csv",
+      "workspace/observability/release-events.json",
+      "workspace/observability/request-windows.csv",
+      "workspace/observability/runtime-profile.json",
+      "workspace/package-lock.json",
+      "workspace/package.json",
+      "workspace/scripts/replay-summary.mjs",
+      "workspace/scripts/validate-investigation.mjs",
+      "workspace/src/cache-key.mjs",
+      "workspace/src/summary-replay.mjs",
+      "workspace/src/summary-service.mjs",
+      "workspace/test/integration/summary-replay.test.mjs",
+      "workspace/test/unit/cache-key.test.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "authority_digest": "sha256:65935ed8132c9280bd72741ba91ee9e9e668145949f2d3b2d6ae8328cdcaa948"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "cache-key-causal-basis",
+      "agent_visible_paths": [
+        "workspace/docs/investigation-contract.md",
+        "workspace/observability/cache-samples.csv",
+        "workspace/observability/release-events.json",
+        "workspace/observability/request-windows.csv",
+        "workspace/observability/runtime-profile.json",
+        "workspace/src/cache-key.mjs",
+        "workspace/src/summary-replay.mjs",
+        "workspace/src/summary-service.mjs",
+        "workspace/test/integration/summary-replay.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "competing-hypothesis-basis",
+      "agent_visible_paths": [
+        "workspace/docs/investigation-contract.md",
+        "workspace/observability/release-events.json",
+        "workspace/observability/request-windows.csv",
+        "workspace/observability/runtime-profile.json"
+      ]
+    },
+    {
+      "evidence_map_id": "causal-confidence-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/docs/investigation-contract.md",
+        "workspace/observability/cache-samples.csv",
+        "workspace/observability/request-windows.csv",
+        "workspace/observability/runtime-profile.json"
+      ]
+    },
+    {
+      "evidence_map_id": "bounded-next-check-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/docs/investigation-contract.md",
+        "workspace/observability/cache-samples.csv",
+        "workspace/observability/request-windows.csv",
+        "workspace/package.json",
+        "workspace/scripts/replay-summary.mjs",
+        "workspace/src/cache-key.mjs",
+        "workspace/src/summary-replay.mjs",
+        "workspace/test/integration/summary-replay.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "investigation-precision-basis",
+      "agent_visible_paths": [
+        "task.md",
+        "workspace/docs/investigation-contract.md",
+        "workspace/investigation.schema.json",
+        "workspace/observability/cache-samples.csv",
+        "workspace/observability/release-events.json",
+        "workspace/observability/request-windows.csv",
+        "workspace/observability/runtime-profile.json",
+        "workspace/package.json",
+        "workspace/scripts/validate-investigation.mjs",
+        "workspace/src/cache-key.mjs",
+        "workspace/src/summary-replay.mjs",
+        "workspace/src/summary-service.mjs",
+        "workspace/test/integration/summary-replay.test.mjs",
+        "workspace/test/unit/cache-key.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-cache-key-causal-basis",
+      "target_evidence_map_id": "cache-key-causal-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:46dd542893d7270f2ba095b8bb03db454b48304e1c44c10eb37c6ddb516150cb"
+    },
+    {
+      "mutation_id": "remove-competing-hypothesis-basis",
+      "target_evidence_map_id": "competing-hypothesis-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:8e7911d716fd5f2f8c267b340b1e51fd7a562bfa1d68ab0965b7749f8ded6c47"
+    },
+    {
+      "mutation_id": "remove-causal-confidence-basis",
+      "target_evidence_map_id": "causal-confidence-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:c9a9a54dd3a40ba6143c043f82ec6c25c67f944fdcebd272c75fb4f84186cb94"
+    },
+    {
+      "mutation_id": "remove-bounded-next-check-basis",
+      "target_evidence_map_id": "bounded-next-check-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:fe70f00125795cec7bc2b67817995ab77c17efdcb4523ff852687f2ceeb370d4"
+    },
+    {
+      "mutation_id": "remove-investigation-precision-basis",
+      "target_evidence_map_id": "investigation-precision-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:44204d991c7f3b5c1c603816ba66ddf3e6b400a63336bb247bb3d3fe47b79fd8"
+    }
+  ]
+}

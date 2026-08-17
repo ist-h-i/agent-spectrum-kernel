@@ -1,0 +1,23 @@
+{
+  "output_contract_id": "output-contract-mp-performance-investigation",
+  "output_contract_schema_path": "benchmarks/schemas/portfolio-output-contract.schema.json",
+  "output_contract_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/output-contract.json",
+  "fixture_id": "mp-performance-investigation",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/evaluator-reference.json",
+  "evaluator_public_reference_digest": "sha256:5dff19656bb30934eec8e1d9d98d5d98852fdcd153d635a6bfb6fb2a60f03193",
+  "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/verification-command-contract.json",
+  "verification_command_contract_digest": "sha256:76cbfe0231f5aed9db6ff8b0ff718462dbf76de8197d8e88094a18cf2fdd6ac0",
+  "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/evidence-map.json",
+  "scope_boundary_authority_digest": "sha256:65935ed8132c9280bd72741ba91ee9e9e668145949f2d3b2d6ae8328cdcaa948",
+  "result_profile": {
+    "name": "binary_scope_verification_v1",
+    "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
+  },
+  "declares_findings": true,
+  "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/evaluator-authority-manifest.json",
+  "evaluator_authority_manifest_raw_sha256": "sha256:078799926746936aaed2a7cf273f1c5cf310e3cd7cd7778c523da4cba08bef87",
+  "evaluator_authority_manifest_digest": "sha256:7543e801687a6746b54fbde15fdb2d46e80ba770813af483b17a795981655b28",
+  "output_contract_digest": "sha256:465d6fbb2ad1f3f43cc461e8746c2e0b4a867a5c4505cd205939c8bc7346c5f0"
+}

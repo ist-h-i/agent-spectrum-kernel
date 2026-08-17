@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Summary latency investigation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["overall_assessment", "hypotheses", "next_check", "scope"],
+  "properties": {
+    "overall_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "leading_hypothesis_id", "causal_basis"],
+      "properties": {
+        "status": { "enum": ["supported_not_proven", "insufficient_evidence", "no_regression"] },
+        "leading_hypothesis_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "causal_basis": { "enum": ["association_only", "controlled_intervention"] }
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "mechanism", "state", "confidence", "evidence"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "mechanism": {
+            "enum": [
+              "request_scoped_cache_identity",
+              "traffic_volume",
+              "database_contention",
+              "garbage_collection",
+              "network_or_scheduler",
+              "memory_pressure",
+              "other"
+            ]
+          },
+          "state": { "enum": ["supported", "weakened", "falsified", "unresolved"] },
+          "confidence": { "enum": ["high", "medium", "low"] },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "line", "source_excerpt"],
+              "properties": {
+                "path": { "type": "string", "minLength": 1, "pattern": "\\S" },
+                "line": { "type": "integer", "minimum": 1 },
+                "source_excerpt": { "type": "string", "minLength": 1, "pattern": "\\S" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "next_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis_id",
+        "environment",
+        "action_type",
+        "candidate_identity",
+        "expected_signals",
+        "stop_condition",
+        "read_only",
+        "customer_traffic_change",
+        "runtime_configuration_change",
+        "live_cache_mutation"
+      ],
+      "properties": {
+        "hypothesis_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "environment": { "enum": ["local_replay", "staging_read_only"] },
+        "action_type": { "enum": ["compare_cache_identity_variants", "observe_cache_identity_variants", "state_mutation", "other"] },
+        "candidate_identity": { "enum": ["tenant_window", "current_request_scoped", "other"] },
+        "expected_signals": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "cache_reuse_increase",
+              "summary_builds_decrease",
+              "latency_decrease",
+              "request_rate_decrease",
+              "database_latency_decrease",
+              "gc_pause_decrease",
+              "memory_usage_decrease"
+            ]
+          }
+        },
+        "stop_condition": { "enum": ["signals_do_not_move_together", "time_box_exceeded", "manual_completion", "other"] },
+        "read_only": { "type": "boolean" },
+        "customer_traffic_change": { "type": "boolean" },
+        "runtime_configuration_change": { "type": "boolean" },
+        "live_cache_mutation": { "type": "boolean" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changes_made", "production_action_authorized"],
+      "properties": {
+        "changes_made": { "const": false },
+        "production_action_authorized": { "const": false }
+      }
+    }
+  }
+}

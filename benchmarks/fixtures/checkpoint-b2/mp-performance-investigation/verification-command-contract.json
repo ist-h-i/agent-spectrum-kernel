@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.2.0",
+  "schema_path": "benchmarks/schemas/portfolio-verification-command-contract.schema.json",
+  "program": "adaptive_ask_verification_command_contract",
+  "fixture_id": "mp-performance-investigation",
+  "fixture_input_digest": "sha256:a653cf0fe5cc87ece94f8b5474eedbd6ac6ddfdab8245a0174f98eb496b3d693",
+  "commands": [
+    {
+      "command_id": "investigation-contract-validation",
+      "purpose": "test",
+      "working_directory": {
+        "path": ".",
+        "evidence_requirement": "not_required"
+      },
+      "safe_argv": null,
+      "execution_form": "codex_shell_command",
+      "shell_family": "posix_bash",
+      "shell_envelope": {
+        "executable": "/bin/bash",
+        "arguments": [
+          "-lc"
+        ]
+      },
+      "canonical_script": "node -e 'const fs=require(\"node:fs\"),crypto=require(\"node:crypto\"),expected={\"docs/investigation-contract.md\":\"8a3e33734a99a938ca7d9877cdba7a2aea6b5042973535f68bc7b036a0b34730\",\"investigation.schema.json\":\"c1142ac15bfa14f076269ac8d2bac42e72368d9bafb956176e0a10bee6b5ce9d\",\"observability/cache-samples.csv\":\"7297c1571180430aea2960bb3ba8cd0036129186b32ca47912910d46edcb9dea\",\"observability/release-events.json\":\"cb5a2089e125a916aa8aa54b20aac7229bca4b7c919a483923336dcbb3be92ab\",\"observability/request-windows.csv\":\"ad7bf355676756e65f2dcf083342f19c2fd9154d0ee4197afa2d22f1a34dd586\",\"observability/runtime-profile.json\":\"c1d9fcfb5e07be1e3ca9fb99a82ca2013c441a7e533663f35f14001994a20e9f\",\"package-lock.json\":\"97fc14e0c5101f36d9f2a2d8bab661f6035a048673095e85e24bb01174cdf249\",\"package.json\":\"44957dce8f4188fce24c7a9821749452aab47dcc729ea42b37dded0f267aa1a8\",\"scripts/replay-summary.mjs\":\"1b5857ac8ec3850c949f3b43c8bf10b1683ed8aeb51759a551a155326c2c9e7d\",\"scripts/validate-investigation.mjs\":\"926c7b2f91528a4fbed8a36fe9daac56c8d50dd8e27761a937f8d75cc52f2e1a\",\"src/cache-key.mjs\":\"9aceecf523cedd945f813818912fea2fa3a3599b8620caf0c45f058bd52eabc4\",\"src/summary-replay.mjs\":\"4ab87839f3de6f809e53b485c6b19e0d82ea90ec3d5b3dc3b9da0890a10b4813\",\"src/summary-service.mjs\":\"fdc8a4c6d57e67a01f1a91c7f9d5bc0c51d120562dbb02b29fc18400c45e4e62\",\"test/integration/summary-replay.test.mjs\":\"be4e26456aab01bf0d74430a551e0bc2d9ff6142c843af9ae6d690347ec7f1d7\",\"test/unit/cache-key.test.mjs\":\"6d00d1c70f6c595c6e3dcb7dd09ad8438c2802a3aa2ef8b32995c12a19853ce7\"};for(const [path,digest] of Object.entries(expected)){if(crypto.createHash(\"sha256\").update(fs.readFileSync(path)).digest(\"hex\")!==digest)process.exit(41)}' && npm run validate:investigation",
+      "requirement": "required",
+      "alternative_group_id": null,
+      "timeout_ms": 60000,
+      "logical_command_digest": "sha256:d2a482397274dcdb832d518e0bb8430a8ab1785b72609db2fc19973d9b5c9642",
+      "rendered_event_command_digest": "sha256:79eaaa3241a2ea6e1fa3962effd963814e1d7f03dda6c8cec2d6428f36d11d31",
+      "command_contract_digest": "sha256:8023656ef993a8ce71f68449183f978f9401eccd39501119562530afe21584fa"
+    }
+  ],
+  "contract_digest": "sha256:76cbfe0231f5aed9db6ff8b0ff718462dbf76de8197d8e88094a18cf2fdd6ac0"
+}
