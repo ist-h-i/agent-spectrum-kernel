@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "fixture_id": "mp-iac-rollback-design",
   "candidate_input_digest": "sha256:1c4410249959473825cc8bc58ac608aaaa11535d49f0a1ecb993026caf5b31f6",
-  "candidate_evaluator_digest": "sha256:916678fa53054e67b69d2a156c61467ecdddd6a048a50bcd88acc0b929b175f3",
+  "candidate_evaluator_digest": "sha256:70c49f43d24b51adb7c14077442afd85315ffa4acc3400cefe90e53da5c91b50",
   "reviewer_status": "pending_independent_review",
   "author_self_approval": false,
   "admission_status": "admission_pending",
@@ -121,5 +121,5 @@
       "result": "not_applicable"
     }
   ],
-  "review_package_digest": "sha256:13a64e13defb250c1d73ee2510febfadb6133f9355928eb0ae049c4578ff4b9b"
+  "review_package_digest": "sha256:b5c55ca2d1adf5b10c2f4fe419c01a35e14bf812993a9740c390909b3081bdbf"
 }
