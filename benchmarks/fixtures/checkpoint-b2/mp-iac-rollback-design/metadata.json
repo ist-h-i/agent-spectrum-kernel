@@ -1,4 +1,33 @@
 {
+  "schema_version": "1.0.0",
   "fixture_id": "mp-iac-rollback-design",
-  "candidate_state": "generation_pending"
+  "fixture_role": "primary",
+  "suite": "mechanism_positive",
+  "task_class": "design_gate",
+  "domain": "iac_cloud",
+  "difficulty": "hard",
+  "repetitions": 3,
+  "risk_boundary": "approval_required",
+  "capability_families": [
+    "contract_design",
+    "rollback_planning",
+    "scope_control"
+  ],
+  "evidence_topologies": [
+    "operational_plan_and_state",
+    "rollback_plan_and_state"
+  ],
+  "outcome_dimensions": [
+    "rollback_truthfulness",
+    "scope_discipline"
+  ],
+  "output_contract_type": "design_or_operation_plan_producing",
+  "requirement_record_id": "requirement-record-mp-iac-rollback-design",
+  "output_contract_id": "output-contract-mp-iac-rollback-design",
+  "evaluator_bundle_id": "evaluator-67ca3b563046a1b64eb9a181461c0c3d290c705cc2b423ef8226211c1aff20db",
+  "evaluator_bundle_digest": "sha256:c5d1d9c4003486095362a3d993fdf5497d2982f55d26052276089179a4f89b1f",
+  "evaluator_byte_count": 153282,
+  "review_status": "pending_independent_review",
+  "measured_execution_performed": false,
+  "metadata_digest": "sha256:be3d2f181d465decd616dc64197a440ddf532d3769bbd6454ecb11099079b5f1"
 }
