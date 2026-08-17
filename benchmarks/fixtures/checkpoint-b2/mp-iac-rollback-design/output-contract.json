@@ -6,7 +6,7 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:21293fb44ab6e78ea62de469dd2f8a2a8f3ad46e0f98846687f676227baf7173",
+  "evaluator_public_reference_digest": "sha256:a35689588f2584d52c1e51d0c0a5791278ef674693194c503b8af4da57e986bb",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/verification-command-contract.json",
   "verification_command_contract_digest": "sha256:604978fcd13de754e4f614a9300885af97d695b027513c4b71f573632e354b35",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/evidence-map.json",
@@ -17,7 +17,7 @@
   },
   "declares_findings": false,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:4bf3bf002cec42fae9c3efab49034e83dadf5277c2dfc678103ffad2808e7215",
-  "evaluator_authority_manifest_digest": "sha256:58b77b5fb802883b88f12713d0d828281dbbf03594ad583af5f008b212fd38fc",
-  "output_contract_digest": "sha256:47cc08827d2a8753f03f4db3264ca577847acbfde3867883f9b71c4913693954"
+  "evaluator_authority_manifest_raw_sha256": "sha256:ebd327b011a9029caf14e672c368c570c618047e224676301368da31bcf8ffb3",
+  "evaluator_authority_manifest_digest": "sha256:b23b6b210d7237a788efd5b480e23485a252578da9464f7712aac12295ffd5a1",
+  "output_contract_digest": "sha256:1df4ed212b9528eec307a212c0820c646765d332813752d94ab226d98a7c52a5"
 }
