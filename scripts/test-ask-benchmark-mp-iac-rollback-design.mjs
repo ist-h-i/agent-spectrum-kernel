@@ -30,6 +30,27 @@ function clone(value) {
   return structuredClone(value);
 }
 
+function validatePrivateEvidenceMapClosure({ requirement, evidenceMap, oracle }) {
+  const maps = new Map(evidenceMap.maps.map((entry) => [entry.evidence_map_id, entry]));
+  for (const entry of requirement.requirements) {
+    const mappedPaths = new Set(entry.evidence_map_ids.flatMap((id) => {
+      const map = maps.get(id);
+      assert.ok(map, `${entry.requirement_id} evidence map must exist: ${id}`);
+      return map.agent_visible_paths.map((path) => path.replace(/^workspace\//u, ""));
+    }));
+    const basisPaths = oracle.basis_paths[entry.requirement_id];
+    assert.ok(Array.isArray(basisPaths), `${entry.requirement_id} private basis paths must exist`);
+    assert.deepEqual([...mappedPaths].sort(), [...basisPaths].sort(), `${entry.requirement_id} public map must equal the private direct-source basis`);
+    for (const group of oracle.required_evidence_groups[entry.requirement_id] ?? []) {
+      for (const citationId of group) {
+        const citation = oracle.citations[citationId];
+        assert.ok(citation, `${entry.requirement_id} citation option must exist: ${citationId}`);
+        assert.ok(mappedPaths.has(citation.path), `${entry.requirement_id} citation option must be recoverable from its public map: ${citationId}`);
+      }
+    }
+  }
+}
+
 function evaluatorSemanticProjection(result) {
   return {
     evaluation_status: result.evaluation_status,
@@ -514,6 +535,8 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
 
   const admission = readJson(resolve(FIXTURE_ROOT, "final-admission-record.json"));
   const evidenceMap = readJson(resolve(FIXTURE_ROOT, "evidence-map.json"));
+  const oracle = readJson(resolve(privateRoot, "oracle.json"));
+  validatePrivateEvidenceMapClosure({ requirement, evidenceMap, oracle });
   const inputRecord = readJson(resolve(FIXTURE_ROOT, "input-manifest.json")).fixtures[FIXTURE_ID];
   const mutationAsset = readJson(resolve(privateRoot, "evidence-removal-mutations.json"));
   const equivalenceAsset = readJson(resolve(privateRoot, "equivalent-solutions.json"));
