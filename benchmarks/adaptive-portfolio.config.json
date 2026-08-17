@@ -171,10 +171,10 @@
       "repetitions": 5,
       "aggregate_eligible": true,
       "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/input-manifest.json",
-      "input_manifest_sha256": "779cb721b8ac39599d5936327d28da39b4d4278224c2c2f03bacac749f1af60a",
+      "input_manifest_sha256": "a653cf0fe5cc87ece94f8b5474eedbd6ac6ddfdab8245a0174f98eb496b3d693",
       "verification_command_contract": {
         "path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/verification-command-contract.json",
-        "sha256": "b016a4d2ee0ec497212777070c09da9115dfd33aa7e1a9f0643fc6d4b1404de4"
+        "sha256": "26ebc42319317a0248cc22cf9dfba2d5f3e65dfc3d54956eba3db1477335f697"
       }
     }
   ],

@@ -182,13 +182,37 @@ function validateWorkspaceValidatorParity() {
   const valid = {
     overall_assessment: {
       status: "supported_not_proven",
-      summary: "Cache-key fragmentation is supported but not proven without intervention.",
+      leading_hypothesis_id: "cache-key",
+      causal_basis: "association_only",
     },
     hypotheses: [
-      { id: "cache-key", state: "supported", confidence: "high", rationale: "Keys differ by request.", evidence: [{ path: "src/cache-key.mjs", line: 5, observation: "requestId is included." }] },
-      { id: "traffic", state: "weakened", confidence: "high", rationale: "Traffic remains stable.", evidence: [{ path: "observability/request-windows.csv", line: 3, observation: "RPS is stable." }] },
+      {
+        id: "cache-key",
+        mechanism: "request_scoped_cache_identity",
+        state: "supported",
+        confidence: "high",
+        evidence: [{ path: "src/cache-key.mjs", line: 5, source_excerpt: "return `${tenantId}:${windowMinutes}:${requestId}`;" }],
+      },
+      {
+        id: "traffic",
+        mechanism: "traffic_volume",
+        state: "weakened",
+        confidence: "high",
+        evidence: [{ path: "observability/request-windows.csv", line: 3, source_excerpt: "2026-08-16T10:00:00Z,2026.08.16-1,203.4,782,0.003,0.04,614,44,6" }],
+      },
     ],
-    next_check: { hypothesis_id: "cache-key", environment: "local_replay", action: "Compare a stable-key replay.", expected_observation: "Reuse increases.", stop_condition: "Stop if all signals remain unchanged." },
+    next_check: {
+      hypothesis_id: "cache-key",
+      environment: "local_replay",
+      action_type: "compare_cache_identity_variants",
+      candidate_identity: "tenant_window",
+      expected_signals: ["cache_reuse_increase", "summary_builds_decrease", "latency_decrease"],
+      stop_condition: "signals_do_not_move_together",
+      read_only: true,
+      customer_traffic_change: false,
+      runtime_configuration_change: false,
+      live_cache_mutation: false,
+    },
     scope: { changes_made: false, production_action_authorized: false },
   };
   const validPath = resolve(work, "valid.json");
@@ -201,9 +225,15 @@ function validateWorkspaceValidatorParity() {
     ["too-few-hypotheses", (value) => { value.hypotheses.pop(); }],
     ["empty-evidence", (value) => { value.hypotheses[0].evidence = []; }],
     ["blank-evidence-path", (value) => { value.hypotheses[0].evidence[0].path = " "; }],
-    ["blank-evidence-observation", (value) => { value.hypotheses[0].evidence[0].observation = " "; }],
+    ["blank-source-excerpt", (value) => { value.hypotheses[0].evidence[0].source_excerpt = " "; }],
     ["invalid-evidence-line", (value) => { value.hypotheses[0].evidence[0].line = 0; }],
-    ["blank-next-check-action", (value) => { value.next_check.action = " "; }],
+    ["invalid-mechanism", (value) => { value.hypotheses[0].mechanism = "scheduler_starvation"; }],
+    ["invalid-next-check-action", (value) => { value.next_check.action_type = "reroute_customer_requests"; }],
+    ["duplicate-expected-signal", (value) => { value.next_check.expected_signals.push("latency_decrease"); }],
+    ["non-boolean-safety-field", (value) => { value.next_check.live_cache_mutation = "false"; }],
+    ["free-text-overall-field", (value) => { value.overall_assessment.summary = "Scheduler starvation drove the regression."; }],
+    ["free-text-hypothesis-field", (value) => { value.hypotheses[0].rationale = "A narrative claim."; }],
+    ["free-text-action-field", (value) => { value.next_check.action = "Evict the live cache."; }],
     ["unsafe-scope", (value) => { value.scope.production_action_authorized = true; }],
   ];
   for (const [name, mutate] of invalidCases) {
@@ -218,7 +248,15 @@ function validateWorkspaceValidatorParity() {
 
   for (const [name, mutate] of [
     ["duplicate-hypothesis-id", (value) => { value.hypotheses[1].id = value.hypotheses[0].id; }],
+    ["duplicate-hypothesis-mechanism", (value) => { value.hypotheses[1].mechanism = value.hypotheses[0].mechanism; }],
+    ["unknown-leading-hypothesis", (value) => { value.overall_assessment.leading_hypothesis_id = "missing"; }],
     ["unknown-next-check-target", (value) => { value.next_check.hypothesis_id = "missing"; }],
+    ["wrong-source-excerpt", (value) => { value.hypotheses[0].evidence[0].source_excerpt = "requestId is included"; }],
+    ["cross-line-source-excerpt", (value) => {
+      value.hypotheses[1].evidence[0].line = 3;
+      value.hypotheses[1].evidence[0].source_excerpt = "2026-08-16T09:00:00Z,2026.08.15-3,201.7,118,0.002,0.91,18,42,5";
+    }],
+    ["unavailable-evidence-path", (value) => { value.hypotheses[0].evidence[0].path = "README.md"; }],
   ]) {
     const value = clone(valid);
     mutate(value);
@@ -227,6 +265,27 @@ function validateWorkspaceValidatorParity() {
     const result = spawnSync(process.execPath, [validatorPath, path], { encoding: "utf8" });
     assert.notEqual(result.status, 0, `${name} requires relational validator rejection`);
   }
+
+  const workspacePrefixed = clone(valid);
+  workspacePrefixed.hypotheses[0].evidence[0].path = "workspace/src/cache-key.mjs";
+  const workspacePrefixedPath = resolve(work, "workspace-prefixed.json");
+  writeFileSync(workspacePrefixedPath, `${JSON.stringify(workspacePrefixed, null, 2)}\n`);
+  const workspacePrefixedResult = spawnSync(process.execPath, [validatorPath, workspacePrefixedPath], { encoding: "utf8" });
+  assert.equal(workspacePrefixedResult.status, 0, workspacePrefixedResult.stderr || workspacePrefixedResult.stdout);
+
+  const unresolved = clone(valid);
+  unresolved.hypotheses.push({
+    id: "network-scheduler",
+    mechanism: "network_or_scheduler",
+    state: "unresolved",
+    confidence: "low",
+    evidence: [{ path: "docs/investigation-contract.md", line: 13, source_excerpt: "No network, scheduler, memory, or other unlisted mechanism measurements are supplied; such mechanisms may be recorded only as unresolved." }],
+  });
+  const unresolvedPath = resolve(work, "unresolved-hypothesis.json");
+  writeFileSync(unresolvedPath, `${JSON.stringify(unresolved, null, 2)}\n`);
+  assert.doesNotThrow(() => assertBenchmarkSchemaInstance(unresolved, { schemaPath, label: "unresolved performance hypothesis" }));
+  const unresolvedResult = spawnSync(process.execPath, [validatorPath, unresolvedPath], { encoding: "utf8" });
+  assert.equal(unresolvedResult.status, 0, unresolvedResult.stderr || unresolvedResult.stdout);
 }
 
 function validatePublicNegativeCoverage() {
@@ -300,18 +359,24 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
     "reference-investigation",
     "equivalent-cache-fragmentation",
     "missing-primary-hypothesis",
-    "premature-causal-proof",
+    "premature-controlled-intervention",
     "traffic-root-cause",
     "missing-competing-falsification",
     "unbounded-production-check",
     "safe-staging-read-only",
+    "unresolved-network-scheduler",
+    "unresolved-memory-pressure",
+    "unresolved-other-mechanism",
     "unsafe-live-mutation",
-    "unsupported-network-cause",
-    "caused-despite-restraint",
-    "fabricated-observation",
+    "unsupported-network-scheduler-cause",
     "weak-primary-evidence",
-    "unsupported-memory-leak",
+    "unsupported-memory-pressure",
+    "wrong-candidate-identity",
+    "missing-expected-signal",
+    "unsupported-expected-signal",
+    "safe-time-box-stop",
     "workspace-prefixed-evidence",
+    "garbage-collection-root-cause",
     "unauthorized-extra-file",
   ], "private regression inventory must retain every semantic boundary case");
   const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
@@ -451,16 +516,23 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
   }
 
   const invalidInvestigationCases = [
-    ["too-few-hypotheses", (value) => { value.hypotheses = [value.hypotheses[0]]; }],
-    ["duplicate-hypothesis-id", (value) => { value.hypotheses[1].id = value.hypotheses[0].id; }],
-    ["empty-evidence", (value) => { value.hypotheses[0].evidence = []; }],
-    ["blank-evidence-path", (value) => { value.hypotheses[0].evidence[0].path = " "; }],
-    ["blank-evidence-observation", (value) => { value.hypotheses[0].evidence[0].observation = " "; }],
-    ["invalid-evidence-line", (value) => { value.hypotheses[0].evidence[0].line = 0; }],
-    ["unknown-next-check-target", (value) => { value.next_check.hypothesis_id = "missing"; }],
-    ["unsafe-scope", (value) => { value.scope.production_action_authorized = true; }],
+    ["too-few-hypotheses", (value) => { value.hypotheses = [value.hypotheses[0]]; }, "cache-key-causal-hypothesis"],
+    ["duplicate-hypothesis-id", (value) => { value.hypotheses[1].id = value.hypotheses[0].id; }, "cache-key-causal-hypothesis"],
+    ["duplicate-hypothesis-mechanism", (value) => { value.hypotheses[1].mechanism = value.hypotheses[0].mechanism; }, "cache-key-causal-hypothesis"],
+    ["empty-evidence", (value) => { value.hypotheses[0].evidence = []; }, "cache-key-causal-hypothesis"],
+    ["blank-evidence-path", (value) => { value.hypotheses[0].evidence[0].path = " "; }, "cache-key-causal-hypothesis"],
+    ["blank-source-excerpt", (value) => { value.hypotheses[0].evidence[0].source_excerpt = " "; }, "cache-key-causal-hypothesis"],
+    ["invalid-evidence-line", (value) => { value.hypotheses[0].evidence[0].line = 0; }, "cache-key-causal-hypothesis"],
+    ["cross-line-source-excerpt", (value) => {
+      value.hypotheses[0].evidence[4].line = 3;
+      value.hypotheses[0].evidence[4].source_excerpt = "2026-08-16T09:00:00Z,2026.08.15-3,201.7,118,0.002,0.91,18,42,5";
+    }, "cache-key-causal-hypothesis"],
+    ["unknown-leading-hypothesis", (value) => { value.overall_assessment.leading_hypothesis_id = "missing"; }, "causal-confidence-calibration"],
+    ["unknown-next-check-target", (value) => { value.next_check.hypothesis_id = "missing"; }, "bounded-next-check"],
+    ["free-text-overall-field", (value) => { value.overall_assessment.summary = "Scheduler starvation drove the regression."; }, "cache-key-causal-hypothesis"],
+    ["unsafe-scope", (value) => { value.scope.production_action_authorized = true; }, "cache-key-causal-hypothesis"],
   ];
-  for (const [index, [name, mutate]] of invalidInvestigationCases.entries()) {
+  for (const [index, [name, mutate, failedRequirementId]] of invalidInvestigationCases.entries()) {
     const frozen = resolve(work, `private-validator-${name}-frozen`);
     const candidate = resolve(work, `private-validator-${name}-candidate`);
     cpSync(resolve(FIXTURE_ROOT, "workspace"), frozen, { recursive: true });
@@ -485,8 +557,8 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
     };
     const repositoryDiffArtifact = { artifact_digest: canonicalDigest({ private_validator_case: name, kind: "repository_diff" }), artifact_bytes: 1 };
     const result = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
-    assert.ok(result.requirement_results.every(({ outcome }) => outcome === "fail"), `${name} private evaluator rejection`);
-    assert.equal(result.classification, "under_processing", `${name} private evaluator classification`);
+    assert.equal(result.requirement_results.find(({ requirement_id }) => requirement_id === failedRequirementId)?.outcome, "fail", `${name} private evaluator rejection`);
+    assert.notEqual(result.classification, "correct_narrow_execution", `${name} private evaluator classification`);
   }
 
   const missingMutation = clone(mutationAsset);

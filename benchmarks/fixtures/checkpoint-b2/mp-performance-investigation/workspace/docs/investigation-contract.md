@@ -9,4 +9,5 @@ The next check must be bounded to a local replay or read-only staging observatio
 
 The summary cache is intended to reuse an entry for the same `tenantId` and `windowMinutes` during its 60-second lifetime.
 `requestId` is trace metadata and is not part of the reusable summary identity.
-Every material conclusion must cite a supplied path and line.
+Every material conclusion must cite a supplied path and line and copy that exact trimmed line into `source_excerpt`.
+No network, scheduler, memory, or other unlisted mechanism measurements are supplied; such mechanisms may be recorded only as unresolved.
