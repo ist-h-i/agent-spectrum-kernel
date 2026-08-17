@@ -2,16 +2,16 @@
   "schema_version": "1.0.0",
   "schema_path": "benchmarks/schemas/evaluator-reference.schema.json",
   "program": "adaptive_ask_evaluator_reference",
-  "evaluator_bundle_id": "evaluator-67ca3b563046a1b64eb9a181461c0c3d290c705cc2b423ef8226211c1aff20db",
-  "evaluator_bundle_digest": "sha256:c5d1d9c4003486095362a3d993fdf5497d2982f55d26052276089179a4f89b1f",
+  "evaluator_bundle_id": "evaluator-756a61767a86a744882f4935faf0370186c28b8e7d5904ab6509e7179965788f",
+  "evaluator_bundle_digest": "sha256:7fbb5c73f38fcaf55344d49405b29f8ec7681a0c8d0c4475fd7e7f40e4ecd5ae",
   "evaluator_bundle_schema_version": "1.0.0",
   "fixture_id": "mp-iac-rollback-design",
-  "fixture_input_digest": "sha256:624a80e14d92c59dca38cba5117b77f2f69c9c2533f710bbf20633db48877619",
+  "fixture_input_digest": "sha256:1c4410249959473825cc8bc58ac608aaaa11535d49f0a1ecb993026caf5b31f6",
   "task_class": "design_gate",
   "suite": "mechanism_positive",
-  "evaluator_revision": "c5b8734d5dc370551170c98f8c2f4b113539f2e2",
+  "evaluator_revision": "baf16157a4c57b0cab9196c2b3236154eaf46174",
   "evaluator_source_identity": {
-    "base_git_revision": "c5b8734d5dc370551170c98f8c2f4b113539f2e2",
+    "base_git_revision": "baf16157a4c57b0cab9196c2b3236154eaf46174",
     "source_tree_digest": "sha256:11814720a7b993e4d54aca3ea14f41ca9f52c5c3b11d606f0df0d9ed1b33f5d3",
     "generator_source_digest": "sha256:d1be7df7b5919f9f06b960c366b4bfd37aba1809fccc87eb64e9dfbb4eb5ae8a",
     "source_files": [
@@ -1448,11 +1448,11 @@
     }
   },
   "generator_identity": "sha256:64a672fda886fca61276c313d8db85510012a64c0bee9afe42761430f2296f84",
-  "independence_statement_digest": "sha256:4290c30ba46afaaf0d1b357708620bef985703d68d61c374c0213173778d89a4",
-  "review_record_digest": "sha256:1c5f3d84429f593212304a880578943adab872ac71091111497d9b66db521ab9",
+  "independence_statement_digest": "sha256:fbf2402173cc5e6e01b61b3941818e6a811a8514dddfc3337f35a0ffd2a653cc",
+  "review_record_digest": "sha256:412afe3a7c84f0b4a16770ff543df11794f3caef17dafc0ccf569fa74d000d90",
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:f65ead53ee9cd2ecf472e2407f01a1bf5e94d6451183eb61ac3be493a83a82d6",
-  "evaluator_authority_manifest_digest": "sha256:b8a53046149d3751719a514fc4bd21fdf08310dc76dfc7797a56f7215e657e3d",
+  "evaluator_authority_manifest_raw_sha256": "sha256:0a657039f95b5db9d542c96087be6dbf1697742cbfa83fe6c6219d92baf31331",
+  "evaluator_authority_manifest_digest": "sha256:cafbe20aa91a31d4b8b1fdfb647002623352b7f12d73af7a4967e121c312ee47",
   "storage_class": "private_evaluator",
-  "public_metadata_digest": "sha256:912e37e3838623f32af319368d94aeaa6a08da8508a0b0452dbe425d5f1278a5"
+  "public_metadata_digest": "sha256:5b4e460400db5d398ea41f5650407e70325642e2a96f2ac8d994818d68d03b84"
 }
