@@ -75,6 +75,9 @@ jobs:
       - name: Run frontend state review fixture source-freeze tests
         run: node scripts/test-ask-benchmark-mp-frontend-state-review.mjs
 
+      - name: Run IaC rollback design fixture source-freeze tests
+        run: node scripts/test-ask-benchmark-mp-iac-rollback-design.mjs
+
       - name: Run performance investigation fixture source-freeze tests
         run: node scripts/test-ask-benchmark-mp-performance-investigation.mjs
 

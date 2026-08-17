@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "mp-iac-rollback-design": {
+      "class": "design_gate",
+      "difficulty": "hard",
+      "target_minutes": 30,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "ab5f7daada66bb1987a8b673b72a6bd1a2f7f3969a4111448529c5e545c771f7",
+          "bytes": 774
+        },
+        {
+          "path": "workspace/change-plan.schema.json",
+          "sha256": "b6d8624c39a486926a3e673fb31aca3c3b1690041c5395316a1c1ad3682821bd",
+          "bytes": 5060
+        },
+        {
+          "path": "workspace/docs/change-request.md",
+          "sha256": "24458fee92c2ed7fa5bfe95f56af6911f1b8639ff10b8ac110c00395c6916c00",
+          "bytes": 946
+        },
+        {
+          "path": "workspace/docs/knowledge-policy.md",
+          "sha256": "0ad8630575f77faefcb66610d58bf8946f7365f89319f4abd2753d2dc66137b8",
+          "bytes": 781
+        },
+        {
+          "path": "workspace/docs/rollback-policy.md",
+          "sha256": "050283401cd2f99f120cc41ced0fc3a33195e1e5d9daae1acb4588264d866d3d",
+          "bytes": 757
+        },
+        {
+          "path": "workspace/infra/alias.tf",
+          "sha256": "6d9ebfd9960efe5c773b4c6e01423041a269c7145c2b02239727281c6f3108a6",
+          "bytes": 215
+        },
+        {
+          "path": "workspace/infra/iam.tf",
+          "sha256": "225e670871ac615237ede92602f96400bf9e84b2dbbc44493e88b6aa1e5498ba",
+          "bytes": 361
+        },
+        {
+          "path": "workspace/operations/commands.json",
+          "sha256": "e8807a8289288edb4881104b4cd773b0e1f34ebab685e201481be5126bbe2db3",
+          "bytes": 1098
+        },
+        {
+          "path": "workspace/package-lock.json",
+          "sha256": "913b787bd230691adf255631664e80b87e6a1ae1478fb1f1e4f73ec7a17abac5",
+          "bytes": 268
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "a2f69220942a021487ab441d25d013d427320103a85f2845221758e381ec9377",
+          "bytes": 249
+        },
+        {
+          "path": "workspace/plans/candidate-plan.json",
+          "sha256": "ae22f7b6f66f252b12530a951592d398be08c56c5702e12bd926f95bffb8f916",
+          "bytes": 697
+        },
+        {
+          "path": "workspace/scripts/validate-change-plan.mjs",
+          "sha256": "d66e79eb6fd5c59f69143b9f4b9ddfa3855943a51069b79b5a2bb3111cbc424c",
+          "bytes": 7227
+        },
+        {
+          "path": "workspace/state/current-state.json",
+          "sha256": "153f59ae462f3a68017ee8cad14548ae83407fd654a220c6733e6b1631621e18",
+          "bytes": 583
+        }
+      ]
+    }
+  }
+}

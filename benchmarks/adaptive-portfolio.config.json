@@ -164,6 +164,20 @@
       }
     },
     {
+      "id": "mp-iac-rollback-design",
+      "suite": "mechanism_positive",
+      "task_class": "design_gate",
+      "difficulty": "hard",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/input-manifest.json",
+      "input_manifest_sha256": "624a80e14d92c59dca38cba5117b77f2f69c9c2533f710bbf20633db48877619",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/verification-command-contract.json",
+        "sha256": "65d48a4ce9e8d4458e06e7f4f86d0112aa637ee215a394b13b270deb1286c0bb"
+      }
+    },
+    {
       "id": "mp-performance-investigation",
       "suite": "mechanism_positive",
       "task_class": "investigation",
