@@ -50,7 +50,7 @@
       "evidence_map_id": "approval-boundary-basis",
       "agent_visible_paths": [
         "workspace/docs/change-request.md",
-        "workspace/operations/commands.json",
+        "workspace/plans/candidate-plan.json",
         "workspace/state/current-state.json"
       ]
     },
@@ -107,7 +107,7 @@
       "target_evidence_map_id": "approval-boundary-basis",
       "expected_recoverability_state": "not_recoverable",
       "expected_admission_result": "fail",
-      "mutation_digest": "sha256:0d33497737b385fb7529ff7218d81bb6dfa13110734effa8d63fd8b20fccd754"
+      "mutation_digest": "sha256:87257d0dd435747f2cde8414ec4acb8cd2480a27231d07ac0dc5bf8857e2123b"
     },
     {
       "mutation_id": "remove-rollback-truth-basis",
