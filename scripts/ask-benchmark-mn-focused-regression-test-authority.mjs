@@ -146,7 +146,7 @@ export function buildMnFocusedRegressionTestAuthority() {
   const publicMutations = mutations.map(({ mutation_id, target_evidence_map_id, expected_recoverability_state, expected_admission_result, mutation_digest }) => ({ mutation_id, target_evidence_map_id, expected_recoverability_state, expected_admission_result, mutation_digest }));
   const evidenceMap = { schema_version: "1.0.0", fixture_id: MN_FOCUSED_REGRESSION_FIXTURE_ID, scope_boundary_authority: { ...scopeBase, authority_digest: canonicalDigest(scopeBase) }, maps, mutation_contracts: publicMutations };
   const equivalenceSeeds = [
-    ["equivalent-mutation-catching-regression", "regression-behavior-coverage", ["baseline_test_pass", "known_regression_mutation_rejected", "syntax_independent_assertion", "observable_behavior"]],
+    ["equivalent-mutation-catching-regression", "regression-behavior-coverage", ["baseline_test_pass", "known_regression_mutation_rejected", "existing_observable_coverage_preserved", "syntax_independent_assertion", "mechanism_independent_assertion", "observable_behavior"]],
     ["equivalent-production-preservation", "production-behavior-preservation", ["production_bytes_unchanged", "documented_behavior_preserved", "observable_behavior"]],
     ["equivalent-focused-test-change", "request-scope-discipline", ["existing_focused_test_file", "no_unrelated_change", "investigation_without_mutation", "observable_behavior"]],
     ["equivalent-focused-verification", "verification-evidence", ["repository_command_evidence", "successful_exit", "observable_behavior"]],

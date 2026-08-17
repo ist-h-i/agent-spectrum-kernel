@@ -333,7 +333,7 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   const work = mkdtempSync(resolve(tmpdir(), "mn-focused-regression-private-"));
   const cases = readJson(resolve(caseRoot, "cases.json"));
   assert.equal(cases.fixture_id, FIXTURE_ID);
-  assert.equal(cases.cases.length, 37, "private regression inventory must remain closed");
+  assert.equal(cases.cases.length, 39, "private regression inventory must remain closed");
   assert.equal(new Set(cases.cases.map(({ case_id }) => case_id)).size, cases.cases.length);
   let production = null;
   let externalAuthorityAnchor = null;
@@ -398,9 +398,46 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
     assert.deepEqual(first, second, `${entry.case_id} evaluator determinism`);
     assertBenchmarkSchemaInstance(first, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} private fragment` });
     assert.deepEqual(evaluatorProjection(first), expectedProjection(entry, normalized, diffArtifact), `${entry.case_id} complete private evaluator projection`);
+    const rerunOutcomes = new Map(first.evaluator_rerun.results.map(({ command_id, outcome }) => [command_id, outcome]));
+    if (entry.case_id === "reference-separate-regression") {
+      assert.deepEqual(
+        [
+          "mixed-case-lowercasing-control-test",
+          "tenant-trim-control-test",
+          "empty-region-validation-control-test",
+        ].map((commandId) => rerunOutcomes.get(commandId)),
+        ["succeeded", "succeeded", "succeeded"],
+        "observable reference coverage must pass every mechanism-independent control",
+      );
+      assert.deepEqual(
+        [
+          "mixed-case-lowercasing-mutant-test",
+          "tenant-trim-mutant-test",
+          "empty-region-validation-mutant-test",
+        ].map((commandId) => rerunOutcomes.get(commandId)),
+        ["failed", "failed", "failed"],
+        "observable reference coverage must reject the requested and retained-behavior mutants",
+      );
+    }
     if (entry.case_id === "patched-trim-masks-real-source-mutation") {
-      assert.deepEqual(first.evaluator_rerun.results.slice(1).map(({ outcome }) => outcome), ["succeeded", "succeeded"], "real source mutation masking must survive both the control and exact source mutant");
+      assert.equal(rerunOutcomes.get("mixed-case-lowercasing-control-test"), "succeeded", "real source mutation masking must pass the behavior-preserving control");
+      assert.equal(rerunOutcomes.get("mixed-case-lowercasing-mutant-test"), "succeeded", "real source mutation masking must survive the exact source mutant");
       assert.equal(first.requirement_results[0].outcome, "fail", "real source mutation masking must fail regression behavior coverage");
+    }
+    if (entry.case_id === "lowercase-mechanism-observation-without-output") {
+      assert.equal(rerunOutcomes.get("candidate-focused-test"), "succeeded", "mechanism observation candidate must pass the supplied implementation");
+      assert.equal(rerunOutcomes.get("mixed-case-lowercasing-control-test"), "failed", "private equivalent control must hide lowercasing mechanism calls");
+      assert.equal(rerunOutcomes.get("mixed-case-lowercasing-mutant-test"), "failed", "exact source mutant must not become distinguishable through lowercasing call observation");
+      assert.equal(first.requirement_results[0].outcome, "fail", "mechanism observation must not establish regression behavior coverage");
+    }
+    if (entry.case_id === "mixed-case-only-replaces-existing-suite") {
+      assert.equal(rerunOutcomes.get("mixed-case-lowercasing-control-test"), "succeeded", "mixed-case-only candidate must retain the requested boundary");
+      assert.equal(rerunOutcomes.get("mixed-case-lowercasing-mutant-test"), "failed", "mixed-case-only candidate must reject lowercasing removal");
+      assert.equal(rerunOutcomes.get("tenant-trim-control-test"), "succeeded", "tenant-trim control must preserve candidate behavior");
+      assert.equal(rerunOutcomes.get("tenant-trim-mutant-test"), "succeeded", "mixed-case-only candidate must expose missing tenant-trim coverage");
+      assert.equal(rerunOutcomes.get("empty-region-validation-control-test"), "succeeded", "empty-region control must preserve candidate behavior");
+      assert.equal(rerunOutcomes.get("empty-region-validation-mutant-test"), "succeeded", "mixed-case-only candidate must expose missing empty-region coverage");
+      assert.equal(first.requirement_results[0].outcome, "fail", "replacing the suite with one boundary test must not count as extending it");
     }
     if (entry.case_id === "unauthorized-extra-file") {
       assert.equal(first.under_processing.state, "not_detected", "pure scope deviation must not be reported as under-processing");
@@ -418,6 +455,8 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   }
   assert.ok(cases.cases.some(({ case_id }) => case_id === "focused-test-replaced-by-directory"), "directory type replacement must remain in the private case inventory");
   assert.ok(cases.cases.some(({ case_id }) => case_id === "patched-trim-masks-real-source-mutation"), "real source mutation masking must remain in the private case inventory");
+  assert.ok(cases.cases.some(({ case_id }) => case_id === "lowercase-mechanism-observation-without-output"), "mechanism-observation negative must remain in the private case inventory");
+  assert.ok(cases.cases.some(({ case_id }) => case_id === "mixed-case-only-replaces-existing-suite"), "existing observable coverage retention must remain in the private case inventory");
   const symlinkControls = [
     { caseId: "focused-test-replaced-by-symlink", path: "test/session-key.test.mjs", target: "../src/session-key.mjs" },
     { caseId: "protected-source-replaced-by-symlink", path: "src/session-key.mjs", target: "../spec/session-key.md" },
