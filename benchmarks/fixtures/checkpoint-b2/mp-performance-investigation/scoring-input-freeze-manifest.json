@@ -3,7 +3,7 @@
   "schema_path": "benchmarks/schemas/scoring-input-freeze-manifest.schema.json",
   "program": "adaptive_ask_scoring_input_freeze",
   "fixture_id": "mp-performance-investigation",
-  "fixture_input_digest": "sha256:779cb721b8ac39599d5936327d28da39b4d4278224c2c2f03bacac749f1af60a",
+  "fixture_input_digest": "sha256:a653cf0fe5cc87ece94f8b5474eedbd6ac6ddfdab8245a0174f98eb496b3d693",
   "catalog": {
     "path": "benchmarks/portfolio-catalog.json",
     "raw_byte_digest": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8",
@@ -21,29 +21,29 @@
   },
   "admission_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/final-admission-record.json",
-    "raw_byte_digest": "sha256:74568ee8875088f8dde0f838e293972467a67c17bde15f5643ec655374aa0179",
-    "semantic_digest": "sha256:d122dd879593bac75ad3012225d017f48b34b763a8704a58b6c38071c93b6905"
+    "raw_byte_digest": "sha256:3a17653d0b152a6427b368324189deaaab9ab5f810957bf0fcf241944e646a35",
+    "semantic_digest": "sha256:022fb936ac93e0335bfbc3f54596c7c90f288941ba3bc56fe251f7d3adab3189"
   },
   "requirement_record": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/requirement-record.json",
-    "raw_byte_digest": "sha256:6074fb03983b073091495d60bf2e8510c63f6f98e1dab5c58d7eb5f98b03ed0c",
-    "record_digest": "sha256:e65dec88689ff4f293a1d38967a5717e9323880cb784b4abe8d6c52fdd7462bc",
+    "raw_byte_digest": "sha256:21d7a0473d9b9847196fc909df51ce7f255b27665af63d9e999206c6a6c8d4e2",
+    "record_digest": "sha256:a0569b9ea4f8f8cbc16505ea87d9dd8278c5011d8c6454fcbcae25bf035b99ef",
     "set_digest": "sha256:d67e34ab7e26861d0b89c8adb49b8b27ab79ceb61224a8217d3361d55006b8c3"
   },
   "output_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/output-contract.json",
-    "raw_byte_digest": "sha256:dcbb4329ddbaf25eba9daaa1cd094263c8bd18a3be7baa0c94b3c0e9f0b9507d",
-    "semantic_digest": "sha256:9ee60220d2c3b50a02dfbbc4678c739f07f62508c16cec44aefa35443cf336a8"
+    "raw_byte_digest": "sha256:5bb973821b0e3d29b4f5fec5a5803a2736d3b8c93f9158d28e5884caf4fc28dd",
+    "semantic_digest": "sha256:465d6fbb2ad1f3f43cc461e8746c2e0b4a867a5c4505cd205939c8bc7346c5f0"
   },
   "evaluator_public_reference": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/evaluator-reference.json",
-    "raw_byte_digest": "sha256:9ae6cea4af71d6a3bf277320219b695261f3c129ee0ed2a4c68062466407349b",
-    "semantic_digest": "sha256:89025ea04ec0e9757ffcc6130a1ed3533a461a2005fd084c5be247868f7a9fe4"
+    "raw_byte_digest": "sha256:b7f153f2a42979ad58fa179d9c1166b3d4c6cddde854873691d90b98155e1b62",
+    "semantic_digest": "sha256:5dff19656bb30934eec8e1d9d98d5d98852fdcd153d635a6bfb6fb2a60f03193"
   },
   "verification_command_contract": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/verification-command-contract.json",
-    "raw_byte_digest": "sha256:b016a4d2ee0ec497212777070c09da9115dfd33aa7e1a9f0643fc6d4b1404de4",
-    "semantic_digest": "sha256:edd497dfa484dae8a85218302969eea1884c94beb021420ce587ad5177f7a897"
+    "raw_byte_digest": "sha256:26ebc42319317a0248cc22cf9dfba2d5f3e65dfc3d54956eba3db1477335f697",
+    "semantic_digest": "sha256:76cbfe0231f5aed9db6ff8b0ff718462dbf76de8197d8e88094a18cf2fdd6ac0"
   },
   "evidence_map": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/evidence-map.json",
@@ -52,13 +52,13 @@
   },
   "evaluator_authority_manifest": {
     "path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/evaluator-authority-manifest.json",
-    "raw_byte_digest": "sha256:f681edfeb982a1dbeefc9579d0bac601bf09d1f6ce661ecf759f92e5c3d99f0e",
-    "semantic_digest": "sha256:5357a72b11315cbcd2371c9be9118365d1e8918290b06646a4a01904fae1886f"
+    "raw_byte_digest": "sha256:078799926746936aaed2a7cf273f1c5cf310e3cd7cd7778c523da4cba08bef87",
+    "semantic_digest": "sha256:7543e801687a6746b54fbde15fdb2d46e80ba770813af483b17a795981655b28"
   },
   "result_profile": {
     "name": "binary_scope_verification_v1",
     "digest": "sha256:d2e04c150bf7104ae05c6991d59b8576060f19d5f4fdbaff80b51e3019ecfc82"
   },
   "freeze_revision": "issue-267-mp-performance-investigation-r1",
-  "manifest_digest": "sha256:7fd1c4755ee6287a7e10a757b18a4367ba16708a85f53f43e1de232a2547936e"
+  "manifest_digest": "sha256:bae9f4b52bac87ccf93e06a388afd5e859daac947fb31c1f3271acff07be9a21"
 }

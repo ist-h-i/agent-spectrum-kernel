@@ -6,9 +6,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:89025ea04ec0e9757ffcc6130a1ed3533a461a2005fd084c5be247868f7a9fe4",
+  "evaluator_public_reference_digest": "sha256:5dff19656bb30934eec8e1d9d98d5d98852fdcd153d635a6bfb6fb2a60f03193",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/verification-command-contract.json",
-  "verification_command_contract_digest": "sha256:edd497dfa484dae8a85218302969eea1884c94beb021420ce587ad5177f7a897",
+  "verification_command_contract_digest": "sha256:76cbfe0231f5aed9db6ff8b0ff718462dbf76de8197d8e88094a18cf2fdd6ac0",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:65935ed8132c9280bd72741ba91ee9e9e668145949f2d3b2d6ae8328cdcaa948",
   "result_profile": {
@@ -17,7 +17,7 @@
   },
   "declares_findings": true,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-performance-investigation/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:f681edfeb982a1dbeefc9579d0bac601bf09d1f6ce661ecf759f92e5c3d99f0e",
-  "evaluator_authority_manifest_digest": "sha256:5357a72b11315cbcd2371c9be9118365d1e8918290b06646a4a01904fae1886f",
-  "output_contract_digest": "sha256:9ee60220d2c3b50a02dfbbc4678c739f07f62508c16cec44aefa35443cf336a8"
+  "evaluator_authority_manifest_raw_sha256": "sha256:078799926746936aaed2a7cf273f1c5cf310e3cd7cd7778c523da4cba08bef87",
+  "evaluator_authority_manifest_digest": "sha256:7543e801687a6746b54fbde15fdb2d46e80ba770813af483b17a795981655b28",
+  "output_contract_digest": "sha256:465d6fbb2ad1f3f43cc461e8746c2e0b4a867a5c4505cd205939c8bc7346c5f0"
 }
