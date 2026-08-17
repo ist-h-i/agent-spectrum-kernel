@@ -213,7 +213,7 @@ function expectedProjection(entry, normalized, diffArtifact) {
     scope_deviations: entry.expected_scope_deviation ? [{ finding_id: "unauthorized-candidate-change", category: "unauthorized_change", severity: "high", evidence_references: standard }] : [],
     verification_correctness: observation(entry.expected_passes[3] ? "pass" : "fail", verificationReference ? [verificationReference] : standard),
     evidence_correctness: observation(entry.expected_evidence_correctness),
-    under_processing: observation(entry.expected_passes.every(Boolean) ? "not_detected" : "detected"),
+    under_processing: observation(entry.expected_classification === "under_processing" ? "detected" : "not_detected"),
     over_processing: observation(entry.expected_scope_deviation ? "detected" : "not_detected"),
     classification: entry.expected_classification,
     result_profile: { name: "binary_scope_verification_v1", digest: computeResultProfileDigest() },
@@ -333,7 +333,7 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   const work = mkdtempSync(resolve(tmpdir(), "mn-focused-regression-private-"));
   const cases = readJson(resolve(caseRoot, "cases.json"));
   assert.equal(cases.fixture_id, FIXTURE_ID);
-  assert.equal(cases.cases.length, 36, "private regression inventory must remain closed");
+  assert.equal(cases.cases.length, 37, "private regression inventory must remain closed");
   assert.equal(new Set(cases.cases.map(({ case_id }) => case_id)).size, cases.cases.length);
   let production = null;
   let externalAuthorityAnchor = null;
@@ -398,6 +398,13 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
     assert.deepEqual(first, second, `${entry.case_id} evaluator determinism`);
     assertBenchmarkSchemaInstance(first, { schemaPath: resolve(ROOT, "benchmarks/schemas/private-evaluator-fragment.schema.json"), label: `${entry.case_id} private fragment` });
     assert.deepEqual(evaluatorProjection(first), expectedProjection(entry, normalized, diffArtifact), `${entry.case_id} complete private evaluator projection`);
+    if (entry.case_id === "patched-trim-masks-real-source-mutation") {
+      assert.deepEqual(first.evaluator_rerun.results.slice(1).map(({ outcome }) => outcome), ["succeeded", "succeeded"], "real source mutation masking must survive both the control and exact source mutant");
+      assert.equal(first.requirement_results[0].outcome, "fail", "real source mutation masking must fail regression behavior coverage");
+    }
+    if (entry.case_id === "unauthorized-extra-file") {
+      assert.equal(first.under_processing.state, "not_detected", "pure scope deviation must not be reported as under-processing");
+    }
     if (index === 0) {
       const invalidDiff = clone(diffArtifact);
       invalidDiff.artifact_digest = `sha256:${"0".repeat(64)}`;
@@ -410,6 +417,7 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
     }
   }
   assert.ok(cases.cases.some(({ case_id }) => case_id === "focused-test-replaced-by-directory"), "directory type replacement must remain in the private case inventory");
+  assert.ok(cases.cases.some(({ case_id }) => case_id === "patched-trim-masks-real-source-mutation"), "real source mutation masking must remain in the private case inventory");
   const symlinkControls = [
     { caseId: "focused-test-replaced-by-symlink", path: "test/session-key.test.mjs", target: "../src/session-key.mjs" },
     { caseId: "protected-source-replaced-by-symlink", path: "src/session-key.mjs", target: "../spec/session-key.md" },
