@@ -6,9 +6,9 @@
   "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
   "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
   "evaluator_public_reference_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/evaluator-reference.json",
-  "evaluator_public_reference_digest": "sha256:912e37e3838623f32af319368d94aeaa6a08da8508a0b0452dbe425d5f1278a5",
+  "evaluator_public_reference_digest": "sha256:5b4e460400db5d398ea41f5650407e70325642e2a96f2ac8d994818d68d03b84",
   "verification_command_contract_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/verification-command-contract.json",
-  "verification_command_contract_digest": "sha256:d1d4d8e73ef5d4b8c341e39c8117c7cd439302358cac1d87c2bc3984274623be",
+  "verification_command_contract_digest": "sha256:604978fcd13de754e4f614a9300885af97d695b027513c4b71f573632e354b35",
   "scope_boundary_authority_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/evidence-map.json",
   "scope_boundary_authority_digest": "sha256:6e10ad324cee282aafbb27772d846c176e1f9d645046422ab9b2f4921f46db04",
   "result_profile": {
@@ -17,7 +17,7 @@
   },
   "declares_findings": false,
   "evaluator_authority_manifest_path": "benchmarks/fixtures/checkpoint-b2/mp-iac-rollback-design/evaluator-authority-manifest.json",
-  "evaluator_authority_manifest_raw_sha256": "sha256:f65ead53ee9cd2ecf472e2407f01a1bf5e94d6451183eb61ac3be493a83a82d6",
-  "evaluator_authority_manifest_digest": "sha256:b8a53046149d3751719a514fc4bd21fdf08310dc76dfc7797a56f7215e657e3d",
-  "output_contract_digest": "sha256:2a2931593c02af34def01983a966eaaca93e89f1bf266e3240238a394e41abf3"
+  "evaluator_authority_manifest_raw_sha256": "sha256:0a657039f95b5db9d542c96087be6dbf1697742cbfa83fe6c6219d92baf31331",
+  "evaluator_authority_manifest_digest": "sha256:cafbe20aa91a31d4b8b1fdfb647002623352b7f12d73af7a4967e121c312ee47",
+  "output_contract_digest": "sha256:cbc8a8b7360a53061302936aa7771766731352883036f9b80419b85b79352160"
 }
