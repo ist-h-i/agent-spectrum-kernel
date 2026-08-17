@@ -70,13 +70,14 @@ if (!exactKeys(value.apply_gate, ["state", "approval_role", "required_condition_
 const digestValid = typeof value.apply_gate.approved_plan_digest === "string" && /^sha256:[a-f0-9]{64}$/u.test(value.apply_gate.approved_plan_digest);
 if ((value.apply_gate.state === "approved" && !digestValid) || (value.apply_gate.state !== "approved" && value.apply_gate.approved_plan_digest !== null)) throw new Error("approved plan digest does not match gate state");
 
-if (!exactKeys(value.rollback, ["strategy", "restore_primary_version", "restore_secondary_weight", "trigger_ids", "requires_fresh_plan", "requires_separate_approval", "forbidden_action_ids", "preservation_ids", "evidence_ids"])
+if (!exactKeys(value.rollback, ["strategy", "restore_primary_version", "restore_secondary_weight", "trigger_ids", "requires_fresh_plan", "requires_separate_approval", "stop_condition_ids", "forbidden_action_ids", "preservation_ids", "evidence_ids"])
   || !oneOf(value.rollback.strategy, ["forward_change", "manual_recovery", "not_available"])
   || !nonEmpty(value.rollback.restore_primary_version)
   || typeof value.rollback.restore_secondary_weight !== "number" || value.rollback.restore_secondary_weight < 0 || value.rollback.restore_secondary_weight > 1
   || !nonEmptyUniqueSlugs(value.rollback.trigger_ids)
   || typeof value.rollback.requires_fresh_plan !== "boolean"
   || typeof value.rollback.requires_separate_approval !== "boolean"
+  || !nonEmptyUniqueSlugs(value.rollback.stop_condition_ids)
   || !nonEmptyUniqueSlugs(value.rollback.forbidden_action_ids)
   || !nonEmptyUniqueSlugs(value.rollback.preservation_ids)
   || !nonEmptyUniqueSlugs(value.rollback.evidence_ids)) throw new Error("rollback is invalid");

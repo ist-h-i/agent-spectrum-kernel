@@ -173,6 +173,7 @@ function validateVisibleScenario() {
   assert.equal(state.observations.executed_rollout_records, 0);
   assert.equal(state.observations.executed_rollback_records, 0);
   assert.match(readFileSync(resolve(workspace, "docs/knowledge-policy.md"), "utf8"), /trigger.+destination.+owner.+evidence boundary|promotion trigger/isu);
+  assert.match(readFileSync(resolve(FIXTURE_ROOT, "task.md"), "utf8"), /local names chosen by the author.+spelling does not establish correctness.+each preparation step/isu, "task must expose the local-label and per-step evidence contract");
 }
 
 function validateWorkspaceValidatorParity() {
@@ -208,6 +209,7 @@ function validateWorkspaceValidatorParity() {
       trigger_ids: ["manual-trigger"],
       requires_fresh_plan: false,
       requires_separate_approval: false,
+      stop_condition_ids: ["state-unavailable"],
       forbidden_action_ids: ["unreviewed-action"],
       preservation_ids: ["change-records"],
       evidence_ids: ["rollback-policy"],
@@ -245,6 +247,7 @@ function validateWorkspaceValidatorParity() {
     ["approved-without-digest", (value) => { value.apply_gate.state = "approved"; }],
     ["non-approved-with-digest", (value) => { value.apply_gate.approved_plan_digest = `sha256:${"0".repeat(64)}`; }],
     ["rollback-weight-out-of-range", (value) => { value.rollback.restore_secondary_weight = 2; }],
+    ["missing-rollback-stop-conditions", (value) => { delete value.rollback.stop_condition_ids; }],
     ["invalid-knowledge-state", (value) => { value.knowledge_promotion.state = "promoted"; }],
     ["empty-knowledge-owner", (value) => { value.knowledge_promotion.owner = ""; }],
     ["invalid-evidence-line", (value) => { value.evidence[0].line = 0; }],
@@ -288,6 +291,31 @@ function validateWorkspaceValidatorParity() {
   writeFileSync(workspacePrefixedPath, `${JSON.stringify(workspacePrefixed, null, 2)}\n`);
   const workspacePrefixedResult = spawnSync(process.execPath, [validatorPath, workspacePrefixedPath], { encoding: "utf8" });
   assert.equal(workspacePrefixedResult.status, 0, workspacePrefixedResult.stderr || workspacePrefixedResult.stdout);
+
+  const alternateLabels = clone(valid);
+  alternateLabels.decision.reason_ids = ["candidate-is-stale", "scope-exceeds-request"];
+  alternateLabels.preparation[0].purpose_id = "verify-formatting";
+  alternateLabels.apply_gate.required_condition_ids = ["latest-state-plan", "requested-resource-only", "digest-bound-approval"];
+  alternateLabels.rollback.trigger_ids = ["manual-trigger-alias"];
+  alternateLabels.rollback.stop_condition_ids = ["rollback-stop-alias"];
+  alternateLabels.rollback.forbidden_action_ids = ["unsafe-shortcut-alias"];
+  alternateLabels.rollback.preservation_ids = ["retain-change-records"];
+  alternateLabels.knowledge_promotion.trigger_id = "promotion-trigger-alias";
+  alternateLabels.knowledge_promotion.evidence_boundary_ids = ["review-evidence-alias"];
+  alternateLabels.knowledge_promotion.stop_condition_id = "promotion-stop-alias";
+  const evidenceLabelMap = new Map(alternateLabels.evidence.map((entry, index) => [entry.evidence_id, `citation-${index + 1}`]));
+  for (const entry of alternateLabels.evidence) entry.evidence_id = evidenceLabelMap.get(entry.evidence_id);
+  const relabel = (ids) => ids.map((id) => evidenceLabelMap.get(id));
+  alternateLabels.decision.evidence_ids = relabel(alternateLabels.decision.evidence_ids);
+  for (const step of alternateLabels.preparation) step.evidence_ids = relabel(step.evidence_ids);
+  alternateLabels.apply_gate.evidence_ids = relabel(alternateLabels.apply_gate.evidence_ids);
+  alternateLabels.rollback.evidence_ids = relabel(alternateLabels.rollback.evidence_ids);
+  alternateLabels.knowledge_promotion.evidence_ids = relabel(alternateLabels.knowledge_promotion.evidence_ids);
+  const alternateLabelsPath = resolve(work, "alternate-local-labels.json");
+  writeFileSync(alternateLabelsPath, `${JSON.stringify(alternateLabels, null, 2)}\n`);
+  assert.doesNotThrow(() => assertBenchmarkSchemaInstance(alternateLabels, { schemaPath, label: "alternate local labels" }));
+  const alternateLabelsResult = spawnSync(process.execPath, [validatorPath, alternateLabelsPath], { encoding: "utf8" });
+  assert.equal(alternateLabelsResult.status, 0, alternateLabelsResult.stderr || alternateLabelsResult.stdout);
 }
 function validatePublicNegativeCoverage() {
   const work = mkdtempSync(resolve(tmpdir(), "mp-iac-rollback-design-public-negative-"));
@@ -361,17 +389,27 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
     "reference-change-plan",
     "equivalent-preparation-order",
     "workspace-prefixed-evidence",
+    "equivalent-local-identifiers",
     "missing-stale-state-reason",
     "missing-out-of-scope-reason",
     "ready-stale-plan",
     "unsafe-apply-preparation",
+    "cross-step-evidence-attribution",
+    "missing-step-mode-evidence",
+    "cross-step-mode-attribution",
+    "missing-step-safety-evidence",
     "wrong-approval-role",
     "false-approval-claim",
     "missing-plan-gate-condition",
+    "missing-apply-scope-evidence",
+    "missing-approved-plan-digest-evidence",
     "git-revert-rollback",
     "rollback-without-fresh-plan",
     "rollback-without-separate-approval",
     "destructive-rollback",
+    "missing-rollback-stop-condition",
+    "wrong-rollback-stop-evidence",
+    "missing-rollback-trigger-evidence",
     "premature-knowledge-promotion",
     "incomplete-knowledge-boundary",
     "wrong-evidence-citation",
@@ -519,6 +557,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
     ["duplicate-preparation-sequence", (value) => { value.preparation.push({ ...value.preparation[0], command_id: "validate-config" }); }, "safe-preparation-boundary"],
     ["approved-without-digest", (value) => { value.apply_gate.state = "approved"; value.apply_gate.approved_plan_digest = null; }, "approval-gate-truthfulness"],
     ["missing-rollback-strategy", (value) => { delete value.rollback.strategy; }, "rollback-truthfulness"],
+    ["missing-rollback-stop-conditions", (value) => { delete value.rollback.stop_condition_ids; }, "rollback-truthfulness"],
     ["invalid-knowledge-state", (value) => { value.knowledge_promotion.state = "promoted"; }, "knowledge-promotion-governance"],
     ["empty-evidence", (value) => { value.evidence = []; }, "evidence-and-scope-precision"],
     ["blank-source-excerpt", (value) => { value.evidence[0].source_excerpt = ""; }, "evidence-and-scope-precision"],

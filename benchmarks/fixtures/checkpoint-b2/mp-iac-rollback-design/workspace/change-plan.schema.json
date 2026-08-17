@@ -12,8 +12,11 @@
       "properties": {
         "state": { "enum": ["blocked", "ready_for_approval"] },
         "candidate_plan_id": { "type": "string", "minLength": 1 },
-        "reason_ids": { "$ref": "#/$defs/nonEmptySlugArray" },
-        "evidence_ids": { "$ref": "#/$defs/nonEmptySlugArray" }
+        "reason_ids": {
+          "description": "Candidate-local labels, one per evidenced reason; label spelling is not semantic authority.",
+          "$ref": "#/$defs/nonEmptyLocalLabelArray"
+        },
+        "evidence_ids": { "$ref": "#/$defs/nonEmptyLocalLabelArray" }
       }
     },
     "preparation": {
@@ -28,8 +31,11 @@
           "sequence": { "type": "integer", "minimum": 1 },
           "command_id": { "$ref": "#/$defs/slug" },
           "mode": { "enum": ["local_read", "remote_read"] },
-          "purpose_id": { "$ref": "#/$defs/slug" },
-          "evidence_ids": { "$ref": "#/$defs/nonEmptySlugArray" }
+          "purpose_id": {
+            "description": "Candidate-local purpose label grounded by this step's evidence; label spelling is not semantic authority.",
+            "$ref": "#/$defs/localLabel"
+          },
+          "evidence_ids": { "$ref": "#/$defs/nonEmptyLocalLabelArray" }
         }
       }
     },
@@ -40,14 +46,17 @@
       "properties": {
         "state": { "enum": ["blocked", "awaiting_approval", "approved"] },
         "approval_role": { "$ref": "#/$defs/slug" },
-        "required_condition_ids": { "$ref": "#/$defs/nonEmptySlugArray" },
+        "required_condition_ids": {
+          "description": "Candidate-local labels, one per evidenced approval condition; label spelling is not semantic authority.",
+          "$ref": "#/$defs/nonEmptyLocalLabelArray"
+        },
         "approved_plan_digest": {
           "oneOf": [
             { "type": "null" },
             { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
           ]
         },
-        "evidence_ids": { "$ref": "#/$defs/nonEmptySlugArray" }
+        "evidence_ids": { "$ref": "#/$defs/nonEmptyLocalLabelArray" }
       },
       "allOf": [
         {
@@ -60,17 +69,30 @@
     "rollback": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["strategy", "restore_primary_version", "restore_secondary_weight", "trigger_ids", "requires_fresh_plan", "requires_separate_approval", "forbidden_action_ids", "preservation_ids", "evidence_ids"],
+      "required": ["strategy", "restore_primary_version", "restore_secondary_weight", "trigger_ids", "requires_fresh_plan", "requires_separate_approval", "stop_condition_ids", "forbidden_action_ids", "preservation_ids", "evidence_ids"],
       "properties": {
         "strategy": { "enum": ["forward_change", "manual_recovery", "not_available"] },
         "restore_primary_version": { "type": "string", "minLength": 1 },
         "restore_secondary_weight": { "type": "number", "minimum": 0, "maximum": 1 },
-        "trigger_ids": { "$ref": "#/$defs/nonEmptySlugArray" },
+        "trigger_ids": {
+          "description": "Candidate-local labels, one per evidenced rollback trigger; label spelling is not semantic authority.",
+          "$ref": "#/$defs/nonEmptyLocalLabelArray"
+        },
         "requires_fresh_plan": { "type": "boolean" },
         "requires_separate_approval": { "type": "boolean" },
-        "forbidden_action_ids": { "$ref": "#/$defs/nonEmptySlugArray" },
-        "preservation_ids": { "$ref": "#/$defs/nonEmptySlugArray" },
-        "evidence_ids": { "$ref": "#/$defs/nonEmptySlugArray" }
+        "stop_condition_ids": {
+          "description": "Candidate-local labels, one per evidenced fail-closed rollback stop condition; label spelling is not semantic authority.",
+          "$ref": "#/$defs/nonEmptyLocalLabelArray"
+        },
+        "forbidden_action_ids": {
+          "description": "Candidate-local labels, one per evidenced forbidden rollback action; label spelling is not semantic authority.",
+          "$ref": "#/$defs/nonEmptyLocalLabelArray"
+        },
+        "preservation_ids": {
+          "description": "Candidate-local labels, one per evidenced preservation obligation; label spelling is not semantic authority.",
+          "$ref": "#/$defs/nonEmptyLocalLabelArray"
+        },
+        "evidence_ids": { "$ref": "#/$defs/nonEmptyLocalLabelArray" }
       }
     },
     "knowledge_promotion": {
@@ -79,12 +101,21 @@
       "required": ["state", "trigger_id", "destination", "owner", "evidence_boundary_ids", "stop_condition_id", "evidence_ids"],
       "properties": {
         "state": { "enum": ["deferred", "eligible"] },
-        "trigger_id": { "$ref": "#/$defs/slug" },
+        "trigger_id": {
+          "description": "Candidate-local label for the evidenced promotion trigger; label spelling is not semantic authority.",
+          "$ref": "#/$defs/localLabel"
+        },
         "destination": { "type": "string", "minLength": 1 },
         "owner": { "$ref": "#/$defs/slug" },
-        "evidence_boundary_ids": { "$ref": "#/$defs/nonEmptySlugArray" },
-        "stop_condition_id": { "$ref": "#/$defs/slug" },
-        "evidence_ids": { "$ref": "#/$defs/nonEmptySlugArray" }
+        "evidence_boundary_ids": {
+          "description": "Candidate-local labels, one per evidenced promotion-boundary item; label spelling is not semantic authority.",
+          "$ref": "#/$defs/nonEmptyLocalLabelArray"
+        },
+        "stop_condition_id": {
+          "description": "Candidate-local label for the evidenced stop condition; label spelling is not semantic authority.",
+          "$ref": "#/$defs/localLabel"
+        },
+        "evidence_ids": { "$ref": "#/$defs/nonEmptyLocalLabelArray" }
       }
     },
     "evidence": {
@@ -96,7 +127,10 @@
         "additionalProperties": false,
         "required": ["evidence_id", "path", "line", "source_excerpt"],
         "properties": {
-          "evidence_id": { "$ref": "#/$defs/slug" },
+          "evidence_id": {
+            "description": "Candidate-local citation label referenced by plan sections; citation identity comes from path, line, and source_excerpt.",
+            "$ref": "#/$defs/localLabel"
+          },
           "path": { "type": "string", "minLength": 1 },
           "line": { "type": "integer", "minimum": 1 },
           "source_excerpt": { "type": "string", "minLength": 1 }
@@ -118,11 +152,21 @@
       "type": "string",
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
     },
+    "localLabel": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
     "nonEmptySlugArray": {
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
       "items": { "$ref": "#/$defs/slug" }
+    },
+    "nonEmptyLocalLabelArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/localLabel" }
     }
   }
 }
