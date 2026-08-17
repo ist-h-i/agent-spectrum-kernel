@@ -69,7 +69,7 @@ function createBoundaryRoots(work) {
   };
   return Object.fromEntries(Object.entries(fields).map(([field, [directory, marker]]) => {
     const root = resolve(work, directory);
-    mkdirSync(root);
+    mkdirSync(root, { recursive: true });
     writeFileSync(resolve(root, marker), "{}\n");
     return [field, root];
   }));
