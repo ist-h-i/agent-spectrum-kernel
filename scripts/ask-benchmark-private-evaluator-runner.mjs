@@ -12,7 +12,8 @@ import * as vm from "node:vm";
 
 const VIRTUAL_ROOT = "/ask-verified-authority";
 const PRIVATE_MODULE_PATH = "private/hidden-evaluator.mjs";
-const SEALED_FILE_MODE = 0o444;
+const SEALED_REGULAR_FILE_MODE = 0o444;
+const SEALED_EXECUTABLE_FILE_MODE = 0o555;
 const SEALED_DIRECTORY_MODE = 0o555;
 const completedBarriers = new Set();
 const ALLOWED_BUILTINS = new Map([
@@ -125,7 +126,7 @@ function buildVirtualAuthority(payload) {
       let content = null;
       if (entry.file_type === "file") {
         content = Buffer.from(entry.content_base64 ?? "", "base64");
-        if (entry.mode !== SEALED_FILE_MODE || content.toString("base64") !== entry.content_base64) fail(`${authority.kind} authority file contract is invalid: ${entry.path}`);
+        if (![SEALED_REGULAR_FILE_MODE, SEALED_EXECUTABLE_FILE_MODE].includes(entry.mode) || content.toString("base64") !== entry.content_base64) fail(`${authority.kind} authority file contract is invalid: ${entry.path}`);
         withBarrier(payload.barrier, "before_authority_map_validation", authority.kind, entry.path, () => {
           if (content.length !== entry.bytes || sha256(content) !== entry.sha256) fail(`${authority.kind} authority bytes are invalid: ${entry.path}`);
         });

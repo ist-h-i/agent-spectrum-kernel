@@ -1183,6 +1183,17 @@ function sealedFileMode(path, executablePaths = SEALED_EXECUTABLE_PATHS) {
   return executablePaths.includes(path) ? SEALED_EXECUTABLE_FILE_MODE : SEALED_REGULAR_FILE_MODE;
 }
 
+function executablePathsFromPortableEntries(entries) {
+  return entries
+    .filter(({ file_type, mode }) => file_type === "file" && (mode & 0o111) !== 0)
+    .map(({ path }) => path)
+    .sort();
+}
+
+function executablePathsFromInventory(inventory) {
+  return executablePathsFromPortableEntries(inventory.portableEntries);
+}
+
 function expectedSealedPortableEntries(inventory, executablePaths, label) {
   const allowed = [...executablePaths].map((path) => assertPortableRelativePath(path, `${label} executable path`)).sort();
   if (new Set(allowed).size !== allowed.length) throw new Error(`${label} executable allowlist contains duplicates`);
@@ -1838,8 +1849,8 @@ function createSealedEvaluatorExecutionFromWorkspaceSources({
   const hidden = readStableFile(resolve(privateBundle.root, hiddenAsset.path), `${label} hidden evaluator sealed copy`, MAX_BOUNDARY_FILE_BYTES, { allowEmpty: false });
   if (hidden.rawByteDigest !== hiddenAsset.sha256 || hidden.bytes.length !== hiddenAsset.bytes) throw new Error(`${label} hidden evaluator sealed copy does not match the verified source`);
   const hiddenIdentity = runtimeIdentityFromStableRead(hidden);
-  const frozen = materializeSealedWorkspaceSnapshot({ inventory: frozenSource, destination: resolve(executionRoot, "frozen-workspace"), label: `${label} frozen workspace sealed snapshot` });
-  const candidate = materializeSealedWorkspaceSnapshot({ inventory: candidateSource, destination: resolve(executionRoot, "candidate-workspace"), label: `${label} candidate workspace sealed snapshot` });
+  const frozen = materializeSealedWorkspaceSnapshot({ inventory: frozenSource, destination: resolve(executionRoot, "frozen-workspace"), label: `${label} frozen workspace sealed snapshot`, executablePaths: executablePathsFromInventory(frozenSource) });
+  const candidate = materializeSealedWorkspaceSnapshot({ inventory: candidateSource, destination: resolve(executionRoot, "candidate-workspace"), label: `${label} candidate workspace sealed snapshot`, executablePaths: executablePathsFromInventory(candidateSource) });
   const evidence = materializeSealedWorkspaceSnapshot({ inventory: evidenceSource, destination: resolve(executionRoot, "evaluation-input-evidence"), label: `${label} evaluation-input evidence sealed snapshot` });
   const originalWorkspaceAuthority = materializeOriginalWorkspaceAuthority({ executionRoot, frozen: frozenSource, candidate: candidateSource, lineage: closedEvaluationLineage, candidateAuthority, label });
   const repository = materializeSealedRepositorySnapshot({ authority: repositoryAuthority, destination: resolve(executionRoot, "repository"), label: `${label} repository authority sealed snapshot` });
@@ -2134,7 +2145,15 @@ function captureVerifiedExecutionAuthority(execution, externalAuthorityAnchor, r
   const candidate = readStableWorkspaceInventory(execution.candidate.path, `${label} candidate workspace verified bytes`);
   const evidence = readStableWorkspaceInventory(execution.evidence.path, `${label} evaluation-input verified bytes`);
   const originalWorkspaceAuthority = readStableWorkspaceInventory(execution.originalWorkspaceAuthority.path, `${label} original workspace authority verified bytes`);
-  for (const [kind, inventory] of [["private bundle", privateBundle], ["frozen workspace", frozen], ["candidate workspace", candidate], ["evaluation-input evidence", evidence], ["original workspace authority", originalWorkspaceAuthority]]) assertSealedSnapshotModes(inventory, { label: `${label} ${kind}` });
+  const originalSource = ORIGINAL_EXECUTION_AUTHORITIES.get(execution);
+  if (!originalSource) throw new Error(`${label} module-owned original workspace authority is missing`);
+  for (const [kind, inventory, executablePaths] of [
+    ["private bundle", privateBundle, SEALED_EXECUTABLE_PATHS],
+    ["frozen workspace", frozen, executablePathsFromPortableEntries(originalSource.frozen.portableEntries)],
+    ["candidate workspace", candidate, executablePathsFromPortableEntries(originalSource.candidate.portableEntries)],
+    ["evaluation-input evidence", evidence, SEALED_EXECUTABLE_PATHS],
+    ["original workspace authority", originalWorkspaceAuthority, SEALED_EXECUTABLE_PATHS],
+  ]) assertSealedSnapshotModes(inventory, { executablePaths, label: `${label} ${kind}` });
   const repository = readSealedRepositoryDescriptor(execution.repository.path, `${label} repository verified bytes`, {
     expectedSourceGraphDigest: execution.repository.sourceGraphDigest ?? null,
     expectedEvaluatorRevision: execution.evaluatorRevision ?? null,
@@ -2145,8 +2164,6 @@ function captureVerifiedExecutionAuthority(execution, externalAuthorityAnchor, r
     if (!expected || inventory.digest !== expected.portable_digest || (inventory.rootIdentity.mode & 0o777) !== (expected.root.mode & 0o777)) throw new Error(`${label} ${kind} does not match its recorded sealed authority`);
   };
   for (const [inventory, expected, kind] of [[repository.inventory, execution.repository.sealed, "repository"], [privateBundle, execution.privateBundle.sealed, "private bundle"], [frozen, execution.frozen.sealed, "frozen workspace"], [candidate, execution.candidate.sealed, "candidate workspace"], [evidence, execution.evidence.sealed, "evaluation-input evidence"], [originalWorkspaceAuthority, execution.originalWorkspaceAuthority.sealed, "original workspace authority"]]) assertPortableRecord(inventory, expected, kind);
-  const originalSource = ORIGINAL_EXECUTION_AUTHORITIES.get(execution);
-  if (!originalSource) throw new Error(`${label} module-owned original workspace authority is missing`);
   const originalAuthority = validateOriginalWorkspaceAuthority({ inventory: originalWorkspaceAuthority, frozen, candidate, lineage: execution.originalWorkspaceAuthority.lineage, candidateAuthority: execution.originalWorkspaceAuthority.candidateAuthority, root: immutableRoot, label, originalSource });
   if (execution.originalWorkspaceAuthority.authorityPath !== ORIGINAL_WORKSPACE_AUTHORITY_PATH || execution.originalWorkspaceAuthority.authoritySha256 !== rawByteDigest(originalAuthority.authorityBytes) || execution.originalWorkspaceAuthority.authorityBytes !== originalAuthority.authorityBytes.length || execution.originalWorkspaceAuthority.authorityDigest !== originalAuthority.authority.authority_digest || execution.originalWorkspaceAuthority.repositoryDiffPath !== SEALED_REPOSITORY_DIFF_ARTIFACT_PATH || execution.originalWorkspaceAuthority.repositoryDiffSha256 !== rawByteDigest(originalAuthority.repositoryDiffBytes) || execution.originalWorkspaceAuthority.repositoryDiffBytes !== originalAuthority.repositoryDiffBytes.length || execution.originalWorkspaceAuthority.repositoryDiffDigest !== originalAuthority.repositoryDiffArtifact.artifact_digest) throw new Error(`${label} original workspace authority does not match the execution record`);
   const runnerIdentity = runtimeIdentityFromStableRead(runner);
@@ -2255,7 +2272,16 @@ function captureSealedExecutionState(execution, label) {
   const evidence = readStableWorkspaceInventory(execution.evidence.path, `${label} evidence sealed snapshot`);
   const originalWorkspaceAuthority = readStableWorkspaceInventory(execution.originalWorkspaceAuthority.path, `${label} original workspace authority sealed snapshot`);
   const repository = readStableWorkspaceInventory(execution.repository.path, `${label} repository authority sealed snapshot`);
-  for (const [kind, inventory] of [["private bundle", privateBundle], ["frozen workspace", frozen], ["candidate workspace", candidate], ["evaluation-input evidence", evidence], ["original workspace authority", originalWorkspaceAuthority], ["repository authority", repository]]) if (inventory) assertSealedSnapshotModes(inventory, { label: `${label} ${kind}` });
+  const originalSource = ORIGINAL_EXECUTION_AUTHORITIES.get(execution);
+  if (!originalSource) throw new Error(`${label} module-owned original workspace authority is missing`);
+  for (const [kind, inventory, executablePaths] of [
+    ["private bundle", privateBundle, SEALED_EXECUTABLE_PATHS],
+    ["frozen workspace", frozen, executablePathsFromPortableEntries(originalSource.frozen.portableEntries)],
+    ["candidate workspace", candidate, executablePathsFromPortableEntries(originalSource.candidate.portableEntries)],
+    ["evaluation-input evidence", evidence, SEALED_EXECUTABLE_PATHS],
+    ["original workspace authority", originalWorkspaceAuthority, SEALED_EXECUTABLE_PATHS],
+    ["repository authority", repository, SEALED_EXECUTABLE_PATHS],
+  ]) if (inventory) assertSealedSnapshotModes(inventory, { executablePaths, label: `${label} ${kind}` });
   return {
     runner: { bytes: runner.bytes.length, sha256: runner.rawByteDigest, identity: runtimeIdentityFromStableRead(runner) },
     hidden: { bytes: hidden.bytes.length, sha256: hidden.rawByteDigest, identity: runtimeIdentityFromStableRead(hidden) },
