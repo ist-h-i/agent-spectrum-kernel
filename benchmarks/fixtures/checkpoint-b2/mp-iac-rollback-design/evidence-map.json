@@ -1,0 +1,134 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mp-iac-rollback-design",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/change-plan.json"
+    ],
+    "required_candidate_paths": [
+      "workspace/change-plan.json"
+    ],
+    "protected_candidate_paths": [
+      "workspace/change-plan.schema.json",
+      "workspace/docs/change-request.md",
+      "workspace/docs/knowledge-policy.md",
+      "workspace/docs/rollback-policy.md",
+      "workspace/infra/alias.tf",
+      "workspace/infra/iam.tf",
+      "workspace/operations/commands.json",
+      "workspace/package-lock.json",
+      "workspace/package.json",
+      "workspace/plans/candidate-plan.json",
+      "workspace/scripts/validate-change-plan.mjs",
+      "workspace/state/current-state.json"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "authority_digest": "sha256:6e10ad324cee282aafbb27772d846c176e1f9d645046422ab9b2f4921f46db04"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "candidate-plan-integrity-basis",
+      "agent_visible_paths": [
+        "workspace/docs/change-request.md",
+        "workspace/infra/alias.tf",
+        "workspace/infra/iam.tf",
+        "workspace/plans/candidate-plan.json",
+        "workspace/state/current-state.json"
+      ]
+    },
+    {
+      "evidence_map_id": "safe-preparation-basis",
+      "agent_visible_paths": [
+        "workspace/docs/change-request.md",
+        "workspace/operations/commands.json",
+        "workspace/plans/candidate-plan.json",
+        "workspace/state/current-state.json"
+      ]
+    },
+    {
+      "evidence_map_id": "approval-boundary-basis",
+      "agent_visible_paths": [
+        "workspace/docs/change-request.md",
+        "workspace/operations/commands.json",
+        "workspace/state/current-state.json"
+      ]
+    },
+    {
+      "evidence_map_id": "rollback-truth-basis",
+      "agent_visible_paths": [
+        "workspace/docs/change-request.md",
+        "workspace/docs/rollback-policy.md",
+        "workspace/operations/commands.json",
+        "workspace/state/current-state.json"
+      ]
+    },
+    {
+      "evidence_map_id": "knowledge-promotion-basis",
+      "agent_visible_paths": [
+        "workspace/docs/knowledge-policy.md",
+        "workspace/state/current-state.json"
+      ]
+    },
+    {
+      "evidence_map_id": "change-plan-precision-basis",
+      "agent_visible_paths": [
+        "workspace/change-plan.schema.json",
+        "workspace/docs/change-request.md",
+        "workspace/docs/knowledge-policy.md",
+        "workspace/docs/rollback-policy.md",
+        "workspace/infra/alias.tf",
+        "workspace/infra/iam.tf",
+        "workspace/operations/commands.json",
+        "workspace/package.json",
+        "workspace/plans/candidate-plan.json",
+        "workspace/scripts/validate-change-plan.mjs",
+        "workspace/state/current-state.json"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-candidate-plan-integrity-basis",
+      "target_evidence_map_id": "candidate-plan-integrity-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:a4bfe44841595f69c2c7a63efa9c68309c45db96bb97679a69449d4f8851fdce"
+    },
+    {
+      "mutation_id": "remove-safe-preparation-basis",
+      "target_evidence_map_id": "safe-preparation-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:6164979e51a62cf6397749abb059f0f8eba2bcc0eb875e2730a5a58c856e4248"
+    },
+    {
+      "mutation_id": "remove-approval-boundary-basis",
+      "target_evidence_map_id": "approval-boundary-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:0d33497737b385fb7529ff7218d81bb6dfa13110734effa8d63fd8b20fccd754"
+    },
+    {
+      "mutation_id": "remove-rollback-truth-basis",
+      "target_evidence_map_id": "rollback-truth-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:4bd9a9b2ccc248865c31b7df8f6cbdbe445fa69841cf816d667d3811f00f02d0"
+    },
+    {
+      "mutation_id": "remove-knowledge-promotion-basis",
+      "target_evidence_map_id": "knowledge-promotion-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:ece1fe9e66f1b8a5c03e3605392012fcf842521589d0dbcf497ff28ed4d7af7c"
+    },
+    {
+      "mutation_id": "remove-change-plan-precision-basis",
+      "target_evidence_map_id": "change-plan-precision-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:f6f8249b614a4631dbb35af750062b8c4a6b33396718c23e6acfa7bdd02310ba"
+    }
+  ]
+}

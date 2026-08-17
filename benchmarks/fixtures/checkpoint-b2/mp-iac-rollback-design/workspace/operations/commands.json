@@ -1,0 +1,46 @@
+{
+  "commands": [
+    {
+      "command_id": "check-format",
+      "mode": "local_read",
+      "production_mutation": false,
+      "approval_required": false
+    },
+    {
+      "command_id": "validate-config",
+      "mode": "local_read",
+      "production_mutation": false,
+      "approval_required": false
+    },
+    {
+      "command_id": "create-saved-plan",
+      "mode": "remote_read",
+      "production_mutation": false,
+      "approval_required": false
+    },
+    {
+      "command_id": "apply-saved-plan",
+      "mode": "production_write",
+      "production_mutation": true,
+      "approval_required": true
+    },
+    {
+      "command_id": "create-rollback-plan",
+      "mode": "remote_read",
+      "production_mutation": false,
+      "approval_required": false
+    },
+    {
+      "command_id": "apply-rollback-plan",
+      "mode": "production_write",
+      "production_mutation": true,
+      "approval_required": true
+    },
+    {
+      "command_id": "delete-published-version",
+      "mode": "production_write",
+      "production_mutation": true,
+      "approval_required": true
+    }
+  ]
+}

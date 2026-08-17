@@ -1,0 +1,22 @@
+{
+  "plan_id": "plan-cr482-317",
+  "plan_digest": "sha256:74c98f6355d9f81d45d4aef0cb88e2dde06388bb7f0fe52dbde0b7e7d1bf88fb",
+  "state_lineage": "prod-api-us-east-1",
+  "state_serial": 317,
+  "changes": [
+    {
+      "resource": "aws_lambda_alias.api_live",
+      "scope_id": "alias-canary",
+      "action": "update",
+      "before": { "primary_version": "41", "secondary_weights": {} },
+      "after": { "primary_version": "41", "secondary_weights": { "42": 0.1 } }
+    },
+    {
+      "resource": "aws_iam_role_policy.api_runtime",
+      "scope_id": "iam-runtime-policy",
+      "action": "replace",
+      "before": { "policy_revision": "7" },
+      "after": { "policy_revision": "8" }
+    }
+  ]
+}

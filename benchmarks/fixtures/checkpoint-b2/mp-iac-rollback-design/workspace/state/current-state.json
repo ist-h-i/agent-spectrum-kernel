@@ -1,0 +1,23 @@
+{
+  "captured_at": "2026-08-16T23:40:00Z",
+  "state_lineage": "prod-api-us-east-1",
+  "state_serial": 318,
+  "alias": {
+    "resource": "aws_lambda_alias.api_live",
+    "primary_version": "41",
+    "secondary_weights": {}
+  },
+  "published_versions": ["41", "42"],
+  "approval": {
+    "change_id": "CR-482",
+    "state": "pending",
+    "required_role": "platform-change-approver",
+    "approved_plan_digest": null
+  },
+  "observations": {
+    "baseline_error_rate_percent": 0.2,
+    "baseline_p95_ms": 185,
+    "executed_rollout_records": 0,
+    "executed_rollback_records": 0
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bounded infrastructure change plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision", "preparation", "apply_gate", "rollback", "knowledge_promotion", "evidence", "scope"],
+  "properties": {
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "candidate_plan_id", "reason_ids", "evidence_ids"],
+      "properties": {
+        "state": { "enum": ["blocked", "ready_for_approval"] },
+        "candidate_plan_id": { "type": "string", "minLength": 1 },
+        "reason_ids": { "$ref": "#/$defs/nonEmptySlugArray" },
+        "evidence_ids": { "$ref": "#/$defs/nonEmptySlugArray" }
+      }
+    },
+    "preparation": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sequence", "command_id", "mode", "purpose_id", "evidence_ids"],
+        "properties": {
+          "sequence": { "type": "integer", "minimum": 1 },
+          "command_id": { "$ref": "#/$defs/slug" },
+          "mode": { "enum": ["local_read", "remote_read"] },
+          "purpose_id": { "$ref": "#/$defs/slug" },
+          "evidence_ids": { "$ref": "#/$defs/nonEmptySlugArray" }
+        }
+      }
+    },
+    "apply_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "approval_role", "required_condition_ids", "approved_plan_digest", "evidence_ids"],
+      "properties": {
+        "state": { "enum": ["blocked", "awaiting_approval", "approved"] },
+        "approval_role": { "$ref": "#/$defs/slug" },
+        "required_condition_ids": { "$ref": "#/$defs/nonEmptySlugArray" },
+        "approved_plan_digest": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+          ]
+        },
+        "evidence_ids": { "$ref": "#/$defs/nonEmptySlugArray" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "approved" } }, "required": ["state"] },
+          "then": { "properties": { "approved_plan_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" } } },
+          "else": { "properties": { "approved_plan_digest": { "type": "null" } } }
+        }
+      ]
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "restore_primary_version", "restore_secondary_weight", "trigger_ids", "requires_fresh_plan", "requires_separate_approval", "forbidden_action_ids", "preservation_ids", "evidence_ids"],
+      "properties": {
+        "strategy": { "enum": ["forward_change", "manual_recovery", "not_available"] },
+        "restore_primary_version": { "type": "string", "minLength": 1 },
+        "restore_secondary_weight": { "type": "number", "minimum": 0, "maximum": 1 },
+        "trigger_ids": { "$ref": "#/$defs/nonEmptySlugArray" },
+        "requires_fresh_plan": { "type": "boolean" },
+        "requires_separate_approval": { "type": "boolean" },
+        "forbidden_action_ids": { "$ref": "#/$defs/nonEmptySlugArray" },
+        "preservation_ids": { "$ref": "#/$defs/nonEmptySlugArray" },
+        "evidence_ids": { "$ref": "#/$defs/nonEmptySlugArray" }
+      }
+    },
+    "knowledge_promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "trigger_id", "destination", "owner", "evidence_boundary_ids", "stop_condition_id", "evidence_ids"],
+      "properties": {
+        "state": { "enum": ["deferred", "eligible"] },
+        "trigger_id": { "$ref": "#/$defs/slug" },
+        "destination": { "type": "string", "minLength": 1 },
+        "owner": { "$ref": "#/$defs/slug" },
+        "evidence_boundary_ids": { "$ref": "#/$defs/nonEmptySlugArray" },
+        "stop_condition_id": { "$ref": "#/$defs/slug" },
+        "evidence_ids": { "$ref": "#/$defs/nonEmptySlugArray" }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evidence_id", "path", "line", "source_excerpt"],
+        "properties": {
+          "evidence_id": { "$ref": "#/$defs/slug" },
+          "path": { "type": "string", "minLength": 1 },
+          "line": { "type": "integer", "minimum": 1 },
+          "source_excerpt": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changes_made", "production_action_authorized"],
+      "properties": {
+        "changes_made": { "const": false },
+        "production_action_authorized": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "nonEmptySlugArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/slug" }
+    }
+  }
+}
