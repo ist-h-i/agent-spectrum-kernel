@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -440,6 +440,7 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
     "incomplete-knowledge-boundary",
     "wrong-evidence-citation",
     "unauthorized-extra-file",
+    "unauthorized-file-mode-change",
   ], "private regression inventory must retain every semantic boundary case");
   const requirement = readJson(resolve(FIXTURE_ROOT, "requirement-record.json"));
   const bundle = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
@@ -471,6 +472,12 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
     const changePlanBytes = readFileSync(changePlanPath);
     cpSync(changePlanPath, resolve(candidate, "change-plan.json"));
     if (entry.extra_candidate_path) writeFileSync(resolve(candidate, entry.extra_candidate_path), "unauthorized candidate change\n");
+    if (entry.mode_change_candidate_path) {
+      const modePath = resolve(candidate, entry.mode_change_candidate_path);
+      assert.equal(lstatSync(modePath).mode & 0o111, 0, `${entry.case_id} source mode must begin non-executable`);
+      chmodSync(modePath, 0o755);
+      assert.notEqual(lstatSync(modePath).mode & 0o111, 0, `${entry.case_id} candidate mode must become executable`);
+    }
     const lineage = {
       run_instance_id: `20620620-6206-4206-8206-${String(index + 1).padStart(12, "0")}`,
       case_id: `case-2062062062062062-${String(index + 101).padStart(16, "0")}`,
