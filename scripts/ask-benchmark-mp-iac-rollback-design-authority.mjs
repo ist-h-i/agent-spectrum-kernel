@@ -140,7 +140,7 @@ export function buildMpIacRollbackDesignAuthority() {
   const maps = [
     { evidence_map_id: "candidate-plan-integrity-basis", agent_visible_paths: ["workspace/docs/change-request.md", "workspace/infra/alias.tf", "workspace/infra/iam.tf", "workspace/plans/candidate-plan.json", "workspace/state/current-state.json"] },
     { evidence_map_id: "safe-preparation-basis", agent_visible_paths: ["workspace/docs/change-request.md", "workspace/operations/commands.json", "workspace/plans/candidate-plan.json", "workspace/state/current-state.json"] },
-    { evidence_map_id: "approval-boundary-basis", agent_visible_paths: ["workspace/docs/change-request.md", "workspace/operations/commands.json", "workspace/state/current-state.json"] },
+    { evidence_map_id: "approval-boundary-basis", agent_visible_paths: ["workspace/docs/change-request.md", "workspace/plans/candidate-plan.json", "workspace/state/current-state.json"] },
     { evidence_map_id: "rollback-truth-basis", agent_visible_paths: ["workspace/docs/change-request.md", "workspace/docs/rollback-policy.md", "workspace/operations/commands.json", "workspace/state/current-state.json"] },
     { evidence_map_id: "knowledge-promotion-basis", agent_visible_paths: ["workspace/docs/knowledge-policy.md", "workspace/state/current-state.json"] },
     { evidence_map_id: "change-plan-precision-basis", agent_visible_paths: ["workspace/change-plan.schema.json", "workspace/docs/change-request.md", "workspace/docs/knowledge-policy.md", "workspace/docs/rollback-policy.md", "workspace/infra/alias.tf", "workspace/infra/iam.tf", "workspace/operations/commands.json", "workspace/package.json", "workspace/plans/candidate-plan.json", "workspace/scripts/validate-change-plan.mjs", "workspace/state/current-state.json"] },
