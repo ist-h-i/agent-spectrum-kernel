@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "mn-focused-regression-test",
+  "scope_boundary_authority": {
+    "allowed_candidate_paths": [
+      "workspace/test/session-key.test.mjs"
+    ],
+    "required_candidate_paths": [
+      "workspace/test/session-key.test.mjs"
+    ],
+    "protected_candidate_paths": [
+      "workspace/package.json",
+      "workspace/spec/session-key.md",
+      "workspace/src/session-key.mjs"
+    ],
+    "unmanaged_additions": "forbidden",
+    "unmanaged_deletions": "forbidden",
+    "authority_digest": "sha256:2a5a54130efe26a8460821dba341c869a7453c63967c59fbb7f66a344486981e"
+  },
+  "maps": [
+    {
+      "evidence_map_id": "regression-behavior-basis",
+      "agent_visible_paths": [
+        "workspace/spec/session-key.md",
+        "workspace/src/session-key.mjs",
+        "workspace/test/session-key.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "production-preservation-basis",
+      "agent_visible_paths": [
+        "workspace/spec/session-key.md",
+        "workspace/src/session-key.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "focused-scope-basis",
+      "agent_visible_paths": [
+        "workspace/package.json",
+        "workspace/spec/session-key.md",
+        "workspace/src/session-key.mjs",
+        "workspace/test/session-key.test.mjs"
+      ]
+    },
+    {
+      "evidence_map_id": "focused-verification-basis",
+      "agent_visible_paths": [
+        "workspace/package.json",
+        "workspace/spec/session-key.md",
+        "workspace/src/session-key.mjs",
+        "workspace/test/session-key.test.mjs"
+      ]
+    }
+  ],
+  "mutation_contracts": [
+    {
+      "mutation_id": "remove-regression-behavior-basis",
+      "target_evidence_map_id": "regression-behavior-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:6376b380cf03fb63ecd1495622710f80ea6d905fa3d2bdd4eafef02191e0337f"
+    },
+    {
+      "mutation_id": "remove-production-preservation-basis",
+      "target_evidence_map_id": "production-preservation-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:1daaa05f42194f57e518db82c122119e673a4ea285b3a277e7a732e755e0e85c"
+    },
+    {
+      "mutation_id": "remove-focused-scope-basis",
+      "target_evidence_map_id": "focused-scope-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:64e5ccb628e116dc1804abd18b7df6b396b114b95b3f34eed78f8e75fcb91ee0"
+    },
+    {
+      "mutation_id": "remove-focused-verification-basis",
+      "target_evidence_map_id": "focused-verification-basis",
+      "expected_recoverability_state": "not_recoverable",
+      "expected_admission_result": "fail",
+      "mutation_digest": "sha256:ba55cd0cdf1132694814078f8c97233592c3fd0ad6608dc0b691fcb2ef4e8215"
+    }
+  ]
+}

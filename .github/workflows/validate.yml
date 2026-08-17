@@ -63,6 +63,9 @@ jobs:
       - name: Run documentation/config fixture source-freeze tests
         run: node scripts/test-ask-benchmark-mn-doc-config-correction.mjs
 
+      - name: Run focused regression fixture source-freeze tests
+        run: node scripts/test-ask-benchmark-mn-focused-regression-test.mjs
+
       - name: Run CI-evidence review fixture source-freeze tests
         run: node scripts/test-ask-benchmark-mp-ci-evidence-gap.mjs
 

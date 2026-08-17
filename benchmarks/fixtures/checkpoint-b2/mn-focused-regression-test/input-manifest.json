@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256",
+  "scope": "agent-visible task.md + workspace/**",
+  "fixtures": {
+    "mn-focused-regression-test": {
+      "class": "verification_only",
+      "difficulty": "medium",
+      "target_minutes": 15,
+      "files": [
+        {
+          "path": "task.md",
+          "sha256": "5aa2b6adf6b39676b6fe0e877dee32dce34ff8e40ca9fd7fe867b0f9697a3edb",
+          "bytes": 440
+        },
+        {
+          "path": "workspace/package.json",
+          "sha256": "9917efea8e57cb07719d5af2c2b97aaa556cdfe220279b9d2b73336501d7ca2e",
+          "bytes": 186
+        },
+        {
+          "path": "workspace/spec/session-key.md",
+          "sha256": "0962415189e2a2c12a5ebff7db8d149524a7409eeb342b814251d1a0caa24bad",
+          "bytes": 435
+        },
+        {
+          "path": "workspace/src/session-key.mjs",
+          "sha256": "34cbda6cafabd736e07b262a655bcbbfb92cbe6af0409803a8b2545bfa9cc510",
+          "bytes": 420
+        },
+        {
+          "path": "workspace/test/session-key.test.mjs",
+          "sha256": "72c2db145559a241d1f315efda792cb105c9fce4e153ae6b0e12ca67ba38500a",
+          "bytes": 451
+        }
+      ]
+    }
+  }
+}

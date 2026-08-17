@@ -1,0 +1,86 @@
+{
+  "requirement_record_id": "requirement-record-mn-focused-regression-test",
+  "requirement_record_schema_path": "benchmarks/schemas/portfolio-requirement-record.schema.json",
+  "requirement_record_path": "benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/requirement-record.json",
+  "fixture_id": "mn-focused-regression-test",
+  "catalog_digest": "sha256:cc29dd2aa1cfd794eb0530411d0d72c5789892cc7f277b849652c6d8f4b2f972",
+  "policy_manifest_digest": "sha256:6b41e2e638f6af9e083602285b7c4c87fe3fb2b5e43c84b33fc347ce70c50c41",
+  "scoring_policy_digest": "sha256:1e8fd6732d5748e42706f8c7cd3cae6b178e39407d0988c8eae68e1586846831",
+  "admission_record_digest": "sha256:ad8bc227cf671a21033934647fc276de3be5d07e0bae55ca56ad21f54988d93c",
+  "requirements": [
+    {
+      "requirement_id": "regression-behavior-coverage",
+      "requirement_kind": "weighted",
+      "max_points": 5,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "regression-behavior-basis"
+      ],
+      "mutation_ids": [
+        "remove-regression-behavior-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-mutation-catching-regression"
+      ],
+      "finding_group_id": "regression-behavior-coverage-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:37df584e40341ab8ce8797b1821cc50db2ab85600cd729f22fa97a330b6b131b"
+    },
+    {
+      "requirement_id": "production-behavior-preservation",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "production-preservation-basis"
+      ],
+      "mutation_ids": [
+        "remove-production-preservation-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-production-preservation"
+      ],
+      "finding_group_id": "production-behavior-preservation-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:7bc447393f64cd617b83e78233496ac505441de6f8a782f4585eda8536d2e051"
+    },
+    {
+      "requirement_id": "request-scope-discipline",
+      "requirement_kind": "weighted",
+      "max_points": 2,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "focused-scope-basis"
+      ],
+      "mutation_ids": [
+        "remove-focused-scope-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-focused-test-change"
+      ],
+      "finding_group_id": "request-scope-discipline-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:bca7579f62646769e514e93e18068bda1ac668ef9518ef1ac76435cbad98c55e"
+    },
+    {
+      "requirement_id": "verification-evidence",
+      "requirement_kind": "weighted",
+      "max_points": 1,
+      "partial_credit_allowed": false,
+      "evidence_map_ids": [
+        "focused-verification-basis"
+      ],
+      "mutation_ids": [
+        "remove-focused-verification-basis"
+      ],
+      "equivalence_class_ids": [
+        "equivalent-focused-verification"
+      ],
+      "finding_group_id": "verification-evidence-outcome",
+      "safety_dimension": "completion_correctness",
+      "requirement_digest": "sha256:e8e55ce64103448fe25b04c2d615c64299176d50a45cf872747ea7cfa95cd588"
+    }
+  ],
+  "requirement_set_digest": "sha256:cd27acbf9e74aa17d6e83658e5fa5d5b5f25501089f313818f9a860fd9a3bfc2",
+  "requirement_record_digest": "sha256:1f4766808bbda772658205a2867bad691abf26d58828bd5c2da06d1d7cbbf1b0"
+}
