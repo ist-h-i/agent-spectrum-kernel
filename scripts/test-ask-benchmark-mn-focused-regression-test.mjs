@@ -332,7 +332,7 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   const work = mkdtempSync(resolve(tmpdir(), "mn-focused-regression-private-"));
   const cases = readJson(resolve(caseRoot, "cases.json"));
   assert.equal(cases.fixture_id, FIXTURE_ID);
-  assert.equal(cases.cases.length, 35, "private regression inventory must remain closed");
+  assert.equal(cases.cases.length, 36, "private regression inventory must remain closed");
   assert.equal(new Set(cases.cases.map(({ case_id }) => case_id)).size, cases.cases.length);
   let production = null;
   let externalAuthorityAnchor = null;
