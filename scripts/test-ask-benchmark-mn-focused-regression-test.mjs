@@ -548,6 +548,9 @@ function validateReviewArchive({ privateRoot, caseRoot }) {
   ]) assert.ok(names.includes(path), `review archive must include ${path}`);
 
   expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath: resolve(work, "wrong-head.zip"), reviewedHead: "0".repeat(40) }), /reviewed HEAD/u, "review archive wrong HEAD");
+  const trackedDrift = validationCopy("review-archive-tracked-drift");
+  writeFileSync(resolve(trackedDrift, FIXTURE_ROOT_RELATIVE, "task.md"), `${readFileSync(resolve(trackedDrift, FIXTURE_ROOT_RELATIVE, "task.md"), "utf8")}\nDrift.\n`);
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: trackedDrift, privateRoot, caseRoot, outputPath: resolve(work, "tracked-drift.zip"), reviewedHead }), /tracked bytes differ/u, "review archive tracked-byte drift");
   const driftedPrivate = resolve(work, "drifted-private");
   cpSync(privateRoot, driftedPrivate, { recursive: true });
   const driftedBundlePath = resolve(driftedPrivate, "private-evaluator-bundle.json");
@@ -559,6 +562,13 @@ function validateReviewArchive({ privateRoot, caseRoot }) {
   cpSync(privateRoot, driftedAsset, { recursive: true });
   writeFileSync(resolve(driftedAsset, "hidden-evaluator.mjs"), `${readFileSync(resolve(driftedAsset, "hidden-evaluator.mjs"), "utf8")}\n// drift\n`);
   expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot: driftedAsset, caseRoot, outputPath: resolve(work, "drifted-asset.zip"), reviewedHead }), /private asset bytes/u, "review archive private asset drift");
+  const transplantedCases = resolve(work, "transplanted-cases");
+  cpSync(caseRoot, transplantedCases, { recursive: true });
+  const transplantedCasesPath = resolve(transplantedCases, "cases.json");
+  const transplantedCaseAuthority = readJson(transplantedCasesPath);
+  transplantedCaseAuthority.fixture_id = "foreign-fixture";
+  writeFileSync(transplantedCasesPath, `${JSON.stringify(transplantedCaseAuthority, null, 2)}\n`);
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot: transplantedCases, outputPath: resolve(work, "transplanted-cases.zip"), reviewedHead }), /case identity/u, "review archive private case transplant");
   const symlinkedPrivate = resolve(work, "symlinked-private");
   cpSync(privateRoot, symlinkedPrivate, { recursive: true });
   symlinkSync("oracle.json", resolve(symlinkedPrivate, "oracle-link.json"));
