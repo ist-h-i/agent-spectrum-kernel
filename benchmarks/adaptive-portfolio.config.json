@@ -108,6 +108,20 @@
       }
     },
     {
+      "id": "mn-focused-regression-test",
+      "suite": "mechanism_negative",
+      "task_class": "verification_only",
+      "difficulty": "medium",
+      "repetitions": 3,
+      "aggregate_eligible": true,
+      "input_manifest_path": "benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/input-manifest.json",
+      "input_manifest_sha256": "065c84ece98ef98807a63b14790abd368ace054f0194f3e5bcf40e9c0fd9797b",
+      "verification_command_contract": {
+        "path": "benchmarks/fixtures/checkpoint-b2/mn-focused-regression-test/verification-command-contract.json",
+        "sha256": "c3d48711701c8c4d8e3be2df938df964a4bb7f6050b7cc73d8e9c9abb5a04347"
+      }
+    },
+    {
       "id": "mp-ci-evidence-gap",
       "suite": "mechanism_positive",
       "task_class": "review_verification",
