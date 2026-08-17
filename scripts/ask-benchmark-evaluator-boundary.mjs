@@ -1743,8 +1743,10 @@ function validateOriginalWorkspaceAuthority({ inventory, frozen, candidate, line
     assertSortedUniquePaths(entries, `${label} original ${kind} inventory`);
     if (canonicalDigest(entries) !== authority[`${kind}_workspace_portable_digest`]) throw new Error(`${label} original ${kind} portable digest is invalid`);
     if (stableCanonicalJson(entries.map(({ path, file_type, bytes, sha256 }) => ({ path, file_type, bytes, sha256 }))) !== stableCanonicalJson(expected.portableEntries.map(({ path, file_type, bytes, sha256 }) => ({ path, file_type, bytes, sha256 })))) throw new Error(`${label} original ${kind} bytes or file types do not match the sealed workspace`);
+    const originalByPath = new Map(entries.map((entry) => [entry.path, entry]));
     for (const entry of expected.portableEntries) {
-      const sealedMode = entry.file_type === "file" ? SEALED_REGULAR_FILE_MODE : SEALED_DIRECTORY_MODE;
+      const original = originalByPath.get(entry.path);
+      const sealedMode = entry.file_type === "file" && (original.mode & 0o111) !== 0 ? SEALED_EXECUTABLE_FILE_MODE : entry.file_type === "file" ? SEALED_REGULAR_FILE_MODE : SEALED_DIRECTORY_MODE;
       if (entry.mode !== sealedMode) throw new Error(`${label} sealed ${kind} execution mode is invalid`);
     }
   }
