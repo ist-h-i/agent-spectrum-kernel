@@ -1965,7 +1965,7 @@ async function runPersistentFullEvaluatorAuthority(privateRoot, state, { isolate
       authority.authority_digest = canonicalDigest(closure);
       authority.authority_bytes = Buffer.byteLength(stableCanonicalJson(closure)) || 1;
       writeSealedOriginalAuthority(authority, repositoryDiff);
-    }, restoreSealedOriginalAuthority, /module-owned source metadata|recorded sealed authority|original workspace authority|snapshot identity|sealed repository/u);
+    }, restoreSealedOriginalAuthority, /module-owned source metadata|recorded sealed authority|original workspace authority|sealed .* execution mode|snapshot identity|sealed repository/u);
     for (const [label, mutate] of [
       ["original authority entry omission", (authority) => { authority.candidate_inventory.pop(); }],
       ["original authority entry addition", (authority) => { authority.candidate_inventory.push({ path: "zz-added.txt", file_type: "file", mode: 0o644, bytes: 1, sha256: `sha256:${"0".repeat(64)}` }); }],
