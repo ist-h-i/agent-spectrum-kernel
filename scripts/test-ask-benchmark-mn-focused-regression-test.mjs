@@ -27,6 +27,7 @@ import {
   buildMnFocusedRegressionTestAuthority,
   validateMnFocusedRegressionTestProductionAuthority,
 } from "./ask-benchmark-mn-focused-regression-test-authority.mjs";
+import { generateMnFocusedRegressionTestReviewArchive } from "./ask-benchmark-mn-focused-regression-test-review-archive.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE_ROOT = resolve(ROOT, FIXTURE_ROOT_RELATIVE);
@@ -514,6 +515,57 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   };
 }
 
+function validateReviewArchive({ privateRoot, caseRoot }) {
+  const work = mkdtempSync(resolve(tmpdir(), "mn-focused-regression-review-archive-"));
+  const reviewedHead = spawnSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).stdout.trim();
+  const firstPath = resolve(work, "first.zip");
+  const secondPath = resolve(work, "second.zip");
+  const first = generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath: firstPath, reviewedHead });
+  const second = generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath: secondPath, reviewedHead });
+  assert.deepEqual({ ...first, archivePath: null }, { ...second, archivePath: null }, "review archive identity must be deterministic");
+  assert.deepEqual(readFileSync(firstPath), readFileSync(secondPath), "review archive bytes must be deterministic");
+  const integrity = spawnSync("unzip", ["-tqq", firstPath], { encoding: "utf8" });
+  assert.equal(integrity.status, 0, integrity.stderr || integrity.stdout);
+  const names = spawnSync("unzip", ["-Z1", firstPath], { encoding: "utf8" }).stdout.trim().split("\n");
+  const manifest = JSON.parse(spawnSync("unzip", ["-p", firstPath, "REVIEW-MANIFEST.json"], { encoding: "utf8" }).stdout);
+  assert.equal(manifest.reviewed_repository_head, reviewedHead);
+  assert.equal(manifest.evaluator_bundle_id, readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).evaluator_bundle_id);
+  assert.equal(manifest.evaluator_bundle_digest, readJson(resolve(FIXTURE_ROOT, "evaluator-reference.json")).evaluator_bundle_digest);
+  assert.equal(manifest.independent_review_status, "pending");
+  assert.equal(manifest.author_self_approval, false);
+  assert.equal(manifest.admission_status, "admission_pending");
+  assert.equal(manifest.scoring_ready, false);
+  assert.equal(manifest.measured_execution, false);
+  assert.equal(manifest.archive_format.generator_source_digest, digestBytes(readFileSync(resolve(ROOT, "scripts/ask-benchmark-mn-focused-regression-test-review-archive.mjs"))));
+  const expectedNames = [...manifest.entries.map(({ path }) => path), "REVIEW-MANIFEST.json"].sort((left, right) => left.localeCompare(right));
+  assert.deepEqual(names, expectedNames, "review archive ZIP inventory must close against its manifest");
+  assert.equal(first.entryCount, expectedNames.length);
+  for (const path of [
+    `repository/${FIXTURE_ROOT_RELATIVE}/task.md`,
+    "repository/scripts/ask-benchmark-mn-focused-regression-test-review-archive.mjs",
+    "private-evaluator/hidden-evaluator.mjs",
+    "private-cases/cases.json",
+  ]) assert.ok(names.includes(path), `review archive must include ${path}`);
+
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot, caseRoot, outputPath: resolve(work, "wrong-head.zip"), reviewedHead: "0".repeat(40) }), /reviewed HEAD/u, "review archive wrong HEAD");
+  const driftedPrivate = resolve(work, "drifted-private");
+  cpSync(privateRoot, driftedPrivate, { recursive: true });
+  const driftedBundlePath = resolve(driftedPrivate, "private-evaluator-bundle.json");
+  const driftedBundle = readJson(driftedBundlePath);
+  driftedBundle.evaluator_bundle_id = `evaluator-${"0".repeat(64)}`;
+  writeFileSync(driftedBundlePath, `${JSON.stringify(driftedBundle, null, 2)}\n`);
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot: driftedPrivate, caseRoot, outputPath: resolve(work, "drifted-private.zip"), reviewedHead }), /private bundle differs/u, "review archive private/public transplant");
+  const driftedAsset = resolve(work, "drifted-asset");
+  cpSync(privateRoot, driftedAsset, { recursive: true });
+  writeFileSync(resolve(driftedAsset, "hidden-evaluator.mjs"), `${readFileSync(resolve(driftedAsset, "hidden-evaluator.mjs"), "utf8")}\n// drift\n`);
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot: driftedAsset, caseRoot, outputPath: resolve(work, "drifted-asset.zip"), reviewedHead }), /private asset bytes/u, "review archive private asset drift");
+  const symlinkedPrivate = resolve(work, "symlinked-private");
+  cpSync(privateRoot, symlinkedPrivate, { recursive: true });
+  symlinkSync("oracle.json", resolve(symlinkedPrivate, "oracle-link.json"));
+  expectFailure(() => generateMnFocusedRegressionTestReviewArchive({ root: ROOT, privateRoot: symlinkedPrivate, caseRoot, outputPath: resolve(work, "symlinked-private.zip"), reviewedHead }), /symlink/u, "review archive private symlink");
+  return { rawSha256: first.archiveSha256, rawBytes: first.archiveBytes, entryCount: first.entryCount };
+}
+
 validateFrozenDesign();
 validateMnFocusedRegressionTestInputClosure({ root: ROOT });
 validateVisibleScenario();
@@ -542,4 +594,5 @@ if (productionExists) {
 
 const requested = privateArgs(process.argv.slice(2));
 const privateSummary = requested ? await validatePrivateCases({ ...requested, productionExists }) : null;
-console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));
+const reviewArchiveSummary = requested ? validateReviewArchive(requested) : null;
+console.log(JSON.stringify({ fixture_id: FIXTURE_ID, input_closure: "pass", frozen_design: "pass", visible_scenario: "pass", negative_regressions: "pass", production_validation: productionExists ? "pass" : "generation_pending", actual_private_validation: requested ? "pass" : "not_supplied", ...(privateSummary ? { private_summary: privateSummary } : {}), ...(reviewArchiveSummary ? { review_archive_validation: reviewArchiveSummary } : {}), admission: effectiveAdmissionStatus, scoring_ready: false }));
