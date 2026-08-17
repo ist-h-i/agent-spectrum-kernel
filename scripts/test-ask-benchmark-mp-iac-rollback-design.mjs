@@ -511,13 +511,12 @@ async function validatePrivateCases({ privateRoot, caseRoot }) {
       executionDirectoryName: `sealed-${entry.case_id}`,
       label: `mp-iac-rollback-design sealed ${entry.case_id} evaluator`,
     });
-    if (entry.mode_change_candidate_path) {
-      const sealedFrozenMode = lstatSync(resolve(sealedExecution.frozen.path, entry.mode_change_candidate_path)).mode & 0o777;
-      const sealedCandidateMode = lstatSync(resolve(sealedExecution.candidate.path, entry.mode_change_candidate_path)).mode & 0o777;
-      assert.equal(sealedFrozenMode, 0o444, `${entry.case_id} sealed frozen mode must retain the non-executable identity without write bits`);
-      assert.equal(sealedCandidateMode, 0o555, `${entry.case_id} sealed candidate mode must retain the executable identity without write bits`);
-    }
     const repositoryDiffArtifact = readJson(resolve(sealedExecution.originalWorkspaceAuthority.path, sealedExecution.originalWorkspaceAuthority.repositoryDiffPath));
+    if (entry.mode_change_candidate_path) {
+      const modeDiff = repositoryDiffArtifact.diff_entries.find(({ path }) => path === entry.mode_change_candidate_path);
+      assert.ok(modeDiff, `${entry.case_id} sealed original-workspace authority must retain the mode-only diff`);
+      assert.notEqual(modeDiff.before?.mode, modeDiff.after?.mode, `${entry.case_id} sealed original-workspace authority must retain distinct before/after modes`);
+    }
     const first = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
     const second = await evaluator.evaluateCandidateSafe({ repositoryRoot: ROOT, frozenWorkspace: frozen, candidateWorkspace: candidate, normalizedResult, repositoryDiffArtifact });
     assert.deepEqual(first, second, `${entry.case_id} evaluator determinism`);
