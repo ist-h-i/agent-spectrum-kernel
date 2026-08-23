@@ -53,6 +53,21 @@ function assertCanonicalOrder(values, label, key = (entry) => stableCanonicalJso
   if (stableCanonicalJson(values) !== stableCanonicalJson(expected)) throw new Error(`${label} must use canonical sorted order`);
 }
 
+function assertUniqueBy(values, label, key) {
+  const seen = new Set();
+  for (const entry of values) {
+    const identity = key(entry);
+    if (seen.has(identity)) throw new Error(`${label} contains a duplicate or conflicting identity: ${identity}`);
+    seen.add(identity);
+  }
+}
+
+function assertDisjoint(left, right, label) {
+  const rightValues = new Set(right);
+  const overlap = left.filter((entry) => rightValues.has(entry));
+  if (overlap.length > 0) throw new Error(`${label} contains contradictory entries: ${overlap.join(", ")}`);
+}
+
 function assertPortableRelativePath(value, label) {
   if (
     typeof value !== "string"
@@ -128,7 +143,9 @@ function validateReuseIdentity(identity, label) {
   for (const input of identity.consumed_inputs) assertPortableRelativePath(input.path, `${label} consumed input`);
   assertCommandBoundary(identity.execution.command);
   assertCanonicalOrder(identity.consumed_inputs, `${label} consumed_inputs`, (entry) => `${entry.path}\0${entry.kind}\0${entry.digest}`);
+  assertUniqueBy(identity.consumed_inputs, `${label} consumed_inputs`, (entry) => entry.path);
   assertCanonicalOrder(identity.execution.toolchain, `${label} toolchain`, (entry) => `${entry.name}\0${entry.version}\0${entry.identity_digest}`);
+  assertUniqueBy(identity.execution.toolchain, `${label} toolchain`, (entry) => entry.name);
   return identity;
 }
 
@@ -152,6 +169,7 @@ export function validateVerificationEvidence(evidence, { schemaPath = VERIFICATI
   assertCanonicalOrder(evidence.execution.toolchain, "verification evidence toolchain", (entry) => `${entry.name}\0${entry.version}\0${entry.identity_digest}`);
   assertCanonicalOrder(evidence.coverage.obligation_refs, "verification evidence obligation_refs", (entry) => entry);
   assertCanonicalOrder(evidence.coverage.explicit_non_coverage, "verification evidence explicit_non_coverage", (entry) => entry);
+  assertDisjoint(evidence.coverage.obligation_refs, evidence.coverage.explicit_non_coverage, "verification evidence coverage");
   const identity = validateReuseIdentity(reuseIdentityFromEvidence(evidence), "verification evidence reuse identity");
   const expectedReuseDigest = canonicalDigest(identity);
   if (evidence.reuse_identity_digest !== expectedReuseDigest) throw new Error("verification evidence reuse identity digest mismatch");
@@ -209,6 +227,7 @@ function selfDigest(value, idField, digestField) {
 function normalizeAuthorityRequirement(authority) {
   const normalized = clone(authority);
   normalized.accepted_producer_kinds = sortedCopy(authority.accepted_producer_kinds, "accepted producer kinds", (entry) => entry);
+  normalized.accepted_producer_identity_digests = sortedCopy(authority.accepted_producer_identity_digests, "accepted producer identity digests", (entry) => entry);
   normalized.accepted_evidence_levels = sortedCopy(authority.accepted_evidence_levels, "accepted evidence levels", (entry) => entry);
   return normalized;
 }
@@ -220,6 +239,7 @@ export function buildVerificationRequirements({ requiredGates }) {
     gate.reuse_identity.consumed_inputs = sortedCopy(gate.reuse_identity.consumed_inputs, `${gate.gate_id} consumed_inputs`, (input) => `${input.path}\0${input.kind}\0${input.digest}`);
     gate.reuse_identity.execution.toolchain = sortedCopy(gate.reuse_identity.execution.toolchain, `${gate.gate_id} toolchain`, (tool) => `${tool.name}\0${tool.version}\0${tool.identity_digest}`);
     gate.reuse_identity_digest = canonicalDigest(gate.reuse_identity);
+    gate.required_obligation_refs = sortedCopy(gate.required_obligation_refs, `${gate.gate_id} required obligation refs`, (entry) => entry);
     gate.authority = normalizeAuthorityRequirement(gate.authority);
     return gate;
   }).sort((left, right) => left.gate_id.localeCompare(right.gate_id));
@@ -252,7 +272,9 @@ export function validateVerificationRequirements(requirements, { schemaPath = VE
     if (stableCanonicalJson(gate.reuse_identity.target) !== stableCanonicalJson(requirements.target)) throw new Error(`${gate.gate_id} target does not match verification requirements target`);
     validateReuseIdentity(gate.reuse_identity, `${gate.gate_id} reuse identity`);
     if (canonicalDigest(gate.reuse_identity) !== gate.reuse_identity_digest) throw new Error(`${gate.gate_id} reuse identity digest mismatch`);
+    assertCanonicalOrder(gate.required_obligation_refs, `${gate.gate_id} required obligation refs`, (entry) => entry);
     assertCanonicalOrder(gate.authority.accepted_producer_kinds, `${gate.gate_id} accepted producer kinds`, (entry) => entry);
+    assertCanonicalOrder(gate.authority.accepted_producer_identity_digests, `${gate.gate_id} accepted producer identity digests`, (entry) => entry);
     assertCanonicalOrder(gate.authority.accepted_evidence_levels, `${gate.gate_id} accepted evidence levels`, (entry) => entry);
   }
   const digest = selfDigest(requirements, "requirements_id", "requirements_digest");
@@ -260,15 +282,35 @@ export function validateVerificationRequirements(requirements, { schemaPath = VE
   return requirements;
 }
 
+function obligationDispositionFields(gate, covered) {
+  const required = clone(gate.required_obligation_refs);
+  return {
+    required_obligation_refs: required,
+    covered_obligation_refs: covered ? clone(required) : [],
+    uncovered_obligation_refs: covered ? [] : clone(required),
+  };
+}
+
+function evidenceCoversRequiredObligations(evidence, gate) {
+  const covered = new Set(evidence.coverage.obligation_refs);
+  const explicitlyUncovered = new Set(evidence.coverage.explicit_non_coverage);
+  return gate.required_obligation_refs.every((obligation) => covered.has(obligation) && !explicitlyUncovered.has(obligation));
+}
+
 function dispositionForGate(gate, allEvidence) {
   const digestCandidates = allEvidence.filter((evidence) => evidence.reuse_identity_digest === gate.reuse_identity_digest);
   const exact = digestCandidates.filter((evidence) => stableCanonicalJson(reuseIdentityFromEvidence(evidence)) === stableCanonicalJson(gate.reuse_identity));
   if (exact.length !== digestCandidates.length) throw new Error(`${gate.gate_id} reuse identity digest maps to non-identical material inputs`);
-  const authorityAccepted = exact.filter((evidence) => gate.authority.accepted_producer_kinds.includes(evidence.producer.kind) && gate.authority.accepted_evidence_levels.includes(evidence.execution.runner.evidence_level));
+  const authorityAccepted = exact.filter((evidence) => (
+    gate.authority.accepted_producer_kinds.includes(evidence.producer.kind)
+    && gate.authority.accepted_producer_identity_digests.includes(evidence.producer.identity_digest)
+    && gate.authority.accepted_evidence_levels.includes(evidence.execution.runner.evidence_level)
+  ));
   if (exact.length > 0 && authorityAccepted.length === 0) {
     return {
       gate_id: gate.gate_id,
       reuse_identity_digest: gate.reuse_identity_digest,
+      ...obligationDispositionFields(gate, false),
       disposition: gate.execution_availability === "unavailable" ? "blocked_uncovered" : "rerun_required",
       reason_code: "exact_evidence_authority_mismatch",
       evidence_id: null,
@@ -281,6 +323,7 @@ function dispositionForGate(gate, allEvidence) {
     return {
       gate_id: gate.gate_id,
       reuse_identity_digest: gate.reuse_identity_digest,
+      ...obligationDispositionFields(gate, false),
       disposition: "rerun_required",
       reason_code: "conflicting_exact_evidence",
       evidence_id: null,
@@ -289,12 +332,14 @@ function dispositionForGate(gate, allEvidence) {
     };
   }
   const passing = authorityAccepted.filter((evidence) => evidence.execution.terminal.status === "succeeded");
-  if (passing.length > 0) {
-    const evidence = passing[0];
+  const covering = passing.filter((evidence) => evidenceCoversRequiredObligations(evidence, gate));
+  if (covering.length > 0) {
+    const evidence = covering[0];
     const independent = gate.authority.independent_judgment_required;
     return {
       gate_id: gate.gate_id,
       reuse_identity_digest: gate.reuse_identity_digest,
+      ...obligationDispositionFields(gate, true),
       disposition: independent ? "independent_judgment_required" : "reuse_exact",
       reason_code: independent ? "independent_judgment_required" : "exact_identity_verified",
       evidence_id: evidence.evidence_id,
@@ -302,10 +347,23 @@ function dispositionForGate(gate, allEvidence) {
       execution_evidence_reusable: true,
     };
   }
+  if (passing.length > 0) {
+    return {
+      gate_id: gate.gate_id,
+      reuse_identity_digest: gate.reuse_identity_digest,
+      ...obligationDispositionFields(gate, false),
+      disposition: gate.execution_availability === "unavailable" ? "blocked_uncovered" : "rerun_required",
+      reason_code: "exact_evidence_coverage_mismatch",
+      evidence_id: null,
+      evidence_digest: null,
+      execution_evidence_reusable: false,
+    };
+  }
   if (authorityAccepted.length > 0) {
     return {
       gate_id: gate.gate_id,
       reuse_identity_digest: gate.reuse_identity_digest,
+      ...obligationDispositionFields(gate, false),
       disposition: gate.execution_availability === "unavailable" ? "blocked_uncovered" : "rerun_required",
       reason_code: "exact_evidence_not_passing",
       evidence_id: null,
@@ -316,6 +374,7 @@ function dispositionForGate(gate, allEvidence) {
   return {
     gate_id: gate.gate_id,
     reuse_identity_digest: gate.reuse_identity_digest,
+    ...obligationDispositionFields(gate, false),
     disposition: gate.execution_availability === "unavailable" ? "blocked_uncovered" : "rerun_required",
     reason_code: gate.execution_availability === "unavailable" ? "execution_unavailable" : "no_exact_evidence",
     evidence_id: null,
@@ -363,11 +422,25 @@ export function planExactReuse({ storeRoot, requirements }) {
     plan_id: `verification-reuse-plan-${digest.slice("sha256:".length)}`,
     plan_digest: digest,
   };
-  validateVerificationReusePlan(plan);
+  validateVerificationReusePlan(plan, { requirements });
   return plan;
 }
 
-export function validateVerificationReusePlan(plan, { schemaPath = VERIFICATION_REUSE_PLAN_SCHEMA_PATH } = {}) {
+function validatePlanRequirementsBinding(plan, requirements) {
+  validateVerificationRequirements(requirements);
+  if (plan.requirements_id !== requirements.requirements_id || plan.requirements_digest !== requirements.requirements_digest) throw new Error("verification reuse plan requirements identity mismatch");
+  if (stableCanonicalJson(plan.target) !== stableCanonicalJson(requirements.target)) throw new Error("verification reuse plan requirements target mismatch");
+  if (plan.dispositions.length !== requirements.required_gates.length) throw new Error("verification reuse plan does not cover every required gate");
+  const requiredByGate = new Map(requirements.required_gates.map((gate) => [gate.gate_id, gate]));
+  for (const disposition of plan.dispositions) {
+    const requiredGate = requiredByGate.get(disposition.gate_id);
+    if (!requiredGate) throw new Error(`${disposition.gate_id} is not present in the bound verification requirements`);
+    if (disposition.reuse_identity_digest !== requiredGate.reuse_identity_digest) throw new Error(`${disposition.gate_id} reuse identity does not match the bound verification requirements`);
+    if (stableCanonicalJson(disposition.required_obligation_refs) !== stableCanonicalJson(requiredGate.required_obligation_refs)) throw new Error(`${disposition.gate_id} obligations do not match the bound verification requirements`);
+  }
+}
+
+export function validateVerificationReusePlan(plan, { schemaPath = VERIFICATION_REUSE_PLAN_SCHEMA_PATH, requirements } = {}) {
   failSchema(plan, schemaPath, "verification reuse plan");
   assertCanonicalOrder(plan.dispositions, "verification reuse dispositions", (entry) => entry.gate_id);
   uniqueCanonical(plan.dispositions.map((entry) => entry.gate_id), "verification reuse disposition gate IDs");
@@ -376,17 +449,27 @@ export function validateVerificationReusePlan(plan, { schemaPath = VERIFICATION_
   if (stableCanonicalJson(plan.coverage) !== stableCanonicalJson(expectedCoverage)) throw new Error("verification reuse plan coverage summary mismatch");
   const allowedReasons = {
     reuse_exact: new Set(["exact_identity_verified"]),
-    rerun_required: new Set(["no_exact_evidence", "exact_evidence_not_passing", "exact_evidence_authority_mismatch", "conflicting_exact_evidence"]),
+    rerun_required: new Set(["no_exact_evidence", "exact_evidence_not_passing", "exact_evidence_authority_mismatch", "exact_evidence_coverage_mismatch", "conflicting_exact_evidence"]),
     independent_judgment_required: new Set(["independent_judgment_required"]),
-    blocked_uncovered: new Set(["execution_unavailable", "exact_evidence_not_passing", "exact_evidence_authority_mismatch"]),
+    blocked_uncovered: new Set(["execution_unavailable", "exact_evidence_not_passing", "exact_evidence_authority_mismatch", "exact_evidence_coverage_mismatch"]),
   };
   for (const disposition of plan.dispositions) {
+    assertCanonicalOrder(disposition.required_obligation_refs, `${disposition.gate_id} required obligation refs`, (entry) => entry);
+    assertCanonicalOrder(disposition.covered_obligation_refs, `${disposition.gate_id} covered obligation refs`, (entry) => entry);
+    assertCanonicalOrder(disposition.uncovered_obligation_refs, `${disposition.gate_id} uncovered obligation refs`, (entry) => entry);
+    assertDisjoint(disposition.covered_obligation_refs, disposition.uncovered_obligation_refs, `${disposition.gate_id} obligation coverage`);
+    const partition = [...disposition.covered_obligation_refs, ...disposition.uncovered_obligation_refs].sort((left, right) => left.localeCompare(right));
+    if (stableCanonicalJson(partition) !== stableCanonicalJson(disposition.required_obligation_refs)) throw new Error(`${disposition.gate_id} obligation coverage does not partition its requirements`);
     const hasEvidence = disposition.evidence_id !== null || disposition.evidence_digest !== null;
+    const fullyCovered = ["reuse_exact", "independent_judgment_required"].includes(disposition.disposition);
     if (hasEvidence && (disposition.evidence_id === null || disposition.evidence_digest === null || evidenceDigestFromId(disposition.evidence_id) !== disposition.evidence_digest)) throw new Error(`${disposition.gate_id} disposition evidence reference is incomplete or mismatched`);
     if (!allowedReasons[disposition.disposition]?.has(disposition.reason_code)) throw new Error(`${disposition.gate_id} disposition reason contradicts its state`);
-    if (["reuse_exact", "independent_judgment_required"].includes(disposition.disposition) !== hasEvidence) throw new Error(`${disposition.gate_id} disposition evidence presence contradicts its state`);
-    if (disposition.execution_evidence_reusable !== ["reuse_exact", "independent_judgment_required"].includes(disposition.disposition)) throw new Error(`${disposition.gate_id} execution_evidence_reusable contradicts its disposition`);
+    if (fullyCovered !== hasEvidence) throw new Error(`${disposition.gate_id} disposition evidence presence contradicts its state`);
+    if (disposition.execution_evidence_reusable !== fullyCovered) throw new Error(`${disposition.gate_id} execution_evidence_reusable contradicts its disposition`);
+    if (fullyCovered && disposition.uncovered_obligation_refs.length > 0) throw new Error(`${disposition.gate_id} reusable evidence leaves required obligations uncovered`);
+    if (!fullyCovered && disposition.covered_obligation_refs.length > 0) throw new Error(`${disposition.gate_id} blocking disposition cannot claim covered obligations`);
   }
+  if (requirements) validatePlanRequirementsBinding(plan, requirements);
   const digest = selfDigest(plan, "plan_id", "plan_digest");
   if (plan.plan_digest !== digest || plan.plan_id !== `verification-reuse-plan-${digest.slice("sha256:".length)}`) throw new Error("verification reuse plan digest or ID mismatch");
   return plan;

@@ -216,7 +216,7 @@ skills/
 
 ## Verification evidence exact reuse
 
-`docs/verification-evidence-contract.md` defines the local-first bounded evidence state for Issue #274 Slice 1. It stores canonical structured results in a shared content-addressed JSON layout, verifies exact material identity before reuse, keeps independent judgment separate, transfers only exportable bounded evidence, and blocks coverage when a required gate remains uncovered.
+`docs/verification-evidence-contract.md` defines the local-first bounded evidence state for Issue #274 Slice 1. It stores canonical structured results in a shared content-addressed JSON layout, verifies exact material identity, accepted producer identity, and required obligation coverage before reuse, keeps independent judgment separate, transfers only exportable bounded evidence, and blocks coverage when a required gate remains uncovered.
 
 The initial planner is intentionally `exact_only`. It does not infer dependencies, emit `reuse_scoped`, replace CI/review/approval, or change benchmark evaluator and scoring authority.
 

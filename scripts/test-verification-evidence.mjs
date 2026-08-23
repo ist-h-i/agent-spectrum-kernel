@@ -88,7 +88,7 @@ function evidenceDraft(overrides = {}) {
       },
     },
     coverage: {
-      obligation_refs: ["VER-274-S1@1#O-CAS", "VER-274-S1@1#O-EXACT"],
+      obligation_refs: ["VER-274-S1@2#O-CAS", "VER-274-S1@2#O-EXACT"],
       explicit_non_coverage: ["independent-semantic-review"],
     },
     invalidation: {
@@ -121,9 +121,11 @@ function acceptedGate(evidence, overrides = {}) {
   return {
     gate_id: evidence.gate.gate_id,
     reuse_identity: reuseIdentityFromEvidence(evidence),
+    required_obligation_refs: structuredClone(evidence.coverage.obligation_refs),
     authority: {
       independent_judgment_required: false,
       accepted_producer_kinds: ["automation", "ci", "developer", "reviewer"],
+      accepted_producer_identity_digests: [evidence.producer.identity_digest],
       accepted_evidence_levels: ["behavior_verified", "executed"],
     },
     execution_availability: "available",
@@ -149,11 +151,42 @@ try {
 
   const requirements = buildVerificationRequirements({ requiredGates: [acceptedGate(sealed)] });
   const exactPlan = planExactReuse({ storeRoot: store, requirements });
-  validateVerificationReusePlan(exactPlan);
+  validateVerificationReusePlan(exactPlan, { requirements });
   assert.equal(exactPlan.dispositions[0].disposition, "reuse_exact");
   assert.equal(exactPlan.dispositions[0].reason_code, "exact_identity_verified");
+  assert.deepEqual(exactPlan.dispositions[0].required_obligation_refs, sealed.coverage.obligation_refs);
+  assert.deepEqual(exactPlan.dispositions[0].covered_obligation_refs, sealed.coverage.obligation_refs);
+  assert.deepEqual(exactPlan.dispositions[0].uncovered_obligation_refs, []);
   assert.equal(exactPlan.coverage.status, "covered");
   assert.deepEqual(exactPlan.coverage.covered_gate_ids, [sealed.gate.gate_id]);
+
+  const uncoveredObligation = "VER-274-S1@2#O-TRANSFER";
+  const obligationMismatchRequirements = buildVerificationRequirements({
+    requiredGates: [acceptedGate(sealed, {
+      required_obligation_refs: [...sealed.coverage.obligation_refs, uncoveredObligation],
+    })],
+  });
+  const obligationMismatchPlan = planExactReuse({ storeRoot: store, requirements: obligationMismatchRequirements });
+  assert.equal(obligationMismatchPlan.dispositions[0].disposition, "rerun_required");
+  assert.equal(obligationMismatchPlan.dispositions[0].reason_code, "exact_evidence_coverage_mismatch");
+  assert.deepEqual(obligationMismatchPlan.dispositions[0].covered_obligation_refs, []);
+  assert.deepEqual(obligationMismatchPlan.dispositions[0].uncovered_obligation_refs, obligationMismatchRequirements.required_gates[0].required_obligation_refs);
+  assert.equal(obligationMismatchPlan.coverage.status, "blocked");
+  expectFailure(
+    "plan requirements binding",
+    () => validateVerificationReusePlan(exactPlan, { requirements: obligationMismatchRequirements }),
+    /requirements|obligation|target|gate/iu,
+  );
+
+  const staleProducerGate = acceptedGate(sealed);
+  staleProducerGate.authority.accepted_producer_identity_digests = [digest("different-producer-authority")];
+  const staleProducerPlan = planExactReuse({
+    storeRoot: store,
+    requirements: buildVerificationRequirements({ requiredGates: [staleProducerGate] }),
+  });
+  assert.equal(staleProducerPlan.dispositions[0].disposition, "rerun_required");
+  assert.equal(staleProducerPlan.dispositions[0].reason_code, "exact_evidence_authority_mismatch");
+  assert.equal(staleProducerPlan.coverage.status, "blocked");
 
   const changedIdentities = [
     ["repository", (identity) => { identity.target.repository_id = "github.com/example/transplant"; }],
@@ -288,6 +321,19 @@ try {
   const rawOutput = evidenceDraft();
   rawOutput.execution.raw_output = "forbidden";
   expectFailure("raw output field", () => sealVerificationEvidence(rawOutput), /raw_output|unknown property|privacy/iu);
+  const contradictoryCoverage = evidenceDraft();
+  contradictoryCoverage.coverage.explicit_non_coverage.push(contradictoryCoverage.coverage.obligation_refs[0]);
+  expectFailure("contradictory coverage", () => sealVerificationEvidence(contradictoryCoverage), /coverage|obligation|contradict/iu);
+  const conflictingInputPath = evidenceDraft();
+  conflictingInputPath.consumed_inputs[1].path = conflictingInputPath.consumed_inputs[0].path;
+  expectFailure("conflicting consumed input path", () => sealVerificationEvidence(conflictingInputPath), /consumed input|path|duplicate|conflict/iu);
+  const conflictingToolchain = evidenceDraft();
+  conflictingToolchain.execution.toolchain.push({
+    ...conflictingToolchain.execution.toolchain[0],
+    version: "v25.0.0",
+    identity_digest: digest("node-v25.0.0-darwin-arm64"),
+  });
+  expectFailure("conflicting toolchain name", () => sealVerificationEvidence(conflictingToolchain), /toolchain|name|duplicate|conflict/iu);
   expectFailure("privacy attestation", () => sealVerificationEvidence(evidenceDraft({
     privacy: { ...evidenceDraft().privacy, raw_output_stored: true },
   })), /raw_output|equal false|privacy/iu);

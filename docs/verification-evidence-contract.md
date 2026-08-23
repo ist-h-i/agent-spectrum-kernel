@@ -61,7 +61,9 @@ This layout may later hold other versioned content-addressed ASK artifacts. Cons
 
 Requirements declare one exact reuse identity per required gate plus:
 
+- the obligation refs that the evidence must cover;
 - accepted producer kinds;
+- accepted producer identity digests;
 - accepted evidence levels;
 - whether independent judgment is still required;
 - whether new execution is available.
@@ -71,14 +73,16 @@ Slice 1 emits one disposition per gate:
 | Disposition | Meaning in this revision |
 |---|---|
 | `reuse_exact` | A passing, authority-compatible object matches every material exact identity. |
-| `rerun_required` | No valid exact pass exists, a material identity changed, a prior result did not pass, authority is incompatible, or exact outcomes conflict. |
+| `rerun_required` | No valid exact pass exists, a material identity changed, required obligations are not covered, a prior result did not pass, authority is incompatible, or exact outcomes conflict. |
 | `independent_judgment_required` | Exact deterministic execution evidence is reusable, but it cannot replace the required independent decision. |
 | `blocked_uncovered` | No covering exact evidence exists and current execution is unavailable. |
 | `reuse_scoped` | Reserved by the shared state model; rejected while `planner_scope` is `exact_only`. |
 
 Conflicting passing and non-passing evidence for one exact identity never resolves by selecting the pass. It yields `rerun_required` with `conflicting_exact_evidence`.
 
-Repository, target, tree, gate-contract, input, command, runner, toolchain, and environment changes produce a different reuse identity. A cross-boundary object therefore cannot satisfy exact reuse even when its gate label or command text looks similar.
+Repository, target, tree, gate-contract, input, command, runner, toolchain, and environment changes produce a different reuse identity. A cross-boundary object therefore cannot satisfy exact reuse even when its gate label or command text looks similar. Producer identity is evaluated separately against the gate's accepted producer identity digests, so a changed or untrusted producer cannot reuse evidence while producer changes remain distinct from material execution changes.
+
+A passing exact-identity object is reusable only when its `coverage.obligation_refs` contains every obligation required by the gate. Covered and explicitly non-covered refs must be disjoint. An unrelated or incomplete obligation set yields `exact_evidence_coverage_mismatch`; it never becomes coverage merely because the command succeeded.
 
 ## Authority boundary
 
@@ -90,7 +94,9 @@ PR HEAD, CI, approval, mergeability, release, authorization, and other current e
 
 ## Coverage foundation
 
-The exact planner includes a coverage summary. In Slice 1, `covered` means every required deterministic gate has `reuse_exact`. Any rerun, unavailable obligation, independent judgment, conflicting result, or reserved scoped reuse yields `blocked` and names the blocking gate IDs.
+The exact planner includes a coverage summary and a required/covered/uncovered obligation partition for every gate. In Slice 1, `covered` means every required deterministic gate has `reuse_exact` and its chosen evidence covers every required obligation. Any rerun, unavailable obligation, independent judgment, conflicting result, or reserved scoped reuse yields `blocked` and names the blocking gate IDs.
+
+The planner validates its output against the exact requirements object before returning it. Consumers using a stored or transferred plan for a coverage claim must likewise supply that requirements object to plan validation; standalone validation proves only schema, digest, and internal consistency, not that a different requirements set was satisfied.
 
 This is a foundation for the later current-target coverage gate. It does not by itself support a completion, merge, or release claim, and it does not replace lifecycle traceability, final review, approval, rollback, or current external-state checks.
 
