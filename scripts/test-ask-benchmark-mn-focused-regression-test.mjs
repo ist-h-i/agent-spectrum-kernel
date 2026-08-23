@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
@@ -333,15 +333,16 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   const work = mkdtempSync(resolve(tmpdir(), "mn-focused-regression-private-"));
   const cases = readJson(resolve(caseRoot, "cases.json"));
   assert.equal(cases.fixture_id, FIXTURE_ID);
-  assert.equal(cases.cases.length, 39, "private regression inventory must remain closed");
+  assert.equal(cases.cases.length, 46, "private regression inventory must remain closed");
   assert.equal(new Set(cases.cases.map(({ case_id }) => case_id)).size, cases.cases.length);
   let production = null;
   let externalAuthorityAnchor = null;
   let hiddenAsset = null;
   let privateEvaluationRoot = null;
   let evaluationInputRoot = null;
+  let boundaryRoots = null;
   if (productionExists) {
-    const boundaryRoots = createBoundaryRoots(resolve(work, "boundaries"));
+    boundaryRoots = createBoundaryRoots(resolve(work, "boundaries"));
     production = validateMnFocusedRegressionTestProductionAuthority({ root: ROOT, privateRoot, boundaryRoots });
     const bundle = readJson(resolve(privateRoot, "private-evaluator-bundle.json"));
     hiddenAsset = bundle.asset_inventory.find(({ role }) => role === "hidden_tests");
@@ -360,7 +361,68 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
     mkdirSync(evaluationInputRoot);
     writeFileSync(resolve(evaluationInputRoot, "private-regression-authority.json"), "{\"measured_execution\":false,\"scoring_ready\":false}\n");
   }
-  const evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${digestBytes(readFileSync(resolve(privateRoot, "hidden-evaluator.mjs")))}`);
+  const inheritedEnvironment = { NODE_OPTIONS: process.env.NODE_OPTIONS, ASK_PRIVATE_VARIANT: process.env.ASK_PRIVATE_VARIANT };
+  process.env.NODE_OPTIONS = "--trace-warnings";
+  process.env.ASK_PRIVATE_VARIANT = "parent-marker";
+  let evaluator;
+  try {
+    evaluator = await import(`${pathToFileURL(resolve(privateRoot, "hidden-evaluator.mjs")).href}?digest=${digestBytes(readFileSync(resolve(privateRoot, "hidden-evaluator.mjs")))}`);
+  } finally {
+    for (const [name, value] of Object.entries(inheritedEnvironment)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+  const loaderContract = evaluator.authenticatedGenericLoaderContractForTest();
+  const loaderBytes = readFileSync(resolve(privateRoot, loaderContract.path));
+  assert.equal(loaderContract.revision, "authenticated-generic-loader.v1");
+  assert.equal(loaderContract.runtime, "node-v24.19.0");
+  assert.equal(loaderContract.bytes, loaderBytes.length);
+  assert.equal(loaderContract.sha256, digestBytes(loaderBytes));
+  assert.deepEqual(loaderContract.environment, { LANG: "C", LC_ALL: "C", TZ: "UTC", PATH: "/usr/bin:/bin" });
+  if (productionExists) {
+    const driftedLoaderRoot = resolve(work, "drifted-authenticated-loader");
+    cpSync(privateRoot, driftedLoaderRoot, { recursive: true });
+    writeFileSync(resolve(driftedLoaderRoot, loaderContract.path), `${loaderBytes.toString("utf8")}\n// drift\n`);
+    expectFailure(
+      () => validateMnFocusedRegressionTestProductionAuthority({ root: ROOT, privateRoot: driftedLoaderRoot, boundaryRoots }),
+      /authenticated generic loader execution contract/u,
+      "authenticated generic loader private contract drift",
+    );
+  }
+  const loaderSource = loaderBytes.toString("utf8");
+  const oracle = readJson(resolve(privateRoot, "oracle.json"));
+  for (const trial of oracle.mutation_trials) {
+    for (const answerBearingValue of [trial.trial_id, trial.boundary, trial.exact_source, trial.control_replacement, trial.mutant_replacement]) {
+      assert.equal(loaderSource.includes(answerBearingValue), false, `generic loader must not contain private trial bytes: ${trial.trial_id}`);
+    }
+  }
+  assert.doesNotMatch(loaderSource, /\bcontrol\b|\bmutant\b/u, "generic loader source must not encode a variant");
+
+  const hmacKey = "11".repeat(32);
+  const runNonce = "22".repeat(32);
+  const bindingToken = "33".repeat(32);
+  const payload = { tenantId: "acme", region: "Us-East-1" };
+  const boundary = { path: ["region"], pattern: "[A-Z]", flags: "u" };
+  const recordFor = ({ nonce = runNonce, sequence = 1, candidatePayload = payload, key = hmacKey, token = bindingToken } = {}) => {
+    const message = { schema_version: "authenticated-boundary-observation.v1", run_nonce: nonce, sequence, payload: candidatePayload, binding_token: token };
+    const mac = `sha256:${createHmac("sha256", Buffer.from(key, "hex")).update(stableCanonicalJson(message)).digest("hex")}`;
+    return { schema_version: "authenticated-boundary-observation.v1", run_nonce: nonce, sequence, payload: candidatePayload, mac };
+  };
+  const observationArguments = { hmacKey, runNonce, bindingToken, payloadFields: ["tenantId", "region"], boundary };
+  const validRecord = recordFor();
+  const validLine = `${JSON.stringify(validRecord)}\n`;
+  assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, output: validLine }), true, "valid authenticated observation must pass");
+  const unsigned = clone(validRecord); delete unsigned.mac;
+  assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, output: `${JSON.stringify(unsigned)}\n` }), false, "unsigned observation must fail");
+  assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, output: `${JSON.stringify({ ...validRecord, mac: `sha256:${"0".repeat(64)}` })}\n` }), false, "wrong MAC must fail");
+  assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, output: `${JSON.stringify(recordFor({ nonce: "44".repeat(32) }))}\n` }), false, "wrong nonce must fail");
+  assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, output: `${JSON.stringify(recordFor({ sequence: 2 }))}\n` }), false, "wrong sequence must fail");
+  assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, runNonce: "55".repeat(32), output: validLine }), false, "cross-run replay must fail");
+  assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, output: `${validLine}${validLine}` }), false, "duplicate sequence must fail");
+  assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, output: `${validLine}{}\n` }), false, "unexpected extra record must fail");
+  assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, output: "not-json\n" }), false, "malformed observation must fail");
+  assert.equal(evaluator.validateAuthenticatedObservationForTest({ ...observationArguments, output: `${JSON.stringify(payload)}\n` }), false, "candidate-originated raw JSON must not establish the boundary");
   for (const [index, entry] of cases.cases.entries()) {
     const frozen = resolve(work, `${entry.case_id}-frozen`);
     const candidate = resolve(work, `${entry.case_id}-candidate`);
@@ -418,6 +480,13 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
         ["failed", "failed", "failed"],
         "observable reference coverage must reject the requested and retained-behavior mutants",
       );
+      for (const trialId of ["mixed-case-lowercasing", "tenant-trim", "empty-region-validation"]) {
+        assert.deepEqual(
+          ["control-1", "mutant-1", "mutant-2", "control-2"].map((slot) => rerunOutcomes.get(`${trialId}-${slot}-test`)),
+          ["succeeded", "failed", "failed", "succeeded"],
+          `${trialId} must use control-mutant-mutant-control with both controls passing and both mutants failing`,
+        );
+      }
     }
     if (entry.case_id === "patched-trim-masks-real-source-mutation") {
       assert.equal(rerunOutcomes.get("mixed-case-lowercasing-control-test"), "succeeded", "real source mutation masking must pass the behavior-preserving control");
@@ -442,6 +511,12 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
     if (entry.case_id === "unauthorized-extra-file") {
       assert.equal(first.under_processing.state, "not_detected", "pure scope deviation must not be reported as under-processing");
     }
+    if (entry.case_id === "forged-fd4-observation-record") {
+      assert.equal(rerunOutcomes.get("candidate-focused-test"), "succeeded", "forged fd4 candidate must pass the supplied behavior");
+      assert.equal(rerunOutcomes.get("mixed-case-lowercasing-control-test"), "succeeded", "forged fd4 candidate process must complete under the control");
+      assert.equal(rerunOutcomes.get("mixed-case-lowercasing-mutant-test"), "succeeded", "forged fd4 candidate must not reject the mutant");
+      assert.equal(first.requirement_results[0].outcome, "fail", "candidate-originated fd4 data must not establish authenticated behavior coverage");
+    }
     if (index === 0) {
       const invalidDiff = clone(diffArtifact);
       invalidDiff.artifact_digest = `sha256:${"0".repeat(64)}`;
@@ -457,6 +532,15 @@ async function validatePrivateCases({ privateRoot, caseRoot, productionExists })
   assert.ok(cases.cases.some(({ case_id }) => case_id === "patched-trim-masks-real-source-mutation"), "real source mutation masking must remain in the private case inventory");
   assert.ok(cases.cases.some(({ case_id }) => case_id === "lowercase-mechanism-observation-without-output"), "mechanism-observation negative must remain in the private case inventory");
   assert.ok(cases.cases.some(({ case_id }) => case_id === "mixed-case-only-replaces-existing-suite"), "existing observable coverage retention must remain in the private case inventory");
+  for (const caseId of [
+    "generic-loader-source-answer-neutral",
+    "stdin-trial-authority-is-closed",
+    "forged-fd4-observation-record",
+    "exec-argv-does-not-disclose-variant",
+    "inherited-environment-authority-unavailable",
+    "network-entry-denied-before-connect",
+    "control-mutant-order-state-isolated",
+  ]) assert.ok(cases.cases.some(({ case_id }) => case_id === caseId), `${caseId} must remain in the private case inventory`);
   const symlinkControls = [
     { caseId: "focused-test-replaced-by-symlink", path: "test/session-key.test.mjs", target: "../src/session-key.mjs" },
     { caseId: "protected-source-replaced-by-symlink", path: "src/session-key.mjs", target: "../spec/session-key.md" },
@@ -590,6 +674,7 @@ function validateReviewArchive({ privateRoot, caseRoot }) {
   for (const path of [
     `repository/${FIXTURE_ROOT_RELATIVE}/task.md`,
     "repository/scripts/ask-benchmark-mn-focused-regression-test-review-archive.mjs",
+    "private-evaluator/authenticated-generic-loader.mjs",
     "private-evaluator/hidden-evaluator.mjs",
     "private-cases/cases.json",
   ]) assert.ok(names.includes(path), `review archive must include ${path}`);

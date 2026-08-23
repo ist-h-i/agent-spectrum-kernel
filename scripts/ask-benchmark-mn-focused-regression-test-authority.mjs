@@ -67,6 +67,7 @@ const PRIVATE_ASSETS = Object.freeze([
   ["evaluator_dependency_graph", "dependency-graph.json", "application/json"],
   ["evidence_removal_mutations", "evidence-removal-mutations.json", "application/json"],
   ["hidden_tests", "hidden-evaluator.mjs", "text/javascript"],
+  ["matchers", "authenticated-generic-loader.mjs", "text/javascript"],
   ["human_evaluation_instructions", "human-instructions.md", "text/markdown"],
   ["independence_provenance", "independence.json", "application/json"],
   ["oracle", "oracle.json", "application/json"],
@@ -191,6 +192,60 @@ function privateInventory(privateRoot) {
   });
 }
 
+function validateAuthenticatedGenericLoaderContract(privateRoot) {
+  const loaderPath = resolve(privateRoot, "authenticated-generic-loader.mjs");
+  const loaderBytes = readFileSync(loaderPath);
+  const scope = readJson(resolve(privateRoot, "scope-boundaries.json"), "mn-focused-regression private scope boundaries");
+  const expected = {
+    revision: "authenticated-generic-loader.v1",
+    runtime: "node-v24.19.0",
+    generic_loader: {
+      path: "authenticated-generic-loader.mjs",
+      bytes: loaderBytes.length,
+      sha256: sha256(loaderBytes),
+      answer_neutrality: "identical bytes for every baseline, trial, and variant; no trial-specific authority",
+    },
+    authority_transport: {
+      channel: "stdin-once-before-candidate-module-evaluation",
+      stdin_closed_after_read: true,
+      argv_env_cwd_marker_disclosure: false,
+      raw_authority_discarded_before_candidate_evaluation: true,
+    },
+    authenticated_observation: {
+      scheme: "hmac-sha256",
+      descriptor: 4,
+      schema: "authenticated-boundary-observation.v1",
+      candidate_originated_records_authoritative: false,
+      required_sequence: 1,
+      fail_closed_on: ["unsigned", "invalid-mac", "replay", "wrong-nonce", "wrong-sequence", "malformed-line", "duplicate-or-extra-record"],
+    },
+    variant_execution: {
+      order: ["control", "mutant", "mutant", "control"],
+      fresh_process_per_run: true,
+      fresh_workspace_per_run: true,
+      shared_writable_state: false,
+    },
+    environment: {
+      policy: "platform-minimal-allowlist.v1",
+      inherited_parent_environment: false,
+      fixed_locale: "C",
+      fixed_timezone: "UTC",
+    },
+    candidate_capabilities: {
+      filesystem_write: "denied",
+      child_process: "denied",
+      worker: "denied",
+      native_addon: "denied",
+      inspector: "denied",
+      network: "denied-before-candidate-module-evaluation",
+      permission_model: "defense-in-depth-only",
+    },
+    failure_mode: "fail-closed",
+  };
+  assertExact(scope.mutation_execution_contract, expected, "mn-focused-regression authenticated generic loader execution contract");
+  return Object.freeze({ path: "authenticated-generic-loader.mjs", bytes: loaderBytes.length, sha256: sha256(loaderBytes) });
+}
+
 function writePrivateAuthority({ root, privateRoot, evaluatorRevision, generationDate, inputDigest }) {
   assertPrivateRootOutsideRepository(root, privateRoot);
   const canonicalPrivateRoot = realpathSync(privateRoot);
@@ -204,6 +259,7 @@ function writePrivateAuthority({ root, privateRoot, evaluatorRevision, generatio
   writeJson(resolve(canonicalPrivateRoot, "evidence-removal-mutations.json"), authority.mutationAsset);
   writeJson(resolve(canonicalPrivateRoot, "equivalent-solutions.json"), authority.equivalenceAsset);
   writeJson(resolve(canonicalPrivateRoot, "dependency-graph.json"), dependencyGraph);
+  validateAuthenticatedGenericLoaderContract(canonicalPrivateRoot);
   const contamination = { state: "not_used", evidence_basis: "Prohibited issue bodies, comments, histories, and legacy answers were not accessed or used." };
   const independenceBase = {
     schema_version: "1.1.0",
@@ -549,6 +605,7 @@ export function validateMnFocusedRegressionTestProductionAuthority({ root = ROOT
   assertExact(runtime, expectedRuntime, "mn-focused-regression runtime registration");
   if (privateRoot) {
     if (!boundaryRoots) throw new Error("mn-focused-regression private validation requires boundary roots");
+    validateAuthenticatedGenericLoaderContract(privateRoot);
     const bundle = verifyPrivateEvaluatorBundle({ root, referencePath: resolve(fixtureRoot, "evaluator-reference.json"), privateRoot, manifestPath: resolve(privateRoot, "private-evaluator-bundle.json"), ...boundaryRoots });
     validateMutationAuthority({ requirementRecord: requirement, admissionRecord: admission, evidenceMapArtifact: evidenceMap, inputManifestRecord: inputRecord, mutationAsset: readJson(resolve(privateRoot, "evidence-removal-mutations.json"), "mn-focused-regression mutation authority") });
     validateEquivalenceAuthority({ requirementRecord: requirement, equivalenceAsset: readJson(resolve(privateRoot, "equivalent-solutions.json"), "mn-focused-regression equivalence authority") });
