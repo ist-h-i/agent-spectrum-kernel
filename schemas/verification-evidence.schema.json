@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/verification-evidence.schema.json",
+  "title": "Agent Spectrum Kernel bounded verification evidence",
+  "$ref": "#/$defs/evidence",
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@+-]*$"
+    },
+    "portablePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?:\\.|[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*)$"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_id", "target_revision", "tree_digest"],
+      "properties": {
+        "repository_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/@+-]*$"
+        },
+        "target_revision": { "$ref": "#/$defs/token" },
+        "base_revision": { "$ref": "#/$defs/token" },
+        "tree_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "contract_digest", "category"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/token" },
+        "contract_digest": { "$ref": "#/$defs/digest" },
+        "category": {
+          "type": "string",
+          "enum": ["build", "generator", "lint", "repository_validation", "schema", "static_analysis", "test", "typecheck", "other"]
+        }
+      }
+    },
+    "consumedInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "digest"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["contract", "dependency", "file", "fixture", "manifest", "schema"]
+        },
+        "path": { "$ref": "#/$defs/portablePath" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executable", "arguments", "working_directory"],
+      "properties": {
+        "executable": { "$ref": "#/$defs/token" },
+        "arguments": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          }
+        },
+        "working_directory": { "$ref": "#/$defs/portablePath" }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runner_id", "runner_version", "adapter_id", "adapter_version", "evidence_level"],
+      "properties": {
+        "runner_id": { "$ref": "#/$defs/token" },
+        "runner_version": { "$ref": "#/$defs/token" },
+        "adapter_id": { "$ref": "#/$defs/token" },
+        "adapter_version": { "$ref": "#/$defs/token" },
+        "evidence_level": {
+          "type": "string",
+          "enum": ["projected", "runtime_detected", "executed", "behavior_verified"]
+        }
+      }
+    },
+    "toolchainItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "identity_digest"],
+      "properties": {
+        "name": { "$ref": "#/$defs/token" },
+        "version": { "$ref": "#/$defs/token" },
+        "identity_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "architecture", "identity_digest"],
+      "properties": {
+        "os": { "$ref": "#/$defs/token" },
+        "architecture": { "$ref": "#/$defs/token" },
+        "identity_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "exit_code", "duration_ms", "output_bytes", "output_digest"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["succeeded", "failed", "declined", "unavailable"]
+        },
+        "exit_code": {
+          "type": ["integer", "null"]
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_digest": { "$ref": "#/$defs/digest" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "succeeded" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": { "exit_code": { "const": 0 } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "failed" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": { "exit_code": { "type": "integer", "minimum": 1, "maximum": 255 } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "enum": ["declined", "unavailable"] } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": { "exit_code": { "type": "null" } }
+          }
+        }
+      ]
+    },
+    "reuseIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate", "target", "consumed_inputs", "execution"],
+      "properties": {
+        "gate": { "$ref": "#/$defs/gate" },
+        "target": { "$ref": "#/$defs/target" },
+        "consumed_inputs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 512,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/consumedInput" }
+        },
+        "execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["command", "runner", "toolchain", "environment"],
+          "properties": {
+            "command": { "$ref": "#/$defs/command" },
+            "runner": { "$ref": "#/$defs/runner" },
+            "toolchain": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/toolchainItem" }
+            },
+            "environment": { "$ref": "#/$defs/environment" }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "schema_path",
+        "program",
+        "evidence_id",
+        "evidence_digest",
+        "reuse_identity_digest",
+        "gate",
+        "target",
+        "consumed_inputs",
+        "execution",
+        "coverage",
+        "invalidation",
+        "producer",
+        "authority",
+        "privacy"
+      ],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-evidence.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_evidence" },
+        "evidence_id": { "type": "string", "pattern": "^verification-evidence-[a-f0-9]{64}$" },
+        "evidence_digest": { "$ref": "#/$defs/digest" },
+        "reuse_identity_digest": { "$ref": "#/$defs/digest" },
+        "gate": { "$ref": "#/$defs/gate" },
+        "target": { "$ref": "#/$defs/target" },
+        "consumed_inputs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 512,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/consumedInput" }
+        },
+        "execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["command", "runner", "toolchain", "environment", "terminal"],
+          "properties": {
+            "command": { "$ref": "#/$defs/command" },
+            "runner": { "$ref": "#/$defs/runner" },
+            "toolchain": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/toolchainItem" }
+            },
+            "environment": { "$ref": "#/$defs/environment" },
+            "terminal": { "$ref": "#/$defs/terminal" }
+          }
+        },
+        "coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["obligation_refs", "explicit_non_coverage"],
+          "properties": {
+            "obligation_refs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/token" }
+            },
+            "explicit_non_coverage": {
+              "type": "array",
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/token" }
+            }
+          }
+        },
+        "invalidation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "unknown_dependencies_require_rerun"],
+          "properties": {
+            "mode": { "type": "string", "const": "exact_identity_only" },
+            "unknown_dependencies_require_rerun": { "type": "boolean", "const": true }
+          }
+        },
+        "producer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "identity_digest"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["automation", "ci", "developer", "reviewer"] },
+            "identity_digest": { "$ref": "#/$defs/digest" }
+          }
+        },
+        "authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["independent_review_status"],
+          "properties": {
+            "independent_review_status": {
+              "type": "string",
+              "enum": ["not_applicable", "not_independent", "independent"]
+            }
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "classification",
+            "exportability",
+            "raw_prompts_stored",
+            "transcripts_stored",
+            "raw_output_stored",
+            "secrets_stored",
+            "absolute_private_paths_stored",
+            "private_evaluators_stored",
+            "review_archives_stored"
+          ],
+          "properties": {
+            "classification": { "type": "string", "enum": ["public", "internal", "private_reference"] },
+            "exportability": { "type": "string", "enum": ["exportable", "local_only"] },
+            "raw_prompts_stored": { "type": "boolean", "const": false },
+            "transcripts_stored": { "type": "boolean", "const": false },
+            "raw_output_stored": { "type": "boolean", "const": false },
+            "secrets_stored": { "type": "boolean", "const": false },
+            "absolute_private_paths_stored": { "type": "boolean", "const": false },
+            "private_evaluators_stored": { "type": "boolean", "const": false },
+            "review_archives_stored": { "type": "boolean", "const": false }
+          }
+        }
+      }
+    }
+  }
+}

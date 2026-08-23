@@ -69,6 +69,9 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/engineering-pattern-ledger-entry.schema.json",
   "schemas/review-rule-ledger-entry.schema.json",
   "schemas/verification-pattern-ledger-entry.schema.json",
+  "schemas/verification-evidence.schema.json",
+  "schemas/verification-evidence-transfer.schema.json",
+  "schemas/verification-reuse-plan.schema.json",
 ];
 const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
 const ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH = "docs/adapter-runtime-boundary-contract.md";

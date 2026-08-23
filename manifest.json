@@ -275,6 +275,7 @@
     "docs/execution-envelope-contract.md",
     "docs/lifecycle-artifact-contract.md",
     "docs/lifecycle-traceability-contract.md",
+    "docs/verification-evidence-contract.md",
     "docs/fixtures/lifecycle-artifact-chains.json",
     "docs/fixtures/lifecycle-traceability-chains.json",
     "docs/skill-matrix.md",
@@ -373,6 +374,9 @@
     "schemas/engineering-pattern-ledger-entry.schema.json",
     "schemas/review-rule-ledger-entry.schema.json",
     "schemas/verification-pattern-ledger-entry.schema.json",
+    "schemas/verification-evidence.schema.json",
+    "schemas/verification-evidence-transfer.schema.json",
+    "schemas/verification-reuse-plan.schema.json",
     "benchmarks/schemas/agent-output.schema.json",
     "benchmarks/schemas/result.schema.json"
   ],
