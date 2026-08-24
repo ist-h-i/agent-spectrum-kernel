@@ -71,6 +71,22 @@ function expectCodes(caseId, issues) {
   assert.deepEqual(codes(issues), expectedById.get(caseId).expected_issue_codes, caseId);
 }
 
+function expectDeterministicIssues(caseId, validate, expectedPaths) {
+  assert.ok(expectedById.has(caseId), `unknown fixture case ${caseId}`);
+  const expectedCodes = expectedById.get(caseId).expected_issue_codes;
+  assert.equal(expectedPaths.length, expectedCodes.length, `${caseId} must bind every expected issue code to a path`);
+  const first = validate();
+  const second = validate();
+  assert.deepEqual(second, first, `${caseId} must return deterministic issues`);
+  expectCodes(caseId, first);
+  assert.deepEqual(
+    first.map(({ code, path }) => ({ code, path })),
+    expectedCodes.map((code, index) => ({ code, path: expectedPaths[index] })),
+    `${caseId} must return the expected ordered issue code/path pairs`,
+  );
+  return first;
+}
+
 function expectEvaluationInputError(caseId, evaluate) {
   assert.ok(expectedById.has(caseId), `unknown fixture case ${caseId}`);
   let caught = null;
@@ -399,7 +415,11 @@ for (const [caseId, mutate] of [
   const invalidPolicyDraft = clone(overridePolicy);
   invalidPolicyDraft.override_rules[0].authority_grants[0].evidence_ref = " ";
   const invalidPolicy = sealEpicAdmissionPolicy(invalidPolicyDraft);
-  expectCodes("NEG-OVERRIDE-GRANT-EVIDENCE-BLANK", validateEpicAdmissionPolicy(invalidPolicy));
+  expectDeterministicIssues(
+    "NEG-OVERRIDE-GRANT-EVIDENCE-BLANK",
+    () => validateEpicAdmissionPolicy(invalidPolicy),
+    ["$.override_rules[0].authority_grants[0].evidence_ref"],
+  );
   assert.throws(() => evaluateEpicAdmission({
     policy: invalidPolicy,
     subject: buildEpicAdmissionSubject(),
@@ -526,11 +546,21 @@ for (const [caseId, field] of [
   const context = clone(canonical.context);
   const plan = clone(canonical.plan);
   const gateId = context.non_overridable_gates[0].verification_id;
+  const stepIndex = plan.verification.steps.findIndex((step) => step.verification_id === gateId);
+  assert.notEqual(stepIndex, -1, `${caseId} fixture must contain the non-overridable full-gate step`);
   context.non_overridable_gates[0][field] = " ";
-  plan.verification.steps.find((step) => step.verification_id === gateId)[field] = " ";
+  plan.verification.steps[stepIndex][field] = " ";
   const bundle = closePlanContextBinding({ ...canonical, context }, plan);
-  assert.deepEqual(codes(validateWorkPackagePlanValidationContext(bundle.context, { policy: bundle.policy, decision: bundle.decision })), ["SCHEMA_INVALID"], `${caseId} trusted context must reject whitespace-only authority text`);
-  expectCodes(caseId, validatePlanBundle(bundle));
+  expectDeterministicIssues(
+    caseId,
+    () => validateWorkPackagePlanValidationContext(bundle.context, { policy: bundle.policy, decision: bundle.decision }),
+    [`$.non_overridable_gates[0].${field}`],
+  );
+  expectDeterministicIssues(
+    caseId,
+    () => validatePlanBundle(bundle),
+    [`$.verification.steps[${stepIndex}].${field}`],
+  );
 }
 expectCodes("NEG-FULL-CHECKPOINT-MISSING", validatePlanBundle(mutatePlan(canonical, (plan) => {
   plan.verification.full_gate_checkpoints = plan.verification.full_gate_checkpoints.filter((entry) => entry.checkpoint_id !== "CHECKPOINT-EXACT-HEAD-CI");
@@ -750,54 +780,68 @@ expectCodes("NEG-PROPOSED-NOT-EXECUTABLE", validateWorkPackagePlanExecutable(mut
   expectCodes("NEG-UNKNOWN-STATE", validateWorkPackagePlan(sealWorkPackagePlan(invalid), canonical));
 }
 for (const decision of [null, {}]) {
-  expectCodes("NEG-ADMISSION-DECISION-DEPENDENCY-MALFORMED", validateWorkPackagePlan(canonical.plan, {
-    ...canonical,
-    decision,
-  }));
-  expectCodes("NEG-ADMISSION-DECISION-DEPENDENCY-MALFORMED", validateWorkPackagePlanValidationContext(canonical.context, {
-    policy: canonical.policy,
-    decision,
-  }));
+  expectDeterministicIssues(
+    "NEG-ADMISSION-DECISION-DEPENDENCY-MALFORMED",
+    () => validateWorkPackagePlan(canonical.plan, { ...canonical, decision }),
+    ["$.admission_decision_ref"],
+  );
+  expectDeterministicIssues(
+    "NEG-ADMISSION-DECISION-DEPENDENCY-MALFORMED",
+    () => validateWorkPackagePlanValidationContext(canonical.context, { policy: canonical.policy, decision }),
+    ["$.current_admission_decision_ref"],
+  );
 }
-expectCodes("NEG-POLICY-DEPENDENCY-MALFORMED", validateWorkPackagePlanValidationContext(canonical.context, {
-  policy: {},
-  decision: canonical.decision,
-}));
-expectCodes("NEG-POLICY-DEPENDENCY-MALFORMED", validateWorkPackagePlan(canonical.plan, {
-  ...canonical,
-  policy: {},
-}));
+expectDeterministicIssues(
+  "NEG-POLICY-DEPENDENCY-MALFORMED",
+  () => validateWorkPackagePlanValidationContext(canonical.context, { policy: {}, decision: canonical.decision }),
+  ["$.current_policy_ref"],
+);
+expectDeterministicIssues(
+  "NEG-POLICY-DEPENDENCY-MALFORMED",
+  () => validateWorkPackagePlan(canonical.plan, { ...canonical, policy: {} }),
+  ["$.admission_decision_ref"],
+);
 for (const malformedPrevious of [
   { previousPlan: {} },
   { previousContext: {} },
 ]) {
-  expectCodes("NEG-PREVIOUS-REVISION-DEPENDENCY-MALFORMED", validateWorkPackagePlan(canonical.plan, {
-    ...canonical,
-    ...malformedPrevious,
-  }));
+  expectDeterministicIssues(
+    "NEG-PREVIOUS-REVISION-DEPENDENCY-MALFORMED",
+    () => validateWorkPackagePlan(canonical.plan, { ...canonical, ...malformedPrevious }),
+    ["$.supersedes_plan_ref"],
+  );
 }
-expectCodes("NEG-REPOSITORY-DECISION-MALFORMED", validateRepositoryEpicAdmissionWorkPackagePlan({
-  root,
-  paths: { decision: "manifest.json" },
-}).issues);
-expectCodes("NEG-REPOSITORY-POLICY-MALFORMED", validateRepositoryEpicAdmissionWorkPackagePlan({
-  root,
-  paths: { policy: "manifest.json" },
-}).issues);
+expectDeterministicIssues(
+  "NEG-REPOSITORY-DECISION-MALFORMED",
+  () => validateRepositoryEpicAdmissionWorkPackagePlan({ root, paths: { decision: "manifest.json" } }).issues,
+  ["$paths.decision"],
+);
+expectDeterministicIssues(
+  "NEG-REPOSITORY-POLICY-MALFORMED",
+  () => validateRepositoryEpicAdmissionWorkPackagePlan({ root, paths: { policy: "manifest.json" } }).issues,
+  ["$paths.policy"],
+);
 for (const [caseId, key, expectedPath] of [
   ["NEG-REPOSITORY-HISTORICAL-R1-CONTEXT-MALFORMED", "firstContext", "$paths.firstContext"],
   ["NEG-REPOSITORY-HISTORICAL-R1-PLAN-MALFORMED", "firstPlan", "$paths.firstPlan"],
   ["NEG-REPOSITORY-HISTORICAL-R2-CONTEXT-MALFORMED", "previousContext", "$paths.previousContext"],
   ["NEG-REPOSITORY-HISTORICAL-R2-PLAN-MALFORMED", "previousPlan", "$paths.previousPlan"],
 ]) {
-  const issues = validateRepositoryEpicAdmissionWorkPackagePlan({ root, paths: { [key]: "manifest.json" } }).issues;
-  expectCodes(caseId, issues);
-  assert.deepEqual(issues.map((entry) => entry.path), [expectedPath], `${caseId} must identify the malformed historical artifact path`);
+  expectDeterministicIssues(
+    caseId,
+    () => validateRepositoryEpicAdmissionWorkPackagePlan({ root, paths: { [key]: "manifest.json" } }).issues,
+    [expectedPath],
+  );
 }
-expectCodes("NEG-REPOSITORY-CATALOG-MALFORMED", validateRepositoryEpicAdmissionWorkPackagePlan({
-  root,
-  paths: { cases: "manifest.json" },
-}).issues);
+expectDeterministicIssues(
+  "NEG-REPOSITORY-CATALOG-MALFORMED",
+  () => {
+    const result = validateRepositoryEpicAdmissionWorkPackagePlan({ root, paths: { cases: "manifest.json" } });
+    assert.equal(result.caseCount, 0, "malformed fixture catalog must not report admitted cases");
+    return result.issues;
+  },
+  ["$.cases"],
+);
 
 const repositoryResult = validateRepositoryEpicAdmissionWorkPackagePlan({ root });
 assert.deepEqual(repositoryResult.issues, [], "checked-in repository artifacts must validate");
