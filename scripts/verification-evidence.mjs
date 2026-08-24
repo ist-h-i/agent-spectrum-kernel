@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+import {
+  createHash,
+  createPublicKey,
+  sign as signBytes,
+  verify as verifyBytes,
+} from "node:crypto";
+import { existsSync } from "node:fs";
 import { dirname, isAbsolute, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -19,12 +26,11 @@ export const VERIFICATION_EVIDENCE_TRANSFER_SCHEMA_PATH = resolve(ROOT, "schemas
 export const VERIFICATION_REUSE_PLAN_SCHEMA_PATH = resolve(ROOT, "schemas/verification-reuse-plan.schema.json");
 export const VERIFICATION_EVIDENCE_SCHEMA_REVISION = "1.0.0";
 export const VERIFICATION_REUSE_PLANNER_REVISION = "1.0.0";
+export const VERIFICATION_EVIDENCE_ATTESTATION_CONTEXT = "ask.verification-evidence.producer-attestation.v1";
+export const VERIFICATION_COMMAND_ARGUMENTS_CONTEXT = "ask.verification-evidence.ordered-argv.v1";
 
 const EVIDENCE_ID_PATTERN = /^verification-evidence-([a-f0-9]{64})$/u;
-const SENSITIVE_ABSOLUTE_PATH = /(?:^|=)(?:\/|[A-Za-z]:[\\/])|(?:\/Users\/|\/home\/|\/private\/|\/var\/folders\/)/u;
-const ENVIRONMENT_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/u;
-const SENSITIVE_ARGUMENT_ASSIGNMENT = /^--?(?:api[-_]?key|credential|password|secret|token)=/iu;
-const SENSITIVE_ARGUMENT_FLAG = /^--?(?:api[-_]?key|credential|password|secret|token)$/iu;
+const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 
 export { stableCanonicalJson };
 
@@ -83,12 +89,26 @@ function assertPortableRelativePath(value, label) {
 
 function assertCommandBoundary(command) {
   assertPortableRelativePath(command.working_directory, "verification command working_directory");
-  for (let index = 0; index < command.arguments.length; index += 1) {
-    const argument = command.arguments[index];
-    if (SENSITIVE_ABSOLUTE_PATH.test(argument) || argument.startsWith("file://")) throw new Error("verification command argument contains an absolute private path");
-    if (ENVIRONMENT_ASSIGNMENT.test(argument)) throw new Error("verification command arguments must not embed environment assignments");
-    if (SENSITIVE_ARGUMENT_ASSIGNMENT.test(argument) || (SENSITIVE_ARGUMENT_FLAG.test(argument) && command.arguments[index + 1] !== undefined)) throw new Error("verification command arguments must not embed credential or secret values");
+  if (!DIGEST_PATTERN.test(command.arguments_digest ?? "")) throw new Error("verification command arguments_digest must be a sha256 digest");
+  if (!Number.isInteger(command.argument_count) || command.argument_count < 0 || command.argument_count > 128) throw new Error("verification command argument_count must be between 0 and 128");
+}
+
+export function verificationCommandIdentity({ executable, arguments: orderedArguments, working_directory: workingDirectory }) {
+  if (!Array.isArray(orderedArguments) || orderedArguments.length > 128) throw new Error("verification command ordered arguments must be an array with at most 128 entries");
+  for (const argument of orderedArguments) {
+    if (typeof argument !== "string") throw new Error("verification command ordered arguments must contain only strings");
   }
+  const command = {
+    executable,
+    arguments_digest: canonicalDigest({
+      context: VERIFICATION_COMMAND_ARGUMENTS_CONTEXT,
+      ordered_arguments: orderedArguments,
+    }),
+    argument_count: orderedArguments.length,
+    working_directory: workingDirectory,
+  };
+  assertCommandBoundary(command);
+  return command;
 }
 
 function normalizeEvidenceDraft(draft) {
@@ -112,6 +132,61 @@ function evidenceContent(evidence) {
   delete content.evidence_id;
   delete content.evidence_digest;
   return content;
+}
+
+function sha256DigestBytes(bytes) {
+  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function publicKeyObject(key) {
+  const publicKey = key?.type === "public" ? key : createPublicKey(key);
+  if (publicKey.asymmetricKeyType !== "ed25519") throw new Error("verification evidence producer key must be Ed25519");
+  return publicKey;
+}
+
+function canonicalBase64Bytes(value, label) {
+  if (typeof value !== "string" || value.length === 0) throw new Error(`${label} must be canonical base64`);
+  const bytes = Buffer.from(value, "base64");
+  if (bytes.length === 0 || bytes.toString("base64") !== value) throw new Error(`${label} must be canonical base64`);
+  return bytes;
+}
+
+function producerPublicKeyBytes(key) {
+  return publicKeyObject(key).export({ format: "der", type: "spki" });
+}
+
+export function producerIdentityDigestFromPublicKey(key) {
+  return sha256DigestBytes(producerPublicKeyBytes(key));
+}
+
+function producerAttestationPayload(evidence) {
+  const content = evidenceContent(evidence);
+  if (content.producer) delete content.producer.attestation;
+  return {
+    context: VERIFICATION_EVIDENCE_ATTESTATION_CONTEXT,
+    evidence: content,
+  };
+}
+
+function producerAttestationBytes(evidence) {
+  return Buffer.from(stableCanonicalJson(producerAttestationPayload(evidence)), "utf8");
+}
+
+function validateProducerAttestation(evidence) {
+  const attestation = evidence.producer.attestation;
+  const publicKeyBytes = canonicalBase64Bytes(attestation.public_key_spki, "verification evidence producer public key");
+  const signature = canonicalBase64Bytes(attestation.signature, "verification evidence producer signature");
+  let publicKey;
+  try {
+    publicKey = publicKeyObject({ key: publicKeyBytes, format: "der", type: "spki" });
+  } catch (error) {
+    throw new Error(`verification evidence producer public key is invalid: ${error.message}`);
+  }
+  const expectedIdentity = sha256DigestBytes(publicKeyBytes);
+  if (evidence.producer.identity_digest !== expectedIdentity) throw new Error("verification evidence producer identity digest does not match its attested public key");
+  const payload = producerAttestationPayload(evidence);
+  if (attestation.payload_digest !== canonicalDigest(payload)) throw new Error("verification evidence producer attestation payload digest mismatch");
+  if (!verifyBytes(null, producerAttestationBytes(evidence), publicKey, signature)) throw new Error("verification evidence producer signature is invalid");
 }
 
 function evidenceIdFromDigest(digest) {
@@ -163,6 +238,27 @@ export function sealVerificationEvidence(draft) {
   return evidence;
 }
 
+export function attestVerificationEvidence(draft, { privateKey }) {
+  if (!privateKey) throw new Error("verification evidence producer private key is required for attestation");
+  const content = normalizeEvidenceDraft(draft);
+  if (!content.producer || typeof content.producer !== "object") throw new Error("verification evidence producer must be present");
+  delete content.producer.attestation;
+  const publicKey = publicKeyObject(privateKey);
+  const publicKeyBytes = producerPublicKeyBytes(publicKey);
+  const identityDigest = sha256DigestBytes(publicKeyBytes);
+  if (content.producer.identity_digest !== undefined && content.producer.identity_digest !== identityDigest) throw new Error("verification evidence producer identity does not match the signing key");
+  content.producer.identity_digest = identityDigest;
+  content.reuse_identity_digest = canonicalDigest(reuseIdentityFromEvidence(content));
+  const payload = producerAttestationPayload(content);
+  content.producer.attestation = {
+    scheme: "ed25519-spki-sha256-v1",
+    public_key_spki: publicKeyBytes.toString("base64"),
+    payload_digest: canonicalDigest(payload),
+    signature: signBytes(null, Buffer.from(stableCanonicalJson(payload), "utf8"), privateKey).toString("base64"),
+  };
+  return sealVerificationEvidence(content);
+}
+
 export function validateVerificationEvidence(evidence, { schemaPath = VERIFICATION_EVIDENCE_SCHEMA_PATH } = {}) {
   failSchema(evidence, schemaPath, "verification evidence");
   assertCanonicalOrder(evidence.consumed_inputs, "verification evidence consumed_inputs", (entry) => `${entry.path}\0${entry.kind}\0${entry.digest}`);
@@ -173,6 +269,7 @@ export function validateVerificationEvidence(evidence, { schemaPath = VERIFICATI
   const identity = validateReuseIdentity(reuseIdentityFromEvidence(evidence), "verification evidence reuse identity");
   const expectedReuseDigest = canonicalDigest(identity);
   if (evidence.reuse_identity_digest !== expectedReuseDigest) throw new Error("verification evidence reuse identity digest mismatch");
+  validateProducerAttestation(evidence);
   const expectedEvidenceDigest = canonicalDigest(evidenceContent(evidence));
   if (evidence.evidence_digest !== expectedEvidenceDigest || evidence.evidence_id !== evidenceIdFromDigest(expectedEvidenceDigest)) throw new Error("verification evidence digest or ID mismatch; evidence may be tampered");
   if (evidenceDigestFromId(evidence.evidence_id) !== evidence.evidence_digest) throw new Error("verification evidence ID and digest disagree");
@@ -226,8 +323,7 @@ function selfDigest(value, idField, digestField) {
 
 function normalizeAuthorityRequirement(authority) {
   const normalized = clone(authority);
-  normalized.accepted_producer_kinds = sortedCopy(authority.accepted_producer_kinds, "accepted producer kinds", (entry) => entry);
-  normalized.accepted_producer_identity_digests = sortedCopy(authority.accepted_producer_identity_digests, "accepted producer identity digests", (entry) => entry);
+  normalized.accepted_producers = sortedCopy(authority.accepted_producers, "accepted producers", (entry) => `${entry.kind}\0${entry.identity_digest}`);
   normalized.accepted_evidence_levels = sortedCopy(authority.accepted_evidence_levels, "accepted evidence levels", (entry) => entry);
   return normalized;
 }
@@ -273,8 +369,8 @@ export function validateVerificationRequirements(requirements, { schemaPath = VE
     validateReuseIdentity(gate.reuse_identity, `${gate.gate_id} reuse identity`);
     if (canonicalDigest(gate.reuse_identity) !== gate.reuse_identity_digest) throw new Error(`${gate.gate_id} reuse identity digest mismatch`);
     assertCanonicalOrder(gate.required_obligation_refs, `${gate.gate_id} required obligation refs`, (entry) => entry);
-    assertCanonicalOrder(gate.authority.accepted_producer_kinds, `${gate.gate_id} accepted producer kinds`, (entry) => entry);
-    assertCanonicalOrder(gate.authority.accepted_producer_identity_digests, `${gate.gate_id} accepted producer identity digests`, (entry) => entry);
+    assertCanonicalOrder(gate.authority.accepted_producers, `${gate.gate_id} accepted producers`, (entry) => `${entry.kind}\0${entry.identity_digest}`);
+    assertUniqueBy(gate.authority.accepted_producers, `${gate.gate_id} accepted producers`, (entry) => `${entry.kind}\0${entry.identity_digest}`);
     assertCanonicalOrder(gate.authority.accepted_evidence_levels, `${gate.gate_id} accepted evidence levels`, (entry) => entry);
   }
   const digest = selfDigest(requirements, "requirements_id", "requirements_digest");
@@ -302,8 +398,10 @@ function dispositionForGate(gate, allEvidence) {
   const exact = digestCandidates.filter((evidence) => stableCanonicalJson(reuseIdentityFromEvidence(evidence)) === stableCanonicalJson(gate.reuse_identity));
   if (exact.length !== digestCandidates.length) throw new Error(`${gate.gate_id} reuse identity digest maps to non-identical material inputs`);
   const authorityAccepted = exact.filter((evidence) => (
-    gate.authority.accepted_producer_kinds.includes(evidence.producer.kind)
-    && gate.authority.accepted_producer_identity_digests.includes(evidence.producer.identity_digest)
+    gate.authority.accepted_producers.some((producer) => (
+      producer.kind === evidence.producer.kind
+      && producer.identity_digest === evidence.producer.identity_digest
+    ))
     && gate.authority.accepted_evidence_levels.includes(evidence.execution.runner.evidence_level)
   ));
   if (exact.length > 0 && authorityAccepted.length === 0) {
@@ -422,7 +520,7 @@ export function planExactReuse({ storeRoot, requirements }) {
     plan_id: `verification-reuse-plan-${digest.slice("sha256:".length)}`,
     plan_digest: digest,
   };
-  validateVerificationReusePlan(plan, { requirements });
+  validateVerificationReusePlan(plan, { requirements, storeRoot });
   return plan;
 }
 
@@ -440,7 +538,7 @@ function validatePlanRequirementsBinding(plan, requirements) {
   }
 }
 
-export function validateVerificationReusePlan(plan, { schemaPath = VERIFICATION_REUSE_PLAN_SCHEMA_PATH, requirements } = {}) {
+export function validateVerificationReusePlan(plan, { schemaPath = VERIFICATION_REUSE_PLAN_SCHEMA_PATH, requirements, storeRoot } = {}) {
   failSchema(plan, schemaPath, "verification reuse plan");
   assertCanonicalOrder(plan.dispositions, "verification reuse dispositions", (entry) => entry.gate_id);
   uniqueCanonical(plan.dispositions.map((entry) => entry.gate_id), "verification reuse disposition gate IDs");
@@ -469,7 +567,12 @@ export function validateVerificationReusePlan(plan, { schemaPath = VERIFICATION_
     if (fullyCovered && disposition.uncovered_obligation_refs.length > 0) throw new Error(`${disposition.gate_id} reusable evidence leaves required obligations uncovered`);
     if (!fullyCovered && disposition.covered_obligation_refs.length > 0) throw new Error(`${disposition.gate_id} blocking disposition cannot claim covered obligations`);
   }
-  if (requirements) validatePlanRequirementsBinding(plan, requirements);
+  if (!requirements) throw new Error("verification reuse plan validation requires its exact requirements object");
+  if (!storeRoot) throw new Error("verification reuse plan validation requires the evidence store to resolve every disposition");
+  validatePlanRequirementsBinding(plan, requirements);
+  const resolvedEvidence = storedVerificationEvidence(storeRoot);
+  const expectedDispositions = requirements.required_gates.map((gate) => dispositionForGate(gate, resolvedEvidence));
+  if (stableCanonicalJson(plan.dispositions) !== stableCanonicalJson(expectedDispositions)) throw new Error("verification reuse plan dispositions do not match resolved evidence in the bound store");
   const digest = selfDigest(plan, "plan_id", "plan_digest");
   if (plan.plan_digest !== digest || plan.plan_id !== `verification-reuse-plan-${digest.slice("sha256:".length)}`) throw new Error("verification reuse plan digest or ID mismatch");
   return plan;
@@ -537,6 +640,12 @@ export function validateEvidenceTransfer(transfer, { schemaPath = VERIFICATION_E
 
 export function importEvidenceTransfer({ storeRoot, transfer }) {
   validateEvidenceTransfer(transfer);
+  for (const evidence of transfer.evidence_objects) {
+    if (existsSync(evidenceObjectPath({ storeRoot, evidenceId: evidence.evidence_id }))) {
+      const existing = readVerificationEvidence({ storeRoot, evidenceId: evidence.evidence_id });
+      if (stableCanonicalJson(existing) !== stableCanonicalJson(evidence)) throw new Error("verification evidence import conflicts with an existing object");
+    }
+  }
   const publications = transfer.evidence_objects.map((evidence) => putVerificationEvidence({ storeRoot, evidence }));
   return {
     transfer_id: transfer.transfer_id,
@@ -572,10 +681,21 @@ function emitCliArtifact(artifact, output) {
 
 function runCli(argv) {
   const { command, options } = parseCliArgs(argv);
+  const allowedOptions = {
+    put: new Set(["store", "input", "output"]),
+    verify: new Set(["store", "evidence_id", "output"]),
+    plan: new Set(["store", "requirements", "output"]),
+    export: new Set(["store", "evidence_ids", "output"]),
+    import: new Set(["store", "input"]),
+  };
+  if (!allowedOptions[command]) throw new Error(`unknown verification evidence command: ${command}`);
+  const unknownOption = Object.keys(options).find((option) => !allowedOptions[command].has(option));
+  if (unknownOption) throw new Error(`unknown verification evidence option for ${command}: --${unknownOption.replaceAll("_", "-")}`);
   if (command === "put") {
     const storeRoot = requiredOption(options, "store");
     const input = readJsonFileStrict(requiredOption(options, "input"), "verification evidence input");
-    const evidence = input.evidence_id ? validateVerificationEvidence(input) : sealVerificationEvidence(input);
+    if (!input.evidence_id) throw new Error("verification evidence put requires a producer-attested sealed evidence object");
+    const evidence = validateVerificationEvidence(input);
     const publication = putVerificationEvidence({ storeRoot, evidence });
     if (options.output) writeCanonicalJsonNoReplace({ outputPath: options.output, artifact: evidence, label: "sealed verification evidence" });
     process.stdout.write(`${stableCanonicalJson(publication)}\n`);
@@ -603,7 +723,6 @@ function runCli(argv) {
     process.stdout.write(`${stableCanonicalJson(result)}\n`);
     return;
   }
-  throw new Error(`unknown verification evidence command: ${command}`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

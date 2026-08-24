@@ -276,6 +276,7 @@
     "docs/lifecycle-artifact-contract.md",
     "docs/lifecycle-traceability-contract.md",
     "docs/verification-evidence-contract.md",
+    "docs/adr/0001-verification-evidence-trust-boundary.md",
     "docs/fixtures/lifecycle-artifact-chains.json",
     "docs/fixtures/lifecycle-traceability-chains.json",
     "docs/skill-matrix.md",

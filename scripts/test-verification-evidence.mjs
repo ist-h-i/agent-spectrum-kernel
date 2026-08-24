@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import {
+  attestVerificationEvidence,
   buildEvidenceTransfer,
   buildVerificationRequirements,
   evidenceObjectPath,
@@ -14,17 +15,34 @@ import {
   putVerificationEvidence,
   readVerificationEvidence,
   reuseIdentityFromEvidence,
-  sealVerificationEvidence,
   stableCanonicalJson,
   validateEvidenceTransfer,
   validateVerificationEvidence,
   validateVerificationReusePlan,
+  verificationCommandIdentity,
 } from "./verification-evidence.mjs";
+import { canonicalDigest } from "./content-addressed-store.mjs";
 
 const digest = (value) => `sha256:${createHash("sha256").update(String(value)).digest("hex")}`;
+const trustedProducerKeys = generateKeyPairSync("ed25519");
+const attackerProducerKeys = generateKeyPairSync("ed25519");
+
+const sealDraft = (draft, privateKey = trustedProducerKeys.privateKey) => attestVerificationEvidence(draft, { privateKey });
 
 function expectFailure(label, action, pattern) {
   assert.throws(action, pattern, label);
+}
+
+function resealPlan(plan) {
+  const content = structuredClone(plan);
+  delete content.plan_id;
+  delete content.plan_digest;
+  const planDigest = canonicalDigest(content);
+  return {
+    ...content,
+    plan_id: `verification-reuse-plan-${planDigest.slice("sha256:".length)}`,
+    plan_digest: planDigest,
+  };
 }
 
 function evidenceDraft(overrides = {}) {
@@ -56,9 +74,11 @@ function evidenceDraft(overrides = {}) {
     ],
     execution: {
       command: {
-        executable: "node",
-        arguments: ["scripts/test-verification-evidence.mjs"],
-        working_directory: ".",
+        ...verificationCommandIdentity({
+          executable: "node",
+          arguments: ["scripts/test-verification-evidence.mjs"],
+          working_directory: ".",
+        }),
       },
       runner: {
         runner_id: "ask-local-node",
@@ -97,7 +117,6 @@ function evidenceDraft(overrides = {}) {
     },
     producer: {
       kind: "developer",
-      identity_digest: digest("developer-producer"),
     },
     authority: {
       independent_review_status: "not_independent",
@@ -124,8 +143,10 @@ function acceptedGate(evidence, overrides = {}) {
     required_obligation_refs: structuredClone(evidence.coverage.obligation_refs),
     authority: {
       independent_judgment_required: false,
-      accepted_producer_kinds: ["automation", "ci", "developer", "reviewer"],
-      accepted_producer_identity_digests: [evidence.producer.identity_digest],
+      accepted_producers: [{
+        kind: evidence.producer.kind,
+        identity_digest: evidence.producer.identity_digest,
+      }],
       accepted_evidence_levels: ["behavior_verified", "executed"],
     },
     execution_availability: "available",
@@ -136,7 +157,7 @@ function acceptedGate(evidence, overrides = {}) {
 const root = mkdtempSync(resolve(tmpdir(), "ask-verification-evidence-"));
 try {
   const store = resolve(root, "store");
-  const sealed = sealVerificationEvidence(evidenceDraft());
+  const sealed = sealDraft(evidenceDraft());
   validateVerificationEvidence(sealed);
   assert.match(sealed.evidence_id, /^verification-evidence-[a-f0-9]{64}$/u);
   assert.match(sealed.evidence_digest, /^sha256:[a-f0-9]{64}$/u);
@@ -151,7 +172,7 @@ try {
 
   const requirements = buildVerificationRequirements({ requiredGates: [acceptedGate(sealed)] });
   const exactPlan = planExactReuse({ storeRoot: store, requirements });
-  validateVerificationReusePlan(exactPlan, { requirements });
+  validateVerificationReusePlan(exactPlan, { requirements, storeRoot: store });
   assert.equal(exactPlan.dispositions[0].disposition, "reuse_exact");
   assert.equal(exactPlan.dispositions[0].reason_code, "exact_identity_verified");
   assert.deepEqual(exactPlan.dispositions[0].required_obligation_refs, sealed.coverage.obligation_refs);
@@ -159,6 +180,25 @@ try {
   assert.deepEqual(exactPlan.dispositions[0].uncovered_obligation_refs, []);
   assert.equal(exactPlan.coverage.status, "covered");
   assert.deepEqual(exactPlan.coverage.covered_gate_ids, [sealed.gate.gate_id]);
+  expectFailure(
+    "reuse plan requires evidence resolution",
+    () => validateVerificationReusePlan(exactPlan, { requirements }),
+    /store|resolve|evidence/iu,
+  );
+  expectFailure(
+    "reuse plan requires bound requirements",
+    () => validateVerificationReusePlan(exactPlan, { storeRoot: store }),
+    /requirements/iu,
+  );
+
+  const unresolvedPlan = structuredClone(exactPlan);
+  unresolvedPlan.dispositions[0].evidence_digest = digest("missing-evidence-object");
+  unresolvedPlan.dispositions[0].evidence_id = `verification-evidence-${unresolvedPlan.dispositions[0].evidence_digest.slice("sha256:".length)}`;
+  expectFailure(
+    "reuse plan must resolve referenced evidence",
+    () => validateVerificationReusePlan(resealPlan(unresolvedPlan), { requirements, storeRoot: store }),
+    /evidence|resolve|store|missing/iu,
+  );
 
   const uncoveredObligation = "VER-274-S1@2#O-TRANSFER";
   const obligationMismatchRequirements = buildVerificationRequirements({
@@ -174,12 +214,12 @@ try {
   assert.equal(obligationMismatchPlan.coverage.status, "blocked");
   expectFailure(
     "plan requirements binding",
-    () => validateVerificationReusePlan(exactPlan, { requirements: obligationMismatchRequirements }),
+    () => validateVerificationReusePlan(exactPlan, { requirements: obligationMismatchRequirements, storeRoot: store }),
     /requirements|obligation|target|gate/iu,
   );
 
   const staleProducerGate = acceptedGate(sealed);
-  staleProducerGate.authority.accepted_producer_identity_digests = [digest("different-producer-authority")];
+  staleProducerGate.authority.accepted_producers[0].identity_digest = digest("different-producer-authority");
   const staleProducerPlan = planExactReuse({
     storeRoot: store,
     requirements: buildVerificationRequirements({ requiredGates: [staleProducerGate] }),
@@ -188,13 +228,26 @@ try {
   assert.equal(staleProducerPlan.dispositions[0].reason_code, "exact_evidence_authority_mismatch");
   assert.equal(staleProducerPlan.coverage.status, "blocked");
 
+  expectFailure("producer impersonation", () => sealDraft(evidenceDraft({
+    producer: {
+      kind: "developer",
+      identity_digest: sealed.producer.identity_digest,
+    },
+  }), attackerProducerKeys.privateKey), /producer identity|signing key|attest/iu);
+
+  const wrongKindStore = resolve(root, "wrong-kind-store");
+  const wrongKind = sealDraft(evidenceDraft({ producer: { kind: "reviewer" } }));
+  putVerificationEvidence({ storeRoot: wrongKindStore, evidence: wrongKind });
+  const wrongKindPlan = planExactReuse({ storeRoot: wrongKindStore, requirements });
+  assert.equal(wrongKindPlan.dispositions[0].reason_code, "exact_evidence_authority_mismatch", "producer kind and key fingerprint must be accepted as one pair");
+
   const changedIdentities = [
     ["repository", (identity) => { identity.target.repository_id = "github.com/example/transplant"; }],
     ["target", (identity) => { identity.target.target_revision = "c2637c364d4ef205448b2844ccc74b2928078020"; }],
     ["tree", (identity) => { identity.target.tree_digest = digest("different-tree"); }],
     ["gate contract", (identity) => { identity.gate.contract_digest = digest("different-contract"); }],
     ["consumed input", (identity) => { identity.consumed_inputs[0].digest = digest("changed-input"); }],
-    ["command", (identity) => { identity.execution.command.arguments = ["scripts/other-test.mjs"]; }],
+    ["command", (identity) => { identity.execution.command = verificationCommandIdentity({ executable: "node", arguments: ["scripts/other-test.mjs"], working_directory: "." }); }],
     ["runner", (identity) => { identity.execution.runner.runner_version = "2.0.0"; }],
     ["toolchain", (identity) => { identity.execution.toolchain[0].version = "v25.0.0"; }],
     ["environment", (identity) => { identity.execution.environment.identity_digest = digest("different-environment"); }],
@@ -231,7 +284,7 @@ try {
 
   const conflictingStore = resolve(root, "conflicting-store");
   putVerificationEvidence({ storeRoot: conflictingStore, evidence: sealed });
-  const failed = sealVerificationEvidence(evidenceDraft({
+  const failed = sealDraft(evidenceDraft({
     execution: {
       ...evidenceDraft().execution,
       terminal: {
@@ -258,6 +311,36 @@ try {
   assert.deepEqual(imported.evidence_ids, [sealed.evidence_id]);
   assert.deepEqual(readVerificationEvidence({ storeRoot: importedStore, evidenceId: sealed.evidence_id }), sealed);
 
+  const untrustedEvidence = sealDraft(evidenceDraft(), attackerProducerKeys.privateKey);
+  const untrustedSourceStore = resolve(root, "untrusted-source-store");
+  putVerificationEvidence({ storeRoot: untrustedSourceStore, evidence: untrustedEvidence });
+  const untrustedTransfer = buildEvidenceTransfer({ storeRoot: untrustedSourceStore, evidenceIds: [untrustedEvidence.evidence_id] });
+  const untrustedImportedStore = resolve(root, "untrusted-imported-store");
+  importEvidenceTransfer({ storeRoot: untrustedImportedStore, transfer: untrustedTransfer });
+  const untrustedImportedPlan = planExactReuse({ storeRoot: untrustedImportedStore, requirements });
+  assert.equal(untrustedImportedPlan.dispositions[0].reason_code, "exact_evidence_authority_mismatch", "import must not grant producer authority");
+
+  const secondEvidence = sealDraft(evidenceDraft({
+    execution: {
+      ...evidenceDraft().execution,
+      terminal: {
+        ...evidenceDraft().execution.terminal,
+        duration_ms: 456,
+        output_digest: digest("second focused test pass"),
+      },
+    },
+  }));
+  putVerificationEvidence({ storeRoot: store, evidence: secondEvidence });
+  const multiTransfer = buildEvidenceTransfer({ storeRoot: store, evidenceIds: [sealed.evidence_id, secondEvidence.evidence_id] });
+  const partialImportStore = resolve(root, "partial-import-store");
+  const firstImportObject = multiTransfer.evidence_objects[0];
+  const conflictingImportObject = multiTransfer.evidence_objects[1];
+  const conflictingImportPath = evidenceObjectPath({ storeRoot: partialImportStore, evidenceId: conflictingImportObject.evidence_id });
+  mkdirSync(dirname(conflictingImportPath), { recursive: true });
+  writeFileSync(conflictingImportPath, "{}\n");
+  expectFailure("multi-object import preflight", () => importEvidenceTransfer({ storeRoot: partialImportStore, transfer: multiTransfer }), /digest|content-addressed|conflict|tamper/iu);
+  assert.equal(existsSync(evidenceObjectPath({ storeRoot: partialImportStore, evidenceId: firstImportObject.evidence_id })), false, "import must preflight all existing destinations before publishing a new object");
+
   const cliDraftPath = resolve(root, "cli-draft.json");
   const cliSealedPath = resolve(root, "cli-sealed.json");
   const cliRequirementsPath = resolve(root, "cli-requirements.json");
@@ -265,9 +348,19 @@ try {
   const cliTransferPath = resolve(root, "cli-transfer.json");
   const cliStore = resolve(root, "cli-store");
   const cliImportedStore = resolve(root, "cli-imported-store");
-  writeFileSync(cliDraftPath, `${JSON.stringify(evidenceDraft(), null, 2)}\n`);
+  writeFileSync(cliDraftPath, `${JSON.stringify(sealed, null, 2)}\n`);
   writeFileSync(cliRequirementsPath, `${JSON.stringify({ requiredGates: [acceptedGate(sealed)] }, null, 2)}\n`);
   const runCli = (args) => spawnSync(process.execPath, [resolve("scripts/verification-evidence.mjs"), ...args], { cwd: resolve("."), encoding: "utf8" });
+  const runCliAsync = (args) => new Promise((complete) => {
+    const child = spawn(process.execPath, [resolve("scripts/verification-evidence.mjs"), ...args], { cwd: resolve(".") });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("close", (status) => complete({ status, stdout, stderr }));
+  });
   const cliPut = runCli(["put", "--store", cliStore, "--input", cliDraftPath, "--output", cliSealedPath]);
   assert.equal(cliPut.status, 0, cliPut.stderr || cliPut.stdout);
   assert.deepEqual(JSON.parse(readFileSync(cliSealedPath, "utf8")), sealed);
@@ -283,6 +376,30 @@ try {
   assert.equal(cliImport.status, 0, cliImport.stderr || cliImport.stdout);
   assert.deepEqual(readVerificationEvidence({ storeRoot: cliImportedStore, evidenceId: sealed.evidence_id }), sealed);
 
+  const unsignedDraftPath = resolve(root, "unsigned-draft.json");
+  writeFileSync(unsignedDraftPath, `${JSON.stringify(evidenceDraft(), null, 2)}\n`);
+  const unsignedPut = runCli(["put", "--store", resolve(root, "unsigned-store"), "--input", unsignedDraftPath]);
+  assert.notEqual(unsignedPut.status, 0);
+  assert.match(unsignedPut.stderr, /producer-attested|sealed evidence/iu);
+  const unknownOption = runCli(["verify", "--store", cliStore, "--evidence-id", sealed.evidence_id, "--surprise", "value"]);
+  assert.notEqual(unknownOption.status, 0);
+  assert.match(unknownOption.stderr, /unknown.*option/iu);
+
+  const duplicateKeyPath = resolve(root, "duplicate-key-evidence.json");
+  const duplicateKeyEvidence = JSON.stringify(sealed).replace('{"schema_version":', '{"schema_version":"1.0.0","schema_version":');
+  writeFileSync(duplicateKeyPath, `${duplicateKeyEvidence}\n`);
+  const duplicateKeyPut = runCli(["put", "--store", resolve(root, "duplicate-key-store"), "--input", duplicateKeyPath]);
+  assert.notEqual(duplicateKeyPut.status, 0);
+  assert.match(duplicateKeyPut.stderr, /duplicate JSON object key/iu);
+
+  const racingStore = resolve(root, "racing-store");
+  const racingPuts = await Promise.all([
+    runCliAsync(["put", "--store", racingStore, "--input", cliDraftPath]),
+    runCliAsync(["put", "--store", racingStore, "--input", cliDraftPath]),
+  ]);
+  for (const result of racingPuts) assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.deepEqual(racingPuts.map((result) => JSON.parse(result.stdout).created).sort(), [false, true]);
+
   const tamperedTransfer = structuredClone(transfer);
   tamperedTransfer.evidence_objects[0].execution.terminal.output_bytes += 1;
   expectFailure("tampered transfer", () => validateEvidenceTransfer(tamperedTransfer), /digest|identity|tamper/iu);
@@ -293,8 +410,11 @@ try {
   duplicateTransfer.evidence_refs.push(structuredClone(duplicateTransfer.evidence_refs[0]));
   duplicateTransfer.evidence_objects.push(structuredClone(duplicateTransfer.evidence_objects[0]));
   expectFailure("duplicate transfer", () => validateEvidenceTransfer(duplicateTransfer), /duplicate|unique|digest/iu);
+  const tamperedSignature = structuredClone(sealed);
+  tamperedSignature.producer.attestation.signature = `${tamperedSignature.producer.attestation.signature[0] === "A" ? "B" : "A"}${tamperedSignature.producer.attestation.signature.slice(1)}`;
+  expectFailure("producer signature tamper", () => validateVerificationEvidence(tamperedSignature), /signature|attestation/iu);
 
-  const localOnly = sealVerificationEvidence(evidenceDraft({
+  const localOnly = sealDraft(evidenceDraft({
     privacy: { ...evidenceDraft().privacy, exportability: "local_only" },
   }));
   putVerificationEvidence({ storeRoot: store, evidence: localOnly });
@@ -308,6 +428,13 @@ try {
   writeFileSync(storedPath, `${JSON.stringify(stored, null, 2)}\n`);
   expectFailure("stored evidence tamper", () => readVerificationEvidence({ storeRoot: tamperStore, evidenceId: sealed.evidence_id }), /digest|content-addressed|tamper/iu);
 
+  const nonCanonicalStore = resolve(root, "non-canonical-store");
+  putVerificationEvidence({ storeRoot: nonCanonicalStore, evidence: sealed });
+  const nonCanonicalPath = evidenceObjectPath({ storeRoot: nonCanonicalStore, evidenceId: sealed.evidence_id });
+  const nonCanonicalValue = JSON.parse(readFileSync(nonCanonicalPath, "utf8"));
+  writeFileSync(nonCanonicalPath, `${JSON.stringify(nonCanonicalValue, null, 2)}\n`);
+  expectFailure("canonical-byte-only tamper", () => readVerificationEvidence({ storeRoot: nonCanonicalStore, evidenceId: sealed.evidence_id }), /canonical byte form/iu);
+
   const symlinkStore = resolve(root, "symlink-store");
   const symlinkTarget = resolve(root, "symlink-target");
   mkdirSync(symlinkStore);
@@ -317,48 +444,71 @@ try {
 
   const missingEnvironment = evidenceDraft();
   delete missingEnvironment.execution.environment;
-  expectFailure("partial evidence", () => sealVerificationEvidence(missingEnvironment), /environment|schema/iu);
+  expectFailure("partial evidence", () => sealDraft(missingEnvironment), /environment|schema/iu);
   const rawOutput = evidenceDraft();
   rawOutput.execution.raw_output = "forbidden";
-  expectFailure("raw output field", () => sealVerificationEvidence(rawOutput), /raw_output|unknown property|privacy/iu);
+  expectFailure("raw output field", () => sealDraft(rawOutput), /raw_output|unknown property|privacy/iu);
   const contradictoryCoverage = evidenceDraft();
   contradictoryCoverage.coverage.explicit_non_coverage.push(contradictoryCoverage.coverage.obligation_refs[0]);
-  expectFailure("contradictory coverage", () => sealVerificationEvidence(contradictoryCoverage), /coverage|obligation|contradict/iu);
+  expectFailure("contradictory coverage", () => sealDraft(contradictoryCoverage), /coverage|obligation|contradict/iu);
   const conflictingInputPath = evidenceDraft();
   conflictingInputPath.consumed_inputs[1].path = conflictingInputPath.consumed_inputs[0].path;
-  expectFailure("conflicting consumed input path", () => sealVerificationEvidence(conflictingInputPath), /consumed input|path|duplicate|conflict/iu);
+  expectFailure("conflicting consumed input path", () => sealDraft(conflictingInputPath), /consumed input|path|duplicate|conflict/iu);
   const conflictingToolchain = evidenceDraft();
   conflictingToolchain.execution.toolchain.push({
     ...conflictingToolchain.execution.toolchain[0],
     version: "v25.0.0",
     identity_digest: digest("node-v25.0.0-darwin-arm64"),
   });
-  expectFailure("conflicting toolchain name", () => sealVerificationEvidence(conflictingToolchain), /toolchain|name|duplicate|conflict/iu);
-  expectFailure("privacy attestation", () => sealVerificationEvidence(evidenceDraft({
+  expectFailure("conflicting toolchain name", () => sealDraft(conflictingToolchain), /toolchain|name|duplicate|conflict/iu);
+  expectFailure("privacy attestation", () => sealDraft(evidenceDraft({
     privacy: { ...evidenceDraft().privacy, raw_output_stored: true },
   })), /raw_output|equal false|privacy/iu);
-  expectFailure("absolute working directory", () => sealVerificationEvidence(evidenceDraft({
+  expectFailure("absolute working directory", () => sealDraft(evidenceDraft({
     execution: {
       ...evidenceDraft().execution,
       command: { ...evidenceDraft().execution.command, working_directory: "/private/tmp/work" },
     },
   })), /portable|absolute|working_directory|pattern/iu);
-  expectFailure("absolute command argument", () => sealVerificationEvidence(evidenceDraft({
+  const privateCommand = verificationCommandIdentity({
+    executable: "node",
+    arguments: ["/Users/example/private-test.mjs", "--token=private-value", "Authorization: Bearer private-value"],
+    working_directory: ".",
+  });
+  assert.equal(Object.hasOwn(privateCommand, "arguments"), false);
+  assert.doesNotMatch(stableCanonicalJson(privateCommand), /Users|private-value|Bearer/u);
+  const privateCommandEvidence = sealDraft(evidenceDraft({
     execution: {
       ...evidenceDraft().execution,
-      command: { ...evidenceDraft().execution.command, arguments: ["/Users/example/private-test.mjs"] },
+      command: privateCommand,
     },
-  })), /absolute|private path|argument/iu);
-  expectFailure("credential argument", () => sealVerificationEvidence(evidenceDraft({
+  }));
+  const privateCommandStore = resolve(root, "private-command-store");
+  putVerificationEvidence({ storeRoot: privateCommandStore, evidence: privateCommandEvidence });
+  const privateCommandTransfer = buildEvidenceTransfer({ storeRoot: privateCommandStore, evidenceIds: [privateCommandEvidence.evidence_id] });
+  assert.doesNotMatch(stableCanonicalJson(privateCommandTransfer), /Users|private-value|Bearer/u);
+  expectFailure("raw credential arguments", () => sealDraft(evidenceDraft({
     execution: {
       ...evidenceDraft().execution,
-      command: { ...evidenceDraft().execution.command, arguments: ["--token=private-value"] },
+      command: { ...evidenceDraft().execution.command, arguments: ["--token=private-value", "Authorization: Bearer private-value"] },
     },
-  })), /credential|secret|argument/iu);
+  })), /arguments|unknown property|schema|privacy/iu);
+  expectFailure("raw prompt transcript", () => sealDraft(evidenceDraft({
+    execution: {
+      ...evidenceDraft().execution,
+      transcript: "private prompt and raw log",
+    },
+  })), /transcript|unknown property|schema|privacy/iu);
+  expectFailure("parent path segment", () => sealDraft(evidenceDraft({
+    consumed_inputs: [{
+      ...evidenceDraft().consumed_inputs[0],
+      path: "scripts/../private-input.json",
+    }],
+  })), /portable|path|pattern|schema/iu);
 
   const reordered = evidenceDraft();
   reordered.consumed_inputs.reverse();
-  const normalizedOrder = sealVerificationEvidence(reordered);
+  const normalizedOrder = sealDraft(reordered);
   assert.equal(normalizedOrder.evidence_id, sealed.evidence_id, "input ordering must not change evidence identity");
 
   console.log("Verification evidence exact-reuse tests passed");

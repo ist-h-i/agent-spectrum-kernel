@@ -49,6 +49,7 @@ manifest.json
 README.md
 CHANGELOG.md
 docs/
+  adr/0001-verification-evidence-trust-boundary.md
   routing-model.md
   lifecycle-artifact-contract.md
   lifecycle-traceability-contract.md
@@ -216,7 +217,7 @@ skills/
 
 ## Verification evidence exact reuse
 
-`docs/verification-evidence-contract.md` defines the local-first bounded evidence state for Issue #274 Slice 1. It stores canonical structured results in a shared content-addressed JSON layout, verifies exact material identity, accepted producer identity, and required obligation coverage before reuse, keeps independent judgment separate, transfers only exportable bounded evidence, and blocks coverage when a required gate remains uncovered.
+`docs/verification-evidence-contract.md` defines the local-first bounded evidence state for Issue #274 Slice 1. It stores canonical structured results in a shared content-addressed JSON layout, verifies exact material identity, Ed25519 producer provenance, accepted producer authority, and required obligation coverage before reuse, keeps independent judgment separate, transfers only exportable bounded evidence, and blocks coverage when a required gate remains uncovered. Raw command arguments are represented only by a domain-separated digest and count.
 
 The initial planner is intentionally `exact_only`. It does not infer dependencies, emit `reuse_scoped`, replace CI/review/approval, or change benchmark evaluator and scoring authority.
 
@@ -234,7 +235,7 @@ node scripts/verification-evidence.mjs verify \
   --evidence-id verification-evidence-<sha256>
 ```
 
-See the contract for the strict schemas, CAS layout, authority boundary, transfer rules, and full command forms.
+See the contract and `docs/adr/0001-verification-evidence-trust-boundary.md` for the strict schemas, CAS layout, trusted ingress, producer attestation, transfer rules, and full command forms.
 
 ## Comparative benchmark
 
