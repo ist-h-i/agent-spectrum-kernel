@@ -1,0 +1,81 @@
+{
+  "context_revision": 1,
+  "context_key": "ISSUE-275-SLICE-1-CURRENT-AUTHORITY",
+  "goal_id": "github:ist-h-i/agent-spectrum-kernel#275",
+  "repository": {
+    "repository_id": "ist-h-i/agent-spectrum-kernel",
+    "base_commit": "05dfa851a57b21c628b8b5d83e83115327aff3ed",
+    "base_tree": "96d6b214dbed50be006fbf2ae11f6514a35be09f",
+    "branch": "feat/issue-275-epic-admission-work-package-plan"
+  },
+  "current_policy_ref": {
+    "policy_id": "EAP-751773caf5530648ac1322be",
+    "policy_revision": 1,
+    "policy_digest": "sha256:6d0effda5bba8fa63309593b7e7a6578e751d211f7cb4cbd1eb59761e008a83d"
+  },
+  "current_admission_decision_ref": {
+    "decision_id": "EAD-7508ec8c170c0ebfa5db46cf",
+    "decision_revision": 1,
+    "decision_digest": "sha256:e821888e342c4d7e68b972b007bf2e87682872d64dd1d67a7ba1fad4953ac8a2"
+  },
+  "current_plan_ref": {
+    "plan_id": "WPP-6f1ea8476454bf3f97969d36",
+    "plan_revision": 1,
+    "lifecycle_state": "accepted"
+  },
+  "upstream_artifacts": [
+    {
+      "artifact_id": "ROADMAP-170",
+      "artifact_type": "compact",
+      "revision": 1,
+      "source_ref": "github:ist-h-i/agent-spectrum-kernel#170@2026-08-24",
+      "item_ids": []
+    },
+    {
+      "artifact_id": "SPEC-275-SLICE-1",
+      "artifact_type": "spec",
+      "revision": 1,
+      "source_ref": "github:ist-h-i/agent-spectrum-kernel#275@2026-08-24-slice-1",
+      "item_ids": [
+        "AC-275-S1-01-ORDINARY",
+        "AC-275-S1-02-EPIC",
+        "AC-275-S1-03-OWNERSHIP",
+        "AC-275-S1-04-TOPOLOGY",
+        "AC-275-S1-05-FAIL-CLOSED",
+        "AC-275-S1-06-OVERRIDE",
+        "AC-275-S1-07-LIFECYCLE",
+        "AC-275-S1-08-DOGFOOD",
+        "AC-275-S1-09-EVIDENCE-BOUNDARY"
+      ]
+    }
+  ],
+  "required_full_checkpoint_ids": [
+    "CHECKPOINT-EXACT-HEAD-CI",
+    "CHECKPOINT-FRESH-CLONE",
+    "CHECKPOINT-FULL-LOCAL",
+    "CHECKPOINT-INDEPENDENT-REVIEW",
+    "CHECKPOINT-INTEGRATION",
+    "CHECKPOINT-MERGE-REFRESH"
+  ],
+  "non_overridable_gate_ids": [
+    "GATE-EXACT-HEAD-CI",
+    "GATE-FRESH-CLONE",
+    "GATE-FULL-LOCAL",
+    "GATE-INDEPENDENT-REVIEW",
+    "GATE-INTEGRATION",
+    "GATE-MERGE-REFRESH"
+  ],
+  "known_blockers": [],
+  "required_human_decisions": [],
+  "required_human_approvals": [],
+  "schema_version": "1.0.0",
+  "artifact_type": "work_package_plan_validation_context",
+  "program": "ask_work_package_plan",
+  "context_id": "WPPC-f504d3b2054304f96ca77de3",
+  "digest_contract": {
+    "algorithm": "sha256",
+    "canonicalization": "sorted_key_canonical_json",
+    "excluded_field": "context_digest"
+  },
+  "context_digest": "sha256:77d060f40ac11a74f5d9e39bf28f5653ecade591b09bb090b9a42958ec6c11db"
+}

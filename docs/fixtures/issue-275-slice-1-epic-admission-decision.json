@@ -1,0 +1,86 @@
+{
+  "decision_revision": 1,
+  "subject": {
+    "repository_id": "ist-h-i/agent-spectrum-kernel",
+    "goal_id": "github:ist-h-i/agent-spectrum-kernel#275",
+    "task_id": "ISSUE-275-SLICE-1",
+    "base_commit": "05dfa851a57b21c628b8b5d83e83115327aff3ed",
+    "base_tree": "96d6b214dbed50be006fbf2ae11f6514a35be09f",
+    "branch": "feat/issue-275-epic-admission-work-package-plan"
+  },
+  "policy_ref": {
+    "policy_id": "EAP-751773caf5530648ac1322be",
+    "policy_revision": 1,
+    "policy_digest": "sha256:57931d873c9df64eb4b30accdf0e19b7662751affe0a837a794dc43a64737ecf"
+  },
+  "observed_signals": {
+    "configured_epic": {
+      "value": true,
+      "evidence_status": "verified",
+      "evidence_ref": "github:ist-h-i/agent-spectrum-kernel#275"
+    },
+    "acceptance_condition_count": {
+      "value": 9,
+      "evidence_status": "verified",
+      "evidence_ref": "github:ist-h-i/agent-spectrum-kernel#275"
+    },
+    "acceptance_registry_digest": {
+      "value": "sha256:6683bc472a93941ff2844b7841523106067db2146613ebdad65c475b18e8bc0e",
+      "evidence_status": "verified",
+      "evidence_ref": "github:ist-h-i/agent-spectrum-kernel#275"
+    },
+    "scope_boundary_count": {
+      "value": 9,
+      "evidence_status": "verified",
+      "evidence_ref": "github:ist-h-i/agent-spectrum-kernel#275"
+    },
+    "ordered_dependency": {
+      "value": true,
+      "evidence_status": "verified",
+      "evidence_ref": "github:ist-h-i/agent-spectrum-kernel#275"
+    },
+    "independent_publication_units": {
+      "value": false,
+      "evidence_status": "verified",
+      "evidence_ref": "github:ist-h-i/agent-spectrum-kernel#275"
+    },
+    "scope_resolution": {
+      "value": "resolved",
+      "evidence_status": "verified",
+      "evidence_ref": "github:ist-h-i/agent-spectrum-kernel#275"
+    },
+    "ai_estimated_complexity": {
+      "value": "large",
+      "evidence_status": "hypothesis",
+      "evidence_ref": "agent-estimate:bootstrap"
+    }
+  },
+  "computed_decision": "work_package_plan_required",
+  "effective_decision": "work_package_plan_required",
+  "reason_codes": [
+    "CONFIGURED_EPIC",
+    "MULTI_BOUNDARY_THRESHOLD",
+    "ORDERED_DEPENDENCY"
+  ],
+  "unresolved_scope": [],
+  "blockers": [],
+  "override": {
+    "state": "not_requested",
+    "rule_id": null,
+    "requested_decision": null,
+    "reason": null,
+    "authority_grant_id": null,
+    "authority_ref": null,
+    "authority_kind": null
+  },
+  "schema_version": "1.1.0",
+  "artifact_type": "epic_admission_decision",
+  "program": "ask_epic_admission",
+  "decision_id": "EAD-7508ec8c170c0ebfa5db46cf",
+  "digest_contract": {
+    "algorithm": "sha256",
+    "canonicalization": "sorted_key_canonical_json",
+    "excluded_field": "decision_digest"
+  },
+  "decision_digest": "sha256:9a8900bbe1ae78f6acdf6ea763c7a00537402dc01be4269cd51cf64e786e6b1c"
+}

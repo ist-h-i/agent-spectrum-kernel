@@ -133,6 +133,8 @@ Conditional fields:
 
 The Work Package is executable only when required business and design decisions are resolved. It packages work; it does not make those decisions.
 
+When current epic-admission policy requires multiple packages, `docs/epic-admission-work-package-plan-contract.md` governs the optional control-plane aggregate. A Work Package Plan contains Work Package-owned projections plus typed plan-local topology. Each entry retains lifecycle `dependencies` for free-form or external prerequisites; its separate `depends_on_package_ids` field carries only plan-local DAG edges. `projectWorkPackagePlanEntryToLifecycleArtifact` maps the owned scope, tasks, dependencies, stops, and evidence expectations into this contract's Work Package shape, and the `work-package-plan-projection` lifecycle fixture plus repository validation guard that mapping. The aggregate is not a new lifecycle stage, does not own acceptance meaning, and does not prove implementation approval, verification, review, or merge readiness.
+
 ## Verification Contract
 
 Required fields:

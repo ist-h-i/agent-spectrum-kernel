@@ -50,10 +50,12 @@ README.md
 CHANGELOG.md
 docs/
   adr/0001-verification-evidence-trust-boundary.md
+  adr/0002-epic-admission-work-package-plan-authority.md
   routing-model.md
   lifecycle-artifact-contract.md
   lifecycle-traceability-contract.md
   verification-evidence-contract.md
+  epic-admission-work-package-plan-contract.md
   fixtures/lifecycle-artifact-chains.json
   fixtures/lifecycle-traceability-chains.json
   agent-session-state-contract.md
@@ -130,6 +132,10 @@ schemas/
   verification-evidence.schema.json
   verification-evidence-transfer.schema.json
   verification-reuse-plan.schema.json
+  epic-admission-policy.schema.json
+  epic-admission-decision.schema.json
+  work-package-plan-validation-context.schema.json
+  work-package-plan.schema.json
 adapters/
   claude-code/
     project/.claude/
@@ -145,6 +151,7 @@ scripts/
   content-addressed-store.mjs
   execution-envelope.mjs
   verification-evidence.mjs
+  epic-admission-work-package-plan.mjs
   adapter-runtime-event.mjs
   adapter-runtime-smoke.mjs
   adapter-runtime-bundle.mjs
@@ -236,6 +243,19 @@ node scripts/verification-evidence.mjs verify \
 ```
 
 See the contract and `docs/adr/0001-verification-evidence-trust-boundary.md` for the strict schemas, CAS layout, trusted ingress, producer attestation, transfer rules, and full command forms.
+
+## Epic admission and Work Package Plans
+
+`docs/epic-admission-work-package-plan-contract.md` defines the Issue #275 Slice 1 control plane that runs before repository mutation. Evidence-backed policy evaluation returns `ordinary_execution_allowed`, `work_package_plan_required`, or `human_decision_required`; AI-estimated complexity is recorded but cannot decide admission by itself.
+
+Before admission policy computation, the evaluator validates caller-supplied subject, signal, revision, and override input and throws a typed `EPIC_ADMISSION_INPUT_INVALID` error instead of returning an allowed outcome from malformed data. Plan and repository validation likewise validates required decision and historical dependency artifacts before dereferencing their bindings, returning typed issues for valid-JSON malformed inputs. When a plan is required, the repository validator checks the current external authority context, deterministic ID/digest, exact plan-content binding, canonical-and-byte-pinned r1/r2 lineage, package DAG, typed allowed/forbidden artifact scope, complete acceptance-condition ownership, stack/base and integration order, reconstructable publication/review units, non-whitespace exact non-overridable gate procedures/purposes, focused cadence, full checkpoints, blockers, decisions, context-owned approval status/evidence, non-whitespace exact-basis override-grant evidence, revision-preserving lifecycle Work Package projection, stale state, tamper, and cross-plan/repository transplant.
+
+```bash
+node scripts/test-epic-admission-work-package-plan.mjs
+node scripts/epic-admission-work-package-plan.mjs --check
+```
+
+Admission is not implementation approval. A valid plan is not correctness proof, independent review, CI evidence, or merge readiness. The accepted dogfood plan covers only the post-validator WP3-WP6 remainder; the earlier bootstrap plan is not retroactively validated. Accepted r1 and r2 are preserved byte-for-byte as historical audit evidence, while the current lineage-bound r3 records the review-driven authority and lifecycle corrections instead of rewriting either predecessor. See `docs/adr/0002-epic-admission-work-package-plan-authority.md` for the external-currentness decision.
 
 ## Comparative benchmark
 

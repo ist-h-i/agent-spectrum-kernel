@@ -39,6 +39,9 @@ This is a transformation skill. It does not make business decisions and must rou
    - If `Open blockers` include unresolved business decisions, route to `requirement-grill`.
    - If technical design choices are unresolved, route to `grill-design`.
    - If risk gates require approval, expose them; do not bury them in the agent prompt.
+   - When current `ask_epic_admission` policy returns `work_package_plan_required`, do not begin repository mutation from a single unvalidated package. Compile the bounded packages, then validate their current DAG, scope, acceptance ownership, stack, publication, review, and verification topology under the repository's current Epic Admission and Work Package Plan contract.
+   - Preserve lifecycle `Dependencies` as external or free-form prerequisites. Record plan-local ordering only in `depends_on_package_ids`, and keep the deterministic lifecycle Work Package projection valid.
+   - A plan may only mirror human-approval status and immutable evidence from the trusted current context; never infer or self-assert approval from a recognizable authority identity.
 
 3. Keep evidence status visible.
    - Mark target files/modules as `Verified`, `Supported`, `Hypothesis`, or `Unknown`.
@@ -75,6 +78,8 @@ Conditional fields, omit when irrelevant:
    - The package is executable only when `Open blockers` has no unresolved business decisions.
    - Required review gates must include `review-domain-impact` when domain rules or business behavior are involved.
    - The user-facing next action must be a work action, not only the name of the next skill.
+   - `ordinary_execution_allowed` means only that an epic plan is not mandatory; it never waives verification, review, risk, or approval gates.
+   - A valid Work Package Plan is packaging evidence, not implementation approval or merge readiness.
 
 ## Output
 

@@ -1,0 +1,1126 @@
+{
+  "plan_revision": 3,
+  "supersedes_plan_ref": {
+    "plan_id": "WPP-6f1ea8476454bf3f97969d36",
+    "plan_revision": 2,
+    "plan_digest": "sha256:e97a2ef854ab5350d11ca00e305aaf44eb01939744500513bfee313ff94b8e3f"
+  },
+  "revision_reason": "Independent adversarial and test-gap review found that r2 left approval outcome ownership and lifecycle Work Package projection ambiguous; r3 preserves r2 and binds trusted approval evidence plus the lifecycle projection surface.",
+  "goal_id": "github:ist-h-i/agent-spectrum-kernel#275",
+  "lifecycle_state": "accepted",
+  "repository": {
+    "repository_id": "ist-h-i/agent-spectrum-kernel",
+    "base_commit": "05dfa851a57b21c628b8b5d83e83115327aff3ed",
+    "base_tree": "96d6b214dbed50be006fbf2ae11f6514a35be09f",
+    "branch": "feat/issue-275-epic-admission-work-package-plan"
+  },
+  "validation_context_ref": {
+    "context_id": "WPPC-f504d3b2054304f96ca77de3",
+    "context_revision": 3,
+    "context_digest": "sha256:751eb919dc64ca9dee6d66ce1d7fa1e928b4edbd791222d2e037b6a020545e73"
+  },
+  "admission_decision_ref": {
+    "decision_id": "EAD-7508ec8c170c0ebfa5db46cf",
+    "decision_revision": 1,
+    "decision_digest": "sha256:9a8900bbe1ae78f6acdf6ea763c7a00537402dc01be4269cd51cf64e786e6b1c"
+  },
+  "upstream_refs": [
+    {
+      "artifact_id": "ROADMAP-170",
+      "observed_revision": 1
+    },
+    {
+      "artifact_id": "SPEC-275-SLICE-1",
+      "observed_revision": 1
+    }
+  ],
+  "packages": [
+    {
+      "package_id": "WP3",
+      "artifact_id": "WORK-PACKAGE-275-S1-WP3",
+      "artifact_type": "work_package",
+      "revision": 3,
+      "plan_binding": {
+        "plan_id": "WPP-6f1ea8476454bf3f97969d36",
+        "plan_revision": 3
+      },
+      "target_binding": {
+        "repository_id": "ist-h-i/agent-spectrum-kernel",
+        "base_commit": "05dfa851a57b21c628b8b5d83e83115327aff3ed",
+        "base_tree": "96d6b214dbed50be006fbf2ae11f6514a35be09f",
+        "branch": "feat/issue-275-epic-admission-work-package-plan"
+      },
+      "upstream_refs": [
+        {
+          "artifact_id": "ROADMAP-170",
+          "observed_revision": 1
+        },
+        {
+          "artifact_id": "SPEC-275-SLICE-1",
+          "observed_revision": 1
+        }
+      ],
+      "depends_on_package_ids": [],
+      "allowed_scope": [
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/epic-admission-policy.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/issue-275-slice-1-epic-admission-decision.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/issue-275-slice-1-work-package-plan-r1.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/issue-275-slice-1-work-package-plan-r2.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r1.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r2.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/issue-275-slice-1-work-package-plan.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "schemas/epic-admission-decision.schema.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "schemas/epic-admission-policy.schema.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "schemas/work-package-plan-validation-context.schema.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "schemas/work-package-plan.schema.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "scripts/epic-admission-work-package-plan.mjs",
+          "match": "exact"
+        }
+      ],
+      "forbidden_scope": [
+        {
+          "kind": "repository_path",
+          "value": "benchmarks",
+          "match": "subtree"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/verification-evidence-contract.md",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "scripts/content-addressed-store.mjs",
+          "match": "exact"
+        }
+      ],
+      "ordered_tasks": [
+        {
+          "task_id": "WP3-T1",
+          "description": "Preserve the already-created bootstrap contract and validator artifacts without claiming retroactive validation."
+        },
+        {
+          "task_id": "WP3-T2",
+          "description": "Materialize the current authority context and the remaining WP3-WP6 topology."
+        },
+        {
+          "task_id": "WP3-T3",
+          "description": "Validate the accepted plan and its rejection of contradictory branch/publication topology."
+        }
+      ],
+      "dependencies": [
+        "Issue #275 Slice 1 bootstrap contracts and provisional Work Package topology"
+      ],
+      "expected_artifacts": [
+        {
+          "artifact_id": "ART-275-ADMISSION-DECISION-SCHEMA",
+          "path": "schemas/epic-admission-decision.schema.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-ADMISSION-POLICY",
+          "path": "docs/fixtures/epic-admission-policy.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-ADMISSION-POLICY-SCHEMA",
+          "path": "schemas/epic-admission-policy.schema.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-CANONICAL-CONTEXT",
+          "path": "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-CANONICAL-CONTEXT-R1",
+          "path": "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r1.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-CANONICAL-CONTEXT-R2",
+          "path": "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r2.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-CANONICAL-DECISION",
+          "path": "docs/fixtures/issue-275-slice-1-epic-admission-decision.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-CANONICAL-PLAN",
+          "path": "docs/fixtures/issue-275-slice-1-work-package-plan.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-CANONICAL-PLAN-R1",
+          "path": "docs/fixtures/issue-275-slice-1-work-package-plan-r1.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-CANONICAL-PLAN-R2",
+          "path": "docs/fixtures/issue-275-slice-1-work-package-plan-r2.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-CONTEXT-SCHEMA",
+          "path": "schemas/work-package-plan-validation-context.schema.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-PLAN-SCHEMA",
+          "path": "schemas/work-package-plan.schema.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-SEMANTIC-VALIDATOR",
+          "path": "scripts/epic-admission-work-package-plan.mjs",
+          "classification": "manual"
+        }
+      ],
+      "expected_evidence_ids": [
+        "FOCUSED-CANONICAL-PLAN"
+      ],
+      "stop_conditions": [
+        {
+          "code": "CANNOT-PROVE-PLAN-TOPOLOGY",
+          "condition": "The validator cannot accept this remaining topology or reject contradictory topology."
+        },
+        {
+          "code": "SHARED-CAS-CHANGE-REQUIRED",
+          "condition": "The generic CAS contract or layout would need to change."
+        }
+      ],
+      "stack_base": {
+        "kind": "repository_base",
+        "package_id": null
+      }
+    },
+    {
+      "package_id": "WP4",
+      "artifact_id": "WORK-PACKAGE-275-S1-WP4",
+      "artifact_type": "work_package",
+      "revision": 3,
+      "plan_binding": {
+        "plan_id": "WPP-6f1ea8476454bf3f97969d36",
+        "plan_revision": 3
+      },
+      "target_binding": {
+        "repository_id": "ist-h-i/agent-spectrum-kernel",
+        "base_commit": "05dfa851a57b21c628b8b5d83e83115327aff3ed",
+        "base_tree": "96d6b214dbed50be006fbf2ae11f6514a35be09f",
+        "branch": "feat/issue-275-epic-admission-work-package-plan"
+      },
+      "upstream_refs": [
+        {
+          "artifact_id": "ROADMAP-170",
+          "observed_revision": 1
+        },
+        {
+          "artifact_id": "SPEC-275-SLICE-1",
+          "observed_revision": 1
+        }
+      ],
+      "depends_on_package_ids": [
+        "WP3"
+      ],
+      "allowed_scope": [
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/epic-admission-work-package-plan-cases.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "scripts/test-epic-admission-work-package-plan.mjs",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "scripts/test-fixtures/epic-admission-work-package-plan-fixture.mjs",
+          "match": "exact"
+        }
+      ],
+      "forbidden_scope": [
+        {
+          "kind": "repository_path",
+          "value": "benchmarks",
+          "match": "subtree"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/verification-evidence-contract.md",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "scripts/content-addressed-store.mjs",
+          "match": "exact"
+        }
+      ],
+      "ordered_tasks": [
+        {
+          "task_id": "WP4-T1",
+          "description": "Add the required positive and negative fixture catalog."
+        },
+        {
+          "task_id": "WP4-T2",
+          "description": "Exercise Schema parity, deterministic identities, fail-closed semantics, tamper and transplant cases."
+        },
+        {
+          "task_id": "WP4-T3",
+          "description": "Address bounded adversarial and test-gap review findings inside Slice 1."
+        }
+      ],
+      "dependencies": [
+        "Accepted WP3 contract and validator baseline"
+      ],
+      "expected_artifacts": [
+        {
+          "artifact_id": "ART-275-CASE-CATALOG",
+          "path": "docs/fixtures/epic-admission-work-package-plan-cases.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-FOCUSED-TEST",
+          "path": "scripts/test-epic-admission-work-package-plan.mjs",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-TEST-FIXTURE-BUILDER",
+          "path": "scripts/test-fixtures/epic-admission-work-package-plan-fixture.mjs",
+          "classification": "manual"
+        }
+      ],
+      "expected_evidence_ids": [
+        "FOCUSED-CONTRACT-TESTS"
+      ],
+      "stop_conditions": [
+        {
+          "code": "SLICE-1-SCOPE-EXPANSION",
+          "condition": "A required fixture needs checkpoint, runtime telemetry, benchmark, or #274 authority changes."
+        },
+        {
+          "code": "VALIDATION-UNSTABLE",
+          "condition": "Repeated identical inputs produce different artifacts or issue ordering."
+        }
+      ],
+      "stack_base": {
+        "kind": "package",
+        "package_id": "WP3"
+      }
+    },
+    {
+      "package_id": "WP5",
+      "artifact_id": "WORK-PACKAGE-275-S1-WP5",
+      "artifact_type": "work_package",
+      "revision": 3,
+      "plan_binding": {
+        "plan_id": "WPP-6f1ea8476454bf3f97969d36",
+        "plan_revision": 3
+      },
+      "target_binding": {
+        "repository_id": "ist-h-i/agent-spectrum-kernel",
+        "base_commit": "05dfa851a57b21c628b8b5d83e83115327aff3ed",
+        "base_tree": "96d6b214dbed50be006fbf2ae11f6514a35be09f",
+        "branch": "feat/issue-275-epic-admission-work-package-plan"
+      },
+      "upstream_refs": [
+        {
+          "artifact_id": "ROADMAP-170",
+          "observed_revision": 1
+        },
+        {
+          "artifact_id": "SPEC-275-SLICE-1",
+          "observed_revision": 1
+        }
+      ],
+      "depends_on_package_ids": [
+        "WP4"
+      ],
+      "allowed_scope": [
+        {
+          "kind": "repository_path",
+          "value": ".github/ask-automation/validation-plan.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": ".github/workflows/validate.yml",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "CHANGELOG.md",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "README.md",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/adr/0002-epic-admission-work-package-plan-authority.md",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/ask-autonomous-development.md",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/epic-admission-work-package-plan-contract.md",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/lifecycle-artifact-chains.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/lifecycle-artifact-contract.md",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "manifest.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "scripts/test-ask-autonomous-development.mjs",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "scripts/test-validate-repo.mjs",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "scripts/validate-repo.mjs",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "skills/work-package-compiler/SKILL.md",
+          "match": "exact"
+        }
+      ],
+      "forbidden_scope": [
+        {
+          "kind": "repository_path",
+          "value": "benchmarks",
+          "match": "subtree"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/verification-evidence-contract.md",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "scripts/content-addressed-store.mjs",
+          "match": "exact"
+        }
+      ],
+      "ordered_tasks": [
+        {
+          "task_id": "WP5-T1",
+          "description": "Register schemas, fixtures, validator, focused CI command and immutable validation plan command."
+        },
+        {
+          "task_id": "WP5-T2",
+          "description": "Document lifecycle, authority, non-equivalence, and Slice 1 boundaries."
+        },
+        {
+          "task_id": "WP5-T3",
+          "description": "Record the cross-cutting current-context decision in ADR-0002."
+        }
+      ],
+      "dependencies": [
+        "Focused contract suite for accepted WP4 semantics"
+      ],
+      "expected_artifacts": [
+        {
+          "artifact_id": "ART-275-ADR",
+          "path": "docs/adr/0002-epic-admission-work-package-plan-authority.md",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-AUTOMATION-DOC",
+          "path": "docs/ask-autonomous-development.md",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-AUTOMATION-PLAN",
+          "path": ".github/ask-automation/validation-plan.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-AUTOMATION-PLAN-TEST",
+          "path": "scripts/test-ask-autonomous-development.mjs",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-CHANGELOG",
+          "path": "CHANGELOG.md",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-CI",
+          "path": ".github/workflows/validate.yml",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-CONTRACT",
+          "path": "docs/epic-admission-work-package-plan-contract.md",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-LIFECYCLE-ARTIFACT",
+          "path": "docs/lifecycle-artifact-contract.md",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-LIFECYCLE-FIXTURE",
+          "path": "docs/fixtures/lifecycle-artifact-chains.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-MANIFEST",
+          "path": "manifest.json",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-README",
+          "path": "README.md",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-REPO-TEST",
+          "path": "scripts/test-validate-repo.mjs",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-REPO-VALIDATOR",
+          "path": "scripts/validate-repo.mjs",
+          "classification": "manual"
+        },
+        {
+          "artifact_id": "ART-275-WORK-PACKAGE-SKILL",
+          "path": "skills/work-package-compiler/SKILL.md",
+          "classification": "manual"
+        }
+      ],
+      "expected_evidence_ids": [
+        "FOCUSED-REPOSITORY-INTEGRATION"
+      ],
+      "stop_conditions": [
+        {
+          "code": "NEW-CANONICAL-SKILL-REQUIRED",
+          "condition": "Integration cannot proceed without a new canonical Skill."
+        },
+        {
+          "code": "UNEXPECTED-GENERATED-SCOPE",
+          "condition": "A generator changes a path outside the four known generated artifacts."
+        }
+      ],
+      "stack_base": {
+        "kind": "package",
+        "package_id": "WP4"
+      }
+    },
+    {
+      "package_id": "WP6",
+      "artifact_id": "WORK-PACKAGE-275-S1-WP6",
+      "artifact_type": "work_package",
+      "revision": 3,
+      "plan_binding": {
+        "plan_id": "WPP-6f1ea8476454bf3f97969d36",
+        "plan_revision": 3
+      },
+      "target_binding": {
+        "repository_id": "ist-h-i/agent-spectrum-kernel",
+        "base_commit": "05dfa851a57b21c628b8b5d83e83115327aff3ed",
+        "base_tree": "96d6b214dbed50be006fbf2ae11f6514a35be09f",
+        "branch": "feat/issue-275-epic-admission-work-package-plan"
+      },
+      "upstream_refs": [
+        {
+          "artifact_id": "ROADMAP-170",
+          "observed_revision": 1
+        },
+        {
+          "artifact_id": "SPEC-275-SLICE-1",
+          "observed_revision": 1
+        }
+      ],
+      "depends_on_package_ids": [
+        "WP5"
+      ],
+      "allowed_scope": [
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/adapter-runtime-bundle.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/adapter-runtime-evidence.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/fixtures/adapter-runtime-profiles.json",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/validation-report.md",
+          "match": "exact"
+        }
+      ],
+      "forbidden_scope": [
+        {
+          "kind": "repository_path",
+          "value": "benchmarks",
+          "match": "subtree"
+        },
+        {
+          "kind": "repository_path",
+          "value": "docs/verification-evidence-contract.md",
+          "match": "exact"
+        },
+        {
+          "kind": "repository_path",
+          "value": "scripts/content-addressed-store.mjs",
+          "match": "exact"
+        }
+      ],
+      "ordered_tasks": [
+        {
+          "task_id": "WP6-T1",
+          "description": "Refresh only the expected generated artifacts and prove deterministic second-run stability."
+        },
+        {
+          "task_id": "WP6-T2",
+          "description": "Run focused, full, fresh-clone and merge-integration verification."
+        },
+        {
+          "task_id": "WP6-T3",
+          "description": "Freeze the candidate for independent exact-head review and complete the gated PR lifecycle."
+        }
+      ],
+      "dependencies": [
+        "Repository integration and documentation from WP5"
+      ],
+      "expected_artifacts": [
+        {
+          "artifact_id": "ART-275-GENERATED-BUNDLE",
+          "path": "docs/fixtures/adapter-runtime-bundle.json",
+          "classification": "generated"
+        },
+        {
+          "artifact_id": "ART-275-GENERATED-EVIDENCE",
+          "path": "docs/fixtures/adapter-runtime-evidence.json",
+          "classification": "generated"
+        },
+        {
+          "artifact_id": "ART-275-GENERATED-PROFILES",
+          "path": "docs/fixtures/adapter-runtime-profiles.json",
+          "classification": "generated"
+        },
+        {
+          "artifact_id": "ART-275-VALIDATION-REPORT",
+          "path": "docs/validation-report.md",
+          "classification": "generated"
+        }
+      ],
+      "expected_evidence_ids": [
+        "FOCUSED-GENERATED-PARITY",
+        "GATE-EXACT-HEAD-CI",
+        "GATE-FRESH-CLONE",
+        "GATE-FULL-LOCAL",
+        "GATE-INDEPENDENT-REVIEW",
+        "GATE-INTEGRATION",
+        "GATE-MERGE-REFRESH"
+      ],
+      "stop_conditions": [
+        {
+          "code": "BASE-CHANGED-REVIEW-INVALIDATED",
+          "condition": "Current main changes the effective reviewed integration and re-review cannot be completed."
+        },
+        {
+          "code": "CI-FAILED",
+          "condition": "Exact-head required CI cannot be made green inside Slice 1."
+        },
+        {
+          "code": "INDEPENDENT-REVIEW-BLOCKED",
+          "condition": "Blocker or Major findings cannot be corrected inside Slice 1."
+        }
+      ],
+      "stack_base": {
+        "kind": "package",
+        "package_id": "WP5"
+      }
+    }
+  ],
+  "acceptance_ownership": [
+    {
+      "acceptance_ref": {
+        "artifact_id": "SPEC-275-SLICE-1",
+        "item_id": "AC-275-S1-01-ORDINARY",
+        "observed_revision": 1
+      },
+      "mode": "exclusive",
+      "owner_package_ids": [
+        "WP4"
+      ],
+      "shared_reason": null
+    },
+    {
+      "acceptance_ref": {
+        "artifact_id": "SPEC-275-SLICE-1",
+        "item_id": "AC-275-S1-02-EPIC",
+        "observed_revision": 1
+      },
+      "mode": "exclusive",
+      "owner_package_ids": [
+        "WP4"
+      ],
+      "shared_reason": null
+    },
+    {
+      "acceptance_ref": {
+        "artifact_id": "SPEC-275-SLICE-1",
+        "item_id": "AC-275-S1-03-OWNERSHIP",
+        "observed_revision": 1
+      },
+      "mode": "exclusive",
+      "owner_package_ids": [
+        "WP3"
+      ],
+      "shared_reason": null
+    },
+    {
+      "acceptance_ref": {
+        "artifact_id": "SPEC-275-SLICE-1",
+        "item_id": "AC-275-S1-04-TOPOLOGY",
+        "observed_revision": 1
+      },
+      "mode": "exclusive",
+      "owner_package_ids": [
+        "WP3"
+      ],
+      "shared_reason": null
+    },
+    {
+      "acceptance_ref": {
+        "artifact_id": "SPEC-275-SLICE-1",
+        "item_id": "AC-275-S1-05-FAIL-CLOSED",
+        "observed_revision": 1
+      },
+      "mode": "exclusive",
+      "owner_package_ids": [
+        "WP4"
+      ],
+      "shared_reason": null
+    },
+    {
+      "acceptance_ref": {
+        "artifact_id": "SPEC-275-SLICE-1",
+        "item_id": "AC-275-S1-06-OVERRIDE",
+        "observed_revision": 1
+      },
+      "mode": "exclusive",
+      "owner_package_ids": [
+        "WP4"
+      ],
+      "shared_reason": null
+    },
+    {
+      "acceptance_ref": {
+        "artifact_id": "SPEC-275-SLICE-1",
+        "item_id": "AC-275-S1-07-LIFECYCLE",
+        "observed_revision": 1
+      },
+      "mode": "exclusive",
+      "owner_package_ids": [
+        "WP5"
+      ],
+      "shared_reason": null
+    },
+    {
+      "acceptance_ref": {
+        "artifact_id": "SPEC-275-SLICE-1",
+        "item_id": "AC-275-S1-08-DOGFOOD",
+        "observed_revision": 1
+      },
+      "mode": "exclusive",
+      "owner_package_ids": [
+        "WP3"
+      ],
+      "shared_reason": null
+    },
+    {
+      "acceptance_ref": {
+        "artifact_id": "SPEC-275-SLICE-1",
+        "item_id": "AC-275-S1-09-EVIDENCE-BOUNDARY",
+        "observed_revision": 1
+      },
+      "mode": "exclusive",
+      "owner_package_ids": [
+        "WP5"
+      ],
+      "shared_reason": null
+    }
+  ],
+  "topology": {
+    "execution_model": "stacked_work_packages",
+    "branch_model": "single_branch",
+    "integration_order": [
+      "WP3",
+      "WP4",
+      "WP5",
+      "WP6"
+    ],
+    "publication_units": [
+      {
+        "unit_id": "PUB-275-S1-ONE-PR",
+        "kind": "pull_request",
+        "branch": "feat/issue-275-epic-admission-work-package-plan",
+        "base_commit": "05dfa851a57b21c628b8b5d83e83115327aff3ed",
+        "package_ids": [
+          "WP3",
+          "WP4",
+          "WP5",
+          "WP6"
+        ],
+        "artifact_ids": [
+          "ART-275-ADMISSION-DECISION-SCHEMA",
+          "ART-275-ADMISSION-POLICY",
+          "ART-275-ADMISSION-POLICY-SCHEMA",
+          "ART-275-ADR",
+          "ART-275-AUTOMATION-DOC",
+          "ART-275-AUTOMATION-PLAN",
+          "ART-275-AUTOMATION-PLAN-TEST",
+          "ART-275-CANONICAL-CONTEXT",
+          "ART-275-CANONICAL-CONTEXT-R1",
+          "ART-275-CANONICAL-CONTEXT-R2",
+          "ART-275-CANONICAL-DECISION",
+          "ART-275-CANONICAL-PLAN",
+          "ART-275-CANONICAL-PLAN-R1",
+          "ART-275-CANONICAL-PLAN-R2",
+          "ART-275-CASE-CATALOG",
+          "ART-275-CHANGELOG",
+          "ART-275-CI",
+          "ART-275-CONTEXT-SCHEMA",
+          "ART-275-CONTRACT",
+          "ART-275-FOCUSED-TEST",
+          "ART-275-GENERATED-BUNDLE",
+          "ART-275-GENERATED-EVIDENCE",
+          "ART-275-GENERATED-PROFILES",
+          "ART-275-LIFECYCLE-ARTIFACT",
+          "ART-275-LIFECYCLE-FIXTURE",
+          "ART-275-MANIFEST",
+          "ART-275-PLAN-SCHEMA",
+          "ART-275-README",
+          "ART-275-REPO-TEST",
+          "ART-275-REPO-VALIDATOR",
+          "ART-275-SEMANTIC-VALIDATOR",
+          "ART-275-TEST-FIXTURE-BUILDER",
+          "ART-275-VALIDATION-REPORT",
+          "ART-275-WORK-PACKAGE-SKILL"
+        ]
+      }
+    ],
+    "review_units": [
+      {
+        "unit_id": "REVIEW-275-S1-EXACT-HEAD",
+        "publication_unit_id": "PUB-275-S1-ONE-PR",
+        "review_state": "planned",
+        "required_review_kind": "independent_exact_head",
+        "package_ids": [
+          "WP3",
+          "WP4",
+          "WP5",
+          "WP6"
+        ],
+        "artifact_ids": [
+          "ART-275-ADMISSION-DECISION-SCHEMA",
+          "ART-275-ADMISSION-POLICY",
+          "ART-275-ADMISSION-POLICY-SCHEMA",
+          "ART-275-ADR",
+          "ART-275-AUTOMATION-DOC",
+          "ART-275-AUTOMATION-PLAN",
+          "ART-275-AUTOMATION-PLAN-TEST",
+          "ART-275-CANONICAL-CONTEXT",
+          "ART-275-CANONICAL-CONTEXT-R1",
+          "ART-275-CANONICAL-CONTEXT-R2",
+          "ART-275-CANONICAL-DECISION",
+          "ART-275-CANONICAL-PLAN",
+          "ART-275-CANONICAL-PLAN-R1",
+          "ART-275-CANONICAL-PLAN-R2",
+          "ART-275-CASE-CATALOG",
+          "ART-275-CHANGELOG",
+          "ART-275-CI",
+          "ART-275-CONTEXT-SCHEMA",
+          "ART-275-CONTRACT",
+          "ART-275-FOCUSED-TEST",
+          "ART-275-GENERATED-BUNDLE",
+          "ART-275-GENERATED-EVIDENCE",
+          "ART-275-GENERATED-PROFILES",
+          "ART-275-LIFECYCLE-ARTIFACT",
+          "ART-275-LIFECYCLE-FIXTURE",
+          "ART-275-MANIFEST",
+          "ART-275-PLAN-SCHEMA",
+          "ART-275-README",
+          "ART-275-REPO-TEST",
+          "ART-275-REPO-VALIDATOR",
+          "ART-275-SEMANTIC-VALIDATOR",
+          "ART-275-TEST-FIXTURE-BUILDER",
+          "ART-275-VALIDATION-REPORT",
+          "ART-275-WORK-PACKAGE-SKILL"
+        ]
+      }
+    ]
+  },
+  "verification": {
+    "steps": [
+      {
+        "verification_id": "FOCUSED-CANONICAL-PLAN",
+        "kind": "focused",
+        "procedure": "node scripts/epic-admission-work-package-plan.mjs --check",
+        "purpose": "Validate the canonical policy, decision, context, plan and case inventory."
+      },
+      {
+        "verification_id": "FOCUSED-CONTRACT-TESTS",
+        "kind": "focused",
+        "procedure": "node scripts/test-epic-admission-work-package-plan.mjs",
+        "purpose": "Exercise positive and exact negative contract oracles."
+      },
+      {
+        "verification_id": "FOCUSED-GENERATED-PARITY",
+        "kind": "focused",
+        "procedure": "Run artifact updaters twice and require byte-identical generated output.",
+        "purpose": "Prove deterministic generated artifacts."
+      },
+      {
+        "verification_id": "FOCUSED-REPOSITORY-INTEGRATION",
+        "kind": "focused",
+        "procedure": "node scripts/test-validate-repo.mjs && node scripts/validate-repo.mjs",
+        "purpose": "Prove repository registration and report integration."
+      },
+      {
+        "verification_id": "GATE-EXACT-HEAD-CI",
+        "kind": "full",
+        "procedure": "Confirm required GitHub Actions succeeded for the exact independently reviewed candidate HEAD.",
+        "purpose": "Confirm required GitHub Actions succeeded for the exact independently reviewed candidate HEAD."
+      },
+      {
+        "verification_id": "GATE-FRESH-CLONE",
+        "kind": "full",
+        "procedure": "Run all locally reproducible candidate checks in a fresh detached clone.",
+        "purpose": "Run all locally reproducible candidate checks in a fresh detached clone."
+      },
+      {
+        "verification_id": "GATE-FULL-LOCAL",
+        "kind": "full",
+        "procedure": "Run every locally reproducible command from the current pull-request workflow.",
+        "purpose": "Run every locally reproducible command from the current pull-request workflow."
+      },
+      {
+        "verification_id": "GATE-INDEPENDENT-REVIEW",
+        "kind": "full",
+        "procedure": "Obtain a fresh exact-head independent decision with zero Blocker and Major findings.",
+        "purpose": "Obtain a fresh exact-head independent decision with zero Blocker and Major findings."
+      },
+      {
+        "verification_id": "GATE-INTEGRATION",
+        "kind": "full",
+        "procedure": "Validate the candidate merged with current origin/main in a disposable integration worktree.",
+        "purpose": "Validate the candidate merged with current origin/main in a disposable integration worktree."
+      },
+      {
+        "verification_id": "GATE-MERGE-REFRESH",
+        "kind": "full",
+        "procedure": "Refresh PR head, base, mergeability, CI, review and Issue state immediately before merge.",
+        "purpose": "Refresh PR head, base, mergeability, CI, review and Issue state immediately before merge."
+      }
+    ],
+    "focused_cadence": [
+      {
+        "after_package_id": "WP3",
+        "verification_ids": [
+          "FOCUSED-CANONICAL-PLAN"
+        ]
+      },
+      {
+        "after_package_id": "WP4",
+        "verification_ids": [
+          "FOCUSED-CONTRACT-TESTS"
+        ]
+      },
+      {
+        "after_package_id": "WP5",
+        "verification_ids": [
+          "FOCUSED-REPOSITORY-INTEGRATION"
+        ]
+      },
+      {
+        "after_package_id": "WP6",
+        "verification_ids": [
+          "FOCUSED-GENERATED-PARITY"
+        ]
+      }
+    ],
+    "full_gate_checkpoints": [
+      {
+        "checkpoint_id": "CHECKPOINT-EXACT-HEAD-CI",
+        "after_package_ids": [
+          "WP3",
+          "WP4",
+          "WP5",
+          "WP6"
+        ],
+        "verification_ids": [
+          "GATE-EXACT-HEAD-CI"
+        ],
+        "required_for_merge": true
+      },
+      {
+        "checkpoint_id": "CHECKPOINT-FRESH-CLONE",
+        "after_package_ids": [
+          "WP3",
+          "WP4",
+          "WP5",
+          "WP6"
+        ],
+        "verification_ids": [
+          "GATE-FRESH-CLONE"
+        ],
+        "required_for_merge": true
+      },
+      {
+        "checkpoint_id": "CHECKPOINT-FULL-LOCAL",
+        "after_package_ids": [
+          "WP3",
+          "WP4",
+          "WP5",
+          "WP6"
+        ],
+        "verification_ids": [
+          "GATE-FULL-LOCAL"
+        ],
+        "required_for_merge": true
+      },
+      {
+        "checkpoint_id": "CHECKPOINT-INDEPENDENT-REVIEW",
+        "after_package_ids": [
+          "WP3",
+          "WP4",
+          "WP5",
+          "WP6"
+        ],
+        "verification_ids": [
+          "GATE-INDEPENDENT-REVIEW"
+        ],
+        "required_for_merge": true
+      },
+      {
+        "checkpoint_id": "CHECKPOINT-INTEGRATION",
+        "after_package_ids": [
+          "WP3",
+          "WP4",
+          "WP5",
+          "WP6"
+        ],
+        "verification_ids": [
+          "GATE-INTEGRATION"
+        ],
+        "required_for_merge": true
+      },
+      {
+        "checkpoint_id": "CHECKPOINT-MERGE-REFRESH",
+        "after_package_ids": [
+          "WP3",
+          "WP4",
+          "WP5",
+          "WP6"
+        ],
+        "verification_ids": [
+          "GATE-MERGE-REFRESH"
+        ],
+        "required_for_merge": true
+      }
+    ]
+  },
+  "unresolved_decisions": [],
+  "human_approvals": [],
+  "blockers": [],
+  "schema_version": "1.2.0",
+  "artifact_type": "work_package_plan",
+  "program": "ask_work_package_plan",
+  "plan_id": "WPP-6f1ea8476454bf3f97969d36",
+  "digest_contract": {
+    "algorithm": "sha256",
+    "canonicalization": "sorted_key_canonical_json",
+    "excluded_field": "plan_digest"
+  },
+  "plan_digest": "sha256:15adac3986e07a1fe230df472180c31cabd7bc1aaee3001e52df15afd0643cdf"
+}

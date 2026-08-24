@@ -24,6 +24,9 @@ jobs:
       - name: Run autonomous development control tests
         run: node scripts/test-ask-autonomous-development.mjs
 
+      - name: Run epic admission and Work Package Plan contract tests
+        run: node scripts/test-epic-admission-work-package-plan.mjs
+
       - name: Run portfolio catalog tests
         run: node scripts/test-ask-benchmark-portfolio-catalog.mjs
 
@@ -113,6 +116,9 @@ jobs:
 
       - name: Validate repository consistency
         run: node scripts/validate-repo.mjs
+
+      - name: Check adapter runtime bundle freshness
+        run: node scripts/adapter-runtime-bundle.mjs --check
 
       - name: Check whitespace errors
         run: |

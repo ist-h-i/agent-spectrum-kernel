@@ -1,0 +1,571 @@
+{
+  "schema_version": "1.1.0",
+  "cases": [
+    {
+      "case_id": "POS-SMALL-ORDINARY",
+      "domain": "admission",
+      "expected_decision": "ordinary_execution_allowed",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-CONFIGURED-EPIC",
+      "domain": "admission",
+      "expected_decision": "work_package_plan_required",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-CONFIGURED-EPIC-ONLY",
+      "domain": "admission",
+      "expected_decision": "work_package_plan_required",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-MULTI-BOUNDARY-THRESHOLD-ONLY",
+      "domain": "admission",
+      "expected_decision": "work_package_plan_required",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-ORDERED-DEPENDENCY-ONLY",
+      "domain": "admission",
+      "expected_decision": "work_package_plan_required",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-INDEPENDENT-PUBLICATION-ONLY",
+      "domain": "admission",
+      "expected_decision": "work_package_plan_required",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-SCOPE-HUMAN-DECISION",
+      "domain": "admission",
+      "expected_decision": "human_decision_required",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-VALID-MULTI-PACKAGE",
+      "domain": "plan",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-VALID-SHARED-OWNERSHIP",
+      "domain": "plan",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-PLAN-DERIVED-STACK-ORDER",
+      "domain": "plan-context",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-INDEPENDENT-PUBLICATION-CONSOLIDATED",
+      "domain": "plan-context",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-TRUSTED-HUMAN-APPROVAL",
+      "domain": "plan-context",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-LIFECYCLE-WORK-PACKAGE-PROJECTION",
+      "domain": "lifecycle",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-OBSERVED-ARTIFACT-CLOSURE",
+      "domain": "plan-publication",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-EXPLICIT-OVERRIDE",
+      "domain": "admission",
+      "expected_decision": "ordinary_execution_allowed",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-DETERMINISTIC-IDENTITY",
+      "domain": "identity",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "POS-REVISION-ONE-TO-TWO",
+      "domain": "plan-lineage",
+      "expected_issue_codes": []
+    },
+    {
+      "case_id": "NEG-SMALL-FALSE-EPIC",
+      "domain": "admission",
+      "expected_issue_codes": ["ADMISSION_DECISION_MISMATCH", "DECISION_RECOMPUTATION_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-AI-ESTIMATE-SOLE-BLOCK",
+      "domain": "admission",
+      "expected_issue_codes": ["AI_ESTIMATE_SOLE_AUTHORITY", "DECISION_RECOMPUTATION_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-EVIDENCE-REF-BLANK",
+      "domain": "admission",
+      "expected_issue_codes": ["ADMISSION_EVIDENCE_REF_INVALID"]
+    },
+    {
+      "case_id": "NEG-EVALUATION-INPUT-COUNT",
+      "domain": "admission-evaluation-input",
+      "expected_issue_codes": ["SCHEMA_INVALID"],
+      "expected_issue_paths": ["$.observed_signals.acceptance_condition_count.value"]
+    },
+    {
+      "case_id": "NEG-EVALUATION-INPUT-EVIDENCE",
+      "domain": "admission-evaluation-input",
+      "expected_issue_codes": ["ADMISSION_EVIDENCE_REF_INVALID"],
+      "expected_issue_paths": ["$.observed_signals.configured_epic.evidence_ref"]
+    },
+    {
+      "case_id": "NEG-EVALUATION-INPUT-SCOPE",
+      "domain": "admission-evaluation-input",
+      "expected_issue_codes": ["SCHEMA_INVALID"],
+      "expected_issue_paths": ["$.observed_signals.scope_resolution.value"]
+    },
+    {
+      "case_id": "NEG-POLICY-UNKNOWN-SCOPE-FAIL-OPEN",
+      "domain": "admission-policy",
+      "expected_issue_codes": ["POLICY_HUMAN_STATE_COVERAGE"]
+    },
+    {
+      "case_id": "NEG-OVERRIDE-REASON",
+      "domain": "admission",
+      "expected_issue_codes": ["DECISION_RECOMPUTATION_MISMATCH", "OVERRIDE_REASON_MISSING"]
+    },
+    {
+      "case_id": "NEG-OVERRIDE-AUTHORITY",
+      "domain": "admission",
+      "expected_issue_codes": ["DECISION_RECOMPUTATION_MISMATCH", "OVERRIDE_AUTHORITY_INVALID"]
+    },
+    {
+      "case_id": "NEG-OVERRIDE-AUTHORITY-REF",
+      "domain": "admission",
+      "expected_issue_codes": ["DECISION_RECOMPUTATION_MISMATCH", "OVERRIDE_AUTHORITY_INVALID"]
+    },
+    {
+      "case_id": "NEG-OVERRIDE-GRANT",
+      "domain": "admission",
+      "expected_issue_codes": ["DECISION_RECOMPUTATION_MISMATCH", "OVERRIDE_AUTHORITY_INVALID"]
+    },
+    {
+      "case_id": "NEG-OVERRIDE-GRANT-EVIDENCE-BLANK",
+      "domain": "admission-policy",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "NEG-OVERRIDE-BASIS-REPLAY",
+      "domain": "admission",
+      "expected_issue_codes": ["DECISION_RECOMPUTATION_MISMATCH", "OVERRIDE_AUTHORITY_INVALID"]
+    },
+    {
+      "case_id": "NEG-OVERRIDE-NOT-REQUESTED-PAYLOAD",
+      "domain": "admission",
+      "expected_issue_codes": ["OVERRIDE_NOT_REQUESTED_PAYLOAD"]
+    },
+    {
+      "case_id": "NEG-OVERRIDE-POLICY",
+      "domain": "admission",
+      "expected_issue_codes": ["DECISION_RECOMPUTATION_MISMATCH", "OVERRIDE_POLICY_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-OVERRIDE-BOUNDARY",
+      "domain": "admission",
+      "expected_issue_codes": ["DECISION_RECOMPUTATION_MISMATCH", "OVERRIDE_AUTHORITY_BOUNDARY", "OVERRIDE_AUTHORITY_INVALID"]
+    },
+    {
+      "case_id": "NEG-PACKAGE-ID-MISSING",
+      "domain": "plan",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "NEG-PACKAGE-ID-DUPLICATE",
+      "domain": "plan",
+      "expected_issue_codes": ["PACKAGE_ID_DUPLICATE"]
+    },
+    {
+      "case_id": "NEG-DAG-CYCLE",
+      "domain": "plan",
+      "expected_issue_codes": ["DEPENDENCY_CYCLE", "DEPENDENCY_ORDER_IMPOSSIBLE"]
+    },
+    {
+      "case_id": "NEG-DEPENDENCY-UNKNOWN",
+      "domain": "plan",
+      "expected_issue_codes": ["DEPENDENCY_TARGET_MISSING", "STACK_DEPENDENCY_CLOSURE_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-DEPENDENCY-TARGET-MISSING",
+      "domain": "plan",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "NEG-AC-UNCOVERED",
+      "domain": "plan",
+      "expected_issue_codes": ["AC_UNCOVERED"]
+    },
+    {
+      "case_id": "NEG-AC-CONFLICT",
+      "domain": "plan",
+      "expected_issue_codes": ["AC_OWNERSHIP_CONFLICT"]
+    },
+    {
+      "case_id": "NEG-AC-OWNER-UNKNOWN",
+      "domain": "plan",
+      "expected_issue_codes": ["AC_OWNER_UNKNOWN"]
+    },
+    {
+      "case_id": "NEG-AC-SHARED-AMBIGUOUS",
+      "domain": "plan",
+      "expected_issue_codes": ["AC_SHARED_OWNERSHIP_AMBIGUOUS"]
+    },
+    {
+      "case_id": "NEG-SCOPE-MISSING",
+      "domain": "plan",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "NEG-SCOPE-OVERLAP",
+      "domain": "plan",
+      "expected_issue_codes": ["SCOPE_ALLOWED_FORBIDDEN_OVERLAP"]
+    },
+    {
+      "case_id": "NEG-SCOPE-PATH-BACKSLASH",
+      "domain": "plan",
+      "expected_issue_codes": ["SCOPE_PATH_INVALID"]
+    },
+    {
+      "case_id": "NEG-SCOPE-PATH-CONTROL",
+      "domain": "plan",
+      "expected_issue_codes": ["SCOPE_PATH_INVALID"]
+    },
+    {
+      "case_id": "NEG-STACK-BASE",
+      "domain": "plan",
+      "expected_issue_codes": ["STACK_BASE_INCOMPATIBLE"]
+    },
+    {
+      "case_id": "NEG-INTEGRATION-ORDER",
+      "domain": "plan",
+      "expected_issue_codes": ["DEPENDENCY_ORDER_IMPOSSIBLE", "INTEGRATION_ORDER_INVALID"]
+    },
+    {
+      "case_id": "NEG-INDEPENDENT-BRANCH",
+      "domain": "plan",
+      "expected_issue_codes": ["PACKAGE_TARGET_BINDING_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-PUBLICATION-UNRECONSTRUCTABLE",
+      "domain": "plan",
+      "expected_issue_codes": ["PUBLICATION_ARTIFACT_COVERAGE_MISMATCH", "REVIEW_CONTENT_COVERAGE_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-REVIEW-UNRECONSTRUCTABLE",
+      "domain": "plan",
+      "expected_issue_codes": ["REVIEW_CONTENT_COVERAGE_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-ARTIFACT-OWNERSHIP-CONFLICT",
+      "domain": "plan",
+      "expected_issue_codes": ["EXPECTED_ARTIFACT_OWNERSHIP_CONFLICT"]
+    },
+    {
+      "case_id": "NEG-WORK-PACKAGE-ARTIFACT-ID-DUPLICATE",
+      "domain": "plan",
+      "expected_issue_codes": ["WORK_PACKAGE_ARTIFACT_ID_DUPLICATE"]
+    },
+    {
+      "case_id": "NEG-TASK-ID-DUPLICATE",
+      "domain": "plan",
+      "expected_issue_codes": ["ORDERED_TASK_ID_DUPLICATE"]
+    },
+    {
+      "case_id": "NEG-STOP-CONDITION-DUPLICATE",
+      "domain": "plan",
+      "expected_issue_codes": ["STOP_CONDITION_CODE_DUPLICATE"]
+    },
+    {
+      "case_id": "NEG-EXPECTED-ARTIFACT-PATH-INVALID",
+      "domain": "plan-scope",
+      "expected_issue_codes": ["EXPECTED_ARTIFACT_PATH_INVALID", "SCOPE_PATH_INVALID"]
+    },
+    {
+      "case_id": "NEG-EXPECTED-ARTIFACT-OUTSIDE-SCOPE",
+      "domain": "plan-scope",
+      "expected_issue_codes": ["EXPECTED_ARTIFACT_OUTSIDE_ALLOWED_SCOPE"]
+    },
+    {
+      "case_id": "NEG-EXPECTED-ARTIFACT-FORBIDDEN",
+      "domain": "plan-scope",
+      "expected_issue_codes": ["EXPECTED_ARTIFACT_IN_FORBIDDEN_SCOPE", "SCOPE_ALLOWED_FORBIDDEN_OVERLAP"]
+    },
+    {
+      "case_id": "NEG-FOCUSED-GATE-MISSING",
+      "domain": "plan",
+      "expected_issue_codes": ["EXPECTED_EVIDENCE_UNBOUND", "FOCUSED_CADENCE_MISSING"]
+    },
+    {
+      "case_id": "NEG-FULL-GATE-PROCEDURE-BLANK",
+      "domain": "plan-context",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "NEG-FULL-GATE-PURPOSE-BLANK",
+      "domain": "plan-context",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "NEG-FULL-CHECKPOINT-MISSING",
+      "domain": "plan",
+      "expected_issue_codes": ["EXPECTED_EVIDENCE_UNBOUND", "FULL_CHECKPOINT_MISSING", "NON_OVERRIDABLE_GATE_MISSING"]
+    },
+    {
+      "case_id": "NEG-HIDDEN-BLOCKER",
+      "domain": "plan-context",
+      "expected_issue_codes": ["CURRENT_BLOCKER_UNRESOLVED", "HIDDEN_BLOCKER"]
+    },
+    {
+      "case_id": "NEG-BLOCKER-STATUS-DOWNGRADE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["BLOCKER_STATUS_MISMATCH", "CURRENT_BLOCKER_UNRESOLVED"]
+    },
+    {
+      "case_id": "NEG-HIDDEN-HUMAN-DECISION",
+      "domain": "plan-context",
+      "expected_issue_codes": ["CURRENT_HUMAN_DECISION_REQUIRED", "HIDDEN_HUMAN_DECISION"]
+    },
+    {
+      "case_id": "NEG-HIDDEN-HUMAN-APPROVAL",
+      "domain": "plan-context",
+      "expected_issue_codes": ["CURRENT_HUMAN_APPROVAL_UNRESOLVED", "HIDDEN_HUMAN_APPROVAL"]
+    },
+    {
+      "case_id": "NEG-BLOCKER-ID-DUPLICATE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PLAN_BLOCKER_DUPLICATE"]
+    },
+    {
+      "case_id": "NEG-DECISION-ID-DUPLICATE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PLAN_HUMAN_DECISION_DUPLICATE"]
+    },
+    {
+      "case_id": "NEG-APPROVAL-ID-DUPLICATE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PLAN_HUMAN_APPROVAL_DUPLICATE"]
+    },
+    {
+      "case_id": "NEG-APPROVAL-AUTHORITY-MISSING",
+      "domain": "plan-context",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "NEG-APPROVAL-AUTHORITY-MISMATCH",
+      "domain": "plan-context",
+      "expected_issue_codes": ["HUMAN_APPROVAL_AUTHORITY_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-APPROVAL-STATUS-SELF-ASSERTED",
+      "domain": "plan-context",
+      "expected_issue_codes": ["CURRENT_HUMAN_APPROVAL_UNRESOLVED", "HUMAN_APPROVAL_AUTHORITY_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-DIGEST-TAMPER",
+      "domain": "identity",
+      "expected_issue_codes": ["PLAN_DIGEST_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-IDENTITY-TAMPER",
+      "domain": "identity",
+      "expected_issue_codes": ["DECISION_DIGEST_MISMATCH", "DECISION_IDENTITY_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-STALE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PLAN_STALE"]
+    },
+    {
+      "case_id": "NEG-PLAN-CONTENT-STALE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PLAN_CONTENT_BINDING_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-GATE-DEFINITION-WEAKENED",
+      "domain": "plan-context",
+      "expected_issue_codes": ["NON_OVERRIDABLE_GATE_DEFINITION_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-ADMISSION-AC-COUNT-STALE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["ADMISSION_ACCEPTANCE_COUNT_MISMATCH", "ADMISSION_ACCEPTANCE_REGISTRY_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-ADMISSION-AC-REGISTRY-STALE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["ADMISSION_ACCEPTANCE_REGISTRY_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-ORDERED-DEPENDENCY-SIGNAL-MISMATCH",
+      "domain": "plan-context",
+      "expected_issue_codes": ["ADMISSION_ORDERED_DEPENDENCY_MISMATCH", "STACK_DEPENDENCY_CLOSURE_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-STACK-DEPENDENCY-CLOSURE",
+      "domain": "plan-context",
+      "expected_issue_codes": ["STACK_DEPENDENCY_CLOSURE_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-REVISION-ONE-LINEAGE-PAYLOAD",
+      "domain": "plan-context",
+      "expected_issue_codes": ["REVISION_LINEAGE_UNEXPECTED"]
+    },
+    {
+      "case_id": "NEG-LIFECYCLE-PROJECTION-DRIFT",
+      "domain": "lifecycle",
+      "expected_issue_codes": ["LIFECYCLE_PROJECTION_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-PLAN-CONTENT-MISMATCH",
+      "domain": "plan-context",
+      "expected_issue_codes": ["PREVIOUS_PLAN_CONTENT_BINDING_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-OBSERVED-ARTIFACT-MISSING",
+      "domain": "plan-publication",
+      "expected_issue_codes": ["OBSERVED_ARTIFACT_MISSING"]
+    },
+    {
+      "case_id": "NEG-OBSERVED-ARTIFACT-UNPLANNED",
+      "domain": "plan-publication",
+      "expected_issue_codes": ["OBSERVED_ARTIFACT_UNPLANNED"]
+    },
+    {
+      "case_id": "NEG-CROSS-PLAN",
+      "domain": "plan",
+      "expected_issue_codes": ["PACKAGE_PLAN_BINDING_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-CROSS-REPOSITORY",
+      "domain": "plan",
+      "expected_issue_codes": ["PACKAGE_TARGET_BINDING_MISMATCH"]
+    },
+    {
+      "case_id": "NEG-PARTIAL",
+      "domain": "schema",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "NEG-PROPOSED-NOT-EXECUTABLE",
+      "domain": "plan-lifecycle",
+      "expected_issue_codes": ["PLAN_NOT_EXECUTABLE"]
+    },
+    {
+      "case_id": "NEG-EXECUTABLE-OPEN-BLOCKER",
+      "domain": "plan-lifecycle",
+      "expected_issue_codes": ["OPEN_BLOCKER_IN_EXECUTABLE_PLAN"]
+    },
+    {
+      "case_id": "NEG-EXECUTABLE-UNRESOLVED-DECISION",
+      "domain": "plan-lifecycle",
+      "expected_issue_codes": ["UNRESOLVED_HUMAN_DECISION"]
+    },
+    {
+      "case_id": "NEG-EXECUTABLE-APPROVAL-REQUIRED",
+      "domain": "plan-lifecycle",
+      "expected_issue_codes": ["CURRENT_HUMAN_APPROVAL_UNRESOLVED", "HUMAN_APPROVAL_UNRESOLVED"]
+    },
+    {
+      "case_id": "NEG-EXECUTABLE-ADMISSION-HUMAN",
+      "domain": "plan-lifecycle",
+      "expected_issue_codes": ["ADMISSION_HUMAN_DECISION"]
+    },
+    {
+      "case_id": "NEG-DUPLICATE-KEY",
+      "domain": "json",
+      "expected_issue_codes": ["DUPLICATE_JSON_KEY"]
+    },
+    {
+      "case_id": "NEG-UNKNOWN-FIELD",
+      "domain": "schema",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "NEG-UNKNOWN-STATE",
+      "domain": "schema",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "NEG-ADMISSION-DECISION-DEPENDENCY-MALFORMED",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["ADMISSION_DECISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-REVISION-DEPENDENCY-MALFORMED",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-REVISION-ONE-PLAN-LINEAGE-PAYLOAD",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-REVISION-ONE-CONTEXT-LINEAGE-PAYLOAD",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-PLAN-SCHEMA-DOWNGRADE",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-CONTEXT-SCHEMA-DOWNGRADE",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-DECISION-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["ADMISSION_DECISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-HISTORICAL-R1-CONTEXT-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["HISTORICAL_R1_CONTEXT_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-HISTORICAL-R1-PLAN-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["HISTORICAL_R1_PLAN_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-HISTORICAL-R2-CONTEXT-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["HISTORICAL_R2_CONTEXT_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-HISTORICAL-R2-PLAN-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["HISTORICAL_R2_PLAN_INVALID"]
+    },
+    {
+      "case_id": "NEG-POLICY-DEPENDENCY-MALFORMED",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["POLICY_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-POLICY-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["POLICY_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-CATALOG-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["FIXTURE_CATALOG_INVALID"]
+    }
+  ]
+}

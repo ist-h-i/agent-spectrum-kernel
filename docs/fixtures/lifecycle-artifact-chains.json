@@ -71,6 +71,38 @@
         { "id": "SPEC-007B", "type": "spec", "upstream_refs": [], "fields": { "behavior_delta": "export task history", "acceptance_criteria": ["exclude archived tasks"] } },
         { "id": "WP-007", "type": "work_package", "upstream_refs": ["SPEC-007A", "SPEC-007B"], "fields": { "allowed_scope": ["task export"], "forbidden_scope": ["archive policy source"], "ordered_tasks": ["implement export"], "dependencies": ["task history"], "stop_conditions": ["superseding decision evidence becomes stale"], "evidence_expectations": ["focused export test"] }, "deltas": [{ "target_ref": "SPEC-007A", "supersedes_refs": ["SPEC-007A", "SPEC-007B"], "field": "acceptance_criteria", "from": ["include archived tasks"], "to": ["exclude archived tasks"], "reason": "approved Spec B supersedes Spec A", "decision_evidence": "Authoritative: approved spec review #9" }] }
       ]
+    },
+    {
+      "id": "work-package-plan-projection",
+      "expected": "valid",
+      "artifacts": [
+        {
+          "id": "SPEC-WORK-PACKAGE-PLAN-PROJECTION",
+          "type": "spec",
+          "revision": 1,
+          "upstream_refs": [],
+          "fields": {
+            "behavior_delta": "Define a bounded projected Work Package.",
+            "acceptance_criteria": ["The trace-enabled projection preserves revisioned upstream identity."]
+          }
+        },
+        {
+          "id": "WORK-PACKAGE-PLAN-PROJECTION",
+          "type": "work_package",
+          "revision": 3,
+          "upstream_refs": [
+            { "artifact_id": "SPEC-WORK-PACKAGE-PLAN-PROJECTION", "observed_revision": 1 }
+          ],
+          "fields": {
+            "allowed_scope": [{ "kind": "repository_path", "value": "scripts/example.mjs", "match": "exact" }],
+            "forbidden_scope": [{ "kind": "repository_path", "value": "benchmarks", "match": "subtree" }],
+            "ordered_tasks": [{ "task_id": "WP-T1", "description": "Implement the bounded change." }],
+            "dependencies": ["Approved external design prerequisite"],
+            "stop_conditions": [{ "code": "AUTHORITY-CHANGED", "condition": "The approved prerequisite changes." }],
+            "evidence_expectations": ["FOCUSED-WP-CHECK"]
+          }
+        }
+      ]
     }
   ]
 }

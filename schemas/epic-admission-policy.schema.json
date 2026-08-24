@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-spectrum-kernel.local/schemas/epic-admission-policy.schema.json",
+  "title": "ASK Epic Admission Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "program",
+    "policy_id",
+    "policy_revision",
+    "policy_key",
+    "rules",
+    "override_rules",
+    "digest_contract",
+    "policy_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.1.0" },
+    "artifact_type": { "const": "epic_admission_policy" },
+    "program": { "const": "ask_epic_admission" },
+    "policy_id": { "$ref": "#/$defs/stableId" },
+    "policy_revision": { "type": "integer", "minimum": 1 },
+    "policy_key": { "$ref": "#/$defs/stableId" },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configured_epic_goal_ids",
+        "multi_boundary_threshold",
+        "human_decision_scope_states",
+        "accepted_authority_evidence_statuses",
+        "ai_estimates_may_decide",
+        "required_gates_non_overridable"
+      ],
+      "properties": {
+        "configured_epic_goal_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "multi_boundary_threshold": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["acceptance_condition_count", "scope_boundary_count"],
+          "properties": {
+            "acceptance_condition_count": { "type": "integer", "minimum": 1 },
+            "scope_boundary_count": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "human_decision_scope_states": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "enum": ["unresolved", "contradictory", "unknown"] }
+        },
+        "accepted_authority_evidence_statuses": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["verified", "supported"] }
+        },
+        "ai_estimates_may_decide": { "const": false },
+        "required_gates_non_overridable": { "const": true }
+      }
+    },
+    "override_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rule_id",
+          "from_decision",
+          "to_decision",
+          "authority_grants",
+          "non_overridable_reason_codes",
+          "may_weaken_required_gates"
+        ],
+        "properties": {
+          "rule_id": { "$ref": "#/$defs/stableId" },
+          "from_decision": { "$ref": "#/$defs/admissionDecision" },
+          "to_decision": { "$ref": "#/$defs/admissionDecision" },
+          "authority_grants": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/authorityGrant" }
+          },
+          "non_overridable_reason_codes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/stableId" }
+          },
+          "may_weaken_required_gates": { "const": false }
+        }
+      }
+    },
+    "digest_contract": { "$ref": "#/$defs/digestContract" },
+    "policy_digest": { "$ref": "#/$defs/sha256Digest" }
+  },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "\\S" },
+    "stableId": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/#-]*$" },
+    "sha256Digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "repositoryId": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+    "gitObjectId": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "subjectBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_id", "goal_id", "task_id", "base_commit", "base_tree", "branch"],
+      "properties": {
+        "repository_id": { "$ref": "#/$defs/repositoryId" },
+        "goal_id": { "$ref": "#/$defs/stableId" },
+        "task_id": { "$ref": "#/$defs/stableId" },
+        "base_commit": { "$ref": "#/$defs/gitObjectId" },
+        "base_tree": { "$ref": "#/$defs/gitObjectId" },
+        "branch": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "authorityGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grant_id", "authority_kind", "authority_ref", "approval_status", "evidence_ref", "evidence_digest", "subject_binding", "admission_basis_digest"],
+      "properties": {
+        "grant_id": { "$ref": "#/$defs/stableId" },
+        "authority_kind": { "$ref": "#/$defs/stableId" },
+        "authority_ref": { "$ref": "#/$defs/nonEmptyString" },
+        "approval_status": { "const": "approved" },
+        "evidence_ref": { "$ref": "#/$defs/nonEmptyString" },
+        "evidence_digest": { "$ref": "#/$defs/sha256Digest" },
+        "subject_binding": { "$ref": "#/$defs/subjectBinding" },
+        "admission_basis_digest": { "$ref": "#/$defs/sha256Digest" }
+      }
+    },
+    "admissionDecision": {
+      "enum": [
+        "ordinary_execution_allowed",
+        "work_package_plan_required",
+        "human_decision_required"
+      ]
+    },
+    "digestContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "canonicalization", "excluded_field"],
+      "properties": {
+        "algorithm": { "const": "sha256" },
+        "canonicalization": { "const": "sorted_key_canonical_json" },
+        "excluded_field": { "const": "policy_digest" }
+      }
+    }
+  }
+}

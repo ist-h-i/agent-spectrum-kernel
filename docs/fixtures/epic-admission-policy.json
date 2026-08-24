@@ -1,0 +1,50 @@
+{
+  "policy_revision": 1,
+  "policy_key": "ASK-EPIC-ADMISSION-POLICY",
+  "rules": {
+    "configured_epic_goal_ids": [
+      "github:ist-h-i/agent-spectrum-kernel#275"
+    ],
+    "multi_boundary_threshold": {
+      "acceptance_condition_count": 4,
+      "scope_boundary_count": 2
+    },
+    "human_decision_scope_states": [
+      "contradictory",
+      "unknown",
+      "unresolved"
+    ],
+    "accepted_authority_evidence_statuses": [
+      "supported",
+      "verified"
+    ],
+    "ai_estimates_may_decide": false,
+    "required_gates_non_overridable": true
+  },
+  "override_rules": [
+    {
+      "rule_id": "OVERRIDE-PLAN-REQUIREMENT",
+      "from_decision": "work_package_plan_required",
+      "to_decision": "ordinary_execution_allowed",
+      "authority_grants": [],
+      "non_overridable_reason_codes": [
+        "ADMISSION_SIGNAL_INSUFFICIENT",
+        "CONFIGURED_EPIC_SIGNAL_CONTRADICTION",
+        "SCOPE_CONTRADICTORY",
+        "SCOPE_UNKNOWN",
+        "SCOPE_UNRESOLVED"
+      ],
+      "may_weaken_required_gates": false
+    }
+  ],
+  "schema_version": "1.1.0",
+  "artifact_type": "epic_admission_policy",
+  "program": "ask_epic_admission",
+  "policy_id": "EAP-751773caf5530648ac1322be",
+  "digest_contract": {
+    "algorithm": "sha256",
+    "canonicalization": "sorted_key_canonical_json",
+    "excluded_field": "policy_digest"
+  },
+  "policy_digest": "sha256:57931d873c9df64eb4b30accdf0e19b7662751affe0a837a794dc43a64737ecf"
+}
