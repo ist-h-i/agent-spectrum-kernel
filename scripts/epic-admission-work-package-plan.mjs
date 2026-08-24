@@ -86,6 +86,7 @@ const REQUIRED_CASE_IDS = Object.freeze([
   "POS-OBSERVED-ARTIFACT-CLOSURE",
   "POS-EXPLICIT-OVERRIDE",
   "POS-DETERMINISTIC-IDENTITY",
+  "POS-REVISION-ONE-TO-TWO",
   "NEG-SMALL-FALSE-EPIC",
   "NEG-AI-ESTIMATE-SOLE-BLOCK",
   "NEG-EVIDENCE-REF-BLANK",
@@ -1306,8 +1307,8 @@ export function validateWorkPackagePlan(plan, {
     && previousPlan
     && previousContext
     && (
-      !isHistoricalPlanArtifact(previousPlan, { requireSupersedes: true })
-      || !isHistoricalContextArtifact(previousContext, { requireSupersedes: true })
+      !isHistoricalPlanArtifact(previousPlan, { requireSupersedes: previousPlan.plan_revision > 1 })
+      || !isHistoricalContextArtifact(previousContext, { requireSupersedes: previousContext.context_revision > 1 })
     )
   ) {
     return sortedIssues([issue(

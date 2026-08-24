@@ -90,6 +90,11 @@
       "expected_issue_codes": []
     },
     {
+      "case_id": "POS-REVISION-ONE-TO-TWO",
+      "domain": "plan-lineage",
+      "expected_issue_codes": []
+    },
+    {
       "case_id": "NEG-SMALL-FALSE-EPIC",
       "domain": "admission",
       "expected_issue_codes": ["ADMISSION_DECISION_MISMATCH", "DECISION_RECOMPUTATION_MISMATCH"]

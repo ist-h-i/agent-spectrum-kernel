@@ -677,6 +677,65 @@ expectCodes("NEG-STACK-DEPENDENCY-CLOSURE", validatePlanBundle(mutatePlan(canoni
   plan.packages[2].depends_on_package_ids = ["WP3"];
 })));
 {
+  const revisionOneContextDraft = clone(canonical.context);
+  revisionOneContextDraft.context_revision = 1;
+  delete revisionOneContextDraft.supersedes_context_ref;
+  delete revisionOneContextDraft.supersedes_plan_ref;
+  delete revisionOneContextDraft.revision_reason;
+  const revisionOnePlanDraft = clone(canonical.plan);
+  revisionOnePlanDraft.plan_revision = 1;
+  delete revisionOnePlanDraft.supersedes_plan_ref;
+  delete revisionOnePlanDraft.revision_reason;
+  for (const workPackage of revisionOnePlanDraft.packages) {
+    workPackage.revision = 1;
+    workPackage.plan_binding.plan_revision = 1;
+  }
+  const revisionOne = closePlanContextBinding({ ...canonical, context: revisionOneContextDraft }, revisionOnePlanDraft);
+  assert.deepEqual(validateWorkPackagePlan(revisionOne.plan, {
+    policy: revisionOne.policy,
+    decision: revisionOne.decision,
+    context: revisionOne.context,
+  }), [], "a Schema 1.2 revision 1 plan/context pair must be valid without predecessor references");
+
+  const revisionTwoContextDraft = clone(revisionOne.context);
+  revisionTwoContextDraft.context_revision = 2;
+  revisionTwoContextDraft.supersedes_context_ref = {
+    context_id: revisionOne.context.context_id,
+    context_revision: revisionOne.context.context_revision,
+    context_digest: revisionOne.context.context_digest,
+  };
+  revisionTwoContextDraft.supersedes_plan_ref = {
+    plan_id: revisionOne.plan.plan_id,
+    plan_revision: revisionOne.plan.plan_revision,
+    plan_digest: revisionOne.plan.plan_digest,
+  };
+  revisionTwoContextDraft.revision_reason = "Publish the first accepted successor without rewriting revision 1.";
+  const revisionTwoPlanDraft = clone(revisionOne.plan);
+  revisionTwoPlanDraft.plan_revision = 2;
+  revisionTwoPlanDraft.supersedes_plan_ref = {
+    plan_id: revisionOne.plan.plan_id,
+    plan_revision: revisionOne.plan.plan_revision,
+    plan_digest: revisionOne.plan.plan_digest,
+  };
+  revisionTwoPlanDraft.revision_reason = revisionTwoContextDraft.revision_reason;
+  for (const workPackage of revisionTwoPlanDraft.packages) {
+    workPackage.revision = 2;
+    workPackage.plan_binding.plan_revision = 2;
+  }
+  const revisionTwo = closePlanContextBinding({ ...revisionOne, context: revisionTwoContextDraft }, revisionTwoPlanDraft);
+  expectDeterministicIssues(
+    "POS-REVISION-ONE-TO-TWO",
+    () => validateWorkPackagePlan(revisionTwo.plan, {
+      policy: revisionTwo.policy,
+      decision: revisionTwo.decision,
+      context: revisionTwo.context,
+      previousContext: revisionOne.context,
+      previousPlan: revisionOne.plan,
+    }),
+    [],
+  );
+}
+{
   const revisionOne = clone(canonical.context);
   revisionOne.context_revision = 1;
   expectCodes("NEG-REVISION-ONE-LINEAGE-PAYLOAD", validateWorkPackagePlanValidationContext(sealWorkPackagePlanValidationContext(revisionOne), {
