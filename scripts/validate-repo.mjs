@@ -13,6 +13,11 @@ import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-cat
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { validatePortfolioDesignAdmissionArtifacts } from "./ask-benchmark-design-admission.mjs";
 import { validatePortfolioDesignIndependentReview, validatePortfolioDesignReviewedState } from "./ask-benchmark-design-review.mjs";
+import {
+  projectWorkPackagePlanEntryToLifecycleArtifact,
+  validateRepositoryEpicAdmissionWorkPackagePlan,
+  validateWorkPackageLifecycleProjection,
+} from "./epic-admission-work-package-plan.mjs";
 
 const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REQUIRED_SKILL_SIGNALS = [
@@ -72,6 +77,10 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/verification-evidence.schema.json",
   "schemas/verification-evidence-transfer.schema.json",
   "schemas/verification-reuse-plan.schema.json",
+  "schemas/epic-admission-policy.schema.json",
+  "schemas/epic-admission-decision.schema.json",
+  "schemas/work-package-plan-validation-context.schema.json",
+  "schemas/work-package-plan.schema.json",
 ];
 const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
 const ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH = "docs/adapter-runtime-boundary-contract.md";
@@ -134,6 +143,7 @@ const ADAPTER_RUNTIME_RENDERER_REGISTRY = Object.freeze({
 });
 const LIFECYCLE_ARTIFACT_CONTRACT_PATH = "docs/lifecycle-artifact-contract.md";
 const LIFECYCLE_ARTIFACT_FIXTURE_PATH = "docs/fixtures/lifecycle-artifact-chains.json";
+const WORK_PACKAGE_PLAN_FIXTURE_PATH = "docs/fixtures/issue-275-slice-1-work-package-plan.json";
 const LIFECYCLE_TRACEABILITY_CONTRACT_PATH = "docs/lifecycle-traceability-contract.md";
 const LIFECYCLE_TRACEABILITY_FIXTURE_PATH = "docs/fixtures/lifecycle-traceability-chains.json";
 const TRACEABILITY_ARTIFACT_ITEM_KINDS = {
@@ -1966,8 +1976,33 @@ export function inspectLifecycleScenario(scenario) {
     }
     if (seen.has(artifact.id)) issues.push(`duplicate artifact id ${artifact.id}`);
     const refs = Array.isArray(artifact.upstream_refs) ? artifact.upstream_refs : [];
-    for (const ref of refs) {
-      if (!seen.has(ref)) issues.push(`${artifact.id} references missing or downstream artifact ${ref}`);
+    const traceEnabled = Object.hasOwn(artifact, "revision");
+    if (traceEnabled && (!Number.isInteger(artifact.revision) || artifact.revision < 1)) {
+      issues.push(`${artifact.id} trace-enabled artifact requires a positive revision`);
+    }
+    const refIds = refs.map((ref) => {
+      if (traceEnabled) {
+        if (!ref || typeof ref !== "object" || Array.isArray(ref) || typeof ref.artifact_id !== "string" || !ref.artifact_id || !Number.isInteger(ref.observed_revision) || ref.observed_revision < 1) {
+          issues.push(`${artifact.id} trace-enabled upstream ref requires artifact_id and positive observed_revision`);
+          return null;
+        }
+        return ref.artifact_id;
+      }
+      if (typeof ref !== "string" || !ref) {
+        issues.push(`${artifact.id} unversioned upstream refs must be artifact ID strings`);
+        return null;
+      }
+      return ref;
+    });
+    for (const [index, refId] of refIds.entries()) {
+      if (!refId) continue;
+      if (!seen.has(refId)) issues.push(`${artifact.id} references missing or downstream artifact ${refId}`);
+      else if (traceEnabled) {
+        const upstream = seen.get(refId);
+        if (!Number.isInteger(upstream.revision) || upstream.revision !== refs[index].observed_revision) {
+          issues.push(`${artifact.id} upstream ref ${refId} is stale or targets an unversioned artifact`);
+        }
+      }
     }
 
     const fieldSource = artifact.type === "compact" ? artifact.boundaries : artifact.fields;
@@ -1980,7 +2015,8 @@ export function inspectLifecycleScenario(scenario) {
     if (missing.length > 0) issues.push(`${artifact.id} is missing required ${artifact.type} fields: ${missing.join(", ")}`);
 
     const inheritedByField = new Map();
-    for (const ref of refs) {
+    for (const ref of refIds) {
+      if (!ref) continue;
       const upstream = seen.get(ref);
       if (!upstream) continue;
       for (const [field, value] of Object.entries(upstream.effectiveFields)) {
@@ -2014,7 +2050,8 @@ export function inspectLifecycleScenario(scenario) {
       if (!LIFECYCLE_FIELD_OWNERS[artifact.type].includes(field)) {
         issues.push(`${artifact.type} cannot own ${field}`);
       }
-      for (const ref of refs) {
+      for (const ref of refIds) {
+        if (!ref) continue;
         const upstream = seen.get(ref);
         if (upstream && Object.hasOwn(upstream.effectiveFields, field) && !lifecycleValuesEqual(upstream.effectiveFields[field], value)) {
           const hasDelta = deltas.some((delta) => delta.target_ref === ref && delta.field === field && lifecycleValuesEqual(delta.to, value));
@@ -2025,7 +2062,7 @@ export function inspectLifecycleScenario(scenario) {
 
     for (const delta of deltas) {
       const upstream = seen.get(delta.target_ref);
-      if (!upstream || !refs.includes(delta.target_ref)) {
+      if (!upstream || !refIds.includes(delta.target_ref)) {
         issues.push(`${artifact.id} delta target ${delta.target_ref} is not an upstream ref`);
         continue;
       }
@@ -2036,7 +2073,7 @@ export function inspectLifecycleScenario(scenario) {
       }
       if (Array.isArray(delta.supersedes_refs)) {
         for (const ref of delta.supersedes_refs) {
-          if (!refs.includes(ref)) issues.push(`${artifact.id} delta supersedes non-upstream ref ${ref}`);
+          if (!refIds.includes(ref)) issues.push(`${artifact.id} delta supersedes non-upstream ref ${ref}`);
         }
       }
       if (LIFECYCLE_FIELD_OWNERS.requirement.includes(delta.field) && !/^Human-confirmed:|^Authoritative:/.test(delta.decision_evidence ?? "")) {
@@ -2052,7 +2089,7 @@ export function inspectLifecycleScenario(scenario) {
 
 function validateLifecycleArtifactContract(root, manifest, errors) {
   const active = manifest?.name === "agent-spectrum-kernel";
-  const checks = { active, contractPresent: false, fixturePresent: false, skills: [], adapters: [], scenarios: [] };
+  const checks = { active, contractPresent: false, fixturePresent: false, skills: [], adapters: [], scenarios: [], planProjections: [] };
   if (!active) return checks;
 
   checks.contractPresent = existsSync(resolve(root, LIFECYCLE_ARTIFACT_CONTRACT_PATH));
@@ -2109,7 +2146,7 @@ function validateLifecycleArtifactContract(root, manifest, errors) {
     fail(errors, "lifecycle artifact contract", `${LIFECYCLE_ARTIFACT_FIXTURE_PATH} is not valid JSON: ${error.message}`);
     return checks;
   }
-  const requiredScenarios = new Set(["complete", "partial", "compact", "changed-assumption", "contradictory", "conflicting-upstreams", "consecutive-deltas", "superseding-upstreams"]);
+  const requiredScenarios = new Set(["complete", "partial", "compact", "changed-assumption", "contradictory", "conflicting-upstreams", "consecutive-deltas", "superseding-upstreams", "work-package-plan-projection"]);
   for (const scenario of fixture.scenarios ?? []) {
     requiredScenarios.delete(scenario.id);
     const issues = inspectLifecycleScenario(scenario);
@@ -2121,6 +2158,63 @@ function validateLifecycleArtifactContract(root, manifest, errors) {
     if (!ok) fail(errors, "lifecycle artifact contract", `scenario ${scenario.id} did not match expectation: ${issues.join("; ") || "no issues"}`);
   }
   if (requiredScenarios.size > 0) fail(errors, "lifecycle artifact contract", `missing scenarios: ${[...requiredScenarios].join(", ")}`);
+
+  const projectionScenario = fixture.scenarios?.find((scenario) => scenario.id === "work-package-plan-projection");
+  const fixtureProjection = projectionScenario?.artifacts?.find((artifact) => artifact.type === "work_package");
+  const fixtureFieldNames = Object.keys(fixtureProjection?.fields ?? {}).sort();
+  const fixtureHeaderNames = Object.keys(fixtureProjection ?? {}).filter((key) => key !== "fields").sort();
+  try {
+    const plan = JSON.parse(readFileSync(resolve(root, WORK_PACKAGE_PLAN_FIXTURE_PATH), "utf8"));
+    for (const workPackage of plan.packages ?? []) {
+      const projection = projectWorkPackagePlanEntryToLifecycleArtifact(workPackage);
+      const independentlyMaterialized = {
+        id: workPackage.artifact_id,
+        type: workPackage.artifact_type,
+        revision: workPackage.revision,
+        upstream_refs: structuredClone(workPackage.upstream_refs),
+        fields: {
+          allowed_scope: structuredClone(workPackage.allowed_scope),
+          forbidden_scope: structuredClone(workPackage.forbidden_scope),
+          ordered_tasks: structuredClone(workPackage.ordered_tasks),
+          dependencies: structuredClone(workPackage.dependencies),
+          stop_conditions: structuredClone(workPackage.stop_conditions),
+          evidence_expectations: structuredClone(workPackage.expected_evidence_ids),
+        },
+      };
+      const typedIssues = validateWorkPackageLifecycleProjection(workPackage, independentlyMaterialized);
+      const upstreamStubs = projection.upstream_refs.map((reference) => ({
+        id: reference.artifact_id,
+        type: "spec",
+        revision: reference.observed_revision,
+        upstream_refs: [],
+        fields: {
+          behavior_delta: "External trace-enabled authority placeholder for projection validation.",
+          acceptance_criteria: ["The projected Work Package observes this exact artifact revision."],
+        },
+      }));
+      const lifecycleIssues = inspectLifecycleScenario({
+        artifacts: [...upstreamStubs, independentlyMaterialized],
+      });
+      const fieldNames = Object.keys(projection.fields ?? {}).sort();
+      const headerNames = Object.keys(projection).filter((key) => key !== "fields").sort();
+      if (!lifecycleValuesEqual(fieldNames, fixtureFieldNames)) {
+        lifecycleIssues.push(`projection fields differ from fixture contract: ${fieldNames.join(", ")}`);
+      }
+      if (!lifecycleValuesEqual(headerNames, fixtureHeaderNames)) {
+        lifecycleIssues.push(`projection headers differ from fixture contract: ${headerNames.join(", ")}`);
+      }
+      const ok = typedIssues.length === 0 && lifecycleIssues.length === 0;
+      checks.planProjections.push({ packageId: workPackage.package_id, artifactId: projection.id, revision: projection.revision, upstreamRefs: projection.upstream_refs, headerNames, fieldNames, typedIssues, lifecycleIssues, ok });
+      if (!ok) {
+        fail(errors, "lifecycle artifact contract", `plan package ${workPackage.package_id} projection is invalid: ${[
+          ...typedIssues.map((entry) => `${entry.code} ${entry.path}: ${entry.message}`),
+          ...lifecycleIssues,
+        ].join("; ")}`);
+      }
+    }
+  } catch (error) {
+    fail(errors, "lifecycle artifact contract", `${WORK_PACKAGE_PLAN_FIXTURE_PATH} projection validation failed: ${error.message}`);
+  }
   return checks;
 }
 
@@ -3901,7 +3995,28 @@ function validateAdapterGovernance(root, checks, errors) {
   }
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings }) {
+function validateEpicAdmissionWorkPackagePlanContract(root, errors) {
+  const result = validateRepositoryEpicAdmissionWorkPackagePlan({ root });
+  for (const contractIssue of result.issues) {
+    fail(errors, "epic admission and Work Package Plan", `${contractIssue.code} ${contractIssue.path}: ${contractIssue.message}`);
+  }
+  return {
+    valid: result.issues.length === 0,
+    policyId: result.policy?.policy_id ?? "unavailable",
+    decision: result.decision?.effective_decision ?? "unavailable",
+    planId: result.plan?.plan_id ?? "unavailable",
+    planRevision: result.plan?.plan_revision ?? "unavailable",
+    planDigest: result.plan?.plan_digest ?? "unavailable",
+    planContentDigest: result.context?.current_plan_ref?.plan_content_digest ?? "unavailable",
+    supersededPlan: result.plan?.supersedes_plan_ref
+      ? `${result.plan.supersedes_plan_ref.plan_id}@${result.plan.supersedes_plan_ref.plan_revision}`
+      : "none",
+    packageCount: result.plan?.packages?.length ?? 0,
+    caseCount: result.caseCount ?? 0,
+  };
+}
+
+function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, epicAdmissionWorkPackagePlanChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -3915,6 +4030,17 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     "Static packaging checks. This does not prove runtime behavior; it catches drift before use.",
     "",
     "Generated by `node scripts/validate-repo.mjs --write-report`.",
+    "",
+    "## Epic admission and Work Package Plan",
+    "",
+    `- policy, decision, current-context, and plan validation: ${epicAdmissionWorkPackagePlanChecks.valid ? "ok" : "invalid"}`,
+    `- policy ID: ${epicAdmissionWorkPackagePlanChecks.policyId}`,
+    `- effective admission decision: ${epicAdmissionWorkPackagePlanChecks.decision}`,
+    `- current plan: ${epicAdmissionWorkPackagePlanChecks.planId}@${epicAdmissionWorkPackagePlanChecks.planRevision}`,
+    `- current plan digest: ${epicAdmissionWorkPackagePlanChecks.planDigest}`,
+    `- current plan content digest: ${epicAdmissionWorkPackagePlanChecks.planContentDigest}`,
+    `- explicit predecessor: ${epicAdmissionWorkPackagePlanChecks.supersededPlan}`,
+    `- planned packages / fixture cases: ${epicAdmissionWorkPackagePlanChecks.packageCount} / ${epicAdmissionWorkPackagePlanChecks.caseCount}`,
     "",
     "## Adaptive ASK portfolio catalog",
     "",
@@ -4287,6 +4413,7 @@ export function validateRepository(options) {
   const adapterRuntimeProfileChecks = validateAdapterRuntimeProfileContract(root, manifest, errors);
   const lifecycleArtifactChecks = validateLifecycleArtifactContract(root, manifest, errors);
   const lifecycleTraceabilityChecks = validateLifecycleTraceabilityContract(root, manifest, errors);
+  const epicAdmissionWorkPackagePlanChecks = validateEpicAdmissionWorkPackagePlanContract(root, errors);
   const reviewSignalRegistryChecks = validateReviewSignalRegistry(root, manifest, errors);
   const portfolioCatalogChecks = validateAdaptivePortfolioCatalog(root, errors);
   const portfolioPolicyChecks = validateAdaptivePortfolioPolicy(root, errors);
@@ -4296,7 +4423,7 @@ export function validateRepository(options) {
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, epicAdmissionWorkPackagePlanChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

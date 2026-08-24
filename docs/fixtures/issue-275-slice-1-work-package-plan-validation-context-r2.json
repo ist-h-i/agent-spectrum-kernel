@@ -1,0 +1,117 @@
+{
+  "context_revision": 2,
+  "supersedes_context_ref": {
+    "context_id": "WPPC-f504d3b2054304f96ca77de3",
+    "context_revision": 1,
+    "context_digest": "sha256:77d060f40ac11a74f5d9e39bf28f5653ecade591b09bb090b9a42958ec6c11db"
+  },
+  "supersedes_plan_ref": {
+    "plan_id": "WPP-6f1ea8476454bf3f97969d36",
+    "plan_revision": 1,
+    "plan_digest": "sha256:11adfda1e0a27c5aee8460807ef26f77b65ebd13ed26835b9e1e3af7654bb65d"
+  },
+  "revision_reason": "Independent adversarial and test-gap review found that r1 did not bind exact plan meaning or the complete changed-file publication set; r2 preserves r1 and adds explicit content, gate, and artifact inventory authority.",
+  "context_key": "ISSUE-275-SLICE-1-CURRENT-AUTHORITY",
+  "goal_id": "github:ist-h-i/agent-spectrum-kernel#275",
+  "repository": {
+    "repository_id": "ist-h-i/agent-spectrum-kernel",
+    "base_commit": "05dfa851a57b21c628b8b5d83e83115327aff3ed",
+    "base_tree": "96d6b214dbed50be006fbf2ae11f6514a35be09f",
+    "branch": "feat/issue-275-epic-admission-work-package-plan"
+  },
+  "current_policy_ref": {
+    "policy_id": "EAP-751773caf5530648ac1322be",
+    "policy_revision": 1,
+    "policy_digest": "sha256:0d6d2efd10a1fd8629cfe61a22f2cc9c759a2db43612044860d8c930622dbe59"
+  },
+  "current_admission_decision_ref": {
+    "decision_id": "EAD-7508ec8c170c0ebfa5db46cf",
+    "decision_revision": 1,
+    "decision_digest": "sha256:ca92a9877b0c7692bfd33afe1e2dea066e0011084417240c6dec828ccda11343"
+  },
+  "current_plan_ref": {
+    "plan_id": "WPP-6f1ea8476454bf3f97969d36",
+    "plan_revision": 2,
+    "lifecycle_state": "accepted",
+    "plan_content_digest": "sha256:76d8c8843bc87c0ccb7666281ce7873a1a7136e062bf352d041fab46f042473f"
+  },
+  "upstream_artifacts": [
+    {
+      "artifact_id": "ROADMAP-170",
+      "artifact_type": "compact",
+      "revision": 1,
+      "source_ref": "github:ist-h-i/agent-spectrum-kernel#170@2026-08-24",
+      "item_ids": []
+    },
+    {
+      "artifact_id": "SPEC-275-SLICE-1",
+      "artifact_type": "spec",
+      "revision": 1,
+      "source_ref": "github:ist-h-i/agent-spectrum-kernel#275@2026-08-24-slice-1",
+      "item_ids": [
+        "AC-275-S1-01-ORDINARY",
+        "AC-275-S1-02-EPIC",
+        "AC-275-S1-03-OWNERSHIP",
+        "AC-275-S1-04-TOPOLOGY",
+        "AC-275-S1-05-FAIL-CLOSED",
+        "AC-275-S1-06-OVERRIDE",
+        "AC-275-S1-07-LIFECYCLE",
+        "AC-275-S1-08-DOGFOOD",
+        "AC-275-S1-09-EVIDENCE-BOUNDARY"
+      ]
+    }
+  ],
+  "required_full_checkpoint_ids": [
+    "CHECKPOINT-EXACT-HEAD-CI",
+    "CHECKPOINT-FRESH-CLONE",
+    "CHECKPOINT-FULL-LOCAL",
+    "CHECKPOINT-INDEPENDENT-REVIEW",
+    "CHECKPOINT-INTEGRATION",
+    "CHECKPOINT-MERGE-REFRESH"
+  ],
+  "non_overridable_gates": [
+    {
+      "verification_id": "GATE-EXACT-HEAD-CI",
+      "procedure": "Confirm required GitHub Actions succeeded for the exact independently reviewed candidate HEAD.",
+      "purpose": "Confirm required GitHub Actions succeeded for the exact independently reviewed candidate HEAD."
+    },
+    {
+      "verification_id": "GATE-FRESH-CLONE",
+      "procedure": "Run all locally reproducible candidate checks in a fresh detached clone.",
+      "purpose": "Run all locally reproducible candidate checks in a fresh detached clone."
+    },
+    {
+      "verification_id": "GATE-FULL-LOCAL",
+      "procedure": "Run every locally reproducible command from the current pull-request workflow.",
+      "purpose": "Run every locally reproducible command from the current pull-request workflow."
+    },
+    {
+      "verification_id": "GATE-INDEPENDENT-REVIEW",
+      "procedure": "Obtain a fresh exact-head independent decision with zero Blocker and Major findings.",
+      "purpose": "Obtain a fresh exact-head independent decision with zero Blocker and Major findings."
+    },
+    {
+      "verification_id": "GATE-INTEGRATION",
+      "procedure": "Validate the candidate merged with current origin/main in a disposable integration worktree.",
+      "purpose": "Validate the candidate merged with current origin/main in a disposable integration worktree."
+    },
+    {
+      "verification_id": "GATE-MERGE-REFRESH",
+      "procedure": "Refresh PR head, base, mergeability, CI, review and Issue state immediately before merge.",
+      "purpose": "Refresh PR head, base, mergeability, CI, review and Issue state immediately before merge."
+    }
+  ],
+  "known_blockers": [],
+  "required_human_decisions": [],
+  "required_human_approvals": [],
+  "schema_version": "1.1.0",
+  "artifact_type": "work_package_plan_validation_context",
+  "program": "ask_work_package_plan",
+  "context_id": "WPPC-f504d3b2054304f96ca77de3",
+  "digest_contract": {
+    "algorithm": "sha256",
+    "canonicalization": "sorted_key_canonical_json",
+    "excluded_field": "context_digest"
+  },
+  "context_digest": "sha256:e33aebb1eacbeb9edb0dea3a33e252c4e686556677c44c47b013b45894d8bc1e"
+}

@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-spectrum-kernel.local/schemas/work-package-plan-validation-context.schema.json",
+  "title": "ASK Work Package Plan Validation Context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "program",
+    "context_id",
+    "context_revision",
+    "context_key",
+    "goal_id",
+    "repository",
+    "current_policy_ref",
+    "current_admission_decision_ref",
+    "current_plan_ref",
+    "upstream_artifacts",
+    "required_full_checkpoint_ids",
+    "non_overridable_gates",
+    "known_blockers",
+    "required_human_decisions",
+    "required_human_approvals",
+    "digest_contract",
+    "context_digest"
+  ],
+  "allOf": [
+    {
+      "if": { "properties": { "context_revision": { "minimum": 2 } }, "required": ["context_revision"] },
+      "then": { "required": ["supersedes_context_ref", "supersedes_plan_ref", "revision_reason"] }
+    },
+    {
+      "if": { "properties": { "context_revision": { "const": 1 } }, "required": ["context_revision"] },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["supersedes_context_ref"] },
+            { "required": ["supersedes_plan_ref"] },
+            { "required": ["revision_reason"] }
+          ]
+        }
+      }
+    }
+  ],
+  "properties": {
+    "schema_version": { "const": "1.2.0" },
+    "artifact_type": { "const": "work_package_plan_validation_context" },
+    "program": { "const": "ask_work_package_plan" },
+    "context_id": { "$ref": "#/$defs/stableId" },
+    "context_revision": { "type": "integer", "minimum": 1 },
+    "supersedes_context_ref": { "$ref": "#/$defs/contextRef" },
+    "supersedes_plan_ref": { "$ref": "#/$defs/planRef" },
+    "revision_reason": { "$ref": "#/$defs/nonEmptyString" },
+    "context_key": { "$ref": "#/$defs/stableId" },
+    "goal_id": { "$ref": "#/$defs/stableId" },
+    "repository": { "$ref": "#/$defs/repositoryTarget" },
+    "current_policy_ref": { "$ref": "#/$defs/policyRef" },
+    "current_admission_decision_ref": { "$ref": "#/$defs/decisionRef" },
+    "current_plan_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_id", "plan_revision", "lifecycle_state", "plan_content_digest"],
+      "properties": {
+        "plan_id": { "$ref": "#/$defs/stableId" },
+        "plan_revision": { "type": "integer", "minimum": 1 },
+        "lifecycle_state": { "enum": ["proposed", "accepted", "superseded"] },
+        "plan_content_digest": { "$ref": "#/$defs/sha256Digest" }
+      }
+    },
+    "upstream_artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["artifact_id", "artifact_type", "revision", "source_ref", "item_ids"],
+        "properties": {
+          "artifact_id": { "$ref": "#/$defs/stableId" },
+          "artifact_type": { "enum": ["requirement", "spec", "work_package", "verification", "implementation", "compact"] },
+          "revision": { "type": "integer", "minimum": 1 },
+          "source_ref": { "$ref": "#/$defs/nonEmptyString" },
+          "item_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/stableId" }
+          }
+        }
+      }
+    },
+    "required_full_checkpoint_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/stableId" }
+    },
+    "non_overridable_gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/verificationAuthority" }
+    },
+    "known_blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["blocker_id", "status", "description"],
+        "properties": {
+          "blocker_id": { "$ref": "#/$defs/stableId" },
+          "status": { "enum": ["open", "resolved", "unknown"] },
+          "description": { "$ref": "#/$defs/nonEmptyString" }
+        }
+      }
+    },
+    "required_human_decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["decision_id", "description", "authority_kind"],
+        "properties": {
+          "decision_id": { "$ref": "#/$defs/stableId" },
+          "description": { "$ref": "#/$defs/nonEmptyString" },
+          "authority_kind": { "$ref": "#/$defs/stableId" }
+        }
+      }
+    },
+    "required_human_approvals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["approval_id", "description", "authority_kind", "status", "authority_ref", "approval_evidence_ref", "approval_evidence_digest"],
+        "allOf": [
+          {
+            "if": { "properties": { "status": { "const": "approved" } }, "required": ["status"] },
+            "then": {
+              "properties": {
+                "authority_ref": { "$ref": "#/$defs/nonEmptyString" },
+                "approval_evidence_ref": { "$ref": "#/$defs/nonEmptyString" },
+                "approval_evidence_digest": { "$ref": "#/$defs/sha256Digest" }
+              }
+            },
+            "else": {
+              "properties": {
+                "approval_evidence_ref": { "const": null },
+                "approval_evidence_digest": { "const": null }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "approval_id": { "$ref": "#/$defs/stableId" },
+          "description": { "$ref": "#/$defs/nonEmptyString" },
+          "authority_kind": { "$ref": "#/$defs/stableId" },
+          "status": { "enum": ["required", "approved", "rejected", "unknown"] },
+          "authority_ref": { "type": ["string", "null"], "maxLength": 512 },
+          "approval_evidence_ref": { "type": ["string", "null"], "maxLength": 1000 },
+          "approval_evidence_digest": { "anyOf": [{ "$ref": "#/$defs/sha256Digest" }, { "type": "null" }] }
+        }
+      }
+    },
+    "digest_contract": { "$ref": "#/$defs/digestContract" },
+    "context_digest": { "$ref": "#/$defs/sha256Digest" }
+  },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "stableId": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/#-]*$" },
+    "repositoryId": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+    "gitObjectId": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256Digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "repositoryTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_id", "base_commit", "base_tree", "branch"],
+      "properties": {
+        "repository_id": { "$ref": "#/$defs/repositoryId" },
+        "base_commit": { "$ref": "#/$defs/gitObjectId" },
+        "base_tree": { "$ref": "#/$defs/gitObjectId" },
+        "branch": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "policyRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "policy_revision", "policy_digest"],
+      "properties": {
+        "policy_id": { "$ref": "#/$defs/stableId" },
+        "policy_revision": { "type": "integer", "minimum": 1 },
+        "policy_digest": { "$ref": "#/$defs/sha256Digest" }
+      }
+    },
+    "decisionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "decision_revision", "decision_digest"],
+      "properties": {
+        "decision_id": { "$ref": "#/$defs/stableId" },
+        "decision_revision": { "type": "integer", "minimum": 1 },
+        "decision_digest": { "$ref": "#/$defs/sha256Digest" }
+      }
+    },
+    "contextRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context_id", "context_revision", "context_digest"],
+      "properties": {
+        "context_id": { "$ref": "#/$defs/stableId" },
+        "context_revision": { "type": "integer", "minimum": 1 },
+        "context_digest": { "$ref": "#/$defs/sha256Digest" }
+      }
+    },
+    "planRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_id", "plan_revision", "plan_digest"],
+      "properties": {
+        "plan_id": { "$ref": "#/$defs/stableId" },
+        "plan_revision": { "type": "integer", "minimum": 1 },
+        "plan_digest": { "$ref": "#/$defs/sha256Digest" }
+      }
+    },
+    "verificationAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verification_id", "procedure", "purpose"],
+      "properties": {
+        "verification_id": { "$ref": "#/$defs/stableId" },
+        "procedure": { "$ref": "#/$defs/nonEmptyString" },
+        "purpose": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "digestContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "canonicalization", "excluded_field"],
+      "properties": {
+        "algorithm": { "const": "sha256" },
+        "canonicalization": { "const": "sorted_key_canonical_json" },
+        "excluded_field": { "const": "context_digest" }
+      }
+    }
+  }
+}

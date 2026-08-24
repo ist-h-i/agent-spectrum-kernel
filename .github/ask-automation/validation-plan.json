@@ -26,6 +26,10 @@
       "argv": ["node", "scripts/test-validate-repo.mjs"]
     },
     {
+      "id": "epic_admission_work_package_plan",
+      "argv": ["node", "scripts/test-epic-admission-work-package-plan.mjs"]
+    },
+    {
       "id": "portfolio_catalog",
       "argv": ["node", "scripts/test-ask-benchmark-portfolio-catalog.mjs"]
     },

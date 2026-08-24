@@ -263,6 +263,15 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/adaptive-portfolio.config.json",
     "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
     "benchmarks/fixtures/checkpoint-b2/mn-build-option-update",
+    "docs/fixtures/epic-admission-policy.json",
+    "docs/fixtures/epic-admission-work-package-plan-cases.json",
+    "docs/fixtures/issue-275-slice-1-epic-admission-decision.json",
+    "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r1.json",
+    "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r2.json",
+    "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context.json",
+    "docs/fixtures/issue-275-slice-1-work-package-plan-r1.json",
+    "docs/fixtures/issue-275-slice-1-work-package-plan-r2.json",
+    "docs/fixtures/issue-275-slice-1-work-package-plan.json",
     "scripts/ask-benchmark-portfolio-repetition-report.mjs",
     "scripts/ask-benchmark-portfolio-paired-comparison-report.mjs",
     "scripts/ask-benchmark-portfolio-directional-outcome-report.mjs",
@@ -331,6 +340,10 @@ function writeAdapterFixture(root) {
     "schemas/verification-evidence.schema.json",
     "schemas/verification-evidence-transfer.schema.json",
     "schemas/verification-reuse-plan.schema.json",
+    "schemas/epic-admission-policy.schema.json",
+    "schemas/epic-admission-decision.schema.json",
+    "schemas/work-package-plan-validation-context.schema.json",
+    "schemas/work-package-plan.schema.json",
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
