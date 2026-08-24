@@ -118,21 +118,22 @@ Expected evidence is a proof obligation only. Executed results, producer authori
 
 ### Executability and fail-closed behavior
 
-An `accepted` plan is invalid while it or the trusted context contains an unresolved or unknown human decision, a non-approved human approval, an open or unknown blocker, or an admission decision that still requires a human. Approval status and immutable evidence must exactly mirror the context. Missing/unknown fields, malformed or partial artifacts, identity/digest mismatch, stale context, and semantic contradictions return fixed-order typed issues.
+An `accepted` plan is invalid while it or the trusted context contains an unresolved or unknown human decision, a non-approved human approval, an open or unknown blocker, or an admission decision that still requires a human. Approval status and immutable evidence must exactly mirror the context. Before computing an admission outcome, `evaluateEpicAdmission` applies the closed decision input Schema plus non-whitespace authority-reference checks to caller-supplied subject, signals, revision, and override request. Invalid input throws `EPIC_ADMISSION_INPUT_INVALID` with sorted `{ code, path, message }` issues; it cannot produce an allowed decision that a caller might consume before validation. Missing/unknown fields, malformed or partial artifacts, identity/digest mismatch, stale context, and semantic contradictions return fixed-order typed issues.
 
 The validator pipeline is:
 
 1. bounded stable read with duplicate-key rejection;
 2. closed Schema validation;
-3. current policy/decision/context binding;
-4. deterministic ID, digest, exact-content, revision-lineage, and canonical-order validation;
-5. policy recomputation and override checks;
-6. package/DAG/integration validation;
-7. current AC closure and ownership validation;
-8. scope overlap validation;
-9. stack, publication, and review reconstruction;
-10. focused/full verification closure;
-11. blocker, human-decision, approval, and lifecycle checks.
+3. evaluator input preflight and current policy/decision/context binding;
+4. pinned canonical digest, repository-byte hash, and r1-to-r2 lineage validation;
+5. deterministic current ID, digest, exact-content, revision-lineage, and canonical-order validation;
+6. policy recomputation and override checks;
+7. package/DAG/integration validation;
+8. current AC closure and ownership validation;
+9. scope overlap validation;
+10. stack, publication, and review reconstruction;
+11. focused/full verification closure;
+12. blocker, human-decision, approval, and lifecycle checks.
 
 Issues use `{ code, path, message }` and sort by code, path, then message. Unknown input never becomes success.
 
@@ -159,7 +160,7 @@ They were not rewritten. The accepted r2 plan/context are likewise preserved at:
 
 R2 is `WPP-6f1ea8476454bf3f97969d36@2` with digest `sha256:e97a2ef854ab5350d11ca00e305aaf44eb01939744500513bfee313ff94b8e3f`. A second review found material authority and lifecycle compatibility gaps: approval outcome was not context-owned, and the aggregate omitted a deterministic lifecycle Work Package projection. Those findings required an explicit successor rather than rewriting r2.
 
-The current accepted artifact is `WPP-6f1ea8476454bf3f97969d36@3` with digest `sha256:15adac3986e07a1fe230df472180c31cabd7bc1aaee3001e52df15afd0643cdf`. It binds exact-basis approved authority grants, context-owned approval evidence, distinct lifecycle dependencies, revision-preserving projection fixtures, and the 34-path publication/review inventory. Historical r1 and r2 remain audit evidence under the earlier `1.0.0` and `1.1.0` contracts; current repository mutation uses only the validated `1.2.0` r3 artifact.
+The current accepted artifact is `WPP-6f1ea8476454bf3f97969d36@3` with digest `sha256:15adac3986e07a1fe230df472180c31cabd7bc1aaee3001e52df15afd0643cdf`. It binds exact-basis approved authority grants, context-owned approval evidence, distinct lifecycle dependencies, revision-preserving projection fixtures, and the 34-path publication/review inventory. Historical r1 and r2 remain audit evidence under the earlier `1.0.0` and `1.1.0` contracts; the repository validator pins both their embedded and recomputed canonical digests, exact checked-in byte hashes, pair bindings, stable identities, and r1-to-r2 supersession references. Current repository mutation uses only the validated `1.2.0` r3 artifact.
 
 ## Non-equivalences and deferred scope
 

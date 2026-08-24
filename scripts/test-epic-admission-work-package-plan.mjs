@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -68,6 +69,31 @@ function expectCodes(caseId, issues) {
   assert.ok(expectedById.has(caseId), `unknown fixture case ${caseId}`);
   executedCaseIds.add(caseId);
   assert.deepEqual(codes(issues), expectedById.get(caseId).expected_issue_codes, caseId);
+}
+
+function expectEvaluationInputError(caseId, evaluate) {
+  assert.ok(expectedById.has(caseId), `unknown fixture case ${caseId}`);
+  let caught = null;
+  try {
+    evaluate();
+  } catch (error) {
+    caught = error;
+  }
+  assert.ok(caught, `${caseId} must fail before producing an admission decision`);
+  assert.equal(caught.code, "EPIC_ADMISSION_INPUT_INVALID", `${caseId} must expose a typed evaluator input error`);
+  assert.deepEqual(codes(caught.issues), expectedById.get(caseId).expected_issue_codes, caseId);
+  assert.deepEqual(caught.issues.map((entry) => entry.path), expectedById.get(caseId).expected_issue_paths, caseId);
+  executedCaseIds.add(caseId);
+}
+
+function canonicalDigestExcluding(value, digestField) {
+  const content = clone(value);
+  delete content[digestField];
+  return canonicalDigest(content);
+}
+
+function rawDigest(path) {
+  return `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`;
 }
 
 function closePlanContextBinding(bundle, inputPlan) {
@@ -162,8 +188,18 @@ for (const [key, path] of checkedArtifacts) {
 }
 assert.equal(canonical.previousContext.context_digest, "sha256:e33aebb1eacbeb9edb0dea3a33e252c4e686556677c44c47b013b45894d8bc1e");
 assert.equal(canonical.previousPlan.plan_digest, "sha256:e97a2ef854ab5350d11ca00e305aaf44eb01939744500513bfee313ff94b8e3f");
-assert.equal(readJsonFileStrict(resolve(root, "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r1.json"), "historical r1 context").context_digest, "sha256:77d060f40ac11a74f5d9e39bf28f5653ecade591b09bb090b9a42958ec6c11db");
-assert.equal(readJsonFileStrict(resolve(root, "docs/fixtures/issue-275-slice-1-work-package-plan-r1.json"), "historical r1 plan").plan_digest, "sha256:11adfda1e0a27c5aee8460807ef26f77b65ebd13ed26835b9e1e3af7654bb65d");
+const historicalPins = [
+  ["docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r1.json", "context_digest", "sha256:77d060f40ac11a74f5d9e39bf28f5653ecade591b09bb090b9a42958ec6c11db", "sha256:0d1de9f8979799c16fd7ed8ea677e360d74dd3a980a3eab58f73a9e6afb51236"],
+  ["docs/fixtures/issue-275-slice-1-work-package-plan-r1.json", "plan_digest", "sha256:11adfda1e0a27c5aee8460807ef26f77b65ebd13ed26835b9e1e3af7654bb65d", "sha256:c65c703eb760467289847364d6dcb68c0bcc863ae091a641d892550e3a815437"],
+  ["docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r2.json", "context_digest", "sha256:e33aebb1eacbeb9edb0dea3a33e252c4e686556677c44c47b013b45894d8bc1e", "sha256:e8d28d9b431d3118563d2db44f8eeeb56851678f3fc9163aeb485b8df3de0d3b"],
+  ["docs/fixtures/issue-275-slice-1-work-package-plan-r2.json", "plan_digest", "sha256:e97a2ef854ab5350d11ca00e305aaf44eb01939744500513bfee313ff94b8e3f", "sha256:545a7d08d055c1e99e95d9b49fca4e26021945328865b686febe94b276c275b4"],
+];
+for (const [path, digestField, expectedCanonicalDigest, expectedRawDigest] of historicalPins) {
+  const artifact = readJsonFileStrict(resolve(root, path), `historical artifact ${path}`);
+  assert.equal(artifact[digestField], expectedCanonicalDigest, `${path} must retain its pinned stored digest`);
+  assert.equal(canonicalDigestExcluding(artifact, digestField), expectedCanonicalDigest, `${path} content must recompute to its pinned digest`);
+  assert.equal(rawDigest(resolve(root, path)), expectedRawDigest, `${path} must retain its pinned repository bytes`);
+}
 
 const rebuilt = buildIssue275PlanBundle();
 assert.equal(stableCanonicalJson(rebuilt), stableCanonicalJson(canonical), "repeated builds must be canonical-byte equivalent");
@@ -308,6 +344,19 @@ for (const caseId of ["NEG-SMALL-FALSE-EPIC", "NEG-AI-ESTIMATE-SOLE-BLOCK"]) {
   const invalid = clone(canonical.decision);
   invalid.observed_signals.configured_epic.evidence_ref = " ";
   expectCodes("NEG-EVIDENCE-REF-BLANK", validateEpicAdmissionDecision(sealEpicAdmissionDecision(invalid), { policy: canonical.policy }));
+}
+for (const [caseId, mutate] of [
+  ["NEG-EVALUATION-INPUT-COUNT", (signals) => { signals.acceptance_condition_count.value = -1; }],
+  ["NEG-EVALUATION-INPUT-EVIDENCE", (signals) => { signals.configured_epic.evidence_ref = " "; }],
+  ["NEG-EVALUATION-INPUT-SCOPE", (signals) => { signals.scope_resolution.value = "invalid"; }],
+]) {
+  const signals = buildObservedSignals("small");
+  mutate(signals);
+  expectEvaluationInputError(caseId, () => evaluateEpicAdmission({
+    policy: resealedSmallPolicy,
+    subject: buildEpicAdmissionSubject({ goal_id: "github:ist-h-i/agent-spectrum-kernel#evaluation-input-fixture", task_id: caseId }),
+    observed_signals: signals,
+  }));
 }
 {
   const invalid = clone(canonical.policy);

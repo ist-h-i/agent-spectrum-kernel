@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -24,9 +25,38 @@ const DEFAULT_PATHS = Object.freeze({
   decision: "docs/fixtures/issue-275-slice-1-epic-admission-decision.json",
   context: "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context.json",
   plan: "docs/fixtures/issue-275-slice-1-work-package-plan.json",
+  firstContext: "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r1.json",
+  firstPlan: "docs/fixtures/issue-275-slice-1-work-package-plan-r1.json",
   previousContext: "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r2.json",
   previousPlan: "docs/fixtures/issue-275-slice-1-work-package-plan-r2.json",
   cases: "docs/fixtures/epic-admission-work-package-plan-cases.json",
+});
+
+const HISTORICAL_ARTIFACT_PINS = Object.freeze({
+  firstContext: Object.freeze({
+    label: "r1 context",
+    digestField: "context_digest",
+    canonicalDigest: "sha256:77d060f40ac11a74f5d9e39bf28f5653ecade591b09bb090b9a42958ec6c11db",
+    rawDigest: "sha256:0d1de9f8979799c16fd7ed8ea677e360d74dd3a980a3eab58f73a9e6afb51236",
+  }),
+  firstPlan: Object.freeze({
+    label: "r1 plan",
+    digestField: "plan_digest",
+    canonicalDigest: "sha256:11adfda1e0a27c5aee8460807ef26f77b65ebd13ed26835b9e1e3af7654bb65d",
+    rawDigest: "sha256:c65c703eb760467289847364d6dcb68c0bcc863ae091a641d892550e3a815437",
+  }),
+  previousContext: Object.freeze({
+    label: "r2 context",
+    digestField: "context_digest",
+    canonicalDigest: "sha256:e33aebb1eacbeb9edb0dea3a33e252c4e686556677c44c47b013b45894d8bc1e",
+    rawDigest: "sha256:e8d28d9b431d3118563d2db44f8eeeb56851678f3fc9163aeb485b8df3de0d3b",
+  }),
+  previousPlan: Object.freeze({
+    label: "r2 plan",
+    digestField: "plan_digest",
+    canonicalDigest: "sha256:e97a2ef854ab5350d11ca00e305aaf44eb01939744500513bfee313ff94b8e3f",
+    rawDigest: "sha256:545a7d08d055c1e99e95d9b49fca4e26021945328865b686febe94b276c275b4",
+  }),
 });
 
 const AUTHORITY_SIGNAL_NAMES = Object.freeze([
@@ -59,6 +89,9 @@ const REQUIRED_CASE_IDS = Object.freeze([
   "NEG-SMALL-FALSE-EPIC",
   "NEG-AI-ESTIMATE-SOLE-BLOCK",
   "NEG-EVIDENCE-REF-BLANK",
+  "NEG-EVALUATION-INPUT-COUNT",
+  "NEG-EVALUATION-INPUT-EVIDENCE",
+  "NEG-EVALUATION-INPUT-SCOPE",
   "NEG-POLICY-UNKNOWN-SCOPE-FAIL-OPEN",
   "NEG-OVERRIDE-REASON",
   "NEG-OVERRIDE-AUTHORITY",
@@ -394,6 +427,93 @@ export function deriveEpicAdmissionOverrideBasisDigest({
   });
 }
 
+const OVERRIDE_REQUEST_FIELDS = Object.freeze([
+  "rule_id",
+  "requested_decision",
+  "reason",
+  "authority_grant_id",
+  "authority_ref",
+  "authority_kind",
+]);
+
+function admissionEvaluationInputIssues({ policy, subject, observedSignals, overrideRequest, decisionRevision }) {
+  const issues = [];
+  const requestIsObject = overrideRequest !== null && typeof overrideRequest === "object" && !Array.isArray(overrideRequest);
+  if (overrideRequest !== null && !requestIsObject) {
+    issues.push(issue("SCHEMA_INVALID", "$.override_request", "override request must be an object or null"));
+  }
+  if (requestIsObject) {
+    for (const key of Object.keys(overrideRequest)) {
+      if (!OVERRIDE_REQUEST_FIELDS.includes(key)) {
+        issues.push(issue("SCHEMA_INVALID", `$.override_request.${key}`, "override request contains an unknown field"));
+      }
+    }
+  }
+
+  const override = requestIsObject
+    ? {
+        state: "rejected",
+        rule_id: overrideRequest.rule_id ?? null,
+        requested_decision: overrideRequest.requested_decision ?? null,
+        reason: overrideRequest.reason ?? null,
+        authority_grant_id: overrideRequest.authority_grant_id ?? null,
+        authority_ref: overrideRequest.authority_ref ?? null,
+        authority_kind: overrideRequest.authority_kind ?? null,
+      }
+    : {
+        state: "not_requested",
+        rule_id: null,
+        requested_decision: null,
+        reason: null,
+        authority_grant_id: null,
+        authority_ref: null,
+        authority_kind: null,
+      };
+  const probe = {
+    schema_version: EPIC_ADMISSION_SCHEMA_VERSION,
+    artifact_type: "epic_admission_decision",
+    program: EPIC_ADMISSION_PROGRAM,
+    decision_id: "EAD-INPUT-PREFLIGHT",
+    decision_revision: decisionRevision,
+    subject,
+    policy_ref: policyRef(policy),
+    observed_signals: observedSignals,
+    computed_decision: "human_decision_required",
+    effective_decision: "human_decision_required",
+    reason_codes: ["ADMISSION_INPUT_PREFLIGHT"],
+    unresolved_scope: [],
+    blockers: ["ADMISSION_INPUT_PREFLIGHT"],
+    override,
+    digest_contract: {
+      algorithm: "sha256",
+      canonicalization: "sorted_key_canonical_json",
+      excluded_field: "decision_digest",
+    },
+    decision_digest: `sha256:${"0".repeat(64)}`,
+  };
+  issues.push(...schemaIssues(probe, resolve(MODULE_ROOT, DEFAULT_PATHS.decisionSchema)));
+
+  if (subject && typeof subject === "object" && !Array.isArray(subject) && typeof subject.branch === "string" && !subject.branch.trim()) {
+    issues.push(issue("SCHEMA_INVALID", "$.subject.branch", "branch must contain non-whitespace text"));
+  }
+  if (observedSignals && typeof observedSignals === "object" && !Array.isArray(observedSignals)) {
+    for (const [signalName, signalRecord] of Object.entries(observedSignals)) {
+      if (
+        signalRecord
+        && typeof signalRecord === "object"
+        && !Array.isArray(signalRecord)
+        && typeof signalRecord.evidence_ref === "string"
+        && !signalRecord.evidence_ref.trim()
+      ) {
+        issues.push(issue("ADMISSION_EVIDENCE_REF_INVALID", `$.observed_signals.${signalName}.evidence_ref`, "admission evidence references must contain non-whitespace authority text"));
+      }
+    }
+  }
+  return sortedIssues(issues.filter((entry, index, values) => values.findIndex((candidate) => (
+    candidate.code === entry.code && candidate.path === entry.path && candidate.message === entry.message
+  )) === index));
+}
+
 function resolveOverride(policy, subject, computedDecision, baseReasonCodes, request) {
   if (!request) {
     return {
@@ -476,6 +596,13 @@ export function evaluateEpicAdmission({
 }) {
   const policyIssues = validateEpicAdmissionPolicy(policy);
   if (policyIssues.length > 0) throw new Error(`epic admission policy is invalid: ${formatIssues(policyIssues)}`);
+  const inputIssues = admissionEvaluationInputIssues({ policy, subject, observedSignals, overrideRequest, decisionRevision });
+  if (inputIssues.length > 0) {
+    const error = new Error(`epic admission input is invalid: ${formatIssues(inputIssues)}`);
+    error.code = "EPIC_ADMISSION_INPUT_INVALID";
+    error.issues = inputIssues;
+    throw error;
+  }
   const base = admissionReasonState(policy, subject, observedSignals);
   const override = resolveOverride(policy, subject, base.computedDecision, base.reasonCodes, overrideRequest
     ? { ...overrideRequest, observed_signals: observedSignals }
@@ -533,13 +660,22 @@ export function validateEpicAdmissionDecision(decision, {
     authority_ref: decision.override.authority_ref,
     authority_kind: decision.override.authority_kind,
   };
-  const recomputed = evaluateEpicAdmission({
-    policy,
-    subject: decision.subject,
-    observed_signals: decision.observed_signals,
-    override_request: request,
-    decision_revision: decision.decision_revision,
-  });
+  let recomputed;
+  try {
+    recomputed = evaluateEpicAdmission({
+      policy,
+      subject: decision.subject,
+      observed_signals: decision.observed_signals,
+      override_request: request,
+      decision_revision: decision.decision_revision,
+    });
+  } catch (error) {
+    if (error.code !== "EPIC_ADMISSION_INPUT_INVALID") throw error;
+    for (const inputIssue of error.issues) {
+      if (!issues.some((entry) => entry.code === inputIssue.code && entry.path === inputIssue.path)) issues.push(inputIssue);
+    }
+    return sortedIssues(issues);
+  }
 
   if (decision.override.state === "applied") {
     if (!decision.override.reason?.trim()) issues.push(issue("OVERRIDE_REASON_MISSING", "$.override.reason", "applied override requires an explicit reason"));
@@ -727,6 +863,93 @@ function storedDigestMatches(value, digestField) {
   const stored = content[digestField];
   delete content[digestField];
   return stored === canonicalDigest(content);
+}
+
+function rawFileDigest(path) {
+  return `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`;
+}
+
+function historicalArtifactIssues(paths, artifacts) {
+  const issues = [];
+  for (const [key, pin] of Object.entries(HISTORICAL_ARTIFACT_PINS)) {
+    const artifact = artifacts[key];
+    const revision = key.startsWith("first") ? "R1" : "R2";
+    const kind = key.endsWith("Plan") ? "PLAN" : "CONTEXT";
+    const prefix = `HISTORICAL_${revision}_${kind}`;
+    const content = deepClone(artifact);
+    const storedDigest = content[pin.digestField];
+    delete content[pin.digestField];
+    const computedDigest = canonicalDigest(content);
+    if (storedDigest !== pin.canonicalDigest || computedDigest !== pin.canonicalDigest) {
+      issues.push(issue(
+        `${prefix}_DIGEST_MISMATCH`,
+        `$paths.${key}`,
+        `${pin.label} must preserve its pinned stored and recomputed canonical digest`,
+      ));
+    }
+    if (rawFileDigest(paths[key]) !== pin.rawDigest) {
+      issues.push(issue(
+        `${prefix}_BYTES_MISMATCH`,
+        `$paths.${key}`,
+        `${pin.label} must preserve its pinned repository bytes`,
+      ));
+    }
+  }
+
+  const { firstContext, firstPlan, previousContext, previousPlan } = artifacts;
+  const firstPlanRef = {
+    plan_id: firstPlan.plan_id,
+    plan_revision: firstPlan.plan_revision,
+    plan_digest: firstPlan.plan_digest,
+  };
+  const firstContextRef = contextRef(firstContext);
+  if (!sameJson(firstPlan.validation_context_ref, firstContextRef)) {
+    issues.push(issue("HISTORICAL_R1_PLAN_CONTEXT_BINDING_MISMATCH", "$paths.firstPlan", "r1 plan must bind the exact pinned r1 context"));
+  }
+  if (
+    firstContext.current_plan_ref?.plan_id !== firstPlan.plan_id
+    || firstContext.current_plan_ref?.plan_revision !== firstPlan.plan_revision
+    || firstContext.current_plan_ref?.lifecycle_state !== firstPlan.lifecycle_state
+  ) {
+    issues.push(issue("HISTORICAL_R1_CONTEXT_PLAN_BINDING_MISMATCH", "$paths.firstContext", "r1 context must name the exact pinned r1 plan revision and lifecycle state"));
+  }
+
+  const previousPlanRef = {
+    plan_id: previousPlan.plan_id,
+    plan_revision: previousPlan.plan_revision,
+    plan_digest: previousPlan.plan_digest,
+  };
+  if (!sameJson(previousPlan.validation_context_ref, contextRef(previousContext))) {
+    issues.push(issue("HISTORICAL_R2_PLAN_CONTEXT_BINDING_MISMATCH", "$paths.previousPlan", "r2 plan must bind the exact pinned r2 context"));
+  }
+  if (
+    previousContext.current_plan_ref?.plan_id !== previousPlan.plan_id
+    || previousContext.current_plan_ref?.plan_revision !== previousPlan.plan_revision
+    || previousContext.current_plan_ref?.lifecycle_state !== previousPlan.lifecycle_state
+    || previousContext.current_plan_ref?.plan_content_digest !== deriveWorkPackagePlanContentDigest(previousPlan)
+  ) {
+    issues.push(issue("HISTORICAL_R2_CONTEXT_PLAN_BINDING_MISMATCH", "$paths.previousContext", "r2 context must bind the exact pinned r2 plan meaning"));
+  }
+  if (
+    !sameJson(previousPlan.supersedes_plan_ref, firstPlanRef)
+    || previousPlan.plan_id !== firstPlan.plan_id
+    || previousPlan.plan_revision !== firstPlan.plan_revision + 1
+  ) {
+    issues.push(issue("HISTORICAL_R2_PLAN_LINEAGE_MISMATCH", "$paths.previousPlan", "r2 plan must exactly supersede the pinned r1 plan"));
+  }
+  if (
+    !sameJson(previousContext.supersedes_plan_ref, firstPlanRef)
+    || !sameJson(previousContext.supersedes_context_ref, firstContextRef)
+    || previousContext.context_id !== firstContext.context_id
+    || previousContext.context_revision !== firstContext.context_revision + 1
+    || !sameJson(previousContext.supersedes_plan_ref, previousPlan.supersedes_plan_ref)
+  ) {
+    issues.push(issue("HISTORICAL_R2_CONTEXT_LINEAGE_MISMATCH", "$paths.previousContext", "r2 context must exactly supersede the pinned r1 plan and context"));
+  }
+  if (previousPlanRef.plan_revision !== previousContext.current_plan_ref?.plan_revision) {
+    issues.push(issue("HISTORICAL_R2_PAIR_REVISION_MISMATCH", "$paths.previousPlan", "r2 plan and context must describe the same plan revision"));
+  }
+  return sortedIssues(issues);
 }
 
 function duplicateIds(values, key) {
@@ -1362,13 +1585,15 @@ function validateCaseCatalog(catalog) {
 
 export function validateRepositoryEpicAdmissionWorkPackagePlan({ root = MODULE_ROOT, paths: pathOverrides = {} } = {}) {
   const paths = resolvedPaths(root, pathOverrides);
-  for (const key of ["policy", "decision", "context", "plan", "previousContext", "previousPlan", "cases"]) {
+  for (const key of ["policy", "decision", "context", "plan", "firstContext", "firstPlan", "previousContext", "previousPlan", "cases"]) {
     if (!existsSync(paths[key])) return { issues: [issue("ARTIFACT_MISSING", `$paths.${key}`, `${paths[key]} is missing`)] };
   }
   let policy;
   let decision;
   let context;
   let plan;
+  let firstContext;
+  let firstPlan;
   let previousContext;
   let previousPlan;
   let cases;
@@ -1377,6 +1602,8 @@ export function validateRepositoryEpicAdmissionWorkPackagePlan({ root = MODULE_R
     decision = readJsonFileStrict(paths.decision, "epic admission decision");
     context = readJsonFileStrict(paths.context, "Work Package Plan validation context");
     plan = readJsonFileStrict(paths.plan, "Work Package Plan");
+    firstContext = readJsonFileStrict(paths.firstContext, "pinned r1 Work Package Plan validation context");
+    firstPlan = readJsonFileStrict(paths.firstPlan, "pinned r1 Work Package Plan");
     previousContext = readJsonFileStrict(paths.previousContext, "superseded Work Package Plan validation context");
     previousPlan = readJsonFileStrict(paths.previousPlan, "superseded Work Package Plan");
     cases = readJsonFileStrict(paths.cases, "epic admission and Work Package Plan fixture catalog");
@@ -1386,6 +1613,7 @@ export function validateRepositoryEpicAdmissionWorkPackagePlan({ root = MODULE_R
   const issues = [
     ...validateEpicAdmissionPolicy(policy, { schemaPath: paths.policySchema }),
     ...validateEpicAdmissionDecision(decision, { policy, schemaPath: paths.decisionSchema }),
+    ...historicalArtifactIssues(paths, { firstContext, firstPlan, previousContext, previousPlan }),
     ...validateWorkPackagePlanExecutable(plan, {
       policy,
       decision,

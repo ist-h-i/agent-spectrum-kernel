@@ -5552,6 +5552,23 @@ try {
 
   const validRoot = cloneFixture("valid");
   assertPass("valid fixture", validRoot);
+
+  const tamperedHistoricalPlanRoot = cloneFixture("tampered-historical-r1-plan");
+  {
+    const historicalPlanPath = resolve(tamperedHistoricalPlanRoot, "docs/fixtures/issue-275-slice-1-work-package-plan-r1.json");
+    const historicalPlan = JSON.parse(readFileSync(historicalPlanPath, "utf8"));
+    historicalPlan.packages[0].ordered_tasks[0].description += " Tampered while retaining the embedded digest.";
+    writeFileSync(historicalPlanPath, `${JSON.stringify(historicalPlan, null, 2)}\n`);
+  }
+  assertFail("tampered historical r1 plan content", tamperedHistoricalPlanRoot, "HISTORICAL_R1_PLAN_DIGEST_MISMATCH");
+
+  const tamperedHistoricalContextBytesRoot = cloneFixture("tampered-historical-r1-context-bytes");
+  {
+    const historicalContextPath = resolve(tamperedHistoricalContextBytesRoot, "docs/fixtures/issue-275-slice-1-work-package-plan-validation-context-r1.json");
+    writeFileSync(historicalContextPath, `${readFileSync(historicalContextPath, "utf8")}\n`);
+  }
+  assertFail("tampered historical r1 context bytes", tamperedHistoricalContextBytesRoot, "HISTORICAL_R1_CONTEXT_BYTES_MISMATCH");
+
   assertCanonicalCollectorInstructions();
   assertRuntimeScripts();
   assertInstallerScripts();

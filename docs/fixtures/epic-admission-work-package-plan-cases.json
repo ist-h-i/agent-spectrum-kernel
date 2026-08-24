@@ -105,6 +105,24 @@
       "expected_issue_codes": ["ADMISSION_EVIDENCE_REF_INVALID"]
     },
     {
+      "case_id": "NEG-EVALUATION-INPUT-COUNT",
+      "domain": "admission-evaluation-input",
+      "expected_issue_codes": ["SCHEMA_INVALID"],
+      "expected_issue_paths": ["$.observed_signals.acceptance_condition_count.value"]
+    },
+    {
+      "case_id": "NEG-EVALUATION-INPUT-EVIDENCE",
+      "domain": "admission-evaluation-input",
+      "expected_issue_codes": ["ADMISSION_EVIDENCE_REF_INVALID"],
+      "expected_issue_paths": ["$.observed_signals.configured_epic.evidence_ref"]
+    },
+    {
+      "case_id": "NEG-EVALUATION-INPUT-SCOPE",
+      "domain": "admission-evaluation-input",
+      "expected_issue_codes": ["SCHEMA_INVALID"],
+      "expected_issue_paths": ["$.observed_signals.scope_resolution.value"]
+    },
+    {
       "case_id": "NEG-POLICY-UNKNOWN-SCOPE-FAIL-OPEN",
       "domain": "admission-policy",
       "expected_issue_codes": ["POLICY_HUMAN_STATE_COVERAGE"]
