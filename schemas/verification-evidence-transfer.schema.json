@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/verification-evidence-transfer.schema.json",
+  "title": "Agent Spectrum Kernel bounded verification evidence transfer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema_path",
+    "program",
+    "transfer_id",
+    "transfer_digest",
+    "evidence_refs",
+    "evidence_objects",
+    "privacy"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "schema_path": { "type": "string", "const": "schemas/verification-evidence-transfer.schema.json" },
+    "program": { "type": "string", "const": "ask_verification_evidence_transfer" },
+    "transfer_id": { "type": "string", "pattern": "^verification-evidence-transfer-[a-f0-9]{64}$" },
+    "transfer_digest": { "$ref": "#/$defs/digest" },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/evidenceRef" }
+    },
+    "evidence_objects": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "verification-evidence.schema.json" }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bounded_structured_evidence_only", "raw_logs_stored", "raw_prompts_stored", "secrets_stored", "private_evaluators_stored", "review_archives_stored"],
+      "properties": {
+        "bounded_structured_evidence_only": { "type": "boolean", "const": true },
+        "raw_logs_stored": { "type": "boolean", "const": false },
+        "raw_prompts_stored": { "type": "boolean", "const": false },
+        "secrets_stored": { "type": "boolean", "const": false },
+        "private_evaluators_stored": { "type": "boolean", "const": false },
+        "review_archives_stored": { "type": "boolean", "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_id", "evidence_digest", "reuse_identity_digest"],
+      "properties": {
+        "evidence_id": { "type": "string", "pattern": "^verification-evidence-[a-f0-9]{64}$" },
+        "evidence_digest": { "$ref": "#/$defs/digest" },
+        "reuse_identity_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

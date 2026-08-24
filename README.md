@@ -49,9 +49,11 @@ manifest.json
 README.md
 CHANGELOG.md
 docs/
+  adr/0001-verification-evidence-trust-boundary.md
   routing-model.md
   lifecycle-artifact-contract.md
   lifecycle-traceability-contract.md
+  verification-evidence-contract.md
   fixtures/lifecycle-artifact-chains.json
   fixtures/lifecycle-traceability-chains.json
   agent-session-state-contract.md
@@ -125,6 +127,9 @@ schemas/
   engineering-pattern-ledger-entry.schema.json
   review-rule-ledger-entry.schema.json
   verification-pattern-ledger-entry.schema.json
+  verification-evidence.schema.json
+  verification-evidence-transfer.schema.json
+  verification-reuse-plan.schema.json
 adapters/
   claude-code/
     project/.claude/
@@ -137,7 +142,9 @@ adapters/
 scripts/
   ask-doctor.mjs
   ask-sensors.mjs
+  content-addressed-store.mjs
   execution-envelope.mjs
+  verification-evidence.mjs
   adapter-runtime-event.mjs
   adapter-runtime-smoke.mjs
   adapter-runtime-bundle.mjs
@@ -150,6 +157,7 @@ scripts/
   ai-metrics-summarize.mjs
   ai-ledger-refresh.mjs
   ask-benchmark.mjs
+  test-verification-evidence.mjs
   test-ask-benchmark.mjs
 benchmarks/
   README.md
@@ -206,6 +214,28 @@ skills/
   review-to-rule-compiler/SKILL.md
   work-package-compiler/SKILL.md
 ```
+
+## Verification evidence exact reuse
+
+`docs/verification-evidence-contract.md` defines the local-first bounded evidence state for Issue #274 Slice 1. It stores canonical structured results in a shared content-addressed JSON layout, verifies exact material identity, Ed25519 producer provenance, accepted producer authority, and required obligation coverage before reuse, keeps independent judgment separate, transfers only exportable bounded evidence, and blocks coverage when a required gate remains uncovered. Raw command arguments are excluded; exact identity uses only public argument identities and opaque, non-secret secret-version references.
+
+The initial planner is intentionally `exact_only`. It does not infer dependencies, emit `reuse_scoped`, replace CI/review/approval, or change benchmark evaluator and scoring authority.
+
+Run the focused contract tests with:
+
+```bash
+node scripts/test-verification-evidence.mjs
+```
+
+The CLI supports explicit `put`, `verify`, `plan`, `export`, and `import` operations:
+
+```bash
+node scripts/verification-evidence.mjs verify \
+  --store /path/to/local-store \
+  --evidence-id verification-evidence-<sha256>
+```
+
+See the contract and `docs/adr/0001-verification-evidence-trust-boundary.md` for the strict schemas, CAS layout, trusted ingress, producer attestation, transfer rules, and full command forms.
 
 ## Comparative benchmark
 

@@ -328,6 +328,9 @@ function writeAdapterFixture(root) {
     "schemas/engineering-pattern-ledger-entry.schema.json",
     "schemas/review-rule-ledger-entry.schema.json",
     "schemas/verification-pattern-ledger-entry.schema.json",
+    "schemas/verification-evidence.schema.json",
+    "schemas/verification-evidence-transfer.schema.json",
+    "schemas/verification-reuse-plan.schema.json",
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });

@@ -51,6 +51,9 @@ jobs:
       - name: Run verification command evidence contract tests
         run: node scripts/test-ask-benchmark-command-evidence.mjs
 
+      - name: Run verification evidence exact-reuse tests
+        run: node scripts/test-verification-evidence.mjs
+
       - name: Run adaptive portfolio normalized result tests
         run: node scripts/test-ask-benchmark-normalized-results.mjs
 

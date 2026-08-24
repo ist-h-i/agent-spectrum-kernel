@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/verification-reuse-plan.schema.json",
+  "title": "Agent Spectrum Kernel exact verification reuse requirements and plan",
+  "oneOf": [
+    { "$ref": "#/$defs/requirements" },
+    { "$ref": "#/$defs/plan" }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@+-]*$"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_id", "target_revision", "tree_digest"],
+      "properties": {
+        "repository_id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._/@+-]*$" },
+        "target_revision": { "$ref": "#/$defs/token" },
+        "base_revision": { "$ref": "#/$defs/token" },
+        "tree_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "portablePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?:\\.|(?!(?:.*\\/)?\\.{1,2}(?:\\/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*)$"
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "contract_digest", "category"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/token" },
+        "contract_digest": { "$ref": "#/$defs/digest" },
+        "category": { "type": "string", "enum": ["build", "generator", "lint", "repository_validation", "schema", "static_analysis", "test", "typecheck", "other"] }
+      }
+    },
+    "consumedInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "digest"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["contract", "dependency", "file", "fixture", "manifest", "schema"] },
+        "path": { "$ref": "#/$defs/portablePath" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executable", "argument_identity_scheme", "arguments_digest", "argument_count", "opaque_argument_count", "working_directory"],
+      "properties": {
+        "executable": { "$ref": "#/$defs/token" },
+        "argument_identity_scheme": { "type": "string", "const": "opaque-references-v1" },
+        "arguments_digest": { "$ref": "#/$defs/digest" },
+        "argument_count": { "type": "integer", "minimum": 0, "maximum": 128 },
+        "opaque_argument_count": { "type": "integer", "minimum": 0, "maximum": 128 },
+        "working_directory": { "$ref": "#/$defs/portablePath" }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runner_id", "runner_version", "adapter_id", "adapter_version", "evidence_level"],
+      "properties": {
+        "runner_id": { "$ref": "#/$defs/token" },
+        "runner_version": { "$ref": "#/$defs/token" },
+        "adapter_id": { "$ref": "#/$defs/token" },
+        "adapter_version": { "$ref": "#/$defs/token" },
+        "evidence_level": { "type": "string", "enum": ["projected", "runtime_detected", "executed", "behavior_verified"] }
+      }
+    },
+    "toolchainItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "identity_digest"],
+      "properties": {
+        "name": { "$ref": "#/$defs/token" },
+        "version": { "$ref": "#/$defs/token" },
+        "identity_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "architecture", "identity_digest"],
+      "properties": {
+        "os": { "$ref": "#/$defs/token" },
+        "architecture": { "$ref": "#/$defs/token" },
+        "identity_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "reuseIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate", "target", "consumed_inputs", "execution"],
+      "properties": {
+        "gate": { "$ref": "#/$defs/gate" },
+        "target": { "$ref": "#/$defs/target" },
+        "consumed_inputs": { "type": "array", "minItems": 1, "maxItems": 512, "uniqueItems": true, "items": { "$ref": "#/$defs/consumedInput" } },
+        "execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["command", "runner", "toolchain", "environment"],
+          "properties": {
+            "command": { "$ref": "#/$defs/command" },
+            "runner": { "$ref": "#/$defs/runner" },
+            "toolchain": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "$ref": "#/$defs/toolchainItem" } },
+            "environment": { "$ref": "#/$defs/environment" }
+          }
+        }
+      }
+    },
+    "authorityRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["independent_judgment_required", "accepted_producers", "accepted_evidence_levels"],
+      "properties": {
+        "independent_judgment_required": { "type": "boolean" },
+        "accepted_producers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "identity_digest"],
+            "properties": {
+              "kind": { "type": "string", "enum": ["automation", "ci", "developer", "reviewer"] },
+              "identity_digest": { "$ref": "#/$defs/digest" }
+            }
+          }
+        },
+        "accepted_evidence_levels": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["projected", "runtime_detected", "executed", "behavior_verified"] }
+        }
+      }
+    },
+    "requiredGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "reuse_identity", "reuse_identity_digest", "required_obligation_refs", "authority", "execution_availability"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/token" },
+        "reuse_identity": { "$ref": "#/$defs/reuseIdentity" },
+        "reuse_identity_digest": { "$ref": "#/$defs/digest" },
+        "required_obligation_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/token" }
+        },
+        "authority": { "$ref": "#/$defs/authorityRequirement" },
+        "execution_availability": { "type": "string", "enum": ["available", "unavailable"] }
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "schema_path", "program", "requirements_id", "requirements_digest", "planner_scope", "target", "required_gates"],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-reuse-plan.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_requirements" },
+        "requirements_id": { "type": "string", "pattern": "^verification-requirements-[a-f0-9]{64}$" },
+        "requirements_digest": { "$ref": "#/$defs/digest" },
+        "planner_scope": { "type": "string", "const": "exact_only" },
+        "target": { "$ref": "#/$defs/target" },
+        "required_gates": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/requiredGate" } }
+      }
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "reuse_identity_digest", "required_obligation_refs", "covered_obligation_refs", "uncovered_obligation_refs", "disposition", "reason_code", "evidence_id", "evidence_digest", "execution_evidence_reusable"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/token" },
+        "reuse_identity_digest": { "$ref": "#/$defs/digest" },
+        "required_obligation_refs": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "covered_obligation_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "uncovered_obligation_refs": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "disposition": { "type": "string", "enum": ["reuse_exact", "reuse_scoped", "rerun_required", "independent_judgment_required", "blocked_uncovered"] },
+        "reason_code": { "type": "string", "enum": ["exact_identity_verified", "no_exact_evidence", "exact_evidence_not_passing", "exact_evidence_authority_mismatch", "exact_evidence_coverage_mismatch", "independent_judgment_required", "conflicting_exact_evidence", "execution_unavailable"] },
+        "evidence_id": { "type": ["string", "null"], "pattern": "^verification-evidence-[a-f0-9]{64}$" },
+        "evidence_digest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "execution_evidence_reusable": { "type": "boolean" }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "required_gate_count", "reuse_exact_count", "reuse_scoped_count", "rerun_required_count", "independent_judgment_required_count", "blocked_uncovered_count", "covered_gate_ids", "blocking_gate_ids"],
+      "properties": {
+        "status": { "type": "string", "enum": ["covered", "blocked"] },
+        "required_gate_count": { "type": "integer", "minimum": 1 },
+        "reuse_exact_count": { "type": "integer", "minimum": 0 },
+        "reuse_scoped_count": { "type": "integer", "minimum": 0 },
+        "rerun_required_count": { "type": "integer", "minimum": 0 },
+        "independent_judgment_required_count": { "type": "integer", "minimum": 0 },
+        "blocked_uncovered_count": { "type": "integer", "minimum": 0 },
+        "covered_gate_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "blocking_gate_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "schema_path", "program", "plan_id", "plan_digest", "planner_revision", "planner_scope", "requirements_id", "requirements_digest", "target", "dispositions", "coverage"],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "schema_path": { "type": "string", "const": "schemas/verification-reuse-plan.schema.json" },
+        "program": { "type": "string", "const": "ask_verification_reuse_plan" },
+        "plan_id": { "type": "string", "pattern": "^verification-reuse-plan-[a-f0-9]{64}$" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "planner_revision": { "type": "string", "const": "1.0.0" },
+        "planner_scope": { "type": "string", "const": "exact_only" },
+        "requirements_id": { "type": "string", "pattern": "^verification-requirements-[a-f0-9]{64}$" },
+        "requirements_digest": { "$ref": "#/$defs/digest" },
+        "target": { "$ref": "#/$defs/target" },
+        "dispositions": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/disposition" } },
+        "coverage": { "$ref": "#/$defs/coverage" }
+      }
+    }
+  }
+}
