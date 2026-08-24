@@ -35,24 +35,32 @@ const DEFAULT_PATHS = Object.freeze({
 const HISTORICAL_ARTIFACT_PINS = Object.freeze({
   firstContext: Object.freeze({
     label: "r1 context",
+    schemaVersion: "1.0.0",
+    revision: 1,
     digestField: "context_digest",
     canonicalDigest: "sha256:77d060f40ac11a74f5d9e39bf28f5653ecade591b09bb090b9a42958ec6c11db",
     rawDigest: "sha256:0d1de9f8979799c16fd7ed8ea677e360d74dd3a980a3eab58f73a9e6afb51236",
   }),
   firstPlan: Object.freeze({
     label: "r1 plan",
+    schemaVersion: "1.0.0",
+    revision: 1,
     digestField: "plan_digest",
     canonicalDigest: "sha256:11adfda1e0a27c5aee8460807ef26f77b65ebd13ed26835b9e1e3af7654bb65d",
     rawDigest: "sha256:c65c703eb760467289847364d6dcb68c0bcc863ae091a641d892550e3a815437",
   }),
   previousContext: Object.freeze({
     label: "r2 context",
+    schemaVersion: "1.1.0",
+    revision: 2,
     digestField: "context_digest",
     canonicalDigest: "sha256:e33aebb1eacbeb9edb0dea3a33e252c4e686556677c44c47b013b45894d8bc1e",
     rawDigest: "sha256:e8d28d9b431d3118563d2db44f8eeeb56851678f3fc9163aeb485b8df3de0d3b",
   }),
   previousPlan: Object.freeze({
     label: "r2 plan",
+    schemaVersion: "1.1.0",
+    revision: 2,
     digestField: "plan_digest",
     canonicalDigest: "sha256:e97a2ef854ab5350d11ca00e305aaf44eb01939744500513bfee313ff94b8e3f",
     rawDigest: "sha256:545a7d08d055c1e99e95d9b49fca4e26021945328865b686febe94b276c275b4",
@@ -171,6 +179,8 @@ const REQUIRED_CASE_IDS = Object.freeze([
   "NEG-PREVIOUS-REVISION-DEPENDENCY-MALFORMED",
   "NEG-PREVIOUS-REVISION-ONE-PLAN-LINEAGE-PAYLOAD",
   "NEG-PREVIOUS-REVISION-ONE-CONTEXT-LINEAGE-PAYLOAD",
+  "NEG-PREVIOUS-PLAN-SCHEMA-DOWNGRADE",
+  "NEG-PREVIOUS-CONTEXT-SCHEMA-DOWNGRADE",
   "NEG-REPOSITORY-DECISION-MALFORMED",
   "NEG-REPOSITORY-HISTORICAL-R1-CONTEXT-MALFORMED",
   "NEG-REPOSITORY-HISTORICAL-R1-PLAN-MALFORMED",
@@ -948,6 +958,15 @@ function hasRevisionAwareContextLineage(value) {
       && isNonEmptyString(value.revision_reason);
 }
 
+function matchesPinnedLegacyArtifact(value, pinKey, revisionField) {
+  const pin = HISTORICAL_ARTIFACT_PINS[pinKey];
+  return isPlainRecord(value)
+    && value.schema_version === pin.schemaVersion
+    && value[revisionField] === pin.revision
+    && value[pin.digestField] === pin.canonicalDigest
+    && storedDigestMatches(value, pin.digestField);
+}
+
 function isHistoricalPlanArtifact(value, { schemaPath } = {}) {
   const structured = isPlainRecord(value)
     && isKnownWorkPackagePlanSchemaVersion(value.schema_version)
@@ -973,6 +992,20 @@ function isHistoricalContextArtifact(value, { schemaPath } = {}) {
     && (value.schema_version !== WORK_PACKAGE_PLAN_SCHEMA_VERSION || schemaIssues(value, schemaPath).length === 0);
 }
 
+function isAdmissiblePreviousPlanArtifact(value, { schemaPath } = {}) {
+  return isHistoricalPlanArtifact(value, { schemaPath })
+    && (value.schema_version === WORK_PACKAGE_PLAN_SCHEMA_VERSION
+      || matchesPinnedLegacyArtifact(value, "firstPlan", "plan_revision")
+      || matchesPinnedLegacyArtifact(value, "previousPlan", "plan_revision"));
+}
+
+function isAdmissiblePreviousContextArtifact(value, { schemaPath } = {}) {
+  return isHistoricalContextArtifact(value, { schemaPath })
+    && (value.schema_version === WORK_PACKAGE_PLAN_SCHEMA_VERSION
+      || matchesPinnedLegacyArtifact(value, "firstContext", "context_revision")
+      || matchesPinnedLegacyArtifact(value, "previousContext", "context_revision"));
+}
+
 function historicalArtifactShapeIssues(paths, artifacts) {
   const checks = [
     ["firstContext", "HISTORICAL_R1_CONTEXT_INVALID", isHistoricalContextArtifact(artifacts.firstContext, { schemaPath: paths.contextSchema })],
@@ -985,7 +1018,7 @@ function historicalArtifactShapeIssues(paths, artifacts) {
     .map(([key, code]) => issue(
       code,
       `$paths.${key}`,
-      `${key} must satisfy its declared Schema or legacy revision-aware shape before lineage and digest validation`,
+      `${key} must satisfy the current Schema or match an exact pinned legacy audit artifact before lineage and digest validation`,
     ));
 }
 
@@ -1333,13 +1366,13 @@ export function validateWorkPackagePlan(plan, {
   }
   if (plan.plan_revision > 1 && previousPlan && previousContext) {
     if (
-      !isHistoricalPlanArtifact(previousPlan, { schemaPath: planSchemaPath })
-      || !isHistoricalContextArtifact(previousContext, { schemaPath: contextSchemaPath })
+      !isAdmissiblePreviousPlanArtifact(previousPlan, { schemaPath: planSchemaPath })
+      || !isAdmissiblePreviousContextArtifact(previousContext, { schemaPath: contextSchemaPath })
     ) {
       return sortedIssues([issue(
         "PREVIOUS_REVISION_INVALID",
         "$.supersedes_plan_ref",
-        "the supplied previous plan and validation context must satisfy their declared Schemas or legacy revision-aware shapes before lineage and digest validation",
+        "the supplied previous plan and validation context must satisfy the current Schemas or match exact pinned legacy audit artifacts before lineage and digest validation",
       )]);
     }
   }

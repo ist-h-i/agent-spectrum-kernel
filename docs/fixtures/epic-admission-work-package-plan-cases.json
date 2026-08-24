@@ -518,6 +518,16 @@
       "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
     },
     {
+      "case_id": "NEG-PREVIOUS-PLAN-SCHEMA-DOWNGRADE",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-CONTEXT-SCHEMA-DOWNGRADE",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
       "case_id": "NEG-REPOSITORY-DECISION-MALFORMED",
       "domain": "repository-validation",
       "expected_issue_codes": ["ADMISSION_DECISION_INVALID"]

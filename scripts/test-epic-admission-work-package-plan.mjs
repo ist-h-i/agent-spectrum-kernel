@@ -735,13 +735,13 @@ expectCodes("NEG-STACK-DEPENDENCY-CLOSURE", validatePlanBundle(mutatePlan(canoni
     [],
   );
 
-  const buildExactRevisionTwoSuccessor = (previous, reason) => {
+  const buildExactRevisionTwoSuccessor = (previous, reason, template = previous) => {
     const previousPlanRef = {
       plan_id: previous.plan.plan_id,
       plan_revision: previous.plan.plan_revision,
       plan_digest: previous.plan.plan_digest,
     };
-    const successorContextDraft = clone(previous.context);
+    const successorContextDraft = clone(template.context);
     successorContextDraft.context_revision = previous.context.context_revision + 1;
     successorContextDraft.supersedes_context_ref = {
       context_id: previous.context.context_id,
@@ -750,7 +750,7 @@ expectCodes("NEG-STACK-DEPENDENCY-CLOSURE", validatePlanBundle(mutatePlan(canoni
     };
     successorContextDraft.supersedes_plan_ref = previousPlanRef;
     successorContextDraft.revision_reason = reason;
-    const successorPlanDraft = clone(previous.plan);
+    const successorPlanDraft = clone(template.plan);
     successorPlanDraft.plan_revision = previous.plan.plan_revision + 1;
     successorPlanDraft.supersedes_plan_ref = previousPlanRef;
     successorPlanDraft.revision_reason = reason;
@@ -758,7 +758,7 @@ expectCodes("NEG-STACK-DEPENDENCY-CLOSURE", validatePlanBundle(mutatePlan(canoni
       workPackage.revision = successorPlanDraft.plan_revision;
       workPackage.plan_binding.plan_revision = successorPlanDraft.plan_revision;
     }
-    return closePlanContextBinding({ ...previous, context: successorContextDraft }, successorPlanDraft);
+    return closePlanContextBinding({ ...template, context: successorContextDraft }, successorPlanDraft);
   };
   const revisionOnePlanRef = {
     plan_id: revisionOne.plan.plan_id,
@@ -811,6 +811,68 @@ expectCodes("NEG-STACK-DEPENDENCY-CLOSURE", validatePlanBundle(mutatePlan(canoni
       context: invalidRevisionOneContextSuccessor.context,
       previousContext: invalidRevisionOneContext.context,
       previousPlan: invalidRevisionOneContext.plan,
+    }),
+    ["$.supersedes_plan_ref"],
+  );
+
+  const downgradedPlan = clone(revisionOne.plan);
+  downgradedPlan.schema_version = "1.0.0";
+  downgradedPlan.unrecognized_legacy_payload = true;
+  downgradedPlan.plan_digest = canonicalDigestExcluding(downgradedPlan, "plan_digest");
+  const downgradedPlanContextDraft = clone(revisionOne.context);
+  downgradedPlanContextDraft.current_plan_ref.plan_content_digest = deriveWorkPackagePlanContentDigest(downgradedPlan);
+  const downgradedPlanContext = sealWorkPackagePlanValidationContext(downgradedPlanContextDraft);
+  downgradedPlan.validation_context_ref.context_digest = downgradedPlanContext.context_digest;
+  downgradedPlan.plan_digest = canonicalDigestExcluding(downgradedPlan, "plan_digest");
+  assert.equal(
+    downgradedPlanContext.current_plan_ref.plan_content_digest,
+    deriveWorkPackagePlanContentDigest(downgradedPlan),
+    "the downgraded predecessor plan must retain an exact content binding",
+  );
+  const downgradedPlanPair = { ...revisionOne, context: downgradedPlanContext, plan: downgradedPlan };
+  const downgradedPlanSuccessor = buildExactRevisionTwoSuccessor(
+    downgradedPlanPair,
+    "Reject an arbitrary predecessor that claims a legacy plan Schema.",
+    revisionOne,
+  );
+  expectDeterministicIssues(
+    "NEG-PREVIOUS-PLAN-SCHEMA-DOWNGRADE",
+    () => validateWorkPackagePlan(downgradedPlanSuccessor.plan, {
+      policy: downgradedPlanSuccessor.policy,
+      decision: downgradedPlanSuccessor.decision,
+      context: downgradedPlanSuccessor.context,
+      previousContext: downgradedPlanPair.context,
+      previousPlan: downgradedPlanPair.plan,
+    }),
+    ["$.supersedes_plan_ref"],
+  );
+
+  const downgradedContext = clone(revisionOne.context);
+  downgradedContext.schema_version = "1.0.0";
+  downgradedContext.unrecognized_legacy_payload = true;
+  downgradedContext.context_digest = canonicalDigestExcluding(downgradedContext, "context_digest");
+  const downgradedContextPlan = clone(revisionOne.plan);
+  downgradedContextPlan.validation_context_ref.context_digest = downgradedContext.context_digest;
+  downgradedContextPlan.plan_digest = canonicalDigestExcluding(downgradedContextPlan, "plan_digest");
+  assert.equal(
+    downgradedContext.current_plan_ref.plan_content_digest,
+    deriveWorkPackagePlanContentDigest(downgradedContextPlan),
+    "the downgraded predecessor context must retain an exact plan content binding",
+  );
+  const downgradedContextPair = { ...revisionOne, context: downgradedContext, plan: downgradedContextPlan };
+  const downgradedContextSuccessor = buildExactRevisionTwoSuccessor(
+    downgradedContextPair,
+    "Reject an arbitrary predecessor that claims a legacy context Schema.",
+    revisionOne,
+  );
+  expectDeterministicIssues(
+    "NEG-PREVIOUS-CONTEXT-SCHEMA-DOWNGRADE",
+    () => validateWorkPackagePlan(downgradedContextSuccessor.plan, {
+      policy: downgradedContextSuccessor.policy,
+      decision: downgradedContextSuccessor.decision,
+      context: downgradedContextSuccessor.context,
+      previousContext: downgradedContextPair.context,
+      previousPlan: downgradedContextPair.plan,
     }),
     ["$.supersedes_plan_ref"],
   );
