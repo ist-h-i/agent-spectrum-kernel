@@ -65,11 +65,13 @@
     "command": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["executable", "arguments_digest", "argument_count", "working_directory"],
+      "required": ["executable", "argument_identity_scheme", "arguments_digest", "argument_count", "opaque_argument_count", "working_directory"],
       "properties": {
         "executable": { "$ref": "#/$defs/token" },
+        "argument_identity_scheme": { "type": "string", "const": "opaque-references-v1" },
         "arguments_digest": { "$ref": "#/$defs/digest" },
         "argument_count": { "type": "integer", "minimum": 0, "maximum": 128 },
+        "opaque_argument_count": { "type": "integer", "minimum": 0, "maximum": 128 },
         "working_directory": { "$ref": "#/$defs/portablePath" }
       }
     },

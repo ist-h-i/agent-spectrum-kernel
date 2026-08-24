@@ -33,7 +33,7 @@ Every sealed evidence object binds:
 - gate ID, category, and exact gate-contract digest;
 - repository, target revision, and tree digest;
 - the sorted consumed input paths, kinds, and digests;
-- executable, ordered-argument digest and count, and repository-relative working directory;
+- executable, ordered non-secret argument-identity digest/counts, and repository-relative working directory;
 - runner, adapter, evidence level, toolchain, and bounded environment identity;
 - terminal status, exit code, duration, output byte count, and output digest;
 - covered obligation refs and explicit non-coverage;
@@ -57,6 +57,8 @@ The store layout is shared infrastructure rather than evidence-specific admissio
 Stored bytes are canonical JSON plus one newline. A verification-evidence object is stored as its bounded content without the derived `evidence_id` and `evidence_digest`; reading the object deterministically reconstructs and verifies both fields.
 
 Writes are no-replace. Repeating an identical write verifies the existing bytes and returns the same object. A conflicting object at the same address, a non-canonical object, a digest mismatch, a symlink inside the owned store path, or an unsupported store entry fails closed.
+
+Publication links a fully written staging inode to the final content address and then removes the staging name. Readers require stable device/inode, ownership, mode, size, and modification time and separately verify exact bytes, content digest, and canonical form. They intentionally do not treat the staging hard-link cleanup's link-count/ctime-only transition as content mutation.
 
 This layout may later hold other versioned content-addressed ASK artifacts. Consumers select objects by their strict `program` and schema contract. Evidence validity never promotes or admits an Asset.
 
@@ -82,7 +84,7 @@ Slice 1 emits one disposition per gate:
 
 Conflicting passing and non-passing evidence for one exact identity never resolves by selecting the pass. It yields `rerun_required` with `conflicting_exact_evidence`.
 
-Repository, target, tree, gate-contract, input, command, runner, toolchain, and environment changes produce a different reuse identity. A cross-boundary object therefore cannot satisfy exact reuse even when its gate label or command display looks similar. Producer authenticity is verified cryptographically, then the signed producer kind and public-key fingerprint are evaluated as one pair against the gate requirement. A changed, forged, retired, or untrusted producer cannot reuse evidence while producer changes remain distinct from material execution changes.
+Repository, target, tree, gate-contract, input, command identity, runner, toolchain, and environment changes produce a different reuse identity. A cross-boundary object therefore cannot satisfy exact reuse even when its gate label or command display looks similar. Producer authenticity is verified cryptographically, then the signed producer kind and public-key fingerprint are evaluated as one pair against the gate requirement. A changed, forged, retired, or untrusted producer cannot reuse evidence while producer changes remain distinct from material execution changes.
 
 A passing exact-identity object is reusable only when its `coverage.obligation_refs` contains every obligation required by the gate. Covered and explicitly non-covered refs must be disjoint. An unrelated or incomplete obligation set yields `exact_evidence_coverage_mismatch`; it never becomes coverage merely because the command succeeded.
 
@@ -129,7 +131,7 @@ Missing objects, mismatched refs, duplicate IDs, modified objects, modified tran
 
 The strict evidence and transfer schemas allow bounded structured fields only. They do not allow raw prompts, full transcripts, raw command output or logs, arbitrary environment values, secrets, credentials, absolute private paths, private evaluator content, or external review archives.
 
-Command execution is represented as a direct executable plus a domain-separated digest and count of the ordered argument vector and a portable repository-relative working directory. Raw arguments are never part of the schema, including when they contain positional credentials, private paths, prompts, or transcript material. Output is represented only by byte count and digest. Environment identity is represented by bounded OS/architecture labels and a digest, not raw environment variables.
+Command execution is represented as a direct executable plus a domain-separated digest and counts of ordered non-secret argument identities and a portable repository-relative working directory. The identity helper accepts only `{ kind, identity_digest }` descriptors. Public positions bind public-material digests; secret-bearing positions bind opaque, non-secret secret-authority version references. It rejects actual argv and descriptor value fields. If no safe opaque version reference exists, exportable exact-reuse evidence is unavailable. Raw arguments are never stored or hashed by this contract, including positional credentials, private paths, prompts, or transcript material. Output is represented only by byte count and digest. Environment identity is represented by bounded OS/architecture labels and a digest, not raw environment variables.
 
 ## CLI
 

@@ -76,7 +76,10 @@ function evidenceDraft(overrides = {}) {
       command: {
         ...verificationCommandIdentity({
           executable: "node",
-          arguments: ["scripts/test-verification-evidence.mjs"],
+          argument_identities: [{
+            kind: "public",
+            identity_digest: digest("public-argument:scripts/test-verification-evidence.mjs"),
+          }],
           working_directory: ".",
         }),
       },
@@ -156,6 +159,11 @@ function acceptedGate(evidence, overrides = {}) {
 
 const root = mkdtempSync(resolve(tmpdir(), "ask-verification-evidence-"));
 try {
+  expectFailure("raw argv identity input", () => verificationCommandIdentity({
+    executable: "node",
+    arguments: ["Authorization: Bearer predictable-secret"],
+    working_directory: ".",
+  }), /command identity|raw argument|unknown.*propert/iu);
   const store = resolve(root, "store");
   const sealed = sealDraft(evidenceDraft());
   validateVerificationEvidence(sealed);
@@ -247,7 +255,11 @@ try {
     ["tree", (identity) => { identity.target.tree_digest = digest("different-tree"); }],
     ["gate contract", (identity) => { identity.gate.contract_digest = digest("different-contract"); }],
     ["consumed input", (identity) => { identity.consumed_inputs[0].digest = digest("changed-input"); }],
-    ["command", (identity) => { identity.execution.command = verificationCommandIdentity({ executable: "node", arguments: ["scripts/other-test.mjs"], working_directory: "." }); }],
+    ["command", (identity) => { identity.execution.command = verificationCommandIdentity({
+      executable: "node",
+      argument_identities: [{ kind: "public", identity_digest: digest("public-argument:scripts/other-test.mjs") }],
+      working_directory: ".",
+    }); }],
     ["runner", (identity) => { identity.execution.runner.runner_version = "2.0.0"; }],
     ["toolchain", (identity) => { identity.execution.toolchain[0].version = "v25.0.0"; }],
     ["environment", (identity) => { identity.execution.environment.identity_digest = digest("different-environment"); }],
@@ -392,13 +404,14 @@ try {
   assert.notEqual(duplicateKeyPut.status, 0);
   assert.match(duplicateKeyPut.stderr, /duplicate JSON object key/iu);
 
-  const racingStore = resolve(root, "racing-store");
-  const racingPuts = await Promise.all([
-    runCliAsync(["put", "--store", racingStore, "--input", cliDraftPath]),
-    runCliAsync(["put", "--store", racingStore, "--input", cliDraftPath]),
-  ]);
-  for (const result of racingPuts) assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.deepEqual(racingPuts.map((result) => JSON.parse(result.stdout).created).sort(), [false, true]);
+  for (let round = 0; round < 4; round += 1) {
+    const racingStore = resolve(root, `racing-store-${round}`);
+    const racingPuts = await Promise.all(Array.from({ length: 4 }, () => (
+      runCliAsync(["put", "--store", racingStore, "--input", cliDraftPath])
+    )));
+    for (const result of racingPuts) assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.deepEqual(racingPuts.map((result) => JSON.parse(result.stdout).created).sort(), [false, false, false, true]);
+  }
 
   const tamperedTransfer = structuredClone(transfer);
   tamperedTransfer.evidence_objects[0].execution.terminal.output_bytes += 1;
@@ -470,23 +483,37 @@ try {
       command: { ...evidenceDraft().execution.command, working_directory: "/private/tmp/work" },
     },
   })), /portable|absolute|working_directory|pattern/iu);
-  const privateCommand = verificationCommandIdentity({
+  const opaqueCommand = verificationCommandIdentity({
     executable: "node",
-    arguments: ["/Users/example/private-test.mjs", "--token=private-value", "Authorization: Bearer private-value"],
+    argument_identities: [
+      { kind: "public", identity_digest: digest("public-argument:scripts/private-test.mjs") },
+      { kind: "opaque_reference", identity_digest: digest("opaque-secret-version:ci-token:v42") },
+      { kind: "opaque_reference", identity_digest: digest("opaque-secret-version:authorization-header:v17") },
+    ],
     working_directory: ".",
   });
-  assert.equal(Object.hasOwn(privateCommand, "arguments"), false);
-  assert.doesNotMatch(stableCanonicalJson(privateCommand), /Users|private-value|Bearer/u);
+  assert.equal(Object.hasOwn(opaqueCommand, "arguments"), false);
+  assert.equal(opaqueCommand.opaque_argument_count, 2);
+  assert.doesNotMatch(stableCanonicalJson(opaqueCommand), /Users|private-value|Bearer/u);
   const privateCommandEvidence = sealDraft(evidenceDraft({
     execution: {
       ...evidenceDraft().execution,
-      command: privateCommand,
+      command: opaqueCommand,
     },
   }));
   const privateCommandStore = resolve(root, "private-command-store");
   putVerificationEvidence({ storeRoot: privateCommandStore, evidence: privateCommandEvidence });
   const privateCommandTransfer = buildEvidenceTransfer({ storeRoot: privateCommandStore, evidenceIds: [privateCommandEvidence.evidence_id] });
   assert.doesNotMatch(stableCanonicalJson(privateCommandTransfer), /Users|private-value|Bearer/u);
+  expectFailure("opaque argument value field", () => verificationCommandIdentity({
+    executable: "node",
+    argument_identities: [{
+      kind: "opaque_reference",
+      identity_digest: digest("opaque-secret-version:ci-token:v42"),
+      value: "predictable-secret",
+    }],
+    working_directory: ".",
+  }), /argument identity|unknown propert/iu);
   expectFailure("raw credential arguments", () => sealDraft(evidenceDraft({
     execution: {
       ...evidenceDraft().execution,

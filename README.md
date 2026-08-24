@@ -217,7 +217,7 @@ skills/
 
 ## Verification evidence exact reuse
 
-`docs/verification-evidence-contract.md` defines the local-first bounded evidence state for Issue #274 Slice 1. It stores canonical structured results in a shared content-addressed JSON layout, verifies exact material identity, Ed25519 producer provenance, accepted producer authority, and required obligation coverage before reuse, keeps independent judgment separate, transfers only exportable bounded evidence, and blocks coverage when a required gate remains uncovered. Raw command arguments are represented only by a domain-separated digest and count.
+`docs/verification-evidence-contract.md` defines the local-first bounded evidence state for Issue #274 Slice 1. It stores canonical structured results in a shared content-addressed JSON layout, verifies exact material identity, Ed25519 producer provenance, accepted producer authority, and required obligation coverage before reuse, keeps independent judgment separate, transfers only exportable bounded evidence, and blocks coverage when a required gate remains uncovered. Raw command arguments are excluded; exact identity uses only public argument identities and opaque, non-secret secret-version references.
 
 The initial planner is intentionally `exact_only`. It does not infer dependencies, emit `reuse_scoped`, replace CI/review/approval, or change benchmark evaluator and scoring authority.
 

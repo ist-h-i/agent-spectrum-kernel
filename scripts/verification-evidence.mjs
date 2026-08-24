@@ -27,7 +27,7 @@ export const VERIFICATION_REUSE_PLAN_SCHEMA_PATH = resolve(ROOT, "schemas/verifi
 export const VERIFICATION_EVIDENCE_SCHEMA_REVISION = "1.0.0";
 export const VERIFICATION_REUSE_PLANNER_REVISION = "1.0.0";
 export const VERIFICATION_EVIDENCE_ATTESTATION_CONTEXT = "ask.verification-evidence.producer-attestation.v1";
-export const VERIFICATION_COMMAND_ARGUMENTS_CONTEXT = "ask.verification-evidence.ordered-argv.v1";
+export const VERIFICATION_COMMAND_ARGUMENTS_CONTEXT = "ask.verification-evidence.ordered-argument-identities.v1";
 
 const EVIDENCE_ID_PATTERN = /^verification-evidence-([a-f0-9]{64})$/u;
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/u;
@@ -89,22 +89,41 @@ function assertPortableRelativePath(value, label) {
 
 function assertCommandBoundary(command) {
   assertPortableRelativePath(command.working_directory, "verification command working_directory");
+  if (command.argument_identity_scheme !== "opaque-references-v1") throw new Error("verification command argument_identity_scheme is unsupported");
   if (!DIGEST_PATTERN.test(command.arguments_digest ?? "")) throw new Error("verification command arguments_digest must be a sha256 digest");
   if (!Number.isInteger(command.argument_count) || command.argument_count < 0 || command.argument_count > 128) throw new Error("verification command argument_count must be between 0 and 128");
+  if (!Number.isInteger(command.opaque_argument_count) || command.opaque_argument_count < 0 || command.opaque_argument_count > command.argument_count) throw new Error("verification command opaque_argument_count must be between 0 and argument_count");
 }
 
-export function verificationCommandIdentity({ executable, arguments: orderedArguments, working_directory: workingDirectory }) {
-  if (!Array.isArray(orderedArguments) || orderedArguments.length > 128) throw new Error("verification command ordered arguments must be an array with at most 128 entries");
-  for (const argument of orderedArguments) {
-    if (typeof argument !== "string") throw new Error("verification command ordered arguments must contain only strings");
+function assertExactObjectKeys(value, expectedKeys, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object`);
+  const actual = Object.keys(value).sort();
+  const expected = [...expectedKeys].sort();
+  if (stableCanonicalJson(actual) !== stableCanonicalJson(expected)) throw new Error(`${label} contains unknown or missing properties`);
+}
+
+export function verificationCommandIdentity(definition) {
+  assertExactObjectKeys(definition, ["executable", "argument_identities", "working_directory"], "verification command identity input");
+  const {
+    executable,
+    argument_identities: orderedArgumentIdentities,
+    working_directory: workingDirectory,
+  } = definition;
+  if (!Array.isArray(orderedArgumentIdentities) || orderedArgumentIdentities.length > 128) throw new Error("verification command ordered argument identities must be an array with at most 128 entries");
+  for (const identity of orderedArgumentIdentities) {
+    assertExactObjectKeys(identity, ["kind", "identity_digest"], "verification command argument identity");
+    if (!["public", "opaque_reference"].includes(identity.kind)) throw new Error("verification command argument identity kind is unsupported");
+    if (!DIGEST_PATTERN.test(identity.identity_digest ?? "")) throw new Error("verification command argument identity_digest must be a sha256 digest");
   }
   const command = {
     executable,
+    argument_identity_scheme: "opaque-references-v1",
     arguments_digest: canonicalDigest({
       context: VERIFICATION_COMMAND_ARGUMENTS_CONTEXT,
-      ordered_arguments: orderedArguments,
+      ordered_argument_identities: orderedArgumentIdentities,
     }),
-    argument_count: orderedArguments.length,
+    argument_count: orderedArgumentIdentities.length,
+    opaque_argument_count: orderedArgumentIdentities.filter((identity) => identity.kind === "opaque_reference").length,
     working_directory: workingDirectory,
   };
   assertCommandBoundary(command);

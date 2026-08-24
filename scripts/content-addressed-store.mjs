@@ -97,12 +97,20 @@ function statusIdentity(status) {
     mode: status.mode,
     size: status.size,
     mtimeMs: status.mtimeMs,
-    ctimeMs: status.ctimeMs,
+    uid: status.uid,
+    gid: status.gid,
   };
 }
 
 function sameStatus(left, right) {
-  return JSON.stringify(statusIdentity(left)) === JSON.stringify(statusIdentity(right));
+  // Atomic no-replace publication links the completed staging inode to its
+  // final address and then unlinks the staging name. That benign link-count
+  // transition changes ctime while bytes, inode, ownership, mode, size, and
+  // mtime remain stable. Byte, digest, and canonical-form checks below remain
+  // authoritative for content integrity.
+  if (JSON.stringify(statusIdentity(left)) !== JSON.stringify(statusIdentity(right))) return false;
+  if (left.ctimeMs === right.ctimeMs && left.nlink === right.nlink) return true;
+  return Number.isInteger(left.nlink) && Number.isInteger(right.nlink) && left.nlink === right.nlink + 1;
 }
 
 export function assertNoSymlinkPathSegments(path, label, { allowMissingLeaf = false } = {}) {

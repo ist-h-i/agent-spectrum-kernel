@@ -35,7 +35,9 @@ Changing or retiring a producer key changes its identity digest. Current require
 
 ### Command privacy and exact identity
 
-Evidence never stores raw command arguments. It stores the executable, repository-relative working directory, ordered-argument count, and a domain-separated SHA-256 digest of the ordered argument vector. The digest remains part of `reuse_identity_digest`, so an argument change invalidates exact reuse without placing arguments, prompts, tokens, paths, or transcripts in the evidence or transfer.
+Evidence never stores or hashes raw command arguments. The execution adapter supplies an ordered list of non-secret argument identities: a public argument uses a digest of public material, while a secret-bearing position uses a digest of an opaque, non-secret version reference issued by the secret authority. The actual secret value is not an accepted input to the identity helper. Evidence stores the executable, repository-relative working directory, identity scheme, argument count, opaque-reference count, and a domain-separated SHA-256 digest of that ordered identity list.
+
+The identity digest remains part of `reuse_identity_digest`, so a public argument or opaque secret-version change invalidates exact reuse without placing arguments, prompts, tokens, paths, transcripts, or an offline verifier for the secret value in the evidence or transfer. If a secret authority cannot supply a non-secret opaque version identity, the execution cannot produce exportable exact-reuse evidence under this contract.
 
 ### Plan authorization
 
@@ -74,7 +76,11 @@ Deferred. It would add availability, credential, deployment, and organizational 
 
 ### Printable argument allowlist or secret scanner
 
-Rejected. A denylist cannot reliably identify positional credentials, prompts, transcripts, or new secret formats. Digest-only ordered arguments provide the required exact identity without retaining the source strings.
+Rejected. A denylist cannot reliably identify positional credentials, prompts, transcripts, or new secret formats. The closed public/opaque identity input keeps actual argv outside the contract instead of trying to sanitize it after receipt.
+
+### Unkeyed digest of the actual argument vector
+
+Rejected. Even without literal strings, a portable unkeyed digest lets a transfer recipient test predictable or low-entropy secret candidates offline when the surrounding arguments are known. Exact identity therefore consumes only public identities and non-secret opaque secret-version references, never secret values.
 
 ## Consequences
 
@@ -82,7 +88,7 @@ Rejected. A denylist cannot reliably identify positional credentials, prompts, t
 - Trust is explicit and current: storing or importing an object does not authorize it.
 - Producer key rotation invalidates reuse until requirements accept the new fingerprint.
 - Consumers must retain the trusted requirements input and evidence store when validating a plan.
-- Raw argv cannot be reconstructed from the artifact; diagnostics must use a separate privacy-controlled execution record outside this contract.
+- Raw argv is neither an identity-helper input nor reconstructable from the artifact; diagnostics must use a separate privacy-controlled execution record outside this contract.
 - The implementation uses Node.js built-in Ed25519 support and adds no dependency.
 
 ## Deferred decisions
