@@ -749,6 +749,55 @@ expectCodes("NEG-PROPOSED-NOT-EXECUTABLE", validateWorkPackagePlanExecutable(mut
   invalid.lifecycle_state = "executing";
   expectCodes("NEG-UNKNOWN-STATE", validateWorkPackagePlan(sealWorkPackagePlan(invalid), canonical));
 }
+for (const decision of [null, {}]) {
+  expectCodes("NEG-ADMISSION-DECISION-DEPENDENCY-MALFORMED", validateWorkPackagePlan(canonical.plan, {
+    ...canonical,
+    decision,
+  }));
+  expectCodes("NEG-ADMISSION-DECISION-DEPENDENCY-MALFORMED", validateWorkPackagePlanValidationContext(canonical.context, {
+    policy: canonical.policy,
+    decision,
+  }));
+}
+expectCodes("NEG-POLICY-DEPENDENCY-MALFORMED", validateWorkPackagePlanValidationContext(canonical.context, {
+  policy: {},
+  decision: canonical.decision,
+}));
+expectCodes("NEG-POLICY-DEPENDENCY-MALFORMED", validateWorkPackagePlan(canonical.plan, {
+  ...canonical,
+  policy: {},
+}));
+for (const malformedPrevious of [
+  { previousPlan: {} },
+  { previousContext: {} },
+]) {
+  expectCodes("NEG-PREVIOUS-REVISION-DEPENDENCY-MALFORMED", validateWorkPackagePlan(canonical.plan, {
+    ...canonical,
+    ...malformedPrevious,
+  }));
+}
+expectCodes("NEG-REPOSITORY-DECISION-MALFORMED", validateRepositoryEpicAdmissionWorkPackagePlan({
+  root,
+  paths: { decision: "manifest.json" },
+}).issues);
+expectCodes("NEG-REPOSITORY-POLICY-MALFORMED", validateRepositoryEpicAdmissionWorkPackagePlan({
+  root,
+  paths: { policy: "manifest.json" },
+}).issues);
+for (const [caseId, key, expectedPath] of [
+  ["NEG-REPOSITORY-HISTORICAL-R1-CONTEXT-MALFORMED", "firstContext", "$paths.firstContext"],
+  ["NEG-REPOSITORY-HISTORICAL-R1-PLAN-MALFORMED", "firstPlan", "$paths.firstPlan"],
+  ["NEG-REPOSITORY-HISTORICAL-R2-CONTEXT-MALFORMED", "previousContext", "$paths.previousContext"],
+  ["NEG-REPOSITORY-HISTORICAL-R2-PLAN-MALFORMED", "previousPlan", "$paths.previousPlan"],
+]) {
+  const issues = validateRepositoryEpicAdmissionWorkPackagePlan({ root, paths: { [key]: "manifest.json" } }).issues;
+  expectCodes(caseId, issues);
+  assert.deepEqual(issues.map((entry) => entry.path), [expectedPath], `${caseId} must identify the malformed historical artifact path`);
+}
+expectCodes("NEG-REPOSITORY-CATALOG-MALFORMED", validateRepositoryEpicAdmissionWorkPackagePlan({
+  root,
+  paths: { cases: "manifest.json" },
+}).issues);
 
 const repositoryResult = validateRepositoryEpicAdmissionWorkPackagePlan({ root });
 assert.deepEqual(repositoryResult.issues, [], "checked-in repository artifacts must validate");

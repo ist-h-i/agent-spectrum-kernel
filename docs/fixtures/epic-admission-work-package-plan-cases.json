@@ -491,6 +491,56 @@
       "case_id": "NEG-UNKNOWN-STATE",
       "domain": "schema",
       "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "NEG-ADMISSION-DECISION-DEPENDENCY-MALFORMED",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["ADMISSION_DECISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-REVISION-DEPENDENCY-MALFORMED",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-DECISION-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["ADMISSION_DECISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-HISTORICAL-R1-CONTEXT-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["HISTORICAL_R1_CONTEXT_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-HISTORICAL-R1-PLAN-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["HISTORICAL_R1_PLAN_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-HISTORICAL-R2-CONTEXT-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["HISTORICAL_R2_CONTEXT_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-HISTORICAL-R2-PLAN-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["HISTORICAL_R2_PLAN_INVALID"]
+    },
+    {
+      "case_id": "NEG-POLICY-DEPENDENCY-MALFORMED",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["POLICY_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-POLICY-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["POLICY_INVALID"]
+    },
+    {
+      "case_id": "NEG-REPOSITORY-CATALOG-MALFORMED",
+      "domain": "repository-validation",
+      "expected_issue_codes": ["FIXTURE_CATALOG_INVALID"]
     }
   ]
 }

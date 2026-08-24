@@ -166,6 +166,16 @@ const REQUIRED_CASE_IDS = Object.freeze([
   "NEG-DUPLICATE-KEY",
   "NEG-UNKNOWN-FIELD",
   "NEG-UNKNOWN-STATE",
+  "NEG-ADMISSION-DECISION-DEPENDENCY-MALFORMED",
+  "NEG-PREVIOUS-REVISION-DEPENDENCY-MALFORMED",
+  "NEG-REPOSITORY-DECISION-MALFORMED",
+  "NEG-REPOSITORY-HISTORICAL-R1-CONTEXT-MALFORMED",
+  "NEG-REPOSITORY-HISTORICAL-R1-PLAN-MALFORMED",
+  "NEG-REPOSITORY-HISTORICAL-R2-CONTEXT-MALFORMED",
+  "NEG-REPOSITORY-HISTORICAL-R2-PLAN-MALFORMED",
+  "NEG-POLICY-DEPENDENCY-MALFORMED",
+  "NEG-REPOSITORY-POLICY-MALFORMED",
+  "NEG-REPOSITORY-CATALOG-MALFORMED",
 ]);
 
 function compareAscii(left, right) {
@@ -628,10 +638,11 @@ export function validateEpicAdmissionDecision(decision, {
   policy,
   expectedSubject = null,
   schemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.decisionSchema),
+  policySchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.policySchema),
 } = {}) {
   const issues = schemaIssues(decision, schemaPath);
   if (issues.length > 0) return sortedIssues(issues);
-  const policyIssues = validateEpicAdmissionPolicy(policy);
+  const policyIssues = validateEpicAdmissionPolicy(policy, { schemaPath: policySchemaPath });
   if (policyIssues.length > 0) {
     return sortedIssues([issue("POLICY_INVALID", "$.policy_ref", formatIssues(policyIssues))]);
   }
@@ -872,7 +883,85 @@ function rawFileDigest(path) {
   return `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`;
 }
 
+function isPlainRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isPositiveRevision(value) {
+  return Number.isInteger(value) && value >= 1;
+}
+
+function isDigest(value) {
+  return typeof value === "string" && /^sha256:[0-9a-f]{64}$/.test(value);
+}
+
+function isPlanReference(value) {
+  return isPlainRecord(value)
+    && isNonEmptyString(value.plan_id)
+    && isPositiveRevision(value.plan_revision)
+    && isDigest(value.plan_digest);
+}
+
+function isContextReference(value) {
+  return isPlainRecord(value)
+    && isNonEmptyString(value.context_id)
+    && isPositiveRevision(value.context_revision)
+    && isDigest(value.context_digest);
+}
+
+function isCurrentPlanReference(value, { requireContentDigest = false } = {}) {
+  return isPlainRecord(value)
+    && isNonEmptyString(value.plan_id)
+    && isPositiveRevision(value.plan_revision)
+    && isNonEmptyString(value.lifecycle_state)
+    && (!requireContentDigest || isDigest(value.plan_content_digest));
+}
+
+function isHistoricalPlanArtifact(value, { requireSupersedes = false } = {}) {
+  return isPlainRecord(value)
+    && isNonEmptyString(value.plan_id)
+    && isPositiveRevision(value.plan_revision)
+    && isDigest(value.plan_digest)
+    && isNonEmptyString(value.lifecycle_state)
+    && isContextReference(value.validation_context_ref)
+    && (!requireSupersedes || isPlanReference(value.supersedes_plan_ref));
+}
+
+function isHistoricalContextArtifact(value, { requireSupersedes = false } = {}) {
+  return isPlainRecord(value)
+    && isNonEmptyString(value.context_id)
+    && isPositiveRevision(value.context_revision)
+    && isDigest(value.context_digest)
+    && isCurrentPlanReference(value.current_plan_ref, { requireContentDigest: requireSupersedes })
+    && (!requireSupersedes || (
+      isPlanReference(value.supersedes_plan_ref)
+      && isContextReference(value.supersedes_context_ref)
+    ));
+}
+
+function historicalArtifactShapeIssues(artifacts) {
+  const checks = [
+    ["firstContext", "HISTORICAL_R1_CONTEXT_INVALID", isHistoricalContextArtifact(artifacts.firstContext)],
+    ["firstPlan", "HISTORICAL_R1_PLAN_INVALID", isHistoricalPlanArtifact(artifacts.firstPlan)],
+    ["previousContext", "HISTORICAL_R2_CONTEXT_INVALID", isHistoricalContextArtifact(artifacts.previousContext, { requireSupersedes: true })],
+    ["previousPlan", "HISTORICAL_R2_PLAN_INVALID", isHistoricalPlanArtifact(artifacts.previousPlan, { requireSupersedes: true })],
+  ];
+  return checks
+    .filter(([, , valid]) => !valid)
+    .map(([key, code]) => issue(
+      code,
+      `$paths.${key}`,
+      `${key} must be a structured historical plan or validation-context artifact before lineage and digest validation`,
+    ));
+}
+
 function historicalArtifactIssues(paths, artifacts) {
+  const shapeIssues = historicalArtifactShapeIssues(artifacts);
+  if (shapeIssues.length > 0) return sortedIssues(shapeIssues);
   const issues = [];
   for (const [key, pin] of Object.entries(HISTORICAL_ARTIFACT_PINS)) {
     const artifact = artifacts[key];
@@ -970,9 +1059,23 @@ export function validateWorkPackagePlanValidationContext(context, {
   policy,
   decision,
   schemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.contextSchema),
+  policySchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.policySchema),
+  decisionSchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.decisionSchema),
 } = {}) {
   const issues = schemaIssues(context, schemaPath);
   if (issues.length > 0) return sortedIssues(issues);
+  if (policy !== undefined) {
+    const policyIssues = validateEpicAdmissionPolicy(policy, { schemaPath: policySchemaPath });
+    if (policyIssues.length > 0) {
+      return sortedIssues([issue("POLICY_INVALID", "$.current_policy_ref", formatIssues(policyIssues))]);
+    }
+  }
+  if (decision !== undefined) {
+    const decisionIssues = schemaIssues(decision, decisionSchemaPath);
+    if (decisionIssues.length > 0) {
+      return sortedIssues([issue("ADMISSION_DECISION_INVALID", "$.current_admission_decision_ref", formatIssues(decisionIssues))]);
+    }
+  }
 
   const resealed = sealWorkPackagePlanValidationContext(context);
   if (context.context_id !== resealed.context_id) {
@@ -1154,28 +1257,64 @@ export function validateWorkPackagePlan(plan, {
   previousContext = null,
   planSchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.planSchema),
   contextSchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.contextSchema),
+  policySchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.policySchema),
+  decisionSchemaPath = resolve(MODULE_ROOT, DEFAULT_PATHS.decisionSchema),
 } = {}) {
   const issues = schemaIssues(plan, planSchemaPath);
   if (issues.length > 0) return sortedIssues(issues);
 
+  const policyIssues = validateEpicAdmissionPolicy(policy, { schemaPath: policySchemaPath });
+  if (policyIssues.length > 0) {
+    return sortedIssues([issue("POLICY_INVALID", "$.admission_decision_ref", formatIssues(policyIssues))]);
+  }
+  const initialDecisionIssues = validateEpicAdmissionDecision(decision, {
+    policy,
+    schemaPath: decisionSchemaPath,
+    policySchemaPath,
+  });
+  if (initialDecisionIssues.length > 0) {
+    return sortedIssues([issue("ADMISSION_DECISION_INVALID", "$.admission_decision_ref", formatIssues(initialDecisionIssues))]);
+  }
   const contextIssues = validateWorkPackagePlanValidationContext(context, {
     policy,
     decision,
     schemaPath: contextSchemaPath,
+    policySchemaPath,
+    decisionSchemaPath,
   });
   if (contextIssues.length > 0) {
     return sortedIssues([issue("VALIDATION_CONTEXT_INVALID", "$.validation_context_ref", formatIssues(contextIssues))]);
   }
-  const decisionIssues = validateEpicAdmissionDecision(decision, { policy, expectedSubject: {
-    repository_id: context.repository.repository_id,
-    goal_id: context.goal_id,
-    task_id: decision.subject.task_id,
-    base_commit: context.repository.base_commit,
-    base_tree: context.repository.base_tree,
-    branch: context.repository.branch,
-  } });
+  const decisionIssues = validateEpicAdmissionDecision(decision, {
+    policy,
+    schemaPath: decisionSchemaPath,
+    policySchemaPath,
+    expectedSubject: {
+      repository_id: context.repository.repository_id,
+      goal_id: context.goal_id,
+      task_id: decision.subject.task_id,
+      base_commit: context.repository.base_commit,
+      base_tree: context.repository.base_tree,
+      branch: context.repository.branch,
+    },
+  });
   if (decisionIssues.length > 0) {
     return sortedIssues([issue("ADMISSION_DECISION_INVALID", "$.admission_decision_ref", formatIssues(decisionIssues))]);
+  }
+  if (
+    plan.plan_revision > 1
+    && previousPlan
+    && previousContext
+    && (
+      !isHistoricalPlanArtifact(previousPlan, { requireSupersedes: true })
+      || !isHistoricalContextArtifact(previousContext, { requireSupersedes: true })
+    )
+  ) {
+    return sortedIssues([issue(
+      "PREVIOUS_REVISION_INVALID",
+      "$.supersedes_plan_ref",
+      "the supplied previous plan and validation context must be structured artifacts before lineage and digest validation",
+    )]);
   }
 
   const resealed = sealWorkPackagePlan(plan);
@@ -1613,11 +1752,22 @@ export function validateRepositoryEpicAdmissionWorkPackagePlan({ root = MODULE_R
   } catch (error) {
     return { issues: [issue(error.code === "DUPLICATE_JSON_OBJECT_KEY" ? "DUPLICATE_JSON_KEY" : "STRICT_JSON_READ_FAILED", "$", error.message)] };
   }
-  const issues = [
-    ...validateEpicAdmissionPolicy(policy, { schemaPath: paths.policySchema }),
-    ...validateEpicAdmissionDecision(decision, { policy, schemaPath: paths.decisionSchema }),
-    ...historicalArtifactIssues(paths, { firstContext, firstPlan, previousContext, previousPlan }),
-    ...validateWorkPackagePlanExecutable(plan, {
+  const policyIssues = validateEpicAdmissionPolicy(policy, { schemaPath: paths.policySchema });
+  const decisionIssues = policyIssues.length === 0
+    ? validateEpicAdmissionDecision(decision, {
+      policy,
+      schemaPath: paths.decisionSchema,
+      policySchemaPath: paths.policySchema,
+    })
+    : [];
+  const historicalIssues = historicalArtifactIssues(paths, { firstContext, firstPlan, previousContext, previousPlan });
+  const dependencyIssues = policyIssues.length > 0
+    ? [issue("POLICY_INVALID", "$paths.policy", formatIssues(policyIssues))]
+    : decisionIssues.length > 0
+      ? [issue("ADMISSION_DECISION_INVALID", "$paths.decision", formatIssues(decisionIssues))]
+      : [];
+  const planIssues = policyIssues.length === 0 && decisionIssues.length === 0 && historicalIssues.length === 0
+    ? validateWorkPackagePlanExecutable(plan, {
       policy,
       decision,
       context,
@@ -1625,7 +1775,14 @@ export function validateRepositoryEpicAdmissionWorkPackagePlan({ root = MODULE_R
       previousPlan,
       planSchemaPath: paths.planSchema,
       contextSchemaPath: paths.contextSchema,
-    }),
+      policySchemaPath: paths.policySchema,
+      decisionSchemaPath: paths.decisionSchema,
+    })
+    : [];
+  const issues = [
+    ...dependencyIssues,
+    ...historicalIssues,
+    ...planIssues,
     ...validateCaseCatalog(cases),
   ];
   return {
@@ -1634,7 +1791,7 @@ export function validateRepositoryEpicAdmissionWorkPackagePlan({ root = MODULE_R
     decision,
     context,
     plan,
-    caseCount: cases.cases.length,
+    caseCount: Array.isArray(cases?.cases) ? cases.cases.length : 0,
   };
 }
 
