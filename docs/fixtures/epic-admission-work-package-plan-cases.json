@@ -508,6 +508,16 @@
       "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
     },
     {
+      "case_id": "NEG-PREVIOUS-REVISION-ONE-PLAN-LINEAGE-PAYLOAD",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
+      "case_id": "NEG-PREVIOUS-REVISION-ONE-CONTEXT-LINEAGE-PAYLOAD",
+      "domain": "dependency-validation",
+      "expected_issue_codes": ["PREVIOUS_REVISION_INVALID"]
+    },
+    {
       "case_id": "NEG-REPOSITORY-DECISION-MALFORMED",
       "domain": "repository-validation",
       "expected_issue_codes": ["ADMISSION_DECISION_INVALID"]

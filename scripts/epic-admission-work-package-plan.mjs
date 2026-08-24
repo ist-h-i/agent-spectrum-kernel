@@ -169,6 +169,8 @@ const REQUIRED_CASE_IDS = Object.freeze([
   "NEG-UNKNOWN-STATE",
   "NEG-ADMISSION-DECISION-DEPENDENCY-MALFORMED",
   "NEG-PREVIOUS-REVISION-DEPENDENCY-MALFORMED",
+  "NEG-PREVIOUS-REVISION-ONE-PLAN-LINEAGE-PAYLOAD",
+  "NEG-PREVIOUS-REVISION-ONE-CONTEXT-LINEAGE-PAYLOAD",
   "NEG-REPOSITORY-DECISION-MALFORMED",
   "NEG-REPOSITORY-HISTORICAL-R1-CONTEXT-MALFORMED",
   "NEG-REPOSITORY-HISTORICAL-R1-PLAN-MALFORMED",
@@ -900,6 +902,14 @@ function isDigest(value) {
   return typeof value === "string" && /^sha256:[0-9a-f]{64}$/.test(value);
 }
 
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function isKnownWorkPackagePlanSchemaVersion(value) {
+  return ["1.0.0", "1.1.0", WORK_PACKAGE_PLAN_SCHEMA_VERSION].includes(value);
+}
+
 function isPlanReference(value) {
   return isPlainRecord(value)
     && isNonEmptyString(value.plan_id)
@@ -922,46 +932,65 @@ function isCurrentPlanReference(value, { requireContentDigest = false } = {}) {
     && (!requireContentDigest || isDigest(value.plan_content_digest));
 }
 
-function isHistoricalPlanArtifact(value, { requireSupersedes = false } = {}) {
-  return isPlainRecord(value)
+function hasRevisionAwarePlanLineage(value) {
+  return value.plan_revision === 1
+    ? !hasOwn(value, "supersedes_plan_ref") && !hasOwn(value, "revision_reason")
+    : isPlanReference(value.supersedes_plan_ref) && isNonEmptyString(value.revision_reason);
+}
+
+function hasRevisionAwareContextLineage(value) {
+  return value.context_revision === 1
+    ? !hasOwn(value, "supersedes_plan_ref")
+      && !hasOwn(value, "supersedes_context_ref")
+      && !hasOwn(value, "revision_reason")
+    : isPlanReference(value.supersedes_plan_ref)
+      && isContextReference(value.supersedes_context_ref)
+      && isNonEmptyString(value.revision_reason);
+}
+
+function isHistoricalPlanArtifact(value, { schemaPath } = {}) {
+  const structured = isPlainRecord(value)
+    && isKnownWorkPackagePlanSchemaVersion(value.schema_version)
     && isNonEmptyString(value.plan_id)
     && isPositiveRevision(value.plan_revision)
     && isDigest(value.plan_digest)
     && isNonEmptyString(value.lifecycle_state)
     && isContextReference(value.validation_context_ref)
-    && (!requireSupersedes || isPlanReference(value.supersedes_plan_ref));
+    && hasRevisionAwarePlanLineage(value);
+  return structured
+    && (value.schema_version !== WORK_PACKAGE_PLAN_SCHEMA_VERSION || schemaIssues(value, schemaPath).length === 0);
 }
 
-function isHistoricalContextArtifact(value, { requireSupersedes = false } = {}) {
-  return isPlainRecord(value)
+function isHistoricalContextArtifact(value, { schemaPath } = {}) {
+  const structured = isPlainRecord(value)
+    && isKnownWorkPackagePlanSchemaVersion(value.schema_version)
     && isNonEmptyString(value.context_id)
     && isPositiveRevision(value.context_revision)
     && isDigest(value.context_digest)
-    && isCurrentPlanReference(value.current_plan_ref, { requireContentDigest: requireSupersedes })
-    && (!requireSupersedes || (
-      isPlanReference(value.supersedes_plan_ref)
-      && isContextReference(value.supersedes_context_ref)
-    ));
+    && isCurrentPlanReference(value.current_plan_ref, { requireContentDigest: value.context_revision > 1 })
+    && hasRevisionAwareContextLineage(value);
+  return structured
+    && (value.schema_version !== WORK_PACKAGE_PLAN_SCHEMA_VERSION || schemaIssues(value, schemaPath).length === 0);
 }
 
-function historicalArtifactShapeIssues(artifacts) {
+function historicalArtifactShapeIssues(paths, artifacts) {
   const checks = [
-    ["firstContext", "HISTORICAL_R1_CONTEXT_INVALID", isHistoricalContextArtifact(artifacts.firstContext)],
-    ["firstPlan", "HISTORICAL_R1_PLAN_INVALID", isHistoricalPlanArtifact(artifacts.firstPlan)],
-    ["previousContext", "HISTORICAL_R2_CONTEXT_INVALID", isHistoricalContextArtifact(artifacts.previousContext, { requireSupersedes: true })],
-    ["previousPlan", "HISTORICAL_R2_PLAN_INVALID", isHistoricalPlanArtifact(artifacts.previousPlan, { requireSupersedes: true })],
+    ["firstContext", "HISTORICAL_R1_CONTEXT_INVALID", isHistoricalContextArtifact(artifacts.firstContext, { schemaPath: paths.contextSchema })],
+    ["firstPlan", "HISTORICAL_R1_PLAN_INVALID", isHistoricalPlanArtifact(artifacts.firstPlan, { schemaPath: paths.planSchema })],
+    ["previousContext", "HISTORICAL_R2_CONTEXT_INVALID", isHistoricalContextArtifact(artifacts.previousContext, { schemaPath: paths.contextSchema })],
+    ["previousPlan", "HISTORICAL_R2_PLAN_INVALID", isHistoricalPlanArtifact(artifacts.previousPlan, { schemaPath: paths.planSchema })],
   ];
   return checks
     .filter(([, , valid]) => !valid)
     .map(([key, code]) => issue(
       code,
       `$paths.${key}`,
-      `${key} must be a structured historical plan or validation-context artifact before lineage and digest validation`,
+      `${key} must satisfy its declared Schema or legacy revision-aware shape before lineage and digest validation`,
     ));
 }
 
 function historicalArtifactIssues(paths, artifacts) {
-  const shapeIssues = historicalArtifactShapeIssues(artifacts);
+  const shapeIssues = historicalArtifactShapeIssues(paths, artifacts);
   if (shapeIssues.length > 0) return sortedIssues(shapeIssues);
   const issues = [];
   for (const [key, pin] of Object.entries(HISTORICAL_ARTIFACT_PINS)) {
@@ -1302,20 +1331,17 @@ export function validateWorkPackagePlan(plan, {
   if (decisionIssues.length > 0) {
     return sortedIssues([issue("ADMISSION_DECISION_INVALID", "$.admission_decision_ref", formatIssues(decisionIssues))]);
   }
-  if (
-    plan.plan_revision > 1
-    && previousPlan
-    && previousContext
-    && (
-      !isHistoricalPlanArtifact(previousPlan, { requireSupersedes: previousPlan.plan_revision > 1 })
-      || !isHistoricalContextArtifact(previousContext, { requireSupersedes: previousContext.context_revision > 1 })
-    )
-  ) {
-    return sortedIssues([issue(
-      "PREVIOUS_REVISION_INVALID",
-      "$.supersedes_plan_ref",
-      "the supplied previous plan and validation context must be structured artifacts before lineage and digest validation",
-    )]);
+  if (plan.plan_revision > 1 && previousPlan && previousContext) {
+    if (
+      !isHistoricalPlanArtifact(previousPlan, { schemaPath: planSchemaPath })
+      || !isHistoricalContextArtifact(previousContext, { schemaPath: contextSchemaPath })
+    ) {
+      return sortedIssues([issue(
+        "PREVIOUS_REVISION_INVALID",
+        "$.supersedes_plan_ref",
+        "the supplied previous plan and validation context must satisfy their declared Schemas or legacy revision-aware shapes before lineage and digest validation",
+      )]);
+    }
   }
 
   const resealed = sealWorkPackagePlan(plan);

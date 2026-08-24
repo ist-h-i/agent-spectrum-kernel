@@ -734,6 +734,86 @@ expectCodes("NEG-STACK-DEPENDENCY-CLOSURE", validatePlanBundle(mutatePlan(canoni
     }),
     [],
   );
+
+  const buildExactRevisionTwoSuccessor = (previous, reason) => {
+    const previousPlanRef = {
+      plan_id: previous.plan.plan_id,
+      plan_revision: previous.plan.plan_revision,
+      plan_digest: previous.plan.plan_digest,
+    };
+    const successorContextDraft = clone(previous.context);
+    successorContextDraft.context_revision = previous.context.context_revision + 1;
+    successorContextDraft.supersedes_context_ref = {
+      context_id: previous.context.context_id,
+      context_revision: previous.context.context_revision,
+      context_digest: previous.context.context_digest,
+    };
+    successorContextDraft.supersedes_plan_ref = previousPlanRef;
+    successorContextDraft.revision_reason = reason;
+    const successorPlanDraft = clone(previous.plan);
+    successorPlanDraft.plan_revision = previous.plan.plan_revision + 1;
+    successorPlanDraft.supersedes_plan_ref = previousPlanRef;
+    successorPlanDraft.revision_reason = reason;
+    for (const workPackage of successorPlanDraft.packages) {
+      workPackage.revision = successorPlanDraft.plan_revision;
+      workPackage.plan_binding.plan_revision = successorPlanDraft.plan_revision;
+    }
+    return closePlanContextBinding({ ...previous, context: successorContextDraft }, successorPlanDraft);
+  };
+  const revisionOnePlanRef = {
+    plan_id: revisionOne.plan.plan_id,
+    plan_revision: revisionOne.plan.plan_revision,
+    plan_digest: revisionOne.plan.plan_digest,
+  };
+  const revisionOneContextRef = {
+    context_id: revisionOne.context.context_id,
+    context_revision: revisionOne.context.context_revision,
+    context_digest: revisionOne.context.context_digest,
+  };
+
+  const invalidRevisionOnePlanDraft = clone(revisionOne.plan);
+  invalidRevisionOnePlanDraft.supersedes_plan_ref = revisionOnePlanRef;
+  invalidRevisionOnePlanDraft.revision_reason = "Schema-invalid lineage payload on a revision 1 predecessor plan.";
+  const invalidRevisionOnePlan = closePlanContextBinding(revisionOne, invalidRevisionOnePlanDraft);
+  const invalidRevisionOnePlanSuccessor = buildExactRevisionTwoSuccessor(
+    invalidRevisionOnePlan,
+    "Reject a revision 1 predecessor plan that claims lineage.",
+  );
+  expectDeterministicIssues(
+    "NEG-PREVIOUS-REVISION-ONE-PLAN-LINEAGE-PAYLOAD",
+    () => validateWorkPackagePlan(invalidRevisionOnePlanSuccessor.plan, {
+      policy: invalidRevisionOnePlanSuccessor.policy,
+      decision: invalidRevisionOnePlanSuccessor.decision,
+      context: invalidRevisionOnePlanSuccessor.context,
+      previousContext: invalidRevisionOnePlan.context,
+      previousPlan: invalidRevisionOnePlan.plan,
+    }),
+    ["$.supersedes_plan_ref"],
+  );
+
+  const invalidRevisionOneContextDraft = clone(revisionOne.context);
+  invalidRevisionOneContextDraft.supersedes_context_ref = revisionOneContextRef;
+  invalidRevisionOneContextDraft.supersedes_plan_ref = revisionOnePlanRef;
+  invalidRevisionOneContextDraft.revision_reason = "Schema-invalid lineage payload on a revision 1 predecessor context.";
+  const invalidRevisionOneContext = closePlanContextBinding(
+    { ...revisionOne, context: invalidRevisionOneContextDraft },
+    revisionOne.plan,
+  );
+  const invalidRevisionOneContextSuccessor = buildExactRevisionTwoSuccessor(
+    invalidRevisionOneContext,
+    "Reject a revision 1 predecessor context that claims lineage.",
+  );
+  expectDeterministicIssues(
+    "NEG-PREVIOUS-REVISION-ONE-CONTEXT-LINEAGE-PAYLOAD",
+    () => validateWorkPackagePlan(invalidRevisionOneContextSuccessor.plan, {
+      policy: invalidRevisionOneContextSuccessor.policy,
+      decision: invalidRevisionOneContextSuccessor.decision,
+      context: invalidRevisionOneContextSuccessor.context,
+      previousContext: invalidRevisionOneContext.context,
+      previousPlan: invalidRevisionOneContext.plan,
+    }),
+    ["$.supersedes_plan_ref"],
+  );
 }
 {
   const revisionOne = clone(canonical.context);
