@@ -1,6 +1,6 @@
 # ADR-0001: Verification evidence trust boundary
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-24
 - Scope: Issue #274 Slice 1 exact verification-evidence reuse
 - Related contract: `docs/verification-evidence-contract.md`
