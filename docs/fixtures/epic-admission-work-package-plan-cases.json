@@ -148,6 +148,11 @@
       "expected_issue_codes": ["DECISION_RECOMPUTATION_MISMATCH", "OVERRIDE_AUTHORITY_INVALID"]
     },
     {
+      "case_id": "NEG-OVERRIDE-GRANT-EVIDENCE-BLANK",
+      "domain": "admission-policy",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
       "case_id": "NEG-OVERRIDE-BASIS-REPLAY",
       "domain": "admission",
       "expected_issue_codes": ["DECISION_RECOMPUTATION_MISMATCH", "OVERRIDE_AUTHORITY_INVALID"]
@@ -296,6 +301,16 @@
       "case_id": "NEG-FOCUSED-GATE-MISSING",
       "domain": "plan",
       "expected_issue_codes": ["EXPECTED_EVIDENCE_UNBOUND", "FOCUSED_CADENCE_MISSING"]
+    },
+    {
+      "case_id": "NEG-FULL-GATE-PROCEDURE-BLANK",
+      "domain": "plan-context",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
+    },
+    {
+      "case_id": "NEG-FULL-GATE-PURPOSE-BLANK",
+      "domain": "plan-context",
+      "expected_issue_codes": ["SCHEMA_INVALID"]
     },
     {
       "case_id": "NEG-FULL-CHECKPOINT-MISSING",

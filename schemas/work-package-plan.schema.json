@@ -157,7 +157,7 @@
     "plan_digest": { "$ref": "#/$defs/sha256Digest" }
   },
   "$defs": {
-    "nonEmptyString": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "nonEmptyString": { "type": "string", "minLength": 1, "maxLength": 2000, "pattern": "\\S" },
     "stableId": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/#-]*$" },
     "repositoryId": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
     "gitObjectId": { "type": "string", "pattern": "^[a-f0-9]{40}$" },

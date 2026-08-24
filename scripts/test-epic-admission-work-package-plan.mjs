@@ -396,6 +396,18 @@ for (const [caseId, mutate] of [
   expectCodes("NEG-OVERRIDE-GRANT", validateEpicAdmissionDecision(sealEpicAdmissionDecision(invalid), { policy: overridePolicy }));
 }
 {
+  const invalidPolicyDraft = clone(overridePolicy);
+  invalidPolicyDraft.override_rules[0].authority_grants[0].evidence_ref = " ";
+  const invalidPolicy = sealEpicAdmissionPolicy(invalidPolicyDraft);
+  expectCodes("NEG-OVERRIDE-GRANT-EVIDENCE-BLANK", validateEpicAdmissionPolicy(invalidPolicy));
+  assert.throws(() => evaluateEpicAdmission({
+    policy: invalidPolicy,
+    subject: buildEpicAdmissionSubject(),
+    observed_signals: buildObservedSignals("epic"),
+    override_request: overrideRequest,
+  }), /epic admission policy is invalid: SCHEMA_INVALID/u, "blank grant evidence must fail before an allowed decision is returned");
+}
+{
   const replayed = clone(overriddenDecision);
   replayed.observed_signals.acceptance_condition_count.value -= 1;
   expectCodes("NEG-OVERRIDE-BASIS-REPLAY", validateEpicAdmissionDecision(sealEpicAdmissionDecision(replayed), { policy: overridePolicy }));
@@ -507,6 +519,19 @@ expectCodes("NEG-EXPECTED-ARTIFACT-FORBIDDEN", validatePlanBundle(mutatePlan(can
 expectCodes("NEG-FOCUSED-GATE-MISSING", validatePlanBundle(mutatePlan(canonical, (plan) => {
   plan.verification.focused_cadence = plan.verification.focused_cadence.filter((entry) => entry.after_package_id !== "WP4");
 })));
+for (const [caseId, field] of [
+  ["NEG-FULL-GATE-PROCEDURE-BLANK", "procedure"],
+  ["NEG-FULL-GATE-PURPOSE-BLANK", "purpose"],
+]) {
+  const context = clone(canonical.context);
+  const plan = clone(canonical.plan);
+  const gateId = context.non_overridable_gates[0].verification_id;
+  context.non_overridable_gates[0][field] = " ";
+  plan.verification.steps.find((step) => step.verification_id === gateId)[field] = " ";
+  const bundle = closePlanContextBinding({ ...canonical, context }, plan);
+  assert.deepEqual(codes(validateWorkPackagePlanValidationContext(bundle.context, { policy: bundle.policy, decision: bundle.decision })), ["SCHEMA_INVALID"], `${caseId} trusted context must reject whitespace-only authority text`);
+  expectCodes(caseId, validatePlanBundle(bundle));
+}
 expectCodes("NEG-FULL-CHECKPOINT-MISSING", validatePlanBundle(mutatePlan(canonical, (plan) => {
   plan.verification.full_gate_checkpoints = plan.verification.full_gate_checkpoints.filter((entry) => entry.checkpoint_id !== "CHECKPOINT-EXACT-HEAD-CI");
 })));
