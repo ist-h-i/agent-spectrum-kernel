@@ -80,7 +80,13 @@ const FIXTURE_DEFINITIONS = [
   { fixture_id: "cal-concurrent-transfer", fixture_role: "calibration", suite: "calibration", task_class: "implementation", repetitions: 5, aggregate_eligible: false },
 ];
 const FIXTURES_BY_ID = new Map(FIXTURE_DEFINITIONS.map((fixture) => [fixture.fixture_id, fixture]));
+const AGGREGATE_NUMERIC_FIXTURE_ID = "mp-accessibility-interaction-review";
+const AGGREGATE_NUMERIC_CONDITIONS = new Set(["kernel_only", "adaptive_ask"]);
 const covered = new Set();
+
+function isAggregateNumericInput({ adapter, fixture, condition }) {
+  return adapter === "codex" && fixture === AGGREGATE_NUMERIC_FIXTURE_ID && AGGREGATE_NUMERIC_CONDITIONS.has(condition);
+}
 
 function hash(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -259,7 +265,9 @@ function buildNormalizedRoot(target) {
     for (const { fixture_id: fixture, repetitions } of FIXTURE_DEFINITIONS) {
       for (const condition of CONDITIONS) {
         for (let repetition = 1; repetition <= repetitions; repetition += 1) {
-          records.push(normalizedRecord({ adapter, fixture, repetitions, condition, repetition, outcome: OUTCOMES[outcomeIndex++ % OUTCOMES.length] }));
+          const syntheticOutcome = OUTCOMES[outcomeIndex++ % OUTCOMES.length];
+          const outcome = isAggregateNumericInput({ adapter, fixture, condition }) ? "completed" : syntheticOutcome;
+          records.push(normalizedRecord({ adapter, fixture, repetitions, condition, repetition, outcome }));
         }
       }
     }
@@ -394,7 +402,8 @@ function observation() {
 
 function engineeringResult(record, index) {
   const evaluatorStatuses = ["completed", "evaluator_unavailable", "evaluator_failed", "invalid_input", "manual_review_required"];
-  const evaluation_status = record.outcome === "completed" ? evaluatorStatuses[index % evaluatorStatuses.length] : "completed";
+  const aggregateNumericInput = isAggregateNumericInput({ adapter: record.lineage.adapter_track, fixture: record.lineage.fixture_id, condition: record.lineage.condition });
+  const evaluation_status = aggregateNumericInput ? "completed" : (record.outcome === "completed" ? evaluatorStatuses[index % evaluatorStatuses.length] : "completed");
   const complete = record.outcome === "completed" && evaluation_status === "completed";
   const normalizedReasons = { failed: "normalized_execution_failed", unavailable: "normalized_execution_unavailable", interrupted: "normalized_execution_interrupted", invalid: "normalized_execution_invalid" };
   const evaluatorReasons = { evaluator_unavailable: "evaluator_unavailable", evaluator_failed: "evaluator_failed", invalid_input: "evaluation_invalid_input", manual_review_required: "manual_review_required" };
@@ -1282,21 +1291,21 @@ try {
   covered.add("paired-comparison-full-authority");
 
   const aggregateAuthorityRoot = resolve(positive.target, "aggregate-authority");
-  const classificationRecordPath = "classification/cal-concurrent-transfer.json";
+  const classificationRecordPath = `classification/${AGGREGATE_NUMERIC_FIXTURE_ID}.json`;
   const classificationRecord = {
-    classification_record_id: "classification-cal-concurrent-transfer-e2e",
+    classification_record_id: `classification-${AGGREGATE_NUMERIC_FIXTURE_ID}-e2e`,
     classification_record_schema_path: "benchmarks/schemas/portfolio-classification-record.schema.json",
     classification_record_path: classificationRecordPath,
-    fixture_id: "cal-concurrent-transfer",
-    fixture_role: "calibration",
+    fixture_id: AGGREGATE_NUMERIC_FIXTURE_ID,
+    fixture_role: "primary",
     catalog_digest: POLICY_AUTHORITIES.verified_catalog.catalog_digest,
     policy_manifest_digest: POLICY_AUTHORITIES.verified_policy_manifest.manifest_digest,
-    pilot_result_digest: digest("cal-concurrent-transfer-e2e-pilot"),
+    pilot_result_digest: digest(`${AGGREGATE_NUMERIC_FIXTURE_ID}-e2e-pilot`),
     supported_adapter_tracks: ["codex"],
-    ceiling_classification_result: "not_applicable",
-    floor_classification_result: "not_applicable",
-    classification_state: "calibration_only",
-    reason_codes: ["calibration_fixture"],
+    ceiling_classification_result: "not_candidate",
+    floor_classification_result: "not_candidate",
+    classification_state: "primary_eligible",
+    reason_codes: ["ceiling_and_floor_not_candidate"],
     classification_revision: 1,
   };
   classificationRecord.classification_digest = computeClassificationRecordDigest(classificationRecord);
@@ -1314,18 +1323,30 @@ try {
     lineageRecordPaths: [],
     immutableArtifactDigests: { [classificationRecordPath]: classificationRecordSourceDigest },
     comparisonView: "adaptive_vs_kernel",
-    suite: "calibration",
-    taskClass: "implementation",
+    suite: "mechanism_positive",
+    taskClass: "pr_review",
     outputPath: aggregateResultPath,
   };
+  const numericFixtureComparison = pairedComparison.artifact.fixture_comparisons.find(({ fixture_id }) => fixture_id === AGGREGATE_NUMERIC_FIXTURE_ID);
+  const numericComparisonView = numericFixtureComparison?.comparison_views.find(({ view_id }) => view_id === "adaptive_vs_kernel");
+  assert.equal(numericComparisonView?.structural_pairing_status, "complete");
+  assert.equal(numericComparisonView?.quality_delta_distribution.distribution_status, "complete");
+  assert.equal(numericComparisonView?.quality_delta_distribution.sample_count, 3);
+  assert.equal(Number.isFinite(numericComparisonView?.quality_delta_distribution.mean), true);
+  const expectedNumericDelta = numericComparisonView.quality_delta_distribution.mean;
   const aggregateResult = reportPortfolioAggregateResult(aggregateOptions);
-  assert.deepEqual(aggregateResult.artifact.expected_fixture_ids, ["cal-concurrent-transfer"]);
-  assert.deepEqual(aggregateResult.artifact.included_fixture_ids, []);
-  assert.deepEqual(aggregateResult.artifact.excluded_fixtures, [{ fixture_id: "cal-concurrent-transfer", reason: "classification_calibration_only" }]);
-  assert.equal(aggregateResult.artifact.fixture_contributions.length, 0);
+  assert.deepEqual(aggregateResult.artifact.expected_fixture_ids, [AGGREGATE_NUMERIC_FIXTURE_ID]);
+  assert.deepEqual(aggregateResult.artifact.included_fixture_ids, [AGGREGATE_NUMERIC_FIXTURE_ID]);
+  assert.deepEqual(aggregateResult.artifact.excluded_fixtures, []);
+  assert.deepEqual(aggregateResult.artifact.fixture_contributions, [{ fixture_id: AGGREGATE_NUMERIC_FIXTURE_ID, normalized_quality_delta: expectedNumericDelta }]);
+  assert.equal(aggregateResult.artifact.unweighted_quality_delta, expectedNumericDelta);
+  assert.equal(aggregateResult.artifact.weighted_quality_delta, null);
+  assert.equal(aggregateResult.artifact.numerator, null);
+  assert.equal(aggregateResult.artifact.denominator, null);
   assert.equal(aggregateResult.artifact.result_status, "insufficient_evidence");
   const verifiedAggregateResult = verifyPortfolioAggregateResult({ ...aggregateOptions, outputPath: undefined, aggregateResultPath });
   assert.equal(verifiedAggregateResult.artifact.aggregate_result_digest, aggregateResult.artifact.aggregate_result_digest);
+  assert.deepEqual(verifiedAggregateResult.artifact, aggregateResult.artifact);
   assert.equal(Object.isFrozen(verifiedAggregateResult.verified_aggregate_result), true);
   assert.equal(Object.isFrozen(verifiedAggregateResult.verified_comparison.verified_comparison_report), true);
   assert.equal(Object.isFrozen(verifiedAggregateResult.verified_policy_artifacts.verified_catalog), true);
@@ -1341,8 +1362,8 @@ try {
     "--classification-record", classificationRecordPath,
     "--classification-record-source-digest", classificationRecordSourceDigest,
     "--comparison-view", "adaptive_vs_kernel",
-    "--suite", "calibration",
-    "--task-class", "implementation",
+    "--suite", "mechanism_positive",
+    "--task-class", "pr_review",
   ];
   const aggregateCliReport = run(["report-engineering-aggregate-result", ...aggregateCliAuthorityArgs, "--output", aggregateCliPath]);
   assert.match(aggregateCliReport.stdout, /Published aggregate result .* with status insufficient_evidence/u);

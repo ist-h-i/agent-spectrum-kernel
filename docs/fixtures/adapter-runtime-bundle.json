@@ -537,7 +537,7 @@
       "engineering_result_set_implementation_path": "scripts/ask-benchmark-portfolio-result-set.mjs",
       "engineering_result_set_implementation_file_sha256": "ae7230381c39c413e4a4b3bb4afb7f07f2be03645dbbe66d5d9d987a6a8f9fda",
       "engineering_result_set_test_path": "scripts/test-ask-benchmark-portfolio-result-set.mjs",
-      "engineering_result_set_test_file_sha256": "a772d802edc4f84b7650843db1ddcb2232c885da8ac732f1ff666bd77f45400d",
+      "engineering_result_set_test_file_sha256": "9d28a4ef9e2faa9a8534c7c54119288e74a6c8145a0ccc883ecc1e6114b80da6",
       "repetition_report_schema_path": "benchmarks/schemas/portfolio-repetition-report.schema.json",
       "repetition_report_schema_file_sha256": "51c4d534782ba1c31497ecd2394d377fadcbe65d7e2f4ae92d63124dd772371e",
       "repetition_report_implementation_path": "scripts/ask-benchmark-portfolio-repetition-report.mjs",
