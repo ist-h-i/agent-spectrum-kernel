@@ -102,6 +102,10 @@
       "argv": ["node", "scripts/test-ask-benchmark-portfolio-paired-comparison-report.mjs"]
     },
     {
+      "id": "portfolio_aggregate_result",
+      "argv": ["node", "scripts/test-ask-benchmark-portfolio-aggregate-result.mjs"]
+    },
+    {
       "id": "portfolio_directional_outcome_report",
       "argv": ["node", "scripts/test-ask-benchmark-portfolio-directional-outcome-report.mjs"]
     },

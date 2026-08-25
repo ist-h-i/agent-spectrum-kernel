@@ -120,6 +120,9 @@ jobs:
       - name: Run portfolio paired comparison report tests
         run: node scripts/test-ask-benchmark-portfolio-paired-comparison-report.mjs
 
+      - name: Run portfolio aggregate result tests
+        run: node scripts/test-ask-benchmark-portfolio-aggregate-result.mjs
+
       - name: Run portfolio directional outcome report tests
         run: node scripts/test-ask-benchmark-portfolio-directional-outcome-report.mjs
 

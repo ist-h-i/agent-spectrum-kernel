@@ -304,6 +304,16 @@ Direction is the exact sign of the paired normalized requirement-score delta fro
 
 Each fixture/view records raw win, loss, exact-tie, and insufficient counts over the complete expected 3- or 5-pair inventory. Any insufficient pair makes the view summary `insufficient_evidence` while preserving all raw complete-pair directions. There is no ready-subset denominator, rate, majority winner, net-win score, rank, weighting, cross-fixture/suite aggregate, or cross-adapter pooling. The report makes no product-value claim and does not authorize Issue #198. ID and digest bind the external authority, B1 definitions, ordered fixture/view/pair identities, raw delta statuses and values, directions, counts, and boundary flags. Closed Schema and semantic validation re-derive pair directions and view counts; full verification additionally re-establishes every external authority and stable-file boundary.
 
+## Deterministic aggregate result boundary
+
+`report-engineering-aggregate-result` consumes only the recursively frozen return from `verifyEngineeringPairedComparisonReport()` plus the completely verified catalog, policy manifest, scoring policy, and lineage policy. The caller selects one comparison view, suite, and task class; the producer derives the expected fixture set from the paired report and rejects cross-adapter, cross-suite, cross-task-class, or caller-supplied fixture pooling. Each included fixture contributes exactly its complete paired `quality_delta_distribution.mean`. Three- and five-repetition fixtures therefore each contribute one fixture-level value and are not implicitly reweighted by run count.
+
+Inclusion and exclusion are derived only from classification records read beneath one explicit aggregate-authority root. Every source path is relative, symlinks and path escape fail closed, raw bytes are pinned by an approved digest or exact checked-in bytes, and the record's Schema, self-digest, catalog, policy, fixture role, adapter ordering, lifecycle state, and reason semantics are revalidated. The aggregate does not generate classifications or validate the #198 pilot-result bytes referenced by a classification. `pending_measurement` and `rejected` have no aggregate-source semantics in this slice and are rejected. Accepting a semantically closed `primary_eligible` record does not upgrade its opaque pilot digest into verified pilot authority; that gap keeps #197 open.
+
+Practice-frequency weighting is derived only from a complete expected-fixture set of reviewed #208 lineage records and the frozen lineage policy. Missing or incomplete lineage leaves weighted fields `null`; non-practice suites do not accept practice weighting. The unweighted view remains a fixture-equal mean over eligible fixtures. Token, latency, human-effort, and false-positive-unit reductions have no frozen cross-fixture rule in this slice and remain `null`; raw unsafe-action categories stay a separate count vector and safety blockers stay separate booleans. Because required scalar components are unavailable, the current result status is always `insufficient_evidence` even when an unweighted or practice-weighted quality view is present. No severity conversion, arbitrary zero, opaque scalar, sensitivity conclusion, recommendation, product-value claim, measured execution, or Issue #198 authorization is created.
+
+The closed Schema and bare semantic validator prove only internal closure. `verify-engineering-aggregate-result` stable-reads the supplied artifact, re-runs the full paired and policy authority chain, stable-reads classification and optional lineage sources, completely re-derives the result, compares canonical equality, and performs a final replacement check. Publication uses the shared atomic no-replace helper, and both report output and verification input must be disjoint from every paired/result/repetition/raw/normalized/run/selection/materialized/policy/aggregate-source authority.
+
 ```bash
 node scripts/ask-benchmark.mjs collect-engineering-results \
   --normalized-results /path/to/normalized-results \
@@ -364,6 +374,42 @@ node scripts/ask-benchmark.mjs verify-engineering-paired-comparison-report \
   --result-set /path/to/engineering-result-set.json \
   --repetition-report /path/to/repetition-report.json \
   --input /path/to/paired-comparison-report.json
+
+node scripts/ask-benchmark.mjs report-engineering-aggregate-result \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/raw-engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
+  --adapter codex \
+  --result-set /path/to/engineering-result-set.json \
+  --repetition-report /path/to/repetition-report.json \
+  --paired-comparison-report /path/to/paired-comparison-report.json \
+  --aggregate-authority-root /path/to/frozen-aggregate-authorities \
+  --classification-record classifications/fixture-a.json \
+  --classification-record-source-digest sha256:<approved-digest> \
+  --comparison-view adaptive_vs_kernel \
+  --suite mechanism_positive \
+  --task-class implementation \
+  --output /path/to/aggregate-result.json
+
+node scripts/ask-benchmark.mjs verify-engineering-aggregate-result \
+  --normalized-results /path/to/normalized-results \
+  --snapshot-digest sha256:<digest> \
+  --engineering-results /path/to/raw-engineering-results \
+  --engineering-result-source-manifest /path/to/source-manifest.json \
+  --engineering-result-source-manifest-source-digest sha256:<approved-digest> \
+  --adapter codex \
+  --result-set /path/to/engineering-result-set.json \
+  --repetition-report /path/to/repetition-report.json \
+  --paired-comparison-report /path/to/paired-comparison-report.json \
+  --aggregate-authority-root /path/to/frozen-aggregate-authorities \
+  --classification-record classifications/fixture-a.json \
+  --classification-record-source-digest sha256:<approved-digest> \
+  --comparison-view adaptive_vs_kernel \
+  --suite mechanism_positive \
+  --task-class implementation \
+  --input /path/to/aggregate-result.json
 
 node scripts/ask-benchmark.mjs report-engineering-directional-outcomes \
   --normalized-results /path/to/normalized-results \

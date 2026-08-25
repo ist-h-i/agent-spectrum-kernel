@@ -562,6 +562,12 @@
       "mechanism_scorecard_implementation_file_sha256": "c022bf1c33d01e0a7e62e6c98ad1779873f2aba93aa42cf91ce814cb0f61bb12",
       "mechanism_scorecard_test_path": "scripts/test-ask-benchmark-portfolio-mechanism-scorecard.mjs",
       "mechanism_scorecard_test_file_sha256": "37f43b8c6207ea0d814e237610a829cc0588c0a0cc4b1a81cf09e7984b081858",
+      "aggregate_result_schema_path": "benchmarks/schemas/portfolio-aggregate-result.schema.json",
+      "aggregate_result_schema_file_sha256": "919654e9b278a25c6e663e892b86578c803d33e32e04f904218962b1cfc33e71",
+      "aggregate_result_implementation_path": "scripts/ask-benchmark-portfolio-aggregate-result.mjs",
+      "aggregate_result_implementation_file_sha256": "835c957fd0181499095737c663558c77fb925cb34c1d6ebea383914efde984a4",
+      "aggregate_result_test_path": "scripts/test-ask-benchmark-portfolio-aggregate-result.mjs",
+      "aggregate_result_test_file_sha256": "658b449824279b1edc5c1b8b9cba3a8da46a2c72765e460565c1dfc297d5ca99",
       "legacy_calibration_migration_schema_path": "benchmarks/schemas/portfolio-legacy-calibration-migration.schema.json",
       "legacy_calibration_migration_schema_file_sha256": "60294edd35870ce137ca7ebbd832d39827f49e5d3fc014e84dac38aa25fde5d0",
       "legacy_calibration_migration_implementation_path": "scripts/ask-benchmark-portfolio-legacy-calibration-migration.mjs",
@@ -597,16 +603,18 @@
         }
       ],
       "scoring_issue": 197,
-      "scoring_slice": "legacy_calibration_compatibility_migration",
+      "scoring_slice": "deterministic_aggregate_reporting",
       "scoring_implemented": true,
       "result_set_authority_implemented": true,
       "unweighted_repetition_reporting_implemented": true,
       "paired_comparison_reporting_implemented": true,
       "directional_win_loss_tie_reporting_implemented": true,
       "mechanism_observation_scorecard_implemented": true,
+      "aggregate_reporting_implemented": true,
       "legacy_calibration_compatibility_migration_implemented": true,
       "comparative_or_weighted_reporting_implemented": true,
-      "weighted_reporting_implemented": false
+      "weighted_reporting_implemented": true,
+      "measured_aggregate_authority_implemented": false
     },
     "portfolio_design_admission": {
       "issue": 205,

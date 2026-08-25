@@ -5,6 +5,7 @@ import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from
 import { dirname, posix, relative, resolve, sep, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertBenchmarkSchemaInstance } from "./ask-benchmark-schema.mjs";
+import { assertStableFileEvidence, readStableFile } from "./ask-benchmark-stable-file.mjs";
 import { verifyPublicEvaluatorReference } from "./ask-benchmark-evaluator-boundary.mjs";
 import { stableCanonicalJson } from "./ask-benchmark-materialize.mjs";
 import { computeFixtureMetadataDigest, validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
@@ -64,6 +65,7 @@ const PAIRED_COMPARISON_REPORT_SCHEMA_PATH = "benchmarks/schemas/portfolio-paire
 const DIRECTIONAL_OUTCOME_REPORT_SCHEMA_PATH = "benchmarks/schemas/portfolio-directional-outcome-report.schema.json";
 const MECHANISM_SCORECARD_SCHEMA_PATH = "benchmarks/schemas/portfolio-mechanism-scorecard.schema.json";
 const LEGACY_CALIBRATION_MIGRATION_SCHEMA_PATH = "benchmarks/schemas/portfolio-legacy-calibration-migration.schema.json";
+const AGGREGATE_RESULT_SCHEMA_PATH = "benchmarks/schemas/portfolio-aggregate-result.schema.json";
 
 const LIFECYCLE_STATES = Object.freeze([
   "design_pending",
@@ -323,6 +325,33 @@ function readAuthoritativeJsonArtifact({ artifactRoot, relativePath, immutableAr
   return { absolutePath, relativePath, sourceDigest, value };
 }
 
+function readStableAuthoritativeJsonArtifact({ artifactRoot, relativePath, immutableArtifactDigests = {}, schemaPath, label }) {
+  assertPortableRelativePath(relativePath, `${label} path`);
+  const root = realpathSync(artifactRoot);
+  const absolutePath = resolve(root, relativePath);
+  if (!isInside(root, absolutePath)) throw new Error(`${label} path escapes the artifact root`);
+  const before = readStableFile(absolutePath, label, 1024 * 1024, { allowEmpty: false });
+  if (!isInside(root, before.canonicalPath)) throw new Error(`${label} must remain inside the artifact root`);
+  const sourceDigest = before.rawByteDigest;
+  const committed = checkedInBytes(root, relativePath);
+  const matchesCheckedInBytes = committed !== null && Buffer.compare(before.bytes, committed) === 0;
+  if (!matchesCheckedInBytes) {
+    const immutableDigest = immutableArtifactDigests[relativePath];
+    assertDigest(immutableDigest, `${label} supplied immutable artifact digest`);
+    if (immutableDigest !== sourceDigest) throw new Error(`${label} supplied immutable artifact digest does not match source bytes`);
+  }
+  let value;
+  try {
+    value = JSON.parse(before.bytes.toString("utf8"));
+  } catch (error) {
+    throw new Error(`${label} is not valid JSON: ${error.message}`);
+  }
+  assertBenchmarkSchemaInstance(value, { schemaPath: resolve(DEFAULT_ROOT, schemaPath), label });
+  const after = readStableFile(absolutePath, label, 1024 * 1024, { allowEmpty: false });
+  assertStableFileEvidence(before, after, label);
+  return { absolutePath, relativePath, sourceDigest, value };
+}
+
 export function computeLineageRecordDigest(lineageRecord) {
   return digest(withoutField(lineageRecord, "lineage_record_digest"));
 }
@@ -552,34 +581,176 @@ function numbersClose(left, right) {
   return typeof left === "number" && typeof right === "number" && Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) < 1e-12;
 }
 
-function validateClassificationRecordBindings({ catalog, policyManifest, result, artifactRoot, immutableArtifactDigests }) {
-  if (!Array.isArray(result.classification_records)) throw new Error("aggregate classification records must be an array");
-  const allowedFields = ["fixture_id", "classification_record_id", "classification_record_path", "classification_digest", "classification_state", "policy_manifest_digest", "catalog_digest"];
-  for (const [index, reference] of result.classification_records.entries()) assertClosedKeys(reference, allowedFields, `classification records[${index}]`);
-  const fixtureIds = result.classification_records.map(({ fixture_id }) => fixture_id);
-  const recordIds = result.classification_records.map(({ classification_record_id }) => classification_record_id);
-  assertUniqueStrings(fixtureIds, "classification fixture IDs");
-  assertUniqueStrings(recordIds, "classification record IDs");
-  if (!arraysEqual([...fixtureIds].sort(compareAscii), [...result.expected_fixture_ids].sort(compareAscii))) throw new Error("classification records must map one-to-one to expected fixture IDs");
-  const records = new Map();
-  for (const reference of result.classification_records) {
-    const source = readAuthoritativeJsonArtifact({
+function assertAsciiOrderedUnique(values, label) {
+  assertUniqueStrings(values, label);
+  if (!arraysEqual(values, [...values].sort(compareAscii))) throw new Error(`${label} must use deterministic ASCII ordering`);
+}
+
+export function validateAggregateClassificationRecordSources({
+  catalog,
+  policyManifest,
+  expectedFixtureIds,
+  adapterTrack,
+  recordPaths,
+  artifactRoot = DEFAULT_ROOT,
+  immutableArtifactDigests = {},
+}) {
+  assertUniqueStrings(expectedFixtureIds, "expected classification fixture IDs");
+  if (expectedFixtureIds.length === 0) throw new Error("aggregate classification requires at least one expected fixture");
+  assertUniqueStrings(recordPaths, "classification record paths");
+  if (!["codex", "claude"].includes(adapterTrack)) throw new Error("aggregate classification adapter track is not supported");
+  if (recordPaths.length !== expectedFixtureIds.length) throw new Error("classification record paths must map one-to-one to expected fixture IDs");
+  const references = [];
+  const records = [];
+  const sources = [];
+  for (const relativePath of recordPaths) {
+    const sourceArtifact = readStableAuthoritativeJsonArtifact({
       artifactRoot,
-      relativePath: reference.classification_record_path,
+      relativePath,
       immutableArtifactDigests,
       schemaPath: CLASSIFICATION_RECORD_SCHEMA_PATH,
       label: "authoritative classification record",
-    }).value;
-    if (source.classification_record_path !== reference.classification_record_path || source.classification_record_id !== reference.classification_record_id) throw new Error("classification record identity does not match authoritative artifact");
-    if (source.classification_digest !== computeClassificationRecordDigest(source) || reference.classification_digest !== source.classification_digest) throw new Error("classification digest does not match authoritative artifact");
-    if (source.fixture_id !== reference.fixture_id) throw new Error("classification fixture binding does not match authoritative artifact");
-    if (source.catalog_digest !== catalog.catalog_digest || reference.catalog_digest !== source.catalog_digest) throw new Error("classification catalog digest binding does not match");
-    if (source.policy_manifest_digest !== policyManifest.manifest_digest || reference.policy_manifest_digest !== source.policy_manifest_digest) throw new Error("classification policy manifest digest binding does not match");
-    if (source.classification_state !== reference.classification_state) throw new Error("classification state does not match authoritative artifact");
+    });
+    const source = sourceArtifact.value;
+    if (source.classification_record_schema_path !== CLASSIFICATION_RECORD_SCHEMA_PATH) throw new Error("classification record schema path does not match the closed schema");
+    if (source.classification_record_path !== relativePath) throw new Error("classification record self path does not match authoritative source path");
+    if (source.classification_digest !== computeClassificationRecordDigest(source)) throw new Error("classification digest does not match authoritative artifact");
+    if (source.catalog_digest !== catalog.catalog_digest) throw new Error("classification catalog digest binding does not match");
+    if (source.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("classification policy manifest digest binding does not match");
     const fixture = catalog.fixtures.find(({ fixture_id }) => fixture_id === source.fixture_id);
     if (!fixture || source.fixture_role !== fixture.fixture_role) throw new Error("classification fixture role binding does not match catalog");
-    records.set(reference.fixture_id, source);
+    assertAsciiOrderedUnique(source.supported_adapter_tracks, "classification supported adapter tracks");
+    if (source.supported_adapter_tracks.some((adapter) => !["claude", "codex"].includes(adapter))) throw new Error("classification record uses an unsupported adapter track");
+    if (["pending_measurement", "rejected"].includes(source.classification_state)) throw new Error(`${source.classification_state} classification lacks an aggregate evidence contract and cannot be an aggregate source`);
+    let expected;
+    if (source.fixture_role === "calibration") {
+      if (source.ceiling_classification_result !== "not_applicable" || source.floor_classification_result !== "not_applicable") throw new Error("calibration classification results must be not_applicable");
+      expected = determineAggregateClassification({ fixtureRole: "calibration" });
+    } else {
+      expected = determineAggregateClassification({
+        fixtureRole: "primary",
+        supportedTracksSufficient: source.supported_adapter_tracks.includes(adapterTrack),
+        requiredInputsKnown: source.ceiling_classification_result !== "unknown" && source.floor_classification_result !== "unknown",
+        ceilingResult: source.ceiling_classification_result,
+        floorResult: source.floor_classification_result,
+      });
+    }
+    if (source.classification_state !== expected.state || !arraysEqual(source.reason_codes, expected.reason_codes)) throw new Error("classification state or reason codes contradict deterministic classification semantics");
+    references.push({
+      fixture_id: source.fixture_id,
+      classification_record_id: source.classification_record_id,
+      classification_record_path: source.classification_record_path,
+      classification_digest: source.classification_digest,
+      classification_state: source.classification_state,
+      policy_manifest_digest: source.policy_manifest_digest,
+      catalog_digest: source.catalog_digest,
+    });
+    records.push(source);
+    sources.push({ relativePath, sourceDigest: sourceArtifact.sourceDigest });
   }
+  const fixtureIds = references.map(({ fixture_id }) => fixture_id);
+  const recordIds = references.map(({ classification_record_id }) => classification_record_id);
+  assertUniqueStrings(fixtureIds, "classification fixture IDs");
+  assertUniqueStrings(recordIds, "classification record IDs");
+  if (!arraysEqual([...fixtureIds].sort(compareAscii), [...expectedFixtureIds].sort(compareAscii))) throw new Error("classification records must map one-to-one to expected fixture IDs");
+  const order = references.map((reference, index) => ({ reference, record: records[index], source: sources[index] })).sort((left, right) => compareAscii(left.reference.fixture_id, right.reference.fixture_id));
+  return cloneAndFreeze({ references: order.map(({ reference }) => reference), records: order.map(({ record }) => record), sources: order.map(({ source }) => source) });
+}
+
+export function validateAggregateLineageRecordSources({
+  scoringPolicy,
+  lineagePolicy,
+  catalog,
+  policyManifest,
+  expectedFixtureIds,
+  suite,
+  recordPaths,
+  artifactRoot = DEFAULT_ROOT,
+  immutableArtifactDigests = {},
+}) {
+  assertUniqueStrings(expectedFixtureIds, "expected lineage fixture IDs");
+  assertUniqueStrings(recordPaths, "lineage record paths");
+  const weightedSuite = scoringPolicy.aggregation_policy.weighted_reduction.applicable_suites.includes(suite);
+  if (!weightedSuite) {
+    if (recordPaths.length !== 0) throw new Error("authoritative lineage records are allowed only for practice_frequency weighted aggregation");
+    return cloneAndFreeze({ insufficient: false, references: [], records: [], sources: [] });
+  }
+  if (recordPaths.length === 0) return cloneAndFreeze({ insufficient: true, references: [], records: [], sources: [] });
+  if (recordPaths.length !== expectedFixtureIds.length) throw new Error("partial practice_frequency lineage is prohibited; provide all expected fixture records or none");
+  if (lineagePolicy.policy_digest !== computePortfolioPolicyDigest(lineagePolicy)) throw new Error("lineage policy digest does not match deterministic closure");
+  if (lineagePolicy.catalog_digest !== catalog.catalog_digest || policyManifest.lineage_policy?.digest !== lineagePolicy.policy_digest) throw new Error("lineage policy catalog or manifest binding does not match");
+  const frequencyBands = new Map(lineagePolicy.frequency_bands.map((band) => [band.band_id, band]));
+  const impactBands = new Map(lineagePolicy.impact_bands.map((band) => [band.band_id, band]));
+  const references = [];
+  const records = [];
+  const sources = [];
+  let insufficient = false;
+  for (const relativePath of recordPaths) {
+    const sourceArtifact = readStableAuthoritativeJsonArtifact({
+      artifactRoot,
+      relativePath,
+      immutableArtifactDigests,
+      schemaPath: LINEAGE_RECORD_SCHEMA_PATH,
+      label: "authoritative lineage record",
+    });
+    const source = sourceArtifact.value;
+    if (source.lineage_record_schema_path !== LINEAGE_RECORD_SCHEMA_PATH) throw new Error("lineage record schema path does not match the closed schema");
+    if (source.lineage_record_path !== relativePath) throw new Error("lineage record self path does not match authoritative source path");
+    if (source.lineage_record_digest !== computeLineageRecordDigest(source)) throw new Error("lineage record digest does not match authoritative artifact");
+    if (source.catalog_digest !== catalog.catalog_digest) throw new Error("lineage record catalog digest binding does not match");
+    if (source.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("lineage record policy manifest digest binding does not match");
+    if (source.lineage_policy_digest !== lineagePolicy.policy_digest) throw new Error("lineage record policy digest binding does not match");
+    if (!lineagePolicy.source_policy.approved_source_types.includes(source.source_type)) throw new Error("lineage record source type is not approved");
+    const frequencyBand = frequencyBands.get(source.frequency_band);
+    const impactBand = impactBands.get(source.impact_band);
+    if (!frequencyBand || !impactBand) throw new Error("lineage record uses an unknown policy band");
+    if (source.review_status !== "reviewed" || source.source_reference_ids.length === 0 || source.frequency_evidence_ids.length === 0 || source.impact_evidence_ids.length === 0 || !frequencyBand.aggregate_eligible || !impactBand.aggregate_eligible) insufficient = true;
+    references.push({
+      fixture_id: source.fixture_id,
+      lineage_record_id: source.lineage_record_id,
+      lineage_record_path: source.lineage_record_path,
+      lineage_record_digest: source.lineage_record_digest,
+      lineage_policy_digest: source.lineage_policy_digest,
+      frequency_band: source.frequency_band,
+      impact_band: source.impact_band,
+      frequency_weight: frequencyBand.weight,
+      impact_weight: impactBand.weight,
+    });
+    records.push(source);
+    sources.push({ relativePath, sourceDigest: sourceArtifact.sourceDigest });
+  }
+  const fixtureIds = references.map(({ fixture_id }) => fixture_id);
+  const recordIds = references.map(({ lineage_record_id }) => lineage_record_id);
+  assertUniqueStrings(fixtureIds, "lineage fixture IDs");
+  assertUniqueStrings(recordIds, "lineage record IDs");
+  if (!arraysEqual([...fixtureIds].sort(compareAscii), [...expectedFixtureIds].sort(compareAscii))) throw new Error("lineage records must map one-to-one to expected fixture IDs");
+  const order = references.map((reference, index) => ({ reference, record: records[index], source: sources[index] })).sort((left, right) => compareAscii(left.reference.fixture_id, right.reference.fixture_id));
+  return cloneAndFreeze({ insufficient, references: order.map(({ reference }) => reference), records: order.map(({ record }) => record), sources: order.map(({ source }) => source) });
+}
+
+function validateClassificationRecordBindings({ catalog, policyManifest, result, artifactRoot, immutableArtifactDigests }) {
+  if (!Array.isArray(result.classification_records)) throw new Error("aggregate classification records must be an array");
+  const verified = validateAggregateClassificationRecordSources({
+    catalog,
+    policyManifest,
+    expectedFixtureIds: result.expected_fixture_ids,
+    adapterTrack: result.adapter_track,
+    recordPaths: result.classification_records.map(({ classification_record_path: path }) => path),
+    artifactRoot,
+    immutableArtifactDigests,
+  });
+  const expectedByPath = new Map(verified.references.map((reference) => [reference.classification_record_path, reference]));
+  for (const reference of result.classification_records) {
+    const expected = expectedByPath.get(reference.classification_record_path);
+    if (!expected || reference.classification_record_id !== expected.classification_record_id) throw new Error("classification record identity does not match authoritative artifact");
+    if (reference.classification_digest !== expected.classification_digest) throw new Error("classification digest does not match authoritative artifact");
+    if (reference.fixture_id !== expected.fixture_id) throw new Error("classification fixture binding does not match authoritative artifact");
+    if (reference.catalog_digest !== expected.catalog_digest) throw new Error("classification catalog digest binding does not match");
+    if (reference.policy_manifest_digest !== expected.policy_manifest_digest) throw new Error("classification policy manifest digest binding does not match");
+    if (reference.classification_state !== expected.classification_state) throw new Error("classification state does not match authoritative artifact");
+  }
+  if (stableCanonicalJson(result.classification_records) !== stableCanonicalJson(verified.references)) throw new Error("classification references do not match canonical authoritative source projections");
+  const records = new Map(verified.records.map((record) => [record.fixture_id, record]));
   for (const fixtureId of result.included_fixture_ids) {
     if (records.get(fixtureId)?.classification_state !== "primary_eligible") throw new Error("only primary_eligible classifications may be included in a weighted aggregate");
   }
@@ -593,51 +764,29 @@ function validateClassificationRecordBindings({ catalog, policyManifest, result,
 
 function validateLineageRecordBindings({ scoringPolicy, lineagePolicy, catalog, policyManifest, result, artifactRoot, immutableArtifactDigests }) {
   if (!Array.isArray(result.lineage_records)) throw new Error("aggregate lineage records must be an array");
-  const allowedFields = [
-    "fixture_id", "lineage_record_id", "lineage_record_path", "lineage_record_digest", "lineage_policy_digest",
-    "frequency_band", "impact_band", "frequency_weight", "impact_weight",
-  ];
-  for (const [index, reference] of result.lineage_records.entries()) assertClosedKeys(reference, allowedFields, `lineage records[${index}]`);
-  const fixtureIds = result.lineage_records.map(({ fixture_id }) => fixture_id);
-  const recordIds = result.lineage_records.map(({ lineage_record_id }) => lineage_record_id);
-  assertUniqueStrings(fixtureIds, "lineage fixture IDs");
-  assertUniqueStrings(recordIds, "lineage record IDs");
-  if (fixtureIds.some((fixtureId) => !result.expected_fixture_ids.includes(fixtureId))) throw new Error("lineage record references an unrelated fixture");
-  const weightedSuite = scoringPolicy.aggregation_policy.weighted_reduction.applicable_suites.includes(result.suite);
-  if (!weightedSuite) {
-    if (result.lineage_records.length !== 0) throw new Error("authoritative lineage records are allowed only for practice_frequency weighted aggregation");
-    return { insufficient: false, records: new Map() };
-  }
-  if (lineagePolicy.policy_digest !== computePortfolioPolicyDigest(lineagePolicy)) throw new Error("lineage policy digest does not match deterministic closure");
-  if (lineagePolicy.catalog_digest !== catalog.catalog_digest || policyManifest.lineage_policy?.digest !== lineagePolicy.policy_digest) throw new Error("lineage policy catalog or manifest binding does not match");
-  const frequencyBands = new Map(lineagePolicy.frequency_bands.map((band) => [band.band_id, band]));
-  const impactBands = new Map(lineagePolicy.impact_bands.map((band) => [band.band_id, band]));
-  const records = new Map();
-  let insufficient = fixtureIds.length !== result.expected_fixture_ids.length;
+  const verified = validateAggregateLineageRecordSources({
+    scoringPolicy,
+    lineagePolicy,
+    catalog,
+    policyManifest,
+    expectedFixtureIds: result.expected_fixture_ids,
+    suite: result.suite,
+    recordPaths: result.lineage_records.map(({ lineage_record_path: path }) => path),
+    artifactRoot,
+    immutableArtifactDigests,
+  });
+  const expectedByPath = new Map(verified.references.map((reference) => [reference.lineage_record_path, reference]));
   for (const reference of result.lineage_records) {
-    const source = readAuthoritativeJsonArtifact({
-      artifactRoot,
-      relativePath: reference.lineage_record_path,
-      immutableArtifactDigests,
-      schemaPath: LINEAGE_RECORD_SCHEMA_PATH,
-      label: "authoritative lineage record",
-    }).value;
-    if (source.lineage_record_path !== reference.lineage_record_path || source.lineage_record_id !== reference.lineage_record_id) throw new Error("lineage record identity does not match authoritative artifact");
-    if (source.lineage_record_digest !== computeLineageRecordDigest(source) || reference.lineage_record_digest !== source.lineage_record_digest) throw new Error("lineage record digest does not match authoritative artifact");
-    if (source.fixture_id !== reference.fixture_id) throw new Error("lineage fixture binding does not match authoritative artifact");
-    if (source.catalog_digest !== catalog.catalog_digest) throw new Error("lineage record catalog digest binding does not match");
-    if (source.policy_manifest_digest !== policyManifest.manifest_digest) throw new Error("lineage record policy manifest digest binding does not match");
-    if (source.lineage_policy_digest !== lineagePolicy.policy_digest || reference.lineage_policy_digest !== source.lineage_policy_digest) throw new Error("lineage record policy digest binding does not match");
-    if (!lineagePolicy.source_policy.approved_source_types.includes(source.source_type)) throw new Error("lineage record source type is not approved");
-    if (reference.frequency_band !== source.frequency_band || reference.impact_band !== source.impact_band) throw new Error("aggregate lineage bands do not match authoritative record");
-    const frequencyBand = frequencyBands.get(source.frequency_band);
-    const impactBand = impactBands.get(source.impact_band);
-    if (!frequencyBand || !impactBand) throw new Error("lineage record uses an unknown policy band");
-    if (reference.frequency_weight !== frequencyBand.weight || reference.impact_weight !== impactBand.weight) throw new Error("aggregate lineage weight does not match the policy-derived band weight");
-    if (source.review_status !== "reviewed" || source.frequency_evidence_ids.length === 0 || source.impact_evidence_ids.length === 0 || !frequencyBand.aggregate_eligible || !impactBand.aggregate_eligible) insufficient = true;
-    records.set(reference.fixture_id, source);
+    const expected = expectedByPath.get(reference.lineage_record_path);
+    if (!expected || reference.lineage_record_id !== expected.lineage_record_id) throw new Error("lineage record identity does not match authoritative artifact");
+    if (reference.lineage_record_digest !== expected.lineage_record_digest) throw new Error("lineage record digest does not match authoritative artifact");
+    if (reference.fixture_id !== expected.fixture_id) throw new Error("lineage fixture binding does not match authoritative artifact");
+    if (reference.lineage_policy_digest !== expected.lineage_policy_digest) throw new Error("lineage record policy digest binding does not match");
+    if (reference.frequency_band !== expected.frequency_band || reference.impact_band !== expected.impact_band) throw new Error("aggregate lineage bands do not match authoritative record");
+    if (reference.frequency_weight !== expected.frequency_weight || reference.impact_weight !== expected.impact_weight) throw new Error("aggregate lineage weight does not match the policy-derived band weight");
   }
-  return { insufficient, records };
+  if (stableCanonicalJson(result.lineage_records) !== stableCanonicalJson(verified.references)) throw new Error("lineage references do not match canonical authoritative source projections");
+  return { insufficient: verified.insufficient, records: new Map(verified.records.map((record) => [record.fixture_id, record])) };
 }
 
 export function validateAggregationResult({ scoringPolicy, lineagePolicy, catalog, policyManifest, result, artifactRoot = DEFAULT_ROOT, immutableArtifactDigests = {} }) {
@@ -651,15 +800,16 @@ export function validateAggregationResult({ scoringPolicy, lineagePolicy, catalo
     if (typeof result[key] !== "string" || result[key].length === 0) throw new Error(`aggregate grouping key ${key} must be one scalar value`);
   }
   if (!scoringPolicy.aggregation_policy.comparison_views.some(({ view_id }) => view_id === result.comparison_view)) throw new Error("aggregate comparison view is not registered");
-  assertUniqueStrings(result.expected_fixture_ids, "expected fixture IDs");
-  assertUniqueStrings(result.included_fixture_ids, "included fixture IDs");
+  assertAsciiOrderedUnique(result.expected_fixture_ids, "expected fixture IDs");
+  if (result.expected_fixture_ids.length === 0) throw new Error("aggregate result requires at least one expected fixture");
+  assertAsciiOrderedUnique(result.included_fixture_ids, "included fixture IDs");
   if (!Array.isArray(result.excluded_fixtures)) throw new Error("excluded fixtures must be an array");
   for (const [index, excluded] of result.excluded_fixtures.entries()) {
     assertClosedKeys(excluded, ["fixture_id", "reason"], `excluded fixtures[${index}]`);
     if (typeof excluded.reason !== "string" || excluded.reason.length === 0) throw new Error("excluded fixture reason is required");
   }
   const excludedIds = result.excluded_fixtures.map(({ fixture_id }) => fixture_id);
-  assertUniqueStrings(excludedIds, "excluded fixture IDs");
+  assertAsciiOrderedUnique(excludedIds, "excluded fixture IDs");
   if (!Number.isInteger(result.excluded_fixture_count) || result.excluded_fixture_count !== excludedIds.length) throw new Error("excluded fixture count must match excluded fixture records");
   const allResultIds = [...result.included_fixture_ids, ...excludedIds];
   if (new Set(allResultIds).size !== allResultIds.length) throw new Error("included and excluded fixture IDs must be disjoint");
@@ -676,13 +826,17 @@ export function validateAggregationResult({ scoringPolicy, lineagePolicy, catalo
   if (!Array.isArray(result.fixture_contributions)) throw new Error("fixture contributions must be an array");
   for (const [index, contribution] of result.fixture_contributions.entries()) {
     assertClosedKeys(contribution, ["fixture_id", "normalized_quality_delta"], `fixture contributions[${index}]`);
-    if (typeof contribution.normalized_quality_delta !== "number" || !Number.isFinite(contribution.normalized_quality_delta)) throw new Error("normalized quality delta must be finite");
+    if (typeof contribution.normalized_quality_delta !== "number" || !Number.isFinite(contribution.normalized_quality_delta) || contribution.normalized_quality_delta < -1 || contribution.normalized_quality_delta > 1) throw new Error("normalized quality delta must be finite and remain within [-1, 1]");
   }
   const contributionIds = result.fixture_contributions.map(({ fixture_id }) => fixture_id);
-  assertUniqueStrings(contributionIds, "fixture contribution IDs");
+  assertAsciiOrderedUnique(contributionIds, "fixture contribution IDs");
   if (!arraysEqual([...contributionIds].sort(compareAscii), [...result.included_fixture_ids].sort(compareAscii))) throw new Error("fixture contributions must exactly match included fixture IDs");
 
   assertClosedKeys(result.overhead_component_vector, ["token_count_delta", "latency_delta", "human_effort_delta", "false_positive_unit_delta", "unsafe_action_category_counts"], "overhead component vector");
+  for (const field of ["token_count_delta", "latency_delta", "human_effort_delta", "false_positive_unit_delta"]) {
+    if (result.overhead_component_vector[field] !== null) throw new Error(`${field} must remain null because B1 defines no aggregate scalar reduction or approved false-positive unit mapping`);
+  }
+  if (result.result_status === "complete") throw new Error("aggregate result cannot be complete while required B1 component values remain unknown or unmapped");
   assertClosedKeys(result.overhead_component_vector.unsafe_action_category_counts, scoringPolicy.aggregation_policy.unsafe_action_aggregation.categories, "unsafe action category count vector");
   for (const count of Object.values(result.overhead_component_vector.unsafe_action_category_counts)) {
     if (!Number.isInteger(count) || count < 0) throw new Error("unsafe action category counts must be non-negative integers");
@@ -692,6 +846,7 @@ export function validateAggregationResult({ scoringPolicy, lineagePolicy, catalo
     if (typeof result.safety_blockers[category] !== "boolean" || result.safety_blockers[category] !== (result.overhead_component_vector.unsafe_action_category_counts[category] > 0)) throw new Error("unsafe action safety blockers must remain separate and match category counts");
   }
   if (!contract.result_statuses.includes(result.result_status)) throw new Error("aggregate result status is not allowed");
+  if (!["included", "excluded"].includes(result.sensitivity_dimension)) throw new Error("aggregate sensitivity dimension is not allowed");
 
   const unweightedExpected = result.fixture_contributions.length === 0
     ? null
@@ -701,6 +856,7 @@ export function validateAggregationResult({ scoringPolicy, lineagePolicy, catalo
   const weightedSuite = scoringPolicy.aggregation_policy.weighted_reduction.applicable_suites.includes(result.suite);
   if (!weightedSuite) {
     if (result.numerator !== null || result.denominator !== null || result.weighted_quality_delta !== null) throw new Error("weighted quality is allowed only for practice_frequency");
+    if (result.included_fixture_ids.length === 0 && result.result_status !== "insufficient_evidence") throw new Error("zero eligible fixtures requires insufficient_evidence");
     return true;
   }
   if (lineageValidation.insufficient) {
@@ -724,7 +880,7 @@ export function validateAggregationResult({ scoringPolicy, lineagePolicy, catalo
   }
   if (expectedDenominator === 0 || result.denominator === 0) throw new Error("weighted aggregation denominator must be non-zero");
   if (!numbersClose(result.numerator, expectedNumerator) || !numbersClose(result.denominator, expectedDenominator) || !numbersClose(result.weighted_quality_delta, expectedNumerator / expectedDenominator)) throw new Error("weighted aggregation reduction does not match frozen numerator and denominator");
-  if (result.result_status !== "complete") throw new Error("complete weighted inputs must produce complete result status");
+  if (!["complete", "insufficient_evidence"].includes(result.result_status)) throw new Error("complete weighted inputs require a valid result status");
   return true;
 }
 
@@ -1489,7 +1645,7 @@ function validatePortfolioPolicyArtifactsInternal({
     [lineagePolicy, "portfolio lineage policy", resolve(root, LINEAGE_SCHEMA_PATH), lineagePolicyPath],
   ];
   const errors = [];
-  for (const schemaPath of [REQUIREMENT_RECORD_SCHEMA_PATH, OUTPUT_CONTRACT_SCHEMA_PATH, LINEAGE_RECORD_SCHEMA_PATH, CLASSIFICATION_RECORD_SCHEMA_PATH, EVALUATOR_REFERENCE_SCHEMA_PATH, EVALUATOR_RESULT_SCHEMA_PATH, ENGINEERING_RESULT_SOURCE_MANIFEST_SCHEMA_PATH, ENGINEERING_RESULT_SCHEMA_PATH, ENGINEERING_RESULT_SET_SCHEMA_PATH, REPETITION_REPORT_SCHEMA_PATH, PAIRED_COMPARISON_REPORT_SCHEMA_PATH, DIRECTIONAL_OUTCOME_REPORT_SCHEMA_PATH, MECHANISM_SCORECARD_SCHEMA_PATH, LEGACY_CALIBRATION_MIGRATION_SCHEMA_PATH, FINAL_ADMISSION_RECORD_SCHEMA_PATH, SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH]) {
+  for (const schemaPath of [REQUIREMENT_RECORD_SCHEMA_PATH, OUTPUT_CONTRACT_SCHEMA_PATH, LINEAGE_RECORD_SCHEMA_PATH, CLASSIFICATION_RECORD_SCHEMA_PATH, EVALUATOR_REFERENCE_SCHEMA_PATH, EVALUATOR_RESULT_SCHEMA_PATH, ENGINEERING_RESULT_SOURCE_MANIFEST_SCHEMA_PATH, ENGINEERING_RESULT_SCHEMA_PATH, ENGINEERING_RESULT_SET_SCHEMA_PATH, REPETITION_REPORT_SCHEMA_PATH, PAIRED_COMPARISON_REPORT_SCHEMA_PATH, DIRECTIONAL_OUTCOME_REPORT_SCHEMA_PATH, MECHANISM_SCORECARD_SCHEMA_PATH, LEGACY_CALIBRATION_MIGRATION_SCHEMA_PATH, AGGREGATE_RESULT_SCHEMA_PATH, FINAL_ADMISSION_RECORD_SCHEMA_PATH, SCORING_INPUT_FREEZE_MANIFEST_SCHEMA_PATH]) {
     if (!existsSync(resolve(root, schemaPath))) errors.push(`required authoritative source schema is missing: ${schemaPath}`);
   }
   for (const [artifact, label, schemaPath, path] of artifacts) {
@@ -1561,7 +1717,14 @@ function validatePortfolioPolicyArtifactsInternal({
     ceilingThreshold: scoringPolicy.ceiling_floor_policy.universal_ceiling_candidate.median_normalized_requirement_score_minimum,
     floorThreshold: scoringPolicy.ceiling_floor_policy.universal_floor_candidate.median_normalized_requirement_score_maximum,
   };
-  return includeVerifiedScoringPolicy ? { ...summary, verified_scoring_policy: cloneAndFreeze(scoringPolicy) } : summary;
+  return includeVerifiedScoringPolicy ? {
+    ...summary,
+    verified_catalog: cloneAndFreeze(catalog),
+    verified_policy_manifest: cloneAndFreeze(manifest),
+    verified_admission_policy: cloneAndFreeze(admissionPolicy),
+    verified_scoring_policy: cloneAndFreeze(scoringPolicy),
+    verified_lineage_policy: cloneAndFreeze(lineagePolicy),
+  } : summary;
 }
 
 export function validatePortfolioPolicyArtifacts(options = {}) {
