@@ -30,7 +30,7 @@ jobs:
       - name: Run generic content-addressed store tests
         run: node scripts/test-content-addressed-store.mjs
 
-      - name: Run Asset Registry contract tests (44 cases)
+      - name: Run Asset Registry contract tests
         run: node scripts/test-asset-registry.mjs
 
       - name: Check the exact candidate-only Asset Registry sample

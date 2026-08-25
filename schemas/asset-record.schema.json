@@ -80,8 +80,17 @@
     "applicability": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["included_scopes", "excluded_scopes", "required_capabilities", "notes"],
+      "required": [
+        "models", "adapters", "stacks", "domains", "projects", "task_classes",
+        "included_scopes", "excluded_scopes", "required_capabilities", "notes"
+      ],
       "properties": {
+        "models": { "$ref": "#/$defs/applicabilityDimension" },
+        "adapters": { "$ref": "#/$defs/applicabilityDimension" },
+        "stacks": { "$ref": "#/$defs/applicabilityDimension" },
+        "domains": { "$ref": "#/$defs/applicabilityDimension" },
+        "projects": { "$ref": "#/$defs/applicabilityDimension" },
+        "task_classes": { "$ref": "#/$defs/applicabilityDimension" },
         "included_scopes": { "$ref": "#/$defs/stringList" },
         "excluded_scopes": { "$ref": "#/$defs/stringList" },
         "required_capabilities": { "$ref": "#/$defs/stringList" },
@@ -101,9 +110,10 @@
     "safety": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "constraint_refs"],
+      "required": ["status", "classifications", "constraint_refs"],
       "properties": {
         "status": { "type": "string", "enum": ["not_evaluated", "supported", "verified"] },
+        "classifications": { "$ref": "#/$defs/stringList" },
         "constraint_refs": { "$ref": "#/$defs/refList" }
       }
     },
@@ -130,17 +140,19 @@
     "maintenance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["stale_status", "regression_refs", "retirement", "rollback"],
+      "required": ["stale_status", "refresh_conditions", "regression_refs", "retirement", "rollback"],
       "properties": {
         "stale_status": { "type": "string", "enum": ["not_assessed", "fresh", "stale"] },
+        "refresh_conditions": { "$ref": "#/$defs/noteList" },
         "regression_refs": { "$ref": "#/$defs/refList" },
         "retirement": { "$ref": "#/$defs/nullableRetirement" },
         "rollback": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["status", "authority_ref"],
+          "required": ["status", "target", "authority_ref"],
           "properties": {
             "status": { "type": "string", "const": "requires_explicit_authority" },
+            "target": { "$ref": "#/$defs/nullableExactAssetRef" },
             "authority_ref": { "$ref": "#/$defs/nullableRef" }
           }
         }
@@ -157,6 +169,16 @@
     "reference": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "\\S" },
     "nullableRef": { "oneOf": [{ "$ref": "#/$defs/reference" }, { "type": "null" }] },
     "stringList": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S" } },
+    "applicabilityDimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "included", "excluded"],
+      "properties": {
+        "status": { "type": "string", "enum": ["unknown", "unrestricted", "bounded"] },
+        "included": { "$ref": "#/$defs/stringList" },
+        "excluded": { "$ref": "#/$defs/stringList" }
+      }
+    },
     "noteList": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 2000, "pattern": "\\S" } },
     "refList": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/reference" } },
     "evidenceStatus": { "type": "string", "enum": ["verified", "supported", "unknown"] },
@@ -192,6 +214,7 @@
         "content_digest": { "$ref": "#/$defs/digest" }
       }
     },
+    "nullableExactAssetRef": { "oneOf": [{ "$ref": "#/$defs/exactAssetRef" }, { "type": "null" }] },
     "derivation": {
       "oneOf": [
         {

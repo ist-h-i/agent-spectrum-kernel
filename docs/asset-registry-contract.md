@@ -96,6 +96,8 @@ The record describes facts and represented claims about immutable content. It do
 
 Optional evidence must be omitted or represented explicitly as unknown according to its field contract; empty strings and invented placeholder evidence are not evidence. Unknown license or owner authority is valid metadata, but must remain unknown and cannot satisfy a policy that requires stronger evidence.
 
+Applicability keeps explicit model, adapter, stack, domain, project, and task-class selectors in addition to included/excluded scopes and required capabilities. Each selector is explicitly `unknown`, `unrestricted`, or `bounded`; a bounded selector carries non-empty included and/or excluded values, while unknown and unrestricted selectors cannot carry values. This prevents an empty list from ambiguously meaning both unknown and universal compatibility.
+
 For `git_revision` records, the registry makes the Asset version equal the represented source revision and verifies the supplied source bytes against their declared raw digests. It does not independently query Git or prove that those bytes came from the represented commit; a consumer that requires that claim needs separate repository-authority evidence.
 
 ### Registry snapshot
@@ -150,6 +152,8 @@ The evaluator-reference extension represents a public, non-executable reference 
 
 Registration proves the identity of the public reference document only. It does not register private evaluator bytes, authorize an evaluator, select an evaluator for execution, or prove a scoring result.
 
+The `private_evaluator_content_included: false` field is a closed caller representation, not a secrecy classifier. The registry verifies the exact bytes and rejects a caller that explicitly marks private content as included, but it cannot infer whether arbitrary bytes contain undisclosed private material. The checked sample is separately pinned to the repository's public evaluator-reference source and exact digest.
+
 ## Exact references, lineage, and dependencies
 
 Every Asset-to-Asset reference is an exact tuple containing:
@@ -170,6 +174,8 @@ V1 supports a closed derivation union:
 - `full_content_revision`: one exact parent reference plus a bounded, non-empty derivation summary.
 
 `full_content_revision` stores the complete child content package. The summary is explanatory metadata, not an executable patch and not an alternative content identity. Parent and child must have the same stable ID and Asset type, differ in version and content identity, and resolve within the verified snapshot history. Parent cycles, missing parents, cross-ID transplants, and digest substitution fail closed.
+
+An optional rollback target uses the same exact-reference tuple. It must resolve to a different registered revision of the same stable ID and Asset type. The target preserves reconstructability intent only; it cannot authorize rollback or Portfolio selection.
 
 ### Dependency closure
 
@@ -272,7 +278,7 @@ Registration, import, verification, listing, resolving, and reference export can
 
 ### Export exact local references
 
-Reference export is read-only and requires an exact verified snapshot and exact selected Asset references. Its deterministic manifest contains the registry snapshot identity, selected record/content identities, and sorted exact lineage/dependency closure needed for later packaging.
+Reference export is read-only and requires an exact verified snapshot and exact selected Asset references. Its deterministic manifest contains the registry snapshot identity, selected record/content identities, sorted exact lineage/dependency closure, and any exact rollback-target hint needed for later packaging.
 
 The manifest contains no absolute source paths, mutable branch or latest references, unverified external bytes, runtime secrets, or private evaluator material. Export does not store, register, admit, activate, install, or execute an Asset. Issue #180 may later package the referenced immutable objects without redefining Asset identity.
 

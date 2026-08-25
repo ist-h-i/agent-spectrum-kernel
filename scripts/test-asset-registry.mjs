@@ -95,6 +95,7 @@ function assetDescriptor({
   version = sample.version,
   dependencies = [],
   derivation = { kind: "root", parent: null, delta: null },
+  rollbackTarget = null,
   applicabilityNotes = [],
 } = {}) {
   const typeExtension = sample.assetType === "skill"
@@ -147,6 +148,14 @@ function assetDescriptor({
       runtime_profiles: [],
     },
     applicability: {
+      models: { status: "unknown", included: [], excluded: [] },
+      adapters: sample.assetType === "prompt"
+        ? { status: "bounded", included: ["codex"], excluded: [] }
+        : { status: "unknown", included: [], excluded: [] },
+      stacks: { status: "unknown", included: [], excluded: [] },
+      domains: { status: "unknown", included: [], excluded: [] },
+      projects: { status: "bounded", included: [REPOSITORY_ID], excluded: [] },
+      task_classes: { status: "unknown", included: [], excluded: [] },
       included_scopes: ["local_repository"],
       excluded_scopes: ["automatic_portfolio_activation"],
       required_capabilities: [],
@@ -159,6 +168,7 @@ function assetDescriptor({
     },
     safety: {
       status: "not_evaluated",
+      classifications: [],
       constraint_refs: [],
     },
     mechanism_and_evidence: {
@@ -173,10 +183,12 @@ function assetDescriptor({
     },
     maintenance: {
       stale_status: "not_assessed",
+      refresh_conditions: [],
       regression_refs: [],
       retirement: null,
       rollback: {
         status: "requires_explicit_authority",
+        target: rollbackTarget,
         authority_ref: null,
       },
     },
@@ -261,6 +273,32 @@ try {
     assert.equal(empty.created, true);
     assert.equal(existsSync(contentAddressedObjectPath({ storeRoot, digest: empty.snapshot_digest })), true);
     assert.deepEqual(listAssets({ storeRoot, snapshotDigest: empty.snapshot_digest }), []);
+  });
+
+  check("registry ordering uses locale-independent code-unit order", () => {
+    const orderStoreRoot = resolve(root, "ordering-store");
+    const orderEmpty = createEmptyAssetRegistry({
+      storeRoot: orderStoreRoot,
+      registryId: "ordering-test",
+      repositoryId: REPOSITORY_ID,
+      scopeId: SCOPE_ID,
+    });
+    const lowercase = registerAsset({
+      storeRoot: orderStoreRoot,
+      sourceRoot,
+      predecessorSnapshotDigest: orderEmpty.snapshot_digest,
+      descriptor: assetDescriptor({ sample: samples.skill, stableId: "ask.skill.order.a" }),
+    });
+    const uppercase = registerAsset({
+      storeRoot: orderStoreRoot,
+      sourceRoot,
+      predecessorSnapshotDigest: lowercase.snapshot_digest,
+      descriptor: assetDescriptor({ sample: samples.skill, stableId: "ask.skill.order.A" }),
+    });
+    assert.deepEqual(
+      listAssets({ storeRoot: orderStoreRoot, snapshotDigest: uppercase.snapshot_digest }).map((asset) => asset.stable_id),
+      ["ask.skill.order.A", "ask.skill.order.a"],
+    );
   });
 
   const skillDescriptor = assetDescriptor({ sample: samples.skill });
@@ -586,6 +624,26 @@ try {
     /cannot establish verified license|verified license .*not .*authority/iu,
   );
 
+  const ambiguousApplicability = assetDescriptor({
+    sample: samples.prompt,
+    stableId: "ask.prompt-template.ambiguous-applicability-test",
+  });
+  ambiguousApplicability.applicability.adapters = {
+    status: "unknown",
+    included: ["codex"],
+    excluded: [],
+  };
+  expectFailure(
+    "unknown applicability cannot carry a positive allowlist",
+    () => registerAsset({
+      storeRoot,
+      sourceRoot,
+      predecessorSnapshotDigest: candidateSnapshotDigest,
+      descriptor: ambiguousApplicability,
+    }),
+    /applicability adapters unknown status cannot carry/iu,
+  );
+
   const incompleteStoreRoot = resolve(root, "incomplete-store");
   mkdirSync(incompleteStoreRoot, { recursive: true });
   const incompleteEmpty = createEmptyAssetRegistry({
@@ -629,6 +687,24 @@ try {
     assert.deepEqual(repeated, admitAuthority);
     assert.match(admitAuthority.context_digest, /^sha256:[a-f0-9]{64}$/u);
   });
+
+  expectFailure(
+    "verification producer identity cannot authorize Asset lifecycle",
+    () => buildAssetLifecycleAuthorityContext({
+      registryId: REGISTRY_ID,
+      repositoryId: REPOSITORY_ID,
+      scopeId: SCOPE_ID,
+      predecessorSnapshotDigest: candidateSnapshotDigest,
+      transitions: admitTransitions,
+      authority: {
+        kind: "verification_evidence_producer",
+        authority_id: "verification-producer",
+        authority_revision: "1",
+        authority_evidence_digest: textDigest("verification-producer-evidence"),
+      },
+    }),
+    /verification evidence producer identity is not Asset lifecycle authority|unsupported Asset lifecycle authority kind/iu,
+  );
 
   expectFailure(
     "lifecycle transition requires caller authority",
@@ -725,6 +801,63 @@ try {
     trustedAuthorityContexts: [admitAuthority],
   });
   const realAssetTrust = [admitAuthority, currentAuthority];
+
+  const currentEvaluator = resolveAsset({
+    storeRoot,
+    snapshotDigest: current.snapshot_digest,
+    stableId: samples.evaluator.stableId,
+    trustedAuthorityContexts: realAssetTrust,
+  });
+  const retireEvaluatorAuthority = lifecycleAuthority({
+    predecessorSnapshotDigest: current.snapshot_digest,
+    transitions: [lifecycleTransition(currentEvaluator, "current", "retired")],
+    revision: "retire-evaluator-reference-1",
+  });
+  const retiredEvaluatorSnapshot = applyAssetLifecycleTransitions({
+    storeRoot,
+    predecessorSnapshotDigest: current.snapshot_digest,
+    authorityContext: retireEvaluatorAuthority,
+    trustedAuthorityContexts: realAssetTrust,
+  });
+  const retiredEvaluatorTrust = [...realAssetTrust, retireEvaluatorAuthority];
+  expectFailure(
+    "retired revision cannot satisfy default resolution",
+    () => resolveAsset({
+      storeRoot,
+      snapshotDigest: retiredEvaluatorSnapshot.snapshot_digest,
+      stableId: samples.evaluator.stableId,
+      trustedAuthorityContexts: retiredEvaluatorTrust,
+    }),
+    /default resolution requires exactly one current Asset|no current Asset revision/iu,
+  );
+  const retiredEvaluator = resolveAsset({
+    storeRoot,
+    snapshotDigest: retiredEvaluatorSnapshot.snapshot_digest,
+    stableId: samples.evaluator.stableId,
+    version: samples.evaluator.version,
+    state: "retired",
+    trustedAuthorityContexts: retiredEvaluatorTrust,
+  });
+  check("retired exact revision remains reconstructable", () => {
+    assert.equal(retiredEvaluator.record_digest, evaluatorCandidate.record_digest);
+    assert.equal(retiredEvaluator.state, "retired");
+  });
+  const invalidRetiredReactivation = lifecycleAuthority({
+    predecessorSnapshotDigest: retiredEvaluatorSnapshot.snapshot_digest,
+    transitions: [lifecycleTransition(retiredEvaluator, "retired", "current")],
+    revision: "invalid-retired-reactivation",
+    kind: "external_asset_rollback_authority",
+  });
+  expectFailure(
+    "retired state is terminal",
+    () => applyAssetLifecycleTransitions({
+      storeRoot,
+      predecessorSnapshotDigest: retiredEvaluatorSnapshot.snapshot_digest,
+      authorityContext: invalidRetiredReactivation,
+      trustedAuthorityContexts: retiredEvaluatorTrust,
+    }),
+    /retired -> current is not allowed|retired.*terminal|transition .*not allowed/iu,
+  );
 
   expectFailure(
     "missing current context fails full verification",
@@ -865,11 +998,35 @@ try {
     state: "candidate",
     trustedAuthorityContexts: historicalTrust,
   });
+  expectFailure(
+    "missing exact rollback target fails closed",
+    () => registerAsset({
+      storeRoot,
+      sourceRoot,
+      predecessorSnapshotDigest: lifecycleV1Registration.snapshot_digest,
+      trustedAuthorityContexts: historicalTrust,
+      descriptor: assetDescriptor({
+        sample: syntheticSample,
+        path: lifecycleV2Path,
+        rawSha256: rawDigest(lifecycleV2Bytes),
+        version: "2.0.0",
+        rollbackTarget: {
+          asset_type: "prompt",
+          stable_id: syntheticSample.stableId,
+          version: "0.0.0",
+          record_digest: textDigest("missing-rollback-record"),
+          content_digest: textDigest("missing-rollback-content"),
+        },
+      }),
+    }),
+    /missing rollback target|rollback target .*not registered/iu,
+  );
   const lifecycleV2Descriptor = assetDescriptor({
     sample: syntheticSample,
     path: lifecycleV2Path,
     rawSha256: rawDigest(lifecycleV2Bytes),
     version: "2.0.0",
+    rollbackTarget: exactAssetRef(lifecycleV1),
     derivation: {
       kind: "full_content_revision",
       parent: exactAssetRef(lifecycleV1),
@@ -894,6 +1051,7 @@ try {
     state: "candidate",
     trustedAuthorityContexts: historicalTrust,
   });
+  assert.deepEqual(lifecycleV2.record.maintenance.rollback.target, exactAssetRef(lifecycleV1));
 
   const admitV1Authority = lifecycleAuthority({
     predecessorSnapshotDigest: lifecycleV2Registration.snapshot_digest,

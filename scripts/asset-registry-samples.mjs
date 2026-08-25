@@ -137,6 +137,14 @@ function descriptorFor(sample, dependencies = []) {
       runtime_profiles: [],
     },
     applicability: {
+      models: { status: "unknown", included: [], excluded: [] },
+      adapters: sample.assetType === "prompt"
+        ? { status: "bounded", included: ["codex"], excluded: [] }
+        : { status: "unknown", included: [], excluded: [] },
+      stacks: { status: "unknown", included: [], excluded: [] },
+      domains: { status: "unknown", included: [], excluded: [] },
+      projects: { status: "bounded", included: [REPOSITORY_ID], excluded: [] },
+      task_classes: { status: "unknown", included: [], excluded: [] },
       included_scopes: ["local_repository"],
       excluded_scopes: ["automatic_portfolio_activation"],
       required_capabilities: [],
@@ -149,6 +157,7 @@ function descriptorFor(sample, dependencies = []) {
     },
     safety: {
       status: "not_evaluated",
+      classifications: [],
       constraint_refs: [],
     },
     mechanism_and_evidence: {
@@ -163,10 +172,12 @@ function descriptorFor(sample, dependencies = []) {
     },
     maintenance: {
       stale_status: "not_assessed",
+      refresh_conditions: [],
       regression_refs: [],
       retirement: null,
       rollback: {
         status: "requires_explicit_authority",
+        target: null,
         authority_ref: null,
       },
     },

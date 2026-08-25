@@ -77,6 +77,11 @@ function compareCanonical(left, right) {
   return stableCanonicalJson(left) === stableCanonicalJson(right);
 }
 
+function compareText(left, right) {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
 function exactRefFromEntry(entry) {
   return {
     asset_type: entry.asset_type,
@@ -92,22 +97,22 @@ function refKey(ref) {
 }
 
 function entryCompare(left, right) {
-  return left.stable_id.localeCompare(right.stable_id)
-    || left.version.localeCompare(right.version)
-    || left.record_digest.localeCompare(right.record_digest);
+  return compareText(left.stable_id, right.stable_id)
+    || compareText(left.version, right.version)
+    || compareText(left.record_digest, right.record_digest);
 }
 
 function refCompare(left, right) {
-  return left.stable_id.localeCompare(right.stable_id)
-    || left.version.localeCompare(right.version)
-    || left.record_digest.localeCompare(right.record_digest)
-    || left.content_digest.localeCompare(right.content_digest);
+  return compareText(left.stable_id, right.stable_id)
+    || compareText(left.version, right.version)
+    || compareText(left.record_digest, right.record_digest)
+    || compareText(left.content_digest, right.content_digest);
 }
 
 function transitionCompare(left, right) {
   return refCompare(left.asset, right.asset)
-    || left.from_state.localeCompare(right.from_state)
-    || left.to_state.localeCompare(right.to_state);
+    || compareText(left.from_state, right.from_state)
+    || compareText(left.to_state, right.to_state);
 }
 
 function assertSortedUnique(values, compare, label) {
@@ -177,8 +182,8 @@ function buildContentPackage({ sourceRoot, descriptor }) {
       raw_digest: actualDigest,
       bytes_base64: bytes.toString("base64"),
     };
-  }).sort((left, right) => left.path.localeCompare(right.path));
-  assertSortedUnique(files, (left, right) => left.path.localeCompare(right.path), "Asset content inventory");
+  }).sort((left, right) => compareText(left.path, right.path));
+  assertSortedUnique(files, (left, right) => compareText(left.path, right.path), "Asset content inventory");
   const content = {
     schema_version: SCHEMA_VERSION,
     object_kind: "asset_content_package",
@@ -194,7 +199,7 @@ function buildContentPackage({ sourceRoot, descriptor }) {
 
 function validateContentSemantics(content) {
   validateSchema(content, SCHEMAS.content, "Asset content package");
-  assertSortedUnique(content.files, (left, right) => left.path.localeCompare(right.path), "Asset content inventory");
+  assertSortedUnique(content.files, (left, right) => compareText(left.path, right.path), "Asset content inventory");
   for (const file of content.files) {
     const bytes = Buffer.from(file.bytes_base64, "base64");
     if (bytes.toString("base64") !== file.bytes_base64) throw new Error(`Asset content ${file.path} has non-canonical base64 bytes`);
@@ -272,6 +277,13 @@ function validateRecordSemantics(record, content) {
       throw new Error("Asset full-content revision must differ from its exact parent");
     }
   }
+  const rollbackTarget = record.maintenance.rollback.target;
+  if (rollbackTarget !== null
+    && (rollbackTarget.stable_id !== record.stable_id
+      || rollbackTarget.asset_type !== record.asset_type
+      || rollbackTarget.version === record.version)) {
+    throw new Error("Asset rollback target must be a different exact revision of the same stable ID and Asset type");
+  }
   if (record.provenance.license.status === "unknown" && (record.provenance.license.spdx_id !== null || record.provenance.license.evidence_ref !== null)) {
     throw new Error("unknown Asset license status cannot carry an asserted license identity");
   }
@@ -285,6 +297,20 @@ function validateRecordSemantics(record, content) {
   if (record.provenance.owner.status === "supported"
     && (record.provenance.owner.owner_id === null || record.provenance.owner.evidence_ref === null)) {
     throw new Error("supported Asset owner status requires an identity and evidence reference");
+  }
+  for (const dimensionName of ["models", "adapters", "stacks", "domains", "projects", "task_classes"]) {
+    const dimension = record.applicability[dimensionName];
+    const values = [...dimension.included, ...dimension.excluded];
+    if ((dimension.status === "unknown" || dimension.status === "unrestricted") && values.length > 0) {
+      throw new Error(`Asset applicability ${dimensionName} ${dimension.status} status cannot carry included or excluded values`);
+    }
+    if (dimension.status === "bounded" && values.length === 0) {
+      throw new Error(`Asset applicability ${dimensionName} bounded status requires an included or excluded value`);
+    }
+    const included = new Set(dimension.included);
+    if (dimension.excluded.some((value) => included.has(value))) {
+      throw new Error(`Asset applicability ${dimensionName} cannot include and exclude the same value`);
+    }
   }
   const unsupportedVerifiedClaims = [
     [record.provenance.license.status, "license"],
@@ -461,6 +487,15 @@ function loadSnapshotAssets({ storeRoot, snapshot }) {
   };
 
   for (const asset of assets) {
+    const rollbackTargetRef = asset.record.maintenance.rollback.target;
+    if (rollbackTargetRef !== null) {
+      const rollbackTarget = resolveExact(rollbackTargetRef, "rollback target");
+      if (rollbackTarget.stable_id !== asset.stable_id
+        || rollbackTarget.asset_type !== asset.asset_type
+        || rollbackTarget.version === asset.version) {
+        throw new Error("Asset rollback target transplant rejected");
+      }
+    }
     asset.dependency_closure = walkDependencies(asset).map((entry) => ({
       ...exactRefFromEntry(entry),
       state: entry.state,
@@ -616,6 +651,15 @@ function assertExactReferencesAvailable(record, predecessor) {
     if (!parent) throw new Error(`missing parent ${record.derivation.parent.stable_id}@${record.derivation.parent.version}`);
     assertReferenceMatches(record.derivation.parent, parent, "parent");
     if (parent.stable_id !== record.stable_id || parent.asset_type !== record.asset_type) throw new Error("Asset parent transplant rejected");
+  }
+  const rollbackTargetRef = record.maintenance.rollback.target;
+  if (rollbackTargetRef !== null) {
+    const rollbackTarget = byKey.get(refKey(rollbackTargetRef));
+    if (!rollbackTarget) throw new Error(`missing rollback target ${rollbackTargetRef.stable_id}@${rollbackTargetRef.version}`);
+    assertReferenceMatches(rollbackTargetRef, rollbackTarget, "rollback target");
+    if (rollbackTarget.stable_id !== record.stable_id || rollbackTarget.asset_type !== record.asset_type) {
+      throw new Error("Asset rollback target transplant rejected");
+    }
   }
 }
 
@@ -858,6 +902,7 @@ export function exportAssetRegistryReference({ storeRoot, snapshotDigest, truste
     scope_id: asset.scope_id,
     dependencies: asset.record.dependencies.map(cloneJson).sort(refCompare),
     parent: asset.record.derivation.kind === "root" ? null : cloneJson(asset.record.derivation.parent),
+    rollback_target: cloneJson(asset.record.maintenance.rollback.target),
   })).sort(entryCompare);
   return deepFreeze({
     schema_version: SCHEMA_VERSION,
