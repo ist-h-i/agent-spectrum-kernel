@@ -1,3 +1,4 @@
+import { lstatSync, realpathSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertAtomicOutputAbsent, publishJsonAtomicNoReplace } from "./ask-benchmark-atomic-publication.mjs";
@@ -263,6 +264,13 @@ function pathsOverlap(left, right) {
   return a === b || a.startsWith(`${b}${sep}`) || b.startsWith(`${a}${sep}`);
 }
 
+function resolveAggregateAuthorityRoot(options, fallbackRoot = DEFAULT_ROOT) {
+  const suppliedRoot = resolve(options.aggregateAuthorityRoot ?? options.artifactRoot ?? fallbackRoot);
+  if (lstatSync(suppliedRoot).isSymbolicLink()) throw new Error("aggregate source authority root must be canonical and must not be a symlink");
+  const canonicalRoot = realpathSync(suppliedRoot);
+  return canonicalRoot;
+}
+
 function policyPaths(root) {
   if (root === DEFAULT_ROOT) return [DEFAULT_PORTFOLIO_CATALOG_PATH, DEFAULT_PORTFOLIO_POLICY_MANIFEST_PATH, DEFAULT_PORTFOLIO_ADMISSION_POLICY_PATH, DEFAULT_PORTFOLIO_SCORING_POLICY_PATH, DEFAULT_PORTFOLIO_LINEAGE_POLICY_PATH];
   return ["benchmarks/portfolio-catalog.json", "benchmarks/portfolio-policy-manifest.json", "benchmarks/portfolio-admission-policy.json", "benchmarks/portfolio-scoring-policy.json", "benchmarks/portfolio-lineage-policy.json"].map((path) => resolve(root, path));
@@ -270,7 +278,7 @@ function policyPaths(root) {
 
 function authorityPaths(options) {
   const root = resolve(options.root ?? DEFAULT_ROOT);
-  const artifactRoot = resolve(options.aggregateAuthorityRoot ?? options.artifactRoot ?? root);
+  const artifactRoot = resolveAggregateAuthorityRoot(options, root);
   return [
     ["paired-comparison input", options.comparisonReportPath],
     ["repetition-report input", options.repetitionReportPath],
@@ -295,7 +303,7 @@ function derive(options) {
   if (!options.comparisonReportPath) throw new Error("paired comparison report input is missing");
   const verifiedComparison = verifyEngineeringPairedComparisonReport(options);
   const verifiedPolicyArtifacts = verifyPortfolioPolicyArtifacts({ root });
-  const artifactRoot = resolve(options.aggregateAuthorityRoot ?? options.artifactRoot ?? root);
+  const artifactRoot = resolveAggregateAuthorityRoot(options, root);
   const artifact = buildPortfolioAggregateResult({
     verifiedComparison,
     verifiedPolicyArtifacts,
@@ -330,7 +338,7 @@ export function verifyPortfolioAggregateResult(options) {
     throw new Error("portfolio aggregate result input must contain valid JSON");
   }
   const root = resolve(options.root ?? DEFAULT_ROOT);
-  const artifactRoot = resolve(options.aggregateAuthorityRoot ?? options.artifactRoot ?? root);
+  const artifactRoot = resolveAggregateAuthorityRoot(options, root);
   validatePortfolioAggregateResult(supplied, { root, artifactRoot, immutableArtifactDigests: options.immutableArtifactDigests ?? {} });
   const derived = derive(options);
   if (stableCanonicalJson(supplied) !== stableCanonicalJson(derived.artifact)) throw new Error("portfolio aggregate result does not match the re-derived full authority report");

@@ -287,7 +287,12 @@ function isInside(root, path) {
 
 function checkedInBytes(root, relativePath) {
   try {
-    return execFileSync("git", ["-C", root, "show", `HEAD:${relativePath}`], { encoding: null, maxBuffer: 2 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+    const repositoryRoot = realpathSync(execFileSync("git", ["-C", root, "rev-parse", "--show-toplevel"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim());
+    const absolutePath = resolve(root, relativePath);
+    if (!isInside(repositoryRoot, absolutePath)) return null;
+    const repositoryRelativePath = relative(repositoryRoot, absolutePath).split(sep).join("/");
+    if (repositoryRelativePath.length === 0) return null;
+    return execFileSync("git", ["-C", repositoryRoot, "show", `HEAD:${repositoryRelativePath}`], { encoding: null, maxBuffer: 2 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
   } catch {
     return null;
   }
@@ -327,7 +332,9 @@ function readAuthoritativeJsonArtifact({ artifactRoot, relativePath, immutableAr
 
 function readStableAuthoritativeJsonArtifact({ artifactRoot, relativePath, immutableArtifactDigests = {}, schemaPath, label }) {
   assertPortableRelativePath(relativePath, `${label} path`);
-  const root = realpathSync(artifactRoot);
+  const suppliedRoot = resolve(artifactRoot);
+  if (lstatSync(suppliedRoot).isSymbolicLink()) throw new Error("aggregate source authority root must be canonical and must not be a symlink");
+  const root = realpathSync(suppliedRoot);
   const absolutePath = resolve(root, relativePath);
   if (!isInside(root, absolutePath)) throw new Error(`${label} path escapes the artifact root`);
   const before = readStableFile(absolutePath, label, 1024 * 1024, { allowEmpty: false });

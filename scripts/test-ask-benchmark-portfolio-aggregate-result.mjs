@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import {
@@ -22,6 +23,7 @@ import {
 import { readStableFile } from "./ask-benchmark-stable-file.mjs";
 
 const root = resolve(import.meta.dirname, "..");
+const runner = resolve(root, "scripts/ask-benchmark.mjs");
 const policyAuthorities = verifyPortfolioPolicyArtifacts({ root });
 const policy = policyAuthorities.verified_scoring_policy;
 const catalog = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-catalog.json"), "utf8"));
@@ -41,6 +43,11 @@ function digest(value) { return `sha256:${hash(value)}`; }
 function freeze(value) { if (value && typeof value === "object" && !Object.isFrozen(value)) { Object.values(value).forEach(freeze); Object.freeze(value); } return value; }
 function metric(value) { return { status: "known", value, reason: "committed_runtime_evidence" }; }
 function serialize(value) { return `${JSON.stringify(value, null, 2)}\n`; }
+function git(cwd, args) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return result.stdout.trim();
+}
 
 function writeAuthority(relativePath, value) {
   const path = resolve(authorityRoot, relativePath);
@@ -244,6 +251,29 @@ try {
     assert.equal(aggregate.weighted_quality_delta, expectedNumerator / aggregate.denominator);
   });
   check("deterministic regeneration is byte identical for one frozen authority", () => assert.equal(serialize(buildPortfolioAggregateResult(options)), serialize(buildPortfolioAggregateResult(options))));
+  check("nested checked-in authority bytes need no duplicate caller digest", () => {
+    const checkedInOptions = buildOptions({ lineageRecordPaths: [] });
+    const repositoryRoot = resolve(work, `checked-in-${sourceSequence}`);
+    const nestedAuthorityRoot = resolve(repositoryRoot, "nested-authority");
+    mkdirSync(nestedAuthorityRoot, { recursive: true });
+    for (const relativePath of checkedInOptions.classificationRecordPaths) {
+      const destination = resolve(nestedAuthorityRoot, relativePath);
+      mkdirSync(resolve(destination, ".."), { recursive: true });
+      cpSync(resolve(authorityRoot, relativePath), destination);
+    }
+    git(repositoryRoot, ["init", "-q"]);
+    git(repositoryRoot, ["config", "user.name", "aggregate-test"]);
+    git(repositoryRoot, ["config", "user.email", "aggregate-test@example.invalid"]);
+    git(repositoryRoot, ["add", "nested-authority"]);
+    git(repositoryRoot, ["-c", "commit.gpgsign=false", "commit", "-qm", "Freeze nested aggregate authorities"]);
+    const changed = buildPortfolioAggregateResult({
+      ...checkedInOptions,
+      artifactRoot: nestedAuthorityRoot,
+      immutableArtifactDigests: {},
+      lineageRecordPaths: [],
+    });
+    assert.equal(changed.classification_records.length, FIXTURES.length);
+  });
   check("caller contribution fields are not accepted", () => assert.throws(() => buildPortfolioAggregateResult({ ...options, fixtureContributions: [{ fixture_id: FIXTURES[0][0], normalized_quality_delta: 1 }] }), /unknown options/));
   check("reclosed caller contribution tamper is rejected", () => {
     const changed = structuredClone(aggregate);
@@ -403,6 +433,41 @@ try {
   });
   const outputDir = resolve(work, "outputs");
   mkdirSync(outputDir);
+  const authorityRootLink = resolve(work, "authority-link");
+  symlinkSync(authorityRoot, authorityRootLink);
+  check("pure producer rejects a symlinked aggregate authority root", () => {
+    assert.throws(() => buildPortfolioAggregateResult({ ...options, artifactRoot: authorityRootLink }), /aggregate source authority root.*symlink/);
+  });
+  check("symlinked aggregate authority root cannot bypass canonical disjointness", () => {
+    const outputPath = resolve(authorityRoot, "canonical-root-output.json");
+    assert.throws(() => reportPortfolioAggregateResult({ outputPath, aggregateAuthorityRoot: authorityRootLink }), /aggregate source authority root.*canonical|aggregate source authority root.*symlink/);
+    assert.equal(existsSync(outputPath), false);
+  });
+  check("CLI help exposes aggregate report and verify commands", () => {
+    const result = spawnSync(process.execPath, [runner, "help"], { cwd: root, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /report-engineering-aggregate-result/);
+    assert.match(result.stdout, /verify-engineering-aggregate-result/);
+  });
+  check("CLI rejects an unpaired classification source digest before publication", () => {
+    const outputPath = resolve(outputDir, "cli-unpaired-digest.json");
+    const result = spawnSync(process.execPath, [
+      runner,
+      "report-engineering-aggregate-result",
+      "--output", outputPath,
+      "--result-set", resolve(work, "missing-result-set.json"),
+      "--repetition-report", resolve(work, "missing-repetition-report.json"),
+      "--paired-comparison-report", resolve(work, "missing-paired-report.json"),
+      "--aggregate-authority-root", authorityRoot,
+      "--classification-record", "classification/missing.json",
+      "--comparison-view", "adaptive_vs_kernel",
+      "--suite", "practice_frequency",
+      "--task-class", "investigation_implementation",
+    ], { cwd: root, encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /one --classification-record-source-digest for every --classification-record/);
+    assert.equal(existsSync(outputPath), false);
+  });
   check("atomic reporter refuses an existing output", () => {
     const outputPath = resolve(outputDir, "existing.json");
     writeFileSync(outputPath, "existing");
@@ -432,7 +497,7 @@ try {
     assert.throws(() => verifyPortfolioAggregateResult({ aggregateResultPath: link, aggregateAuthorityRoot: authorityRoot }), /symlink/);
   });
 
-  assert.equal(covered.size, 47, `expected 47 aggregate closures, received ${covered.size}`);
+  assert.equal(covered.size, 52, `expected 52 aggregate closures, received ${covered.size}`);
   console.log(`Portfolio aggregate result contract test passed (${covered.size} closures).`);
 } finally {
   rmSync(work, { recursive: true, force: true });
