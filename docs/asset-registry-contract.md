@@ -98,7 +98,11 @@ Optional evidence must be omitted or represented explicitly as unknown according
 
 Applicability keeps explicit model, adapter, stack, domain, project, and task-class selectors in addition to included/excluded scopes and required capabilities. Each selector is explicitly `unknown`, `unrestricted`, or `bounded`; a bounded selector carries non-empty included and/or excluded values, while unknown and unrestricted selectors cannot carry values. This prevents an empty list from ambiguously meaning both unknown and universal compatibility.
 
+The same value cannot appear in both sides of one included/excluded selector, including the top-level scope selector. Such a contradiction fails registration and imported-record verification instead of leaving precedence to a consumer.
+
 Permissions and effects keep the declared values separate from their evidence references. `requested_permissions` and `possible_effects` are closed, bounded string sets; `permission_refs` and `effect_refs` cite the represented support for those declarations. Empty declaration sets under `not_evaluated` mean that this registry has not established an operational surface, not that execution is permissionless or effect-free.
+
+Unordered metadata sets and reference collections are normalized to locale-independent code-unit order before record identity is computed. Verification requires that canonical order on stored or imported records. Reordering the same set therefore remains an idempotent registration retry rather than creating a second identity.
 
 For `git_revision` records, the registry makes the Asset version equal the represented source revision and verifies the supplied source bytes against their declared raw digests. It does not independently query Git or prove that those bytes came from the represented commit; a consumer that requires that claim needs separate repository-authority evidence.
 

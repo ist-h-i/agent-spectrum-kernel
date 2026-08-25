@@ -29,6 +29,8 @@ import {
 import {
   contentAddressedObjectPath,
   listContentAddressedJson,
+  putContentAddressedJson,
+  readContentAddressedJson,
   stableCanonicalJson,
 } from "./content-addressed-store.mjs";
 
@@ -705,14 +707,30 @@ try {
     /applicability adapters unknown status cannot carry/iu,
   );
 
+  const contradictoryScope = assetDescriptor({
+    sample: samples.skill,
+    stableId: "ask.skill.contradictory-scope-test",
+  });
+  contradictoryScope.applicability.excluded_scopes.push("local_repository");
+  expectFailure(
+    "the same top-level scope cannot be both included and excluded",
+    () => registerAsset({
+      storeRoot,
+      sourceRoot,
+      predecessorSnapshotDigest: candidateSnapshotDigest,
+      descriptor: contradictoryScope,
+    }),
+    /cannot include and exclude the same scope/iu,
+  );
+
   const declaredOperationalSurface = assetDescriptor({
     sample: samples.skill,
     stableId: "ask.skill.declared-operational-surface-test",
   });
   declaredOperationalSurface.permissions_and_effects = {
     status: "declared_by_consumer",
-    requested_permissions: ["repository.read"],
-    possible_effects: ["local_files_read"],
+    requested_permissions: ["repository.write", "repository.read"],
+    possible_effects: ["local_files_written", "local_files_read"],
     permission_refs: [],
     effect_refs: [],
   };
@@ -732,11 +750,66 @@ try {
       version: declaredOperationalSurface.version,
       state: "candidate",
     });
-    assert.deepEqual(resolved.record.permissions_and_effects.requested_permissions, ["repository.read"]);
-    assert.deepEqual(resolved.record.permissions_and_effects.possible_effects, ["local_files_read"]);
+    assert.deepEqual(resolved.record.permissions_and_effects.requested_permissions, ["repository.read", "repository.write"]);
+    assert.deepEqual(resolved.record.permissions_and_effects.possible_effects, ["local_files_read", "local_files_written"]);
     assert.deepEqual(resolved.record.safety.classifications, ["local_read_only"]);
     assert.deepEqual(resolved.record.maintenance.refresh_conditions, ["repository read boundary changes"]);
   });
+  check("reordered semantic sets are an idempotent registration retry", () => {
+    const reordered = structuredClone(declaredOperationalSurface);
+    reordered.permissions_and_effects.requested_permissions.reverse();
+    reordered.permissions_and_effects.possible_effects.reverse();
+    const repeated = registerAsset({
+      storeRoot,
+      sourceRoot,
+      predecessorSnapshotDigest: declaredOperationalRegistration.snapshot_digest,
+      descriptor: reordered,
+    });
+    assert.equal(repeated.created, false);
+    assert.equal(repeated.snapshot_digest, declaredOperationalRegistration.snapshot_digest);
+    assert.equal(repeated.record_digest, declaredOperationalRegistration.record_digest);
+  });
+
+  const nonCanonicalSetStoreRoot = resolve(root, "non-canonical-record-set-store");
+  mkdirSync(nonCanonicalSetStoreRoot, { recursive: true });
+  const nonCanonicalSetEmpty = createEmptyAssetRegistry({
+    storeRoot: nonCanonicalSetStoreRoot,
+    registryId: "non-canonical-record-set-test",
+    repositoryId: REPOSITORY_ID,
+    scopeId: SCOPE_ID,
+  });
+  const nonCanonicalSetRegistration = registerAsset({
+    storeRoot: nonCanonicalSetStoreRoot,
+    sourceRoot,
+    predecessorSnapshotDigest: nonCanonicalSetEmpty.snapshot_digest,
+    descriptor: declaredOperationalSurface,
+  });
+  const nonCanonicalRecord = structuredClone(readContentAddressedJson({
+    storeRoot: nonCanonicalSetStoreRoot,
+    digest: nonCanonicalSetRegistration.record_digest,
+  }).value);
+  nonCanonicalRecord.permissions_and_effects.requested_permissions.reverse();
+  const nonCanonicalRecordPublication = putContentAddressedJson({
+    storeRoot: nonCanonicalSetStoreRoot,
+    artifact: nonCanonicalRecord,
+  });
+  const nonCanonicalSnapshot = structuredClone(readContentAddressedJson({
+    storeRoot: nonCanonicalSetStoreRoot,
+    digest: nonCanonicalSetRegistration.snapshot_digest,
+  }).value);
+  nonCanonicalSnapshot.entries[0].record_digest = nonCanonicalRecordPublication.digest;
+  const nonCanonicalSnapshotPublication = putContentAddressedJson({
+    storeRoot: nonCanonicalSetStoreRoot,
+    artifact: nonCanonicalSnapshot,
+  });
+  expectFailure(
+    "an imported record with non-canonical set ordering fails closed",
+    () => verifyAssetRegistry({
+      storeRoot: nonCanonicalSetStoreRoot,
+      snapshotDigest: nonCanonicalSnapshotPublication.digest,
+    }),
+    /requested-permission set .*deterministically ordered|requested-permission set .*strictly sorted/iu,
+  );
 
   const incompleteStoreRoot = resolve(root, "incomplete-store");
   mkdirSync(incompleteStoreRoot, { recursive: true });

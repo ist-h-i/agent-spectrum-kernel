@@ -115,6 +115,35 @@ function transitionCompare(left, right) {
     || compareText(left.to_state, right.to_state);
 }
 
+function unorderedRecordTextSets(record) {
+  return [
+    [record.compatibility.asset_contract_versions, "Asset contract-version set"],
+    [record.compatibility.runtime_profiles, "Asset runtime-profile set"],
+    ...["models", "adapters", "stacks", "domains", "projects", "task_classes"].flatMap((dimensionName) => [
+      [record.applicability[dimensionName].included, `Asset applicability ${dimensionName} included set`],
+      [record.applicability[dimensionName].excluded, `Asset applicability ${dimensionName} excluded set`],
+    ]),
+    [record.applicability.included_scopes, "Asset included-scope set"],
+    [record.applicability.excluded_scopes, "Asset excluded-scope set"],
+    [record.applicability.required_capabilities, "Asset required-capability set"],
+    [record.permissions_and_effects.requested_permissions, "Asset requested-permission set"],
+    [record.permissions_and_effects.possible_effects, "Asset possible-effect set"],
+    [record.permissions_and_effects.permission_refs, "Asset permission-reference set"],
+    [record.permissions_and_effects.effect_refs, "Asset effect-reference set"],
+    [record.safety.classifications, "Asset safety-classification set"],
+    [record.safety.constraint_refs, "Asset safety-constraint-reference set"],
+    [record.mechanism_and_evidence.mechanism_refs, "Asset mechanism-reference set"],
+    [record.mechanism_and_evidence.evidence_refs, "Asset mechanism-evidence-reference set"],
+    [record.evaluation_history.evidence_refs, "Asset evaluation-evidence-reference set"],
+    [record.maintenance.refresh_conditions, "Asset refresh-condition set"],
+    [record.maintenance.regression_refs, "Asset regression-reference set"],
+  ];
+}
+
+function normalizeRecordTextSets(record) {
+  for (const [values] of unorderedRecordTextSets(record)) values.sort(compareText);
+}
+
 function assertSortedUnique(values, compare, label) {
   for (let index = 1; index < values.length; index += 1) {
     const order = compare(values[index - 1], values[index]);
@@ -253,6 +282,7 @@ function buildRecord(descriptor, contentDigest, content) {
     type_extension: cloneJson(descriptor.type_extension),
   };
   validateSchema(record, SCHEMAS.record, "Asset record");
+  normalizeRecordTextSets(record);
   validateRecordSemantics(record, content);
   return record;
 }
@@ -266,6 +296,7 @@ function validateRecordSemantics(record, content) {
   if (!compareCanonical(record.content.files, contentFiles)) throw new Error("Asset record content inventory mismatch");
   if (!compareCanonical(record.type_extension, content.type_extension)) throw new Error("Asset record/content type extension mismatch");
   assertSortedUnique(record.dependencies, refCompare, "Asset dependency list");
+  for (const [values, label] of unorderedRecordTextSets(record)) assertSortedUnique(values, compareText, label);
   for (const dependency of record.dependencies) {
     if (dependency.stable_id === record.stable_id && dependency.version === record.version) throw new Error("Asset record contains a self dependency; dependency cycle rejected");
   }
@@ -311,6 +342,10 @@ function validateRecordSemantics(record, content) {
     if (dimension.excluded.some((value) => included.has(value))) {
       throw new Error(`Asset applicability ${dimensionName} cannot include and exclude the same value`);
     }
+  }
+  const includedScopes = new Set(record.applicability.included_scopes);
+  if (record.applicability.excluded_scopes.some((scope) => includedScopes.has(scope))) {
+    throw new Error("Asset applicability cannot include and exclude the same scope");
   }
   const unsupportedVerifiedClaims = [
     [record.provenance.license.status, "license"],
