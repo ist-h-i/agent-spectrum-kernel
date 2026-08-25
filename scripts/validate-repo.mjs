@@ -11,6 +11,7 @@ import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { codexCompactProfileCanonicalPaths } from "./codex-runtime-profile.mjs";
 import { exportAssetRegistryReference, listAssets, verifyAssetRegistry } from "./asset-registry.mjs";
 import { listContentAddressedJson, readContentAddressedJson, readJsonFileStrict } from "./content-addressed-store.mjs";
+import { verifyPortfolioLock, verifyPortfolioSelection } from "./portfolio-manager.mjs";
 import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { validatePortfolioDesignAdmissionArtifacts } from "./ask-benchmark-design-admission.mjs";
@@ -87,6 +88,11 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/asset-record.schema.json",
   "schemas/asset-registry-snapshot.schema.json",
   "schemas/asset-lifecycle-authority-context.schema.json",
+  "schemas/portfolio-manifest.schema.json",
+  "schemas/portfolio-lock.schema.json",
+  "schemas/portfolio-authority-context.schema.json",
+  "schemas/portfolio-selection-context.schema.json",
+  "schemas/portfolio-selection.schema.json",
 ];
 const REQUIRED_ASSET_REGISTRY_PATHS = [
   "docs/asset-registry-contract.md",
@@ -101,6 +107,17 @@ const REQUIRED_ASSET_REGISTRY_PATHS = [
 ];
 const ASSET_REGISTRY_REFERENCE_PATH = "docs/fixtures/asset-registry/reference.json";
 const ASSET_REGISTRY_STORE_PATH = "docs/fixtures/asset-registry/store";
+const REQUIRED_PORTFOLIO_MANAGER_PATHS = [
+  "docs/portfolio-manager-contract.md",
+  "docs/adr/0004-portfolio-activation-authority-boundary.md",
+  "docs/fixtures/portfolio-manager/reference.json",
+  "docs/fixtures/portfolio-manager/store",
+  "scripts/portfolio-manager.mjs",
+  "scripts/portfolio-manager-samples.mjs",
+  "scripts/test-portfolio-manager.mjs",
+];
+const PORTFOLIO_MANAGER_REFERENCE_PATH = "docs/fixtures/portfolio-manager/reference.json";
+const PORTFOLIO_MANAGER_STORE_PATH = "docs/fixtures/portfolio-manager/store";
 const EXPECTED_SAMPLE_ASSETS = new Map([
   ["ask.skill.test-first-verification", "skill"],
   ["ask.prompt-template.codex.skill-verify", "prompt"],
@@ -4019,22 +4036,22 @@ function validateAdapterGovernance(root, checks, errors) {
   }
 }
 
-function collectAssetStoreFiles(storeRoot) {
+function collectSharedCasFiles(storeRoot, label) {
   const files = [];
   const visit = (directory) => {
     for (const entry of readdirSync(directory, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
       const path = resolve(directory, entry.name);
       const relativePath = relative(storeRoot, path).split(sep).join("/");
-      if (entry.isSymbolicLink()) throw new Error(`Asset Registry sample store contains a symlink: ${relativePath}`);
+      if (entry.isSymbolicLink()) throw new Error(`${label} store contains a symlink: ${relativePath}`);
       if (entry.isDirectory()) {
         if (!["objects", "objects/sha256"].includes(relativePath)
           && !/^objects\/sha256\/[a-f0-9]{2}$/u.test(relativePath)) {
-          throw new Error(`Asset Registry sample store contains a directory outside the shared objects/sha256 layout: ${relativePath}`);
+          throw new Error(`${label} store contains a directory outside the shared objects/sha256 layout: ${relativePath}`);
         }
         visit(path);
       }
       else if (entry.isFile()) files.push(relativePath);
-      else throw new Error(`Asset Registry sample store contains an unsupported entry: ${relativePath}`);
+      else throw new Error(`${label} store contains an unsupported entry: ${relativePath}`);
     }
   };
   visit(storeRoot);
@@ -4109,7 +4126,7 @@ function validateAssetRegistryFixture(root, errors) {
       throw new Error("candidate-only sample store must not contain lifecycle authority contexts");
     }
     const canonicalStoreRoot = realpathSync(storeRoot);
-    const actualStoreFiles = collectAssetStoreFiles(canonicalStoreRoot);
+    const actualStoreFiles = collectSharedCasFiles(canonicalStoreRoot, "Asset Registry sample");
     const canonicalStoreFiles = objects
       .map(({ path }) => relative(canonicalStoreRoot, path).split(sep).join("/"))
       .sort();
@@ -4129,6 +4146,235 @@ function validateAssetRegistryFixture(root, errors) {
   } catch (error) {
     fail(errors, "Asset Registry", `checked-in sample verification failed: ${error.message}`);
     return { valid: false, assetCount: 0 };
+  }
+}
+
+function assertPortablePortfolioReference(value, path = "reference") {
+  if (typeof value === "string") {
+    if (isAbsolute(value)) throw new Error(`${path} contains an absolute path`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertPortablePortfolioReference(entry, `${path}[${index}]`));
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, entry] of Object.entries(value)) {
+      if (/(?:^|_)latest(?:_|$)/iu.test(key) && entry !== false) {
+        throw new Error(`${path}.${key} must explicitly deny mutable latest use`);
+      }
+      assertPortablePortfolioReference(entry, `${path}.${key}`);
+    }
+  }
+}
+
+function assertExactPortfolioReferenceKeys(value, expectedKeys, label) {
+  const actual = Object.keys(value ?? {}).sort();
+  const expected = [...expectedKeys].sort();
+  if (stableCanonicalJson(actual) !== stableCanonicalJson(expected)) {
+    throw new Error(`${label} uses an unknown or missing field`);
+  }
+}
+
+function addPortfolioLockReachability({ storeRoot, lockDigest, reachable }) {
+  let cursorDigest = lockDigest;
+  const visited = new Set();
+  while (cursorDigest !== null) {
+    if (visited.has(cursorDigest)) throw new Error("Portfolio sample lock predecessor cycle detected");
+    visited.add(cursorDigest);
+    reachable.add(cursorDigest);
+    const lock = readContentAddressedJson({ storeRoot, digest: cursorDigest }).value;
+    if (lock.authority_context_digest !== null) reachable.add(lock.authority_context_digest);
+    for (const entry of lock.entries) reachable.add(entry.manifest_digest);
+    cursorDigest = lock.predecessor?.lock_digest ?? null;
+  }
+}
+
+function addAssetRegistryReachability({ storeRoot, snapshotDigest, reachable }) {
+  let cursorDigest = snapshotDigest;
+  const visited = new Set();
+  while (cursorDigest !== null) {
+    if (visited.has(cursorDigest)) throw new Error("Portfolio sample Registry predecessor cycle detected");
+    visited.add(cursorDigest);
+    reachable.add(cursorDigest);
+    const snapshot = readContentAddressedJson({ storeRoot, digest: cursorDigest }).value;
+    for (const entry of snapshot.entries) {
+      reachable.add(entry.record_digest);
+      reachable.add(entry.content_digest);
+    }
+    if (snapshot.lifecycle_authority_context_digest !== null) reachable.add(snapshot.lifecycle_authority_context_digest);
+    cursorDigest = snapshot.predecessor?.snapshot_digest ?? null;
+  }
+}
+
+function validatePortfolioManagerFixture(root, errors) {
+  for (const path of REQUIRED_PORTFOLIO_MANAGER_PATHS) {
+    if (!existsSync(resolve(root, path))) fail(errors, "Portfolio Manager", `required Portfolio Manager path is missing: ${path}`);
+  }
+
+  const referencePath = resolve(root, PORTFOLIO_MANAGER_REFERENCE_PATH);
+  const storeRoot = resolve(root, PORTFOLIO_MANAGER_STORE_PATH);
+  if (!existsSync(referencePath) || !existsSync(storeRoot)) return { valid: false, objectCount: 0 };
+
+  try {
+    const reference = readJsonFileStrict(referencePath, "Portfolio Manager sample reference");
+    if (reference.schema_version !== "1.0.0" || reference.program !== "ask_portfolio_manager_samples") {
+      throw new Error("sample reference program/schema identity mismatch");
+    }
+    assertExactPortfolioReferenceKeys(reference, [
+      "schema_version",
+      "program",
+      "source_revision",
+      "registry_snapshot_digest",
+      "kernel_only",
+      "adaptive_ask",
+      "frozen_benchmark_results_mutated",
+    ], "Portfolio Manager sample reference");
+    if (reference.frozen_benchmark_results_mutated !== false) {
+      throw new Error("sample reference must deny frozen benchmark result mutation");
+    }
+    assertPortablePortfolioReference(reference);
+
+    const views = [
+      ["kernel_only", reference.kernel_only],
+      ["adaptive_ask", reference.adaptive_ask],
+    ];
+    const reachable = new Set();
+    const manifestDigests = new Set();
+    for (const [name, view] of views) {
+      if (!view || view.program !== "ask_portfolio_reference") throw new Error(`${name} Portfolio reference is missing or malformed`);
+      assertExactPortfolioReferenceKeys(view, [
+        "schema_version",
+        "program",
+        "portfolio_id",
+        "repository_id",
+        "scope_id",
+        "lock_revision",
+        "lock_digest",
+        "required_portfolio_authority_context_digests",
+        "current_manifest",
+        "selections",
+        "mutable_latest_pointer_used",
+        "runtime_activation_implied",
+        "execution_implied",
+        "effectiveness_implied",
+      ], `${name} Portfolio reference`);
+      assertExactPortfolioReferenceKeys(view.current_manifest, [
+        "revision",
+        "manifest_digest",
+        "asset_set_digest",
+      ], `${name} current manifest reference`);
+      const authorityDigests = view.required_portfolio_authority_context_digests;
+      if (!Array.isArray(authorityDigests) || authorityDigests.length === 0) {
+        throw new Error(`${name} Portfolio reference must declare exact required authority contexts`);
+      }
+      if (stableCanonicalJson(authorityDigests) !== stableCanonicalJson([...new Set(authorityDigests)].sort())) {
+        throw new Error(`${name} required authority contexts are not a deterministic set`);
+      }
+      const authorityContexts = authorityDigests.map((digest) => {
+        reachable.add(digest);
+        return readContentAddressedJson({ storeRoot, digest }).value;
+      });
+      const verifiedLock = verifyPortfolioLock({
+        storeRoot,
+        lockDigest: view.lock_digest,
+        trustedPortfolioAuthorityContexts: authorityContexts,
+      });
+      if (verifiedLock.lock.lock_revision !== view.lock_revision
+        || verifiedLock.lock.current_manifest_digest !== view.current_manifest.manifest_digest
+        || verifiedLock.lock.current_asset_set_digest !== view.current_manifest.asset_set_digest) {
+        throw new Error(`${name} Portfolio lock/reference identity mismatch`);
+      }
+      addPortfolioLockReachability({ storeRoot, lockDigest: view.lock_digest, reachable });
+      const currentClosure = verifiedLock.manifests.find((entry) => entry.manifest_digest === view.current_manifest.manifest_digest);
+      if (!currentClosure || currentClosure.manifest.revision !== view.current_manifest.revision) {
+        throw new Error(`${name} current manifest reference does not resolve exactly`);
+      }
+      if (currentClosure.manifest.source_revision !== reference.source_revision
+        || currentClosure.manifest.registry.snapshot_digest !== reference.registry_snapshot_digest) {
+        throw new Error(`${name} current manifest source/Registry binding mismatch`);
+      }
+      for (const closure of verifiedLock.manifests) manifestDigests.add(closure.manifest_digest);
+
+      if (!Array.isArray(view.selections) || view.selections.length !== 1) {
+        throw new Error(`${name} reference must contain exactly one deterministic selection`);
+      }
+      for (const selectionRef of view.selections) {
+        assertExactPortfolioReferenceKeys(selectionRef, [
+          "selection_object_digest",
+          "selection_digest",
+          "context_object_digest",
+          "context_digest",
+          "decision",
+        ], `${name} selection reference`);
+        reachable.add(selectionRef.selection_object_digest);
+        reachable.add(selectionRef.context_object_digest);
+        const verifiedSelection = verifyPortfolioSelection({
+          storeRoot,
+          selectionObjectDigest: selectionRef.selection_object_digest,
+          trustedPortfolioAuthorityContexts: authorityContexts,
+        }).selection;
+        if (verifiedSelection.selection_digest !== selectionRef.selection_digest
+          || verifiedSelection.context_object_digest !== selectionRef.context_object_digest
+          || verifiedSelection.context_digest !== selectionRef.context_digest
+          || verifiedSelection.decision !== selectionRef.decision) {
+          throw new Error(`${name} selection reference does not match deterministic reconstruction`);
+        }
+        if (verifiedSelection.selected_assets.length !== 0) {
+          throw new Error(`${name} checked sample must not imply an activated runtime Asset`);
+        }
+      }
+
+      if (name === "kernel_only") {
+        if (currentClosure.manifest.entries.length !== 0 || view.selections[0].decision !== "selected") {
+          throw new Error("Kernel-only sample must be an explicit selected zero-Asset manifest");
+        }
+      } else if (currentClosure.manifest.entries.length === 0
+        || currentClosure.manifest.entries.some((entry) => entry.assurance_lane !== "challenger"
+          || entry.expected_registry_state !== "candidate"
+          || !["shadow", "canary"].includes(entry.exposure.mode))
+        || !["bypass", "downgrade"].includes(view.selections[0].decision)) {
+        throw new Error("Adaptive ASK sample must remain candidate-only shadow/canary with a typed non-active decision");
+      }
+    }
+
+    for (const manifestDigest of manifestDigests) {
+      const manifest = readContentAddressedJson({ storeRoot, digest: manifestDigest }).value;
+      reachable.add(manifest.registry.snapshot_digest);
+      for (const entry of manifest.entries) {
+        reachable.add(entry.asset.record_digest);
+        reachable.add(entry.asset.content_digest);
+      }
+    }
+    addAssetRegistryReachability({
+      storeRoot,
+      snapshotDigest: reference.registry_snapshot_digest,
+      reachable,
+    });
+
+    const canonicalStoreRoot = realpathSync(storeRoot);
+    const objects = listContentAddressedJson({ storeRoot: canonicalStoreRoot });
+    const actualStoreFiles = collectSharedCasFiles(canonicalStoreRoot, "Portfolio Manager sample");
+    const canonicalStoreFiles = objects
+      .map(({ path }) => relative(canonicalStoreRoot, path).split(sep).join("/"))
+      .sort();
+    if (stableCanonicalJson(actualStoreFiles) !== stableCanonicalJson(canonicalStoreFiles)) {
+      throw new Error("sample store must contain exactly canonical shared-CAS object paths");
+    }
+    const actualDigests = objects.map(({ digest }) => digest).sort();
+    const reachableDigests = [...reachable].sort();
+    if (stableCanonicalJson(actualDigests) !== stableCanonicalJson(reachableDigests)) {
+      throw new Error("sample store contains an orphan or omits an exact reachable Portfolio/Registry object");
+    }
+
+    return {
+      valid: true,
+      objectCount: objects.length,
+      finalLockDigest: reference.adaptive_ask.lock_digest,
+    };
+  } catch (error) {
+    fail(errors, "Portfolio Manager", `checked-in sample verification failed: ${error.message}`);
+    return { valid: false, objectCount: 0 };
   }
 }
 
@@ -4551,6 +4797,7 @@ export function validateRepository(options) {
   const lifecycleArtifactChecks = validateLifecycleArtifactContract(root, manifest, errors);
   const lifecycleTraceabilityChecks = validateLifecycleTraceabilityContract(root, manifest, errors);
   validateAssetRegistryFixture(root, errors);
+  validatePortfolioManagerFixture(root, errors);
   const epicAdmissionWorkPackagePlanChecks = validateEpicAdmissionWorkPackagePlanContract(root, errors);
   const reviewSignalRegistryChecks = validateReviewSignalRegistry(root, manifest, errors);
   const portfolioCatalogChecks = validateAdaptivePortfolioCatalog(root, errors);

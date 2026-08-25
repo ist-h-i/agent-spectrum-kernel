@@ -52,6 +52,7 @@ docs/
   adr/0001-verification-evidence-trust-boundary.md
   adr/0002-epic-admission-work-package-plan-authority.md
   adr/0003-asset-registry-authority-boundary.md
+  adr/0004-portfolio-activation-authority-boundary.md
   routing-model.md
   lifecycle-artifact-contract.md
   lifecycle-traceability-contract.md
@@ -60,6 +61,9 @@ docs/
   asset-registry-contract.md
   fixtures/asset-registry/reference.json
   fixtures/asset-registry/store/objects/sha256/
+  portfolio-manager-contract.md
+  fixtures/portfolio-manager/reference.json
+  fixtures/portfolio-manager/store/objects/sha256/
   fixtures/lifecycle-artifact-chains.json
   fixtures/lifecycle-traceability-chains.json
   agent-session-state-contract.md
@@ -144,6 +148,11 @@ schemas/
   asset-record.schema.json
   asset-registry-snapshot.schema.json
   asset-lifecycle-authority-context.schema.json
+  portfolio-manifest.schema.json
+  portfolio-lock.schema.json
+  portfolio-authority-context.schema.json
+  portfolio-selection-context.schema.json
+  portfolio-selection.schema.json
 adapters/
   claude-code/
     project/.claude/
@@ -159,6 +168,8 @@ scripts/
   content-addressed-store.mjs
   asset-registry.mjs
   asset-registry-samples.mjs
+  portfolio-manager.mjs
+  portfolio-manager-samples.mjs
   execution-envelope.mjs
   verification-evidence.mjs
   epic-admission-work-package-plan.mjs
@@ -177,6 +188,7 @@ scripts/
   test-verification-evidence.mjs
   test-content-addressed-store.mjs
   test-asset-registry.mjs
+  test-portfolio-manager.mjs
   test-ask-benchmark.mjs
 benchmarks/
   README.md
@@ -271,6 +283,19 @@ node scripts/asset-registry-samples.mjs --check
 ```
 
 `node scripts/asset-registry-samples.mjs --write` deterministically rebuilds the sample after an intentional source or contract change. See `docs/adr/0003-asset-registry-authority-boundary.md` for the storage, lifecycle-authority, and Portfolio boundary decision.
+
+## Evidence-conditioned Portfolio Manager
+
+`docs/portfolio-manager-contract.md` defines the local versioned Portfolio plane above the Asset Registry. Immutable manifests and full predecessor-closed locks share the same canonical JSON CAS. A stored manifest is not current, a current manifest is not an executed Asset set, and verification-evidence, evaluator, producer, Asset owner, or digest identity does not grant Portfolio activation or rollback authority.
+
+Resolution uses a closed pre-result context, exact Registry and Asset identities, exact verification-reuse plans, exact current-state references, explicit selectors and capability differences, known-or-unknown budgets, and typed `selected` / `bypass` / `downgrade` / `stop` outcomes. High-impact activation needs an exact independent grant, while rollback uses a separate exact rollback authority and preserves every historical object.
+
+```bash
+node scripts/test-portfolio-manager.mjs
+node scripts/portfolio-manager-samples.mjs --check
+```
+
+The checked fixture represents an explicit zero-Asset Kernel-only selection and a candidate-only Adaptive ASK shadow challenger that downgrades on missing evidence and unknown safety. It never implies installation, execution, effectiveness, mutable-latest resolution, or a change to frozen benchmark results. `node scripts/portfolio-manager-samples.mjs --write` regenerates it deterministically after an intentional contract change. See `docs/adr/0004-portfolio-activation-authority-boundary.md` for the authority decision.
 
 ## Epic admission and Work Package Plans
 

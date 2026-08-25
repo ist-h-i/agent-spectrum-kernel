@@ -42,6 +42,14 @@
       "argv": ["node", "scripts/asset-registry-samples.mjs", "--check"]
     },
     {
+      "id": "portfolio_manager_contract",
+      "argv": ["node", "scripts/test-portfolio-manager.mjs"]
+    },
+    {
+      "id": "portfolio_manager_sample_check",
+      "argv": ["node", "scripts/portfolio-manager-samples.mjs", "--check"]
+    },
+    {
       "id": "portfolio_catalog",
       "argv": ["node", "scripts/test-ask-benchmark-portfolio-catalog.mjs"]
     },

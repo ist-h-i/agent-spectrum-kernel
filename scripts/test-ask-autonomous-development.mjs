@@ -365,6 +365,7 @@ assert.deepEqual(loadedPlan.plan.container.environment_allowlist, ["PATH", "HOME
 const requiredCommandIds = [
   "changed_mjs_syntax", "autonomous_development_control", "repository_validation_tests", "epic_admission_work_package_plan",
   "content_addressed_store", "asset_registry_contract", "asset_registry_sample_check",
+  "portfolio_manager_contract", "portfolio_manager_sample_check",
   "portfolio_catalog",
   "portfolio_policy", "design_admission", "design_independent_review", "general_benchmark", "execution",
   "command_evidence_contract", "normalized_results", "evaluator_boundary", "portfolio_score", "portfolio_result_set", "portfolio_repetition_report", "portfolio_paired_comparison_report", "portfolio_directional_outcome_report", "portfolio_mechanism_scorecard", "portfolio_legacy_calibration_migration", "adapter_runtime_bundle", "repository_consistency", "whitespace",

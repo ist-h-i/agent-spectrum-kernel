@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/portfolio-selection.schema.json",
+  "title": "Agent Spectrum Kernel deterministic pre-result Portfolio selection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_kind",
+    "selection_phase",
+    "portfolio_lock",
+    "manifest",
+    "registry",
+    "context_object_digest",
+    "context_digest",
+    "decision",
+    "selected_assets",
+    "omitted_assets",
+    "reasons",
+    "evidence_plans",
+    "capability_downgrades",
+    "budget",
+    "rollback_target",
+    "selection_digest"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "object_kind": { "type": "string", "const": "portfolio_selection" },
+    "selection_phase": { "type": "string", "const": "pre_result" },
+    "portfolio_lock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lock_revision", "lock_digest"],
+      "properties": {
+        "lock_revision": { "type": "integer", "minimum": 1 },
+        "lock_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "manifest": { "$ref": "#/$defs/portfolioRef" },
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registry_id", "snapshot_revision", "snapshot_digest"],
+      "properties": {
+        "registry_id": { "$ref": "#/$defs/stableId" },
+        "snapshot_revision": { "type": "integer", "minimum": 1 },
+        "snapshot_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "context_object_digest": { "$ref": "#/$defs/digest" },
+    "context_digest": { "$ref": "#/$defs/digest" },
+    "decision": { "$ref": "#/$defs/actionOrSelected" },
+    "selected_assets": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/selectedAsset" }
+    },
+    "omitted_assets": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/omittedAsset" }
+    },
+    "reasons": {
+      "type": "array",
+      "maxItems": 512,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/reason" }
+    },
+    "evidence_plans": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requirement_id", "plan"],
+        "properties": {
+          "requirement_id": { "$ref": "#/$defs/stableId" },
+          "plan": { "$ref": "verification-reuse-plan.schema.json" }
+        }
+      }
+    },
+    "capability_downgrades": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entry_id", "missing_capabilities", "action"],
+        "properties": {
+          "entry_id": { "$ref": "#/$defs/stableId" },
+          "missing_capabilities": { "$ref": "#/$defs/stringSet" },
+          "action": { "$ref": "#/$defs/action" }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token_count", "duration_ms", "cost_microunits"],
+      "properties": {
+        "token_count": { "$ref": "#/$defs/budgetDisposition" },
+        "duration_ms": { "$ref": "#/$defs/budgetDisposition" },
+        "cost_microunits": { "$ref": "#/$defs/budgetDisposition" }
+      }
+    },
+    "rollback_target": {
+      "oneOf": [
+        { "$ref": "#/$defs/portfolioRef" },
+        { "type": "null" }
+      ]
+    },
+    "selection_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@/+~-]*$"
+    },
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "stringSet": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "exactAssetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_type", "stable_id", "version", "record_digest", "content_digest"],
+      "properties": {
+        "asset_type": { "type": "string", "enum": ["skill", "prompt", "evaluator_reference"] },
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "version": { "$ref": "#/$defs/token" },
+        "record_digest": { "$ref": "#/$defs/digest" },
+        "content_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "portfolioRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["portfolio_id", "revision", "manifest_digest", "asset_set_digest"],
+      "properties": {
+        "portfolio_id": { "$ref": "#/$defs/stableId" },
+        "revision": { "$ref": "#/$defs/token" },
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "asset_set_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "action": { "type": "string", "enum": ["bypass", "downgrade", "stop"] },
+    "actionOrSelected": { "type": "string", "enum": ["selected", "bypass", "downgrade", "stop"] },
+    "selectedAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry_id", "role", "assurance_lane", "asset", "exposure"],
+      "properties": {
+        "entry_id": { "$ref": "#/$defs/stableId" },
+        "role": { "type": "string", "enum": ["baseline", "challenger", "experimental"] },
+        "assurance_lane": { "type": "string", "enum": ["exploratory", "challenger", "admitted", "high_impact_active"] },
+        "asset": { "$ref": "#/$defs/exactAssetRef" },
+        "exposure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "canary_percent"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["active", "shadow", "canary"] },
+            "canary_percent": { "type": ["integer", "null"], "minimum": 1, "maximum": 100 }
+          }
+        }
+      }
+    },
+    "omittedAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry_id", "asset", "action", "reason_codes"],
+      "properties": {
+        "entry_id": { "$ref": "#/$defs/stableId" },
+        "asset": { "$ref": "#/$defs/exactAssetRef" },
+        "action": { "$ref": "#/$defs/action" },
+        "reason_codes": { "$ref": "#/$defs/stringSet" }
+      }
+    },
+    "reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "code", "entry_id", "subject_digest"],
+      "properties": {
+        "action": { "$ref": "#/$defs/action" },
+        "code": {
+          "type": "string",
+          "enum": [
+            "portfolio_inapplicable",
+            "selector_conflict",
+            "asset_inapplicable",
+            "capability_missing",
+            "prohibited_task_class",
+            "evidence_missing",
+            "evidence_stale",
+            "evidence_conflict",
+            "evidence_not_passing",
+            "evidence_authority_mismatch",
+            "evidence_coverage_mismatch",
+            "safety_unknown",
+            "prohibited_effect",
+            "budget_unknown",
+            "budget_exceeded",
+            "empty_selection"
+          ]
+        },
+        "entry_id": {
+          "oneOf": [
+            { "$ref": "#/$defs/stableId" },
+            { "type": "null" }
+          ]
+        },
+        "subject_digest": {
+          "oneOf": [
+            { "$ref": "#/$defs/digest" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "value"],
+      "properties": {
+        "status": { "type": "string", "enum": ["known", "unknown"] },
+        "value": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "limit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "maximum"],
+      "properties": {
+        "status": { "type": "string", "enum": ["bounded", "unbounded"] },
+        "maximum": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "budgetDisposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["estimated", "available", "policy_limit", "status"],
+      "properties": {
+        "estimated": { "$ref": "#/$defs/quantity" },
+        "available": { "$ref": "#/$defs/quantity" },
+        "policy_limit": { "$ref": "#/$defs/limit" },
+        "status": { "type": "string", "enum": ["within", "unknown", "exceeded"] }
+      }
+    }
+  }
+}

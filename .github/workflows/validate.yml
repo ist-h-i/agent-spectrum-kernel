@@ -36,6 +36,12 @@ jobs:
       - name: Check the exact candidate-only Asset Registry sample
         run: node scripts/asset-registry-samples.mjs --check
 
+      - name: Run evidence-conditioned Portfolio Manager contract tests
+        run: node scripts/test-portfolio-manager.mjs
+
+      - name: Check the exact Portfolio Manager sample
+        run: node scripts/portfolio-manager-samples.mjs --check
+
       - name: Run portfolio catalog tests
         run: node scripts/test-ask-benchmark-portfolio-catalog.mjs
 

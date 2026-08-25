@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/portfolio-authority-context.schema.json",
+  "title": "Agent Spectrum Kernel external Portfolio lifecycle authority context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_kind",
+    "portfolio_id",
+    "repository_id",
+    "scope_id",
+    "predecessor_lock_digest",
+    "transitions",
+    "transition_basis_digest",
+    "grants",
+    "grant_basis_digest",
+    "rollback_target",
+    "authority",
+    "context_digest"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "object_kind": { "type": "string", "const": "portfolio_authority_context" },
+    "portfolio_id": { "$ref": "#/$defs/stableId" },
+    "repository_id": { "$ref": "#/$defs/repositoryId" },
+    "scope_id": { "$ref": "#/$defs/stableId" },
+    "predecessor_lock_digest": { "$ref": "#/$defs/digest" },
+    "transitions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/transition" }
+    },
+    "transition_basis_digest": { "$ref": "#/$defs/digest" },
+    "grants": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/grant" }
+    },
+    "grant_basis_digest": { "$ref": "#/$defs/digest" },
+    "rollback_target": {
+      "oneOf": [
+        { "$ref": "#/$defs/portfolioRef" },
+        { "type": "null" }
+      ]
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "authority_id", "authority_revision", "authority_evidence_digest"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["external_portfolio_activation_authority", "external_portfolio_rollback_authority"]
+        },
+        "authority_id": { "$ref": "#/$defs/token" },
+        "authority_revision": { "$ref": "#/$defs/token" },
+        "authority_evidence_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "context_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@/+~-]*$"
+    },
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "repositoryId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/@+-]*$"
+    },
+    "portfolioState": {
+      "type": "string",
+      "enum": ["current", "historical", "superseded", "retired"]
+    },
+    "portfolioRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["portfolio_id", "revision", "manifest_digest", "asset_set_digest"],
+      "properties": {
+        "portfolio_id": { "$ref": "#/$defs/stableId" },
+        "revision": { "$ref": "#/$defs/token" },
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "asset_set_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest", "from_state", "to_state"],
+      "properties": {
+        "manifest": { "$ref": "#/$defs/portfolioRef" },
+        "from_state": {
+          "oneOf": [
+            { "$ref": "#/$defs/portfolioState" },
+            { "type": "null" }
+          ]
+        },
+        "to_state": { "$ref": "#/$defs/portfolioState" }
+      }
+    },
+    "exactAssetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_type", "stable_id", "version", "record_digest", "content_digest"],
+      "properties": {
+        "asset_type": { "type": "string", "enum": ["skill", "prompt", "evaluator_reference"] },
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "version": { "$ref": "#/$defs/token" },
+        "record_digest": { "$ref": "#/$defs/digest" },
+        "content_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "grant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grant_kind", "manifest_digest", "entry_id", "asset", "approval_evidence_digest"],
+      "properties": {
+        "grant_kind": { "type": "string", "const": "high_impact_independent_activation" },
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "entry_id": { "$ref": "#/$defs/stableId" },
+        "asset": { "$ref": "#/$defs/exactAssetRef" },
+        "approval_evidence_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

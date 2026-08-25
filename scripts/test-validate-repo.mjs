@@ -8,6 +8,7 @@ import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TA
 import { CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
+import { putContentAddressedJson } from "./content-addressed-store.mjs";
 import { REQUIRED_TRACEABILITY_SCENARIOS, computeAdapterAppliedProvenanceFingerprint, computeAdapterProfileFingerprint, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -275,11 +276,17 @@ function writeFixture(root, skills = ["alpha"]) {
     "docs/asset-registry-contract.md",
     "docs/adr/0003-asset-registry-authority-boundary.md",
     "docs/fixtures/asset-registry",
+    "docs/portfolio-manager-contract.md",
+    "docs/adr/0004-portfolio-activation-authority-boundary.md",
+    "docs/fixtures/portfolio-manager",
     "scripts/content-addressed-store.mjs",
     "scripts/asset-registry.mjs",
     "scripts/asset-registry-samples.mjs",
     "scripts/test-content-addressed-store.mjs",
     "scripts/test-asset-registry.mjs",
+    "scripts/portfolio-manager.mjs",
+    "scripts/portfolio-manager-samples.mjs",
+    "scripts/test-portfolio-manager.mjs",
     "scripts/ask-benchmark-portfolio-repetition-report.mjs",
     "scripts/ask-benchmark-portfolio-paired-comparison-report.mjs",
     "scripts/ask-benchmark-portfolio-directional-outcome-report.mjs",
@@ -296,7 +303,7 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/schemas",
   ]) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    if (["benchmarks/portfolio-design-admission-records", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update", "benchmarks/schemas", "docs/fixtures/asset-registry"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
+    if (["benchmarks/portfolio-design-admission-records", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update", "benchmarks/schemas", "docs/fixtures/asset-registry", "docs/fixtures/portfolio-manager"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
     else writeFileSync(resolve(root, path), readFileSync(resolve(repoRoot, path)));
   }
 
@@ -356,6 +363,11 @@ function writeAdapterFixture(root) {
     "schemas/asset-record.schema.json",
     "schemas/asset-registry-snapshot.schema.json",
     "schemas/asset-lifecycle-authority-context.schema.json",
+    "schemas/portfolio-manifest.schema.json",
+    "schemas/portfolio-lock.schema.json",
+    "schemas/portfolio-authority-context.schema.json",
+    "schemas/portfolio-selection-context.schema.json",
+    "schemas/portfolio-selection.schema.json",
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
@@ -5611,6 +5623,38 @@ try {
     "tampered Asset Registry sample reference",
     tamperedAssetReferenceRoot,
     "checked-in reference does not match the exact deterministic registry export",
+  );
+
+  const missingPortfolioSchemaRoot = cloneFixture("missing-portfolio-selection-schema");
+  rmSync(resolve(missingPortfolioSchemaRoot, "schemas/portfolio-selection.schema.json"));
+  assertFail(
+    "missing Portfolio selection schema",
+    missingPortfolioSchemaRoot,
+    "required schema is missing: schemas/portfolio-selection.schema.json",
+  );
+
+  const tamperedPortfolioReferenceRoot = cloneFixture("tampered-portfolio-manager-reference");
+  {
+    const referencePath = resolve(tamperedPortfolioReferenceRoot, "docs/fixtures/portfolio-manager/reference.json");
+    const reference = JSON.parse(readFileSync(referencePath, "utf8"));
+    reference.tampered = true;
+    writeFileSync(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+  }
+  assertFail(
+    "tampered Portfolio Manager sample reference",
+    tamperedPortfolioReferenceRoot,
+    "Portfolio Manager sample reference uses an unknown or missing field",
+  );
+
+  const orphanPortfolioObjectRoot = cloneFixture("orphan-portfolio-manager-object");
+  putContentAddressedJson({
+    storeRoot: resolve(orphanPortfolioObjectRoot, "docs/fixtures/portfolio-manager/store"),
+    artifact: { schema_version: "1.0.0", object_kind: "portfolio_fixture_orphan" },
+  });
+  assertFail(
+    "orphan Portfolio Manager sample object",
+    orphanPortfolioObjectRoot,
+    "sample store contains an orphan or omits an exact reachable Portfolio/Registry object",
   );
 
   const missingAdapterEventSchemaRoot = cloneFixture("missing-adapter-event-schema");
