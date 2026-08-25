@@ -88,6 +88,11 @@ function isAggregateNumericInput({ adapter, fixture, condition }) {
   return adapter === "codex" && fixture === AGGREGATE_NUMERIC_FIXTURE_ID && AGGREGATE_NUMERIC_CONDITIONS.has(condition);
 }
 
+function aggregateNumericRequirementScore(condition) {
+  const normalized = condition === "kernel_only" ? 0.25 : 0.75;
+  return { scored_requirement_count: 1, requirement_points_earned: normalized, requirement_points_possible: 1, normalized_requirement_score: normalized };
+}
+
 function hash(value) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -405,6 +410,9 @@ function engineeringResult(record, index) {
   const aggregateNumericInput = isAggregateNumericInput({ adapter: record.lineage.adapter_track, fixture: record.lineage.fixture_id, condition: record.lineage.condition });
   const evaluation_status = aggregateNumericInput ? "completed" : (record.outcome === "completed" ? evaluatorStatuses[index % evaluatorStatuses.length] : "completed");
   const complete = record.outcome === "completed" && evaluation_status === "completed";
+  const completeRequirementScore = aggregateNumericInput
+    ? aggregateNumericRequirementScore(record.lineage.condition)
+    : { scored_requirement_count: 1, requirement_points_earned: 1, requirement_points_possible: 1, normalized_requirement_score: 1 };
   const normalizedReasons = { failed: "normalized_execution_failed", unavailable: "normalized_execution_unavailable", interrupted: "normalized_execution_interrupted", invalid: "normalized_execution_invalid" };
   const evaluatorReasons = { evaluator_unavailable: "evaluator_unavailable", evaluator_failed: "evaluator_failed", invalid_input: "evaluation_invalid_input", manual_review_required: "manual_review_required" };
   const scoring_reason = complete ? "completed_evaluation_scoring_ready" : record.outcome === "completed" ? evaluatorReasons[evaluation_status] : normalizedReasons[record.outcome];
@@ -454,7 +462,7 @@ function engineeringResult(record, index) {
     condition: record.lineage.condition,
     repetition: record.lineage.repetition,
     requirement_score: complete
-      ? { scored_requirement_count: 1, requirement_points_earned: 1, requirement_points_possible: 1, normalized_requirement_score: 1 }
+      ? completeRequirementScore
       : { scored_requirement_count: null, requirement_points_earned: null, requirement_points_possible: null, normalized_requirement_score: null },
     blockers: complete
       ? { requirement_ids: [], outcomes: [], non_pass_requirement_ids: [], gate_status: "not_applicable" }
@@ -1327,13 +1335,15 @@ try {
     taskClass: "pr_review",
     outputPath: aggregateResultPath,
   };
-  const numericFixtureComparison = pairedComparison.artifact.fixture_comparisons.find(({ fixture_id }) => fixture_id === AGGREGATE_NUMERIC_FIXTURE_ID);
+  const numericFixtureComparison = verifiedPairedComparison.verified_comparison_report.fixture_comparisons.find(({ fixture_id }) => fixture_id === AGGREGATE_NUMERIC_FIXTURE_ID);
   const numericComparisonView = numericFixtureComparison?.comparison_views.find(({ view_id }) => view_id === "adaptive_vs_kernel");
   assert.equal(numericComparisonView?.structural_pairing_status, "complete");
   assert.equal(numericComparisonView?.quality_delta_distribution.distribution_status, "complete");
   assert.equal(numericComparisonView?.quality_delta_distribution.sample_count, 3);
   assert.equal(Number.isFinite(numericComparisonView?.quality_delta_distribution.mean), true);
   const expectedNumericDelta = numericComparisonView.quality_delta_distribution.mean;
+  assert.equal(expectedNumericDelta, 0.5);
+  assert.notEqual(expectedNumericDelta, 0);
   const aggregateResult = reportPortfolioAggregateResult(aggregateOptions);
   assert.deepEqual(aggregateResult.artifact.expected_fixture_ids, [AGGREGATE_NUMERIC_FIXTURE_ID]);
   assert.deepEqual(aggregateResult.artifact.included_fixture_ids, [AGGREGATE_NUMERIC_FIXTURE_ID]);
