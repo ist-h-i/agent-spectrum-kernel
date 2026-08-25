@@ -272,6 +272,14 @@ function writeFixture(root, skills = ["alpha"]) {
     "docs/fixtures/issue-275-slice-1-work-package-plan-r1.json",
     "docs/fixtures/issue-275-slice-1-work-package-plan-r2.json",
     "docs/fixtures/issue-275-slice-1-work-package-plan.json",
+    "docs/asset-registry-contract.md",
+    "docs/adr/0003-asset-registry-authority-boundary.md",
+    "docs/fixtures/asset-registry",
+    "scripts/content-addressed-store.mjs",
+    "scripts/asset-registry.mjs",
+    "scripts/asset-registry-samples.mjs",
+    "scripts/test-content-addressed-store.mjs",
+    "scripts/test-asset-registry.mjs",
     "scripts/ask-benchmark-portfolio-repetition-report.mjs",
     "scripts/ask-benchmark-portfolio-paired-comparison-report.mjs",
     "scripts/ask-benchmark-portfolio-directional-outcome-report.mjs",
@@ -288,7 +296,7 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/schemas",
   ]) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    if (["benchmarks/portfolio-design-admission-records", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update", "benchmarks/schemas"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
+    if (["benchmarks/portfolio-design-admission-records", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update", "benchmarks/schemas", "docs/fixtures/asset-registry"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
     else writeFileSync(resolve(root, path), readFileSync(resolve(repoRoot, path)));
   }
 
@@ -344,6 +352,10 @@ function writeAdapterFixture(root) {
     "schemas/epic-admission-decision.schema.json",
     "schemas/work-package-plan-validation-context.schema.json",
     "schemas/work-package-plan.schema.json",
+    "schemas/asset-content.schema.json",
+    "schemas/asset-record.schema.json",
+    "schemas/asset-registry-snapshot.schema.json",
+    "schemas/asset-lifecycle-authority-context.schema.json",
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
@@ -5583,6 +5595,23 @@ try {
   const missingSchemaRoot = cloneFixture("missing-schema");
   rmSync(resolve(missingSchemaRoot, "schemas/metrics-event.schema.json"));
   assertFail("missing required schema", missingSchemaRoot, "required schema is missing");
+
+  const missingAssetSchemaRoot = cloneFixture("missing-asset-record-schema");
+  rmSync(resolve(missingAssetSchemaRoot, "schemas/asset-record.schema.json"));
+  assertFail("missing Asset record schema", missingAssetSchemaRoot, "required schema is missing: schemas/asset-record.schema.json");
+
+  const tamperedAssetReferenceRoot = cloneFixture("tampered-asset-registry-reference");
+  {
+    const referencePath = resolve(tamperedAssetReferenceRoot, "docs/fixtures/asset-registry/reference.json");
+    const reference = JSON.parse(readFileSync(referencePath, "utf8"));
+    reference.tampered = true;
+    writeFileSync(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+  }
+  assertFail(
+    "tampered Asset Registry sample reference",
+    tamperedAssetReferenceRoot,
+    "checked-in reference does not match the exact deterministic registry export",
+  );
 
   const missingAdapterEventSchemaRoot = cloneFixture("missing-adapter-event-schema");
   rmSync(resolve(missingAdapterEventSchemaRoot, "schemas/adapter-runtime-event.schema.json"));

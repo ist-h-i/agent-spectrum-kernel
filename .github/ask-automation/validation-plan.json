@@ -30,6 +30,18 @@
       "argv": ["node", "scripts/test-epic-admission-work-package-plan.mjs"]
     },
     {
+      "id": "content_addressed_store",
+      "argv": ["node", "scripts/test-content-addressed-store.mjs"]
+    },
+    {
+      "id": "asset_registry_44_cases",
+      "argv": ["node", "scripts/test-asset-registry.mjs"]
+    },
+    {
+      "id": "asset_registry_sample_check",
+      "argv": ["node", "scripts/asset-registry-samples.mjs", "--check"]
+    },
+    {
       "id": "portfolio_catalog",
       "argv": ["node", "scripts/test-ask-benchmark-portfolio-catalog.mjs"]
     },

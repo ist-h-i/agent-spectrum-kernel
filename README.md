@@ -51,11 +51,15 @@ CHANGELOG.md
 docs/
   adr/0001-verification-evidence-trust-boundary.md
   adr/0002-epic-admission-work-package-plan-authority.md
+  adr/0003-asset-registry-authority-boundary.md
   routing-model.md
   lifecycle-artifact-contract.md
   lifecycle-traceability-contract.md
   verification-evidence-contract.md
   epic-admission-work-package-plan-contract.md
+  asset-registry-contract.md
+  fixtures/asset-registry/reference.json
+  fixtures/asset-registry/store/objects/sha256/
   fixtures/lifecycle-artifact-chains.json
   fixtures/lifecycle-traceability-chains.json
   agent-session-state-contract.md
@@ -136,6 +140,10 @@ schemas/
   epic-admission-decision.schema.json
   work-package-plan-validation-context.schema.json
   work-package-plan.schema.json
+  asset-content.schema.json
+  asset-record.schema.json
+  asset-registry-snapshot.schema.json
+  asset-lifecycle-authority-context.schema.json
 adapters/
   claude-code/
     project/.claude/
@@ -149,6 +157,8 @@ scripts/
   ask-doctor.mjs
   ask-sensors.mjs
   content-addressed-store.mjs
+  asset-registry.mjs
+  asset-registry-samples.mjs
   execution-envelope.mjs
   verification-evidence.mjs
   epic-admission-work-package-plan.mjs
@@ -165,6 +175,8 @@ scripts/
   ai-ledger-refresh.mjs
   ask-benchmark.mjs
   test-verification-evidence.mjs
+  test-content-addressed-store.mjs
+  test-asset-registry.mjs
   test-ask-benchmark.mjs
 benchmarks/
   README.md
@@ -243,6 +255,22 @@ node scripts/verification-evidence.mjs verify \
 ```
 
 See the contract and `docs/adr/0001-verification-evidence-trust-boundary.md` for the strict schemas, CAS layout, trusted ingress, producer attestation, transfer rules, and full command forms.
+
+## AI Engineering Asset Registry
+
+`docs/asset-registry-contract.md` defines a local immutable registry for exact Skill, Prompt template, and public evaluator-reference Assets. It reuses the generic `objects/sha256` CAS; it does not create a second store or a mutable latest pointer.
+
+The states are deliberately separate: content stored does not mean Asset registered; registered does not mean validated, admitted, or `current`; registry `current` does not mean Portfolio `active`; and neither state proves installation, execution, safety, or effectiveness. Registration creates `candidate` entries only. Lifecycle transitions beyond `candidate` require a separate exact caller-supplied authority context, while Issue #277 remains responsible for Portfolio activation.
+
+The checked-in sample contains exactly three public candidate Assets: `test-first-verification` Skill, the unrendered Codex `skill-verify` Prompt template with an exact Skill dependency, and the public `mn-build-option-update` evaluator reference. It contains no lifecycle-authority context, private evaluator content, runtime selection, or effectiveness claim.
+
+```bash
+node scripts/test-content-addressed-store.mjs
+node scripts/test-asset-registry.mjs
+node scripts/asset-registry-samples.mjs --check
+```
+
+`node scripts/asset-registry-samples.mjs --write` deterministically rebuilds the sample after an intentional source or contract change. See `docs/adr/0003-asset-registry-authority-boundary.md` for the storage, lifecycle-authority, and Portfolio boundary decision.
 
 ## Epic admission and Work Package Plans
 

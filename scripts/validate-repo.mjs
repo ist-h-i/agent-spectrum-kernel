@@ -2,13 +2,15 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ADAPTER_RENDERER_METADATA } from "./adapter-runtime-inventory.mjs";
 import { APPROVAL_REQUIRED_SURFACE_IDS, OPERATING_MODES, TASK_CLASSES } from "./ask-shared.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { codexCompactProfileCanonicalPaths } from "./codex-runtime-profile.mjs";
+import { exportAssetRegistryReference, listAssets, verifyAssetRegistry } from "./asset-registry.mjs";
+import { listContentAddressedJson, readContentAddressedJson, readJsonFileStrict } from "./content-addressed-store.mjs";
 import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { validatePortfolioDesignAdmissionArtifacts } from "./ask-benchmark-design-admission.mjs";
@@ -81,7 +83,29 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/epic-admission-decision.schema.json",
   "schemas/work-package-plan-validation-context.schema.json",
   "schemas/work-package-plan.schema.json",
+  "schemas/asset-content.schema.json",
+  "schemas/asset-record.schema.json",
+  "schemas/asset-registry-snapshot.schema.json",
+  "schemas/asset-lifecycle-authority-context.schema.json",
 ];
+const REQUIRED_ASSET_REGISTRY_PATHS = [
+  "docs/asset-registry-contract.md",
+  "docs/adr/0003-asset-registry-authority-boundary.md",
+  "docs/fixtures/asset-registry/reference.json",
+  "docs/fixtures/asset-registry/store",
+  "scripts/content-addressed-store.mjs",
+  "scripts/asset-registry.mjs",
+  "scripts/asset-registry-samples.mjs",
+  "scripts/test-content-addressed-store.mjs",
+  "scripts/test-asset-registry.mjs",
+];
+const ASSET_REGISTRY_REFERENCE_PATH = "docs/fixtures/asset-registry/reference.json";
+const ASSET_REGISTRY_STORE_PATH = "docs/fixtures/asset-registry/store";
+const EXPECTED_SAMPLE_ASSETS = new Map([
+  ["ask.skill.test-first-verification", "skill"],
+  ["ask.prompt-template.codex.skill-verify", "prompt"],
+  ["ask.evaluator-reference.mn-build-option-update", "evaluator_reference"],
+]);
 const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
 const ADAPTER_RUNTIME_BOUNDARY_CONTRACT_PATH = "docs/adapter-runtime-boundary-contract.md";
 const ADAPTER_RUNTIME_PROFILE_SCHEMA_PATH = "schemas/adapter-runtime-profile.schema.json";
@@ -3995,6 +4019,119 @@ function validateAdapterGovernance(root, checks, errors) {
   }
 }
 
+function collectAssetStoreFiles(storeRoot) {
+  const files = [];
+  const visit = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+      const path = resolve(directory, entry.name);
+      const relativePath = relative(storeRoot, path).split(sep).join("/");
+      if (entry.isSymbolicLink()) throw new Error(`Asset Registry sample store contains a symlink: ${relativePath}`);
+      if (entry.isDirectory()) {
+        if (!["objects", "objects/sha256"].includes(relativePath)
+          && !/^objects\/sha256\/[a-f0-9]{2}$/u.test(relativePath)) {
+          throw new Error(`Asset Registry sample store contains a directory outside the shared objects/sha256 layout: ${relativePath}`);
+        }
+        visit(path);
+      }
+      else if (entry.isFile()) files.push(relativePath);
+      else throw new Error(`Asset Registry sample store contains an unsupported entry: ${relativePath}`);
+    }
+  };
+  visit(storeRoot);
+  return files;
+}
+
+function validateAssetRegistryFixture(root, errors) {
+  for (const path of REQUIRED_ASSET_REGISTRY_PATHS) {
+    if (!existsSync(resolve(root, path))) fail(errors, "Asset Registry", `required Asset Registry path is missing: ${path}`);
+  }
+
+  const referencePath = resolve(root, ASSET_REGISTRY_REFERENCE_PATH);
+  const storeRoot = resolve(root, ASSET_REGISTRY_STORE_PATH);
+  if (!existsSync(referencePath) || !existsSync(storeRoot)) return { valid: false, assetCount: 0 };
+
+  try {
+    const reference = readJsonFileStrict(referencePath, "Asset Registry sample reference");
+    const verified = verifyAssetRegistry({
+      storeRoot,
+      snapshotDigest: reference.snapshot_digest,
+    });
+    const listed = listAssets({
+      storeRoot,
+      snapshotDigest: reference.snapshot_digest,
+    });
+    const exported = exportAssetRegistryReference({
+      storeRoot,
+      snapshotDigest: reference.snapshot_digest,
+    });
+
+    if (stableCanonicalJson(exported) !== stableCanonicalJson(reference)) {
+      throw new Error("checked-in reference does not match the exact deterministic registry export");
+    }
+    if (verified.assets.length !== EXPECTED_SAMPLE_ASSETS.size || listed.length !== EXPECTED_SAMPLE_ASSETS.size) {
+      throw new Error(`expected exactly ${EXPECTED_SAMPLE_ASSETS.size} registered sample Assets`);
+    }
+
+    const listedIds = listed.map((asset) => asset.stable_id);
+    if (stableCanonicalJson(listedIds) !== stableCanonicalJson([...EXPECTED_SAMPLE_ASSETS.keys()].sort())) {
+      throw new Error("sample Asset stable IDs or deterministic list ordering do not match the closed reference set");
+    }
+    for (const asset of verified.assets) {
+      if (EXPECTED_SAMPLE_ASSETS.get(asset.stable_id) !== asset.asset_type) {
+        throw new Error(`sample Asset type mismatch for ${asset.stable_id}`);
+      }
+      if (asset.state !== "candidate") throw new Error(`sample Asset ${asset.stable_id} must remain candidate-only`);
+    }
+    if (listed.some((asset) => asset.state !== "candidate")) throw new Error("listed sample Assets must remain candidate-only");
+
+    const prompt = verified.assets.find((asset) => asset.asset_type === "prompt");
+    if (prompt?.record?.type_extension?.kind !== "prompt_template"
+      || prompt.record.type_extension.rendered_runtime_content !== false) {
+      throw new Error("sample Prompt must remain an unrendered prompt_template Asset");
+    }
+    const evaluator = verified.assets.find((asset) => asset.asset_type === "evaluator_reference");
+    if (evaluator?.record?.type_extension?.kind !== "public_evaluator_reference"
+      || evaluator.record.type_extension.entrypoint !== "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json"
+      || evaluator.record.type_extension.private_evaluator_content_included !== false) {
+      throw new Error("sample evaluator-reference must remain public-only without private evaluator content");
+    }
+
+    const snapshot = readContentAddressedJson({
+      storeRoot,
+      digest: reference.snapshot_digest,
+    }).value;
+    if (snapshot.lifecycle_authority_context_digest !== null) {
+      throw new Error("candidate-only sample must not bind a lifecycle authority context");
+    }
+
+    const objects = listContentAddressedJson({ storeRoot });
+    if (objects.some(({ value }) => value?.object_kind === "asset_lifecycle_authority_context")) {
+      throw new Error("candidate-only sample store must not contain lifecycle authority contexts");
+    }
+    const canonicalStoreRoot = realpathSync(storeRoot);
+    const actualStoreFiles = collectAssetStoreFiles(canonicalStoreRoot);
+    const canonicalStoreFiles = objects
+      .map(({ path }) => relative(canonicalStoreRoot, path).split(sep).join("/"))
+      .sort();
+    if (stableCanonicalJson(actualStoreFiles) !== stableCanonicalJson(canonicalStoreFiles)) {
+      throw new Error("sample store must contain exactly the shared objects/sha256 CAS object set");
+    }
+    if (actualStoreFiles.some((path) => !/^objects\/sha256\/[a-f0-9]{2}\/[a-f0-9]{62}\.json$/u.test(path))) {
+      throw new Error("sample store contains an object outside the shared objects/sha256 layout");
+    }
+
+    return {
+      valid: true,
+      assetCount: verified.assets.length,
+      snapshotDigest: verified.snapshot_digest,
+      assetTypes: [...new Set(verified.assets.map((asset) => asset.asset_type))].sort(),
+    };
+  } catch (error) {
+    fail(errors, "Asset Registry", `checked-in sample verification failed: ${error.message}`);
+    return { valid: false, assetCount: 0 };
+  }
+}
+
 function validateEpicAdmissionWorkPackagePlanContract(root, errors) {
   const result = validateRepositoryEpicAdmissionWorkPackagePlan({ root });
   for (const contractIssue of result.issues) {
@@ -4413,6 +4550,7 @@ export function validateRepository(options) {
   const adapterRuntimeProfileChecks = validateAdapterRuntimeProfileContract(root, manifest, errors);
   const lifecycleArtifactChecks = validateLifecycleArtifactContract(root, manifest, errors);
   const lifecycleTraceabilityChecks = validateLifecycleTraceabilityContract(root, manifest, errors);
+  validateAssetRegistryFixture(root, errors);
   const epicAdmissionWorkPackagePlanChecks = validateEpicAdmissionWorkPackagePlanContract(root, errors);
   const reviewSignalRegistryChecks = validateReviewSignalRegistry(root, manifest, errors);
   const portfolioCatalogChecks = validateAdaptivePortfolioCatalog(root, errors);

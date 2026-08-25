@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0.0",
+  "manifest_kind": "asset_registry_exact_reference",
+  "registry_id": "ask-local-assets",
+  "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
+  "scope_id": "agent-spectrum-kernel",
+  "snapshot_revision": 4,
+  "snapshot_digest": "sha256:faf0f6a7aece8872edfe79bd5f56df3eb8cfbd7e9b24f23656640e78b3023d05",
+  "assets": [
+    {
+      "asset_type": "evaluator_reference",
+      "stable_id": "ask.evaluator-reference.mn-build-option-update",
+      "version": "git:656edf1ac611890a3ae5a93a90e9076f50ee2488",
+      "record_digest": "sha256:a34670089f477aa233a000c11e666945392e0cd72796a0873e1785199e9fad37",
+      "content_digest": "sha256:06cacaea5b7b84bb2a9f6a6e849f1e561967637cfc0c28bd60675b665f090a54",
+      "state": "candidate",
+      "scope_id": "agent-spectrum-kernel",
+      "dependencies": [],
+      "parent": null
+    },
+    {
+      "asset_type": "prompt",
+      "stable_id": "ask.prompt-template.codex.skill-verify",
+      "version": "git:656edf1ac611890a3ae5a93a90e9076f50ee2488",
+      "record_digest": "sha256:c20d62f091e4ffcbc742ba0c7f0ec51932cff4cd45046553076699694c449366",
+      "content_digest": "sha256:c619c6c426da2f6fac9185c2426908ea83ff1598e5e9af7add61f509678a5853",
+      "state": "candidate",
+      "scope_id": "agent-spectrum-kernel",
+      "dependencies": [
+        {
+          "asset_type": "skill",
+          "content_digest": "sha256:d6e6ac3acac3ee396987fd0333b6193c809156c88eb343b43c9e0b0c72fbe1c5",
+          "record_digest": "sha256:5be372e20b4aeaefd085a947dc814d4fa33105c89fbbf3dbce55cf09c2931a5d",
+          "stable_id": "ask.skill.test-first-verification",
+          "version": "git:656edf1ac611890a3ae5a93a90e9076f50ee2488"
+        }
+      ],
+      "parent": null
+    },
+    {
+      "asset_type": "skill",
+      "stable_id": "ask.skill.test-first-verification",
+      "version": "git:656edf1ac611890a3ae5a93a90e9076f50ee2488",
+      "record_digest": "sha256:5be372e20b4aeaefd085a947dc814d4fa33105c89fbbf3dbce55cf09c2931a5d",
+      "content_digest": "sha256:d6e6ac3acac3ee396987fd0333b6193c809156c88eb343b43c9e0b0c72fbe1c5",
+      "state": "candidate",
+      "scope_id": "agent-spectrum-kernel",
+      "dependencies": [],
+      "parent": null
+    }
+  ],
+  "portable_exact_references_only": true,
+  "runtime_activation_implied": false
+}

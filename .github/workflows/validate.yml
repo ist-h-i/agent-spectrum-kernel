@@ -27,6 +27,15 @@ jobs:
       - name: Run epic admission and Work Package Plan contract tests
         run: node scripts/test-epic-admission-work-package-plan.mjs
 
+      - name: Run generic content-addressed store tests
+        run: node scripts/test-content-addressed-store.mjs
+
+      - name: Run Asset Registry contract tests (44 cases)
+        run: node scripts/test-asset-registry.mjs
+
+      - name: Check the exact candidate-only Asset Registry sample
+        run: node scripts/asset-registry-samples.mjs --check
+
       - name: Run portfolio catalog tests
         run: node scripts/test-ask-benchmark-portfolio-catalog.mjs
 
