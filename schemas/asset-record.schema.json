@@ -100,9 +100,14 @@
     "permissions_and_effects": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "permission_refs", "effect_refs"],
+      "required": [
+        "status", "requested_permissions", "possible_effects",
+        "permission_refs", "effect_refs"
+      ],
       "properties": {
         "status": { "type": "string", "enum": ["declared_by_consumer", "not_evaluated", "supported", "verified"] },
+        "requested_permissions": { "$ref": "#/$defs/stringList" },
+        "possible_effects": { "$ref": "#/$defs/stringList" },
         "permission_refs": { "$ref": "#/$defs/refList" },
         "effect_refs": { "$ref": "#/$defs/refList" }
       }

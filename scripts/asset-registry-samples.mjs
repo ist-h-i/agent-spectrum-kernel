@@ -151,7 +151,9 @@ function descriptorFor(sample, dependencies = []) {
       notes: [],
     },
     permissions_and_effects: {
-      status: "declared_by_consumer",
+      status: "not_evaluated",
+      requested_permissions: [],
+      possible_effects: [],
       permission_refs: [],
       effect_refs: [],
     },
@@ -320,7 +322,10 @@ function assertPortableReference(value, location = "reference") {
 function listTree(root) {
   const result = [];
   function visit(current) {
-    for (const entry of readdirSync(current, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+    for (const entry of readdirSync(current, { withFileTypes: true }).sort((left, right) => {
+      if (left.name === right.name) return 0;
+      return left.name < right.name ? -1 : 1;
+    })) {
       const path = resolve(current, entry.name);
       const relativePath = relative(root, path).split(sep).join("/");
       assert.equal(entry.isSymbolicLink(), false, `fixture symlink is prohibited: ${relativePath}`);

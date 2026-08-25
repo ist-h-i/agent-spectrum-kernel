@@ -98,6 +98,8 @@ Optional evidence must be omitted or represented explicitly as unknown according
 
 Applicability keeps explicit model, adapter, stack, domain, project, and task-class selectors in addition to included/excluded scopes and required capabilities. Each selector is explicitly `unknown`, `unrestricted`, or `bounded`; a bounded selector carries non-empty included and/or excluded values, while unknown and unrestricted selectors cannot carry values. This prevents an empty list from ambiguously meaning both unknown and universal compatibility.
 
+Permissions and effects keep the declared values separate from their evidence references. `requested_permissions` and `possible_effects` are closed, bounded string sets; `permission_refs` and `effect_refs` cite the represented support for those declarations. Empty declaration sets under `not_evaluated` mean that this registry has not established an operational surface, not that execution is permissionless or effect-free.
+
 For `git_revision` records, the registry makes the Asset version equal the represented source revision and verifies the supplied source bytes against their declared raw digests. It does not independently query Git or prove that those bytes came from the represented commit; a consumer that requires that claim needs separate repository-authority evidence.
 
 ### Registry snapshot
@@ -254,7 +256,7 @@ Identical registration against the same effective inventory is deterministic and
 
 Verification accepts an exact snapshot digest and the shared CAS. It must strictly parse and canonically verify the snapshot, recursively verify its predecessor chain, and resolve every Asset record, content package, parent, dependency, and required lifecycle-authority context.
 
-Verification returns a complete detached immutable view or typed, deterministically ordered issues. It never returns a partial valid inventory. Schema validity or self-digest validity alone is insufficient. Verification of recorded lifecycle state does not authenticate the caller's original external authority source and must report that trust boundary accurately.
+The v1 JavaScript API returns one complete detached immutable view or throws a fail-closed `Error`. Error text is diagnostic and is not a stable typed-issue protocol in v1. Verification never returns a partial valid inventory. Schema validity or self-digest validity alone is insufficient. Verification of recorded lifecycle state does not authenticate the caller's original external authority source and must report that trust boundary accurately.
 
 ### List
 
@@ -266,7 +268,7 @@ Resolution is read-only and requires an exact verified snapshot digest.
 
 - Default resolution takes a stable ID and lifecycle scope and succeeds only for exactly one `current` entry.
 - Resolution of any non-current state requires the exact version and explicit expected state.
-- Exact resolution checks the requested stable ID, version, type, state, record digest, content digest, and complete dependency/lineage closure before returning bytes or references.
+- Exact non-current resolution accepts the stable ID, exact version, and explicit expected state. Full snapshot verification checks the resolved type, record digest, content digest, and complete dependency/lineage closure before returning bytes or references. A consumer that already holds an exact five-field Asset reference must compare all five returned identity fields; v1 does not expose a second exact-reference selector.
 
 Candidate, admitted, historical, superseded, and retired entries cannot be substituted when a caller requests current authority. Retired entries remain explicitly reconstructable but unavailable for new selection.
 
@@ -278,9 +280,9 @@ Registration, import, verification, listing, resolving, and reference export can
 
 ### Export exact local references
 
-Reference export is read-only and requires an exact verified snapshot and exact selected Asset references. Its deterministic manifest contains the registry snapshot identity, selected record/content identities, sorted exact lineage/dependency closure, and any exact rollback-target hint needed for later packaging.
+Reference export is read-only and requires an exact verified snapshot. The v1 export is a deterministic full-snapshot manifest containing the complete Asset inventory, every exact record/content identity, each record's sorted direct parent/dependency references, and any exact rollback-target hint. Snapshot verification has already closed every transitive parent and dependency reference before export.
 
-The manifest contains no absolute source paths, mutable branch or latest references, unverified external bytes, runtime secrets, or private evaluator material. Export does not store, register, admit, activate, install, or execute an Asset. Issue #180 may later package the referenced immutable objects without redefining Asset identity.
+The manifest contains no absolute source paths, mutable branch or latest references, unverified external bytes, runtime secrets, or private evaluator material. Export does not store, register, admit, activate, install, or execute an Asset. Selected-subset export and transfer packaging are deferred to Issue #180; that work may select from this full exact inventory but may not redefine Asset identity.
 
 ## Publication, interruption, and import semantics
 
@@ -309,7 +311,7 @@ The focused verification suite must cover at least these cases. Until the checks
 | Absolute path, traversal, or prohibited symlink | Source ingress fails before content publication. |
 | Missing parent or cross-Asset parent transplant | Exact lineage closure fails. |
 | Missing dependency or dependency record/content transplant | Exact dependency closure fails. |
-| Parent or dependency cycle | Full closure verification fails deterministically. |
+| Parent or dependency cycle | Registration permits references only to exact predecessor inventory and immutable stable-ID/version collisions reject coordinated rewrites, so a valid multi-record cycle cannot be formed through registration. Full verification also retains deterministic defensive cycle rejection for imported object graphs. |
 | Incomplete multi-object publication or import | Orphans remain unregistered; no partial snapshot is returned. |
 | Stale lifecycle context | Exact predecessor/context binding fails. |
 | Self-declared admitted/current state | Registration or transition validation fails. |

@@ -327,6 +327,10 @@ function validateRecordSemantics(record, content) {
     && record.permissions_and_effects.permission_refs.length + record.permissions_and_effects.effect_refs.length === 0) {
     throw new Error("supported Asset permissions and effects status requires a reference");
   }
+  if (record.permissions_and_effects.status === "not_evaluated"
+    && record.permissions_and_effects.permission_refs.length + record.permissions_and_effects.effect_refs.length > 0) {
+    throw new Error("not-evaluated Asset permissions and effects cannot carry evidence references");
+  }
   if (record.safety.status === "supported" && record.safety.constraint_refs.length === 0) {
     throw new Error("supported Asset safety status requires a constraint reference");
   }

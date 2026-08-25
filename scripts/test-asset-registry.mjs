@@ -163,6 +163,8 @@ function assetDescriptor({
     },
     permissions_and_effects: {
       status: "declared_by_consumer",
+      requested_permissions: [],
+      possible_effects: [],
       permission_refs: [],
       effect_refs: [],
     },
@@ -533,6 +535,65 @@ try {
     /self dependency|dependency cycle/iu,
   );
 
+  const dependencyCycleStoreRoot = resolve(root, "multi-record-dependency-cycle-store");
+  mkdirSync(dependencyCycleStoreRoot, { recursive: true });
+  const dependencyCycleEmpty = createEmptyAssetRegistry({
+    storeRoot: dependencyCycleStoreRoot,
+    registryId: "multi-record-dependency-cycle-test",
+    repositoryId: REPOSITORY_ID,
+    scopeId: SCOPE_ID,
+  });
+  const dependencyCycleARegistration = registerAsset({
+    storeRoot: dependencyCycleStoreRoot,
+    sourceRoot,
+    predecessorSnapshotDigest: dependencyCycleEmpty.snapshot_digest,
+    descriptor: assetDescriptor({
+      sample: samples.skill,
+      stableId: "ask.skill.multi-record-cycle-a",
+      version: "1.0.0",
+    }),
+  });
+  const dependencyCycleA = resolveAsset({
+    storeRoot: dependencyCycleStoreRoot,
+    snapshotDigest: dependencyCycleARegistration.snapshot_digest,
+    stableId: "ask.skill.multi-record-cycle-a",
+    version: "1.0.0",
+    state: "candidate",
+  });
+  const dependencyCycleBRegistration = registerAsset({
+    storeRoot: dependencyCycleStoreRoot,
+    sourceRoot,
+    predecessorSnapshotDigest: dependencyCycleARegistration.snapshot_digest,
+    descriptor: assetDescriptor({
+      sample: samples.skill,
+      stableId: "ask.skill.multi-record-cycle-b",
+      version: "1.0.0",
+      dependencies: [exactAssetRef(dependencyCycleA)],
+    }),
+  });
+  const dependencyCycleB = resolveAsset({
+    storeRoot: dependencyCycleStoreRoot,
+    snapshotDigest: dependencyCycleBRegistration.snapshot_digest,
+    stableId: "ask.skill.multi-record-cycle-b",
+    version: "1.0.0",
+    state: "candidate",
+  });
+  expectFailure(
+    "coordinated multi-record dependency cycle cannot rewrite an immutable predecessor",
+    () => registerAsset({
+      storeRoot: dependencyCycleStoreRoot,
+      sourceRoot,
+      predecessorSnapshotDigest: dependencyCycleBRegistration.snapshot_digest,
+      descriptor: assetDescriptor({
+        sample: samples.skill,
+        stableId: dependencyCycleA.stable_id,
+        version: dependencyCycleA.version,
+        dependencies: [exactAssetRef(dependencyCycleB)],
+      }),
+    }),
+    /stable ID and version collision/iu,
+  );
+
   const outsidePath = resolve(root, "outside.md");
   writeFileSync(outsidePath, originalSkillBytes);
   expectFailure(
@@ -643,6 +704,39 @@ try {
     }),
     /applicability adapters unknown status cannot carry/iu,
   );
+
+  const declaredOperationalSurface = assetDescriptor({
+    sample: samples.skill,
+    stableId: "ask.skill.declared-operational-surface-test",
+  });
+  declaredOperationalSurface.permissions_and_effects = {
+    status: "declared_by_consumer",
+    requested_permissions: ["repository.read"],
+    possible_effects: ["local_files_read"],
+    permission_refs: [],
+    effect_refs: [],
+  };
+  declaredOperationalSurface.safety.classifications = ["local_read_only"];
+  declaredOperationalSurface.maintenance.refresh_conditions = ["repository read boundary changes"];
+  const declaredOperationalRegistration = registerAsset({
+    storeRoot,
+    sourceRoot,
+    predecessorSnapshotDigest: candidateSnapshotDigest,
+    descriptor: declaredOperationalSurface,
+  });
+  check("requested permissions, possible effects, safety, and refresh conditions are preserved", () => {
+    const resolved = resolveAsset({
+      storeRoot,
+      snapshotDigest: declaredOperationalRegistration.snapshot_digest,
+      stableId: declaredOperationalSurface.stable_id,
+      version: declaredOperationalSurface.version,
+      state: "candidate",
+    });
+    assert.deepEqual(resolved.record.permissions_and_effects.requested_permissions, ["repository.read"]);
+    assert.deepEqual(resolved.record.permissions_and_effects.possible_effects, ["local_files_read"]);
+    assert.deepEqual(resolved.record.safety.classifications, ["local_read_only"]);
+    assert.deepEqual(resolved.record.maintenance.refresh_conditions, ["repository read boundary changes"]);
+  });
 
   const incompleteStoreRoot = resolve(root, "incomplete-store");
   mkdirSync(incompleteStoreRoot, { recursive: true });
@@ -1052,6 +1146,29 @@ try {
     trustedAuthorityContexts: historicalTrust,
   });
   assert.deepEqual(lifecycleV2.record.maintenance.rollback.target, exactAssetRef(lifecycleV1));
+
+  expectFailure(
+    "coordinated multi-record parent cycle cannot rewrite an immutable predecessor",
+    () => registerAsset({
+      storeRoot,
+      sourceRoot,
+      predecessorSnapshotDigest: lifecycleV2Registration.snapshot_digest,
+      trustedAuthorityContexts: historicalTrust,
+      descriptor: assetDescriptor({
+        sample: syntheticSample,
+        version: "1.0.0",
+        derivation: {
+          kind: "full_content_revision",
+          parent: exactAssetRef(lifecycleV2),
+          delta: {
+            kind: "replacement",
+            summary: "Attempt to rewrite v1 so that it points back to v2.",
+          },
+        },
+      }),
+    }),
+    /stable ID and version collision/iu,
+  );
 
   const admitV1Authority = lifecycleAuthority({
     predecessorSnapshotDigest: lifecycleV2Registration.snapshot_digest,
