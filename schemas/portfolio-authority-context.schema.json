@@ -128,13 +128,23 @@
     "grant": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["grant_kind", "manifest_digest", "entry_id", "asset", "approval_evidence_digest"],
+      "required": ["grant_kind", "manifest_digest", "entry_id", "asset", "approval_authority"],
       "properties": {
         "grant_kind": { "type": "string", "const": "high_impact_independent_activation" },
         "manifest_digest": { "$ref": "#/$defs/digest" },
         "entry_id": { "$ref": "#/$defs/stableId" },
         "asset": { "$ref": "#/$defs/exactAssetRef" },
-        "approval_evidence_digest": { "$ref": "#/$defs/digest" }
+        "approval_authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "authority_id", "authority_revision", "authority_evidence_digest"],
+          "properties": {
+            "kind": { "type": "string", "const": "external_high_impact_approval_authority" },
+            "authority_id": { "$ref": "#/$defs/token" },
+            "authority_revision": { "$ref": "#/$defs/token" },
+            "authority_evidence_digest": { "$ref": "#/$defs/digest" }
+          }
+        }
       }
     }
   }

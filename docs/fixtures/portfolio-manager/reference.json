@@ -10,21 +10,22 @@
     "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
     "scope_id": "agent-spectrum-kernel",
     "lock_revision": 2,
-    "lock_digest": "sha256:3c2471d3ba7ea2cb516574fba30ff8efbedf1730764eafc16bfc61797a4d9d5b",
+    "lock_digest": "sha256:2b096afb1739764ae015552af32291b7d6676dbd2f9f8380cbc4540b242c4959",
     "required_portfolio_authority_context_digests": [
-      "sha256:d08b867995838b452b832eeb8a8e531e63bb1404329d9e61be540e3b5e5bce29"
+      "sha256:b7339f940970b65856bc8991f5475107063e76c01829fb605989dfead80ee514"
     ],
+    "required_high_impact_approval_grant_digests": [],
     "current_manifest": {
       "revision": "reference-kernel-only-v1",
-      "manifest_digest": "sha256:87e405037b54264df40832904acb0e3142926f8caa56382790d3efa4d0e4e67f",
+      "manifest_digest": "sha256:e116cc23d57fca4594e903ea8a6aeb4b85d2b82dd2470ddc0758acd3cef8b747",
       "asset_set_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     "selections": [
       {
-        "selection_object_digest": "sha256:6ea20e13e76e861d7a5d0a8abe4d7206ffcfeb0f010aa74746d0aa2f5b4245fb",
-        "selection_digest": "sha256:c85d2526ec2bf087dc71e3f3681a3ef1c9b48ebf27e2ab2d0648488d7de6be68",
-        "context_object_digest": "sha256:c2716f8eca4939bbbd23f08ce2117c192deed3a790b6d2d709a17ee5e5cfa8fb",
-        "context_digest": "sha256:a3d599165eed6fd10e7ce6af1b0e819097e1eb5347e4d3a0e92e2941caa29670",
+        "selection_object_digest": "sha256:a0f2c76f8d4194c06b2a28bf2f323f00c797985abb955926f1aeb2d5c46fb5bc",
+        "selection_digest": "sha256:c1bdd28735e56e757349b916090ca26987da44aa2df6ad7f5963eba4c7be7ab9",
+        "context_object_digest": "sha256:f29b03891c6aa3ca72cd2e79834aa5c0fa22930a2f5b17410e497ad24d68f781",
+        "context_digest": "sha256:dea3740b36e09857a7cb1fac79a3956998bdac79f1c49123a905b2e2327432c0",
         "decision": "selected"
       }
     ],
@@ -40,22 +41,23 @@
     "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
     "scope_id": "agent-spectrum-kernel",
     "lock_revision": 3,
-    "lock_digest": "sha256:5bd16480b6309ade655bb277b989f9fc8d1f2d5bbb8544c270453226bbbe9235",
+    "lock_digest": "sha256:b4fc6bf06f8ec01c55c847ac6733a26e458352850c2697b8c45c33998c38fc3d",
     "required_portfolio_authority_context_digests": [
-      "sha256:b2b58efb0c9a270659079c5ede68b0a73a8fcdda538f44bf882fff6e54ebb4ee",
-      "sha256:d08b867995838b452b832eeb8a8e531e63bb1404329d9e61be540e3b5e5bce29"
+      "sha256:b7339f940970b65856bc8991f5475107063e76c01829fb605989dfead80ee514",
+      "sha256:fb808457c840a2e9b354c2d16923acdaa3dc106f6ceaa32be77df9c4c1efc8f1"
     ],
+    "required_high_impact_approval_grant_digests": [],
     "current_manifest": {
       "revision": "reference-adaptive-ask-v1",
-      "manifest_digest": "sha256:9e80ecf4f6b67dac0ddc0cca3de8df173638a78468ad2f77885deb52c33cacb6",
+      "manifest_digest": "sha256:00399989ee4be2513f4b8e112603f87e1fb3e7f84c514f91c59a81049b2d7c9e",
       "asset_set_digest": "sha256:bf7aa0a97dbdd6fa46453e661ce05482e3619062f9fc949d916e2fdc6c11a329"
     },
     "selections": [
       {
-        "selection_object_digest": "sha256:03f2beeb60118919276792734bcd5e0798b528a4c77215a6fa66222e26f74d57",
-        "selection_digest": "sha256:34735f93d59c811f9da6ddb1f6dcab0a59ad408c4f81e6633cc7efe56d83765d",
-        "context_object_digest": "sha256:fe5ac954a673df105a71534ee865132fc3bdfa41894b79e1c2f2d800978f17ab",
-        "context_digest": "sha256:454595e86d65b020ae477b56b7d3ea313fc8ae1716e312e910893f65a7965fc4",
+        "selection_object_digest": "sha256:4c960a17ac6c747040cb171c8b625e30ac00323498608c4daa9177eac27e704f",
+        "selection_digest": "sha256:0cd2a92950d69e18788590afccf5498bdfdb46c62ceebad618db65c4c32549b0",
+        "context_object_digest": "sha256:11a436fe98b3611ffcfc3352870c8497490c9f84e7d90eba9fc6d9b00d38317e",
+        "context_digest": "sha256:0071809877b1431c3b126f30bc29bc1574f0166ab91e5329f526bbff74456293",
         "decision": "downgrade"
       }
     ],

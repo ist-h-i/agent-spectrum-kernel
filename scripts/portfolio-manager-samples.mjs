@@ -112,6 +112,17 @@ function baseManifestDraft({ registry, revision, entries = [], rollbackTarget = 
       snapshot_digest: registry.snapshot_digest,
     },
     selectors: selector(),
+    selection_context_allowlist: {
+      task_classes: ["implementation", "risk-gated-production"],
+      projects: [REPOSITORY_ID],
+      models: ["gpt-5.6-sol"],
+      adapters: ["codex"],
+      stacks: ["node"],
+      domains: ["ai-engineering"],
+      risk_classes: ["ordinary"],
+      capabilities: ["local_filesystem"],
+      operation_scopes: ["automatic_portfolio_activation", "local_repository"],
+    },
     entries,
     evidence_requirements: [],
     selection_policy: {

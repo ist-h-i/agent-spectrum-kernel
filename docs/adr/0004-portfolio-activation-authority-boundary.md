@@ -28,6 +28,10 @@ telemetry into the selection context would let outcome information influence the
 claimed pre-result choice. It would make later comparisons non-reconstructable
 and could leak evaluation authority into lifecycle control.
 
+A denylist alone cannot close that boundary because new outcome-derived labels
+can be invented. The accepted task/applicability vocabulary therefore also has
+to be an immutable part of the manifest that is current before selection.
+
 Finally, ordinary activation and rollback have different effects. Activation
 makes a new exact manifest current. Rollback revives an exact historical or
 superseded manifest and Asset set. Merely retaining old bytes or naming a
@@ -52,7 +56,9 @@ selection, execution, evaluation, or organizational authority.
 A Portfolio manifest binds one exact configuration revision: the exact Registry
 snapshot and Asset references, roles and assurance lanes, applicability,
 exposure and prohibited tasks, budgets, evidence requirements, approval
-constraints, failure actions, conflicts, and rollback intent.
+constraints, failure actions, conflicts, rollback intent, and the sealed
+pre-result vocabulary allowed for task, project, model, adapter, stack, domain,
+risk, capability, and operation-scope selection facts.
 
 The manifest is stored configuration, not active state. A full immutable
 Portfolio lock is the sole lifecycle commit marker. Each non-empty successor
@@ -65,6 +71,12 @@ Exactly one manifest is current in a non-empty valid lock. Historical,
 superseded, and retired manifests remain reconstructable and are not default
 selection candidates. An empty initial lock has no current manifest and needs no
 authority; every non-empty successor requires exact authority.
+
+When a current manifest names an exact rollback target, the verified lock must
+retain that target as `historical` or `superseded`. Ordinary activation cannot
+retire the outgoing current while simultaneously making it the new current
+manifest's rollback target, and it cannot retire that target while the referring
+manifest remains current.
 
 ### Keep activation and rollback authority separate
 
@@ -88,12 +100,19 @@ recommendations are not Portfolio activation or rollback authorities.
 ### Require exact approval for high-impact activation
 
 An active high-impact assurance lane requires a separately trusted exact
-activation approval. It binds the exact manifest and Asset set, repository and
-scope, bounded risk/task applicability, authority identity and revision, and
-immutable approval evidence. It is additional to ordinary activation and must
-satisfy the manifest's closed independent-review constraint. Approval is not
-inherited from a related Asset, another version, the same owner, a broad
-repository approval, or a prior Registry transition.
+approval grant. The grant binds the exact manifest digest, entry, and Asset
+reference and carries its own closed high-impact `approval_authority` kind,
+identity, revision, and immutable authority-evidence digest. The approval
+authority identity must differ from the Portfolio lifecycle authority identity.
+
+Placing the grant inside the lifecycle authority context does not establish
+approval trust. The caller must separately supply the byte-identical grant as a
+trusted high-impact approval input, and the local manager exact-compares it
+before applying or verifying the lifecycle transition or any derived selection
+and export. It is additional to ordinary activation and must satisfy the
+manifest's closed independent-review constraint. Approval is not inherited from
+a related Asset, another version, the same owner, a broad repository approval,
+or a prior Registry transition.
 
 Unknown operational metadata is not evidence of low impact. Missing exposure
 bounds, prohibited-task enforcement, capability state, safety constraints, or
@@ -107,14 +126,31 @@ execution: exact lock/repository/source identity, task and applicability
 dimensions, actual adapter capabilities, bounded operation scopes,
 known-or-unknown budgets, and exact current-state/invalidation identities.
 
+The current manifest's sealed `selection_context_allowlist` is the primary gate
+for task class, project, model, adapter, stack, domain, risk class, capability,
+and operation-scope vocabulary. It also bounds selector and referenced Asset
+applicability values. An otherwise Schema-valid but unlisted value is rejected.
+The recursive outcome/evaluator vocabulary check remains a defense-in-depth
+gate over both that allowlist and the selector input; it is not the source of
+authority for newly invented labels.
+
 It recursively rejects result, score, correctness, recommendation,
 completion-claim, measured-outcome, oracle, hidden-test/answer, evaluator
 outcome, and post-execution telemetry concepts, including nested or renamed
 equivalents. Timestamps are not part of selection identity. Filesystem wrappers
 must reject result-like artifacts before constructing the selector input.
 
+The material-state array has mapping semantics: duplicate
+`current_state_refs.state_id` values are rejected even if their digests differ.
+Array ordering or last-write behavior never selects which material-state digest
+is authoritative.
+
 Resolution records a deterministic typed pre-result decision; it does not record
-an evaluation result or promotion recommendation.
+an evaluation result or promotion recommendation. Exporting a portable
+reference re-verifies and deterministically reconstructs every requested
+selection from its stored context and exact trust inputs before projecting its
+reference fields. A Schema-valid but forged self-sealed selection, a duplicate
+selection digest, or a selection from another lock is not exportable.
 
 ### Preserve exact material freshness and explicit uncertainty
 
@@ -128,6 +164,13 @@ Freshness means exact material identity, not wall-clock age or file modification
 time. Unknown cost, duration, token, applicability, capability, or risk values
 remain unknown. They are not interpreted as zero, unrestricted, within budget,
 or low impact.
+
+`permissions_and_effects.status: declared_by_consumer` is likewise treated as
+safety unknown rather than verified safety metadata. If budget metrics contain
+both unknown and exceeded values, both conditions retain their typed reasons
+and configured actions; their effective disposition uses
+`stop > downgrade > bypass`, so an unknown-value action cannot hide an
+exceeded-budget stop.
 
 ### Make failure disposition typed and deterministic
 

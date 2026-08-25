@@ -288,7 +288,7 @@ node scripts/asset-registry-samples.mjs --check
 
 `docs/portfolio-manager-contract.md` defines the local versioned Portfolio plane above the Asset Registry. Immutable manifests and full predecessor-closed locks share the same canonical JSON CAS. A stored manifest is not current, a current manifest is not an executed Asset set, and verification-evidence, evaluator, producer, Asset owner, or digest identity does not grant Portfolio activation or rollback authority.
 
-Resolution uses a closed pre-result context, exact Registry and Asset identities, exact verification-reuse plans, exact current-state references, explicit selectors and capability differences, known-or-unknown budgets, and typed `selected` / `bypass` / `downgrade` / `stop` outcomes. High-impact activation needs an exact independent grant, while rollback uses a separate exact rollback authority and preserves every historical object.
+Resolution uses a manifest-sealed pre-result vocabulary, exact Registry and Asset identities, exact verification-reuse plans, unique exact current-state references, explicit selectors and capability differences, known-or-unknown budgets, and typed `selected` / `bypass` / `downgrade` / `stop` outcomes. High-impact activation needs an exact grant from a separately trusted approval authority, while rollback uses a separate exact rollback authority, keeps the active manifest's exact rollback target available, and preserves every historical object.
 
 ```bash
 node scripts/test-portfolio-manager.mjs

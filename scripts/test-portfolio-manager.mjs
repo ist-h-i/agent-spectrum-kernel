@@ -22,6 +22,7 @@ import {
 import {
   contentAddressedObjectPath,
   listContentAddressedJson,
+  putContentAddressedJson,
   stableCanonicalJson,
 } from "./content-addressed-store.mjs";
 import {
@@ -71,6 +72,7 @@ const alternateProducerKeys = generateKeyPairSync("ed25519");
 const repositoryRoot = resolve(import.meta.dirname, "..");
 
 let caseCount = 0;
+const regressionFailures = [];
 
 function digest(value) {
   return `sha256:${createHash("sha256").update(String(value)).digest("hex")}`;
@@ -88,6 +90,15 @@ function check(label, action) {
 
 function expectFailure(label, action, pattern) {
   assert.throws(action, pattern, label);
+  caseCount += 1;
+}
+
+function regression(label, action) {
+  try {
+    action();
+  } catch (error) {
+    regressionFailures.push({ label, message: error.message });
+  }
   caseCount += 1;
 }
 
@@ -122,7 +133,14 @@ function assetDimension(included) {
   return { status: "bounded", included, excluded: [] };
 }
 
-function assetDescriptor({ name, stableId, version = "1.0.0", highImpact = false, sourceFile }) {
+function assetDescriptor({
+  name,
+  stableId,
+  version = "1.0.0",
+  highImpact = false,
+  permissionsStatus = "supported",
+  sourceFile,
+}) {
   const evidenceRef = `issue-277:${name}`;
   return {
     schema_version: "1.0.0",
@@ -165,7 +183,7 @@ function assetDescriptor({ name, stableId, version = "1.0.0", highImpact = false
       notes: [],
     },
     permissions_and_effects: {
-      status: "supported",
+      status: permissionsStatus,
       requested_permissions: [CAPABILITY],
       possible_effects: ["read_repository"],
       permission_refs: [evidenceRef],
@@ -230,6 +248,21 @@ function selectors(overrides = {}) {
     domains: selectorDimension([DOMAIN]),
     capabilities: selectorDimension([CAPABILITY]),
     risk_classes: selectorDimension([RISK_CLASS]),
+    ...structuredClone(overrides),
+  };
+}
+
+function selectionContextAllowlist(overrides = {}) {
+  return {
+    task_classes: [TASK_CLASS],
+    projects: [REPOSITORY_ID, "github.com/example/other"],
+    models: [MODEL, "gpt-4"],
+    adapters: [ADAPTER, "other-adapter"],
+    stacks: [STACK],
+    domains: [DOMAIN],
+    risk_classes: [RISK_CLASS, "high"],
+    capabilities: [CAPABILITY],
+    operation_scopes: [OPERATION_SCOPE],
     ...structuredClone(overrides),
   };
 }
@@ -322,6 +355,7 @@ function manifestDraft({
   registry,
   entries = [],
   manifestSelectors = selectors(),
+  contextAllowlist = selectionContextAllowlist(),
   evidenceRequirements = [],
   rollbackTarget = null,
   selectionPolicy = {},
@@ -351,6 +385,7 @@ function manifestDraft({
       snapshot_digest: registry.snapshot_digest,
     },
     selectors: structuredClone(manifestSelectors),
+    selection_context_allowlist: structuredClone(contextAllowlist),
     entries: structuredClone(entries),
     evidence_requirements: structuredClone(evidenceRequirements),
     selection_policy: {
@@ -698,6 +733,7 @@ function select({
   scenario,
   assetTrust,
   portfolioTrust = [scenario.authorityContext],
+  highImpactTrust = [],
   contextOverrides = {},
 } = {}) {
   const context = selectionContext({
@@ -710,6 +746,7 @@ function select({
     selectorContext: context,
     trustedPortfolioAuthorityContexts: portfolioTrust,
     trustedAssetAuthorityContexts: assetTrust,
+    trustedHighImpactApprovalGrants: highImpactTrust,
   });
   return { context, ...resolved };
 }
@@ -748,6 +785,11 @@ function buildSyntheticRegistry({ sourceRoot, storeRoot }) {
   const definitions = [
     { name: "baseline", stableId: "ask.skill.issue277.baseline" },
     { name: "challenger", stableId: "ask.skill.issue277.challenger" },
+    {
+      name: "declared-boundary",
+      stableId: "ask.skill.issue277.declared-boundary",
+      permissionsStatus: "declared_by_consumer",
+    },
     { name: "experiment", stableId: "ask.skill.issue277.experiment" },
     { name: "high-impact", stableId: "ask.skill.issue277.high-impact", highImpact: true },
   ];
@@ -838,12 +880,13 @@ try {
   const { registry, assets, assetTrust } = synthetic;
 
   check("synthetic Registry preserves candidate, admitted, and current authority closure", () => {
-    assert.equal(registry.assets.length, 4);
+    assert.equal(registry.assets.length, 5);
     assert.deepEqual(
       registry.assets.map((asset) => [asset.stable_id, asset.state]),
       [
         ["ask.skill.issue277.baseline", "current"],
         ["ask.skill.issue277.challenger", "candidate"],
+        ["ask.skill.issue277.declared-boundary", "candidate"],
         ["ask.skill.issue277.experiment", "candidate"],
         ["ask.skill.issue277.high-impact", "current"],
       ],
@@ -1157,6 +1200,32 @@ try {
       taskClass: "hidden-test",
     }),
     /prohibited result\/evaluator value/iu,
+  );
+  expectFailure(
+    "manifest cannot pre-authorize a post-result selector vocabulary",
+    () => buildPortfolioManifest(manifestDraft({
+      portfolioId: "ask.portfolio.issue277.leaking-vocabulary",
+      revision: "v1",
+      registry,
+      contextAllowlist: selectionContextAllowlist({
+        task_classes: [TASK_CLASS, "promotion_decision_adopt"],
+      }),
+    })),
+    /prohibited result\/evaluator value|post-result|pre-result/iu,
+  );
+  expectFailure(
+    "selection rejects a non-prohibited but unsealed context vocabulary value",
+    () => resolvePortfolioSelection({
+      storeRoot,
+      lockDigest: baselineLockFirst.lock_digest,
+      selectorContext: selectionContext({
+        lockDigest: baselineLockFirst.lock_digest,
+        taskClass: "maintenance_review",
+      }),
+      trustedPortfolioAuthorityContexts: baselinePortfolioTrust,
+      trustedAssetAuthorityContexts: assetTrust,
+    }),
+    /sealed pre-result allowlist/iu,
   );
 
   const challengerTemplate = (asset = assets.challenger) => portfolioEntry({
@@ -1495,7 +1564,12 @@ try {
     manifest_digest: highImpactPublication.manifest_digest,
     entry_id: highImpactEntry.entry_id,
     asset: exactAssetRef(assets["high-impact"]),
-    approval_evidence_digest: digest("independent-high-impact-approval"),
+    approval_authority: {
+      kind: "external_high_impact_approval_authority",
+      authority_id: "issue-277-independent-high-impact-reviewer",
+      authority_revision: "high-impact-v1",
+      authority_evidence_digest: digest("independent-high-impact-approval"),
+    },
   };
   const highImpactContext = (grants, revision) => buildPortfolioAuthorityContext({
     portfolioId: highImpactPublication.portfolio_id,
@@ -1534,7 +1608,10 @@ try {
     ...structuredClone(exactHighImpactGrant),
     manifest_digest: digest("foreign-manifest"),
     entry_id: "foreign-entry",
-    approval_evidence_digest: digest("foreign-approval"),
+    approval_authority: {
+      ...structuredClone(exactHighImpactGrant.approval_authority),
+      authority_evidence_digest: digest("foreign-approval"),
+    },
   };
   const extraHighImpactGrant = highImpactContext(
     [exactHighImpactGrant, foreignGrant],
@@ -1551,11 +1628,36 @@ try {
     /unused|transplanted|grant/iu,
   );
   const exactHighImpactAuthority = highImpactContext([exactHighImpactGrant], "high-exact-grant");
+  expectFailure(
+    "high-impact approval grant must be supplied as a separate trusted root",
+    () => applyPortfolioTransitions({
+      storeRoot,
+      predecessorLockDigest: highImpactEmpty.lock_digest,
+      authorityContext: exactHighImpactAuthority,
+      trustedAssetAuthorityContexts: assetTrust,
+    }),
+    /separately trusted|approval.*trust/iu,
+  );
+  const sameAuthorityGrant = structuredClone(exactHighImpactGrant);
+  sameAuthorityGrant.approval_authority.authority_id = "issue-277-portfolio-maintainer";
+  const sameAuthorityContext = highImpactContext([sameAuthorityGrant], "high-self-approved");
+  expectFailure(
+    "high-impact approval authority must differ from lifecycle activation authority",
+    () => applyPortfolioTransitions({
+      storeRoot,
+      predecessorLockDigest: highImpactEmpty.lock_digest,
+      authorityContext: sameAuthorityContext,
+      trustedAssetAuthorityContexts: assetTrust,
+      trustedHighImpactApprovalGrants: [sameAuthorityGrant],
+    }),
+    /independent|differ/iu,
+  );
   const highImpactLock = applyPortfolioTransitions({
     storeRoot,
     predecessorLockDigest: highImpactEmpty.lock_digest,
     authorityContext: exactHighImpactAuthority,
     trustedAssetAuthorityContexts: assetTrust,
+    trustedHighImpactApprovalGrants: [exactHighImpactGrant],
   });
   const highImpactScenario = {
     publication: highImpactPublication,
@@ -1567,11 +1669,32 @@ try {
       storeRoot,
       scenario: highImpactScenario,
       assetTrust,
+      highImpactTrust: [exactHighImpactGrant],
       contextOverrides: { riskClass: "high" },
     });
     assert.equal(resolved.selection.decision, "selected");
     assert.equal(resolved.selection.selected_assets[0].assurance_lane, "high_impact_active");
     assert.deepEqual(resolved.selection.selected_assets[0].asset, exactHighImpactGrant.asset);
+  });
+  check("high-impact export identifies the separately trusted approval grant", () => {
+    const resolved = select({
+      storeRoot,
+      scenario: highImpactScenario,
+      assetTrust,
+      highImpactTrust: [exactHighImpactGrant],
+      contextOverrides: { riskClass: "high" },
+    });
+    const reference = exportPortfolioReference({
+      storeRoot,
+      lockDigest: highImpactLock.lock_digest,
+      selectionObjectDigests: [resolved.selection_object_digest],
+      trustedPortfolioAuthorityContexts: [exactHighImpactAuthority],
+      trustedAssetAuthorityContexts: assetTrust,
+      trustedHighImpactApprovalGrants: [exactHighImpactGrant],
+    });
+    assert.deepEqual(reference.required_high_impact_approval_grant_digests, [
+      digest(stableCanonicalJson(exactHighImpactGrant)),
+    ]);
   });
 
   const rollbackTransitions = [
@@ -1735,6 +1858,178 @@ try {
     assert.equal(reference.effectiveness_implied, false);
     assert.equal(JSON.stringify(reference).includes(temporaryRoot), false);
   });
+
+  const retiringSuccessorDraft = manifestDraft({
+    portfolioId: kernelPublicationFirst.portfolio_id,
+    revision: "retiring-successor-v3",
+    registry,
+    rollbackTarget: portfolioRef(baselinePublication),
+  });
+  const retiringSuccessorPublication = publishManifest({
+    storeRoot,
+    draft: retiringSuccessorDraft,
+    assetTrust,
+  });
+  const retiringActivationAuthority = buildPortfolioAuthorityContext({
+    portfolioId: kernelPublicationFirst.portfolio_id,
+    repositoryId: REPOSITORY_ID,
+    scopeId: SCOPE_ID,
+    predecessorLockDigest: baselineLockFirst.lock_digest,
+    transitions: [
+      manifestTransition(baselinePublication, "current", "retired"),
+      manifestTransition(retiringSuccessorPublication, null, "current"),
+    ],
+    authority: portfolioAuthority({ revision: "retiring-successor-v3" }),
+  });
+  regression("ordinary activation rejects retiring its exact rollback target before publication", () => {
+    const objectCountBefore = listContentAddressedJson({ storeRoot }).length;
+    let rejection = null;
+    let accepted = null;
+    try {
+      accepted = applyPortfolioTransitions({
+        storeRoot,
+        predecessorLockDigest: baselineLockFirst.lock_digest,
+        authorityContext: retiringActivationAuthority,
+        trustedPortfolioAuthorityContexts: baselinePortfolioTrust,
+        trustedAssetAuthorityContexts: assetTrust,
+      });
+    } catch (error) {
+      rejection = error;
+    }
+    const objectCountAfter = listContentAddressedJson({ storeRoot }).length;
+    assert.ok(
+      rejection,
+      `ordinary activation accepted unrollbackable lock ${accepted?.lock_digest}; CAS objects ${objectCountBefore} -> ${objectCountAfter}`,
+    );
+    assert.equal(objectCountAfter, objectCountBefore, "rejected activation must not publish authority or lock objects");
+  });
+
+  regression("selection context rejects duplicate current-state IDs with different digests", () => {
+    const duplicatedStateRefs = [
+      ...structuredClone(REQUIRED_STATE_REFS),
+      {
+        state_id: REQUIRED_STATE_REFS[0].state_id,
+        state_digest: digest("conflicting-current-state"),
+      },
+    ];
+    assert.throws(
+      () => selectionContext({
+        lockDigest: baselineLockFirst.lock_digest,
+        currentStateRefs: duplicatedStateRefs,
+      }),
+      /duplicate|repeat|current-state ID/iu,
+      "duplicate current-state ID was accepted and left Map precedence ambiguous",
+    );
+  });
+
+  for (const postResultValue of [
+    "promotion_decision_adopt",
+    "reward_high",
+    "verdict_pass",
+  ]) {
+    regression(`selection context rejects post-result synonym ${postResultValue}`, () => {
+      assert.throws(
+        () => selectionContext({
+          lockDigest: baselineLockFirst.lock_digest,
+          taskClass: postResultValue,
+        }),
+        /prohibited|post-result|pre-result/iu,
+        `post-result selector value ${postResultValue} was accepted`,
+      );
+    });
+  }
+
+  const mixedBudgetScenario = createExploratoryScenario({
+    storeRoot,
+    registry,
+    assetTrust,
+    portfolioId: "ask.portfolio.issue277.mixed-budget-severity",
+    entries: [portfolioEntry({
+      entryId: "mixed-budget",
+      asset: assets.challenger,
+      costEstimate: knownCost(10),
+    })],
+    budgets: {
+      unknown_value_action: "bypass",
+      exceeded_action: "stop",
+    },
+  });
+  regression("mixed unknown and exceeded budget metrics combine by stop severity", () => {
+    const resolved = select({
+      storeRoot,
+      scenario: mixedBudgetScenario,
+      assetTrust,
+      contextOverrides: {
+        availableBudget: {
+          token_count: unknown(),
+          duration_ms: known(5),
+          cost_microunits: known(1000),
+        },
+      },
+    });
+    assert.equal(
+      resolved.selection.decision,
+      "stop",
+      `mixed budget resolved ${resolved.selection.decision}; reasons=${resolved.selection.reasons.map((reason) => `${reason.action}:${reason.code}`).join(",")}`,
+    );
+    assert.ok(hasReason(resolved.selection, "budget_exceeded", "stop"));
+  });
+
+  const declaredBoundaryScenario = createExploratoryScenario({
+    storeRoot,
+    registry,
+    assetTrust,
+    portfolioId: "ask.portfolio.issue277.declared-permission-boundary",
+    entries: [portfolioEntry({
+      entryId: "declared-permission-boundary",
+      asset: assets["declared-boundary"],
+      actions: failureActions({ safety_unknown: "downgrade" }),
+    })],
+  });
+  regression("declared-by-consumer permissions remain an unverified safety boundary", () => {
+    const resolved = select({ storeRoot, scenario: declaredBoundaryScenario, assetTrust });
+    assert.equal(
+      resolved.selection.decision,
+      "downgrade",
+      `declared_by_consumer permissions resolved ${resolved.selection.decision} without safety_unknown`,
+    );
+    assert.ok(hasReason(resolved.selection, "safety_unknown", "downgrade"));
+  });
+
+  const forgedKernelSelection = structuredClone(kernelSelectionFirst.selection);
+  forgedKernelSelection.decision = "stop";
+  forgedKernelSelection.reasons = [{
+    action: "stop",
+    code: "selector_conflict",
+    entry_id: null,
+    subject_digest: kernelPublicationFirst.manifest_digest,
+  }];
+  forgedKernelSelection.selection_digest = computePortfolioSelectionDigest(forgedKernelSelection);
+  validatePortfolioSelection(forgedKernelSelection);
+  const forgedKernelSelectionPublication = putContentAddressedJson({
+    storeRoot,
+    artifact: forgedKernelSelection,
+  });
+  regression("Portfolio export reconstructs and rejects a forged deterministic decision", () => {
+    assert.throws(
+      () => exportPortfolioReference({
+        storeRoot,
+        lockDigest: kernelLock.lock_digest,
+        selectionObjectDigests: [forgedKernelSelectionPublication.digest],
+        trustedPortfolioAuthorityContexts: [kernelAuthority],
+        trustedAssetAuthorityContexts: assetTrust,
+      }),
+      /deterministic|reconstruct|selection.*match|forg/iu,
+      "schema-valid forged Portfolio decision was exported without deterministic reconstruction",
+    );
+  });
+
+  if (regressionFailures.length > 0) {
+    throw new Error([
+      `Issue 277 regression RED (${regressionFailures.length})`,
+      ...regressionFailures.map(({ label, message }, index) => `${index + 1}. ${label}: ${message}`),
+    ].join("\n"));
+  }
 
   check("Asset, manifest, lock, evidence, context, and selection share one CAS object set", () => {
     const objects = listContentAddressedJson({ storeRoot });

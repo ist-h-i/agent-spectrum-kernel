@@ -4252,6 +4252,7 @@ function validatePortfolioManagerFixture(root, errors) {
         "lock_revision",
         "lock_digest",
         "required_portfolio_authority_context_digests",
+        "required_high_impact_approval_grant_digests",
         "current_manifest",
         "selections",
         "mutable_latest_pointer_used",
@@ -4270,6 +4271,14 @@ function validatePortfolioManagerFixture(root, errors) {
       }
       if (stableCanonicalJson(authorityDigests) !== stableCanonicalJson([...new Set(authorityDigests)].sort())) {
         throw new Error(`${name} required authority contexts are not a deterministic set`);
+      }
+      const highImpactGrantDigests = view.required_high_impact_approval_grant_digests;
+      if (!Array.isArray(highImpactGrantDigests)
+        || stableCanonicalJson(highImpactGrantDigests) !== stableCanonicalJson([...new Set(highImpactGrantDigests)].sort())) {
+        throw new Error(`${name} required high-impact approval grants are not a deterministic digest set`);
+      }
+      if (highImpactGrantDigests.length !== 0) {
+        throw new Error(`${name} candidate-only checked sample cannot require high-impact activation approval`);
       }
       const authorityContexts = authorityDigests.map((digest) => {
         reachable.add(digest);

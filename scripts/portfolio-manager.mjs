@@ -45,8 +45,9 @@ const CONTEXT_SELECTOR_FIELDS = {
   domains: "domain",
   risk_classes: "risk_class",
 };
+const CONTEXT_ALLOWLIST_SET_FIELDS = ["capabilities", "operation_scopes"];
 const BUDGET_METRICS = ["token_count", "duration_ms", "cost_microunits"];
-const PROHIBITED_SELECTION_KEY = /(?:^|_)(?:result|results|score|scores|correctness|recommendation|recommendations|completion_claim|outcome|outcomes|measured_result|measured_metric|hidden_test|hidden_answer|oracle|evaluator_result|evaluator_outcome|telemetry)(?:_|$)/iu;
+const PROHIBITED_SELECTION_KEY = /(?:^|_)(?:result|results|score|scores|correctness|recommendation|recommendations|completion_claim|outcome|outcomes|measured_result|measured_metric|hidden_test|hidden_answer|oracle|evaluator_result|evaluator_outcome|evaluator_decision|evaluation_decision|promotion_decision|post_execution|post_result|verdict|verdicts|reward|rewards|pass_rate|failure_rate|success_rate|observed_quality|telemetry)(?:_|$)/iu;
 
 const schemaPath = (name) => {
   const colocated = resolve(RUNTIME_ROOT, name);
@@ -159,7 +160,9 @@ function grantCompare(left, right) {
   return compareText(left.manifest_digest, right.manifest_digest)
     || compareText(left.entry_id, right.entry_id)
     || assetRefCompare(left.asset, right.asset)
-    || compareText(left.approval_evidence_digest, right.approval_evidence_digest);
+    || compareText(left.approval_authority.authority_id, right.approval_authority.authority_id)
+    || compareText(left.approval_authority.authority_revision, right.approval_authority.authority_revision)
+    || compareText(left.approval_authority.authority_evidence_digest, right.approval_authority.authority_evidence_digest);
 }
 
 function normalizeSelector(selector) {
@@ -185,6 +188,40 @@ function validateSelector(selector, label) {
   }
 }
 
+function validateSelectionContextAllowlist(allowlist) {
+  scanProhibitedSelectionKeys(allowlist, "$.selection_context_allowlist");
+  for (const field of [...Object.keys(CONTEXT_SELECTOR_FIELDS), ...CONTEXT_ALLOWLIST_SET_FIELDS]) {
+    assertSortedUnique(allowlist[field], compareText, `Portfolio selection-context ${field} allowlist`);
+  }
+}
+
+function assertValuesAllowed(values, allowedValues, label) {
+  const disallowed = values.filter((value) => !allowedValues.includes(value));
+  if (disallowed.length > 0) {
+    throw new Error(`${label} contains values outside the sealed pre-result allowlist: ${disallowed.join(", ")}`);
+  }
+}
+
+function validateSelectorVocabulary(selector, allowlist, label) {
+  for (const field of Object.keys(CONTEXT_SELECTOR_FIELDS)) {
+    assertValuesAllowed(selector[field].included, allowlist[field], `${label} ${field} included set`);
+    assertValuesAllowed(selector[field].excluded, allowlist[field], `${label} ${field} excluded set`);
+  }
+  assertValuesAllowed(selector.capabilities.included, allowlist.capabilities, `${label} capabilities included set`);
+  assertValuesAllowed(selector.capabilities.excluded, allowlist.capabilities, `${label} capabilities excluded set`);
+}
+
+function validateAssetApplicabilityVocabulary(asset, allowlist, label) {
+  const applicability = asset.record.applicability;
+  for (const field of ["task_classes", "projects", "models", "adapters", "stacks", "domains"]) {
+    assertValuesAllowed(applicability[field].included, allowlist[field], `${label} ${field} included set`);
+    assertValuesAllowed(applicability[field].excluded, allowlist[field], `${label} ${field} excluded set`);
+  }
+  assertValuesAllowed(applicability.required_capabilities, allowlist.capabilities, `${label} required capabilities`);
+  assertValuesAllowed(applicability.included_scopes, allowlist.operation_scopes, `${label} included operation scopes`);
+  assertValuesAllowed(applicability.excluded_scopes, allowlist.operation_scopes, `${label} excluded operation scopes`);
+}
+
 function validateQuantity(quantity, label) {
   if (quantity.status === "known" && !Number.isInteger(quantity.value)) throw new Error(`${label} known quantity requires an integer value`);
   if (quantity.status === "unknown" && quantity.value !== null) throw new Error(`${label} unknown quantity must keep a null value`);
@@ -198,6 +235,9 @@ function validateLimit(limit, label) {
 function normalizeManifestDraft(draft) {
   const manifest = cloneJson(draft);
   normalizeSelector(manifest.selectors);
+  for (const field of [...Object.keys(CONTEXT_SELECTOR_FIELDS), ...CONTEXT_ALLOWLIST_SET_FIELDS]) {
+    manifest.selection_context_allowlist[field] = sortedText(manifest.selection_context_allowlist[field]);
+  }
   for (const entry of manifest.entries) {
     normalizeSelector(entry.selectors);
     entry.prohibited_task_classes = sortedText(entry.prohibited_task_classes);
@@ -370,6 +410,8 @@ export function validatePortfolioManifest(manifest) {
   if (!compareCanonical(normalized, manifest)) throw new Error("Portfolio manifest unordered sets or entries are not deterministically ordered");
   assertManifestComputedIdentity(manifest);
   validateSelector(manifest.selectors, "Portfolio manifest");
+  validateSelectionContextAllowlist(manifest.selection_context_allowlist);
+  validateSelectorVocabulary(manifest.selectors, manifest.selection_context_allowlist, "Portfolio manifest");
   assertSortedUnique(manifest.entries, entryCompare, "Portfolio manifest entries");
   assertSortedUnique(manifest.unresolved_conflicts, (left, right) => compareText(left.conflict_id, right.conflict_id), "Portfolio unresolved conflicts");
   assertSortedUnique(manifest.benchmark_compatibility, (left, right) => compareText(left.condition_id, right.condition_id)
@@ -383,9 +425,16 @@ export function validatePortfolioManifest(manifest) {
     if (assetRefs.has(assetKey)) throw new Error(`Portfolio manifest repeats exact Asset ${entry.asset.stable_id}@${entry.asset.version}`);
     assetRefs.add(assetKey);
     validateEntrySemantics(entry);
+    validateSelectorVocabulary(entry.selectors, manifest.selection_context_allowlist, `Portfolio entry ${entry.entry_id}`);
+    assertValuesAllowed(
+      entry.prohibited_task_classes,
+      manifest.selection_context_allowlist.task_classes,
+      `Portfolio entry ${entry.entry_id} prohibited task classes`,
+    );
   }
   for (const conflict of manifest.unresolved_conflicts) {
     validateSelector(conflict.selectors, `Portfolio conflict ${conflict.conflict_id}`);
+    validateSelectorVocabulary(conflict.selectors, manifest.selection_context_allowlist, `Portfolio conflict ${conflict.conflict_id}`);
     assertSortedUnique(conflict.entry_ids, compareText, `Portfolio conflict ${conflict.conflict_id} entry IDs`);
     if (conflict.entry_ids.length < 2 || conflict.entry_ids.some((entryId) => !entryIds.has(entryId))) {
       throw new Error(`Portfolio conflict ${conflict.conflict_id} must bind at least two known entries`);
@@ -452,6 +501,11 @@ function verifiedRegistryForManifest({ storeRoot, manifest, trustedAssetAuthorit
     if (classifiedHighImpact && entry.assurance_lane !== "high_impact_active") {
       throw new Error(`Portfolio entry ${entry.entry_id} cannot downgrade a high-impact Asset assurance lane`);
     }
+    validateAssetApplicabilityVocabulary(
+      asset,
+      manifest.selection_context_allowlist,
+      `Portfolio entry ${entry.entry_id} Asset applicability`,
+    );
     boundAssets.push({ entry_id: entry.entry_id, asset });
   }
   return { registry, boundAssets };
@@ -644,7 +698,7 @@ function assertPortfolioRefMatchesManifest(ref, closure, relation) {
   if (!compareCanonical(ref, expected)) throw new Error(`${relation} exact manifest identity mismatch; Portfolio transplant rejected`);
 }
 
-function highImpactGrantsForManifest(context, closure) {
+function highImpactGrantsForManifest(context, closure, trustedHighImpactApprovalGrants) {
   const requiredEntries = closure.manifest.entries.filter((entry) => entry.assurance_lane === "high_impact_active");
   const grants = context.grants.filter((grant) => grant.manifest_digest === closure.manifest_digest);
   for (const entry of requiredEntries) {
@@ -655,9 +709,30 @@ function highImpactGrantsForManifest(context, closure) {
     if (matches.length !== 1) {
       throw new Error(`Portfolio entry ${entry.entry_id} high-impact activation requires one exact independent approval grant`);
     }
+    const [grant] = matches;
+    if (grant.approval_authority.authority_id === context.authority.authority_id) {
+      throw new Error(`Portfolio entry ${entry.entry_id} high-impact approval authority must be independent from lifecycle activation authority`);
+    }
+    if (!trustedHighImpactApprovalGrants.some((trusted) => compareCanonical(trusted, grant))) {
+      throw new Error(`Portfolio entry ${entry.entry_id} requires a separately trusted exact high-impact approval grant`);
+    }
   }
   if (grants.length !== requiredEntries.length || context.grants.length !== requiredEntries.length) {
     throw new Error("Portfolio authority context contains unused or transplanted high-impact activation grants");
+  }
+}
+
+function assertCurrentRollbackTargetAvailable(entries, currentClosure) {
+  const rollback = currentClosure.manifest.rollback;
+  if (rollback.mode === "none") return;
+  const target = entries.find((entry) => entry.manifest_digest === rollback.target.manifest_digest);
+  if (!target
+    || target.revision !== rollback.target.revision
+    || target.asset_set_digest !== rollback.target.asset_set_digest) {
+    throw new Error("current Portfolio rollback target is absent or its exact identity drifted");
+  }
+  if (!["historical", "superseded"].includes(target.state)) {
+    throw new Error("current Portfolio exact rollback target must remain historical or superseded; it cannot be current or retired");
   }
 }
 
@@ -666,6 +741,7 @@ function applyPortfolioTransitionsToEntries({
   predecessor,
   context,
   trustedAssetAuthorityContexts,
+  trustedHighImpactApprovalGrants,
 }) {
   const next = predecessor.entries.map(cloneJson);
   const byDigest = new Map(next.map((entry) => [entry.manifest_digest, entry]));
@@ -724,7 +800,8 @@ function applyPortfolioTransitionsToEntries({
       manifestDigest: current[0].manifest_digest,
       trustedAssetAuthorityContexts,
     });
-  highImpactGrantsForManifest(context, currentClosure);
+  highImpactGrantsForManifest(context, currentClosure, trustedHighImpactApprovalGrants);
+  assertCurrentRollbackTargetAvailable(next, currentClosure);
 
   const predecessorCurrent = predecessor.entries.find((entry) => entry.state === "current") ?? null;
   if (context.authority.kind === "external_portfolio_activation_authority") {
@@ -785,6 +862,7 @@ function verifyPortfolioLockInternal({
   lockDigest,
   trustedPortfolioAuthorityContexts,
   trustedAssetAuthorityContexts,
+  trustedHighImpactApprovalGrants,
   stack = new Set(),
 }) {
   assertDigest(lockDigest, "Portfolio lock digest");
@@ -806,6 +884,7 @@ function verifyPortfolioLockInternal({
         lockDigest: lock.predecessor.lock_digest,
         trustedPortfolioAuthorityContexts,
         trustedAssetAuthorityContexts,
+        trustedHighImpactApprovalGrants,
         stack,
       });
       if (lock.portfolio_id !== predecessor.lock.portfolio_id
@@ -836,6 +915,7 @@ function verifyPortfolioLockInternal({
         predecessor: predecessor.lock,
         context,
         trustedAssetAuthorityContexts,
+        trustedHighImpactApprovalGrants,
       });
       if (!compareCanonical(expectedEntries, lock.entries)) {
         throw new Error("Portfolio lock inventory does not match the complete authorized transition batch");
@@ -867,15 +947,19 @@ export function verifyPortfolioLock({
   lockDigest,
   trustedPortfolioAuthorityContexts = [],
   trustedAssetAuthorityContexts = [],
+  trustedHighImpactApprovalGrants = [],
 }) {
-  if (!Array.isArray(trustedPortfolioAuthorityContexts) || !Array.isArray(trustedAssetAuthorityContexts)) {
-    throw new Error("trusted Portfolio and Asset authority contexts must be arrays");
+  if (!Array.isArray(trustedPortfolioAuthorityContexts)
+    || !Array.isArray(trustedAssetAuthorityContexts)
+    || !Array.isArray(trustedHighImpactApprovalGrants)) {
+    throw new Error("trusted Portfolio, Asset, and high-impact approval inputs must be arrays");
   }
   const verified = verifyPortfolioLockInternal({
     storeRoot,
     lockDigest,
     trustedPortfolioAuthorityContexts,
     trustedAssetAuthorityContexts,
+    trustedHighImpactApprovalGrants,
   });
   return deepFreeze({
     lock_digest: verified.lock_digest,
@@ -895,8 +979,10 @@ export function applyPortfolioTransitions({
   authorityContext,
   trustedPortfolioAuthorityContexts = [],
   trustedAssetAuthorityContexts = [],
+  trustedHighImpactApprovalGrants = [],
 }) {
   if (!authorityContext) throw new Error("Portfolio authority context is required");
+  if (!Array.isArray(trustedHighImpactApprovalGrants)) throw new Error("trusted high-impact approval grants must be an array");
   const detachedContext = cloneJson(authorityContext);
   validateAuthorityContext(detachedContext);
   const predecessor = verifyPortfolioLockInternal({
@@ -904,6 +990,7 @@ export function applyPortfolioTransitions({
     lockDigest: predecessorLockDigest,
     trustedPortfolioAuthorityContexts,
     trustedAssetAuthorityContexts,
+    trustedHighImpactApprovalGrants,
   });
   if (detachedContext.predecessor_lock_digest !== predecessorLockDigest) {
     throw new Error("stale Portfolio authority predecessor lock mismatch");
@@ -918,6 +1005,7 @@ export function applyPortfolioTransitions({
     predecessor: predecessor.lock,
     context: detachedContext,
     trustedAssetAuthorityContexts,
+    trustedHighImpactApprovalGrants,
   });
   const contextPublication = putContentAddressedJson({ storeRoot, artifact: detachedContext });
   const current = entries.find((entry) => entry.state === "current");
@@ -944,6 +1032,7 @@ export function applyPortfolioTransitions({
     lockDigest: publication.digest,
     trustedPortfolioAuthorityContexts: [...trustedPortfolioAuthorityContexts, detachedContext],
     trustedAssetAuthorityContexts,
+    trustedHighImpactApprovalGrants,
   });
   return deepFreeze({
     lock_digest: publication.digest,
@@ -960,12 +1049,14 @@ export function resolveCurrentPortfolio({
   lockDigest,
   trustedPortfolioAuthorityContexts = [],
   trustedAssetAuthorityContexts = [],
+  trustedHighImpactApprovalGrants = [],
 }) {
   const verified = verifyPortfolioLockInternal({
     storeRoot,
     lockDigest,
     trustedPortfolioAuthorityContexts,
     trustedAssetAuthorityContexts,
+    trustedHighImpactApprovalGrants,
   });
   const current = verified.lock.entries.find((entry) => entry.state === "current");
   if (!current) throw new Error("Portfolio lock has no current manifest");
@@ -1029,6 +1120,13 @@ export function validatePortfolioSelectionContext(context) {
   assertSortedUnique(context.operation_scopes, compareText, "Portfolio selection context operation scopes");
   assertSortedUnique(context.current_state_refs, (left, right) => compareText(left.state_id, right.state_id)
     || compareText(left.state_digest, right.state_digest), "Portfolio selection current-state references");
+  const currentStateIds = new Set();
+  for (const stateRef of context.current_state_refs) {
+    if (currentStateIds.has(stateRef.state_id)) {
+      throw new Error(`Portfolio selection context repeats current-state ID ${stateRef.state_id}`);
+    }
+    currentStateIds.add(stateRef.state_id);
+  }
   for (const metric of BUDGET_METRICS) validateQuantity(context.available_budget[metric], `Portfolio available ${metric}`);
   if (context.context_digest !== computePortfolioSelectionContextDigest(context)) {
     throw new Error("Portfolio selection context digest mismatch");
@@ -1084,6 +1182,18 @@ function selectorsMatch(selector, context) {
     unknown: sortedText([...new Set(unknown)]),
     missingCapabilities: sortedText(missingCapabilities),
   };
+}
+
+function validateSelectionContextAgainstManifest(context, manifest) {
+  const allowlist = manifest.selection_context_allowlist;
+  for (const [field, contextField] of Object.entries(CONTEXT_SELECTOR_FIELDS)) {
+    if (!allowlist[field].includes(context[contextField])) {
+      throw new Error(`Portfolio selection ${contextField} is not in the sealed pre-result allowlist`);
+    }
+  }
+  for (const field of CONTEXT_ALLOWLIST_SET_FIELDS) {
+    assertValuesAllowed(context[field], allowlist[field], `Portfolio selection ${field}`);
+  }
 }
 
 function assetApplicability(asset, context) {
@@ -1278,6 +1388,7 @@ export function resolvePortfolioSelection({
   selectorContext,
   trustedPortfolioAuthorityContexts = [],
   trustedAssetAuthorityContexts = [],
+  trustedHighImpactApprovalGrants = [],
 }) {
   const context = buildPortfolioSelectionContext(selectorContext);
   if (context.portfolio_lock_digest !== lockDigest) throw new Error("Portfolio selection context lock binding mismatch");
@@ -1286,12 +1397,14 @@ export function resolvePortfolioSelection({
     lockDigest,
     trustedPortfolioAuthorityContexts,
     trustedAssetAuthorityContexts,
+    trustedHighImpactApprovalGrants,
   });
   if (verified.lock.repository_id !== context.repository_id) throw new Error("Portfolio selection context repository transplant rejected");
   const current = verified.lock.entries.find((entry) => entry.state === "current");
   if (!current) throw new Error("Portfolio selection requires a current manifest");
   const closure = verified.manifests.get(current.manifest_digest);
   const manifest = closure.manifest;
+  validateSelectionContextAgainstManifest(context, manifest);
   const assetsByEntry = new Map(closure.bound_assets.map((binding) => [binding.entry_id, binding.asset]));
   const reasons = [];
   const entryReasonMap = new Map(manifest.entries.map((entry) => [entry.entry_id, []]));
@@ -1383,7 +1496,7 @@ export function resolvePortfolioSelection({
       });
     }
     const safetyUnknown = asset.record.safety.status === "not_evaluated"
-      || asset.record.permissions_and_effects.status === "not_evaluated"
+      || ["not_evaluated", "declared_by_consumer"].includes(asset.record.permissions_and_effects.status)
       || asset.record.maintenance.stale_status !== "fresh";
     if (safetyUnknown) {
       addReason({
@@ -1455,24 +1568,36 @@ export function resolvePortfolioSelection({
   const unknownBudget = Object.values(budget).some((entry) => entry.status === "unknown");
   const exceededBudget = Object.values(budget).some((entry) => entry.status === "exceeded");
   if (unknownBudget || exceededBudget) {
-    const action = unknownBudget ? manifest.budgets.unknown_value_action : manifest.budgets.exceeded_action;
-    const code = unknownBudget ? "budget_unknown" : "budget_exceeded";
-    addReason({ action, code, subjectDigest: manifest.selection_basis_digest });
+    const budgetFailures = [
+      ...(unknownBudget ? [{ action: manifest.budgets.unknown_value_action, code: "budget_unknown" }] : []),
+      ...(exceededBudget ? [{ action: manifest.budgets.exceeded_action, code: "budget_exceeded" }] : []),
+    ];
+    let action = null;
+    for (const failure of budgetFailures) {
+      action = severityAction(action, failure.action);
+      addReason({ ...failure, subjectDigest: manifest.selection_basis_digest });
+    }
     const toOmit = action === "bypass"
       ? eligibleEntries
       : action === "downgrade"
         ? eligibleEntries.filter((entry) => entry.role !== "baseline")
         : eligibleEntries;
     for (const entry of toOmit) {
-      addReason({ action, code, entryId: entry.entry_id, subjectDigest: entry.asset.record_digest });
+      for (const failure of budgetFailures) {
+        addReason({ ...failure, entryId: entry.entry_id, subjectDigest: entry.asset.record_digest });
+      }
     }
     eligibleEntries = eligibleEntries.filter((entry) => !toOmit.includes(entry));
     budget = computeBudget(eligibleEntries, context, manifest);
     const remainingInvalid = Object.values(budget).some((entry) => entry.status !== "within");
     if (remainingInvalid && eligibleEntries.length > 0) {
-      addReason({ action: "stop", code, subjectDigest: manifest.selection_basis_digest });
+      for (const failure of budgetFailures) {
+        addReason({ action: "stop", code: failure.code, subjectDigest: manifest.selection_basis_digest });
+      }
       for (const entry of eligibleEntries) {
-        addReason({ action: "stop", code, entryId: entry.entry_id, subjectDigest: entry.asset.record_digest });
+        for (const failure of budgetFailures) {
+          addReason({ action: "stop", code: failure.code, entryId: entry.entry_id, subjectDigest: entry.asset.record_digest });
+        }
       }
       eligibleEntries = [];
     }
@@ -1555,6 +1680,7 @@ export function verifyPortfolioSelection({
   selectorContext = null,
   trustedPortfolioAuthorityContexts = [],
   trustedAssetAuthorityContexts = [],
+  trustedHighImpactApprovalGrants = [],
 }) {
   assertDigest(selectionObjectDigest, "Portfolio selection object digest");
   const stored = readContentAddressedJson({ storeRoot, digest: selectionObjectDigest }).value;
@@ -1577,6 +1703,7 @@ export function verifyPortfolioSelection({
     selectorContext: effectiveContext,
     trustedPortfolioAuthorityContexts,
     trustedAssetAuthorityContexts,
+    trustedHighImpactApprovalGrants,
   });
   if (!compareCanonical(stored, expected.selection)) throw new Error("Portfolio selection does not match deterministic reconstruction from exact inputs");
   return deepFreeze({
@@ -1591,26 +1718,44 @@ export function exportPortfolioReference({
   selectionObjectDigests = [],
   trustedPortfolioAuthorityContexts = [],
   trustedAssetAuthorityContexts = [],
+  trustedHighImpactApprovalGrants = [],
 }) {
   const verified = verifyPortfolioLockInternal({
     storeRoot,
     lockDigest,
     trustedPortfolioAuthorityContexts,
     trustedAssetAuthorityContexts,
+    trustedHighImpactApprovalGrants,
   });
   const current = verified.lock.entries.find((entry) => entry.state === "current") ?? null;
   const requiredAuthorityContextDigests = [];
+  const requiredHighImpactGrantDigests = [];
   let cursorDigest = lockDigest;
   while (cursorDigest !== null) {
     const cursor = readContentAddressedJson({ storeRoot, digest: cursorDigest }).value;
     validateLockShape(cursor);
-    if (cursor.authority_context_digest !== null) requiredAuthorityContextDigests.push(cursor.authority_context_digest);
+    if (cursor.authority_context_digest !== null) {
+      requiredAuthorityContextDigests.push(cursor.authority_context_digest);
+      const authorityContext = readContentAddressedJson({
+        storeRoot,
+        digest: cursor.authority_context_digest,
+      }).value;
+      validateAuthorityContext(authorityContext);
+      for (const grant of authorityContext.grants) requiredHighImpactGrantDigests.push(canonicalDigest(grant));
+    }
     cursorDigest = cursor.predecessor?.lock_digest ?? null;
   }
-  const selections = sortedText(selectionObjectDigests).map((selectionObjectDigest) => {
+  const sortedSelectionDigests = sortedText(selectionObjectDigests);
+  assertSortedUnique(sortedSelectionDigests, compareText, "Portfolio exported selection object digests");
+  const selections = sortedSelectionDigests.map((selectionObjectDigest) => {
     assertDigest(selectionObjectDigest, "Portfolio exported selection object digest");
-    const selection = readContentAddressedJson({ storeRoot, digest: selectionObjectDigest }).value;
-    validatePortfolioSelection(selection);
+    const selection = verifyPortfolioSelection({
+      storeRoot,
+      selectionObjectDigest,
+      trustedPortfolioAuthorityContexts,
+      trustedAssetAuthorityContexts,
+      trustedHighImpactApprovalGrants,
+    }).selection;
     if (selection.portfolio_lock.lock_digest !== lockDigest) throw new Error("exported Portfolio selection uses another lock");
     return {
       selection_object_digest: selectionObjectDigest,
@@ -1629,6 +1774,7 @@ export function exportPortfolioReference({
     lock_revision: verified.lock.lock_revision,
     lock_digest: lockDigest,
     required_portfolio_authority_context_digests: sortedText(requiredAuthorityContextDigests),
+    required_high_impact_approval_grant_digests: sortedText([...new Set(requiredHighImpactGrantDigests)]),
     current_manifest: current === null ? null : {
       revision: current.revision,
       manifest_digest: current.manifest_digest,

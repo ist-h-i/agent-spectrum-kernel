@@ -100,6 +100,9 @@ of the following as one immutable revision:
   `high_impact_active`);
 - closed positive and negative selectors for task class, project, model,
   adapter, stack, domain, required capabilities, and risk class;
+- a closed `selection_context_allowlist` for the task, project, model, adapter,
+  stack, domain, risk, capability, and operation-scope vocabulary that may
+  participate in this manifest's pre-result selection;
 - exposure mode (`active`, `shadow`, or a bounded `canary`), prohibited task
   classes, activation requirements, and an explicit failure action for every
   eligibility condition;
@@ -123,7 +126,10 @@ A manifest is invalid when it contains contradictory include/exclude values,
 ambiguous overlapping selectors without an explicit conflict rule,
 role/lane/exposure contradictions, an Asset outside the bound Registry scope or
 applicability, a rollback target with a different Portfolio identity or scope,
-or any reference whose exact identity cannot be reconstructed.
+or any reference whose exact identity cannot be reconstructed. It is also
+invalid when a manifest selector, entry selector, prohibited task class,
+conflict selector, or bound Asset applicability value falls outside the
+manifest's sealed selection-context allowlist.
 
 ### Registry state, role, and exposure
 
@@ -196,15 +202,26 @@ activation context may add an absent exact manifest as current, atomically move
 the former current to historical or superseded, or retire an eligible
 non-retired manifest. It cannot reactivate a historical or superseded manifest.
 Only an exact rollback context may perform that reverse transition. Retired is
-terminal.
+terminal. When the new current manifest binds the former current as its exact
+rollback target, that target must remain `historical` or `superseded` in the
+successor lock; an activation batch cannot retire it while relying on it for
+rollback.
 
 ### High-impact activation approval
 
 The `high_impact_active` lane requires an exact approval supplied through a
-separately trusted activation authority. That approval must bind the exact
-manifest revision and digest, exact Asset set, repository and lifecycle scope,
-risk/task applicability, authority identity and revision, and immutable approval
-evidence. It is additional to ordinary activation and must satisfy the
+separately trusted approval authority. Each grant carries a closed
+`approval_authority` with the dedicated high-impact authority kind, authority
+identity, authority revision, and immutable authority-evidence digest. Its
+authority identity must differ from the Portfolio lifecycle authority identity.
+The grant must bind the exact manifest digest, entry, and Asset reference.
+
+Embedding that grant in a Portfolio lifecycle authority context does not make
+it trusted. The caller must also supply the byte-identical grant through the
+separate trusted high-impact approval input when applying or verifying the
+transition, resolving or verifying a selection, or exporting a reference. The
+manager exact-compares that supplied trust-root object with the embedded grant.
+This approval is additional to ordinary activation and must satisfy the
 manifest's closed independent-review constraint. A related Asset, an older
 version, the same owner, an approval of the Registry lifecycle state, or a broad
 unbound approval cannot satisfy it.
@@ -230,8 +247,17 @@ exists. The closed selector context may contain only:
 - exact current-state or invalidation digests required by the manifest.
 
 The selection phase is explicitly pre-result. Timestamps are not part of its
-digest identity. The selector must recursively reject keys, labels, or nested
-payloads that encode or semantically substitute for:
+digest identity. Before selector matching, every task class, project, model,
+adapter, stack, domain, risk class, capability, and operation scope must be a
+member of the current manifest's sealed `selection_context_allowlist`. The same
+allowlist bounds manifest and entry selectors, prohibited task classes,
+conflict selectors, and referenced Asset applicability. An unlisted value is a
+contract error, even when its spelling is otherwise Schema-valid.
+
+The sealed allowlist is the primary semantic-vocabulary gate. In addition, as
+defense in depth, the manifest allowlist and selector input must recursively
+reject keys, labels, or nested payloads that encode or semantically substitute
+for:
 
 - `result`, `score`, `correctness`, `recommendation`, or `completion_claim`;
 - measured outcomes, post-execution telemetry, or observed quality;
@@ -248,6 +274,11 @@ selection boundary.
 
 The selection record itself may report the manager's typed pre-result decision.
 It must not contain an evaluation outcome or promotion recommendation.
+
+`current_state_refs` is a mapping by `state_id`, not only a JSON array. The
+selector context must contain at most one reference for each `state_id`;
+repeating an ID is rejected even when the repeated entries carry different
+digests. Array order or last-write precedence must not choose material state.
 
 ## Applicability and capability resolution
 
@@ -268,6 +299,11 @@ missing required capability produces the manifest's explicit typed failure
 action. Adapter differences remain visible in the selection record, including
 any allowed downgrade; they are never normalized away as a successful full
 selection.
+
+Asset `permissions_and_effects.status` equal to `declared_by_consumer` is a
+consumer declaration, not verified safety metadata. The manager treats it as
+safety unknown and combines the entry's `safety_unknown` action with the
+manifest's unknown-safety action using the normal severity precedence.
 
 Prohibited task classes override positive selectors, challenger/canary
 eligibility, and general approval. A canary must have exact deterministic bounds;
@@ -311,6 +347,11 @@ the explicit over-budget action. Those actions may be bypass or stop as allowed
 by the closed rule; they cannot silently select the Asset. A downgrade is valid
 only when the manifest defines a lower bounded mode whose own requirements and
 budget are satisfied.
+
+Unknown and exceeded conditions are evaluated independently across all budget
+metrics. When both occur, the selection retains both typed reason codes and
+combines their configured actions by `stop > downgrade > bypass`. The
+unknown-value action cannot mask or downgrade an exceeded-budget stop.
 
 ## Typed deterministic resolution
 
@@ -399,6 +440,12 @@ and authority-history object; it does not delete, overwrite, or rewrite prior
 history. The successor lock's current-manifest and Asset-set identities must
 equal the exact target identities.
 
+The same exact-target invariant applies before rollback occurs. Any valid lock
+whose current manifest names an exact rollback target must keep that target in
+`historical` or `superseded` state. It cannot be retired in the activation that
+makes the referring manifest current or by a later ordinary activation while it
+remains the current manifest's target.
+
 ## Samples and benchmark non-mutation
 
 Checked samples may bridge to existing benchmark condition IDs and frozen
@@ -426,12 +473,24 @@ A consumer of this contract must:
 
 - verify the complete lock, exact current manifest, Registry snapshot, Asset
   closure, authority contexts, and exact evidence before resolution;
+- supply high-impact approval grants as a separate exact trusted input when a
+  verified lock history requires them; lifecycle-context storage alone is not
+  approval trust;
 - provide the actual adapter capabilities and preserve unknown budget or
   applicability values;
 - act only on an explicit typed selection result;
 - preserve the exact selection digest if a later execution or evaluation needs
   to cite what was selected; and
 - keep execution and post-result data outside the pre-result selector boundary.
+
+Portable reference export is a verification boundary, not a projection of
+Schema-valid stored fields. For every requested selection object digest, the
+manager re-reads the stored selector context and deterministically reconstructs
+the selection from the exact lock, trusted lifecycle contexts, trusted Asset
+contexts, and any separately trusted high-impact grants. Export fails on a
+reconstruction mismatch, a duplicate requested selection digest, or a selection
+bound to another lock. Only then may it emit the exact selection/context fields
+and the required lifecycle-context and high-impact-grant digests.
 
 The exact selection identity and its evidence bindings are designed for reuse
 through the Issue #274 evidence boundary and for consumption by Issues #197 and

@@ -15,6 +15,7 @@
     "kernel_foundation",
     "registry",
     "selectors",
+    "selection_context_allowlist",
     "entries",
     "evidence_requirements",
     "selection_policy",
@@ -37,6 +38,7 @@
     "kernel_foundation": { "$ref": "#/$defs/kernelFoundation" },
     "registry": { "$ref": "#/$defs/registryRef" },
     "selectors": { "$ref": "#/$defs/selectors" },
+    "selection_context_allowlist": { "$ref": "#/$defs/selectionContextAllowlist" },
     "entries": {
       "type": "array",
       "maxItems": 256,
@@ -103,6 +105,13 @@
       "uniqueItems": true,
       "items": { "$ref": "#/$defs/token" }
     },
+    "nonEmptyStringSet": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/token" }
+    },
     "exactAssetRef": {
       "type": "object",
       "additionalProperties": false,
@@ -138,6 +147,32 @@
         "domains": { "$ref": "#/$defs/selectorDimension" },
         "capabilities": { "$ref": "#/$defs/selectorDimension" },
         "risk_classes": { "$ref": "#/$defs/selectorDimension" }
+      }
+    },
+    "selectionContextAllowlist": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_classes",
+        "projects",
+        "models",
+        "adapters",
+        "stacks",
+        "domains",
+        "risk_classes",
+        "capabilities",
+        "operation_scopes"
+      ],
+      "properties": {
+        "task_classes": { "$ref": "#/$defs/nonEmptyStringSet" },
+        "projects": { "$ref": "#/$defs/nonEmptyStringSet" },
+        "models": { "$ref": "#/$defs/nonEmptyStringSet" },
+        "adapters": { "$ref": "#/$defs/nonEmptyStringSet" },
+        "stacks": { "$ref": "#/$defs/nonEmptyStringSet" },
+        "domains": { "$ref": "#/$defs/nonEmptyStringSet" },
+        "risk_classes": { "$ref": "#/$defs/nonEmptyStringSet" },
+        "capabilities": { "$ref": "#/$defs/stringSet" },
+        "operation_scopes": { "$ref": "#/$defs/stringSet" }
       }
     },
     "quantity": {
