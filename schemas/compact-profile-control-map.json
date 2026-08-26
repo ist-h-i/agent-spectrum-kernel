@@ -40,8 +40,11 @@
       "stop_without_approval": true
     },
     "evidence": {
-      "source_refs": ["AGENTS.md", "skills/evidence-ledger/SKILL.md"],
-      "truth_statuses": ["Verified", "Supported", "Hypothesis", "Unknown", "Falsified"],
+      "source_refs": ["AGENTS.md", "docs/claim-evidence-status-contract.md", "schemas/claim-evidence-status.schema.json"],
+      "contract_ref": "ask.claim-evidence-status@1.0.0",
+      "schema_ref": "schemas/claim-evidence-status.schema.json",
+      "inline_default": true,
+      "formal_ledger_trigger_ids": ["explicit_claim_audit", "multiple_material_claims", "high_stakes_readiness", "cross_artifact_synthesis", "stable_claim_ids"],
       "claims_require_evidence": true,
       "unsupported_claim_behavior": "downgrade"
     },

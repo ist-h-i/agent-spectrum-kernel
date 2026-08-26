@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   copyFileSync,
@@ -29,6 +28,7 @@ import {
   readJsonFileStrict,
   stableCanonicalJson,
 } from "./content-addressed-store.mjs";
+import { materializeGitRevisionSources } from "./git-revision-source.mjs";
 
 const REPOSITORY_ID = "github.com/ist-h-i/agent-spectrum-kernel";
 const SOURCE_REVISION = "656edf1ac611890a3ae5a93a90e9076f50ee2488";
@@ -186,26 +186,16 @@ function descriptorFor(sample, dependencies = []) {
   };
 }
 
-function verifySourceRevision() {
-  for (const sample of samples) {
-    const workingBytes = readFileSync(resolve(repositoryRoot, sample.path));
-    assert.equal(rawDigest(workingBytes), sample.rawDigest, `${sample.path} working bytes drifted`);
-
-    const revision = spawnSync("git", ["show", `${SOURCE_REVISION}:${sample.path}`], {
-      cwd: repositoryRoot,
-      encoding: null,
-      maxBuffer: 2 * 1024 * 1024,
-    });
-    assert.equal(revision.status, 0, `cannot read ${sample.path} at ${SOURCE_REVISION}: ${revision.stderr.toString("utf8")}`);
-    assert.equal(rawDigest(revision.stdout), sample.rawDigest, `${sample.path} does not match its declared source revision`);
-    assert.deepEqual(workingBytes, revision.stdout, `${sample.path} working bytes differ from the declared source revision`);
-  }
-}
-
 function generateFixture() {
-  verifySourceRevision();
   const temporaryRoot = mkdtempSync(resolve(tmpdir(), "ask-asset-registry-samples-"));
+  const sourceRoot = resolve(temporaryRoot, "source");
   const storeRoot = resolve(temporaryRoot, "store");
+  materializeGitRevisionSources({
+    repositoryRoot,
+    targetRoot: sourceRoot,
+    revision: SOURCE_REVISION,
+    sources: samples.map((sample) => ({ path: sample.path, rawDigest: sample.rawDigest })),
+  });
   mkdirSync(storeRoot, { recursive: true });
 
   const empty = createEmptyAssetRegistry({
@@ -216,7 +206,7 @@ function generateFixture() {
   });
   const skillRegistration = registerAsset({
     storeRoot,
-    sourceRoot: repositoryRoot,
+    sourceRoot,
     predecessorSnapshotDigest: empty.snapshot_digest,
     descriptor: descriptorFor(samples[0]),
   });
@@ -229,13 +219,13 @@ function generateFixture() {
   });
   const promptRegistration = registerAsset({
     storeRoot,
-    sourceRoot: repositoryRoot,
+    sourceRoot,
     predecessorSnapshotDigest: skillRegistration.snapshot_digest,
     descriptor: descriptorFor(samples[1], [exactAssetRef(skill)]),
   });
   const evaluatorRegistration = registerAsset({
     storeRoot,
-    sourceRoot: repositoryRoot,
+    sourceRoot,
     predecessorSnapshotDigest: promptRegistration.snapshot_digest,
     descriptor: descriptorFor(samples[2]),
   });

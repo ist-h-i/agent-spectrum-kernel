@@ -32,6 +32,8 @@ Do not over-process trivial tasks. For non-trivial tasks, select the smallest re
 
 ## 1. Truth model
 
+The machine-readable source is `ask.claim-evidence-status@1.0.0` (`schemas/claim-evidence-status.schema.json`). Apply it inline by default.
+
 Separate every important statement by evidence status.
 
 - `Verified`: directly observed in code, docs, tests, logs, runtime output, command output, or user-provided input.
@@ -191,7 +193,7 @@ Every non-trivial change needs evidence proportional to risk.
 ## 10. Output contracts
 
 Evidence overlay:
-Use `evidence-ledger` whenever the response makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
+Apply the five claim statuses inline for ordinary work. Use `evidence-ledger` only when `ask.claim-evidence-status@1.0.0` selects `formal_ledger` for an explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs.
 
 For implementation tasks, end with:
 

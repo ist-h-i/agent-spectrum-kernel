@@ -93,7 +93,6 @@ Execution Envelope:
 - `spec-driven-development`
 - `test-first-verification`
 - `controlled-implementation`
-- `evidence-ledger`
 
 ### 期待する出力
 
@@ -106,6 +105,7 @@ Execution Envelope:
 
 - 仕様が曖昧なら実装前に止めます。
 - stack overlay は generic workflow 選択後、該当する場合だけ使います。
+- 通常の主張は `ask.claim-evidence-status@1.0.0` をインライン適用し、closed formal-audit trigger がある場合だけ `evidence-ledger` を使います。
 
 ## Operating mode routing
 
@@ -167,7 +167,7 @@ Execution Envelope:
 
 - 候補探索は実装承認ではありません。
 - `Hypothesis` domain rule は質問や警告にだけ使い、review blockの単独根拠にしません。
-- AI推測を `Human-confirmed` に昇格しません。
+- AI推測を人間確認だけで強いevidence statusへ昇格せず、human authorityを別metadataとして記録します。
 
 ## Project adoption pack
 
@@ -217,7 +217,7 @@ Hypothesisは質問にだけ使い、enforcementやblockerにしないでくだ�
 - `review-finding-compiler`
 - `documentation-knowledge-compiler`
 - `architecture-decision-memory`
-- `evidence-ledger`
+- `evidence-ledger` only when multiple material claims, cross-artifact synthesis, or another closed formal-audit trigger applies
 
 ### 期待する出力
 
@@ -248,7 +248,7 @@ operating-mode-router で observability_metrics に分類し、skill-effectivene
 
 - `operating-mode-router`
 - `skill-effectiveness-evaluation`
-- `evidence-ledger` when claims need evidence status
+- `evidence-ledger` only when a closed formal-audit trigger applies; otherwise apply claim status inline
 
 ### 期待する出力
 
@@ -432,7 +432,6 @@ doubt-driven-development を使って原因調査してください。
 ### 使われる主なSkill
 
 - `doubt-driven-development`
-- `evidence-ledger`
 
 ### 期待する出力
 
@@ -442,6 +441,7 @@ doubt-driven-development を使って原因調査してください。
 ### 注意
 
 - 調査だけなら実装しません。修正依頼が含まれる場合だけ実装へ進みます。
+- 観測事実・仮説・未確認は `ask.claim-evidence-status@1.0.0` でインライン分類します。
 
 ## Design grill
 
@@ -456,7 +456,6 @@ repoから確認できることは先に調べ、未確定の前提、失敗モ�
 ### 使われる主なSkill
 
 - `grill-design`
-- `evidence-ledger`
 
 ### 期待する出力
 
@@ -467,6 +466,7 @@ repoから確認できることは先に調べ、未確定の前提、失敗モ�
 ### 注意
 
 - deploy、migration、secret、authなどが出たら `risk-gate` が先です。
+- 通常の設計主張はインライン分類し、明示的なclaim auditやcross-artifact synthesisの場合だけformal `evidence-ledger`を追加します。
 
 ## Docs / ADR / terminology fit review
 
@@ -689,7 +689,7 @@ review-code-health が applicable な場合は、current PR blocker と non-bloc
 - `review-router`
 - required gates
 - `review-final-merge-gate`
-- `evidence-ledger`
+- `evidence-ledger` selected by the `high_stakes_readiness` trigger for the final merge/readiness claim
 
 ### 期待する出力
 
@@ -720,7 +720,7 @@ review-ai-quality、review-architecture-impact、review-adversarial-risk の責�
 - `review-code-health`
 - `review-ai-quality` when ordinary implementation quality review is also required
 - `review-architecture-impact` / `review-adversarial-risk` when specialized signals appear
-- `evidence-ledger` when claims need evidence status
+- `evidence-ledger` only when a closed formal-audit trigger applies; otherwise apply claim status inline
 
 ### 期待する出力
 
@@ -782,7 +782,7 @@ repeated finding や high-impact single case がある場合だけ、Repeat patt
 
 - `improvement-ledger`
 - `review-code-health` only if findings still need detection
-- `evidence-ledger` when resolution or readiness claims need evidence status
+- `evidence-ledger` only when resolution/readiness reaches a closed formal-audit trigger; otherwise apply claim status inline
 
 ### 期待する出力
 
@@ -811,7 +811,7 @@ improvement-ledger を使って、台帳内またはレビュー内の repeated 
 ### 使われる主なSkill
 
 - `improvement-ledger`
-- `evidence-ledger` when repeat pattern or readiness claims need evidence status
+- `evidence-ledger` only when repeat-pattern/readiness analysis reaches a closed formal-audit trigger; otherwise apply claim status inline
 
 ### 期待する出力
 
@@ -937,7 +937,6 @@ Task、Context、Allowed scope、Forbidden scope、Expected output、Verificatio
 ### 使われる主なSkill
 
 - `handoff-generation`
-- `evidence-ledger`
 
 ### 期待する出力
 
@@ -947,3 +946,4 @@ Task、Context、Allowed scope、Forbidden scope、Expected output、Verificatio
 ### 注意
 
 - 汎用的な助言ではなく、具体的な次タスクにします。
+- 事実・推論・未確認はhandoff内でインライン分類し、stable claim IDなどclosed triggerがある場合だけformal `evidence-ledger`を追加します。

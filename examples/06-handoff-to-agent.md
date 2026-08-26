@@ -11,7 +11,8 @@ Create the next Codex task from this partial implementation.
 Use:
 
 ```text
-handoff-generation → evidence-ledger
+handoff-generation → ask.claim-evidence-status@1.0.0 inline
+formal evidence-ledger only when a closed audit trigger applies
 ```
 
 ## Expected output

@@ -51,17 +51,17 @@ Treat missing, template, stale, or contradicted inputs as evidence limitations. 
 
 ```text
 1. Current explicit user requirement / issue / approved spec
-2. Human-confirmed domain rule
+2. Verified domain rule with explicit source/authority metadata
 3. Verified production/repo behavior
 4. Supported domain rule
 5. Hypothesis domain rule
 ```
 
 Rules:
-- `Human-confirmed` and `Verified` domain rules may be used as review constraints.
+- `Verified` domain rules may be used as review constraints when scope matches; human authority metadata identifies ownership but does not promote evidence.
 - `Supported` rules may support caution or insufficient-evidence findings.
 - `Hypothesis` rules may generate questions or warnings, but cannot be the sole basis for fail or block.
-- `Contradicted` rules must be reported as conflicts requiring human/domain-owner decision.
+- Rules with `Record state=contradicted` must be reported as conflicts requiring human/domain-owner decision.
 - Stale rules require explicit review before use as constraints.
 
 3. Identify the domain object.
@@ -111,7 +111,7 @@ Domain rule checks:
 - Applied confirmed/verified rules:
 - Supported rules considered:
 - Hypothesis rules used only for questions:
-- Contradicted/stale rules:
+- Contradicted record states / stale rules:
 ```
 
 8. Identify responsibility shift.

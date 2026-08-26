@@ -34,9 +34,20 @@ function resolveJsonPointer(root, pointer) {
 }
 
 function loadReferencedSchema(ref, baseDir, rootSchema) {
-  if (ref.startsWith("#")) return resolveJsonPointer(rootSchema, ref);
-  const path = resolve(baseDir, ref);
-  return existsSync(path) ? readJson(path) : null;
+  if (ref.startsWith("#")) {
+    return { schema: resolveJsonPointer(rootSchema, ref), baseDir, rootSchema };
+  }
+  const hashIndex = ref.indexOf("#");
+  const fileRef = hashIndex === -1 ? ref : ref.slice(0, hashIndex);
+  const fragment = hashIndex === -1 ? "" : ref.slice(hashIndex);
+  const path = resolve(baseDir, fileRef);
+  if (!existsSync(path)) return { schema: null, baseDir: dirname(path), rootSchema: null };
+  const referencedRoot = readJson(path);
+  return {
+    schema: fragment ? resolveJsonPointer(referencedRoot, fragment) : referencedRoot,
+    baseDir: dirname(path),
+    rootSchema: referencedRoot,
+  };
 }
 
 function validFormat(value, format) {
@@ -65,9 +76,9 @@ function validateSchemaValue(value, schema, context, path = "$") {
 
   if (schema.$ref) {
     const referenced = loadReferencedSchema(schema.$ref, context.baseDir, context.rootSchema);
-    return validateSchemaValue(value, referenced, {
-      baseDir: schema.$ref.startsWith("#") ? context.baseDir : dirname(resolve(context.baseDir, schema.$ref)),
-      rootSchema: schema.$ref.startsWith("#") ? context.rootSchema : referenced,
+    return validateSchemaValue(value, referenced.schema, {
+      baseDir: referenced.baseDir,
+      rootSchema: referenced.rootSchema,
     }, path);
   }
   for (const subschema of schema.allOf ?? []) {

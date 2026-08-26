@@ -11,7 +11,8 @@ Several review findings repeat across PRs. Decide which ones should become rules
 Use:
 
 ```text
-improvement-ledger prevention-rule feedback -> evidence-ledger if the conversion claim needs evidence classification
+improvement-ledger prevention-rule feedback -> ask.claim-evidence-status@1.0.0 inline
+formal evidence-ledger only when a closed audit trigger applies
 ```
 
 ## Input

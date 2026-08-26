@@ -353,7 +353,7 @@ review-adversarial-risk if needed
 review-domain-impact if needed
 adr-review if needed
 risk-gate if needed
-evidence-ledger if needed
+evidence-ledger only for a closed formal-audit trigger
 review-final-merge-gate
 ```
 

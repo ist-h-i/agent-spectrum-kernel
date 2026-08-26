@@ -61,7 +61,7 @@ Use ASK-native terms and truth-model labels.
 ## Evidence Rules
 
 - `execution_envelope` is the sole source of truth for route, evidence presence (`checked` / `missing`), stop reason, human approval requirement, and next action. Its shape must conform to `schemas/execution-envelope.schema.json`.
-- `evidence_details` must use `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified` and holds detailed proof or uncertainty that does not fit the bounded Envelope lists.
+- `evidence_details` must use `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`. It holds detailed proof or uncertainty that does not fit the bounded Envelope lists.
 - A session-state record does not prove readiness, safety, correctness, no regression, or production suitability.
 - Missing verification remains in `execution_envelope.evidence_status.missing` and/or `evidence_details`; do not convert it into an assumption.
 - `stop_reason.stop_if` is the sole stop-condition field. Do not add parallel `blocked_reason`, `required_human_approval`, `resume_instruction`, or `stop_conditions` fields.

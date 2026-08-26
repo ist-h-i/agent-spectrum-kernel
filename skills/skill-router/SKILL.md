@@ -111,13 +111,13 @@ The user-facing route should describe work steps and stop points without requiri
 | Repeated or high-impact review findings should become prevention knowledge | `review-finding-compiler` | Route domain/business rules to `review-to-rule-compiler`; route non-blocking work to `improvement-ledger`; route implementation and verification lessons to their ledgers |
 | Release candidate or bundled change-set readiness | `release-readiness-gate` | `risk-gate` before deploy, publish, migration, external notification, or release execution; `review-final-merge-gate` remains the PR-level decision gate |
 | Technical debt, code smell, or refactor candidate review | `review-router` | `review-code-health`; specialized gates only when findings cross into architecture, adversarial, risk, or evidence concerns |
-| Persisting non-blocking review findings, debt, rule feedback, validation check candidates, accepted risks, or stale improvement items | `improvement-ledger` | `review-code-health` only if findings still need detection; `evidence-ledger` if readiness or resolution claims need evidence classification |
+| Persisting non-blocking review findings, debt, rule feedback, validation check candidates, accepted risks, or stale improvement items | `improvement-ledger` | `review-code-health` only if findings still need detection; apply claim status inline, and select `evidence-ledger` only for a closed formal-audit trigger |
 | Durable domain rule creation, update, stale review, contradiction handling, or promotion gates | `domain-rule-ledger` | `review-to-rule-compiler` first when extracting candidates from review or correction evidence |
 | Extract domain rule candidates from review findings, human corrections, incidents, or rejected AI outputs | `review-to-rule-compiler` | `domain-rule-ledger` only when explicitly updating durable rules |
 | MR/PR README, PR explanation, or durable change-context documentation | `mr-readme-generation` | `adr-review` |
 | Repeated review context setup | `review-context-generation` | `repository-orientation` for repo facts before drafting context |
 | Durable documentation knowledge extraction, freshness review, conflict routing, or target selection | `documentation-knowledge-compiler` | Route reusable review or implementation knowledge to context generation, domain rules to `domain-rule-ledger`, architecture decisions to `architecture-decision-memory` or `adr-review`, and task progress to handoff/planning |
-| Claim validation | `evidence-ledger` | `doubt-driven-development` |
+| Explicit or high-value multi-claim audit | `evidence-ledger` | `doubt-driven-development` when the claim itself needs falsification |
 | End of work | `handoff-generation` | — |
 
 7. Apply project overlay skill selection.
@@ -130,7 +130,7 @@ The user-facing route should describe work steps and stop points without requiri
 
 9. Apply overlays before action.
    - Risk overlay: if any task involves destructive, external, production, auth, secret, dependency, migration, billing, email, or infra impact, run `risk-gate` before the selected workflow proceeds to action.
-   - Evidence overlay: use `evidence-ledger` whenever the response makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
+   - Evidence overlay: apply `ask.claim-evidence-status@1.0.0` inline for ordinary work. Select `evidence-ledger` only for `explicit_claim_audit`, `multiple_material_claims`, `high_stakes_readiness`, `cross_artifact_synthesis`, or `stable_claim_ids`.
 
 10. Preserve review gate minimality.
    - When routing to `review-router`, require observed change signals and trace each required gate to a signal and evidence.

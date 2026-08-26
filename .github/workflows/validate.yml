@@ -21,6 +21,12 @@ jobs:
       - name: Run repository validation tests
         run: node scripts/test-validate-repo.mjs
 
+      - name: Run claim evidence status contract tests
+        run: node scripts/test-claim-evidence-status.mjs
+
+      - name: Run claim evidence status contract tests
+        run: node scripts/test-claim-evidence-status.mjs
+
       - name: Run autonomous development control tests
         run: node scripts/test-ask-autonomous-development.mjs
 

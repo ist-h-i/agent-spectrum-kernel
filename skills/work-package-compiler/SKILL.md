@@ -46,10 +46,10 @@ This is a transformation skill. It does not make business decisions and must rou
 3. Keep evidence status visible.
    - Mark target files/modules as `Verified`, `Supported`, `Hypothesis`, or `Unknown`.
    - Do not invent target files when repo evidence is missing.
-   - Use `Human-confirmed` and `Verified` domain rules as constraints.
+   - Use scoped `Verified` domain rules as constraints; keep human authority metadata separate from truth strength.
    - Use `Supported` domain rules as cautions.
    - Use `Hypothesis` domain rules only as questions or warnings.
-   - Use `Verified` and `Human-confirmed` engineering, verification, and architecture memory entries only when their scope matches the Work Package.
+   - Use `Verified` engineering, verification, and architecture memory entries only when their scope matches the Work Package; human authority metadata alone is not implementation proof.
    - Treat `template`, stale, archived, missing, or hypothesis ledger entries as insufficient evidence for constraints.
 
 4. Produce a Work Package that owns only the executable change boundary.

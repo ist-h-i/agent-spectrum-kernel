@@ -21,7 +21,7 @@ An adapter may produce a different internal trace, use different orchestration, 
 |---|---|---|
 | Workflow meaning | Applicability signals, contracts, gates, lifecycle semantics, normalized output meaning | Discovery surfaces, invocation entry points, orchestration mechanism |
 | Risk and approval | Risk classes, approval-required actions, stop semantics | Sandbox, permission, hook, and manual enforcement surfaces |
-| Evidence | Evidence states, claim sufficiency, downgrade requirement | Detection probes, runtime observations, evidence locators |
+| Evidence | `ask.claim-evidence-status@1.0.0`, claim sufficiency, formal-audit triggers, downgrade requirement | Detection probes, runtime observations, evidence locators, deterministic projection of the selected inline/formal mode |
 | Rendering | Required semantics and canonical revision | Renderer identity, deterministic inputs, output roots, asset kinds |
 | Generated assets | Provenance and drift requirements | Managed paths, ownership, install/update/rollback/detach implementation |
 | Events and privacy | Normalized event meaning and prohibited claim upgrades | Collector path, local storage mode, unavailable events, adapter-specific health reporting |
@@ -111,6 +111,12 @@ The profile must preserve the strongest claim allowed by both axes:
 
 Missing repository, diff, skill-load, runtime, or verification evidence remains unavailable or insufficient. Hook or collector failure may lower observability confidence; it must not silently change the engineering decision unless the missing evidence is required for that decision.
 
+### Claim evidence mode
+
+Ordinary implementation, investigation, verification, review, and handoff apply the canonical five claim statuses inline. Installing `evidence-ledger` only makes the capability available. A generated direct trigger selects `formal_ledger` only when `ask.claim-evidence-status@1.0.0` identifies explicit claim audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs. Adapters must reject copied status enums, unknown trigger IDs, missing conditional-route bytes, and unconditional ordinary activation.
+
+The derived `claim_evidence_mode` in cross-adapter conformance is a projection oracle, not a new runtime event or lifecycle state. Runtime application remains unavailable until an external adapter run observes it.
+
 ## Deterministic rendering contract
 
 A renderer consumes only:
@@ -170,7 +176,7 @@ Profiles declare whether event collection is disabled, local opt-in, or locally 
 
 `docs/fixtures/adapter-runtime-profiles.json` contains representative Claude and Codex profiles, `docs/fixtures/adapter-runtime-evidence.json` contains their typed repository evidence records, and `docs/fixtures/adapter-runtime-bundle.json` binds all common profile projections to one canonical union digest. `node scripts/validate-repo.mjs` checks profile structure, required capability coverage, support/evidence downgrade consistency, provenance, lifecycle ownership, privacy boundaries, and the absence of model-dependent fields.
 
-`docs/fixtures/adapter-cross-conformance.json` applies the same nine representative scenarios to both projection plans. `scripts/adapter-cross-conformance.mjs` reads each Claude command or generated Codex prompt independently, derives and schema-validates an adapter event, then compares normalized contract meaning. It fails on missing required projected contracts, entry assets, risk/approval/stop controls, missing-evidence controls, or agent-activity controls. Mutation fixtures remove approval/stop, verification, final-review, executable-handoff, and knowledge-promotion bytes and must fail. It reports `pass_projected`, not behavioral conformance. `scripts/test-adapter-runtime-migration.mjs` verifies current installer coexistence, idempotence, profile migration, rollback, pruned shrink, detach isolation, and preservation of non-managed project files inside `.claude/` and `.agents/`.
+`docs/fixtures/adapter-cross-conformance.json` applies the same nine representative scenarios to both projection plans. `scripts/adapter-cross-conformance.mjs` reads each Claude command or generated Codex prompt independently, derives and schema-validates an adapter event, then compares normalized contract meaning, including derived `inline` versus `formal_ledger` selection. It fails on missing required projected contracts, entry assets, risk/approval/stop controls, claim-contract revision or conditional-route bytes, missing-evidence controls, or agent-activity controls. Mutation fixtures remove approval/stop, verification, final-review, executable-handoff, knowledge-promotion, and formal-claim-routing bytes and must fail. It reports `pass_projected`, not behavioral conformance. `scripts/test-adapter-runtime-migration.mjs` verifies current installer coexistence, idempotence, profile migration, rollback, pruned shrink, detach isolation, and preservation of non-managed project files inside `.claude/` and `.agents/`.
 
 Projection evidence is profile-scoped. It records `profile_id`, `renderer_profile`, and a profile fingerprint derived from canonical digest, renderer ID/version/profile, plan-shaping options, renderer input digest, and static projected inventory digest. The repository fixtures provide evidence only for their declared default options; a non-default plan must use its own projection fingerprint and cannot reuse that static Profile evidence. Adapter-global evidence must declare a different scope and cannot satisfy a profile projection claim. Registered verifier fixtures bind both their declared verifier path and executable check callback.
 

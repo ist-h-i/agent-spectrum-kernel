@@ -266,7 +266,8 @@ repository-orientation
 -> test-first-verification for Verification Contract
 -> controlled-implementation using Implementation Contract
 -> test-first-verification for evidence
--> evidence-ledger when completion claims need evidence
+-> ask.claim-evidence-status@1.0.0 inline for ordinary completion claims
+-> evidence-ledger only when a closed formal-audit trigger applies
 ```
 
 ### Bug fix

@@ -40,7 +40,7 @@ This skill evaluates the release package. It does not deploy, publish, notify cu
 
 ## Process
 
-1. Confirm scope. Read `docs/lifecycle-traceability-contract.md` when the readiness decision depends on lifecycle evidence, and use current refs to the reviewed change set instead of recreating acceptance, verification, or review content.
+1. Confirm scope. Release readiness activates the `high_stakes_readiness` formal-audit trigger in `ask.claim-evidence-status@1.0.0`; use `evidence-ledger` for the material readiness claims. Read `docs/lifecycle-traceability-contract.md` when the readiness decision depends on lifecycle evidence, and use current refs to the reviewed change set instead of recreating acceptance, verification, or review content.
    - Confirm that claim evidence reaches every applicable acceptance and verification item through current upstream refs.
    - Preserve evidence-item identity during traversal; multi-item Evidence artifacts require item-level support edges.
    - Confirm that the release subject is a Release Readiness check connected to the claim's required refs.

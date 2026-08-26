@@ -68,6 +68,8 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/adapter-runtime-profile.schema.json",
   "schemas/adapter-runtime-evidence.schema.json",
   "schemas/adapter-runtime-event.schema.json",
+  "schemas/claim-evidence-status.schema.json",
+  "schemas/claim-evidence-status.schema.json",
   "schemas/review-signal-gate-map.json",
   "schemas/adoption-report.schema.json",
   "schemas/improvement-ledger-entry.schema.json",
@@ -107,6 +109,7 @@ const REQUIRED_ASSET_REGISTRY_PATHS = [
   "docs/fixtures/asset-registry/reference.json",
   "docs/fixtures/asset-registry/store",
   "scripts/content-addressed-store.mjs",
+  "scripts/git-revision-source.mjs",
   "scripts/asset-registry.mjs",
   "scripts/asset-registry-samples.mjs",
   "scripts/test-content-addressed-store.mjs",
@@ -390,9 +393,13 @@ const REQUIRED_CLAUDE_ADAPTER_PATHS = [
   "adapters/claude-code/github-actions/README.md",
   "adapters/claude-code/plugin/.claude-plugin/plugin.json",
   "adapters/claude-code/plugin/README.md",
+  "adapters/claude-code/plugin/contracts/claim-evidence-status-contract.md",
   "adapters/claude-code/plugin/contracts/execution-envelope-contract.md",
+  "adapters/claude-code/plugin/schemas/claim-evidence-status.schema.json",
   "adapters/claude-code/plugin/schemas/execution-envelope.schema.json",
   "adapters/claude-code/plugin/schemas/metrics-event.schema.json",
+  "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs",
+  "adapters/claude-code/plugin/skills/evidence-ledger/SKILL.md",
   "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
   "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
   "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
@@ -576,6 +583,8 @@ const REQUIRED_DOMAIN_RULE_FIELDS = [
   "State / condition",
   "Source",
   "Evidence status",
+  "Authority status",
+  "Record state",
   "Applies to",
   "Used by",
   "Last checked",
@@ -584,12 +593,48 @@ const REQUIRED_DOMAIN_RULE_FIELDS = [
 ];
 const ALLOWED_DOMAIN_RULE_EVIDENCE_STATUSES = new Set([
   "Verified",
-  "Human-confirmed",
   "Supported",
   "Hypothesis",
-  "Deprecated",
-  "Contradicted",
+  "Unknown",
+  "Falsified",
 ]);
+const ALLOWED_DOMAIN_RULE_AUTHORITY_STATUSES = new Set(["not_asserted", "human_confirmed"]);
+const ALLOWED_DOMAIN_RULE_RECORD_STATES = new Set(["active", "deprecated", "contradicted"]);
+const CLAIM_EVIDENCE_SCHEMA_PATH = "schemas/claim-evidence-status.schema.json";
+const CLAIM_EVIDENCE_CONTRACT_DOC_PATH = "docs/claim-evidence-status-contract.md";
+const CLAIM_EVIDENCE_ADR_PATH = "docs/adr/0006-claim-evidence-status-boundary.md";
+const CLAIM_EVIDENCE_PLUGIN_PROJECTION = Object.freeze([
+  { canonical: CLAIM_EVIDENCE_CONTRACT_DOC_PATH, packaged: "adapters/claude-code/plugin/contracts/claim-evidence-status-contract.md" },
+  { canonical: CLAIM_EVIDENCE_SCHEMA_PATH, packaged: "adapters/claude-code/plugin/schemas/claim-evidence-status.schema.json" },
+  { canonical: "skills/evidence-ledger/SKILL.md", packaged: "adapters/claude-code/plugin/skills/evidence-ledger/SKILL.md" },
+  { canonical: "scripts/claim-evidence-status.mjs", packaged: "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs" },
+]);
+const CANONICAL_CLAIM_EVIDENCE_STATUSES = Object.freeze(["Verified", "Supported", "Hypothesis", "Unknown", "Falsified"]);
+const FORMAL_CLAIM_EVIDENCE_TRIGGER_IDS = Object.freeze([
+  "explicit_claim_audit",
+  "multiple_material_claims",
+  "high_stakes_readiness",
+  "cross_artifact_synthesis",
+  "stable_claim_ids",
+]);
+const DIRECT_CLAIM_EVIDENCE_SCHEMA_CONSUMERS = Object.freeze([
+  "schemas/domain-rule-ledger-entry.schema.json",
+  "schemas/review-rule-ledger-entry.schema.json",
+  "schemas/engineering-pattern-ledger-entry.schema.json",
+  "schemas/verification-pattern-ledger-entry.schema.json",
+  "schemas/architecture-decision-memory-entry.schema.json",
+  "schemas/documentation-knowledge-ledger-entry.schema.json",
+  "schemas/engineering-capability-ledger-entry.schema.json",
+]);
+const CLAIM_EVIDENCE_SEPARATION_REQUIREMENTS = Object.freeze({
+  "schemas/domain-rule-ledger-entry.schema.json": ["authority_status", "record_state"],
+  "schemas/review-rule-ledger-entry.schema.json": ["authority_status", "record_state"],
+  "schemas/engineering-pattern-ledger-entry.schema.json": ["authority_status", "record_state"],
+  "schemas/verification-pattern-ledger-entry.schema.json": ["authority_status", "record_state"],
+  "schemas/architecture-decision-memory-entry.schema.json": ["authority_status", "record_state"],
+  "schemas/documentation-knowledge-ledger-entry.schema.json": ["authority_status", "freshness_status"],
+  "schemas/engineering-capability-ledger-entry.schema.json": ["authority_status", "assessment_state"],
+});
 
 function parseArgs(argv) {
   const args = {
@@ -1333,6 +1378,130 @@ function validateManifestPaths(root, manifest, errors) {
     for (const path of manifest[key]) {
       if (!existsSync(resolve(root, path))) {
         fail(errors, "paths", `manifest.json.${key} path does not exist: ${path}`);
+      }
+    }
+  }
+}
+
+function readClaimEvidenceSchema(root, path, errors) {
+  const absolutePath = resolve(root, path);
+  if (!existsSync(absolutePath)) {
+    fail(errors, "claim evidence status", `required claim evidence schema is missing: ${path}`);
+    return null;
+  }
+  try {
+    return JSON.parse(readFileSync(absolutePath, "utf8"));
+  } catch (error) {
+    fail(errors, "claim evidence status", `${path} is not valid JSON: ${error.message}`);
+    return null;
+  }
+}
+
+export function inspectClaimEvidencePluginProjection(root) {
+  const issues = [];
+  const projection = CLAIM_EVIDENCE_PLUGIN_PROJECTION.map(({ canonical, packaged }) => {
+    const canonicalPath = resolve(root, canonical);
+    const packagedPath = resolve(root, packaged);
+    const ok = existsSync(canonicalPath) && existsSync(packagedPath) && readFileSync(canonicalPath).equals(readFileSync(packagedPath));
+    if (!ok) issues.push(`Claude plugin projection must be byte-identical to ${canonical}: ${packaged}`);
+    return { canonical, packaged, ok };
+  });
+  const readPluginSkill = (name) => {
+    const path = `adapters/claude-code/plugin/skills/${name}/SKILL.md`;
+    if (!existsSync(resolve(root, path))) {
+      issues.push(`Claude plugin claim entry point is missing: ${path}`);
+      return "";
+    }
+    return readFileSync(resolve(root, path), "utf8");
+  };
+  const requiredTokens = [
+    ["review-pr", ["${CLAUDE_PLUGIN_ROOT}/contracts/claim-evidence-status-contract.md", "${CLAUDE_PLUGIN_ROOT}/schemas/claim-evidence-status.schema.json", "high_stakes_readiness", "formal_ledger", "/ai-skills:evidence-ledger"]],
+    ["adoption-report", ["multiple_material_claims", "formal_ledger", "/ai-skills:evidence-ledger"]],
+    ["ledger-refresh", ["inline by default", "stable_claim_ids", "only when an observed closed trigger", "installation alone is not activation"]],
+    ["implementation-context-check", ["ask.claim-evidence-status@1.0.0", "inline", "Do not activate", "only a closed formal-audit trigger"]],
+  ];
+  for (const [name, tokens] of requiredTokens) {
+    const content = readPluginSkill(name);
+    for (const token of tokens) if (!content.includes(token)) issues.push(`Claude plugin ${name} must preserve claim routing token: ${token}`);
+  }
+  const evidencePlugin = readPluginSkill("evidence-ledger");
+  if (!evidencePlugin.includes("${CLAUDE_PLUGIN_ROOT}/scripts/claim-evidence-status.mjs")) {
+    issues.push("Claude plugin evidence-ledger must resolve the bundled legacy normalizer through CLAUDE_PLUGIN_ROOT");
+  }
+  return { issues, projection };
+}
+
+function validateClaimEvidenceStatusContract(root, manifest, errors) {
+  const schema = readClaimEvidenceSchema(root, CLAIM_EVIDENCE_SCHEMA_PATH, errors);
+  if (!schema) return;
+
+  const metadata = schema["x-ask-contract"];
+  if (JSON.stringify(schema.enum) !== JSON.stringify(CANONICAL_CLAIM_EVIDENCE_STATUSES)) {
+    fail(errors, "claim evidence status", "canonical schema enum must be exactly Verified, Supported, Hypothesis, Unknown, Falsified");
+  }
+  if (
+    metadata?.id !== "ask.claim-evidence-status" ||
+    metadata?.revision !== "1.0.0" ||
+    metadata?.ref !== "ask.claim-evidence-status@1.0.0" ||
+    metadata?.inline_default !== true
+  ) {
+    fail(errors, "claim evidence status", "contract identity, revision, ref, and inline_default must remain ask.claim-evidence-status@1.0.0 with inline_default=true");
+  }
+  if (
+    metadata?.formal_ledger?.contract !== "evidence-ledger" ||
+    metadata?.formal_ledger?.direct_trigger_id !== "formal_claim_audit_required" ||
+    JSON.stringify(metadata?.formal_ledger?.trigger_ids) !== JSON.stringify(FORMAL_CLAIM_EVIDENCE_TRIGGER_IDS)
+  ) {
+    fail(errors, "claim evidence status", "formal Evidence Ledger routing must use the closed five-trigger contract");
+  }
+  if (JSON.stringify(schema.$defs?.lowercase_status?.enum) !== JSON.stringify(CANONICAL_CLAIM_EVIDENCE_STATUSES.map((status) => status.toLowerCase()))) {
+    fail(errors, "claim evidence status", "lowercase compatibility statuses must mirror the canonical five-status order");
+  }
+  if (JSON.stringify(schema.$defs?.lowercase_observation_status?.enum) !== JSON.stringify(["verified", "supported", "unknown"])) {
+    fail(errors, "claim evidence status", "Asset observation compatibility must preserve the existing verified, supported, unknown subset");
+  }
+
+  if (manifest?.name === "agent-spectrum-kernel") {
+    if (!Array.isArray(manifest.schemas) || !manifest.schemas.includes(CLAIM_EVIDENCE_SCHEMA_PATH)) {
+      fail(errors, "claim evidence status", `manifest.json.schemas must include ${CLAIM_EVIDENCE_SCHEMA_PATH}`);
+    }
+    for (const path of [CLAIM_EVIDENCE_CONTRACT_DOC_PATH, CLAIM_EVIDENCE_ADR_PATH]) {
+      if (!Array.isArray(manifest.docs) || !manifest.docs.includes(path)) {
+        fail(errors, "claim evidence status", `manifest.json.docs must include ${path}`);
+      }
+    }
+  }
+
+  const validateRef = (path, value, expectedRef, label) => {
+    if (value?.$ref !== expectedRef || Object.hasOwn(value ?? {}, "enum")) {
+      fail(errors, "claim evidence status", `${path} ${label} must reference ${expectedRef} without copying an enum`);
+    }
+  };
+
+  for (const path of DIRECT_CLAIM_EVIDENCE_SCHEMA_CONSUMERS) {
+    const consumer = readClaimEvidenceSchema(root, path, errors);
+    if (consumer) {
+      validateRef(path, consumer.properties?.evidence_status, "claim-evidence-status.schema.json", "evidence_status");
+      for (const field of CLAIM_EVIDENCE_SEPARATION_REQUIREMENTS[path]) {
+        if (!consumer.properties?.[field] || !consumer.required?.includes(field)) {
+          fail(errors, "claim evidence status", `${path} must define and require separated field ${field}`);
+        }
+      }
+    }
+  }
+  const improvement = readClaimEvidenceSchema(root, "schemas/improvement-ledger-entry.schema.json", errors);
+  if (improvement) validateRef("schemas/improvement-ledger-entry.schema.json", improvement.properties?.evidence?.properties?.status, "claim-evidence-status.schema.json", "evidence.status");
+  const epicAdmission = readClaimEvidenceSchema(root, "schemas/epic-admission-decision.schema.json", errors);
+  if (epicAdmission) validateRef("schemas/epic-admission-decision.schema.json", epicAdmission.$defs?.evidenceStatus, "claim-evidence-status.schema.json#/$defs/lowercase_status", "$defs.evidenceStatus");
+  const assetRecord = readClaimEvidenceSchema(root, "schemas/asset-record.schema.json", errors);
+  if (assetRecord) validateRef("schemas/asset-record.schema.json", assetRecord.$defs?.evidenceStatus, "claim-evidence-status.schema.json#/$defs/lowercase_observation_status", "$defs.evidenceStatus");
+
+  if (manifest?.name === "agent-spectrum-kernel") {
+    const plugin = inspectClaimEvidencePluginProjection(root);
+    for (const issue of plugin.issues) fail(errors, "claim evidence status", issue);
+    for (const { packaged } of CLAIM_EVIDENCE_PLUGIN_PROJECTION) {
+      if (!Array.isArray(manifest.adapters) || !manifest.adapters.includes(packaged)) {
+        fail(errors, "claim evidence status", `manifest.json.adapters must include Claude plugin claim projection ${packaged}`);
       }
     }
   }
@@ -3039,6 +3208,16 @@ function validateDomainRuleLedgerRows(rows, ledgerStatus, errors) {
     const evidenceStatus = domainRuleValue(row, "Evidence status");
     if (evidenceStatus && !ALLOWED_DOMAIN_RULE_EVIDENCE_STATUSES.has(evidenceStatus)) {
       fail(errors, "domain rule ledger", `${rowLabel} has invalid Evidence status '${evidenceStatus}'`);
+    }
+
+    const authorityStatus = domainRuleValue(row, "Authority status");
+    if (authorityStatus && !ALLOWED_DOMAIN_RULE_AUTHORITY_STATUSES.has(authorityStatus)) {
+      fail(errors, "domain rule ledger", `${rowLabel} has invalid Authority status '${authorityStatus}'`);
+    }
+
+    const recordState = domainRuleValue(row, "Record state");
+    if (recordState && !ALLOWED_DOMAIN_RULE_RECORD_STATES.has(recordState)) {
+      fail(errors, "domain rule ledger", `${rowLabel} has invalid Record state '${recordState}'`);
     }
 
     const lastChecked = domainRuleValue(row, "Last checked");
@@ -5260,6 +5439,7 @@ export function validateRepository(options) {
   const planeChecks = validatePlaneModel(root, manifest, errors);
   const routingChecks = validateRoutingManifest(root, manifest, errors);
   validateManifestPaths(root, manifest, errors);
+  validateClaimEvidenceStatusContract(root, manifest, errors);
   const skillChecks = validateSkills(root, skillDirectories, errors);
   const contextMetadataChecks = validateContextMetadata(root, errors);
   const improvementLedgerChecks = validateImprovementLedger(root, errors);

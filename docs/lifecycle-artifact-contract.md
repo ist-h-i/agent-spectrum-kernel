@@ -83,6 +83,8 @@ Conditional fields, included only when present:
 
 An unresolved human decision remains unresolved. Its absence from a later artifact is not approval.
 
+When a lifecycle artifact records the truth strength of a claim, it uses `ask.claim-evidence-status@1.0.0`. Artifact type, delta precedence, ownership, completion, and superseding state remain lifecycle semantics and are not claim statuses.
+
 ## Spec
 
 Required fields:

@@ -126,6 +126,8 @@ Claude Code project skills load from `.claude/skills/<skill-name>/SKILL.md` and 
 
 The Requirement-to-Rule Loop and full-layer intelligence skills are projected by default so teams can move from candidate discovery to Requirement Contract, Work Package, domain review, reusable implementation/verification/review/documentation/architecture memory, and capability evaluation without copying extra skill files manually. Projection only makes skills available; routing still loads them only when relevant.
 
+`evidence-ledger` follows the same availability/activation boundary. Ordinary commands apply `ask.claim-evidence-status@1.0.0` inline. A separate formal ledger is selected only when an explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs triggers it.
+
 ## Project Commands
 
 The project adapter installs local command templates for common daily workflows:
@@ -170,6 +172,7 @@ Operational boundary:
 
 - Project adapter: owns `.claude/skills/`, `.claude/commands/`, `.claude/settings.json` managed hooks, local runtime scripts, and project-local metrics files.
 - Plugin: owns plugin-packaged commands/hooks and resolves its metrics wrapper through `CLAUDE_PLUGIN_ROOT`.
+- The plugin bundles byte-exact claim-evidence contract/schema, formal-ledger Skill, and normalizer projections. Ordinary entry points use inline claim discipline; only a closed trigger activates the bundled formal ledger (`review-pr` uses `high_stakes_readiness`).
 - Local metrics recording requires the project runtime. Plugin hooks no-op when the project runtime is not present.
 - Project and plugin Stop hooks may coexist: the runtime-owned collector uses deterministic event IDs and idempotent upsert to prevent duplicate local rows.
 

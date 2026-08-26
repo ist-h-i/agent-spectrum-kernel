@@ -77,7 +77,7 @@ Review architecture impact from repository evidence, not preference. A finding n
    - Domain meaning change -> `review-domain-impact`.
    - Durable architecture record needed -> `adr-review`.
    - Risky action such as dependency, infra, auth, secret, production, migration, or external effect -> `risk-gate`.
-   - Unsupported correctness, readiness, reliability, security, performance, cost, or maintainability claim -> `evidence-ledger`.
+   - Unsupported correctness, readiness, reliability, security, performance, cost, or maintainability claim -> inline claim status; select `evidence-ledger` only for a closed formal-audit trigger.
    - Local implementation quality -> `review-ai-quality`.
 
 5. Decide required action.

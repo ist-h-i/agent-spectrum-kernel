@@ -19,7 +19,7 @@ The policy and decision Schemas are:
 
 ### Evidence-backed signals
 
-The decision consumes closed signals for configured-epic membership, acceptance-condition count and registry identity, scope-boundary count, ordered dependencies, independent publication units, and scope resolution. Every signal carries an evidence status and a non-whitespace source reference. The current policy accepts only `verified` or `supported` authority signals.
+The decision consumes closed signals for configured-epic membership, acceptance-condition count and registry identity, scope-boundary count, ordered dependencies, independent publication units, and scope resolution. Every signal carries an evidence status and a non-whitespace source reference. The stored lowercase field references the compatibility definition in `ask.claim-evidence-status@1.0.0`; the current policy still accepts only `verified` or `supported` authority signals, and existing fixture bytes are not migrated in place.
 
 `acceptance_registry_digest` is derived by `deriveAcceptanceRegistryDigest`. The input is the complete array of exact `{ artifact_id, item_id, observed_revision }` records, ASCII-sorted by the tuple `artifact_id`, `observed_revision`, then `item_id`. SHA-256 covers sorted-key canonical JSON of `{ "digest_domain": "ask_epic_admission_acceptance_registry_v1", "acceptance_refs": [...] }`. The count signal alone is not registry authority: same-count identity substitution changes this digest and fails closed.
 

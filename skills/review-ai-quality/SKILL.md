@@ -12,7 +12,7 @@ Find evidence-backed implementation issues that a code reviewer can identify fro
 This gate may flag performance, security, scope, architecture, ADR, output quality, adversarial risk, evidence, or domain signals, but it must route final judgment to the specialized gate when the issue affects:
 
 - external risk -> `risk-gate`,
-- unsupported claim -> `evidence-ledger`,
+- unsupported claim -> inline claim status; `evidence-ledger` only for a closed formal-audit trigger,
 - architecture quality -> `review-architecture-impact`,
 - unresolved boundary mechanics -> `application-boundary-architecture`,
 - domain meaning -> `review-domain-impact`,
@@ -88,7 +88,7 @@ Be specific. A finding needs file/line evidence, impact, and a required fix. Do 
    - output quality -> `review-output-quality`,
    - adversarial risk -> `review-adversarial-risk`,
    - external risk -> `risk-gate`,
-   - unsupported claim -> `evidence-ledger`,
+   - unsupported claim -> inline claim status; formal audit -> `evidence-ledger`,
    - scope authorization -> `scope-control`.
 
 7. Return quality gate status, not final merge approval.

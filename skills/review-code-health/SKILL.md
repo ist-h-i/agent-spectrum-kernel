@@ -70,7 +70,7 @@ Security boundary: this skill can identify evidence-backed vulnerability and sec
 6. Route specialized signals.
    - Security weakness with abuse path or privacy risk may require `review-adversarial-risk`.
    - Boundary or dependency direction issues may require `review-architecture-impact`.
-   - Unsupported safety, readiness, performance, or reliability claims require `evidence-ledger`.
+   - Unsupported safety, readiness, performance, or reliability claims are downgraded inline. Select `evidence-ledger` only when the shared contract activates a formal audit.
    - Risky external action requires `risk-gate`.
 
 7. Produce AI-rule feedback only when evidence supports it.

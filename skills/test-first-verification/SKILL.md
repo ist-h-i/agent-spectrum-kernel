@@ -30,7 +30,7 @@ Use available repository context for commands, existing coverage, and test patte
 When `docs/ai/verification-pattern-ledger.md` exists, consult it only for matching change types, risk classes, regressions, or historically flaky areas:
 
 - `template`: treat as no project-specific reusable verification evidence.
-- `active`: use matching `Verified` or `Human-confirmed` entries as expected evidence, `Supported` entries as candidate evidence requiring current confirmation, and `Hypothesis` entries as test ideas only.
+- `active`: use matching `Verified` entries as expected evidence. Treat `Supported` entries, including a legacy human confirmation normalized to `Supported` with `authority_status=human_confirmed`, as candidate evidence requiring current confirmation. Use `Hypothesis` entries as test ideas only, keep `Unknown` unavailable, and correct claims marked `Falsified` before reuse.
 - `archived`: cite for history only; do not use as current verification requirements.
 
 Stored verification patterns do not prove current task behavior. Current commands, focused tests, runtime checks, or explicit insufficient evidence remain required.

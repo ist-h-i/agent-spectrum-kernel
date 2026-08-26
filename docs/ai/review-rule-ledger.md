@@ -22,14 +22,7 @@ This checked-in file is an empty generic template. Do not add project-specific e
 
 ## Evidence Status Key
 
-| Status | Meaning |
-|---|---|
-| `Verified` | Directly supported by review findings, code, tests, CI, incidents, or merged PR evidence. |
-| `Human-confirmed` | Confirmed by a responsible human or reviewer. |
-| `Supported` | Backed by repeated or related findings but not fully proven. |
-| `Hypothesis` | May guide review questions only; must not become a blocking rule. |
-| `Deprecated` | Retained for history but no longer recommended. |
-| `Contradicted` | Conflicts with current evidence and needs resolution. |
+Use `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`. Record human confirmation in `Authority status` (`not_asserted` or `human_confirmed`) and lifecycle in `Record state` (`active`, `deprecated`, or `contradicted`).
 
 ## Entry ID Convention
 
@@ -54,6 +47,8 @@ RR-0003
 | Suggested prevention target | yes | Review checklist, project overlay, SKILL.md, ledger, validation script, lint/test/check, or improvement-ledger. |
 | Evidence source | yes | PR, review, incident, code, test, CI, or human confirmation. |
 | Evidence status | yes | One of the evidence statuses above. |
+| Authority status | yes | Human authority metadata, separate from evidence strength. |
+| Record state | yes | Rule lifecycle/conflict state, separate from evidence strength. |
 | Repeat pattern | yes | `one-off`, `repeated`, `likely_repeated`, or `high_impact_single_case`. |
 | False-positive risk | yes | Known noise risk or `none`. |
 | Suppression rule | yes | When to suppress or downgrade the rule. |
@@ -62,12 +57,12 @@ RR-0003
 
 ## Review Rule Entries
 
-| ID | Finding pattern | Review layer | Trigger signal | Why it matters | Current PR blocker policy | Suggested prevention target | Evidence source | Evidence status | Repeat pattern | False-positive risk | Suppression rule | Staleness trigger | Owner |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Finding pattern | Review layer | Trigger signal | Why it matters | Current PR blocker policy | Suggested prevention target | Evidence source | Evidence status | Authority status | Record state | Repeat pattern | False-positive risk | Suppression rule | Staleness trigger | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 <!--
 Example active row:
-| RR-0001 | Missing negative case for permission denial | Test / verification | Permission or role behavior changes | Unauthorized access regressions can pass happy-path tests | Block when permission behavior changes without denial evidence | verification-pattern-ledger; review checklist | Review comments on PR #123 and PR #145 | Supported | repeated | low | Suppress for copy-only docs changes | Permission model or route guard changes | platform-team |
+| RR-0001 | Missing negative case for permission denial | Test / verification | Permission or role behavior changes | Unauthorized access regressions can pass happy-path tests | Block when permission behavior changes without denial evidence | verification-pattern-ledger; review checklist | Review comments on PR #123 and PR #145 | Supported | not_asserted | active | repeated | low | Suppress for copy-only docs changes | Permission model or route guard changes | platform-team |
 -->
 
 ## Stale Rule Review

@@ -346,7 +346,8 @@ Workflow:
 
 ```text
 handoff-generation
-evidence-ledger
+ask.claim-evidence-status@1.0.0 inline
+evidence-ledger only if a closed formal-audit trigger applies
 ```
 
 Expected output:

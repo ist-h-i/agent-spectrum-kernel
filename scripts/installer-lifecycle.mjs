@@ -8,6 +8,8 @@ export const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "docs/adapter-conformance-contract.md",
   "docs/agent-session-state-contract.md",
+  "docs/claim-evidence-status-contract.md",
+  "docs/claim-evidence-status-contract.md",
   "docs/debt-lifecycle-contract.md",
   "docs/execution-envelope-contract.md",
   "docs/lifecycle-artifact-contract.md",
@@ -17,6 +19,8 @@ export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "docs/operation-automation-contract.md",
   "docs/stack-implementation-overlay-contract.md",
   "schemas/adapter-runtime-event.schema.json",
+  "schemas/claim-evidence-status.schema.json",
+  "schemas/claim-evidence-status.schema.json",
   "schemas/compact-profile-control-map.json",
   "schemas/execution-envelope.schema.json",
   "schemas/normalized-event-schema-registry.json",

@@ -24,14 +24,7 @@ This file is not a project overlay, ADR, implementation context, or task plan. R
 
 ## Evidence Status Key
 
-| Status | Meaning |
-|---|---|
-| `Verified` | Directly observed in code, docs, tests, CI, runtime output, or merged PR evidence. |
-| `Human-confirmed` | Confirmed by a responsible human or owner. |
-| `Supported` | Backed by indirect or repeated evidence but not fully proven. |
-| `Hypothesis` | May guide questions only; must not be enforced as an implementation rule. |
-| `Deprecated` | Retained for history but no longer recommended. |
-| `Contradicted` | Conflicts with newer evidence and needs resolution. |
+Use `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`. Record human confirmation in `Authority status` and pattern lifecycle/conflict in `Record state`.
 
 ## Entry ID Convention
 
@@ -56,6 +49,8 @@ EP-0003
 | Rejected alternatives | yes | Alternatives rejected by evidence, or `none` if unavailable. |
 | Evidence source | yes | PR, issue, review, docs, test, runtime output, or human confirmation. |
 | Evidence status | yes | One of the evidence statuses above. |
+| Authority status | yes | `not_asserted` or `human_confirmed`. |
+| Record state | yes | `active`, `deprecated`, or `contradicted`. |
 | Related files / modules | yes | Paths, modules, or `none`. |
 | Related skills | yes | Skills that may consume the entry. |
 | Review impact | yes | How review should use the pattern. |
@@ -65,12 +60,12 @@ EP-0003
 
 ## Engineering Pattern Entries
 
-| ID | Pattern name | Layer / boundary | Applies when | Do not use when | Accepted implementation shape | Rejected alternatives | Evidence source | Evidence status | Related files / modules | Related skills | Review impact | Verification expectation | Staleness trigger | Owner |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Pattern name | Layer / boundary | Applies when | Do not use when | Accepted implementation shape | Rejected alternatives | Evidence source | Evidence status | Authority status | Record state | Related files / modules | Related skills | Review impact | Verification expectation | Staleness trigger | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 <!--
 Example active row:
-| EP-0001 | Route writes through use cases | Application service boundary | Feature writes cross repository and API boundaries | Local pure formatting or copy-only changes | Use case owns transaction and mapper boundary | Component-level data writes | Merged PR #123 and integration test `account-write.test.ts` | Verified | src/account/usecases; src/account/repositories | controlled-implementation; review-architecture-impact | Review direct data writes outside use case boundary | Focused integration test for write path | Repository boundary or transaction model changes | platform-team |
+| EP-0001 | Route writes through use cases | Application service boundary | Feature writes cross repository and API boundaries | Local pure formatting or copy-only changes | Use case owns transaction and mapper boundary | Component-level data writes | Merged PR #123 and integration test `account-write.test.ts` | Verified | not_asserted | active | src/account/usecases; src/account/repositories | controlled-implementation; review-architecture-impact | Review direct data writes outside use case boundary | Focused integration test for write path | Repository boundary or transaction model changes | platform-team |
 -->
 
 ## Stale Pattern Review

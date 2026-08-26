@@ -31,6 +31,7 @@ assert.equal(report.status, "pass_projected");
 assert.equal(report.evidence_level, "projected");
 assert.equal(report.scenarios.length, 9);
 assert.deepEqual(new Set(report.adapters), new Set(["claude_code", "codex"]));
+const formalScenarioIds = new Set(["pr_review_selective_gates", "destructive_external_action", "explicit_knowledge_promotion"]);
 for (const scenario of report.scenarios) {
   assert.equal(scenario.results.length, 2);
   assert.ok(scenario.results.every((result) => result.status === "pass_projected"));
@@ -42,6 +43,9 @@ for (const scenario of report.scenarios) {
   assert.ok(scenario.results.every((result) => result.runtime_application_evidence === "unavailable"));
   assert.ok(scenario.results.every((result) => result.projection_sha256.startsWith("sha256:")));
   assert.ok(scenario.results.every((result) => result.schema_errors.length === 0));
+  const expectedMode = formalScenarioIds.has(scenario.scenario_id) ? "formal_ledger" : "inline";
+  assert.ok(scenario.results.every((result) => result.normalized_contract.claim_evidence_mode === expectedMode));
+  assert.ok(scenario.results.every((result) => result.normalized_contract.selected_contracts.includes("evidence-ledger") === (expectedMode === "formal_ledger")));
 }
 
 const fixture = JSON.parse(readFileSync(conformanceFixture, "utf8"));
@@ -78,6 +82,8 @@ for (const [label, mutate, expectedError] of [
   ["empty adapters", (value) => { value.adapters = []; }, "fixture adapters must be exactly"],
   ["scenario replacement", (value) => { value.scenarios[0].scenario_id = "replacement_scenario"; }, "exact #179 set"],
   ["missing expected value", (value) => { delete value.scenarios[0].expected.stop_status; }, "expected fields must be exactly"],
+  ["claim mode mismatch", (value) => { value.scenarios[0].expected.claim_evidence_mode = "formal_ledger"; }, "claim evidence mode must match"],
+  ["unknown formal trigger", (value) => { value.scenarios[0].input.formal_evidence_trigger_ids = ["generic_correctness_claim"]; }, "unknown formal evidence ledger trigger"],
   ["schema ref change", (value) => { value.normalized_event_schema_ref = "schemas/metrics-event.schema.json"; }, "canonical adapter runtime event schema"],
   ["empty contract minimum", (value) => { value.scenarios[0].required_contracts = []; }, "missing required contract minimums"],
 ]) {

@@ -37,12 +37,8 @@ This skill helps `test-first-verification` draft better Verification Contracts o
    - `docs/ai/verification-pattern-ledger.md` and related engineering/domain patterns.
 
 3. Classify evidence status.
-   - `Verified`: direct evidence from tests, CI, runtime checks, validation scripts, or documented successful usage.
-   - `Human-confirmed`: explicit responsible confirmation.
-   - `Supported`: indirect or repeated evidence but not fully proven.
-   - `Hypothesis`: test idea or suspected regression path only.
-   - `Deprecated`: old check retained for context.
-   - `Contradicted`: check no longer matches current repo behavior.
+   - Use `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`.
+   - Record human confirmation as `Authority status=human_confirmed` and lifecycle/conflict as `Record state=active|deprecated|contradicted`.
 
 4. Decide use in current workflow.
    - Feed matching patterns into `test-first-verification` as candidate Verification Contract items.
@@ -67,6 +63,8 @@ Verification pattern ledger update:
 - Known flaky areas:
 - Evidence source:
 - Evidence status:
+- Authority status:
+- Record state:
 - Related files / modules:
 - Related domain rules:
 - Related engineering patterns:

@@ -31,8 +31,10 @@ This file is framework-agnostic. Put Angular, React, Python, Java, or other stac
 | `Verified` | Directly observed in repo files, docs, tests, runtime output, command output, or user input. |
 | `Supported` | Backed by indirect evidence but not fully proven. |
 | `Hypothesis` | Plausible inference that needs confirmation before being used as fact. |
-| `Human-confirmed` | Confirmed by a human owner in the current or prior documented implementation context. |
 | `Unknown` | Not inspected, unavailable, ambiguous, or outside current evidence. |
+| `Falsified` | Direct evidence contradicts the claim; correct it and retain the source. |
+
+These rows use `ask.claim-evidence-status@1.0.0`. Record human confirmation in the source/owner metadata; it is authority evidence, not a sixth status.
 
 ## Stack Inventory
 

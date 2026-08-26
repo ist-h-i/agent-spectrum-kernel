@@ -11,6 +11,7 @@
     "source_document",
     "source_location",
     "evidence_status",
+    "authority_status",
     "freshness_status",
     "consumers",
     "conflicts",
@@ -29,9 +30,9 @@
     "source_document": { "type": "string", "minLength": 1 },
     "source_location": { "type": "string", "minLength": 1 },
     "evidence_status": {
-      "type": "string",
-      "enum": ["Verified", "Human-confirmed", "Supported", "Hypothesis", "Deprecated", "Contradicted"]
+      "$ref": "claim-evidence-status.schema.json"
     },
+    "authority_status": { "type": "string", "enum": ["not_asserted", "human_confirmed"] },
     "freshness_status": {
       "type": "string",
       "enum": ["current", "stale", "conflicting", "unknown", "deprecated"]

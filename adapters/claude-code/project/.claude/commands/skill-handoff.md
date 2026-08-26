@@ -4,7 +4,7 @@ description: Produce a precise next-task handoff for another agent or human.
 
 Use the installed project skills from this repository projection.
 
-Use `/evidence-ledger` to separate verified resume evidence from unresolved risk.
+Apply `ask.claim-evidence-status@1.0.0` inline. Apply `/evidence-ledger` only when its closed trigger selects `formal_ledger` (explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs); installation alone is not activation.
 
 Use `/handoff-generation` after reading the relevant repository context and current diff or issue state. The handoff must be executable, not a generic summary.
 

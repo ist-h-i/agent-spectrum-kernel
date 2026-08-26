@@ -46,7 +46,8 @@ This skill sits after review gates. It does not replace `review-router`, `review
    - Review guidance -> `review-rule-ledger` or `review-context-generation`.
 
 4. Classify evidence status.
-   - `Verified`, `Human-confirmed`, `Supported`, `Hypothesis`, `Deprecated`, or `Contradicted`.
+   - Use `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`.
+   - Record human authority and rule lifecycle/conflict in separate fields.
    - Do not promote `Hypothesis` to a rule or check.
 
 5. Write or update the review rule entry with current blocker policy, suppression, staleness trigger, and owner.

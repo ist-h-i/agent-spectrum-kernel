@@ -583,7 +583,7 @@ Default outputs should describe the selected work mode, user-facing route, missi
 | docs/ADR/PR/handoffからdurable knowledgeを抽出 | `documentation-knowledge-compiler` |
 | 次のAgentへ渡す | `handoff-generation` |
 
-Use `evidence-ledger` whenever final text makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
+Use `ask.claim-evidence-status@1.0.0` inline for ordinary claims. Use `evidence-ledger` only for its closed formal-audit triggers: explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs.
 
 ## What changed from v1
 

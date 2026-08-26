@@ -11,7 +11,8 @@ Use these existing review findings and prepare improvement-ledger entries. Do no
 Use:
 
 ```text
-improvement-ledger -> evidence-ledger when readiness or conversion claims need evidence status
+improvement-ledger -> ask.claim-evidence-status@1.0.0 inline
+formal evidence-ledger only when a closed audit trigger applies
 review-code-health only if findings still need detection
 ```
 

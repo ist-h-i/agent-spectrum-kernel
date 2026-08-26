@@ -41,6 +41,8 @@ The terms mean:
 
 An Asset's `current` state and a Portfolio's `active` selection are separate. Issue #277 owns baseline, challenger, bypass, and rollback Portfolio decisions. Registration or a registry lifecycle transition must not change runtime defaults.
 
+Asset lifecycle terms and `permissions_and_effects` / `safety` states remain Asset-domain values. License and owner provenance claims reference the lowercase compatibility subset of `ask.claim-evidence-status@1.0.0`, preserving the existing `verified`, `supported`, and `unknown` inputs; this does not add `hypothesis` or `falsified` to the v1 Asset schema.
+
 ## Shared storage boundary
 
 All immutable registry objects use the generic canonical JSON CAS established by Issue #274 and ADR-0001. The shared store supplies:
@@ -105,6 +107,8 @@ Permissions and effects keep the declared values separate from their evidence re
 Unordered metadata sets and reference collections are normalized to locale-independent code-unit order before record identity is computed. Verification requires that canonical order on stored or imported records. Reordering the same set therefore remains an idempotent registration retry rather than creating a second identity.
 
 For `git_revision` records, the registry makes the Asset version equal the represented source revision and verifies the supplied source bytes against their declared raw digests. It does not independently query Git or prove that those bytes came from the represented commit; a consumer that requires that claim needs separate repository-authority evidence.
+
+Checked historical sample generation is a separate repository-authority check. It materializes exact blobs from the bound full commit SHA into a disposable source root, verifies each declared raw digest, and passes only that root to registration. It never requires the current working-tree file to remain equal to historical bytes and never falls back to current bytes when the commit or path is unavailable. Updating a live Skill therefore does not rewrite an existing historical Asset or its rollback identity; registering the live bytes requires a new exact Asset revision.
 
 ### Registry snapshot
 
@@ -224,7 +228,7 @@ No lifecycle state asserts that the Asset is active, installed, executed, safe, 
 
 ## Provenance, license, owner, and evidence status
 
-Provenance, license, owner, mechanism, evaluation-history, and cost claims carry a closed evidence status:
+Provenance, license, and owner claims carry the backward-compatible observation subset of `ask.claim-evidence-status@1.0.0`:
 
 - `verified`: the registry validator directly established the stated binding from the exact supplied evidence it is defined to check;
 - `supported`: exact cited evidence supports the claim, but the local validator cannot establish the complete authority or meaning;
@@ -232,7 +236,7 @@ Provenance, license, owner, mechanism, evaluation-history, and cost claims carry
 
 `verified` is scoped to the named check. For example, verifying supplied bytes against their declared raw digests does not establish that they came from a represented repository commit, nor does it verify copyright ownership, license compatibility, organizational approval, safety, or effectiveness. Repository authorship and a `LICENSE` file may support a represented claim; they do not automatically prove Asset owner authority.
 
-Permissions/effects, safety, mechanism, and evaluation-history fields use their own closed operational statuses, including `declared_by_consumer` and `not_evaluated`. Those values explicitly record an unverified boundary; they are not aliases for evidence-status `verified`, `supported`, or `unknown`, and registration does not upgrade them.
+Permissions/effects, safety, mechanism, evaluation-history, and cost fields use their own closed operational statuses, including `declared_by_consumer` and `not_evaluated`. Those values explicitly record an unverified boundary; they are not aliases for evidence-status `verified`, `supported`, or `unknown`, and registration does not upgrade them.
 
 The validator must not upgrade `supported` or `unknown` based on a content digest, registration success, producer identity, evaluator reference, or nearby repository metadata. Policies and consumers decide which evidence statuses are sufficient for admission or use. Registration may preserve unknown evidence; it may not convert it into authority.
 

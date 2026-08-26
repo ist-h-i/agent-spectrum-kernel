@@ -3,6 +3,12 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODEX_PROMPT_CONTRACTS, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
+import {
+  CLAIM_EVIDENCE_CONTRACT_REF,
+  FORMAL_EVIDENCE_LEDGER_DIRECT_TRIGGER_ID,
+  FORMAL_EVIDENCE_LEDGER_TRIGGER_IDS,
+  canonicalClaimEvidenceStatuses,
+} from "./claim-evidence-status.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CONTROL_MAP_PATH = "schemas/compact-profile-control-map.json";
@@ -13,9 +19,10 @@ const DIRECT_TRIGGER_PLACEHOLDER = "{{ASK_COMPACT_DIRECT_TRIGGERS}}";
 const SUPPORTED_CONTROL_IDS = ["scope", "verification", "risk_approval", "evidence", "missing_evidence", "output"];
 const COMMON_CANONICAL_SOURCES = [
   "AGENTS.md",
+  "docs/claim-evidence-status-contract.md",
   "docs/execution-envelope-contract.md",
+  "schemas/claim-evidence-status.schema.json",
   CONTROL_MAP_PATH,
-  "skills/evidence-ledger/SKILL.md",
   "skills/risk-gate/SKILL.md",
   "skills/scope-control/SKILL.md",
   "skills/test-first-verification/SKILL.md",
@@ -26,35 +33,35 @@ export const CODEX_COMPACT_PROFILE_DEFINITIONS = Object.freeze({
     profileId: "codex-implementation-compact-v1",
     taskClass: "implementation",
     primarySkill: "controlled-implementation",
-    requestedContracts: ["controlled-implementation", "test-first-verification", "evidence-ledger", "risk-gate"],
+    requestedContracts: ["controlled-implementation", "test-first-verification", "risk-gate"],
     canonicalSources: ["docs/lifecycle-artifact-contract.md", "skills/controlled-implementation/SKILL.md"],
   }),
   "skill-investigate.md": Object.freeze({
     profileId: "codex-investigation-compact-v1",
     taskClass: "investigation",
     primarySkill: "doubt-driven-development",
-    requestedContracts: ["doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
+    requestedContracts: ["doubt-driven-development", "test-first-verification", "controlled-implementation", "risk-gate"],
     canonicalSources: ["skills/doubt-driven-development/SKILL.md", "skills/controlled-implementation/SKILL.md"],
   }),
   "skill-review.md": Object.freeze({
     profileId: "codex-review-compact-v1",
     taskClass: "review",
     primarySkill: "review-router",
-    requestedContracts: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
+    requestedContracts: ["review-router", "review-final-merge-gate", "risk-gate"],
     canonicalSources: ["docs/lifecycle-traceability-contract.md", "schemas/review-signal-gate-map.json", "skills/review-router/SKILL.md", "skills/review-final-merge-gate/SKILL.md"],
   }),
   "skill-verify.md": Object.freeze({
     profileId: "codex-verification-compact-v1",
     taskClass: "verification",
     primarySkill: "test-first-verification",
-    requestedContracts: ["test-first-verification", "evidence-ledger", "risk-gate"],
+    requestedContracts: ["test-first-verification", "risk-gate"],
     canonicalSources: ["docs/lifecycle-artifact-contract.md"],
   }),
   "skill-handoff.md": Object.freeze({
     profileId: "codex-handoff-compact-v1",
     taskClass: "handoff",
     primarySkill: "handoff-generation",
-    requestedContracts: ["handoff-generation", "evidence-ledger", "risk-gate"],
+    requestedContracts: ["handoff-generation", "risk-gate"],
     canonicalSources: ["docs/agent-session-state-contract.md", "skills/handoff-generation/SKILL.md"],
   }),
 });
@@ -104,9 +111,10 @@ export function validateCodexCompactControlMap(controlMap = readControlMap()) {
   if (risk.approval_scope !== "specific_action" || risk.execution_scope !== "approved_action_only") throw new Error("risk_approval control requires specific-action approval and approved-action-only execution");
 
   const evidence = controlMap.controls.evidence;
-  assertExactKeys(evidence, ["source_refs", "truth_statuses", "claims_require_evidence", "unsupported_claim_behavior"], "evidence control");
-  assertArrayEquals(evidence.truth_statuses, ["Verified", "Supported", "Hypothesis", "Unknown", "Falsified"], "evidence truth_statuses");
-  if (evidence.claims_require_evidence !== true || evidence.unsupported_claim_behavior !== "downgrade") throw new Error("evidence control must require evidence and downgrade unsupported claims");
+  assertExactKeys(evidence, ["source_refs", "contract_ref", "schema_ref", "inline_default", "formal_ledger_trigger_ids", "claims_require_evidence", "unsupported_claim_behavior"], "evidence control");
+  if (evidence.contract_ref !== CLAIM_EVIDENCE_CONTRACT_REF || evidence.schema_ref !== "schemas/claim-evidence-status.schema.json") throw new Error("evidence control must reference the canonical claim evidence status revision");
+  assertArrayEquals(evidence.formal_ledger_trigger_ids, FORMAL_EVIDENCE_LEDGER_TRIGGER_IDS, "formal Evidence Ledger trigger IDs");
+  if (evidence.inline_default !== true || evidence.claims_require_evidence !== true || evidence.unsupported_claim_behavior !== "downgrade") throw new Error("evidence control must keep inline discipline, require evidence, and downgrade unsupported claims");
 
   const missing = controlMap.controls.missing_evidence;
   assertExactKeys(missing, ["source_refs", "allowed_statuses", "inference", "stop_when_required"], "missing_evidence control");
@@ -128,6 +136,7 @@ export function validateCodexCompactControlMap(controlMap = readControlMap()) {
       ids.add(trigger.id);
       if (!/^[a-z0-9][a-z0-9-]*$/.test(trigger.contract) || !trigger.signal) throw new Error(`${taskClass} direct trigger requires a signal and canonical contract`);
       if (trigger.action !== "apply_before_primary" || trigger.missing_contract_behavior !== "capability_missing") throw new Error(`${taskClass} direct trigger must apply before primary and fail closed when unavailable`);
+      if (trigger.id === FORMAL_EVIDENCE_LEDGER_DIRECT_TRIGGER_ID) throw new Error(`${taskClass} direct triggers must derive the formal ledger trigger from the claim evidence contract`);
     }
   }
   return controlMap;
@@ -137,7 +146,7 @@ function renderControl(controlId, control) {
   if (controlId === "scope") return "[scope] Repo/code/tests/docs/API; missing => stop/insufficient_evidence; smallest diff; no cleanup.";
   if (controlId === "verification") return "[verification] Before behavior change: contract; focused then risk-based checks; exact results.";
   if (controlId === "risk_approval") return "[risk_approval] Exact action/risk/impact/reversibility/visibility; alternative/preconditions. Stop without approval for that specific action; execute only it.";
-  if (controlId === "evidence") return `[evidence] ${control.truth_statuses.join("/")}; claims need evidence else downgrade.`;
+  if (controlId === "evidence") return `[evidence] ${canonicalClaimEvidenceStatuses().join("/")} (${control.contract_ref}); inline; formal[audit|multi-claim|high-stakes|cross-revision|stable-IDs]=>evidence-ledger; unsupported=>downgrade.`;
   if (controlId === "missing_evidence") return "[missing_evidence] unavailable/insufficient_evidence; no inference; required => stop.";
   if (controlId === "output") return "[output] Required sections; one Execution Envelope; next_action only there.";
   throw new Error(`compact control has no renderer: ${controlId}`);
@@ -160,11 +169,12 @@ export function validateRenderedCodexCompactControls(content, controlMap = readC
 }
 
 function renderDirectTriggers(triggers) {
-  if (triggers.length === 0) return "Direct conditional contracts: none beyond the fixed primary contract for this entry.";
+  const routedTriggers = triggers.filter((trigger) => trigger.id !== FORMAL_EVIDENCE_LEDGER_DIRECT_TRIGGER_ID);
+  if (routedTriggers.length === 0) return "";
   return [
-    "Generated direct conditional contracts:",
+    "Conditional contracts:",
     "",
-    ...triggers.map((trigger) => `- \`${trigger.id}\` => \`${trigger.contract}\` before primary when ${trigger.signal}; missing => \`capability_missing\`.`),
+    ...routedTriggers.map((trigger) => `- \`${trigger.id}\`: ${trigger.signal} => \`${trigger.contract}\`; missing=>\`capability_missing\`.`),
   ].join("\n");
 }
 
@@ -184,7 +194,16 @@ export function codexDirectTriggersForPrompt(promptName, controlMap = readContro
   const definition = CODEX_COMPACT_PROFILE_DEFINITIONS[promptName];
   if (!definition) return [];
   const validated = validateCodexCompactControlMap(controlMap);
-  return validated.direct_triggers[definition.taskClass].map((trigger) => ({ ...trigger }));
+  return [
+    ...validated.direct_triggers[definition.taskClass].map((trigger) => ({ ...trigger })),
+    {
+      id: FORMAL_EVIDENCE_LEDGER_DIRECT_TRIGGER_ID,
+      signal: `${CLAIM_EVIDENCE_CONTRACT_REF} selects formal_ledger`,
+      contract: "evidence-ledger",
+      action: "apply_before_primary",
+      missing_contract_behavior: "capability_missing",
+    },
+  ];
 }
 
 export function codexCompactProfileCanonicalPaths(promptName, controlMap = readControlMap()) {
@@ -208,7 +227,7 @@ export function renderCodexCompactProfile(promptName, {
   const validatedControlMap = validateCodexCompactControlMap(controlMap);
   const body = sourceBody ?? readFileSync(resolve(REPO_ROOT, "adapters", "codex", "prompts", promptName), "utf8");
   validatePromptTemplate(promptName, body, definition);
-  const triggers = validatedControlMap.direct_triggers[definition.taskClass];
+  const triggers = codexDirectTriggersForPrompt(promptName, validatedControlMap);
   const renderedBody = body
     .replace(CONTROL_PLACEHOLDER, renderControls(validatedControlMap))
     .replace(DIRECT_TRIGGER_PLACEHOLDER, [

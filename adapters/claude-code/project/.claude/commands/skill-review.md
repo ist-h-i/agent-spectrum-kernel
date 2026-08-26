@@ -4,7 +4,7 @@ description: Run the Agent Spectrum Kernel review flow for the current PR or dif
 
 Use the installed project skills from this repository projection.
 
-Use `/evidence-ledger` for every correctness, readiness, or merge claim.
+Apply `ask.claim-evidence-status@1.0.0` inline. Apply `/evidence-ledger` only when its closed trigger selects `formal_ledger` (explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs); installation alone is not activation.
 
 Start with `/review-router` to extract observed change signals and map them to required gates. Run only the required gates. End with `/review-final-merge-gate` style output:
 

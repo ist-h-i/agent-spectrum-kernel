@@ -1,28 +1,28 @@
 # Cross-Adapter Conformance Report
 
-Evidence date: 2026-07-14 JST
+Evidence date: 2026-08-26 JST
 
 ## Decision
 
-Claude Code and Codex pass the same nine fixtures at the `projected` evidence level. Each result is derived independently from that Adapter's generated command or prompt bytes and is validated against `schemas/adapter-runtime-event.schema.json` before comparison. The fixtures confirm deterministic entry and required-contract coverage with the same normalized risk, evidence, approval, verification, stop, handoff, knowledge-promotion, and projected agent-activity meaning. They do not establish external runtime loading or behavioral conformance.
+Claude Code and Codex pass the same nine fixtures at the `projected` evidence level. Each result is derived independently from that Adapter's generated command or prompt bytes and is validated against `schemas/adapter-runtime-event.schema.json` before comparison. The fixtures confirm deterministic entry and required-contract coverage with the same normalized risk, evidence, approval, verification, stop, handoff, knowledge-promotion, projected agent-activity, and derived claim-evidence-mode meaning. They do not establish external runtime loading or behavioral conformance.
 
 ## Fixture result
 
-| Scenario | Claude Code | Codex | Normalized meaning |
-|---|---|---|---|
-| Localized implementation | pass_projected | pass_projected | Scoped implementation; no approval or agent activity required. |
-| New behavior | pass_projected | pass_projected | Verification contract required before completion. |
-| Unknown root cause | pass_projected | pass_projected | Doubt-driven investigation plus verification. |
-| PR review | pass_projected | pass_projected | Selective review routing and final merge gate. |
-| Destructive/external action | pass_projected | pass_projected | Risk gate; specific-action approval missing; stop. |
-| Missing repository/diff/test evidence | pass_projected | pass_projected | Insufficient evidence; no inferred readiness. |
-| Handoff/resume | pass_projected | pass_projected | Evidence-bounded handoff contract. |
-| Explicit knowledge promotion | pass_projected | pass_projected | Organizational profile and explicit knowledge-plane route. |
-| Lightweight task | pass_projected | pass_projected | No agent activity required; heavy routing is not part of the normalized requirement. |
+| Scenario | Claude Code | Codex | Claim evidence mode | Normalized meaning |
+|---|---|---|---|---|
+| Localized implementation | pass_projected | pass_projected | inline | Scoped implementation; no approval or agent activity required. |
+| New behavior | pass_projected | pass_projected | inline | Verification contract required before completion. |
+| Unknown root cause | pass_projected | pass_projected | inline | Doubt-driven investigation plus verification. |
+| PR review | pass_projected | pass_projected | formal_ledger | Selective review routing, final merge gate, and high-stakes readiness audit. |
+| Destructive/external action | pass_projected | pass_projected | formal_ledger | Risk gate; specific-action approval missing; stop. |
+| Missing repository/diff/test evidence | pass_projected | pass_projected | inline | Insufficient evidence; no inferred readiness. |
+| Handoff/resume | pass_projected | pass_projected | inline | Evidence-bounded handoff contract. |
+| Explicit knowledge promotion | pass_projected | pass_projected | formal_ledger | Organizational profile, stable claim IDs, and explicit knowledge-plane route. |
+| Lightweight task | pass_projected | pass_projected | inline | No agent activity required; heavy routing is not part of the normalized requirement. |
 
 Command: `node scripts/test-adapter-cross-conformance.mjs`
 
-The same command also runs fail-closed cases for empty Adapter sets, substituted scenario IDs, missing expected values, schema-reference drift, missing contract minimums, and a mutation that removes the Codex specific-action approval/stop control.
+The same command also runs fail-closed cases for empty Adapter sets, substituted scenario IDs, missing expected values, schema-reference drift, missing contract minimums, unconditional formal-ledger activation, and mutations that remove the claim-contract reference, formal route/condition, or Codex specific-action approval/stop control.
 
 ## Cost and over-processing
 

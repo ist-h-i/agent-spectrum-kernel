@@ -78,23 +78,23 @@ const RUNTIME_DIRECTORIES = [
 ];
 const COMMAND_METADATA = {
   "skill-review.md": {
-    requiredSkills: ["review-router", "review-final-merge-gate", "evidence-ledger", "risk-gate"],
+    requiredSkills: ["review-router", "review-final-merge-gate", "risk-gate"],
     requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-implement.md": {
-    requiredSkills: ["skill-router", "test-first-verification", "controlled-implementation", "evidence-ledger", "risk-gate"],
+    requiredSkills: ["skill-router", "test-first-verification", "controlled-implementation", "risk-gate"],
     requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-investigate.md": {
-    requiredSkills: ["skill-router", "doubt-driven-development", "test-first-verification", "evidence-ledger", "risk-gate"],
+    requiredSkills: ["skill-router", "doubt-driven-development", "test-first-verification", "risk-gate"],
     requiredAssets: ["docs/execution-envelope-contract.md"],
   },
   "skill-verify.md": {
-    requiredSkills: ["test-first-verification", "evidence-ledger"],
+    requiredSkills: ["test-first-verification"],
     requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md", "docs/lifecycle-traceability-contract.md"],
   },
   "skill-handoff.md": {
-    requiredSkills: ["handoff-generation", "evidence-ledger"],
+    requiredSkills: ["handoff-generation"],
     requiredAssets: ["docs/agent-session-state-contract.md", "docs/execution-envelope-contract.md"],
     initialProjectStateAssets: [],
     runtimeDirectories: [],
@@ -118,7 +118,7 @@ const COMMAND_METADATA = {
     ],
   },
   "skill-ledger-refresh.md": {
-    requiredSkills: ["operating-mode-router", "domain-rule-ledger", "improvement-ledger", "evidence-ledger"],
+    requiredSkills: ["operating-mode-router", "domain-rule-ledger", "improvement-ledger"],
     requiredAssets: [
       "docs/debt-lifecycle-contract.md",
       "docs/metrics-event-contract.md",
@@ -149,15 +149,6 @@ const SKILL_RELATIONSHIPS = {
   },
   "project-adoption-pack-generation": {
     requires: ["repository-orientation"],
-  },
-  "skill-adoption-metrics": {
-    requires: ["evidence-ledger"],
-  },
-  "skill-effectiveness-evaluation": {
-    requires: ["evidence-ledger"],
-  },
-  "engineering-capability-evaluation": {
-    requires: ["evidence-ledger"],
   },
 };
 const CLAUDE_PROFILES = {
@@ -302,7 +293,7 @@ const PROFILE_ROUTING_FIXTURES = {
       id: "bug_investigation",
       router: "skill-router",
       selectedRoute: "doubt-driven-development",
-      requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation", "evidence-ledger"],
+      requiredSkills: ["doubt-driven-development", "test-first-verification", "controlled-implementation"],
     },
     {
       id: "unfamiliar_repository",
@@ -340,7 +331,6 @@ const PROFILE_ROUTING_FIXTURES = {
         "review-output-quality",
         "review-adversarial-risk",
         "review-final-merge-gate",
-        "evidence-ledger",
         "risk-gate",
         "adr-review",
         "improvement-ledger",
@@ -352,19 +342,19 @@ const PROFILE_ROUTING_FIXTURES = {
       id: "skill_effectiveness",
       router: "operating-mode-router",
       selectedRoute: "skill-effectiveness-evaluation",
-      requiredSkills: ["skill-effectiveness-evaluation", "evidence-ledger"],
+      requiredSkills: ["skill-effectiveness-evaluation"],
     },
     {
       id: "adoption_metrics",
       router: "operating-mode-router",
       selectedRoute: "skill-adoption-metrics",
-      requiredSkills: ["skill-adoption-metrics", "evidence-ledger"],
+      requiredSkills: ["skill-adoption-metrics"],
     },
     {
       id: "capability_evaluation",
       router: "operating-mode-router",
       selectedRoute: "engineering-capability-evaluation",
-      requiredSkills: ["engineering-capability-evaluation", "evidence-ledger"],
+      requiredSkills: ["engineering-capability-evaluation"],
     },
   ],
   full: [],

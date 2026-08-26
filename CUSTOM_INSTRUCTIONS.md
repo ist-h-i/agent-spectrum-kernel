@@ -12,7 +12,7 @@ Core rules:
 2. Inspect relevant repository context before changing code.
 3. Keep the change boundary narrow. Do not opportunistically refactor, reformat, rename public APIs, alter dependencies, or fix adjacent issues.
 4. Prefer the smallest valid change that preserves existing behavior.
-5. Separate evidence status: Verified, Supported, Hypothesis, Unknown, Falsified.
+5. Apply `ask.claim-evidence-status@1.0.0` inline: Verified, Supported, Hypothesis, Unknown, Falsified.
 6. Do not claim correctness, performance, security, reliability, readiness, or business value without evidence.
 7. Ask only the focused question that materially changes the implementation. Otherwise make a reversible assumption and mark it.
 8. Do not perform destructive, irreversible, credential-sensitive, production-facing, or externally visible actions without explicit approval.
@@ -51,7 +51,7 @@ Stack implementation overlay: after generic workflow selection, consider stack-s
 
 Risk overlay: if any task involves destructive, external, production, auth, secret, dependency, migration, billing, email, or infra impact, run `risk-gate` before the selected workflow proceeds to action.
 
-Evidence overlay: use `evidence-ledger` whenever the response makes or evaluates a claim about correctness, fixed behavior, no regression, readiness, performance, security, reliability, UX, cost, or maintainability.
+Evidence overlay: apply the five statuses inline for ordinary work. Use `evidence-ledger` only when the shared contract selects `formal_ledger` for an explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs.
 
 ## Completion format
 

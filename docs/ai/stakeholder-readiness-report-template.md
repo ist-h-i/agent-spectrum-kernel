@@ -132,7 +132,7 @@ Rollout risks:
 
 ## Evidence Rules
 
-- Mark each important claim as Verified, Supported, Hypothesis, Unknown, or Falsified.
+- Mark each important claim with `ask.claim-evidence-status@1.0.0`: Verified, Supported, Hypothesis, Unknown, or Falsified. Stakeholder readiness selects the formal `high_stakes_readiness` audit trigger.
 - Do not convert internal quality scores into client-value claims without outcome evidence.
 - Do not use adoption metrics for HR, compensation, promotion, or personnel evaluation.
 - Do not store raw prompts, secrets, customer data, personal data, full file contents, or full command output in readiness reports.

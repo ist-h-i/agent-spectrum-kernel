@@ -56,7 +56,7 @@ This skill is a retrospective evaluator for one task, PR, review, implementation
 4. Evaluate evidence quality.
    - Prefer executed tests, validation, CI, review evidence, diffs, artifacts, and explicit unknowns.
    - Downgrade claims that rely on intent, assumption, or inspection only.
-   - Use `evidence-ledger` when readiness, correctness, reliability, security, performance, or no-regression claims need classification.
+   - Apply `ask.claim-evidence-status@1.0.0` inline. Use `evidence-ledger` only when the evaluation independently audits multiple material claims, high-stakes readiness, cross-artifact evidence, or stable claim IDs.
 
 5. Evaluate overhead and missed coverage.
    - Mark steps that were too heavy for the task.

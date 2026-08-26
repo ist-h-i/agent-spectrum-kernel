@@ -7,20 +7,21 @@ import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { validateAdapterRuntimeEvent } from "./adapter-runtime-event.mjs";
 import { parseCodexCompactProfileHeader } from "./ask-shared.mjs";
+import { selectClaimEvidenceMode } from "./claim-evidence-status.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const defaultFixture = resolve(root, "docs/fixtures/adapter-cross-conformance.json");
 const ADAPTERS = ["claude_code", "codex"];
 const SCENARIO_REQUIREMENTS = Object.freeze({
-  localized_implementation: { taskClass: "implementation", contracts: ["controlled-implementation", "evidence-ledger"], gates: [] },
-  new_behavior_with_verification: { taskClass: "implementation", contracts: ["controlled-implementation", "test-first-verification", "evidence-ledger"], gates: [] },
-  unknown_root_cause_investigation: { taskClass: "investigation", contracts: ["doubt-driven-development", "test-first-verification", "evidence-ledger"], gates: [] },
+  localized_implementation: { taskClass: "implementation", contracts: ["controlled-implementation"], gates: [] },
+  new_behavior_with_verification: { taskClass: "implementation", contracts: ["controlled-implementation", "test-first-verification"], gates: [] },
+  unknown_root_cause_investigation: { taskClass: "investigation", contracts: ["doubt-driven-development", "test-first-verification"], gates: [] },
   pr_review_selective_gates: { taskClass: "review", contracts: ["review-router", "review-final-merge-gate", "evidence-ledger"], gates: ["review-router", "review-final-merge-gate"] },
   destructive_external_action: { taskClass: "risk-gated", contracts: ["risk-gate", "evidence-ledger"], gates: ["risk-gate"] },
-  missing_repository_diff_test_evidence: { taskClass: "review", contracts: ["review-router", "evidence-ledger"], gates: ["review-router"] },
-  handoff_resume_state: { taskClass: "handoff", contracts: ["handoff-generation", "evidence-ledger"], gates: [] },
+  missing_repository_diff_test_evidence: { taskClass: "review", contracts: ["review-router"], gates: ["review-router"] },
+  handoff_resume_state: { taskClass: "handoff", contracts: ["handoff-generation"], gates: [] },
   explicit_knowledge_promotion: { taskClass: "knowledge", contracts: ["operating-mode-router", "domain-rule-ledger", "evidence-ledger"], gates: [] },
-  lightweight_no_heavy_routing_or_agents: { taskClass: "implementation", contracts: ["controlled-implementation", "evidence-ledger"], gates: [] },
+  lightweight_no_heavy_routing_or_agents: { taskClass: "implementation", contracts: ["controlled-implementation"], gates: [] },
 });
 const STOP_STATUSES = new Set(["none", "risk_gate", "insufficient_evidence"]);
 
@@ -90,12 +91,15 @@ function validateFixture(fixture) {
     identifiers(scenario.required_gates, `${scenario.scenario_id}.required_gates`);
     if (!includesAll(scenario.required_contracts, requirement.contracts)) throw new Error(`${scenario.scenario_id} is missing required contract minimums`);
     if (!includesAll(scenario.required_gates, requirement.gates)) throw new Error(`${scenario.scenario_id} is missing required gate minimums`);
-    exactKeys(scenario.input, ["risk_action", "missing_evidence", "knowledge_promotion_requested", "agent_activity_required", "verification_required", "review_final_gate_required", "handoff_required"], `${scenario.scenario_id}.input`);
+    exactKeys(scenario.input, ["risk_action", "missing_evidence", "knowledge_promotion_requested", "agent_activity_required", "verification_required", "review_final_gate_required", "handoff_required", "formal_evidence_trigger_ids"], `${scenario.scenario_id}.input`);
     for (const flag of ["risk_action", "knowledge_promotion_requested", "agent_activity_required", "verification_required", "review_final_gate_required", "handoff_required"]) if (typeof scenario.input[flag] !== "boolean") throw new Error(`${scenario.scenario_id}.${flag} must be boolean`);
     identifiers(scenario.input.missing_evidence, `${scenario.scenario_id}.input.missing_evidence`);
-    exactKeys(scenario.expected, ["approval_required", "stop_status", "missing_evidence", "knowledge_promotion", "agent_activity", "verification_obligation", "review_final_gate", "handoff_executable"], `${scenario.scenario_id}.expected`);
+    identifiers(scenario.input.formal_evidence_trigger_ids, `${scenario.scenario_id}.input.formal_evidence_trigger_ids`);
+    exactKeys(scenario.expected, ["approval_required", "stop_status", "missing_evidence", "knowledge_promotion", "verification_obligation", "review_final_gate", "handoff_executable", "claim_evidence_mode", "agent_activity"], `${scenario.scenario_id}.expected`);
     for (const flag of ["approval_required", "knowledge_promotion", "verification_obligation", "review_final_gate", "handoff_executable"]) if (typeof scenario.expected[flag] !== "boolean") throw new Error(`${scenario.scenario_id}.${flag} must be boolean`);
     if (!STOP_STATUSES.has(scenario.expected.stop_status)) throw new Error(`${scenario.scenario_id}.stop_status has an invalid enum`);
+    if (!["inline", "formal_ledger"].includes(scenario.expected.claim_evidence_mode)) throw new Error(`${scenario.scenario_id}.claim_evidence_mode has an invalid enum`);
+    if (scenario.expected.claim_evidence_mode !== selectClaimEvidenceMode(scenario.input.formal_evidence_trigger_ids)) throw new Error(`${scenario.scenario_id} claim evidence mode must match its formal-audit trigger IDs`);
     identifiers(scenario.expected.missing_evidence, `${scenario.scenario_id}.expected.missing_evidence`);
     nonNegativeCounters(scenario.expected.agent_activity, `${scenario.scenario_id}.expected.agent_activity`);
     exactKeys(scenario.projections, ADAPTERS, `${scenario.scenario_id}.projections`);
@@ -140,10 +144,18 @@ function projectionSemantics(adapterId, content) {
   const canonicalReferences = adapterId === "codex"
     ? header?.requested_contracts ?? []
     : [...content.matchAll(/(?:^|[\s`])\/([a-z][a-z0-9-]*)/gmu)].map((match) => match[1]);
-  const contracts = [...new Set(canonicalReferences)].sort();
+  const formalLedgerConditional = adapterId === "codex"
+    ? /ask\.claim-evidence-status@1\.0\.0.*inline.*formal\[audit\|multi-claim\|high-stakes\|cross-revision\|stable-IDs\]=>evidence-ledger/iu.test(content)
+    : /ask\.claim-evidence-status@1\.0\.0[\s\S]{0,240}\/evidence-ledger[\s\S]{0,160}(?:only when|stable_claim_ids)[\s\S]{0,120}formal_ledger|\/evidence-ledger[\s\S]{0,160}(?:only when|stable_claim_ids)[\s\S]{0,120}formal_ledger/iu.test(content);
+  const formalLedgerReferenced = canonicalReferences.includes("evidence-ledger") || formalLedgerConditional;
+  const formalLedgerUnconditional = canonicalReferences.includes("evidence-ledger") && !formalLedgerConditional;
+  const contracts = [...new Set(canonicalReferences.filter((contract) => contract !== "evidence-ledger" || formalLedgerUnconditional))].sort();
   const controlIds = adapterId === "codex" ? header?.control_ids ?? [] : [];
   return {
     contracts,
+    formalLedgerConditional,
+    formalLedgerReferenced,
+    formalLedgerUnconditional,
     controlIds,
     approvalSpecificAction: /approval for (?:that|the) specific action|specific-action approval/iu.test(content),
     stopWithoutApproval: /stop without (?:that )?approval|stop without approval for that specific action/iu.test(content),
@@ -157,6 +169,16 @@ function projectionSemantics(adapterId, content) {
   };
 }
 
+function semanticsForResult(content, adapterId, scenario) {
+  const semantics = projectionSemantics(adapterId, content);
+  const mismatches = [];
+  if (!content.includes("ask.claim-evidence-status@1.0.0")) mismatches.push("claim_evidence_contract_revision");
+  if (!semantics.formalLedgerConditional) mismatches.push("formal_ledger_conditional_route");
+  if (semantics.formalLedgerUnconditional) mismatches.push("formal_ledger_overactivated");
+  if (selectClaimEvidenceMode(scenario.input.formal_evidence_trigger_ids) === "formal_ledger" && !semantics.formalLedgerReferenced) mismatches.push("formal_ledger_required");
+  return mismatches;
+}
+
 function expectedContract(scenario) {
   return {
     selected_contracts: [...scenario.required_contracts].sort(),
@@ -168,6 +190,7 @@ function expectedContract(scenario) {
     verification_obligation: scenario.expected.verification_obligation,
     review_final_gate: scenario.expected.review_final_gate,
     handoff_executable: scenario.expected.handoff_executable,
+    claim_evidence_mode: scenario.expected.claim_evidence_mode,
     agent_activity: scenario.expected.agent_activity,
   };
 }
@@ -183,6 +206,7 @@ function normalizedContract(event) {
     verification_obligation: event.verification.obligation_required,
     review_final_gate: event.review.final_gate_required,
     handoff_executable: event.handoff.executable_state_required,
+    claim_evidence_mode: event.contracts.selected.includes("evidence-ledger") ? "formal_ledger" : "inline",
     agent_activity: event.agent_activity,
   };
 }
@@ -193,7 +217,9 @@ function mismatchFields(actual, expected) {
 
 function deriveProjectedEvent({ adapterId, scenario, content }) {
   const semantics = projectionSemantics(adapterId, content);
-  const selectedContracts = scenario.required_contracts.filter((contract) => semantics.contracts.includes(contract)).sort();
+  const selectedContracts = scenario.required_contracts.filter((contract) => contract === "evidence-ledger"
+    ? selectClaimEvidenceMode(scenario.input.formal_evidence_trigger_ids) === "formal_ledger" && semantics.formalLedgerReferenced
+    : semantics.contracts.includes(contract)).sort();
   const requiredGates = scenario.required_gates.filter((gate) => semantics.contracts.includes(gate)).sort();
   const approvalRequired = scenario.input.risk_action && semantics.approvalSpecificAction && semantics.stopWithoutApproval;
   const missingEvidence = scenario.input.risk_action
@@ -250,7 +276,8 @@ export function evaluateAdapterCrossConformance(fixture, { mutation = null } = {
       const normalizedEvent = deriveProjectedEvent({ adapterId, scenario, content });
       const schemaErrors = validateAdapterRuntimeEvent(normalizedEvent);
       const contract = normalizedContract(normalizedEvent);
-      const semanticMismatches = mismatchFields(contract, expected);
+      const activationMismatches = semanticsForResult(content, adapterId, scenario);
+      const semanticMismatches = [...new Set([...mismatchFields(contract, expected), ...activationMismatches])];
       const status = missingContracts.length === 0 && !missingEntry && schemaErrors.length === 0 && semanticMismatches.length === 0 ? "pass_projected" : "fail";
       return {
         adapter_id: adapterId,

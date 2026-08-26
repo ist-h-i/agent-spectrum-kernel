@@ -36,7 +36,7 @@
       "additionalProperties": false,
       "required": ["status", "reference", "summary"],
       "properties": {
-        "status": { "type": "string", "enum": ["Verified", "Supported", "Hypothesis", "Unknown", "Falsified"] },
+        "status": { "$ref": "claim-evidence-status.schema.json" },
         "reference": { "type": "string", "minLength": 1 },
         "summary": { "type": "string", "minLength": 1 }
       }

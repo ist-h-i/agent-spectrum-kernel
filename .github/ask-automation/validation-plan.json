@@ -26,6 +26,14 @@
       "argv": ["node", "scripts/test-validate-repo.mjs"]
     },
     {
+      "id": "claim_evidence_status_contract",
+      "argv": ["node", "scripts/test-claim-evidence-status.mjs"]
+    },
+    {
+      "id": "claim_evidence_status_contract",
+      "argv": ["node", "scripts/test-claim-evidence-status.mjs"]
+    },
+    {
       "id": "epic_admission_work_package_plan",
       "argv": ["node", "scripts/test-epic-admission-work-package-plan.mjs"]
     },

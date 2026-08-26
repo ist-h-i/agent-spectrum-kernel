@@ -48,7 +48,7 @@ The JSON object inside the fenced block is the only accepted serialized Envelope
 
 `route` explains where the work is going. User-facing route text uses work terms; skill names belong under `internal route` for traceability. `work mode` and `operating mode` are separate: the former describes the task intent, while the latter describes the operating layer.
 
-`evidence status` distinguishes what was directly checked from what is still missing. Do not convert missing evidence into a positive claim or hide it in a skill artifact.
+`evidence status` distinguishes what was directly checked from what is still missing. This checked/missing control object is not the five-value claim truth taxonomy. Claims made about the Envelope use `ask.claim-evidence-status@1.0.0` in their owning artifact. Do not convert missing evidence into a positive claim or hide it in a skill artifact.
 
 When `docs/lifecycle-traceability-contract.md` applies, `evidence_status.checked`, `evidence_status.missing`, and `stop_reason.details` may carry stable artifact or item refs. The Envelope reports control state only; it does not copy acceptance conditions, evidence records, blockers, approvals, or rollback content from the trace chain.
 

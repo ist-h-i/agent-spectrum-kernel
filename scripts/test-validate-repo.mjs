@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import assert from "node:assert/strict";
 import { chmodSync, cpSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, readdirSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -9,7 +10,7 @@ import { CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
 import { putContentAddressedJson } from "./content-addressed-store.mjs";
-import { REQUIRED_TRACEABILITY_SCENARIOS, computeAdapterAppliedProvenanceFingerprint, computeAdapterProfileFingerprint, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
+import { REQUIRED_TRACEABILITY_SCENARIOS, computeAdapterAppliedProvenanceFingerprint, computeAdapterProfileFingerprint, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectClaimEvidencePluginProjection, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -147,8 +148,8 @@ source_scope: "generic empty template; no project-specific domain rules recorded
 
 ## Domain Rule Entries
 
-| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Applies to | Used by | Last checked | Staleness trigger | Owner |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Authority status | Record state | Applies to | Used by | Last checked | Staleness trigger | Owner |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 `;
 
 function skillGroupsFor(skills, overrides = {}) {
@@ -285,6 +286,7 @@ function writeFixture(root, skills = ["alpha"]) {
     "docs/fixtures/evolution-loop",
     "adapters/codex/prompts/skill-verify.md",
     "scripts/content-addressed-store.mjs",
+    "scripts/git-revision-source.mjs",
     "scripts/asset-registry.mjs",
     "scripts/asset-registry-samples.mjs",
     "scripts/test-content-addressed-store.mjs",
@@ -343,13 +345,58 @@ function writeFixture(root, skills = ["alpha"]) {
   );
 }
 
+function cloneClaimEvidencePluginFixture(name) {
+  const root = resolve(fixtureRoot, name);
+  for (const path of [
+    "docs/claim-evidence-status-contract.md",
+    "schemas/claim-evidence-status.schema.json",
+    "skills/evidence-ledger/SKILL.md",
+    "scripts/claim-evidence-status.mjs",
+    "adapters/claude-code/plugin/contracts/claim-evidence-status-contract.md",
+    "adapters/claude-code/plugin/schemas/claim-evidence-status.schema.json",
+    "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs",
+    "adapters/claude-code/plugin/skills/evidence-ledger/SKILL.md",
+    "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+    "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
+    "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
+    "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md",
+  ]) {
+    const target = resolve(root, path);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, readFileSync(resolve(repoRoot, path)));
+  }
+  return root;
+}
+
+function assertClaimEvidencePluginProjectionFailure(label, root, expected) {
+  const result = inspectClaimEvidencePluginProjection(root);
+  if (!result.issues.some((issue) => issue.includes(expected))) {
+    throw new Error(`${label} should expose '${expected}'\n${result.issues.join("\n")}`);
+  }
+}
+
 function writeAdapterFixture(root) {
+  const canonicalClaimEvidenceSchemaPaths = new Set([
+    "schemas/claim-evidence-status.schema.json",
+    "schemas/improvement-ledger-entry.schema.json",
+    "schemas/domain-rule-ledger-entry.schema.json",
+    "schemas/architecture-decision-memory-entry.schema.json",
+    "schemas/documentation-knowledge-ledger-entry.schema.json",
+    "schemas/engineering-capability-ledger-entry.schema.json",
+    "schemas/engineering-pattern-ledger-entry.schema.json",
+    "schemas/review-rule-ledger-entry.schema.json",
+    "schemas/verification-pattern-ledger-entry.schema.json",
+    "schemas/epic-admission-decision.schema.json",
+    "schemas/asset-record.schema.json",
+  ]);
   const schemaPaths = [
     "schemas/metrics-event.schema.json",
     "schemas/execution-envelope.schema.json",
     "schemas/adapter-runtime-profile.schema.json",
     "schemas/adapter-runtime-evidence.schema.json",
     "schemas/adapter-runtime-event.schema.json",
+    "schemas/claim-evidence-status.schema.json",
+    "schemas/claim-evidence-status.schema.json",
     "schemas/normalized-event-schema-registry.json",
     "schemas/review-signal-gate-map.json",
     "schemas/adoption-report.schema.json",
@@ -386,7 +433,7 @@ function writeAdapterFixture(root) {
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    const content = path === "schemas/review-signal-gate-map.json"
+    const content = path === "schemas/review-signal-gate-map.json" || canonicalClaimEvidenceSchemaPaths.has(path)
       ? readFileSync(resolve(repoRoot, path), "utf8")
       : path === "schemas/metrics-event.schema.json"
       ? '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "properties": { "command_attempt_metrics": { "properties": { "classified_as_verification": { "type": "boolean" } } } } }\n'
@@ -483,10 +530,14 @@ console.log(path, code, privacy);
     "adapters/claude-code/project/.claude/commands/skill-ledger-refresh.md",
     "adapters/claude-code/github-actions/README.md",
     "adapters/claude-code/plugin/README.md",
+    "adapters/claude-code/plugin/contracts/claim-evidence-status-contract.md",
     "adapters/claude-code/plugin/contracts/execution-envelope-contract.md",
     "adapters/claude-code/plugin/contracts/review-signal-gate-map.json",
+    "adapters/claude-code/plugin/schemas/claim-evidence-status.schema.json",
     "adapters/claude-code/plugin/schemas/execution-envelope.schema.json",
     "adapters/claude-code/plugin/schemas/metrics-event.schema.json",
+    "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs",
+    "adapters/claude-code/plugin/skills/evidence-ledger/SKILL.md",
     "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
     "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
     "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
@@ -501,11 +552,18 @@ console.log(path, code, privacy);
     "adapters/codex/prompts/skill-verify.md",
     "adapters/codex/prompts/skill-handoff.md",
   ];
+  const exactAdapterFiles = new Set([
+    "adapters/claude-code/plugin/contracts/claim-evidence-status-contract.md",
+    "adapters/claude-code/plugin/contracts/review-signal-gate-map.json",
+    "adapters/claude-code/plugin/schemas/claim-evidence-status.schema.json",
+    "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs",
+    "adapters/claude-code/plugin/skills/evidence-ledger/SKILL.md",
+  ]);
   for (const path of adapterFiles) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
     writeFileSync(
       resolve(root, path),
-      path === "adapters/claude-code/plugin/contracts/review-signal-gate-map.json"
+      exactAdapterFiles.has(path)
         ? readFileSync(resolve(repoRoot, path), "utf8")
         : "# Fixture\n",
     );
@@ -884,8 +942,8 @@ function writeImprovementLedger(root, content) {
   writeFileSync(resolve(root, "docs/ai/improvement-ledger.md"), content);
 }
 
-const domainRuleHeader = "| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Applies to | Used by | Last checked | Staleness trigger | Owner |";
-const domainRuleSeparator = "|---|---|---|---|---|---|---|---|---|---|---|---|---|";
+const domainRuleHeader = "| ID | Rule | Business object | Business actor | Workflow | State / condition | Source | Evidence status | Authority status | Record state | Applies to | Used by | Last checked | Staleness trigger | Owner |";
+const domainRuleSeparator = "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|";
 
 function domainRuleRow(overrides = {}) {
   const row = {
@@ -896,7 +954,9 @@ function domainRuleRow(overrides = {}) {
     Workflow: "Refund approval",
     "State / condition": "Refund amount exceeds configured threshold",
     Source: "Human-confirmed: fixture domain owner note",
-    "Evidence status": "Human-confirmed",
+    "Evidence status": "Supported",
+    "Authority status": "human_confirmed",
+    "Record state": "active",
     "Applies to": "Refund workflow",
     "Used by": "requirement-grill; review-domain-impact",
     "Last checked": "2999-01-01",
@@ -914,6 +974,8 @@ function domainRuleRow(overrides = {}) {
     row["State / condition"],
     row.Source,
     row["Evidence status"],
+    row["Authority status"],
+    row["Record state"],
     row["Applies to"],
     row["Used by"],
     row["Last checked"],
@@ -4224,7 +4286,7 @@ EOF
     throw new Error(`codex runner should capture output and report executed evidence\n${passResult.stdout}\n${passResult.stderr}`);
   }
   for (const expected of [
-    "Requested contracts: 4",
+    "Requested contracts: 3",
     "Projected contracts evidence: projected",
     "Runtime-detected compact output profile evidence: runtime_detected",
     "Runtime-loaded contracts evidence: none",
@@ -4251,7 +4313,7 @@ EOF
   assertRuntimePass("codex runner emits structured execution evidence", jsonResult);
   const jsonReport = JSON.parse(jsonResult.stdout);
   if (
-    jsonReport.execution_evidence?.requested_contracts?.contracts?.length !== 4 ||
+    jsonReport.execution_evidence?.requested_contracts?.contracts?.length !== 3 ||
     jsonReport.execution_evidence?.projected_contracts?.evidence_level !== "projected" ||
     jsonReport.execution_evidence?.runtime_detected_profile?.evidence_level !== "runtime_detected" ||
     jsonReport.execution_evidence?.runtime_loaded_contracts?.evidence_level !== "none" ||
@@ -5014,10 +5076,17 @@ ${validEnvelopeBlock}
   const pluginOnlyRoot = resolve(fixtureRoot, "claude-plugin-only-package");
   for (const relativePath of [
     "skills/review-pr/SKILL.md",
+    "skills/adoption-report/SKILL.md",
+    "skills/ledger-refresh/SKILL.md",
+    "skills/implementation-context-check/SKILL.md",
+    "skills/evidence-ledger/SKILL.md",
+    "contracts/claim-evidence-status-contract.md",
     "contracts/execution-envelope-contract.md",
     "contracts/review-signal-gate-map.json",
+    "schemas/claim-evidence-status.schema.json",
     "schemas/execution-envelope.schema.json",
     "schemas/metrics-event.schema.json",
+    "scripts/claim-evidence-status.mjs",
   ]) {
     const sourcePath = resolve(repoRoot, "adapters/claude-code/plugin", relativePath);
     const targetPath = resolve(pluginOnlyRoot, relativePath);
@@ -5027,13 +5096,40 @@ ${validEnvelopeBlock}
   const pluginSkill = readFileSync(resolve(pluginOnlyRoot, "skills/review-pr/SKILL.md"), "utf8");
   const pluginContract = resolve(pluginOnlyRoot, "contracts/execution-envelope-contract.md");
   const pluginSignalRegistry = resolve(pluginOnlyRoot, "contracts/review-signal-gate-map.json");
+  const pluginClaimContract = resolve(pluginOnlyRoot, "contracts/claim-evidence-status-contract.md");
+  const pluginClaimSchema = resolve(pluginOnlyRoot, "schemas/claim-evidence-status.schema.json");
+  const pluginClaimNormalizer = resolve(pluginOnlyRoot, "scripts/claim-evidence-status.mjs");
+  const pluginEvidenceSkill = resolve(pluginOnlyRoot, "skills/evidence-ledger/SKILL.md");
   const pluginSchema = resolve(pluginOnlyRoot, "schemas/execution-envelope.schema.json");
-  if (!pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md") || !pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json") || !existsSync(pluginContract) || !existsSync(pluginSignalRegistry) || !existsSync(pluginSchema)) {
-    throw new Error("Claude plugin-only package must contain resolvable contract, signal registry, and schema assets");
+  if (
+    !pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md") ||
+    !pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json") ||
+    !pluginSkill.includes("${CLAUDE_PLUGIN_ROOT}/contracts/claim-evidence-status-contract.md") ||
+    !pluginSkill.includes("high_stakes_readiness") ||
+    !pluginSkill.includes("formal_ledger") ||
+    !pluginSkill.includes("/ai-skills:evidence-ledger") ||
+    !existsSync(pluginContract) ||
+    !existsSync(pluginSignalRegistry) ||
+    !existsSync(pluginClaimContract) ||
+    !existsSync(pluginClaimSchema) ||
+    !existsSync(pluginClaimNormalizer) ||
+    !existsSync(pluginEvidenceSkill) ||
+    !existsSync(pluginSchema)
+  ) {
+    throw new Error("Claude plugin-only package must contain resolvable execution and claim contract, Skill, normalizer, signal registry, and schema assets");
   }
   const pluginRegistry = JSON.parse(readFileSync(pluginSignalRegistry, "utf8"));
   if (!pluginRegistry.signal_to_gates?.public_api_change?.includes("review-architecture-impact") || !pluginRegistry.signal_to_gates?.generated_output_failure_mode?.includes("review-adversarial-risk")) {
     throw new Error("Claude plugin-only package must expose the controlled signal registry mapping");
+  }
+  const pluginClaim = JSON.parse(readFileSync(pluginClaimSchema, "utf8"));
+  if (
+    JSON.stringify(pluginClaim.enum) !== JSON.stringify(["Verified", "Supported", "Hypothesis", "Unknown", "Falsified"]) ||
+    pluginClaim["x-ask-contract"]?.ref !== "ask.claim-evidence-status@1.0.0" ||
+    pluginClaim["x-ask-contract"]?.inline_default !== true ||
+    JSON.stringify(pluginClaim["x-ask-contract"]?.formal_ledger?.trigger_ids) !== JSON.stringify(["explicit_claim_audit", "multiple_material_claims", "high_stakes_readiness", "cross_artifact_synthesis", "stable_claim_ids"])
+  ) {
+    throw new Error("Claude plugin-only package must preserve the exact claim evidence taxonomy and formal trigger contract");
   }
   const pluginOnlyEnvelope = inspectExecutionEnvelope(validEnvelopeBlock, { schemaPath: pluginSchema });
   if (pluginOnlyEnvelope.status !== "parsed") {
@@ -5622,6 +5718,115 @@ try {
   const missingSchemaRoot = cloneFixture("missing-schema");
   rmSync(resolve(missingSchemaRoot, "schemas/metrics-event.schema.json"));
   assertFail("missing required schema", missingSchemaRoot, "required schema is missing");
+
+  const expandedClaimEvidenceTaxonomyRoot = cloneFixture("expanded-claim-evidence-taxonomy");
+  {
+    const schemaPath = resolve(expandedClaimEvidenceTaxonomyRoot, "schemas/claim-evidence-status.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema.enum.push("weak");
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertFail(
+    "expanded claim evidence taxonomy",
+    expandedClaimEvidenceTaxonomyRoot,
+    "canonical schema enum must be exactly Verified, Supported, Hypothesis, Unknown, Falsified",
+  );
+
+  const copiedClaimEvidenceTaxonomyRoot = cloneFixture("copied-claim-evidence-taxonomy");
+  {
+    const schemaPath = resolve(copiedClaimEvidenceTaxonomyRoot, "schemas/domain-rule-ledger-entry.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema.properties.evidence_status = { type: "string", enum: ["Verified", "Supported"] };
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertFail(
+    "copied claim evidence taxonomy",
+    copiedClaimEvidenceTaxonomyRoot,
+    "schemas/domain-rule-ledger-entry.schema.json evidence_status must reference claim-evidence-status.schema.json without copying an enum",
+  );
+
+  const optionalClaimAuthorityRoot = cloneFixture("optional-claim-authority");
+  {
+    const schemaPath = resolve(optionalClaimAuthorityRoot, "schemas/domain-rule-ledger-entry.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema.required = schema.required.filter((field) => field !== "authority_status");
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertFail(
+    "optional claim authority separation",
+    optionalClaimAuthorityRoot,
+    "schemas/domain-rule-ledger-entry.schema.json must define and require separated field authority_status",
+  );
+
+  const validClaimPluginProjectionRoot = cloneClaimEvidencePluginFixture("valid-plugin-claim-projection");
+  assert.deepEqual(inspectClaimEvidencePluginProjection(validClaimPluginProjectionRoot).issues, [], "valid Claude plugin claim projection must pass");
+
+  const driftedPluginClaimContractRoot = cloneClaimEvidencePluginFixture("drifted-plugin-claim-contract");
+  {
+    const path = resolve(driftedPluginClaimContractRoot, "adapters/claude-code/plugin/contracts/claim-evidence-status-contract.md");
+    writeFileSync(path, `${readFileSync(path, "utf8")}drift\n`);
+  }
+  assertClaimEvidencePluginProjectionFailure(
+    "drifted Claude plugin claim contract",
+    driftedPluginClaimContractRoot,
+    "Claude plugin projection must be byte-identical to docs/claim-evidence-status-contract.md",
+  );
+
+  const missingPluginClaimNormalizerRoot = cloneClaimEvidencePluginFixture("missing-plugin-claim-normalizer");
+  rmSync(resolve(missingPluginClaimNormalizerRoot, "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs"));
+  assertClaimEvidencePluginProjectionFailure(
+    "missing Claude plugin claim normalizer",
+    missingPluginClaimNormalizerRoot,
+    "Claude plugin projection must be byte-identical to scripts/claim-evidence-status.mjs",
+  );
+
+  const weakenedPluginReviewClaimRouteRoot = cloneClaimEvidencePluginFixture("weakened-plugin-review-claim-route");
+  {
+    const path = resolve(weakenedPluginReviewClaimRouteRoot, "adapters/claude-code/plugin/skills/review-pr/SKILL.md");
+    writeFileSync(path, readFileSync(path, "utf8").replace("high_stakes_readiness", "generic_review_claim"));
+  }
+  assertClaimEvidencePluginProjectionFailure(
+    "weakened Claude plugin review claim route",
+    weakenedPluginReviewClaimRouteRoot,
+    "Claude plugin review-pr must preserve claim routing token: high_stakes_readiness",
+  );
+
+  const overactivatedPluginOrdinaryClaimRoot = cloneClaimEvidencePluginFixture("overactivated-plugin-ordinary-claim");
+  {
+    const path = resolve(overactivatedPluginOrdinaryClaimRoot, "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md");
+    writeFileSync(path, readFileSync(path, "utf8").replace("Do not activate", "Always activate"));
+  }
+  assertClaimEvidencePluginProjectionFailure(
+    "overactivated Claude plugin ordinary claim route",
+    overactivatedPluginOrdinaryClaimRoot,
+    "Claude plugin implementation-context-check must preserve claim routing token: Do not activate",
+  );
+
+  const broadenedAssetEvidenceStatusRoot = cloneFixture("broadened-asset-evidence-status");
+  {
+    const schemaPath = resolve(broadenedAssetEvidenceStatusRoot, "schemas/asset-record.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema.$defs.evidenceStatus.$ref = "claim-evidence-status.schema.json#/$defs/lowercase_status";
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertFail(
+    "broadened Asset evidence status",
+    broadenedAssetEvidenceStatusRoot,
+    "schemas/asset-record.schema.json $defs.evidenceStatus must reference claim-evidence-status.schema.json#/$defs/lowercase_observation_status without copying an enum",
+  );
+
+  const detachedEpicEvidenceStatusRoot = cloneFixture("detached-epic-evidence-status");
+  {
+    const schemaPath = resolve(detachedEpicEvidenceStatusRoot, "schemas/epic-admission-decision.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema.$defs.evidenceStatus = { enum: ["verified", "supported", "hypothesis", "unknown", "falsified"] };
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertFail(
+    "detached Epic evidence status",
+    detachedEpicEvidenceStatusRoot,
+    "schemas/epic-admission-decision.schema.json $defs.evidenceStatus must reference claim-evidence-status.schema.json#/$defs/lowercase_status without copying an enum",
+  );
 
   const missingAssetSchemaRoot = cloneFixture("missing-asset-record-schema");
   rmSync(resolve(missingAssetSchemaRoot, "schemas/asset-record.schema.json"));
@@ -6367,6 +6572,18 @@ jobs:
   const invalidDomainRuleStatusRoot = cloneFixture("invalid-domain-rule-status");
   writeDomainRuleLedger(invalidDomainRuleStatusRoot, domainRuleLedgerFixture({ rows: [domainRuleRow({ "Evidence status": "Confirmed" })] }));
   assertFail("invalid domain rule status", invalidDomainRuleStatusRoot, "invalid Evidence status");
+
+  const invalidDomainRuleAuthorityRoot = cloneFixture("invalid-domain-rule-authority");
+  writeDomainRuleLedger(invalidDomainRuleAuthorityRoot, domainRuleLedgerFixture({ rows: [domainRuleRow({ "Authority status": "owner_says_so" })] }));
+  assertFail("invalid domain rule authority", invalidDomainRuleAuthorityRoot, "invalid Authority status");
+
+  const invalidDomainRuleRecordStateRoot = cloneFixture("invalid-domain-rule-record-state");
+  writeDomainRuleLedger(invalidDomainRuleRecordStateRoot, domainRuleLedgerFixture({ rows: [domainRuleRow({ "Record state": "confirmed" })] }));
+  assertFail("invalid domain rule record state", invalidDomainRuleRecordStateRoot, "invalid Record state");
+
+  const missingDomainRuleSeparationRoot = cloneFixture("missing-domain-rule-separation");
+  writeDomainRuleLedger(missingDomainRuleSeparationRoot, domainRuleLedgerFixture({ rows: [domainRuleRow({ "Authority status": "", "Record state": "" })] }));
+  assertFail("missing domain rule separation", missingDomainRuleSeparationRoot, "is missing required fields: Authority status, Record state");
 
   const duplicateDomainRuleRoot = cloneFixture("duplicate-domain-rule");
   writeDomainRuleLedger(duplicateDomainRuleRoot, domainRuleLedgerFixture({ rows: [domainRuleRow(), domainRuleRow()] }));

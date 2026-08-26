@@ -29,6 +29,8 @@ The adapters may coexist. Claude owns only the paths registered in its managed i
 | Profile expansion | Add the newly selected managed assets. | Closure or canonical provenance validation fails. | Fix the selected profile/Skill closure and rerun. |
 | Profile shrink | Requires `--prune` when excluded managed assets remain discoverable. | Modified excluded asset or omitted `--prune`. | Resolve the modified file, then rerun with `--prune`; do not silently retain it as selected capability. |
 | Claude and Codex installed together | Preserve disjoint adapter ownership and independent state. | A path is claimed by both adapters or by the core. | Stop; correct the inventory contract before applying either projection. |
+| Pre-#229 evidence projection | Regenerate ordinary commands with inline `ask.claim-evidence-status@1.0.0`; keep formal `evidence-ledger` installed but conditionally selected. | A copied taxonomy, missing contract revision, or unconditional ordinary-ledger route is detected. | Regenerate both projections and runtime fixtures; do not reinterpret or rewrite stored legacy artifacts in place. |
+| Pre-#229 evidence projection | Regenerate ordinary commands with inline `ask.claim-evidence-status@1.0.0`; keep formal `evidence-ledger` installed but conditionally selected. | A copied taxonomy, missing contract revision, or unconditional ordinary-ledger route is detected. | Regenerate both projections and runtime fixtures; do not reinterpret or rewrite stored legacy artifacts in place. |
 
 Schema additions remain compatible only when older profile documents remain valid and downgrade behavior is not weakened. Capability ID removal/rename, changed downgrade meaning, or canonical ownership changes require a schema-version change and new migration evidence.
 
@@ -57,6 +59,10 @@ node scripts/install-claude-adapter.mjs --target /path/to/project --detach
 The repository fixture `scripts/test-adapter-runtime-migration.mjs` verifies current installer idempotence, profile expansion, rollback, pruned shrink, coexistence, detach isolation, and project-owned content preservation in a temporary repository. Existing Codex fixtures separately cover pre-compact prompt replacement and rollback.
 
 These checks prove bounded installer behavior. They do not prove an external Claude or Codex process loaded the projected assets or applied canonical risk, evidence, approval, and verification semantics. Capture bounded runtime evidence before upgrading those claims.
+
+For #229, the repository additionally verifies deterministic projection selection between `inline` and `formal_ledger`. Existing lowercase and legacy evidence values are normalized read-only under `docs/claim-evidence-status-contract.md`; migration must not upgrade `weak` to `Verified`, broaden the #276 Asset observation subset, or treat Skill installation as task activation.
+
+For #229, the repository additionally verifies deterministic projection selection between `inline` and `formal_ledger`. Existing lowercase and legacy evidence values are normalized read-only under `docs/claim-evidence-status-contract.md`; migration must not upgrade `weak` to `Verified`, broaden the #276 Asset observation subset, or treat Skill installation as task activation.
 
 ## Checkpoint C handoff
 

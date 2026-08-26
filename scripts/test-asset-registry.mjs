@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -33,6 +32,7 @@ import {
   readContentAddressedJson,
   stableCanonicalJson,
 } from "./content-addressed-store.mjs";
+import { materializeGitRevisionSources } from "./git-revision-source.mjs";
 
 const REPOSITORY_ID = "github.com/ist-h-i/agent-spectrum-kernel";
 const SOURCE_REVISION = "656edf1ac611890a3ae5a93a90e9076f50ee2488";
@@ -80,13 +80,6 @@ function check(label, action) {
 function expectFailure(label, action, pattern) {
   assert.throws(action, pattern, label);
   caseCount += 1;
-}
-
-function copyFixture(sourceRoot, relativePath) {
-  const target = resolve(sourceRoot, relativePath);
-  mkdirSync(dirname(target), { recursive: true });
-  copyFileSync(resolve(repositoryRoot, relativePath), target);
-  return target;
 }
 
 function assetDescriptor({
@@ -255,13 +248,57 @@ try {
   mkdirSync(sourceRoot, { recursive: true });
   mkdirSync(storeRoot, { recursive: true });
 
-  for (const sample of Object.values(samples)) copyFixture(sourceRoot, sample.path);
+  materializeGitRevisionSources({
+    repositoryRoot,
+    targetRoot: sourceRoot,
+    revision: SOURCE_REVISION,
+    sources: Object.values(samples).map((sample) => ({ path: sample.path, rawDigest: sample.sha256 })),
+  });
 
   check("three checked-in sample identities are exact", () => {
     for (const sample of Object.values(samples)) {
       assert.equal(rawDigest(readFileSync(resolve(sourceRoot, sample.path))), sample.sha256, sample.path);
     }
   });
+
+  check("historical Skill bytes stay separate from the canonical live Skill", () => {
+    const historical = readFileSync(resolve(sourceRoot, samples.skill.path), "utf8");
+    const live = readFileSync(resolve(repositoryRoot, samples.skill.path), "utf8");
+    assert.match(historical, /Human-confirmed/u);
+    assert.doesNotMatch(live, /Human-confirmed/u);
+    assert.notEqual(rawDigest(Buffer.from(live, "utf8")), samples.skill.sha256);
+  });
+
+  expectFailure(
+    "historical materialization rejects an unavailable revision without live fallback",
+    () => materializeGitRevisionSources({
+      repositoryRoot,
+      targetRoot: resolve(root, "missing-revision"),
+      revision: "0".repeat(40),
+      sources: [{ path: samples.skill.path, rawDigest: samples.skill.sha256 }],
+    }),
+    /revision is unavailable/iu,
+  );
+  expectFailure(
+    "historical materialization rejects a missing revision path",
+    () => materializeGitRevisionSources({
+      repositoryRoot,
+      targetRoot: resolve(root, "missing-path"),
+      revision: SOURCE_REVISION,
+      sources: [{ path: "skills/not-present/SKILL.md", rawDigest: samples.skill.sha256 }],
+    }),
+    /source is unavailable/iu,
+  );
+  expectFailure(
+    "historical materialization rejects a declared digest mismatch",
+    () => materializeGitRevisionSources({
+      repositoryRoot,
+      targetRoot: resolve(root, "wrong-digest"),
+      revision: SOURCE_REVISION,
+      sources: [{ path: samples.skill.path, rawDigest: `sha256:${"0".repeat(64)}` }],
+    }),
+    /digest mismatch/iu,
+  );
 
   const runtimeFixturePath = resolve(repositoryRoot, "docs/fixtures/adapter-runtime-profiles.json");
   const runtimeFixtureDigestBefore = rawDigest(readFileSync(runtimeFixturePath));

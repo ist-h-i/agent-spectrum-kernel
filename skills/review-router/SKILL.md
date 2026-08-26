@@ -43,7 +43,7 @@ Select the smallest set of review gates needed to make the merge decision defens
    - `review-automated-gate`: merge confidence depends on lint, format, typecheck, build, test, static analysis, or CI evidence.
    - `review-code-health`: the request or diff exposes debt, smell, duplication, dead code, maintainability, testability, performance, dependency/tooling, boundary weakness, or repeated finding risk.
    - `review-ai-quality`: local design, logic, scope, and implementation-quality signals not covered by a specialized gate.
-   - `evidence-ledger`: the review makes a correctness, readiness, reliability, performance, security, UX, cost, or maintainability claim.
+   - `evidence-ledger`: `ask.claim-evidence-status@1.0.0` selects a formal audit because the review has multiple material claims, evaluates high-stakes merge/release/security/reliability/performance/cost/externally communicated readiness, synthesizes revisions, needs stable claim IDs, or the user explicitly requests it. Ordinary review claims stay inline.
    - `review-final-merge-gate`: always last when a merge decision is requested.
    - A route or gate decision trigger is valid only when every trigger ID is present in `change_signals[].signal` and the controlled mapping includes that gate. Unknown, mismatched, negated, or free-form evidence text does not justify a gate.
 

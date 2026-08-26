@@ -118,6 +118,8 @@ Each dimension preserves `complete`, `insufficient_evidence`, `unknown`,
 `unknown`, `unavailable`, or `not_applicable` conclusions as appropriate. They
 cannot be serialized as retained, zero, or neutral.
 
+These dimension, recommendation, action, and decision values remain Evolution operational state. A claim made about them uses `ask.claim-evidence-status@1.0.0`; the shared claim taxonomy neither changes the sealed evaluation bytes nor grants recommendation, Portfolio-update, rollback, or human-decision authority.
+
 The MVP has no separate trusted #178 input. Therefore an external-outcome
 dimension remains typed incomplete even when an `external_outcome_report`
 artifact identity is present; `complete` external-outcome evidence is rejected

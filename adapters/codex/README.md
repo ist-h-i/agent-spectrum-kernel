@@ -34,7 +34,7 @@ Codex-compatible projection uses these surfaces:
 | Reusable workflows | Repo-scoped `.agents/skills/<skill>/SKILL.md` projections of canonical `skills/<name>/SKILL.md` | `behavior_verified` for projection; runtime skill loading remains Codex-controlled |
 | Task commands | Prompt templates passed to Codex through `scripts/codex-exec-runner.mjs` | `executed` only after the runner captures output; business correctness remains unproven |
 | Explicit entry routing | Direct primary contract selected by the compact profile; review retains `review-router` for signal-to-gate selection | `projected`; upper routers are skipped only because mode/task class is already fixed |
-| Risk and evidence gates | `risk-gate`, `test-first-verification`, `evidence-ledger` | Prompt controls are `projected`; an explicitly required `risk-gate` stops the bounded runner before execution when specific-action approval is unavailable |
+| Risk and evidence controls | `risk-gate`, `test-first-verification`, `ask.claim-evidence-status@1.0.0`, conditional `evidence-ledger` | Prompt controls are `projected`; ordinary claims use the shared status inline, a closed trigger selects the formal ledger, and an explicitly required `risk-gate` stops the bounded runner before execution when specific-action approval is unavailable |
 | Metrics / observability | Project-local metrics contract only when separately enabled | unsupported in this adapter; no Codex hook or telemetry integration is shipped |
 | Shared PR automation | Codex GitHub Action or workflow defined by an adopting project | unsupported in this adapter; no workflow is provided here |
 
