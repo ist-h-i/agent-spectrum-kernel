@@ -26,7 +26,7 @@
       "scope": "profile_projection",
       "profile_id": "claude-code-local-observed-v1",
       "renderer_profile": "observability",
-      "profile_fingerprint": "sha256:bd89f16548a903a74404a16ad730f5de490345e773ff9c90f54ad00026ba93f8"
+      "profile_fingerprint": "sha256:795062b562f98e133ca5114c277a0d9df0f95f4f9ab2e294d029434f59d0505a"
     },
     {
       "record_id": "codex-projection-manifest",
@@ -54,7 +54,7 @@
       "scope": "profile_projection",
       "profile_id": "codex-local-projection-v1",
       "renderer_profile": "implementation",
-      "profile_fingerprint": "sha256:8ed08886d21b9cbc3049263e0882ffa969af039f68704dcf96e82a0d1fca78c6"
+      "profile_fingerprint": "sha256:a9d17d5fa8e8b026ab997502c360879f0879479612bb595a122cbf478c1ad380"
     },
     {
       "record_id": "claude-canonical-metrics-collector",
