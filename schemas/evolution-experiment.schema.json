@@ -268,8 +268,7 @@
       ]
     },
     "recommendation": {
-      "type": "string",
-      "enum": ["expand", "retain", "simplify", "stop", "insufficient_evidence"]
+      "$ref": "effectiveness-decision-vocabulary.schema.json#/$defs/overallRecommendation"
     },
     "action": {
       "type": "string",

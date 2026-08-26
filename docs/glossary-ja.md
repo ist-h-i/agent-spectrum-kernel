@@ -71,13 +71,14 @@ Do not confuse with:
 ## Skill effectiveness evaluation
 
 Meaning:
-- 1つの完了済みタスクについて、選んだSkillが効果的だったか、過剰だったか、足りなかったかを根拠付きで評価するworkflowです。
+- 1つの完了済みタスクについて、選んだSkillが効果的だったか、過剰だったか、足りなかったかを、closed catalogのnative-unit measurement、根拠から導出したeffect、7つの独立したdimension classificationで評価するworkflowです。独自metricや総合点は作りません。
 
 Use when:
-- routing quality、output usefulness、evidence quality、risk reduction、overhead control、reuse valueをふりかえりたい場合。
+- outcome quality、false-positive control、safety、routing quality、evidence quality、overhead、reuse valueを、実際のfinding、claim、token、duration、artifact、reworkなどの単位と、comparison/materiality根拠を分けてふりかえりたい場合。
 
 Do not confuse with:
 - 複数タスクや期間でadoption maturityを見る `skill-adoption-metrics`。
+- `0-5`のanchored capability level、benchmark scoring、ROI、Asset/Portfolio更新authority。
 
 ## Skill adoption metrics
 

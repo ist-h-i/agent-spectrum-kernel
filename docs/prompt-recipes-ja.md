@@ -242,7 +242,8 @@ Hypothesisは質問にだけ使い、enforcementやblockerにしないでくだ�
 ```text
 この完了済みタスクで選んだSkillが有効だったかを評価してください。
 operating-mode-router で observability_metrics に分類し、skill-effectiveness-evaluation を使ってください。
-使ったSkill、skipしたSkill、成果物、検証結果、残リスクを根拠に、routing quality、output usefulness、evidence quality、risk reduction、overhead control、reuse valueを0-100で評価してください。
+使ったSkill、skipしたSkill、成果物、検証結果、残リスクを根拠に、valid/missed findings、false positive、requirements、scope deviation、overclaim、route correctness、tokens、duration、tools、artifacts、agents、実測したhuman correction/reworkを、closed v1 catalogにある元の単位で記録してください。独自metric、score、percentage、aggregate、ordinalは作らないでください。
+measurementとeffectを分け、comparison metricは同じunitのreference、materiality threshold、rule ref、effect evidenceからdeltaとimpactを導出してください。観測済みresourceでも比較根拠がなければeffectはUnknownです。Unknown/unavailableは0にせず、null、Unknown、limitationとして残してください。outcome quality、false-positive control、safety、routing quality、evidence quality、overhead、reuse valueを別々に effective | neutral | excessive | harmful | insufficient_evidence へ分類し、harmを平均で打ち消さず、expand | retain | simplify | stop | insufficient_evidence を決定してください。
 一つの実例だけでSkillを書き換えず、必要なら prompt recipe、validation、project overlay、context、example、improvement-ledger への狭いfollow-upを提案してください。
 ```
 
@@ -254,16 +255,19 @@ operating-mode-router で observability_metrics に分類し、skill-effectivene
 
 ### 期待する出力
 
-- Scores
+- Catalog-bound native-unit measurements, derived effects, and evidence limitations
+- Seven separate dimension classifications
+- Scoped overall recommendation with authority_implied: false
 - What worked / excessive / missing
 - Defects or risks caught / missed
 - Recommended follow-up
-- Confidence
+- Evidence limitations
 
 ### 注意
 
 - 1タスクの評価です。期間集計は `skill-adoption-metrics` です。
 - 人やチームの評価ではなくworkflow効果の評価です。
+- benchmark score、capability level、ROI、Asset/Portfolio更新authorityとして扱いません。
 
 ## Adoption metrics measurement
 

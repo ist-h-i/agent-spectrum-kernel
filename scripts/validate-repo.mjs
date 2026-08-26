@@ -20,7 +20,13 @@ import {
 import { exportAssetRegistryReference, listAssets, verifyAssetRegistry } from "./asset-registry.mjs";
 import { listContentAddressedJson, readContentAddressedJson, readJsonFileStrict } from "./content-addressed-store.mjs";
 import { verifyEvolutionClosure } from "./evolution-loop.mjs";
+import {
+  CORE_IMMUTABLE_CONTRACT_ASSETS,
+  CORE_IMMUTABLE_RUNTIME_ASSETS,
+  CORE_OWNED_IMMUTABLE_ASSETS,
+} from "./installer-lifecycle.mjs";
 import { verifyPortfolioLock, verifyPortfolioSelection } from "./portfolio-manager.mjs";
+import { validateSkillEffectivenessFixtureCatalog } from "./skill-effectiveness-outcome.mjs";
 import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { validatePortfolioDesignAdmissionArtifacts } from "./ask-benchmark-design-admission.mjs";
@@ -761,6 +767,115 @@ function validateAskAutomationActionPins(root, errors) {
   const path = resolve(root, ASK_AUTOMATION_WORKFLOW_PATH);
   if (!existsSync(path)) return;
   for (const message of validateAskAutomationActionPinsText(readFileSync(path, "utf8"))) fail(errors, "ASK automation Action pins", message);
+}
+
+function validateSkillEffectivenessOutcomeContract(root, manifest, errors) {
+  if (!manifest?.skills?.includes("skill-effectiveness-evaluation")) return;
+  const section = "one-task Skill effectiveness outcome";
+  const requiredDocs = [
+    "docs/skill-effectiveness-evaluation-contract.md",
+    "docs/adr/0010-one-task-effectiveness-authority-boundary.md",
+    "docs/fixtures/skill-effectiveness-outcome-cases.json",
+  ];
+  const requiredSchemas = [
+    "schemas/effectiveness-decision-vocabulary.schema.json",
+    "schemas/skill-effectiveness-outcome.schema.json",
+  ];
+  const immutableAssets = [
+    "docs/skill-effectiveness-evaluation-contract.md",
+    "schemas/effectiveness-decision-vocabulary.schema.json",
+    "schemas/skill-effectiveness-outcome.schema.json",
+  ];
+  for (const path of requiredDocs) {
+    if (!manifest?.docs?.includes(path)) fail(errors, section, `manifest docs inventory is missing ${path}`);
+  }
+  for (const path of requiredSchemas) {
+    if (!manifest?.schemas?.includes(path)) fail(errors, section, `manifest schema inventory is missing ${path}`);
+  }
+  for (const path of immutableAssets) {
+    if (!CORE_IMMUTABLE_CONTRACT_ASSETS.includes(path)) fail(errors, section, `core installer immutable inventory is missing ${path}`);
+  }
+  for (const path of ["scripts/json-schema-validation.mjs", "scripts/skill-effectiveness-outcome.mjs"]) {
+    if (!CORE_IMMUTABLE_RUNTIME_ASSETS.includes(path)) fail(errors, section, `core installer immutable runtime inventory is missing ${path}`);
+    if (!CORE_OWNED_IMMUTABLE_ASSETS.includes(path)) fail(errors, section, `combined core immutable inventory is missing ${path}`);
+    if (!existsSync(resolve(root, path))) fail(errors, section, `required semantic runtime is missing ${path}`);
+  }
+
+  const skillPath = resolve(root, "skills/skill-effectiveness-evaluation/SKILL.md");
+  const canonicalSkillText = existsSync(skillPath) ? readFileSync(skillPath, "utf8") : "";
+  for (const token of [
+    "scripts/skill-effectiveness-outcome.mjs",
+    "build <input.json|->",
+    "validate <outcome.json|->",
+  ]) {
+    if (!canonicalSkillText.includes(token)) fail(errors, section, `canonical Skill must require semantic CLI token: ${token}`);
+  }
+  const semanticText = existsSync(resolve(root, "scripts/skill-effectiveness-outcome.mjs"))
+    ? readFileSync(resolve(root, "scripts/skill-effectiveness-outcome.mjs"), "utf8")
+    : "";
+  if (!semanticText.includes('from "./json-schema-validation.mjs"') || !semanticText.includes('["build", "validate"]')) {
+    fail(errors, section, "semantic builder/validator must consume the shared Schema runtime and expose build/validate CLI commands");
+  }
+  const envelopeText = existsSync(resolve(root, "scripts/execution-envelope.mjs"))
+    ? readFileSync(resolve(root, "scripts/execution-envelope.mjs"), "utf8")
+    : "";
+  if (!envelopeText.includes('from "./json-schema-validation.mjs"') || !envelopeText.includes('export { validateJsonSchema } from "./json-schema-validation.mjs"')) {
+    fail(errors, section, "Execution Envelope must consume and re-export the shared JSON Schema validator");
+  }
+  const promptRecipeText = existsSync(resolve(root, "docs/prompt-recipes-ja.md"))
+    ? readFileSync(resolve(root, "docs/prompt-recipes-ja.md"), "utf8")
+    : "";
+  const promptSection = promptRecipeText.split("## Skill effectiveness evaluation", 2)[1]?.split("\n## ", 1)[0] ?? "";
+  if (promptSection.includes("- Confidence") || !promptSection.includes("- Evidence limitations")) {
+    fail(errors, section, "Skill effectiveness prompt recipe must use Evidence limitations instead of Confidence");
+  }
+
+  const fixturePath = resolve(root, "docs/fixtures/skill-effectiveness-outcome-cases.json");
+  if (!existsSync(fixturePath)) {
+    fail(errors, section, "fixture catalog is missing");
+  } else {
+    try {
+      const catalog = readJsonFileStrict(fixturePath, "one-task Skill effectiveness outcome fixture catalog");
+      for (const contractIssue of validateSkillEffectivenessFixtureCatalog(catalog)) fail(errors, section, contractIssue);
+    } catch (error) {
+      fail(errors, section, `fixture catalog is invalid: ${error.message}`);
+    }
+  }
+
+  for (const path of ["schemas/evolution-experiment.schema.json", "schemas/evolution-recommendation.schema.json"]) {
+    const absolutePath = resolve(root, path);
+    const text = existsSync(absolutePath) ? readFileSync(absolutePath, "utf8") : "";
+    if (!text.includes('"$ref": "effectiveness-decision-vocabulary.schema.json#/$defs/overallRecommendation"')) {
+      fail(errors, section, `${path} must reference the shared overall recommendation vocabulary`);
+    }
+  }
+
+  const skillText = readFileSync(resolve(root, "skills/skill-effectiveness-evaluation/SKILL.md"), "utf8");
+  const recipeText = readFileSync(resolve(root, "docs/prompt-recipes-ja.md"), "utf8");
+  for (const [path, text] of [["skills/skill-effectiveness-evaluation/SKILL.md", skillText], ["docs/prompt-recipes-ja.md", recipeText]]) {
+    if (/\b0\s*-\s*100\b/u.test(text)) fail(errors, section, `${path} must not request an unanchored 0-100 effectiveness score`);
+  }
+  for (const token of [
+    "docs/skill-effectiveness-evaluation-contract.md",
+    "schemas/skill-effectiveness-outcome.schema.json",
+    "schemas/effectiveness-decision-vocabulary.schema.json",
+  ]) {
+    if (!skillText.includes(token)) fail(errors, section, `Skill contract must name ${token}`);
+  }
+
+  try {
+    const plan = readJsonFileStrict(resolve(root, ".github/ask-automation/validation-plan.json"), "immutable validation plan");
+    const command = plan.commands?.find(({ id }) => id === "skill_effectiveness_outcome_contract");
+    if (JSON.stringify(command?.argv) !== JSON.stringify(["node", "scripts/test-skill-effectiveness-outcome.mjs"])) {
+      fail(errors, section, "immutable validation plan must run the focused outcome contract test");
+    }
+  } catch (error) {
+    fail(errors, section, `immutable validation plan is unavailable: ${error.message}`);
+  }
+  const workflowText = readFileSync(resolve(root, ".github/workflows/validate.yml"), "utf8");
+  if (!workflowText.includes("run: node scripts/test-skill-effectiveness-outcome.mjs")) {
+    fail(errors, section, "repository validation workflow must run the focused outcome contract test");
+  }
 }
 
 function validateAdaptivePortfolioCatalog(root, errors) {
@@ -1996,7 +2111,8 @@ function isCanonicalSourcePath(path) {
   return ["AGENTS.md", "CUSTOM_INSTRUCTIONS.md", "manifest.json"].includes(path)
     || /^skills\/[a-z0-9-]+\/SKILL\.md$/.test(path)
     || /^docs\/[A-Za-z0-9._/-]+-contract\.md$/.test(path)
-    || /^schemas\/[A-Za-z0-9._/-]+\.(?:json|ya?ml)$/.test(path);
+    || /^schemas\/[A-Za-z0-9._/-]+\.(?:json|ya?ml)$/.test(path)
+    || CORE_IMMUTABLE_RUNTIME_ASSETS.includes(path);
 }
 
 function isCanonicalOwnedTargetPath(path) {
@@ -4336,7 +4452,7 @@ function validateCoreInstaller(root, checks, errors) {
   checks.coreInstaller.verifiesPruneHash = combinedText.includes("modified managed file; refusing to prune") && /currentHash\s*!==\s*record\.sha256/.test(combinedText);
   checks.coreInstaller.prunesManagedFileOnly = combinedText.includes("unlinkSync") && !combinedText.includes("rmSync(");
   checks.coreInstaller.avoidsCodexProjectionDefault = !/\.agents\/skills/.test(text);
-  checks.coreInstaller.alwaysOwnsImmutableContracts = text.includes("CORE_IMMUTABLE_CONTRACT_ASSETS") && text.includes("immutable_contract");
+  checks.coreInstaller.alwaysOwnsImmutableAssets = text.includes("CORE_OWNED_IMMUTABLE_ASSETS") && text.includes("coreImmutableAssetKind");
 
   for (const [field, ok] of Object.entries(checks.coreInstaller)) {
     if (!ok) {
@@ -4378,7 +4494,7 @@ function validateCodexInstaller(root, checks, errors) {
   checks.codexInstaller.installsRuntimeRunner = text.includes("CODEX_RUNTIME_SCRIPTS") && text.includes("codex_runtime") && combinedText.includes("codex-exec-runner.mjs");
   checks.codexInstaller.projectsLifecycleContract = text.includes("docs/lifecycle-artifact-contract.md") && text.includes("requiredAssetsForPrompts");
   checks.codexInstaller.resolvesSkillOnlyAssets = text.includes("requiredAssetsForSkills") && text.includes("CORE_OWNED_IMMUTABLE_ASSETS");
-  checks.codexInstaller.preservesCoreContracts = text.includes("CORE_PRESERVE_PATHS") && text.includes("ASK core immutable contract is missing or stale");
+  checks.codexInstaller.preservesCoreAssets = text.includes("CORE_PRESERVE_PATHS") && text.includes("coreImmutableAssetKind") && text.includes("scripts/json-schema-validation.mjs");
   checks.codexInstaller.requiresWorkPackageCompiler = /"spec-driven-development"\s*:\s*\{[\s\S]{0,200}requires:\s*\[[^\]]*"work-package-compiler"/.test(text);
   checks.codexInstaller.hasDryRun = text.includes("--dry-run") && /dryRun/.test(text);
   checks.codexInstaller.hasMergeAgents = text.includes("--merge-agents") && text.includes("agent-spectrum-kernel:start") && text.includes("agent-spectrum-kernel:end");
@@ -4428,7 +4544,7 @@ function validateInstallerProjection(root, checks, errors) {
   checks.installerProjection.installsCommandAssets = text.includes("requiredAssets") && text.includes("installAssets");
   checks.installerProjection.projectsLifecycleContract = text.includes("docs/lifecycle-artifact-contract.md") && text.includes("CORE_OWNED_IMMUTABLE_ASSETS");
   checks.installerProjection.resolvesSkillAssets = text.includes("requiredAssetsForSkills") && text.includes("CORE_OWNED_IMMUTABLE_ASSETS");
-  checks.installerProjection.preservesCoreContracts = text.includes("CORE_PRESERVE_PATHS") && text.includes("ASK core immutable contract is missing or stale");
+  checks.installerProjection.preservesCoreAssets = text.includes("CORE_PRESERVE_PATHS") && text.includes("coreImmutableAssetKind") && text.includes("scripts/json-schema-validation.mjs");
   checks.installerProjection.requiresWorkPackageCompiler = /"spec-driven-development"\s*:\s*\{[\s\S]{0,200}requires:\s*\[[^\]]*"work-package-compiler"/.test(text);
   checks.installerProjection.skipRuntimeSkipsHooks = text.includes("args.skipHooks || args.skipRuntime") && text.includes("removeManagedHooks");
   checks.installerProjection.settingsSourceOfTruth =
@@ -4450,7 +4566,7 @@ function validateInstallerProjection(root, checks, errors) {
     "installsCommandAssets",
     "resolvesSkillAssets",
     "projectsLifecycleContract",
-    "preservesCoreContracts",
+    "preservesCoreAssets",
     "requiresWorkPackageCompiler",
     "skipRuntimeSkipsHooks",
     "settingsSourceOfTruth",
@@ -5838,6 +5954,7 @@ export function validateRepository(options) {
   const routingChecks = validateRoutingManifest(root, manifest, errors);
   validateManifestPaths(root, manifest, errors);
   validateClaimEvidenceStatusContract(root, manifest, errors);
+  validateSkillEffectivenessOutcomeContract(root, manifest, errors);
   const skillChecks = validateSkills(root, skillDirectories, errors);
   const contextMetadataChecks = validateContextMetadata(root, errors);
   const improvementLedgerChecks = validateImprovementLedger(root, errors);

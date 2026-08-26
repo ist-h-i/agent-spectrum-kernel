@@ -53,7 +53,7 @@ git pull
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 ```
 
-`scripts/install-kernel.mjs` は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、`.agent-spectrum-kernel/install-state.json` を更新します。導入先の独自 `AGENTS.md` 本文は保持します。managed file は前回stateのhashと導入先の現在hashが一致する場合だけ更新し、ローカル改変がある場合は `--force` なしでは失敗します。`--check`、`--dry-run`、`--prune`、`--rollback`、`--detach` を使えます。
+`scripts/install-kernel.mjs` は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、immutable contract/schema、core-ownedの `scripts/json-schema-validation.mjs` と `scripts/skill-effectiveness-outcome.mjs`、`.agent-spectrum-kernel/install-state.json` を更新します。2つのscriptは `immutable_runtime` であり、adapterは参照しても所有・prune・detachしません。導入先の独自 `AGENTS.md` 本文は保持します。managed file は前回stateのhashと導入先の現在hashが一致する場合だけ更新し、ローカル改変がある場合は `--force` なしでは失敗します。`--check`、`--dry-run`、`--prune`、`--rollback`、`--detach` を使えます。
 
 Codex のrepo-scoped skill surfaceも使う場合は、Codex adapter installerを使います。
 
@@ -62,7 +62,7 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-このinstallerは profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile daily|organizational|minimal|implementation|investigation|review|adoption|observability|full` を使います。`daily` と `organizational` はそれぞれmanifestの `daily_delivery` と `organizational_intelligence` projection packを使います。`--skills <csv>` は advanced override で、選択 prompt / command、router到達可能route、指定 skill 依存の必須 skill 閉包を満たさない場合は書き込み前に失敗します。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。Codex用のローカル投影だけを行い、hook、telemetry、外部公開、GitHub Actions は作りません。
+このinstallerは profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex-owned runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。Execution Envelope transportはadapter-ownedですが、shared Schema engineは常に、Skill effectiveness semantic CLIはそのSkill選択時に、core stateの完全性を検査して利用します。default は `implementation` profile です。通常は `--profile daily|organizational|minimal|implementation|investigation|review|adoption|observability|full` を使います。`daily` と `organizational` はそれぞれmanifestの `daily_delivery` と `organizational_intelligence` projection packを使います。`--skills <csv>` は advanced override で、選択 prompt / command、router到達可能route、指定 skill 依存の必須 skill 閉包を満たさない場合は書き込み前に失敗します。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。Codex用のローカル投影だけを行い、hook、telemetry、外部公開、GitHub Actions は作りません。
 
 Codex の非対話実行は、導入された runner 経由で行います。
 
@@ -425,7 +425,7 @@ skill-effectiveness-evaluation for one completed task
 skill-adoption-metrics for multiple tasks or period measurement
 ```
 
-`skill-effectiveness-evaluation` は、1つの完了済みタスクでSkill選択が役に立ったか、過剰だったか、足りなかったかを根拠付きで評価します。
+`skill-effectiveness-evaluation` は、1つの完了済みタスクでSkill選択が役に立ったか、過剰だったか、足りなかったかを根拠付きで評価します。finding、requirement、claim、route decision、token、duration、artifact、実測したreworkなどをclosed catalogの元の単位で記録し、measurementとeffectを分離して7つのdimensionを独立分類します。comparison metricのimpactはreference、native-unit delta、materiality rule、effect evidenceから導出し、観測済みresourceでも比較根拠がなければeffectはUnknownです。Unknown/unavailableは0へ変換せず、独自metric、総合点、平均は作りません。結果は次の類似task workflowへの狭い提案であり、benchmark score、capability level、ROI、Asset/Portfolio更新authorityではありません。
 
 `skill-adoption-metrics` は、複数タスクや期間を対象に、instruction quality、skill usage maturity、task outcomes、quality improvement、maturity movementを見ます。raw promptは既定で保存せず、HR/personnel evaluationには使いません。
 

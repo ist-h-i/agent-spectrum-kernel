@@ -9,7 +9,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CORE_STATE_PATH = ".agent-spectrum-kernel/install-state.json";
 const STATE_PATH = ".agent-spectrum-kernel/claude-install-state.json";
 const CANONICAL_REGISTRY_PATH = "schemas/review-signal-gate-map.json";
-const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_IMMUTABLE_CONTRACT_ASSETS;
+const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_OWNED_IMMUTABLE_ASSETS;
 const CORE_PRESERVE_PATHS = [CANONICAL_REGISTRY_PATH, ...CORE_OWNED_IMMUTABLE_ASSETS];
 const DEFAULT_PROFILE = "full";
 const HOOK_MARKER = "agent-spectrum-kernel:claude-adapter-hook";
@@ -875,8 +875,10 @@ function validateCoreInstalled(args) {
     const sourceContent = readFileSync(resolve(REPO_ROOT, asset), "utf8");
     const record = state?.managed_files?.[asset];
     const targetPath = resolve(args.target, asset);
-    if (record?.kind !== "immutable_contract" || record.sha256 !== lifecycle.hashText(sourceContent) || !existsSync(targetPath) || lifecycle.hashText(readFileSync(targetPath, "utf8")) !== record.sha256) {
-      throw new Error(`ASK core immutable contract is missing or stale: ${asset}. Re-run scripts/install-kernel.mjs before installing the Claude adapter.`);
+    const kind = lifecycle.coreImmutableAssetKind(asset);
+    const label = kind === "immutable_runtime" ? "runtime" : "contract";
+    if (record?.kind !== kind || record.sha256 !== lifecycle.hashText(sourceContent) || !existsSync(targetPath) || lifecycle.hashText(readFileSync(targetPath, "utf8")) !== record.sha256) {
+      throw new Error(`ASK core immutable ${label} is missing or stale: ${asset}. Re-run scripts/install-kernel.mjs before installing the Claude adapter.`);
     }
   }
 }
@@ -922,6 +924,7 @@ function resolveSelection(args) {
     throw new Error(`Selected Claude commands are not closed over installed skills: ${missingRequiredSkills.join(", ")}`);
   }
   const requiredAssets = [...new Set([
+    "scripts/json-schema-validation.mjs",
     "schemas/execution-envelope.schema.json",
     ...selectedCommands.flatMap((command) => COMMAND_METADATA[command].requiredAssets),
     ...requiredAssetsForSkills(selectedSkills),
@@ -949,7 +952,7 @@ function claudeRendererInputsForSelection(args, { skipHooks, skipRuntime }) {
     { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
     { path: "schemas/metrics-event.schema.json", role: "schema" },
     ...args.selectedSkills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
-    ...args.requiredAssets.filter((path) => path.startsWith("schemas/") || path.endsWith("-contract.md")).map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : "contract" })),
+    ...args.requiredAssets.filter((path) => CORE_OWNED_IMMUTABLE_ASSETS.includes(path) || path.startsWith("schemas/") || path.endsWith("-contract.md")).map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : path.endsWith(".mjs") ? "runtime_source" : "contract" })),
   ];
   const adapterOwned = [
     { path: "scripts/install-claude-adapter.mjs", role: "renderer" },
@@ -959,7 +962,7 @@ function claudeRendererInputsForSelection(args, { skipHooks, skipRuntime }) {
     ...args.selectedCommands.map((command) => ({ path: `adapters/claude-code/project/.claude/commands/${command}`, role: "command_template" })),
     ...(!skipRuntime ? CLAUDE_RUNTIME_FILES.map((file) => ({ path: file.source, role: file.assetKind === "schemas" ? "runtime_schema" : "runtime_source" })) : []),
     ...(!skipRuntime ? [{ path: "docs/ai/observability-config.yml", role: "config_source" }] : []),
-    ...args.requiredAssets.filter((path) => !path.startsWith("schemas/") && !path.endsWith("-contract.md")).map((path) => ({ path, role: "config_source" })),
+    ...args.requiredAssets.filter((path) => !CORE_OWNED_IMMUTABLE_ASSETS.includes(path) && !path.startsWith("schemas/") && !path.endsWith("-contract.md")).map((path) => ({ path, role: "config_source" })),
     ...args.initialProjectStateAssets.map((path) => ({ path, role: "config_source" })),
   ];
   const dedupe = (items) => [...new Map(items.map((item) => [item.path, item])).values()].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);

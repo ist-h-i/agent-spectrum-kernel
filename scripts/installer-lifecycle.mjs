@@ -18,6 +18,7 @@ export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "docs/observability-runtime-contract.md",
   "docs/operation-automation-contract.md",
   "docs/review-finding-contract.md",
+  "docs/skill-effectiveness-evaluation-contract.md",
   "docs/stack-implementation-overlay-contract.md",
   "docs/verification-proof-policy-contract.md",
   "schemas/adapter-runtime-event.schema.json",
@@ -26,10 +27,26 @@ export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "schemas/compact-profile-control-map.json",
   "schemas/execution-envelope.schema.json",
   "schemas/execution-envelope-record.schema.json",
+  "schemas/effectiveness-decision-vocabulary.schema.json",
   "schemas/normalized-event-schema-registry.json",
   "schemas/review-finding.schema.json",
+  "schemas/skill-effectiveness-outcome.schema.json",
   "schemas/verification-proof-policy.schema.json",
 ]);
+export const CORE_IMMUTABLE_RUNTIME_ASSETS = Object.freeze([
+  "scripts/json-schema-validation.mjs",
+  "scripts/skill-effectiveness-outcome.mjs",
+]);
+export const CORE_OWNED_IMMUTABLE_ASSETS = Object.freeze([
+  ...CORE_IMMUTABLE_CONTRACT_ASSETS,
+  ...CORE_IMMUTABLE_RUNTIME_ASSETS,
+]);
+
+export function coreImmutableAssetKind(asset) {
+  if (CORE_IMMUTABLE_CONTRACT_ASSETS.includes(asset)) return "immutable_contract";
+  if (CORE_IMMUTABLE_RUNTIME_ASSETS.includes(asset)) return "immutable_runtime";
+  return null;
+}
 
 export function hashText(text) {
   return createHash("sha256").update(text).digest("hex");

@@ -8,7 +8,13 @@ import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
 import { CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
-import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
+import {
+  CORE_IMMUTABLE_CONTRACT_ASSETS,
+  CORE_IMMUTABLE_RUNTIME_ASSETS,
+  CORE_OWNED_IMMUTABLE_ASSETS,
+  coreImmutableAssetKind,
+  hashText,
+} from "./installer-lifecycle.mjs";
 import { putContentAddressedJson } from "./content-addressed-store.mjs";
 import { REQUIRED_TRACEABILITY_SCENARIOS, computeAdapterAppliedProvenanceFingerprint, computeAdapterProfileFingerprint, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectClaimEvidencePluginProjection, inspectLifecycleScenario, inspectTraceabilityScenarioResult, inspectVerificationProofPolicyContract, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
 
@@ -23,6 +29,7 @@ const crossAdapterConformanceTestScript = resolve(repoRoot, "scripts/test-adapte
 const adapterMigrationTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-migration.mjs");
 const adapterRuntimeEventTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-event.mjs");
 const verificationProofPolicyTestScript = resolve(repoRoot, "scripts/test-verification-proof-policy.mjs");
+const skillEffectivenessOutcomeTestScript = resolve(repoRoot, "scripts/test-skill-effectiveness-outcome.mjs");
 const fixtureRoot = mkdtempSync(resolve(tmpdir(), "validate-repo-"));
 
 const compactProfileResult = spawnSync(process.execPath, [codexCompactProfileTestScript], { cwd: repoRoot, encoding: "utf8" });
@@ -35,6 +42,7 @@ for (const [label, script] of [
   ["Cross-adapter conformance", crossAdapterConformanceTestScript],
   ["Dual-runtime migration", adapterMigrationTestScript],
   ["Verification proof policy", verificationProofPolicyTestScript],
+  ["One-task Skill effectiveness outcome", skillEffectivenessOutcomeTestScript],
 ]) {
   const result = spawnSync(process.execPath, [script], { cwd: repoRoot, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`${label} tests failed\n${result.stdout}\n${result.stderr}`);
@@ -723,6 +731,9 @@ function applyLifecyclePlan() {
 const MANAGED_START = "<!-- agent-spectrum-kernel:start -->";
 const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const CORE_IMMUTABLE_CONTRACT_ASSETS = ["docs/execution-envelope-contract.md", "docs/lifecycle-artifact-contract.md"];
+const CORE_IMMUTABLE_RUNTIME_ASSETS = ["scripts/json-schema-validation.mjs"];
+const CORE_OWNED_IMMUTABLE_ASSETS = [...CORE_IMMUTABLE_CONTRACT_ASSETS, ...CORE_IMMUTABLE_RUNTIME_ASSETS];
+function coreImmutableAssetKind(path) { return path.endsWith(".mjs") ? "immutable_runtime" : "immutable_contract"; }
 function install(manifest, options) {
   const skills = manifest.skills;
   const immutableContract = "immutable_contract";
@@ -732,7 +743,7 @@ function install(manifest, options) {
   const record = { sha256: "expected" };
   if (currentHash !== record.sha256) throw new Error("modified managed file; refusing to prune");
   unlinkSync("skills/example/SKILL.md");
-  if (dryRun) return { skills, managed_files, CORE_IMMUTABLE_CONTRACT_ASSETS, immutableContract };
+  if (dryRun) return { skills, managed_files, CORE_OWNED_IMMUTABLE_ASSETS, immutableContract, coreImmutableAssetKind };
   if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
   if (options["--prune"]) return "stale managed projection";
   return STATE_PATH;
@@ -753,8 +764,10 @@ const PROFILE_ROUTING_FIXTURES = { implementation: [{ id: "unfamiliar_repository
 const SKILL_RELATIONSHIPS = { "controlled-implementation": { requires: ["test-first-verification"], recommends: ["evidence-ledger"], incompatibleWith: [] } };
 const LIFECYCLE_ASSET = "docs/lifecycle-artifact-contract.md";
 function requiredAssetsForPrompts() { return [LIFECYCLE_ASSET]; }
-const CORE_OWNED_IMMUTABLE_ASSETS = [LIFECYCLE_ASSET];
-const CORE_PRESERVE_PATHS = [LIFECYCLE_ASSET];
+const CORE_IMMUTABLE_RUNTIME_ASSETS = ["scripts/json-schema-validation.mjs"];
+const CORE_OWNED_IMMUTABLE_ASSETS = [LIFECYCLE_ASSET, ...CORE_IMMUTABLE_RUNTIME_ASSETS];
+const CORE_PRESERVE_PATHS = CORE_OWNED_IMMUTABLE_ASSETS;
+function coreImmutableAssetKind(path) { return path.endsWith(".mjs") ? "immutable_runtime" : "immutable_contract"; }
 function requiredAssetsForSkills() { return CORE_OWNED_IMMUTABLE_ASSETS; }
 function routingFixturesForProfile() {
   return { router_reachable_skills: ["repository-orientation"], routing_fixtures: PROFILE_ROUTING_FIXTURES.implementation };
@@ -783,7 +796,7 @@ function install(manifest, options) {
   if (options["--merge-agents"]) return MANAGED_START + MANAGED_END;
   if (skipAgents) return ".agents/skills";
   if (options["--prune"]) return "stale Codex managed projection";
-  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill" + "codex_runtime" + "codex-exec-runner.mjs" + CODEX_RUNTIME_SCRIPTS + profile + retained_stale_prompts + retained_stale_commands + stale_codex_prompt + stale_codex_command + validateSkillClosure().required_skills + routingFixturesForProfile().router_reachable_skills + routingFixturesForProfile().routing_fixtures + validateManagedReferences() + requiredAssetsForPrompts() + requiredAssetsForSkills() + CORE_PRESERVE_PATHS + "ASK core immutable contract is missing or stale" + '"spec-driven-development": { requires: ["work-package-compiler"] }';
+  return STATE_PATH + ".agents/prompts" + ".agents/commands" + "codex_skill" + "codex_runtime" + "codex-exec-runner.mjs" + CODEX_RUNTIME_SCRIPTS + profile + retained_stale_prompts + retained_stale_commands + stale_codex_prompt + stale_codex_command + validateSkillClosure().required_skills + routingFixturesForProfile().router_reachable_skills + routingFixturesForProfile().routing_fixtures + validateManagedReferences() + requiredAssetsForPrompts() + requiredAssetsForSkills() + CORE_PRESERVE_PATHS + coreImmutableAssetKind("scripts/json-schema-validation.mjs") + "ASK core immutable contract is missing or stale" + '"spec-driven-development": { requires: ["work-package-compiler"] }';
 }
 `,
   );
@@ -840,8 +853,10 @@ const COMMAND_METADATA = {
   "skill-review.md": { requiredSkills: ["review-router"], requiredAssets: ["docs/lifecycle-artifact-contract.md"] },
 };
 const SKILL_RELATIONSHIPS = { "spec-driven-development": { requires: ["work-package-compiler"] } };
-const CORE_OWNED_IMMUTABLE_ASSETS = ["docs/lifecycle-artifact-contract.md"];
-const CORE_PRESERVE_PATHS = ["docs/lifecycle-artifact-contract.md"];
+const CORE_IMMUTABLE_RUNTIME_ASSETS = ["scripts/json-schema-validation.mjs"];
+const CORE_OWNED_IMMUTABLE_ASSETS = ["docs/lifecycle-artifact-contract.md", ...CORE_IMMUTABLE_RUNTIME_ASSETS];
+const CORE_PRESERVE_PATHS = CORE_OWNED_IMMUTABLE_ASSETS;
+function coreImmutableAssetKind(path) { return path.endsWith(".mjs") ? "immutable_runtime" : "immutable_contract"; }
 const CLAUDE_PROFILES = { full: { skills: DEFAULT_SKILLS, commands: COMMAND_TEMPLATES } };
 const PROFILE_ROUTING_FIXTURES = {
   implementation: [
@@ -885,7 +900,7 @@ function removeAdapterOwnedHooks() {
 }
 function install(args) {
   if (args.skipHooks || args.skipRuntime) removeManagedHooks();
-  if (args.profile || DEFAULT_PROFILE) return HELP + "Selected Claude commands are not closed over installed skills" + "settings.json" + installAssets(COMMAND_METADATA["skill-review.md"]) + requiredAssetsForSkills() + validateCoreInstalled() + CORE_PRESERVE_PATHS + "ASK core immutable contract is missing or stale" + SKILL_RELATIONSHIPS;
+  if (args.profile || DEFAULT_PROFILE) return HELP + "Selected Claude commands are not closed over installed skills" + "settings.json" + installAssets(COMMAND_METADATA["skill-review.md"]) + requiredAssetsForSkills() + validateCoreInstalled() + CORE_PRESERVE_PATHS + coreImmutableAssetKind("scripts/json-schema-validation.mjs") + "ASK core immutable contract is missing or stale" + SKILL_RELATIONSHIPS;
 }
 `,
   );
@@ -2780,8 +2795,8 @@ function assertInstallerScripts() {
   assertRuntimePass("Claude ownership full core setup", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget]));
   assertRuntimePass("Claude ownership adapter setup", runRepoScript([installer, "--target", corePruneOwnershipTarget, "--profile", "implementation"]));
   assertRuntimePass("Claude ownership core shrink prune", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget, "--skills", "evidence-ledger,risk-gate", "--prune"]));
-  if (CORE_IMMUTABLE_CONTRACT_ASSETS.some((asset) => !existsSync(resolve(corePruneOwnershipTarget, asset)))) {
-    throw new Error("core shrink prune must preserve all immutable contracts required by an active Claude adapter");
+  if (CORE_OWNED_IMMUTABLE_ASSETS.some((asset) => !existsSync(resolve(corePruneOwnershipTarget, asset)))) {
+    throw new Error("core shrink prune must preserve all immutable assets required by an active Claude adapter");
   }
   assertInstalledDocReferences("Claude active adapter after core prune", corePruneOwnershipTarget, [".claude/skills", ".claude/commands"]);
 
@@ -2790,8 +2805,8 @@ function assertInstallerScripts() {
   assertRuntimePass("Claude ownership adapter install", runRepoScript([installer, "--target", adapterDetachOwnershipTarget, "--profile", "implementation"]));
   assertRuntimePass("Claude ownership core expand", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget]));
   assertRuntimePass("Claude ownership adapter detach", runRepoScript([installer, "--target", adapterDetachOwnershipTarget, "--detach"]));
-  if (CORE_IMMUTABLE_CONTRACT_ASSETS.some((asset) => !existsSync(resolve(adapterDetachOwnershipTarget, asset)))) {
-    throw new Error("Claude detach must preserve all core-owned immutable contracts");
+  if (CORE_OWNED_IMMUTABLE_ASSETS.some((asset) => !existsSync(resolve(adapterDetachOwnershipTarget, asset)))) {
+    throw new Error("Claude detach must preserve all core-owned immutable assets");
   }
   assertRuntimePass("core check after Claude ownership transition", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget, "--check"]));
 
@@ -2800,7 +2815,7 @@ function assertInstallerScripts() {
   assertRuntimePass("legacy Claude ownership adapter setup", runRepoScript([installer, "--target", legacyOwnershipTarget, "--profile", "full"]));
   const legacyClaudeStatePath = resolve(legacyOwnershipTarget, ".agent-spectrum-kernel/claude-install-state.json");
   const legacyClaudeState = JSON.parse(readFileSync(legacyClaudeStatePath, "utf8"));
-  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
+  for (const asset of CORE_OWNED_IMMUTABLE_ASSETS) {
     const content = readFileSync(resolve(legacyOwnershipTarget, asset), "utf8");
     legacyClaudeState.managed_files[asset] = { kind: "claude_asset", asset, sha256: hashText(content) };
   }
@@ -2809,11 +2824,11 @@ function assertInstallerScripts() {
   assertRuntimePass("legacy Claude ownership implementation prune", runRepoScript([installer, "--target", legacyOwnershipTarget, "--profile", "implementation", "--prune"]));
   const migratedCoreState = JSON.parse(readFileSync(resolve(legacyOwnershipTarget, ".agent-spectrum-kernel/install-state.json"), "utf8"));
   const migratedClaudeState = JSON.parse(readFileSync(legacyClaudeStatePath, "utf8"));
-  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
+  for (const asset of CORE_OWNED_IMMUTABLE_ASSETS) {
     const targetPath = resolve(legacyOwnershipTarget, asset);
     const coreRecord = migratedCoreState.managed_files?.[asset];
-    if (!existsSync(targetPath) || coreRecord?.kind !== "immutable_contract" || hashText(readFileSync(targetPath, "utf8")) !== coreRecord.sha256) {
-      throw new Error(`legacy Claude ownership migration must preserve the core-owned immutable contract: ${asset}`);
+    if (!existsSync(targetPath) || coreRecord?.kind !== coreImmutableAssetKind(asset) || hashText(readFileSync(targetPath, "utf8")) !== coreRecord.sha256) {
+      throw new Error(`legacy Claude ownership migration must preserve the core-owned immutable asset: ${asset}`);
     }
     if (Object.hasOwn(migratedClaudeState.managed_files ?? {}, asset)) {
       throw new Error(`legacy Claude ownership migration must drop the adapter ownership record: ${asset}`);
@@ -3135,9 +3150,9 @@ function assertCoreInstallerScripts() {
   if (!existsSync(resolve(freshTarget, "skills/operating-mode-router/SKILL.md"))) {
     throw new Error("kernel installer should project manifest skills");
   }
-  for (const asset of CORE_IMMUTABLE_CONTRACT_ASSETS) {
-    if (freshState.managed_files?.[asset]?.kind !== "immutable_contract" || !existsSync(resolve(freshTarget, asset))) {
-      throw new Error(`core installer state must own and project immutable contract: ${asset}`);
+  for (const asset of CORE_OWNED_IMMUTABLE_ASSETS) {
+    if (freshState.managed_files?.[asset]?.kind !== coreImmutableAssetKind(asset) || !existsSync(resolve(freshTarget, asset))) {
+      throw new Error(`core installer state must own and project immutable asset: ${asset}`);
     }
   }
   assertInstalledDocReferences("core installer dependency closure", freshTarget, ["skills"]);
@@ -3145,6 +3160,7 @@ function assertCoreInstallerScripts() {
     throw new Error("kernel installer should project the canonical signal registry");
   }
 
+  assertSkillEffectivenessRuntimeProjection({ installer, freshTarget });
   assertExecutionEnvelopeSchemaProjection({ installer, freshTarget });
 
   const beforeRerunAgents = readFileSync(resolve(freshTarget, "AGENTS.md"), "utf8");
@@ -3302,6 +3318,88 @@ function assertCoreInstallerScripts() {
   if (existsSync(resolve(overwriteTarget, ".agent-spectrum-kernel/install-state.json"))) {
     throw new Error("kernel installer no-overwrite failure should not write state");
   }
+}
+
+function assertSkillEffectivenessRuntimeProjection({ installer, freshTarget }) {
+  const statePath = resolve(freshTarget, ".agent-spectrum-kernel/install-state.json");
+  let state = JSON.parse(readFileSync(statePath, "utf8"));
+  for (const asset of CORE_IMMUTABLE_RUNTIME_ASSETS) {
+    const projectedPath = resolve(freshTarget, asset);
+    const canonicalBytes = readFileSync(resolve(repoRoot, asset), "utf8");
+    const digest = hashText(canonicalBytes);
+    const record = state.managed_files?.[asset];
+    if (
+      !existsSync(projectedPath) ||
+      readFileSync(projectedPath, "utf8") !== canonicalBytes ||
+      record?.kind !== "immutable_runtime" ||
+      record?.asset !== asset ||
+      record?.sha256 !== digest ||
+      record?.canonical_sha256 !== digest
+    ) {
+      throw new Error(`fresh core installation must project and exactly identify immutable runtime ${asset}`);
+    }
+  }
+
+  const cliPath = resolve(freshTarget, "scripts/skill-effectiveness-outcome.mjs");
+  const catalog = JSON.parse(readFileSync(resolve(repoRoot, "docs/fixtures/skill-effectiveness-outcome-cases.json"), "utf8"));
+  const input = structuredClone(catalog.base_input);
+  input.outcome_id = "installed-core-cli";
+  input.task_id = "installed-core-cli-task";
+  const build = spawnSync(process.execPath, [cliPath, "build", "-"], {
+    cwd: freshTarget,
+    encoding: "utf8",
+    input: `${JSON.stringify(input)}\n`,
+  });
+  assertRuntimePass("installed core Skill effectiveness CLI build", build);
+  const outcome = JSON.parse(build.stdout);
+  const validate = spawnSync(process.execPath, [cliPath, "validate", "-"], {
+    cwd: freshTarget,
+    encoding: "utf8",
+    input: `${JSON.stringify(outcome)}\n`,
+  });
+  assertRuntimePass("installed core Skill effectiveness CLI validate", validate);
+  if (JSON.parse(validate.stdout).valid !== true) throw new Error("installed core semantic CLI must validate its canonical build");
+
+  const tampered = structuredClone(outcome);
+  tampered.observations.find(({ observation_id }) => observation_id === "obs-outcome-quality").effect.delta = 999;
+  const reject = spawnSync(process.execPath, [cliPath, "validate", "-"], {
+    cwd: freshTarget,
+    encoding: "utf8",
+    input: `${JSON.stringify(tampered)}\n`,
+  });
+  assertRuntimeFail("installed core semantic CLI rejects tampered delta", reject, "EFFECT_DELTA_MISMATCH");
+
+  const sharedPath = resolve(freshTarget, "scripts/json-schema-validation.mjs");
+  rmSync(sharedPath);
+  assertRuntimeFail(
+    "kernel installer check missing shared JSON Schema runtime",
+    runRepoScript([installer, "--target", freshTarget, "--check"]),
+    "core immutable runtime is missing: scripts/json-schema-validation.mjs",
+  );
+  assertRuntimePass("kernel installer repairs missing shared JSON Schema runtime", runRepoScript([installer, "--target", freshTarget]));
+
+  writeFileSync(sharedPath, "// project drift\n");
+  assertRuntimeFail(
+    "kernel installer check drifted shared JSON Schema runtime",
+    runRepoScript([installer, "--target", freshTarget, "--check"]),
+    "core immutable runtime bytes do not match install state: scripts/json-schema-validation.mjs",
+  );
+  assertRuntimeFail(
+    "kernel installer preserves drifted shared JSON Schema runtime",
+    runRepoScript([installer, "--target", freshTarget]),
+    "managed file conflict",
+  );
+  assertRuntimePass("kernel installer force repairs shared JSON Schema runtime", runRepoScript([installer, "--target", freshTarget, "--force"]));
+
+  state = JSON.parse(readFileSync(statePath, "utf8"));
+  state.managed_files["scripts/skill-effectiveness-outcome.mjs"].kind = "immutable_contract";
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  assertRuntimeFail(
+    "kernel installer check semantic CLI ownership mismatch",
+    runRepoScript([installer, "--target", freshTarget, "--check"]),
+    "core immutable runtime ownership mismatch: scripts/skill-effectiveness-outcome.mjs",
+  );
+  assertRuntimePass("kernel installer repairs semantic CLI ownership", runRepoScript([installer, "--target", freshTarget]));
 }
 
 function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
@@ -3491,6 +3589,51 @@ function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
       runRepoScript([installer, "--target", adapterTarget, "--check"]),
       "core immutable contract is missing",
     );
+    assertRuntimePass(`${label} core repairs canonical Execution Envelope schema`, runRepoScript([installer, "--target", adapterTarget]));
+
+    const adapterStatePath = resolve(
+      adapterTarget,
+      label === "Codex" ? ".agent-spectrum-kernel/codex-install-state.json" : ".agent-spectrum-kernel/claude-install-state.json",
+    );
+    const adapterState = JSON.parse(readFileSync(adapterStatePath, "utf8"));
+    const adapterManagedPaths = new Set(Object.keys(adapterState.managed_files ?? {}));
+    const projectedManagedPaths = new Set((adapterState.projection_plan?.projected_managed_assets ?? []).map(({ path }) => path));
+    for (const asset of CORE_IMMUTABLE_RUNTIME_ASSETS) {
+      if (adapterManagedPaths.has(asset) || projectedManagedPaths.has(asset)) {
+        throw new Error(`${label} adapter must consume rather than own core immutable runtime ${asset}`);
+      }
+    }
+    if (!adapterManagedPaths.has("scripts/execution-envelope.mjs")) {
+      throw new Error(`${label} adapter must continue to own Execution Envelope transport runtime`);
+    }
+
+    const sharedRuntimePath = resolve(adapterTarget, "scripts/json-schema-validation.mjs");
+    rmSync(sharedRuntimePath);
+    assertRuntimeFail(
+      `${label} adapter rejects missing shared JSON Schema runtime`,
+      runRepoScript([adapter, "--target", adapterTarget, "--check"]),
+      "ASK core immutable runtime is missing or stale: scripts/json-schema-validation.mjs",
+    );
+    assertRuntimePass(`${label} core repairs shared JSON Schema runtime`, runRepoScript([installer, "--target", adapterTarget]));
+
+    assertRuntimePass(`${label} selects Skill effectiveness profile`, runRepoScript([adapter, "--target", adapterTarget, "--profile", "organizational"]));
+    const semanticRuntimePath = resolve(adapterTarget, "scripts/skill-effectiveness-outcome.mjs");
+    rmSync(semanticRuntimePath);
+    assertRuntimeFail(
+      `${label} Skill effectiveness profile rejects missing semantic CLI`,
+      runRepoScript([adapter, "--target", adapterTarget, "--profile", "organizational", "--check"]),
+      "ASK core immutable runtime is missing or stale: scripts/skill-effectiveness-outcome.mjs",
+    );
+    assertRuntimePass(`${label} core repairs semantic CLI`, runRepoScript([installer, "--target", adapterTarget]));
+
+    assertRuntimePass(`${label} adapter detach preserves core runtime`, runRepoScript([adapter, "--target", adapterTarget, "--detach"]));
+    for (const asset of CORE_IMMUTABLE_RUNTIME_ASSETS) {
+      if (!existsSync(resolve(adapterTarget, asset))) throw new Error(`${label} detach must preserve core immutable runtime ${asset}`);
+    }
+    if (existsSync(resolve(adapterTarget, "scripts/execution-envelope.mjs"))) {
+      throw new Error(`${label} detach must remove its adapter-owned Execution Envelope transport runtime`);
+    }
+    assertRuntimePass(`${label} core remains valid after adapter detach`, runRepoScript([installer, "--target", adapterTarget, "--check"]));
   }
 }
 
@@ -3578,7 +3721,7 @@ function assertCodexInstallerScripts() {
   assertRuntimePass("Codex ownership full core setup", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget]));
   assertRuntimePass("Codex ownership adapter setup", runRepoScript([installer, "--target", corePruneOwnershipTarget]));
   assertRuntimePass("Codex ownership core shrink prune", runRepoScript([coreInstaller, "--target", corePruneOwnershipTarget, "--skills", "evidence-ledger,risk-gate", "--prune"]));
-  if (CORE_IMMUTABLE_CONTRACT_ASSETS.some((asset) => !existsSync(resolve(corePruneOwnershipTarget, asset)))) {
+  if (CORE_OWNED_IMMUTABLE_ASSETS.some((asset) => !existsSync(resolve(corePruneOwnershipTarget, asset)))) {
     throw new Error("core shrink prune must preserve all immutable contracts required by an active Codex adapter");
   }
   assertInstalledDocReferences("Codex active adapter after core prune", corePruneOwnershipTarget, [".agents/skills", ".agents/prompts", ".agents/commands"]);
@@ -3588,7 +3731,7 @@ function assertCodexInstallerScripts() {
   assertRuntimePass("Codex ownership adapter install", runRepoScript([installer, "--target", adapterDetachOwnershipTarget]));
   assertRuntimePass("Codex ownership core expand", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget]));
   assertRuntimePass("Codex ownership adapter detach", runRepoScript([installer, "--target", adapterDetachOwnershipTarget, "--detach"]));
-  if (CORE_IMMUTABLE_CONTRACT_ASSETS.some((asset) => !existsSync(resolve(adapterDetachOwnershipTarget, asset)))) {
+  if (CORE_OWNED_IMMUTABLE_ASSETS.some((asset) => !existsSync(resolve(adapterDetachOwnershipTarget, asset)))) {
     throw new Error("Codex detach must preserve all core-owned immutable contracts");
   }
   assertRuntimePass("core check after Codex ownership transition", runRepoScript([coreInstaller, "--target", adapterDetachOwnershipTarget, "--check"]));
@@ -4995,6 +5138,7 @@ EOF
   const originalSharedRuntime = readFileSync(resolve(target, "scripts/ask-shared.mjs"), "utf8");
   const originalAdapterEventRuntime = readFileSync(resolve(target, "scripts/adapter-runtime-event.mjs"), "utf8");
   const originalEnvelopeRuntime = readFileSync(resolve(target, "scripts/execution-envelope.mjs"), "utf8");
+  const originalJsonSchemaRuntime = readFileSync(resolve(target, "scripts/json-schema-validation.mjs"), "utf8");
   const originalObservabilityRuntime = readFileSync(resolve(target, "scripts/observability-paths.mjs"), "utf8");
   const outsideRuntimeDir = resolve(fixtureRoot, "outside-codex-runtime", "scripts");
   mkdirSync(outsideRuntimeDir, { recursive: true });
@@ -5003,6 +5147,7 @@ EOF
   writeFileSync(resolve(outsideRuntimeDir, "ask-shared.mjs"), originalSharedRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "adapter-runtime-event.mjs"), originalAdapterEventRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "execution-envelope.mjs"), originalEnvelopeRuntime);
+  writeFileSync(resolve(outsideRuntimeDir, "json-schema-validation.mjs"), originalJsonSchemaRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "observability-paths.mjs"), originalObservabilityRuntime);
   rmSync(targetRunnerScript);
   symlinkSync(outsideRunnerPath, targetRunnerScript);
@@ -7194,7 +7339,6 @@ jobs:
   if (customInstructionsEntries.length !== 1 || !dedupedReport.includes("`CUSTOM_INSTRUCTIONS.md`: ok (copy_paste_kernel, docs)")) {
     throw new Error(`deduped path report should list CUSTOM_INSTRUCTIONS.md once with both roles\n${dedupedReport}`);
   }
-
   console.log("validate-repo fixture tests passed");
 } finally {
   rmSync(fixtureRoot, { recursive: true, force: true });

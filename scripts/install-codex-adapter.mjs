@@ -16,7 +16,7 @@ const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const PLANE_ORDER = ["execution", "knowledge", "control"];
 const DEFAULT_PROFILE = "implementation";
 const CANONICAL_REGISTRY_PATH = "schemas/review-signal-gate-map.json";
-const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_IMMUTABLE_CONTRACT_ASSETS;
+const CORE_OWNED_IMMUTABLE_ASSETS = lifecycle.CORE_OWNED_IMMUTABLE_ASSETS;
 const CORE_PRESERVE_PATHS = [CANONICAL_REGISTRY_PATH, ...CORE_OWNED_IMMUTABLE_ASSETS];
 const PROMPT_TEMPLATES = [
   "skill-implement.md",
@@ -452,8 +452,10 @@ function validateCoreInstalled(target, statePath, requiredAssets) {
     const sourceContent = readText(resolve(REPO_ROOT, asset));
     const record = state?.managed_files?.[asset];
     const targetPath = resolve(target, asset);
-    if (record?.kind !== "immutable_contract" || record.sha256 !== hashText(sourceContent) || !existsSync(targetPath) || hashText(readText(targetPath)) !== record.sha256) {
-      throw new Error(`ASK core immutable contract is missing or stale: ${asset}. Re-run scripts/install-kernel.mjs before installing the Codex adapter.`);
+    const kind = lifecycle.coreImmutableAssetKind(asset);
+    const label = kind === "immutable_runtime" ? "runtime" : "contract";
+    if (record?.kind !== kind || record.sha256 !== hashText(sourceContent) || !existsSync(targetPath) || hashText(readText(targetPath)) !== record.sha256) {
+      throw new Error(`ASK core immutable ${label} is missing or stale: ${asset}. Re-run scripts/install-kernel.mjs before installing the Codex adapter.`);
     }
   }
   return state;
@@ -812,6 +814,7 @@ function resolveCodexProjectionSelection({ profileName, skills = null, skipPromp
   validateSkillNames(selectedSkills, [...manifest.skills].sort());
   validateSkillClosure({ selectedSkills, requiredSkills, profileName });
   const requiredAssets = [...new Set([
+    "scripts/json-schema-validation.mjs",
     "schemas/execution-envelope.schema.json",
     "schemas/execution-envelope-record.schema.json",
     ...requiredAssetsForPrompts(prompts),
@@ -832,7 +835,7 @@ function codexRendererInputsForSelection({ prompts, commands, skills, requiredAs
     { path: "schemas/normalized-event-schema-registry.json", role: "schema" },
     ...prompts.flatMap((prompt) => codexCompactProfileCanonicalPaths(prompt).map((path) => ({ path, role: path.startsWith("skills/") ? "skill" : path.startsWith("schemas/") ? "schema" : path === "AGENTS.md" ? "kernel" : "contract" }))),
     ...skills.map((skill) => ({ path: `skills/${skill}/SKILL.md`, role: "skill" })),
-    ...requiredAssets.map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : "contract" })),
+    ...requiredAssets.map((path) => ({ path, role: path.startsWith("schemas/") ? "schema" : path.endsWith(".mjs") ? "runtime_source" : "contract" })),
     ...runtimeFiles.filter((file) => file.assetKind === "schemas").map((file) => ({ path: file.source, role: "schema" })),
   ];
   const adapterOwned = [

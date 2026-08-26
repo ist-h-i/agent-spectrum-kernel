@@ -116,7 +116,7 @@
                 "required": ["path", "role", "digest"],
                 "properties": {
                   "path": { "type": "string", "minLength": 1 },
-                  "role": { "type": "string", "enum": ["kernel", "manifest", "skill", "contract", "schema"] },
+                  "role": { "type": "string", "enum": ["kernel", "manifest", "skill", "contract", "schema", "runtime_source"] },
                   "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
                 }
               }

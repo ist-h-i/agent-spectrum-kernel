@@ -402,6 +402,46 @@ Expected behavior:
 - Keep `Unknown`, stale, contradicted, and insufficient-evidence areas visible.
 - Do not claim human-equivalent capability or replace task-level verification/review gates.
 
+## 10.1 One-task Skill effectiveness evaluation
+
+User request:
+
+```text
+Evaluate whether the selected Skills helped this completed task.
+```
+
+Workflow:
+
+```text
+operating-mode-router -> observability_metrics
+skill-effectiveness-evaluation
+evidence-ledger only when a closed formal-audit trigger applies
+```
+
+Expected output:
+
+```text
+Skill effectiveness evaluation:
+- Scope: one_task_workflow_retrospective
+- Subject: workflow_and_artifacts
+- Native observations: closed-catalog finding, requirement, claim, route_decision, token, duration, artifact, or measured rework with catalog unit/definition and measurement evidence refs
+- Effect: direct catalog rule or same-unit reference, delta, materiality threshold, rule ref, and effect evidence; impact is derived
+- Unknown / unavailable measurement or effect: null/unknown fields plus explicit limitation
+- Dimensions: outcome_quality, false_positive_control, safety, routing_quality, evidence_quality, overhead, reuse_value
+- Classification: effective | neutral | excessive | harmful | insufficient_evidence
+- Recommendation: expand | retain | simplify | stop | insufficient_evidence
+- Recommendation scope: next_similar_task_workflow_only
+- Authority implied: false
+```
+
+Do not invent a metric, produce a task-effectiveness average, or infer quality
+or effect from overhead. An observed resource value without comparison evidence
+has unknown effect. Any
+harmful dimension yields `stop`; missing evidence remains
+`insufficient_evidence`. This one-task result is separate from adoption trends,
+capability maturity, benchmark scoring, external outcomes, and Portfolio
+authority.
+
 ## 11. MR/PR README generation
 
 User request:

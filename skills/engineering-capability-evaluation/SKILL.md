@@ -39,6 +39,7 @@ This skill evaluates capability growth. It does not replace task-level verificat
    - Apply `ask.claim-evidence-status@1.0.0` inline and keep human authority plus assessment lifecycle separate. Select formal `evidence-ledger` only for a closed audit trigger.
 
 3. Score level using evidence-backed criteria.
+   - Treat a one-task `ask.skill-effectiveness-outcome@1.0.0` result only as scoped source evidence. Its dimension classifications and recommendation are not capability levels and do not move maturity by themselves.
    - `0 Unknown`: no usable evidence.
    - `1 One-off assisted`: one task outcome with limited reuse evidence.
    - `2 Repeatable with human supervision`: repeated use with human decisions still central.

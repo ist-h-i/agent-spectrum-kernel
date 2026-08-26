@@ -35,7 +35,7 @@ git pull
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 ```
 
-installer は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、`.agent-spectrum-kernel/install-state.json` を更新します。managed file は前回stateのhashと導入先の現在hashが一致する場合だけ更新し、ローカル改変がある場合は `--force` なしでは失敗します。`--check`、`--dry-run`、`--prune`、`--rollback`、`--detach` を使えます。`--detach` は実行面を外し、project-owned contentを残します。
+installer は `AGENTS.md` の managed block、`CUSTOM_INSTRUCTIONS.md`、`skills/<name>/SKILL.md`、immutable contract/schema、core-ownedの `scripts/json-schema-validation.mjs` と `scripts/skill-effectiveness-outcome.mjs`、`.agent-spectrum-kernel/install-state.json` を更新します。2つのscriptは `immutable_runtime` として管理され、adapterは利用しても所有・削除しません。managed file は前回stateのhashと導入先の現在hashが一致する場合だけ更新し、ローカル改変がある場合は `--force` なしでは失敗します。`--check`、`--dry-run`、`--prune`、`--rollback`、`--detach` を使えます。`--detach` は実行面を外し、project-owned contentを残します。
 
 導入状態を確認する場合:
 
@@ -58,7 +58,7 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-Codex installer は profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。default は `implementation` profile です。通常は `--profile daily|organizational|minimal|implementation|investigation|review|adoption|observability|full` を使います。`daily` と `organizational` はmanifestのprojection packを使い、`--skills <csv>` は選択 prompt / command、router到達可能route、指定 skill 依存の閉包検証付き advanced override として扱います。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。hook、telemetry、外部公開、GitHub Actions は作りません。
+Codex installer は profile 選択された `.agents/skills/<skill>/SKILL.md`、`.agents/prompts/`、`.agents/commands/`、Codex runner runtime、`.agent-spectrum-kernel/codex-install-state.json` を更新します。`scripts/execution-envelope.mjs` はadapter-ownedですが、shared Schema engineとSkill effectiveness semantic CLIはcore-ownedのままです。default は `implementation` profile です。通常は `--profile daily|organizational|minimal|implementation|investigation|review|adoption|observability|full` を使います。`daily` と `organizational` はmanifestのprojection packを使い、`--skills <csv>` は選択 prompt / command、router到達可能route、指定 skill 依存の閉包検証付き advanced override として扱います。coreと同じく `--check`、`--prune`、`--force`、`--rollback`、`--detach` を使えます。hook、telemetry、外部公開、GitHub Actions は作りません。
 
 Codex の非対話実行は `codex exec` を直接呼ぶ代わりに、導入された runner を使います。
 
@@ -200,7 +200,7 @@ node scripts/install-claude-adapter.mjs --target /path/to/project
 5. project-local events と ledger から週次/月次reportを生成する。
 ```
 
-Claude adapter installer は core installer が作る `.agent-spectrum-kernel/install-state.json` を要求します。core state がない場合は `.claude/` を書き込む前に失敗します。
+Claude adapter installer は core installer が作る `.agent-spectrum-kernel/install-state.json` と必要なcore-owned immutable runtimeを要求します。shared Schema engineが欠落・driftしている場合、または選択Skillが必要とするsemantic CLIが欠落・driftしている場合は、`.claude/` を書き込む前に失敗します。
 
 Claude adapter は `.agent-spectrum-kernel/claude-install-state.json` を記録し、core/Codexと同じ lifecycle semantics を使います。`--check`、`--dry-run`、`--prune`、`--force`、`--rollback`、`--detach` が使えます。`--detach` は `.claude/skills`、`.claude/commands`、runtime script、adapter-owned hooksを外し、local metrics、reports、ledgersは既定で残します。
 

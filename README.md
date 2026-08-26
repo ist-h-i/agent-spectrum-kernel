@@ -373,7 +373,7 @@ The measured Checkpoint C result is in `benchmarks/results/checkpoint-c-report.m
 4. For non-trivial tasks, use `operating-mode-router` when the operating layer is unclear, then use `skill-router` for delivery/quality work or invoke an explicitly requested specific skill directly.
 5. Add project-specific rules and skills as a separate overlay, not by bloating the kernel.
 
-From this repository, the generic core installer can project and later update the kernel and canonical skills in an adopting repository:
+From this repository, the generic core installer can project and later update the kernel, canonical skills, immutable contracts/schemas, and dependency-complete shared semantic runtime in an adopting repository:
 
 ```bash
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
@@ -386,7 +386,7 @@ git pull
 node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 ```
 
-The installer writes only local files, records `.agent-spectrum-kernel/install-state.json`, reports stale managed skill projections, and uses three-way update safety: managed files are updated only when the target still matches the previous managed hash, unless `--force` is used. `--check`, `--dry-run`, `--prune`, `--rollback`, and `--detach` are supported lifecycle commands. `--detach` removes ASK execution surfaces while preserving project-owned content.
+The installer writes only local files, records `.agent-spectrum-kernel/install-state.json`, reports stale managed skill projections, and uses three-way update safety: managed files are updated only when the target still matches the previous managed hash, unless `--force` is used. Core-owned `scripts/json-schema-validation.mjs` and `scripts/skill-effectiveness-outcome.mjs` are tracked as `immutable_runtime`; adapters consume them but do not own or delete them. `--check`, `--dry-run`, `--prune`, `--rollback`, and `--detach` are supported lifecycle commands. `--detach` removes ASK execution surfaces while preserving project-owned content.
 
 For tools that only support a single custom instruction field, use `CUSTOM_INSTRUCTIONS.md`.
 
@@ -402,7 +402,7 @@ node scripts/install-claude-adapter.mjs --target /path/to/project
 Recommended adoption path:
 
 ```text
-1. Install core kernel/skills with `scripts/install-kernel.mjs`.
+1. Install the core kernel, skills, immutable contracts, and shared semantic runtime with `scripts/install-kernel.mjs`.
 2. Install the Claude project adapter or optional plugin.
 3. Enable local hooks for project-local observability.
 4. Use Pattern B @claude review GitHub Actions only when PR-level shared review is needed.
@@ -432,7 +432,7 @@ node scripts/install-kernel.mjs --target /path/to/adopting-repo --merge-agents
 node scripts/install-codex-adapter.mjs --target /path/to/adopting-repo
 ```
 
-The core installer owns `AGENTS.md`; the Codex installer updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, and `.agent-spectrum-kernel/codex-install-state.json`. The default profile is `implementation`, not every manifest skill. Supported profiles are `daily`, `organizational`, `minimal`, `implementation`, `investigation`, `review`, `adoption`, `observability`, and `full`.
+The core installer owns `AGENTS.md`, canonical contracts/schemas, and shared immutable runtime; the Codex installer updates profile-selected `.agents/skills`, `.agents/prompts`, `.agents/commands`, adapter-owned runner files such as `scripts/execution-envelope.mjs`, and `.agent-spectrum-kernel/codex-install-state.json`. The default profile is `implementation`, not every manifest skill. Supported profiles are `daily`, `organizational`, `minimal`, `implementation`, `investigation`, `review`, `adoption`, `observability`, and `full`.
 
 Use `--profile <name>` for normal installs. Use `--skills <csv>` only as an advanced override; the installer fails before writing files when the override is not closed over required skills for the selected prompts, commands, router-reachable routes, and dependencies of the specified skills.
 
