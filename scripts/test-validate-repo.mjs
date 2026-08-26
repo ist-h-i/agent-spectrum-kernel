@@ -7339,6 +7339,17 @@ jobs:
   if (customInstructionsEntries.length !== 1 || !dedupedReport.includes("`CUSTOM_INSTRUCTIONS.md`: ok (copy_paste_kernel, docs)")) {
     throw new Error(`deduped path report should list CUSTOM_INSTRUCTIONS.md once with both roles\n${dedupedReport}`);
   }
+  const coreImmutableAssetRows = dedupedReport.match(/^- core immutable assets always core-owned: ok$/gm) ?? [];
+  const coreAssetOwnershipRows = dedupedReport.match(/^- core asset ownership preserved: ok$/gm) ?? [];
+  const obsoleteOwnershipLabels = [
+    "- immutable contracts always core-owned:",
+    "- core contract ownership preserved:",
+  ].filter((label) => dedupedReport.includes(label));
+  if (coreImmutableAssetRows.length !== 1 || coreAssetOwnershipRows.length !== 2 || obsoleteOwnershipLabels.length > 0) {
+    throw new Error(
+      `generated report should render current immutable/core asset ownership checks as ok without obsolete contracts-only labels\n${dedupedReport}`,
+    );
+  }
   console.log("validate-repo fixture tests passed");
 } finally {
   rmSync(fixtureRoot, { recursive: true, force: true });
