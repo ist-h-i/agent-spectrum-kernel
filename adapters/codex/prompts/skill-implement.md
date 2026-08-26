@@ -17,6 +17,7 @@ Implementation Contract:
 - Actual files/components and change boundary:
 - Verification attempted:
 - Evidence references:
+- Selected proof ref (Compact Proof or Formal Verification Contract; do not copy it):
 - Handoff state:
 
 Evidence:

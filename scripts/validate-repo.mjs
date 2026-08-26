@@ -9,6 +9,14 @@ import { APPROVAL_REQUIRED_SURFACE_IDS, OPERATING_MODES, TASK_CLASSES } from "./
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { codexCompactProfileCanonicalPaths } from "./codex-runtime-profile.mjs";
+import {
+  COMPACT_ELIGIBILITY_FACT_IDS,
+  FORMAL_VERIFICATION_TRIGGER_IDS,
+  PROTECTED_COMPACT_CLAIM_TYPES,
+  VERIFICATION_PROOF_PATHS,
+  VERIFICATION_PROOF_POLICY_REF,
+  renderCompactProofShape,
+} from "./verification-proof-policy.mjs";
 import { exportAssetRegistryReference, listAssets, verifyAssetRegistry } from "./asset-registry.mjs";
 import { listContentAddressedJson, readContentAddressedJson, readJsonFileStrict } from "./content-addressed-store.mjs";
 import { verifyEvolutionClosure } from "./evolution-loop.mjs";
@@ -71,7 +79,7 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/adapter-runtime-evidence.schema.json",
   "schemas/adapter-runtime-event.schema.json",
   "schemas/claim-evidence-status.schema.json",
-  "schemas/claim-evidence-status.schema.json",
+  "schemas/verification-proof-policy.schema.json",
   "schemas/review-signal-gate-map.json",
   "schemas/adoption-report.schema.json",
   "schemas/improvement-ledger-entry.schema.json",
@@ -637,7 +645,35 @@ const CLAIM_EVIDENCE_SEPARATION_REQUIREMENTS = Object.freeze({
   "schemas/documentation-knowledge-ledger-entry.schema.json": ["authority_status", "freshness_status"],
   "schemas/engineering-capability-ledger-entry.schema.json": ["authority_status", "assessment_state"],
 });
-
+const VERIFICATION_PROOF_POLICY_SCHEMA_PATH = "schemas/verification-proof-policy.schema.json";
+const VERIFICATION_PROOF_POLICY_CONTRACT_PATH = "docs/verification-proof-policy-contract.md";
+const VERIFICATION_PROOF_POLICY_ADR_PATH = "docs/adr/0008-monotonic-verification-proof-path.md";
+const VERIFICATION_PROOF_POLICY_FIXTURE_PATH = "docs/fixtures/verification-proof-policy-cases.json";
+const VERIFICATION_PROOF_FORMAL_BASELINE_PATH = "docs/fixtures/verification-proof-formal-baseline.md";
+const VERIFICATION_PROOF_POLICY_MODULE_PATH = "scripts/verification-proof-policy.mjs";
+const VERIFICATION_PROOF_POLICY_TEST_PATH = "scripts/test-verification-proof-policy.mjs";
+const VERIFICATION_PROOF_POLICY_MANIFEST_PATHS = Object.freeze({
+  docs: Object.freeze([
+    VERIFICATION_PROOF_POLICY_CONTRACT_PATH,
+    VERIFICATION_PROOF_POLICY_ADR_PATH,
+    VERIFICATION_PROOF_FORMAL_BASELINE_PATH,
+    VERIFICATION_PROOF_POLICY_FIXTURE_PATH,
+  ]),
+  schemas: Object.freeze([VERIFICATION_PROOF_POLICY_SCHEMA_PATH]),
+  adapters: Object.freeze([VERIFICATION_PROOF_POLICY_MODULE_PATH, VERIFICATION_PROOF_POLICY_TEST_PATH]),
+});
+const VERIFICATION_PROOF_POLICY_CORE_ASSETS = Object.freeze([
+  VERIFICATION_PROOF_POLICY_CONTRACT_PATH,
+  VERIFICATION_PROOF_POLICY_SCHEMA_PATH,
+]);
+const VERIFICATION_PROOF_POLICY_RAW_PATH_PROJECTIONS = Object.freeze([
+  "skills/test-first-verification/SKILL.md",
+  "skills/controlled-implementation/SKILL.md",
+  "skills/refactor-implementation/SKILL.md",
+  "adapters/claude-code/project/.claude/commands/skill-implement.md",
+  "adapters/claude-code/project/.claude/commands/skill-investigate.md",
+  "adapters/claude-code/project/.claude/commands/skill-verify.md",
+]);
 function parseArgs(argv) {
   const args = {
     root: DEFAULT_ROOT,
@@ -1507,6 +1543,242 @@ function validateClaimEvidenceStatusContract(root, manifest, errors) {
       }
     }
   }
+}
+
+function readVerificationProofPolicyJson(root, path, issues) {
+  const absolutePath = resolve(root, path);
+  if (!existsSync(absolutePath)) {
+    issues.push(`required verification proof policy path is missing: ${path}`);
+    return null;
+  }
+  try {
+    return JSON.parse(readFileSync(absolutePath, "utf8"));
+  } catch (error) {
+    issues.push(`${path} is not valid JSON: ${error.message}`);
+    return null;
+  }
+}
+
+export function inspectVerificationProofPolicyContract(root, manifest = null) {
+  const issues = [];
+  const requiredPaths = [
+    ...VERIFICATION_PROOF_POLICY_MANIFEST_PATHS.docs,
+    ...VERIFICATION_PROOF_POLICY_MANIFEST_PATHS.schemas,
+    ...VERIFICATION_PROOF_POLICY_MANIFEST_PATHS.adapters,
+    "schemas/compact-profile-control-map.json",
+    "scripts/installer-lifecycle.mjs",
+    "scripts/ask-shared.mjs",
+    "scripts/ask-sensors.mjs",
+    "docs/adapter-runtime-migration.md",
+    ".github/ask-automation/validation-plan.json",
+    ".github/workflows/validate.yml",
+    "docs/fixtures/adapter-cross-conformance.json",
+    "docs/fixtures/adapter-runtime-profiles.json",
+    ...VERIFICATION_PROOF_POLICY_RAW_PATH_PROJECTIONS,
+    "adapters/codex/prompts/skill-verify.md",
+  ];
+  for (const path of requiredPaths) {
+    if (!existsSync(resolve(root, path))) issues.push(`required verification proof policy path is missing: ${path}`);
+  }
+
+  const schema = readVerificationProofPolicyJson(root, VERIFICATION_PROOF_POLICY_SCHEMA_PATH, issues);
+  const metadata = schema?.["x-ask-contract"];
+  if (
+    metadata?.id !== "ask.verification-proof-policy"
+    || metadata?.revision !== "1.0.0"
+    || metadata?.ref !== VERIFICATION_PROOF_POLICY_REF
+  ) {
+    issues.push(`verification proof policy identity must remain ${VERIFICATION_PROOF_POLICY_REF}`);
+  }
+  if (JSON.stringify(metadata?.paths) !== JSON.stringify(VERIFICATION_PROOF_PATHS)) {
+    issues.push("verification proof policy paths must remain exactly compact_proof and formal_verification_contract");
+  }
+  if (JSON.stringify(metadata?.compact_eligibility_fact_ids) !== JSON.stringify(COMPACT_ELIGIBILITY_FACT_IDS)) {
+    issues.push("verification proof policy compact eligibility facts differ from the canonical module");
+  }
+  if (JSON.stringify(metadata?.formal_trigger_ids) !== JSON.stringify(FORMAL_VERIFICATION_TRIGGER_IDS)) {
+    issues.push("verification proof policy formal trigger IDs differ from the canonical module");
+  }
+  if (JSON.stringify(metadata?.protected_compact_claim_types) !== JSON.stringify(PROTECTED_COMPACT_CLAIM_TYPES)) {
+    issues.push("verification proof policy protected compact claim types differ from the canonical module");
+  }
+  if (metadata?.compact_rendered_shape !== renderCompactProofShape()) {
+    issues.push("verification proof policy Compact Proof shape differs from the canonical module");
+  }
+  if (metadata?.formal_path_absorbing !== true || metadata?.execution_evidence_owner_ref !== "docs/verification-evidence-contract.md") {
+    issues.push("verification proof policy must keep formal absorbing and existing execution-evidence ownership");
+  }
+  const rootAlternatives = schema?.oneOf?.map((entry) => entry?.$ref) ?? [];
+  if (JSON.stringify(rootAlternatives) !== JSON.stringify(["#/$defs/selection", "#/$defs/compactProof", "#/$defs/transition"])) {
+    issues.push("verification proof policy schema root alternatives must remain selection, Compact Proof, and transition only");
+  }
+
+  const fixture = readVerificationProofPolicyJson(root, VERIFICATION_PROOF_POLICY_FIXTURE_PATH, issues);
+  if (fixture) {
+    if (fixture.policy_ref !== VERIFICATION_PROOF_POLICY_REF) issues.push(`verification proof fixture policy_ref must be ${VERIFICATION_PROOF_POLICY_REF}`);
+    if (fixture.compact_rendered_shape !== renderCompactProofShape()) issues.push("verification proof fixture Compact Proof shape differs from the canonical module");
+    if (JSON.stringify(fixture.closed_sets?.compact_eligibility_fact_ids) !== JSON.stringify(COMPACT_ELIGIBILITY_FACT_IDS)) issues.push("verification proof fixture compact eligibility facts differ from the canonical module");
+    if (JSON.stringify(fixture.closed_sets?.formal_trigger_ids) !== JSON.stringify(FORMAL_VERIFICATION_TRIGGER_IDS)) issues.push("verification proof fixture formal trigger IDs differ from the canonical module");
+    if (JSON.stringify(fixture.closed_sets?.protected_compact_claim_types) !== JSON.stringify(PROTECTED_COMPACT_CLAIM_TYPES)) issues.push("verification proof fixture protected compact claim types differ from the canonical module");
+
+    if (fixture.size_proxy?.formal_baseline_path !== VERIFICATION_PROOF_FORMAL_BASELINE_PATH) {
+      issues.push(`verification proof fixture formal baseline must remain ${VERIFICATION_PROOF_FORMAL_BASELINE_PATH}`);
+    } else if (existsSync(resolve(root, VERIFICATION_PROOF_FORMAL_BASELINE_PATH))) {
+      const compactBytes = Buffer.byteLength(renderCompactProofShape(), "utf8");
+      const formalBytes = readFileSync(resolve(root, VERIFICATION_PROOF_FORMAL_BASELINE_PATH)).byteLength;
+      const maximumRatio = fixture.size_proxy?.maximum_compact_ratio;
+      if (
+        fixture.size_proxy?.compact_expected_bytes !== compactBytes
+        || fixture.size_proxy?.formal_expected_bytes !== formalBytes
+        || typeof maximumRatio !== "number"
+        || compactBytes > formalBytes * maximumRatio
+      ) {
+        issues.push("verification proof artifact-size proxy does not match the checked-in Compact Proof and formal baseline bytes");
+      }
+    }
+
+    const promptProxy = fixture.size_proxy?.generated_localized_prompt;
+    const expectedPromptBaseline = "docs/fixtures/codex-pre-compact-prompts/skill-verify.md";
+    if (
+      promptProxy?.baseline_path !== expectedPromptBaseline
+      || promptProxy?.candidate_adapter_id !== "codex"
+      || promptProxy?.candidate_profile_id !== "codex-verification-compact-v1"
+      || promptProxy?.candidate_prompt_name !== "skill-verify.md"
+    ) {
+      issues.push("verification proof generated-prompt proxy must bind the immutable Codex verification baseline and current verification profile");
+    } else if (existsSync(resolve(root, expectedPromptBaseline))) {
+      const baselineBytes = readFileSync(resolve(root, expectedPromptBaseline));
+      const baselineDigest = createHash("sha256").update(baselineBytes).digest("hex");
+      if (baselineBytes.byteLength !== promptProxy.baseline_expected_bytes || baselineDigest !== promptProxy.baseline_sha256) {
+        issues.push("verification proof generated-prompt baseline bytes or digest are stale");
+      }
+    } else {
+      issues.push(`required verification proof policy path is missing: ${expectedPromptBaseline}`);
+    }
+
+    const runtimeProfiles = readVerificationProofPolicyJson(root, "docs/fixtures/adapter-runtime-profiles.json", issues);
+    const runtimeCodex = runtimeProfiles?.profiles?.find(({ adapter_id }) => adapter_id === promptProxy?.candidate_adapter_id);
+    const runtimePrompt = runtimeCodex?.rendering?.compact_profiles?.find(({ profile_id }) => profile_id === promptProxy?.candidate_profile_id);
+    if (
+      runtimePrompt?.prompt_name !== promptProxy?.candidate_prompt_name
+      || runtimePrompt?.rendered_bytes !== promptProxy?.candidate_expected_bytes
+      || runtimePrompt?.rendered_sha256 !== `sha256:${promptProxy?.candidate_sha256}`
+      || typeof promptProxy?.maximum_candidate_ratio !== "number"
+      || promptProxy.candidate_expected_bytes > promptProxy.baseline_expected_bytes * promptProxy.maximum_candidate_ratio
+    ) {
+      issues.push("verification proof generated localized prompt does not match the runtime fixture or material-size threshold");
+    }
+  }
+
+  const controlMap = readVerificationProofPolicyJson(root, "schemas/compact-profile-control-map.json", issues);
+  const verificationControl = controlMap?.controls?.verification;
+  if (
+    verificationControl?.proof_policy_ref !== VERIFICATION_PROOF_POLICY_REF
+    || verificationControl?.proof_policy_schema_ref !== VERIFICATION_PROOF_POLICY_SCHEMA_PATH
+    || verificationControl?.proof_path_selected_before_implementation_claim !== true
+    || verificationControl?.compact_to_formal_upgrade_required !== true
+  ) {
+    issues.push("compact profile verification control must project the canonical policy ref, schema, pre-claim selection, and compact-to-formal upgrade");
+  }
+
+  if (existsSync(resolve(root, "scripts/installer-lifecycle.mjs"))) {
+    const installer = readFileSync(resolve(root, "scripts/installer-lifecycle.mjs"), "utf8");
+    for (const path of VERIFICATION_PROOF_POLICY_CORE_ASSETS) {
+      if (!installer.includes(`"${path}"`)) issues.push(`core immutable contract assets must include ${path}`);
+    }
+  }
+
+  for (const path of VERIFICATION_PROOF_POLICY_RAW_PATH_PROJECTIONS) {
+    if (!existsSync(resolve(root, path))) continue;
+    const text = readFileSync(resolve(root, path), "utf8");
+    for (const token of [VERIFICATION_PROOF_POLICY_REF, ...VERIFICATION_PROOF_PATHS]) {
+      if (!text.includes(token)) issues.push(`${path} must project verification proof policy token: ${token}`);
+    }
+  }
+  if (existsSync(resolve(root, "adapters/codex/prompts/skill-verify.md"))) {
+    const codexVerify = readFileSync(resolve(root, "adapters/codex/prompts/skill-verify.md"), "utf8");
+    for (const token of [...VERIFICATION_PROOF_PATHS, "Proof:"]) {
+      if (!codexVerify.includes(token)) issues.push(`adapters/codex/prompts/skill-verify.md must preserve verification proof token: ${token}`);
+    }
+  }
+  if (existsSync(resolve(root, "docs/fixtures/adapter-cross-conformance.json"))) {
+    const profiles = readFileSync(resolve(root, "docs/fixtures/adapter-cross-conformance.json"), "utf8");
+    for (const token of [VERIFICATION_PROOF_POLICY_REF, ...VERIFICATION_PROOF_PATHS]) {
+      if (!profiles.includes(token)) issues.push(`adapter cross-conformance fixture must project verification proof policy token: ${token}`);
+    }
+  }
+
+  if (existsSync(resolve(root, "scripts/ask-shared.mjs"))) {
+    const shared = readFileSync(resolve(root, "scripts/ask-shared.mjs"), "utf8");
+    if (!shared.includes('exactlyOneOfSections: ["Proof:", "Verification Contract:"]')) {
+      issues.push("ASK shared verification output must require exactly one Compact Proof or Verification Contract section");
+    }
+  }
+  if (existsSync(resolve(root, "scripts/ask-sensors.mjs"))) {
+    const sensors = readFileSync(resolve(root, "scripts/ask-sensors.mjs"), "utf8");
+    if (!sensors.includes('"Proof:"') || !sensors.includes("exactlyOneOfSections")) {
+      issues.push("ASK sensors must recognize and enforce the exclusive Compact Proof output section");
+    }
+  }
+
+  const validationPlan = readVerificationProofPolicyJson(root, ".github/ask-automation/validation-plan.json", issues);
+  const policyCommand = validationPlan?.commands?.find((command) => command.id === "verification_proof_policy");
+  if (JSON.stringify(policyCommand?.argv) !== JSON.stringify(["node", VERIFICATION_PROOF_POLICY_TEST_PATH])) {
+    issues.push("immutable validation plan must run the verification proof policy contract test");
+  }
+  if (existsSync(resolve(root, ".github/workflows/validate.yml"))) {
+    const workflow = readFileSync(resolve(root, ".github/workflows/validate.yml"), "utf8");
+    if (!workflow.includes(`node ${VERIFICATION_PROOF_POLICY_TEST_PATH}`)) issues.push("repository workflow must run the verification proof policy contract test");
+  }
+
+  if (existsSync(resolve(root, "docs/adapter-runtime-migration.md"))) {
+    const migration = readFileSync(resolve(root, "docs/adapter-runtime-migration.md"), "utf8");
+    for (const token of [VERIFICATION_PROOF_POLICY_REF, "formal-only", "does not downgrade", "97-byte", "287-byte"]) {
+      if (!migration.includes(token)) issues.push(`adapter runtime migration must preserve verification proof migration token: ${token}`);
+    }
+  }
+
+  if (manifest) {
+    for (const [key, paths] of Object.entries(VERIFICATION_PROOF_POLICY_MANIFEST_PATHS)) {
+      for (const path of paths) {
+        if (!Array.isArray(manifest[key]) || !manifest[key].includes(path)) issues.push(`manifest.json.${key} must include ${path}`);
+      }
+    }
+  }
+
+  return {
+    issues,
+    policyRef: metadata?.ref ?? "missing",
+    pathCount: Array.isArray(metadata?.paths) ? metadata.paths.length : 0,
+    compactEligibilityFactCount: Array.isArray(metadata?.compact_eligibility_fact_ids) ? metadata.compact_eligibility_fact_ids.length : 0,
+    formalTriggerCount: Array.isArray(metadata?.formal_trigger_ids) ? metadata.formal_trigger_ids.length : 0,
+    protectedCompactClaimCount: Array.isArray(metadata?.protected_compact_claim_types) ? metadata.protected_compact_claim_types.length : 0,
+    compactBytes: fixture?.size_proxy?.compact_expected_bytes ?? "unknown",
+    formalBaselineBytes: fixture?.size_proxy?.formal_expected_bytes ?? "unknown",
+    generatedPromptBytes: fixture?.size_proxy?.generated_localized_prompt?.candidate_expected_bytes ?? "unknown",
+    generatedPromptBaselineBytes: fixture?.size_proxy?.generated_localized_prompt?.baseline_expected_bytes ?? "unknown",
+  };
+}
+
+function validateVerificationProofPolicyContract(root, manifest, errors) {
+  if (manifest?.name !== "agent-spectrum-kernel") {
+    return {
+      active: false,
+      valid: true,
+      policyRef: "not applicable",
+      pathCount: 0,
+      compactEligibilityFactCount: 0,
+      formalTriggerCount: 0,
+      protectedCompactClaimCount: 0,
+      compactBytes: "not applicable",
+      formalBaselineBytes: "not applicable",
+      generatedPromptBytes: "not applicable",
+      generatedPromptBaselineBytes: "not applicable",
+    };
+  }
+  const result = inspectVerificationProofPolicyContract(root, manifest);
+  for (const issue of result.issues) fail(errors, "verification proof policy", issue);
+  return { active: true, valid: result.issues.length === 0, ...result };
 }
 
 function validateExecutionEnvelope(root, manifest, errors) {
@@ -5121,7 +5393,7 @@ function validateEpicAdmissionWorkPackagePlanContract(root, errors) {
   };
 }
 
-function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, epicAdmissionWorkPackagePlanChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings }) {
+function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, verificationProofPolicyChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, epicAdmissionWorkPackagePlanChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings }) {
   const manifestSkills = Array.isArray(manifest?.skills) ? [...manifest.skills].sort() : [];
   const missingDirectories = manifestSkills.filter((skill) => !skillDirectories.includes(skill));
   const extraDirectories = skillDirectories.filter((skill) => !manifestSkills.includes(skill));
@@ -5250,6 +5522,15 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
     `- machine-readable profile/evidence schemas: ${adapterRuntimeProfileChecks.schemaPresent && adapterRuntimeProfileChecks.evidenceSchemaPresent ? "ok" : "missing"}`,
     `- normalized event schema registry: ${adapterRuntimeProfileChecks.eventSchemaRegistryPresent ? "ok" : "missing"}`,
     `- required adapter fixtures: ${adapterRuntimeProfileChecks.fixturePresent && adapterRuntimeProfileChecks.evidenceFixturePresent && adapterRuntimeProfileChecks.requiredAdaptersPresent && adapterRuntimeProfileChecks.profiles.every((profile) => profile.ok) ? "ok" : "invalid"}`,
+    "",
+    "## Verification proof policy checks",
+    "",
+    `- canonical policy: ${verificationProofPolicyChecks.valid ? "ok" : "invalid"}`,
+    `- policy ref: ${verificationProofPolicyChecks.policyRef}`,
+    `- proof paths: ${verificationProofPolicyChecks.pathCount}`,
+    `- compact eligibility facts / formal triggers / protected compact claims: ${verificationProofPolicyChecks.compactEligibilityFactCount} / ${verificationProofPolicyChecks.formalTriggerCount} / ${verificationProofPolicyChecks.protectedCompactClaimCount}`,
+    `- Compact Proof / formal baseline artifact bytes: ${verificationProofPolicyChecks.compactBytes} / ${verificationProofPolicyChecks.formalBaselineBytes}`,
+    `- generated localized / immutable pre-compact verification prompt bytes: ${verificationProofPolicyChecks.generatedPromptBytes} / ${verificationProofPolicyChecks.generatedPromptBaselineBytes}`,
     "",
     "## Lifecycle artifact contract checks",
     "",
@@ -5517,6 +5798,7 @@ export function validateRepository(options) {
   const claudeAdapterChecks = validateClaudeAdapterArchitecture(root, manifest, errors);
   const executionEnvelopeChecks = validateExecutionEnvelope(root, manifest, errors);
   const adapterRuntimeProfileChecks = validateAdapterRuntimeProfileContract(root, manifest, errors);
+  const verificationProofPolicyChecks = validateVerificationProofPolicyContract(root, manifest, errors);
   const lifecycleArtifactChecks = validateLifecycleArtifactContract(root, manifest, errors);
   const lifecycleTraceabilityChecks = validateLifecycleTraceabilityContract(root, manifest, errors);
   validateAssetRegistryFixture(root, errors);
@@ -5532,7 +5814,7 @@ export function validateRepository(options) {
   const currentSkillCount = Array.isArray(manifest?.skills) ? manifest.skills.length : null;
   const staleFindings = findStalePhrases(root, currentSkillCount, errors);
   const pathChecks = buildPathChecks(root, manifest);
-  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, epicAdmissionWorkPackagePlanChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings });
+  const report = buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks, routingChecks, skillChecks, contextMetadataChecks, improvementLedgerChecks, domainRuleLedgerChecks, claudeAdapterChecks, executionEnvelopeChecks, adapterRuntimeProfileChecks, verificationProofPolicyChecks, lifecycleArtifactChecks, lifecycleTraceabilityChecks, epicAdmissionWorkPackagePlanChecks, reviewSignalRegistryChecks, portfolioCatalogChecks, portfolioPolicyChecks, portfolioDesignAdmissionChecks, portfolioDesignReviewChecks, pathChecks, staleFindings });
 
   checkReport(root, report, options.writeReport, options.skipReportCheck, errors);
 

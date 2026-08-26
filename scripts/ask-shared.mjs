@@ -121,7 +121,8 @@ export const CODEX_PROMPT_CONTRACTS = {
     sandbox: "workspace-write",
     requiredGates: [],
     route: { workMode: "実装", userFacing: "verify the bounded behavior and report evidence" },
-    requiredSections: ["Verification Contract:", "Evidence:"],
+    requiredSections: ["Evidence:"],
+    exactlyOneOfSections: ["Proof:", "Verification Contract:"],
   },
   "skill-handoff.md": {
     mode: "handoff",

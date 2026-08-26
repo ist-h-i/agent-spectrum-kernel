@@ -126,6 +126,14 @@ Do not ask broad question dumps. Ask the next decision that materially changes t
 
 Completion means verified behavior, not edited files.
 
+When verification applies, use `ask.verification-proof-policy@1.0.0` from
+`docs/verification-proof-policy-contract.md` before implementation claims.
+Select Compact Proof only when every closed localized/reversible eligibility
+fact is evidenced and no formal trigger is present; otherwise retain the
+existing Formal Verification Contract. Upgrade compact to formal when a trigger
+appears, preserve executed evidence refs, and never downgrade formal after a
+failed check, resume, or handoff.
+
 Use the strongest affordable evidence:
 - focused unit/integration/e2e tests,
 - typecheck, lint, build,
@@ -204,6 +212,7 @@ Implementation Contract:
 - Actual change boundary:
 - Verification attempted:
 - Evidence references:
+- Selected Compact Proof or Formal Verification Contract ref:
 - Handoff state:
 
 Evidence:

@@ -10,6 +10,21 @@ Trivial or localized changes are exempt only from creating a lifecycle trace cha
 
 An exemption is not established by a `trivial` label or reason alone. It requires observed facts with evidence for `localized_scope`, `no_claim`, and `no_required_gate`. Any completion, merge, or release claim, or any security, permission, deployment, production, migration, or other required gate, makes the exemption invalid. Record the evidence-backed exemption only when a consumer needs to know why no chain exists; otherwise create no traceability artifact.
 
+### Compact Proof is not the exemption
+
+A Compact Proof selected under `ask.verification-proof-policy@1.0.0` may support
+one bounded localized completion claim. Because it supports a completion claim,
+it is not the localized trace exemption above. The completion mapping references
+the selected Compact Proof obligation and the matching observed execution
+evidence required by `docs/verification-proof-policy-contract.md`.
+
+The canonical compact-eligibility facts and formal triggers are owned by
+`schemas/verification-proof-policy.schema.json`; traceability consumes the
+validated selection and does not reclassify it. A merge or release claim, or the
+appearance of any formal trigger, requires a Formal Verification Contract and
+the corresponding formal trace. Missing or ambiguous eligibility cannot be
+turned into an exemption.
+
 ## Stable reference model
 
 Every reference points to an artifact and, when the claim needs item-level precision, a stable item inside it:
@@ -59,6 +74,12 @@ Canonical item kinds:
 
 An accepted-risk item must record `accepted_by` and an `accepted_stage` of `review` or `release`. Approval evidence remains a referenceable item; it is not inferred from a lack of objections.
 
+A selected Compact Proof exposes its one bounded proof requirement as a
+Verification `obligation`. Its observed check result remains an Evidence record
+and must resolve through the current observation or the existing Issue #274
+verification-evidence boundary. The proof policy and trace chain create no
+alternate evidence store.
+
 ## Propagation and delta rules
 
 - Requirement, Spec, Work Package, Verification, and Implementation artifacts keep the ownership rules in `docs/lifecycle-artifact-contract.md`.
@@ -94,6 +115,8 @@ Rules:
 - Completion classifies `acceptance` and `verification`; merge classifies `implementation` and `review`; release classifies `acceptance`, `verification`, `review`, `approval`, and `rollback`.
 - `supported` requires at least one current evidence ref, every applicable required ref to resolve at its observed revision, and no unresolved blocker ref.
 - For `acceptance` and `verification`, at least one claim evidence ref must reach the exact required item by following current `upstream_refs`. Merely listing unrelated current refs in the same claim does not establish support.
+- A Compact Proof may satisfy only the `verification` mapping for its selected localized completion. Its evidence ref must resolve to the same focused check ID and exact command with an observed passing result. A missing, failed, stale, or mismatching result produces `insufficient_evidence`; Compact Proof cannot satisfy a merge or release mapping.
+- When a compact selection upgrades, the Formal Verification Contract becomes the current verification subject. Retained compact evidence refs preserve execution history but support a new formal obligation only when an explicit current trace edge establishes that relationship. Formal-to-compact downgrade is invalid.
 - Completion subjects are Spec `behavior` / `acceptance` items or Work Package `task` items. Merge subjects are Implementation `change` items. Release subjects are Release Readiness `check` items.
 - Every resolved required ref must be the same item as, or have a valid item-level trace relationship to, at least one subject. Every subject must likewise connect to at least one resolved required ref.
 - Finding fields are claim-type restricted: completion claims forbid both `blocker_refs` and `accepted_risk_refs`; merge claims allow Review blockers and accepted risks whose `accepted_stage` is `review`; release claims allow Review blockers and accepted risks whose stage is `review` or `release`.

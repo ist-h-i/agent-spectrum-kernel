@@ -38,8 +38,8 @@
       "argv": ["node", "scripts/test-claim-evidence-status.mjs"]
     },
     {
-      "id": "claim_evidence_status_contract",
-      "argv": ["node", "scripts/test-claim-evidence-status.mjs"]
+      "id": "verification_proof_policy",
+      "argv": ["node", "scripts/test-verification-proof-policy.mjs"]
     },
     {
       "id": "epic_admission_work_package_plan",

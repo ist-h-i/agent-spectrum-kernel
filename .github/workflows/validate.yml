@@ -33,6 +33,9 @@ jobs:
       - name: Run claim evidence status contract tests
         run: node scripts/test-claim-evidence-status.mjs
 
+      - name: Run verification proof policy contract tests
+        run: node scripts/test-verification-proof-policy.mjs
+
       - name: Run autonomous development control tests
         run: node scripts/test-ask-autonomous-development.mjs
 

@@ -16,7 +16,7 @@ Core rules:
 6. Do not claim correctness, performance, security, reliability, readiness, or business value without evidence.
 7. Ask only the focused question that materially changes the implementation. Otherwise make a reversible assumption and mark it.
 8. Do not perform destructive, irreversible, credential-sensitive, production-facing, or externally visible actions without explicit approval.
-9. Verify before completion using tests, typecheck, lint, build, runtime/manual checks, reproduction, measurement, or security-specific checks as appropriate.
+9. Verify before completion using tests, typecheck, lint, build, runtime/manual checks, reproduction, measurement, or security-specific checks as appropriate. When verification applies, use `ask.verification-proof-policy@1.0.0`: Compact Proof requires every closed localized eligibility fact and no formal trigger; otherwise keep the Formal Verification Contract. Compact may upgrade to formal with evidence retained; formal never downgrades.
 10. If verification cannot be run, state exactly why, what was checked instead, and the next verification step.
 11. Use `docs/agent-session-state-contract.md` only for non-trivial continuation, handoff, interrupted work, or risk-gated work. Do not require session state for trivial or fully captured simple local tasks.
 
@@ -35,8 +35,8 @@ Core rules:
 - Design / “grill me”: `grill-design`.
 - Docs/domain/ADR fit: `grill-with-docs`.
 - Application boundary decision needed before implementation, including dependency direction, state ownership, external I/O boundary, DTO/error trust boundary, async lifetime, feature public API, usecase/repository/port/adapter/mapper necessity, ID boundary, or architecture guard rollout: `application-boundary-architecture`, then return to `spec-driven-development` or `controlled-implementation`.
-- New feature: `spec-driven-development` -> `test-first-verification` for Verification Contract -> `controlled-implementation` -> `test-first-verification` for evidence.
-- Bug/unknown root cause: `doubt-driven-development` -> `test-first-verification` for reproduction and Verification Contract -> `controlled-implementation` -> `test-first-verification` for regression proof.
+- New feature: `spec-driven-development` -> `test-first-verification` selects Compact Proof or Formal Verification Contract -> `controlled-implementation` references it -> `test-first-verification` for evidence.
+- Bug/unknown root cause: `doubt-driven-development` -> `test-first-verification` selects the Formal Verification Contract for reproduction/regression -> `controlled-implementation` -> `test-first-verification` for regression proof.
 - Scope creep/refactor risk: `scope-control`; then `controlled-implementation` if proceeding to code. In review, use `review-router` -> required gates; scope findings generally route to `review-ai-quality`.
 - Hard-to-reverse architecture decision or ADR need: `adr-review`.
 - Diff/PR/generated code review: `review-router` -> observed change signals -> required gates, including `review-architecture-impact` for structural or boundary impact, `review-output-quality` for consumer-facing or machine-consumed output, and `review-adversarial-risk` for severe failure paths -> `review-final-merge-gate`.
@@ -64,6 +64,7 @@ Implementation Contract:
 - Actual change boundary:
 - Verification attempted:
 - Evidence references:
+- Selected Compact Proof or Formal Verification Contract ref:
 - Handoff state:
 
 Evidence:

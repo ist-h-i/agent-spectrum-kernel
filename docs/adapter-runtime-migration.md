@@ -31,6 +31,7 @@ The adapters may coexist. Claude owns only the paths registered in its managed i
 | Claude and Codex installed together | Preserve disjoint adapter ownership and independent state. | A path is claimed by both adapters or by the core. | Stop; correct the inventory contract before applying either projection. |
 | Pre-#229 evidence projection | Regenerate ordinary commands with inline `ask.claim-evidence-status@1.0.0`; keep formal `evidence-ledger` installed but conditionally selected. | A copied taxonomy, missing contract revision, or unconditional ordinary-ledger route is detected. | Regenerate both projections and runtime fixtures; do not reinterpret or rewrite stored legacy artifacts in place. |
 | Pre-#228 inline-only Envelope | Managed Codex migrates to a runner-owned bound record and ordinary `sidecar`; direct Codex and current Claude paths remain explicit `inline_required` compatibility. | Structured output, profile binding, record validation, or runtime-owned persistence is unavailable. | Reinstall the managed Codex runtime or remain explicitly inline. Never parse prose or silently upgrade a legacy inline payload to sidecar. |
+| Pre-#231 formal-only verification projection | Regenerate commands and prompts with `ask.verification-proof-policy@1.0.0`; existing Formal Verification Contract artifacts remain byte-preserved and readable. | The projected policy ref or path differs, an unknown path appears, Compact Proof lacks complete eligibility, or formal is downgraded. | Regenerate both projections and runtime fixtures. Keep existing formal artifacts in place; do not rewrite selection history or execution evidence. |
 | Pre-#229 evidence projection | Regenerate ordinary commands with inline `ask.claim-evidence-status@1.0.0`; keep formal `evidence-ledger` installed but conditionally selected. | A copied taxonomy, missing contract revision, or unconditional ordinary-ledger route is detected. | Regenerate both projections and runtime fixtures; do not reinterpret or rewrite stored legacy artifacts in place. |
 
 Schema additions remain compatible only when older profile documents remain valid and downgrade behavior is not weakened. Capability ID removal/rename, changed downgrade meaning, or canonical ownership changes require a schema-version change and new migration evidence.
@@ -44,7 +45,12 @@ node scripts/install-codex-adapter.mjs --target /path/to/project --rollback
 node scripts/install-claude-adapter.mjs --target /path/to/project --rollback
 ```
 
-Rollback restores managed assets and state. It does not claim that an external runtime stopped using already loaded instructions, and it does not delete project-owned event/report data or content-addressed Execution Envelope records.
+Rollback restores managed assets and state. Rolling back a #231 projection restores
+the prior formal-only prompt behavior; it does not downgrade or erase a formal
+selection already made, reinterpret Compact Proof evidence, or rewrite an existing
+Formal Verification Contract. More generally, rollback does not claim that an
+external runtime stopped using already loaded instructions, and it does not delete
+project-owned event/report data or content-addressed Execution Envelope records.
 
 ## Detach
 
@@ -62,6 +68,16 @@ The repository fixture `scripts/test-adapter-runtime-migration.mjs` verifies cur
 These checks prove bounded installer behavior. They do not prove an external Claude or Codex process loaded the projected assets or applied canonical risk, evidence, approval, and verification semantics. Capture bounded runtime evidence before upgrading those claims.
 
 For #229, the repository additionally verifies deterministic projection selection between `inline` and `formal_ledger`. Existing lowercase and legacy evidence values are normalized read-only under `docs/claim-evidence-status-contract.md`; migration must not upgrade `weak` to `Verified`, broaden the #276 Asset observation subset, or treat Skill installation as task activation.
+
+For #231, `scripts/test-verification-proof-policy.mjs` verifies the closed two-path
+selection policy, Compact Proof result binding, protected-claim rejection,
+monotonic compact-to-formal upgrade, exact legacy-formal fixture bytes, and the
+bounded 97-byte versus 287-byte artifact-shape proxy, plus the separate 2029-byte
+generated Codex verification prompt versus its immutable 2291-byte pre-compact
+fixture. Adapter conformance verifies the same selected path across current Claude
+and Codex projections. These static and local checks do not establish that an
+external runtime loaded the projection, nor do the byte counts establish token,
+latency, quality, or effectiveness gains.
 
 For #229, the repository additionally verifies deterministic projection selection between `inline` and `formal_ledger`. Existing lowercase and legacy evidence values are normalized read-only under `docs/claim-evidence-status-contract.md`; migration must not upgrade `weak` to `Verified`, broaden the #276 Asset observation subset, or treat Skill installation as task activation.
 

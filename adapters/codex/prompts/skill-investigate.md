@@ -10,6 +10,8 @@ Entry mode: investigation. Primary contract: `doubt-driven-development`. Start r
 
 [agent_activity] opt-in; S/C/F counts.
 
+Bug reproduction and regression closure select `formal_verification_contract`; retain earlier evidence if the route upgraded from `compact_proof`.
+
 Findings:
 - ...
 

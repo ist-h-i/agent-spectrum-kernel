@@ -20,11 +20,14 @@
       "cleanup_boundary": "separate"
     },
     "verification": {
-      "source_refs": ["AGENTS.md", "skills/test-first-verification/SKILL.md"],
-      "verification_contract_before_behavior_change": true,
+      "source_refs": ["AGENTS.md", "docs/verification-proof-policy-contract.md", "schemas/verification-proof-policy.schema.json", "skills/test-first-verification/SKILL.md"],
+      "proof_policy_ref": "ask.verification-proof-policy@1.0.0",
+      "proof_policy_schema_ref": "schemas/verification-proof-policy.schema.json",
+      "proof_path_selected_before_implementation_claim": true,
       "focused_check_first": true,
       "broader_checks_proportional_to_risk": true,
-      "exact_results_required": true
+      "exact_results_required": true,
+      "compact_to_formal_upgrade_required": true
     },
     "risk_approval": {
       "source_refs": ["AGENTS.md", "skills/risk-gate/SKILL.md"],

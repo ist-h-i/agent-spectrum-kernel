@@ -8,12 +8,19 @@ import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { validateAdapterRuntimeEvent } from "./adapter-runtime-event.mjs";
 import { parseCodexCompactProfileHeader } from "./ask-shared.mjs";
 import { selectClaimEvidenceMode } from "./claim-evidence-status.mjs";
+import {
+  COMPACT_ELIGIBILITY_FACT_IDS,
+  FORMAL_VERIFICATION_TRIGGER_IDS,
+  VERIFICATION_PROOF_POLICY_REF,
+  VERIFICATION_PROOF_PATHS,
+  selectVerificationProofPath,
+} from "./verification-proof-policy.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const defaultFixture = resolve(root, "docs/fixtures/adapter-cross-conformance.json");
 const ADAPTERS = ["claude_code", "codex"];
 const SCENARIO_REQUIREMENTS = Object.freeze({
-  localized_implementation: { taskClass: "implementation", contracts: ["controlled-implementation"], gates: [] },
+  localized_implementation: { taskClass: "implementation", contracts: ["controlled-implementation", "test-first-verification"], gates: [] },
   new_behavior_with_verification: { taskClass: "implementation", contracts: ["controlled-implementation", "test-first-verification"], gates: [] },
   unknown_root_cause_investigation: { taskClass: "investigation", contracts: ["doubt-driven-development", "test-first-verification"], gates: [] },
   pr_review_selective_gates: { taskClass: "review", contracts: ["review-router", "review-final-merge-gate", "evidence-ledger"], gates: ["review-router", "review-final-merge-gate"] },
@@ -75,10 +82,11 @@ function includesAll(actual, required) {
 }
 
 function validateFixture(fixture) {
-  exactKeys(fixture, ["schema_version", "adapters", "normalized_event_schema_ref", "scenarios", "mutation_fixtures"], "fixture");
-  if (fixture.schema_version !== "1.0.0") throw new Error("fixture schema_version must be 1.0.0");
+  exactKeys(fixture, ["schema_version", "adapters", "normalized_event_schema_ref", "verification_proof_policy_ref", "scenarios", "mutation_fixtures"], "fixture");
+  if (fixture.schema_version !== "1.1.0") throw new Error("fixture schema_version must be 1.1.0");
   if (JSON.stringify(fixture.adapters) !== JSON.stringify(ADAPTERS)) throw new Error("fixture adapters must be exactly claude_code, codex");
   if (fixture.normalized_event_schema_ref !== "schemas/adapter-runtime-event.schema.json") throw new Error("fixture normalized_event_schema_ref must reference the canonical adapter runtime event schema");
+  if (fixture.verification_proof_policy_ref !== VERIFICATION_PROOF_POLICY_REF) throw new Error("fixture must reference the canonical verification proof policy");
   if (!Array.isArray(fixture.scenarios) || fixture.scenarios.length !== Object.keys(SCENARIO_REQUIREMENTS).length) throw new Error("fixture must contain the nine required #179 scenarios");
   const ids = fixture.scenarios.map((scenario) => scenario?.scenario_id);
   if (new Set(ids).size !== ids.length || !includesAll(ids, Object.keys(SCENARIO_REQUIREMENTS))) throw new Error("fixture scenario IDs must be the exact #179 set");
@@ -91,13 +99,24 @@ function validateFixture(fixture) {
     identifiers(scenario.required_gates, `${scenario.scenario_id}.required_gates`);
     if (!includesAll(scenario.required_contracts, requirement.contracts)) throw new Error(`${scenario.scenario_id} is missing required contract minimums`);
     if (!includesAll(scenario.required_gates, requirement.gates)) throw new Error(`${scenario.scenario_id} is missing required gate minimums`);
-    exactKeys(scenario.input, ["risk_action", "missing_evidence", "knowledge_promotion_requested", "agent_activity_required", "verification_required", "review_final_gate_required", "handoff_required", "formal_evidence_trigger_ids"], `${scenario.scenario_id}.input`);
+    exactKeys(scenario.input, ["risk_action", "missing_evidence", "knowledge_promotion_requested", "agent_activity_required", "verification_required", "review_final_gate_required", "handoff_required", "formal_evidence_trigger_ids", "verification_proof"], `${scenario.scenario_id}.input`);
     for (const flag of ["risk_action", "knowledge_promotion_requested", "agent_activity_required", "verification_required", "review_final_gate_required", "handoff_required"]) if (typeof scenario.input[flag] !== "boolean") throw new Error(`${scenario.scenario_id}.${flag} must be boolean`);
     identifiers(scenario.input.missing_evidence, `${scenario.scenario_id}.input.missing_evidence`);
     identifiers(scenario.input.formal_evidence_trigger_ids, `${scenario.scenario_id}.input.formal_evidence_trigger_ids`);
-    exactKeys(scenario.expected, ["approval_required", "stop_status", "missing_evidence", "knowledge_promotion", "verification_obligation", "review_final_gate", "handoff_executable", "claim_evidence_mode", "agent_activity"], `${scenario.scenario_id}.expected`);
+    exactKeys(scenario.input.verification_proof, ["applies", "compact_eligibility_fact_ids", "formal_trigger_ids"], `${scenario.scenario_id}.input.verification_proof`);
+    if (typeof scenario.input.verification_proof.applies !== "boolean") throw new Error(`${scenario.scenario_id}.input.verification_proof.applies must be boolean`);
+    identifiers(scenario.input.verification_proof.compact_eligibility_fact_ids, `${scenario.scenario_id}.input.verification_proof.compact_eligibility_fact_ids`);
+    identifiers(scenario.input.verification_proof.formal_trigger_ids, `${scenario.scenario_id}.input.verification_proof.formal_trigger_ids`);
+    const eligibilityFacts = scenario.input.verification_proof.compact_eligibility_fact_ids.map((fact_id) => ({ fact_id, evidence_refs: [`fixture:${scenario.scenario_id}:${fact_id}`] }));
+    const formalTriggers = scenario.input.verification_proof.formal_trigger_ids.map((trigger_id) => ({ trigger_id, evidence_refs: [`fixture:${scenario.scenario_id}:${trigger_id}`] }));
+    const selectedProofPath = scenario.input.verification_proof.applies
+      ? selectVerificationProofPath({ eligibility_facts: eligibilityFacts, formal_triggers: formalTriggers })
+      : null;
+    if (!scenario.input.verification_proof.applies && (eligibilityFacts.length > 0 || formalTriggers.length > 0)) throw new Error(`${scenario.scenario_id} non-applicable verification proof input must not carry facts or triggers`);
+    exactKeys(scenario.expected, ["approval_required", "stop_status", "missing_evidence", "knowledge_promotion", "verification_obligation", "verification_proof_path", "review_final_gate", "handoff_executable", "claim_evidence_mode", "agent_activity"], `${scenario.scenario_id}.expected`);
     for (const flag of ["approval_required", "knowledge_promotion", "verification_obligation", "review_final_gate", "handoff_executable"]) if (typeof scenario.expected[flag] !== "boolean") throw new Error(`${scenario.scenario_id}.${flag} must be boolean`);
     if (!STOP_STATUSES.has(scenario.expected.stop_status)) throw new Error(`${scenario.scenario_id}.stop_status has an invalid enum`);
+    if (scenario.expected.verification_proof_path !== selectedProofPath) throw new Error(`${scenario.scenario_id} verification proof path must match the canonical selection`);
     if (!["inline", "formal_ledger"].includes(scenario.expected.claim_evidence_mode)) throw new Error(`${scenario.scenario_id}.claim_evidence_mode has an invalid enum`);
     if (scenario.expected.claim_evidence_mode !== selectClaimEvidenceMode(scenario.input.formal_evidence_trigger_ids)) throw new Error(`${scenario.scenario_id} claim evidence mode must match its formal-audit trigger IDs`);
     identifiers(scenario.expected.missing_evidence, `${scenario.scenario_id}.expected.missing_evidence`);
@@ -105,8 +124,12 @@ function validateFixture(fixture) {
     exactKeys(scenario.projections, ADAPTERS, `${scenario.scenario_id}.projections`);
     for (const adapterId of ADAPTERS) {
       const projection = scenario.projections[adapterId];
-      exactKeys(projection, ["profile", "entry"], `${scenario.scenario_id}.projections.${adapterId}`);
+      exactKeys(projection, ["profile", "entry", "verification_proof_policy_ref", "verification_proof_paths"], `${scenario.scenario_id}.projections.${adapterId}`);
       if (typeof projection.profile !== "string" || !projection.profile || typeof projection.entry !== "string" || !projection.entry) throw new Error(`${scenario.scenario_id}.${adapterId} projection requires profile and entry`);
+      if (projection.verification_proof_policy_ref !== null && projection.verification_proof_policy_ref !== VERIFICATION_PROOF_POLICY_REF) throw new Error(`${scenario.scenario_id}.${adapterId} projection has an invalid verification proof policy ref`);
+      identifiers(projection.verification_proof_paths, `${scenario.scenario_id}.projections.${adapterId}.verification_proof_paths`);
+      if (projection.verification_proof_policy_ref === null && projection.verification_proof_paths.length > 0) throw new Error(`${scenario.scenario_id}.${adapterId} projection paths require the canonical verification proof policy`);
+      if (projection.verification_proof_policy_ref !== null && JSON.stringify(projection.verification_proof_paths) !== JSON.stringify(VERIFICATION_PROOF_PATHS)) throw new Error(`${scenario.scenario_id}.${adapterId} projection must expose both verification proof paths`);
     }
   }
   if (!Array.isArray(fixture.mutation_fixtures) || fixture.mutation_fixtures.length === 0) throw new Error("fixture requires at least one fail-closed mutation fixture");
@@ -151,6 +174,8 @@ function projectionSemantics(adapterId, content) {
   const formalLedgerUnconditional = canonicalReferences.includes("evidence-ledger") && !formalLedgerConditional;
   const contracts = [...new Set(canonicalReferences.filter((contract) => contract !== "evidence-ledger" || formalLedgerUnconditional))].sort();
   const controlIds = adapterId === "codex" ? header?.control_ids ?? [] : [];
+  const verificationProofPolicyRef = content.includes(VERIFICATION_PROOF_POLICY_REF) ? VERIFICATION_PROOF_POLICY_REF : null;
+  const verificationProofPaths = VERIFICATION_PROOF_PATHS.filter((path) => content.includes(path));
   return {
     contracts,
     formalLedgerConditional,
@@ -161,8 +186,12 @@ function projectionSemantics(adapterId, content) {
     stopWithoutApproval: /stop without (?:that )?approval|stop without approval for that specific action/iu.test(content),
     missingEvidenceStop: lines.some((line) => /required evidence is missing.*insufficient_evidence.*stop/iu.test(line) || /\[missing_evidence\].*(?:stop if required|required => stop)/iu.test(line)),
     noImplicitAgentActivity: /do not start or delegate agents unless the request explicitly requires agent activity|\[agent_activity\] opt-in; S\/C\/F counts/iu.test(content),
+    verificationProofPolicyRef,
+    verificationProofPaths,
     verificationObligation: contracts.includes("test-first-verification")
-      && (adapterId === "claude_code" ? /Verification Contract|verify the observable behavior/iu.test(content) : controlIds.includes("verification") && /\[verification\].*behavior change.*exact results/iu.test(content)),
+      && verificationProofPolicyRef === VERIFICATION_PROOF_POLICY_REF
+      && VERIFICATION_PROOF_PATHS.every((path) => verificationProofPaths.includes(path))
+      && (adapterId === "claude_code" ? /Compact Proof|Verification Contract|verify the observable behavior/iu.test(content) : controlIds.includes("verification") && /\[verification\].*behavior change.*exact results/iu.test(content)),
     reviewFinalGate: contracts.includes("review-final-merge-gate") && /final.merge.gate|Decision:/iu.test(content),
     handoffExecutable: contracts.includes("handoff-generation") && /handoff must be executable|\[handoff\] executable state/iu.test(content),
     knowledgePromotion: contracts.includes("operating-mode-router") && contracts.includes("domain-rule-ledger") && /explicit knowledge.promotion|\[knowledge_promotion\]/iu.test(content),
@@ -176,6 +205,16 @@ function semanticsForResult(content, adapterId, scenario) {
   if (!semantics.formalLedgerConditional) mismatches.push("formal_ledger_conditional_route");
   if (semantics.formalLedgerUnconditional) mismatches.push("formal_ledger_overactivated");
   if (selectClaimEvidenceMode(scenario.input.formal_evidence_trigger_ids) === "formal_ledger" && !semantics.formalLedgerReferenced) mismatches.push("formal_ledger_required");
+  const projection = scenario.projections[adapterId];
+  if (projection.verification_proof_policy_ref !== null && semantics.verificationProofPolicyRef !== projection.verification_proof_policy_ref) mismatches.push("verification_proof_policy_ref");
+  const missingProofPaths = projection.verification_proof_policy_ref === null
+    ? []
+    : projection.verification_proof_paths.filter((path) => !semantics.verificationProofPaths.includes(path));
+  const canonicalPath = scenario.expected.verification_proof_path;
+  if (missingProofPaths.length > 0) {
+    if (canonicalPath === "compact_proof" && missingProofPaths.includes("compact_proof") && semantics.verificationProofPaths.includes("formal_verification_contract")) mismatches.push("verification_proof_path_overactivated");
+    else mismatches.push("verification_proof_path_missing");
+  }
   return mismatches;
 }
 
@@ -188,6 +227,8 @@ function expectedContract(scenario) {
     missing_evidence: [...scenario.expected.missing_evidence].sort(),
     knowledge_promotion: scenario.expected.knowledge_promotion,
     verification_obligation: scenario.expected.verification_obligation,
+    verification_proof_path: scenario.expected.verification_proof_path,
+    verification_proof_policy_ref: scenario.expected.verification_proof_path ? VERIFICATION_PROOF_POLICY_REF : null,
     review_final_gate: scenario.expected.review_final_gate,
     handoff_executable: scenario.expected.handoff_executable,
     claim_evidence_mode: scenario.expected.claim_evidence_mode,
@@ -195,7 +236,17 @@ function expectedContract(scenario) {
   };
 }
 
-function normalizedContract(event) {
+function normalizedContract(event, scenario, semantics) {
+  let verificationProofPath = null;
+  let verificationProofPolicyRef = null;
+  if (scenario.input.verification_proof.applies && semantics.verificationProofPolicyRef === VERIFICATION_PROOF_POLICY_REF) {
+    const eligibilityFacts = scenario.input.verification_proof.compact_eligibility_fact_ids.map((fact_id) => ({ fact_id, evidence_refs: [`fixture:${scenario.scenario_id}:${fact_id}`] }));
+    const formalTriggers = scenario.input.verification_proof.formal_trigger_ids.map((trigger_id) => ({ trigger_id, evidence_refs: [`fixture:${scenario.scenario_id}:${trigger_id}`] }));
+    const selected = selectVerificationProofPath({ eligibility_facts: eligibilityFacts, formal_triggers: formalTriggers });
+    if (semantics.verificationProofPaths.includes(selected)) verificationProofPath = selected;
+    else if (selected === "compact_proof" && semantics.verificationProofPaths.includes("formal_verification_contract")) verificationProofPath = "formal_verification_contract";
+    verificationProofPolicyRef = verificationProofPath ? VERIFICATION_PROOF_POLICY_REF : null;
+  }
   return {
     selected_contracts: event.contracts.selected,
     required_gates: event.gates.required,
@@ -204,6 +255,8 @@ function normalizedContract(event) {
     missing_evidence: event.evidence.missing,
     knowledge_promotion: event.knowledge.promotion_requested,
     verification_obligation: event.verification.obligation_required,
+    verification_proof_path: verificationProofPath,
+    verification_proof_policy_ref: verificationProofPolicyRef,
     review_final_gate: event.review.final_gate_required,
     handoff_executable: event.handoff.executable_state_required,
     claim_evidence_mode: event.contracts.selected.includes("evidence-ledger") ? "formal_ledger" : "inline",
@@ -273,9 +326,10 @@ export function evaluateAdapterCrossConformance(fixture, { mutation = null } = {
       const entries = selectedEntries(adapterId, plan);
       const missingEntry = !entries.includes(projection.entry) ? projection.entry : null;
       const content = mutateBytes(projectionBytes(adapterId, plan, projection.entry), mutation, adapterId, scenario.scenario_id);
+      const semantics = projectionSemantics(adapterId, content);
       const normalizedEvent = deriveProjectedEvent({ adapterId, scenario, content });
       const schemaErrors = validateAdapterRuntimeEvent(normalizedEvent);
-      const contract = normalizedContract(normalizedEvent);
+      const contract = normalizedContract(normalizedEvent, scenario, semantics);
       const activationMismatches = semanticsForResult(content, adapterId, scenario);
       const semanticMismatches = [...new Set([...mismatchFields(contract, expected), ...activationMismatches])];
       const status = missingContracts.length === 0 && !missingEntry && schemaErrors.length === 0 && semanticMismatches.length === 0 ? "pass_projected" : "fail";

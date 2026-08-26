@@ -84,7 +84,7 @@ Workflow:
 
 ```text
 spec-driven-development
-test-first-verification for Verification Contract
+test-first-verification selects Compact Proof or Formal Verification Contract
 controlled-implementation
 test-first-verification for evidence
 ```
@@ -105,13 +105,12 @@ Work Package WP-CSV:
 - allowed/forbidden scope
 - ordered tasks, dependencies, stop conditions, expected evidence
 
-Verification Contract VER-CSV:
-- upstream refs: SPEC-CSV, WP-CSV
-- behavior proof obligations
-- focused checks, required evidence, insufficient-evidence conditions
+Selected proof:
+- use Compact Proof only when all localized eligibility facts are evidenced and no formal trigger exists
+- otherwise use Formal Verification Contract VER-CSV with stable obligations
 
 Implementation Contract IMPL-CSV:
-- upstream refs: WP-CSV, VER-CSV
+- upstream refs: WP-CSV and the selected proof artifact
 - implementation-only decisions
 - actual change boundary, evidence refs, limitations, handoff state
 ```
@@ -132,7 +131,7 @@ Workflow:
 
 ```text
 doubt-driven-development
-test-first-verification for reproduction and Verification Contract
+test-first-verification selects Formal Verification Contract for reproduction/regression
 controlled-implementation
 test-first-verification for regression proof
 ```

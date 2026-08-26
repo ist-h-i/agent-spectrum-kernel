@@ -6,7 +6,7 @@ Use the installed project skills from this repository projection.
 
 Apply `ask.claim-evidence-status@1.0.0` inline. Apply `/evidence-ledger` only when its closed trigger selects `formal_ledger` (explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs); installation alone is not activation.
 
-Start with `/skill-router`, then use `/doubt-driven-development` for root-cause work. Define a Verification Contract with `/test-first-verification` before or alongside the fix path.
+Start with `/skill-router`, then use `/doubt-driven-development` for root-cause work. Apply `ask.verification-proof-policy@1.0.0` through `/test-first-verification`; bug reproduction/regression selects `formal_verification_contract`, never a downgrade to `compact_proof`. Define the existing Verification Contract before or alongside the fix path and retain earlier evidence on upgrade.
 
 Investigation requirements:
 

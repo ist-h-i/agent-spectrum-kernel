@@ -92,7 +92,7 @@ Rules:
 
 4. Add or update verification.
 
-Use `test-first-verification` when behavior needs proof or a bug/regression is involved. Reference its Verification Contract before changing behavior.
+Use `test-first-verification` when behavior needs proof or a bug/regression is involved. Before implementation claims, reference the selected `compact_proof` or `formal_verification_contract` from `ask.verification-proof-policy@1.0.0`. Do not copy unchanged proof fields into the Implementation Contract. Upgrade compact to formal if a trigger emerges; never downgrade formal after failure or resume.
 
 5. Run focused checks.
 

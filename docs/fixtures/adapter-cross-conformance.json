@@ -1,88 +1,89 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "adapters": ["claude_code", "codex"],
   "normalized_event_schema_ref": "schemas/adapter-runtime-event.schema.json",
+  "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0",
   "scenarios": [
     {
       "scenario_id": "localized_implementation",
       "task_class": "implementation",
-      "required_contracts": ["controlled-implementation"],
+      "required_contracts": ["controlled-implementation", "test-first-verification"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": [] },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "inline" },
-      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md" }, "codex": { "profile": "implementation", "entry": "skill-implement.md" } }
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": true, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": [], "verification_proof": { "applies": true, "compact_eligibility_fact_ids": ["localized_scope", "reversible_change", "single_observable_behavior", "single_focused_check", "single_session_no_handoff", "no_cross_boundary_change", "consistent_local_upstream_proof", "localized_completion_claim_only"], "formal_trigger_ids": [] } },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": true, "verification_proof_path": "compact_proof", "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "inline" },
+      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] }, "codex": { "profile": "implementation", "entry": "skill-implement.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] } }
     },
     {
       "scenario_id": "new_behavior_with_verification",
       "task_class": "implementation",
       "required_contracts": ["controlled-implementation", "test-first-verification"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": true, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": [] },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": true, "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "inline" },
-      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md" }, "codex": { "profile": "implementation", "entry": "skill-implement.md" } }
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": true, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": [], "verification_proof": { "applies": true, "compact_eligibility_fact_ids": [], "formal_trigger_ids": ["compact_eligibility_incomplete"] } },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": true, "verification_proof_path": "formal_verification_contract", "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "inline" },
+      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] }, "codex": { "profile": "implementation", "entry": "skill-implement.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] } }
     },
     {
       "scenario_id": "unknown_root_cause_investigation",
       "task_class": "investigation",
       "required_contracts": ["doubt-driven-development", "test-first-verification"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": true, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": [] },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": true, "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "inline" },
-      "projections": { "claude_code": { "profile": "investigation", "entry": "skill-investigate.md" }, "codex": { "profile": "investigation", "entry": "skill-investigate.md" } }
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": true, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": [], "verification_proof": { "applies": true, "compact_eligibility_fact_ids": [], "formal_trigger_ids": ["bug_reproduction_or_regression"] } },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": true, "verification_proof_path": "formal_verification_contract", "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "inline" },
+      "projections": { "claude_code": { "profile": "investigation", "entry": "skill-investigate.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] }, "codex": { "profile": "investigation", "entry": "skill-investigate.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] } }
     },
     {
       "scenario_id": "pr_review_selective_gates",
       "task_class": "review",
       "required_contracts": ["review-router", "review-final-merge-gate", "evidence-ledger"],
       "required_gates": ["review-router", "review-final-merge-gate"],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": true, "handoff_required": false, "formal_evidence_trigger_ids": ["high_stakes_readiness"] },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": true, "handoff_executable": false, "claim_evidence_mode": "formal_ledger" },
-      "projections": { "claude_code": { "profile": "review", "entry": "skill-review.md" }, "codex": { "profile": "review", "entry": "skill-review.md" } }
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": true, "handoff_required": false, "formal_evidence_trigger_ids": ["high_stakes_readiness"], "verification_proof": { "applies": false, "compact_eligibility_fact_ids": [], "formal_trigger_ids": [] } },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "verification_proof_path": null, "review_final_gate": true, "handoff_executable": false, "claim_evidence_mode": "formal_ledger" },
+      "projections": { "claude_code": { "profile": "review", "entry": "skill-review.md", "verification_proof_policy_ref": null, "verification_proof_paths": [] }, "codex": { "profile": "review", "entry": "skill-review.md", "verification_proof_policy_ref": null, "verification_proof_paths": [] } }
     },
     {
       "scenario_id": "destructive_external_action",
       "task_class": "risk-gated",
       "required_contracts": ["risk-gate", "evidence-ledger"],
       "required_gates": ["risk-gate"],
-      "input": { "risk_action": true, "missing_evidence": ["specific_action_approval"], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": ["high_stakes_readiness"] },
-      "expected": { "approval_required": true, "stop_status": "risk_gate", "missing_evidence": ["specific_action_approval"], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "formal_ledger" },
-      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md" }, "codex": { "profile": "implementation", "entry": "skill-implement.md" } }
+      "input": { "risk_action": true, "missing_evidence": ["specific_action_approval"], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": ["high_stakes_readiness"], "verification_proof": { "applies": false, "compact_eligibility_fact_ids": [], "formal_trigger_ids": [] } },
+      "expected": { "approval_required": true, "stop_status": "risk_gate", "missing_evidence": ["specific_action_approval"], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "verification_proof_path": null, "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "formal_ledger" },
+      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] }, "codex": { "profile": "implementation", "entry": "skill-implement.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] } }
     },
     {
       "scenario_id": "missing_repository_diff_test_evidence",
       "task_class": "review",
       "required_contracts": ["review-router"],
       "required_gates": ["review-router"],
-      "input": { "risk_action": false, "missing_evidence": ["repository", "diff", "verification"], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": [] },
-      "expected": { "approval_required": false, "stop_status": "insufficient_evidence", "missing_evidence": ["diff", "repository", "verification"], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "inline" },
-      "projections": { "claude_code": { "profile": "review", "entry": "skill-review.md" }, "codex": { "profile": "review", "entry": "skill-review.md" } }
+      "input": { "risk_action": false, "missing_evidence": ["repository", "diff", "verification"], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": [], "verification_proof": { "applies": false, "compact_eligibility_fact_ids": [], "formal_trigger_ids": [] } },
+      "expected": { "approval_required": false, "stop_status": "insufficient_evidence", "missing_evidence": ["diff", "repository", "verification"], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "verification_proof_path": null, "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "inline" },
+      "projections": { "claude_code": { "profile": "review", "entry": "skill-review.md", "verification_proof_policy_ref": null, "verification_proof_paths": [] }, "codex": { "profile": "review", "entry": "skill-review.md", "verification_proof_policy_ref": null, "verification_proof_paths": [] } }
     },
     {
       "scenario_id": "handoff_resume_state",
       "task_class": "handoff",
       "required_contracts": ["handoff-generation"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": true, "formal_evidence_trigger_ids": [] },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": false, "handoff_executable": true, "claim_evidence_mode": "inline" },
-      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-handoff.md" }, "codex": { "profile": "implementation", "entry": "skill-handoff.md" } }
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": true, "formal_evidence_trigger_ids": [], "verification_proof": { "applies": false, "compact_eligibility_fact_ids": [], "formal_trigger_ids": [] } },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "verification_proof_path": null, "review_final_gate": false, "handoff_executable": true, "claim_evidence_mode": "inline" },
+      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-handoff.md", "verification_proof_policy_ref": null, "verification_proof_paths": [] }, "codex": { "profile": "implementation", "entry": "skill-handoff.md", "verification_proof_policy_ref": null, "verification_proof_paths": [] } }
     },
     {
       "scenario_id": "explicit_knowledge_promotion",
       "task_class": "knowledge",
       "required_contracts": ["operating-mode-router", "domain-rule-ledger", "evidence-ledger"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": true, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": ["stable_claim_ids"] },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": true, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "formal_ledger" },
-      "projections": { "claude_code": { "profile": "organizational", "entry": "skill-ledger-refresh.md" }, "codex": { "profile": "organizational", "entry": "skill-implement.md" } }
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": true, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": ["stable_claim_ids"], "verification_proof": { "applies": false, "compact_eligibility_fact_ids": [], "formal_trigger_ids": [] } },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": true, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "verification_proof_path": null, "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "formal_ledger" },
+      "projections": { "claude_code": { "profile": "organizational", "entry": "skill-ledger-refresh.md", "verification_proof_policy_ref": null, "verification_proof_paths": [] }, "codex": { "profile": "organizational", "entry": "skill-implement.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] } }
     },
     {
       "scenario_id": "lightweight_no_heavy_routing_or_agents",
       "task_class": "implementation",
       "required_contracts": ["controlled-implementation"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": [] },
-      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "inline" },
-      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md" }, "codex": { "profile": "implementation", "entry": "skill-implement.md" } }
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": [], "verification_proof": { "applies": false, "compact_eligibility_fact_ids": [], "formal_trigger_ids": [] } },
+      "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "verification_proof_path": null, "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "inline" },
+      "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] }, "codex": { "profile": "implementation", "entry": "skill-implement.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] } }
     }
   ],
   "mutation_fixtures": [
@@ -97,7 +98,7 @@
       "mutation_id": "codex_remove_verification_obligation",
       "scenario_id": "new_behavior_with_verification",
       "adapter_id": "codex",
-      "remove": ["- [verification] Before behavior change: contract; focused then risk-based checks; exact results."],
+      "remove": ["- [verification] Before behavior change: ask.verification-proof-policy@1.0.0 selects compact_proof|formal_verification_contract; focused then risk-based checks; exact results; compact=>formal on trigger."],
       "expected_status": "fail"
     },
     {
@@ -140,6 +141,27 @@
       "scenario_id": "localized_implementation",
       "adapter_id": "codex",
       "remove": ["ask.claim-evidence-status@1.0.0"],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "codex_remove_verification_proof_policy_ref",
+      "scenario_id": "localized_implementation",
+      "adapter_id": "codex",
+      "remove": ["ask.verification-proof-policy@1.0.0"],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "claude_remove_compact_proof_path",
+      "scenario_id": "localized_implementation",
+      "adapter_id": "claude_code",
+      "remove": ["compact_proof"],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "codex_remove_formal_verification_path",
+      "scenario_id": "new_behavior_with_verification",
+      "adapter_id": "codex",
+      "remove": ["formal_verification_contract"],
       "expected_status": "fail"
     }
   ]

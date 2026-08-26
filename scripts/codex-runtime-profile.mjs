@@ -9,6 +9,10 @@ import {
   FORMAL_EVIDENCE_LEDGER_TRIGGER_IDS,
   canonicalClaimEvidenceStatuses,
 } from "./claim-evidence-status.mjs";
+import {
+  VERIFICATION_PROOF_PATHS,
+  VERIFICATION_PROOF_POLICY_REF,
+} from "./verification-proof-policy.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CONTROL_MAP_PATH = "schemas/compact-profile-control-map.json";
@@ -21,7 +25,9 @@ const COMMON_CANONICAL_SOURCES = [
   "AGENTS.md",
   "docs/claim-evidence-status-contract.md",
   "docs/execution-envelope-contract.md",
+  "docs/verification-proof-policy-contract.md",
   "schemas/claim-evidence-status.schema.json",
+  "schemas/verification-proof-policy.schema.json",
   CONTROL_MAP_PATH,
   "skills/risk-gate/SKILL.md",
   "skills/scope-control/SKILL.md",
@@ -101,8 +107,9 @@ export function validateCodexCompactControlMap(controlMap = readControlMap()) {
   if (scope.missing_input_behavior !== "stop_or_insufficient_evidence" || scope.change_boundary !== "smallest_task_required" || scope.cleanup_boundary !== "separate") throw new Error("scope control weakens canonical stop or change-boundary semantics");
 
   const verification = controlMap.controls.verification;
-  assertExactKeys(verification, ["source_refs", "verification_contract_before_behavior_change", "focused_check_first", "broader_checks_proportional_to_risk", "exact_results_required"], "verification control");
-  for (const field of ["verification_contract_before_behavior_change", "focused_check_first", "broader_checks_proportional_to_risk", "exact_results_required"]) if (verification[field] !== true) throw new Error(`verification control requires ${field}`);
+  assertExactKeys(verification, ["source_refs", "proof_policy_ref", "proof_policy_schema_ref", "proof_path_selected_before_implementation_claim", "focused_check_first", "broader_checks_proportional_to_risk", "exact_results_required", "compact_to_formal_upgrade_required"], "verification control");
+  for (const field of ["proof_path_selected_before_implementation_claim", "focused_check_first", "broader_checks_proportional_to_risk", "exact_results_required", "compact_to_formal_upgrade_required"]) if (verification[field] !== true) throw new Error(`verification control requires ${field}`);
+  if (verification.proof_policy_ref !== VERIFICATION_PROOF_POLICY_REF || verification.proof_policy_schema_ref !== "schemas/verification-proof-policy.schema.json") throw new Error("verification control must reference the canonical verification proof policy");
 
   const risk = controlMap.controls.risk_approval;
   const riskBooleanFields = ["exact_action_required", "risk_type_required", "potential_impact_required", "reversibility_required", "external_visibility_required", "safer_alternative_required", "preconditions_required", "stop_without_approval"];
@@ -151,7 +158,7 @@ export function validateCodexCompactControlMap(controlMap = readControlMap()) {
 
 function renderControl(controlId, control) {
   if (controlId === "scope") return "[scope] Repo/code/tests/docs/API; missing => stop/insufficient_evidence; smallest diff; no cleanup.";
-  if (controlId === "verification") return "[verification] Before behavior change: contract; focused then risk-based checks; exact results.";
+  if (controlId === "verification") return `[verification] Before behavior change: ${control.proof_policy_ref} selects ${VERIFICATION_PROOF_PATHS.join("|")}; focused then risk-based checks; exact results; compact=>formal on trigger.`;
   if (controlId === "risk_approval") return "[risk_approval] Exact action/risk/impact/reversibility/visibility; alternative/preconditions. Stop without approval for that specific action; execute only it.";
   if (controlId === "evidence") return `[evidence] ${canonicalClaimEvidenceStatuses().join("/")} (${control.contract_ref}); inline; formal[audit|multi-claim|high-stakes|cross-revision|stable-IDs]=>evidence-ledger; unsupported=>downgrade.`;
   if (controlId === "missing_evidence") return "[missing_evidence] unavailable/insufficient_evidence; no inference; required => stop.";
@@ -194,6 +201,7 @@ function validatePromptTemplate(promptName, body, definition) {
   if ((body.match(new RegExp(DIRECT_TRIGGER_PLACEHOLDER, "g")) ?? []).length !== 1) throw new Error(`${promptName} must contain one direct-trigger placeholder`);
   if (/\[(?:scope|verification|risk_approval|evidence|missing_evidence|output)\]/u.test(body)) throw new Error(`${promptName} must not hand-maintain canonical fallback controls`);
   for (const section of contract.requiredSections) if (!body.includes(section)) throw new Error(`${promptName} is missing required output evidence section: ${section}`);
+  for (const section of contract.exactlyOneOfSections ?? []) if (!body.includes(section)) throw new Error(`${promptName} is missing selectable proof section: ${section}`);
   if (!body.includes("$ARGUMENTS")) throw new Error(`${promptName} must retain the Codex argument placeholder`);
 }
 

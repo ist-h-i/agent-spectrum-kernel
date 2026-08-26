@@ -10,7 +10,7 @@ import { CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
 import { CORE_IMMUTABLE_CONTRACT_ASSETS, hashText } from "./installer-lifecycle.mjs";
 import { putContentAddressedJson } from "./content-addressed-store.mjs";
-import { REQUIRED_TRACEABILITY_SCENARIOS, computeAdapterAppliedProvenanceFingerprint, computeAdapterProfileFingerprint, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectClaimEvidencePluginProjection, inspectLifecycleScenario, inspectTraceabilityScenarioResult, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
+import { REQUIRED_TRACEABILITY_SCENARIOS, computeAdapterAppliedProvenanceFingerprint, computeAdapterProfileFingerprint, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectClaimEvidencePluginProjection, inspectLifecycleScenario, inspectTraceabilityScenarioResult, inspectVerificationProofPolicyContract, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const validateScript = resolve(repoRoot, "scripts/validate-repo.mjs");
@@ -22,6 +22,7 @@ const codexCompactProfileTestScript = resolve(repoRoot, "scripts/test-codex-runt
 const crossAdapterConformanceTestScript = resolve(repoRoot, "scripts/test-adapter-cross-conformance.mjs");
 const adapterMigrationTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-migration.mjs");
 const adapterRuntimeEventTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-event.mjs");
+const verificationProofPolicyTestScript = resolve(repoRoot, "scripts/test-verification-proof-policy.mjs");
 const fixtureRoot = mkdtempSync(resolve(tmpdir(), "validate-repo-"));
 
 const compactProfileResult = spawnSync(process.execPath, [codexCompactProfileTestScript], { cwd: repoRoot, encoding: "utf8" });
@@ -33,6 +34,7 @@ for (const [label, script] of [
   ["Normalized adapter runtime event", adapterRuntimeEventTestScript],
   ["Cross-adapter conformance", crossAdapterConformanceTestScript],
   ["Dual-runtime migration", adapterMigrationTestScript],
+  ["Verification proof policy", verificationProofPolicyTestScript],
 ]) {
   const result = spawnSync(process.execPath, [script], { cwd: repoRoot, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`${label} tests failed\n${result.stdout}\n${result.stderr}`);
@@ -386,9 +388,58 @@ function assertClaimEvidencePluginProjectionFailure(label, root, expected) {
   }
 }
 
+function cloneVerificationProofPolicyFixture(name) {
+  const root = resolve(fixtureRoot, name);
+  for (const path of [
+    "manifest.json",
+    "docs/verification-proof-policy-contract.md",
+    "docs/adr/0008-monotonic-verification-proof-path.md",
+    "docs/fixtures/verification-proof-formal-baseline.md",
+    "docs/fixtures/verification-proof-policy-cases.json",
+    "schemas/verification-proof-policy.schema.json",
+    "schemas/compact-profile-control-map.json",
+    "scripts/verification-proof-policy.mjs",
+    "scripts/test-verification-proof-policy.mjs",
+    "scripts/installer-lifecycle.mjs",
+    "scripts/ask-shared.mjs",
+    "scripts/ask-sensors.mjs",
+    "docs/adapter-runtime-migration.md",
+    ".github/ask-automation/validation-plan.json",
+    ".github/workflows/validate.yml",
+    "docs/fixtures/adapter-cross-conformance.json",
+    "docs/fixtures/adapter-runtime-profiles.json",
+    "docs/fixtures/codex-pre-compact-prompts/skill-verify.md",
+    "skills/test-first-verification/SKILL.md",
+    "skills/controlled-implementation/SKILL.md",
+    "skills/refactor-implementation/SKILL.md",
+    "adapters/claude-code/project/.claude/commands/skill-implement.md",
+    "adapters/claude-code/project/.claude/commands/skill-investigate.md",
+    "adapters/claude-code/project/.claude/commands/skill-verify.md",
+    "adapters/codex/prompts/skill-verify.md",
+  ]) {
+    const target = resolve(root, path);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, readFileSync(resolve(repoRoot, path)));
+  }
+  return root;
+}
+
+function inspectVerificationProofPolicyFixture(root) {
+  const manifest = JSON.parse(readFileSync(resolve(root, "manifest.json"), "utf8"));
+  return inspectVerificationProofPolicyContract(root, manifest);
+}
+
+function assertVerificationProofPolicyFailure(label, root, expected) {
+  const result = inspectVerificationProofPolicyFixture(root);
+  if (!result.issues.some((issue) => issue.includes(expected))) {
+    throw new Error(`${label} should expose '${expected}'\n${result.issues.join("\n")}`);
+  }
+}
+
 function writeAdapterFixture(root) {
   const canonicalClaimEvidenceSchemaPaths = new Set([
     "schemas/claim-evidence-status.schema.json",
+    "schemas/verification-proof-policy.schema.json",
     "schemas/improvement-ledger-entry.schema.json",
     "schemas/domain-rule-ledger-entry.schema.json",
     "schemas/architecture-decision-memory-entry.schema.json",
@@ -409,7 +460,7 @@ function writeAdapterFixture(root) {
     "schemas/adapter-runtime-evidence.schema.json",
     "schemas/adapter-runtime-event.schema.json",
     "schemas/claim-evidence-status.schema.json",
-    "schemas/claim-evidence-status.schema.json",
+    "schemas/verification-proof-policy.schema.json",
     "schemas/normalized-event-schema-registry.json",
     "schemas/review-signal-gate-map.json",
     "schemas/adoption-report.schema.json",
@@ -5409,6 +5460,80 @@ ${validEnvelopeBlock}
     }
   }
 
+  const compactVerificationInput = resolve(target, "verification-compact-contract.txt");
+  writeFileSync(compactVerificationInput, `Proof:
+- Behavior: localized fixture behavior.
+- Focused check: node scripts/test-validate-repo.mjs
+- Result or missing evidence: pass.
+- Broader check required when: scope expands.
+
+Evidence:
+- Selected proof artifact ref: PROOF-FIXTURE
+- command: node scripts/test-validate-repo.mjs
+  result: pass
+
+${validEnvelopeBlock}`);
+  const compactVerificationResult = runRepoScript([sensorsScript, "--target", target, "--mode", "verification", "--input", compactVerificationInput]);
+  assertRuntimePass("sensors Compact Proof contract pass", compactVerificationResult);
+  if (!compactVerificationResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`Compact Proof prompt contract should pass sensors\n${compactVerificationResult.stdout}`);
+  }
+
+  const ambiguousVerificationInput = resolve(target, "verification-ambiguous-contract.txt");
+  writeFileSync(ambiguousVerificationInput, `Proof:
+- Behavior: ambiguous fixture.
+
+Verification Contract:
+- Artifact ID: VER-AMBIGUOUS
+
+Evidence:
+- command: node scripts/test-validate-repo.mjs
+  result: pass
+
+${validEnvelopeBlock}`);
+  const ambiguousVerificationResult = runRepoScript([sensorsScript, "--target", target, "--mode", "verification", "--input", ambiguousVerificationInput]);
+  assertRuntimePass("sensors ambiguous proof path is report-only", ambiguousVerificationResult);
+  if (!ambiguousVerificationResult.stdout.includes("ASK sensors: fail") || !ambiguousVerificationResult.stdout.includes("exactly one selected proof section")) {
+    throw new Error(`ambiguous proof-path output must fail the completion sensor\n${ambiguousVerificationResult.stdout}`);
+  }
+
+  const incidentalProofInput = resolve(target, "verification-incidental-proof.txt");
+  writeFileSync(incidentalProofInput, `The prose mentions Proof: but does not select that top-level path.
+
+Evidence:
+- command: node scripts/test-validate-repo.mjs
+  result: pass
+
+${validEnvelopeBlock}`);
+  const incidentalProofResult = runRepoScript([sensorsScript, "--target", target, "--mode", "verification", "--input", incidentalProofInput]);
+  assertRuntimePass("sensors incidental proof label is report-only", incidentalProofResult);
+  if (!incidentalProofResult.stdout.includes("ASK sensors: fail") || !incidentalProofResult.stdout.includes("exactly one selected proof section")) {
+    throw new Error(`incidental Proof label must not satisfy the completion sensor\n${incidentalProofResult.stdout}`);
+  }
+
+  const fencedFormalLabelInput = resolve(target, "verification-fenced-formal-label.txt");
+  writeFileSync(fencedFormalLabelInput, `Proof:
+- Behavior: localized fixture behavior.
+- Focused check: node scripts/test-validate-repo.mjs
+- Result or missing evidence: pass.
+- Broader check required when: scope expands.
+
+Evidence:
+- command: node scripts/test-validate-repo.mjs
+  result: pass
+
+\`\`\`text
+Verification Contract:
+- This is quoted reference material, not the selected path.
+\`\`\`
+
+${validEnvelopeBlock}`);
+  const fencedFormalLabelResult = runRepoScript([sensorsScript, "--target", target, "--mode", "verification", "--input", fencedFormalLabelInput]);
+  assertRuntimePass("sensors fenced formal label is ignored", fencedFormalLabelResult);
+  if (!fencedFormalLabelResult.stdout.includes("ASK sensors: pass")) {
+    throw new Error(`fenced Verification Contract label must not make Compact Proof ambiguous\n${fencedFormalLabelResult.stdout}`);
+  }
+
   const riskInput = resolve(target, "risk.txt");
   writeFileSync(riskInput, "Next action: deploy production config.\n");
   const riskResult = runRepoScript([
@@ -5942,6 +6067,67 @@ try {
       throw new Error(`traceability scenario ${scenario.id} should expose structured gaps\nexpected=${JSON.stringify(scenario.expected_gaps ?? [])}\nactual=${JSON.stringify(gaps)}`);
     }
   }
+
+  const validVerificationProofPolicyRoot = cloneVerificationProofPolicyFixture("valid-verification-proof-policy");
+  assert.deepEqual(inspectVerificationProofPolicyFixture(validVerificationProofPolicyRoot).issues, [], "valid verification proof policy projection must pass");
+
+  const missingVerificationProofSchemaRoot = cloneVerificationProofPolicyFixture("missing-verification-proof-schema");
+  rmSync(resolve(missingVerificationProofSchemaRoot, "schemas/verification-proof-policy.schema.json"));
+  assertVerificationProofPolicyFailure(
+    "missing verification proof policy schema",
+    missingVerificationProofSchemaRoot,
+    "required verification proof policy path is missing: schemas/verification-proof-policy.schema.json",
+  );
+
+  const expandedVerificationProofTriggerRoot = cloneVerificationProofPolicyFixture("expanded-verification-proof-trigger");
+  {
+    const schemaPath = resolve(expandedVerificationProofTriggerRoot, "schemas/verification-proof-policy.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema["x-ask-contract"].formal_trigger_ids.push("invented_trigger");
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertVerificationProofPolicyFailure(
+    "expanded verification proof trigger vocabulary",
+    expandedVerificationProofTriggerRoot,
+    "verification proof policy formal trigger IDs differ from the canonical module",
+  );
+
+  const thirdVerificationProofPathRoot = cloneVerificationProofPolicyFixture("third-verification-proof-path");
+  {
+    const schemaPath = resolve(thirdVerificationProofPathRoot, "schemas/verification-proof-policy.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
+    schema.oneOf.push({ $ref: "#/$defs/unboundedProof" });
+    writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+  }
+  assertVerificationProofPolicyFailure(
+    "third verification proof schema path",
+    thirdVerificationProofPathRoot,
+    "verification proof policy schema root alternatives must remain selection, Compact Proof, and transition only",
+  );
+
+  const driftedVerificationProofControlRoot = cloneVerificationProofPolicyFixture("drifted-verification-proof-control");
+  {
+    const controlPath = resolve(driftedVerificationProofControlRoot, "schemas/compact-profile-control-map.json");
+    const control = JSON.parse(readFileSync(controlPath, "utf8"));
+    control.controls.verification.proof_policy_ref = "ask.verification-proof-policy@2.0.0";
+    writeFileSync(controlPath, `${JSON.stringify(control, null, 2)}\n`);
+  }
+  assertVerificationProofPolicyFailure(
+    "drifted verification proof control ref",
+    driftedVerificationProofControlRoot,
+    "compact profile verification control must project the canonical policy ref",
+  );
+
+  const missingCompactAdapterPathRoot = cloneVerificationProofPolicyFixture("missing-compact-adapter-path");
+  {
+    const commandPath = resolve(missingCompactAdapterPathRoot, "adapters/claude-code/project/.claude/commands/skill-verify.md");
+    writeFileSync(commandPath, readFileSync(commandPath, "utf8").replaceAll("compact_proof", "localized_proof"));
+  }
+  assertVerificationProofPolicyFailure(
+    "missing Compact Proof adapter path",
+    missingCompactAdapterPathRoot,
+    "adapters/claude-code/project/.claude/commands/skill-verify.md must project verification proof policy token: compact_proof",
+  );
 
   const validRoot = cloneFixture("valid");
   assertPass("valid fixture", validRoot);

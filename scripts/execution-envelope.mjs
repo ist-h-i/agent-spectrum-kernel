@@ -201,7 +201,7 @@ function markdownLines(text) {
   return { source, lines };
 }
 
-function markdownFenceOpening(line) {
+export function markdownFenceOpening(line) {
   const match = line.match(MARKDOWN_FENCE_LINE);
   if (!match) return null;
   const fence = match[1];
@@ -209,7 +209,7 @@ function markdownFenceOpening(line) {
   return { character: fence[0], length: fence.length };
 }
 
-function isMarkdownFenceClosing(line, opening) {
+export function isMarkdownFenceClosing(line, opening) {
   const match = line.match(MARKDOWN_FENCE_CLOSE_LINE);
   return Boolean(match && match[1][0] === opening.character && match[1].length >= opening.length);
 }

@@ -7,10 +7,16 @@ import {
   detectApprovalRequiredSurfaces,
   findUnsupportedCapabilityClaims,
 } from "./ask-shared.mjs";
-import { inspectExecutionEnvelope, inspectExecutionEnvelopeRecordEmission } from "./execution-envelope.mjs";
+import {
+  inspectExecutionEnvelope,
+  inspectExecutionEnvelopeRecordEmission,
+  isMarkdownFenceClosing,
+  markdownFenceOpening,
+} from "./execution-envelope.mjs";
 
 const KNOWN_OUTPUT_SECTIONS = [
   "Implementation Contract:",
+  "Proof:",
   "Verification Contract:",
   "Changed:",
   "Verified:",
@@ -127,7 +133,7 @@ function runSensors({ target, mode, text, changedFiles, envelopeRecord }) {
   const sensors = [];
   const contract = codexPromptContractForMode(mode);
   if (contract) {
-    sensors.push(completionContractSensor(text, mode, contract.requiredSections));
+    sensors.push(completionContractSensor(text, mode, contract));
   }
   sensors.push(executionEnvelopeSensor(text, envelopeRecord));
   if (["implementation", "investigation"].includes(mode)) {
@@ -175,17 +181,27 @@ function executionEnvelopeSensor(text, envelopeRecord) {
   );
 }
 
-function completionContractSensor(text, mode, requiredSections) {
+function completionContractSensor(text, mode, contract) {
   if (!text.trim()) {
     return sensor("completion_contract", "warn", "No implementation output text was provided.");
   }
-  const missing = requiredSections.filter((section) => !text.includes(section));
+  const missing = contract.requiredSections.filter((section) => !hasTopLevelSection(text, section));
   if (missing.length > 0) {
     return sensor(
       "completion_contract",
       "fail",
       `${mode} output is missing required sections: ${missing.join(", ")}.`,
       `Do not claim ${mode} completion/readiness until the managed completion contract is present.`,
+    );
+  }
+  const alternatives = contract.exactlyOneOfSections ?? [];
+  const presentAlternatives = alternatives.filter((section) => hasTopLevelSection(text, section));
+  if (alternatives.length > 0 && presentAlternatives.length !== 1) {
+    return sensor(
+      "completion_contract",
+      "fail",
+      `${mode} output must contain exactly one selected proof section: ${alternatives.join(" or ")}.`,
+      `Do not claim ${mode} completion until one proof path is selected and recorded.`,
     );
   }
   return sensor("completion_contract", "pass", `${mode} completion contract sections are present.`);
@@ -216,13 +232,18 @@ function reviewLayerSummarySensor(text) {
 }
 
 function hasTopLevelSection(text, section) {
-  let inFence = false;
+  let activeFence = null;
   for (const line of text.split(/\r?\n/)) {
-    if (/^\s*```/.test(line)) {
-      inFence = !inFence;
+    if (activeFence) {
+      if (isMarkdownFenceClosing(line, activeFence)) activeFence = null;
       continue;
     }
-    if (inFence || /^\s*(?:>|[-*+]\s)/.test(line)) {
+    const opening = markdownFenceOpening(line);
+    if (opening) {
+      activeFence = opening;
+      continue;
+    }
+    if (/^\s*(?:>|[-*+]\s)/.test(line)) {
       continue;
     }
     if (line === section) {

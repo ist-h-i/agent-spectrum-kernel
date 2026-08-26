@@ -28,7 +28,7 @@ Project overlay = リポジトリ固有の規約・コマンド・禁止範囲
 
 `skills/operating-mode-router/SKILL.md` は、通常のdelivery/quality作業と、project adoption、observability/metrics、operation/automationを先に分ける上位routerです。`skills/skill-router/SKILL.md` はdelivery/quality内のrouterとして使います。
 
-共通の制御メタデータ（route、evidence status、stop reason、next action）の正本は `docs/execution-envelope-contract.md` です。router、adapter、session state はこの Execution Envelope を意味のあるworkflow境界で一度だけ出し、個別SkillはRequirement Contract、Spec、Verification Contract、Implementation Summary、Review Findingsなどの固有artifactに集中します。Metrics event candidate は明示的なopt-in時だけ任意で出します。
+共通の制御メタデータ（route、evidence status、stop reason、next action）の正本は `docs/execution-envelope-contract.md` です。router、adapter、session state はこの Execution Envelope を意味のあるworkflow境界で一度だけ出し、個別SkillはRequirement Contract、Spec、Compact Proof / Formal Verification Contract、Implementation Summary、Review Findingsなどの固有artifactに集中します。検証pathは `ask.verification-proof-policy@1.0.0` が観測済みtask/risk factsから選択し、compactからformalへの昇格だけを許します。Metrics event candidate は明示的なopt-in時だけ任意で出します。
 
 claim に必要な lifecycle evidence の接続は `docs/lifecycle-traceability-contract.md` が正本です。Requirement から Release Readiness までを stable item ref と observed revision で必要な範囲だけ結び、stale・contradictory・claim-relevant missing evidence を検出します。release gap は acceptance / verification / review / approval / rollback を区別します。trivial/localized task のtrace免除には観測事実が必要で、approvalやrisk gateは免除されません。中央serverやworkflow databaseは不要です。
 
@@ -560,8 +560,8 @@ Default outputs should describe the selected work mode, user-facing route, missi
 | 再利用可能な実装patternを台帳化 | `engineering-pattern-ledger` |
 | 再利用可能な検証patternを台帳化 | `verification-pattern-ledger` |
 | ADR未満のarchitecture decision memory | `architecture-decision-memory`（ADRが必要なら `adr-review`） |
-| 新機能・挙動変更 | `spec-driven-development` → `test-first-verification` for Verification Contract → `controlled-implementation` → `test-first-verification` for evidence |
-| バグ・原因不明 | `doubt-driven-development` → `test-first-verification` for reproduction and Verification Contract → `controlled-implementation` → `test-first-verification` for regression proof |
+| 新機能・挙動変更 | `spec-driven-development` → `test-first-verification` selects Compact Proof or Formal Verification Contract → `controlled-implementation` references it → evidence |
+| バグ・原因不明 | `doubt-driven-development` → `test-first-verification` selects Formal Verification Contract for reproduction/regression → `controlled-implementation` → regression proof |
 | 承認済みリファクタ実装 | `refactor-implementation` → `test-first-verification` for regression proof |
 | スコープが広がりそう | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → required gates） |
 | 危険操作・外部影響 | `risk-gate` before the selected workflow proceeds to action |
