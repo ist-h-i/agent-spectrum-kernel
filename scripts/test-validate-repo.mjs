@@ -279,6 +279,11 @@ function writeFixture(root, skills = ["alpha"]) {
     "docs/portfolio-manager-contract.md",
     "docs/adr/0004-portfolio-activation-authority-boundary.md",
     "docs/fixtures/portfolio-manager",
+    "docs/evolution-loop-contract.md",
+    "docs/evolution-loop-sample-prompt-candidate.md",
+    "docs/adr/0005-evolution-authority-boundary.md",
+    "docs/fixtures/evolution-loop",
+    "adapters/codex/prompts/skill-verify.md",
     "scripts/content-addressed-store.mjs",
     "scripts/asset-registry.mjs",
     "scripts/asset-registry-samples.mjs",
@@ -287,6 +292,10 @@ function writeFixture(root, skills = ["alpha"]) {
     "scripts/portfolio-manager.mjs",
     "scripts/portfolio-manager-samples.mjs",
     "scripts/test-portfolio-manager.mjs",
+    "scripts/evolution-loop.mjs",
+    "scripts/evolution-loop-samples.mjs",
+    "scripts/test-evolution-loop.mjs",
+    "scripts/test-evolution-loop-integration.mjs",
     "scripts/ask-benchmark-portfolio-repetition-report.mjs",
     "scripts/ask-benchmark-portfolio-paired-comparison-report.mjs",
     "scripts/ask-benchmark-portfolio-directional-outcome-report.mjs",
@@ -303,7 +312,7 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/schemas",
   ]) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    if (["benchmarks/portfolio-design-admission-records", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update", "benchmarks/schemas", "docs/fixtures/asset-registry", "docs/fixtures/portfolio-manager"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
+    if (["benchmarks/portfolio-design-admission-records", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update", "benchmarks/schemas", "docs/fixtures/asset-registry", "docs/fixtures/portfolio-manager", "docs/fixtures/evolution-loop"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
     else writeFileSync(resolve(root, path), readFileSync(resolve(repoRoot, path)));
   }
 
@@ -368,6 +377,12 @@ function writeAdapterFixture(root) {
     "schemas/portfolio-authority-context.schema.json",
     "schemas/portfolio-selection-context.schema.json",
     "schemas/portfolio-selection.schema.json",
+    "schemas/evolution-candidate.schema.json",
+    "schemas/evolution-experiment.schema.json",
+    "schemas/evolution-recommendation.schema.json",
+    "schemas/evolution-action-proposal.schema.json",
+    "schemas/evolution-human-decision.schema.json",
+    "schemas/evolution-application-receipt.schema.json",
   ];
   for (const path of schemaPaths) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
@@ -5655,6 +5670,76 @@ try {
     "orphan Portfolio Manager sample object",
     orphanPortfolioObjectRoot,
     "sample store contains an orphan or omits an exact reachable Portfolio/Registry object",
+  );
+
+  const missingEvolutionSchemaRoot = cloneFixture("missing-evolution-candidate-schema");
+  rmSync(resolve(missingEvolutionSchemaRoot, "schemas/evolution-candidate.schema.json"));
+  assertFail(
+    "missing Evolution candidate schema",
+    missingEvolutionSchemaRoot,
+    "required schema is missing: schemas/evolution-candidate.schema.json",
+  );
+
+  const tamperedEvolutionReferenceRoot = cloneFixture("tampered-evolution-reference");
+  {
+    const referencePath = resolve(tamperedEvolutionReferenceRoot, "docs/fixtures/evolution-loop/reference.json");
+    const reference = JSON.parse(readFileSync(referencePath, "utf8"));
+    reference.tampered = true;
+    writeFileSync(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+  }
+  assertFail(
+    "tampered Evolution sample reference",
+    tamperedEvolutionReferenceRoot,
+    "Evolution sample reference uses an unknown or missing field",
+  );
+
+  const untrustedEvolutionExperimentRoot = cloneFixture("untrusted-evolution-experiment-authority");
+  {
+    const referencePath = resolve(untrustedEvolutionExperimentRoot, "docs/fixtures/evolution-loop/reference.json");
+    const reference = JSON.parse(readFileSync(referencePath, "utf8"));
+    reference.trusted_contexts.experiment[0].authority_id = "unreserved-evolution-experiment-authority";
+    writeFileSync(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+  }
+  assertFail(
+    "untrusted Evolution experiment authority",
+    untrustedEvolutionExperimentRoot,
+    "Evolution experiment authority requires a separately trusted exact authority context",
+  );
+
+  const missingEvolutionObjectRoot = cloneFixture("missing-evolution-application-receipt");
+  {
+    const reference = JSON.parse(readFileSync(resolve(missingEvolutionObjectRoot, "docs/fixtures/evolution-loop/reference.json"), "utf8"));
+    const hex = reference.artifacts.application_receipt.object_digest.slice("sha256:".length);
+    rmSync(resolve(missingEvolutionObjectRoot, `docs/fixtures/evolution-loop/store/objects/sha256/${hex.slice(0, 2)}/${hex.slice(2)}.json`));
+  }
+  assertFail(
+    "missing Evolution closure object",
+    missingEvolutionObjectRoot,
+    "content-addressed object does not exist",
+  );
+
+  const orphanEvolutionObjectRoot = cloneFixture("orphan-evolution-object");
+  putContentAddressedJson({
+    storeRoot: resolve(orphanEvolutionObjectRoot, "docs/fixtures/evolution-loop/store"),
+    artifact: { schema_version: "1.0.0", object_kind: "evolution_fixture_orphan" },
+  });
+  assertFail(
+    "orphan Evolution sample object",
+    orphanEvolutionObjectRoot,
+    "Evolution sample store contains an orphan or omits an exact full reachable closure object",
+  );
+
+  const promptStopDriftRoot = cloneFixture("evolution-prompt-stop-drift");
+  {
+    const referencePath = resolve(promptStopDriftRoot, "docs/fixtures/evolution-loop/reference.json");
+    const reference = JSON.parse(readFileSync(referencePath, "utf8"));
+    reference.prompt_vertical.stop_code = "prompt_v2_assumed_available";
+    writeFileSync(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+  }
+  assertFail(
+    "Evolution Prompt typed stop drift",
+    promptStopDriftRoot,
+    "must retain the typed prompt_v2_materialization_unavailable stop",
   );
 
   const missingAdapterEventSchemaRoot = cloneFixture("missing-adapter-event-schema");

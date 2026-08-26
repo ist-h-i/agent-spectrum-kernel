@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ist-h-i/agent-spectrum-kernel/schemas/evolution-candidate.schema.json",
+  "title": "Agent Spectrum Kernel governed Evolution candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_kind",
+    "candidate_id",
+    "parent_asset",
+    "parent_portfolio",
+    "candidate_asset",
+    "registry",
+    "delta",
+    "generation",
+    "hypothesis",
+    "factors",
+    "evaluation_scope",
+    "assurance_lane",
+    "expected_upside",
+    "risks",
+    "retirement_condition",
+    "rollback",
+    "prohibited_effects",
+    "authorities",
+    "candidate_digest"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "object_kind": { "type": "string", "const": "evolution_candidate" },
+    "candidate_id": { "$ref": "#/$defs/stableId" },
+    "parent_asset": { "$ref": "#/$defs/exactAssetRef" },
+    "parent_portfolio": { "$ref": "#/$defs/lockedPortfolioRef" },
+    "candidate_asset": { "$ref": "#/$defs/exactAssetRef" },
+    "registry": { "$ref": "#/$defs/registryRef" },
+    "delta": { "$ref": "#/$defs/delta" },
+    "generation": { "$ref": "#/$defs/generation" },
+    "hypothesis": { "$ref": "#/$defs/hypothesis" },
+    "factors": { "$ref": "#/$defs/factors" },
+    "evaluation_scope": { "$ref": "#/$defs/evaluationScope" },
+    "assurance_lane": {
+      "type": "string",
+      "enum": ["exploratory", "challenger", "admitted", "high_impact_active"]
+    },
+    "expected_upside": { "$ref": "#/$defs/textSet" },
+    "risks": { "$ref": "#/$defs/textSet" },
+    "retirement_condition": { "$ref": "#/$defs/nonBlankText" },
+    "rollback": { "$ref": "#/$defs/rollback" },
+    "prohibited_effects": { "$ref": "#/$defs/tokenSet" },
+    "authorities": { "$ref": "#/$defs/authorities" },
+    "candidate_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:#@/+~-]*$"
+    },
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "repositoryId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/@+-]*$"
+    },
+    "nonBlankText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "\\S"
+    },
+    "tokenSet": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "textSet": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlankText" }
+    },
+    "exactAssetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_type", "stable_id", "version", "record_digest", "content_digest"],
+      "properties": {
+        "asset_type": {
+          "type": "string",
+          "enum": ["skill", "prompt", "prompt_template", "evaluator_reference"]
+        },
+        "stable_id": { "$ref": "#/$defs/stableId" },
+        "version": { "$ref": "#/$defs/token" },
+        "record_digest": { "$ref": "#/$defs/digest" },
+        "content_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "portfolioRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["portfolio_id", "revision", "manifest_digest", "asset_set_digest"],
+      "properties": {
+        "portfolio_id": { "$ref": "#/$defs/stableId" },
+        "revision": { "$ref": "#/$defs/token" },
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "asset_set_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "lockedPortfolioRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["portfolio_id", "revision", "manifest_digest", "asset_set_digest", "lock_digest"],
+      "properties": {
+        "portfolio_id": { "$ref": "#/$defs/stableId" },
+        "revision": { "$ref": "#/$defs/token" },
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "asset_set_digest": { "$ref": "#/$defs/digest" },
+        "lock_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "registryRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registry_id", "repository_id", "scope_id", "snapshot_revision", "snapshot_digest"],
+      "properties": {
+        "registry_id": { "$ref": "#/$defs/stableId" },
+        "repository_id": { "$ref": "#/$defs/repositoryId" },
+        "scope_id": { "$ref": "#/$defs/stableId" },
+        "snapshot_revision": { "type": "integer", "minimum": 0 },
+        "snapshot_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "summary", "delta_digest"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/token" },
+        "summary": { "$ref": "#/$defs/nonBlankText" },
+        "delta_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "generationActor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "actor_id", "authority_evidence_digest"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/token" },
+        "actor_id": { "$ref": "#/$defs/stableId" },
+        "authority_evidence_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "actor"],
+      "properties": {
+        "source": { "$ref": "#/$defs/token" },
+        "actor": { "$ref": "#/$defs/generationActor" }
+      }
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intended_mechanism", "applicability"],
+      "properties": {
+        "intended_mechanism": { "$ref": "#/$defs/nonBlankText" },
+        "applicability": { "$ref": "#/$defs/nonBlankText" }
+      }
+    },
+    "factor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["factor_id", "identity_digest"],
+      "properties": {
+        "factor_id": { "$ref": "#/$defs/stableId" },
+        "identity_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "factors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["design", "changed", "frozen"],
+      "properties": {
+        "design": {
+          "type": "string",
+          "enum": ["one_factor", "factorial_or_ablation_required"]
+        },
+        "changed": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/factor" }
+        },
+        "frozen": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/factor" }
+        }
+      }
+    },
+    "evaluationScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture_ids", "task_classes", "exclusions"],
+      "properties": {
+        "fixture_ids": { "$ref": "#/$defs/tokenSet" },
+        "task_classes": { "$ref": "#/$defs/tokenSet" },
+        "exclusions": { "$ref": "#/$defs/textSet" }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition", "parent_asset", "parent_portfolio"],
+      "properties": {
+        "condition": { "$ref": "#/$defs/nonBlankText" },
+        "parent_asset": { "$ref": "#/$defs/exactAssetRef" },
+        "parent_portfolio": { "$ref": "#/$defs/lockedPortfolioRef" }
+      }
+    },
+    "experimentAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "authority_id", "authority_revision", "authority_evidence_digest"],
+      "properties": {
+        "kind": { "type": "string", "const": "external_evolution_experiment_authority" },
+        "authority_id": { "$ref": "#/$defs/stableId" },
+        "authority_revision": { "type": "integer", "minimum": 1 },
+        "authority_evidence_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "decisionAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "authority_id", "authority_revision", "authority_evidence_digest"],
+      "properties": {
+        "kind": { "type": "string", "const": "external_evolution_human_decision_authority" },
+        "authority_id": { "$ref": "#/$defs/stableId" },
+        "authority_revision": { "type": "integer", "minimum": 1 },
+        "authority_evidence_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "authorities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["experiment", "decision"],
+      "properties": {
+        "experiment": { "$ref": "#/$defs/experimentAuthority" },
+        "decision": { "$ref": "#/$defs/decisionAuthority" }
+      }
+    }
+  }
+}

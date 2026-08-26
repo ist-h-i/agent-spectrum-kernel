@@ -42,6 +42,15 @@ jobs:
       - name: Check the exact Portfolio Manager sample
         run: node scripts/portfolio-manager-samples.mjs --check
 
+      - name: Run governed Evolution contract tests
+        run: node scripts/test-evolution-loop.mjs
+
+      - name: Run governed Evolution full-closure integration tests
+        run: node scripts/test-evolution-loop-integration.mjs
+
+      - name: Check the exact governed Evolution sample
+        run: node scripts/evolution-loop-samples.mjs --check
+
       - name: Run portfolio catalog tests
         run: node scripts/test-ask-benchmark-portfolio-catalog.mjs
 

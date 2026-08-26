@@ -50,6 +50,18 @@
       "argv": ["node", "scripts/portfolio-manager-samples.mjs", "--check"]
     },
     {
+      "id": "evolution_loop_contract",
+      "argv": ["node", "scripts/test-evolution-loop.mjs"]
+    },
+    {
+      "id": "evolution_loop_integration",
+      "argv": ["node", "scripts/test-evolution-loop-integration.mjs"]
+    },
+    {
+      "id": "evolution_loop_sample_check",
+      "argv": ["node", "scripts/evolution-loop-samples.mjs", "--check"]
+    },
+    {
       "id": "portfolio_catalog",
       "argv": ["node", "scripts/test-ask-benchmark-portfolio-catalog.mjs"]
     },

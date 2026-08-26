@@ -11,6 +11,7 @@ import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { codexCompactProfileCanonicalPaths } from "./codex-runtime-profile.mjs";
 import { exportAssetRegistryReference, listAssets, verifyAssetRegistry } from "./asset-registry.mjs";
 import { listContentAddressedJson, readContentAddressedJson, readJsonFileStrict } from "./content-addressed-store.mjs";
+import { verifyEvolutionClosure } from "./evolution-loop.mjs";
 import { verifyPortfolioLock, verifyPortfolioSelection } from "./portfolio-manager.mjs";
 import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
@@ -93,6 +94,12 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/portfolio-authority-context.schema.json",
   "schemas/portfolio-selection-context.schema.json",
   "schemas/portfolio-selection.schema.json",
+  "schemas/evolution-candidate.schema.json",
+  "schemas/evolution-experiment.schema.json",
+  "schemas/evolution-recommendation.schema.json",
+  "schemas/evolution-action-proposal.schema.json",
+  "schemas/evolution-human-decision.schema.json",
+  "schemas/evolution-application-receipt.schema.json",
 ];
 const REQUIRED_ASSET_REGISTRY_PATHS = [
   "docs/asset-registry-contract.md",
@@ -118,6 +125,20 @@ const REQUIRED_PORTFOLIO_MANAGER_PATHS = [
 ];
 const PORTFOLIO_MANAGER_REFERENCE_PATH = "docs/fixtures/portfolio-manager/reference.json";
 const PORTFOLIO_MANAGER_STORE_PATH = "docs/fixtures/portfolio-manager/store";
+const REQUIRED_EVOLUTION_LOOP_PATHS = [
+  "adapters/codex/prompts/skill-verify.md",
+  "docs/evolution-loop-contract.md",
+  "docs/evolution-loop-sample-prompt-candidate.md",
+  "docs/adr/0005-evolution-authority-boundary.md",
+  "docs/fixtures/evolution-loop/reference.json",
+  "docs/fixtures/evolution-loop/store",
+  "scripts/evolution-loop.mjs",
+  "scripts/evolution-loop-samples.mjs",
+  "scripts/test-evolution-loop.mjs",
+  "scripts/test-evolution-loop-integration.mjs",
+];
+const EVOLUTION_LOOP_REFERENCE_PATH = "docs/fixtures/evolution-loop/reference.json";
+const EVOLUTION_LOOP_STORE_PATH = "docs/fixtures/evolution-loop/store";
 const EXPECTED_SAMPLE_ASSETS = new Map([
   ["ask.skill.test-first-verification", "skill"],
   ["ask.prompt-template.codex.skill-verify", "prompt"],
@@ -4387,6 +4408,449 @@ function validatePortfolioManagerFixture(root, errors) {
   }
 }
 
+function assertEvolutionReferenceKeys(value, expectedKeys, label) {
+  assertExactPortfolioReferenceKeys(value, expectedKeys, label);
+}
+
+function assertEvolutionDigest(value, label) {
+  if (!SHA256_DIGEST_PATTERN.test(value ?? "")) throw new Error(`${label} must be a sha256 digest`);
+}
+
+function assertEvolutionAssetReference(value, label) {
+  assertEvolutionReferenceKeys(value, ["asset_type", "stable_id", "version", "record_digest", "content_digest"], label);
+  assertEvolutionDigest(value.record_digest, `${label}.record_digest`);
+  assertEvolutionDigest(value.content_digest, `${label}.content_digest`);
+}
+
+function assertEvolutionPortfolioReference(value, label, { locked = false } = {}) {
+  const keys = ["portfolio_id", "revision", "manifest_digest", "asset_set_digest"];
+  if (locked) keys.push("lock_digest");
+  assertEvolutionReferenceKeys(value, keys, label);
+  assertEvolutionDigest(value.manifest_digest, `${label}.manifest_digest`);
+  assertEvolutionDigest(value.asset_set_digest, `${label}.asset_set_digest`);
+  if (locked) assertEvolutionDigest(value.lock_digest, `${label}.lock_digest`);
+}
+
+function assertEvolutionPortfolioAuthorityContextShape(value, label) {
+  assertEvolutionReferenceKeys(value, [
+    "schema_version",
+    "object_kind",
+    "portfolio_id",
+    "repository_id",
+    "scope_id",
+    "predecessor_lock_digest",
+    "transitions",
+    "transition_basis_digest",
+    "grants",
+    "grant_basis_digest",
+    "rollback_target",
+    "authority",
+    "context_digest",
+  ], label);
+  if (value.schema_version !== "1.0.0" || value.object_kind !== "portfolio_authority_context") {
+    throw new Error(`${label} program/schema identity mismatch`);
+  }
+  assertEvolutionReferenceKeys(value.authority, ["kind", "authority_id", "authority_revision", "authority_evidence_digest"], `${label}.authority`);
+  assertEvolutionDigest(value.authority.authority_evidence_digest, `${label}.authority.authority_evidence_digest`);
+  assertEvolutionDigest(value.predecessor_lock_digest, `${label}.predecessor_lock_digest`);
+  assertEvolutionDigest(value.transition_basis_digest, `${label}.transition_basis_digest`);
+  assertEvolutionDigest(value.grant_basis_digest, `${label}.grant_basis_digest`);
+  assertEvolutionDigest(value.context_digest, `${label}.context_digest`);
+  if (!Array.isArray(value.transitions) || value.transitions.length === 0) throw new Error(`${label}.transitions must not be empty`);
+  for (const [index, transition] of value.transitions.entries()) {
+    assertEvolutionReferenceKeys(transition, ["manifest", "from_state", "to_state"], `${label}.transitions[${index}]`);
+    assertEvolutionPortfolioReference(transition.manifest, `${label}.transitions[${index}].manifest`);
+  }
+  if (!Array.isArray(value.grants) || value.grants.length !== 0 || value.rollback_target !== null) {
+    throw new Error(`${label} fixture must not claim a high-impact grant or implicit rollback transition`);
+  }
+}
+
+function assertEvolutionReferenceShape(reference) {
+  assertEvolutionReferenceKeys(reference, [
+    "schema_version",
+    "program",
+    "source_revision",
+    "tree_digest",
+    "fixture_scope",
+    "source_files",
+    "foundation",
+    "asset_lineage",
+    "pre_result_roles",
+    "artifacts",
+    "application",
+    "trusted_contexts",
+    "contract_closure_meanings",
+    "synthetic_evidence_provenance",
+    "prompt_vertical",
+    "boundaries",
+  ], "Evolution sample reference");
+  if (reference.schema_version !== "1.0.0" || reference.program !== "ask_evolution_loop_samples") {
+    throw new Error("Evolution sample reference program/schema identity mismatch");
+  }
+  if (!/^[a-f0-9]{40}$/u.test(reference.source_revision ?? "")) throw new Error("Evolution sample source_revision must be an exact commit SHA");
+  assertEvolutionDigest(reference.tree_digest, "Evolution sample tree_digest");
+  if (reference.fixture_scope !== "local_deterministic_contract_test_only") {
+    throw new Error("Evolution sample must remain a local deterministic contract-only fixture");
+  }
+
+  assertEvolutionReferenceKeys(reference.source_files, ["parent", "candidate"], "Evolution source_files");
+  for (const [name, expectedPath] of [
+    ["parent", "adapters/codex/prompts/skill-verify.md"],
+    ["candidate", "docs/evolution-loop-sample-prompt-candidate.md"],
+  ]) {
+    const source = reference.source_files[name];
+    assertEvolutionReferenceKeys(source, ["path", "raw_digest", "byte_length"], `Evolution source_files.${name}`);
+    if (source.path !== expectedPath) throw new Error(`Evolution source_files.${name}.path drifted`);
+    assertEvolutionDigest(source.raw_digest, `Evolution source_files.${name}.raw_digest`);
+    if (!Number.isSafeInteger(source.byte_length) || source.byte_length < 1) throw new Error(`Evolution source_files.${name}.byte_length is invalid`);
+  }
+
+  assertEvolutionReferenceKeys(reference.foundation, ["copied_portfolio_object_count", "portfolio_reference", "portfolio_authority_contexts"], "Evolution foundation");
+  if (!Number.isSafeInteger(reference.foundation.copied_portfolio_object_count) || reference.foundation.copied_portfolio_object_count < 1) {
+    throw new Error("Evolution foundation copied_portfolio_object_count is invalid");
+  }
+  if (!Array.isArray(reference.foundation.portfolio_authority_contexts) || reference.foundation.portfolio_authority_contexts.length === 0) {
+    throw new Error("Evolution foundation must contain exact Portfolio authority contexts");
+  }
+  reference.foundation.portfolio_authority_contexts.forEach((context, index) => (
+    assertEvolutionPortfolioAuthorityContextShape(context, `Evolution foundation.portfolio_authority_contexts[${index}]`)
+  ));
+
+  assertEvolutionReferenceKeys(reference.asset_lineage, [
+    "original_parent",
+    "sample_baseline",
+    "sample_candidate",
+    "registry_snapshot_digest",
+    "original_parent_bytes_preserved",
+    "sample_baseline_content_changed",
+    "candidate_is_only_content_changing_child",
+    "eligibility_metadata_authority",
+    "asset_lifecycle_authority_contexts",
+  ], "Evolution asset_lineage");
+  for (const name of ["original_parent", "sample_baseline", "sample_candidate"]) {
+    assertEvolutionAssetReference(reference.asset_lineage[name], `Evolution asset_lineage.${name}`);
+  }
+  assertEvolutionDigest(reference.asset_lineage.registry_snapshot_digest, "Evolution asset_lineage.registry_snapshot_digest");
+  assertEvolutionReferenceKeys(reference.asset_lineage.eligibility_metadata_authority, [
+    "kind",
+    "authority_id",
+    "authority_revision",
+    "scope",
+    "authority_evidence_digest",
+    "scoring_evidence_implied",
+    "quality_evidence_implied",
+    "effectiveness_implied",
+    "production_eligibility_implied",
+  ], "Evolution eligibility metadata authority");
+  assertEvolutionDigest(reference.asset_lineage.eligibility_metadata_authority.authority_evidence_digest, "Evolution eligibility metadata authority.authority_evidence_digest");
+  if (reference.asset_lineage.original_parent_bytes_preserved !== true
+    || reference.asset_lineage.sample_baseline_content_changed !== false
+    || reference.asset_lineage.candidate_is_only_content_changing_child !== true
+    || reference.asset_lineage.eligibility_metadata_authority.scoring_evidence_implied !== false
+    || reference.asset_lineage.eligibility_metadata_authority.quality_evidence_implied !== false
+    || reference.asset_lineage.eligibility_metadata_authority.effectiveness_implied !== false
+    || reference.asset_lineage.eligibility_metadata_authority.production_eligibility_implied !== false
+    || !Array.isArray(reference.asset_lineage.asset_lifecycle_authority_contexts)
+    || reference.asset_lineage.asset_lifecycle_authority_contexts.length !== 0) {
+    throw new Error("Evolution Asset lineage fixture boundaries drifted");
+  }
+
+  assertEvolutionReferenceKeys(reference.pre_result_roles, ["baseline", "challenger"], "Evolution pre_result_roles");
+  for (const name of ["baseline", "challenger"]) {
+    const role = reference.pre_result_roles[name];
+    assertEvolutionReferenceKeys(role, ["role", "portfolio", "registry_snapshot_digest", "selection_object_digest", "selection_digest", "selected_asset"], `Evolution pre_result_roles.${name}`);
+    if (role.role !== name) throw new Error(`Evolution pre_result_roles.${name}.role drifted`);
+    assertEvolutionPortfolioReference(role.portfolio, `Evolution pre_result_roles.${name}.portfolio`, { locked: true });
+    assertEvolutionDigest(role.registry_snapshot_digest, `Evolution pre_result_roles.${name}.registry_snapshot_digest`);
+    assertEvolutionDigest(role.selection_object_digest, `Evolution pre_result_roles.${name}.selection_object_digest`);
+    assertEvolutionDigest(role.selection_digest, `Evolution pre_result_roles.${name}.selection_digest`);
+    assertEvolutionAssetReference(role.selected_asset, `Evolution pre_result_roles.${name}.selected_asset`);
+  }
+
+  const artifactNames = ["candidate", "experiment", "recommendation", "action_proposal", "human_decision", "application_receipt"];
+  assertEvolutionReferenceKeys(reference.artifacts, artifactNames, "Evolution artifacts");
+  for (const name of artifactNames) {
+    const artifact = reference.artifacts[name];
+    assertEvolutionReferenceKeys(artifact, ["object_digest", "semantic_digest"], `Evolution artifacts.${name}`);
+    assertEvolutionDigest(artifact.object_digest, `Evolution artifacts.${name}.object_digest`);
+    assertEvolutionDigest(artifact.semantic_digest, `Evolution artifacts.${name}.semantic_digest`);
+    if (artifact.object_digest === artifact.semantic_digest) throw new Error(`Evolution artifacts.${name} collapses object and semantic identity`);
+  }
+
+  assertEvolutionReferenceKeys(reference.application, ["gate_evidence_object_digest", "base_portfolio_lock_digest", "result_portfolio_lock_digest", "rollback_anchor"], "Evolution application");
+  for (const field of ["gate_evidence_object_digest", "base_portfolio_lock_digest", "result_portfolio_lock_digest"]) {
+    assertEvolutionDigest(reference.application[field], `Evolution application.${field}`);
+  }
+  assertEvolutionPortfolioReference(reference.application.rollback_anchor, "Evolution application.rollback_anchor");
+
+  assertEvolutionReferenceKeys(reference.trusted_contexts, ["experiment", "evaluation", "human_decision", "asset_lifecycle", "portfolio_lifecycle", "high_impact_approval_grants"], "Evolution trusted_contexts");
+  if (!Array.isArray(reference.trusted_contexts.experiment) || reference.trusted_contexts.experiment.length !== 1
+    || !Array.isArray(reference.trusted_contexts.evaluation) || reference.trusted_contexts.evaluation.length !== 1
+    || !Array.isArray(reference.trusted_contexts.human_decision) || reference.trusted_contexts.human_decision.length !== 1
+    || !Array.isArray(reference.trusted_contexts.asset_lifecycle) || reference.trusted_contexts.asset_lifecycle.length !== 0
+    || !Array.isArray(reference.trusted_contexts.portfolio_lifecycle) || reference.trusted_contexts.portfolio_lifecycle.length !== 3
+    || !Array.isArray(reference.trusted_contexts.high_impact_approval_grants) || reference.trusted_contexts.high_impact_approval_grants.length !== 0) {
+    throw new Error("Evolution trusted context inventory drifted");
+  }
+  const [experimentAuthority] = reference.trusted_contexts.experiment;
+  assertEvolutionReferenceKeys(experimentAuthority, ["kind", "authority_id", "authority_revision", "authority_evidence_digest"], "Evolution trusted experiment authority");
+  if (experimentAuthority.kind !== "external_evolution_experiment_authority") throw new Error("Evolution trusted experiment authority kind drifted");
+  assertEvolutionDigest(experimentAuthority.authority_evidence_digest, "Evolution trusted experiment authority.authority_evidence_digest");
+  const [evaluation] = reference.trusted_contexts.evaluation;
+  assertEvolutionReferenceKeys(evaluation, ["authority", "dimensions", "causal_attribution", "reason_codes"], "Evolution trusted evaluation evidence");
+  assertEvolutionReferenceKeys(evaluation.authority, ["kind", "authority_id", "authority_revision", "authority_evidence_digest", "experiment_digest", "verification_mode", "artifact_inventory_digest"], "Evolution trusted evaluation authority");
+  assertEvolutionReferenceKeys(evaluation.dimensions, ["quality", "safety", "cost", "variance", "mechanism", "external_outcome"], "Evolution trusted evaluation dimensions");
+  for (const name of ["quality", "safety", "cost", "variance", "mechanism", "external_outcome"]) {
+    assertEvolutionReferenceKeys(evaluation.dimensions[name], ["status", "conclusion", "source_kind", "artifact_id", "artifact_digest", "causal_credit_applied", "factor_ids"], `Evolution trusted evaluation dimensions.${name}`);
+  }
+  assertEvolutionReferenceKeys(evaluation.causal_attribution, ["status", "factor_ids", "evidence_digests"], "Evolution trusted evaluation causal_attribution");
+  const [decision] = reference.trusted_contexts.human_decision;
+  assertEvolutionReferenceKeys(decision, ["schema_version", "object_kind", "proposal_digest", "action", "disposition", "reason_codes", "authority", "authority_implied", "decision_digest"], "Evolution trusted human decision");
+  assertEvolutionReferenceKeys(decision.authority, ["kind", "authority_id", "authority_revision", "authority_evidence_digest"], "Evolution trusted human decision authority");
+  reference.trusted_contexts.portfolio_lifecycle.forEach((context, index) => (
+    assertEvolutionPortfolioAuthorityContextShape(context, `Evolution trusted_contexts.portfolio_lifecycle[${index}]`)
+  ));
+
+  const expectedClosureMeanings = [
+    "six_artifact_full_closure_reconstructable",
+    "untrusted_evaluation_authority_rejected",
+    "untrusted_human_decision_authority_rejected",
+    "decision_bound_portfolio_authority_preserves_rollback",
+    "completed_receipt_binds_exact_successor_heads",
+    "all_six_evolution_publications_are_idempotent",
+    "semantic_digest_and_unknown_field_tamper_rejected",
+    "missing_human_decision_rejected_before_mutation",
+    "wrong_decision_evidence_digest_rejected",
+    "stale_portfolio_predecessor_rejected",
+    "untrusted_portfolio_activation_authority_rejected",
+    "rollback_anchor_drift_rejected",
+    "semantic_and_object_digests_remain_distinct",
+    "insufficient_evidence_verified_exact_head_noop_without_implicit_retention",
+    "evaluation_authority_experiment_transplant_rejected",
+    "forged_completed_receipt_reconstruction_rejected",
+    "target_portfolio_transplant_rejected",
+    "candidate_reserved_experiment_authority_and_scope_closure",
+    "evaluation_authority_role_collapse_rejected",
+    "unreserved_human_decision_authority_rejected",
+    "incomplete_evidence_affirmative_or_retention_mapping_rejected",
+    "causal_and_dimension_source_semantics_closed",
+  ];
+  if (!Array.isArray(reference.contract_closure_meanings)
+    || stableCanonicalJson([...reference.contract_closure_meanings].sort()) !== stableCanonicalJson([...expectedClosureMeanings].sort())) {
+    throw new Error("Evolution contract_closure_meanings must contain the exact 22 required closure claims");
+  }
+  assertEvolutionReferenceKeys(reference.synthetic_evidence_provenance, [
+    "fixture_only",
+    "contract_test_scenario",
+    "executed_benchmark_result",
+    "real_scoring_result",
+    "production_recommendation",
+    "generalization_allowed",
+    "external_outcome_evidence_present",
+  ], "Evolution synthetic_evidence_provenance");
+  if (reference.synthetic_evidence_provenance.fixture_only !== true
+    || reference.synthetic_evidence_provenance.contract_test_scenario !== "expand_to_adopt_candidate_mechanics"
+    || reference.synthetic_evidence_provenance.executed_benchmark_result !== false
+    || reference.synthetic_evidence_provenance.real_scoring_result !== false
+    || reference.synthetic_evidence_provenance.production_recommendation !== false
+    || reference.synthetic_evidence_provenance.generalization_allowed !== false
+    || reference.synthetic_evidence_provenance.external_outcome_evidence_present !== false) {
+    throw new Error("Evolution synthetic evidence must remain fixture-only and non-generalizable");
+  }
+  assertEvolutionReferenceKeys(reference.prompt_vertical, ["sample_is_prompt_v2", "status", "stop_code", "generic_issue_197_projection_available"], "Evolution prompt_vertical");
+  if (reference.prompt_vertical.sample_is_prompt_v2 !== false
+    || reference.prompt_vertical.status !== "typed_stop"
+    || reference.prompt_vertical.stop_code !== "prompt_v2_materialization_unavailable"
+    || reference.prompt_vertical.generic_issue_197_projection_available !== false) {
+    throw new Error("Evolution Prompt vertical must retain the typed prompt_v2_materialization_unavailable stop");
+  }
+  assertEvolutionReferenceKeys(reference.boundaries, ["prompt_v2_vertical_completed", "product_evidence_implied", "external_outcome_claimed", "autonomous_mutation", "mutable_latest_pointer_used", "frozen_benchmark_results_mutated"], "Evolution boundaries");
+  if (Object.values(reference.boundaries).some((value) => value !== false)) {
+    throw new Error("Evolution sample boundaries must all remain explicitly false");
+  }
+}
+
+function assertPortableEvolutionReference(value, path = "reference") {
+  if (typeof value === "string") {
+    if (isAbsolute(value)) throw new Error(`${path} contains an absolute path`);
+    if (/(?:^|[._-])latest(?:[._-]|$)/iu.test(value)) throw new Error(`${path} contains a mutable latest label`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertPortableEvolutionReference(entry, `${path}[${index}]`));
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, entry] of Object.entries(value)) {
+      if (/timestamp|created_at|updated_at/iu.test(key)) throw new Error(`${path}.${key} is time-dependent`);
+      if (/(?:^|_)latest(?:_|$)/iu.test(key) && entry !== false) throw new Error(`${path}.${key} must explicitly deny mutable latest use`);
+      assertPortableEvolutionReference(entry, `${path}.${key}`);
+    }
+  }
+}
+
+function collectReachableEvolutionDigests(value, available, reachable) {
+  if (typeof value === "string") {
+    if (available.has(value)) reachable.add(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectReachableEvolutionDigests(entry, available, reachable));
+    return;
+  }
+  if (value && typeof value === "object") {
+    Object.values(value).forEach((entry) => collectReachableEvolutionDigests(entry, available, reachable));
+  }
+}
+
+function validateEvolutionLoopFixture(root, errors) {
+  for (const path of REQUIRED_EVOLUTION_LOOP_PATHS) {
+    if (!existsSync(resolve(root, path))) fail(errors, "Evolution loop", `required Evolution loop path is missing: ${path}`);
+  }
+
+  const referencePath = resolve(root, EVOLUTION_LOOP_REFERENCE_PATH);
+  const storeRoot = resolve(root, EVOLUTION_LOOP_STORE_PATH);
+  const portfolioReferencePath = resolve(root, PORTFOLIO_MANAGER_REFERENCE_PATH);
+  const portfolioStoreRoot = resolve(root, PORTFOLIO_MANAGER_STORE_PATH);
+  if (!existsSync(referencePath) || !existsSync(storeRoot) || !existsSync(portfolioReferencePath) || !existsSync(portfolioStoreRoot)) {
+    return { valid: false, objectCount: 0 };
+  }
+
+  try {
+    const reference = readJsonFileStrict(referencePath, "Evolution loop sample reference");
+    assertEvolutionReferenceShape(reference);
+    assertPortableEvolutionReference(reference);
+
+    for (const [name, source] of Object.entries(reference.source_files)) {
+      const bytes = readFileSync(resolve(root, source.path));
+      const digest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+      if (bytes.length !== source.byte_length || digest !== source.raw_digest) {
+        throw new Error(`Evolution ${name} source bytes differ from the exact checked reference`);
+      }
+    }
+
+    const portfolioReference = readJsonFileStrict(portfolioReferencePath, "Portfolio Manager sample reference");
+    if (stableCanonicalJson(reference.foundation.portfolio_reference) !== stableCanonicalJson(portfolioReference)) {
+      throw new Error("Evolution foundation does not embed the exact checked Portfolio reference");
+    }
+    const foundationContextDigests = [...new Set([
+      ...portfolioReference.kernel_only.required_portfolio_authority_context_digests,
+      ...portfolioReference.adaptive_ask.required_portfolio_authority_context_digests,
+    ])].sort();
+    const expectedFoundationContexts = foundationContextDigests.map((digest) => (
+      readContentAddressedJson({ storeRoot: portfolioStoreRoot, digest }).value
+    ));
+    if (stableCanonicalJson(reference.foundation.portfolio_authority_contexts) !== stableCanonicalJson(expectedFoundationContexts)) {
+      throw new Error("Evolution foundation Portfolio authority contexts differ from the exact Portfolio sample objects");
+    }
+
+    const canonicalPortfolioStoreRoot = realpathSync(portfolioStoreRoot);
+    const canonicalEvolutionStoreRoot = realpathSync(storeRoot);
+    const portfolioFiles = collectSharedCasFiles(canonicalPortfolioStoreRoot, "Portfolio Manager sample");
+    if (reference.foundation.copied_portfolio_object_count !== portfolioFiles.length) {
+      throw new Error("Evolution copied Portfolio object count differs from the checked Portfolio store");
+    }
+    for (const path of portfolioFiles) {
+      const evolutionPath = resolve(canonicalEvolutionStoreRoot, path);
+      if (!existsSync(evolutionPath)
+        || !readFileSync(resolve(canonicalPortfolioStoreRoot, path)).equals(readFileSync(evolutionPath))) {
+        throw new Error(`Evolution shared CAS changed or omitted Portfolio sample object ${path}`);
+      }
+    }
+
+    const artifacts = reference.artifacts;
+    const closure = verifyEvolutionClosure({
+      storeRoot,
+      receiptObjectDigest: artifacts.application_receipt.object_digest,
+      decisionObjectDigest: artifacts.human_decision.object_digest,
+      proposalObjectDigest: artifacts.action_proposal.object_digest,
+      candidateObjectDigest: artifacts.candidate.object_digest,
+      experimentObjectDigest: artifacts.experiment.object_digest,
+      recommendationObjectDigest: artifacts.recommendation.object_digest,
+      trustedHumanDecisionAuthorities: reference.trusted_contexts.human_decision,
+      trustedExperimentAuthorities: reference.trusted_contexts.experiment,
+      trustedEvaluationAuthorities: reference.trusted_contexts.evaluation,
+      trustedAssetAuthorityContexts: reference.trusted_contexts.asset_lifecycle,
+      trustedPortfolioAuthorityContexts: reference.trusted_contexts.portfolio_lifecycle,
+      trustedHighImpactApprovalGrants: reference.trusted_contexts.high_impact_approval_grants,
+    });
+    const semanticBindings = [
+      ["candidate", closure.candidate.candidate_digest],
+      ["experiment", closure.experiment.experiment_digest],
+      ["recommendation", closure.recommendation.recommendation_digest],
+      ["action_proposal", closure.proposal.proposal_digest],
+      ["human_decision", closure.decision.decision_digest],
+      ["application_receipt", closure.receipt.receipt_digest],
+    ];
+    for (const [name, semanticDigest] of semanticBindings) {
+      if (artifacts[name].semantic_digest !== semanticDigest) throw new Error(`Evolution ${name} semantic digest reference drifted`);
+    }
+    if (stableCanonicalJson(reference.pre_result_roles) !== stableCanonicalJson(closure.experiment.roles)
+      || stableCanonicalJson(reference.asset_lineage.sample_baseline) !== stableCanonicalJson(closure.candidate.parent_asset)
+      || stableCanonicalJson(reference.asset_lineage.sample_candidate) !== stableCanonicalJson(closure.candidate.candidate_asset)
+      || reference.asset_lineage.registry_snapshot_digest !== closure.candidate.registry.snapshot_digest) {
+      throw new Error("Evolution candidate lineage or pre-result role reference drifted");
+    }
+    if (reference.application.base_portfolio_lock_digest !== closure.receipt.base_heads.portfolio_lock_digest
+      || reference.application.result_portfolio_lock_digest !== closure.receipt.result_heads.portfolio_lock_digest
+      || stableCanonicalJson(reference.application.rollback_anchor) !== stableCanonicalJson(closure.receipt.rollback_anchor)) {
+      throw new Error("Evolution application reference differs from the verified receipt heads or rollback anchor");
+    }
+
+    const objects = listContentAddressedJson({ storeRoot: canonicalEvolutionStoreRoot });
+    const byDigest = new Map(objects.map(({ digest, value }) => [digest, value]));
+    const requiredRoots = [
+      ...Object.values(artifacts).map(({ object_digest: digest }) => digest),
+      reference.application.gate_evidence_object_digest,
+      reference.application.base_portfolio_lock_digest,
+      reference.application.result_portfolio_lock_digest,
+      reference.asset_lineage.registry_snapshot_digest,
+      ...foundationContextDigests,
+      portfolioReference.kernel_only.lock_digest,
+      portfolioReference.adaptive_ask.lock_digest,
+      ...[portfolioReference.kernel_only, portfolioReference.adaptive_ask].flatMap((view) => (
+        view.selections.flatMap((selection) => [selection.selection_object_digest, selection.context_object_digest])
+      )),
+      ...Object.values(reference.pre_result_roles).flatMap((role) => [role.portfolio.lock_digest, role.selection_object_digest]),
+    ];
+    for (const digest of requiredRoots) {
+      if (!byDigest.has(digest)) throw new Error(`Evolution exact closure root is missing: ${digest}`);
+    }
+    const reachable = new Set();
+    collectReachableEvolutionDigests(reference, byDigest, reachable);
+    const queue = [...reachable];
+    const traversed = new Set();
+    while (queue.length > 0) {
+      const digest = queue.shift();
+      if (traversed.has(digest)) continue;
+      traversed.add(digest);
+      const before = new Set(reachable);
+      collectReachableEvolutionDigests(byDigest.get(digest), byDigest, reachable);
+      for (const candidate of reachable) if (!before.has(candidate)) queue.push(candidate);
+    }
+    const actualStoreFiles = collectSharedCasFiles(canonicalEvolutionStoreRoot, "Evolution loop sample");
+    const canonicalStoreFiles = objects
+      .map(({ path }) => relative(canonicalEvolutionStoreRoot, path).split(sep).join("/"))
+      .sort();
+    if (stableCanonicalJson(actualStoreFiles) !== stableCanonicalJson(canonicalStoreFiles)) {
+      throw new Error("Evolution sample store must contain exactly canonical shared-CAS object paths");
+    }
+    if (stableCanonicalJson(objects.map(({ digest }) => digest).sort()) !== stableCanonicalJson([...reachable].sort())) {
+      throw new Error("Evolution sample store contains an orphan or omits an exact full reachable closure object");
+    }
+
+    return {
+      valid: true,
+      objectCount: objects.length,
+      receiptObjectDigest: artifacts.application_receipt.object_digest,
+    };
+  } catch (error) {
+    fail(errors, "Evolution loop", `checked-in sample verification failed: ${error.message}`);
+    return { valid: false, objectCount: 0 };
+  }
+}
+
 function validateEpicAdmissionWorkPackagePlanContract(root, errors) {
   const result = validateRepositoryEpicAdmissionWorkPackagePlan({ root });
   for (const contractIssue of result.issues) {
@@ -4807,6 +5271,7 @@ export function validateRepository(options) {
   const lifecycleTraceabilityChecks = validateLifecycleTraceabilityContract(root, manifest, errors);
   validateAssetRegistryFixture(root, errors);
   validatePortfolioManagerFixture(root, errors);
+  validateEvolutionLoopFixture(root, errors);
   const epicAdmissionWorkPackagePlanChecks = validateEpicAdmissionWorkPackagePlanContract(root, errors);
   const reviewSignalRegistryChecks = validateReviewSignalRegistry(root, manifest, errors);
   const portfolioCatalogChecks = validateAdaptivePortfolioCatalog(root, errors);

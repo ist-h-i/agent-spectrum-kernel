@@ -366,9 +366,10 @@ const requiredCommandIds = [
   "changed_mjs_syntax", "autonomous_development_control", "repository_validation_tests", "epic_admission_work_package_plan",
   "content_addressed_store", "asset_registry_contract", "asset_registry_sample_check",
   "portfolio_manager_contract", "portfolio_manager_sample_check",
+  "evolution_loop_contract", "evolution_loop_integration", "evolution_loop_sample_check",
   "portfolio_catalog",
   "portfolio_policy", "design_admission", "design_independent_review", "general_benchmark", "execution",
-  "command_evidence_contract", "normalized_results", "evaluator_boundary", "portfolio_score", "portfolio_result_set", "portfolio_repetition_report", "portfolio_paired_comparison_report", "portfolio_directional_outcome_report", "portfolio_mechanism_scorecard", "portfolio_legacy_calibration_migration", "adapter_runtime_bundle", "repository_consistency", "whitespace",
+  "command_evidence_contract", "normalized_results", "evaluator_boundary", "portfolio_score", "portfolio_result_set", "portfolio_repetition_report", "portfolio_paired_comparison_report", "portfolio_aggregate_result", "portfolio_directional_outcome_report", "portfolio_mechanism_scorecard", "portfolio_legacy_calibration_migration", "adapter_runtime_bundle", "repository_consistency", "whitespace",
 ];
 assert.deepEqual(loadedPlan.plan.commands.map((command) => command.id), requiredCommandIds);
 const sampleDockerArgs = dockerArguments({ image: loadedPlan.plan.container.image, repository: "/safe/workspace", control: "/safe/control", planPath: "/safe/plan.json", commandId: "general_benchmark" });

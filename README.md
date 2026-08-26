@@ -53,6 +53,7 @@ docs/
   adr/0002-epic-admission-work-package-plan-authority.md
   adr/0003-asset-registry-authority-boundary.md
   adr/0004-portfolio-activation-authority-boundary.md
+  adr/0005-evolution-authority-boundary.md
   routing-model.md
   lifecycle-artifact-contract.md
   lifecycle-traceability-contract.md
@@ -64,6 +65,10 @@ docs/
   portfolio-manager-contract.md
   fixtures/portfolio-manager/reference.json
   fixtures/portfolio-manager/store/objects/sha256/
+  evolution-loop-contract.md
+  evolution-loop-sample-prompt-candidate.md
+  fixtures/evolution-loop/reference.json
+  fixtures/evolution-loop/store/objects/sha256/
   fixtures/lifecycle-artifact-chains.json
   fixtures/lifecycle-traceability-chains.json
   agent-session-state-contract.md
@@ -170,6 +175,8 @@ scripts/
   asset-registry-samples.mjs
   portfolio-manager.mjs
   portfolio-manager-samples.mjs
+  evolution-loop.mjs
+  evolution-loop-samples.mjs
   execution-envelope.mjs
   verification-evidence.mjs
   epic-admission-work-package-plan.mjs
@@ -189,6 +196,8 @@ scripts/
   test-content-addressed-store.mjs
   test-asset-registry.mjs
   test-portfolio-manager.mjs
+  test-evolution-loop.mjs
+  test-evolution-loop-integration.mjs
   test-ask-benchmark.mjs
 benchmarks/
   README.md
@@ -296,6 +305,20 @@ node scripts/portfolio-manager-samples.mjs --check
 ```
 
 The checked fixture represents an explicit zero-Asset Kernel-only selection and a candidate-only Adaptive ASK shadow challenger that downgrades on missing evidence and unknown safety. It never implies installation, execution, effectiveness, mutable-latest resolution, or a change to frozen benchmark results. `node scripts/portfolio-manager-samples.mjs --write` regenerates it deterministically after an intentional contract change. See `docs/adr/0004-portfolio-activation-authority-boundary.md` for the authority decision.
+
+## Governed Evolution loop
+
+`docs/evolution-loop-contract.md` defines the Issue #278 plane above exact Asset, Portfolio, and evaluation/report identities. Candidate, pre-result experiment, evaluation recommendation, Portfolio action proposal, human decision, and application receipt are six separate shared-CAS objects. Experiment verification exact-binds the candidate-reserved authority, factor identities, and evaluation scope; evaluation authority remains distinct from generation, experiment, and decision roles. Recommendation never becomes mutation authority; an approved canary change still requires an exact separately trusted #277 activation context whose authority evidence binds the human-decision object digest.
+
+The bridge preserves quality, safety, cost, variance, mechanism, and external outcome evidence as separate typed dimensions with closed source vocabularies. Unsupported causal attribution cannot carry credit, and all-incomplete evidence can only produce `insufficient_evidence`, which cannot be remapped to implicit retention or rejection. It performs no raw scoring or arbitrary Asset comparison. A candidate without an exact #197 projection stops as `evaluation_projection_unavailable` instead of being aliased to a frozen benchmark condition.
+
+```bash
+node scripts/test-evolution-loop.mjs
+node scripts/test-evolution-loop-integration.mjs
+node scripts/evolution-loop-samples.mjs --check
+```
+
+The checked sample proves deterministic parent/candidate lineage, exact baseline/challenger pre-result selection, a bounded human-approved canary Portfolio successor, and preserved rollback history. Its prompt bytes are a generic contract sample, not Prompt v2 from Issues #227-#235; the Prompt vertical remains a typed stop until the real Asset and exact evaluation projection exist. The fixture is non-product, makes no external-outcome claim, does not autonomously mutate an organizational current head, and leaves frozen benchmark results unchanged. See `docs/adr/0005-evolution-authority-boundary.md`.
 
 ## Epic admission and Work Package Plans
 
