@@ -34,8 +34,8 @@
     {
       "scenario_id": "pr_review_selective_gates",
       "task_class": "review",
-      "required_contracts": ["review-router", "review-final-merge-gate", "evidence-ledger"],
-      "required_gates": ["review-router", "review-final-merge-gate"],
+      "required_contracts": ["review-router", "review-ai-quality", "review-final-merge-gate", "evidence-ledger"],
+      "required_gates": ["review-router", "review-ai-quality", "review-final-merge-gate"],
       "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": true, "handoff_required": false, "formal_evidence_trigger_ids": ["high_stakes_readiness"], "verification_proof": { "applies": false, "compact_eligibility_fact_ids": [], "formal_trigger_ids": [] } },
       "expected": { "approval_required": false, "stop_status": "none", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "verification_proof_path": null, "review_final_gate": true, "handoff_executable": false, "claim_evidence_mode": "formal_ledger" },
       "projections": { "claude_code": { "profile": "review", "entry": "skill-review.md", "verification_proof_policy_ref": null, "verification_proof_paths": [] }, "codex": { "profile": "review", "entry": "skill-review.md", "verification_proof_policy_ref": null, "verification_proof_paths": [] } }
@@ -52,8 +52,8 @@
     {
       "scenario_id": "missing_repository_diff_test_evidence",
       "task_class": "review",
-      "required_contracts": ["review-router"],
-      "required_gates": ["review-router"],
+      "required_contracts": ["review-router", "review-ai-quality"],
+      "required_gates": ["review-router", "review-ai-quality"],
       "input": { "risk_action": false, "missing_evidence": ["repository", "diff", "verification"], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": [], "verification_proof": { "applies": false, "compact_eligibility_fact_ids": [], "formal_trigger_ids": [] } },
       "expected": { "approval_required": false, "stop_status": "insufficient_evidence", "missing_evidence": ["diff", "repository", "verification"], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "verification_proof_path": null, "review_final_gate": false, "handoff_executable": false, "claim_evidence_mode": "inline" },
       "projections": { "claude_code": { "profile": "review", "entry": "skill-review.md", "verification_proof_policy_ref": null, "verification_proof_paths": [] }, "codex": { "profile": "review", "entry": "skill-review.md", "verification_proof_policy_ref": null, "verification_proof_paths": [] } }
@@ -109,6 +109,48 @@
       "expected_status": "fail"
     },
     {
+      "mutation_id": "claude_remove_review_baseline",
+      "scenario_id": "pr_review_selective_gates",
+      "adapter_id": "claude_code",
+      "remove": ["Produce exactly one /review-ai-quality baseline result"],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "codex_remove_review_baseline",
+      "scenario_id": "pr_review_selective_gates",
+      "adapter_id": "codex",
+      "remove": ["Produce exactly one review-ai-quality baseline result"],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "claude_remove_review_finding_field",
+      "scenario_id": "pr_review_selective_gates",
+      "adapter_id": "claude_code",
+      "remove": ["Required post-fix condition:"],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "codex_remove_review_finding_field",
+      "scenario_id": "pr_review_selective_gates",
+      "adapter_id": "codex",
+      "remove": ["Required post-fix condition:"],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "claude_remove_conditional_final_gate",
+      "scenario_id": "pr_review_selective_gates",
+      "adapter_id": "claude_code",
+      "remove": ["Append Decision only when a final merge decision was requested:"],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "codex_remove_conditional_final_gate",
+      "scenario_id": "pr_review_selective_gates",
+      "adapter_id": "codex",
+      "remove": ["Run review-final-merge-gate last only when runner-required.", "Only when review-final-merge-gate is runner-required, append:"],
+      "expected_status": "fail"
+    },
+    {
       "mutation_id": "claude_remove_executable_handoff",
       "scenario_id": "handoff_resume_state",
       "adapter_id": "claude_code",
@@ -126,7 +168,7 @@
       "mutation_id": "codex_remove_formal_ledger_route",
       "scenario_id": "pr_review_selective_gates",
       "adapter_id": "codex",
-      "remove": ["formal[audit|multi-claim|high-stakes|cross-revision|stable-IDs]=>evidence-ledger"],
+      "remove": ["formal[audit|multi-claim|high-stakes|cross|stable-ID]=>evidence-ledger"],
       "expected_status": "fail"
     },
     {

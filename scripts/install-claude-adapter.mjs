@@ -78,8 +78,8 @@ const RUNTIME_DIRECTORIES = [
 ];
 const COMMAND_METADATA = {
   "skill-review.md": {
-    requiredSkills: ["review-router", "review-final-merge-gate", "risk-gate"],
-    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-traceability-contract.md"],
+    requiredSkills: ["review-router", "review-ai-quality", "review-final-merge-gate", "risk-gate"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-traceability-contract.md", "docs/review-finding-contract.md", "schemas/review-finding.schema.json"],
   },
   "skill-implement.md": {
     requiredSkills: ["skill-router", "test-first-verification", "controlled-implementation", "risk-gate"],
@@ -141,8 +141,11 @@ const SKILL_RELATIONSHIPS = {
   "spec-driven-development": {
     requires: ["work-package-compiler", "test-first-verification", "controlled-implementation"],
   },
+  "review-router": {
+    requires: ["review-ai-quality"],
+  },
   "review-final-merge-gate": {
-    requires: ["review-router"],
+    requires: ["review-router", "review-ai-quality"],
   },
   "release-readiness-gate": {
     requires: ["risk-gate", "evidence-ledger"],

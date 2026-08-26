@@ -71,6 +71,8 @@ If target audience, purpose, medium, or output contract is missing, mark the aff
 
 ## Output
 
+Actionable output findings follow `ask.review-finding@1.0.0` in `docs/review-finding-contract.md` and join the one impact-ordered review inventory.
+
 ```text
 Output quality gate:
 - Gate status: pass | pass with comments | fail | insufficient evidence
@@ -98,13 +100,14 @@ System/AI-output checks:
 - machine-consumable fields:
 
 Findings:
-- [severity] target - issue
-  Evidence:
-  Consumer impact:
-  Required fix:
-
-Suggestions:
-- ...
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: output
 
 Residual output risk:
 - ...
@@ -115,7 +118,7 @@ Residual output risk:
 - Output-layer findings are separated from implementation, domain, and adversarial findings.
 - Human-facing and system/AI-facing output checks are represented when applicable.
 - Missing persona, medium, sample output, or output contract produces `insufficient evidence`.
-- Every required finding names the observed artifact or missing artifact, consumer impact, and required fix.
+- Every actionable finding uses the closed common fields and names the consumer impact and observed failure trace.
 - Final merge decision is left to `review-final-merge-gate`.
 
 ## Failure modes

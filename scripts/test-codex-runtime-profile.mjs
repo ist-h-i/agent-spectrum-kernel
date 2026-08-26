@@ -51,7 +51,7 @@ for (const profile of summary.profiles) {
   if (!artifact.content.includes(expectedOutputControl)) throw new Error(`${profile.prompt_name} does not preserve the runner-owned emission policy`);
   for (const triggerId of route.direct_trigger_ids.filter((id) => id !== formalLedgerDirectTriggerId)) if (!artifact.content.includes(`\`${triggerId}\``)) throw new Error(`${profile.prompt_name} rendered output is missing direct trigger ${triggerId}`);
   if (!profile.direct_trigger_ids.includes(formalLedgerDirectTriggerId)) throw new Error(`${profile.prompt_name} must expose the closed formal-ledger direct trigger`);
-  if (!artifact.content.includes(claimEvidenceContractRef) || !artifact.content.includes("; inline; formal[audit|multi-claim|high-stakes|cross-revision|stable-IDs]=>evidence-ledger")) throw new Error(`${profile.prompt_name} must render the shared inline-default and closed formal-audit claim evidence contract revision`);
+  if (!artifact.content.includes(claimEvidenceContractRef) || !artifact.content.includes("; inline; formal[audit|multi-claim|high-stakes|cross|stable-ID]=>evidence-ledger")) throw new Error(`${profile.prompt_name} must render the shared inline-default and closed formal-audit claim evidence contract revision`);
   const source = readFileSync(resolve(root, "adapters", "codex", "prompts", profile.prompt_name), "utf8");
   if (source.includes("operating-mode-router") || source.includes("skill-router")) throw new Error(`${profile.prompt_name} invokes an upper router despite fixed entry mode`);
   if (!source.includes("{{ASK_COMPACT_CONTROLS}}") || !source.includes("{{ASK_COMPACT_DIRECT_TRIGGERS}}")) throw new Error(`${profile.prompt_name} must generate controls and triggers from the canonical map`);
@@ -72,6 +72,14 @@ const investigation = buildCodexProjectionPlan({ profileName: "investigation" })
 for (const triggerId of routeByPrompt.get("skill-investigate.md").direct_trigger_ids) {
   const trigger = investigation.routingFixtures.find((fixture) => fixture.id === triggerId);
   if (!trigger || trigger.router !== "compact-profile-direct-trigger" || !investigation.skills.includes(trigger.selected_route)) throw new Error(`investigation direct trigger is not closure-equivalent: ${triggerId}`);
+}
+const review = buildCodexProjectionPlan({ profileName: "review" });
+const reviewProfile = review.compactProfiles.find((profile) => profile.task_class === "review");
+if (!review.skills.includes("review-ai-quality") || !reviewProfile?.requested_contracts.includes("review-ai-quality")) {
+  throw new Error("review compact profile must project the mandatory review-ai-quality baseline contract");
+}
+if (!review.renderer_inputs.canonical.some((input) => input.path === "docs/review-finding-contract.md") || !review.renderer_inputs.canonical.some((input) => input.path === "schemas/review-finding.schema.json")) {
+  throw new Error("review compact profile must bind the shared finding contract and schema");
 }
 if (!implementation.renderer_inputs.adapter_owned.some((input) => input.path === "scripts/codex-runtime-profile.mjs")) throw new Error("projection provenance must bind the Codex compact-profile renderer");
 if (!implementation.renderer_inputs.canonical.some((input) => input.path === "schemas/compact-profile-control-map.json")) throw new Error("projection provenance must bind the canonical compact control map");

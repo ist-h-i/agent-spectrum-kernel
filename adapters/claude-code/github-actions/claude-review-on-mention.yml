@@ -114,34 +114,33 @@ jobs:
             - Read .claude/pr-context.json, .claude/pr.diff, and .claude/pr-head-sha.txt before extracting change signals.
             - If the PR head workspace or diff evidence is unavailable, return insufficient evidence instead of a confident decision.
             - Read schemas/review-signal-gate-map.json before extracting signals; emit only its exact signal IDs and use its signal-to-gate mapping.
-            - Use review-router first to extract observed change signals and map them to required gates.
-            - Run only required gates.
+            - Use review-router first, then produce exactly one review-ai-quality baseline result; baseline needs no signal and is never over-processing.
+            - Run only exact-signal additional gates.
             - Include review-code-health only when code-health risk or non-blocking debt is applicable.
-            - End with review-final-merge-gate style output.
-            - Keep current-PR blockers in Blocking evidence (use Required fixes only as a detailed sub-list when needed).
-            - Put non-blocking follow-up under Non-blocking follow-ups and keep improvement-ledger candidates separate when applicable.
-            - Do not emit a fixed layer-by-layer applicability table in the normal route. Use Change signals, Required gates, Skipped heavy gates, and Missing evidence instead.
+            - This Action explicitly requests a final merge decision; run review-final-merge-gate last.
+            - Keep current-PR blockers in the one impact-ordered Findings inventory.
+            - Every actionable finding must include Finding ID, severity, merge-blocker status, practical impact, trigger/failure trace, evidence location, and required post-fix condition.
+            - Do not emit a fixed layer-by-layer applicability table, skipped-heavy boilerplate, or empty category sections in the normal route.
             - Normal routing output:
-            - Change signals: signal and observed evidence
-            - Required gates: gate, reason, and triggering signal(s)
-            - Skipped heavy gates: gate/layer and observed reason
-            - Missing evidence: missing input and why it remains unknown
+            - Baseline review: exactly one review-ai-quality result with normalized status and non-empty evidence
+            - Additional required gates: exactly one closed `<gate>: status=...; evidence=...; signals=...` record per derived gate, in registry order
+            - Missing evidence: missing input, affected judgment, and next check
+            - Findings: one impact-ordered inventory
             - Do not deploy, merge, release, publish, or mutate production configuration.
             - Do not store secrets or raw prompts.
             - Emit exactly one fenced JSON Execution Envelope using docs/execution-envelope-contract.md. The serialized output must contain the literal `Execution Envelope:` heading immediately before the JSON fence. Do not repeat route, evidence, stop, or next-action metadata in the review artifact.
 
             Final output contract:
+            - Baseline review
+            - Additional required gates
+            - Missing evidence
+            - Findings
             - Decision: approve | approve with comments | request changes | block | insufficient evidence
-            - Blocking evidence
-            - Passed required gates
-            - Insufficient evidence
-            - Non-blocking follow-ups
-            - Residual risk
             Execution Envelope:
             ```json
             {
               "schema_version": "1.0.0",
-              "route": { "work_mode": "レビュー", "operating_mode": "delivery_quality", "user_facing": "レビュー結果を記録する", "internal": { "primary": "review-router" } },
+              "route": { "work_mode": "レビュー", "operating_mode": "delivery_quality", "user_facing": "レビュー結果を記録する", "internal": { "primary": "review-router", "secondary": ["review-ai-quality", "review-final-merge-gate"] } },
               "evidence_status": { "checked": [], "missing": [] },
               "stop_reason": { "status": "none", "details": [], "human_decision_required": [], "stop_if": [] },
               "next_action": "record the review decision"

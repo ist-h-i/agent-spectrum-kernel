@@ -26,6 +26,10 @@
       "argv": ["node", "scripts/test-validate-repo.mjs"]
     },
     {
+      "id": "review_route_contract",
+      "argv": ["node", "scripts/test-review-route.mjs"]
+    },
+    {
       "id": "execution_envelope_record",
       "argv": ["node", "scripts/test-execution-envelope-record.mjs"]
     },

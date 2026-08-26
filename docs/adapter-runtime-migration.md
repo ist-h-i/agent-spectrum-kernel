@@ -32,6 +32,9 @@ The adapters may coexist. Claude owns only the paths registered in its managed i
 | Pre-#229 evidence projection | Regenerate ordinary commands with inline `ask.claim-evidence-status@1.0.0`; keep formal `evidence-ledger` installed but conditionally selected. | A copied taxonomy, missing contract revision, or unconditional ordinary-ledger route is detected. | Regenerate both projections and runtime fixtures; do not reinterpret or rewrite stored legacy artifacts in place. |
 | Pre-#228 inline-only Envelope | Managed Codex migrates to a runner-owned bound record and ordinary `sidecar`; direct Codex and current Claude paths remain explicit `inline_required` compatibility. | Structured output, profile binding, record validation, or runtime-owned persistence is unavailable. | Reinstall the managed Codex runtime or remain explicitly inline. Never parse prose or silently upgrade a legacy inline payload to sidecar. |
 | Pre-#231 formal-only verification projection | Regenerate commands and prompts with `ask.verification-proof-policy@1.0.0`; existing Formal Verification Contract artifacts remain byte-preserved and readable. | The projected policy ref or path differs, an unknown path appears, Compact Proof lacks complete eligibility, or formal is downgraded. | Regenerate both projections and runtime fixtures. Keep existing formal artifacts in place; do not rewrite selection history or execution evidence. |
+| Pre-#230 optional semantic baseline review | Regenerate review entries with exactly one signal-independent `review-ai-quality` baseline, exact-signal additional gates, one shared finding contract, and requested-only last `review-final-merge-gate`. | Baseline is absent/duplicated, an additional gate has no exact signal, ordinary output emits skipped/category boilerplate, or an unrequested final Decision appears. | Regenerate both projections and runtime fixtures. Preserve historical review artifacts; do not reinterpret their gate execution or quality. |
+| Pre-#230 optional semantic baseline review | Regenerate review entries with exactly one signal-independent `review-ai-quality` baseline, exact-signal additional gates, one shared finding contract, and requested-only last `review-final-merge-gate`. | Baseline is absent/duplicated, an additional gate has no exact signal, ordinary output emits skipped/category boilerplate, or an unrequested final Decision appears. | Regenerate both projections and runtime fixtures. Preserve historical review artifacts; do not reinterpret their gate execution or quality. |
+| Pre-#230 optional semantic baseline review | Regenerate review entries with exactly one signal-independent `review-ai-quality` baseline, exact-signal additional gates, one shared finding contract, and requested-only last `review-final-merge-gate`. | Baseline is absent/duplicated, an additional gate has no exact signal, ordinary output emits skipped/category boilerplate, or an unrequested final Decision appears. | Regenerate both projections and runtime fixtures. Preserve historical review artifacts; do not reinterpret their gate execution or quality. |
 | Pre-#229 evidence projection | Regenerate ordinary commands with inline `ask.claim-evidence-status@1.0.0`; keep formal `evidence-ledger` installed but conditionally selected. | A copied taxonomy, missing contract revision, or unconditional ordinary-ledger route is detected. | Regenerate both projections and runtime fixtures; do not reinterpret or rewrite stored legacy artifacts in place. |
 
 Schema additions remain compatible only when older profile documents remain valid and downgrade behavior is not weakened. Capability ID removal/rename, changed downgrade meaning, or canonical ownership changes require a schema-version change and new migration evidence.
@@ -78,6 +81,27 @@ fixture. Adapter conformance verifies the same selected path across current Clau
 and Codex projections. These static and local checks do not establish that an
 external runtime loaded the projection, nor do the byte counts establish token,
 latency, quality, or effectiveness gains.
+
+For #230, `scripts/test-review-route.mjs` verifies baseline cardinality, exact
+signal-to-additional-gate routing, requested-only final-gate ordering, missing
+evidence handling, and the shared finding fields/order. Cross-adapter conformance
+verifies the same projected baseline route for Claude and Codex. These checks prove
+the review mechanism contract only; they do not establish review quality, value,
+or a physical model-invocation count.
+
+For #230, `scripts/test-review-route.mjs` verifies baseline cardinality, exact
+signal-to-additional-gate routing, requested-only final-gate ordering, missing
+evidence handling, and the shared finding fields/order. Cross-adapter conformance
+verifies the same projected baseline route for Claude and Codex. These checks prove
+the review mechanism contract only; they do not establish review quality, value,
+or a physical model-invocation count.
+
+For #230, `scripts/test-review-route.mjs` verifies baseline cardinality, exact
+signal-to-additional-gate routing, requested-only final-gate ordering, missing
+evidence handling, and the shared finding fields/order. Cross-adapter conformance
+verifies the same projected baseline route for Claude and Codex. These checks prove
+the review mechanism contract only; they do not establish review quality, value,
+or a physical model-invocation count.
 
 For #229, the repository additionally verifies deterministic projection selection between `inline` and `formal_ledger`. Existing lowercase and legacy evidence values are normalized read-only under `docs/claim-evidence-status-contract.md`; migration must not upgrade `weak` to `Verified`, broaden the #276 Asset observation subset, or treat Skill installation as task activation.
 

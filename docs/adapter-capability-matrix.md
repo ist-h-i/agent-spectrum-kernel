@@ -15,7 +15,7 @@ Levels:
 |---|---|---|---|---|---|---|
 | Project-local skill projection | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
 | Local command templates | behavior_verified | behavior_verified | unknown | unknown | unknown | unknown |
-| Review route support | projected | projected | unknown | unknown | unknown | unknown |
+| Baseline-first review route support | projected | projected | unknown | unknown | unknown | unknown |
 | Risk-gate preservation | projected | projected | unknown | unknown | unknown | unknown |
 | Verification-first workflow support | projected | projected | unknown | unknown | unknown | unknown |
 | Evidence-ledger output support | projected | projected | unknown | unknown | unknown | unknown |

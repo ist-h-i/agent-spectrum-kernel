@@ -289,15 +289,15 @@ doubt-driven-development を使って、最初の仮説に飛びつかず反証�
 
 ```text
 review-router を使ってこのdiffをレビューしてください。
-観測した Change signals を出し、そこから必要なgateだけを選んでください。
+必ず1件のreview-ai-quality baselineを出し、観測した正確なsignal IDから必要な追加gateだけを選んでください。
 最後は review-final-merge-gate で approve / request changes / block / insufficient evidence を判断してください。
 ```
 
 主な流れ:
 
 - `review-router`
-- Change signals / Required gates / Missing evidence
-- required gates
+- `review-ai-quality` baseline
+- exact-signal additional gates / Missing evidence / Findings
 - `review-final-merge-gate`
 
 ### Review context setup

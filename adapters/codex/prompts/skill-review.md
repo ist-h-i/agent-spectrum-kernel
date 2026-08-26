@@ -2,7 +2,10 @@
 description: Review a diff or output with the Codex compact ASK profile.
 ---
 
-Entry mode is fixed to review. Primary contract: `review-router`. Read `schemas/review-signal-gate-map.json`, emit exact signal IDs, and run only gates triggered by observed signals.
+Review entry. Primary contract: `review-router`. Read schemas/review-signal-gate-map.json.
+
+Produce exactly one review-ai-quality baseline result. It is signal-independent. Select additional gates only for exact observed signal IDs. Run review-final-merge-gate last only when runner-required.
+Use one impact-ordered Findings inventory with the listed fields.
 
 {{ASK_COMPACT_CONTROLS}}
 
@@ -10,34 +13,32 @@ Entry mode is fixed to review. Primary contract: `review-router`. Read `schemas/
 
 [agent_activity] opt-in; S/C/F counts.
 
-Change signals:
-- signal: observed evidence
+Baseline review:
+- Gate: review-ai-quality
+- Status: pass | pass_with_comments | fail | insufficient_evidence
+- Evidence: target/evidence
 
-Required gates:
-- gate: reason; triggered by signal(s)
-
-Skipped heavy gates:
-- gate/layer: observed reason
+Additional required gates:
+- <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<text>; signals=<exact IDs>
 
 Missing evidence:
-- input: impact and next check
+- input/gate: affected judgment; next check
+
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: optional
+
+Only when review-final-merge-gate is runner-required, append:
 
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
-Blocking evidence:
-- [severity] gate/file:line - evidence, impact, required fix
-
-Passed required gates:
-- gate - evidence checked
-
-Insufficient evidence:
-- gate/input - unknown and next check
-
-Non-blocking follow-ups:
-- ...
-
-Residual risk:
-- ...
+Use - none for empty sections. Omit skipped gates, empty categories, and applicability diagnostics unless explicitly requested.
 
 $ARGUMENTS

@@ -45,10 +45,9 @@ const PROMPT_METADATA = {
   "skill-review.md": {
     label: "Review",
     execution: CODEX_PROMPT_CONTRACTS["skill-review.md"],
-    requiredSkills: ["review-router", "review-final-merge-gate", "risk-gate"],
+    requiredSkills: ["review-router", "review-ai-quality", "review-final-merge-gate", "risk-gate"],
     recommendedSkills: [
       "review-automated-gate",
-      "review-ai-quality",
       "review-code-health",
       "review-domain-impact",
       "review-architecture-impact",
@@ -57,7 +56,7 @@ const PROMPT_METADATA = {
       "review-finding-compiler",
       "improvement-ledger",
     ],
-    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-traceability-contract.md"],
+    requiredAssets: ["docs/execution-envelope-contract.md", "docs/lifecycle-traceability-contract.md", "docs/review-finding-contract.md", "schemas/review-finding.schema.json"],
   },
   "skill-verify.md": {
     label: "Verification",
@@ -90,8 +89,13 @@ const SKILL_RELATIONSHIPS = {
     recommends: ["controlled-implementation"],
     incompatibleWith: [],
   },
+  "review-router": {
+    requires: ["review-ai-quality"],
+    recommends: ["review-final-merge-gate"],
+    incompatibleWith: [],
+  },
   "review-final-merge-gate": {
-    requires: ["review-router"],
+    requires: ["review-router", "review-ai-quality"],
     recommends: ["evidence-ledger"],
     incompatibleWith: [],
   },
@@ -1050,7 +1054,7 @@ function commandSectionForPrompt(prompt) {
 node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox} --diff-base origin/main...HEAD --output codex-review.md
 \`\`\`
 
-Treat this as diff-only review unless the runner output also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.`;
+Replace \`--gates-observed\` with repeated exact \`--observed-signal <id>\` arguments when the diff has a mapped signal; the runner derives additional gates from the canonical registry. Treat this as diff-only review unless the runner output also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.`;
   }
   if (prompt === "skill-implement.md") {
     return `## ${metadata.label}

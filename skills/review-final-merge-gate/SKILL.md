@@ -1,98 +1,114 @@
 ---
 name: review-final-merge-gate
-description: Combine review gate results into the only final merge decision for a PR, diff, commit, patch, or generated code review.
+description: Make the only final merge decision when explicitly requested, after the mandatory baseline semantic review and every exact-signal additional gate.
 ---
 
 # Final Merge Gate
 
 ## Goal
 
-Make the final merge decision from executed gate evidence without replaying the router's full diagnostic contract or hiding missing checks, unresolved blockers, or required approvals.
+Produce the final merge decision from current baseline, specialized-gate, finding, and evidence results without replaying debug diagnostics or hiding missing checks.
 
 ## Use when
 
-- A review needs a final merge decision.
-- Required gates have produced results or their absence must be judged.
+- The user or adapter explicitly requests a final merge decision.
+- review-router has established the mandatory baseline and any additional required gates.
 
 ## Do not use when
 
-- Earlier required gates have not been routed.
-- The user only wants a specific gate result, not a merge decision.
-- A risky action is about to be executed and `risk-gate` has not cleared it.
+- No final decision was requested.
+- The baseline route has not been established.
+- A risky action is about to execute and risk-gate has not cleared it.
 
 ## Process
 
-1. Collect the signal route and gate results from `review-router`, required gates, automated checks, and the formal `evidence-ledger`. A requested merge decision activates the `high_stakes_readiness` trigger in `ask.claim-evidence-status@1.0.0`. Use `docs/lifecycle-traceability-contract.md` when the merge decision depends on lifecycle evidence: reference current acceptance, change, evidence, blocker, and accepted-risk items instead of restating them.
-   - Confirm every required review item, blocker, and accepted risk connects to the merge subject; matching only the implementation required ref is insufficient.
-2. Apply precedence.
-   - Domain, architecture, output quality, adversarial risk, risk, and evidence issues take precedence over mechanical success.
-   - A mechanical pass proves only its own checks.
-   - Required gates without gate evidence remain `insufficient evidence`; do not downgrade them to skipped.
-   - Missing diff, context, output, or verification inputs remain `insufficient evidence`.
-3. Separate current-PR blockers from non-blocking follow-ups.
-   - Blockers stay in `Blocking evidence` and `Required fixes` when a detailed fix is needed.
-   - Improvement-ledger candidates, rule feedback, suggestions, and accepted risks remain separate.
-   - Do not update `docs/ai/improvement-ledger.md` from this gate.
-4. Decide.
+1. Confirm authority and order.
+   - schemas/review-signal-gate-map.json names this as the requested-only final gate.
+   - It runs last.
+   - The router and baseline never approve.
+
+2. Collect the current route.
+   - exactly one review-ai-quality baseline result;
+   - every exact-signal additional gate result;
+   - applicable automated evidence;
+   - missing target/diff/changed-file/contract/test/output/context/CI evidence;
+   - one ask.review-finding@1.0.0 inventory;
+   - formal evidence-ledger and lifecycle trace refs when their independent triggers apply.
+
+3. Fail closed on missing required evidence.
+   - Missing baseline result is under-processing.
+   - Missing baseline capability is capability_missing.
+   - A required gate without current evidence remains insufficient evidence.
+   - Missing applicable input remains insufficient evidence, never skipped or pass.
+   - A lower-level pass cannot override domain, architecture, output, adversarial, risk, approval, or evidence failure.
+
+4. Validate the finding inventory.
+   - Preserve every current Finding ID and required field.
+   - Order merge blockers first, then severity, then Finding ID.
+   - Do not hide a blocker in suggestions or a durable follow-up.
+   - Accepted risk remains explicit and separately authorized; absence of objection is not acceptance.
+
+5. Decide.
 
 | Decision | Use when |
 |---|---|
-| `approve` | Required gates pass or are evidence-backed skipped, and evidence is sufficient. |
-| `approve with comments` | Required gates pass and only minor follow-ups or documented low residual risk remain. |
-| `request changes` | Fixes or missing gate evidence are reasonably actionable and direction is sound. |
-| `block` | Critical correctness, security, domain, build, or risk issue exists. |
-| `insufficient evidence` | The target cannot be judged without more context, checks, or approvals. |
+| approve | Baseline and every required additional gate pass with sufficient evidence and no unresolved merge blocker. |
+| approve with comments | Required gates pass and only non-blocking findings or bounded residual risk remain. |
+| request changes | Actionable repair or missing evidence is bounded and direction remains viable. |
+| block | Critical correctness, security, domain, build, approval, or risk failure exists. |
+| insufficient evidence | The target cannot be judged without current target, gate, verification, context, or approval evidence. |
 
 ## Output
 
-Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This artifact owns the merge decision and does not repeat envelope fields.
+Use the shared Execution Envelope from docs/execution-envelope-contract.md for route/evidence/stop/next-action control.
 
-```text
-Trace refs, when required for the merge claim:
-- Review artifact ID / revision:
-- Claim ID:
-- Subject / evidence / blocker / accepted-risk refs:
-- Applicable / not-applicable gap types and required refs:
+~~~text
+Baseline review:
+- Gate: review-ai-quality
+- Status and evidence:
+
+Additional required gates:
+- gate: status, evidence, and exact trigger signal
+
+Missing evidence:
+- input/gate: affected judgment and next check
+
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: optional
 
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
+~~~
 
-Blocking evidence:
-- [severity] gate/file:line — evidence, impact, and required fix or decision
+Use - none for empty Additional required gates, Missing evidence, or Findings. Do not emit skipped-heavy or empty category sections. Complete applicability and route deviations remain diagnostic/debug output only.
 
-Passed required gates:
-- gate — evidence checked
-
-Insufficient evidence:
-- gate/input — what remains unknown and the next check
-
-Non-blocking follow-ups:
-- improvement-ledger candidate, rule feedback, or suggestion — scope/owner when known
-
-Residual risk:
-- ...
-```
-
-Include `Improvement ledger candidates`, `Rule feedback`, or `Deferred / accepted code-health risks` only when applicable. Keep them separate from `Blocking evidence`.
+When a merge claim requires stable traceability, reference the current Review decision, implementation subject, evidence, blockers, and accepted risks under docs/lifecycle-traceability-contract.md without copying their content.
 
 ## Exit criteria
 
-- The final decision is explicit.
-- Every required gate is represented by a result or explicit insufficient evidence.
-- Blocking evidence is separated from passed gates and non-blocking follow-ups.
-- Upper-layer and cross-cutting failures are not overridden by lower-layer passes.
-- Required but missing gate evidence prevents approval.
-- Claim-relevant refs are current, or stale/missing refs are reported as insufficient evidence.
-- Suggestions do not become merge blockers unless they identify required missing evidence or a failing gate.
-- Complete per-layer diagnostics, when needed, remain validation/debug detail rather than normal final output.
+- A final decision was explicitly requested.
+- Exactly one baseline result is present.
+- Every required additional gate is represented by current result or explicit insufficient evidence.
+- Findings are complete, impact-ordered, and not hidden.
+- Missing evidence prevents approval.
+- The final decision is explicit and this gate is last.
+- Ordinary output contains no empty category or skipped-heavy boilerplate.
 
 ## Failure modes
 
 | Failure | Correction |
 |---|---|
-| Approving without required gate evidence | Return `insufficient evidence` or request the missing gate. |
-| Letting logic or mechanical review override domain/risk failure | Upper-layer and cross-cutting failures block regardless of lower-layer success. |
-| Mixing suggestions with required fixes | Separate blocking evidence from non-blocking follow-ups. |
-| Hiding non-blocking code-health findings | Put them under non-blocking follow-ups or an applicable ledger/rule-feedback section. |
-| Updating the improvement ledger from the final gate | Stop at explicit candidates and hand off to `improvement-ledger`. |
-| Treating unknown as pass | Unknown remains insufficient evidence. |
+| Final gate runs by default | Require an explicit final-decision request. |
+| Approval without baseline | Return insufficient evidence or capability_missing. |
+| Missing gate treated as skipped | Keep the decision insufficient. |
+| Lower-level pass overrides specialized failure | Apply specialized/risk precedence. |
+| Category output hides merge consequence | Use one impact-ordered finding inventory. |
+| Follow-up removes current blocker | Keep the blocker in Findings until resolved. |
+| Unknown becomes pass | Unknown remains insufficient evidence. |

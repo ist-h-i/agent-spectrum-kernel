@@ -1,0 +1,791 @@
+{
+  "schema_version": "1.0.0",
+  "registry_ref": "schemas/review-signal-gate-map.json",
+  "baseline_gate": "review-ai-quality",
+  "final_gate": "review-final-merge-gate",
+  "required_finding_fields": [
+    "finding_id",
+    "severity",
+    "merge_blocker",
+    "practical_impact",
+    "trigger_or_failure_trace",
+    "evidence_location",
+    "required_post_fix_condition"
+  ],
+  "severity_order": [
+    "blocker",
+    "major",
+    "minor",
+    "nit"
+  ],
+  "scenarios": [
+    {
+      "id": "localized_logic_defect",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality"
+      ],
+      "baseline_result_status": "fail",
+      "baseline_result_count": 1,
+      "findings": [
+        {
+          "finding_id": "F-LOGIC-001",
+          "severity": "major",
+          "merge_blocker": true,
+          "practical_impact": "Incorrect result reaches the caller.",
+          "trigger_or_failure_trace": "Input reaches the changed branch and returns the wrong value.",
+          "evidence_location": "src/example.mjs:12",
+          "required_post_fix_condition": "The branch returns the compatible value and a focused regression test passes.",
+          "category": "logic"
+        }
+      ],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "fail",
+        "issues": []
+      }
+    },
+    {
+      "id": "cross_module_architecture",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [
+        "cross_module_responsibility_change"
+      ],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality",
+        "review-architecture-impact"
+      ],
+      "baseline_result_status": "pass",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality",
+          "review-architecture-impact"
+        ],
+        "additional_required_gates": [
+          "review-architecture-impact"
+        ],
+        "baseline_status": "pass",
+        "issues": []
+      }
+    },
+    {
+      "id": "domain_state_change",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [
+        "state_semantics_change"
+      ],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality",
+        "review-domain-impact"
+      ],
+      "baseline_result_status": "pass",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality",
+          "review-domain-impact"
+        ],
+        "additional_required_gates": [
+          "review-domain-impact"
+        ],
+        "baseline_status": "pass",
+        "issues": []
+      }
+    },
+    {
+      "id": "user_facing_output_change",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [
+        "consumer_facing_wording_change"
+      ],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality",
+        "review-output-quality"
+      ],
+      "baseline_result_status": "pass",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality",
+          "review-output-quality"
+        ],
+        "additional_required_gates": [
+          "review-output-quality"
+        ],
+        "baseline_status": "pass",
+        "issues": []
+      }
+    },
+    {
+      "id": "severe_adversarial_path",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [
+        "untrusted_input",
+        "critical_workflow_blast_radius"
+      ],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality",
+        "review-adversarial-risk"
+      ],
+      "baseline_result_status": "pass",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality",
+          "review-adversarial-risk"
+        ],
+        "additional_required_gates": [
+          "review-adversarial-risk"
+        ],
+        "baseline_status": "pass",
+        "issues": []
+      }
+    },
+    {
+      "id": "clean_low_risk",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality"
+      ],
+      "baseline_result_status": "pass",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "pass",
+        "issues": []
+      }
+    },
+    {
+      "id": "automated_evidence",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [
+        "automated_evidence_required"
+      ],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality",
+        "review-automated-gate"
+      ],
+      "baseline_result_status": "pass",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality",
+          "review-automated-gate"
+        ],
+        "additional_required_gates": [
+          "review-automated-gate"
+        ],
+        "baseline_status": "pass",
+        "issues": []
+      }
+    },
+    {
+      "id": "decision_requested",
+      "target_present": true,
+      "final_decision_requested": true,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality",
+        "review-final-merge-gate"
+      ],
+      "baseline_result_status": "pass",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings",
+        "Decision"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality",
+          "review-final-merge-gate"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "pass",
+        "issues": []
+      }
+    },
+    {
+      "id": "missing_applicable_evidence",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [
+        "diff",
+        "changed_files",
+        "contract",
+        "tests",
+        "output",
+        "context",
+        "ci"
+      ],
+      "executed_gates": [],
+      "baseline_result_status": "insufficient_evidence",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "insufficient_evidence",
+        "issues": []
+      }
+    },
+    {
+      "id": "missing_target",
+      "target_present": false,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [
+        "target"
+      ],
+      "executed_gates": [],
+      "baseline_result_status": "insufficient_evidence",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "insufficient_evidence",
+        "issues": []
+      }
+    },
+    {
+      "id": "missing_baseline_under_processing",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [],
+      "baseline_result_status": "missing",
+      "baseline_result_count": 0,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "missing",
+        "issues": [
+          "under_processing:review-ai-quality"
+        ]
+      }
+    },
+    {
+      "id": "untriggered_heavy_over_processing",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality",
+        "review-adversarial-risk"
+      ],
+      "baseline_result_status": "pass",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "pass",
+        "issues": [
+          "over_processing:review-adversarial-risk"
+        ]
+      }
+    },
+    {
+      "id": "duplicate_baseline",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality",
+        "review-ai-quality"
+      ],
+      "baseline_result_status": "pass",
+      "baseline_result_count": 2,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "pass",
+        "issues": [
+          "baseline_result_cardinality:expected_exactly_one"
+        ]
+      }
+    },
+    {
+      "id": "final_gate_overactivation",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality",
+        "review-final-merge-gate"
+      ],
+      "baseline_result_status": "pass",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "pass",
+        "issues": [
+          "final_gate_overactivation:review-final-merge-gate"
+        ]
+      }
+    },
+    {
+      "id": "final_gate_missing",
+      "target_present": true,
+      "final_decision_requested": true,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality"
+      ],
+      "baseline_result_status": "pass",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings",
+        "Decision"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality",
+          "review-final-merge-gate"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "pass",
+        "issues": [
+          "under_processing:review-final-merge-gate",
+          "final_gate_not_last:review-final-merge-gate"
+        ]
+      }
+    },
+    {
+      "id": "impact_ordered_findings",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality"
+      ],
+      "baseline_result_status": "pass_with_comments",
+      "baseline_result_count": 1,
+      "findings": [
+        {
+          "finding_id": "F-BLOCK-001",
+          "severity": "blocker",
+          "merge_blocker": true,
+          "practical_impact": "Data can be lost.",
+          "trigger_or_failure_trace": "The destructive branch executes before validation.",
+          "evidence_location": "src/store.mjs:44",
+          "required_post_fix_condition": "Validation completes before mutation."
+        },
+        {
+          "finding_id": "F-MAJOR-001",
+          "severity": "major",
+          "merge_blocker": false,
+          "practical_impact": "Compatibility can regress.",
+          "trigger_or_failure_trace": "Legacy callers omit the new field.",
+          "evidence_location": "src/api.mjs:20",
+          "required_post_fix_condition": "Legacy callers retain the prior result."
+        },
+        {
+          "finding_id": "F-MINOR-001",
+          "severity": "minor",
+          "merge_blocker": false,
+          "practical_impact": "Maintenance cost increases.",
+          "trigger_or_failure_trace": "Two branches duplicate normalization.",
+          "evidence_location": "src/api.mjs:31",
+          "required_post_fix_condition": "One local helper owns normalization."
+        }
+      ],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "pass_with_comments",
+        "issues": []
+      }
+    },
+    {
+      "id": "missing_finding_field",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality"
+      ],
+      "baseline_result_status": "fail",
+      "baseline_result_count": 1,
+      "findings": [
+        {
+          "finding_id": "F-MISSING-001",
+          "severity": "major",
+          "merge_blocker": true,
+          "practical_impact": "The finding cannot be closed deterministically.",
+          "trigger_or_failure_trace": "The producer omits the observable repair condition.",
+          "evidence_location": "fixture:missing_finding_field"
+        }
+      ],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "fail",
+        "issues": [
+          "finding:F-MISSING-001:missing_required_post_fix_condition"
+        ]
+      }
+    },
+    {
+      "id": "duplicate_finding_id",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality"
+      ],
+      "baseline_result_status": "fail",
+      "baseline_result_count": 1,
+      "findings": [
+        {
+          "finding_id": "F-DUP-001",
+          "severity": "major",
+          "merge_blocker": true,
+          "practical_impact": "Two defects cannot be referenced independently.",
+          "trigger_or_failure_trace": "Two gates emit the same Finding ID.",
+          "evidence_location": "fixture:duplicate_finding_id:first",
+          "required_post_fix_condition": "Every finding has a unique ID."
+        },
+        {
+          "finding_id": "F-DUP-001",
+          "severity": "major",
+          "merge_blocker": true,
+          "practical_impact": "Two defects cannot be referenced independently.",
+          "trigger_or_failure_trace": "Two gates emit the same Finding ID.",
+          "evidence_location": "fixture:duplicate_finding_id:second",
+          "required_post_fix_condition": "Every finding has a unique ID."
+        }
+      ],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "fail",
+        "issues": [
+          "finding:F-DUP-001:duplicate_id"
+        ]
+      }
+    },
+    {
+      "id": "invalid_finding_severity",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality"
+      ],
+      "baseline_result_status": "fail",
+      "baseline_result_count": 1,
+      "findings": [
+        {
+          "finding_id": "F-SEVERITY-001",
+          "severity": "critical",
+          "merge_blocker": true,
+          "practical_impact": "Impact order is no longer portable across adapters.",
+          "trigger_or_failure_trace": "A producer emits an uncontrolled severity.",
+          "evidence_location": "fixture:invalid_finding_severity",
+          "required_post_fix_condition": "Severity uses the controlled vocabulary."
+        }
+      ],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "fail",
+        "issues": [
+          "finding:F-SEVERITY-001:invalid_severity"
+        ]
+      }
+    },
+    {
+      "id": "unknown_finding_field",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality"
+      ],
+      "baseline_result_status": "fail",
+      "baseline_result_count": 1,
+      "findings": [
+        {
+          "finding_id": "F-UNKNOWN-001",
+          "severity": "major",
+          "merge_blocker": true,
+          "practical_impact": "Adapter-specific fields create incompatible inventories.",
+          "trigger_or_failure_trace": "A producer adds an uncontrolled owner field.",
+          "evidence_location": "fixture:unknown_finding_field",
+          "required_post_fix_condition": "Only closed finding fields remain.",
+          "owner": "adapter-local"
+        }
+      ],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "fail",
+        "issues": [
+          "finding:F-UNKNOWN-001:unknown_owner"
+        ]
+      }
+    },
+    {
+      "id": "finding_impact_misorder",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality"
+      ],
+      "baseline_result_status": "fail",
+      "baseline_result_count": 1,
+      "findings": [
+        {
+          "finding_id": "F-MINOR-900",
+          "severity": "minor",
+          "merge_blocker": false,
+          "practical_impact": "A low-impact item appears before the blocker.",
+          "trigger_or_failure_trace": "The producer sorts by discovery time.",
+          "evidence_location": "fixture:finding_impact_misorder:first",
+          "required_post_fix_condition": "Impact order is deterministic."
+        },
+        {
+          "finding_id": "F-BLOCK-900",
+          "severity": "blocker",
+          "merge_blocker": true,
+          "practical_impact": "A merge blocker is hidden below a minor item.",
+          "trigger_or_failure_trace": "The producer sorts by discovery time.",
+          "evidence_location": "fixture:finding_impact_misorder:second",
+          "required_post_fix_condition": "The merge blocker appears first."
+        }
+      ],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "fail",
+        "issues": [
+          "findings:impact_order_invalid"
+        ]
+      }
+    },
+    {
+      "id": "ordinary_output_boilerplate_rejected",
+      "target_present": true,
+      "final_decision_requested": false,
+      "observed_signals": [],
+      "missing_evidence": [],
+      "executed_gates": [
+        "review-ai-quality"
+      ],
+      "baseline_result_status": "pass",
+      "baseline_result_count": 1,
+      "findings": [],
+      "ordinary_output_sections": [
+        "Baseline review",
+        "Additional required gates",
+        "Skipped heavy gates",
+        "Missing evidence",
+        "Findings"
+      ],
+      "expected": {
+        "required_gates": [
+          "review-ai-quality"
+        ],
+        "additional_required_gates": [],
+        "baseline_status": "pass",
+        "issues": [
+          "ordinary_output:forbidden_section:Skipped heavy gates"
+        ]
+      }
+    }
+  ]
+}

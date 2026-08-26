@@ -70,6 +70,8 @@ If assets, actors, safety boundaries, accepted risks, or threat/misuse model are
 
 ## Output
 
+Actionable adversarial findings follow `ask.review-finding@1.0.0` in `docs/review-finding-contract.md` and join the one impact-ordered review inventory.
+
 ```text
 Adversarial risk gate:
 - Gate status: pass | pass with residual risk | fail | insufficient evidence
@@ -79,14 +81,15 @@ Adversarial risk gate:
 - Known issues ignored:
 - Missing context:
 
-Top critical risks:
-1. Risk:
-   Failure path:
-   Preconditions:
-   Blast radius:
-   Evidence:
-   Why this is not already covered:
-   Required fix or decision:
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: adversarial-risk
 
 Non-findings:
 - Items intentionally not reported:
@@ -100,7 +103,7 @@ Residual adversarial risk:
 - Findings are limited to severe, evidence-backed, high-impact risks.
 - Known, accepted, duplicate, generic, and low-severity issues are suppressed.
 - Missing context produces `insufficient evidence` rather than invented threats.
-- Each finding names the asset, actor or precondition, failure path, blast radius, and required fix or decision.
+- Each finding encodes the asset/actor/precondition and failure path in the common trace and impact fields.
 - Final merge decision is left to `review-final-merge-gate`.
 
 ## Failure modes

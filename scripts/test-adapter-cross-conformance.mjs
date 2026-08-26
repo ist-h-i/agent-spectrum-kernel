@@ -67,6 +67,10 @@ for (const scenario of report.scenarios) {
   assert.ok(scenario.results.every((result) => result.normalized_contract.verification_proof_policy_ref === (expectedProofPath ? VERIFICATION_PROOF_POLICY_REF : null)));
   if (expectedProofPath) assert.ok(scenario.results.every((result) => result.normalized_contract.selected_contracts.includes("test-first-verification")));
   if (expectedProofPath === "formal_verification_contract") assert.ok(scenario.results.every((result) => result.normalized_contract.verification_proof_path !== "compact_proof"));
+  if (scenario.task_class === "review") {
+    assert.ok(scenario.results.every((result) => result.normalized_contract.selected_contracts.includes("review-ai-quality")));
+    assert.ok(scenario.results.every((result) => result.normalized_contract.required_gates.includes("review-ai-quality")));
+  }
 }
 
 const localizedScenario = report.scenarios.find((scenario) => scenario.scenario_id === "localized_implementation");
@@ -106,6 +110,14 @@ const proofMutationMismatch = new Map([
   ["claude_remove_compact_proof_path", "verification_proof_path_overactivated"],
   ["codex_remove_formal_verification_path", "verification_proof_path_missing"],
 ]);
+const reviewMutationMismatch = new Map([
+  ["claude_remove_review_baseline", "baseline_semantic_review_required"],
+  ["codex_remove_review_baseline", "baseline_semantic_review_required"],
+  ["claude_remove_review_finding_field", "review_finding_contract_required"],
+  ["codex_remove_review_finding_field", "review_finding_contract_required"],
+  ["claude_remove_conditional_final_gate", "review_final_gate_must_be_conditional"],
+  ["codex_remove_conditional_final_gate", "review_final_gate_must_be_conditional"],
+]);
 for (const mutation of fixture.mutation_fixtures) {
   const mutated = runFixture(fixture, ["--mutation", mutation.mutation_id]);
   assert.notEqual(mutated.status, 0, `${mutation.mutation_id} must fail closed`);
@@ -120,6 +132,12 @@ for (const mutation of fixture.mutation_fixtures) {
     assert.ok(
       mutatedAdapter.semantic_mismatches.includes(proofMutationMismatch.get(mutation.mutation_id)),
       `${mutation.mutation_id} must expose its proof-policy mismatch`,
+    );
+  }
+  if (reviewMutationMismatch.has(mutation.mutation_id)) {
+    assert.ok(
+      mutatedAdapter.semantic_mismatches.includes(reviewMutationMismatch.get(mutation.mutation_id)),
+      `${mutation.mutation_id} must expose its baseline-review mismatch`,
     );
   }
 }

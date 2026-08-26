@@ -17,6 +17,7 @@ export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "docs/metrics-event-contract.md",
   "docs/observability-runtime-contract.md",
   "docs/operation-automation-contract.md",
+  "docs/review-finding-contract.md",
   "docs/stack-implementation-overlay-contract.md",
   "docs/verification-proof-policy-contract.md",
   "schemas/adapter-runtime-event.schema.json",
@@ -26,6 +27,7 @@ export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "schemas/execution-envelope.schema.json",
   "schemas/execution-envelope-record.schema.json",
   "schemas/normalized-event-schema-registry.json",
+  "schemas/review-finding.schema.json",
   "schemas/verification-proof-policy.schema.json",
 ]);
 

@@ -6,7 +6,7 @@ The installer generates a profile-limited `.agents/commands/codex-exec.md` in ad
 
 Run these commands from the adopting repository so that `scripts/codex-exec-runner.mjs` is the installed, managed runner for that repository.
 
-After task classification, add `--gates-observed` when no task-specific gate is required, or repeat `--required-gate <id>` for each required gate. Without either evidence, the normalized event records `required_gate_observation` as missing. The review entry always records `review-final-merge-gate`; `--required-gate risk-gate` records missing specific-action approval and stops before invoking Codex.
+After task classification, add `--gates-observed` when no task-specific additional gate is required, or repeat `--required-gate <id>` for each exact-signal additional gate. Without either evidence, the normalized event records `required_gate_observation` as missing. The review entry always records the mandatory `review-ai-quality` baseline. Add `--final-decision` only when a final merge decision is requested; the runner then adds `review-final-merge-gate` after baseline and additional gates. `--required-gate risk-gate` records missing specific-action approval and stops before invoking Codex.
 
 ## Implementation
 
@@ -27,10 +27,10 @@ Start with reproduction and evidence gathering. Make local edits only after the 
 ## Review
 
 ```bash
-node scripts/codex-exec-runner.mjs --prompt skill-review.md --mode review --sandbox read-only --diff-base origin/main...HEAD --output codex-review.md
+node scripts/codex-exec-runner.mjs --prompt skill-review.md --mode review --sandbox read-only --diff-base origin/main...HEAD --final-decision --output codex-review.md
 ```
 
-Treat this as diff-only review unless the command also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.
+Omit `--final-decision` for a gate-status review with no merge judgment. Treat either form as diff-only review unless the command also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.
 
 ## Verification
 

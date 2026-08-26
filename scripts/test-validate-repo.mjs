@@ -58,6 +58,31 @@ function envelopeBlock(overrides = {}) {
 }
 
 const validEnvelopeBlock = envelopeBlock();
+function reviewFixture({
+  baselineStatus = "pass",
+  baselineEvidence = "isolated fixture",
+  additionalGates = "- none",
+  missingEvidence = "- none",
+  findings = "- none",
+  decision = null,
+  suffix = "",
+} = {}) {
+  return `Baseline review:
+- Gate: review-ai-quality
+- Status: ${baselineStatus}
+- Evidence: ${baselineEvidence}
+
+Additional required gates:
+${additionalGates}
+
+Missing evidence:
+${missingEvidence}
+
+Findings:
+${findings}
+${decision ? `\nDecision:\n- ${decision}\n` : ""}${suffix ? `\n${suffix}\n` : ""}
+${validEnvelopeBlock}`;
+}
 function codexStructuredResult(responseMarkdown, control = {}) {
   return JSON.stringify({
     schema_version: "1.0.0",
@@ -1735,13 +1760,13 @@ function assertRuntimeScripts() {
       task_id: "REVIEW-1",
       task_type: "review",
       occurred_at: "2999-01-01T00:00:00.000Z",
-      skills_used: ["review-router", "review-final-merge-gate"],
+      skills_used: ["review-router", "review-ai-quality", "review-final-merge-gate"],
       routing_result: {
         operating_mode: "delivery_quality",
         primary_skill: "review-router",
         correct_routing: true,
-        required_gates: ["review-router", "review-final-merge-gate"],
-        executed_gates: ["review-router", "review-final-merge-gate"],
+        required_gates: ["review-router", "review-ai-quality", "review-final-merge-gate"],
+        executed_gates: ["review-router", "review-ai-quality", "review-final-merge-gate"],
       },
       review_result: {
         decision: "request_changes",
@@ -1766,13 +1791,13 @@ function assertRuntimeScripts() {
       task_id: "REVIEW-2",
       task_type: "review",
       occurred_at: "2999-01-01T00:00:00.000Z",
-      skills_used: ["review-router"],
+      skills_used: ["review-router", "review-ai-quality"],
       routing_result: {
         operating_mode: "delivery_quality",
         primary_skill: "review-router",
         correct_routing: false,
-        required_gates: ["review-router", "review-final-merge-gate"],
-        executed_gates: ["review-router"],
+        required_gates: ["review-router", "review-ai-quality", "review-final-merge-gate"],
+        executed_gates: ["review-router", "review-ai-quality"],
         skipped_gates: [{ gate: "review-final-merge-gate", reason: "fixture missing evidence" }],
       },
       review_result: {
@@ -1810,7 +1835,7 @@ function assertRuntimeScripts() {
   ]);
   assertRuntimePass("metrics summarizer review coverage smoke", reviewSummarizeResult);
   const reviewReport = JSON.parse(readFileSync(resolve(root, "docs/ai/reports/review-report.json"), "utf8"));
-  if (reviewReport.skill_usage.correct_routing_rate !== 0.5 || reviewReport.skill_usage.required_gate_coverage !== 0.75) {
+  if (reviewReport.skill_usage.correct_routing_rate !== 0.5 || reviewReport.skill_usage.required_gate_coverage !== (1 + 2 / 3) / 2) {
     throw new Error(`summarizer should compute routing and gate coverage when evidence exists\n${JSON.stringify(reviewReport.skill_usage, null, 2)}`);
   }
   if (reviewReport.review_quality.review_tasks !== 2 || reviewReport.review_quality.insufficient_evidence_tasks !== 1 || reviewReport.review_quality.required_fixes_count !== 2) {
@@ -2089,7 +2114,7 @@ function assertRuntimeScripts() {
     task_id,
     task_type: "review",
     occurred_at: "2999-01-01T00:00:00.000Z",
-    skills_used: ["review-router"],
+    skills_used: [...new Set(["review-router", ...(routing_result?.executed_gates ?? [])])],
     routing_result,
     review_result,
     changed_file_summary,
@@ -2135,8 +2160,8 @@ function assertRuntimeScripts() {
       task_id: "LIGHT-ROUTE-1",
       changed_file_summary: { count: 1, paths: ["docs/ok.md"] },
       routing_result: {
-        required_gates: ["review-router", "review-final-merge-gate"],
-        executed_gates: ["review-router", "review-final-merge-gate"],
+        required_gates: ["review-router", "review-ai-quality"],
+        executed_gates: ["review-router", "review-ai-quality"],
         gate_applicability: [
           {
             layer: "Domain",
@@ -2182,8 +2207,8 @@ function assertRuntimeScripts() {
       changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
       routing_result: {
         change_signals: [{ signal: "public_api_change", evidence: "schema changed" }],
-        required_gates: ["review-router", "review-architecture-impact", "review-final-merge-gate"],
-        executed_gates: ["review-router", "review-architecture-impact", "review-final-merge-gate"],
+        required_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
         gate_applicability: [
           {
             layer: "Architecture",
@@ -2211,8 +2236,8 @@ function assertRuntimeScripts() {
       changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
       routing_result: {
         change_signals: [{ signal: "public_api_change", evidence: "schema file changed" }],
-        required_gates: ["review-router", "review-architecture-impact"],
-        executed_gates: ["review-router", "review-architecture-impact"],
+        required_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
       },
     }),
   ]);
@@ -2276,12 +2301,12 @@ function assertRuntimeScripts() {
       event_id: "evt-compact-missing-evidence",
       task_id: "COMPACT-MISSING-EVIDENCE-1",
       routing_result: {
-        change_signals: [{ signal: "verification", evidence: "behavior changed" }],
-        required_gates: ["review-automated-gate"],
+        change_signals: [{ signal: "automated_evidence_required", evidence: "behavior changed" }],
+        required_gates: ["review-ai-quality", "review-automated-gate"],
         required_gate_routes: [
-          { gate: "review-automated-gate", reason: "Verification evidence is required.", trigger_signals: ["verification"] },
+          { gate: "review-automated-gate", reason: "Verification evidence is required.", trigger_signals: ["automated_evidence_required"] },
         ],
-        executed_gates: ["review-router"],
+        executed_gates: ["review-router", "review-ai-quality"],
         missing_evidence: [{ input: "verification command output", reason: "Focused command output is unavailable." }],
       },
     }),
@@ -2299,8 +2324,8 @@ function assertRuntimeScripts() {
       event_id: "evt-unexecuted-heavy-gate",
       task_id: "UNEXECUTED-HEAVY-GATE-1",
       routing_result: {
-        required_gates: ["review-architecture-impact"],
-        executed_gates: [],
+        required_gates: ["review-ai-quality", "review-architecture-impact"],
+        executed_gates: ["review-ai-quality"],
       },
     }),
   ]);
@@ -2317,8 +2342,8 @@ function assertRuntimeScripts() {
       task_id: "MISSING-HEAVY-APP-1",
       changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
       routing_result: {
-        required_gates: ["review-router", "review-architecture-impact"],
-        executed_gates: ["review-router", "review-architecture-impact"],
+        required_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
       },
     }),
   ]);
@@ -2335,8 +2360,8 @@ function assertRuntimeScripts() {
       task_id: "MISSING-HEAVY-TRIGGER-1",
       changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
       routing_result: {
-        required_gates: ["review-router", "review-architecture-impact"],
-        executed_gates: ["review-router", "review-architecture-impact"],
+        required_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
         gate_applicability: [
           {
             layer: "Architecture",
@@ -2362,8 +2387,8 @@ function assertRuntimeScripts() {
       event_id: "evt-missing-routing-evidence",
       task_id: "MISSING-ROUTE-1",
       routing_result: {
-        required_gates: ["review-router"],
-        executed_gates: ["review-router"],
+        required_gates: ["review-router", "review-ai-quality"],
+        executed_gates: ["review-router", "review-ai-quality"],
         gate_applicability: [
           {
             layer: "Architecture",
@@ -2391,8 +2416,8 @@ function assertRuntimeScripts() {
       task_id: "MISSING-GATE-ROUTE-1",
       changed_file_summary: { count: 1, paths: ["docs/output.md"] },
       routing_result: {
-        required_gates: ["review-router"],
-        executed_gates: ["review-router"],
+        required_gates: ["review-router", "review-ai-quality"],
+        executed_gates: ["review-router", "review-ai-quality"],
         gate_applicability: [
           {
             layer: "Output quality",
@@ -2419,8 +2444,8 @@ function assertRuntimeScripts() {
       task_id: "UNDER-ROUTE-1",
       changed_file_summary: { count: 1, paths: ["schemas/public-api.schema.json"] },
       routing_result: {
-        required_gates: ["review-router", "review-architecture-impact"],
-        executed_gates: ["review-router"],
+        required_gates: ["review-router", "review-ai-quality", "review-architecture-impact"],
+        executed_gates: ["review-router", "review-ai-quality"],
         gate_applicability: [
           {
             layer: "Architecture",
@@ -2435,7 +2460,7 @@ function assertRuntimeScripts() {
     }),
   ]);
   if (
-    underProcessingReport.skill_usage.required_gate_coverage !== 0.5 ||
+    underProcessingReport.skill_usage.required_gate_coverage !== 2 / 3 ||
     !underProcessingReport.adoption_effect.weak_signal.some((signal) => signal.includes("Under-processing") && signal.includes("review-architecture-impact"))
   ) {
     throw new Error(`required gate not executed should be flagged\n${JSON.stringify(underProcessingReport.skill_usage, null, 2)}`);
@@ -2447,8 +2472,8 @@ function assertRuntimeScripts() {
       task_id: "OVER-ROUTE-1",
       changed_file_summary: { count: 1, paths: ["docs/ok.md"] },
       routing_result: {
-        required_gates: ["review-router"],
-        executed_gates: ["review-router", "review-adversarial-risk"],
+        required_gates: ["review-router", "review-ai-quality"],
+        executed_gates: ["review-router", "review-ai-quality", "review-adversarial-risk"],
         gate_applicability: [
           {
             layer: "Adversarial risk overlay",
@@ -4437,26 +4462,22 @@ EOF
   assertRuntimePass("codex review runner install setup", runRepoScript([installer, "--target", reviewTarget, "--profile", "review"]));
   const reviewRunnerScript = resolve(reviewTarget, "scripts/codex-exec-runner.mjs");
   const fakeReviewCodex = resolve(reviewTarget, "fake-review-codex");
-  const reviewResponse = `Change signals:
-- signal: fixture
-Required gates:
-- review-final-merge-gate: fixture
-Skipped heavy gates:
+  const reviewResponse = `Baseline review:
+- Gate: review-ai-quality
+- Status: pass
+- Evidence: isolated fixture
+
+Additional required gates:
 - none
+
 Missing evidence:
 - none
+
+Findings:
+- none
+
 Decision:
 - approve
-Blocking evidence:
-- none
-Passed required gates:
-- review-final-merge-gate: fixture
-Insufficient evidence:
-- none
-Non-blocking follow-ups:
-- none
-Residual risk:
-- none
 `;
   writeFileSync(
     fakeReviewCodex,
@@ -4479,6 +4500,8 @@ EOF
     "skill-review.md",
     "--mode",
     "review",
+    "--gates-observed",
+    "--final-decision",
     "--codex-bin",
     fakeReviewCodex,
     "--output",
@@ -4488,13 +4511,86 @@ EOF
   assertRuntimePass("codex review runner emits required gate evidence", reviewResult);
   const reviewReport = JSON.parse(reviewResult.stdout);
   if (
-    JSON.stringify(reviewReport.execution_evidence?.required_gates?.gates) !== JSON.stringify(["review-final-merge-gate"]) ||
-    JSON.stringify(reviewReport.normalized_adapter_event?.gates?.required) !== JSON.stringify(["review-final-merge-gate"]) ||
+    JSON.stringify(reviewReport.execution_evidence?.required_gates?.gates) !== JSON.stringify(["review-ai-quality", "review-final-merge-gate"]) ||
+    JSON.stringify(reviewReport.execution_evidence?.required_gates?.observed_signals) !== JSON.stringify([]) ||
+    JSON.stringify(reviewReport.execution_evidence?.required_gates?.additional_gates) !== JSON.stringify([]) ||
+    reviewReport.execution_evidence?.required_gates?.missing_evidence?.includes("required_gate_observation") ||
+    JSON.stringify(reviewReport.normalized_adapter_event?.gates?.required) !== JSON.stringify(["review-ai-quality", "review-final-merge-gate"]) ||
     reviewReport.normalized_adapter_event?.review?.final_gate_required !== true ||
     reviewReport.execution_envelope_record?.emission_class !== "sidecar" ||
     readFileSync(resolve(reviewTarget, "codex-review-output.md"), "utf8").includes("Execution Envelope:")
   ) {
-    throw new Error(`codex review runner must connect review-final-merge-gate to the normalized event\n${reviewResult.stdout}`);
+    throw new Error(`codex review runner must connect the mandatory baseline and requested final gate to the normalized event\n${reviewResult.stdout}`);
+  }
+
+  const unobservedReviewResult = runRepoScript([
+    reviewRunnerScript,
+    "--target", reviewTarget,
+    "--prompt", "skill-review.md",
+    "--mode", "review",
+    "--final-decision",
+    "--codex-bin", fakeReviewCodex,
+    "--output", "codex-review-unobserved-output.md",
+    "--json",
+  ]);
+  assertRuntimePass("codex review runner preserves missing classification evidence", unobservedReviewResult);
+  const unobservedReviewReport = JSON.parse(unobservedReviewResult.stdout);
+  if (
+    !unobservedReviewReport.execution_evidence?.required_gates?.missing_evidence?.includes("required_gate_observation") ||
+    unobservedReviewReport.execution_evidence?.required_gates?.evidence_level !== "projected" ||
+    !unobservedReviewReport.normalized_adapter_event?.evidence?.missing?.includes("required_gate_observation")
+  ) {
+    throw new Error(`baseline and final gates must not suppress missing review classification evidence\n${unobservedReviewResult.stdout}`);
+  }
+
+  const forbiddenReviewGateResult = runRepoScript([
+    reviewRunnerScript,
+    "--target", reviewTarget,
+    "--prompt", "skill-review.md",
+    "--mode", "review",
+    "--required-gate", "review-adversarial-risk",
+    "--dry-run",
+  ]);
+  if (forbiddenReviewGateResult.status === 0 || !forbiddenReviewGateResult.stderr.includes("review --required-gate is forbidden")) {
+    throw new Error(`review runner must reject a bare heavy-gate request\n${forbiddenReviewGateResult.stdout}\n${forbiddenReviewGateResult.stderr}`);
+  }
+
+  const fakeSignalReviewCodex = resolve(reviewTarget, "fake-signal-review-codex");
+  const signalReviewResponse = reviewFixture({
+    additionalGates: "- review-adversarial-risk: status=pass; evidence=isolated adversarial fixture; signals=untrusted_input",
+  }).replace(validEnvelopeBlock, "");
+  writeFileSync(
+    fakeSignalReviewCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
+${codexStructuredResult(signalReviewResponse)}
+EOF
+`,
+  );
+  chmodSync(fakeSignalReviewCodex, 0o755);
+  const signalReviewResult = runRepoScript([
+    reviewRunnerScript,
+    "--target", reviewTarget,
+    "--prompt", "skill-review.md",
+    "--mode", "review",
+    "--observed-signal", "untrusted_input",
+    "--codex-bin", fakeSignalReviewCodex,
+    "--output", "codex-review-signal-output.md",
+    "--json",
+  ]);
+  assertRuntimePass("codex review runner derives and enforces signal-selected gates", signalReviewResult);
+  const signalReviewReport = JSON.parse(signalReviewResult.stdout);
+  if (
+    JSON.stringify(signalReviewReport.execution_evidence?.required_gates?.gates) !== JSON.stringify(["review-ai-quality", "review-adversarial-risk"]) ||
+    JSON.stringify(signalReviewReport.execution_evidence?.required_gates?.observed_signals) !== JSON.stringify(["untrusted_input"]) ||
+    JSON.stringify(signalReviewReport.execution_evidence?.required_gates?.additional_gates) !== JSON.stringify(["review-adversarial-risk"]) ||
+    signalReviewReport.sensor_status !== "pass"
+  ) {
+    throw new Error(`review runner must bind observed signals, derived gates, and gate results\n${signalReviewResult.stdout}`);
   }
 
   const riskInvocationMarker = `${fakeCodex}.invocations`;
@@ -5243,64 +5339,85 @@ ${validEnvelopeBlock}
   const reviewPass = resolve(target, "review-pass.txt");
   writeFileSync(
     reviewPass,
-    `Change signals:
-- docs_output_change: docs output fixture changed
-
-Required gates:
-- review-output-quality: output contract review; triggered by docs_output_change
-
-Skipped heavy gates:
-- review-adversarial-risk: no security or misuse signal; changed file is docs-only
-
-Missing evidence:
-- none
-
-Decision:
-- approve with comments
-
-Blocking evidence:
-- none
-
-Passed required gates:
-- review-automated-gate - focused validation
-
-Insufficient evidence:
-- none
-
-Non-blocking follow-ups:
-- none
-
-Residual risk:
-- none
-${validEnvelopeBlock}
-`,
+    reviewFixture({
+      additionalGates: "- review-output-quality: status=pass; evidence=docs output fixture; signals=docs_output_change",
+    }),
   );
-  const reviewPassResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", reviewPass]);
+  const reviewPassResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", reviewPass, "--required-gate", "review-output-quality", "--observed-signal", "docs_output_change"]);
   assertRuntimePass("sensors review pass", reviewPassResult);
   if (!reviewPassResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`review contract fixture should pass sensors\n${reviewPassResult.stdout}`);
   }
 
+  const missingRequiredGate = resolve(target, "review-missing-required-gate.txt");
+  writeFileSync(missingRequiredGate, reviewFixture());
+  const missingRequiredGateResult = runRepoScript([
+    sensorsScript,
+    "--target", target,
+    "--mode", "review",
+    "--input", missingRequiredGate,
+    "--required-gate", "review-adversarial-risk",
+  ]);
+  assertRuntimePass("required additional gate without an observed signal is report-only fail", missingRequiredGateResult);
+  if (!missingRequiredGateResult.stdout.includes("ASK sensors: fail") || !missingRequiredGateResult.stdout.includes("do not match the canonical observed-signal route")) {
+    throw new Error(`a bare required gate with no result must fail review sensors\n${missingRequiredGateResult.stdout}`);
+  }
+
+  const mismatchedGateOutput = resolve(target, "review-mismatched-gate.txt");
+  writeFileSync(mismatchedGateOutput, reviewFixture({
+    additionalGates: "- review-adversarial-risk: status=pass; evidence=wrong route fixture; signals=docs_output_change",
+  }));
+  const mismatchedGateResult = runRepoScript([
+    sensorsScript,
+    "--target", target,
+    "--mode", "review",
+    "--input", mismatchedGateOutput,
+    "--required-gate", "review-output-quality",
+    "--observed-signal", "docs_output_change",
+  ]);
+  assertRuntimePass("untriggered additional gate result is report-only fail", mismatchedGateResult);
+  if (!mismatchedGateResult.stdout.includes("ASK sensors: fail") || !mismatchedGateResult.stdout.includes("order or selection is invalid")) {
+    throw new Error(`an untriggered or mismatched gate result must fail review sensors\n${mismatchedGateResult.stdout}`);
+  }
+
   const quotedLegacyReviewOutput = resolve(target, "quoted-legacy-review-output.txt");
   writeFileSync(
     quotedLegacyReviewOutput,
-    `Change signals:\n- docs_output_change: docs output fixture changed\n\nRequired gates:\n- review-output-quality: output contract review; triggered by docs_output_change\n\nSkipped heavy gates:\n- review-adversarial-risk: no security or misuse signal\n\nMissing evidence:\n- none\n\nDecision:\n- approve\n\nBlocking evidence:\n- none\n- The quoted legacy label is \"Layer summary:\" and must not be interpreted as a heading.\n\nPassed required gates:\n- review-output-quality - output contract checked\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- none\n\nResidual risk:\n- none\n\n\`\`\`text\nLayer summary:\n- legacy example inside a code fence\n\`\`\`\n\n${validEnvelopeBlock}`,
+    reviewFixture({
+      additionalGates: "- review-output-quality: status=pass; evidence=docs output fixture; signals=docs_output_change",
+      suffix: `The quoted legacy label is "Layer summary:" and must not be interpreted as a heading.
+
+\`\`\`text
+Layer summary:
+- legacy example inside a code fence
+\`\`\``,
+    }),
   );
-  const quotedLegacyReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", quotedLegacyReviewOutput]);
+  const quotedLegacyReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", quotedLegacyReviewOutput, "--required-gate", "review-output-quality", "--observed-signal", "docs_output_change"]);
   assertRuntimePass("quoted and fenced legacy heading is ignored", quotedLegacyReviewResult);
   if (!quotedLegacyReviewResult.stdout.includes("ASK sensors: pass")) {
-    throw new Error(`quoted/fenced legacy heading should not fail signal-first sensor\n${quotedLegacyReviewResult.stdout}`);
+    throw new Error(`quoted/fenced legacy heading should not fail the baseline-first sensor\n${quotedLegacyReviewResult.stdout}`);
   }
 
   const separatedReviewOutput = resolve(target, "separated-review-output.txt");
   writeFileSync(
     separatedReviewOutput,
-    `Change signals:\n- docs_output_change: output contract changed\n\nRequired gates:\n- review-output-quality: output contract review; triggered by docs_output_change\n\nSkipped heavy gates:\n- review-adversarial-risk: no security or misuse signal\n\nMissing evidence:\n- none\n\nDecision:\n- request changes\n\nBlocking evidence:\n- [major] review-output-quality - output contract is incomplete\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- IMP candidate: improve documentation example\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`,
+    reviewFixture({
+      additionalGates: "- review-output-quality: status=fail; evidence=output contract fixture; signals=docs_output_change",
+      findings: `- Finding ID: F-FIXTURE-001
+  Severity: major
+  Merge blocker: true
+  Practical impact: output consumers receive an incomplete contract
+  Trigger or failure trace: docs_output_change -> review-output-quality
+  Evidence location: fixture/output-contract
+  Required post-fix condition: complete the output contract`,
+      decision: "request changes",
+    }),
   );
-  const separatedReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", separatedReviewOutput]);
-  assertRuntimePass("review blocker and follow-up sections stay separate", separatedReviewResult);
+  const separatedReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", separatedReviewOutput, "--required-gate", "review-output-quality", "--required-gate", "review-final-merge-gate", "--observed-signal", "docs_output_change"]);
+  assertRuntimePass("review finding inventory and conditional decision", separatedReviewResult);
   if (!separatedReviewResult.stdout.includes("ASK sensors: pass")) {
-    throw new Error(`review blocker/follow-up separation fixture should pass sensors\n${separatedReviewResult.stdout}`);
+    throw new Error(`review finding inventory and requested decision should pass sensors\n${separatedReviewResult.stdout}`);
   }
 
   const legacyReviewOutput = resolve(target, "legacy-review-output.txt");
@@ -5311,7 +5428,7 @@ ${validEnvelopeBlock}
   const legacyReviewResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", legacyReviewOutput]);
   assertRuntimePass("legacy fixed layer summary is rejected", legacyReviewResult);
   if (!legacyReviewResult.stdout.includes("fixed layer summary contract")) {
-    throw new Error(`legacy review output should be rejected by the signal-first sensor\n${legacyReviewResult.stdout}`);
+    throw new Error(`legacy review output should be rejected by the baseline-first sensor\n${legacyReviewResult.stdout}`);
   }
 
   const claudeReviewCommand = readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/commands/skill-review.md"), "utf8");
@@ -5326,9 +5443,9 @@ ${validEnvelopeBlock}
   ];
   for (const adapterPath of distributedReviewAdapters) {
     const adapterText = readFileSync(resolve(repoRoot, adapterPath), "utf8");
-    for (const section of ["Change signals:", "Required gates:", "Skipped heavy gates:", "Missing evidence:"]) {
+    for (const section of ["Baseline review:", "Additional required gates:", "Missing evidence:", "Findings:"]) {
       if (!adapterText.includes(section)) {
-        throw new Error(`${adapterPath} must project the signal-first review route section: ${section}`);
+        throw new Error(`${adapterPath} must project the baseline-first review route section: ${section}`);
       }
     }
     const registryReference = adapterPath.startsWith("adapters/claude-code/plugin/")
@@ -5338,9 +5455,13 @@ ${validEnvelopeBlock}
       throw new Error(`${adapterPath} must reference the controlled signal registry: ${registryReference}`);
     }
   }
+  const claudeReviewFixture = reviewFixture({
+    additionalGates: "- review-automated-gate: status=pass; evidence=focused validation; signals=automated_evidence_required",
+    decision: "approve with comments",
+  });
   const claudeOutput = resolve(target, "claude-review-output.txt");
-  writeFileSync(claudeOutput, `Change signals:\n- verification: focused validation is available\n\nRequired gates:\n- review-automated-gate: regression evidence; triggered by verification\n\nSkipped heavy gates:\n- review-adversarial-risk: no security or misuse signal\n\nMissing evidence:\n- none\n\nDecision:\n- approve with comments\n\nBlocking evidence:\n- none\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- none\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`);
-  const claudeOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeOutput]);
+  writeFileSync(claudeOutput, claudeReviewFixture);
+  const claudeOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeOutput, "--required-gate", "review-automated-gate", "--required-gate", "review-final-merge-gate", "--observed-signal", "automated_evidence_required"]);
   assertRuntimePass("Claude adapter output smoke", claudeOutputResult);
   if (!claudeOutputResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`Claude adapter output smoke should pass shared envelope validation\n${claudeOutputResult.stdout}`);
@@ -5350,9 +5471,9 @@ ${validEnvelopeBlock}
   const claudePromptMatch = claudeGithubAction.match(/\n {10}prompt: \|\n([\s\S]*?)\n {10}claude_args:/);
   if (!claudePromptMatch) throw new Error("Claude GitHub Actions prompt block is missing");
   const claudePrompt = claudePromptMatch[1].split("\n").map((line) => line.startsWith("            ") ? line.slice(12) : line).join("\n");
-  for (const section of ["Change signals:", "Required gates:", "Skipped heavy gates:", "Missing evidence:"]) {
+  for (const section of ["Baseline review:", "Additional required gates:", "Missing evidence:", "Findings:"]) {
     if (!claudePrompt.includes(section)) {
-      throw new Error(`Claude GitHub Actions prompt must require the signal-first review route section: ${section}`);
+      throw new Error(`Claude GitHub Actions prompt must require the baseline-first review route section: ${section}`);
     }
   }
   const claudeActionEnvelope = inspectExecutionEnvelope(claudePrompt);
@@ -5363,8 +5484,8 @@ ${validEnvelopeBlock}
     throw new Error("Claude GitHub Actions adapter must require a fenced JSON Execution Envelope");
   }
   const claudeGithubOutput = resolve(target, "claude-github-action-output.txt");
-  writeFileSync(claudeGithubOutput, `Change signals:\n- verification: focused validation is available\n\nRequired gates:\n- review-automated-gate: regression evidence; triggered by verification\n\nSkipped heavy gates:\n- review-adversarial-risk: no security or misuse signal\n\nMissing evidence:\n- none\n\nDecision:\n- approve with comments\n\nBlocking evidence:\n- none\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- none\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`);
-  const claudeGithubOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeGithubOutput]);
+  writeFileSync(claudeGithubOutput, claudeReviewFixture);
+  const claudeGithubOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudeGithubOutput, "--required-gate", "review-automated-gate", "--required-gate", "review-final-merge-gate", "--observed-signal", "automated_evidence_required"]);
   assertRuntimePass("Claude GitHub Actions adapter output smoke", claudeGithubOutputResult);
   if (!claudeGithubOutputResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`Claude GitHub Actions adapter output smoke should pass shared envelope validation\n${claudeGithubOutputResult.stdout}`);
@@ -5375,8 +5496,8 @@ ${validEnvelopeBlock}
     throw new Error("Claude plugin review skill must require the shared fenced JSON Execution Envelope");
   }
   const claudePluginOutput = resolve(target, "claude-plugin-review-output.txt");
-  writeFileSync(claudePluginOutput, `Change signals:\n- verification: focused validation is available\n\nRequired gates:\n- review-automated-gate: regression evidence; triggered by verification\n\nSkipped heavy gates:\n- review-adversarial-risk: no security or misuse signal\n\nMissing evidence:\n- none\n\nDecision:\n- approve with comments\n\nBlocking evidence:\n- none\n\nPassed required gates:\n- review-automated-gate - focused validation\n\nInsufficient evidence:\n- none\n\nNon-blocking follow-ups:\n- none\n\nResidual risk:\n- none\n\n${validEnvelopeBlock}`);
-  const claudePluginOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudePluginOutput]);
+  writeFileSync(claudePluginOutput, claudeReviewFixture);
+  const claudePluginOutputResult = runRepoScript([sensorsScript, "--target", target, "--mode", "review", "--input", claudePluginOutput, "--required-gate", "review-automated-gate", "--required-gate", "review-final-merge-gate", "--observed-signal", "automated_evidence_required"]);
   assertRuntimePass("Claude plugin adapter output smoke", claudePluginOutputResult);
   if (!claudePluginOutputResult.stdout.includes("ASK sensors: pass")) {
     throw new Error(`Claude plugin adapter output smoke should pass shared envelope validation\n${claudePluginOutputResult.stdout}`);

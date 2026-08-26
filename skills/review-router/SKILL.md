@@ -1,132 +1,152 @@
 ---
 name: review-router
-description: Route a diff, PR, commit, patch, or generated code review from observed change signals to the smallest required review gates.
+description: Route an evaluative PR, diff, commit, patch, design artifact, or generated-code review through one mandatory baseline semantic review, exact-signal additional gates, and an optional final merge decision.
 ---
 
 # Review Router
 
 ## Goal
 
-Select the smallest set of review gates needed to make the merge decision defensible. Start from observed change signals, keep the normal route compact, and retain complete layer diagnostics only for validation or debugging.
+Require one ordinary semantic review result for every evaluative review request, add only evidence-triggered specialized gates, and leave final merge authority to the final gate.
 
 ## Use when
 
-- Reviewing a PR, diff, commit, patch, or generated code.
-- The review may involve tests, logic, maintainability, code health, domain behavior, architecture, output, risk, or evidence.
+- Reviewing a PR, diff, commit, patch, design artifact, or generated code.
+- A review request may need logic, design, compatibility, evidence, domain, architecture, output, adversarial, code-health, risk, ADR, release, or final-decision judgment.
 
 ## Do not use when
 
-- The user only asks for a non-evaluative summary.
-- No code, diff, design artifact, or review target is available.
-- A specific narrower review gate has already been requested and no routing decision is needed.
+- The user asks only for a non-evaluative summary.
+- A specific narrower gate was explicitly requested and no complete review route or final decision is needed.
+
+A missing concrete target is not a reason to skip this router. Record one baseline result as insufficient evidence and name the target evidence needed.
+
+## Canonical policy
+
+Read schemas/review-signal-gate-map.json. It owns:
+
+- the signal-independent baseline gate;
+- exact signal-selected additional gates;
+- the heavy-gate over-processing subset;
+- the requested-only final gate; and
+- the closed impact-ordered finding fields.
+
+Do not create another signal map in prose or in an adapter.
 
 ## Process
 
-1. Inspect the smallest evidence set that can expose review risk.
-   - changed files and diff;
-   - touched public interfaces, domain terms, generated/system-consumed output, tests, and verification commands;
-   - `docs/ai/review-context.md` and relevant docs/ADRs when available. Treat `context_status: template` as missing context and `stale` as insufficient evidence for affected claims;
-   - active ledgers only when their entries materially affect the target.
+1. Classify the request and target.
+   - If the request is evaluative, require exactly one logical review-ai-quality baseline result.
+   - Exactly one means one current gate result in route/evidence. Do not claim a physical invocation count without runtime evidence.
+   - If the target is absent, the baseline result is insufficient evidence.
 
-2. Extract observed change signals before choosing gates.
-   - Record a short signal and the evidence that made it observable, for example `public contract`, `domain meaning`, `generated output`, `untrusted input`, `maintainability`, or `verification`.
-   - Read `schemas/review-signal-gate-map.json` as the machine-readable signal registry. Use only its exact signal IDs and mapping. `evidence` is explanatory text only and never acts as a trigger ID.
-   - Do not infer a trigger from the existence of a review layer.
-   - If changed-file, diff, context, output, or verification evidence is unavailable, record that input under `Missing evidence` as `insufficient evidence`.
+2. Inspect the smallest applicable evidence set.
+   - target and changed files;
+   - diff or changed artifact;
+   - affected contracts and compatibility surface;
+   - relevant tests and automated evidence;
+   - affected output;
+   - repository context, docs, ADRs, and active ledgers;
+   - CI evidence when the requested judgment depends on it.
+   Missing applicable evidence stays insufficient evidence. Evidence that is not applicable to the concrete target is not required.
 
-3. Map signals to required gates.
-   - `review-domain-impact`: business rule, workflow responsibility, permission, notification, reporting meaning, state semantics, or generated business text.
-   - `review-architecture-impact`: public API/contract, dependency direction, persistence, state ownership, cross-module responsibility, infrastructure, lifecycle, coupling, or hard-to-reverse boundary.
-   - `review-output-quality`: UI, docs, reports, notifications, CLI output, API responses, generated text, AI-facing output, structured output, or consumer-facing wording.
-   - `review-adversarial-risk`: untrusted input, security/privacy impact, prompt or generated-output failure modes, critical workflow blast radius, misuse path, release-readiness risk, or safety-boundary uncertainty.
-   - `risk-gate`: destructive, external, auth, secret, production, dependency, migration, billing, email, or infrastructure action.
-   - `review-automated-gate`: merge confidence depends on lint, format, typecheck, build, test, static analysis, or CI evidence.
-   - `review-code-health`: the request or diff exposes debt, smell, duplication, dead code, maintainability, testability, performance, dependency/tooling, boundary weakness, or repeated finding risk.
-   - `review-ai-quality`: local design, logic, scope, and implementation-quality signals not covered by a specialized gate.
-   - `evidence-ledger`: `ask.claim-evidence-status@1.0.0` selects a formal audit because the review has multiple material claims, evaluates high-stakes merge/release/security/reliability/performance/cost/externally communicated readiness, synthesizes revisions, needs stable claim IDs, or the user explicitly requests it. Ordinary review claims stay inline.
-   - `review-final-merge-gate`: always last when a merge decision is requested.
-   - A route or gate decision trigger is valid only when every trigger ID is present in `change_signals[].signal` and the controlled mapping includes that gate. Unknown, mismatched, negated, or free-form evidence text does not justify a gate.
+3. Extract exact observed signals.
+   - Use only IDs in signal_to_gates.
+   - Evidence explains a signal but never acts as a trigger ID.
+   - Unknown, free-form, negated, or inferred-from-layer signals do not select a gate.
+   - automated_evidence_required selects review-automated-gate when a judgment depends on automated test/build/lint/typecheck/static-analysis/CI evidence.
 
-4. Apply the active adapter capability gate.
-   - When an adapter state is active, verify every selected gate and follow-up destination against `selected_skills`, not `installed_skills` or directory presence.
-   - Missing required review gates stop with `capability_missing`; do not approximate the missing review procedure.
-   - Missing knowledge follow-ups such as `review-finding-compiler` or `improvement-ledger` remain explicit candidates in the current review artifact, stop before promotion, and recommend the `organizational` profile or a closed override. They never affect the current merge blocker decision.
+4. Run the baseline semantic review first.
+   - review-ai-quality covers logic, local design, state/error boundaries, types/contracts, compatibility, observability, concurrency, performance signals, test adequacy, maintainability, and scope.
+   - Specialized signals discovered by baseline are routed; baseline does not decide domain, architecture, output, adversarial, risk, ADR, release, approval, or final merge questions.
+   - A missing baseline capability stops as capability_missing. Heavy gates never substitute for it.
 
-5. Order the route by decision impact.
-   - Domain and architecture signals precede technical review when applicable.
-   - Output and adversarial overlays run when their signals are observed.
-   - Automated evidence runs before the final merge gate.
-   - `review-finding-compiler` and `improvement-ledger` are knowledge-plane follow-ups only after an explicit promotion trigger identifies the destination, evidence boundary, owner, and stop condition; they never hide current-PR blockers and are never updated as a side effect of review completion.
+5. Select additional gates.
+   - Map exact observed signals through signal_to_gates.
+   - Deduplicate gates and order them by signal_selected_gates.
+   - Run no heavy gate merely because it exists or because the change is important.
+   - Apply the active adapter capability gate against selected_skills. Missing required capability remains explicit and blocks any dependent final judgment.
 
-6. Detect routing deviations.
-   - Under-processing: a required gate is absent from executed gate evidence.
-   - Over-processing: an executed heavy gate has no matching observed trigger signal.
-   - Missing-evidence deviation: unavailable inputs are represented as skipped or omitted instead of insufficient evidence.
-   - Heavy gates are `review-domain-impact`, `review-architecture-impact`, `review-output-quality`, `review-adversarial-risk`, `review-code-health`, `risk-gate`, `adr-review`, and `release-readiness-gate`.
+6. Compile one finding inventory.
+   - Follow ask.review-finding@1.0.0 in docs/review-finding-contract.md.
+   - Preserve unique Finding IDs across gates.
+   - Order merge blockers first, then blocker/major/minor/nit, then Finding ID in code-unit order.
+   - Category is metadata. Do not emit empty category sections.
 
-7. Keep the route minimal.
-   - Do not run a gate only because a layer exists.
-   - A skipped heavy gate must cite observed evidence or an observed signal showing why it is not applicable.
-   - The normal user-facing route does not enumerate unaffected layers.
-   - Use work terms in the user-facing route; keep gate names for traceability.
+7. Run review-final-merge-gate only when a final decision is explicitly requested.
+   - It runs after baseline and every required additional gate.
+   - Missing required gate evidence remains insufficient evidence.
+   - The router never approves.
+
+8. Detect deviations.
+   - Under-processing: the one baseline result or another required gate result is absent.
+   - Over-processing: an executed signal-selected gate has no mapped observed signal.
+   - Baseline is never over-processing because it is signal-independent.
+   - Final-gate overactivation: final gate ran without a final-decision request.
+   - Missing-evidence deviation: an unavailable applicable input was skipped, omitted, or treated as pass.
 
 ## Output
 
-Use the shared `Execution Envelope` from `docs/execution-envelope-contract.md` for route, evidence, stop reason, and next action. This review artifact owns signal-to-gate routing and does not repeat envelope fields.
+Use the shared Execution Envelope from docs/execution-envelope-contract.md for route/evidence/stop/next-action control. Ordinary user-facing review output contains only:
 
-```text
-Change signals:
-- signal: observed evidence
+~~~text
+Baseline review:
+- Gate: review-ai-quality
+- Status: pass | pass with comments | fail | insufficient evidence
+- Evidence: target and applicable evidence checked
 
-Required gates:
-- gate: reason; triggered by signal(s)
-
-Skipped heavy gates:
-- gate/layer: observed reason
+Additional required gates:
+- gate: status and exact triggering signal(s)
 
 Missing evidence:
-- input: why it is required and what remains unknown
+- input: affected judgment and next check
 
-Routing deviations:
-- Under-processing: gate — required but not executed
-- Over-processing: gate — executed without matching observed trigger signal
-```
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: optional metadata
 
-Use `- none` for empty sections. For validation or debugging only, append a `Diagnostic applicability` object with complete layer statuses (`required | skipped | insufficient evidence`), reasons, evidence, trigger signals, selected gate, and inputs still needed. That diagnostic object is not required in the normal route.
+Decision:
+- approve | approve with comments | request changes | block | insufficient evidence
+~~~
+
+Omit Decision when no final decision was requested. Use - none for an empty Additional required gates, Missing evidence, or Findings section. Do not emit Skipped heavy gates or empty category sections in ordinary output.
+
+For explicit validation/debug requests only, append Diagnostic applicability with complete gate states, skip reasons, missing inputs, trigger signals, under-processing, over-processing, and final-gate overactivation.
 
 ## Routing Decision
 
-- Decisive signals:
-- Reason for primary route:
-- Reason for each secondary route:
-- Intentionally skipped:
-- Risk overlay:
+- Decisive target/evidence:
+- Baseline result:
+- Additional exact-signal routes:
+- Final decision requested:
+- Capability or evidence gaps:
 - Uncertainty:
-
-## Optional Metrics Event Candidate
-
-Only when adoption metrics are explicitly enabled or requested, and the review reaches a meaningful durable state through the selected gates or final merge gate, include a `Metrics event candidate` following `docs/metrics-event-contract.md`. Route selection alone is not a durable task outcome.
 
 ## Exit criteria
 
-- Observed change signals are explicit before gates run.
-- Required gates are traceable to signals and reasons.
-- Missing inputs are reported as `insufficient evidence`, never silently as skipped.
-- Heavy gates skipped in the normal route have evidence-backed reasons.
-- Required-but-not-executed gates are reported as under-processing.
-- Executed heavy gates without matching observed trigger signals are reported as over-processing warnings.
-- Domain, architecture, output, adversarial, code-health, and risk signals route to their specialized gates rather than being hidden in generic review.
-- The route does not run every gate by default.
-- Final merge decisions are delegated to `review-final-merge-gate`.
-- Repeated or high-impact findings remain current-PR blockers until the final gate and are routed to durable follow-up only afterward.
+- Every evaluative request has exactly one logical baseline result or explicit baseline insufficient evidence.
+- Baseline is signal-independent and excluded from heavy/over-processing classification.
+- Every additional gate traces to an exact controlled signal.
+- No all-heavy default exists.
+- Missing applicable evidence is insufficient, never skipped or pass.
+- Findings follow the one closed impact-ordered inventory.
+- Ordinary output omits skipped-layer and empty-category boilerplate.
+- Final decisions are optional, last, and owned only by review-final-merge-gate.
 
 ## Failure modes
 
 | Failure | Correction |
 |---|---|
-| Treating every PR as needing every gate | Route by observed signals and risk. |
-| Approving from router output | Router selects gates; it does not approve. |
-| Missing hidden domain change | Check state, permissions, notifications, reports, and generated business text before technical gates. |
-| Skipping risk review because the diff is small | Route by possible impact, not diff size. |
-| Silently omitting a required gate | Trace every required gate to an observed signal before choosing gate order. |
-| Marking missing inputs as skipped | Add the input to `Missing evidence` and keep the affected judgment insufficient. |
+| Optional ordinary semantic review | Require exactly one review-ai-quality baseline result. |
+| Heavy gate substitutes for baseline | Stop for missing baseline capability or evidence. |
+| Free-form evidence selects a gate | Require an exact signal_to_gates ID. |
+| Every gate runs by default | Keep only baseline plus mapped additional gates. |
+| Missing target exits silently | Emit baseline insufficient evidence and the next required input. |
+| Category report hides impact | Compile one blocker/severity-ordered inventory. |
+| Router approves | Run review-final-merge-gate only when a decision was requested. |

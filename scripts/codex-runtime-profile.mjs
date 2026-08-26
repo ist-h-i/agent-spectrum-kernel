@@ -53,8 +53,8 @@ export const CODEX_COMPACT_PROFILE_DEFINITIONS = Object.freeze({
     profileId: "codex-review-compact-v1",
     taskClass: "review",
     primarySkill: "review-router",
-    requestedContracts: ["review-router", "review-final-merge-gate", "risk-gate"],
-    canonicalSources: ["docs/lifecycle-traceability-contract.md", "schemas/review-signal-gate-map.json", "skills/review-router/SKILL.md", "skills/review-final-merge-gate/SKILL.md"],
+    requestedContracts: ["review-router", "review-ai-quality", "review-final-merge-gate", "risk-gate"],
+    canonicalSources: ["docs/lifecycle-traceability-contract.md", "docs/review-finding-contract.md", "schemas/review-signal-gate-map.json", "schemas/review-finding.schema.json", "skills/review-router/SKILL.md", "skills/review-ai-quality/SKILL.md", "skills/review-final-merge-gate/SKILL.md"],
   }),
   "skill-verify.md": Object.freeze({
     profileId: "codex-verification-compact-v1",
@@ -160,7 +160,7 @@ function renderControl(controlId, control) {
   if (controlId === "scope") return "[scope] Repo/code/tests/docs/API; missing => stop/insufficient_evidence; smallest diff; no cleanup.";
   if (controlId === "verification") return `[verification] Before behavior change: ${control.proof_policy_ref} selects ${VERIFICATION_PROOF_PATHS.join("|")}; focused then risk-based checks; exact results; compact=>formal on trigger.`;
   if (controlId === "risk_approval") return "[risk_approval] Exact action/risk/impact/reversibility/visibility; alternative/preconditions. Stop without approval for that specific action; execute only it.";
-  if (controlId === "evidence") return `[evidence] ${canonicalClaimEvidenceStatuses().join("/")} (${control.contract_ref}); inline; formal[audit|multi-claim|high-stakes|cross-revision|stable-IDs]=>evidence-ledger; unsupported=>downgrade.`;
+  if (controlId === "evidence") return `[evidence] ${canonicalClaimEvidenceStatuses().join("/")} (${control.contract_ref}); inline; formal[audit|multi-claim|high-stakes|cross|stable-ID]=>evidence-ledger; unsupported=>downgrade.`;
   if (controlId === "missing_evidence") return "[missing_evidence] unavailable/insufficient_evidence; no inference; required => stop.";
   if (controlId === "output") return "[output] Managed runner owns the record: ordinary=>sidecar; stop/handoff=>inline; diagnostic only explicit. Unmanaged=>one inline. next_action only there.";
   throw new Error(`compact control has no renderer: ${controlId}`);

@@ -88,6 +88,8 @@ Review architecture impact from repository evidence, not preference. A finding n
 
 ## Output
 
+Actionable architecture findings follow `ask.review-finding@1.0.0` in `docs/review-finding-contract.md` and join the one impact-ordered review inventory.
+
 ```text
 Architecture impact gate:
 - Gate status: pass | pass with comments | fail | insufficient evidence
@@ -100,10 +102,14 @@ Architecture impact gate:
 - ADR needed: yes | no | update | supersede
 
 Findings:
-- [severity] file:line - issue
-  Evidence:
-  Impact:
-  Required fix:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: architecture
 
 Routed signals:
 - Application boundary:
@@ -124,7 +130,7 @@ Residual architecture risk:
 - ADR need is detected without treating ADR recording as the architecture review itself.
 - Active architecture decision memory is used only by evidence status and never replaces ADRs.
 - Domain, risk, evidence, and local quality signals are routed instead of folded into this gate.
-- Each blocking or major architecture issue has evidence, impact, and a required fix.
+- Each actionable architecture issue uses the closed common finding fields and impact order.
 - Final merge decision is left to `review-final-merge-gate`.
 
 ## Failure modes

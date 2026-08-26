@@ -350,10 +350,21 @@ const REVIEW_SIGNAL_GATE_REQUIREMENTS = {
   "review-output-quality": ["ui_change", "docs_output_change", "report_output_change", "notification_output_change", "cli_output_change", "api_response_change", "generated_text_change", "generated_output_change", "ai_output_change", "ai_facing_output_change", "structured_output_change", "consumer_facing_wording_change"],
   "review-adversarial-risk": ["untrusted_input", "security_impact", "privacy_impact", "prompt_failure_mode", "generated_output_failure_mode", "critical_workflow_blast_radius", "misuse_path", "release_readiness_risk", "safety_boundary_uncertainty"],
   "review-code-health": ["technical_debt", "code_smell", "duplication", "dead_code", "maintainability_risk", "testability_risk", "performance_risk", "dependency_tooling_risk", "boundary_weakness", "repeated_finding"],
+  "review-automated-gate": ["automated_evidence_required"],
   "risk-gate": ["destructive_action", "external_effect", "auth_change", "secret_change", "production_change", "dependency_change", "migration_change", "billing_change", "email_change", "infrastructure_change", "deployment_change"],
   "adr-review": ["architecture_decision", "hard_to_reverse_boundary"],
   "release-readiness-gate": ["release_readiness", "release_candidate"],
 };
+const REVIEW_HEAVY_GATES = [
+  "review-domain-impact",
+  "review-architecture-impact",
+  "review-output-quality",
+  "review-adversarial-risk",
+  "review-code-health",
+  "risk-gate",
+  "adr-review",
+  "release-readiness-gate",
+];
 const EXECUTION_ENVELOPE_SESSION_STATE_PATH = "docs/agent-session-state-contract.md";
 const EXECUTION_ENVELOPE_SKILL_PATHS = [
   "skills/operating-mode-router/SKILL.md",
@@ -3219,7 +3230,7 @@ function validateReviewSignalRegistry(root, manifest, errors) {
   const path = "schemas/review-signal-gate-map.json";
   const absolutePath = resolve(root, path);
   const active = manifest?.name === "agent-spectrum-kernel";
-  const checks = { active, present: existsSync(absolutePath), schemaListed: manifest?.schemas?.includes(path) === true, gates: false, signals: false, coverage: false, pluginProjection: false };
+  const checks = { active, present: existsSync(absolutePath), schemaListed: manifest?.schemas?.includes(path) === true, baseline: false, final: false, gates: false, heavyGates: false, signals: false, coverage: false, findings: false, pluginProjection: false };
   if (!active) {
     return checks;
   }
@@ -3237,14 +3248,41 @@ function validateReviewSignalRegistry(root, manifest, errors) {
     fail(errors, "review signal registry", `${path} is not valid JSON: ${error.message}`);
     return checks;
   }
+  const baseline = registry.baseline_gate;
+  checks.baseline = registry.registry_version === 2
+    && baseline?.gate === "review-ai-quality"
+    && baseline?.required_when === "evaluative_review_requested"
+    && baseline?.result_cardinality === "exactly_one"
+    && baseline?.missing_target_status === "insufficient_evidence"
+    && baseline?.signal_independent === true;
+  if (!checks.baseline) {
+    fail(errors, "review signal registry", `${path}.baseline_gate must define the signal-independent exactly-one review-ai-quality result`);
+  }
+  const finalGate = registry.final_gate;
+  checks.final = finalGate?.gate === "review-final-merge-gate"
+    && finalGate?.required_when === "final_decision_requested"
+    && finalGate?.must_run_last === true;
+  if (!checks.final) {
+    fail(errors, "review signal registry", `${path}.final_gate must define the requested-only final review decision`);
+  }
+  const selectedGates = Array.isArray(registry.signal_selected_gates) ? registry.signal_selected_gates : [];
   const heavyGates = Array.isArray(registry.heavy_gates) ? registry.heavy_gates : [];
   const signalToGates = registry.signal_to_gates && typeof registry.signal_to_gates === "object" ? registry.signal_to_gates : {};
-  checks.gates = heavyGates.length === Object.keys(REVIEW_SIGNAL_GATE_REQUIREMENTS).length
-    && heavyGates.every((gate) => Object.hasOwn(REVIEW_SIGNAL_GATE_REQUIREMENTS, gate));
+  checks.gates = selectedGates.length === Object.keys(REVIEW_SIGNAL_GATE_REQUIREMENTS).length
+    && new Set(selectedGates).size === selectedGates.length
+    && selectedGates.every((gate) => Object.hasOwn(REVIEW_SIGNAL_GATE_REQUIREMENTS, gate))
+    && !selectedGates.includes("review-ai-quality")
+    && !selectedGates.includes("review-final-merge-gate");
   if (!checks.gates) {
-    fail(errors, "review signal registry", `${path}.heavy_gates must contain the canonical heavy gate set`);
+    fail(errors, "review signal registry", `${path}.signal_selected_gates must contain the canonical additional gate set`);
   }
-  checks.signals = Object.entries(signalToGates).every(([signal, gates]) => typeof signal === "string" && signal.length > 0 && Array.isArray(gates) && gates.length > 0 && gates.every((gate) => heavyGates.includes(gate)));
+  checks.heavyGates = JSON.stringify(heavyGates) === JSON.stringify(REVIEW_HEAVY_GATES)
+    && heavyGates.every((gate) => selectedGates.includes(gate))
+    && !heavyGates.includes("review-ai-quality");
+  if (!checks.heavyGates) {
+    fail(errors, "review signal registry", `${path}.heavy_gates must preserve the canonical over-processing subset`);
+  }
+  checks.signals = Object.entries(signalToGates).every(([signal, gates]) => typeof signal === "string" && signal.length > 0 && Array.isArray(gates) && gates.length > 0 && gates.every((gate) => selectedGates.includes(gate)));
   if (!checks.signals) {
     fail(errors, "review signal registry", `${path}.signal_to_gates contains an empty, unknown, or invalid mapping`);
   }
@@ -3252,6 +3290,15 @@ function validateReviewSignalRegistry(root, manifest, errors) {
   checks.coverage = missingCoverage.length === 0;
   if (!checks.coverage) {
     fail(errors, "review signal registry", `${path} is missing router trigger coverage: ${missingCoverage.join(", ")}`);
+  }
+  const findingContract = registry.finding_contract;
+  checks.findings = JSON.stringify(findingContract?.required_fields) === JSON.stringify(["finding_id", "severity", "merge_blocker", "practical_impact", "trigger_or_failure_trace", "evidence_location", "required_post_fix_condition"])
+    && JSON.stringify(findingContract?.optional_fields) === JSON.stringify(["category"])
+    && JSON.stringify(findingContract?.severity_order) === JSON.stringify(["blocker", "major", "minor", "nit"])
+    && JSON.stringify(findingContract?.impact_order) === JSON.stringify(["merge_blocker_true_first", "severity_order", "finding_id_code_unit"])
+    && findingContract?.omit_empty_category_sections === true;
+  if (!checks.findings) {
+    fail(errors, "review signal registry", `${path}.finding_contract must preserve the closed impact-ordered finding contract`);
   }
   const pluginPath = "adapters/claude-code/plugin/contracts/review-signal-gate-map.json";
   const pluginAbsolutePath = resolve(root, pluginPath);
@@ -5728,7 +5775,7 @@ function buildReport({ manifest, skillDirectories, skillGroupChecks, planeChecks
       ? `- Stale skill-count references found above: ${staleSkillCountFindings.length}.`
       : "- No stale skill-count references found.",
     "- No deleted legacy code-review adapter references found.",
-    "- Review route references use the current signal-first route through `review-router`, observed change signals, required gates, and `review-final-merge-gate`.",
+    "- Review route references use one signal-independent `review-ai-quality` baseline, exact-signal additional gates, one finding inventory, and requested-only last `review-final-merge-gate` authority.",
     "- Implementation route references use Verification Contract, Implementation Contract, `controlled-implementation`, and evidence-oriented verification wording.",
     "- Operating mode routing, skill group metadata, adoption workflows, observability metrics, and operation reporting are represented as separate layers.",
     "- Project overlay, stack overlay, review context, implementation context, and task progress terminology is explicitly separated in maintained auxiliary docs.",

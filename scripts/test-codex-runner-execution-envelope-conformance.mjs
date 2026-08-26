@@ -79,26 +79,24 @@ Evidence:
     prompt: "skill-review.md",
     mode: "review",
     emission: "sidecar",
-    response: `Change signals:
-- signal: isolated fixture
-Required gates:
-- review-final-merge-gate: fixture
-Skipped heavy gates:
+    finalDecision: true,
+    gatesObserved: true,
+    response: `Baseline review:
+- Gate: review-ai-quality
+- Status: pass
+- Evidence: isolated fixture
+
+Additional required gates:
 - none
+
 Missing evidence:
 - none
+
+Findings:
+- none
+
 Decision:
 - approve
-Blocking evidence:
-- none
-Passed required gates:
-- review-final-merge-gate: fixture
-Insufficient evidence:
-- none
-Non-blocking follow-ups:
-- none
-Residual risk:
-- none
 `,
   },
   {
@@ -182,7 +180,7 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     const resultPath = resolve(target, `.fixture-${fixture.mode}.json`);
     const outputRelative = `.agents/runs/conformance-${fixture.mode}.md`;
     writeFileSync(resultPath, `${JSON.stringify(structuredResult(fixture.response), null, 2)}\n`);
-    const result = runNode([
+    const runnerArgs = [
       runner,
       "--target", target,
       "--prompt", fixture.prompt,
@@ -190,7 +188,10 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
       "--codex-bin", fakeCodex,
       "--output", outputRelative,
       "--json",
-    ], { cwd: target, env: { ASK_FAKE_RESULT_PATH: resultPath } });
+    ];
+    if (fixture.gatesObserved) runnerArgs.push("--gates-observed");
+    if (fixture.finalDecision) runnerArgs.push("--final-decision");
+    const result = runNode(runnerArgs, { cwd: target, env: { ASK_FAKE_RESULT_PATH: resultPath } });
     assertPass(`${fixture.mode} managed runner`, result);
     const report = JSON.parse(result.stdout);
     const output = readFileSync(resolve(target, outputRelative), "utf8");

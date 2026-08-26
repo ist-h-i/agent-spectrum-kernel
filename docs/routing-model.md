@@ -64,7 +64,7 @@ Users do not need to know skill names to start work. The default surface is a sm
 | User-facing intent | Example request | Selected work mode | Internal route family |
 |---|---|---|---|
 | 進める / proceed with this ticket or task | このチケットを進めて | 要件確認 / 実装準備 / 実装 | requirement, work package, implementation |
-| レビューする / review a PR, diff, design, or output | このPRをレビューして | レビュー | review-router and required gates |
+| レビューする / review a PR, diff, design, or output | このPRをレビューして | レビュー | review-router, mandatory baseline, and exact-signal additional gates |
 | 調べる / investigate a bug, regression, or uncertainty | このバグを調べて | 調査 | doubt-driven-development and verification |
 | 詰める / refine requirement, design, architecture, or decision | この設計を詰めて | 要件確認 / 設計 | requirement, design, architecture |
 | 作業化する / convert to agent-ready work | Codexに渡せる形にして | 実装準備 | work-package |

@@ -23,9 +23,9 @@ const SCENARIO_REQUIREMENTS = Object.freeze({
   localized_implementation: { taskClass: "implementation", contracts: ["controlled-implementation", "test-first-verification"], gates: [] },
   new_behavior_with_verification: { taskClass: "implementation", contracts: ["controlled-implementation", "test-first-verification"], gates: [] },
   unknown_root_cause_investigation: { taskClass: "investigation", contracts: ["doubt-driven-development", "test-first-verification"], gates: [] },
-  pr_review_selective_gates: { taskClass: "review", contracts: ["review-router", "review-final-merge-gate", "evidence-ledger"], gates: ["review-router", "review-final-merge-gate"] },
+  pr_review_selective_gates: { taskClass: "review", contracts: ["review-router", "review-ai-quality", "review-final-merge-gate", "evidence-ledger"], gates: ["review-router", "review-ai-quality", "review-final-merge-gate"] },
   destructive_external_action: { taskClass: "risk-gated", contracts: ["risk-gate", "evidence-ledger"], gates: ["risk-gate"] },
-  missing_repository_diff_test_evidence: { taskClass: "review", contracts: ["review-router"], gates: ["review-router"] },
+  missing_repository_diff_test_evidence: { taskClass: "review", contracts: ["review-router", "review-ai-quality"], gates: ["review-router", "review-ai-quality"] },
   handoff_resume_state: { taskClass: "handoff", contracts: ["handoff-generation"], gates: [] },
   explicit_knowledge_promotion: { taskClass: "knowledge", contracts: ["operating-mode-router", "domain-rule-ledger", "evidence-ledger"], gates: [] },
   lightweight_no_heavy_routing_or_agents: { taskClass: "implementation", contracts: ["controlled-implementation"], gates: [] },
@@ -168,7 +168,7 @@ function projectionSemantics(adapterId, content) {
     ? header?.requested_contracts ?? []
     : [...content.matchAll(/(?:^|[\s`])\/([a-z][a-z0-9-]*)/gmu)].map((match) => match[1]);
   const formalLedgerConditional = adapterId === "codex"
-    ? /ask\.claim-evidence-status@1\.0\.0.*inline.*formal\[audit\|multi-claim\|high-stakes\|cross-revision\|stable-IDs\]=>evidence-ledger/iu.test(content)
+    ? /ask\.claim-evidence-status@1\.0\.0.*inline.*formal\[audit\|multi-claim\|high-stakes\|cross\|stable-ID\]=>evidence-ledger/iu.test(content)
     : /ask\.claim-evidence-status@1\.0\.0[\s\S]{0,240}\/evidence-ledger[\s\S]{0,160}(?:only when|stable_claim_ids)[\s\S]{0,120}formal_ledger|\/evidence-ledger[\s\S]{0,160}(?:only when|stable_claim_ids)[\s\S]{0,120}formal_ledger/iu.test(content);
   const formalLedgerReferenced = canonicalReferences.includes("evidence-ledger") || formalLedgerConditional;
   const formalLedgerUnconditional = canonicalReferences.includes("evidence-ledger") && !formalLedgerConditional;
@@ -184,7 +184,7 @@ function projectionSemantics(adapterId, content) {
     controlIds,
     approvalSpecificAction: /approval for (?:that|the) specific action|specific-action approval/iu.test(content),
     stopWithoutApproval: /stop without (?:that )?approval|stop without approval for that specific action/iu.test(content),
-    missingEvidenceStop: lines.some((line) => /required evidence is missing.*insufficient_evidence.*stop/iu.test(line) || /\[missing_evidence\].*(?:stop if required|required => stop)/iu.test(line)),
+    missingEvidenceStop: lines.some((line) => /required evidence is missing.*insufficient_evidence.*stop/iu.test(line) || /missing applicable.*insufficient_evidence/iu.test(line) || /\[missing_evidence\].*(?:stop if required|required => stop)/iu.test(line)),
     noImplicitAgentActivity: /do not start or delegate agents unless the request explicitly requires agent activity|\[agent_activity\] opt-in; S\/C\/F counts/iu.test(content),
     verificationProofPolicyRef,
     verificationProofPaths,
@@ -192,6 +192,10 @@ function projectionSemantics(adapterId, content) {
       && verificationProofPolicyRef === VERIFICATION_PROOF_POLICY_REF
       && VERIFICATION_PROOF_PATHS.every((path) => verificationProofPaths.includes(path))
       && (adapterId === "claude_code" ? /Compact Proof|Verification Contract|verify the observable behavior/iu.test(content) : controlIds.includes("verification") && /\[verification\].*behavior change.*exact results/iu.test(content)),
+    baselineSemantic: contracts.includes("review-ai-quality") && /produce exactly one (?:\/)?review-ai-quality baseline result/iu.test(content),
+    reviewFindingSemantic: /one impact-ordered (?:finding|Findings) inventory/iu.test(content)
+      && ["Finding ID:", "Severity:", "Merge blocker:", "Practical impact:", "Trigger or failure trace:", "Evidence location:", "Required post-fix condition:"].every((field) => content.includes(field)),
+    reviewFinalConditional: /(?:run review-final-merge-gate last only when|append Decision only when|only when review-final-merge-gate is runner-required)/iu.test(content),
     reviewFinalGate: contracts.includes("review-final-merge-gate") && /final.merge.gate|Decision:/iu.test(content),
     handoffExecutable: contracts.includes("handoff-generation") && /handoff must be executable|\[handoff\] executable state/iu.test(content),
     knowledgePromotion: contracts.includes("operating-mode-router") && contracts.includes("domain-rule-ledger") && /explicit knowledge.promotion|\[knowledge_promotion\]/iu.test(content),
@@ -205,6 +209,9 @@ function semanticsForResult(content, adapterId, scenario) {
   if (!semantics.formalLedgerConditional) mismatches.push("formal_ledger_conditional_route");
   if (semantics.formalLedgerUnconditional) mismatches.push("formal_ledger_overactivated");
   if (selectClaimEvidenceMode(scenario.input.formal_evidence_trigger_ids) === "formal_ledger" && !semantics.formalLedgerReferenced) mismatches.push("formal_ledger_required");
+  if (scenario.task_class === "review" && !semantics.baselineSemantic) mismatches.push("baseline_semantic_review_required");
+  if (scenario.task_class === "review" && !semantics.reviewFindingSemantic) mismatches.push("review_finding_contract_required");
+  if (scenario.task_class === "review" && !semantics.reviewFinalConditional) mismatches.push("review_final_gate_must_be_conditional");
   const projection = scenario.projections[adapterId];
   if (projection.verification_proof_policy_ref !== null && semantics.verificationProofPolicyRef !== projection.verification_proof_policy_ref) mismatches.push("verification_proof_policy_ref");
   const missingProofPaths = projection.verification_proof_policy_ref === null

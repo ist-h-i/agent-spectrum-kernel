@@ -21,6 +21,9 @@ jobs:
       - name: Run repository validation tests
         run: node scripts/test-validate-repo.mjs
 
+      - name: Run baseline semantic review route contract tests
+        run: node scripts/test-review-route.mjs
+
       - name: Run Execution Envelope record contract tests
         run: node scripts/test-execution-envelope-record.mjs
 

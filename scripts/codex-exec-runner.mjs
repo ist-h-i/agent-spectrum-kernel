@@ -4,7 +4,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSyn
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
+import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, deriveReviewSignalGateRoute, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, parseCodexCompactProfileHeader, readReviewSignalGateMap } from "./ask-shared.mjs";
 import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
 import { buildExecutionEnvelopeRecord, hasExecutionEnvelopeMarker, inspectExecutionEnvelopeRecordEmission, renderExecutionEnvelopeProjection, selectExecutionEnvelopeEmission, validateExecutionEnvelope, validateExecutionEnvelopeRecord, validateJsonSchema } from "./execution-envelope.mjs";
 import { resolveGitDirectory, resolveObservabilityPath } from "./observability-paths.mjs";
@@ -54,7 +54,9 @@ function parseArgs(argv) {
     codexBin: "codex",
     diffBase: "",
     explicitRequiredGates: [],
+    observedSignals: [],
     gatesObserved: false,
+    finalDecision: false,
     dryRun: false,
     diagnosticEnvelope: false,
     json: false,
@@ -77,8 +79,12 @@ function parseArgs(argv) {
       args.diffBase = argv[++index];
     } else if (arg === "--required-gate") {
       args.explicitRequiredGates.push(argv[++index]);
+    } else if (arg === "--observed-signal") {
+      args.observedSignals.push(argv[++index]);
     } else if (arg === "--gates-observed") {
       args.gatesObserved = true;
+    } else if (arg === "--final-decision") {
+      args.finalDecision = true;
     } else if (arg === "--dry-run") {
       args.dryRun = true;
     } else if (arg === "--diagnostic-envelope") {
@@ -97,16 +103,35 @@ function parseArgs(argv) {
   if (args.mode && args.mode !== profile.mode) throw new Error(`prompt/mode mismatch: ${args.prompt} requires ${profile.mode}`);
   if (args.sandbox && args.sandbox !== profile.sandbox) throw new Error(`prompt/sandbox mismatch: ${args.prompt} requires ${profile.sandbox}`);
   if (args.explicitRequiredGates.some((gate) => typeof gate !== "string" || !/^[a-z0-9][a-z0-9-]*$/u.test(gate))) throw new Error("--required-gate must be a controlled identifier");
+  if (args.explicitRequiredGates.includes("review-final-merge-gate")) throw new Error("use --final-decision instead of --required-gate review-final-merge-gate");
   args.mode = profile.mode;
   args.sandbox = profile.sandbox;
+  if (args.finalDecision && args.mode !== "review") throw new Error("--final-decision requires the review entry");
   args.explicitRequiredGates = [...new Set(args.explicitRequiredGates)].sort();
-  args.requiredGates = [...new Set([...(profile.requiredGates ?? []), ...args.explicitRequiredGates])].sort();
-  args.gateEvidenceLevel = args.explicitRequiredGates.length > 0 || args.gatesObserved
-    ? "runtime_detected"
-    : (profile.requiredGates ?? []).length > 0
-      ? "projected"
-      : "none";
-  args.gatesObserved = args.gatesObserved || args.requiredGates.length > 0;
+  args.additionalRequiredGates = [];
+  args.reviewSignalsByGate = {};
+  if (args.mode === "review") {
+    if (args.explicitRequiredGates.length > 0) throw new Error("review --required-gate is forbidden; pass exact --observed-signal values and let the canonical registry derive additional gates");
+    if (args.gatesObserved && args.observedSignals.length > 0) throw new Error("--gates-observed means no additional review signal; do not combine it with --observed-signal");
+    const route = deriveReviewSignalGateRoute(readReviewSignalGateMap(args.target), args.observedSignals);
+    if (route.issues.length > 0) throw new Error(`review signal selection is invalid: ${route.issues.join(", ")}`);
+    args.observedSignals = route.observed_signals;
+    args.additionalRequiredGates = route.additional_gates;
+    args.reviewSignalsByGate = route.signals_by_gate;
+    const finalGate = args.finalDecision ? [profile.conditionalGates?.finalDecision].filter(Boolean) : [];
+    args.requiredGates = [...(profile.requiredGates ?? []), ...args.additionalRequiredGates, ...finalGate];
+    args.gatesObserved = args.gatesObserved || args.observedSignals.length > 0;
+    args.gateEvidenceLevel = args.gatesObserved ? "runtime_detected" : (profile.requiredGates ?? []).length > 0 ? "projected" : "none";
+  } else {
+    if (args.observedSignals.length > 0) throw new Error("--observed-signal requires the review entry");
+    args.requiredGates = [...new Set([...(profile.requiredGates ?? []), ...args.explicitRequiredGates])].sort();
+    args.gatesObserved = args.gatesObserved || args.explicitRequiredGates.length > 0;
+    args.gateEvidenceLevel = args.explicitRequiredGates.length > 0 || args.gatesObserved
+      ? "runtime_detected"
+      : (profile.requiredGates ?? []).length > 0
+        ? "projected"
+        : "none";
+  }
   return args;
 }
 
@@ -121,8 +146,10 @@ Options:
   --output <path>       Output file inside target. Defaults to .agents/runs/codex-last-output.md.
   --codex-bin <path>    Codex executable. Defaults to codex.
   --diff-base <rev>     Optional git diff range for review context, for example origin/main...HEAD.
-  --required-gate <id>  Task-specific required gate. Repeat for multiple gates.
-  --gates-observed      Record that task gate classification ran and found no additional gate.
+  --required-gate <id>  Non-review task-specific required gate. Repeat for multiple gates.
+  --observed-signal <id> Review only: exact controlled signal. Repeat as observed.
+  --gates-observed      Record that classification ran and found no additional review signal/gate.
+  --final-decision      Review only: request review-final-merge-gate after baseline and additional gates.
   --dry-run             Run preflight and print the codex command without invoking Codex.
   --diagnostic-envelope Explicitly serialize the validated record for route/debug diagnosis.
   --json                Print machine-readable result JSON.
@@ -279,6 +306,13 @@ function gitDiffContext(args) {
 
 function buildPrompt(args, state, promptPath, compactProfile) {
   const prompt = readFileSync(promptPath, "utf8");
+  const reviewSignalObservation = args.mode !== "review"
+    ? "not applicable"
+    : !args.gatesObserved
+      ? "unobserved"
+      : args.observedSignals.length > 0
+        ? args.observedSignals.join(", ")
+        : "none";
   const context = [
     "Repository context:",
     `- Codex profile: ${state?.selected_profile ?? "unknown"}`,
@@ -288,6 +322,13 @@ function buildPrompt(args, state, promptPath, compactProfile) {
     `- Runner mode: ${args.mode}`,
     `- Sandbox: ${args.sandbox}`,
     `- Required gates: ${args.gatesObserved ? args.requiredGates.join(", ") || "none" : "unobserved"}`,
+    `- Review signal observation: ${reviewSignalObservation}`,
+    `- Derived additional review gates: ${args.mode === "review" ? args.additionalRequiredGates.join(", ") || "none" : "not applicable"}`,
+    ...(args.mode === "review" ? [
+      `- Baseline review gate: ${(CODEX_PROMPT_CONTRACTS[args.prompt]?.requiredGates ?? []).join(", ") || "none"}`,
+      `- Final review gate requested: ${args.finalDecision ? CODEX_PROMPT_CONTRACTS[args.prompt]?.conditionalGates?.finalDecision ?? "none" : "none"}`,
+      "- For each derived additional gate, emit exactly: - <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<text>; signals=<comma-separated exact signal IDs>",
+    ] : []),
     "Evidence boundary: file projection and sensors do not prove business correctness.",
     "Managed runner result boundary:",
     "- Return only the JSON object required by scripts/codex-runner-result.schema.json.",
@@ -474,7 +515,11 @@ function persistEnvelopeRecord(args, record) {
 }
 
 function runSensors(args, outputPath, recordPath) {
-  const result = spawnSync(process.execPath, ["scripts/ask-sensors.mjs", "--target", args.target, "--mode", args.mode, "--input", outputPath, "--envelope-record", recordPath], {
+  const sensorArgs = ["scripts/ask-sensors.mjs", "--target", args.target, "--mode", args.mode, "--input", outputPath, "--envelope-record", recordPath];
+  for (const gate of args.requiredGates) sensorArgs.push("--required-gate", gate);
+  for (const signal of args.observedSignals) sensorArgs.push("--observed-signal", signal);
+  if (args.diagnosticEnvelope) sensorArgs.push("--diagnostic");
+  const result = spawnSync(process.execPath, sensorArgs, {
     cwd: args.target,
     encoding: "utf8",
     maxBuffer: 5 * 1024 * 1024,
@@ -647,16 +692,22 @@ try {
       required_gates: {
         evidence_level: preflightPassed ? args.gateEvidenceLevel : "none",
         gates: args.requiredGates,
+        observed_signals: args.observedSignals,
+        additional_gates: args.additionalRequiredGates,
         missing_evidence: [
           ...(!preflightPassed || !args.gatesObserved ? ["required_gate_observation"] : []),
           ...(approvalBlocked ? ["specific_action_approval"] : []),
           ...preflightResult.capabilityMissing.map((capability) => `capability:${capability}`),
         ],
         detail: !args.gatesObserved
-          ? "Task-specific required-gate classification was not observed."
+          ? "Task-specific required-gate classification was not observed; baseline and conditional final gates do not substitute for that observation."
           : approvalBlocked
             ? "risk-gate is required and specific-action approval is not available."
-            : "Required gates were derived from the managed prompt contract or explicit task classification.",
+            : args.mode === "review"
+              ? args.observedSignals.length > 0
+                ? "Additional review gates were derived from exact observed signals in the canonical registry."
+                : "Review classification was observed and found no signal-selected additional gate."
+              : "Required gates were derived from the managed prompt contract or explicit task classification.",
       },
       projected_contracts: {
         evidence_level: preflightPassed ? "projected" : "none",

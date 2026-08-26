@@ -345,8 +345,8 @@ doubt-driven-development を使って、最初の仮説に飛びつかず、反�
 
 ```text
 review-router
+review-ai-quality（必須baseline）
 review-automated-gate
-review-ai-quality
 review-architecture-impact if needed
 review-output-quality if needed
 review-adversarial-risk if needed
@@ -354,16 +354,16 @@ review-domain-impact if needed
 adr-review if needed
 risk-gate if needed
 evidence-ledger only for a closed formal-audit trigger
-review-final-merge-gate
+review-final-merge-gate if a final merge decision is requested
 ```
 
 例:
 
 ```text
-review-router を使ってこのdiffの Change signals を抽出し、必要ゲートを選んでください。必要なレビュー後に review-final-merge-gate で approve/request changes/block の判断を出してください。
+review-router を使ってこのdiffをレビューしてください。必ず1件のreview-ai-quality baselineを出し、観測した正確なsignal IDから必要な追加gateだけを選んでください。merge判断も必要なので、最後にreview-final-merge-gateでapprove/request changes/blockを判断してください。
 ```
 
-`review-router` は、まず観測した Change signals を抽出し、そこから Required gates を選びます。通常出力では影響のない層を列挙せず、重いゲートをスキップした場合だけ観測根拠を残します。diff・context・output・verification が不足している場合は skipped ではなく `insufficient evidence` とします。完全な層診断は検証・debug 用に限定します。
+`review-router` は、すべての評価レビューに1件の `review-ai-quality` baselineを置きます。その後、観測した正確なsignal IDから追加gateだけを選びます。通常出力では、選ばれなかったgateや空のcategoryを列挙しません。diff・context・output・verificationが不足している場合は、該当判断を `insufficient evidence` とします。完全な適用診断はdebug用に限定します。
 
 `review-architecture-impact` は、dependency direction、module boundary、public API、persistence / infrastructure、ownership / lifecycle、cross-module coupling などの構造影響をレビューします。詳細な境界メカニクスは `application-boundary-architecture`、記録が必要な判断は `adr-review` に分けます。
 
@@ -371,7 +371,7 @@ review-router を使ってこのdiffの Change signals を抽出し、必要ゲ�
 
 `review-adversarial-risk` は、通常レビュー後に残る高impactの失敗経路、misuse、blast radiusを最大3件程度に絞って確認します。known issueやaccepted riskを再報告しないため、利用可能なら `docs/ai/review-context.md` を先に読みます。
 
-`review-final-merge-gate` は、Decision、Blocking evidence、Passed required gates、Insufficient evidence、Non-blocking follow-ups、Residual risk を優先して出力します。lint/testのようなMechanical passだけでは、Domain、Architecture、Output quality、Adversarial risk、Risk、Evidenceの未解決問題を上書きできません。
+`review-final-merge-gate` は、merge判断が明示的に要求された場合だけ最後に実行し、`Decision` を追加します。baselineと追加gateのfindingは共通fieldを持つ1つのimpact順一覧に統合します。lint/testのようなMechanical passだけでは、Domain、Architecture、Output quality、Adversarial risk、Risk、Evidenceの未解決問題を上書きできません。
 
 ### 繰り返しレビュー文脈
 

@@ -29,12 +29,12 @@ export const CODEX_RUNTIME_FILES = Object.freeze([
 export const ADAPTER_RENDERER_METADATA = Object.freeze({
   claude_code: Object.freeze({
     rendererId: "install-claude-adapter",
-    rendererVersion: "4",
+    rendererVersion: "5",
     installerPath: "scripts/install-claude-adapter.mjs",
   }),
   codex: Object.freeze({
     rendererId: "install-codex-adapter",
-    rendererVersion: "6",
+    rendererVersion: "7",
     installerPath: "scripts/install-codex-adapter.mjs",
   }),
 });

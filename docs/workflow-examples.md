@@ -296,44 +296,33 @@ Workflow:
 
 ```text
 review-router
-observed change signals
-required gates, including review-architecture-impact, review-output-quality, and review-adversarial-risk when applicable
+one review-ai-quality baseline
+exact-signal additional gates, including review-architecture-impact, review-output-quality, and review-adversarial-risk when applicable
 review-final-merge-gate
 ```
 
 Expected output:
 
 ```text
-Change signals:
-- signal: observed evidence
+Baseline review:
+- Gate: review-ai-quality
+- Status: pass | pass_with_comments | fail | insufficient_evidence
+- Evidence: target and applicable evidence checked
 
-Required gates:
-- gate: reason; triggered by signal(s)
-
-Skipped heavy gates:
-- gate/layer: observed reason
+Additional required gates:
+- <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<non-empty text>; signals=<comma-separated exact signal IDs>
 
 Missing evidence:
 - input: what remains unknown
 
+Findings:
+- Finding ID, severity, merge blocker, practical impact, trigger/failure trace, evidence location, required post-fix condition
+
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
-
-Blocking evidence:
-- [severity] gate/file:line — issue, evidence, impact, required fix
-
-Passed required gates:
-- gate — evidence checked
-
-Insufficient evidence:
-- gate/input — next check
-
-Non-blocking follow-ups:
-- improvement-ledger candidate or suggestion
-
-Residual risk:
-- ...
 ```
+
+Omit `Decision` unless a final merge decision was requested. Use `- none` for empty sections and omit skipped-gate/category boilerplate.
 
 ## 8. Handoff to another agent
 

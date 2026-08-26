@@ -132,7 +132,7 @@ The Requirement-to-Rule Loop and full-layer intelligence skills are projected by
 
 The project adapter installs local command templates for common daily workflows:
 
-- `/skill-review`: layered PR or diff review through `review-router` and `review-final-merge-gate`.
+- `/skill-review`: PR or diff review through one `review-ai-quality` baseline, exact-signal additional gates, and `review-final-merge-gate` only when a final decision is requested.
 - `/skill-implement`: scoped implementation through `skill-router`, `test-first-verification`, and `controlled-implementation`.
 - `/skill-investigate`: bug, regression, performance, or unknown-root-cause work through `doubt-driven-development` and verification.
 - `/skill-verify`: focused verification and evidence classification before readiness or correctness claims.

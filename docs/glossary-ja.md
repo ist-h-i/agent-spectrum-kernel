@@ -151,18 +151,18 @@ Meaning:
 - PR/diff/生成物レビューの特定観点を担当するgateです。
 
 Use when:
-- architecture、domain、output quality、adversarial risk などの観点が該当する場合。
+- `review-ai-quality` はすべての評価レビューのbaselineとして1件必要です。architecture、domain、output quality、adversarial riskなどの追加gateは正確なsignalが該当する場合だけ使います。
 
 Do not confuse with:
 - 最終判断を出す `review-final-merge-gate`。
 
-## Signal-first review route
+## Baseline-first review route
 
 Meaning:
-- 観測した Change signals から必要なgateを選び、missing inputは `insufficient evidence` として残す工程です。
+- まず1件の `review-ai-quality` baselineを作り、観測した正確なsignal IDから必要な追加gateだけを選び、missing inputは `insufficient evidence` として残す工程です。
 
 Use when:
-- PR/diffレビューで、必要なgateだけを選びたい場合。
+- PR/diffレビューで、通常品質確認を欠かさず、不要な重いgateを増やしたくない場合。
 
 Do not confuse with:
 - gate実行後のmerge判断。
@@ -170,7 +170,7 @@ Do not confuse with:
 ## Merge evidence summary
 
 Meaning:
-- 最終レビューで Blocking evidence、Passed required gates、Insufficient evidence、Non-blocking follow-ups、Residual risk を要約したものです。完全な層診断は検証/debug 用の補助情報です。
+- merge判断が要求された最終レビューで、baseline、追加gate、missing evidence、1つのFindings一覧を消費してDecisionを出すものです。完全な適用診断はdebug用の補助情報です。
 
 Use when:
 - merge可否や残リスクを一目で確認したい場合。

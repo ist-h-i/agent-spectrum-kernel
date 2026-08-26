@@ -54,6 +54,8 @@ try {
   assert.ok(existsSync(resolve(target, "schemas/normalized-event-schema-registry.json")), "core projection omitted the normalized event registry");
   assert.ok(existsSync(resolve(target, "docs/verification-proof-policy-contract.md")), "core projection omitted the verification proof policy contract");
   assert.ok(existsSync(resolve(target, "schemas/verification-proof-policy.schema.json")), "core projection omitted the verification proof policy schema");
+  assert.ok(existsSync(resolve(target, "docs/review-finding-contract.md")), "core projection omitted the review finding contract");
+  assert.ok(existsSync(resolve(target, "schemas/review-finding.schema.json")), "core projection omitted the review finding schema");
   run(claudeInstaller, ["--profile", "implementation"]);
   run(codexInstaller, ["--profile", "implementation"]);
 
@@ -74,8 +76,8 @@ try {
     assert.ok(projected.includes("compact_proof"), `${path} omitted the Compact Proof path`);
     assert.ok(projected.includes("formal_verification_contract"), `${path} omitted the formal verification path`);
   }
-  assert.equal(claudeInitial.projection_plan?.renderer_version, "4", "Claude migration used an unexpected renderer revision");
-  assert.equal(codexInitial.projection_plan?.renderer_version, "6", "Codex migration used an unexpected renderer revision");
+  assert.equal(claudeInitial.projection_plan?.renderer_version, "5", "Claude migration used an unexpected renderer revision");
+  assert.equal(codexInitial.projection_plan?.renderer_version, "7", "Codex migration used an unexpected renderer revision");
 
   run(claudeInstaller, ["--profile", "implementation"]);
   run(codexInstaller, ["--profile", "implementation"]);

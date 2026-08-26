@@ -12,7 +12,7 @@ Every adapter must preserve these core behaviors or explicitly downgrade its cla
 |---|---|
 | File projection | Kernel and selected `skills/<name>/SKILL.md` files remain traceable to this repository's canonical files. |
 | Invocation model | Ambiguous entries route through `operating-mode-router` / `skill-router`; entries with fixed mode/task class may invoke the named specific Skill directly when critical canonical controls remain self-contained and provenance-validated. |
-| Review route support | A review-oriented adapter provides every gate referenced by `review-router` and `review-final-merge-gate`, including automated, AI-quality, domain, architecture, output-quality, adversarial-risk, evidence, ADR, risk, improvement-ledger, and adoption-metrics support. |
+| Review route support | A review-oriented adapter projects exactly one signal-independent `review-ai-quality` baseline, exact-signal additional gates, one shared finding contract, and requested-only last `review-final-merge-gate` authority. It provides the automated, domain, architecture, output-quality, adversarial-risk, code-health, evidence, ADR, risk, improvement-ledger, and adoption-metrics support referenced by that route. |
 | Risk gate behavior | Destructive, irreversible, external, production, credential, auth, dependency, migration, billing, email, or infra-impacting actions require `risk-gate` before action. |
 | Evidence output | Final outputs use exactly Verified, Supported, Hypothesis, Unknown, and Falsified for claim truth. Ordinary work applies them inline; a formal Evidence Ledger appears only for a closed `ask.claim-evidence-status@1.0.0` audit trigger. Unsupported readiness or no-regression claims are downgraded. |
 | Execution Envelope | One owner produces one canonical control payload. Managed ordinary output may use a profile-bound sidecar; protected/handoff output is visible exactly once. Adapters without structured ownership stay explicit inline compatibility and never infer control from prose. |
@@ -42,7 +42,7 @@ Future adapters should add validation or fixture coverage for:
 - required projected skills and commands,
 - no hidden telemetry or external publication by default,
 - risk-gate language on risky actions,
-- review gate completeness,
+- mandatory baseline, exact-signal additional-gate, shared-finding, and requested-final-gate completeness,
 - local command routing through existing skills,
 - metrics event schema compatibility when metrics are emitted,
 - documentation of unsupported or unknown capabilities,

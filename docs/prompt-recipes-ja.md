@@ -24,7 +24,7 @@
 | やりたいこと | こう言う | 期待される内部route |
 |---|---|---|
 | チケットを前に進める | このチケットを進めて | requirement / work package / implementation route |
-| PR、diff、生成物をレビューする | このPRをレビューして | review-router and required gates |
+| PR、diff、生成物をレビューする | このPRをレビューして | review-router, mandatory baseline, and exact-signal additional gates |
 | バグ、regression、原因不明を調べる | このバグを調べて | doubt-driven-development and verification route |
 | 要件、設計、アーキテクチャを詰める | この設計を詰めて | requirement / design / architecture route |
 | Codexや別Agentへ渡せる作業にする | Codexに渡せる形にして | work-package route |
@@ -681,28 +681,29 @@ Angular固有の制約は controlled-implementation に、検証補足は test-f
 
 ```text
 review-router を使ってこのdiffをレビューしてください。
-観測した Change signals から Required gates を選び、必要なゲートだけを実行して review-final-merge-gate で判断してください。
-Missing evidence は skipped にせず insufficient evidence として残してください。通常出力では全層の固定表を出さず、必要な場合だけ診断用に添付してください。
-review-code-health が applicable な場合は、current PR blocker と non-blocking な improvement ledger candidate / rule feedback / deferred or accepted code-health risk を分け、final review output に必要時だけ optional section として残してください。
+必ず1件のreview-ai-quality baselineを出し、観測した正確なsignal IDから必要な追加gateだけを実行してください。
+Missing evidenceは該当判断のinsufficient evidenceとして残し、選ばれなかったgateや空のcategoryは通常出力に出さないでください。
+findingは共通fieldを持つ1つのimpact順一覧に統合してください。merge判断も必要なので、review-final-merge-gateを最後に実行してください。
 ```
 
 ### 使われる主なSkill
 
 - `review-router`
-- required gates
+- `review-ai-quality` baseline
+- exact-signal additional gates
 - `review-final-merge-gate`
 - `evidence-ledger` selected by the `high_stakes_readiness` trigger for the final merge/readiness claim
 
 ### 期待する出力
 
-- Change signals / Required gates / Skipped heavy gates / Missing evidence
-- Blocking evidence / Passed required gates / Insufficient evidence / Non-blocking follow-ups / Residual risk
+- Baseline review / Additional required gates / Missing evidence
+- 共通fieldを持つ1つのFindings一覧
 - Decision
 
 ### 注意
 
 - Mechanical pass だけで merge 可とは判断しません。
-- Required fixes と backlog / rule feedback / accepted risk を混ぜません。
+- current blockerと別途追跡する改善候補を混ぜません。
 - final gate は `docs/ai/improvement-ledger.md` を直接更新せず、必要な場合に `improvement-ledger` へ渡せる候補を明示します。
 
 ## Code health review
@@ -713,21 +714,20 @@ review-code-health が applicable な場合は、current PR blocker と non-bloc
 review-code-health を使って、このdiffまたは指定範囲の技術負債、脆弱性/security weakness、リファクタ候補、コードスメル、保守性・テスト容易性・性能・依存関係リスク、dead code、重複、境界問題、repeated review finding を確認してください。
 各findingは evidence、impact、severity、urgency、recommended action、scope guidance、AI-rule feedback を含め、current PRで直すものと separate PR / project-level improvement / no action に分けてください。
 これは完全なセキュリティ監査、SAST、依存脆弱性スキャン、脅威モデリング、ペンテスト、コンプライアンスレビューの代替ではありません。
-review-ai-quality、review-architecture-impact、review-adversarial-risk の責務は置き換えず、該当する場合だけroutingしてください。
+必須baselineのreview-ai-qualityは置き換えず、review-architecture-impactとreview-adversarial-riskは正確なsignalが該当する場合だけroutingしてください。
 ```
 
 ### 使われる主なSkill
 
 - `review-router`
 - `review-code-health`
-- `review-ai-quality` when ordinary implementation quality review is also required
+- `review-ai-quality` mandatory baseline
 - `review-architecture-impact` / `review-adversarial-risk` when specialized signals appear
 - `evidence-ledger` only when a closed formal-audit trigger applies; otherwise apply claim status inline
 
 ### 期待する出力
 
-- category / evidence / impact
-- severity / urgency / recommended action
+- 共通Finding field（ID / severity / merge blocker / practical impact / trigger or failure trace / evidence location / required post-fix condition）
 - current PR blocker と backlog candidate の分離
 - AI-rule feedback
 
@@ -775,7 +775,7 @@ deploy、publish、migration、external notification、release execution は実�
 
 ```text
 improvement-ledger を使って、review-code-health やPRレビューで出たnon-blockingな負債、リファクタ候補、rule gap、validation check候補、accepted riskを docs/ai/improvement-ledger.md の形式に沿って整理してください。
-current PR blocker は台帳に逃がさず Blocking evidence（必要なら詳細な Required fixes）に残し、non-blockingなものだけ separate PR / backlog / convert_to_rule / convert_to_check / accept / wont_fix / needs_more_evidence に分類してください。
+current PR blockerは台帳に逃がさずFindings一覧でmerge blockerとして残し、non-blockingなものだけseparate PR / backlog / convert_to_rule / convert_to_check / accept / wont_fix / needs_more_evidenceに分類してください。
 各entryは ID、Source、Finding、Category、Evidence、Impact、Severity、Urgency、Decision、Recommended action、Prevention target、Owner / status、Refresh rule を含めてください。
 repeated finding や high-impact single case がある場合だけ、Repeat pattern、Proposed rule or check、Why this target、Scope、convert / defer / reject / needs_more_evidence の判断も出してください。
 ```

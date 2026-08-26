@@ -77,7 +77,7 @@ The following belong in the skill artifact and should not be repeated in the env
 | `spec-driven-development` | Spec behavior delta and acceptance criteria |
 | `test-first-verification` | Verification Contract and evidence |
 | `controlled-implementation` | Implementation Contract and evidence references |
-| `review-router` / review gates | Change signals, required gates, or review findings |
+| `review-router` / review gates | Mandatory baseline, exact-signal additional gates, missing evidence, or review findings |
 | `review-final-merge-gate` | Final decision and merge evidence summary |
 | `handoff-generation` | Next-task handoff and bounded resume state |
 

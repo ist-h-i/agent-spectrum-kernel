@@ -61,7 +61,7 @@ Security boundary: this skill can identify evidence-backed vulnerability and sec
    - Do not treat every small style preference as debt.
 
 5. Classify action and scope.
-   - Use severity to describe impact if ignored: `critical`, `high`, `medium`, or `low`.
+   - Use the shared review severity vocabulary: `blocker`, `major`, `minor`, or `nit`.
    - Use urgency to describe timing: `now`, `soon`, `backlog`, or `observe`.
    - Use recommended action to separate fixing, backlog creation, rule/check feedback, later refactor, or acceptance.
    - Use scope guidance to keep current-PR blockers separate from separate-PR or project-level improvements.
@@ -81,41 +81,25 @@ Security boundary: this skill can identify evidence-backed vulnerability and sec
 
 ## Output
 
+Actionable code-health findings follow `ask.review-finding@1.0.0` in `docs/review-finding-contract.md` and join the one impact-ordered review inventory. Urgency, durable handoff, or rule/check promotion stays outside the finding item and references its Finding ID.
+
 ```text
 Code health review:
 - Gate status: pass | pass with findings | fail | insufficient evidence
 - Scope reviewed:
-- Current-PR blockers:
-- Backlog / separate-PR candidates:
-- Rule or check feedback:
-- Improvement-ledger handoff:
 
-Finding:
-- Short description
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: code-health
 
-Category:
-- vulnerability | technical_debt | refactor_candidate | code_smell | maintainability | testability | performance | dependency | dead_code | duplication | boundary | repeated_finding
-
-Evidence:
-- File / line / snippet / observed pattern
-
-Impact:
-- Why this matters
-
-Severity:
-- critical | high | medium | low
-
-Urgency:
-- now | soon | backlog | observe
-
-Recommended action:
-- fix now | create backlog | add lint/test/check | update skill/rule | refactor later | accept
-
-Scope guidance:
-- in current PR | separate PR | project-level improvement | no action
-
-AI-rule feedback:
-- Should this become an AI implementation rule, review checklist item, validation check, project overlay update, or no rule?
+Code-health follow-up:
+- Finding ID: urgency, current/separate scope, durable handoff or rule/check candidate
 
 Specialized signals routed:
 - Architecture:
@@ -138,7 +122,8 @@ Use counts for debt detected, ledger candidates, converted rules/checks, and ref
 
 ## Exit criteria
 
-- Each finding has category, evidence, impact, severity, urgency, recommended action, scope guidance, and AI-rule feedback.
+- Each actionable finding uses the closed common fields and impact order.
+- Urgency, scope guidance, and AI-rule feedback reference the Finding ID outside the finding item.
 - Current-PR blockers are separated from separate-PR or backlog candidates.
 - Refactor implementation is not performed during the review.
 - Existing review gates keep their responsibilities.

@@ -1,45 +1,54 @@
 ---
-description: Run the Agent Spectrum Kernel review flow for the current PR or diff.
+description: Run the Agent Spectrum Kernel review flow for the current PR, diff, or review target.
 ---
 
 Use the installed project skills from this repository projection.
 
-Apply `ask.claim-evidence-status@1.0.0` inline. Apply `/evidence-ledger` only when its closed trigger selects `formal_ledger` (explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs); installation alone is not activation.
+Apply ask.claim-evidence-status@1.0.0 inline. Apply /evidence-ledger only when its closed trigger selects `formal_ledger`. A requested final merge decision activates `high_stakes_readiness`; installation alone is not activation.
 
-Start with `/review-router` to extract observed change signals and map them to required gates. Run only the required gates. End with `/review-final-merge-gate` style output:
+Read schemas/review-signal-gate-map.json before reviewing. It is the single review-policy registry.
 
-- require approval for the specific action and stop without that approval before any risk-gated action
-- when required evidence is missing, report `insufficient_evidence` and stop; do not infer the missing result
-- do not start or delegate agents unless the request explicitly requires agent activity; report started, completed, and failed counts
+1. Start with /review-router.
+2. Produce exactly one /review-ai-quality baseline result. The baseline needs no signal and is never over-processing.
+3. Extract only exact registry signal IDs and run only the mapped additional gates.
+4. Keep missing applicable target, diff, contract, test, output, context, or CI evidence as insufficient_evidence.
+5. Use one impact-ordered finding inventory with the registry's closed fields. Category is optional metadata.
+6. Run /review-final-merge-gate last only when $ARGUMENTS explicitly asks for a final merge decision.
+7. Require approval for the specific action and stop before any risk-gated action without it.
+8. Do not start or delegate agents unless the request explicitly requires agent activity. Report started, completed, and failed counts when agent activity occurs.
 
-Before extracting signals, read `schemas/review-signal-gate-map.json`. Emit only its exact signal IDs and use its signal-to-gate mapping; do not invent free-form trigger IDs.
+Normal output:
 
-- decision: `approve`, `approve with comments`, `request changes`, `block`, or `insufficient evidence`
-- blocking evidence
-- passed required gates
-- insufficient evidence
-- non-blocking follow-ups
-- residual risk
-- one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`
+Baseline review:
+- Gate: review-ai-quality
+- Status: pass | pass_with_comments | fail | insufficient_evidence
+- Evidence: non-empty checked target/evidence
 
-When the merge claim depends on lifecycle evidence, use stable refs from `docs/lifecycle-traceability-contract.md`; do not copy acceptance, evidence, blocker, or accepted-risk content into another lifecycle section.
-
-Keep current-PR blockers separate from non-blocking improvement-ledger candidates and suggestions. Do not publish metrics externally.
-
-Normal review route:
-
-Change signals:
-- signal: observed evidence
-
-Required gates:
-- gate: reason; triggered by signal(s)
-
-Skipped heavy gates:
-- gate/layer: observed reason
+Additional required gates:
+- <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<non-empty text>; signals=<comma-separated exact signal IDs>
 
 Missing evidence:
-- input: why it is required and what remains unknown
+- input/gate: affected judgment and next check
 
-Do not emit a fixed layer-by-layer applicability table unless validation or debugging explicitly requests the diagnostic artifact.
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: optional
+
+Append Decision only when a final merge decision was requested:
+
+Decision:
+- approve | approve with comments | request changes | block | insufficient evidence
+
+Use - none for empty Additional required gates, Missing evidence, or Findings. Do not emit Skipped heavy gates, empty category sections, or full applicability diagnostics unless debug output was explicitly requested.
+
+Use exactly one fenced JSON `Execution Envelope` from docs/execution-envelope-contract.md. When a merge claim depends on lifecycle evidence, use stable refs from docs/lifecycle-traceability-contract.md. Keep current blockers in Findings and separate durable follow-up only after the current judgment.
+
+Do not publish metrics externally.
 
 $ARGUMENTS

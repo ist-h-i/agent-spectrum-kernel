@@ -112,9 +112,12 @@ export const CODEX_PROMPT_CONTRACTS = {
   "skill-review.md": {
     mode: "review",
     sandbox: "read-only",
-    requiredGates: ["review-final-merge-gate"],
+    requiredGates: ["review-ai-quality"],
+    conditionalGates: { finalDecision: "review-final-merge-gate" },
     route: { workMode: "レビュー", userFacing: "review the bounded change and gate the decision" },
-    requiredSections: ["Change signals:", "Required gates:", "Skipped heavy gates:", "Missing evidence:", "Decision:", "Blocking evidence:", "Passed required gates:", "Insufficient evidence:", "Non-blocking follow-ups:", "Residual risk:"],
+    requiredSections: ["Baseline review:", "Additional required gates:", "Missing evidence:", "Findings:"],
+    conditionalSections: { "review-final-merge-gate": ["Decision:"] },
+    forbiddenOrdinarySections: ["Skipped heavy gates:", "Diagnostic applicability:", "Design findings:", "Logic findings:", "Test adequacy findings:", "Style / maintainability findings:", "Scope findings:"],
   },
   "skill-verify.md": {
     mode: "verification",
@@ -137,6 +140,45 @@ export const CODEX_PROMPT_MODES = new Set(Object.values(CODEX_PROMPT_CONTRACTS).
 
 export function codexPromptContractForMode(mode) {
   return Object.values(CODEX_PROMPT_CONTRACTS).find((contract) => contract.mode === mode) ?? null;
+}
+
+export function readReviewSignalGateMap(target = REPO_ROOT) {
+  const path = resolve(target, "schemas/review-signal-gate-map.json");
+  if (!existsSync(path)) throw new Error("review signal gate registry is missing: schemas/review-signal-gate-map.json");
+  let registry;
+  try {
+    registry = JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    throw new Error(`review signal gate registry is invalid JSON: ${error.message}`);
+  }
+  if (
+    registry?.registry_version !== 2
+    || registry?.baseline_gate?.gate !== "review-ai-quality"
+    || registry?.final_gate?.gate !== "review-final-merge-gate"
+    || !Array.isArray(registry?.signal_selected_gates)
+    || !registry?.signal_to_gates
+    || typeof registry.signal_to_gates !== "object"
+    || Array.isArray(registry.signal_to_gates)
+  ) {
+    throw new Error("review signal gate registry has an unsupported route shape");
+  }
+  return registry;
+}
+
+export function deriveReviewSignalGateRoute(registry, observedSignals = []) {
+  const issues = [];
+  if (!Array.isArray(observedSignals)) return { observed_signals: [], additional_gates: [], signals_by_gate: {}, issues: ["observed_signals:invalid"] };
+  if (new Set(observedSignals).size !== observedSignals.length) issues.push("observed_signals:duplicate");
+  const controlledSignals = Object.keys(registry?.signal_to_gates ?? {});
+  for (const signal of observedSignals) if (typeof signal !== "string" || !controlledSignals.includes(signal)) issues.push(`observed_signal:unknown:${String(signal)}`);
+  const normalizedSignals = [...new Set(observedSignals.filter((signal) => controlledSignals.includes(signal)))].sort();
+  const selected = new Set(normalizedSignals.flatMap((signal) => registry.signal_to_gates[signal] ?? []));
+  const additionalGates = (registry?.signal_selected_gates ?? []).filter((gate) => selected.has(gate));
+  const signalsByGate = Object.fromEntries(additionalGates.map((gate) => [
+    gate,
+    normalizedSignals.filter((signal) => (registry.signal_to_gates[signal] ?? []).includes(gate)),
+  ]));
+  return { observed_signals: normalizedSignals, additional_gates: additionalGates, signals_by_gate: signalsByGate, issues };
 }
 
 export function inspectCodexProjectionCanonicalInputs(target, projectionPlan = {}) {

@@ -486,7 +486,7 @@ node ./scripts/codex-exec-runner.mjs --prompt skill-implement.md --mode implemen
 
 The Codex runner can report `executed` after capturing output and running `ask-sensors`; this evidences only the inspected output contract. It does not prove workflow, risk/approval, or verification-contract application, business correctness, product readiness, or no regression.
 
-After classifying the task, pass `--gates-observed` when no task-specific gate applies, or `--required-gate <id>` for each required gate. Review runs include `review-final-merge-gate` from the managed prompt contract. Missing gate observation is recorded as missing evidence; an explicitly required `risk-gate` without specific-action approval stops before Codex invocation.
+After classifying the task, pass `--gates-observed` when no task-specific gate applies. For review, repeat `--observed-signal <exact-id>` and let the canonical registry derive every additional gate; bare `--required-gate` is rejected in review mode. For non-review entries, `--required-gate <id>` remains available. Every review run includes one `review-ai-quality` baseline. Add `--final-decision` only when the run must make a final merge decision; this runs `review-final-merge-gate` last. Missing gate observation is recorded as missing evidence; a derived or non-review-required `risk-gate` without specific-action approval stops before Codex invocation.
 
 Use `ask-sensors` to classify control risks in an implementation or review output:
 
@@ -533,7 +533,7 @@ First-time users should start with `docs/quickstart-ja.md`.
 | User wants to... | Say this | System should route to... |
 |---|---|---|
 | Move a ticket forward | このチケットを進めて | requirement / work package / implementation route |
-| Review a PR | このPRをレビューして | review-router and required gates |
+| Review a PR | このPRをレビューして | review-router, mandatory baseline, and exact-signal additional gates |
 | Investigate a bug | このバグを調べて | doubt-driven-development and verification route |
 | Refine a design | この設計を詰めて | design / architecture route |
 | Prepare agent work | Codexに渡せる形にして | work-package route |
@@ -563,10 +563,10 @@ Default outputs should describe the selected work mode, user-facing route, missi
 | 新機能・挙動変更 | `spec-driven-development` → `test-first-verification` selects Compact Proof or Formal Verification Contract → `controlled-implementation` references it → evidence |
 | バグ・原因不明 | `doubt-driven-development` → `test-first-verification` selects Formal Verification Contract for reproduction/regression → `controlled-implementation` → regression proof |
 | 承認済みリファクタ実装 | `refactor-implementation` → `test-first-verification` for regression proof |
-| スコープが広がりそう | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → required gates） |
+| スコープが広がりそう | `scope-control`（実装へ進むなら `controlled-implementation`、レビューでは `review-router` → mandatory baseline → exact-signal additional gates） |
 | 危険操作・外部影響 | `risk-gate` before the selected workflow proceeds to action |
 | 繰り返し実装文脈の固定 | `implementation-context-generation`（既定: `docs/ai/implementation-context.md`） |
-| PR/diffレビュー | `review-router` → observed change signals → required gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ `review-final-merge-gate` |
+| PR/diffレビュー | `review-router` → 必須の`review-ai-quality` baseline → exact-signal additional gates（architecture impact は `review-architecture-impact`、output quality は `review-output-quality`、adversarial risk は `review-adversarial-risk`）→ 最終判断を要求した場合だけ`review-final-merge-gate` |
 | 繰り返し/高impact review findingsを予防知識へ変換 | `review-finding-compiler` |
 | 既存要件・業務ルールとの照合 | `review-domain-impact`（Requirement Contract / Work Package / Domain Rule Ledger を入力にできる） |
 | リリース候補のready判定 | `release-readiness-gate`（deploy / publish / migration / external notification / release execution は `risk-gate` と明示承認が先） |

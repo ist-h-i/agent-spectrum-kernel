@@ -224,24 +224,32 @@ Execution Envelope transport follows `docs/execution-envelope-contract.md`: the 
 For review tasks, end with:
 
 ```text
+Baseline review:
+- Gate: review-ai-quality
+- Status: pass | pass_with_comments | fail | insufficient_evidence
+- Evidence: non-empty checked target/evidence
+
+Additional required gates:
+- <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<non-empty text>; signals=<comma-separated exact signal IDs>
+
+Missing evidence:
+- gate/input — affected judgment and the next check
+
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker:
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: optional
+
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
-
-Blocking evidence:
-- [severity] gate/file:line — evidence, impact, and required fix or decision
-
-Passed required gates:
-- gate — evidence checked
-
-Insufficient evidence:
-- gate/input — what remains unknown and the next check
-
-Non-blocking follow-ups:
-- improvement-ledger candidate, rule feedback, or suggestion
-
-Residual risk:
-- ...
 ```
+
+Omit `Decision` when no final decision was requested. Use one impact-ordered finding inventory; do not emit empty category sections or skipped-heavy-gate boilerplate in ordinary output.
 
 For handoff tasks, produce a precise next task, not a generic recommendation.
 

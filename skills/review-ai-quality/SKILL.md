@@ -1,171 +1,122 @@
 ---
 name: review-ai-quality
-description: Review a code change for AI-assessable implementation quality: design, logic, test adequacy, style/maintainability, and scope. Use for PR/diff/code reviews after routing, but do not make architecture, domain, output quality, adversarial risk, risk, ADR, evidence, or final merge decisions.
+description: Perform the mandatory baseline semantic review for every evaluative review request. Cover ordinary implementation quality and route specialized decisions without owning final merge approval.
 ---
 
-# AI Quality Review
+# Baseline Semantic Review
 
 ## Goal
 
-Find evidence-backed implementation issues that a code reviewer can identify from the diff and repository context, and report them by review layer so design, logic, test, style, and scope concerns are not collapsed into one broad judgment.
-
-This gate may flag performance, security, scope, architecture, ADR, output quality, adversarial risk, evidence, or domain signals, but it must route final judgment to the specialized gate when the issue affects:
-
-- external risk -> `risk-gate`,
-- unsupported claim -> inline claim status; `evidence-ledger` only for a closed formal-audit trigger,
-- architecture quality -> `review-architecture-impact`,
-- unresolved boundary mechanics -> `application-boundary-architecture`,
-- domain meaning -> `review-domain-impact`,
-- output quality -> `review-output-quality`,
-- adversarial risk -> `review-adversarial-risk`,
-- durable architecture memory -> `adr-review`,
-- scope authorization -> `scope-control`.
+Produce exactly one evidence-backed baseline review result for the concrete target, covering ordinary semantic implementation quality before optional specialized gates run.
 
 ## Use when
 
-- Reviewing implementation quality in a PR, diff, commit, patch, or generated code.
-- The change may affect correctness, edge cases, local APIs, tests, maintainability, local design, performance, security, or scope.
-- `review-router` selects an AI quality review gate.
+- Any PR, diff, commit, patch, design artifact, or generated code is evaluated.
+- The target may affect logic, local design, state/error boundaries, types/contracts, compatibility, observability, concurrency, performance signals, tests, maintainability, or scope.
 
 ## Do not use when
 
-- The only question is whether commands passed.
-- The issue is primarily architecture impact, boundary mechanics, output quality, adversarial risk, domain authorization, owner approval, ADR need, or a risky action.
-- No concrete code or design artifact is available.
+- The request is a non-evaluative summary.
+- A physical invocation count is being inferred from projected contract text.
+
+A missing target or missing applicable evidence produces an insufficient-evidence baseline result. It does not remove the baseline obligation.
 
 ## Review stance
 
-Be specific. A finding needs file/line evidence, impact, and a required fix. Do not produce generic style advice.
+Be specific and evidence-backed. Passing tests prove only their observed behavior. A finding needs the closed fields from ask.review-finding@1.0.0; generic advice is not a finding.
 
 ## Severity
 
 | Severity | Meaning |
 |---|---|
-| `blocker` | Must fix before merge; correctness/security/data loss/build break. |
-| `major` | Likely bug, regression, missing critical test, bad API/data boundary. |
-| `minor` | Maintainability, edge case, or local correctness issue worth fixing. |
-| `nit` | Optional clarity/style issue; must not block. |
+| blocker | Must be fixed before merge because the current change can cause critical correctness, security, data-loss, build, or operational harm. |
+| major | Actionable defect, regression, incompatible boundary, or critical missing proof. |
+| minor | Actionable local correctness, maintainability, or bounded edge issue. |
+| nit | Optional clarity/style improvement; never a merge blocker by severity alone. |
 
 ## Process
 
-1. Read the change in context.
-   - diff,
-   - touched files,
-   - nearby implementation,
-   - tests,
-   - public contracts,
-   - docs/ADRs if needed for technical meaning.
+1. Read the target in repository context.
+   - changed files and diff/artifact;
+   - nearby implementation and tests;
+   - affected public/local contracts;
+   - relevant docs/ADRs and active context;
+   - applicable output and CI/test evidence.
 
-2. Review focus areas by layer.
-   - Design: local API shape, local responsibility split, data flow, state ownership, error boundaries, and local decisions that are not public contracts or architecture boundaries.
-   - Logic: correctness, edge cases, backward compatibility, API use, error handling, observability, concurrency, and local performance/security signals.
-   - Test adequacy: changed behavior coverage, regression proof, missing negative cases, and whether evidence matches the claimed behavior.
-   - Style / maintainability: naming, readability, duplication, local complexity, and consistency with nearby implementation.
-   - Scope: scope creep, broad refactors, unrelated cleanup, and unauthorized behavior expansion.
+2. If any evidence required for the concrete judgment is absent, return insufficient evidence and name the exact next check. Do not treat an inapplicable evidence class as missing.
 
-3. For AI-generated work, additionally check:
-   - invented APIs,
-   - stale assumptions,
-   - unsupported claims,
-   - missing negative cases,
-   - broad refactors,
-   - unverified behavior.
+3. Review the baseline semantic surface.
+   - Logic and edge cases.
+   - Local design and responsibility split.
+   - State transitions, state ownership signals, and error boundaries.
+   - Types, local/public contract signals, API use, and backward compatibility.
+   - Error handling and observability.
+   - Concurrency and race signals.
+   - Local performance and security signals.
+   - Test adequacy, negative cases, and proof-to-claim fit.
+   - Readability, duplication, local complexity, and maintainability.
+   - Scope creep, unrelated cleanup, and unauthorized expansion.
+   - For generated work: invented APIs, stale assumptions, unsupported claims, and broad unverified rewrites.
 
-4. Classify every required finding into one of:
-   - Design findings,
-   - Logic findings,
-   - Test adequacy findings,
-   - Style / maintainability findings,
-   - Scope findings.
+4. Route specialized signals without deciding them.
+   - domain meaning -> review-domain-impact;
+   - public/cross-module architecture -> review-architecture-impact;
+   - user/system-facing output -> review-output-quality;
+   - adversarial/security/privacy/misuse paths -> review-adversarial-risk;
+   - material debt beyond ordinary local maintainability -> review-code-health;
+   - required automated evidence -> review-automated-gate using automated_evidence_required;
+   - destructive/external/auth/secret/production/etc. action -> risk-gate;
+   - durable hard-to-reverse architecture -> adr-review;
+   - release readiness -> release-readiness-gate.
+   The baseline may identify and route these signals, but does not make their specialized judgment.
 
-5. Separate findings from suggestions.
+5. Produce one finding inventory.
+   - Every blocker or actionable finding has a unique Finding ID, severity, merge-blocker boolean, practical impact, trigger or failure trace, evidence location, and required post-fix condition.
+   - Category is optional metadata, not a section.
+   - Sort merge blockers first, then blocker/major/minor/nit, then Finding ID in code-unit order.
+   - Keep non-actionable suggestions outside the finding inventory.
 
-6. Route specialized signals before judging them.
-   - domain meaning -> `review-domain-impact`,
-   - architecture quality -> `review-architecture-impact`,
-   - unresolved boundary mechanics -> `application-boundary-architecture`,
-   - durable architecture memory -> `adr-review`,
-   - output quality -> `review-output-quality`,
-   - adversarial risk -> `review-adversarial-risk`,
-   - external risk -> `risk-gate`,
-   - unsupported claim -> inline claim status; formal audit -> `evidence-ledger`,
-   - scope authorization -> `scope-control`.
-
-7. Return quality gate status, not final merge approval.
+6. Return baseline gate status only. Final merge approval belongs to review-final-merge-gate and runs only when requested.
 
 ## Output
 
-```text
-AI quality gate:
-- Gate status: pass | pass with comments | fail | insufficient evidence
+~~~text
+Baseline review:
+- Gate: review-ai-quality
+- Status: pass | pass with comments | fail | insufficient evidence
+- Evidence: concrete target and applicable evidence reviewed
+- Specialized signals routed: exact signal ID -> additional gate, or none
 
-Design findings:
-- [severity] file:line - issue
-  Evidence:
-  Impact:
-  Required fix:
+Findings:
+- Finding ID:
+  Severity:
+  Merge blocker: true | false
+  Practical impact:
+  Trigger or failure trace:
+  Evidence location:
+  Required post-fix condition:
+  Category: optional
+~~~
 
-Logic findings:
-- [severity] file:line - issue
-  Evidence:
-  Impact:
-  Required fix:
-
-Test adequacy findings:
-- [severity] file:line - issue
-  Evidence:
-  Impact:
-  Required fix:
-
-Style / maintainability findings:
-- [severity] file:line - issue
-  Evidence:
-  Impact:
-  Required fix:
-
-Scope findings:
-- [severity] file:line - issue
-  Evidence:
-  Impact:
-  Required fix:
-
-Specialized signals routed:
-- Domain:
-- Architecture quality:
-- Boundary mechanics:
-- ADR:
-- Output quality: routed | none
-- Adversarial risk: routed | none
-- Risk:
-- Evidence:
-
-Suggestions:
-- ...
-
-Evidence reviewed:
-- ...
-
-Residual quality risk:
-- ...
-```
+Use - none when there is no finding. Do not emit empty category sections. Do not emit a final merge Decision.
 
 ## Exit criteria
 
-- Each blocking or major issue has evidence and required fix.
-- Design, logic, test adequacy, style/maintainability, and scope findings are separately inspectable.
-- Suggestions are not mixed with required fixes.
-- Specialized signals are routed and not finalized inside this gate.
-- Residual risk is named.
-- Final merge decision is left to `review-final-merge-gate`.
+- Exactly one current baseline result exists.
+- The status follows the evidence actually available.
+- Logic, local design, state/error, types/contracts, compatibility, observability, concurrency, performance signals, tests, maintainability, and scope were considered.
+- Each actionable finding uses the closed common fields and impact order.
+- Specialized decisions are routed, not made inside baseline.
+- Final merge authority is untouched.
 
 ## Failure modes
 
 | Failure | Correction |
 |---|---|
-| Generic advice | Tie each finding to code/evidence. |
-| Treating passing tests as complete proof | Assess coverage and changed behavior. |
-| Making architecture approval decisions | Route architecture quality to `review-architecture-impact`, unresolved boundary mechanics to `application-boundary-architecture`, and ADR memory to `adr-review`. |
-| Making domain approval decisions | Route domain meaning to `review-domain-impact`. |
-| Making output quality or adversarial risk decisions | Route output quality to `review-output-quality` and adversarial risk to `review-adversarial-risk` without finalizing them here. |
-| Making specialized risk, claim, ADR, or scope decisions | Flag the signal and route final judgment to the specialized gate. |
-| Approving the PR directly | Report gate status only. |
+| Baseline runs only when a signal exists | Run it for every evaluative request. |
+| Missing target means no baseline | Return baseline insufficient evidence. |
+| Category-separated report | Emit one impact-ordered inventory with optional category metadata. |
+| Generic advice | Supply practical impact, trace, evidence, and post-fix condition. |
+| Tests pass, therefore review passes | Assess coverage and the changed semantic surface. |
+| Baseline decides architecture/domain/output/adversarial/risk | Route the exact signal to the owning gate. |
+| Baseline approves merge | Return gate status only. |
