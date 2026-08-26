@@ -2,15 +2,26 @@
 
 The Execution Envelope is the shared control record for one meaningful workflow boundary. It keeps routing, evidence state, stopping conditions, and the next action together so chained skills do not repeat the same control metadata in every skill-specific artifact.
 
-This document is the human-readable source of truth. The machine-readable shape is mirrored by `schemas/execution-envelope.schema.json`; the schema does not replace the workflow rules in this document. The core installer projects that canonical schema as an ASK-managed immutable contract into adopting repositories. Adapter runtime copies are copied deterministically from the same canonical file and must remain byte-identical; they do not become independent schema sources.
+This document is the human-readable source of truth. The control payload is mirrored by `schemas/execution-envelope.schema.json`; the runner-owned transport wrapper is mirrored by `schemas/execution-envelope-record.schema.json`. Neither schema replaces the workflow rules in this document. The core installer projects both as ASK-managed immutable contracts into adopting repositories. Adapter runtime copies are deterministic projections and do not become independent schema sources.
 
 ## Ownership and emission boundary
 
-- Routers, adapters, and session-state handoffs own the envelope for their workflow boundary.
-- A chained skill receives the current envelope, updates only the fields affected by its work, and emits its own domain artifact without copying the envelope again.
-- An entry router or adapter may emit one envelope at the start, and a meaningful task boundary may emit one final updated envelope. A bare skill invocation does not require a new metrics event.
+- One runner or explicit compatibility boundary owns the envelope for a meaningful workflow boundary. Chained skills provide domain artifacts and structured control inputs; they do not independently serialize or mutate another envelope.
+- A managed runner derives fixed route fields from the validated profile. It accepts dynamic evidence, stop, and next-action fields only from its closed structured result or from runner-observed preflight/process state. Final prose is never an authority source.
+- The runner validates one canonical payload, binds it to the exact adapter entry/profile/revision/fingerprint and response digest, then persists one immutable content-addressed record under runtime-owned storage.
+- Inline JSON is a visibility projection of that same validated record, not a second mutable source of truth.
 - The envelope is control metadata. Requirement Contracts, Specs, Verification Contracts, Implementation Summaries, Review Findings, and Handoffs remain skill-specific artifacts.
 - `Metrics event candidate` is optional and must be omitted unless adoption metrics are explicitly enabled or requested and the boundary reached a meaningful durable state. It is never required for skill completion.
+
+## Emission classes
+
+| Class | Boundary | User-visible serialization |
+|---|---|---|
+| `sidecar` | Managed fixed implementation, investigation, review, or verification with `none` or `completed` stop state | Zero serialized Envelopes in ordinary prose; the validated record is persisted by the runner. |
+| `inline_required` | Handoff/resume, `human_decision`, `insufficient_evidence`, `capability_missing`, `risk_gate`, or `blocked` | Exactly one fenced canonical payload rendered by the owner. |
+| `diagnostic` | Explicit route/debug request only | Exactly one fenced canonical payload rendered from the same validated record. |
+
+Missing or invalid structured authority fails closed. It must not be reconstructed from phrases such as “tests passed”, “approved”, “ready”, “safe”, or “no missing evidence”. A direct or copied prompt without a runner-owned structured channel uses explicit `inline_required` compatibility and must not claim sidecar support.
 
 ## Canonical shape
 
@@ -42,7 +53,7 @@ Execution Envelope:
 }
 ```
 
-The JSON object inside the fenced block is the only accepted serialized Envelope form. A heading or flat `- route: ...` list without a parseable JSON object is malformed and must not pass completion validation.
+The JSON object inside the fenced block is the only accepted visible serialization. A heading or flat `- route: ...` list without a parseable JSON object is malformed. Ordinary managed `sidecar` output deliberately contains no visible serialization; its record must validate against `schemas/execution-envelope-record.schema.json` and bind the canonical payload plus response/profile provenance.
 
 ## Field rules
 
@@ -74,4 +85,7 @@ These artifacts may contain evidence, blockers, or next-step detail required by 
 
 ## Compatibility
 
-Adapters may keep entry-specific artifacts only when they do not duplicate lifecycle or control fields. They must place the shared `Execution Envelope` at the workflow boundary and must not invent a second route or metrics contract. Codex implementation and verification profiles use their canonical Contract plus Evidence record; they do not add legacy `Changed`, `Verified`, `Not verified`, or `Next` summaries. `next_action` remains owned by the Envelope.
+- Managed Codex runner paths use the runner-owned record policy. The runner passes `codex exec` a closed structured-result schema and does not parse the domain prose for control state.
+- Direct/copied Codex prompts and current Claude project, plugin, and GitHub Action paths remain explicit inline compatibility because the repository has not verified an equivalent independent structured channel for them.
+- Legacy inline payloads remain readable and schema-valid. They are not silently upgraded to sidecar records, and historical measured prompt fixtures remain unchanged.
+- Adapters may keep entry-specific artifacts only when they do not duplicate lifecycle or control fields. Codex implementation and verification profiles use their canonical Contract plus Evidence record; investigation does not add `Verified`, `Unknown / not verified`, or `Next`; handoff does not add a separate `Stop condition`. `next_action` and `stop_reason.stop_if` remain owned by the Envelope.
