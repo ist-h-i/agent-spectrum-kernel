@@ -15,6 +15,7 @@ Every adapter must preserve these core behaviors or explicitly downgrade its cla
 | Review route support | A review-oriented adapter provides every gate referenced by `review-router` and `review-final-merge-gate`, including automated, AI-quality, domain, architecture, output-quality, adversarial-risk, evidence, ADR, risk, improvement-ledger, and adoption-metrics support. |
 | Risk gate behavior | Destructive, irreversible, external, production, credential, auth, dependency, migration, billing, email, or infra-impacting actions require `risk-gate` before action. |
 | Evidence output | Final outputs use exactly Verified, Supported, Hypothesis, Unknown, and Falsified for claim truth. Ordinary work applies them inline; a formal Evidence Ledger appears only for a closed `ask.claim-evidence-status@1.0.0` audit trigger. Unsupported readiness or no-regression claims are downgraded. |
+| Execution Envelope | One owner produces one canonical control payload. Managed ordinary output may use a profile-bound sidecar; protected/handoff output is visible exactly once. Adapters without structured ownership stay explicit inline compatibility and never infer control from prose. |
 | Verification | Behavior changes define an observable verification path before completion claims. |
 | Metrics boundary | Metrics are opt-in summaries only. Raw prompts, secrets, customer data, personal data, full file contents, and full command output are omitted by default. |
 | Privacy / publication | Local storage is the default. External publication, webhooks, telemetry, or cloud destinations require explicit approval and project policy. |
@@ -53,7 +54,7 @@ Claude and Codex additionally share `docs/fixtures/adapter-cross-conformance.jso
 
 `ask-doctor --runtime-probe` is an optional local/static/dry-run confidence check for projected adapter surfaces. It may inspect command/template directories, projected `SKILL.md` files, adapter config shape, static project-overlay contradictions, and docs that reference command/template paths.
 
-Runtime probe output is not a per-task gate and is not proof of real Claude, Codex, GitHub Actions, network, deployment, or product/client-value execution. Failures downgrade runtime conformance/readiness claims only; installation health remains a separate doctor result. `adapter-runtime-smoke.mjs` is the explicit local smoke path for write checks such as Claude event-store writability. `codex-exec-runner.mjs` is the explicit Codex execution path; it can reach `executed` after captured output passes `ask-sensors`, but it still does not prove business correctness.
+Runtime probe output is not a per-task gate and is not proof of real Claude, Codex, GitHub Actions, network, deployment, or product/client-value execution. Failures downgrade runtime conformance/readiness claims only; installation health remains a separate doctor result. `adapter-runtime-smoke.mjs` is the explicit local smoke path for write checks such as Claude event-store writability. `codex-exec-runner.mjs` is the explicit Codex execution path; it can reach `executed` after a bound record and captured output pass `ask-sensors`, but sensor pass is not command-result or business-correctness evidence.
 
 ## Evidence Status
 

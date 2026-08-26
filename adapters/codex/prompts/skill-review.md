@@ -40,9 +40,4 @@ Non-blocking follow-ups:
 Residual risk:
 - ...
 
-Execution Envelope:
-```json
-{"schema_version":"1.0.0","route":{"work_mode":"レビュー","operating_mode":"delivery_quality","user_facing":"...","internal":{"primary":"review-router"}},"evidence_status":{"checked":[],"missing":[]},"stop_reason":{"status":"none","details":[],"human_decision_required":[],"stop_if":[]},"next_action":"..."}
-```
-
 $ARGUMENTS

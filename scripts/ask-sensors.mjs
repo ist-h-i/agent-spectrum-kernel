@@ -7,7 +7,7 @@ import {
   detectApprovalRequiredSurfaces,
   findUnsupportedCapabilityClaims,
 } from "./ask-shared.mjs";
-import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
+import { inspectExecutionEnvelope, inspectExecutionEnvelopeRecordEmission } from "./execution-envelope.mjs";
 
 const KNOWN_OUTPUT_SECTIONS = [
   "Implementation Contract:",
@@ -70,6 +70,7 @@ function parseArgs(argv) {
     target: process.cwd(),
     mode: "implementation",
     input: null,
+    envelopeRecord: null,
     changedFiles: [],
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -80,6 +81,8 @@ function parseArgs(argv) {
       args.mode = argv[++index];
     } else if (arg === "--input") {
       args.input = resolve(argv[++index]);
+    } else if (arg === "--envelope-record") {
+      args.envelopeRecord = resolve(argv[++index]);
     } else if (arg === "--changed-files") {
       args.changedFiles = argv[++index].split(",").map((path) => path.trim()).filter(Boolean);
     } else if (arg === "--help" || arg === "-h") {
@@ -102,6 +105,7 @@ Options:
   --target <path>           Repository root to scan for capability claims. Defaults to cwd.
   --mode <mode>             Managed Codex prompt contract mode. Defaults to implementation.
   --input <path>            Output text to inspect. If omitted, stdin is used when piped.
+  --envelope-record <path>  Managed runner record to validate against the output.
   --changed-files <csv>     Optional comma-separated changed file paths for risk-surface checks.
 
 Initial rollout is report-only: warn, fail, and hard_stop findings do not change
@@ -119,13 +123,13 @@ function readInput(args) {
   return "";
 }
 
-function runSensors({ target, mode, text, changedFiles }) {
+function runSensors({ target, mode, text, changedFiles, envelopeRecord }) {
   const sensors = [];
   const contract = codexPromptContractForMode(mode);
   if (contract) {
     sensors.push(completionContractSensor(text, mode, contract.requiredSections));
   }
-  sensors.push(executionEnvelopeSensor(text));
+  sensors.push(executionEnvelopeSensor(text, envelopeRecord));
   if (["implementation", "investigation"].includes(mode)) {
     sensors.push(evidenceQualitySensor(text));
   }
@@ -140,7 +144,25 @@ function runSensors({ target, mode, text, changedFiles }) {
   return { status, sensors };
 }
 
-function executionEnvelopeSensor(text) {
+function executionEnvelopeSensor(text, envelopeRecord) {
+  if (envelopeRecord) {
+    let record;
+    try {
+      record = JSON.parse(readFileSync(envelopeRecord, "utf8"));
+    } catch (error) {
+      return sensor("execution_envelope", "fail", `Runner-owned Execution Envelope record is unreadable: ${error.message}.`);
+    }
+    const result = inspectExecutionEnvelopeRecordEmission(text, record);
+    if (result.status === "valid") {
+      return sensor("execution_envelope", "pass", `Runner-owned ${record.emission_class} Execution Envelope record and output agree.`);
+    }
+    return sensor(
+      "execution_envelope",
+      "fail",
+      `Runner-owned Execution Envelope record is invalid: ${result.errors.join(" ")}.`,
+      "Do not infer or repair control state from prose; regenerate one valid bound record.",
+    );
+  }
   const result = inspectExecutionEnvelope(text);
   if (result.status === "parsed") {
     return sensor("execution_envelope", "pass", "Execution Envelope is valid JSON and conforms to the shared schema.");
@@ -490,7 +512,7 @@ function printReport({ mode, target, changedFiles, report }) {
 try {
   const args = parseArgs(process.argv.slice(2));
   const text = readInput(args);
-  const report = runSensors({ target: args.target, mode: args.mode, text, changedFiles: args.changedFiles });
+  const report = runSensors({ target: args.target, mode: args.mode, text, changedFiles: args.changedFiles, envelopeRecord: args.envelopeRecord });
   printReport({ mode: args.mode, target: args.target, changedFiles: args.changedFiles, report });
   process.exit(0);
 } catch (error) {

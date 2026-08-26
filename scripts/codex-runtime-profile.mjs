@@ -122,8 +122,15 @@ export function validateCodexCompactControlMap(controlMap = readControlMap()) {
   if (missing.inference !== "prohibited" || missing.stop_when_required !== true) throw new Error("missing_evidence control must prohibit inference and stop when evidence is required");
 
   const output = controlMap.controls.output;
-  assertExactKeys(output, ["source_refs", "required_sections_from_prompt_contract", "execution_envelope_count", "next_action_location"], "output control");
-  if (output.required_sections_from_prompt_contract !== true || output.execution_envelope_count !== 1 || output.next_action_location !== "execution_envelope_only") throw new Error("output control must use prompt-contract sections and one Execution Envelope");
+  assertExactKeys(output, ["source_refs", "required_sections_from_prompt_contract", "managed_runner_ordinary", "managed_runner_protected", "managed_runner_diagnostic", "unmanaged_compatibility", "next_action_location"], "output control");
+  if (
+    output.required_sections_from_prompt_contract !== true ||
+    output.managed_runner_ordinary !== "sidecar" ||
+    output.managed_runner_protected !== "inline_required" ||
+    output.managed_runner_diagnostic !== "explicit_only" ||
+    output.unmanaged_compatibility !== "inline_required" ||
+    output.next_action_location !== "execution_envelope_only"
+  ) throw new Error("output control must preserve runner-owned sidecar, protected inline, explicit diagnostic, and unmanaged inline semantics");
 
   const expectedClasses = ["implementation", "investigation", "review", "verification", "handoff"];
   assertExactKeys(controlMap.direct_triggers, expectedClasses, "direct_triggers");
@@ -148,7 +155,7 @@ function renderControl(controlId, control) {
   if (controlId === "risk_approval") return "[risk_approval] Exact action/risk/impact/reversibility/visibility; alternative/preconditions. Stop without approval for that specific action; execute only it.";
   if (controlId === "evidence") return `[evidence] ${canonicalClaimEvidenceStatuses().join("/")} (${control.contract_ref}); inline; formal[audit|multi-claim|high-stakes|cross-revision|stable-IDs]=>evidence-ledger; unsupported=>downgrade.`;
   if (controlId === "missing_evidence") return "[missing_evidence] unavailable/insufficient_evidence; no inference; required => stop.";
-  if (controlId === "output") return "[output] Required sections; one Execution Envelope; next_action only there.";
+  if (controlId === "output") return "[output] Managed runner owns the record: ordinary=>sidecar; stop/handoff=>inline; diagnostic only explicit. Unmanaged=>one inline. next_action only there.";
   throw new Error(`compact control has no renderer: ${controlId}`);
 }
 

@@ -32,6 +32,8 @@
 
 ### 期待する出力
 
+以下はprotected/direct compatibilityでの可視形式です。managed runnerの通常完了では同じpayloadをbound sidecarとして保存し、proseには出力しません。
+
 Execution Envelope:
 ```json
 {

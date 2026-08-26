@@ -65,6 +65,8 @@ export const APPROVED_ASK_AUTOMATION_ACTION_PINS = Object.freeze({
 const REQUIRED_SCHEMA_PATHS = [
   "schemas/metrics-event.schema.json",
   "schemas/execution-envelope.schema.json",
+  "schemas/execution-envelope-record.schema.json",
+  "schemas/codex-runner-result.schema.json",
   "schemas/adapter-runtime-profile.schema.json",
   "schemas/adapter-runtime-evidence.schema.json",
   "schemas/adapter-runtime-event.schema.json",
@@ -1513,6 +1515,8 @@ function validateExecutionEnvelope(root, manifest, errors) {
     active,
     contractPresent: existsSync(resolve(root, EXECUTION_ENVELOPE_DOC_PATH)),
     schemaListed: Array.isArray(manifest?.schemas) && manifest.schemas.includes("schemas/execution-envelope.schema.json"),
+    recordSchemaListed: Array.isArray(manifest?.schemas) && manifest.schemas.includes("schemas/execution-envelope-record.schema.json"),
+    runnerResultSchemaListed: Array.isArray(manifest?.schemas) && manifest.schemas.includes("schemas/codex-runner-result.schema.json"),
     docListed: Array.isArray(manifest?.docs) && manifest.docs.includes(EXECUTION_ENVELOPE_DOC_PATH),
     pluginProjection: [],
     sessionState: false,
@@ -1539,6 +1543,12 @@ function validateExecutionEnvelope(root, manifest, errors) {
   }
   if (!checks.schemaListed) {
     fail(errors, "execution envelope", "manifest.json.schemas must list schemas/execution-envelope.schema.json");
+  }
+  if (!checks.recordSchemaListed) {
+    fail(errors, "execution envelope", "manifest.json.schemas must list schemas/execution-envelope-record.schema.json");
+  }
+  if (!checks.runnerResultSchemaListed) {
+    fail(errors, "execution envelope", "manifest.json.schemas must list schemas/codex-runner-result.schema.json");
   }
   checks.pluginProjection = EXECUTION_ENVELOPE_PLUGIN_PROJECTION.map(({ canonical, packaged }) => {
     const canonicalPath = resolve(root, canonical);
@@ -1575,6 +1585,49 @@ function validateExecutionEnvelope(root, manifest, errors) {
       }
       if (schema.properties?.metrics_event_candidate?.$ref !== "metrics-event.schema.json") {
         fail(errors, "execution envelope", "schemas/execution-envelope.schema.json.metrics_event_candidate must $ref metrics-event.schema.json");
+      }
+    } catch {
+      // The required-schema validation reports malformed JSON separately.
+    }
+  }
+  const recordSchemaPath = resolve(root, "schemas/execution-envelope-record.schema.json");
+  if (existsSync(recordSchemaPath)) {
+    try {
+      const recordSchema = JSON.parse(readFileSync(recordSchemaPath, "utf8"));
+      const required = new Set(recordSchema.required ?? []);
+      const requiredRecordFields = ["schema_version", "record_id", "emission_class", "authority", "binding", "envelope", "envelope_sha256", "response_sha256", "control_input_sha256"];
+      if (recordSchema.additionalProperties !== false || requiredRecordFields.some((field) => !required.has(field))) {
+        fail(errors, "execution envelope", "schemas/execution-envelope-record.schema.json must remain a closed runner record with all binding and digest fields required");
+      }
+      if (recordSchema.properties?.envelope?.$ref !== "execution-envelope.schema.json") {
+        fail(errors, "execution envelope", "schemas/execution-envelope-record.schema.json.envelope must $ref execution-envelope.schema.json");
+      }
+      if (JSON.stringify(recordSchema.properties?.emission_class?.enum) !== JSON.stringify(["sidecar", "inline_required", "diagnostic"])) {
+        fail(errors, "execution envelope", "schemas/execution-envelope-record.schema.json must keep the closed sidecar, inline_required, and diagnostic emission classes");
+      }
+      if (recordSchema.properties?.authority?.properties?.owner?.const !== "runner") {
+        fail(errors, "execution envelope", "schemas/execution-envelope-record.schema.json must keep the runner as authority owner");
+      }
+    } catch {
+      // The required-schema validation reports malformed JSON separately.
+    }
+  }
+  const runnerResultSchemaPath = resolve(root, "schemas/codex-runner-result.schema.json");
+  if (existsSync(runnerResultSchemaPath)) {
+    try {
+      const runnerResultSchema = JSON.parse(readFileSync(runnerResultSchemaPath, "utf8"));
+      const required = new Set(runnerResultSchema.required ?? []);
+      const control = runnerResultSchema.properties?.control;
+      const controlRequired = new Set(control?.required ?? []);
+      if (
+        runnerResultSchema.additionalProperties !== false ||
+        !required.has("response_markdown") ||
+        !required.has("control") ||
+        Object.hasOwn(runnerResultSchema.properties ?? {}, "route") ||
+        control?.additionalProperties !== false ||
+        ["evidence_status", "stop_reason", "next_action"].some((field) => !controlRequired.has(field))
+      ) {
+        fail(errors, "execution envelope", "schemas/codex-runner-result.schema.json must remain closed, route-free, and limited to response_markdown plus dynamic control");
       }
     } catch {
       // The required-schema validation reports malformed JSON separately.
@@ -1617,12 +1670,15 @@ function validateExecutionEnvelope(root, manifest, errors) {
       || (promptName ? codexCompactProfileCanonicalPaths(promptName).includes(expectedContractReference) : false);
     const hasEnvelope = text.includes("Execution Envelope:") || text.includes("Execution Envelope");
     const hasStructuredEnvelope = text.includes("fenced JSON") || /Execution Envelope:\s*```json/.test(text);
-    const ok = exists && referencesContract && hasEnvelope && hasStructuredEnvelope;
-    checks.adapters.push({ path, expectedContractReference, exists, referencesContract, hasEnvelope, hasStructuredEnvelope, ok });
+    const managedCodexBoundary = Boolean(promptName) && text.includes("{{ASK_COMPACT_CONTROLS}}") && !/Execution Envelope:\s*```json/.test(text);
+    const ok = exists && referencesContract && (promptName ? managedCodexBoundary : hasEnvelope && hasStructuredEnvelope);
+    checks.adapters.push({ path, expectedContractReference, exists, referencesContract, hasEnvelope, hasStructuredEnvelope, managedCodexBoundary, ok });
     if (!exists) {
       fail(errors, "execution envelope", `adapter prompt is missing: ${path}`);
-    } else if (!referencesContract || !hasEnvelope || !hasStructuredEnvelope) {
-      fail(errors, "execution envelope", `${path} must reference and require one fenced JSON shared Execution Envelope`);
+    } else if (!ok) {
+      fail(errors, "execution envelope", promptName
+        ? `${path} must defer managed emission to generated runner controls and must not embed an independent Envelope`
+        : `${path} must reference and require one fenced JSON shared Execution Envelope`);
     }
   }
 
@@ -4901,11 +4957,25 @@ function validateEvolutionLoopFixture(root, errors) {
     assertEvolutionReferenceShape(reference);
     assertPortableEvolutionReference(reference);
 
+    const sourceAssets = {
+      parent: reference.asset_lineage.original_parent,
+      candidate: reference.asset_lineage.sample_candidate,
+    };
     for (const [name, source] of Object.entries(reference.source_files)) {
-      const bytes = readFileSync(resolve(root, source.path));
-      const digest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
-      if (bytes.length !== source.byte_length || digest !== source.raw_digest) {
-        throw new Error(`Evolution ${name} source bytes differ from the exact checked reference`);
+      const content = readContentAddressedJson({ storeRoot, digest: sourceAssets[name].content_digest }).value;
+      const packaged = content.files?.find((file) => file.path === source.path);
+      const bytes = packaged?.encoding === "base64" && typeof packaged.bytes_base64 === "string"
+        ? Buffer.from(packaged.bytes_base64, "base64")
+        : null;
+      const digest = bytes ? `sha256:${createHash("sha256").update(bytes).digest("hex")}` : null;
+      if (
+        !bytes ||
+        bytes.length !== source.byte_length ||
+        digest !== source.raw_digest ||
+        packaged.byte_length !== source.byte_length ||
+        packaged.raw_digest !== source.raw_digest
+      ) {
+        throw new Error(`Evolution ${name} source bytes differ from the exact historical CAS reference`);
       }
     }
 

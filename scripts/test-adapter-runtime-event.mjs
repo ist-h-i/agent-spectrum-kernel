@@ -60,11 +60,20 @@ const codexNormalized = mapCodexRunnerResult(codexRunnerResult, {
 });
 assert.deepEqual(validateAdapterRuntimeEvent(codexNormalized), []);
 assert.equal(codexNormalized.adapter_id, "codex");
-assert.deepEqual(codexNormalized.verification, { obligation_required: false, attempted: 1, passed: 1, failed: 0, unavailable: 0 });
+assert.deepEqual(codexNormalized.verification, { obligation_required: false, attempted: 0, passed: 0, failed: 0, unavailable: 0 });
 assert.equal(codexNormalized.stop.status, "insufficient_evidence");
 assert.equal(codexNormalized.outcome.classification, "insufficient_evidence");
 assert.notEqual(codexNormalized.outcome.claim_effect, "support_within_scope");
 assert.ok(codexNormalized.evidence.missing.includes("required_gate_observation"));
+
+const codexVerificationResult = structuredClone(codexRunnerResult);
+codexVerificationResult.execution_evidence.requested_contracts.contracts.push("test-first-verification");
+const codexVerificationNormalized = mapCodexRunnerResult(codexVerificationResult, {
+  eventId: "evt:codex-verification-fixture",
+  taskId: "task:codex-verification-fixture",
+  occurredAt: "2026-07-14T00:00:01Z",
+});
+assert.deepEqual(codexVerificationNormalized.verification, { obligation_required: true, attempted: 0, passed: 0, failed: 0, unavailable: 1 }, "sensor pass must not become command or verification evidence");
 
 const missingStop = structuredClone(codexNormalized);
 delete missingStop.stop;

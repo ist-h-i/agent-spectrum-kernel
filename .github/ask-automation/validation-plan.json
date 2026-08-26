@@ -26,6 +26,14 @@
       "argv": ["node", "scripts/test-validate-repo.mjs"]
     },
     {
+      "id": "execution_envelope_record",
+      "argv": ["node", "scripts/test-execution-envelope-record.mjs"]
+    },
+    {
+      "id": "codex_runner_execution_envelope_conformance",
+      "argv": ["node", "scripts/test-codex-runner-execution-envelope-conformance.mjs"]
+    },
+    {
       "id": "claim_evidence_status_contract",
       "argv": ["node", "scripts/test-claim-evidence-status.mjs"]
     },

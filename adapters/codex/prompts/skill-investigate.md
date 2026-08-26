@@ -19,18 +19,7 @@ Cause:
 Changed:
 - ...
 
-Verified:
-- ...
-
-Unknown / not verified:
-- ...
-
-Next:
-- ...
-
-Execution Envelope:
-```json
-{"schema_version":"1.0.0","route":{"work_mode":"調査","operating_mode":"delivery_quality","user_facing":"...","internal":{"primary":"doubt-driven-development"}},"evidence_status":{"checked":[],"missing":[]},"stop_reason":{"status":"none","details":[],"human_decision_required":[],"stop_if":[]},"next_action":"..."}
-```
+Evidence:
+- claim, source or command, and exact result
 
 $ARGUMENTS

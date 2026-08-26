@@ -71,7 +71,7 @@ Users do not need to know skill names to start work. The default surface is a sm
 | 整理する / document, summarize, or hand off | この状態を整理して | ドキュメント整理 | documentation, handoff |
 | 活かす / preserve review findings or corrections | この指摘を次に活かして | 知識蓄積 | finding, ledger, documentation |
 
-Default route output uses one shared Execution Envelope. The envelope separates user-facing work terms from internal routing and is emitted once per meaningful workflow boundary:
+Default route output uses one shared Execution Envelope. The envelope separates user-facing work terms from internal routing. The JSON below illustrates the canonical payload; a managed ordinary boundary persists it as a runner-owned sidecar, while protected/handoff and explicit compatibility boundaries serialize it once:
 
 Execution Envelope:
 ```json

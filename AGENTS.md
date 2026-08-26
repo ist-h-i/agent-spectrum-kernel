@@ -198,21 +198,19 @@ Apply the five claim statuses inline for ordinary work. Use `evidence-ledger` on
 For implementation tasks, end with:
 
 ```text
-Changed:
-- ...
+Implementation Contract:
+- Artifact ID:
+- Upstream refs:
+- Actual change boundary:
+- Verification attempted:
+- Evidence references:
+- Handoff state:
 
-Verified:
-- ...
-
-Not verified:
-- ...
-
-Risks / assumptions:
-- ...
-
-Next:
-- ...
+Evidence:
+- claim, command or observation, and exact result
 ```
+
+Execution Envelope transport follows `docs/execution-envelope-contract.md`: the managed runner persists ordinary control state as a sidecar, protected and handoff boundaries serialize it once, and direct/unmanaged adapters use explicit inline compatibility. Do not copy route, checked/missing evidence, stop conditions, or next action into renamed summary fields.
 
 For review tasks, end with:
 
@@ -245,5 +243,5 @@ Allowed scope:
 Forbidden scope:
 Expected output:
 Verification:
-Stop condition:
+Unverified evidence:
 ```

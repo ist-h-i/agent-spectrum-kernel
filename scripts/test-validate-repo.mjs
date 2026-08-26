@@ -56,6 +56,17 @@ function envelopeBlock(overrides = {}) {
 }
 
 const validEnvelopeBlock = envelopeBlock();
+function codexStructuredResult(responseMarkdown, control = {}) {
+  return JSON.stringify({
+    schema_version: "1.0.0",
+    response_markdown: responseMarkdown,
+    control: {
+      evidence_status: { checked: ["fixture structured result"], missing: [], ...(control.evidence_status ?? {}) },
+      stop_reason: { status: "completed", details: [], human_decision_required: [], stop_if: [], ...(control.stop_reason ?? {}) },
+      next_action: control.next_action ?? "continue bounded verification",
+    },
+  }, null, 2);
+}
 const validMetricsCandidate = {
   schema_version: "1.0.0",
   event_id: "fixture:execution-envelope",
@@ -392,6 +403,8 @@ function writeAdapterFixture(root) {
   const schemaPaths = [
     "schemas/metrics-event.schema.json",
     "schemas/execution-envelope.schema.json",
+    "schemas/execution-envelope-record.schema.json",
+    "schemas/codex-runner-result.schema.json",
     "schemas/adapter-runtime-profile.schema.json",
     "schemas/adapter-runtime-evidence.schema.json",
     "schemas/adapter-runtime-event.schema.json",
@@ -658,7 +671,7 @@ const MANAGED_END = "<!-- agent-spectrum-kernel:end -->";
 const DEFAULT_PROFILE = "implementation";
 const PROMPT_TEMPLATES = ["skill-implement.md"];
 const COMMAND_TEMPLATES = ["codex-exec.md"];
-const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs", "execution-envelope.mjs", "adapter-runtime-event.mjs", "execution-envelope.schema.json", "metrics-event.schema.json", "adapter-runtime-event.schema.json"];
+const CODEX_RUNTIME_SCRIPTS = ["codex-exec-runner.mjs", "ask-sensors.mjs", "ask-shared.mjs", "execution-envelope.mjs", "adapter-runtime-event.mjs", "observability-paths.mjs", "execution-envelope.schema.json", "execution-envelope-record.schema.json", "codex-runner-result.schema.json", "metrics-event.schema.json", "adapter-runtime-event.schema.json"];
 const CODEX_PROFILES = { implementation: { skills: ["operating-mode-router"], prompts: PROMPT_TEMPLATES, commands: COMMAND_TEMPLATES } };
 const PROFILE_ROUTING_FIXTURES = { implementation: [{ id: "unfamiliar_repository", selected_route: "repository-orientation", required_skills: ["repository-orientation"] }] };
 const SKILL_RELATIONSHIPS = { "controlled-implementation": { requires: ["test-first-verification"], recommends: ["evidence-ledger"], incompatibleWith: [] } };
@@ -3217,13 +3230,18 @@ function assertCoreInstallerScripts() {
 
 function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
   const schemaPath = "schemas/execution-envelope.schema.json";
+  const recordSchemaPath = "schemas/execution-envelope-record.schema.json";
   const statePath = ".agent-spectrum-kernel/install-state.json";
   const canonicalBytes = readFileSync(resolve(repoRoot, schemaPath), "utf8");
   const canonicalDigest = hashText(canonicalBytes);
+  const recordCanonicalBytes = readFileSync(resolve(repoRoot, recordSchemaPath), "utf8");
+  const recordCanonicalDigest = hashText(recordCanonicalBytes);
   const projectedPath = resolve(freshTarget, schemaPath);
+  const projectedRecordPath = resolve(freshTarget, recordSchemaPath);
   const freshStatePath = resolve(freshTarget, statePath);
   const freshState = JSON.parse(readFileSync(freshStatePath, "utf8"));
   const schemaRecord = freshState.managed_files?.[schemaPath];
+  const envelopeRecordSchemaRecord = freshState.managed_files?.[recordSchemaPath];
 
   if (
     !existsSync(projectedPath) ||
@@ -3234,6 +3252,16 @@ function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
     schemaRecord?.canonical_sha256 !== canonicalDigest
   ) {
     throw new Error("fresh core installation must project and exactly identify the canonical Execution Envelope schema");
+  }
+  if (
+    !existsSync(projectedRecordPath) ||
+    readFileSync(projectedRecordPath, "utf8") !== recordCanonicalBytes ||
+    envelopeRecordSchemaRecord?.kind !== "immutable_contract" ||
+    envelopeRecordSchemaRecord?.asset !== recordSchemaPath ||
+    envelopeRecordSchemaRecord?.sha256 !== recordCanonicalDigest ||
+    envelopeRecordSchemaRecord?.canonical_sha256 !== recordCanonicalDigest
+  ) {
+    throw new Error("fresh core installation must project and exactly identify the canonical Execution Envelope record schema");
   }
   const canonicalExample = inspectExecutionEnvelope(readFileSync(resolve(freshTarget, "docs/execution-envelope-contract.md"), "utf8"), {
     schemaPath: projectedPath,
@@ -3354,6 +3382,18 @@ function assertExecutionEnvelopeSchemaProjection({ installer, freshTarget }) {
     const runtimePath = resolve(adapterTarget, "scripts/execution-envelope.schema.json");
     if (readFileSync(canonicalPath, "utf8") !== readFileSync(runtimePath, "utf8")) {
       throw new Error(`${label} runtime Execution Envelope schema must be byte-identical to the core canonical projection`);
+    }
+    const runtimeRecordPath = resolve(adapterTarget, "scripts/execution-envelope-record.schema.json");
+    const runtimeResultPath = resolve(adapterTarget, "scripts/codex-runner-result.schema.json");
+    if (label === "Codex") {
+      if (readFileSync(resolve(adapterTarget, recordSchemaPath), "utf8") !== readFileSync(runtimeRecordPath, "utf8")) {
+        throw new Error("Codex runtime Execution Envelope record schema must be byte-identical to the core canonical projection");
+      }
+      if (readFileSync(resolve(repoRoot, "schemas/codex-runner-result.schema.json"), "utf8") !== readFileSync(runtimeResultPath, "utf8")) {
+        throw new Error("Codex runner result schema must be byte-identical to its adapter runtime projection");
+      }
+    } else if (existsSync(runtimeRecordPath) || existsSync(runtimeResultPath)) {
+      throw new Error("Claude inline-compatibility runtime must not install Codex-only record or structured-result schemas");
     }
     const runtimeSchema = JSON.parse(readFileSync(runtimePath, "utf8"));
     runtimeSchema.properties.schema_version.const = "9.9.9";
@@ -4242,16 +4282,7 @@ function assertCodexRunnerScript() {
   const targetRunnerScript = resolve(target, "scripts/codex-exec-runner.mjs");
 
   const fakeCodex = resolve(target, "fake-codex");
-  writeFileSync(
-    fakeCodex,
-    `#!/bin/sh
-printf 'invoked\n' >> "$0.invocations"
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
-  shift
-done
-cat <<'EOF' > "$output"
-Implementation Contract:
+  const implementationResponse = `Implementation Contract:
 - Artifact ID: IMPL-FAKE
 - Upstream refs: WP-FAKE, VER-FAKE
 - Actual change boundary: local fixture
@@ -4263,7 +4294,17 @@ Evidence:
 - Implementation Contract ref: IMPL-FAKE
 - command: node scripts/test-validate-repo.mjs
   result: pass
-${validEnvelopeBlock}
+`;
+  writeFileSync(
+    fakeCodex,
+    `#!/bin/sh
+printf 'invoked\n' >> "$0.invocations"
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
+${codexStructuredResult(implementationResponse)}
 EOF
 `,
   );
@@ -4285,6 +4326,7 @@ EOF
   if (!passResult.stdout.includes("Codex runner: executed") || !passResult.stdout.includes("Evidence level: executed") || !existsSync(resolve(target, "codex-output.md"))) {
     throw new Error(`codex runner should capture output and report executed evidence\n${passResult.stdout}\n${passResult.stderr}`);
   }
+  if (readFileSync(resolve(target, "codex-output.md"), "utf8").includes("Execution Envelope:")) throw new Error("ordinary managed implementation output must not serialize the runner-owned Envelope");
   for (const expected of [
     "Requested contracts: 3",
     "Projected contracts evidence: projected",
@@ -4330,7 +4372,10 @@ EOF
     jsonReport.normalized_adapter_event?.stop?.status !== "insufficient_evidence" ||
     jsonReport.normalized_adapter_event?.outcome?.claim_effect !== "downgrade" ||
     jsonReport.normalized_adapter_event?.contracts?.applied?.length !== 0 ||
-    jsonReport.normalized_adapter_event?.verification?.passed !== 1 ||
+    jsonReport.normalized_adapter_event?.verification?.passed !== 0 ||
+    jsonReport.execution_envelope_record?.emission_class !== "sidecar" ||
+    jsonReport.execution_envelope_record?.persisted !== true ||
+    !jsonReport.execution_envelope_record?.logical_path?.startsWith("ask-runtime/execution-envelopes/execution-envelope-record-") ||
     Object.hasOwn(jsonReport.execution_evidence ?? {}, "applied")
   ) {
     throw new Error(`codex runner structured evidence stages are invalid\n${jsonResult.stdout}`);
@@ -4341,15 +4386,7 @@ EOF
   assertRuntimePass("codex review runner install setup", runRepoScript([installer, "--target", reviewTarget, "--profile", "review"]));
   const reviewRunnerScript = resolve(reviewTarget, "scripts/codex-exec-runner.mjs");
   const fakeReviewCodex = resolve(reviewTarget, "fake-review-codex");
-  writeFileSync(
-    fakeReviewCodex,
-    `#!/bin/sh
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
-  shift
-done
-cat <<'EOF' > "$output"
-Change signals:
+  const reviewResponse = `Change signals:
 - signal: fixture
 Required gates:
 - review-final-merge-gate: fixture
@@ -4369,7 +4406,16 @@ Non-blocking follow-ups:
 - none
 Residual risk:
 - none
-${validEnvelopeBlock}
+`;
+  writeFileSync(
+    fakeReviewCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
+${codexStructuredResult(reviewResponse)}
 EOF
 `,
   );
@@ -4393,7 +4439,9 @@ EOF
   if (
     JSON.stringify(reviewReport.execution_evidence?.required_gates?.gates) !== JSON.stringify(["review-final-merge-gate"]) ||
     JSON.stringify(reviewReport.normalized_adapter_event?.gates?.required) !== JSON.stringify(["review-final-merge-gate"]) ||
-    reviewReport.normalized_adapter_event?.review?.final_gate_required !== true
+    reviewReport.normalized_adapter_event?.review?.final_gate_required !== true ||
+    reviewReport.execution_envelope_record?.emission_class !== "sidecar" ||
+    readFileSync(resolve(reviewTarget, "codex-review-output.md"), "utf8").includes("Execution Envelope:")
   ) {
     throw new Error(`codex review runner must connect review-final-merge-gate to the normalized event\n${reviewResult.stdout}`);
   }
@@ -4423,10 +4471,164 @@ EOF
     riskReport.normalized_adapter_event?.approval?.required !== true ||
     riskReport.normalized_adapter_event?.approval?.status !== "missing" ||
     riskReport.normalized_adapter_event?.stop?.status !== "risk_gate" ||
+    riskReport.execution_envelope_record?.emission_class !== "inline_required" ||
+    (readFileSync(resolve(target, "codex-risk-output.md"), "utf8").match(/Execution Envelope:/gu) ?? []).length !== 1 ||
     invocationsAfterRisk !== invocationsBeforeRisk
   ) {
     throw new Error(`codex risk runner must emit approval-required state and stop before execution\n${riskResult.stdout}`);
   }
+
+  const invocationsBeforeCapability = existsSync(riskInvocationMarker) ? readFileSync(riskInvocationMarker, "utf8") : "";
+  const capabilityResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--required-gate",
+    "unavailable-gate",
+    "--codex-bin",
+    fakeCodex,
+    "--output",
+    "codex-capability-output.md",
+    "--json",
+  ]);
+  if (capabilityResult.status === 0) throw new Error(`codex capability runner must stop before execution\n${capabilityResult.stdout}`);
+  const capabilityReport = JSON.parse(capabilityResult.stdout);
+  const invocationsAfterCapability = existsSync(riskInvocationMarker) ? readFileSync(riskInvocationMarker, "utf8") : "";
+  if (
+    capabilityReport.execution_envelope_record?.envelope?.stop_reason?.status !== "capability_missing" ||
+    capabilityReport.execution_envelope_record?.emission_class !== "inline_required" ||
+    capabilityReport.normalized_adapter_event?.stop?.status !== "capability_missing" ||
+    (readFileSync(resolve(target, "codex-capability-output.md"), "utf8").match(/Execution Envelope:/gu) ?? []).length !== 1 ||
+    invocationsAfterCapability !== invocationsBeforeCapability
+  ) {
+    throw new Error(`codex capability runner must emit one bound inline stop without invoking Codex\n${capabilityResult.stdout}`);
+  }
+
+  const fakeBlockedCodex = resolve(target, "fake-blocked-codex");
+  writeFileSync(
+    fakeBlockedCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
+${codexStructuredResult(implementationResponse, {
+  evidence_status: { checked: ["repository files"], missing: ["external runtime"] },
+  stop_reason: { status: "insufficient_evidence", details: ["external runtime was not checked"], human_decision_required: [], stop_if: ["external runtime evidence is required"] },
+  next_action: "capture the external runtime result",
+})}
+EOF
+`,
+  );
+  chmodSync(fakeBlockedCodex, 0o755);
+  const blockedResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--codex-bin",
+    fakeBlockedCodex,
+    "--output",
+    "codex-blocked-output.md",
+    "--json",
+  ]);
+  if (blockedResult.status === 0) throw new Error(`blocking insufficient evidence must not report executed success\n${blockedResult.stdout}`);
+  const blockedReport = JSON.parse(blockedResult.stdout);
+  if (
+    blockedReport.execution_envelope_record?.envelope?.stop_reason?.status !== "insufficient_evidence" ||
+    blockedReport.execution_envelope_record?.emission_class !== "inline_required" ||
+    (readFileSync(resolve(target, "codex-blocked-output.md"), "utf8").match(/Execution Envelope:/gu) ?? []).length !== 1
+  ) {
+    throw new Error(`blocking insufficient evidence must emit exactly one inline projection\n${blockedResult.stdout}`);
+  }
+
+  const diagnosticResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--codex-bin",
+    fakeCodex,
+    "--output",
+    "codex-diagnostic-output.md",
+    "--diagnostic-envelope",
+    "--json",
+  ]);
+  assertRuntimePass("codex runner explicitly emits diagnostic Envelope", diagnosticResult);
+  const diagnosticReport = JSON.parse(diagnosticResult.stdout);
+  if (
+    diagnosticReport.execution_envelope_record?.emission_class !== "diagnostic" ||
+    (readFileSync(resolve(target, "codex-diagnostic-output.md"), "utf8").match(/Execution Envelope:/gu) ?? []).length !== 1
+  ) {
+    throw new Error(`explicit diagnostic output must serialize exactly one bound Envelope\n${diagnosticResult.stdout}`);
+  }
+
+  const handoffTarget = resolve(fixtureRoot, "codex-runner-handoff-target");
+  assertRuntimePass("codex handoff runner core setup", runRepoScript([coreInstaller, "--target", handoffTarget]));
+  assertRuntimePass("codex handoff runner install setup", runRepoScript([installer, "--target", handoffTarget, "--profile", "full"]));
+  const handoffRunnerScript = resolve(handoffTarget, "scripts/codex-exec-runner.mjs");
+  const fakeHandoffCodex = resolve(handoffTarget, "fake-handoff-codex");
+  const handoffResponse = `Task:
+- continue the bounded fixture
+Context:
+- exact local state
+Allowed scope:
+- fixture only
+Forbidden scope:
+- external effects
+Expected output:
+- bounded continuation artifact
+Verification:
+- node scripts/test-validate-repo.mjs
+Unverified evidence:
+- external runtime
+`;
+  writeFileSync(
+    fakeHandoffCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+cat <<'EOF' > "$output"
+${codexStructuredResult(handoffResponse, { next_action: "resume the bounded fixture" })}
+EOF
+`,
+  );
+  chmodSync(fakeHandoffCodex, 0o755);
+  const handoffResult = runRepoScript([
+    handoffRunnerScript,
+    "--target",
+    handoffTarget,
+    "--prompt",
+    "skill-handoff.md",
+    "--codex-bin",
+    fakeHandoffCodex,
+    "--output",
+    "codex-handoff-output.md",
+    "--json",
+  ]);
+  assertRuntimePass("codex handoff runner emits inline Envelope", handoffResult);
+  const handoffReport = JSON.parse(handoffResult.stdout);
+  if (
+    handoffReport.execution_envelope_record?.emission_class !== "inline_required" ||
+    (readFileSync(resolve(handoffTarget, "codex-handoff-output.md"), "utf8").match(/Execution Envelope:/gu) ?? []).length !== 1
+  ) {
+    throw new Error(`handoff must serialize exactly one runner-owned Envelope\n${handoffResult.stdout}`);
+  }
+  const handoffRecordPath = resolve(
+    handoffTarget,
+    ".agent-spectrum-kernel/runtime/execution-envelopes",
+    `${handoffReport.execution_envelope_record.record_id}.json`,
+  );
+  if (!existsSync(handoffRecordPath)) throw new Error("handoff runner must persist its content-addressed Envelope record");
+  assertRuntimePass("codex adapter detach preserves runtime Envelope records", runRepoScript([installer, "--target", handoffTarget, "--detach"]));
+  if (!existsSync(handoffRecordPath)) throw new Error("Codex detach must preserve runner-owned Envelope records as runtime data");
 
   const doctorResult = runRepoScript([doctorScript, "--target", target, "--runtime-probe", "--json"]);
   assertRuntimePass("Codex doctor reports static compact-profile evidence", doctorResult);
@@ -4646,6 +4848,7 @@ EOF
   const originalSharedRuntime = readFileSync(resolve(target, "scripts/ask-shared.mjs"), "utf8");
   const originalAdapterEventRuntime = readFileSync(resolve(target, "scripts/adapter-runtime-event.mjs"), "utf8");
   const originalEnvelopeRuntime = readFileSync(resolve(target, "scripts/execution-envelope.mjs"), "utf8");
+  const originalObservabilityRuntime = readFileSync(resolve(target, "scripts/observability-paths.mjs"), "utf8");
   const outsideRuntimeDir = resolve(fixtureRoot, "outside-codex-runtime", "scripts");
   mkdirSync(outsideRuntimeDir, { recursive: true });
   const outsideRunnerPath = resolve(outsideRuntimeDir, "codex-exec-runner.mjs");
@@ -4653,6 +4856,7 @@ EOF
   writeFileSync(resolve(outsideRuntimeDir, "ask-shared.mjs"), originalSharedRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "adapter-runtime-event.mjs"), originalAdapterEventRuntime);
   writeFileSync(resolve(outsideRuntimeDir, "execution-envelope.mjs"), originalEnvelopeRuntime);
+  writeFileSync(resolve(outsideRuntimeDir, "observability-paths.mjs"), originalObservabilityRuntime);
   rmSync(targetRunnerScript);
   symlinkSync(outsideRunnerPath, targetRunnerScript);
   const symlinkRunnerResult = runRepoScript([targetRunnerScript, "--target", target, "--dry-run"]);
@@ -4712,6 +4916,39 @@ exit 9
   assertRuntimeFail("codex runner preserves prior output on process failure", failedOutputResult, "codex exec exited 9");
   if (readFileSync(failedOutputPath, "utf8") !== "previous successful output\n") {
     throw new Error("codex runner must preserve the previous official output when Codex exits non-zero");
+  }
+
+  const recordStorePath = resolve(target, ".agent-spectrum-kernel/runtime/execution-envelopes");
+  const recordsBeforeInvalidResult = existsSync(recordStorePath) ? readdirSync(recordStorePath).sort() : [];
+  const fakeInvalidStructuredCodex = resolve(target, "fake-invalid-structured-codex");
+  writeFileSync(
+    fakeInvalidStructuredCodex,
+    `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
+  shift
+done
+printf 'not-json\n' > "$output"
+`,
+  );
+  chmodSync(fakeInvalidStructuredCodex, 0o755);
+  const invalidStructuredResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--codex-bin",
+    fakeInvalidStructuredCodex,
+    "--output",
+    "codex-preserved-output.md",
+  ]);
+  assertRuntimeFail("codex runner preserves prior output on invalid structured result", invalidStructuredResult, "Codex structured result is invalid JSON");
+  if (
+    readFileSync(failedOutputPath, "utf8") !== "previous successful output\n" ||
+    JSON.stringify(existsSync(recordStorePath) ? readdirSync(recordStorePath).sort() : []) !== JSON.stringify(recordsBeforeInvalidResult)
+  ) {
+    throw new Error("invalid structured control must preserve the prior official output and publish no Envelope record");
   }
 
   const mismatchResult = runRepoScript([targetRunnerScript, "--target", target, "--prompt", "skill-investigate.md", "--mode", "implementation", "--codex-bin", fakeCodex]);
@@ -4783,6 +5020,27 @@ exit 9
   if (!weakResult.stdout.includes("Codex runner: insufficient_evidence") || !weakResult.stdout.includes("Sensor status: not run") || !weakResult.stdout.includes("Evidence level: runtime_detected")) {
     throw new Error(`codex runner should normalize weak output as insufficient evidence\n${weakResult.stdout}\n${weakResult.stderr}`);
   }
+
+  const outsideRecordStore = resolve(fixtureRoot, "outside-codex-envelope-records");
+  rmSync(recordStorePath, { recursive: true, force: true });
+  mkdirSync(outsideRecordStore, { recursive: true });
+  symlinkSync(outsideRecordStore, recordStorePath);
+  const recordStoreEscapeResult = runRepoScript([
+    targetRunnerScript,
+    "--target",
+    target,
+    "--prompt",
+    "skill-implement.md",
+    "--codex-bin",
+    fakeCodex,
+    "--output",
+    "codex-record-store-escape.md",
+  ]);
+  assertRuntimeFail("codex runner rejects Envelope record store symlink escape", recordStoreEscapeResult, "Execution Envelope record store escapes runtime-owned storage through a symbolic link");
+  if (existsSync(resolve(target, "codex-record-store-escape.md")) || readdirSync(outsideRecordStore).length !== 0) {
+    throw new Error("Codex runner must not publish output or a record through a symlinked runtime store");
+  }
+  rmSync(recordStorePath);
 
   const missingPromptResult = runRepoScript([targetRunnerScript, "--target", target, "--prompt", "missing.md", "--codex-bin", fakeCodex]);
   assertRuntimeFail("codex runner missing prompt preflight", missingPromptResult, "prompt has no validated execution profile");
@@ -5137,9 +5395,9 @@ ${validEnvelopeBlock}
   }
 
   const promptContracts = [
-    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nVerified:\n- node scripts/test-validate-repo.mjs\n\nUnknown / not verified:\n- External runtime.\n\nNext:\n- Continue investigation.\n\n" + validEnvelopeBlock],
+    ["investigation", "Findings:\n- Reproduced fixture.\n\nCause:\n- Fixture cause.\n\nChanged:\n- None.\n\nEvidence:\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n- Unknown: external runtime unavailable.\n\n" + validEnvelopeBlock],
     ["verification", "Verification Contract:\n- Artifact ID: VER-FIXTURE\n- Behavior to prove: fixture.\n\nEvidence:\n- Verification Contract ref: VER-FIXTURE\n- command: node scripts/test-validate-repo.mjs\n  result: pass\n\n" + validEnvelopeBlock],
-    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nStop condition:\n- Missing evidence.\n\n" + insufficientEvidenceEnvelopeBlock],
+    ["handoff", "Task:\n- Continue fixture work.\n\nContext:\n- Local test only.\n\nAllowed scope:\n- Tests.\n\nForbidden scope:\n- External operations.\n\nExpected output:\n- Verification result.\n\nVerification:\n- node scripts/test-validate-repo.mjs\n\nUnverified evidence:\n- External runtime.\n\n" + insufficientEvidenceEnvelopeBlock],
   ];
   for (const [mode, content] of promptContracts) {
     const input = resolve(target, `${mode}-contract.txt`);

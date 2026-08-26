@@ -19,11 +19,5 @@ Forbidden scope:
 Expected output:
 Verification:
 Unverified evidence:
-Stop condition:
-
-Execution Envelope:
-```json
-{"schema_version":"1.0.0","route":{"work_mode":"ドキュメント整理","operating_mode":"delivery_quality","user_facing":"...","internal":{"primary":"handoff-generation"}},"evidence_status":{"checked":[],"missing":[]},"stop_reason":{"status":"none","details":[],"human_decision_required":[],"stop_if":[]},"next_action":"..."}
-```
 
 $ARGUMENTS

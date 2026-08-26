@@ -2,7 +2,7 @@
 
 This contract defines the smallest durable state needed to resume Agent Spectrum Kernel work. It is not a lifecycle engine, not a stage taxonomy, and not proof that work is correct.
 
-The shared control metadata for a resumable workflow is the [Execution Envelope](execution-envelope-contract.md). Session state may embed the latest envelope under `execution_envelope`; the envelope contract remains canonical for route, evidence status, stop reason, next action, and optional metrics behavior.
+The shared control metadata for a resumable workflow is the [Execution Envelope](execution-envelope-contract.md). Managed session state references the latest runner-owned record under `execution_envelope_ref`. Unmanaged compatibility may embed one payload under `execution_envelope` only when that is the boundary's sole serialization.
 
 ## Applicability
 
@@ -22,22 +22,9 @@ Use ASK-native terms and truth-model labels.
 ```json
 {
   "task_intent": "Implement the scoped change or continue the named issue.",
-  "execution_envelope": {
-    "schema_version": "1.0.0",
-    "route": {
-      "work_mode": "実装",
-      "operating_mode": "delivery_quality",
-      "user_facing": "実装して検証する",
-      "internal": { "primary": "controlled-implementation", "secondary": ["test-first-verification"] }
-    },
-    "evidence_status": { "checked": [], "missing": [] },
-    "stop_reason": {
-      "status": "none",
-      "details": [],
-      "human_decision_required": [],
-      "stop_if": []
-    },
-    "next_action": "run the focused verification"
+  "execution_envelope_ref": {
+    "record_id": "execution-envelope-record-<sha256>",
+    "logical_path": "ask-runtime/execution-envelopes/<record-id>.json"
   },
   "current_phase": "Verification Contract | Implementation Contract | implementation | verification | handoff | waiting for approval",
   "evidence_details": [
@@ -60,10 +47,10 @@ Use ASK-native terms and truth-model labels.
 
 ## Evidence Rules
 
-- `execution_envelope` is the sole source of truth for route, evidence presence (`checked` / `missing`), stop reason, human approval requirement, and next action. Its shape must conform to `schemas/execution-envelope.schema.json`.
+- `execution_envelope_ref` identifies the sole runner-owned record for route, evidence presence, stop reason, human approval requirement, and next action. Its record and payload must conform to the two Execution Envelope schemas. Unmanaged compatibility may use `"execution_envelope_ref": "inline_boundary"` or one embedded `execution_envelope`, but never both or a second independently edited payload.
 - `evidence_details` must use `ask.claim-evidence-status@1.0.0`: `Verified`, `Supported`, `Hypothesis`, `Unknown`, or `Falsified`. It holds detailed proof or uncertainty that does not fit the bounded Envelope lists.
 - A session-state record does not prove readiness, safety, correctness, no regression, or production suitability.
-- Missing verification remains in `execution_envelope.evidence_status.missing` and/or `evidence_details`; do not convert it into an assumption.
+- Missing verification remains in the referenced Envelope's `evidence_status.missing` and/or `evidence_details`; do not convert it into an assumption.
 - `stop_reason.stop_if` is the sole stop-condition field. Do not add parallel `blocked_reason`, `required_human_approval`, `resume_instruction`, or `stop_conditions` fields.
 
 ## Storage Boundary

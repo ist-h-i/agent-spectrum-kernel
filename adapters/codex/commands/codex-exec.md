@@ -47,15 +47,14 @@ node scripts/codex-exec-runner.mjs --prompt skill-handoff.md --mode handoff --sa
 ```
 
 The runner performs local preflight, loads the generated compact prompt/profile,
-invokes `codex exec`, captures final output, runs `ask-sensors`, and reports
+invokes `codex exec` with a closed structured-result schema, derives and persists one bound Execution Envelope record, runs `ask-sensors` against the record/output pair, and reports
 requested contracts, required gates, projected contracts, runtime-loaded contracts, and applied
 output-contract evidence separately. Workflow, risk/approval, and verification
 application remain unavailable unless separately observed.
 Codex-controlled Skill loading remains unavailable unless separately observed.
-A passing sensor result is not proof of business correctness, product readiness,
-or no regression.
+A passing sensor result is not a verification attempt and is not proof of business correctness, product readiness, or no regression. Ordinary fixed output contains no serialized Envelope; protected and handoff output contains exactly one runner-rendered projection. Add `--diagnostic-envelope` only for an explicit route/debug request.
 
-Use this when a task needs a precise next-agent handoff with allowed scope, forbidden scope, expected output, verification, and stop condition.
+Use this when a task needs a precise next-agent handoff with allowed scope, forbidden scope, expected output, and verification. The Envelope owns the stop condition.
 
 ## Safety Notes
 

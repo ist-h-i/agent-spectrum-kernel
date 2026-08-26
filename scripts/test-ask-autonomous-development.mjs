@@ -90,6 +90,8 @@ assert.equal(foreignPullIgnored.mode, "advance_issue");
 assert.equal(isDisallowedPath(".github/workflows/validate.yml"), true);
 assert.equal(isDisallowedPath("scripts/test-validate-repo.mjs"), true);
 assert.equal(isDisallowedPath("scripts/validate-repo.mjs"), true);
+assert.equal(isDisallowedPath("scripts/test-execution-envelope-record.mjs"), true);
+assert.equal(isDisallowedPath("scripts/test-codex-runner-execution-envelope-conformance.mjs"), true);
 assert.equal(isDisallowedPath("scripts/test-ask-benchmark.mjs"), true);
 assert.equal(isDisallowedPath("benchmarks/results/measured.json"), true);
 assert.equal(isDisallowedPath("private-evaluator/oracle.json"), true);
@@ -363,7 +365,7 @@ assert.equal(loadedPlan.plan.container.node_major, 24);
 assert.equal(loadedPlan.plan.container.image_digest, VALIDATION_IMAGE_DIGEST);
 assert.deepEqual(loadedPlan.plan.container.environment_allowlist, ["PATH", "HOME", "LANG", "LC_ALL", "NODE_ENV"]);
 const requiredCommandIds = [
-  "changed_mjs_syntax", "autonomous_development_control", "repository_validation_tests", "claim_evidence_status_contract", "epic_admission_work_package_plan",
+  "changed_mjs_syntax", "autonomous_development_control", "repository_validation_tests", "execution_envelope_record", "codex_runner_execution_envelope_conformance", "claim_evidence_status_contract", "epic_admission_work_package_plan",
   "content_addressed_store", "asset_registry_contract", "asset_registry_sample_check",
   "portfolio_manager_contract", "portfolio_manager_sample_check",
   "evolution_loop_contract", "evolution_loop_integration", "evolution_loop_sample_check",

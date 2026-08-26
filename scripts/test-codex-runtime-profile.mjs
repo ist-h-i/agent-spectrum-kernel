@@ -25,6 +25,7 @@ const requiredControls = ["scope", "verification", "risk_approval", "evidence", 
 const requiredTaskClasses = ["implementation", "investigation", "review", "verification", "handoff"];
 const claimEvidenceContractRef = "ask.claim-evidence-status@1.0.0";
 const formalLedgerDirectTriggerId = "formal_claim_audit_required";
+const expectedOutputControl = "[output] Managed runner owns the record: ordinary=>sidecar; stop/handoff=>inline; diagnostic only explicit. Unmanaged=>one inline. next_action only there.";
 
 validateCodexCompactControlMap(controlMap);
 if (summary.rendered_bytes >= summary.baseline_bytes) throw new Error("Codex compact profiles must reduce aggregate prompt bytes measured from immutable pre-compact fixtures");
@@ -47,13 +48,18 @@ for (const profile of summary.profiles) {
   if (JSON.stringify(header.requested_contracts) !== JSON.stringify(profile.requested_contracts) || JSON.stringify(header.control_ids) !== JSON.stringify(profile.control_ids)) throw new Error(`${profile.prompt_name} header omits requested contracts or control IDs`);
   if (artifact.content.includes("{{ASK_COMPACT_")) throw new Error(`${profile.prompt_name} retained an unresolved generated-content placeholder`);
   for (const controlId of requiredControls) if (!artifact.content.includes(`[${controlId}]`)) throw new Error(`${profile.prompt_name} rendered output is missing ${controlId}`);
+  if (!artifact.content.includes(expectedOutputControl)) throw new Error(`${profile.prompt_name} does not preserve the runner-owned emission policy`);
   for (const triggerId of route.direct_trigger_ids.filter((id) => id !== formalLedgerDirectTriggerId)) if (!artifact.content.includes(`\`${triggerId}\``)) throw new Error(`${profile.prompt_name} rendered output is missing direct trigger ${triggerId}`);
   if (!profile.direct_trigger_ids.includes(formalLedgerDirectTriggerId)) throw new Error(`${profile.prompt_name} must expose the closed formal-ledger direct trigger`);
   if (!artifact.content.includes(claimEvidenceContractRef) || !artifact.content.includes("; inline; formal[audit|multi-claim|high-stakes|cross-revision|stable-IDs]=>evidence-ledger")) throw new Error(`${profile.prompt_name} must render the shared inline-default and closed formal-audit claim evidence contract revision`);
   const source = readFileSync(resolve(root, "adapters", "codex", "prompts", profile.prompt_name), "utf8");
   if (source.includes("operating-mode-router") || source.includes("skill-router")) throw new Error(`${profile.prompt_name} invokes an upper router despite fixed entry mode`);
   if (!source.includes("{{ASK_COMPACT_CONTROLS}}") || !source.includes("{{ASK_COMPACT_DIRECT_TRIGGERS}}")) throw new Error(`${profile.prompt_name} must generate controls and triggers from the canonical map`);
+  if (source.includes("Execution Envelope:") || source.includes("```json")) throw new Error(`${profile.prompt_name} must not embed an independent managed Execution Envelope`);
 }
+
+const handoffSource = readFileSync(resolve(root, "adapters/codex/prompts/skill-handoff.md"), "utf8");
+if (handoffSource.includes("Stop condition:")) throw new Error("handoff prompt must keep stop conditions only in the runner-owned Execution Envelope");
 
 const implementation = buildCodexProjectionPlan({ profileName: "implementation" });
 if (implementation.skills.includes("operating-mode-router") || implementation.skills.includes("skill-router")) throw new Error("implementation compact profile must not install upper routers as prompt dependencies");

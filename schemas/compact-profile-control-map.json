@@ -57,7 +57,10 @@
     "output": {
       "source_refs": ["docs/execution-envelope-contract.md"],
       "required_sections_from_prompt_contract": true,
-      "execution_envelope_count": 1,
+      "managed_runner_ordinary": "sidecar",
+      "managed_runner_protected": "inline_required",
+      "managed_runner_diagnostic": "explicit_only",
+      "unmanaged_compatibility": "inline_required",
       "next_action_location": "execution_envelope_only"
     }
   },

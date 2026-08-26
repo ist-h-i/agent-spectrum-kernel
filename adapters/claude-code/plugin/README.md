@@ -11,7 +11,7 @@ Use the project-local adapter when one repository needs short commands such as `
 - `/ai-skills:ledger-refresh`
 - `/ai-skills:implementation-context-check`
 
-The plugin remains an adapter. Core skills in `skills/*/SKILL.md` remain the source of truth. The package includes the canonical Execution Envelope and claim-evidence contracts, their referenced schemas, the formal `evidence-ledger` Skill, and the legacy claim normalizer under plugin-root-qualified paths, so entry points do not depend on root-level ASK files.
+The plugin remains an adapter. Core skills in `skills/*/SKILL.md` remain the source of truth. The package includes the canonical Execution Envelope and claim-evidence contracts, their referenced schemas, the formal `evidence-ledger` Skill, and the legacy claim normalizer under plugin-root-qualified paths, so entry points do not depend on root-level ASK files. Its Execution Envelope path is explicit inline compatibility; plugin installation or the Stop wrapper does not provide or claim a runner-owned sidecar.
 
 The bundled assets are byte-exact projections of `docs/execution-envelope-contract.md`, `docs/claim-evidence-status-contract.md`, their schemas, `skills/evidence-ledger/SKILL.md`, and `scripts/claim-evidence-status.mjs`. Repository validation requires byte-for-byte equality with the canonical files.
 

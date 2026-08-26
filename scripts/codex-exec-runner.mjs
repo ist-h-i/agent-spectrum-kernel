@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ASK_SHARED_MODULE_PATH, CODEX_PROMPT_CONTRACTS, inspectCodexDiscoverySkillAssets, inspectCodexProjectionCanonicalInputs, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
 import { mapCodexRunnerResult } from "./adapter-runtime-event.mjs";
+import { buildExecutionEnvelopeRecord, hasExecutionEnvelopeMarker, inspectExecutionEnvelopeRecordEmission, renderExecutionEnvelopeProjection, selectExecutionEnvelopeEmission, validateExecutionEnvelope, validateExecutionEnvelopeRecord, validateJsonSchema } from "./execution-envelope.mjs";
+import { resolveGitDirectory, resolveObservabilityPath } from "./observability-paths.mjs";
 
 const CODEX_STATE_PATH = ".agent-spectrum-kernel/codex-install-state.json";
 const DEFAULT_OUTPUT = ".agents/runs/codex-last-output.md";
@@ -17,7 +19,10 @@ const MANAGED_CODEX_RUNTIME_FILES = [
   "ask-shared.mjs",
   "execution-envelope.mjs",
   "adapter-runtime-event.mjs",
+  "observability-paths.mjs",
   "execution-envelope.schema.json",
+  "execution-envelope-record.schema.json",
+  "codex-runner-result.schema.json",
   "metrics-event.schema.json",
   "adapter-runtime-event.schema.json",
 ];
@@ -51,6 +56,7 @@ function parseArgs(argv) {
     explicitRequiredGates: [],
     gatesObserved: false,
     dryRun: false,
+    diagnosticEnvelope: false,
     json: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -75,6 +81,8 @@ function parseArgs(argv) {
       args.gatesObserved = true;
     } else if (arg === "--dry-run") {
       args.dryRun = true;
+    } else if (arg === "--diagnostic-envelope") {
+      args.diagnosticEnvelope = true;
     } else if (arg === "--json") {
       args.json = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -116,6 +124,7 @@ Options:
   --required-gate <id>  Task-specific required gate. Repeat for multiple gates.
   --gates-observed      Record that task gate classification ran and found no additional gate.
   --dry-run             Run preflight and print the codex command without invoking Codex.
+  --diagnostic-envelope Explicitly serialize the validated record for route/debug diagnosis.
   --json                Print machine-readable result JSON.
 
 The runner is bounded: it runs preflight, assembles an installed prompt with
@@ -132,9 +141,10 @@ function readJson(path) {
 function preflight(args) {
   const failures = [];
   const warnings = [];
+  const capabilityMissing = [];
   if (!existsSync(args.target)) {
     failures.push(`target is missing: ${args.target}`);
-    return { failures, warnings, state: null, promptPath: null, compactProfile: null };
+    return { failures, warnings, capabilityMissing, state: null, promptPath: null, compactProfile: null };
   }
   args.target = realpathSync(args.target);
   const statePath = resolve(args.target, CODEX_STATE_PATH);
@@ -191,7 +201,7 @@ function preflight(args) {
     if (compactProfile.rendered_sha256 !== `sha256:${hashText(promptContent)}`) failures.push(`compact-profile rendered digest mismatch: ${args.prompt}`);
     if (compactProfile.canonical_source_digest !== state?.projection_plan?.canonical_source_digest) failures.push(`compact-profile canonical source digest does not match shared projection plan: ${args.prompt}`);
     if (compactProfile.profile_fingerprint !== state?.projection_plan?.fingerprint) failures.push(`compact-profile fingerprint does not match shared projection plan: ${args.prompt}`);
-    for (const gate of args.requiredGates) if (!(state?.selected_skills ?? []).includes(gate)) failures.push(`required gate is not installed in the selected profile: ${gate}`);
+    for (const gate of args.requiredGates) if (!(state?.selected_skills ?? []).includes(gate)) capabilityMissing.push(gate);
     const selectedProfile = (state?.compact_runtime_profiles ?? []).find((profile) => profile.profile_id === compactProfile.profile_id);
     if (!selectedProfile || selectedProfile.rendered_sha256 !== compactProfile.rendered_sha256) failures.push(`compact profile is not selected in Codex install state: ${compactProfile.profile_id}`);
     for (const finding of inspectCodexProjectionCanonicalInputs(args.target, state?.projection_plan)) {
@@ -234,7 +244,9 @@ function preflight(args) {
       failures.push(`invalid --diff-base: ${error.message}`);
     }
   }
-  return { failures, warnings, state, promptPath, compactProfile };
+  args.structuredResultSchemaPath = resolve(args.target, "scripts/codex-runner-result.schema.json");
+  args.envelopeRecordSchemaPath = resolve(args.target, "scripts/execution-envelope-record.schema.json");
+  return { failures, warnings, capabilityMissing, state, promptPath, compactProfile };
 }
 
 function resolveDiffRange(target, value) {
@@ -277,18 +289,22 @@ function buildPrompt(args, state, promptPath, compactProfile) {
     `- Sandbox: ${args.sandbox}`,
     `- Required gates: ${args.gatesObserved ? args.requiredGates.join(", ") || "none" : "unobserved"}`,
     "Evidence boundary: file projection and sensors do not prove business correctness.",
+    "Managed runner result boundary:",
+    "- Return only the JSON object required by scripts/codex-runner-result.schema.json.",
+    "- Put the domain artifact in response_markdown without an Execution Envelope marker.",
+    "- Put evidence_status, stop_reason, and next_action in control; do not infer them from prose.",
+    "- Omit route fields. The runner derives them from this validated compact profile.",
   ];
   const diff = gitDiffContext(args);
   return [prompt.trimEnd(), "", context.join("\n"), diff ? `\n${diff}` : ""].join("\n");
 }
 
 function runCodex(args, prompt) {
-  const outputPath = args.outputPath;
-  mkdirSync(dirname(outputPath), { recursive: true });
-  const temporaryOutput = `.agents/runs/codex-run-${process.pid}-${Date.now()}.md`;
+  mkdirSync(dirname(args.outputPath), { recursive: true });
+  const temporaryOutput = `.agents/runs/codex-run-${process.pid}-${Date.now()}.json`;
   const temporaryOutputPath = resolveWithinTarget(args.target, temporaryOutput, "temporary output");
   mkdirSync(dirname(temporaryOutputPath), { recursive: true });
-  const commandArgs = ["exec", "--sandbox", args.sandbox, "--output-last-message", temporaryOutput];
+  const commandArgs = ["exec", "--sandbox", args.sandbox, "--output-schema", "scripts/codex-runner-result.schema.json", "--output-last-message", temporaryOutput];
   const result = spawnSync(args.codexBin, commandArgs, {
     cwd: args.target,
     encoding: "utf8",
@@ -298,21 +314,167 @@ function runCodex(args, prompt) {
   const outputExists = existsSync(temporaryOutputPath);
   const finalOutput = outputExists ? readFileSync(temporaryOutputPath, "utf8") : "";
   const acceptedOutput = !result.error && result.status === 0 && outputExists && finalOutput.trim().length > 0;
-  if (acceptedOutput) renameSync(temporaryOutputPath, outputPath);
-  else if (outputExists) unlinkSync(temporaryOutputPath);
+  if (!acceptedOutput && outputExists) unlinkSync(temporaryOutputPath);
   return {
     command: [args.codexBin, ...commandArgs, "<stdin-prompt>"].join(" "),
     exitCode: result.status,
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
     error: result.error?.message ?? null,
-    outputPath: args.output,
+    temporaryOutputPath: acceptedOutput ? temporaryOutputPath : null,
     finalOutput: acceptedOutput ? finalOutput : "",
   };
 }
 
-function runSensors(args, outputPath) {
-  const result = spawnSync(process.execPath, ["scripts/ask-sensors.mjs", "--target", args.target, "--mode", args.mode, "--input", outputPath], {
+function runnerBinding(args, compactProfile) {
+  return {
+    adapter_id: "codex",
+    entry_id: args.prompt,
+    mode: args.mode,
+    profile_id: compactProfile.profile_id,
+    profile_schema_version: compactProfile.schema_version,
+    canonical_revision: compactProfile.canonical_revision,
+    canonical_source_digest: compactProfile.canonical_source_digest,
+    profile_fingerprint: compactProfile.profile_fingerprint,
+    rendered_sha256: compactProfile.rendered_sha256,
+  };
+}
+
+function envelopeForControl(args, compactProfile, control) {
+  const contract = CODEX_PROMPT_CONTRACTS[args.prompt];
+  const secondary = (compactProfile.requested_contracts ?? []).filter((item) => item !== compactProfile.primary_contract);
+  const internal = {
+    primary: compactProfile.primary_contract,
+    ...(secondary.length > 0 ? { secondary } : {}),
+  };
+  return {
+    schema_version: "1.0.0",
+    route: {
+      work_mode: contract.route.workMode,
+      operating_mode: "delivery_quality",
+      user_facing: contract.route.userFacing,
+      internal,
+    },
+    evidence_status: control.evidence_status,
+    stop_reason: control.stop_reason,
+    next_action: control.next_action,
+  };
+}
+
+function recordForControl(args, compactProfile, responseMarkdown, control, { dynamicFieldsSource, controlInputSha256 = null } = {}) {
+  const envelope = envelopeForControl(args, compactProfile, control);
+  const envelopeErrors = validateExecutionEnvelope(envelope);
+  if (envelopeErrors.length > 0) throw new Error(`structured control cannot produce a canonical Execution Envelope: ${envelopeErrors.join("; ")}`);
+  const emissionClass = selectExecutionEnvelopeEmission({
+    mode: args.mode,
+    stopStatus: envelope.stop_reason.status,
+    diagnostic: args.diagnosticEnvelope,
+  });
+  const record = buildExecutionEnvelopeRecord({
+    emissionClass,
+    authority: {
+      owner: "runner",
+      fixed_fields_source: "compact_profile",
+      dynamic_fields_source: dynamicFieldsSource,
+    },
+    binding: runnerBinding(args, compactProfile),
+    envelope,
+    responseMarkdown,
+    controlInputSha256,
+  });
+  const errors = validateExecutionEnvelopeRecord(record, { schemaPath: args.envelopeRecordSchemaPath, responseMarkdown });
+  if (errors.length > 0) throw new Error(`runner-owned Execution Envelope record is invalid: ${errors.join("; ")}`);
+  return record;
+}
+
+function parseStructuredResult(args, compactProfile, rawOutput) {
+  let value;
+  try {
+    value = JSON.parse(rawOutput);
+  } catch (error) {
+    throw new Error(`Codex structured result is invalid JSON: ${error.message}`);
+  }
+  const schemaErrors = validateJsonSchema(value, { schemaPath: args.structuredResultSchemaPath });
+  if (schemaErrors.length > 0) throw new Error(`Codex structured result does not match its schema: ${schemaErrors.join("; ")}`);
+  if (hasExecutionEnvelopeMarker(value.response_markdown)) throw new Error("Codex response_markdown duplicates the runner-owned Execution Envelope");
+  const controlInputSha256 = `sha256:${hashText(rawOutput)}`;
+  const record = recordForControl(args, compactProfile, value.response_markdown, value.control, {
+    dynamicFieldsSource: "structured_runtime_result",
+    controlInputSha256,
+  });
+  return { value, record };
+}
+
+function runnerObservedStop(args, compactProfile, { status, details, missing, nextAction, responseMarkdown }) {
+  return {
+    responseMarkdown,
+    record: recordForControl(args, compactProfile, responseMarkdown, {
+      evidence_status: {
+        checked: [`managed compact profile ${compactProfile.profile_id}`],
+        missing,
+      },
+      stop_reason: {
+        status,
+        details,
+        human_decision_required: status === "risk_gate" ? ["specific approval for the risk-gated action"] : [],
+        stop_if: details,
+      },
+      next_action: nextAction,
+    }, { dynamicFieldsSource: "runner_observation" }),
+  };
+}
+
+function prepareOutputCandidate(args, responseMarkdown, record) {
+  const output = renderExecutionEnvelopeProjection(responseMarkdown, record);
+  const nonce = `${process.pid}-${Date.now()}`;
+  const temporaryOutputPath = resolveWithinTarget(args.target, `${args.output}.ask-${nonce}.tmp`, "temporary managed output");
+  const temporaryRecordPath = resolveWithinTarget(args.target, `${args.output}.ask-${nonce}.record.json`, "temporary envelope record");
+  mkdirSync(dirname(temporaryOutputPath), { recursive: true });
+  writeFileSync(temporaryOutputPath, output, { flag: "wx", mode: 0o600 });
+  writeFileSync(temporaryRecordPath, `${JSON.stringify(record, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+  return { output, temporaryOutputPath, temporaryRecordPath };
+}
+
+function cleanupCandidate(candidate) {
+  for (const path of [candidate?.temporaryOutputPath, candidate?.temporaryRecordPath]) {
+    if (path && existsSync(path)) unlinkSync(path);
+  }
+}
+
+function insidePath(path, root) {
+  return path === root || path.startsWith(`${root}/`);
+}
+
+function persistEnvelopeRecord(args, record) {
+  const logicalPath = `ask-runtime/execution-envelopes/${record.record_id}.json`;
+  const storageDirectory = resolveObservabilityPath(args.target, "ask-runtime/execution-envelopes");
+  const recordPath = resolveObservabilityPath(args.target, logicalPath);
+  const gitDirectory = resolveGitDirectory(args.target);
+  const allowedRoot = realpathSync(gitDirectory ?? args.target);
+  let existingParent = storageDirectory;
+  while (!existsSync(existingParent)) existingParent = dirname(existingParent);
+  if (!insidePath(realpathSync(existingParent), allowedRoot)) throw new Error("Execution Envelope record store escapes runtime-owned storage through a symbolic link");
+  mkdirSync(storageDirectory, { recursive: true });
+  if (!insidePath(realpathSync(storageDirectory), allowedRoot)) throw new Error("Execution Envelope record store escapes runtime-owned storage through a symbolic link");
+  const bytes = `${JSON.stringify(record, null, 2)}\n`;
+  if (existsSync(recordPath)) {
+    const stats = lstatSync(recordPath);
+    if (stats.isSymbolicLink() || !stats.isFile()) throw new Error("Execution Envelope record path must be a regular runtime-owned file");
+    if (readFileSync(recordPath, "utf8") !== bytes) throw new Error("content-addressed Execution Envelope record conflicts with existing bytes");
+    return { logicalPath, recordPath, digest: `sha256:${hashText(bytes)}` };
+  }
+  const temporaryPath = `${recordPath}.${process.pid}-${Date.now()}.tmp`;
+  try {
+    writeFileSync(temporaryPath, bytes, { flag: "wx", mode: 0o600 });
+    renameSync(temporaryPath, recordPath);
+  } finally {
+    if (existsSync(temporaryPath)) unlinkSync(temporaryPath);
+  }
+  return { logicalPath, recordPath, digest: `sha256:${hashText(bytes)}` };
+}
+
+function runSensors(args, outputPath, recordPath) {
+  const result = spawnSync(process.execPath, ["scripts/ask-sensors.mjs", "--target", args.target, "--mode", args.mode, "--input", outputPath, "--envelope-record", recordPath], {
     cwd: args.target,
     encoding: "utf8",
     maxBuffer: 5 * 1024 * 1024,
@@ -326,11 +488,30 @@ function runSensors(args, outputPath) {
   };
 }
 
-function resultStatus({ preflightResult, codexResult, sensorResult, dryRun, approvalBlocked }) {
+function publishOutput(args, responseMarkdown, record, { inspectDomainOutput = true } = {}) {
+  const candidate = prepareOutputCandidate(args, responseMarkdown, record);
+  let sensorResult = null;
+  try {
+    const inspection = inspectExecutionEnvelopeRecordEmission(candidate.output, record, { schemaPath: args.envelopeRecordSchemaPath });
+    if (inspection.status !== "valid") throw new Error(`runner output projection is invalid: ${inspection.errors.join("; ")}`);
+    if (inspectDomainOutput) {
+      sensorResult = runSensors(args, candidate.temporaryOutputPath, candidate.temporaryRecordPath);
+      if (sensorResult.exitCode !== 0 || sensorResult.status !== "pass") return { published: false, sensorResult, persistence: null };
+    }
+    const persistence = persistEnvelopeRecord(args, record);
+    renameSync(candidate.temporaryOutputPath, args.outputPath);
+    unlinkSync(candidate.temporaryRecordPath);
+    return { published: true, sensorResult, persistence };
+  } finally {
+    cleanupCandidate(candidate);
+  }
+}
+
+function resultStatus({ preflightResult, codexResult, sensorResult, dryRun, approvalBlocked, capabilityBlocked, record, published, structuredError }) {
   if (preflightResult.failures.length > 0) {
     return { status: "insufficient_evidence", evidenceLevel: "unknown" };
   }
-  if (approvalBlocked) {
+  if (approvalBlocked || capabilityBlocked) {
     return { status: "insufficient_evidence", evidenceLevel: "runtime_detected" };
   }
   if (dryRun) {
@@ -345,7 +526,10 @@ function resultStatus({ preflightResult, codexResult, sensorResult, dryRun, appr
   if (!codexResult.finalOutput.trim()) {
     return { status: "insufficient_evidence", evidenceLevel: "runtime_detected" };
   }
-  if (sensorResult?.exitCode === 0 && sensorResult?.status === "pass") {
+  if (structuredError || !record || !published) {
+    return { status: "insufficient_evidence", evidenceLevel: "executed" };
+  }
+  if (["none", "completed"].includes(record.envelope.stop_reason.status) && sensorResult?.exitCode === 0 && sensorResult?.status === "pass") {
     return { status: "executed", evidenceLevel: "executed" };
   }
   return { status: "insufficient_evidence", evidenceLevel: "executed" };
@@ -359,6 +543,8 @@ function printResult(report, json) {
   console.log(`Codex runner: ${report.status}`);
   console.log(`Evidence level: ${report.evidence_level}`);
   console.log(`Output: ${report.output_path ?? "not written"}`);
+  console.log(`Envelope emission: ${report.execution_envelope_record?.emission_class ?? "not available"}`);
+  console.log(`Envelope record: ${report.execution_envelope_record?.logical_path ?? "not persisted"}`);
   console.log(`Sensor status: ${report.sensor_status ?? "not run"}`);
   console.log(`Requested contracts: ${report.execution_evidence.requested_contracts.contracts.length}`);
   console.log(`Required gates evidence: ${report.execution_evidence.required_gates.evidence_level}`);
@@ -390,18 +576,54 @@ try {
   let codexResult = null;
   let sensorResult = null;
   let command = null;
+  let envelopeRecord = null;
+  let publication = null;
+  let structuredError = null;
   const approvalBlocked = args.requiredGates.includes("risk-gate");
+  const capabilityBlocked = preflightResult.capabilityMissing.length > 0;
   if (preflightResult.failures.length === 0) {
     const prompt = buildPrompt(args, preflightResult.state, preflightResult.promptPath, preflightResult.compactProfile);
-    command = `${args.codexBin} exec --sandbox ${args.sandbox} --output-last-message ${args.output} <stdin-prompt>`;
-    if (!args.dryRun && !approvalBlocked) {
-      codexResult = runCodex(args, prompt);
-      if (codexResult.exitCode === 0 && codexResult.finalOutput.trim()) {
-        sensorResult = runSensors(args, args.outputPath);
+    command = `${args.codexBin} exec --sandbox ${args.sandbox} --output-schema scripts/codex-runner-result.schema.json --output-last-message <temporary-json> <stdin-prompt>`;
+    if (!args.dryRun) {
+      if (approvalBlocked) {
+        const stop = runnerObservedStop(args, preflightResult.compactProfile, {
+          status: "risk_gate",
+          details: ["risk-gate requires specific-action approval before execution"],
+          missing: ["specific_action_approval"],
+          nextAction: "obtain approval for the exact risk-gated action",
+          responseMarkdown: "Codex runner stopped before execution because the selected action requires specific approval.\n",
+        });
+        envelopeRecord = stop.record;
+        publication = publishOutput(args, stop.responseMarkdown, stop.record, { inspectDomainOutput: false });
+      } else if (capabilityBlocked) {
+        const missing = preflightResult.capabilityMissing.map((capability) => `selected capability ${capability}`);
+        const stop = runnerObservedStop(args, preflightResult.compactProfile, {
+          status: "capability_missing",
+          details: missing.map((item) => `${item} is unavailable in the installed profile`),
+          missing,
+          nextAction: `install or explicitly select a profile containing ${preflightResult.capabilityMissing.join(", ")}`,
+          responseMarkdown: "Codex runner stopped before execution because a required capability is unavailable.\n",
+        });
+        envelopeRecord = stop.record;
+        publication = publishOutput(args, stop.responseMarkdown, stop.record, { inspectDomainOutput: false });
+      } else {
+        codexResult = runCodex(args, prompt);
+        try {
+          if (codexResult.exitCode === 0 && codexResult.finalOutput.trim()) {
+            const parsed = parseStructuredResult(args, preflightResult.compactProfile, codexResult.finalOutput);
+            envelopeRecord = parsed.record;
+            publication = publishOutput(args, parsed.value.response_markdown, parsed.record);
+            sensorResult = publication.sensorResult;
+          }
+        } catch (error) {
+          structuredError = error.message;
+        } finally {
+          if (codexResult.temporaryOutputPath && existsSync(codexResult.temporaryOutputPath)) unlinkSync(codexResult.temporaryOutputPath);
+        }
       }
     }
   }
-  const normalized = resultStatus({ preflightResult, codexResult, sensorResult, dryRun: args.dryRun, approvalBlocked });
+  const normalized = resultStatus({ preflightResult, codexResult, sensorResult, dryRun: args.dryRun, approvalBlocked, capabilityBlocked, record: envelopeRecord, published: publication?.published === true, structuredError });
   const preflightPassed = preflightResult.failures.length === 0;
   const report = {
     status: normalized.status,
@@ -409,8 +631,14 @@ try {
     mode: args.mode,
     sandbox: args.sandbox,
     command,
-    output_path: codexResult?.outputPath ?? args.output,
+    output_path: publication?.published ? args.output : null,
     sensor_status: sensorResult?.status ?? null,
+    execution_envelope_record: envelopeRecord ? {
+      ...envelopeRecord,
+      persisted: publication?.published === true,
+      logical_path: publication?.persistence?.logicalPath ?? null,
+      record_file_sha256: publication?.persistence?.digest ?? null,
+    } : null,
     execution_evidence: {
       requested_contracts: {
         profile_id: preflightResult.compactProfile?.profile_id ?? null,
@@ -422,6 +650,7 @@ try {
         missing_evidence: [
           ...(!preflightPassed || !args.gatesObserved ? ["required_gate_observation"] : []),
           ...(approvalBlocked ? ["specific_action_approval"] : []),
+          ...preflightResult.capabilityMissing.map((capability) => `capability:${capability}`),
         ],
         detail: !args.gatesObserved
           ? "Task-specific required-gate classification was not observed."
@@ -469,7 +698,7 @@ try {
         detail: "Output inspection distinguishes reported evidence but does not prove that the verification workflow was applied.",
       },
     },
-    failures: [...preflightResult.failures, ...(codexResult?.error ? [`codex exec could not start: ${codexResult.error}`] : []), ...(codexResult && codexResult.exitCode !== null && codexResult.exitCode !== 0 ? [`codex exec exited ${codexResult.exitCode}`] : []), ...(sensorResult && (sensorResult.exitCode !== 0 || sensorResult.status !== "pass") ? [`ask-sensors rejected output: status=${sensorResult.status}, exit=${sensorResult.exitCode}`] : [])],
+    failures: [...preflightResult.failures, ...(codexResult?.error ? [`codex exec could not start: ${codexResult.error}`] : []), ...(codexResult && codexResult.exitCode !== null && codexResult.exitCode !== 0 ? [`codex exec exited ${codexResult.exitCode}`] : []), ...(structuredError ? [structuredError] : []), ...(sensorResult && (sensorResult.exitCode !== 0 || sensorResult.status !== "pass") ? [`ask-sensors rejected output: status=${sensorResult.status}, exit=${sensorResult.exitCode}`] : [])],
     warnings: preflightResult.warnings,
     boundary: "File projection and ask-sensors output checks do not prove business correctness, product readiness, or no regression.",
   };

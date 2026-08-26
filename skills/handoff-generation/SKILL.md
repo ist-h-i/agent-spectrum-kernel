@@ -41,9 +41,9 @@ Status: complete | partial | blocked | needs review | needs verification
 
 7. Create the next task as a narrow instruction with allowed/forbidden scope.
 
-8. Include a stop condition so the next agent knows when to pause.
+8. Put the stop condition only in `Execution Envelope.stop_reason.stop_if` so the next agent knows when to pause.
 
-9. For handoff, non-trivial continuation, interrupted work, or risk-gated work, include a resume block compatible with `docs/agent-session-state-contract.md`. The resume state must keep `execution_envelope` as the only route/evidence/stop/next-action control record. Do not create session state for trivial tasks where the final response already fully captures the state.
+9. For handoff, non-trivial continuation, interrupted work, or risk-gated work, include a resume block compatible with `docs/agent-session-state-contract.md`. Reference the same runner record with `execution_envelope_ref`; unmanaged inline compatibility may use `inline_boundary`. Do not embed a second independent payload or create session state for trivial tasks.
 
 ## Output
 
@@ -60,10 +60,9 @@ Handoff:
 - Risks:
 - Important context:
 - Next task:
-- Stop condition:
 - Resume state: optional; include only for handoff, non-trivial continuation, interrupted work, or risk-gated work. Omit for trivial or fully captured simple tasks.
   - task_intent:
-  - execution_envelope:
+  - execution_envelope_ref:
   - current_phase:
   - evidence_details:
   - open_assumptions:
@@ -81,7 +80,6 @@ Forbidden scope:
 Expected output:
 Verification:
 Do not:
-Stop condition:
 ```
 
 ## Exit criteria

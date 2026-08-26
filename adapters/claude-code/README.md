@@ -126,7 +126,7 @@ Claude Code project skills load from `.claude/skills/<skill-name>/SKILL.md` and 
 
 The Requirement-to-Rule Loop and full-layer intelligence skills are projected by default so teams can move from candidate discovery to Requirement Contract, Work Package, domain review, reusable implementation/verification/review/documentation/architecture memory, and capability evaluation without copying extra skill files manually. Projection only makes skills available; routing still loads them only when relevant.
 
-`evidence-ledger` follows the same availability/activation boundary. Ordinary commands apply `ask.claim-evidence-status@1.0.0` inline. A separate formal ledger is selected only when an explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs triggers it.
+`evidence-ledger` follows the same availability/activation boundary. Ordinary commands apply `ask.claim-evidence-status@1.0.0` inline. A separate formal ledger is selected only when an explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs triggers it. Claude commands remain explicit `inline_required` Execution Envelope compatibility because the Stop collector consumes `last_assistant_message`; the project and plugin must not advertise a runner-owned sidecar.
 
 ## Project Commands
 

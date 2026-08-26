@@ -809,6 +809,7 @@ function resolveCodexProjectionSelection({ profileName, skills = null, skipPromp
   validateSkillClosure({ selectedSkills, requiredSkills, profileName });
   const requiredAssets = [...new Set([
     "schemas/execution-envelope.schema.json",
+    "schemas/execution-envelope-record.schema.json",
     ...requiredAssetsForPrompts(prompts),
     ...requiredAssetsForSkills(selectedSkills),
   ])].sort();

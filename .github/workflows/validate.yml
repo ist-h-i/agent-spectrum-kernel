@@ -21,6 +21,12 @@ jobs:
       - name: Run repository validation tests
         run: node scripts/test-validate-repo.mjs
 
+      - name: Run Execution Envelope record contract tests
+        run: node scripts/test-execution-envelope-record.mjs
+
+      - name: Run installed Codex runner Execution Envelope conformance tests
+        run: node scripts/test-codex-runner-execution-envelope-conformance.mjs
+
       - name: Run claim evidence status contract tests
         run: node scripts/test-claim-evidence-status.mjs
 

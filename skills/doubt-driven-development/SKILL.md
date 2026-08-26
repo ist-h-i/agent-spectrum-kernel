@@ -84,9 +84,6 @@ Results:
 
 Conclusion:
 - Verified | Supported | Hypothesis | Unknown | Falsified
-
-Next:
-- ...
 ```
 
 ## Exit criteria

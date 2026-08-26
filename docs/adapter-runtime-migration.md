@@ -30,6 +30,7 @@ The adapters may coexist. Claude owns only the paths registered in its managed i
 | Profile shrink | Requires `--prune` when excluded managed assets remain discoverable. | Modified excluded asset or omitted `--prune`. | Resolve the modified file, then rerun with `--prune`; do not silently retain it as selected capability. |
 | Claude and Codex installed together | Preserve disjoint adapter ownership and independent state. | A path is claimed by both adapters or by the core. | Stop; correct the inventory contract before applying either projection. |
 | Pre-#229 evidence projection | Regenerate ordinary commands with inline `ask.claim-evidence-status@1.0.0`; keep formal `evidence-ledger` installed but conditionally selected. | A copied taxonomy, missing contract revision, or unconditional ordinary-ledger route is detected. | Regenerate both projections and runtime fixtures; do not reinterpret or rewrite stored legacy artifacts in place. |
+| Pre-#228 inline-only Envelope | Managed Codex migrates to a runner-owned bound record and ordinary `sidecar`; direct Codex and current Claude paths remain explicit `inline_required` compatibility. | Structured output, profile binding, record validation, or runtime-owned persistence is unavailable. | Reinstall the managed Codex runtime or remain explicitly inline. Never parse prose or silently upgrade a legacy inline payload to sidecar. |
 | Pre-#229 evidence projection | Regenerate ordinary commands with inline `ask.claim-evidence-status@1.0.0`; keep formal `evidence-ledger` installed but conditionally selected. | A copied taxonomy, missing contract revision, or unconditional ordinary-ledger route is detected. | Regenerate both projections and runtime fixtures; do not reinterpret or rewrite stored legacy artifacts in place. |
 
 Schema additions remain compatible only when older profile documents remain valid and downgrade behavior is not weakened. Capability ID removal/rename, changed downgrade meaning, or canonical ownership changes require a schema-version change and new migration evidence.
@@ -43,11 +44,11 @@ node scripts/install-codex-adapter.mjs --target /path/to/project --rollback
 node scripts/install-claude-adapter.mjs --target /path/to/project --rollback
 ```
 
-Rollback restores managed assets and state. It does not claim that an external runtime stopped using already loaded instructions, and it does not delete project-owned event/report data.
+Rollback restores managed assets and state. It does not claim that an external runtime stopped using already loaded instructions, and it does not delete project-owned event/report data or content-addressed Execution Envelope records.
 
 ## Detach
 
-Detach removes one adapter's managed execution surfaces while preserving the core and the other adapter. Claude detach preserves project-owned local metrics, reports, and ledgers by default. Purging runtime data is a separate destructive operation and requires explicit project approval.
+Detach removes one adapter's managed execution surfaces while preserving the core and the other adapter. Claude detach preserves project-owned local metrics, reports, and ledgers by default; Codex detach preserves runtime-owned Envelope records. Purging runtime data is a separate destructive operation and requires explicit project approval.
 
 ```bash
 node scripts/install-codex-adapter.mjs --target /path/to/project --detach

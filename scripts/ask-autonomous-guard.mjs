@@ -30,6 +30,8 @@ const DISALLOWED_EXACT_PATHS = new Set([
   "scripts/test-ask-benchmark-portfolio-mechanism-scorecard.mjs",
   "scripts/test-ask-benchmark-portfolio-legacy-calibration-migration.mjs",
   "scripts/test-ask-benchmark.mjs",
+  "scripts/test-codex-runner-execution-envelope-conformance.mjs",
+  "scripts/test-execution-envelope-record.mjs",
   "scripts/test-validate-repo.mjs",
   "scripts/validate-repo.mjs",
 ]);

@@ -23,6 +23,7 @@ export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "schemas/claim-evidence-status.schema.json",
   "schemas/compact-profile-control-map.json",
   "schemas/execution-envelope.schema.json",
+  "schemas/execution-envelope-record.schema.json",
   "schemas/normalized-event-schema-registry.json",
 ]);
 

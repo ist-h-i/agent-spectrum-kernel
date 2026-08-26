@@ -55,19 +55,17 @@ Evidence overlay: apply the five statuses inline for ordinary work. Use `evidenc
 
 ## Completion format
 
+For implementation, use the canonical implementation artifact. The managed runner owns ordinary Execution Envelope state as a sidecar; direct/unmanaged use follows the explicit inline compatibility in `docs/execution-envelope-contract.md`.
+
 ```text
-Changed:
-- ...
+Implementation Contract:
+- Artifact ID:
+- Upstream refs:
+- Actual change boundary:
+- Verification attempted:
+- Evidence references:
+- Handoff state:
 
-Verified:
-- ...
-
-Not verified:
-- ...
-
-Risks / assumptions:
-- ...
-
-Next:
-- ...
+Evidence:
+- claim, command or observation, and exact result
 ```

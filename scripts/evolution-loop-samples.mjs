@@ -194,7 +194,7 @@ function metadataAuthority() {
 }
 
 function sampleDescriptor({ sourcePath, version, parent, metadata }) {
-  const sourceBytes = readFileSync(resolve(repositoryRoot, sourcePath));
+  const sourceBytes = gitBytes(sourcePath);
   const evidenceRef = `issue-278:fixture-eligibility:${metadata.authority_evidence_digest}`;
   const isBaseline = version === BASELINE_VERSION;
   return {
@@ -823,8 +823,6 @@ function loadFoundation(storeRoot) {
 
 function sourceIdentity(path) {
   const committed = gitBytes(path);
-  const working = readFileSync(resolve(repositoryRoot, path));
-  assert.deepEqual(working, committed, `${path} working bytes differ from exact source revision`);
   return { path, raw_digest: rawDigest(committed), byte_length: committed.length };
 }
 
@@ -844,8 +842,15 @@ function generateFixture() {
   assert.equal(originalInventory.size, ORIGINAL_PORTFOLIO_OBJECT_COUNT, "checked Portfolio fixture object count drifted");
   const temporaryRoot = mkdtempSync(resolve(tmpdir(), "ask-evolution-loop-samples-"));
   const storeRoot = resolve(temporaryRoot, "store");
+  const exactSourceRoot = resolve(temporaryRoot, "exact-source-revision");
   cpSync(portfolioFixtureStoreRoot, storeRoot, { recursive: true });
   assertInventorySubsetUnchanged(originalInventory, byteInventory(storeRoot), "initial Portfolio fixture copy");
+
+  for (const path of [PARENT_SOURCE_PATH, CANDIDATE_SOURCE_PATH]) {
+    const target = resolve(exactSourceRoot, path);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, gitBytes(path));
+  }
 
   const parentSource = sourceIdentity(PARENT_SOURCE_PATH);
   const candidateSource = sourceIdentity(CANDIDATE_SOURCE_PATH);
@@ -864,7 +869,7 @@ function generateFixture() {
   const metadata = metadataAuthority();
   const baselineRegistration = registerAsset({
     storeRoot,
-    sourceRoot: repositoryRoot,
+    sourceRoot: exactSourceRoot,
     predecessorSnapshotDigest: foundation.registry.snapshot_digest,
     descriptor: sampleDescriptor({
       sourcePath: PARENT_SOURCE_PATH,
@@ -885,7 +890,7 @@ function generateFixture() {
 
   const candidateRegistration = registerAsset({
     storeRoot,
-    sourceRoot: repositoryRoot,
+    sourceRoot: exactSourceRoot,
     predecessorSnapshotDigest: baselineRegistry.snapshot_digest,
     descriptor: sampleDescriptor({
       sourcePath: CANDIDATE_SOURCE_PATH,

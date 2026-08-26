@@ -32,6 +32,8 @@ then the smallest selected workflow
 
 Expected output shape:
 
+The following is the visible protected/direct-compatibility form. A managed ordinary runner boundary persists the same payload as a bound sidecar and omits this block from prose.
+
 Execution Envelope:
 ```json
 {
