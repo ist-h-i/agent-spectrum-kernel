@@ -51,7 +51,7 @@ The #276 sample registry intentionally pins the pre-#229 `test-first-verificatio
 ## Consumer bindings
 
 - Kernel, Skills, compact controls, and both adapter projections use the canonical Title Case writer vocabulary.
-- Existing #275 admission records keep their stored lowercase representation through `#/$defs/lowercase_status`. #276 Asset provenance claims use the narrower `#/$defs/lowercase_observation_status`, preserving their existing `verified` / `supported` / `unknown` acceptance set. Their fixture bytes are not migrated in place.
+- Existing #275 admission and #276 Asset records keep their stored lowercase representation through `#/$defs/lowercase_status`; their fixture bytes are not migrated in place.
 - #274 verification evidence, #197 evaluation/scoring records, and #278 Evolution objects keep their own verification/result/decision states. When they make a prose or metadata claim about those objects, the claim status references this contract revision; their operational enums do not become claim statuses.
 - Durable knowledge ledgers use the canonical claim status and keep human authority, deprecation, contradiction, and freshness in separate fields.
 

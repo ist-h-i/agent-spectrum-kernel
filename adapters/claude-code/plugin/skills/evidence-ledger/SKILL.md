@@ -93,3 +93,4 @@ Trigger: explicit_claim_audit | multiple_material_claims | high_stakes_readiness
 | “Fixed” claimed without reproduction | Require failing-then-passing evidence when feasible. |
 | “No known issue” used as proof | Unknown is not evidence of absence. |
 | Formal table emitted for ordinary work | Keep the status and concise evidence inline unless a closed trigger selects this Skill. |
+| Formal table emitted for ordinary work | Keep the status and concise evidence inline unless a closed trigger selects this Skill. |
