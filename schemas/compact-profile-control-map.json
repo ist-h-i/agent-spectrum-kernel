@@ -110,6 +110,13 @@
         "contract": "planning-with-files",
         "action": "apply_before_primary",
         "missing_contract_behavior": "capability_missing"
+      },
+      {
+        "id": "explicit_knowledge_promotion",
+        "signal": "the user explicitly requests durable knowledge promotion",
+        "contract": "domain-rule-ledger",
+        "action": "apply_before_primary",
+        "missing_contract_behavior": "capability_missing"
       }
     ],
     "investigation": [
