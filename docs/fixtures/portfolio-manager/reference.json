@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "program": "ask_portfolio_manager_samples",
   "source_revision": "c24f459b0bf69a755dfde00719516e4a5844018d",
-  "registry_snapshot_digest": "sha256:5b50712f43feecf82d532178310cf2e0fe2fe709e0d951eb797a3876ff0cf92d",
+  "registry_snapshot_digest": "sha256:34a511af596bc1317941241135f053153d9862ff7552a243c0231fc079c4edba",
   "kernel_only": {
     "schema_version": "1.0.0",
     "program": "ask_portfolio_reference",
@@ -10,22 +10,22 @@
     "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
     "scope_id": "agent-spectrum-kernel",
     "lock_revision": 2,
-    "lock_digest": "sha256:2b096afb1739764ae015552af32291b7d6676dbd2f9f8380cbc4540b242c4959",
+    "lock_digest": "sha256:0d03d0cacd8b523dc30eb24d5451f1a2ebfb2a248d0ec6e25bde5047b4602e19",
     "required_portfolio_authority_context_digests": [
-      "sha256:b7339f940970b65856bc8991f5475107063e76c01829fb605989dfead80ee514"
+      "sha256:1094f4f97134c7098dbf5a170163dd67e0f1c3e0284bcd9188bfe582e71f6d33"
     ],
     "required_high_impact_approval_grant_digests": [],
     "current_manifest": {
       "revision": "reference-kernel-only-v1",
-      "manifest_digest": "sha256:e116cc23d57fca4594e903ea8a6aeb4b85d2b82dd2470ddc0758acd3cef8b747",
+      "manifest_digest": "sha256:521828aea1751c4f70e1915131f9751bf8a38f5b65aaf59a2155e248cb0200cd",
       "asset_set_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     "selections": [
       {
-        "selection_object_digest": "sha256:a0f2c76f8d4194c06b2a28bf2f323f00c797985abb955926f1aeb2d5c46fb5bc",
-        "selection_digest": "sha256:c1bdd28735e56e757349b916090ca26987da44aa2df6ad7f5963eba4c7be7ab9",
-        "context_object_digest": "sha256:f29b03891c6aa3ca72cd2e79834aa5c0fa22930a2f5b17410e497ad24d68f781",
-        "context_digest": "sha256:dea3740b36e09857a7cb1fac79a3956998bdac79f1c49123a905b2e2327432c0",
+        "selection_object_digest": "sha256:1d079efbcaa1f4aeed8cbf9cc9949c7b4de326c95bed8f8315ea02221756c081",
+        "selection_digest": "sha256:cd2c3070f9798c34297d442eae0d1c33e4627a9b747aada9369e372fb44f2ca9",
+        "context_object_digest": "sha256:09c537850ac0a4a8f6d1f6c6fea27e11cfda2718eea0c040c750396e5b5c5dd5",
+        "context_digest": "sha256:b769deb939762c5a26af1464db348d3ba881c3fe295f0c65a0c0c32d39704a0a",
         "decision": "selected"
       }
     ],
@@ -41,23 +41,23 @@
     "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
     "scope_id": "agent-spectrum-kernel",
     "lock_revision": 3,
-    "lock_digest": "sha256:b4fc6bf06f8ec01c55c847ac6733a26e458352850c2697b8c45c33998c38fc3d",
+    "lock_digest": "sha256:83e406f149b89e8ed14c16c5aa51b610ad1f85e24c09653e720b0da09144b033",
     "required_portfolio_authority_context_digests": [
-      "sha256:b7339f940970b65856bc8991f5475107063e76c01829fb605989dfead80ee514",
-      "sha256:fb808457c840a2e9b354c2d16923acdaa3dc106f6ceaa32be77df9c4c1efc8f1"
+      "sha256:1094f4f97134c7098dbf5a170163dd67e0f1c3e0284bcd9188bfe582e71f6d33",
+      "sha256:f65b48e004eaf4b60b7aacb8232558b46a1e24f2885393f3093ffa4577383c46"
     ],
     "required_high_impact_approval_grant_digests": [],
     "current_manifest": {
       "revision": "reference-adaptive-ask-v1",
-      "manifest_digest": "sha256:00399989ee4be2513f4b8e112603f87e1fb3e7f84c514f91c59a81049b2d7c9e",
+      "manifest_digest": "sha256:6e9a0e950e73c5bba8569bdd60a00c3ea983178313027ffb976fc4d32d8703bf",
       "asset_set_digest": "sha256:bf7aa0a97dbdd6fa46453e661ce05482e3619062f9fc949d916e2fdc6c11a329"
     },
     "selections": [
       {
-        "selection_object_digest": "sha256:4c960a17ac6c747040cb171c8b625e30ac00323498608c4daa9177eac27e704f",
-        "selection_digest": "sha256:0cd2a92950d69e18788590afccf5498bdfdb46c62ceebad618db65c4c32549b0",
-        "context_object_digest": "sha256:11a436fe98b3611ffcfc3352870c8497490c9f84e7d90eba9fc6d9b00d38317e",
-        "context_digest": "sha256:0071809877b1431c3b126f30bc29bc1574f0166ab91e5329f526bbff74456293",
+        "selection_object_digest": "sha256:f5cbf66003c14ab9ee9566b28bc5a570baff86d10b7d7bc93cad0287b812a040",
+        "selection_digest": "sha256:63607ebc9b547bd117f09a80af2332346a5a7be371f898e7424ea38d1d039be1",
+        "context_object_digest": "sha256:4d9282491eec9ebaaa007c21560b2f0af2edfb01e4e48b9db73eb6b49aba5677",
+        "context_digest": "sha256:47da45c426da14c73525232f7cc09667a65bf8cfea01aa05bb8b534831767119",
         "decision": "downgrade"
       }
     ],

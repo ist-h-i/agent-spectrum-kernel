@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { canonicalPathSetDigest } from "./installer-lifecycle.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
+import { verifyPromptV2PreregistrationFixture } from "./prompt-v2-preregistration-samples.mjs";
 import { validatePortfolioCatalogArtifacts } from "./ask-benchmark-portfolio-catalog.mjs";
 import { validatePortfolioPolicyArtifacts } from "./ask-benchmark-portfolio-policy.mjs";
 import { validatePortfolioDesignAdmissionArtifacts } from "./ask-benchmark-design-admission.mjs";
@@ -14,6 +15,16 @@ import { validatePortfolioDesignIndependentReview, validatePortfolioDesignReview
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const defaultOutput = resolve(root, "docs/fixtures/adapter-runtime-bundle.json");
 const commonProfiles = ["daily", "organizational", "implementation", "investigation", "review", "observability", "full"];
+const frozenLegacyCalibrationSources = Object.freeze([
+  Object.freeze({ path: "benchmarks/results/checkpoint-b-2026-07-12.json", file_sha256: "6cc61a07b4da9640a8f1a1e7ea66352faaf4858cbdbd28e12458700fed88db46" }),
+  Object.freeze({ path: "benchmarks/results/checkpoint-b2-2026-07-12.json", file_sha256: "80dd7a195dc8c9c1cbf3e793b18398bcf911d50bf17151e8981d8d8508c98cae" }),
+  Object.freeze({ path: "benchmarks/results/checkpoint-c-2026-07-14.json", file_sha256: "d0a6281abf113d7eb73d60cdcf9b27a2efd222189a9709d0869973ff7d342fdc" }),
+]);
+const frozenLegacyCalibrationMigrations = Object.freeze([
+  Object.freeze({ path: "benchmarks/results/checkpoint-b-2026-07-12.migration.json", file_sha256: "c972505bc96bd3334c0ed088d630b448d60e1909c50b96c1d009c16ca291fbf5" }),
+  Object.freeze({ path: "benchmarks/results/checkpoint-b2-2026-07-12.migration.json", file_sha256: "83bcabc0424afc298b1fcd63f3d4d611f02f4ffae7ec11e8c0abfa155bbfdf64" }),
+  Object.freeze({ path: "benchmarks/results/checkpoint-c-2026-07-14.migration.json", file_sha256: "a6f23fa5f4f7a250f29552705dc95f33ab7f1d63ae036051cc65e6d8ca4194d2" }),
+]);
 
 function fileSha256(path) {
   return createHash("sha256").update(readFileSync(resolve(root, path))).digest("hex");
@@ -91,6 +102,11 @@ export function buildAdapterRuntimeBundle() {
   validatePortfolioDesignAdmissionArtifacts({ root });
   validatePortfolioDesignIndependentReview({ root });
   validatePortfolioDesignReviewedState({ root });
+  const promptV2FixtureRoot = resolve(root, "docs/fixtures/prompt-v2-preregistration");
+  const promptV2Summary = verifyPromptV2PreregistrationFixture({ root: promptV2FixtureRoot });
+  const promptV2Binding = JSON.parse(readFileSync(resolve(promptV2FixtureRoot, "binding.json"), "utf8"));
+  const promptV2Reference = JSON.parse(readFileSync(resolve(promptV2FixtureRoot, "reference.json"), "utf8"));
+  const promptV2Preregistration = JSON.parse(readFileSync(resolve(root, "benchmarks/prompt-v2-preregistration.json"), "utf8"));
   const portfolioCatalog = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-catalog.json"), "utf8"));
   const portfolioSimilarity = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-similarity.json"), "utf8"));
   const portfolioPolicyManifest = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-policy-manifest.json"), "utf8"));
@@ -207,16 +223,10 @@ export function buildAdapterRuntimeBundle() {
         legacy_calibration_migration_implementation_file_sha256: fileSha256("scripts/ask-benchmark-portfolio-legacy-calibration-migration.mjs"),
         legacy_calibration_migration_test_path: "scripts/test-ask-benchmark-portfolio-legacy-calibration-migration.mjs",
         legacy_calibration_migration_test_file_sha256: fileSha256("scripts/test-ask-benchmark-portfolio-legacy-calibration-migration.mjs"),
-        legacy_calibration_sources: [
-          "benchmarks/results/checkpoint-b-2026-07-12.json",
-          "benchmarks/results/checkpoint-b2-2026-07-12.json",
-          "benchmarks/results/checkpoint-c-2026-07-14.json",
-        ].map((path) => ({ path, file_sha256: fileSha256(path) })),
-        legacy_calibration_migrations: [
-          "benchmarks/results/checkpoint-b-2026-07-12.migration.json",
-          "benchmarks/results/checkpoint-b2-2026-07-12.migration.json",
-          "benchmarks/results/checkpoint-c-2026-07-14.migration.json",
-        ].map((path) => ({ path, file_sha256: fileSha256(path) })),
+        // These are pre-existing public authority identities. Keep them opaque so
+        // result-blind preregistration checks never need to read measured bytes.
+        legacy_calibration_sources: frozenLegacyCalibrationSources,
+        legacy_calibration_migrations: frozenLegacyCalibrationMigrations,
         scoring_issue: 197,
         scoring_slice: "deterministic_aggregate_reporting",
         scoring_implemented: true,
@@ -263,6 +273,75 @@ export function buildAdapterRuntimeBundle() {
         projected_state: portfolioDesignReviewedState.projected_state,
         final_admission_implied: portfolioDesignReviewedState.final_admission_implied,
         implementation_authorized: portfolioDesignReviewedState.implementation_authorized,
+      },
+      prompt_v2_preregistration: {
+        issue: 234,
+        execution_issue: 235,
+        phase: "pre_result",
+        protocol: {
+          path: "benchmarks/protocol-prompt-v2.md",
+          file_sha256: fileSha256("benchmarks/protocol-prompt-v2.md"),
+          raw_digest: promptV2Preregistration.protocol.raw_byte_digest,
+        },
+        preregistration: {
+          path: "benchmarks/prompt-v2-preregistration.json",
+          file_sha256: fileSha256("benchmarks/prompt-v2-preregistration.json"),
+          preregistration_id: promptV2Preregistration.preregistration_id,
+          preregistration_digest: promptV2Preregistration.preregistration_digest,
+          expected_case_count: promptV2Preregistration.expected_case_count,
+          prompt_roles: promptV2Preregistration.prompt_roles,
+        },
+        source_archive: {
+          revision: promptV2Summary.source_revision,
+          tree: promptV2Summary.source_tree,
+          rendered_root: promptV2Binding.source.rendered_source_root,
+          rendered_inventory_digest: promptV2Binding.source.rendered_source_inventory_digest,
+        },
+        generated_authority: {
+          binding_path: "docs/fixtures/prompt-v2-preregistration/binding.json",
+          binding_file_sha256: fileSha256("docs/fixtures/prompt-v2-preregistration/binding.json"),
+          binding_digest: promptV2Summary.binding_digest,
+          reference_path: "docs/fixtures/prompt-v2-preregistration/reference.json",
+          reference_file_sha256: fileSha256("docs/fixtures/prompt-v2-preregistration/reference.json"),
+          reference_digest: promptV2Summary.reference_digest,
+          registry_snapshot_digest: promptV2Summary.registry_snapshot_digest,
+          store_root: "docs/fixtures/prompt-v2-preregistration/store",
+          object_count: promptV2Summary.object_count,
+          object_inventory_digest: promptV2Summary.object_inventory_digest,
+        },
+        schemas: [
+          "benchmarks/schemas/prompt-v2-preregistration.schema.json",
+          "benchmarks/schemas/prompt-v2-execution-plan.schema.json",
+          "benchmarks/schemas/prompt-v2-materialization-manifest.schema.json",
+          "benchmarks/schemas/prompt-v2-resume-state.schema.json",
+          "benchmarks/schemas/prompt-v2-normalized-result.schema.json",
+          "benchmarks/schemas/prompt-v2-comparison-report.schema.json",
+        ].map((path) => ({ path, file_sha256: fileSha256(path) })),
+        implementations: [
+          "scripts/ask-benchmark-prompt-v2.mjs",
+          "scripts/test-ask-benchmark-prompt-v2.mjs",
+          "scripts/prompt-v2-preregistration-samples.mjs",
+          "scripts/test-prompt-v2-preregistration-samples.mjs",
+        ].map((path) => ({ path, file_sha256: fileSha256(path) })),
+        adapter_tracks: promptV2Reference.adapters.map((adapter) => ({
+          adapter_track: adapter.adapter_track,
+          selector_adapter: adapter.selector_adapter,
+          baseline_asset_record_digest: adapter.baseline_asset.record_digest,
+          candidate_asset_record_digest: adapter.candidate_asset.record_digest,
+          baseline_selection_digest: adapter.baseline_selection.selection_digest,
+          challenger_selection_digest: adapter.challenger_selection.selection_digest,
+          candidate_digest: adapter.evolution.candidate_digest,
+          experiment_digest: adapter.evolution.experiment_digest,
+        })),
+        handoff_path: "docs/prompt-v2-execution-handoff.md",
+        boundaries: {
+          measured_execution_authorized: false,
+          results_accessed: promptV2Summary.results_accessed,
+          runtime_activation_implied: promptV2Summary.runtime_activation_implied,
+          recommendation_created: false,
+          lifecycle_mutation_authorized: false,
+          private_evaluator_content_included: false,
+        },
       },
       portfolio_fixture_admission: {
         issue: 207,

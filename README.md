@@ -69,6 +69,11 @@ docs/
   evolution-loop-sample-prompt-candidate.md
   fixtures/evolution-loop/reference.json
   fixtures/evolution-loop/store/objects/sha256/
+  prompt-v2-execution-handoff.md
+  fixtures/prompt-v2-preregistration/binding.json
+  fixtures/prompt-v2-preregistration/reference.json
+  fixtures/prompt-v2-preregistration/rendered/
+  fixtures/prompt-v2-preregistration/store/objects/sha256/
   fixtures/lifecycle-artifact-chains.json
   fixtures/lifecycle-traceability-chains.json
   agent-session-state-contract.md
@@ -177,6 +182,8 @@ scripts/
   portfolio-manager-samples.mjs
   evolution-loop.mjs
   evolution-loop-samples.mjs
+  ask-benchmark-prompt-v2.mjs
+  prompt-v2-preregistration-samples.mjs
   execution-envelope.mjs
   verification-evidence.mjs
   epic-admission-work-package-plan.mjs
@@ -202,6 +209,8 @@ scripts/
 benchmarks/
   README.md
   protocol.md
+  protocol-prompt-v2.md
+  prompt-v2-preregistration.json
   checkpoint-b.config.json
   schemas/
   fixtures/
@@ -318,7 +327,21 @@ node scripts/test-evolution-loop-integration.mjs
 node scripts/evolution-loop-samples.mjs --check
 ```
 
-The checked sample proves deterministic parent/candidate lineage, exact baseline/challenger pre-result selection, a bounded human-approved canary Portfolio successor, and preserved rollback history. Its prompt bytes are a generic contract sample, not Prompt v2 from Issues #227-#235; the Prompt vertical remains a typed stop until the real Asset and exact evaluation projection exist. The fixture is non-product, makes no external-outcome claim, does not autonomously mutate an organizational current head, and leaves frozen benchmark results unchanged. See `docs/adr/0005-evolution-authority-boundary.md`.
+The checked generic sample proves deterministic parent/candidate lineage, exact baseline/challenger pre-result selection, a bounded human-approved canary Portfolio successor, and preserved rollback history. Its prompt bytes are not Prompt v2 from Issues #227-#235. The separate Issue #234 preregistration fixture described below supplies exact Prompt Assets and an evaluation projection without changing this generic sample or creating a post-result decision. The fixture is non-product, makes no external-outcome claim, does not autonomously mutate an organizational current head, and leaves frozen benchmark results unchanged. See `docs/adr/0005-evolution-authority-boundary.md`.
+
+## Prompt v2 result-blind canary preregistration
+
+`benchmarks/prompt-v2-preregistration.json` freezes a two-arm `current_prompt` / `prompt_v2` comparison before any measured output is accessed. It keeps Codex and Claude as separate tracks, projects both roles to the existing #197 `full_ask` raw-scoring authority, and expands four protected calibration fixtures to exactly 56 balanced cases. The checked fixture binds adapter-specific rendered Prompt bundles, distinct shadow Portfolio selections, exact rollback targets, and pre-result Evolution candidates/experiments in the shared CAS.
+
+The frozen local environment has an available Codex track and a typed-unavailable Claude track. Unavailable or incomplete evidence remains `insufficient_evidence`; it is never converted to zero, pass, tie, or inferred parity. Registration and preregistration do not authorize measured execution, result access, recommendation, activation, lifecycle mutation, or external publication. Issue #235 must follow the exact handoff in `docs/prompt-v2-execution-handoff.md` before any measured run.
+
+```bash
+node scripts/test-ask-benchmark-prompt-v2.mjs
+node scripts/test-prompt-v2-preregistration-samples.mjs
+node scripts/prompt-v2-preregistration-samples.mjs --check
+```
+
+See `benchmarks/protocol-prompt-v2.md` and `docs/adr/0011-prompt-v2-result-blind-canary-authority.md` for the frozen thresholds, result-access boundary, authority separation, and stop conditions.
 
 ## Epic admission and Work Package Plans
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { chmodSync, cpSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, readdirSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -16,7 +16,7 @@ import {
   coreImmutableAssetKind,
   hashText,
 } from "./installer-lifecycle.mjs";
-import { putContentAddressedJson } from "./content-addressed-store.mjs";
+import { canonicalDigest, putContentAddressedJson } from "./content-addressed-store.mjs";
 import { REQUIRED_TRACEABILITY_SCENARIOS, computeAdapterAppliedProvenanceFingerprint, computeAdapterProfileFingerprint, inspectAdapterRuntimeEvidenceArtifact, inspectAdapterRuntimeProfile, inspectClaimEvidencePluginProjection, inspectLifecycleScenario, inspectTraceabilityScenarioResult, inspectVerificationProofPolicyContract, traceabilityRequiredOutcomeIssue, traceabilityScenarioMatchesExpectation } from "./validate-repo.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,7 +32,32 @@ const adapterMigrationTestScript = resolve(repoRoot, "scripts/test-adapter-runti
 const adapterRuntimeEventTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-event.mjs");
 const verificationProofPolicyTestScript = resolve(repoRoot, "scripts/test-verification-proof-policy.mjs");
 const skillEffectivenessOutcomeTestScript = resolve(repoRoot, "scripts/test-skill-effectiveness-outcome.mjs");
-const fixtureRoot = mkdtempSync(resolve(tmpdir(), "validate-repo-"));
+const fixtureRoot = realpathSync(mkdtempSync(resolve(tmpdir(), "validate-repo-")));
+const promptV2PreregistrationDocs = [
+  "docs/adr/0011-prompt-v2-result-blind-canary-authority.md",
+  "docs/prompt-v2-execution-handoff.md",
+  "benchmarks/protocol-prompt-v2.md",
+  "benchmarks/prompt-v2-preregistration.json",
+  "docs/fixtures/prompt-v2-preregistration/binding.json",
+  "docs/fixtures/prompt-v2-preregistration/reference.json",
+  "docs/fixtures/prompt-v2-preregistration/rendered/reference.json",
+  ...["claude_code", "codex"].flatMap((adapter) => ["handoff", "implement", "investigate", "review", "verify"]
+    .map((mode) => `docs/fixtures/prompt-v2-preregistration/rendered/${adapter}/skill-${mode}.md`)),
+];
+const promptV2PreregistrationSchemas = [
+  "benchmarks/schemas/prompt-v2-preregistration.schema.json",
+  "benchmarks/schemas/prompt-v2-execution-plan.schema.json",
+  "benchmarks/schemas/prompt-v2-materialization-manifest.schema.json",
+  "benchmarks/schemas/prompt-v2-resume-state.schema.json",
+  "benchmarks/schemas/prompt-v2-normalized-result.schema.json",
+  "benchmarks/schemas/prompt-v2-comparison-report.schema.json",
+];
+const promptV2PreregistrationAdapters = [
+  "scripts/ask-benchmark-prompt-v2.mjs",
+  "scripts/test-ask-benchmark-prompt-v2.mjs",
+  "scripts/prompt-v2-preregistration-samples.mjs",
+  "scripts/test-prompt-v2-preregistration-samples.mjs",
+];
 
 const compactProfileResult = spawnSync(process.execPath, [codexCompactProfileTestScript], { cwd: repoRoot, encoding: "utf8" });
 if (compactProfileResult.status !== 0) {
@@ -333,6 +358,10 @@ function writeFixture(root, skills = ["alpha"]) {
     "docs/evolution-loop-sample-prompt-candidate.md",
     "docs/adr/0005-evolution-authority-boundary.md",
     "docs/fixtures/evolution-loop",
+    ...promptV2PreregistrationDocs,
+    ...promptV2PreregistrationSchemas,
+    ...promptV2PreregistrationAdapters,
+    "docs/fixtures/prompt-v2-preregistration",
     "adapters/codex/prompts/skill-verify.md",
     "scripts/content-addressed-store.mjs",
     "scripts/git-revision-source.mjs",
@@ -363,7 +392,7 @@ function writeFixture(root, skills = ["alpha"]) {
     "benchmarks/schemas",
   ]) {
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
-    if (["benchmarks/portfolio-design-admission-records", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update", "benchmarks/schemas", "docs/fixtures/asset-registry", "docs/fixtures/portfolio-manager", "docs/fixtures/evolution-loop"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
+    if (["benchmarks/portfolio-design-admission-records", "benchmarks/fixtures/checkpoint-b2/mn-build-option-update", "benchmarks/schemas", "docs/fixtures/asset-registry", "docs/fixtures/portfolio-manager", "docs/fixtures/evolution-loop", "docs/fixtures/prompt-v2-preregistration"].includes(path)) cpSync(resolve(repoRoot, path), resolve(root, path), { recursive: true });
     else writeFileSync(resolve(root, path), readFileSync(resolve(repoRoot, path)));
   }
 
@@ -384,8 +413,10 @@ function writeFixture(root, skills = ["alpha"]) {
         skill_groups: skillGroupsFor(skills),
         allowed_multi_group_skills: [],
         routing: routingFixture(),
-        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md", "docs/ai/domain-rule-ledger.md"],
+        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md", "docs/ai/domain-rule-ledger.md", ...promptV2PreregistrationDocs],
         examples: ["examples/ok.md"],
+        schemas: promptV2PreregistrationSchemas,
+        adapters: promptV2PreregistrationAdapters,
         design: { quality_target: "95+" },
       },
       null,
@@ -6695,6 +6726,66 @@ try {
     "must retain the typed prompt_v2_materialization_unavailable stop",
   );
 
+  const missingPromptV2SchemaRoot = cloneFixture("missing-prompt-v2-preregistration-schema");
+  rmSync(resolve(missingPromptV2SchemaRoot, "benchmarks/schemas/prompt-v2-preregistration.schema.json"));
+  assertFail(
+    "missing Prompt v2 preregistration schema",
+    missingPromptV2SchemaRoot,
+    "required schema is missing: benchmarks/schemas/prompt-v2-preregistration.schema.json",
+  );
+
+  const missingPromptV2ManifestEntryRoot = cloneFixture("missing-prompt-v2-preregistration-manifest-entry");
+  {
+    const manifestPath = resolve(missingPromptV2ManifestEntryRoot, "manifest.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    manifest.docs = manifest.docs.filter((path) => path !== "docs/fixtures/prompt-v2-preregistration/binding.json");
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+  assertFail(
+    "missing Prompt v2 preregistration manifest entry",
+    missingPromptV2ManifestEntryRoot,
+    "manifest.json.docs must list docs/fixtures/prompt-v2-preregistration/binding.json",
+  );
+
+  const tamperedPromptV2BindingRoot = cloneFixture("tampered-prompt-v2-preregistration-binding");
+  {
+    const bindingPath = resolve(tamperedPromptV2BindingRoot, "docs/fixtures/prompt-v2-preregistration/binding.json");
+    const binding = JSON.parse(readFileSync(bindingPath, "utf8"));
+    binding.adapter_bindings[0].roles[0].asset.content_digest = `sha256:${"f".repeat(64)}`;
+    writeFileSync(bindingPath, `${JSON.stringify(binding, null, 2)}\n`);
+  }
+  assertFail(
+    "tampered Prompt v2 preregistration binding",
+    tamperedPromptV2BindingRoot,
+    "binding digest mismatch",
+  );
+
+  const orphanPromptV2ObjectRoot = cloneFixture("orphan-prompt-v2-preregistration-object");
+  putContentAddressedJson({
+    storeRoot: resolve(orphanPromptV2ObjectRoot, "docs/fixtures/prompt-v2-preregistration/store"),
+    artifact: { schema_version: "1.0.0", object_kind: "prompt_v2_preregistration_orphan" },
+  });
+  assertFail(
+    "orphan Prompt v2 preregistration object",
+    orphanPromptV2ObjectRoot,
+    "CAS inventory digest/count mismatch",
+  );
+
+  const accessedPromptV2ResultRoot = cloneFixture("accessed-prompt-v2-preregistration-result");
+  {
+    const referencePath = resolve(accessedPromptV2ResultRoot, "docs/fixtures/prompt-v2-preregistration/reference.json");
+    const reference = JSON.parse(readFileSync(referencePath, "utf8"));
+    reference.boundaries.results_accessed = true;
+    const basis = Object.fromEntries(Object.entries(reference).filter(([key]) => key !== "reference_digest"));
+    reference.reference_digest = canonicalDigest(basis);
+    writeFileSync(referencePath, `${JSON.stringify(reference, null, 2)}\n`);
+  }
+  assertFail(
+    "Prompt v2 result-access boundary drift",
+    accessedPromptV2ResultRoot,
+    "forbidden result, lifecycle, or activation boundary",
+  );
+
   const missingAdapterEventSchemaRoot = cloneFixture("missing-adapter-event-schema");
   rmSync(resolve(missingAdapterEventSchemaRoot, "schemas/adapter-runtime-event.schema.json"));
   assertFail("missing normalized adapter event schema", missingAdapterEventSchemaRoot, "required schema is missing");
@@ -7017,8 +7108,10 @@ jobs:
         skill_groups: skillGroupsFor(["alpha"], { adoption_bootstrap: ["alpha"] }),
         allowed_multi_group_skills: ["alpha"],
         routing: routingFixture(),
-        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md"],
+        docs: ["docs/ok.md", "docs/ai/improvement-ledger.md", ...promptV2PreregistrationDocs],
         examples: ["examples/ok.md"],
+        schemas: promptV2PreregistrationSchemas,
+        adapters: promptV2PreregistrationAdapters,
         design: { quality_target: "95+" },
       },
       null,
@@ -7363,8 +7456,10 @@ jobs:
         skill_groups: skillGroupsFor(["alpha"]),
         allowed_multi_group_skills: [],
         routing: routingFixture(),
-        docs: ["CUSTOM_INSTRUCTIONS.md", "docs/ok.md"],
+        docs: ["CUSTOM_INSTRUCTIONS.md", "docs/ok.md", ...promptV2PreregistrationDocs],
         examples: ["examples/ok.md"],
+        schemas: promptV2PreregistrationSchemas,
+        adapters: promptV2PreregistrationAdapters,
         design: { quality_target: "95+" },
       },
       null,

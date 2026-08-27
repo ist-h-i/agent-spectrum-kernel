@@ -162,6 +162,15 @@ jobs:
       - name: Run legacy calibration migration tests
         run: node scripts/test-ask-benchmark-portfolio-legacy-calibration-migration.mjs
 
+      - name: Run Prompt v2 preregistration contract tests
+        run: node scripts/test-ask-benchmark-prompt-v2.mjs
+
+      - name: Run Prompt v2 preregistration authority fixture tests
+        run: node scripts/test-prompt-v2-preregistration-samples.mjs
+
+      - name: Check Prompt v2 preregistration authority fixture freshness
+        run: node scripts/prompt-v2-preregistration-samples.mjs --check
+
       - name: Validate repository consistency
         run: node scripts/validate-repo.mjs
 

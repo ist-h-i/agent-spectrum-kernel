@@ -92,8 +92,8 @@ const ALLOWED_OBJECT_KINDS = new Set([
 ]);
 
 export const PROMPT_V2_PREREGISTRATION_RENDERED_ROOT = "docs/fixtures/prompt-v2-preregistration/rendered";
-export const PROMPT_V2_SOURCE_REVISION = "869d96b16543ef68b4c459064c8010e1cdb0b8de";
-export const PROMPT_V2_SOURCE_TREE = "1546f9cd522716f5d266018b7cc4901bed98c204";
+export const PROMPT_V2_SOURCE_REVISION = "1710b3007d60e249d553ca7a43b5a83937066b61";
+export const PROMPT_V2_SOURCE_TREE = "caff00c8f1d97386fe28d62d819028e644036a27";
 
 const adapterDefinitions = Object.freeze([
   Object.freeze({

@@ -17,12 +17,12 @@
     }
   },
   "foundation": {
-    "copied_portfolio_object_count": 21,
+    "copied_portfolio_object_count": 27,
     "portfolio_reference": {
       "schema_version": "1.0.0",
       "program": "ask_portfolio_manager_samples",
       "source_revision": "c24f459b0bf69a755dfde00719516e4a5844018d",
-      "registry_snapshot_digest": "sha256:5b50712f43feecf82d532178310cf2e0fe2fe709e0d951eb797a3876ff0cf92d",
+      "registry_snapshot_digest": "sha256:34a511af596bc1317941241135f053153d9862ff7552a243c0231fc079c4edba",
       "kernel_only": {
         "schema_version": "1.0.0",
         "program": "ask_portfolio_reference",
@@ -30,22 +30,22 @@
         "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
         "scope_id": "agent-spectrum-kernel",
         "lock_revision": 2,
-        "lock_digest": "sha256:2b096afb1739764ae015552af32291b7d6676dbd2f9f8380cbc4540b242c4959",
+        "lock_digest": "sha256:0d03d0cacd8b523dc30eb24d5451f1a2ebfb2a248d0ec6e25bde5047b4602e19",
         "required_portfolio_authority_context_digests": [
-          "sha256:b7339f940970b65856bc8991f5475107063e76c01829fb605989dfead80ee514"
+          "sha256:1094f4f97134c7098dbf5a170163dd67e0f1c3e0284bcd9188bfe582e71f6d33"
         ],
         "required_high_impact_approval_grant_digests": [],
         "current_manifest": {
           "revision": "reference-kernel-only-v1",
-          "manifest_digest": "sha256:e116cc23d57fca4594e903ea8a6aeb4b85d2b82dd2470ddc0758acd3cef8b747",
+          "manifest_digest": "sha256:521828aea1751c4f70e1915131f9751bf8a38f5b65aaf59a2155e248cb0200cd",
           "asset_set_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
         },
         "selections": [
           {
-            "selection_object_digest": "sha256:a0f2c76f8d4194c06b2a28bf2f323f00c797985abb955926f1aeb2d5c46fb5bc",
-            "selection_digest": "sha256:c1bdd28735e56e757349b916090ca26987da44aa2df6ad7f5963eba4c7be7ab9",
-            "context_object_digest": "sha256:f29b03891c6aa3ca72cd2e79834aa5c0fa22930a2f5b17410e497ad24d68f781",
-            "context_digest": "sha256:dea3740b36e09857a7cb1fac79a3956998bdac79f1c49123a905b2e2327432c0",
+            "selection_object_digest": "sha256:1d079efbcaa1f4aeed8cbf9cc9949c7b4de326c95bed8f8315ea02221756c081",
+            "selection_digest": "sha256:cd2c3070f9798c34297d442eae0d1c33e4627a9b747aada9369e372fb44f2ca9",
+            "context_object_digest": "sha256:09c537850ac0a4a8f6d1f6c6fea27e11cfda2718eea0c040c750396e5b5c5dd5",
+            "context_digest": "sha256:b769deb939762c5a26af1464db348d3ba881c3fe295f0c65a0c0c32d39704a0a",
             "decision": "selected"
           }
         ],
@@ -61,23 +61,23 @@
         "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
         "scope_id": "agent-spectrum-kernel",
         "lock_revision": 3,
-        "lock_digest": "sha256:b4fc6bf06f8ec01c55c847ac6733a26e458352850c2697b8c45c33998c38fc3d",
+        "lock_digest": "sha256:83e406f149b89e8ed14c16c5aa51b610ad1f85e24c09653e720b0da09144b033",
         "required_portfolio_authority_context_digests": [
-          "sha256:b7339f940970b65856bc8991f5475107063e76c01829fb605989dfead80ee514",
-          "sha256:fb808457c840a2e9b354c2d16923acdaa3dc106f6ceaa32be77df9c4c1efc8f1"
+          "sha256:1094f4f97134c7098dbf5a170163dd67e0f1c3e0284bcd9188bfe582e71f6d33",
+          "sha256:f65b48e004eaf4b60b7aacb8232558b46a1e24f2885393f3093ffa4577383c46"
         ],
         "required_high_impact_approval_grant_digests": [],
         "current_manifest": {
           "revision": "reference-adaptive-ask-v1",
-          "manifest_digest": "sha256:00399989ee4be2513f4b8e112603f87e1fb3e7f84c514f91c59a81049b2d7c9e",
+          "manifest_digest": "sha256:6e9a0e950e73c5bba8569bdd60a00c3ea983178313027ffb976fc4d32d8703bf",
           "asset_set_digest": "sha256:bf7aa0a97dbdd6fa46453e661ce05482e3619062f9fc949d916e2fdc6c11a329"
         },
         "selections": [
           {
-            "selection_object_digest": "sha256:4c960a17ac6c747040cb171c8b625e30ac00323498608c4daa9177eac27e704f",
-            "selection_digest": "sha256:0cd2a92950d69e18788590afccf5498bdfdb46c62ceebad618db65c4c32549b0",
-            "context_object_digest": "sha256:11a436fe98b3611ffcfc3352870c8497490c9f84e7d90eba9fc6d9b00d38317e",
-            "context_digest": "sha256:0071809877b1431c3b126f30bc29bc1574f0166ab91e5329f526bbff74456293",
+            "selection_object_digest": "sha256:f5cbf66003c14ab9ee9566b28bc5a570baff86d10b7d7bc93cad0287b812a040",
+            "selection_digest": "sha256:63607ebc9b547bd117f09a80af2332346a5a7be371f898e7424ea38d1d039be1",
+            "context_object_digest": "sha256:4d9282491eec9ebaaa007c21560b2f0af2edfb01e4e48b9db73eb6b49aba5677",
+            "context_digest": "sha256:47da45c426da14c73525232f7cc09667a65bf8cfea01aa05bb8b534831767119",
             "decision": "downgrade"
           }
         ],
@@ -96,7 +96,7 @@
           "authority_revision": "kernel-only-v1",
           "kind": "external_portfolio_activation_authority"
         },
-        "context_digest": "sha256:3a5be2d436052f341a0c69caf09e366366fd0a1554a13089e932c392f89eb3e6",
+        "context_digest": "sha256:55b73fca327b3af00475e7b0283de314a5b1786b2fa398575bb8362cecf28bc6",
         "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "grants": [],
         "object_kind": "portfolio_authority_context",
@@ -106,13 +106,13 @@
         "rollback_target": null,
         "schema_version": "1.0.0",
         "scope_id": "agent-spectrum-kernel",
-        "transition_basis_digest": "sha256:3db5acb690453743008c05b2486f521897b477d0e063a9434eeb6befe2b94e9c",
+        "transition_basis_digest": "sha256:389b8506795296de5f6830721321b64ab45276d12ca0d2a9224d0fdf578d2f43",
         "transitions": [
           {
             "from_state": null,
             "manifest": {
               "asset_set_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-              "manifest_digest": "sha256:e116cc23d57fca4594e903ea8a6aeb4b85d2b82dd2470ddc0758acd3cef8b747",
+              "manifest_digest": "sha256:521828aea1751c4f70e1915131f9751bf8a38f5b65aaf59a2155e248cb0200cd",
               "portfolio_id": "ask.portfolio.reference",
               "revision": "reference-kernel-only-v1"
             },
@@ -127,23 +127,23 @@
           "authority_revision": "adaptive-ask-v1",
           "kind": "external_portfolio_activation_authority"
         },
-        "context_digest": "sha256:d94a3ce1d2bb440b5788e9ac5ba196ffe5b34c9d248d7be8e63ffc7fc99b4e5e",
+        "context_digest": "sha256:ef19681bdaec5e87079149426085bb43c0833193bf64e8f92c2d57bdfb775e4a",
         "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "grants": [],
         "object_kind": "portfolio_authority_context",
         "portfolio_id": "ask.portfolio.reference",
-        "predecessor_lock_digest": "sha256:2b096afb1739764ae015552af32291b7d6676dbd2f9f8380cbc4540b242c4959",
+        "predecessor_lock_digest": "sha256:0d03d0cacd8b523dc30eb24d5451f1a2ebfb2a248d0ec6e25bde5047b4602e19",
         "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
         "rollback_target": null,
         "schema_version": "1.0.0",
         "scope_id": "agent-spectrum-kernel",
-        "transition_basis_digest": "sha256:137698423701879162e690e738986d6bcf8d3cf0502645939712e9c85a5d74ce",
+        "transition_basis_digest": "sha256:cd572899ac1383c8186e42b0d45d9353d1207fcc61c5fbc580a3753a0b7cfd84",
         "transitions": [
           {
             "from_state": null,
             "manifest": {
               "asset_set_digest": "sha256:bf7aa0a97dbdd6fa46453e661ce05482e3619062f9fc949d916e2fdc6c11a329",
-              "manifest_digest": "sha256:00399989ee4be2513f4b8e112603f87e1fb3e7f84c514f91c59a81049b2d7c9e",
+              "manifest_digest": "sha256:6e9a0e950e73c5bba8569bdd60a00c3ea983178313027ffb976fc4d32d8703bf",
               "portfolio_id": "ask.portfolio.reference",
               "revision": "reference-adaptive-ask-v1"
             },
@@ -153,7 +153,7 @@
             "from_state": "current",
             "manifest": {
               "asset_set_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-              "manifest_digest": "sha256:e116cc23d57fca4594e903ea8a6aeb4b85d2b82dd2470ddc0758acd3cef8b747",
+              "manifest_digest": "sha256:521828aea1751c4f70e1915131f9751bf8a38f5b65aaf59a2155e248cb0200cd",
               "portfolio_id": "ask.portfolio.reference",
               "revision": "reference-kernel-only-v1"
             },
@@ -185,7 +185,7 @@
       "record_digest": "sha256:9c93cb116df6bf61e855fc8d24fd26116acedbceaabae9a8b8d7fb5185ab6d78",
       "content_digest": "sha256:d89ac64c6b863068939aef479e324542c9b9c0150d3d37373467d81d6d7bcc84"
     },
-    "registry_snapshot_digest": "sha256:bed19f2c11e147262fb211ff162c590834f1f1d5f40f66b8e0a12e1caed4f801",
+    "registry_snapshot_digest": "sha256:679ecc1a1507a3663a97d45fb8152acef0ec547fe39b37a12a6345227533dca7",
     "original_parent_bytes_preserved": true,
     "sample_baseline_content_changed": false,
     "candidate_is_only_content_changing_child": true,
@@ -208,13 +208,13 @@
       "portfolio": {
         "portfolio_id": "ask.portfolio.issue278.sample-runtime",
         "revision": "sample-baseline-v1",
-        "manifest_digest": "sha256:f7be1b013f6e96041848e63388aeba6e72786f3dcb31cc9f21b0282a3e01aa21",
+        "manifest_digest": "sha256:01b90828482e22833c6e246872c05b7a20349a0357eef8f9be9d587add0b893f",
         "asset_set_digest": "sha256:06ef54d6a0516d07d2b058a08b8a291d37f8e884bdb2ba6a924661776e8fb460",
-        "lock_digest": "sha256:c156f2106ecabd6a0275d519d6b31237850fbfd21103c5ed766314294b3367f0"
+        "lock_digest": "sha256:4e771bfb45ba55e473bbef342fb0139171a2d30a14088e285bfb582c3097f800"
       },
-      "registry_snapshot_digest": "sha256:bed19f2c11e147262fb211ff162c590834f1f1d5f40f66b8e0a12e1caed4f801",
-      "selection_object_digest": "sha256:5e07faaff52fc3ac74d0ec98ae1ceac0dc9caeda48a0fba9fee4171a914677cf",
-      "selection_digest": "sha256:9e09842f67ffa8a487b08b2df109f260360eb7946247ebbf37de639e318542bc",
+      "registry_snapshot_digest": "sha256:679ecc1a1507a3663a97d45fb8152acef0ec547fe39b37a12a6345227533dca7",
+      "selection_object_digest": "sha256:783c1a33e10a46e73d5365ba1e7ee6907456f85d9d2cf516ae108a6f3d2c3f33",
+      "selection_digest": "sha256:c37bd82a4a67e80f90cbe3f9bc3c329a828b83e4c5ff839b96cd06054b93aaa2",
       "selected_asset": {
         "asset_type": "prompt",
         "stable_id": "ask.prompt-template.issue278.evolution-sample",
@@ -228,13 +228,13 @@
       "portfolio": {
         "portfolio_id": "ask.portfolio.issue278.sample-evaluation",
         "revision": "sample-challenger-v1",
-        "manifest_digest": "sha256:f43c5fcd36120e7b4b33219a5d3b0dcd217c2ecf1e598d4b4c7811a51eaa5ec4",
+        "manifest_digest": "sha256:2b9550fef6878114702bf2b318f9e6b02460694e8b295b148dc77a054a5aff6d",
         "asset_set_digest": "sha256:2e39061606b95f53b482e4aedf368f555d5e5be3f4a63eddc19e81e87006f963",
-        "lock_digest": "sha256:3f25ba2955ccc1562fd1611da035c81eaef5eab85998ce43f65e99c8e463428c"
+        "lock_digest": "sha256:e9b0c0320e2181568b838261a37946a6861ba96b414e4304cac4b643be3f297a"
       },
-      "registry_snapshot_digest": "sha256:bed19f2c11e147262fb211ff162c590834f1f1d5f40f66b8e0a12e1caed4f801",
-      "selection_object_digest": "sha256:cc537c48e462ecd812477fb79510f8dbe776d9efacdbe64843b3308807e6d783",
-      "selection_digest": "sha256:ce4a319b1020ee9b6fa783045683293692f10a6c8cb93e7742ce6af9003941ec",
+      "registry_snapshot_digest": "sha256:679ecc1a1507a3663a97d45fb8152acef0ec547fe39b37a12a6345227533dca7",
+      "selection_object_digest": "sha256:fef4aa45d53d205dd71362892313dee6209580ff72437c40776ef9771c8f627f",
+      "selection_digest": "sha256:d7dbe4e669c848d6e9f653094ebed57fabd8e394cd695c3d124bf2ec574a9244",
       "selected_asset": {
         "asset_type": "prompt",
         "stable_id": "ask.prompt-template.issue278.evolution-sample",
@@ -246,38 +246,38 @@
   },
   "artifacts": {
     "candidate": {
-      "object_digest": "sha256:e8b0437aaa3ac4df4435b8e4537fa951cda85e37c196fbd09ad3121fcd2bb2d7",
-      "semantic_digest": "sha256:c55000bbcacc39a15439ebb808c789cec128bfea3cc6d91d8199dd288fdab529"
+      "object_digest": "sha256:0a70562fc0b0b5c4c5a615ccce307c6f49eccf5db817cf8a68f77eb91f7c615c",
+      "semantic_digest": "sha256:e458c82cfc4eadb9e0c7655d426f1a3262b0bea1f79846b28547ec9e74a9d41d"
     },
     "experiment": {
-      "object_digest": "sha256:686f965bd0fccd83f79a0c0452f63debdf037feef133e8e6f9a5671f7b92f9ef",
-      "semantic_digest": "sha256:4ebf51bd8b38cce175168c14f9437cbf30f2615f81a4d3b5cebd941344b1f305"
+      "object_digest": "sha256:86b9deb8716742c76e040e750b3e1f645b19fb08ad1579f5b2344f1cf97c2d88",
+      "semantic_digest": "sha256:bb41ef0d0dae67e31b9ca22e1d027ebb679ef4b69aa31bc9d756cda2abc1d544"
     },
     "recommendation": {
-      "object_digest": "sha256:271a82d3cf2ea487636d50fc4582d4e64e1ce7a792b7f3ea266b61d65b59a667",
-      "semantic_digest": "sha256:1fd9c53beb64960a1942f28ab0c3fc2da3921bccc143cba2c27a935115a80661"
+      "object_digest": "sha256:21566d99eef552e79f3776c86fb68b7a75cd52ccff601391982a893e435f55b1",
+      "semantic_digest": "sha256:abf4b4484db1d982705806775a49600e72b6abf2bf64cea9d9a2b7d0598527a2"
     },
     "action_proposal": {
-      "object_digest": "sha256:02ff43a87ce18935956be9b5bb6ad01aeb3656e0fc71c6be6c0678b5f6066290",
-      "semantic_digest": "sha256:2461d25e6b370dae841478aa6f1f9384905ce5abcf041060b6d9a790ae685534"
+      "object_digest": "sha256:2bb874e33d7ac4ca72b43e5a59ed4ae0e968a9c0880312908f37f77fe125f379",
+      "semantic_digest": "sha256:30aaf940a6c461ac4c753dac87b05eae43632ea69cdf38d067ee5e9cd73aa086"
     },
     "human_decision": {
-      "object_digest": "sha256:5679f2f21781d0d1e912a4e49cec39bb7fe3e0607c436fd432afade0b2231a74",
-      "semantic_digest": "sha256:d3c2c85e2aa337e0fbafac2dc9a5662e8ddd169cbc9e753454326930f774d420"
+      "object_digest": "sha256:eec65127c27339503729cec191f4be095016393e3395d6271c4b20fb09218f9f",
+      "semantic_digest": "sha256:01e8f2714afb17c6b80da8ec710278e5eefa2e68817caf4efabee43b9ea497ba"
     },
     "application_receipt": {
-      "object_digest": "sha256:1edefd0e313f1e27ad848439c5d82d2dffcaefba1a856aa571285f89dd378eca",
-      "semantic_digest": "sha256:935ff82f6010b78064e661bcf480ccecb12db170d9441384ccb33dea658f9cf0"
+      "object_digest": "sha256:1dfd22044f50990abaca1cc04894b87a628395d8d9b5691537b90bfb1a0463e4",
+      "semantic_digest": "sha256:8e2b1a733bece0eef0df9b31706e3f62eaae96ddb6c0314cafec091e81703070"
     }
   },
   "application": {
-    "gate_evidence_object_digest": "sha256:3a07a31f4f5f50c1c5a7b0a673f164d47ce77c91fc056dbdcfed524ffc05c1d2",
-    "base_portfolio_lock_digest": "sha256:c156f2106ecabd6a0275d519d6b31237850fbfd21103c5ed766314294b3367f0",
-    "result_portfolio_lock_digest": "sha256:a7ea2532f53b16f5032a6e5869f8cab2f1cbe1a02041166c23b610474fa5806e",
+    "gate_evidence_object_digest": "sha256:5416a6960ec4ed19a03fc0dd6a2039f14beb5a0d7db8a1ad8a7f030fe6a3aa12",
+    "base_portfolio_lock_digest": "sha256:4e771bfb45ba55e473bbef342fb0139171a2d30a14088e285bfb582c3097f800",
+    "result_portfolio_lock_digest": "sha256:7643df91cd2ef164e21105e1814a688487578a35f2c35e3387c6f2e1a673c3ff",
     "rollback_anchor": {
       "portfolio_id": "ask.portfolio.issue278.sample-runtime",
       "revision": "sample-baseline-v1",
-      "manifest_digest": "sha256:f7be1b013f6e96041848e63388aeba6e72786f3dcb31cc9f21b0282a3e01aa21",
+      "manifest_digest": "sha256:01b90828482e22833c6e246872c05b7a20349a0357eef8f9be9d587add0b893f",
       "asset_set_digest": "sha256:06ef54d6a0516d07d2b058a08b8a291d37f8e884bdb2ba6a924661776e8fb460"
     }
   },
@@ -297,7 +297,7 @@
           "authority_id": "issue-278-synthetic-contract-verifier",
           "authority_revision": 1,
           "authority_evidence_digest": "sha256:c4eab53f278e1254e0444b49bf60c8abc3163355ea94f854ba5fcb3979645a23",
-          "experiment_digest": "sha256:4ebf51bd8b38cce175168c14f9437cbf30f2615f81a4d3b5cebd941344b1f305",
+          "experiment_digest": "sha256:bb41ef0d0dae67e31b9ca22e1d027ebb679ef4b69aa31bc9d756cda2abc1d544",
           "verification_mode": "full_verifier",
           "artifact_inventory_digest": "sha256:9f5b862133519d3b7c995e55fc1be03564b0a8be191a0cf75ddb89b1f6c70ce9"
         },
@@ -377,7 +377,7 @@
       {
         "schema_version": "1.0.0",
         "object_kind": "evolution_human_decision",
-        "proposal_digest": "sha256:2461d25e6b370dae841478aa6f1f9384905ce5abcf041060b6d9a790ae685534",
+        "proposal_digest": "sha256:30aaf940a6c461ac4c753dac87b05eae43632ea69cdf38d067ee5e9cd73aa086",
         "action": "adopt_candidate",
         "disposition": "approved",
         "reason_codes": [
@@ -390,7 +390,7 @@
           "authority_evidence_digest": "sha256:201a8fbe4edfabea55f79934bad4709cf5704a2c69f34ddf9856c3537bb9285f"
         },
         "authority_implied": false,
-        "decision_digest": "sha256:d3c2c85e2aa337e0fbafac2dc9a5662e8ddd169cbc9e753454326930f774d420"
+        "decision_digest": "sha256:01e8f2714afb17c6b80da8ec710278e5eefa2e68817caf4efabee43b9ea497ba"
       }
     ],
     "asset_lifecycle": [],
@@ -407,14 +407,14 @@
             "manifest": {
               "portfolio_id": "ask.portfolio.issue278.sample-runtime",
               "revision": "sample-baseline-v1",
-              "manifest_digest": "sha256:f7be1b013f6e96041848e63388aeba6e72786f3dcb31cc9f21b0282a3e01aa21",
+              "manifest_digest": "sha256:01b90828482e22833c6e246872c05b7a20349a0357eef8f9be9d587add0b893f",
               "asset_set_digest": "sha256:06ef54d6a0516d07d2b058a08b8a291d37f8e884bdb2ba6a924661776e8fb460"
             },
             "from_state": null,
             "to_state": "current"
           }
         ],
-        "transition_basis_digest": "sha256:e14cee6c46533a78a068a60e21ef354f687d8209c6ee02a3be805d6fd59497d8",
+        "transition_basis_digest": "sha256:a5c7179eb80f47c5854a0f4c98dcd3ea278f721ad948c92f9350d14cd5501f93",
         "grants": [],
         "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "rollback_target": null,
@@ -424,7 +424,7 @@
           "authority_revision": "1",
           "authority_evidence_digest": "sha256:05095d596e79c23a49159147d3130f7aa4e3133bd0353b485b71b1c50c62e3a9"
         },
-        "context_digest": "sha256:be82d99906a8f7b00fece2ef93f06884c8696d0d7d17712da059773462d6d052"
+        "context_digest": "sha256:ab1e39162bc96447f53ca5392cd1f6756dd66b8ffd03707a4d2a977bbd906e14"
       },
       {
         "schema_version": "1.0.0",
@@ -438,14 +438,14 @@
             "manifest": {
               "portfolio_id": "ask.portfolio.issue278.sample-evaluation",
               "revision": "sample-challenger-v1",
-              "manifest_digest": "sha256:f43c5fcd36120e7b4b33219a5d3b0dcd217c2ecf1e598d4b4c7811a51eaa5ec4",
+              "manifest_digest": "sha256:2b9550fef6878114702bf2b318f9e6b02460694e8b295b148dc77a054a5aff6d",
               "asset_set_digest": "sha256:2e39061606b95f53b482e4aedf368f555d5e5be3f4a63eddc19e81e87006f963"
             },
             "from_state": null,
             "to_state": "current"
           }
         ],
-        "transition_basis_digest": "sha256:dedcbf5a4a4d172ff07c6a0b98e80e3d4f1463ccdfd52b61189965e1ecc94756",
+        "transition_basis_digest": "sha256:108a7ff34f636590726ab0830ead0181e4ee85670f81930838d08d8d0cf0c75e",
         "grants": [],
         "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "rollback_target": null,
@@ -455,7 +455,7 @@
           "authority_revision": "1",
           "authority_evidence_digest": "sha256:37bd9c3c21bfb3a3d508199dcfa67c018198d5c1f6a09653d38a40a48c2430e0"
         },
-        "context_digest": "sha256:16dcbef299ecb65850d8098fecae04f2c951d6086da0e1941d4f343c51e42450"
+        "context_digest": "sha256:b5228d0841a806317ba0421436276f616e14ca097cc89169bb60da4e3a950952"
       },
       {
         "schema_version": "1.0.0",
@@ -463,13 +463,13 @@
         "portfolio_id": "ask.portfolio.issue278.sample-runtime",
         "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
         "scope_id": "agent-spectrum-kernel",
-        "predecessor_lock_digest": "sha256:c156f2106ecabd6a0275d519d6b31237850fbfd21103c5ed766314294b3367f0",
+        "predecessor_lock_digest": "sha256:4e771bfb45ba55e473bbef342fb0139171a2d30a14088e285bfb582c3097f800",
         "transitions": [
           {
             "manifest": {
               "portfolio_id": "ask.portfolio.issue278.sample-runtime",
               "revision": "sample-baseline-v1",
-              "manifest_digest": "sha256:f7be1b013f6e96041848e63388aeba6e72786f3dcb31cc9f21b0282a3e01aa21",
+              "manifest_digest": "sha256:01b90828482e22833c6e246872c05b7a20349a0357eef8f9be9d587add0b893f",
               "asset_set_digest": "sha256:06ef54d6a0516d07d2b058a08b8a291d37f8e884bdb2ba6a924661776e8fb460"
             },
             "from_state": "current",
@@ -479,14 +479,14 @@
             "manifest": {
               "portfolio_id": "ask.portfolio.issue278.sample-runtime",
               "revision": "sample-candidate-canary-v2",
-              "manifest_digest": "sha256:8e987ccdea2f6cb42a27549246a6590ea7299f4c897833767ae64d3b7dce9bfc",
+              "manifest_digest": "sha256:c9ab3115073d7d50b2b099ee1ca8b08a15f5f962a71e3c9fe56e8e5bc90f584b",
               "asset_set_digest": "sha256:21e68b89466702a19cbaf4213f8927ba52498ab14ca21e67aec17d9c60ba7eab"
             },
             "from_state": null,
             "to_state": "current"
           }
         ],
-        "transition_basis_digest": "sha256:f611c84df8847cb8f37a176b34b1d33df19de7a7f95362a46a81e99a68739028",
+        "transition_basis_digest": "sha256:e8582f621d38c5884f36cccfa29a530a6ed38f9c9792340bf1ffac110f6139d5",
         "grants": [],
         "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "rollback_target": null,
@@ -494,9 +494,9 @@
           "kind": "external_portfolio_activation_authority",
           "authority_id": "issue-278-sample-human-maintainer",
           "authority_revision": "3",
-          "authority_evidence_digest": "sha256:5679f2f21781d0d1e912a4e49cec39bb7fe3e0607c436fd432afade0b2231a74"
+          "authority_evidence_digest": "sha256:eec65127c27339503729cec191f4be095016393e3395d6271c4b20fb09218f9f"
         },
-        "context_digest": "sha256:fd8bf2ea1c5d49693564d26cbd371dbfa2cd037460e00640323befc0f9856cc2"
+        "context_digest": "sha256:39008a7221366262524a3d3e5f6c89fbfcc5589bc9f4d2e01b40233ba2f4ac0f"
       }
     ],
     "high_impact_approval_grants": []

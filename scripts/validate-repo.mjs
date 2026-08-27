@@ -20,6 +20,7 @@ import {
 import { exportAssetRegistryReference, listAssets, verifyAssetRegistry } from "./asset-registry.mjs";
 import { listContentAddressedJson, readContentAddressedJson, readJsonFileStrict } from "./content-addressed-store.mjs";
 import { verifyEvolutionClosure } from "./evolution-loop.mjs";
+import { verifyPromptV2PreregistrationFixture } from "./prompt-v2-preregistration-samples.mjs";
 import {
   CORE_IMMUTABLE_CONTRACT_ASSETS,
   CORE_IMMUTABLE_RUNTIME_ASSETS,
@@ -119,6 +120,12 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/evolution-action-proposal.schema.json",
   "schemas/evolution-human-decision.schema.json",
   "schemas/evolution-application-receipt.schema.json",
+  "benchmarks/schemas/prompt-v2-preregistration.schema.json",
+  "benchmarks/schemas/prompt-v2-execution-plan.schema.json",
+  "benchmarks/schemas/prompt-v2-materialization-manifest.schema.json",
+  "benchmarks/schemas/prompt-v2-resume-state.schema.json",
+  "benchmarks/schemas/prompt-v2-normalized-result.schema.json",
+  "benchmarks/schemas/prompt-v2-comparison-report.schema.json",
 ];
 const REQUIRED_ASSET_REGISTRY_PATHS = [
   "docs/asset-registry-contract.md",
@@ -159,6 +166,42 @@ const REQUIRED_EVOLUTION_LOOP_PATHS = [
 ];
 const EVOLUTION_LOOP_REFERENCE_PATH = "docs/fixtures/evolution-loop/reference.json";
 const EVOLUTION_LOOP_STORE_PATH = "docs/fixtures/evolution-loop/store";
+const PROMPT_V2_PREREGISTRATION_FIXTURE_ROOT = "docs/fixtures/prompt-v2-preregistration";
+const REQUIRED_PROMPT_V2_PREREGISTRATION_PATHS = Object.freeze({
+  docs: Object.freeze([
+    "docs/adr/0011-prompt-v2-result-blind-canary-authority.md",
+    "docs/prompt-v2-execution-handoff.md",
+    "benchmarks/protocol-prompt-v2.md",
+    "benchmarks/prompt-v2-preregistration.json",
+    "docs/fixtures/prompt-v2-preregistration/binding.json",
+    "docs/fixtures/prompt-v2-preregistration/reference.json",
+    "docs/fixtures/prompt-v2-preregistration/rendered/reference.json",
+    "docs/fixtures/prompt-v2-preregistration/rendered/claude_code/skill-handoff.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/claude_code/skill-implement.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/claude_code/skill-investigate.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/claude_code/skill-review.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/claude_code/skill-verify.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/codex/skill-handoff.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/codex/skill-implement.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/codex/skill-investigate.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/codex/skill-review.md",
+    "docs/fixtures/prompt-v2-preregistration/rendered/codex/skill-verify.md",
+  ]),
+  schemas: Object.freeze([
+    "benchmarks/schemas/prompt-v2-preregistration.schema.json",
+    "benchmarks/schemas/prompt-v2-execution-plan.schema.json",
+    "benchmarks/schemas/prompt-v2-materialization-manifest.schema.json",
+    "benchmarks/schemas/prompt-v2-resume-state.schema.json",
+    "benchmarks/schemas/prompt-v2-normalized-result.schema.json",
+    "benchmarks/schemas/prompt-v2-comparison-report.schema.json",
+  ]),
+  adapters: Object.freeze([
+    "scripts/ask-benchmark-prompt-v2.mjs",
+    "scripts/test-ask-benchmark-prompt-v2.mjs",
+    "scripts/prompt-v2-preregistration-samples.mjs",
+    "scripts/test-prompt-v2-preregistration-samples.mjs",
+  ]),
+});
 const EXPECTED_SAMPLE_ASSETS = new Map([
   ["ask.skill.test-first-verification", "skill"],
   ["ask.prompt-template.codex.skill-verify", "prompt"],
@@ -5562,6 +5605,34 @@ function validateEvolutionLoopFixture(root, errors) {
   }
 }
 
+function validateCheckedPromptV2PreregistrationFixture(root, manifest, errors) {
+  let missing = false;
+  for (const [manifestKey, paths] of Object.entries(REQUIRED_PROMPT_V2_PREREGISTRATION_PATHS)) {
+    for (const path of paths) {
+      if (!existsSync(resolve(root, path))) {
+        fail(errors, "Prompt v2 preregistration", `required Prompt v2 preregistration path is missing: ${path}`);
+        missing = true;
+      }
+      if (!manifest?.[manifestKey]?.includes(path)) {
+        fail(errors, "Prompt v2 preregistration", `manifest.json.${manifestKey} must list ${path}`);
+      }
+    }
+  }
+  const fixtureRoot = resolve(root, PROMPT_V2_PREREGISTRATION_FIXTURE_ROOT);
+  if (!existsSync(fixtureRoot)) {
+    fail(errors, "Prompt v2 preregistration", `required Prompt v2 preregistration path is missing: ${PROMPT_V2_PREREGISTRATION_FIXTURE_ROOT}`);
+    return { valid: false, objectCount: 0 };
+  }
+  if (missing) return { valid: false, objectCount: 0 };
+  try {
+    const summary = verifyPromptV2PreregistrationFixture({ root: fixtureRoot });
+    return { valid: true, ...summary };
+  } catch (error) {
+    fail(errors, "Prompt v2 preregistration", `checked-in result-blind fixture verification failed: ${error.message}`);
+    return { valid: false, objectCount: 0 };
+  }
+}
+
 function validateEpicAdmissionWorkPackagePlanContract(root, errors) {
   const result = validateRepositoryEpicAdmissionWorkPackagePlan({ root });
   for (const contractIssue of result.issues) {
@@ -5995,6 +6066,7 @@ export function validateRepository(options) {
   validateAssetRegistryFixture(root, errors);
   validatePortfolioManagerFixture(root, errors);
   validateEvolutionLoopFixture(root, errors);
+  validateCheckedPromptV2PreregistrationFixture(root, manifest, errors);
   const epicAdmissionWorkPackagePlanChecks = validateEpicAdmissionWorkPackagePlanContract(root, errors);
   const reviewSignalRegistryChecks = validateReviewSignalRegistry(root, manifest, errors);
   const portfolioCatalogChecks = validateAdaptivePortfolioCatalog(root, errors);

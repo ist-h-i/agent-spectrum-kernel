@@ -181,8 +181,8 @@ function main() {
   }
 
   assert.equal(PROMPT_V2_PREREGISTRATION_RENDERED_ROOT, "docs/fixtures/prompt-v2-preregistration/rendered");
-  assert.equal(PROMPT_V2_SOURCE_REVISION, "869d96b16543ef68b4c459064c8010e1cdb0b8de");
-  assert.equal(PROMPT_V2_SOURCE_TREE, "1546f9cd522716f5d266018b7cc4901bed98c204");
+  assert.equal(PROMPT_V2_SOURCE_REVISION, "1710b3007d60e249d553ca7a43b5a83937066b61");
+  assert.equal(PROMPT_V2_SOURCE_TREE, "caff00c8f1d97386fe28d62d819028e644036a27");
   const fixtureSummary = verifyPromptV2PreregistrationFixture({
     root: canonicalFixtureRoot,
   });
@@ -190,7 +190,7 @@ function main() {
   assert.equal(fixtureSummary.source_tree, PROMPT_V2_SOURCE_TREE);
   assert.equal(fixtureSummary.results_accessed, false);
   assert.equal(fixtureSummary.runtime_activation_implied, false);
-  assert.equal(fixtureSummary.object_count, 48);
+  assert.equal(fixtureSummary.object_count, 57);
 
   const binding = readJson(resolve(canonicalFixtureRoot, "binding.json"));
   const reference = readJson(resolve(canonicalFixtureRoot, "reference.json"));

@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "canonical_contract": {
     "revision": "ask-3.0.0",
-    "source_digest": "sha256:4c8923aabce45dd227c4e79c8fb626ddd0c56dc670707438b05e89b01cad75ca",
+    "source_digest": "sha256:4a60c7ddd6b2fcbcc21db2798dd49a938d9e5e23759451012d96fc1a5fe98198",
     "source_paths": [
       "AGENTS.md",
       "docs/adapter-runtime-boundary-contract.md",
@@ -98,8 +98,8 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "daily",
-          "profile_fingerprint": "sha256:4d3e9962d74cd50175e111f555b43a0a6095cdce4e96dd8a8ee5eac3c0dc92d2",
-          "canonical_subset_digest": "sha256:81349b1b19438d90f00ff2964bc8c0ca8229bd375028b9898289b9c0ca186da8",
+          "profile_fingerprint": "sha256:9128e8291d3adbbfde2a3e29e9f7eb79d09a24fbb57e643b1c99e60b780d8ba8",
+          "canonical_subset_digest": "sha256:b4da852b21912dd9d5f92fa5ea4c487180764f3e9a190844d8567c8521482474",
           "canonical_source_count": 58,
           "projected_asset_count": 50,
           "projected_asset_digest": "sha256:d5dbddc5a4514904237e42177151c93dc7c1ea7f3d3adf288f3564d36fe0d079",
@@ -124,8 +124,8 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "7",
           "renderer_profile": "daily",
-          "profile_fingerprint": "sha256:2182c2da605b874ebd892b104b6414fabbb2d5e3a4393571a09528872f29095d",
-          "canonical_subset_digest": "sha256:32461a57128ad77dd784d9602b42dd495532ceb3065200ce1a9159b500dbe60d",
+          "profile_fingerprint": "sha256:7945321264293e6e7115b5ea24345d4fee70e286698c25f255b046dd755a47a1",
+          "canonical_subset_digest": "sha256:ba4358417638357d835d70492af045146b2b6bd5153fa8a6636c26444198887e",
           "canonical_source_count": 60,
           "projected_asset_count": 49,
           "projected_asset_digest": "sha256:30a5ae4cd58cadce8955d03968c5d36c805571cb99249eb2a4c41fd81c590257",
@@ -153,8 +153,8 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "organizational",
-          "profile_fingerprint": "sha256:a6b883896fae5b15988c4901ab0549c63446024ba3ae9e8d6d3fb12ac44070eb",
-          "canonical_subset_digest": "sha256:47c60156a1dd863bc6f738793ea07f9213559ae5b726b065160ab957b2aedd67",
+          "profile_fingerprint": "sha256:ba0c08d9596e781ba8078fe3e8433d43e33f10123c4067293e67832c28a8248c",
+          "canonical_subset_digest": "sha256:57e3523cdcd96d595e85ea4f19af89032b17cd0b8f2f0cde684419f736c019cc",
           "canonical_source_count": 77,
           "projected_asset_count": 70,
           "projected_asset_digest": "sha256:bc29f43b2d2fee99dbd030ce84ff997aab36f45cb5171e718b29266a914676d3",
@@ -179,8 +179,8 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "7",
           "renderer_profile": "organizational",
-          "profile_fingerprint": "sha256:1007f672c9768bb91527eb6e39621eed8a9979aa8e3a0c7bcaea6aa7a80d4aa6",
-          "canonical_subset_digest": "sha256:4c8923aabce45dd227c4e79c8fb626ddd0c56dc670707438b05e89b01cad75ca",
+          "profile_fingerprint": "sha256:cde1789c5c591f8df412b4c7decb08763f29109baf2f17dae4353ea8ae6735dd",
+          "canonical_subset_digest": "sha256:4a60c7ddd6b2fcbcc21db2798dd49a938d9e5e23759451012d96fc1a5fe98198",
           "canonical_source_count": 79,
           "projected_asset_count": 64,
           "projected_asset_digest": "sha256:63f25ed81110f0cf3309072ba79b0a0d40618921e836bdb58382277b9d2b7faa",
@@ -208,8 +208,8 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "implementation",
-          "profile_fingerprint": "sha256:247d8d41163fc7ec809a6a443f2ed47faa6c6024d0ea120c223c7b9e10dd018a",
-          "canonical_subset_digest": "sha256:bbdb5d1c34b2971b1108f427c2dc3d70f22cf0344410d053d78131bc907e1391",
+          "profile_fingerprint": "sha256:76ce67ba6c296f581346ed1708cf34d80470a3538cdae04136de60eb144018b3",
+          "canonical_subset_digest": "sha256:092342d03e5aa02965483da4cf040ea6e306762bf5afa65bc992604f42c507eb",
           "canonical_source_count": 39,
           "projected_asset_count": 33,
           "projected_asset_digest": "sha256:f28b3cd2231c059af50a21bed8776ea2b3441f0f7291860b192bfbff260589e4",
@@ -234,8 +234,8 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "7",
           "renderer_profile": "implementation",
-          "profile_fingerprint": "sha256:8a55dd18ac996a8923616297a76d630ff9306cbdb347a19f56001d4bcf3e3a27",
-          "canonical_subset_digest": "sha256:ef6ef46339796f302e39d0e624bae089e124c8034524213329c28e760ef9f8f4",
+          "profile_fingerprint": "sha256:8ff5901d2cfcdc9c18d7541654cb106ecfa433dc6adcad4d839968a98d8e20b4",
+          "canonical_subset_digest": "sha256:186abe48ed79a3f9dc10bf966ec853aca4ac898974e113d38273c005f4228d51",
           "canonical_source_count": 35,
           "projected_asset_count": 27,
           "projected_asset_digest": "sha256:eb8eb67f19f0bee0b9c1801f224f0e3f7584b668a1cafe6f8b154fa8b2911715",
@@ -263,8 +263,8 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "investigation",
-          "profile_fingerprint": "sha256:7120bbe364188e28e42f2edcad566a42495a116ca2cd71380d4da0e1e249a542",
-          "canonical_subset_digest": "sha256:7a7a25d2a1616d0a453a3ac74e6fa9b664cb1b77f6d80dc1c4d9ac01341f2b16",
+          "profile_fingerprint": "sha256:1a37a7eae03e38fd08278677a12d0bbaa05102fc025b258e4cd48608c32ac6ad",
+          "canonical_subset_digest": "sha256:c7972947f2a18172e76838391c5ea2ab7601d87a2bb6f1a4928cc89dae9c75b2",
           "canonical_source_count": 33,
           "projected_asset_count": 28,
           "projected_asset_digest": "sha256:d77798b7f5aeb650640b5ceb9f739497db20149b7924bcf9e2b6098cc8d047f7",
@@ -289,8 +289,8 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "7",
           "renderer_profile": "investigation",
-          "profile_fingerprint": "sha256:2d7312cea297e7ebfa7f650798dc5419a34d9b079db52fc233015c9cf4025d8b",
-          "canonical_subset_digest": "sha256:c353cef81d4339d596fb39116283dfd5f6c9322a2f04213395622dea823757b9",
+          "profile_fingerprint": "sha256:c8a9ba8f28a279aa8cee40cb5fd0e48317a7362df4c540e8b8fcf9725f6592ed",
+          "canonical_subset_digest": "sha256:829cd6e09edf20d5f4fd5e75122887abf37212ef4f590624640862c80bb2bb4e",
           "canonical_source_count": 32,
           "projected_asset_count": 25,
           "projected_asset_digest": "sha256:7e8a4324bf49c92a931a7c8e274cb5fb16eca6e35dd8ab84bf6783f5f0a87569",
@@ -318,8 +318,8 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "review",
-          "profile_fingerprint": "sha256:4a678813555a3bb789bb7d8eadb95cab6ff8db0efba3b1a2967c18beec16533d",
-          "canonical_subset_digest": "sha256:e7d60e54d7e0726332dc127694c365a0deace8cd10ed9f25b14b14ea83279c56",
+          "profile_fingerprint": "sha256:2f65ec49ea6db9b4b0b20c623618723d2581ec5b7cdde38fe3cb7419e0d36506",
+          "canonical_subset_digest": "sha256:e8896d4ada5b9babf72232f75fcd937159246b287cd48cc7c0ba4a94e6473a4c",
           "canonical_source_count": 44,
           "projected_asset_count": 35,
           "projected_asset_digest": "sha256:33d6aa98738f844cd3bd5d266204f86806693a5f8916655ea143b736c23cf6ee",
@@ -344,8 +344,8 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "7",
           "renderer_profile": "review",
-          "profile_fingerprint": "sha256:66eea04dc2ff300f05b7eb5161d147cbbba7d501c689177d365d27630a27393e",
-          "canonical_subset_digest": "sha256:37a112de0d94c92e68f7752306c77c4a006f3568821a96b35cc8d63289aa4aea",
+          "profile_fingerprint": "sha256:57e6b6602eccf2529d10a4663abce982ec3bb10bf30f3fd87e10efbb48040a0c",
+          "canonical_subset_digest": "sha256:b7f68cc2c47bb7ac24270f443feaa0a6ec9946ecd4f014ae7b609926bec0d94f",
           "canonical_source_count": 46,
           "projected_asset_count": 34,
           "projected_asset_digest": "sha256:696c739c6577e4d8505897ceb3fc78ab15dbf9fc7302ad0df8502d5995973c2f",
@@ -373,8 +373,8 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "observability",
-          "profile_fingerprint": "sha256:a405b511f862e0de8d1b29b9517b89abb207d03318816e003732ceb910b53a2c",
-          "canonical_subset_digest": "sha256:16335a34c3fc1e5d6cd293c775352bfa030a4ce73e7028c694bcc684cac78e9a",
+          "profile_fingerprint": "sha256:aa3015f220a56ff02ef1a5682103836fbca8b8477f95d4937cab6a43e8209743",
+          "canonical_subset_digest": "sha256:4d30f8e13dcdf61079ea59cf3a2638d26892b4c0601409d3c9c099e2caa5de0f",
           "canonical_source_count": 40,
           "projected_asset_count": 32,
           "projected_asset_digest": "sha256:5a00f43070bf2346a1eeac29fe08d5900426201274ad93a787a6aca8f460467f",
@@ -399,8 +399,8 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "7",
           "renderer_profile": "observability",
-          "profile_fingerprint": "sha256:511c037c3d96427aaeb0f618ebd1dba101d0d14ff3aee829c7d80d3c7220c808",
-          "canonical_subset_digest": "sha256:52fd2b371aa1c25f91e683d1de023b46c0c751e9f28844db2f2123b8da94b138",
+          "profile_fingerprint": "sha256:463789025c8daa5f8af927c02dbfff6d011536ad109cd7fedd522177fb987464",
+          "canonical_subset_digest": "sha256:c53b3fa23d8dfbbda81965554f896f87731e1e3b930a51709fe0147f680bcee1",
           "canonical_source_count": 40,
           "projected_asset_count": 24,
           "projected_asset_digest": "sha256:704bd6752312a96e08dfa7c1e3246d8bf343724914b56b3ce0771a83e051f3e1",
@@ -428,8 +428,8 @@
           "renderer_id": "install-claude-adapter",
           "renderer_version": "5",
           "renderer_profile": "full",
-          "profile_fingerprint": "sha256:17633e22f76df8564dc056ad294a61bf577c6d2f8d29ee4373c7c23007c7312e",
-          "canonical_subset_digest": "sha256:47c60156a1dd863bc6f738793ea07f9213559ae5b726b065160ab957b2aedd67",
+          "profile_fingerprint": "sha256:ef539efec8de7c131c27c81877d41865c0d95a53c989cd8f87d9b60b1c37d569",
+          "canonical_subset_digest": "sha256:57e3523cdcd96d595e85ea4f19af89032b17cd0b8f2f0cde684419f736c019cc",
           "canonical_source_count": 77,
           "projected_asset_count": 70,
           "projected_asset_digest": "sha256:bc29f43b2d2fee99dbd030ce84ff997aab36f45cb5171e718b29266a914676d3",
@@ -454,8 +454,8 @@
           "renderer_id": "install-codex-adapter",
           "renderer_version": "7",
           "renderer_profile": "full",
-          "profile_fingerprint": "sha256:248d835ef12a094c2193291177f75e566127d6560dc2182d939ae17123090fd9",
-          "canonical_subset_digest": "sha256:4c8923aabce45dd227c4e79c8fb626ddd0c56dc670707438b05e89b01cad75ca",
+          "profile_fingerprint": "sha256:bf336485031f94a77bfa569ed331e5a2830028202e8901e56ffbabdb4428f3b4",
+          "canonical_subset_digest": "sha256:4a60c7ddd6b2fcbcc21db2798dd49a938d9e5e23759451012d96fc1a5fe98198",
           "canonical_source_count": 79,
           "projected_asset_count": 64,
           "projected_asset_digest": "sha256:63f25ed81110f0cf3309072ba79b0a0d40618921e836bdb58382277b9d2b7faa",
@@ -662,6 +662,120 @@
       "projected_state": "design_reviewed",
       "final_admission_implied": false,
       "implementation_authorized": false
+    },
+    "prompt_v2_preregistration": {
+      "issue": 234,
+      "execution_issue": 235,
+      "phase": "pre_result",
+      "protocol": {
+        "path": "benchmarks/protocol-prompt-v2.md",
+        "file_sha256": "4ab18a466567e0a94df575bddb5aabc4ccf8fff496be11d3af74a32ef44aff3a",
+        "raw_digest": "sha256:4ab18a466567e0a94df575bddb5aabc4ccf8fff496be11d3af74a32ef44aff3a"
+      },
+      "preregistration": {
+        "path": "benchmarks/prompt-v2-preregistration.json",
+        "file_sha256": "898d0f45e10c6e4951d04000a735b772d6d4c32482b15effc952226ff5e440c2",
+        "preregistration_id": "prompt-v2-prereg-09a8375bb8db1bdb89df80a684d49cce",
+        "preregistration_digest": "sha256:5c7c9d0a8bce5171f5c9b6bbb4c737d509a8375bb8db1bdb89df80a684d49cce",
+        "expected_case_count": 56,
+        "prompt_roles": [
+          "current_prompt",
+          "prompt_v2"
+        ]
+      },
+      "source_archive": {
+        "revision": "1710b3007d60e249d553ca7a43b5a83937066b61",
+        "tree": "caff00c8f1d97386fe28d62d819028e644036a27",
+        "rendered_root": "docs/fixtures/prompt-v2-preregistration/rendered",
+        "rendered_inventory_digest": "sha256:479c63756fa0df8c71d3f1561b69c9fd8397acc63fae8289ee191dfaa2867778"
+      },
+      "generated_authority": {
+        "binding_path": "docs/fixtures/prompt-v2-preregistration/binding.json",
+        "binding_file_sha256": "15d98a106793cf5cd15c5c633df6ca675c3e70bf4b9678f0db28ba070a1f5249",
+        "binding_digest": "sha256:fab615bac51d18488c50c6674845db9be17ee2766272c6dbb9d82c334d93324a",
+        "reference_path": "docs/fixtures/prompt-v2-preregistration/reference.json",
+        "reference_file_sha256": "f62a4701b8df9ed4dc90e87b563c3b53a9f7c13cafc2ab97d0ebba2714ac2bee",
+        "reference_digest": "sha256:aa0b1a76b0198a44981773311b28e9b884dc7b889839ad233ddff5e267547fd5",
+        "registry_snapshot_digest": "sha256:d4f1962245e57fdbadf098dc959f49130e7f97ecb888d13d306a82338df05bfa",
+        "store_root": "docs/fixtures/prompt-v2-preregistration/store",
+        "object_count": 57,
+        "object_inventory_digest": "sha256:5ee22a11150b4dfbb5ee8a26251e265afb880dc7f1c90ebf4241a2ac5d616e26"
+      },
+      "schemas": [
+        {
+          "path": "benchmarks/schemas/prompt-v2-preregistration.schema.json",
+          "file_sha256": "e6ef0415208a0e3ea5b5aef8147c427a6b697cbe9231affb4cae8b7719b94843"
+        },
+        {
+          "path": "benchmarks/schemas/prompt-v2-execution-plan.schema.json",
+          "file_sha256": "5da26e4df45dea11f072d65c7d02e11f6edb5743a49093d1b5772311f7e35499"
+        },
+        {
+          "path": "benchmarks/schemas/prompt-v2-materialization-manifest.schema.json",
+          "file_sha256": "d0ab8ef36d2d7fadc621628841711543ed94b5fe596c71f943e58af7c91d9dfb"
+        },
+        {
+          "path": "benchmarks/schemas/prompt-v2-resume-state.schema.json",
+          "file_sha256": "0a7dd1debfff68c6a6c2fe5bd70af273aa753078f7ba603db307e4da54136633"
+        },
+        {
+          "path": "benchmarks/schemas/prompt-v2-normalized-result.schema.json",
+          "file_sha256": "9f28c902d6dd6217da1017b5c4e295ed2d9943e5d82faf351175ee664fa7828c"
+        },
+        {
+          "path": "benchmarks/schemas/prompt-v2-comparison-report.schema.json",
+          "file_sha256": "92c11941b9d290db6eba7de0b49d637f69d5f9b61b2914fe26dfd5a8d8a10ebc"
+        }
+      ],
+      "implementations": [
+        {
+          "path": "scripts/ask-benchmark-prompt-v2.mjs",
+          "file_sha256": "ea3242c2ebdf1a1b7c89b8c4e0327b85d43793da5f45983fc815ab1f699afab2"
+        },
+        {
+          "path": "scripts/test-ask-benchmark-prompt-v2.mjs",
+          "file_sha256": "95d1926b8a93c44ece5197ee58599b86a27158bbab0ed25963eb8f023637ccf9"
+        },
+        {
+          "path": "scripts/prompt-v2-preregistration-samples.mjs",
+          "file_sha256": "7abc810741ef96f2306642fa7d8af2500e61c4b90c2fd8ce1dee5d3ddc69b3c5"
+        },
+        {
+          "path": "scripts/test-prompt-v2-preregistration-samples.mjs",
+          "file_sha256": "c4edba5095e2046d744c6d4fece0f564be118af7b8714fc9a8407bb1dbf0cd8e"
+        }
+      ],
+      "adapter_tracks": [
+        {
+          "adapter_track": "codex",
+          "selector_adapter": "codex",
+          "baseline_asset_record_digest": "sha256:81815fd22afae413217b241a65c9b8d7a7068bc703c33967c1a45c0824a4c80f",
+          "candidate_asset_record_digest": "sha256:36f9b3b20a946aacb840e031c1b0d2cb87e0ab4f6e913aa877ea4bdca4cc52b2",
+          "baseline_selection_digest": "sha256:fb6285640883b058e09adff9d5a878a347af8753e9da2af3d602eb0dc04b5c01",
+          "challenger_selection_digest": "sha256:c65a4bcd434e5868982a1a9ea24bcf4cd71d0475c9c5544752af9e184befa7d5",
+          "candidate_digest": "sha256:bcc14a6650e90c1688b2eab2d102907fbb4295b339676318d585478fa8fbed1a",
+          "experiment_digest": "sha256:9514c272c2f0636d8152cf3f9be3aacca2c72ab2468b213d915744b22fb1dc91"
+        },
+        {
+          "adapter_track": "claude",
+          "selector_adapter": "claude_code",
+          "baseline_asset_record_digest": "sha256:0c23fd8c7aa03e146535e2ed5735a1ec2c0123784ac45a05a2d157733e081fc1",
+          "candidate_asset_record_digest": "sha256:5ea73fbbe3ca75707c8328a5d2fe5723c94f681db67c528b35d33b501cd44e4a",
+          "baseline_selection_digest": "sha256:92a8565fe347835af936ae7ac085109cb6cbebee81cd9a962643281a30951d05",
+          "challenger_selection_digest": "sha256:524a694b360def9e61f82776ad594a45d6269fe361fa75e3949ab72d6446f60d",
+          "candidate_digest": "sha256:c2f898284de497b2bde5fac0f44dc11b78ada15f735bd3150dfdf85b2e352cde",
+          "experiment_digest": "sha256:26cee61977de4b5b43c1e4f3f2f35f6d26186c78783f754ec0f20751b9ba4efc"
+        }
+      ],
+      "handoff_path": "docs/prompt-v2-execution-handoff.md",
+      "boundaries": {
+        "measured_execution_authorized": false,
+        "results_accessed": false,
+        "runtime_activation_implied": false,
+        "recommendation_created": false,
+        "lifecycle_mutation_authorized": false,
+        "private_evaluator_content_included": false
+      }
     },
     "portfolio_fixture_admission": {
       "issue": 207,

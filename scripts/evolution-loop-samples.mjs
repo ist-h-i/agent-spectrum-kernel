@@ -81,7 +81,7 @@ const CAPABILITY = "repository.read";
 const OPERATION_SCOPE = "local_repository";
 const BASE_PORTFOLIO_ID = "ask.portfolio.issue278.sample-runtime";
 const CHALLENGER_PORTFOLIO_ID = "ask.portfolio.issue278.sample-evaluation";
-const ORIGINAL_PORTFOLIO_OBJECT_COUNT = 21;
+const ORIGINAL_PORTFOLIO_OBJECT_COUNT = 27;
 
 const repositoryRoot = resolve(import.meta.dirname, "..");
 const portfolioFixtureRoot = resolve(repositoryRoot, "docs/fixtures/portfolio-manager");
