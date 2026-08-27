@@ -730,11 +730,11 @@
       "implementations": [
         {
           "path": "scripts/ask-benchmark-prompt-v2.mjs",
-          "file_sha256": "a65deb6cf19c80e450bd01d5209e9205406ae1d05e4b240171b92aa35bc8b06c"
+          "file_sha256": "93d991723444e75b5fb1b97b8d0cfe296e6dbc59ba0f2c81d4d2d4f1aa6f500c"
         },
         {
           "path": "scripts/test-ask-benchmark-prompt-v2.mjs",
-          "file_sha256": "e6a88128a9482ac221ea24ad03f9b360995778a7c8eb2cffd37fa9d7f5333633"
+          "file_sha256": "831c35c0b1ecd62f5aad6f89198f5e59ac5fdf7b840a816ea53f8f192a7d0af2"
         },
         {
           "path": "scripts/prompt-v2-preregistration-samples.mjs",

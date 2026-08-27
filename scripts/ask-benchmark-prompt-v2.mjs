@@ -1107,6 +1107,7 @@ function buildAdapterReport({ adapter, preregistration, plannedCases, results })
   const guardrail_regression_fields = GUARDRAIL_FIELDS.filter((field) => pairs.some((pair) => pair.prompt_v2.guardrails[field].value > pair.current_prompt.guardrails[field].value));
   const gateRank = { unavailable: 0, unknown: 0, not_applicable: 0, fail: 1, pass: 2 };
   const route_gate_regression_fields = ROUTE_GATE_FIELDS.filter((field) => pairs.some((pair) => gateRank[pair.prompt_v2.route_gates[field]] < gateRank[pair.current_prompt.route_gates[field]]));
+  const promptV2RouteGatesAllPass = pairs.every(({ prompt_v2 }) => ROUTE_GATE_FIELDS.every((field) => prompt_v2.route_gates[field] === "pass"));
 
   const currentTokens = pairs.map((pair) => pair.current_prompt.metrics.input_tokens.value + pair.current_prompt.metrics.output_tokens.value);
   const candidateTokens = pairs.map((pair) => pair.prompt_v2.metrics.input_tokens.value + pair.prompt_v2.metrics.output_tokens.value);
@@ -1173,7 +1174,7 @@ function buildAdapterReport({ adapter, preregistration, plannedCases, results })
   let prompt_outcome = "adopt_prompt_v2";
   if (!statistics_complete) prompt_outcome = "insufficient_evidence";
   else if (regression) prompt_outcome = "revise_and_repeat";
-  else if (!tokens.pass || !duration.pass) prompt_outcome = "retain_current";
+  else if (!promptV2RouteGatesAllPass || !tokens.pass || !duration.pass) prompt_outcome = "retain_current";
   return {
     adapter_track: adapter,
     expected_cases,

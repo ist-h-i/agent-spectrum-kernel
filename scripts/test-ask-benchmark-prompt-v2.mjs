@@ -327,6 +327,7 @@ function permissiveRawScoreAuthorityResolver(authority, context) {
 function scoringReadyResult(caseRecord, {
   rawScoreRef = null,
   metricOverrides = {},
+  routeGateOverrides = {},
   resolver = rawScoreAuthorityResolver,
 } = {}) {
   const candidate = caseRecord.prompt_role === "prompt_v2";
@@ -344,6 +345,7 @@ function scoringReadyResult(caseRecord, {
     verification_correctness: "pass",
     evidence_correctness: "pass",
     required_mechanism_observation: "pass",
+    ...routeGateOverrides,
   };
   const projection = scoreProjection(metrics, guardrails, routeGates);
   const authority = rawScoreRef ?? scoreReference(caseRecord, projection);
@@ -504,6 +506,38 @@ function resumeFor(results, resolver = rawScoreAuthorityResolver) {
   });
   return state;
 }
+
+function reportForRouteGates({ currentPrompt = {}, promptV2 = {} } = {}) {
+  const results = plan.cases.map((caseRecord) => caseRecord.adapter_track === "codex"
+    ? scoringReadyResult(caseRecord, {
+      routeGateOverrides: caseRecord.prompt_role === "prompt_v2" ? promptV2 : currentPrompt,
+    })
+    : unavailableResult(caseRecord));
+  const state = resumeFor(results);
+  return buildPromptV2ComparisonReport({
+    preregistration,
+    authorityBinding,
+    plan,
+    materialization,
+    resumeState: state,
+    normalizedResults: results,
+    rawScoreAuthorityResolver,
+  });
+}
+
+check("route-gate outcomes reject regressions and require every Prompt v2 gate to pass before adoption", () => {
+  const currentPassPromptFail = reportForRouteGates({ promptV2: { decision_correctness: "fail" } });
+  assert.equal(currentPassPromptFail.adapter_reports.find(({ adapter_track: adapterTrack }) => adapterTrack === "codex").prompt_outcome, "revise_and_repeat");
+
+  const bothFail = reportForRouteGates({
+    currentPrompt: { decision_correctness: "fail" },
+    promptV2: { decision_correctness: "fail" },
+  });
+  assert.equal(bothFail.adapter_reports.find(({ adapter_track: adapterTrack }) => adapterTrack === "codex").prompt_outcome, "retain_current");
+
+  const allPass = reportForRouteGates();
+  assert.equal(allPass.adapter_reports.find(({ adapter_track: adapterTrack }) => adapterTrack === "codex").prompt_outcome, "adopt_prompt_v2");
+});
 
 check("frozen unavailable adapter cannot publish scoring-ready evidence or another reason", () => {
   const claudeCase = plan.cases.find(({ adapter_track: adapterTrack }) => adapterTrack === "claude");
