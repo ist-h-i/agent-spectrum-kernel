@@ -20,18 +20,20 @@ function fileSha256(path) {
 }
 
 function parseArgs(argv) {
-  const args = { check: false, write: false, output: defaultOutput };
+  const args = { check: false, write: false, checkAdapters: false, writeAdapters: false, output: defaultOutput };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--check") args.check = true;
     else if (arg === "--write") args.write = true;
+    else if (arg === "--check-adapters") args.checkAdapters = true;
+    else if (arg === "--write-adapters") args.writeAdapters = true;
     else if (arg === "--output") args.output = resolve(argv[++index]);
     else if (arg === "--help" || arg === "-h") {
-      console.log("Usage: node scripts/adapter-runtime-bundle.mjs [--check | --write] [--output <path>]");
+      console.log("Usage: node scripts/adapter-runtime-bundle.mjs [--check | --write | --check-adapters | --write-adapters] [--output <path>]");
       process.exit(0);
     } else throw new Error(`Unknown argument: ${arg}`);
   }
-  if (args.check && args.write) throw new Error("--check and --write are mutually exclusive");
+  if ([args.check, args.write, args.checkAdapters, args.writeAdapters].filter(Boolean).length > 1) throw new Error("bundle modes are mutually exclusive");
   return args;
 }
 
@@ -53,27 +55,8 @@ function projectionRecord(adapterId, plan) {
   };
 }
 
-export function buildAdapterRuntimeBundle() {
+export function buildAdapterProjectionBundle() {
   const manifest = JSON.parse(readFileSync(resolve(root, "manifest.json"), "utf8"));
-  validatePortfolioCatalogArtifacts({ root });
-  validatePortfolioPolicyArtifacts({ root });
-  validatePortfolioDesignAdmissionArtifacts({ root });
-  validatePortfolioDesignIndependentReview({ root });
-  validatePortfolioDesignReviewedState({ root });
-  const portfolioCatalog = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-catalog.json"), "utf8"));
-  const portfolioSimilarity = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-similarity.json"), "utf8"));
-  const portfolioPolicyManifest = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-policy-manifest.json"), "utf8"));
-  const portfolioDesignManifest = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-admission-manifest.json"), "utf8"));
-  const portfolioDesignReviewPackage = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-review-package.json"), "utf8"));
-  const portfolioIndependentDesignReview = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-independent-review.json"), "utf8"));
-  const portfolioDesignReviewedState = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-reviewed-state.json"), "utf8"));
-  const mnBuildOptionMetadata = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/metadata.json"), "utf8"));
-  const mnBuildOptionReference = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json"), "utf8"));
-  const mnBuildOptionRequirement = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/requirement-record.json"), "utf8"));
-  const mnBuildOptionOutput = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/output-contract.json"), "utf8"));
-  const mnBuildOptionAdmission = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/final-admission-record.json"), "utf8"));
-  const mnBuildOptionFreeze = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/scoring-input-freeze-manifest.json"), "utf8"));
-  const mnBuildOptionReview = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/admission-review.json"), "utf8"));
   const profiles = [];
   const canonicalPaths = new Set(["AGENTS.md", "manifest.json"]);
   for (const profile of commonProfiles) {
@@ -98,6 +81,32 @@ export function buildAdapterRuntimeBundle() {
     normalized_event_schema_registry: "schemas/normalized-event-schema-registry.json",
     conformance_fixture: "docs/fixtures/adapter-cross-conformance.json",
     migration_contract: "docs/adapter-runtime-migration.md",
+  };
+}
+
+export function buildAdapterRuntimeBundle() {
+  const projection = buildAdapterProjectionBundle();
+  validatePortfolioCatalogArtifacts({ root });
+  validatePortfolioPolicyArtifacts({ root });
+  validatePortfolioDesignAdmissionArtifacts({ root });
+  validatePortfolioDesignIndependentReview({ root });
+  validatePortfolioDesignReviewedState({ root });
+  const portfolioCatalog = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-catalog.json"), "utf8"));
+  const portfolioSimilarity = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-similarity.json"), "utf8"));
+  const portfolioPolicyManifest = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-policy-manifest.json"), "utf8"));
+  const portfolioDesignManifest = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-admission-manifest.json"), "utf8"));
+  const portfolioDesignReviewPackage = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-review-package.json"), "utf8"));
+  const portfolioIndependentDesignReview = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-independent-review.json"), "utf8"));
+  const portfolioDesignReviewedState = JSON.parse(readFileSync(resolve(root, "benchmarks/portfolio-design-reviewed-state.json"), "utf8"));
+  const mnBuildOptionMetadata = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/metadata.json"), "utf8"));
+  const mnBuildOptionReference = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json"), "utf8"));
+  const mnBuildOptionRequirement = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/requirement-record.json"), "utf8"));
+  const mnBuildOptionOutput = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/output-contract.json"), "utf8"));
+  const mnBuildOptionAdmission = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/final-admission-record.json"), "utf8"));
+  const mnBuildOptionFreeze = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/scoring-input-freeze-manifest.json"), "utf8"));
+  const mnBuildOptionReview = JSON.parse(readFileSync(resolve(root, "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/admission-review.json"), "utf8"));
+  return {
+    ...projection,
     benchmark_handoff: {
       issue: 171,
       checkpoint: "C",
@@ -308,11 +317,42 @@ function serializedBundle() {
   return `${JSON.stringify(buildAdapterRuntimeBundle(), null, 2)}\n`;
 }
 
+function adapterProjectionKeys() {
+  return Object.keys(buildAdapterProjectionBundle());
+}
+
+function adapterProjectionFrom(value) {
+  return Object.fromEntries(adapterProjectionKeys().map((key) => [key, value[key]]));
+}
+
+function checkedInBundle(path) {
+  if (!existsSync(path)) throw new Error(`Adapter runtime bundle is missing: ${path}`);
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function writeAdapterProjection(path) {
+  const current = checkedInBundle(path);
+  const projection = buildAdapterProjectionBundle();
+  writeFileSync(path, `${JSON.stringify({ ...current, ...projection }, null, 2)}\n`);
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     const args = parseArgs(process.argv.slice(2));
-    const content = serializedBundle();
-    if (args.check) {
+    if (args.checkAdapters) {
+      const current = adapterProjectionFrom(checkedInBundle(args.output));
+      const expected = buildAdapterProjectionBundle();
+      if (JSON.stringify(current) !== JSON.stringify(expected)) {
+        console.error(`Adapter-owned runtime bundle projection is stale: ${args.output}`);
+        process.exitCode = 1;
+      } else {
+        console.log("Adapter-owned runtime bundle projection is current");
+      }
+    } else if (args.writeAdapters) {
+      writeAdapterProjection(args.output);
+      console.log(`Adapter-owned runtime bundle projection written: ${args.output}`);
+    } else if (args.check) {
+      const content = serializedBundle();
       if (!existsSync(args.output) || readFileSync(args.output, "utf8") !== content) {
         console.error(`Adapter runtime bundle is missing or stale: ${args.output}`);
         process.exitCode = 1;
@@ -320,10 +360,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         console.log("Adapter runtime bundle is current");
       }
     } else if (args.write) {
+      const content = serializedBundle();
       writeFileSync(args.output, content);
       console.log(`Adapter runtime bundle written: ${args.output}`);
     } else {
-      process.stdout.write(content);
+      process.stdout.write(serializedBundle());
     }
   } catch (error) {
     console.error(`adapter-runtime-bundle failed: ${error.message}`);

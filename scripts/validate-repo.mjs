@@ -85,6 +85,7 @@ const REQUIRED_SCHEMA_PATHS = [
   "schemas/adapter-runtime-evidence.schema.json",
   "schemas/adapter-runtime-event.schema.json",
   "schemas/claim-evidence-status.schema.json",
+  "schemas/fixed-entry-profile-registry.json",
   "schemas/verification-proof-policy.schema.json",
   "schemas/review-signal-gate-map.json",
   "schemas/adoption-report.schema.json",
@@ -161,6 +162,8 @@ const EVOLUTION_LOOP_STORE_PATH = "docs/fixtures/evolution-loop/store";
 const EXPECTED_SAMPLE_ASSETS = new Map([
   ["ask.skill.test-first-verification", "skill"],
   ["ask.prompt-template.codex.skill-verify", "prompt"],
+  ["ask.prompt-policy.compact-controls", "prompt"],
+  ["ask.prompt-template.fixed-entry-semantics", "prompt"],
   ["ask.evaluator-reference.mn-build-option-update", "evaluator_reference"],
 ]);
 const EXECUTION_ENVELOPE_DOC_PATH = "docs/execution-envelope-contract.md";
@@ -402,7 +405,11 @@ const EXECUTION_ENVELOPE_ADAPTER_PATHS = [
   "adapters/claude-code/project/.claude/commands/skill-verify.md",
   "adapters/claude-code/project/.claude/commands/skill-handoff.md",
   "adapters/claude-code/github-actions/claude-review-on-mention.yml",
+  "adapters/claude-code/plugin/skills/implement/SKILL.md",
+  "adapters/claude-code/plugin/skills/investigate/SKILL.md",
   "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+  "adapters/claude-code/plugin/skills/verify/SKILL.md",
+  "adapters/claude-code/plugin/skills/handoff/SKILL.md",
 ];
 const DUPLICATED_EXECUTION_ENVELOPE_FIELDS = ["Selected work mode:", "User-facing route:", "Internal route:", "Route confidence:", "Evidence checked:"];
 const REQUIRED_CLAUDE_ADAPTER_PATHS = [
@@ -427,10 +434,19 @@ const REQUIRED_CLAUDE_ADAPTER_PATHS = [
   "adapters/claude-code/plugin/schemas/metrics-event.schema.json",
   "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs",
   "adapters/claude-code/plugin/skills/evidence-ledger/SKILL.md",
+  "adapters/claude-code/plugin/skills/implement/SKILL.md",
+  "adapters/claude-code/plugin/skills/investigate/SKILL.md",
   "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+  "adapters/claude-code/plugin/skills/verify/SKILL.md",
+  "adapters/claude-code/plugin/skills/handoff/SKILL.md",
   "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
   "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
   "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md",
+  "adapters/claude-code/plugin/templates/implement.md",
+  "adapters/claude-code/plugin/templates/investigate.md",
+  "adapters/claude-code/plugin/templates/review-pr.md",
+  "adapters/claude-code/plugin/templates/verify.md",
+  "adapters/claude-code/plugin/templates/handoff.md",
   "adapters/claude-code/plugin/hooks/hooks.json",
   "adapters/claude-code/plugin/bin/ai-skills-metrics-record",
 ];
@@ -453,6 +469,10 @@ const REQUIRED_ADAPTER_RUNTIME_PATHS = [
   "scripts/test-adapter-runtime-migration.mjs",
   "scripts/test-adapter-runtime-event.mjs",
   "scripts/codex-runtime-profile.mjs",
+  "scripts/fixed-entry-profile.mjs",
+  "scripts/claude-fixed-entry-profile.mjs",
+  "scripts/claude-plugin-fixed-entries.mjs",
+  "scripts/test-fixed-entry-profiles.mjs",
   "scripts/codex-exec-runner.mjs",
   "scripts/execution-envelope.mjs",
 ];
@@ -1817,7 +1837,14 @@ export function inspectVerificationProofPolicyContract(root, manifest = null) {
   for (const path of VERIFICATION_PROOF_POLICY_RAW_PATH_PROJECTIONS) {
     if (!existsSync(resolve(root, path))) continue;
     const text = readFileSync(resolve(root, path), "utf8");
-    for (const token of [VERIFICATION_PROOF_POLICY_REF, ...VERIFICATION_PROOF_PATHS]) {
+    const generatedClaudeTemplate = path.startsWith("adapters/claude-code/") && text.includes("{{ASK_COMPACT_CONTROLS}}");
+    const tokens = generatedClaudeTemplate
+      ? (path.endsWith("skill-verify.md") ? VERIFICATION_PROOF_PATHS : [])
+      : [VERIFICATION_PROOF_POLICY_REF, ...VERIFICATION_PROOF_PATHS];
+    if (generatedClaudeTemplate && (text.match(/\{\{ASK_COMPACT_CONTROLS\}\}/gu) ?? []).length !== 1) {
+      issues.push(`${path} must contain exactly one generated compact-control placeholder`);
+    }
+    for (const token of tokens) {
       if (!text.includes(token)) issues.push(`${path} must project verification proof policy token: ${token}`);
     }
   }
@@ -2360,7 +2387,7 @@ export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
   const add = (message) => issues.push(message);
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) return ["profile must be an object"];
   if (!root) return ["validation root is required"];
-  if (!["1.0.0", "1.1.0"].includes(profile.schema_version)) add("schema_version must be 1.0.0 or 1.1.0");
+  if (!["1.0.0", "1.1.0", "1.2.0"].includes(profile.schema_version)) add("schema_version must be 1.0.0, 1.1.0, or 1.2.0");
   for (const field of ["profile_id", "adapter_id"]) {
     if (typeof profile[field] !== "string" || profile[field].trim() === "") add(`${field} must be a non-empty string`);
   }
@@ -2454,9 +2481,9 @@ export function inspectAdapterRuntimeProfile(profile, { root = null } = {}) {
         add(`renderer_profile cannot resolve plan-shaping options: ${error.message}`);
       }
     }
-    if (profile.schema_version === "1.1.0") {
-      if (!Array.isArray(rendering.compact_profiles) || rendering.compact_profiles.length === 0) add("schema_version 1.1.0 requires rendering.compact_profiles");
-      else if (stableCanonicalJson(rendering.compact_profiles) !== stableCanonicalJson(resolvedPlan?.compactProfiles ?? [])) add("rendering.compact_profiles must exactly match the shared Codex projection plan");
+    if (["1.1.0", "1.2.0"].includes(profile.schema_version)) {
+      if (!Array.isArray(rendering.compact_profiles) || rendering.compact_profiles.length === 0) add(`schema_version ${profile.schema_version} requires rendering.compact_profiles`);
+      else if (stableCanonicalJson(rendering.compact_profiles) !== stableCanonicalJson(resolvedPlan?.compactProfiles ?? [])) add("rendering.compact_profiles must exactly match the shared adapter projection plan");
     } else if (Object.hasOwn(rendering, "compact_profiles")) {
       add("schema_version 1.0.0 must not contain rendering.compact_profiles");
     }

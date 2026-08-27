@@ -8,7 +8,7 @@
       "pre_compact_sha256": "sha256:8af01267df59f874517c24a0f203f40ee13017d0392905491593bddbec83456a",
       "pre_compact_stages": ["operating-mode-router", "skill-router", "controlled-implementation", "test-first-verification", "evidence-ledger"],
       "compact_stages": ["controlled-implementation", "test-first-verification"],
-      "direct_trigger_ids": ["unfamiliar_repository", "unclear_scope", "boundary_decision", "design_grill", "docs_or_adr_constraints", "long_running_or_multi_agent", "formal_claim_audit_required"]
+      "direct_trigger_ids": ["unfamiliar_repository", "unclear_scope", "boundary_decision", "design_grill", "docs_or_adr_constraints", "long_running_or_multi_agent", "explicit_knowledge_promotion", "formal_claim_audit_required"]
     },
     {
       "prompt_name": "skill-investigate.md",

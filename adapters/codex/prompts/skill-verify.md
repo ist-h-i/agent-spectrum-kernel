@@ -8,6 +8,8 @@ Entry mode is fixed to verification. Primary contract: `test-first-verification`
 
 {{ASK_COMPACT_DIRECT_TRIGGERS}}
 
+[agent_activity] opt-in; S/C/F counts.
+
 Select one path before implementation claims. For `compact_proof`, emit only:
 
 Proof:

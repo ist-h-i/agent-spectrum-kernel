@@ -1,37 +1,38 @@
 ---
-description: Run the Agent Spectrum Kernel PR review flow through one baseline semantic review, exact-signal additional gates, and an optional final merge decision.
+name: review-pr
+description: Review a target through the fixed-entry Agent Spectrum Kernel profile.
 ---
+<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"review","k":"p","r":"ask-fixed-entry-assets-v1","p":"13fc729130ef3c1ace6ca5ec5ff922a84e947f5aa5a56b2f475dfed9497417a9","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
 
 # Review PR
 
-Use the bundled Agent Spectrum Kernel review model. Read ${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json, ${CLAUDE_PLUGIN_ROOT}/contracts/claim-evidence-status-contract.md, ${CLAUDE_PLUGIN_ROOT}/schemas/claim-evidence-status.schema.json, and ${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md. Do not substitute host repository policy for the bundled plugin contracts.
+Entry mode is fixed to review. Primary contract: `review-router`. Apply the review semantics directly; do not add an upper routing stage. Read `${CLAUDE_PLUGIN_ROOT}/contracts/review-signal-gate-map.json`.
 
-Apply ask.claim-evidence-status@1.0.0 inline. Apply /ai-skills:evidence-ledger only when its closed trigger selects formal_ledger. A requested final merge decision activates high_stakes_readiness; capability availability alone does not.
+Produce exactly one `review-ai-quality` baseline result. Select additional gates only for exact observed signal IDs. Run `review-final-merge-gate` last only when `$ARGUMENTS` explicitly requests a final merge decision.
 
-Process:
+- [scope] repo/code/tests/docs/API; missing=>stop|insufficient; minimal diff; cleanup separate
+- [verification] ask.verification-proof-policy@1.0.0: compact_proof|formal_verification_contract before claim; focused->risk-based; exact; trigger=>formal.
+- [risk_approval] exact action/risk/impact/reversibility/visibility/alternative/preconditions; unapproved=>stop; approved-only.
+- [evidence] Verified|Supported|Hypothesis|Unknown|Falsified@ask.claim-evidence-status@1.0.0; inline; closed formal=>evidence-ledger; unsupported=>downgrade.
+- [missing_evidence] unavailable|insufficient; no inference; required=>stop
+- [output] managed: ordinary=>sidecar, stop/handoff=>inline, diagnostic explicit; unmanaged=>one inline; next_action only.
 
-1. Start with review-router.
-2. Produce exactly one review-ai-quality baseline result for the evaluative target. The baseline needs no signal and is never over-processing.
-3. Emit only exact bundled registry signal IDs and run only mapped additional gates.
-4. Keep missing applicable target, diff, contract, test, output, context, or CI evidence as insufficient_evidence.
-5. Compile one impact-ordered finding inventory using the bundled registry's closed fields.
-6. Run review-final-merge-gate last only when $ARGUMENTS explicitly asks for a final merge decision.
-7. Use stable lifecycle refs from the bundled traceability contract when a merge claim depends on them.
-8. Validate legacy claim-status input with ${CLAUDE_PLUGIN_ROOT}/scripts/claim-evidence-status.mjs; never infer a stronger status.
-9. Do not start or delegate agents unless the request explicitly requires agent activity. Report started, completed, and failed counts when agent activity occurs.
 
-Normal output:
+
+[agent_activity] opt-in; report started, completed, and failed counts.
+
+Read `${CLAUDE_PLUGIN_ROOT}/contracts/claim-evidence-status-contract.md` and `${CLAUDE_PLUGIN_ROOT}/schemas/claim-evidence-status.schema.json`. Apply `ask.claim-evidence-status@1.0.0` inline. A requested final merge decision selects `high_stakes_readiness` and `formal_ledger`; apply `/ai-skills:evidence-ledger`. Installation alone is not activation.
 
 Baseline review:
 - Gate: review-ai-quality
 - Status: pass | pass_with_comments | fail | insufficient_evidence
-- Evidence: non-empty checked target/evidence
+- Evidence: target/evidence
 
 Additional required gates:
-- <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<non-empty text>; signals=<comma-separated exact signal IDs>
+- <gate>: status=<pass|pass_with_comments|fail|insufficient_evidence>; evidence=<text>; signals=<exact IDs>
 
 Missing evidence:
-- input/gate: affected judgment and next check
+- input/gate: affected judgment; next check
 
 Findings:
 - Finding ID:
@@ -43,13 +44,11 @@ Findings:
   Required post-fix condition:
   Category: optional
 
-Append Decision only when final merge judgment was requested:
+Only when final merge judgment was requested, append:
 
 Decision:
 - approve | approve with comments | request changes | block | insufficient evidence
 
-Use - none for empty Additional required gates, Missing evidence, or Findings. Do not emit Skipped heavy gates, empty category sections, or full applicability diagnostics unless debug output was explicitly requested.
-
-Emit exactly one fenced JSON `Execution Envelope` from ${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md, with the literal Execution Envelope: heading immediately before the JSON fence. Do not merge, deploy, publish, or mutate production configuration.
+Use `- none` for empty sections. Emit exactly one fenced JSON `Execution Envelope` using `${CLAUDE_PLUGIN_ROOT}/contracts/execution-envelope-contract.md`.
 
 $ARGUMENTS

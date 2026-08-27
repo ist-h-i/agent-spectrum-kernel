@@ -2,16 +2,17 @@
   "schema_version": "1.0.0",
   "profiles": [
     {
-      "schema_version": "1.0.0",
+      "schema_version": "1.2.0",
       "profile_id": "claude-code-local-observed-v1",
       "adapter_id": "claude_code",
       "canonical_contract": {
         "revision": "ask-3.0.0",
-        "source_digest": "sha256:7111b45c08a57adbbf3478fbc22d01bd7d5b2df6ca0feffbeff74e6fc15b681e",
+        "source_digest": "sha256:16335a34c3fc1e5d6cd293c775352bfa030a4ce73e7028c694bcc684cac78e9a",
         "source_paths": [
           "AGENTS.md",
           "docs/adapter-runtime-boundary-contract.md",
           "docs/agent-session-state-contract.md",
+          "docs/claim-evidence-status-contract.md",
           "docs/debt-lifecycle-contract.md",
           "docs/execution-envelope-contract.md",
           "docs/lifecycle-artifact-contract.md",
@@ -25,11 +26,15 @@
           "schemas/adapter-runtime-event.schema.json",
           "schemas/adapter-runtime-evidence.schema.json",
           "schemas/adapter-runtime-profile.schema.json",
+          "schemas/claim-evidence-status.schema.json",
+          "schemas/compact-profile-control-map.json",
           "schemas/effectiveness-decision-vocabulary.schema.json",
           "schemas/execution-envelope.schema.json",
+          "schemas/fixed-entry-profile-registry.json",
           "schemas/metrics-event.schema.json",
           "schemas/normalized-event-schema-registry.json",
           "schemas/skill-effectiveness-outcome.schema.json",
+          "schemas/verification-proof-policy.schema.json",
           "scripts/json-schema-validation.mjs",
           "scripts/skill-effectiveness-outcome.mjs",
           "skills/domain-rule-ledger/SKILL.md",
@@ -39,6 +44,7 @@
           "skills/improvement-ledger/SKILL.md",
           "skills/operating-mode-router/SKILL.md",
           "skills/risk-gate/SKILL.md",
+          "skills/scope-control/SKILL.md",
           "skills/skill-adoption-metrics/SKILL.md",
           "skills/skill-effectiveness-evaluation/SKILL.md",
           "skills/skill-router/SKILL.md",
@@ -57,7 +63,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -76,7 +82,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -95,7 +101,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -114,7 +120,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -133,7 +139,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -162,7 +168,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -181,7 +187,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "behavior_verified",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -200,7 +206,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -239,18 +245,23 @@
           "canonical": [
             {
               "path": "AGENTS.md",
-              "role": "kernel",
+              "role": "contract",
               "digest": "sha256:8bbf593c2bb64e98803d486e3f0ff722a60b40d28107ddac1d69fc69b74dc4b3"
             },
             {
               "path": "docs/adapter-runtime-boundary-contract.md",
               "role": "contract",
-              "digest": "sha256:9847b1b5a1a3d3baf0db57cf27a52583598f2ed2f7b8c82e425094e4bbd902e7"
+              "digest": "sha256:4a36eb49917cd507b80cf171990a029f9ce01dcb4c86fe800529218f20416dbd"
             },
             {
               "path": "docs/agent-session-state-contract.md",
               "role": "contract",
               "digest": "sha256:623a46f7eefbe8f5f08b57989b3644a372505ebf54052d2cf8d535e91607a5ff"
+            },
+            {
+              "path": "docs/claim-evidence-status-contract.md",
+              "role": "contract",
+              "digest": "sha256:01696b6087f09c8f98232b0f450cd7bc43fd8f2911880821192549afa6ca843c"
             },
             {
               "path": "docs/debt-lifecycle-contract.md",
@@ -300,7 +311,7 @@
             {
               "path": "manifest.json",
               "role": "manifest",
-              "digest": "sha256:37a79015697abbfda5f3f8adc772a6d8c1a0c6623b47a34adad0fc96805407f1"
+              "digest": "sha256:8aec979b43a4cde45601c88d940c283c0d3f7b36ff1ec42e63aec9f33964410b"
             },
             {
               "path": "schemas/adapter-runtime-event.schema.json",
@@ -315,7 +326,17 @@
             {
               "path": "schemas/adapter-runtime-profile.schema.json",
               "role": "schema",
-              "digest": "sha256:cfce3e8da443fbf6398fa15e468f4973ae36daf8147265bbcf937c3405cb95bd"
+              "digest": "sha256:665ce8b143e77ff5770da3d893b24f5b166dd42e12ffa523df9ec4626b918676"
+            },
+            {
+              "path": "schemas/claim-evidence-status.schema.json",
+              "role": "schema",
+              "digest": "sha256:be0ad5f23e3eeae32ac80f9e27e05a4dc397c479cd3719692764609569690098"
+            },
+            {
+              "path": "schemas/compact-profile-control-map.json",
+              "role": "schema",
+              "digest": "sha256:3dc1cbaf148b7236b86a56f065a772c0623d87240a02a0df066fae0f89077f4f"
             },
             {
               "path": "schemas/effectiveness-decision-vocabulary.schema.json",
@@ -326,6 +347,11 @@
               "path": "schemas/execution-envelope.schema.json",
               "role": "schema",
               "digest": "sha256:7eee67a2ce018ded1cdf47c8525a627aeaacae5dd39c2c3e1cb23beac218e251"
+            },
+            {
+              "path": "schemas/fixed-entry-profile-registry.json",
+              "role": "schema",
+              "digest": "sha256:065bf20f6af19d3b9d48ad5680a31033b20997ced1c2913826946209272a830c"
             },
             {
               "path": "schemas/metrics-event.schema.json",
@@ -341,6 +367,11 @@
               "path": "schemas/skill-effectiveness-outcome.schema.json",
               "role": "schema",
               "digest": "sha256:c98f4ca04f2f579df5b37d23e994d71f194087b12b618ec99eb480a8df83bf44"
+            },
+            {
+              "path": "schemas/verification-proof-policy.schema.json",
+              "role": "schema",
+              "digest": "sha256:22886eaaf4627116aadc3bf6f0955c789f105680c8b139c9bf8e91906823edd9"
             },
             {
               "path": "scripts/json-schema-validation.mjs",
@@ -388,6 +419,11 @@
               "digest": "sha256:4ff0ef2cbc3f8c0c366526d6f5ddc8ef110c49e13552d2194134b6285e27584a"
             },
             {
+              "path": "skills/scope-control/SKILL.md",
+              "role": "skill",
+              "digest": "sha256:c9788b51bd5ff843138c80b95f0b340429bfeb44cbdebdd70b3c4ad0004726b2"
+            },
+            {
               "path": "skills/skill-adoption-metrics/SKILL.md",
               "role": "skill",
               "digest": "sha256:3d9e5e5afce9d3db2ddc212147c43a774e2790457adc99cee284317d38913d58"
@@ -412,7 +448,7 @@
             {
               "path": "adapters/claude-code/project/.claude/commands/skill-handoff.md",
               "role": "command_template",
-              "digest": "sha256:81d1b167a4151ffe4e9f9efc01811b511e727c6ae53095ccd415801fee4f3254"
+              "digest": "sha256:3c0184918c55f845134a9e8c65990d6af82d40c528cd83846cbb3b0c1ba55871"
             },
             {
               "path": "adapters/claude-code/project/.claude/commands/skill-ledger-refresh.md",
@@ -427,7 +463,7 @@
             {
               "path": "adapters/claude-code/project/.claude/commands/skill-verify.md",
               "role": "command_template",
-              "digest": "sha256:a6e15f2467599a73d4fc047582d48b3dc18ff0874ebda90be3879dd63fee818f"
+              "digest": "sha256:1725ac3ee9624cef3f66422d38e1c53e3f07e2f26835e5f1f57ab82c332569c3"
             },
             {
               "path": "adapters/claude-code/project/.claude/hooks/hooks.json",
@@ -510,19 +546,29 @@
               "digest": "sha256:fbce689f58b6b74069a6ef2c5d3dd767668bbfc7c1551480c42fc7234d094cf4"
             },
             {
+              "path": "scripts/claude-fixed-entry-profile.mjs",
+              "role": "renderer",
+              "digest": "sha256:0a85c22d54020adbc5706091e240c4fd65752723113f971c28a7ed477f09403e"
+            },
+            {
               "path": "scripts/execution-envelope.mjs",
               "role": "runtime_source",
               "digest": "sha256:d1ef64cc75db819bbbe9aee227ede05c0ddd84467ebbff2c2a37bfd42c8d6395"
             },
             {
+              "path": "scripts/fixed-entry-profile.mjs",
+              "role": "renderer",
+              "digest": "sha256:388bdf99cb0f8317088e0852452960c80a739c5be6bb640545b6c128c14c0736"
+            },
+            {
               "path": "scripts/install-claude-adapter.mjs",
               "role": "renderer",
-              "digest": "sha256:53aff875f06fe19018da4f06c203e209bcb68dde8f019196ca2f2b67311f55e2"
+              "digest": "sha256:f2c2c89c6969364ba99c520cd0aa36c3c82cbb646ff39166e4f7c7383409590f"
             },
             {
               "path": "scripts/installer-lifecycle.mjs",
               "role": "runtime_source",
-              "digest": "sha256:108c7b3003ac661abe62a3886d93ca09b8e89dc62e5b3e094160bda28ec75547"
+              "digest": "sha256:21c33a7937a68871c173f5191ba2858d75121cd1c34a38add82d0979581f8c68"
             },
             {
               "path": "scripts/observability-paths.mjs",
@@ -541,7 +587,97 @@
             "partial_file_managed_subset_digest",
             "target_partial_file_state_digest"
           ]
-        }
+        },
+        "compact_profiles": [
+          {
+            "schema_version": "1.2.0",
+            "profile_id": "claude-verification-fixed-entry-v1",
+            "prompt_name": "skill-verify.md",
+            "mode": "verification",
+            "task_class": "verification",
+            "primary_contract": "test-first-verification",
+            "requested_contracts": [
+              "test-first-verification",
+              "risk-gate"
+            ],
+            "control_ids": [
+              "scope",
+              "verification",
+              "risk_approval",
+              "evidence",
+              "missing_evidence",
+              "output"
+            ],
+            "direct_trigger_ids": [
+              "formal_claim_audit_required"
+            ],
+            "canonical_asset_refs": [
+              {
+                "asset_type": "prompt",
+                "stable_id": "ask.prompt-policy.compact-controls",
+                "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+                "record_digest": "sha256:0a1bf5ec027954e2def2bf6591655365258e4ed6c3e58a151ea242b961591dcc",
+                "content_digest": "sha256:621237eed65b92d996a11b259d7ef8854357c9fd1e7170071d59c4f50f4e7b3e"
+              },
+              {
+                "asset_type": "prompt",
+                "stable_id": "ask.prompt-template.fixed-entry-semantics",
+                "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+                "record_digest": "sha256:d96f3131c5d6556d2fa74665befef66c0d279dd1177dc6d41f232f2844eafba6",
+                "content_digest": "sha256:124a398892b63295e43b894776bea049625e3847010acd2dce61880a207cf1da"
+              }
+            ],
+            "canonical_revision": "ask-3.0.0",
+            "canonical_source_digest": "sha256:16335a34c3fc1e5d6cd293c775352bfa030a4ce73e7028c694bcc684cac78e9a",
+            "profile_fingerprint": "sha256:7a1bd52a2c312a1d3a07a46f0ca7529458e6e077ff423e5fec5fd7a192e7b22e",
+            "rendered_sha256": "sha256:ac65cfe24f621830013a1fc7f49b3321943633d21f3a56f7d044c43e4ffecab5",
+            "rendered_bytes": 1934
+          },
+          {
+            "schema_version": "1.2.0",
+            "profile_id": "claude-handoff-fixed-entry-v1",
+            "prompt_name": "skill-handoff.md",
+            "mode": "handoff",
+            "task_class": "handoff",
+            "primary_contract": "handoff-generation",
+            "requested_contracts": [
+              "handoff-generation",
+              "risk-gate"
+            ],
+            "control_ids": [
+              "scope",
+              "verification",
+              "risk_approval",
+              "evidence",
+              "missing_evidence",
+              "output"
+            ],
+            "direct_trigger_ids": [
+              "formal_claim_audit_required"
+            ],
+            "canonical_asset_refs": [
+              {
+                "asset_type": "prompt",
+                "stable_id": "ask.prompt-policy.compact-controls",
+                "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+                "record_digest": "sha256:0a1bf5ec027954e2def2bf6591655365258e4ed6c3e58a151ea242b961591dcc",
+                "content_digest": "sha256:621237eed65b92d996a11b259d7ef8854357c9fd1e7170071d59c4f50f4e7b3e"
+              },
+              {
+                "asset_type": "prompt",
+                "stable_id": "ask.prompt-template.fixed-entry-semantics",
+                "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+                "record_digest": "sha256:d96f3131c5d6556d2fa74665befef66c0d279dd1177dc6d41f232f2844eafba6",
+                "content_digest": "sha256:124a398892b63295e43b894776bea049625e3847010acd2dce61880a207cf1da"
+              }
+            ],
+            "canonical_revision": "ask-3.0.0",
+            "canonical_source_digest": "sha256:16335a34c3fc1e5d6cd293c775352bfa030a4ce73e7028c694bcc684cac78e9a",
+            "profile_fingerprint": "sha256:7a1bd52a2c312a1d3a07a46f0ca7529458e6e077ff423e5fec5fd7a192e7b22e",
+            "rendered_sha256": "sha256:51a3102e21cc08782b1baa105c9be9a59e304e6600b360e480b3db1bd6b02b73",
+            "rendered_bytes": 1598
+          }
+        ]
       },
       "generated_assets": {
         "owner": "adapter",
@@ -757,15 +893,15 @@
         "schemas/adapter-runtime-event.schema.json",
         "schemas/metrics-event.schema.json"
       ],
-      "profile_fingerprint": "sha256:681cc34edd84a9cf5b5896c16d07825940ba1631f7bacd450e3034572d0e3e5a"
+      "profile_fingerprint": "sha256:7a1bd52a2c312a1d3a07a46f0ca7529458e6e077ff423e5fec5fd7a192e7b22e"
     },
     {
-      "schema_version": "1.1.0",
+      "schema_version": "1.2.0",
       "profile_id": "codex-local-projection-v1",
       "adapter_id": "codex",
       "canonical_contract": {
         "revision": "ask-3.0.0",
-        "source_digest": "sha256:ca3cae95b43584d0a3a9981db4c370d140967508c1ea78586079ae1bd0eb3ce2",
+        "source_digest": "sha256:ef6ef46339796f302e39d0e624bae089e124c8034524213329c28e760ef9f8f4",
         "source_paths": [
           "AGENTS.md",
           "docs/adapter-runtime-boundary-contract.md",
@@ -785,12 +921,14 @@
           "schemas/compact-profile-control-map.json",
           "schemas/execution-envelope-record.schema.json",
           "schemas/execution-envelope.schema.json",
+          "schemas/fixed-entry-profile-registry.json",
           "schemas/metrics-event.schema.json",
           "schemas/normalized-event-schema-registry.json",
           "schemas/verification-proof-policy.schema.json",
           "scripts/json-schema-validation.mjs",
           "skills/application-boundary-architecture/SKILL.md",
           "skills/controlled-implementation/SKILL.md",
+          "skills/domain-rule-ledger/SKILL.md",
           "skills/evidence-ledger/SKILL.md",
           "skills/grill-design/SKILL.md",
           "skills/grill-with-docs/SKILL.md",
@@ -814,7 +952,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -833,7 +971,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -852,7 +990,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -871,7 +1009,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -890,7 +1028,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -909,7 +1047,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -928,7 +1066,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -947,7 +1085,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -966,7 +1104,7 @@
               "artifact_ref": "docs/fixtures/adapter-runtime-evidence.json",
               "result": "pass",
               "evidence_level": "projected",
-              "artifact_digest": "sha256:df0fb5540b3f31f482a78f82f7b7893dbd437a31cdf6d75781f841854e098727"
+              "artifact_digest": "sha256:5091d9171075712521939eeddf8e987688488113d191ccaecd4dcccff2d17874"
             }
           ],
           "limitations": [
@@ -1009,7 +1147,7 @@
             {
               "path": "docs/adapter-runtime-boundary-contract.md",
               "role": "contract",
-              "digest": "sha256:9847b1b5a1a3d3baf0db57cf27a52583598f2ed2f7b8c82e425094e4bbd902e7"
+              "digest": "sha256:4a36eb49917cd507b80cf171990a029f9ce01dcb4c86fe800529218f20416dbd"
             },
             {
               "path": "docs/agent-session-state-contract.md",
@@ -1049,7 +1187,7 @@
             {
               "path": "manifest.json",
               "role": "manifest",
-              "digest": "sha256:37a79015697abbfda5f3f8adc772a6d8c1a0c6623b47a34adad0fc96805407f1"
+              "digest": "sha256:8aec979b43a4cde45601c88d940c283c0d3f7b36ff1ec42e63aec9f33964410b"
             },
             {
               "path": "schemas/adapter-runtime-event.schema.json",
@@ -1064,7 +1202,7 @@
             {
               "path": "schemas/adapter-runtime-profile.schema.json",
               "role": "schema",
-              "digest": "sha256:cfce3e8da443fbf6398fa15e468f4973ae36daf8147265bbcf937c3405cb95bd"
+              "digest": "sha256:665ce8b143e77ff5770da3d893b24f5b166dd42e12ffa523df9ec4626b918676"
             },
             {
               "path": "schemas/claim-evidence-status.schema.json",
@@ -1079,7 +1217,7 @@
             {
               "path": "schemas/compact-profile-control-map.json",
               "role": "schema",
-              "digest": "sha256:47dd9d11c111ab745b30b5bc750d590ec7bb792b6fed34bd70cc0eefeff81042"
+              "digest": "sha256:3dc1cbaf148b7236b86a56f065a772c0623d87240a02a0df066fae0f89077f4f"
             },
             {
               "path": "schemas/execution-envelope-record.schema.json",
@@ -1090,6 +1228,11 @@
               "path": "schemas/execution-envelope.schema.json",
               "role": "schema",
               "digest": "sha256:7eee67a2ce018ded1cdf47c8525a627aeaacae5dd39c2c3e1cb23beac218e251"
+            },
+            {
+              "path": "schemas/fixed-entry-profile-registry.json",
+              "role": "schema",
+              "digest": "sha256:065bf20f6af19d3b9d48ad5680a31033b20997ced1c2913826946209272a830c"
             },
             {
               "path": "schemas/metrics-event.schema.json",
@@ -1120,6 +1263,11 @@
               "path": "skills/controlled-implementation/SKILL.md",
               "role": "skill",
               "digest": "sha256:1d2c9aee590a4a90243329d4f4dba0b3a460dbb4cf6e2c792bb40954ac87484a"
+            },
+            {
+              "path": "skills/domain-rule-ledger/SKILL.md",
+              "role": "skill",
+              "digest": "sha256:f1b9e2f7712d4b445a10fee88eb511f2551e61e7e7a00f662faf2e6937d7526c"
             },
             {
               "path": "skills/evidence-ledger/SKILL.md",
@@ -1186,7 +1334,7 @@
             {
               "path": "adapters/codex/prompts/skill-verify.md",
               "role": "prompt_template",
-              "digest": "sha256:2eb27056464143bb340798fe1f4cd6411fa8181e6d7827d8caed7b55778d8757"
+              "digest": "sha256:18a90a97a33cb25478ed5f2fca7334bcc4b212c6e206246d8fa7e8e6dd1fbd4c"
             },
             {
               "path": "scripts/adapter-runtime-event.mjs",
@@ -1206,7 +1354,7 @@
             {
               "path": "scripts/ask-shared.mjs",
               "role": "runtime_source",
-              "digest": "sha256:9fa642fb6e074cf252c2e4a83a1e253abe5947a18f013e352e40598e18124f22"
+              "digest": "sha256:300bb88cc1261c4320a876409613fba93809cd497f7abc3f2dd09b5d1f55f7f0"
             },
             {
               "path": "scripts/claim-evidence-status.mjs",
@@ -1216,12 +1364,12 @@
             {
               "path": "scripts/codex-exec-runner.mjs",
               "role": "runtime_source",
-              "digest": "sha256:d859a98bec0bcfc549cd16ca0329e2bc549d09a0f9de170f49d61143f7ba15ba"
+              "digest": "sha256:62ebf6b4ee2ce56b9f934c384710f1d7a0e6a1cd6bf9d4d24712cb292908d979"
             },
             {
               "path": "scripts/codex-runtime-profile.mjs",
               "role": "renderer",
-              "digest": "sha256:20166488f71e1e6ec66fd592b96d6b9ffe09907909f3ef844b331383bcea50aa"
+              "digest": "sha256:a8d7a6b9a4ac2fd8e9e4a07de05dbb35dac813e7279cf22a87f229a4c6aa5af0"
             },
             {
               "path": "scripts/execution-envelope.mjs",
@@ -1231,12 +1379,12 @@
             {
               "path": "scripts/install-codex-adapter.mjs",
               "role": "renderer",
-              "digest": "sha256:076bd9c159c151701ccc8ff55ff775ef583355078ac3d7c8a015d659947d7524"
+              "digest": "sha256:328eb9bc93917a6df0b143a649be4b8ce01681c2e00ed207e02ced99d0f04c2c"
             },
             {
               "path": "scripts/installer-lifecycle.mjs",
               "role": "runtime_source",
-              "digest": "sha256:108c7b3003ac661abe62a3886d93ca09b8e89dc62e5b3e094160bda28ec75547"
+              "digest": "sha256:21c33a7937a68871c173f5191ba2858d75121cd1c34a38add82d0979581f8c68"
             },
             {
               "path": "scripts/observability-paths.mjs",
@@ -1258,7 +1406,7 @@
         },
         "compact_profiles": [
           {
-            "schema_version": "1.1.0",
+            "schema_version": "1.2.0",
             "profile_id": "codex-implementation-compact-v1",
             "prompt_name": "skill-implement.md",
             "mode": "implementation",
@@ -1284,16 +1432,33 @@
               "design_grill",
               "docs_or_adr_constraints",
               "long_running_or_multi_agent",
+              "explicit_knowledge_promotion",
               "formal_claim_audit_required"
             ],
+            "canonical_asset_refs": [
+              {
+                "asset_type": "prompt",
+                "stable_id": "ask.prompt-policy.compact-controls",
+                "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+                "record_digest": "sha256:0a1bf5ec027954e2def2bf6591655365258e4ed6c3e58a151ea242b961591dcc",
+                "content_digest": "sha256:621237eed65b92d996a11b259d7ef8854357c9fd1e7170071d59c4f50f4e7b3e"
+              },
+              {
+                "asset_type": "prompt",
+                "stable_id": "ask.prompt-template.fixed-entry-semantics",
+                "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+                "record_digest": "sha256:d96f3131c5d6556d2fa74665befef66c0d279dd1177dc6d41f232f2844eafba6",
+                "content_digest": "sha256:124a398892b63295e43b894776bea049625e3847010acd2dce61880a207cf1da"
+              }
+            ],
             "canonical_revision": "ask-3.0.0",
-            "canonical_source_digest": "sha256:ca3cae95b43584d0a3a9981db4c370d140967508c1ea78586079ae1bd0eb3ce2",
-            "profile_fingerprint": "sha256:4452aa60a83f9ee332a0f21a73d3d739e37d89cda213c98301904f885fb2a3dd",
-            "rendered_sha256": "sha256:11835c5ee3eee9923a581267447cbac49024a3ca2171450c430bcb01e16aac92",
-            "rendered_bytes": 2752
+            "canonical_source_digest": "sha256:ef6ef46339796f302e39d0e624bae089e124c8034524213329c28e760ef9f8f4",
+            "profile_fingerprint": "sha256:42b1eff6724926b31133b3cd35353ce2490b79275362293ab46356e48c403881",
+            "rendered_sha256": "sha256:33c38a8cf95f32297985e36154f9c1ac4465ed5727af2b40d11f30686f7a595d",
+            "rendered_bytes": 2276
           },
           {
-            "schema_version": "1.1.0",
+            "schema_version": "1.2.0",
             "profile_id": "codex-verification-compact-v1",
             "prompt_name": "skill-verify.md",
             "mode": "verification",
@@ -1314,14 +1479,30 @@
             "direct_trigger_ids": [
               "formal_claim_audit_required"
             ],
+            "canonical_asset_refs": [
+              {
+                "asset_type": "prompt",
+                "stable_id": "ask.prompt-policy.compact-controls",
+                "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+                "record_digest": "sha256:0a1bf5ec027954e2def2bf6591655365258e4ed6c3e58a151ea242b961591dcc",
+                "content_digest": "sha256:621237eed65b92d996a11b259d7ef8854357c9fd1e7170071d59c4f50f4e7b3e"
+              },
+              {
+                "asset_type": "prompt",
+                "stable_id": "ask.prompt-template.fixed-entry-semantics",
+                "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+                "record_digest": "sha256:d96f3131c5d6556d2fa74665befef66c0d279dd1177dc6d41f232f2844eafba6",
+                "content_digest": "sha256:124a398892b63295e43b894776bea049625e3847010acd2dce61880a207cf1da"
+              }
+            ],
             "canonical_revision": "ask-3.0.0",
-            "canonical_source_digest": "sha256:ca3cae95b43584d0a3a9981db4c370d140967508c1ea78586079ae1bd0eb3ce2",
-            "profile_fingerprint": "sha256:4452aa60a83f9ee332a0f21a73d3d739e37d89cda213c98301904f885fb2a3dd",
-            "rendered_sha256": "sha256:aafdd39bd9602811604880509cb3d2bee9df007de82fe8fa3f9bf09bc9f3b182",
-            "rendered_bytes": 2029
+            "canonical_source_digest": "sha256:ef6ef46339796f302e39d0e624bae089e124c8034524213329c28e760ef9f8f4",
+            "profile_fingerprint": "sha256:42b1eff6724926b31133b3cd35353ce2490b79275362293ab46356e48c403881",
+            "rendered_sha256": "sha256:31a050334a6adeb48188913e7ab9b8ce64e69a287c079be18a4ca4b43ffd5ccf",
+            "rendered_bytes": 1944
           },
           {
-            "schema_version": "1.1.0",
+            "schema_version": "1.2.0",
             "profile_id": "codex-handoff-compact-v1",
             "prompt_name": "skill-handoff.md",
             "mode": "handoff",
@@ -1342,11 +1523,27 @@
             "direct_trigger_ids": [
               "formal_claim_audit_required"
             ],
+            "canonical_asset_refs": [
+              {
+                "asset_type": "prompt",
+                "stable_id": "ask.prompt-policy.compact-controls",
+                "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+                "record_digest": "sha256:0a1bf5ec027954e2def2bf6591655365258e4ed6c3e58a151ea242b961591dcc",
+                "content_digest": "sha256:621237eed65b92d996a11b259d7ef8854357c9fd1e7170071d59c4f50f4e7b3e"
+              },
+              {
+                "asset_type": "prompt",
+                "stable_id": "ask.prompt-template.fixed-entry-semantics",
+                "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+                "record_digest": "sha256:d96f3131c5d6556d2fa74665befef66c0d279dd1177dc6d41f232f2844eafba6",
+                "content_digest": "sha256:124a398892b63295e43b894776bea049625e3847010acd2dce61880a207cf1da"
+              }
+            ],
             "canonical_revision": "ask-3.0.0",
-            "canonical_source_digest": "sha256:ca3cae95b43584d0a3a9981db4c370d140967508c1ea78586079ae1bd0eb3ce2",
-            "profile_fingerprint": "sha256:4452aa60a83f9ee332a0f21a73d3d739e37d89cda213c98301904f885fb2a3dd",
-            "rendered_sha256": "sha256:12794b44cd5227e73be94a4e0342f70991383e8aba0574aff2519135df864021",
-            "rendered_bytes": 1714
+            "canonical_source_digest": "sha256:ef6ef46339796f302e39d0e624bae089e124c8034524213329c28e760ef9f8f4",
+            "profile_fingerprint": "sha256:42b1eff6724926b31133b3cd35353ce2490b79275362293ab46356e48c403881",
+            "rendered_sha256": "sha256:4c6840c85b00eec6dc86098cc0ba131d7719ad82e7eedc61e71b40d91e027037",
+            "rendered_bytes": 1589
           }
         ]
       },
@@ -1533,7 +1730,7 @@
       "normalized_event_schema_refs": [
         "schemas/adapter-runtime-event.schema.json"
       ],
-      "profile_fingerprint": "sha256:4452aa60a83f9ee332a0f21a73d3d739e37d89cda213c98301904f885fb2a3dd"
+      "profile_fingerprint": "sha256:42b1eff6724926b31133b3cd35353ce2490b79275362293ab46356e48c403881"
     }
   ]
 }

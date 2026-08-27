@@ -25,7 +25,7 @@ const requiredControls = ["scope", "verification", "risk_approval", "evidence", 
 const requiredTaskClasses = ["implementation", "investigation", "review", "verification", "handoff"];
 const claimEvidenceContractRef = "ask.claim-evidence-status@1.0.0";
 const formalLedgerDirectTriggerId = "formal_claim_audit_required";
-const expectedOutputControl = "[output] Managed runner owns the record: ordinary=>sidecar; stop/handoff=>inline; diagnostic only explicit. Unmanaged=>one inline. next_action only there.";
+const expectedOutputControl = "[output] managed: ordinary=>sidecar, stop/handoff=>inline, diagnostic explicit; unmanaged=>one inline; next_action only.";
 
 validateCodexCompactControlMap(controlMap);
 if (summary.rendered_bytes >= summary.baseline_bytes) throw new Error("Codex compact profiles must reduce aggregate prompt bytes measured from immutable pre-compact fixtures");
@@ -51,7 +51,7 @@ for (const profile of summary.profiles) {
   if (!artifact.content.includes(expectedOutputControl)) throw new Error(`${profile.prompt_name} does not preserve the runner-owned emission policy`);
   for (const triggerId of route.direct_trigger_ids.filter((id) => id !== formalLedgerDirectTriggerId)) if (!artifact.content.includes(`\`${triggerId}\``)) throw new Error(`${profile.prompt_name} rendered output is missing direct trigger ${triggerId}`);
   if (!profile.direct_trigger_ids.includes(formalLedgerDirectTriggerId)) throw new Error(`${profile.prompt_name} must expose the closed formal-ledger direct trigger`);
-  if (!artifact.content.includes(claimEvidenceContractRef) || !artifact.content.includes("; inline; formal[audit|multi-claim|high-stakes|cross|stable-ID]=>evidence-ledger")) throw new Error(`${profile.prompt_name} must render the shared inline-default and closed formal-audit claim evidence contract revision`);
+  if (!artifact.content.includes(claimEvidenceContractRef) || !artifact.content.includes("; inline; closed formal=>evidence-ledger")) throw new Error(`${profile.prompt_name} must render the shared inline-default and closed formal-audit claim evidence contract revision`);
   const source = readFileSync(resolve(root, "adapters", "codex", "prompts", profile.prompt_name), "utf8");
   if (source.includes("operating-mode-router") || source.includes("skill-router")) throw new Error(`${profile.prompt_name} invokes an upper router despite fixed entry mode`);
   if (!source.includes("{{ASK_COMPACT_CONTROLS}}") || !source.includes("{{ASK_COMPACT_DIRECT_TRIGGERS}}")) throw new Error(`${profile.prompt_name} must generate controls and triggers from the canonical map`);
@@ -66,7 +66,12 @@ if (implementation.skills.includes("operating-mode-router") || implementation.sk
 const implementationRoute = routeByPrompt.get("skill-implement.md");
 for (const triggerId of implementationRoute.direct_trigger_ids) {
   const trigger = implementation.routingFixtures.find((fixture) => fixture.id === triggerId);
-  if (!trigger || trigger.router !== "compact-profile-direct-trigger" || !implementation.skills.includes(trigger.selected_route)) throw new Error(`implementation direct trigger is not closure-equivalent: ${triggerId}`);
+  if (!trigger || trigger.router !== "compact-profile-direct-trigger") throw new Error(`implementation direct trigger is not projected: ${triggerId}`);
+  if (triggerId === "explicit_knowledge_promotion") {
+    if (trigger.outcome !== "capability_missing" || implementation.skills.includes(trigger.selected_route) || trigger.recommended_profile !== "organizational") throw new Error("implementation knowledge promotion trigger must fail closed outside the organizational profile");
+  } else if (trigger.outcome !== "available" || !implementation.skills.includes(trigger.selected_route)) {
+    throw new Error(`implementation direct trigger is not closure-equivalent: ${triggerId}`);
+  }
 }
 const investigation = buildCodexProjectionPlan({ profileName: "investigation" });
 for (const triggerId of routeByPrompt.get("skill-investigate.md").direct_trigger_ids) {
@@ -106,7 +111,7 @@ try {
 if (!rejected) throw new Error("renderer must reject hand-maintained fallback semantics even without forbidden keywords");
 
 const weakenedRendererOutput = implementationArtifact.content.replace(
-  "Stop without approval for that specific action; execute only it.",
+  "unapproved=>stop; approved-only.",
   "Production and secret changes may proceed with general approval.",
 );
 if (weakenedRendererOutput === implementationArtifact.content) throw new Error("risk semantic inversion fixture must alter the generated renderer output");
@@ -140,7 +145,7 @@ try {
 if (!rejected) throw new Error("a new canonical required control must fail until the renderer supports it");
 
 const schema = JSON.parse(readFileSync(resolve(root, "schemas/adapter-runtime-profile.schema.json"), "utf8"));
-if (!schema.properties.schema_version.enum.includes("1.1.0") || !schema.properties.rendering.properties.compact_profiles) throw new Error("shared adapter runtime profile schema must define compact profile metadata revision 1.1.0");
+if (!schema.properties.schema_version.enum.includes("1.2.0") || !schema.properties.rendering.properties.compact_profiles) throw new Error("shared adapter runtime profile schema must define exact-Asset compact profile metadata revision 1.2.0");
 const runtimeBoundaryContract = readFileSync(resolve(root, "docs/adapter-runtime-boundary-contract.md"), "utf8");
 if (!runtimeBoundaryContract.includes("The #163 and #164 runtime implementations consume this contract and schema. Adapter-owned renderer or collector fields may be added only through a schema revision")) {
   throw new Error("the parent adapter runtime boundary must continue to require a shared schema revision for child adapter fields");

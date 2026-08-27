@@ -4,8 +4,8 @@
   "registry_id": "ask-local-assets",
   "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
   "scope_id": "agent-spectrum-kernel",
-  "snapshot_revision": 4,
-  "snapshot_digest": "sha256:5b50712f43feecf82d532178310cf2e0fe2fe709e0d951eb797a3876ff0cf92d",
+  "snapshot_revision": 6,
+  "snapshot_digest": "sha256:34a511af596bc1317941241135f053153d9862ff7552a243c0231fc079c4edba",
   "assets": [
     {
       "asset_type": "evaluator_reference",
@@ -13,6 +13,18 @@
       "version": "git:656edf1ac611890a3ae5a93a90e9076f50ee2488",
       "record_digest": "sha256:33d26707d82e68099085b91f60b26b6bea6ea17af802a493dd70ee4629dfc72b",
       "content_digest": "sha256:06cacaea5b7b84bb2a9f6a6e849f1e561967637cfc0c28bd60675b665f090a54",
+      "state": "candidate",
+      "scope_id": "agent-spectrum-kernel",
+      "dependencies": [],
+      "parent": null,
+      "rollback_target": null
+    },
+    {
+      "asset_type": "prompt",
+      "stable_id": "ask.prompt-policy.compact-controls",
+      "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+      "record_digest": "sha256:0a1bf5ec027954e2def2bf6591655365258e4ed6c3e58a151ea242b961591dcc",
+      "content_digest": "sha256:621237eed65b92d996a11b259d7ef8854357c9fd1e7170071d59c4f50f4e7b3e",
       "state": "candidate",
       "scope_id": "agent-spectrum-kernel",
       "dependencies": [],
@@ -34,6 +46,26 @@
           "record_digest": "sha256:43e18c25bca6279ab7b333b5e4ce3bfdc8ada01023bfe47d0889d61e71872c56",
           "stable_id": "ask.skill.test-first-verification",
           "version": "git:656edf1ac611890a3ae5a93a90e9076f50ee2488"
+        }
+      ],
+      "parent": null,
+      "rollback_target": null
+    },
+    {
+      "asset_type": "prompt",
+      "stable_id": "ask.prompt-template.fixed-entry-semantics",
+      "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+      "record_digest": "sha256:d96f3131c5d6556d2fa74665befef66c0d279dd1177dc6d41f232f2844eafba6",
+      "content_digest": "sha256:124a398892b63295e43b894776bea049625e3847010acd2dce61880a207cf1da",
+      "state": "candidate",
+      "scope_id": "agent-spectrum-kernel",
+      "dependencies": [
+        {
+          "asset_type": "prompt",
+          "content_digest": "sha256:621237eed65b92d996a11b259d7ef8854357c9fd1e7170071d59c4f50f4e7b3e",
+          "record_digest": "sha256:0a1bf5ec027954e2def2bf6591655365258e4ed6c3e58a151ea242b961591dcc",
+          "stable_id": "ask.prompt-policy.compact-controls",
+          "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7"
         }
       ],
       "parent": null,

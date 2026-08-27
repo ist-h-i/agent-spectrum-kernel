@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ADAPTER_RENDERER_METADATA } from "./adapter-runtime-inventory.mjs";
-import { buildAdapterRuntimeBundle } from "./adapter-runtime-bundle.mjs";
+import { buildAdapterProjectionBundle } from "./adapter-runtime-bundle.mjs";
 import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import { computeAdapterProfileFingerprint, computeProfilePathSetDigest } from "./validate-repo.mjs";
@@ -36,10 +36,8 @@ for (const profile of profileArtifact.profiles) {
   profile.rendering.renderer_id = registration.metadata.rendererId;
   profile.rendering.renderer_version = registration.metadata.rendererVersion;
   profile.rendering.renderer_inputs = plan.renderer_inputs;
-  if (profile.adapter_id === "codex") {
-    profile.schema_version = "1.1.0";
-    profile.rendering.compact_profiles = plan.compactProfiles;
-  }
+  profile.schema_version = "1.2.0";
+  profile.rendering.compact_profiles = plan.compactProfiles;
   profile.normalized_event_schema_refs = profile.adapter_id === "claude_code"
     ? ["schemas/adapter-runtime-event.schema.json", "schemas/metrics-event.schema.json"]
     : ["schemas/adapter-runtime-event.schema.json"];
@@ -67,6 +65,7 @@ for (const profile of profileArtifact.profiles) {
   }
 }
 writeFileSync(profilePath, `${JSON.stringify(profileArtifact, null, 2)}\n`);
-writeFileSync(bundlePath, `${JSON.stringify(buildAdapterRuntimeBundle(), null, 2)}\n`);
+const currentBundle = JSON.parse(readFileSync(bundlePath, "utf8"));
+writeFileSync(bundlePath, `${JSON.stringify({ ...currentBundle, ...buildAdapterProjectionBundle() }, null, 2)}\n`);
 
 console.log("Adapter runtime fixtures updated");

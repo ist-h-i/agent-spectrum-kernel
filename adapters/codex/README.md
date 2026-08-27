@@ -72,7 +72,7 @@ Pack profiles are strict projection boundaries. When changing from `full` or `or
 
 Named implementation and investigation profiles are compact explicit-entry projections: they install the primary workflow and critical verification/evidence/risk/handoff contracts without upper routers. `daily`, `organizational`, `adoption`, `observability`, and `full` retain routers where the entry intent is broader. Review retains `review-router`, always projects one `review-ai-quality` baseline, and lets exact observed signals select only additional gates. `review-final-merge-gate` runs last only with `--final-decision`. Durable domain-rule work requires an explicit knowledge-plane profile or advanced override.
 
-Use `--skills <csv>` only as an advanced override. The override must include all required skills for installed prompt templates, command templates, router-reachable routes, and dependencies of the specified skills. Invalid combinations fail before any files are written.
+Use `--skills <csv>` only as an advanced override. The override must include unconditional prompt/command requirements and dependencies of the specified skills. A conditional fixed-entry capability may be omitted; install state records it as `capability_missing`, and execution stops only if that trigger is selected. Other invalid combinations fail before any files are written.
 
 ## Prompt Templates
 
@@ -84,7 +84,7 @@ The source files below are adapter renderer inputs. After installation, use the 
 - `prompts/skill-verify.md`
 - `prompts/skill-handoff.md`
 
-The installer validates each source template against canonical Skill/contract inputs, generates critical controls and direct conditional contracts from `schemas/compact-profile-control-map.json`, embeds the shared adapter profile revision/digest provenance, and writes the generated compact profile to `.agents/prompts`. The generated profile invokes its fixed primary contract directly while preserving direct triggers for repository orientation, scope, boundary, design, docs/ADR, and long-running work where applicable. It does not store raw prompts, secrets, customer data, personal data, full command output, or full file contents.
+The installer validates each source template against canonical Skill/contract inputs, selects the five mode-to-primary mappings from `schemas/fixed-entry-profile-registry.json`, generates critical controls and direct conditional contracts from `schemas/compact-profile-control-map.json`, binds the two exact registered candidate Asset tuples, embeds shared schema `1.2.0` provenance, and writes the generated compact profile to `.agents/prompts`. The same semantic registries feed Claude, while each adapter retains its own templates and headers. The generated profile invokes its fixed primary contract directly while preserving direct triggers for repository orientation, scope, boundary, design, docs/ADR, and long-running work where applicable. Missing selected capability stops as `capability_missing`; candidate registration is not activation. The adapter does not store raw prompts, secrets, customer data, personal data, full command output, or full file contents.
 
 Prompt templates define entry intent, mutation level, evidence requirements, and output contract. They use `docs/lifecycle-artifact-contract.md` for lifecycle artifacts and the shared `docs/execution-envelope-contract.md` for one boundary-level control record. The managed runner requests a closed structured result, derives route from the compact profile, and persists ordinary control state as a bound sidecar; protected/handoff output is projected inline once. Direct copy/paste use is explicit inline compatibility. Implementation and verification outputs use one Contract plus Evidence artifact and keep `next_action` only in the Envelope.
 
@@ -94,7 +94,7 @@ For non-trivial continuation, handoff, interrupted work, or risk-gated work, han
 
 The installer records managed skills, prompts, commands, and Codex runner runtime scripts in `.agent-spectrum-kernel/codex-install-state.json`.
 
-Install state also records `compact_runtime_profiles` and per-prompt `compact_profile` metadata. Prompt update, stale retention/prune, rollback, and detach use the existing managed prompt lifecycle, so profile provenance cannot outlive its managed prompt silently.
+Install state also records `compact_runtime_profiles`, per-prompt `compact_profile` metadata, and exact Asset refs. Prompt update, stale retention/prune, rollback, and detach use the existing managed prompt lifecycle, so profile provenance cannot outlive its managed prompt silently.
 
 When a later install no longer selects a previously managed file, the installer reports it as stale and retains it by default. Use `--prune` to delete stale managed files only when the current file hash still matches the previous managed hash. Modified managed files are preserved and cause prune to fail before deletion.
 

@@ -25,6 +25,7 @@ export const CORE_IMMUTABLE_CONTRACT_ASSETS = Object.freeze([
   "schemas/claim-evidence-status.schema.json",
   "schemas/claim-evidence-status.schema.json",
   "schemas/compact-profile-control-map.json",
+  "schemas/fixed-entry-profile-registry.json",
   "schemas/execution-envelope.schema.json",
   "schemas/execution-envelope-record.schema.json",
   "schemas/effectiveness-decision-vocabulary.schema.json",
@@ -177,21 +178,23 @@ export function readGitRevision(repoRoot) {
     return null;
   }
   const ref = refMatch[1];
-  const refPath = resolve(gitDir, ref);
-  if (existsSync(refPath)) {
-    return readText(refPath).trim() || null;
-  }
-  const packedRefsPath = resolve(gitDir, "packed-refs");
-  if (!existsSync(packedRefsPath)) {
-    return null;
-  }
-  for (const line of readText(packedRefsPath).split(/\r?\n/)) {
-    if (line.startsWith("#") || line.startsWith("^")) {
-      continue;
+  const commonDirPath = resolve(gitDir, "commondir");
+  const commonDir = existsSync(commonDirPath)
+    ? resolve(gitDir, readText(commonDirPath).trim())
+    : gitDir;
+  for (const refRoot of [...new Set([gitDir, commonDir])]) {
+    const refPath = resolve(refRoot, ref);
+    if (existsSync(refPath)) {
+      return readText(refPath).trim() || null;
     }
-    const [hash, packedRef] = line.split(" ");
-    if (packedRef === ref) {
-      return hash;
+  }
+  for (const refRoot of [...new Set([gitDir, commonDir])]) {
+    const packedRefsPath = resolve(refRoot, "packed-refs");
+    if (!existsSync(packedRefsPath)) continue;
+    for (const line of readText(packedRefsPath).split(/\r?\n/)) {
+      if (line.startsWith("#") || line.startsWith("^")) continue;
+      const [hash, packedRef] = line.split(" ");
+      if (packedRef === ref) return hash;
     }
   }
   return null;

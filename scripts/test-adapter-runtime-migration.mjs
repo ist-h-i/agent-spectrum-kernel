@@ -10,6 +10,9 @@ const target = mkdtempSync(resolve(tmpdir(), "ask-dual-runtime-migration-"));
 const coreInstaller = resolve(root, "scripts/install-kernel.mjs");
 const claudeInstaller = resolve(root, "scripts/install-claude-adapter.mjs");
 const codexInstaller = resolve(root, "scripts/install-codex-adapter.mjs");
+const fixedEntries = ["skill-implement.md", "skill-investigate.md", "skill-review.md", "skill-verify.md", "skill-handoff.md"];
+const implementationFixedEntries = ["skill-implement.md", "skill-verify.md", "skill-handoff.md"];
+const exactAssetRefFields = ["asset_type", "content_digest", "record_digest", "stable_id", "version"];
 
 function run(script, args) {
   const result = spawnSync(process.execPath, [script, "--target", target, ...args], {
@@ -41,6 +44,31 @@ function assertInstalledProfile(name, profile) {
   return current;
 }
 
+function assertFixedEntryProjection(name, adapterState, entries) {
+  const rootPath = name === "claude" ? ".claude/commands" : ".agents/prompts";
+  const marker = name === "claude" ? "ASK_CLAUDE_FIXED_ENTRY_PROFILE" : "ASK_CODEX_COMPACT_PROFILE";
+  const profiles = adapterState.compact_runtime_profiles ?? [];
+  assert.equal(profiles.length, entries.length, `${name} must record exactly one compact profile per selected fixed entry`);
+  for (const entry of entries) {
+    const profile = profiles.find((candidate) => candidate.prompt_name === entry);
+    const path = `${rootPath}/${entry}`;
+    const record = adapterState.managed_files?.[path];
+    assert.ok(profile, `${name} omitted compact profile metadata for ${entry}`);
+    assert.equal(profile.schema_version, "1.2.0", `${name} ${entry} used an obsolete compact profile revision`);
+    assert.deepEqual(record?.compact_profile, profile, `${name} ${entry} managed provenance must use the selected compact profile`);
+    assert.equal(profile.canonical_asset_refs?.length, 2, `${name} ${entry} must bind both registered fixed-entry Assets`);
+    for (const reference of profile.canonical_asset_refs) {
+      assert.deepEqual(Object.keys(reference).sort(), exactAssetRefFields, `${name} ${entry} must preserve an exact Asset reference tuple`);
+      assert.match(reference.record_digest, /^sha256:[a-f0-9]{64}$/u);
+      assert.match(reference.content_digest, /^sha256:[a-f0-9]{64}$/u);
+    }
+    const content = readFileSync(resolve(target, path), "utf8");
+    assert.ok(content.includes(marker), `${name} ${entry} omitted its fixed-entry provenance marker`);
+    assert.ok(!content.includes("{{ASK_COMPACT_"), `${name} ${entry} retained an unrendered fixed-entry placeholder`);
+    assert.ok(!content.includes("operating-mode-router") && !content.includes("skill-router"), `${name} ${entry} must skip upper routers`);
+  }
+}
+
 try {
   writeFileSync(resolve(target, "README.md"), "# Adopting project\n");
   writeFileSync(resolve(target, "AGENTS.md"), "# Project-owned instructions\n\nKeep this text.\n");
@@ -56,6 +84,7 @@ try {
   assert.ok(existsSync(resolve(target, "schemas/verification-proof-policy.schema.json")), "core projection omitted the verification proof policy schema");
   assert.ok(existsSync(resolve(target, "docs/review-finding-contract.md")), "core projection omitted the review finding contract");
   assert.ok(existsSync(resolve(target, "schemas/review-finding.schema.json")), "core projection omitted the review finding schema");
+  assert.ok(existsSync(resolve(target, "schemas/fixed-entry-profile-registry.json")), "core projection omitted the fixed-entry semantic registry");
   run(claudeInstaller, ["--profile", "implementation"]);
   run(codexInstaller, ["--profile", "implementation"]);
 
@@ -63,6 +92,8 @@ try {
   const codexInitial = state("codex");
   const claudeInitialBytes = managedBytes(claudeInitial);
   const codexInitialBytes = managedBytes(codexInitial);
+  assertFixedEntryProjection("claude", claudeInitial, implementationFixedEntries);
+  assertFixedEntryProjection("codex", codexInitial, implementationFixedEntries);
   assert.ok(existsSync(resolve(target, ".claude/commands/skill-implement.md")));
   assert.ok(existsSync(resolve(target, ".agents/prompts/skill-implement.md")));
   for (const path of [
@@ -86,8 +117,12 @@ try {
 
   run(claudeInstaller, ["--profile", "full"]);
   run(codexInstaller, ["--profile", "full"]);
-  assert.equal(state("claude").selected_profile, "full");
-  assert.equal(state("codex").selected_profile, "full");
+  const claudeFull = state("claude");
+  const codexFull = state("codex");
+  assert.equal(claudeFull.selected_profile, "full");
+  assert.equal(codexFull.selected_profile, "full");
+  assertFixedEntryProjection("claude", claudeFull, fixedEntries);
+  assertFixedEntryProjection("codex", codexFull, fixedEntries);
 
   run(claudeInstaller, ["--rollback"]);
   assert.equal(state("claude").selected_profile, "implementation");

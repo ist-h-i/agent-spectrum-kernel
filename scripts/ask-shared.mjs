@@ -272,6 +272,14 @@ export function parseCodexCompactProfileHeader(content) {
       profile_fingerprint: typeof parsed.p === "string" ? `sha256:${parsed.p}` : null,
       requested_contracts: typeof parsed.rc === "string" ? parsed.rc.split(",").filter(Boolean) : [],
       control_ids: typeof parsed.ci === "string" ? parsed.ci.split(",").filter(Boolean) : [],
+      canonical_asset_ref_digest: typeof parsed.a === "string" ? `sha256:${parsed.a}` : null,
+      canonical_asset_refs: Array.isArray(parsed.ar) ? parsed.ar.map((reference) => ({
+        asset_type: reference.t,
+        stable_id: reference.id,
+        version: reference.v,
+        record_digest: typeof reference.r === "string" ? `sha256:${reference.r}` : null,
+        content_digest: typeof reference.c === "string" ? `sha256:${reference.c}` : null,
+      })) : [],
     };
   } catch {
     return null;

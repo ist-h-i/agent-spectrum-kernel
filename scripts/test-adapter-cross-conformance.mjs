@@ -24,13 +24,14 @@ const proofPathByScenario = new Map([
   ["localized_implementation", "compact_proof"],
   ["new_behavior_with_verification", "formal_verification_contract"],
   ["unknown_root_cause_investigation", "formal_verification_contract"],
+  ["direct_verification_entry", "formal_verification_contract"],
 ]);
 
 for (const path of [bundleScript, conformanceScript, bundleFixture, conformanceFixture]) {
   assert.equal(existsSync(path), true, `required Phase 3-5 artifact is missing: ${path}`);
 }
 
-const bundleCheck = spawnSync(process.execPath, [bundleScript, "--check"], {
+const bundleCheck = spawnSync(process.execPath, [bundleScript, "--check-adapters"], {
   cwd: root,
   encoding: "utf8",
 });
@@ -45,7 +46,7 @@ assert.equal(conformance.status, 0, conformance.stderr || conformance.stdout);
 const report = JSON.parse(conformance.stdout);
 assert.equal(report.status, "pass_projected");
 assert.equal(report.evidence_level, "projected");
-assert.equal(report.scenarios.length, 9);
+assert.equal(report.scenarios.length, 12);
 assert.deepEqual(new Set(report.adapters), new Set(["claude_code", "codex"]));
 const formalScenarioIds = new Set(["pr_review_selective_gates", "destructive_external_action", "explicit_knowledge_promotion"]);
 for (const scenario of report.scenarios) {
@@ -59,6 +60,7 @@ for (const scenario of report.scenarios) {
   assert.ok(scenario.results.every((result) => result.runtime_application_evidence === "unavailable"));
   assert.ok(scenario.results.every((result) => result.projection_sha256.startsWith("sha256:")));
   assert.ok(scenario.results.every((result) => result.schema_errors.length === 0));
+  assert.ok(scenario.results.every((result) => result.canonical_asset_refs.length === 2));
   const expectedMode = formalScenarioIds.has(scenario.scenario_id) ? "formal_ledger" : "inline";
   assert.ok(scenario.results.every((result) => result.normalized_contract.claim_evidence_mode === expectedMode));
   assert.ok(scenario.results.every((result) => result.normalized_contract.selected_contracts.includes("evidence-ledger") === (expectedMode === "formal_ledger")));
@@ -79,7 +81,7 @@ assert.ok(localizedScenario.results.every((result) => result.normalized_contract
 assert.ok(localizedScenario.results.every((result) => !result.semantic_mismatches.includes("verification_proof_path_overactivated")));
 
 const fixture = JSON.parse(readFileSync(conformanceFixture, "utf8"));
-assert.equal(fixture.schema_version, "1.1.0");
+assert.equal(fixture.schema_version, "1.2.0");
 assert.equal(fixture.verification_proof_policy_ref, VERIFICATION_PROOF_POLICY_REF);
 const localizedFixture = fixture.scenarios.find((scenario) => scenario.scenario_id === "localized_implementation");
 assert.deepEqual(localizedFixture.input.verification_proof.compact_eligibility_fact_ids, COMPACT_ELIGIBILITY_FACT_IDS);
@@ -88,6 +90,11 @@ assert.equal(localizedFixture.expected.verification_proof_path, "compact_proof")
 for (const scenario of fixture.scenarios) {
   assert.equal(scenario.expected.verification_proof_path, proofPathByScenario.get(scenario.scenario_id) ?? null);
 }
+const secondaryScenario = report.scenarios.find((scenario) => scenario.scenario_id === "triggered_secondary_contract");
+assert.ok(secondaryScenario.results.every((result) => result.normalized_contract.selected_contracts.includes("repository-orientation")));
+const missingCapabilityScenario = report.scenarios.find((scenario) => scenario.scenario_id === "missing_triggered_capability");
+assert.ok(missingCapabilityScenario.results.every((result) => result.normalized_contract.stop_status === "capability_missing"));
+assert.ok(missingCapabilityScenario.results.every((result) => JSON.stringify(result.normalized_contract.capability_downgrades) === JSON.stringify(["repository-orientation"])));
 function runFixture(value, extraArgs = []) {
   return spawnSync(process.execPath, [conformanceScript, "--fixture", "-", "--json", ...extraArgs], {
     cwd: root,
@@ -109,6 +116,11 @@ const proofMutationMismatch = new Map([
   ["codex_remove_verification_proof_policy_ref", "verification_proof_policy_ref"],
   ["claude_remove_compact_proof_path", "verification_proof_path_overactivated"],
   ["codex_remove_formal_verification_path", "verification_proof_path_missing"],
+]);
+const fixedEntryMutationMismatch = new Map([
+  ["codex_remove_asset_binding_digest", "canonical_asset_binding"],
+  ["claude_remove_direct_secondary_trigger", "direct_trigger_missing:unfamiliar_repository"],
+  ["claude_remove_capability_missing_behavior", "missing_capability_must_fail_closed"],
 ]);
 const reviewMutationMismatch = new Map([
   ["claude_remove_review_baseline", "baseline_semantic_review_required"],
@@ -140,11 +152,17 @@ for (const mutation of fixture.mutation_fixtures) {
       `${mutation.mutation_id} must expose its baseline-review mismatch`,
     );
   }
+  if (fixedEntryMutationMismatch.has(mutation.mutation_id)) {
+    assert.ok(
+      mutatedAdapter.semantic_mismatches.includes(fixedEntryMutationMismatch.get(mutation.mutation_id)),
+      `${mutation.mutation_id} must expose its fixed-entry mismatch`,
+    );
+  }
 }
 
 for (const [label, mutate, expectedError] of [
   ["empty adapters", (value) => { value.adapters = []; }, "fixture adapters must be exactly"],
-  ["scenario replacement", (value) => { value.scenarios[0].scenario_id = "replacement_scenario"; }, "exact #179 set"],
+  ["scenario replacement", (value) => { value.scenarios[0].scenario_id = "replacement_scenario"; }, "exact registered conformance set"],
   ["missing expected value", (value) => { delete value.scenarios[0].expected.stop_status; }, "expected fields must be exactly"],
   ["claim mode mismatch", (value) => { value.scenarios[0].expected.claim_evidence_mode = "formal_ledger"; }, "claim evidence mode must match"],
   ["unknown formal trigger", (value) => { value.scenarios[0].input.formal_evidence_trigger_ids = ["generic_correctness_claim"]; }, "unknown formal evidence ledger trigger"],

@@ -808,7 +808,7 @@ function resolveCodexProjectionSelection({ profileName, skills = null, skipPromp
   const prompts = skipPrompts ? [] : [...resolvedProfile.prompts];
   const commands = skipCommand ? [] : [...resolvedProfile.commands];
   const skillSeed = skills ?? resolvedProfile.skills;
-  const routingFixtures = routingFixturesForProfile(profileName, skillSeed, prompts);
+  const routingFixtures = routingFixturesForProfile(profileName, skillSeed, prompts, { customSelection: skills !== null });
   const requiredSkills = computeRequiredClosure(skillSeed, prompts, routingFixtures);
   const selectedSkills = [...(skills ?? requiredSkills)].sort();
   validateSkillNames(selectedSkills, [...manifest.skills].sort());
@@ -902,10 +902,6 @@ export function buildCodexProjectionPlan({ profileName, skills = null, skipPromp
   const compactProfileArtifacts = selection.prompts.map((prompt) => renderCodexCompactProfile(prompt, {
     canonicalContract,
     profileFingerprint: provenance.fingerprint,
-    additionalRequestedContracts: profileName === "organizational" && prompt === "skill-implement.md"
-      ? ["operating-mode-router", "domain-rule-ledger"]
-      : [],
-    knowledgePromotion: profileName === "organizational" && prompt === "skill-implement.md",
   }));
   const compactProfiles = compactProfileArtifacts.map((artifact) => artifact.metadata);
   return { ...selection, ...provenance, compactProfiles, compactProfileArtifacts, projectedManagedAssets, actualInstalledInventory: [...actualByPath.values()].sort((left, right) => left.path.localeCompare(right.path)), prune };
@@ -930,9 +926,10 @@ function recommendedSkillsForPrompts(prompts) {
   return prompts.flatMap((prompt) => PROMPT_METADATA[prompt]?.recommendedSkills ?? []);
 }
 
-function routingFixturesForProfile(profileName, seedSkills, promptTemplates) {
+function routingFixturesForProfile(profileName, seedSkills, promptTemplates, { customSelection = false } = {}) {
   const selectedRouters = new Set([...seedSkills, ...requiredSkillsForPrompts(promptTemplates)]);
-  const routedFixtures = (PROFILE_ROUTING_FIXTURES[profileName] ?? [])
+  const profileFixtures = PROFILE_ROUTING_FIXTURES[profileName] ?? [];
+  const routedFixtures = profileFixtures
     .filter((fixture) => selectedRouters.has(fixture.router))
     .map((fixture) => ({
       id: fixture.id,
@@ -943,15 +940,24 @@ function routingFixturesForProfile(profileName, seedSkills, promptTemplates) {
       recommended_profile: fixture.recommendedProfile ?? null,
       required_skills: [...(fixture.requiredSkills ?? [])].sort(),
     }));
-  const directFixtures = promptTemplates.flatMap((prompt) => codexDirectTriggersForPrompt(prompt).map((trigger) => ({
-    id: trigger.id,
-    signal: trigger.signal,
-    router: "compact-profile-direct-trigger",
-    selected_route: trigger.contract,
-    outcome: "available",
-    recommended_profile: null,
-    required_skills: [trigger.contract],
-  })));
+  const availableCapabilities = new Set(selectedRouters);
+  for (const fixture of customSelection ? [] : profileFixtures) {
+    if (fixture.outcome === "capability_missing") continue;
+    if (fixture.selected_route) availableCapabilities.add(fixture.selected_route);
+    for (const skill of fixture.requiredSkills ?? []) availableCapabilities.add(skill);
+  }
+  const directFixtures = promptTemplates.flatMap((prompt) => codexDirectTriggersForPrompt(prompt).map((trigger) => {
+    const available = availableCapabilities.has(trigger.contract);
+    return {
+      id: trigger.id,
+      signal: trigger.signal,
+      router: "compact-profile-direct-trigger",
+      selected_route: trigger.contract,
+      outcome: available ? "available" : "capability_missing",
+      recommended_profile: available ? null : "organizational",
+      required_skills: available ? [trigger.contract] : [],
+    };
+  }));
   return [...new Map([...routedFixtures, ...directFixtures].map((fixture) => [fixture.id, fixture])).values()];
 }
 
@@ -1217,7 +1223,10 @@ function buildPlan(args) {
     managedFiles[relativePath] = {
       ...lifecycle.createManagedFileRecord({ kind: "codex_prompt", prompt, content }),
       prompt,
-      required_skills: [...new Set([...(PROMPT_METADATA[prompt]?.requiredSkills ?? []), ...codexDirectTriggersForPrompt(prompt).map((trigger) => trigger.contract)])].sort(),
+      required_skills: [...new Set([
+        ...(PROMPT_METADATA[prompt]?.requiredSkills ?? []),
+        ...codexDirectTriggersForPrompt(prompt).map((trigger) => trigger.contract).filter((skill) => selectedSkills.has(skill)),
+      ])].sort(),
       recommended_skills: [...(PROMPT_METADATA[prompt]?.recommendedSkills ?? [])].sort(),
       compact_profile: renderedProfile.metadata,
       content,

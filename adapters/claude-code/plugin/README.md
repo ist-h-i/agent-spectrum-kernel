@@ -7,15 +7,19 @@ Use the project-local adapter when one repository needs short commands such as `
 ## Entry Points
 
 - `/ai-skills:review-pr`
+- `/ai-skills:implement`
+- `/ai-skills:investigate`
+- `/ai-skills:verify`
+- `/ai-skills:handoff`
 - `/ai-skills:adoption-report`
 - `/ai-skills:ledger-refresh`
 - `/ai-skills:implementation-context-check`
 
-The plugin remains an adapter. Core skills in `skills/*/SKILL.md` remain the source of truth. The package includes the canonical Execution Envelope and claim-evidence contracts, their referenced schemas, the formal `evidence-ledger` Skill, and the legacy claim normalizer under plugin-root-qualified paths, so entry points do not depend on root-level ASK files. Its Execution Envelope path is explicit inline compatibility; plugin installation or the Stop wrapper does not provide or claim a runner-owned sidecar.
+The plugin remains an adapter. Core skills in `skills/*/SKILL.md` and the shared fixed-entry/control registries remain the source of truth. The five fixed entries are generated from adapter-owned templates and bind the same exact registered candidate Asset references as the project and Codex projections; they do not carry an independent route table. The package also includes the canonical Execution Envelope and claim-evidence contracts, their referenced schemas, the formal `evidence-ledger` Skill, and the legacy claim normalizer under plugin-root-qualified paths, so entry points do not depend on root-level ASK files. Its Execution Envelope path is explicit inline compatibility; plugin installation or the Stop wrapper does not provide or claim a runner-owned sidecar.
 
 The bundled assets include byte-exact projections of the Execution Envelope and claim-evidence contracts/schemas plus the review-route registry, `skills/evidence-ledger/SKILL.md`, and `scripts/claim-evidence-status.mjs`. The registry carries the closed finding fields used by the plugin review entry. Repository validation requires byte-for-byte equality with the canonical files.
 
-Ordinary entry points apply `ask.claim-evidence-status@1.0.0` inline. `/ai-skills:review-pr` selects `high_stakes_readiness` only when a final merge decision is explicitly requested; `/ai-skills:adoption-report` selects `multiple_material_claims`. Other entry points keep the bundled capability inactive unless an observed closed trigger selects `formal_ledger`; installation is never activation evidence.
+Ordinary entry points apply `ask.claim-evidence-status@1.0.0` inline. `/ai-skills:implement`, `/ai-skills:investigate`, `/ai-skills:review-pr`, `/ai-skills:verify`, and `/ai-skills:handoff` skip upper routers because their task class is fixed, while preserving shared scope, verification, risk/approval, evidence, missing-evidence, output, and direct-trigger controls. `/ai-skills:review-pr` selects `high_stakes_readiness` only when a final merge decision is explicitly requested; `/ai-skills:adoption-report` selects `multiple_material_claims`. Other entry points keep the bundled capability inactive unless an observed closed trigger selects `formal_ledger`; installation is never activation evidence.
 
 ## Local-First Hooks
 

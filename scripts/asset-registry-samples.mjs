@@ -31,7 +31,8 @@ import {
 import { materializeGitRevisionSources } from "./git-revision-source.mjs";
 
 const REPOSITORY_ID = "github.com/ist-h-i/agent-spectrum-kernel";
-const SOURCE_REVISION = "656edf1ac611890a3ae5a93a90e9076f50ee2488";
+const BASELINE_SOURCE_REVISION = "656edf1ac611890a3ae5a93a90e9076f50ee2488";
+const FIXED_ENTRY_SOURCE_REVISION = "8f85b9bfc0ac315a2f3298471092fb98f76617f7";
 const REGISTRY_ID = "ask-local-assets";
 const SCOPE_ID = "agent-spectrum-kernel";
 const repositoryRoot = resolve(import.meta.dirname, "..");
@@ -43,7 +44,8 @@ const samples = [
   {
     assetType: "skill",
     stableId: "ask.skill.test-first-verification",
-    version: `git:${SOURCE_REVISION}`,
+    revision: BASELINE_SOURCE_REVISION,
+    version: `git:${BASELINE_SOURCE_REVISION}`,
     path: "skills/test-first-verification/SKILL.md",
     mediaType: "text/markdown; charset=utf-8",
     rawDigest: "sha256:6ab90c0cc61752132f25bb579a35b98e0e9b2ed1a8b36dc2a82db715b9e44684",
@@ -51,18 +53,49 @@ const samples = [
   {
     assetType: "prompt",
     stableId: "ask.prompt-template.codex.skill-verify",
-    version: `git:${SOURCE_REVISION}`,
+    revision: BASELINE_SOURCE_REVISION,
+    version: `git:${BASELINE_SOURCE_REVISION}`,
     path: "adapters/codex/prompts/skill-verify.md",
     mediaType: "text/markdown; charset=utf-8",
     rawDigest: "sha256:0fb394cd590cfd00215e581d3d159a31967437f039156f5e5e3d6b4f1b157b82",
+    adapter: "codex",
+    applicabilityAdapters: ["codex"],
+    dependencyStableIds: ["ask.skill.test-first-verification"],
   },
   {
     assetType: "evaluator_reference",
     stableId: "ask.evaluator-reference.mn-build-option-update",
-    version: `git:${SOURCE_REVISION}`,
+    revision: BASELINE_SOURCE_REVISION,
+    version: `git:${BASELINE_SOURCE_REVISION}`,
     path: "benchmarks/fixtures/checkpoint-b2/mn-build-option-update/evaluator-reference.json",
     mediaType: "application/json",
     rawDigest: "sha256:bc701eb717206d68fed24c037106ae72d3f7d52b63dfcf71a8d767d599f35874",
+  },
+  {
+    assetType: "prompt",
+    stableId: "ask.prompt-policy.compact-controls",
+    revision: FIXED_ENTRY_SOURCE_REVISION,
+    version: `git:${FIXED_ENTRY_SOURCE_REVISION}`,
+    path: "schemas/compact-profile-control-map.json",
+    mediaType: "application/json",
+    rawDigest: "sha256:3dc1cbaf148b7236b86a56f065a772c0623d87240a02a0df066fae0f89077f4f",
+    adapter: "shared",
+    applicabilityAdapters: ["claude-code", "codex"],
+    applicabilityTaskClasses: ["handoff", "implementation", "investigation", "review", "verification"],
+    dependencyStableIds: [],
+  },
+  {
+    assetType: "prompt",
+    stableId: "ask.prompt-template.fixed-entry-semantics",
+    revision: FIXED_ENTRY_SOURCE_REVISION,
+    version: `git:${FIXED_ENTRY_SOURCE_REVISION}`,
+    path: "schemas/fixed-entry-profile-registry.json",
+    mediaType: "application/json",
+    rawDigest: "sha256:065bf20f6af19d3b9d48ad5680a31033b20997ced1c2913826946209272a830c",
+    adapter: "shared",
+    applicabilityAdapters: ["claude-code", "codex"],
+    applicabilityTaskClasses: ["handoff", "implementation", "investigation", "review", "verification"],
+    dependencyStableIds: ["ask.prompt-policy.compact-controls"],
   },
 ];
 
@@ -86,7 +119,7 @@ function descriptorFor(sample, dependencies = []) {
     : sample.assetType === "prompt"
       ? {
           kind: "prompt_template",
-          adapter: "codex",
+          adapter: sample.adapter,
           entrypoint: sample.path,
           rendered_runtime_content: false,
         }
@@ -115,7 +148,7 @@ function descriptorFor(sample, dependencies = []) {
     source: {
       kind: "git_repository",
       repository_id: REPOSITORY_ID,
-      revision: SOURCE_REVISION,
+      revision: sample.revision,
     },
     provenance: {
       origin: "repository_file",
@@ -139,12 +172,14 @@ function descriptorFor(sample, dependencies = []) {
     applicability: {
       models: { status: "unknown", included: [], excluded: [] },
       adapters: sample.assetType === "prompt"
-        ? { status: "bounded", included: ["codex"], excluded: [] }
+        ? { status: "bounded", included: sample.applicabilityAdapters, excluded: [] }
         : { status: "unknown", included: [], excluded: [] },
       stacks: { status: "unknown", included: [], excluded: [] },
       domains: { status: "unknown", included: [], excluded: [] },
       projects: { status: "bounded", included: [REPOSITORY_ID], excluded: [] },
-      task_classes: { status: "unknown", included: [], excluded: [] },
+      task_classes: sample.applicabilityTaskClasses
+        ? { status: "bounded", included: sample.applicabilityTaskClasses, excluded: [] }
+        : { status: "unknown", included: [], excluded: [] },
       included_scopes: ["local_repository"],
       excluded_scopes: ["automatic_portfolio_activation"],
       required_capabilities: [],
@@ -190,12 +225,16 @@ function generateFixture() {
   const temporaryRoot = mkdtempSync(resolve(tmpdir(), "ask-asset-registry-samples-"));
   const sourceRoot = resolve(temporaryRoot, "source");
   const storeRoot = resolve(temporaryRoot, "store");
-  materializeGitRevisionSources({
-    repositoryRoot,
-    targetRoot: sourceRoot,
-    revision: SOURCE_REVISION,
-    sources: samples.map((sample) => ({ path: sample.path, rawDigest: sample.rawDigest })),
-  });
+  for (const revision of new Set(samples.map((sample) => sample.revision))) {
+    materializeGitRevisionSources({
+      repositoryRoot,
+      targetRoot: sourceRoot,
+      revision,
+      sources: samples
+        .filter((sample) => sample.revision === revision)
+        .map((sample) => ({ path: sample.path, rawDigest: sample.rawDigest })),
+    });
+  }
   mkdirSync(storeRoot, { recursive: true });
 
   const empty = createEmptyAssetRegistry({
@@ -204,33 +243,29 @@ function generateFixture() {
     repositoryId: REPOSITORY_ID,
     scopeId: SCOPE_ID,
   });
-  const skillRegistration = registerAsset({
-    storeRoot,
-    sourceRoot,
-    predecessorSnapshotDigest: empty.snapshot_digest,
-    descriptor: descriptorFor(samples[0]),
-  });
-  const skill = resolveAsset({
-    storeRoot,
-    snapshotDigest: skillRegistration.snapshot_digest,
-    stableId: samples[0].stableId,
-    version: samples[0].version,
-    state: "candidate",
-  });
-  const promptRegistration = registerAsset({
-    storeRoot,
-    sourceRoot,
-    predecessorSnapshotDigest: skillRegistration.snapshot_digest,
-    descriptor: descriptorFor(samples[1], [exactAssetRef(skill)]),
-  });
-  const evaluatorRegistration = registerAsset({
-    storeRoot,
-    sourceRoot,
-    predecessorSnapshotDigest: promptRegistration.snapshot_digest,
-    descriptor: descriptorFor(samples[2]),
-  });
-
-  const snapshotDigest = evaluatorRegistration.snapshot_digest;
+  let snapshotDigest = empty.snapshot_digest;
+  const registered = new Map();
+  for (const sample of samples) {
+    const dependencies = (sample.dependencyStableIds ?? []).map((stableId) => {
+      const dependency = registered.get(stableId);
+      if (!dependency) throw new Error(`sample dependency must be registered first: ${stableId}`);
+      return exactAssetRef(dependency);
+    });
+    const registration = registerAsset({
+      storeRoot,
+      sourceRoot,
+      predecessorSnapshotDigest: snapshotDigest,
+      descriptor: descriptorFor(sample, dependencies),
+    });
+    snapshotDigest = registration.snapshot_digest;
+    registered.set(sample.stableId, resolveAsset({
+      storeRoot,
+      snapshotDigest,
+      stableId: sample.stableId,
+      version: sample.version,
+      state: "candidate",
+    }));
+  }
   const verified = verifyAssetRegistry({ storeRoot, snapshotDigest });
   const listed = listAssets({ storeRoot, snapshotDigest });
   const reference = exportAssetRegistryReference({ storeRoot, snapshotDigest });
@@ -245,7 +280,7 @@ function verifyGeneratedView({ storeRoot, snapshotDigest, verified, listed, refe
   assert.deepEqual(
     listed.map((entry) => entry.stable_id),
     [...samples.map((sample) => sample.stableId)].sort(),
-    "registry list must contain the three samples in deterministic order",
+    "registry list must contain every sample in deterministic order",
   );
   assert.deepEqual(new Set(listed.map((entry) => entry.state)), new Set(["candidate"]));
 
@@ -267,20 +302,26 @@ function verifyGeneratedView({ storeRoot, snapshotDigest, verified, listed, refe
     assert.equal(rawDigest(decoded), sample.rawDigest);
   }
 
-  const prompt = resolveAsset({
-    storeRoot,
-    snapshotDigest,
-    stableId: samples[1].stableId,
-    version: samples[1].version,
-    state: "candidate",
-  });
-  assert.deepEqual(prompt.dependency_closure.map(exactAssetRef), [exactAssetRef(resolveAsset({
-    storeRoot,
-    snapshotDigest,
-    stableId: samples[0].stableId,
-    version: samples[0].version,
-    state: "candidate",
-  }))]);
+  for (const sample of samples.filter((entry) => (entry.dependencyStableIds ?? []).length > 0)) {
+    const resolved = resolveAsset({
+      storeRoot,
+      snapshotDigest,
+      stableId: sample.stableId,
+      version: sample.version,
+      state: "candidate",
+    });
+    const expected = sample.dependencyStableIds.map((stableId) => {
+      const dependency = samples.find((entry) => entry.stableId === stableId);
+      return exactAssetRef(resolveAsset({
+        storeRoot,
+        snapshotDigest,
+        stableId: dependency.stableId,
+        version: dependency.version,
+        state: "candidate",
+      }));
+    });
+    assert.deepEqual(resolved.dependency_closure.map(exactAssetRef), expected);
+  }
 
   assert.equal(reference.snapshot_digest, snapshotDigest);
   const serializedReference = stableCanonicalJson(reference);

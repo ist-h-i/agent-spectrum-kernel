@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { APPROVAL_REQUIRED_SURFACES, CODEX_PROMPT_CONTRACTS, OPERATING_MODES, TASK_CLASSES, parseCodexCompactProfileHeader } from "./ask-shared.mjs";
 import { CODEX_RUNTIME_FILES } from "./adapter-runtime-inventory.mjs";
 import { inspectExecutionEnvelope } from "./execution-envelope.mjs";
+import { buildClaudeProjectionPlan } from "./install-claude-adapter.mjs";
 import {
   CORE_IMMUTABLE_CONTRACT_ASSETS,
   CORE_IMMUTABLE_RUNTIME_ASSETS,
@@ -25,6 +26,7 @@ const sensorsScript = resolve(repoRoot, "scripts/ask-sensors.mjs");
 const runtimeSmokeScript = resolve(repoRoot, "scripts/adapter-runtime-smoke.mjs");
 const codexRunnerScript = resolve(repoRoot, "scripts/codex-exec-runner.mjs");
 const codexCompactProfileTestScript = resolve(repoRoot, "scripts/test-codex-runtime-profile.mjs");
+const fixedEntryProfileTestScript = resolve(repoRoot, "scripts/test-fixed-entry-profiles.mjs");
 const crossAdapterConformanceTestScript = resolve(repoRoot, "scripts/test-adapter-cross-conformance.mjs");
 const adapterMigrationTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-migration.mjs");
 const adapterRuntimeEventTestScript = resolve(repoRoot, "scripts/test-adapter-runtime-event.mjs");
@@ -38,6 +40,7 @@ if (compactProfileResult.status !== 0) {
 }
 
 for (const [label, script] of [
+  ["Shared fixed-entry profiles", fixedEntryProfileTestScript],
   ["Normalized adapter runtime event", adapterRuntimeEventTestScript],
   ["Cross-adapter conformance", crossAdapterConformanceTestScript],
   ["Dual-runtime migration", adapterMigrationTestScript],
@@ -493,6 +496,7 @@ function writeAdapterFixture(root) {
     "schemas/adapter-runtime-evidence.schema.json",
     "schemas/adapter-runtime-event.schema.json",
     "schemas/claim-evidence-status.schema.json",
+    "schemas/fixed-entry-profile-registry.json",
     "schemas/verification-proof-policy.schema.json",
     "schemas/normalized-event-schema-registry.json",
     "schemas/review-signal-gate-map.json",
@@ -635,10 +639,19 @@ console.log(path, code, privacy);
     "adapters/claude-code/plugin/schemas/metrics-event.schema.json",
     "adapters/claude-code/plugin/scripts/claim-evidence-status.mjs",
     "adapters/claude-code/plugin/skills/evidence-ledger/SKILL.md",
+    "adapters/claude-code/plugin/skills/implement/SKILL.md",
+    "adapters/claude-code/plugin/skills/investigate/SKILL.md",
     "adapters/claude-code/plugin/skills/review-pr/SKILL.md",
+    "adapters/claude-code/plugin/skills/verify/SKILL.md",
+    "adapters/claude-code/plugin/skills/handoff/SKILL.md",
     "adapters/claude-code/plugin/skills/adoption-report/SKILL.md",
     "adapters/claude-code/plugin/skills/ledger-refresh/SKILL.md",
     "adapters/claude-code/plugin/skills/implementation-context-check/SKILL.md",
+    "adapters/claude-code/plugin/templates/implement.md",
+    "adapters/claude-code/plugin/templates/investigate.md",
+    "adapters/claude-code/plugin/templates/review-pr.md",
+    "adapters/claude-code/plugin/templates/verify.md",
+    "adapters/claude-code/plugin/templates/handoff.md",
     "adapters/claude-code/plugin/bin/ai-skills-metrics-record",
     "adapters/codex/README.md",
     "adapters/codex/commands/codex-exec.md",
@@ -809,6 +822,10 @@ function install(manifest, options) {
   writeFileSync(resolve(root, "scripts/test-adapter-runtime-event.mjs"), "console.log('adapter runtime event tests');\n");
   writeFileSync(resolve(root, "scripts/adapter-runtime-inventory.mjs"), "export const CODEX_RUNTIME_FILES = [{ name: 'codex-exec-runner.mjs' }];\n");
   writeFileSync(resolve(root, "scripts/codex-runtime-profile.mjs"), "console.log('codex compact profile');\n");
+  writeFileSync(resolve(root, "scripts/fixed-entry-profile.mjs"), "console.log('shared fixed-entry profile');\n");
+  writeFileSync(resolve(root, "scripts/claude-fixed-entry-profile.mjs"), "console.log('Claude fixed-entry projection');\n");
+  writeFileSync(resolve(root, "scripts/claude-plugin-fixed-entries.mjs"), "console.log('Claude plugin fixed-entry generator');\n");
+  writeFileSync(resolve(root, "scripts/test-fixed-entry-profiles.mjs"), "console.log('shared fixed-entry profile tests');\n");
   writeFileSync(resolve(root, "scripts/codex-exec-runner.mjs"), "console.log('codex runner');\n");
   writeFileSync(resolve(root, "scripts/execution-envelope.mjs"), "console.log('execution envelope');\n");
   writeFileSync(
@@ -1234,8 +1251,12 @@ function assertCodexCompactProfiles(name, target) {
     if (!record?.compact_profile || !header || header.id !== record.compact_profile.profile_id || header.source_digest !== record.compact_profile.canonical_source_digest) {
       throw new Error(`${name} has invalid compact profile provenance for ${prompt}`);
     }
-    if (record.compact_profile.schema_version !== "1.1.0" || record.compact_profile.profile_fingerprint !== state.projection_plan?.fingerprint) {
-      throw new Error(`${name} compact metadata must derive from shared adapter profile revision 1.1.0 for ${prompt}`);
+    if (record.compact_profile.schema_version !== "1.2.0" || record.compact_profile.profile_fingerprint !== state.projection_plan?.fingerprint) {
+      throw new Error(`${name} compact metadata must derive from shared adapter profile revision 1.2.0 for ${prompt}`);
+    }
+    const exactAssetRefs = record.compact_profile.canonical_asset_refs;
+    if (!Array.isArray(exactAssetRefs) || exactAssetRefs.length !== 2 || `sha256:${hashText(JSON.stringify(exactAssetRefs))}` !== header.canonical_asset_ref_digest) {
+      throw new Error(`${name} compact metadata must preserve the two exact registered fixed-entry Asset references for ${prompt}`);
     }
   }
 }
@@ -2674,7 +2695,9 @@ function assertInstallerScripts() {
     "managed file conflict",
   );
   assertRuntimePass("installer force updates managed command", runRepoScript([installer, "--target", target, "--force"]));
-  if (readFileSync(resolve(target, ".claude/commands/skill-handoff.md"), "utf8") !== readFileSync(resolve(repoRoot, "adapters/claude-code/project/.claude/commands/skill-handoff.md"), "utf8")) {
+  const expectedHandoff = buildClaudeProjectionPlan({ profileName: "full" }).compactProfileArtifacts
+    .find((artifact) => artifact.metadata.prompt_name === "skill-handoff.md")?.content;
+  if (!expectedHandoff || readFileSync(resolve(target, ".claude/commands/skill-handoff.md"), "utf8") !== expectedHandoff) {
     throw new Error("installer --force should refresh locally modified managed commands");
   }
   if (!existsSync(resolve(target, "docs/ai/improvement-ledger.md")) || !existsSync(resolve(target, "docs/ai/skill-adoption-metrics.md")) || !existsSync(resolve(target, "docs/debt-lifecycle-contract.md"))) {
@@ -2735,7 +2758,7 @@ function assertInstallerScripts() {
           throw new Error(`Claude daily available fixture '${id}' is invalid\n${JSON.stringify(profileState, null, 2)}`);
         }
       }
-      for (const id of ["daily_knowledge_capability_missing", "daily_adoption_capability_missing", "daily_observability_capability_missing"]) {
+      for (const id of ["daily_knowledge_capability_missing", "daily_adoption_capability_missing", "daily_observability_capability_missing", "explicit_knowledge_promotion"]) {
         if (fixtures.get(id)?.outcome !== "capability_missing" || profileState.selected_skills.includes(fixtures.get(id)?.selected_route) || fixtures.get(id)?.recommended_profile !== "organizational") {
           throw new Error(`Claude daily capability fixture '${id}' is not fail-closed\n${JSON.stringify(profileState, null, 2)}`);
         }
@@ -3056,23 +3079,29 @@ function assertInstallerScripts() {
     throw new Error("installer invalid partial skills should not install commands");
   }
 
-  const invalidRoutingTarget = resolve(fixtureRoot, "install-invalid-routing-profile-target");
-  assertRuntimePass("installer invalid routing core setup", runRepoScript([coreInstaller, "--target", invalidRoutingTarget]));
-  assertRuntimeFail(
-    "installer invalid routing closure",
+  const boundedRoutingTarget = resolve(fixtureRoot, "install-bounded-routing-profile-target");
+  assertRuntimePass("installer bounded routing core setup", runRepoScript([coreInstaller, "--target", boundedRoutingTarget]));
+  assertRuntimePass(
+    "installer bounded routing closure",
     runRepoScript([
       installer,
       "--target",
-      invalidRoutingTarget,
+      boundedRoutingTarget,
       "--profile",
       "implementation",
       "--skills",
       "operating-mode-router,skill-router,test-first-verification,controlled-implementation,evidence-ledger,risk-gate,handoff-generation",
     ]),
-    "repository-orientation",
   );
-  if (existsSync(resolve(invalidRoutingTarget, ".claude/commands/skill-implement.md"))) {
-    throw new Error("installer invalid routing closure should not install commands");
+  const boundedRoutingState = JSON.parse(readFileSync(resolve(boundedRoutingTarget, ".agent-spectrum-kernel/claude-install-state.json"), "utf8"));
+  const unavailableOrientation = boundedRoutingState.skill_closure?.routing_fixtures?.find((fixture) => fixture.id === "unfamiliar_repository");
+  if (
+    unavailableOrientation?.outcome !== "capability_missing" ||
+    unavailableOrientation.selected_route !== "repository-orientation" ||
+    boundedRoutingState.selected_skills.includes("repository-orientation") ||
+    !existsSync(resolve(boundedRoutingTarget, ".claude/commands/skill-implement.md"))
+  ) {
+    throw new Error(`installer bounded routing closure must install the fixed entry and fail closed only when the unavailable trigger is selected\n${JSON.stringify(boundedRoutingState, null, 2)}`);
   }
 
   const missingWorkPackageTarget = resolve(fixtureRoot, "install-missing-work-package-target");
@@ -3849,6 +3878,7 @@ function assertCodexInstallerScripts() {
         "daily_knowledge_capability_missing",
         "daily_adoption_capability_missing",
         "daily_observability_capability_missing",
+        "explicit_knowledge_promotion",
       ]);
     }
   }
@@ -6119,8 +6149,16 @@ try {
     if (issues.length > 0) throw new Error(`${profile.profile_id} should pass semantic profile validation\n${issues.join("\n")}`);
   }
   const codexCompactProfile = adapterProfileFixture.profiles.find((profile) => profile.adapter_id === "codex");
-  if (!codexCompactProfile || codexCompactProfile.schema_version !== "1.1.0" || !Array.isArray(codexCompactProfile.rendering.compact_profiles)) {
-    throw new Error("Codex compact metadata must be represented by shared adapter runtime profile schema revision 1.1.0");
+  const claudeCompactProfile = adapterProfileFixture.profiles.find((profile) => profile.adapter_id === "claude_code");
+  for (const profile of [claudeCompactProfile, codexCompactProfile]) {
+    if (!profile || profile.schema_version !== "1.2.0" || !Array.isArray(profile.rendering.compact_profiles)) {
+      throw new Error("Both adapters must represent fixed-entry metadata with shared adapter runtime profile schema revision 1.2.0");
+    }
+    for (const compactProfile of profile.rendering.compact_profiles) {
+      if (!Array.isArray(compactProfile.canonical_asset_refs) || compactProfile.canonical_asset_refs.length !== 2) {
+        throw new Error(`${profile.adapter_id} compact profile must bind the two exact registered fixed-entry Asset references`);
+      }
+    }
   }
   const legacySchemaWithCompactMetadata = JSON.parse(JSON.stringify(codexCompactProfile));
   legacySchemaWithCompactMetadata.schema_version = "1.0.0";
@@ -6131,14 +6169,14 @@ try {
   const revisedSchemaWithoutCompactMetadata = JSON.parse(JSON.stringify(codexCompactProfile));
   delete revisedSchemaWithoutCompactMetadata.rendering.compact_profiles;
   const revisedSchemaWithoutCompactMetadataIssues = inspectAdapterRuntimeProfile(revisedSchemaWithoutCompactMetadata, { root: repoRoot });
-  if (!revisedSchemaWithoutCompactMetadataIssues.includes("schema_version 1.1.0 requires rendering.compact_profiles")) {
-    throw new Error(`schema revision 1.1.0 must require compact metadata\n${revisedSchemaWithoutCompactMetadataIssues.join("\n")}`);
+  if (!revisedSchemaWithoutCompactMetadataIssues.includes("schema_version 1.2.0 requires rendering.compact_profiles")) {
+    throw new Error(`schema revision 1.2.0 must require compact metadata\n${revisedSchemaWithoutCompactMetadataIssues.join("\n")}`);
   }
   const driftedCompactMetadata = JSON.parse(JSON.stringify(codexCompactProfile));
   driftedCompactMetadata.rendering.compact_profiles[0].requested_contracts.push("unsupported-child-contract");
   const driftedCompactMetadataIssues = inspectAdapterRuntimeProfile(driftedCompactMetadata, { root: repoRoot });
-  if (!driftedCompactMetadataIssues.includes("rendering.compact_profiles must exactly match the shared Codex projection plan")) {
-    throw new Error(`compact metadata must remain derived from the shared Codex projection plan\n${driftedCompactMetadataIssues.join("\n")}`);
+  if (!driftedCompactMetadataIssues.includes("rendering.compact_profiles must exactly match the shared adapter projection plan")) {
+    throw new Error(`compact metadata must remain derived from the shared adapter projection plan\n${driftedCompactMetadataIssues.join("\n")}`);
   }
   const invalidDowngradeProfile = JSON.parse(JSON.stringify(adapterProfileFixture.profiles[0]));
   invalidDowngradeProfile.capabilities.find((capability) => capability.capability_id === "lifecycle_hooks").downgrade_behavior = "none";

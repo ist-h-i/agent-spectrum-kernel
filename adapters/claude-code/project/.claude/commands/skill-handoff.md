@@ -1,32 +1,26 @@
 ---
-description: Produce a precise next-task handoff for another agent or human.
+description: Fixed-entry Agent Spectrum Kernel handoff.
 ---
 
-Use the installed project skills from this repository projection.
+Fixed handoff entry. Primary contract: `handoff-generation`; apply it with `risk-gate`. Read-only unless a handoff file was requested.
 
-Apply `ask.claim-evidence-status@1.0.0` inline. Apply `/evidence-ledger` only when its closed trigger selects `formal_ledger` (explicit audit, multiple material claims, high-stakes readiness, cross-artifact synthesis, or stable claim IDs); installation alone is not activation.
+{{ASK_COMPACT_CONTROLS}}
 
-Use `/handoff-generation` after reading the relevant repository context and current diff or issue state. The handoff must be executable, not a generic summary.
+{{ASK_COMPACT_DIRECT_TRIGGERS}}
 
-- require approval for the specific action and stop without that approval before any risk-gated action
-- when required evidence is missing, report `insufficient_evidence` and stop; do not infer the missing result
-- do not start or delegate agents unless the request explicitly requires agent activity; report started, completed, and failed counts
+[agent_activity] opt-in; report started/completed/failed.
 
-Output the next task in this shape:
+[handoff] executable resume evidence and unresolved risks.
 
-```text
 Task:
 Context:
 Allowed scope:
 Forbidden scope:
 Expected output:
 Verification:
+Unverified evidence:
 Stop condition:
-```
 
-Include verified evidence and unresolved risks. Do not hide current blockers as optional follow-up.
-Include exactly one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`; do not repeat its route and next-action fields inside the handoff sections.
-
-For non-trivial continuation, handoff, interrupted work, or risk-gated work, also include the bounded resume state fields from `docs/agent-session-state-contract.md`. Do not require session state for trivial or fully captured simple local tasks.
+Emit one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`; for non-trivial continuation include bounded `docs/agent-session-state-contract.md` fields.
 
 $ARGUMENTS
