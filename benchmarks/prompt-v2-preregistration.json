@@ -162,7 +162,7 @@
       ],
       "renderer": {
         "renderer_id": "install-codex-adapter",
-        "renderer_version": "8",
+        "renderer_version": "7",
         "implementation_path": "scripts/install-codex-adapter.mjs",
         "implementation_raw_byte_digest": "sha256:4784e1eebf76702db5b08e15208e9d31d12d3a056af4828e607e6e4551ccc851"
       }
@@ -180,7 +180,7 @@
       ],
       "renderer": {
         "renderer_id": "install-claude-adapter",
-        "renderer_version": "6",
+        "renderer_version": "5",
         "implementation_path": "scripts/install-claude-adapter.mjs",
         "implementation_raw_byte_digest": "sha256:f2c2c89c6969364ba99c520cd0aa36c3c82cbb646ff39166e4f7c7383409590f"
       }
@@ -406,6 +406,6 @@
     "runtime_activation_implied": false,
     "lifecycle_mutation_authorized": false
   },
-  "preregistration_id": "prompt-v2-prereg-3679c051c6e01b8cc0c0a4d35c594f68",
-  "preregistration_digest": "sha256:03356a8d046dccb6aed37d42a44ea96a3679c051c6e01b8cc0c0a4d35c594f68"
+  "preregistration_id": "prompt-v2-prereg-09a8375bb8db1bdb89df80a684d49cce",
+  "preregistration_digest": "sha256:5c7c9d0a8bce5171f5c9b6bbb4c737d509a8375bb8db1bdb89df80a684d49cce"
 }
