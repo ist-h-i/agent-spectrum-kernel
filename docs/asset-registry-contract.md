@@ -2,7 +2,7 @@
 
 This document defines the closed local Asset contract and registry semantics for Issue #276. The repository contains the corresponding Schemas, operations, and candidate-only sample, but this contract text alone is not evidence that a particular revision passed its required checks.
 
-Contract revision `1.0.0` supports three Asset types: `skill`, `prompt`, and `evaluator_reference`. A later type must extend the closed union deliberately. It must not fork the common identity, provenance, lineage, dependency, lifecycle, or authority model.
+Contract revision `1.0.0` supports three Asset types: `skill`, `prompt`, and `evaluator_reference`. The closed Prompt extensions are `prompt_template` and `rendered_prompt_bundle`. A later type or extension must extend the closed union deliberately. It must not fork the common identity, provenance, lineage, dependency, lifecycle, or authority model.
 
 ## Responsibility boundary
 
@@ -152,9 +152,21 @@ The Skill extension identifies one normalized entrypoint within the content pack
 
 ### `prompt`
 
-The v1 Prompt extension represents `prompt_template` content and identifies its normalized template entrypoint and declared template format. Template variables, renderer inputs, model context, and rendered output are not silently part of the registered content.
+The `prompt_template` extension identifies one normalized template entrypoint and declares `rendered_runtime_content: false`. Template variables, renderer inputs, model context, and rendered output are not silently part of that Asset.
 
-A rendered runtime Prompt is a different exact Asset or an exact later execution/projection record. Registering a template must not be described as registering the unmaterialized rendered baseline, a Prompt v2 challenger, or the Prompt actually executed by a model.
+The `rendered_prompt_bundle` extension represents a closed multi-file adapter projection. It contains exactly:
+
+- `adapter`;
+- a non-empty, unique, locale-independent code-unit-ordered `entrypoints` array that exactly equals the complete content-package path inventory;
+- `renderer.id`, `renderer.version`, and an exact `renderer.input_digest` supplied by the producer for the renderer-input closure;
+- `renderer.projection_digest`, equal to the canonical JSON digest of the ordered `[{ path, raw_digest }]` content inventory; and
+- `runtime_application_implied: false`.
+
+The record's bounded adapter applicability must contain exactly the extension adapter and no excluded adapter. Content and record extensions must be byte-identical. The Registry recomputes the projection digest from the packaged output files, but it does not independently reconstruct or authenticate the producer-supplied renderer-input closure. A consumer that relies on `renderer.input_digest` must separately reconstruct that exact renderer input.
+
+A full-content rendered-bundle revision must use its exact direct parent as its maintenance rollback target. Both references preserve exact lineage and reconstructability only. Neither registration, the renderer identities, nor a rollback target proves that the bundle was selected, installed, loaded, executed, effective, or approved for rollback.
+
+A rendered Prompt bundle is a different exact Asset from a Prompt template and from an execution record. Registering a template must not be described as registering the unmaterialized rendered baseline, a Prompt v2 challenger, or the Prompt actually executed by a model. Registering a rendered bundle proves exact projected bytes, not that any runtime applied them.
 
 ### `evaluator_reference`
 
@@ -186,6 +198,8 @@ V1 supports a closed derivation union:
 `full_content_revision` stores the complete child content package. The summary is explanatory metadata, not an executable patch and not an alternative content identity. Parent and child must have the same stable ID and Asset type, differ in version and content identity, and resolve within the verified snapshot history. Parent cycles, missing parents, cross-ID transplants, and digest substitution fail closed.
 
 An optional rollback target uses the same exact-reference tuple. It must resolve to a different registered revision of the same stable ID and Asset type. The target preserves reconstructability intent only; it cannot authorize rollback or Portfolio selection.
+
+For `rendered_prompt_bundle`, a `full_content_revision` closes one additional invariant: its rollback target is mandatory and must be byte-identical to its direct derivation parent. A Prompt v2 Evolution candidate therefore cannot name one baseline as its parent while retaining a different revision as its rollback anchor.
 
 ### Dependency closure
 
@@ -328,6 +342,8 @@ The focused verification suite must cover at least these cases. Until the checks
 | Historical, superseded, or retired substitution | Default resolution fails; explicit exact-state reconstruction remains separate. |
 | Mutable caller input changes after verification | Detached verified values remain unchanged; consumers do not re-read the mutable input. |
 | Unsupported Asset type or type-extension field | Closed Schema validation fails. |
+| Rendered Prompt entrypoint, adapter, renderer, or projection digest drift | Exact inventory, adapter applicability, closed renderer fields, and recomputed projection identity fail. |
+| Rendered Prompt revision omits or substitutes its direct-parent rollback target | Registration and imported-record verification fail before the revision is returned. |
 | Owner/license/effectiveness inferred from a digest | Evidence-status validation preserves supported/unknown; no authority is granted. |
 | Registration changes a runtime default | Integration verification fails; no projection, Portfolio, evaluator selection, or execution file may change from registration alone. |
 | Private evaluator bytes enter the sample package | Public-content and evaluator-reference boundary validation fails. |
@@ -369,7 +385,7 @@ Contract revision `1.0.0` does not define:
 - automatic admission, selection, promotion, mutation, or generation;
 - Portfolio baseline, challenger, bypass, or rollback selection;
 - adapter installation or runtime projection;
-- Prompt v2 content or rendered Prompt capture;
+- measured Prompt execution, runtime-load evidence, or Prompt comparison results;
 - matched evaluation, scoring-policy changes, product evidence, ROI, or effectiveness claims;
 - migration of every existing ASK artifact into the common model.
 

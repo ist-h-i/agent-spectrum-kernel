@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-spectrum-kernel.local/benchmarks/schemas/prompt-v2-execution-plan.schema.json",
+  "title": "Prompt v2 deterministic execution plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "schema_path", "artifact_type", "program", "preregistration_id",
+    "preregistration_digest", "authority_binding_digest", "randomization", "expected_case_count",
+    "pool_adapter_results", "cases", "boundaries", "plan_id", "plan_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/prompt-v2-execution-plan.schema.json" },
+    "artifact_type": { "const": "prompt_v2_execution_plan" },
+    "program": { "const": "ask_prompt_v2_result_blind_canary" },
+    "preregistration_id": { "type": "string", "pattern": "^prompt-v2-prereg-[a-f0-9]{32}$" },
+    "preregistration_digest": { "$ref": "#/$defs/digest" },
+    "authority_binding_digest": { "$ref": "#/$defs/digest" },
+    "randomization": {
+      "type": "object", "additionalProperties": false, "required": ["strategy", "seed", "seed_digest"],
+      "properties": {
+        "strategy": { "const": "seeded_balanced_two_arm_rotation" },
+        "seed": { "type": "string", "minLength": 1 },
+        "seed_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "expected_case_count": { "const": 56 },
+    "pool_adapter_results": { "const": false },
+    "cases": { "type": "array", "minItems": 56, "maxItems": 56, "items": { "$ref": "#/$defs/case" } },
+    "boundaries": {
+      "type": "object", "additionalProperties": false,
+      "required": ["measured_execution_authorized", "results_accessed", "adapter_substitution_allowed", "retry_substitution_allowed"],
+      "properties": {
+        "measured_execution_authorized": { "const": false },
+        "results_accessed": { "const": false },
+        "adapter_substitution_allowed": { "const": false },
+        "retry_substitution_allowed": { "const": false }
+      }
+    },
+    "plan_id": { "type": "string", "pattern": "^prompt-v2-plan-[a-f0-9]{32}$" },
+    "plan_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "adapter": { "enum": ["codex", "claude"] },
+    "role": { "enum": ["current_prompt", "prompt_v2"] },
+    "asset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["asset_type", "stable_id", "version", "record_digest", "content_digest"],
+      "properties": {
+        "asset_type": { "const": "prompt" }, "stable_id": { "type": "string", "minLength": 1 }, "version": { "type": "string", "minLength": 1 },
+        "record_digest": { "$ref": "#/$defs/digest" }, "content_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "portfolio": {
+      "type": "object", "additionalProperties": false,
+      "required": ["portfolio_id", "revision", "manifest_digest", "asset_set_digest", "lock_digest"],
+      "properties": {
+        "portfolio_id": { "type": "string", "minLength": 1 }, "revision": { "type": "string", "minLength": 1 },
+        "manifest_digest": { "$ref": "#/$defs/digest" }, "asset_set_digest": { "$ref": "#/$defs/digest" }, "lock_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "selection": {
+      "type": "object", "additionalProperties": false, "required": ["selection_object_digest", "selection_digest"],
+      "properties": { "selection_object_digest": { "$ref": "#/$defs/digest" }, "selection_digest": { "$ref": "#/$defs/digest" } }
+    },
+    "projection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["renderer_id", "renderer_version", "renderer_input_digest", "rendered_bundle_digest", "inventory_digest"],
+      "properties": {
+        "renderer_id": { "type": "string", "minLength": 1 }, "renderer_version": { "type": "string", "minLength": 1 },
+        "renderer_input_digest": { "$ref": "#/$defs/digest" }, "rendered_bundle_digest": { "$ref": "#/$defs/digest" }, "inventory_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "evolution": {
+      "type": "object", "additionalProperties": false,
+      "required": ["candidate_object_digest", "candidate_digest", "experiment_object_digest", "experiment_digest", "baseline_asset_record_digest", "candidate_asset_record_digest", "rollback_target_manifest_digest", "phase", "results_accessed", "projection_mode", "raw_scoring_condition"],
+      "properties": {
+        "candidate_object_digest": { "$ref": "#/$defs/digest" }, "candidate_digest": { "$ref": "#/$defs/digest" },
+        "experiment_object_digest": { "$ref": "#/$defs/digest" }, "experiment_digest": { "$ref": "#/$defs/digest" },
+        "baseline_asset_record_digest": { "$ref": "#/$defs/digest" }, "candidate_asset_record_digest": { "$ref": "#/$defs/digest" },
+        "rollback_target_manifest_digest": { "$ref": "#/$defs/digest" },
+        "phase": { "const": "pre_result" }, "results_accessed": { "const": false },
+        "projection_mode": { "const": "prompt_v2_exact" }, "raw_scoring_condition": { "const": "full_ask" }
+      }
+    },
+    "authority": {
+      "type": "object", "additionalProperties": false, "required": ["asset", "portfolio", "selection", "projection", "evolution"],
+      "properties": {
+        "asset": { "$ref": "#/$defs/asset" }, "portfolio": { "$ref": "#/$defs/portfolio" }, "selection": { "$ref": "#/$defs/selection" },
+        "projection": { "$ref": "#/$defs/projection" }, "evolution": { "$ref": "#/$defs/evolution" }
+      }
+    },
+    "case": {
+      "type": "object", "additionalProperties": false,
+      "required": ["position", "case_id", "case_identity_digest", "block_id", "block_identity_digest", "adapter_track", "fixture_id", "source_fixture_id", "task_class", "repetition", "prompt_role", "role_order_position", "raw_scoring_condition", "raw_scorer_authority_digest", "common_input_identity_digest", "prompt_projection_digest", "runtime_identity_digest", "prompt_authority"],
+      "properties": {
+        "position": { "type": "integer", "minimum": 1, "maximum": 56 },
+        "case_id": { "type": "string", "pattern": "^prompt-v2-case-[a-f0-9]{32}$" },
+        "case_identity_digest": { "$ref": "#/$defs/digest" },
+        "block_id": { "type": "string", "pattern": "^prompt-v2-block-[a-f0-9]{32}$" },
+        "block_identity_digest": { "$ref": "#/$defs/digest" },
+        "adapter_track": { "$ref": "#/$defs/adapter" },
+        "fixture_id": { "type": "string", "minLength": 1 }, "source_fixture_id": { "type": "string", "minLength": 1 },
+        "task_class": { "enum": ["review", "implementation"] }, "repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "prompt_role": { "$ref": "#/$defs/role" }, "role_order_position": { "enum": [1, 2] },
+        "raw_scoring_condition": { "const": "full_ask" },
+        "raw_scorer_authority_digest": { "$ref": "#/$defs/digest" },
+        "common_input_identity_digest": { "$ref": "#/$defs/digest" }, "prompt_projection_digest": { "$ref": "#/$defs/digest" },
+        "runtime_identity_digest": { "$ref": "#/$defs/digest" }, "prompt_authority": { "$ref": "#/$defs/authority" }
+      }
+    }
+  }
+}

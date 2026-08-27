@@ -67,6 +67,15 @@ The record freezes:
 frozen. Candidate generation never grants Registry admission or Portfolio
 activation.
 
+Full candidate verification resolves both exact Assets through the bound
+Registry snapshot and checks the candidate record rather than trusting the
+Evolution references alone. The candidate Asset record must be a
+`full_content_revision` whose direct parent is byte-identical to the
+candidate's `parent_asset`. Its exact maintenance rollback target must be
+byte-identical to `rollback.parent_asset`. A valid Registry revision whose
+parent or rollback target is another revision of the same stable ID is still
+invalid for that Evolution candidate.
+
 ## Experiment seal
 
 The experiment is always `phase: pre_result` and `results_accessed: false`. It
@@ -87,6 +96,50 @@ ID, revision, or authority-evidence digest is rejected. The exact
 candidate-to-#197 condition projection is also sealed. A `fixed_b1_exact`
 projection is limited to byte-proven `kernel_only` baseline and `adaptive_ask`
 challenger material; labels alone are insufficient.
+
+`prompt_v2_exact` is a separate two-role comparison projection and does not add
+a fifth #197 condition. Its baseline role is `current_prompt`, its challenger
+role is `prompt_v2`, and both `baseline_condition` and
+`challenger_condition` are exactly the existing `full_ask` raw-scoring
+condition. Both selected references must be exact `prompt` Assets backed by
+`rendered_prompt_bundle` records for the experiment protocol's adapter. The
+Assets, Portfolio manifests and locks, selection objects, and semantic
+selection digests remain distinct even though the #197 condition is common.
+
+The mapping digest is exactly the canonical JSON digest of:
+
+```json
+{
+  "schema_version": "1.0.0",
+  "projection_mode": "prompt_v2_exact",
+  "prompt_roles": {
+    "current_prompt": {
+      "experiment_role": "baseline",
+      "raw_scoring_condition": "full_ask"
+    },
+    "prompt_v2": {
+      "experiment_role": "challenger",
+      "raw_scoring_condition": "full_ask"
+    }
+  }
+}
+```
+
+The projection-evidence digest is the canonical JSON digest of an object with
+`schema_version: "1.0.0"`, `projection_mode: "prompt_v2_exact"`, that exact
+`mapping_digest`, and `roles.baseline` / `roles.challenger`. Each role contains
+its fixed `prompt_role`, `raw_scoring_condition: "full_ask"`, and byte-identical
+copies of the experiment role's `portfolio`, `registry_snapshot_digest`,
+`selection_object_digest`, `selection_digest`, and `selected_asset`. The
+exported `computePromptV2ExactProjectionDigests` helper is the implementation
+authority for constructing both digests; copied prose or a condition label is
+not projection evidence.
+
+This result-blind seal uses the candidate-reserved
+`external_evolution_experiment_authority`. Preregistration does not create a
+second authority kind. Experiment authority cannot be reused as evaluation,
+recommendation, human-decision, Asset lifecycle, Portfolio activation, or
+rollback authority.
 
 The recommendation decision table and recommendation-to-action mapping are
 policy inputs and are sealed before result access. Result, score, verdict,
@@ -186,7 +239,8 @@ revise_and_repeat     -> revise_candidate
 insufficient_evidence -> insufficient_evidence
 ```
 
-Until exact Prompt v2 bytes and an exact #197 projection exist, the loop returns
+Until exact rendered Prompt bundle bytes and an exact `prompt_v2_exact`
+projection exist, the loop returns
 `prompt_v2_materialization_unavailable` or
 `prompt_v2_projection_unavailable`; it never relabels the existing sample.
 
@@ -270,6 +324,7 @@ typed successful stop.
 ## Non-goals
 
 The local contract does not authenticate an organization, choose a mutable
-current head, execute benchmarks, score raw outputs, mutate evaluators, add a
-generic optimizer, activate high-impact Assets automatically, implement Prompt
-v2, replace Product Evidence Run #198, or create a hosted service.
+current head, execute Prompt comparisons or benchmarks, score raw outputs,
+mutate evaluators, add a generic optimizer, activate high-impact Assets
+automatically, decide that Prompt v2 won, replace Product Evidence Run #198, or
+create a hosted service.

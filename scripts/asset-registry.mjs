@@ -175,14 +175,29 @@ function sourceFilePath(sourceRoot, portablePath) {
   return target;
 }
 
-function expectedTypeExtensionKind(assetType) {
-  if (assetType === "skill") return "skill";
-  if (assetType === "prompt") return "prompt_template";
-  return "public_evaluator_reference";
+function allowedTypeExtensionKinds(assetType) {
+  if (assetType === "skill") return new Set(["skill"]);
+  if (assetType === "prompt") return new Set(["prompt_template", "rendered_prompt_bundle"]);
+  if (assetType === "evaluator_reference") return new Set(["public_evaluator_reference"]);
+  throw new Error("unsupported Asset type extension mapping");
 }
 
 function validateTypeExtension(assetType, extension, inventory) {
-  if (extension?.kind !== expectedTypeExtensionKind(assetType)) throw new Error("Asset type extension does not match asset_type");
+  if (!allowedTypeExtensionKinds(assetType).has(extension?.kind)) throw new Error("Asset type extension does not match asset_type");
+  if (extension.kind === "rendered_prompt_bundle") {
+    assertSortedUnique(extension.entrypoints, compareText, "rendered Prompt bundle entrypoint inventory");
+    const projectedInventory = inventory.map(({ path, raw_digest }) => ({ path, raw_digest }));
+    if (!compareCanonical(extension.entrypoints, projectedInventory.map(({ path }) => path))) {
+      throw new Error("rendered Prompt bundle entrypoints must exactly match the complete content inventory");
+    }
+    if (extension.renderer.projection_digest !== canonicalDigest(projectedInventory)) {
+      throw new Error("rendered Prompt bundle projection digest does not match the exact content inventory");
+    }
+    if (extension.runtime_application_implied !== false) {
+      throw new Error("rendered Prompt bundle registration cannot imply runtime application or activation");
+    }
+    return;
+  }
   if (!inventory.some((file) => file.path === extension.entrypoint)) throw new Error("Asset type extension entrypoint is missing from the content inventory");
   if (assetType === "evaluator_reference") {
     if (extension.private_evaluator_content_included !== false) throw new Error("private evaluator content is not permitted in an evaluator-reference Asset");
@@ -314,6 +329,18 @@ function validateRecordSemantics(record, content) {
       || rollbackTarget.asset_type !== record.asset_type
       || rollbackTarget.version === record.version)) {
     throw new Error("Asset rollback target must be a different exact revision of the same stable ID and Asset type");
+  }
+  if (record.type_extension.kind === "rendered_prompt_bundle") {
+    const adapterBinding = record.applicability.adapters;
+    if (adapterBinding.status !== "bounded"
+      || !compareCanonical(adapterBinding.included, [record.type_extension.adapter])
+      || adapterBinding.excluded.length !== 0) {
+      throw new Error("rendered Prompt bundle applicability adapter binding must exactly match its adapter");
+    }
+    if (record.derivation.kind === "full_content_revision"
+      && (rollbackTarget === null || !compareCanonical(rollbackTarget, record.derivation.parent))) {
+      throw new Error("rendered Prompt bundle full-content revision requires its direct parent as the exact rollback target");
+    }
   }
   if (record.provenance.license.status === "unknown" && (record.provenance.license.spdx_id !== null || record.provenance.license.evidence_ref !== null)) {
     throw new Error("unknown Asset license status cannot carry an asserted license identity");

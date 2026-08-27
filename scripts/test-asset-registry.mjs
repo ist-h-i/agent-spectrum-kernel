@@ -26,6 +26,7 @@ import {
   verifyAssetRegistry,
 } from "./asset-registry.mjs";
 import {
+  canonicalDigest,
   contentAddressedObjectPath,
   listContentAddressedJson,
   putContentAddressedJson,
@@ -69,6 +70,48 @@ const samples = {
 
 const rawDigest = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const textDigest = (value) => rawDigest(Buffer.from(String(value), "utf8"));
+
+function renderedProjectionDigest(files) {
+  return canonicalDigest(files
+    .map(({ path, raw_digest: rawDigestValue }) => ({ path, raw_digest: rawDigestValue }))
+    .sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0)));
+}
+
+function renderedPromptBundleDescriptor({
+  stableId,
+  version,
+  files,
+  adapter = "codex",
+  renderer = {},
+  derivation = { kind: "root", parent: null, delta: null },
+  rollbackTarget = null,
+} = {}) {
+  const sample = {
+    ...samples.prompt,
+    stableId,
+    version,
+    path: files[0].path,
+    mediaType: files[0].media_type,
+    sha256: files[0].raw_digest,
+  };
+  const descriptor = assetDescriptor({ sample, derivation, rollbackTarget });
+  descriptor.content.files = structuredClone(files);
+  descriptor.type_extension = {
+    kind: "rendered_prompt_bundle",
+    adapter,
+    entrypoints: files.map(({ path }) => path).sort(),
+    renderer: {
+      id: `ask.renderer.${adapter}.fixed-entry`,
+      version: "1.0.0",
+      input_digest: textDigest(`${adapter}:${version}:renderer-input`),
+      projection_digest: renderedProjectionDigest(files),
+      ...structuredClone(renderer),
+    },
+    runtime_application_implied: false,
+  };
+  descriptor.applicability.adapters = { status: "bounded", included: [adapter], excluded: [] };
+  return descriptor;
+}
 
 let caseCount = 0;
 function check(label, action) {
@@ -314,6 +357,149 @@ try {
     assert.equal(empty.created, true);
     assert.equal(existsSync(contentAddressedObjectPath({ storeRoot, digest: empty.snapshot_digest })), true);
     assert.deepEqual(listAssets({ storeRoot, snapshotDigest: empty.snapshot_digest }), []);
+  });
+
+  const renderedBundleStoreRoot = resolve(root, "rendered-prompt-bundle-store");
+  const renderedBundleStableId = "ask.prompt-bundle.codex.fixed-entry";
+  const renderedBundleFiles = (role) => ["implementation", "verification"].map((taskClass) => {
+    const path = `synthetic/rendered/${role}/${taskClass}.md`;
+    const bytes = Buffer.from(`# ${role} ${taskClass}\n\nClosed rendered Prompt bundle fixture.\n`, "utf8");
+    mkdirSync(dirname(resolve(sourceRoot, path)), { recursive: true });
+    writeFileSync(resolve(sourceRoot, path), bytes);
+    return {
+      path,
+      media_type: "text/markdown; charset=utf-8",
+      raw_digest: rawDigest(bytes),
+    };
+  });
+  const renderedBaselineFiles = renderedBundleFiles("current-prompt");
+  const renderedCandidateFiles = renderedBundleFiles("prompt-v2");
+  const renderedBundleEmpty = createEmptyAssetRegistry({
+    storeRoot: renderedBundleStoreRoot,
+    registryId: "ask-rendered-prompt-bundles",
+    repositoryId: REPOSITORY_ID,
+    scopeId: SCOPE_ID,
+  });
+  const renderedBaselineDescriptor = renderedPromptBundleDescriptor({
+    stableId: renderedBundleStableId,
+    version: "1.0.0",
+    files: renderedBaselineFiles,
+  });
+  const renderedBaselineRegistration = registerAsset({
+    storeRoot: renderedBundleStoreRoot,
+    sourceRoot,
+    predecessorSnapshotDigest: renderedBundleEmpty.snapshot_digest,
+    descriptor: renderedBaselineDescriptor,
+  });
+  const renderedBaseline = resolveAsset({
+    storeRoot: renderedBundleStoreRoot,
+    snapshotDigest: renderedBaselineRegistration.snapshot_digest,
+    stableId: renderedBundleStableId,
+    version: "1.0.0",
+    state: "candidate",
+  });
+
+  check("multi-file rendered Prompt bundle closes adapter, renderer, and projected inventory identity", () => {
+    assert.deepEqual(renderedBaseline.record.type_extension, renderedBaseline.content.type_extension);
+    assert.deepEqual(renderedBaseline.content.type_extension.entrypoints, renderedBaselineFiles.map(({ path }) => path).sort());
+    assert.equal(renderedBaseline.content.type_extension.renderer.projection_digest, renderedProjectionDigest(renderedBaselineFiles));
+    assert.equal(renderedBaseline.content.type_extension.runtime_application_implied, false);
+    assert.deepEqual(renderedBaseline.record.applicability.adapters, {
+      status: "bounded",
+      included: ["codex"],
+      excluded: [],
+    });
+    assert.equal(renderedBaseline.state, "candidate");
+  });
+
+  for (const [label, mutate, pattern] of [
+    [
+      "rendered Prompt bundle rejects a runtime-application claim",
+      (descriptor) => { descriptor.type_extension.runtime_application_implied = true; },
+      /runtime_application_implied|runtime application|activation|closed schema|oneOf/iu,
+    ],
+    [
+      "rendered Prompt bundle rejects incomplete runtime inventory",
+      (descriptor) => { descriptor.type_extension.entrypoints.pop(); },
+      /entrypoint|inventory/iu,
+    ],
+    [
+      "rendered Prompt bundle rejects non-deterministic runtime inventory ordering",
+      (descriptor) => { descriptor.type_extension.entrypoints.reverse(); },
+      /entrypoint|ordered|inventory/iu,
+    ],
+    [
+      "rendered Prompt bundle rejects adapter-binding drift",
+      (descriptor) => { descriptor.applicability.adapters.included = ["claude"]; },
+      /adapter.*binding|applicability.*adapter/iu,
+    ],
+    [
+      "rendered Prompt bundle rejects projection-digest drift",
+      (descriptor) => { descriptor.type_extension.renderer.projection_digest = textDigest("wrong projection"); },
+      /projection.*digest/iu,
+    ],
+    [
+      "rendered Prompt bundle rejects malformed renderer identity",
+      (descriptor) => { descriptor.type_extension.renderer.input_digest = "not-a-digest"; },
+      /renderer|input_digest|sha256|schema/iu,
+    ],
+  ]) {
+    const invalid = structuredClone(renderedBaselineDescriptor);
+    invalid.stable_id = `${renderedBundleStableId}.${label.split(" ").at(-1)}`;
+    mutate(invalid);
+    expectFailure(
+      label,
+      () => registerAsset({
+        storeRoot: renderedBundleStoreRoot,
+        sourceRoot,
+        predecessorSnapshotDigest: renderedBaselineRegistration.snapshot_digest,
+        descriptor: invalid,
+      }),
+      pattern,
+    );
+  }
+
+  const renderedCandidateWithoutRollback = renderedPromptBundleDescriptor({
+    stableId: renderedBundleStableId,
+    version: "2.0.0",
+    files: renderedCandidateFiles,
+    derivation: {
+      kind: "full_content_revision",
+      parent: exactAssetRef(renderedBaseline),
+      delta: { kind: "replacement", summary: "Replace the complete current Prompt bundle with Prompt v2." },
+    },
+  });
+  expectFailure(
+    "rendered Prompt candidate requires its direct parent as the exact rollback target",
+    () => registerAsset({
+      storeRoot: renderedBundleStoreRoot,
+      sourceRoot,
+      predecessorSnapshotDigest: renderedBaselineRegistration.snapshot_digest,
+      descriptor: renderedCandidateWithoutRollback,
+    }),
+    /direct parent|rollback target|lineage/iu,
+  );
+
+  const renderedCandidateDescriptor = structuredClone(renderedCandidateWithoutRollback);
+  renderedCandidateDescriptor.maintenance.rollback.target = exactAssetRef(renderedBaseline);
+  const renderedCandidateRegistration = registerAsset({
+    storeRoot: renderedBundleStoreRoot,
+    sourceRoot,
+    predecessorSnapshotDigest: renderedBaselineRegistration.snapshot_digest,
+    descriptor: renderedCandidateDescriptor,
+  });
+  const renderedCandidate = resolveAsset({
+    storeRoot: renderedBundleStoreRoot,
+    snapshotDigest: renderedCandidateRegistration.snapshot_digest,
+    stableId: renderedBundleStableId,
+    version: "2.0.0",
+    state: "candidate",
+  });
+  check("rendered Prompt candidate preserves direct parent lineage and exact rollback closure without activation", () => {
+    assert.deepEqual(renderedCandidate.record.derivation.parent, exactAssetRef(renderedBaseline));
+    assert.deepEqual(renderedCandidate.record.maintenance.rollback.target, exactAssetRef(renderedBaseline));
+    assert.deepEqual(renderedCandidate.parent_closure.map(exactAssetRef), [exactAssetRef(renderedBaseline)]);
+    assert.equal(renderedCandidate.state, "candidate");
   });
 
   check("registry ordering uses locale-independent code-unit order", () => {

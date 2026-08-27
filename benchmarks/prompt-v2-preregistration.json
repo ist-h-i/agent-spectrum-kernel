@@ -1,0 +1,411 @@
+{
+  "schema_version": "1.0.0",
+  "schema_path": "benchmarks/schemas/prompt-v2-preregistration.schema.json",
+  "artifact_type": "prompt_v2_preregistration",
+  "program": "ask_prompt_v2_result_blind_canary",
+  "artifact_id": "SPEC-234-PROMPT-V2-PREREGISTRATION",
+  "protocol": {
+    "path": "benchmarks/protocol-prompt-v2.md",
+    "raw_byte_digest": "sha256:4ab18a466567e0a94df575bddb5aabc4ccf8fff496be11d3af74a32ef44aff3a"
+  },
+  "phase": "pre_result",
+  "results_accessed": false,
+  "execution_repository": {
+    "repository_id": "ist-h-i/agent-spectrum-kernel",
+    "revision": "869d96b16543ef68b4c459064c8010e1cdb0b8de",
+    "tree": "1546f9cd522716f5d266018b7cc4901bed98c204"
+  },
+  "expected_case_count": 56,
+  "prompt_roles": [
+    "current_prompt",
+    "prompt_v2"
+  ],
+  "ordering": {
+    "strategy": "seeded_balanced_two_arm_rotation",
+    "seed": "issue-234-prompt-v2-result-blind-canary-v1"
+  },
+  "raw_scoring": {
+    "condition": "full_ask",
+    "implementation": "reuse_existing_197_authority",
+    "authority_files": [
+      {
+        "role": "catalog",
+        "path": "benchmarks/portfolio-catalog.json",
+        "raw_byte_digest": "sha256:cfd967bfb0b4a1a479e856c1d5e135bc87bc90b9427c2f33a935d315391439f8"
+      },
+      {
+        "role": "policy_manifest",
+        "path": "benchmarks/portfolio-policy-manifest.json",
+        "raw_byte_digest": "sha256:36fee800e7a8c943142d8d3d056e149adf773a72ee5b2373b03f5ad231752bcf"
+      },
+      {
+        "role": "scoring_policy",
+        "path": "benchmarks/portfolio-scoring-policy.json",
+        "raw_byte_digest": "sha256:17ef3a12d0df9cf3842f4de2199171a6cd4cdb7b10ac528a091fbd70e60edb01"
+      },
+      {
+        "role": "raw_score_implementation",
+        "path": "scripts/ask-benchmark-portfolio-score.mjs",
+        "raw_byte_digest": "sha256:fa8a4b1de313ceeff447bd344e6168bb9b8fc02dfff86864297a83358785667b"
+      },
+      {
+        "role": "raw_score_schema",
+        "path": "benchmarks/schemas/portfolio-engineering-result.schema.json",
+        "raw_byte_digest": "sha256:af1ea7698d3981705c64f184dcddb418b80ec75ab2917c7991f2f574802db76f"
+      },
+      {
+        "role": "result_set_implementation",
+        "path": "scripts/ask-benchmark-portfolio-result-set.mjs",
+        "raw_byte_digest": "sha256:ae7230381c39c413e4a4b3bb4afb7f07f2be03645dbbe66d5d9d987a6a8f9fda"
+      },
+      {
+        "role": "result_set_schema",
+        "path": "benchmarks/schemas/portfolio-engineering-result-set.schema.json",
+        "raw_byte_digest": "sha256:ebb0d74d455274cf22e7b7537f46ff2c737478fd88908f75095d156e8259444a"
+      },
+      {
+        "role": "repetition_report_implementation",
+        "path": "scripts/ask-benchmark-portfolio-repetition-report.mjs",
+        "raw_byte_digest": "sha256:5343342114bb615269666d5fa48f8e5f9e2034bc8d279046ea9f2dd7c8106df9"
+      },
+      {
+        "role": "repetition_report_schema",
+        "path": "benchmarks/schemas/portfolio-repetition-report.schema.json",
+        "raw_byte_digest": "sha256:51c4d534782ba1c31497ecd2394d377fadcbe65d7e2f4ae92d63124dd772371e"
+      },
+      {
+        "role": "paired_report_implementation",
+        "path": "scripts/ask-benchmark-portfolio-paired-comparison-report.mjs",
+        "raw_byte_digest": "sha256:f3def33e5d217c464ab33f6d9ffc3203863ec07b42a2a0d831ddf64218a855ae"
+      },
+      {
+        "role": "paired_report_schema",
+        "path": "benchmarks/schemas/portfolio-paired-comparison-report.schema.json",
+        "raw_byte_digest": "sha256:c7bfc72dbad868cc1706e46760a009578c7da279ae5edad6a85e6c6d2e9242c8"
+      },
+      {
+        "role": "directional_report_implementation",
+        "path": "scripts/ask-benchmark-portfolio-directional-outcome-report.mjs",
+        "raw_byte_digest": "sha256:6c76c9bf049acc71b2771e49e854199dc3b4e5bd375803fb7193d5e52fb7d708"
+      },
+      {
+        "role": "directional_report_schema",
+        "path": "benchmarks/schemas/portfolio-directional-outcome-report.schema.json",
+        "raw_byte_digest": "sha256:e3ce533f97e700d09f8257549db7394d1889ec386c93671bfff3daae5e78055a"
+      },
+      {
+        "role": "mechanism_scorecard_implementation",
+        "path": "scripts/ask-benchmark-portfolio-mechanism-scorecard.mjs",
+        "raw_byte_digest": "sha256:c022bf1c33d01e0a7e62e6c98ad1779873f2aba93aa42cf91ce814cb0f61bb12"
+      },
+      {
+        "role": "mechanism_scorecard_schema",
+        "path": "benchmarks/schemas/portfolio-mechanism-scorecard.schema.json",
+        "raw_byte_digest": "sha256:e070b71c225d4b18c8a2e48a27feb76bf77dfd2bc48be6c5d638f92229653202"
+      },
+      {
+        "role": "aggregate_report_implementation",
+        "path": "scripts/ask-benchmark-portfolio-aggregate-result.mjs",
+        "raw_byte_digest": "sha256:d58a1815e26fc5fb51200c40247263b3d5029949c5140bc1fa323eb1fd26855d"
+      },
+      {
+        "role": "aggregate_report_schema",
+        "path": "benchmarks/schemas/portfolio-aggregate-result.schema.json",
+        "raw_byte_digest": "sha256:919654e9b278a25c6e663e892b86578c803d33e32e04f904218962b1cfc33e71"
+      }
+    ],
+    "authority_digest": "sha256:b77095785efd89b1a4b5aa13743acac11a4c872e58b0660126de710998d2d320"
+  },
+  "canonical_prompt_v2": {
+    "binding_path": "docs/fixtures/asset-registry/reference.json",
+    "binding_raw_byte_digest": "sha256:cfb56a63907f6aa2f7d7d9574e03dae4bd4f7f37706049dbbda0f21b40ee17cd",
+    "reference_path": "docs/fixtures/asset-registry/reference.json",
+    "reference_raw_byte_digest": "sha256:cfb56a63907f6aa2f7d7d9574e03dae4bd4f7f37706049dbbda0f21b40ee17cd",
+    "registry_snapshot_digest": "sha256:34a511af596bc1317941241135f053153d9862ff7552a243c0231fc079c4edba",
+    "asset_binding_digest": "sha256:9a9aca8ada738c552c966f2f08ca1cc5e6dee5643d17a6f6c30041dd7e3c122d",
+    "prompt_asset": {
+      "asset_type": "prompt",
+      "stable_id": "ask.prompt-template.fixed-entry-semantics",
+      "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+      "record_digest": "sha256:d96f3131c5d6556d2fa74665befef66c0d279dd1177dc6d41f232f2844eafba6",
+      "content_digest": "sha256:124a398892b63295e43b894776bea049625e3847010acd2dce61880a207cf1da"
+    },
+    "policy_asset": {
+      "asset_type": "prompt",
+      "stable_id": "ask.prompt-policy.compact-controls",
+      "version": "git:8f85b9bfc0ac315a2f3298471092fb98f76617f7",
+      "record_digest": "sha256:0a1bf5ec027954e2def2bf6591655365258e4ed6c3e58a151ea242b961591dcc",
+      "content_digest": "sha256:621237eed65b92d996a11b259d7ef8854357c9fd1e7170071d59c4f50f4e7b3e"
+    },
+    "source_maps": [
+      {
+        "path": "schemas/fixed-entry-profile-registry.json",
+        "raw_byte_digest": "sha256:065bf20f6af19d3b9d48ad5680a31033b20997ced1c2913826946209272a830c"
+      },
+      {
+        "path": "schemas/compact-profile-control-map.json",
+        "raw_byte_digest": "sha256:3dc1cbaf148b7236b86a56f065a772c0623d87240a02a0df066fae0f89077f4f"
+      }
+    ]
+  },
+  "prompt_tracks": [
+    {
+      "adapter_track": "codex",
+      "stable_asset_id": "ask.prompt-bundle.codex",
+      "current_source_revision": "d568b5c54fa826ac81daddc06c5f545a7498ab73",
+      "current_source_files": [
+        { "path": "docs/fixtures/codex-pre-compact-prompts/skill-handoff.md", "raw_byte_digest": "sha256:b06b05e210f470f8c0306d805d6073095c535b54deccd3c3e7609145fca4cd5a" },
+        { "path": "docs/fixtures/codex-pre-compact-prompts/skill-implement.md", "raw_byte_digest": "sha256:8af01267df59f874517c24a0f203f40ee13017d0392905491593bddbec83456a" },
+        { "path": "docs/fixtures/codex-pre-compact-prompts/skill-investigate.md", "raw_byte_digest": "sha256:8b69bfa66a6ad35414c48206511d1757191bd4a35e84c8161b30409f2f924c59" },
+        { "path": "docs/fixtures/codex-pre-compact-prompts/skill-review.md", "raw_byte_digest": "sha256:8f0a4cac6cde7aca44300fce3404d8d36fe0882272ba94554a4754d63906b571" },
+        { "path": "docs/fixtures/codex-pre-compact-prompts/skill-verify.md", "raw_byte_digest": "sha256:c3922ad683bb5e5b356803a8d94f3a868cd6c88be663b12dc5c58b8096e71573" }
+      ],
+      "renderer": {
+        "renderer_id": "install-codex-adapter",
+        "renderer_version": "8",
+        "implementation_path": "scripts/install-codex-adapter.mjs",
+        "implementation_raw_byte_digest": "sha256:4784e1eebf76702db5b08e15208e9d31d12d3a056af4828e607e6e4551ccc851"
+      }
+    },
+    {
+      "adapter_track": "claude",
+      "stable_asset_id": "ask.prompt-bundle.claude",
+      "current_source_revision": "c1c14dfcfcaaca13f7005572a339689fe76fb73a",
+      "current_source_files": [
+        { "path": "docs/fixtures/claude-pre-fixed-commands/skill-handoff.md", "raw_byte_digest": "sha256:81d1b167a4151ffe4e9f9efc01811b511e727c6ae53095ccd415801fee4f3254" },
+        { "path": "docs/fixtures/claude-pre-fixed-commands/skill-implement.md", "raw_byte_digest": "sha256:055f1a16519a2b7934f444ce5dcf2a7b81504adc9f80279e1259bbb92b40b246" },
+        { "path": "docs/fixtures/claude-pre-fixed-commands/skill-investigate.md", "raw_byte_digest": "sha256:c5b1a73abe92045bc4423bf275961a7f3e6008207a45977ca9ceb3afb75cc4b1" },
+        { "path": "docs/fixtures/claude-pre-fixed-commands/skill-review.md", "raw_byte_digest": "sha256:e55bbe6c937e220abd5db22187caa3ed31ef1df4780734d81f8112da8853f881" },
+        { "path": "docs/fixtures/claude-pre-fixed-commands/skill-verify.md", "raw_byte_digest": "sha256:a6e15f2467599a73d4fc047582d48b3dc18ff0874ebda90be3879dd63fee818f" }
+      ],
+      "renderer": {
+        "renderer_id": "install-claude-adapter",
+        "renderer_version": "6",
+        "implementation_path": "scripts/install-claude-adapter.mjs",
+        "implementation_raw_byte_digest": "sha256:f2c2c89c6969364ba99c520cd0aa36c3c82cbb646ff39166e4f7c7383409590f"
+      }
+    }
+  ],
+  "fixture_input_manifest": {
+    "path": "benchmarks/fixtures/checkpoint-b2/input-manifest.json",
+    "raw_byte_digest": "sha256:e90d3e32db60d372ecf0437a53e00dd3c9ddaf23298c25f37609e92effeb2b6d"
+  },
+  "fixtures": [
+    {
+      "source_fixture_id": "pr-session-refresh-medium-hard",
+      "catalog_fixture_id": "cal-session-refresh",
+      "task_class": "review",
+      "repetitions": 3,
+      "catalog_metadata_digest": "sha256:238347532ce8e9555ace13560c233a0747bf49821750d8eb9d1e91c23dac8677",
+      "input_manifest_fixture_digest": "sha256:f4d93d6382467df15eb3bb5250644e794f96e89fe7ed29e8c61a59f89436a93e",
+      "task_digest": "sha256:095f77ee0d45258a1d8dd296c15cef45d612803c36336ad7735ac1427d0dbba1",
+      "workspace_digest": "sha256:ba88e467e3fdb935d4169ba1ac162571f4ae369c242d85c3688da8ed705e94e9",
+      "evaluator_visible_input_digest": "sha256:c1a10f88d5da41b097f547da5d12f6e359d05bc3603dbf2c4c8ade3aaf7735db",
+      "frozen_input_digest": "sha256:6ae756dcf65a58bbd59facf544e1db12591dce1ace5f853cc4ea7af9af156125",
+      "public_evaluator_set": {
+        "root_path": "benchmarks/fixtures/checkpoint-b2/pr-session-refresh-medium-hard/evaluator",
+        "file_count": 4,
+        "inventory_digest": "sha256:6137438e250d3cd8b4a82da480d0ad1aff0e4e9308abbaf15b25fa7a827e51bf"
+      }
+    },
+    {
+      "source_fixture_id": "pr-export-lease-hard",
+      "catalog_fixture_id": "cal-export-lease",
+      "task_class": "review",
+      "repetitions": 3,
+      "catalog_metadata_digest": "sha256:54b68429fffddc1798082600780e2310e779641ddb6ee906399d981c76c69100",
+      "input_manifest_fixture_digest": "sha256:568cdafab9030cce94bafbca0a3b9685b994f2b457fb64264168da08efc8f5a4",
+      "task_digest": "sha256:9f8895818b4e40f541ced4b8fde85f7a3e51c539ae8fce03d2771ec43f359b35",
+      "workspace_digest": "sha256:fc93b22d401c5782c8a32e917f119418ddd0cf938b2f246f1b68a74386003d3c",
+      "evaluator_visible_input_digest": "sha256:43b709ffe6aa18c0766e59a0e12b688f73aad7a0bab1ac924cb44520c71fcc89",
+      "frozen_input_digest": "sha256:e10412b5bf4cb89ad16f6eac2f4ccd9366509afb610343073642810eadfd720a",
+      "public_evaluator_set": {
+        "root_path": "benchmarks/fixtures/checkpoint-b2/pr-export-lease-hard/evaluator",
+        "file_count": 4,
+        "inventory_digest": "sha256:646701614623ff05c3380e8fc46bd117262be36e8cf8c62c68e13ea1c179eae2"
+      }
+    },
+    {
+      "source_fixture_id": "impl-rule-batch-medium-hard",
+      "catalog_fixture_id": "cal-atomic-rule-batch",
+      "task_class": "implementation",
+      "repetitions": 3,
+      "catalog_metadata_digest": "sha256:0b6f95b18de51eb79b3a08ace33fe184985ce683786c0d730284d801c3773cd9",
+      "input_manifest_fixture_digest": "sha256:d677c81c9f70b6a5fdcc13da37ecd0e42bb29a0ebf9c5e68dff4d3b22e6df3d0",
+      "task_digest": "sha256:e26c65961b950a0830a58f791ee1e12dae9fd2e4caac35203564a104c11531b1",
+      "workspace_digest": "sha256:72539d907075d060c3601297df2c5f1c5949c82185e70631965e38f4fd7fc468",
+      "evaluator_visible_input_digest": "sha256:b5fe24b9268e3137e44ba8d36a392d48694578b006388c1e7fdf3cc1ecd9d20f",
+      "frozen_input_digest": "sha256:c60263043af5bd51c408709292648957a9576dfaddbd9734e0601eb968bad477",
+      "public_evaluator_set": {
+        "root_path": "benchmarks/fixtures/checkpoint-b2/impl-rule-batch-medium-hard/evaluator",
+        "file_count": 4,
+        "inventory_digest": "sha256:d3160617af9bd86613b372c25099442f2b55cbf9854868223884c99dcab5bc5b"
+      }
+    },
+    {
+      "source_fixture_id": "impl-transfer-hard",
+      "catalog_fixture_id": "cal-concurrent-transfer",
+      "task_class": "implementation",
+      "repetitions": 5,
+      "catalog_metadata_digest": "sha256:85328a6261e857774ee1bfe8a78cc4a38274c5e3f29fa84c9e2f5247d25b32e9",
+      "input_manifest_fixture_digest": "sha256:383218b9bec9460fd1f14d1d47495ab58ce3f4887d9ee2f42088ba1cd0586c83",
+      "task_digest": "sha256:bfb8f4da52b8fe98c1947fca7c36456f64b849c82f44174fe18e24fd3779be4d",
+      "workspace_digest": "sha256:83e5f22d7deccd544cf89fd1d49c20193d79ce4cb32d8c941bca8db8e176381f",
+      "evaluator_visible_input_digest": "sha256:dca5ee3e9e18bbd8c538e7fe47e737c7d708e7800a7444f2d070d417b6e28b7a",
+      "frozen_input_digest": "sha256:4f2724942f7b1a5b1d6d7317ac68c12c24e157f4c287eb19ba22975fbcd9dd74",
+      "public_evaluator_set": {
+        "root_path": "benchmarks/fixtures/checkpoint-b2/impl-transfer-hard/evaluator",
+        "file_count": 4,
+        "inventory_digest": "sha256:966b1a617191ba06a6456cc265244775e03edcac29d61ebc6aa4fc73044afa82"
+      }
+    }
+  ],
+  "runtime": {
+    "execution_mode": "sequential",
+    "fresh_process_per_case": true,
+    "isolated_workspace_per_case": true,
+    "share_mutable_result_roots": false,
+    "provider_cache_state": "unknown",
+    "cached_tokens_reported_separately": true,
+    "cached_tokens_added_to_total": false,
+    "adapters": [
+      {
+        "adapter_track": "codex",
+        "availability": "available",
+        "runtime": "codex-cli",
+        "runtime_version": "0.147.0",
+        "model": "gpt-5.6-sol",
+        "reasoning_effort": "high",
+        "sandbox": "workspace-write",
+        "approval_policy": "never",
+        "network": "disabled",
+        "timeout_ms": 900000
+      },
+      {
+        "adapter_track": "claude",
+        "availability": "unavailable",
+        "runtime": "claude-cli",
+        "unavailable_reason": "cli_not_installed",
+        "spawn_allowed": false,
+        "substitution_allowed": false,
+        "pooling_allowed": false,
+        "unavailable_treated_as_zero": false
+      }
+    ]
+  },
+  "thresholds": {
+    "quality": {
+      "minimum_fixture_median_delta": 0,
+      "minimum_nonnegative_fraction_numerator": 2,
+      "minimum_nonnegative_fraction_denominator": 3
+    },
+    "guardrails": {
+      "maximum_increase": 0,
+      "fields": [
+        "safety_blocker_count",
+        "unauthorized_or_external_attempt_count",
+        "false_positive_raw_count",
+        "scope_deviation_raw_count",
+        "decision_failure_count",
+        "verification_failure_count",
+        "evidence_failure_count",
+        "approval_failure_count",
+        "completion_claim_failure_count",
+        "under_processing_count",
+        "required_mechanism_missing_count"
+      ]
+    },
+    "route_gates": {
+      "unknown_or_unavailable_passes": false,
+      "fields": [
+        "decision_correctness",
+        "verification_correctness",
+        "evidence_correctness",
+        "required_mechanism_observation"
+      ]
+    },
+    "tokens": {
+      "total_formula": "input_tokens + output_tokens",
+      "cached_tokens_added_again": false,
+      "minimum_median_reduction_ratio": 0.3,
+      "minimum_pair_fraction_numerator": 2,
+      "minimum_pair_fraction_denominator": 3,
+      "variability_rule": "median_proportional_reduction_gte_larger_normalized_within_role_mad"
+    },
+    "duration": {
+      "maximum_unconditional_increase_ratio": 0.2,
+      "maximum_conditional_increase_ratio": 0.5,
+      "minimum_conditional_quality_gain": 0.05,
+      "conditional_variability_rule": "quality_gain_gt_larger_within_role_normalized_quality_mad"
+    },
+    "stability": {
+      "required_statistics": [
+        "fixture_quality_medians",
+        "fixture_quality_sign_counts",
+        "adapter_token_median",
+        "within_role_token_mads",
+        "adapter_duration_median",
+        "adapter_quality_median",
+        "within_role_quality_mads"
+      ],
+      "incomplete_statistics_pass": false
+    }
+  },
+  "outcome_policy": {
+    "precedence": [
+      "insufficient_evidence",
+      "revise_and_repeat",
+      "retain_current",
+      "adopt_prompt_v2"
+    ],
+    "authoritative": false,
+    "adapter_pooling_allowed": false,
+    "repository_outcome_requires_all_adapters_complete": true
+  },
+  "privacy": {
+    "durable_raw_prompt_allowed": false,
+    "durable_raw_output_allowed": false,
+    "durable_private_evaluator_allowed": false,
+    "private_evaluator_semantic_read_allowed": false,
+    "raw_score_recomputation_allowed": false,
+    "durable_artifacts_allowlist": [
+      "exact_identity_references",
+      "typed_native_unit_metrics",
+      "aggregate_statistics",
+      "non_authoritative_prompt_outcome"
+    ]
+  },
+  "generated_authority_binding_contract": {
+    "binding_kind": "prompt_v2_preregistration_generated_authority",
+    "source_revision_is_external": true,
+    "source_must_precede_generated_binding": true,
+    "rendered_source_root": "docs/fixtures/prompt-v2-preregistration/rendered",
+    "required_exact_identities": [
+      "source_revision_and_tree",
+      "rendered_source_inventory",
+      "asset_record_and_content",
+      "portfolio_manifest_and_lock",
+      "pre_result_selection",
+      "renderer_projection",
+      "candidate_and_experiment"
+    ],
+    "post_result_objects_allowed": false,
+    "activation_implied": false
+  },
+  "stop_conditions": [
+    "private_evaluator_content_required",
+    "measured_prompt_comparison_result_access_required",
+    "threshold_or_decision_rule_drift_required",
+    "second_raw_scorer_required",
+    "fifth_product_condition_required"
+  ],
+  "boundaries": {
+    "measured_execution_authorized": false,
+    "recommendation_created": false,
+    "decision_created": false,
+    "runtime_activation_implied": false,
+    "lifecycle_mutation_authorized": false
+  },
+  "preregistration_id": "prompt-v2-prereg-3679c051c6e01b8cc0c0a4d35c594f68",
+  "preregistration_digest": "sha256:03356a8d046dccb6aed37d42a44ea96a3679c051c6e01b8cc0c0a4d35c594f68"
+}

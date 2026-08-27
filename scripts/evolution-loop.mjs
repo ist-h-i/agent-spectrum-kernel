@@ -252,7 +252,21 @@ function assertResolvedAsset(reference, resolved, label) {
   }, label);
 }
 
-export function verifyEvolutionCandidate({
+function assertEvolutionCandidateLineageClosure(candidate, parent, revision) {
+  const derivation = revision.record.derivation;
+  if (derivation.kind !== "full_content_revision") {
+    throw new Error("Evolution candidate Asset must be an exact full-content revision of its parent");
+  }
+  assertAssetRefMatches(derivation.parent, candidate.parent_asset, "Evolution candidate direct parent lineage");
+  const rollbackTarget = revision.record.maintenance.rollback.target;
+  if (rollbackTarget === null) {
+    throw new Error("Evolution candidate Asset must preserve its exact direct parent as rollback target");
+  }
+  assertAssetRefMatches(rollbackTarget, candidate.rollback.parent_asset, "Evolution candidate Asset rollback target");
+  assertResolvedAsset(candidate.parent_asset, parent, "Evolution candidate direct parent");
+}
+
+function verifyEvolutionCandidateInternal({
   storeRoot,
   candidateObjectDigest,
   trustedAssetAuthorityContexts = [],
@@ -279,6 +293,7 @@ export function verifyEvolutionCandidate({
   const revision = findExact(candidate.candidate_asset, "Evolution candidate");
   assertResolvedAsset(candidate.parent_asset, parent, "Evolution parent");
   assertResolvedAsset(candidate.candidate_asset, revision, "Evolution candidate");
+  assertEvolutionCandidateLineageClosure(candidate, parent, revision);
   const verifiedLock = verifyPortfolioLock({
     storeRoot,
     lockDigest: candidate.parent_portfolio.lock_digest,
@@ -294,11 +309,68 @@ export function verifyEvolutionCandidate({
     manifest_digest: parentEntry.manifest_digest,
     asset_set_digest: parentEntry.asset_set_digest,
   }, "Evolution candidate parent Portfolio");
-  return deepFreeze({ candidate_object_digest: candidateObjectDigest, candidate: cloneJson(candidate) });
+  return deepFreeze({
+    candidate_object_digest: candidateObjectDigest,
+    candidate: cloneJson(candidate),
+    parent_asset: cloneJson(parent),
+    candidate_asset: cloneJson(revision),
+  });
+}
+
+export function verifyEvolutionCandidate(options) {
+  const verified = verifyEvolutionCandidateInternal(options);
+  return deepFreeze({
+    candidate_object_digest: verified.candidate_object_digest,
+    candidate: cloneJson(verified.candidate),
+  });
 }
 
 export function computeEvolutionExperimentDigest(value) {
   return canonicalDigest(withoutField(value, "experiment_digest"));
+}
+
+const PROMPT_V2_EXACT_MAPPING_BASIS = Object.freeze({
+  schema_version: SCHEMA_VERSION,
+  projection_mode: "prompt_v2_exact",
+  prompt_roles: Object.freeze({
+    current_prompt: Object.freeze({
+      experiment_role: "baseline",
+      raw_scoring_condition: "full_ask",
+    }),
+    prompt_v2: Object.freeze({
+      experiment_role: "challenger",
+      raw_scoring_condition: "full_ask",
+    }),
+  }),
+});
+
+function promptV2ProjectionRole(role, promptRole) {
+  return {
+    prompt_role: promptRole,
+    raw_scoring_condition: "full_ask",
+    portfolio: cloneJson(role.portfolio),
+    registry_snapshot_digest: role.registry_snapshot_digest,
+    selection_object_digest: role.selection_object_digest,
+    selection_digest: role.selection_digest,
+    selected_asset: cloneJson(role.selected_asset),
+  };
+}
+
+export function computePromptV2ExactProjectionDigests(roles) {
+  const mappingDigest = canonicalDigest(PROMPT_V2_EXACT_MAPPING_BASIS);
+  const projectionEvidence = {
+    schema_version: SCHEMA_VERSION,
+    projection_mode: "prompt_v2_exact",
+    mapping_digest: mappingDigest,
+    roles: {
+      baseline: promptV2ProjectionRole(roles.baseline, "current_prompt"),
+      challenger: promptV2ProjectionRole(roles.challenger, "prompt_v2"),
+    },
+  };
+  return deepFreeze({
+    mapping_digest: mappingDigest,
+    projection_evidence_digest: canonicalDigest(projectionEvidence),
+  });
 }
 
 function normalizeExperimentDraft(draft) {
@@ -352,7 +424,8 @@ export function validateEvolutionExperiment(experiment) {
     throw new Error("Evolution baseline/challenger role reversal rejected");
   }
   if (experiment.roles.baseline.portfolio.lock_digest === experiment.roles.challenger.portfolio.lock_digest
-    || experiment.roles.baseline.selection_object_digest === experiment.roles.challenger.selection_object_digest) {
+    || experiment.roles.baseline.selection_object_digest === experiment.roles.challenger.selection_object_digest
+    || experiment.roles.baseline.selection_digest === experiment.roles.challenger.selection_digest) {
     throw new Error("Evolution baseline and challenger must bind distinct exact selections");
   }
   if (experiment.roles.baseline.selected_asset.stable_id !== experiment.roles.challenger.selected_asset.stable_id
@@ -368,6 +441,28 @@ export function validateEvolutionExperiment(experiment) {
   if (experiment.projection.mode === "fixed_b1_exact"
     && (experiment.projection.baseline_condition !== "kernel_only" || experiment.projection.challenger_condition !== "adaptive_ask")) {
     throw new Error("fixed B1 projection must use the exact kernel_only/adaptive_ask roles");
+  }
+  if (experiment.projection.mode === "prompt_v2_exact") {
+    if (experiment.projection.baseline_condition !== "full_ask" || experiment.projection.challenger_condition !== "full_ask") {
+      throw new Error("prompt_v2_exact projection must map both Prompt roles to the existing full_ask raw-scoring condition");
+    }
+    if (experiment.roles.baseline.selected_asset.asset_type !== "prompt"
+      || experiment.roles.challenger.selected_asset.asset_type !== "prompt") {
+      throw new Error("prompt_v2_exact projection requires exact rendered Prompt Assets, not template proxies");
+    }
+    if (compareCanonical(experiment.roles.baseline.selected_asset, experiment.roles.challenger.selected_asset)) {
+      throw new Error("prompt_v2_exact projection requires distinct exact Asset identities");
+    }
+    if (experiment.roles.baseline.portfolio.manifest_digest === experiment.roles.challenger.portfolio.manifest_digest) {
+      throw new Error("prompt_v2_exact projection requires distinct exact Portfolio manifests");
+    }
+    const expectedProjection = computePromptV2ExactProjectionDigests(experiment.roles);
+    if (experiment.projection.mapping_digest !== expectedProjection.mapping_digest) {
+      throw new Error("prompt_v2_exact mapping digest drift rejected");
+    }
+    if (experiment.projection.projection_evidence_digest !== expectedProjection.projection_evidence_digest) {
+      throw new Error("prompt_v2_exact projection evidence digest drift rejected");
+    }
   }
   for (const mapping of experiment.action_mapping) {
     if (!RECOMMENDATIONS.has(mapping.recommendation) || mapping.actions.some((action) => !ACTIONS.has(action))) {
@@ -422,7 +517,7 @@ export function verifyEvolutionExperiment({
 }) {
   const experiment = readArtifact({ storeRoot, objectDigest: experimentObjectDigest, validate: validateEvolutionExperiment, label: "Evolution experiment" });
   exactTrustedAuthority(experiment.authority, trustedExperimentAuthorities, "Evolution experiment authority");
-  const candidateVerified = verifyEvolutionCandidate({
+  const candidateVerified = verifyEvolutionCandidateInternal({
     storeRoot,
     candidateObjectDigest: experiment.candidate_object_digest,
     trustedAssetAuthorityContexts,
@@ -447,6 +542,19 @@ export function verifyEvolutionExperiment({
   }
   assertAssetRefMatches(experiment.roles.baseline.selected_asset, candidate.parent_asset, "experiment baseline parent Asset");
   assertAssetRefMatches(experiment.roles.challenger.selected_asset, candidate.candidate_asset, "experiment challenger candidate Asset");
+  if (experiment.projection.mode === "prompt_v2_exact") {
+    for (const [roleName, asset] of [
+      ["baseline", candidateVerified.parent_asset],
+      ["challenger", candidateVerified.candidate_asset],
+    ]) {
+      if (asset.record.type_extension.kind !== "rendered_prompt_bundle") {
+        throw new Error(`prompt_v2_exact ${roleName} must resolve to an exact rendered Prompt bundle`);
+      }
+      if (asset.record.type_extension.adapter !== experiment.protocol.adapter.name) {
+        throw new Error(`prompt_v2_exact ${roleName} rendered Prompt adapter differs from the experiment adapter`);
+      }
+    }
+  }
   for (const role of [experiment.roles.baseline, experiment.roles.challenger]) {
     const verified = verifyPortfolioSelection({
       storeRoot,

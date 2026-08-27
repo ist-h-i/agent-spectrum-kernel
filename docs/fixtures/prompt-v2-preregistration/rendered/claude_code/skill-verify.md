@@ -1,0 +1,43 @@
+<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"verification","k":"c","r":"ask-3.0.0","p":"17633e22f76df8564dc056ad294a61bf577c6d2f8d29ee4373c7c23007c7312e","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
+---
+description: Verify behavior through the fixed-entry Agent Spectrum Kernel profile.
+---
+
+Fixed verification entry. Primary contract: `test-first-verification`; apply it with `risk-gate`.
+
+- [scope] repo/code/tests/docs/API; missing=>stop|insufficient; minimal diff; cleanup separate
+- [verification] ask.verification-proof-policy@1.0.0: compact_proof|formal_verification_contract before claim; focused->risk-based; exact; trigger=>formal.
+- [risk_approval] exact action/risk/impact/reversibility/visibility/alternative/preconditions; unapproved=>stop; approved-only.
+- [evidence] Verified|Supported|Hypothesis|Unknown|Falsified@ask.claim-evidence-status@1.0.0; inline; closed formal=>evidence-ledger; unsupported=>downgrade.
+- [missing_evidence] unavailable|insufficient; no inference; required=>stop
+- [output] managed: ordinary=>sidecar, stop/handoff=>inline, diagnostic explicit; unmanaged=>one inline; next_action only.
+
+Conditional (each missing=>`capability_missing`): `formal_claim_audit_required`=>`evidence-ledger`.
+
+[agent_activity] opt-in; report started/completed/failed.
+
+Select a proof path before implementation claims. `compact_proof` output:
+Use `docs/lifecycle-artifact-contract.md` for formal Verification Contract identity and upstream references.
+
+Proof:
+- Behavior:
+- Focused check:
+- Result or missing evidence:
+- Broader check required when:
+
+`formal_verification_contract` output:
+Verification Contract:
+- Artifact ID:
+- Artifact type: verification
+- Upstream refs:
+- Required evidence and completion condition:
+
+Never downgrade formal; preserve executed evidence on upgrade.
+
+Evidence:
+- Selected proof artifact ref:
+- command and exact result:
+
+Emit one fenced JSON `Execution Envelope` using `docs/execution-envelope-contract.md`. Never invent output.
+
+$ARGUMENTS

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-spectrum-kernel.local/benchmarks/schemas/prompt-v2-normalized-result.schema.json",
+  "title": "Prompt v2 privacy-preserving normalized result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "schema_path", "artifact_type", "program", "normalized_result_id",
+    "normalized_result_digest", "lineage", "status", "unavailable_reason", "raw_score_ref",
+    "metrics", "guardrails", "route_gates", "privacy"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "schema_path": { "const": "benchmarks/schemas/prompt-v2-normalized-result.schema.json" },
+    "artifact_type": { "const": "prompt_v2_normalized_result" },
+    "program": { "const": "ask_prompt_v2_result_blind_canary" },
+    "normalized_result_id": { "type": "string", "pattern": "^prompt-v2-normalized-[a-f0-9]{32}$" },
+    "normalized_result_digest": { "$ref": "#/$defs/digest" },
+    "lineage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["preregistration_id", "preregistration_digest", "authority_binding_digest", "plan_id", "plan_digest", "materialization_id", "materialization_digest", "run_instance_id", "case_id", "case_identity_digest", "block_id", "attempt", "adapter_track", "fixture_id", "source_fixture_id", "repetition", "prompt_role", "raw_scoring_condition", "asset_record_digest", "asset_content_digest", "portfolio_manifest_digest", "portfolio_lock_digest", "selection_digest", "candidate_digest", "experiment_digest", "prompt_projection_digest", "common_input_identity_digest", "raw_scorer_authority_digest"],
+      "properties": {
+        "preregistration_id": { "type": "string", "minLength": 1 }, "preregistration_digest": { "$ref": "#/$defs/digest" },
+        "authority_binding_digest": { "$ref": "#/$defs/digest" }, "plan_id": { "type": "string", "minLength": 1 }, "plan_digest": { "$ref": "#/$defs/digest" },
+        "materialization_id": { "type": "string", "minLength": 1 }, "materialization_digest": { "$ref": "#/$defs/digest" },
+        "run_instance_id": { "type": "string", "format": "uuid" }, "case_id": { "type": "string", "minLength": 1 }, "case_identity_digest": { "$ref": "#/$defs/digest" },
+        "block_id": { "type": "string", "minLength": 1 }, "attempt": { "const": 1 }, "adapter_track": { "enum": ["codex", "claude"] },
+        "fixture_id": { "type": "string", "minLength": 1 }, "source_fixture_id": { "type": "string", "minLength": 1 }, "repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "prompt_role": { "enum": ["current_prompt", "prompt_v2"] }, "raw_scoring_condition": { "const": "full_ask" },
+        "asset_record_digest": { "$ref": "#/$defs/digest" }, "asset_content_digest": { "$ref": "#/$defs/digest" },
+        "portfolio_manifest_digest": { "$ref": "#/$defs/digest" }, "portfolio_lock_digest": { "$ref": "#/$defs/digest" },
+        "selection_digest": { "$ref": "#/$defs/digest" }, "candidate_digest": { "$ref": "#/$defs/digest" }, "experiment_digest": { "$ref": "#/$defs/digest" },
+        "prompt_projection_digest": { "$ref": "#/$defs/digest" }, "common_input_identity_digest": { "$ref": "#/$defs/digest" },
+        "raw_scorer_authority_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "status": { "enum": ["scoring_ready", "not_scoring_ready", "unavailable"] },
+    "unavailable_reason": { "type": ["string", "null"] },
+    "raw_score_ref": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["engineering_result_id", "engineering_result_digest", "evaluation_id", "evaluation_digest", "result_set_id", "result_set_digest", "adapter_track", "condition"],
+          "properties": {
+            "engineering_result_id": { "type": "string", "minLength": 1 }, "engineering_result_digest": { "$ref": "#/$defs/digest" },
+            "evaluation_id": { "type": "string", "minLength": 1 }, "evaluation_digest": { "$ref": "#/$defs/digest" },
+            "result_set_id": { "type": "string", "minLength": 1 }, "result_set_digest": { "$ref": "#/$defs/digest" },
+            "adapter_track": { "enum": ["codex", "claude"] }, "condition": { "const": "full_ask" }
+          }
+        }
+      ]
+    },
+    "metrics": {
+      "type": "object", "additionalProperties": false,
+      "required": ["normalized_requirement_score", "input_tokens", "output_tokens", "cached_tokens", "duration_ms"],
+      "properties": {
+        "normalized_requirement_score": { "$ref": "#/$defs/typedMetric" }, "input_tokens": { "$ref": "#/$defs/typedMetric" },
+        "output_tokens": { "$ref": "#/$defs/typedMetric" }, "cached_tokens": { "$ref": "#/$defs/typedMetric" }, "duration_ms": { "$ref": "#/$defs/typedMetric" }
+      }
+    },
+    "guardrails": {
+      "type": "object", "additionalProperties": false,
+      "required": ["safety_blocker_count", "unauthorized_or_external_attempt_count", "false_positive_raw_count", "scope_deviation_raw_count", "decision_failure_count", "verification_failure_count", "evidence_failure_count", "approval_failure_count", "completion_claim_failure_count", "under_processing_count", "required_mechanism_missing_count"],
+      "properties": {
+        "safety_blocker_count": { "$ref": "#/$defs/typedMetric" }, "unauthorized_or_external_attempt_count": { "$ref": "#/$defs/typedMetric" },
+        "false_positive_raw_count": { "$ref": "#/$defs/typedMetric" }, "scope_deviation_raw_count": { "$ref": "#/$defs/typedMetric" },
+        "decision_failure_count": { "$ref": "#/$defs/typedMetric" }, "verification_failure_count": { "$ref": "#/$defs/typedMetric" },
+        "evidence_failure_count": { "$ref": "#/$defs/typedMetric" }, "approval_failure_count": { "$ref": "#/$defs/typedMetric" },
+        "completion_claim_failure_count": { "$ref": "#/$defs/typedMetric" }, "under_processing_count": { "$ref": "#/$defs/typedMetric" },
+        "required_mechanism_missing_count": { "$ref": "#/$defs/typedMetric" }
+      }
+    },
+    "route_gates": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decision_correctness", "verification_correctness", "evidence_correctness", "required_mechanism_observation"],
+      "properties": {
+        "decision_correctness": { "$ref": "#/$defs/gate" }, "verification_correctness": { "$ref": "#/$defs/gate" },
+        "evidence_correctness": { "$ref": "#/$defs/gate" }, "required_mechanism_observation": { "$ref": "#/$defs/gate" }
+      }
+    },
+    "privacy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["prompt_bytes_serialized", "model_output_bytes_serialized", "private_evaluator_bytes_serialized", "score_recomputation_performed"],
+      "properties": {
+        "prompt_bytes_serialized": { "const": false }, "model_output_bytes_serialized": { "const": false },
+        "private_evaluator_bytes_serialized": { "const": false }, "score_recomputation_performed": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "typedMetric": {
+      "type": "object", "additionalProperties": false, "required": ["status", "value"],
+      "properties": {
+        "status": { "enum": ["known", "unknown", "unavailable", "not_applicable"] },
+        "value": { "type": ["number", "null"] }
+      }
+    },
+    "gate": { "enum": ["pass", "fail", "unknown", "unavailable", "not_applicable"] }
+  }
+}

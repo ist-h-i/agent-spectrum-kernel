@@ -65,6 +65,34 @@
         {
           "type": "object",
           "additionalProperties": false,
+          "required": ["kind", "adapter", "entrypoints", "renderer", "runtime_application_implied"],
+          "properties": {
+            "kind": { "type": "string", "const": "rendered_prompt_bundle" },
+            "adapter": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+            "entrypoints": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/portablePath" }
+            },
+            "renderer": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "version", "input_digest", "projection_digest"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+                "version": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$" },
+                "input_digest": { "$ref": "#/$defs/digest" },
+                "projection_digest": { "$ref": "#/$defs/digest" }
+              }
+            },
+            "runtime_application_implied": { "type": "boolean", "const": false }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
           "required": ["kind", "fixture_id", "entrypoint", "private_evaluator_content_included"],
           "properties": {
             "kind": { "type": "string", "const": "public_evaluator_reference" },

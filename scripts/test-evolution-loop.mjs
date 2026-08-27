@@ -7,6 +7,7 @@ import {
   buildEvolutionCandidate,
   buildEvolutionExperiment,
   buildEvolutionHumanDecision,
+  computePromptV2ExactProjectionDigests,
   deriveEvolutionActionProposal,
   deriveEvolutionRecommendation,
   validateEvolutionCandidate,
@@ -142,8 +143,8 @@ function experimentDraft(candidate) {
     candidate_digest: candidate.candidate_digest,
     candidate_object_digest: D[0],
     roles: {
-      baseline: role("baseline", D[1], D[2], D[7], D[5], D[6], parentAsset),
-      challenger: role("challenger", D[3], D[4], D[8], D[9], D.a, candidateAsset),
+      baseline: role("baseline", D[1], D[2], D[7], D[5], D[6], candidate.parent_asset),
+      challenger: role("challenger", D[3], D[4], D[8], D[9], D.a, candidate.candidate_asset),
     },
     projection: {
       mode: "fixed_b1_exact",
@@ -302,6 +303,109 @@ closes("experiment rejects baseline/challenger reversal and Prompt mapping drift
   const promptDrift = experimentDraft(candidate);
   promptDrift.prompt_outcome_mapping.find(({ prompt_outcome: value }) => value === "adopt_prompt_v2").action = "retain_current";
   assert.throws(() => buildEvolutionExperiment(promptDrift), /Prompt v2 outcome mapping drift/iu);
+});
+
+const promptV2CandidateDraft = candidateDraft();
+for (const reference of [
+  promptV2CandidateDraft.parent_asset,
+  promptV2CandidateDraft.candidate_asset,
+  promptV2CandidateDraft.rollback.parent_asset,
+]) {
+  reference.asset_type = "prompt";
+  reference.stable_id = "ask.prompt-bundle.codex.fixed-entry";
+}
+const promptV2Candidate = buildEvolutionCandidate(promptV2CandidateDraft);
+function promptV2ExperimentDraft() {
+  const draft = experimentDraft(promptV2Candidate);
+  draft.projection.mode = "prompt_v2_exact";
+  draft.projection.baseline_condition = "full_ask";
+  draft.projection.challenger_condition = "full_ask";
+  Object.assign(draft.projection, computePromptV2ExactProjectionDigests(draft.roles));
+  return draft;
+}
+
+const promptV2Draft = promptV2ExperimentDraft();
+const expectedPromptV2MappingDigest = canonicalDigest({
+  schema_version: "1.0.0",
+  projection_mode: "prompt_v2_exact",
+  prompt_roles: {
+    current_prompt: {
+      experiment_role: "baseline",
+      raw_scoring_condition: "full_ask",
+    },
+    prompt_v2: {
+      experiment_role: "challenger",
+      raw_scoring_condition: "full_ask",
+    },
+  },
+});
+const expectedPromptV2ProjectionDigest = canonicalDigest({
+  schema_version: "1.0.0",
+  projection_mode: "prompt_v2_exact",
+  mapping_digest: expectedPromptV2MappingDigest,
+  roles: {
+    baseline: {
+      prompt_role: "current_prompt",
+      raw_scoring_condition: "full_ask",
+      portfolio: structuredClone(promptV2Draft.roles.baseline.portfolio),
+      registry_snapshot_digest: promptV2Draft.roles.baseline.registry_snapshot_digest,
+      selection_object_digest: promptV2Draft.roles.baseline.selection_object_digest,
+      selection_digest: promptV2Draft.roles.baseline.selection_digest,
+      selected_asset: structuredClone(promptV2Draft.roles.baseline.selected_asset),
+    },
+    challenger: {
+      prompt_role: "prompt_v2",
+      raw_scoring_condition: "full_ask",
+      portfolio: structuredClone(promptV2Draft.roles.challenger.portfolio),
+      registry_snapshot_digest: promptV2Draft.roles.challenger.registry_snapshot_digest,
+      selection_object_digest: promptV2Draft.roles.challenger.selection_object_digest,
+      selection_digest: promptV2Draft.roles.challenger.selection_digest,
+      selected_asset: structuredClone(promptV2Draft.roles.challenger.selected_asset),
+    },
+  },
+});
+const promptV2Experiment = buildEvolutionExperiment(promptV2Draft);
+closes("prompt_v2_exact maps both distinct Prompt roles to full_ask with exact projection identity", () => {
+  assert.equal(promptV2Experiment.projection.baseline_condition, "full_ask");
+  assert.equal(promptV2Experiment.projection.challenger_condition, "full_ask");
+  assert.equal(promptV2Experiment.projection.mapping_digest, expectedPromptV2MappingDigest);
+  assert.equal(promptV2Experiment.projection.projection_evidence_digest, expectedPromptV2ProjectionDigest);
+  assert.notDeepEqual(promptV2Experiment.roles.baseline.selected_asset, promptV2Experiment.roles.challenger.selected_asset);
+  assert.notEqual(promptV2Experiment.roles.baseline.selection_digest, promptV2Experiment.roles.challenger.selection_digest);
+});
+
+closes("prompt_v2_exact rejects product-condition aliases and mapping or projection drift", () => {
+  for (const mutate of [
+    (draft) => { draft.projection.baseline_condition = "kernel_only"; },
+    (draft) => { draft.projection.challenger_condition = "adaptive_ask"; },
+    (draft) => { draft.projection.mapping_digest = D[0]; },
+    (draft) => { draft.projection.projection_evidence_digest = D[1]; },
+  ]) {
+    const drifted = promptV2ExperimentDraft();
+    mutate(drifted);
+    assert.throws(
+      () => buildEvolutionExperiment(drifted),
+      /prompt_v2_exact|full_ask|mapping.*digest|projection.*digest/iu,
+    );
+  }
+});
+
+closes("prompt_v2_exact preserves distinct exact Asset and selection identities", () => {
+  const sameAsset = promptV2ExperimentDraft();
+  sameAsset.roles.challenger.selected_asset = structuredClone(sameAsset.roles.baseline.selected_asset);
+  Object.assign(sameAsset.projection, computePromptV2ExactProjectionDigests(sameAsset.roles));
+  assert.throws(() => buildEvolutionExperiment(sameAsset), /distinct.*Asset|Asset.*distinct/iu);
+
+  const sameSelection = promptV2ExperimentDraft();
+  sameSelection.roles.challenger.selection_digest = sameSelection.roles.baseline.selection_digest;
+  Object.assign(sameSelection.projection, computePromptV2ExactProjectionDigests(sameSelection.roles));
+  assert.throws(() => buildEvolutionExperiment(sameSelection), /distinct.*selection|selection.*distinct/iu);
+
+  const templateProxy = promptV2ExperimentDraft();
+  templateProxy.roles.baseline.selected_asset.asset_type = "prompt_template";
+  templateProxy.roles.challenger.selected_asset.asset_type = "prompt_template";
+  Object.assign(templateProxy.projection, computePromptV2ExactProjectionDigests(templateProxy.roles));
+  assert.throws(() => buildEvolutionExperiment(templateProxy), /Prompt Asset|rendered Prompt|asset_type/iu);
 });
 
 closes("experiment rejects missing-evidence action remapping", () => {
