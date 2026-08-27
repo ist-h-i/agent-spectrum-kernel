@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { canonicalPathSetDigest } from "./installer-lifecycle.mjs";
+import { canonicalPathSetDigest, canonicalValueDigest } from "./installer-lifecycle.mjs";
 import { buildCodexProjectionPlan } from "./install-codex-adapter.mjs";
 import {
   CODEX_COMPACT_PROFILE_DEFINITIONS,
@@ -87,6 +87,20 @@ if (!review.renderer_inputs.canonical.some((input) => input.path === "docs/revie
   throw new Error("review compact profile must bind the shared finding contract and schema");
 }
 if (!implementation.renderer_inputs.adapter_owned.some((input) => input.path === "scripts/codex-runtime-profile.mjs")) throw new Error("projection provenance must bind the Codex compact-profile renderer");
+const sharedRendererInput = implementation.renderer_inputs.adapter_owned.find((input) => input.path === "scripts/fixed-entry-profile.mjs");
+if (!sharedRendererInput) throw new Error("projection provenance must bind the shared fixed-entry renderer");
+const alteredRendererInputs = structuredClone(implementation.renderer_inputs);
+alteredRendererInputs.adapter_owned.find((input) => input.path === "scripts/fixed-entry-profile.mjs").digest = `sha256:${"0".repeat(64)}`;
+const alteredRendererFingerprint = canonicalValueDigest({
+  canonical_source_digest: implementation.canonical_source_digest,
+  renderer_id: implementation.renderer_id,
+  renderer_version: implementation.renderer_version,
+  renderer_profile: implementation.renderer_profile,
+  plan_shaping_options: implementation.plan_shaping_options,
+  renderer_inputs_digest: canonicalValueDigest(alteredRendererInputs),
+  managed_inventory_digest: implementation.managed_inventory_digest,
+});
+if (alteredRendererFingerprint === implementation.fingerprint) throw new Error("shared fixed-entry renderer changes must alter the Codex projection fingerprint");
 if (!implementation.renderer_inputs.canonical.some((input) => input.path === "schemas/compact-profile-control-map.json")) throw new Error("projection provenance must bind the canonical compact control map");
 if (!implementation.renderer_inputs.canonical.some((input) => input.path === "schemas/claim-evidence-status.schema.json")) throw new Error("projection provenance must bind the canonical claim evidence status contract");
 if (!implementation.skills.includes("evidence-ledger")) throw new Error("formal Evidence Ledger capability must remain installed even though ordinary output does not activate it");

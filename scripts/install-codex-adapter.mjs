@@ -841,6 +841,7 @@ function codexRendererInputsForSelection({ prompts, commands, skills, requiredAs
   const adapterOwned = [
     { path: "scripts/install-codex-adapter.mjs", role: "renderer" },
     { path: "scripts/codex-runtime-profile.mjs", role: "renderer" },
+    ...(prompts.length > 0 ? [{ path: "scripts/fixed-entry-profile.mjs", role: "renderer" }] : []),
     { path: "scripts/installer-lifecycle.mjs", role: "runtime_source" },
     { path: "scripts/adapter-runtime-inventory.mjs", role: "inventory" },
     ...prompts.map((prompt) => ({ path: `adapters/codex/prompts/${prompt}`, role: "prompt_template" })),

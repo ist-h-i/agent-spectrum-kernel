@@ -50,11 +50,11 @@
         "adapters/codex/commands/codex-exec.md",
         "scripts/install-codex-adapter.mjs"
       ],
-      "subject_digest": "sha256:24d79afd3c8d0b4ef88ea859cca7d28a383c23090d1715db28d3c5fe448e97f7",
+      "subject_digest": "sha256:261a9d31525371304cd14e9b853b4202dc9eb144cc539489573fff35b72c407f",
       "scope": "profile_projection",
       "profile_id": "codex-local-projection-v1",
       "renderer_profile": "implementation",
-      "profile_fingerprint": "sha256:42b1eff6724926b31133b3cd35353ce2490b79275362293ab46356e48c403881"
+      "profile_fingerprint": "sha256:8a55dd18ac996a8923616297a76d630ff9306cbdb347a19f56001d4bcf3e3a27"
     },
     {
       "record_id": "claude-canonical-metrics-collector",
