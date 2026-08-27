@@ -79,7 +79,7 @@ For #229, the repository additionally verifies deterministic projection selectio
 For #231, `scripts/test-verification-proof-policy.mjs` verifies the closed two-path
 selection policy, Compact Proof result binding, protected-claim rejection,
 monotonic compact-to-formal upgrade, exact legacy-formal fixture bytes, and the
-bounded 97-byte versus 287-byte artifact-shape proxy, plus the separate 1944-byte
+bounded 97-byte versus 287-byte artifact-shape proxy, plus the separate 2043-byte
 generated Codex verification prompt versus its immutable 2291-byte pre-compact
 fixture. Adapter conformance verifies the same selected path across current Claude
 and Codex projections. These static and local checks do not establish that an
