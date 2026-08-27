@@ -33,7 +33,7 @@ const SCENARIO_REQUIREMENTS = Object.freeze({
   lightweight_no_heavy_routing_or_agents: { taskClass: "implementation", contracts: ["controlled-implementation"], gates: [] },
   direct_verification_entry: { taskClass: "verification", contracts: ["test-first-verification"], gates: [] },
   triggered_secondary_contract: { taskClass: "implementation", contracts: ["controlled-implementation", "repository-orientation"], gates: [] },
-  missing_triggered_capability: { taskClass: "implementation", contracts: ["controlled-implementation", "repository-orientation"], gates: [] },
+  missing_triggered_capability: { taskClass: "implementation", contracts: ["controlled-implementation", "repository-orientation", "evidence-ledger"], gates: [] },
 });
 const STOP_STATUSES = new Set(["none", "risk_gate", "insufficient_evidence", "capability_missing"]);
 

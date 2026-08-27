@@ -49,7 +49,7 @@ for (const profile of summary.profiles) {
   if (artifact.content.includes("{{ASK_COMPACT_")) throw new Error(`${profile.prompt_name} retained an unresolved generated-content placeholder`);
   for (const controlId of requiredControls) if (!artifact.content.includes(`[${controlId}]`)) throw new Error(`${profile.prompt_name} rendered output is missing ${controlId}`);
   if (!artifact.content.includes(expectedOutputControl)) throw new Error(`${profile.prompt_name} does not preserve the runner-owned emission policy`);
-  for (const triggerId of route.direct_trigger_ids.filter((id) => id !== formalLedgerDirectTriggerId)) if (!artifact.content.includes(`\`${triggerId}\``)) throw new Error(`${profile.prompt_name} rendered output is missing direct trigger ${triggerId}`);
+  for (const triggerId of route.direct_trigger_ids) if (!artifact.content.includes(`\`${triggerId}\``)) throw new Error(`${profile.prompt_name} rendered output is missing direct trigger ${triggerId}`);
   if (!profile.direct_trigger_ids.includes(formalLedgerDirectTriggerId)) throw new Error(`${profile.prompt_name} must expose the closed formal-ledger direct trigger`);
   if (!artifact.content.includes(claimEvidenceContractRef) || !artifact.content.includes("; inline; closed formal=>evidence-ledger")) throw new Error(`${profile.prompt_name} must render the shared inline-default and closed formal-audit claim evidence contract revision`);
   const source = readFileSync(resolve(root, "adapters", "codex", "prompts", profile.prompt_name), "utf8");

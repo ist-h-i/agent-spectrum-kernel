@@ -173,9 +173,8 @@ export function renderFixedEntryControls(controlMap = validateFixedEntryControlM
 }
 
 export function renderFixedEntryDirectTriggers(triggers) {
-  const routed = triggers.filter((trigger) => trigger.id !== FORMAL_EVIDENCE_LEDGER_DIRECT_TRIGGER_ID);
-  if (routed.length === 0) return "";
-  return `Conditional (each missing=>\`capability_missing\`): ${routed.map((trigger) => `\`${trigger.id}\`=>\`${trigger.contract}\``).join("; ")}.`;
+  if (triggers.length === 0) return "";
+  return `Conditional (each missing=>\`capability_missing\`): ${triggers.map((trigger) => `\`${trigger.id}\`=>\`${trigger.contract}\``).join("; ")}.`;
 }
 
 export function validateFixedEntryTemplate(entryName, body, { validateAdapterTemplate = null } = {}) {

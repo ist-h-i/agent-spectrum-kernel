@@ -106,10 +106,10 @@
     {
       "scenario_id": "missing_triggered_capability",
       "task_class": "implementation",
-      "required_contracts": ["controlled-implementation", "repository-orientation"],
+      "required_contracts": ["controlled-implementation", "repository-orientation", "evidence-ledger"],
       "required_gates": [],
-      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": [], "direct_trigger_ids": ["unfamiliar_repository"], "unavailable_contracts": ["repository-orientation"], "verification_proof": { "applies": false, "compact_eligibility_fact_ids": [], "formal_trigger_ids": [] } },
-      "expected": { "approval_required": false, "stop_status": "capability_missing", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "verification_proof_path": null, "review_final_gate": false, "handoff_executable": false, "capability_downgrades": ["repository-orientation"], "claim_evidence_mode": "inline" },
+      "input": { "risk_action": false, "missing_evidence": [], "knowledge_promotion_requested": false, "agent_activity_required": false, "verification_required": false, "review_final_gate_required": false, "handoff_required": false, "formal_evidence_trigger_ids": ["high_stakes_readiness"], "direct_trigger_ids": ["unfamiliar_repository", "formal_claim_audit_required"], "unavailable_contracts": ["repository-orientation", "evidence-ledger"], "verification_proof": { "applies": false, "compact_eligibility_fact_ids": [], "formal_trigger_ids": [] } },
+      "expected": { "approval_required": false, "stop_status": "capability_missing", "missing_evidence": [], "knowledge_promotion": false, "agent_activity": { "started": 0, "completed": 0, "failed": 0 }, "verification_obligation": false, "verification_proof_path": null, "review_final_gate": false, "handoff_executable": false, "capability_downgrades": ["evidence-ledger", "repository-orientation"], "claim_evidence_mode": "formal_ledger" },
       "projections": { "claude_code": { "profile": "implementation", "entry": "skill-implement.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] }, "codex": { "profile": "implementation", "entry": "skill-implement.md", "verification_proof_policy_ref": "ask.verification-proof-policy@1.0.0", "verification_proof_paths": ["compact_proof", "formal_verification_contract"] } }
     }
   ],
@@ -252,6 +252,20 @@
       "scenario_id": "missing_triggered_capability",
       "adapter_id": "claude_code",
       "remove": ["missing=>`capability_missing`"],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "claude_remove_formal_capability_trigger",
+      "scenario_id": "missing_triggered_capability",
+      "adapter_id": "claude_code",
+      "remove": ["`formal_claim_audit_required`=>`evidence-ledger`"],
+      "expected_status": "fail"
+    },
+    {
+      "mutation_id": "codex_remove_formal_capability_trigger",
+      "scenario_id": "missing_triggered_capability",
+      "adapter_id": "codex",
+      "remove": ["`formal_claim_audit_required`=>`evidence-ledger`"],
       "expected_status": "fail"
     }
   ]

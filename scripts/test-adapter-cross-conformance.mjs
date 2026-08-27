@@ -48,7 +48,7 @@ assert.equal(report.status, "pass_projected");
 assert.equal(report.evidence_level, "projected");
 assert.equal(report.scenarios.length, 12);
 assert.deepEqual(new Set(report.adapters), new Set(["claude_code", "codex"]));
-const formalScenarioIds = new Set(["pr_review_selective_gates", "destructive_external_action", "explicit_knowledge_promotion"]);
+const formalScenarioIds = new Set(["pr_review_selective_gates", "destructive_external_action", "explicit_knowledge_promotion", "missing_triggered_capability"]);
 for (const scenario of report.scenarios) {
   assert.equal(scenario.results.length, 2);
   assert.ok(scenario.results.every((result) => result.status === "pass_projected"));
@@ -94,7 +94,7 @@ const secondaryScenario = report.scenarios.find((scenario) => scenario.scenario_
 assert.ok(secondaryScenario.results.every((result) => result.normalized_contract.selected_contracts.includes("repository-orientation")));
 const missingCapabilityScenario = report.scenarios.find((scenario) => scenario.scenario_id === "missing_triggered_capability");
 assert.ok(missingCapabilityScenario.results.every((result) => result.normalized_contract.stop_status === "capability_missing"));
-assert.ok(missingCapabilityScenario.results.every((result) => JSON.stringify(result.normalized_contract.capability_downgrades) === JSON.stringify(["repository-orientation"])));
+assert.ok(missingCapabilityScenario.results.every((result) => JSON.stringify(result.normalized_contract.capability_downgrades) === JSON.stringify(["evidence-ledger", "repository-orientation"])));
 function runFixture(value, extraArgs = []) {
   return spawnSync(process.execPath, [conformanceScript, "--fixture", "-", "--json", ...extraArgs], {
     cwd: root,
@@ -121,6 +121,8 @@ const fixedEntryMutationMismatch = new Map([
   ["codex_remove_asset_binding_digest", "canonical_asset_binding"],
   ["claude_remove_direct_secondary_trigger", "direct_trigger_missing:unfamiliar_repository"],
   ["claude_remove_capability_missing_behavior", "missing_capability_must_fail_closed"],
+  ["claude_remove_formal_capability_trigger", "direct_trigger_missing:formal_claim_audit_required"],
+  ["codex_remove_formal_capability_trigger", "direct_trigger_missing:formal_claim_audit_required"],
 ]);
 const reviewMutationMismatch = new Map([
   ["claude_remove_review_baseline", "baseline_semantic_review_required"],

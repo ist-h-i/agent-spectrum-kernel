@@ -21,11 +21,11 @@ Claude Code and Codex pass the same twelve fixtures at the `projected` evidence 
 | Lightweight task | pass_projected | pass_projected | inline | No agent activity required; heavy routing is not part of the normalized requirement. |
 | Direct verification entry | pass_projected | pass_projected | inline | Fixed verification entry selects `test-first-verification` without upper routers. |
 | Triggered secondary contract | pass_projected | pass_projected | inline | `unfamiliar_repository` selects `repository-orientation` from the shared trigger registry. |
-| Missing triggered capability | pass_projected | pass_projected | inline | Unavailable `repository-orientation` stops as `capability_missing` and records a downgrade. |
+| Missing triggered capability | pass_projected | pass_projected | formal_ledger | Unavailable `repository-orientation` and formal-audit `evidence-ledger` capabilities both stop as `capability_missing` and record explicit downgrades. |
 
 Command: `node scripts/test-adapter-cross-conformance.mjs`
 
-The same command also runs fail-closed cases for empty Adapter sets, substituted scenario IDs, missing expected values, schema-reference or exact Asset-binding drift, missing contract minimums, unconditional formal-ledger activation, missing direct-trigger/fail-closed behavior, and mutations that remove claim-contract, approval/stop, verification, review, handoff, or knowledge-promotion controls.
+The same command also runs fail-closed cases for empty Adapter sets, substituted scenario IDs, missing expected values, schema-reference or exact Asset-binding drift, missing contract minimums, unconditional formal-ledger activation, missing direct-trigger/fail-closed behavior (including the formal-audit trigger in both Adapters), and mutations that remove claim-contract, approval/stop, verification, review, handoff, or knowledge-promotion controls.
 
 ## Cost and over-processing
 

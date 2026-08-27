@@ -57,8 +57,26 @@ for (const entryName of entryNames) {
   const artifact = claude.compactProfileArtifacts.find((candidate) => candidate.metadata.prompt_name === entryName);
   if (!artifact || artifact.content.includes("{{ASK_COMPACT_")) throw new Error(`${entryName} generated command bytes are unavailable`);
   for (const controlId of controlIds) if (!artifact.content.includes(`[${controlId}]`)) throw new Error(`${entryName} is missing generated ${controlId} control`);
-  for (const triggerId of artifact.metadata.direct_trigger_ids.filter((id) => id !== "formal_claim_audit_required")) {
+  for (const triggerId of artifact.metadata.direct_trigger_ids) {
     if (!artifact.content.includes(`\`${triggerId}\``) || !artifact.content.includes("missing=>`capability_missing`")) throw new Error(`${entryName} must fail closed for missing triggered capabilities`);
+  }
+}
+
+const boundedSkills = ["controlled-implementation", "test-first-verification", "risk-gate", "handoff-generation"];
+for (const [adapter, plan] of [
+  ["Claude", buildClaudeProjectionPlan({ profileName: "implementation", skills: boundedSkills })],
+  ["Codex", buildCodexProjectionPlan({ profileName: "implementation", skills: boundedSkills })],
+]) {
+  const formalTrigger = plan.routingFixtures.find((fixture) => fixture.id === "formal_claim_audit_required");
+  const selectedRoute = formalTrigger?.selectedRoute ?? formalTrigger?.selected_route;
+  const selectedSkills = plan.selectedSkills ?? plan.skills;
+  if (formalTrigger?.outcome !== "capability_missing" || selectedRoute !== "evidence-ledger" || selectedSkills.includes("evidence-ledger")) {
+    throw new Error(`${adapter} custom selection must record a missing formal Evidence Ledger capability`);
+  }
+  for (const artifact of plan.compactProfileArtifacts) {
+    if (!artifact.content.includes("`formal_claim_audit_required`=>`evidence-ledger`") || !artifact.content.includes("missing=>`capability_missing`")) {
+      throw new Error(`${adapter} custom selection must render the formal Evidence Ledger capability_missing stop`);
+    }
   }
 }
 

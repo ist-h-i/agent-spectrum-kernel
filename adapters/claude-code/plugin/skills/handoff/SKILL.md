@@ -15,7 +15,7 @@ Entry mode is fixed to handoff. Primary contract: `handoff-generation`. Apply it
 - [missing_evidence] unavailable|insufficient; no inference; required=>stop
 - [output] managed: ordinary=>sidecar, stop/handoff=>inline, diagnostic explicit; unmanaged=>one inline; next_action only.
 
-
+Conditional (each missing=>`capability_missing`): `formal_claim_audit_required`=>`evidence-ledger`.
 
 [agent_activity] opt-in; report started, completed, and failed counts.
 

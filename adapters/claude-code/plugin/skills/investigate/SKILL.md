@@ -15,7 +15,7 @@ Entry mode is fixed to investigation. Primary contract: `doubt-driven-developmen
 - [missing_evidence] unavailable|insufficient; no inference; required=>stop
 - [output] managed: ordinary=>sidecar, stop/handoff=>inline, diagnostic explicit; unmanaged=>one inline; next_action only.
 
-Conditional (each missing=>`capability_missing`): `unfamiliar_repository`=>`repository-orientation`; `unclear_scope`=>`scope-control`; `boundary_decision`=>`application-boundary-architecture`.
+Conditional (each missing=>`capability_missing`): `unfamiliar_repository`=>`repository-orientation`; `unclear_scope`=>`scope-control`; `boundary_decision`=>`application-boundary-architecture`; `formal_claim_audit_required`=>`evidence-ledger`.
 
 [agent_activity] opt-in; report started, completed, and failed counts.
 
