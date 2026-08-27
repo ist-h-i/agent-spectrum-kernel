@@ -213,6 +213,13 @@ function main() {
       storeRoot: resolve(canonicalFixtureRoot, "store"),
       digest: adapter.evolution.experiment_object_digest,
     }).value;
+    for (const manifestDigest of [adapter.baseline_portfolio.manifest_digest, adapter.challenger_portfolio.manifest_digest]) {
+      const manifest = readContentAddressedJson({
+        storeRoot: resolve(canonicalFixtureRoot, "store"),
+        digest: manifestDigest,
+      }).value;
+      assert.deepEqual(manifest.benchmark_compatibility.map(({ condition_id: conditionId }) => conditionId), ["full_ask"]);
+    }
     assert.equal(experiment.object_kind, "evolution_experiment");
     assert.equal(experiment.phase, "pre_result");
     assert.equal(experiment.results_accessed, false);

@@ -243,19 +243,6 @@ function known(value) {
   return { status: "known", value };
 }
 
-function scoreReference(caseRecord) {
-  return {
-    engineering_result_id: `engineering-result-${canonicalDigest({ case_id: caseRecord.case_id }).slice(-32)}`,
-    engineering_result_digest: digest(`${caseRecord.case_id}:engineering-result`),
-    evaluation_id: `evaluation-${canonicalDigest({ case_id: caseRecord.case_id, evaluation: true }).slice(-32)}`,
-    evaluation_digest: digest(`${caseRecord.case_id}:evaluation`),
-    result_set_id: `engineering-result-set-${canonicalDigest({ adapter: caseRecord.adapter_track }).slice(-32)}`,
-    result_set_digest: digest(`${caseRecord.adapter_track}:result-set`),
-    adapter_track: caseRecord.adapter_track,
-    condition: "full_ask",
-  };
-}
-
 const GUARDRAIL_FIELDS = [
   "safety_blocker_count",
   "unauthorized_or_external_attempt_count",
@@ -270,8 +257,97 @@ const GUARDRAIL_FIELDS = [
   "required_mechanism_missing_count",
 ];
 
-function scoringReadyResult(caseRecord) {
+const verifiedRawScoreAuthorities = new Map();
+const verifiedRawScoreAuthorityByCase = new Map();
+
+function scoreProjection(metrics, guardrails, routeGates) {
+  return {
+    metrics: structuredClone(metrics),
+    guardrails: structuredClone(guardrails),
+    route_gates: structuredClone(routeGates),
+  };
+}
+
+function scoreReference(caseRecord, projection) {
+  const sourcePlanDigest = canonicalDigest({
+    adapter_track: caseRecord.adapter_track,
+    condition: preregistration.raw_scoring.condition,
+    source_plan: true,
+  });
+  const sourceCaseHex = canonicalDigest({
+    prompt_case_id: caseRecord.case_id,
+    score_projection_digest: canonicalDigest(projection),
+  }).slice("sha256:".length);
+  const variant = canonicalDigest({ case_id: caseRecord.case_id, score_projection: projection });
+  return {
+    engineering_result_id: `engineering-result-${variant.slice(-32)}`,
+    engineering_result_digest: canonicalDigest({ kind: "engineering_result", case_id: caseRecord.case_id, score_projection: projection }),
+    evaluation_id: `evaluation-${canonicalDigest({ kind: "evaluation", case_id: caseRecord.case_id, score_projection: projection }).slice(-32)}`,
+    evaluation_digest: canonicalDigest({ kind: "evaluation_record", case_id: caseRecord.case_id, score_projection: projection }),
+    result_set_id: `engineering-result-set-${canonicalDigest({ adapter: caseRecord.adapter_track }).slice(-32)}`,
+    result_set_digest: digest(`${caseRecord.adapter_track}:result-set`),
+    adapter_track: caseRecord.adapter_track,
+    condition: preregistration.raw_scoring.condition,
+    source_run_instance_id: "00000000-0000-4000-8000-000000000197",
+    source_plan_id: `plan-${sourcePlanDigest.slice("sha256:".length)}`,
+    source_plan_digest: sourcePlanDigest,
+    source_case_id: `case-${sourceCaseHex.slice(0, 16)}-${sourceCaseHex.slice(16, 32)}`,
+    source_fixture_id: caseRecord.source_fixture_id,
+    source_repetition: caseRecord.repetition,
+  };
+}
+
+function registerRawScoreAuthority(caseRecord, authority, projection) {
+  const record = {
+    authority: structuredClone(authority),
+    prompt_case_id: caseRecord.case_id,
+    score_projection: structuredClone(projection),
+  };
+  const existing = verifiedRawScoreAuthorities.get(authority.engineering_result_id);
+  if (existing) assert.deepEqual(existing, record);
+  else verifiedRawScoreAuthorities.set(authority.engineering_result_id, record);
+  verifiedRawScoreAuthorityByCase.set(caseRecord.case_id, structuredClone(authority));
+}
+
+function rawScoreAuthorityResolver(authority) {
+  const record = verifiedRawScoreAuthorities.get(authority.engineering_result_id);
+  if (!record) throw new Error("synthetic verified #197 raw-score authority is missing");
+  assert.deepEqual(authority, record.authority);
+  return structuredClone(record);
+}
+
+function permissiveRawScoreAuthorityResolver(authority, context) {
+  return {
+    authority: structuredClone(authority),
+    prompt_case_id: context.case_id,
+    score_projection: structuredClone(context.score_projection),
+  };
+}
+
+function scoringReadyResult(caseRecord, {
+  rawScoreRef = null,
+  metricOverrides = {},
+  resolver = rawScoreAuthorityResolver,
+} = {}) {
   const candidate = caseRecord.prompt_role === "prompt_v2";
+  const metrics = {
+    normalized_requirement_score: known(candidate ? 0.85 : 0.8),
+    input_tokens: known(candidate ? 420 : 700),
+    output_tokens: known(candidate ? 180 : 300),
+    cached_tokens: known(0),
+    duration_ms: known(candidate ? 110 : 100),
+    ...metricOverrides,
+  };
+  const guardrails = Object.fromEntries(GUARDRAIL_FIELDS.map((field) => [field, known(0)]));
+  const routeGates = {
+    decision_correctness: "pass",
+    verification_correctness: "pass",
+    evidence_correctness: "pass",
+    required_mechanism_observation: "pass",
+  };
+  const projection = scoreProjection(metrics, guardrails, routeGates);
+  const authority = rawScoreRef ?? scoreReference(caseRecord, projection);
+  if (rawScoreRef === null) registerRawScoreAuthority(caseRecord, authority, projection);
   return buildPromptV2NormalizedResult({
     preregistration,
     authorityBinding,
@@ -280,21 +356,11 @@ function scoringReadyResult(caseRecord) {
     runInstanceId,
     caseId: caseRecord.case_id,
     status: "scoring_ready",
-    rawScoreRef: scoreReference(caseRecord),
-    metrics: {
-      normalized_requirement_score: known(candidate ? 0.85 : 0.8),
-      input_tokens: known(candidate ? 420 : 700),
-      output_tokens: known(candidate ? 180 : 300),
-      cached_tokens: known(0),
-      duration_ms: known(candidate ? 110 : 100),
-    },
-    guardrails: Object.fromEntries(GUARDRAIL_FIELDS.map((field) => [field, known(0)])),
-    route_gates: {
-      decision_correctness: "pass",
-      verification_correctness: "pass",
-      evidence_correctness: "pass",
-      required_mechanism_observation: "pass",
-    },
+    rawScoreRef: authority,
+    metrics,
+    guardrails,
+    route_gates: routeGates,
+    rawScoreAuthorityResolver: resolver,
   });
 }
 
@@ -307,20 +373,20 @@ function unavailableResult(caseRecord) {
     runInstanceId,
     caseId: caseRecord.case_id,
     status: "unavailable",
-    unavailableReason: "adapter_runtime_unavailable",
+    unavailableReason: "cli_not_installed",
   });
 }
 
 const normalizedResults = [];
 for (const caseRecord of plan.cases) {
   const result = caseRecord.adapter_track === "codex" ? scoringReadyResult(caseRecord) : unavailableResult(caseRecord);
-  validatePromptV2NormalizedResult(result, { preregistration, authorityBinding, plan, materialization });
+  validatePromptV2NormalizedResult(result, { preregistration, authorityBinding, plan, materialization, rawScoreAuthorityResolver });
   normalizedResults.push(result);
-  resumeState = applyPromptV2NormalizedResult({ state: resumeState, plan, materialization, result });
+  resumeState = applyPromptV2NormalizedResult({ state: resumeState, preregistration, authorityBinding, plan, materialization, result, rawScoreAuthorityResolver });
 }
 
 let partialState = createPromptV2ResumeState({ plan, materialization, runInstanceId });
-for (const result of normalizedResults.slice(0, 7)) partialState = applyPromptV2NormalizedResult({ state: partialState, plan, materialization, result });
+for (const result of normalizedResults.slice(0, 7)) partialState = applyPromptV2NormalizedResult({ state: partialState, preregistration, authorityBinding, plan, materialization, result, rawScoreAuthorityResolver });
 
 check("partial resume retains sealed refs and schedules only the untouched inventory", () => {
   assert.equal(validatePromptV2ResumeState(partialState, { plan, materialization }), partialState);
@@ -329,7 +395,7 @@ check("partial resume retains sealed refs and schedules only the untouched inven
   assert.equal(partialState.completeness.partial, true);
   assert.deepEqual(pendingPromptV2Cases({ state: partialState, plan }).map(({ case_id }) => case_id), plan.cases.slice(7).map(({ case_id }) => case_id));
   const sealed = structuredClone(partialState.cases[0].result_ref);
-  const advanced = applyPromptV2NormalizedResult({ state: partialState, plan, materialization, result: normalizedResults[7] });
+  const advanced = applyPromptV2NormalizedResult({ state: partialState, preregistration, authorityBinding, plan, materialization, result: normalizedResults[7], rawScoreAuthorityResolver });
   assert.deepEqual(advanced.cases[0].result_ref, sealed);
   assert.deepEqual(partialState.cases[7].result_ref, null);
 });
@@ -339,10 +405,10 @@ check("resume appends immutable refs, schedules pending only, and rejects duplic
   assert.equal(resumeState.completeness.partial, false);
   assert.equal(resumeState.completeness.terminal_cases, 56);
   assert.equal(pendingPromptV2Cases({ state: resumeState, plan }).length, 0);
-  assert.throws(() => applyPromptV2NormalizedResult({ state: resumeState, plan, materialization, result: normalizedResults[0] }), /already terminal|duplicate|substitution/u);
+  assert.throws(() => applyPromptV2NormalizedResult({ state: resumeState, preregistration, authorityBinding, plan, materialization, result: normalizedResults[0], rawScoreAuthorityResolver }), /already terminal|duplicate|substitution/u);
   const transplanted = structuredClone(normalizedResults[0]);
   transplanted.lineage.run_instance_id = "00000000-0000-4000-8000-000000000999";
-  assert.throws(() => applyPromptV2NormalizedResult({ state: createPromptV2ResumeState({ plan, materialization, runInstanceId }), plan, materialization, result: transplanted }), /run|identity|digest/u);
+  assert.throws(() => applyPromptV2NormalizedResult({ state: createPromptV2ResumeState({ plan, materialization, runInstanceId }), preregistration, authorityBinding, plan, materialization, result: transplanted, rawScoreAuthorityResolver }), /run|identity|digest/u);
 
   const crossVersionBinding = structuredClone(authorityBinding);
   crossVersionBinding.source.repository_revision = "c".repeat(40);
@@ -352,7 +418,15 @@ check("resume appends immutable refs, schedules pending only, and rejects duplic
   const crossVersionPlan = buildPromptV2ExecutionPlan({ preregistration, authorityBinding: crossVersionBinding });
   const crossVersionMaterialization = buildPromptV2MaterializationManifest({ preregistration, authorityBinding: crossVersionBinding, plan: crossVersionPlan });
   const crossVersionState = createPromptV2ResumeState({ plan: crossVersionPlan, materialization: crossVersionMaterialization, runInstanceId });
-  assert.throws(() => applyPromptV2NormalizedResult({ state: crossVersionState, plan: crossVersionPlan, materialization: crossVersionMaterialization, result: normalizedResults[0] }), /case|identity|digest|transplant/u);
+  assert.throws(() => applyPromptV2NormalizedResult({
+    state: crossVersionState,
+    preregistration,
+    authorityBinding: crossVersionBinding,
+    plan: crossVersionPlan,
+    materialization: crossVersionMaterialization,
+    result: normalizedResults[0],
+    rawScoreAuthorityResolver,
+  }), /case|identity|digest|transplant/u);
 });
 
 check("typed unavailable never becomes zero, pass, tie, or a raw durable payload", () => {
@@ -372,10 +446,11 @@ const report = buildPromptV2ComparisonReport({
   materialization,
   resumeState,
   normalizedResults,
+  rawScoreAuthorityResolver,
 });
 
 check("comparison report stays adapter-separated and derives only non-authoritative outcomes", () => {
-  assert.equal(validatePromptV2ComparisonReport(report, { preregistration, authorityBinding, plan, materialization, resumeState, normalizedResults }), report);
+  assert.equal(validatePromptV2ComparisonReport(report, { preregistration, authorityBinding, plan, materialization, resumeState, normalizedResults, rawScoreAuthorityResolver }), report);
   assert.deepEqual(report.adapter_reports.map(({ adapter_track }) => adapter_track), ["codex", "claude"]);
   assert.equal(report.adapter_reports[0].prompt_outcome, "adopt_prompt_v2");
   assert.equal(report.adapter_reports[1].prompt_outcome, "insufficient_evidence");
@@ -388,20 +463,146 @@ check("comparison report stays adapter-separated and derives only non-authoritat
 });
 
 check("report rejects omission, duplication, cherry-pick, raw/private leakage, and threshold mutation", () => {
-  assert.throws(() => buildPromptV2ComparisonReport({ preregistration, authorityBinding, plan, materialization, resumeState, normalizedResults: normalizedResults.slice(1) }), /missing|inventory|terminal/u);
-  assert.throws(() => buildPromptV2ComparisonReport({ preregistration, authorityBinding, plan, materialization, resumeState, normalizedResults: [...normalizedResults, normalizedResults[0]] }), /duplicate|inventory/u);
+  assert.throws(() => buildPromptV2ComparisonReport({ preregistration, authorityBinding, plan, materialization, resumeState, normalizedResults: normalizedResults.slice(1), rawScoreAuthorityResolver }), /missing|inventory|terminal/u);
+  assert.throws(() => buildPromptV2ComparisonReport({ preregistration, authorityBinding, plan, materialization, resumeState, normalizedResults: [...normalizedResults, normalizedResults[0]], rawScoreAuthorityResolver }), /duplicate|inventory/u);
 
   const cherryPickState = structuredClone(resumeState);
   cherryPickState.cases = cherryPickState.cases.slice(1);
-  assert.throws(() => buildPromptV2ComparisonReport({ preregistration, authorityBinding, plan, materialization, resumeState: cherryPickState, normalizedResults: normalizedResults.slice(1) }), /resume|inventory|case/u);
+  assert.throws(() => buildPromptV2ComparisonReport({ preregistration, authorityBinding, plan, materialization, resumeState: cherryPickState, normalizedResults: normalizedResults.slice(1), rawScoreAuthorityResolver }), /resume|inventory|case/u);
 
   const leaked = structuredClone(normalizedResults[0]);
   leaked.raw_evaluator_prompt = "synthetic private marker";
-  assert.throws(() => validatePromptV2NormalizedResult(leaked, { preregistration, authorityBinding, plan, materialization }), /private|raw|Schema|digest/u);
+  assert.throws(() => validatePromptV2NormalizedResult(leaked, { preregistration, authorityBinding, plan, materialization, rawScoreAuthorityResolver }), /private|raw|Schema|digest/u);
 
   const changedThresholds = structuredClone(preregistration);
   changedThresholds.thresholds.duration.maximum_unconditional_increase_ratio = 0.21;
-  assert.throws(() => validatePromptV2ComparisonReport(report, { preregistration: changedThresholds, authorityBinding, plan, materialization, resumeState, normalizedResults }), /preregistration|threshold|digest|identity/u);
+  assert.throws(() => validatePromptV2ComparisonReport(report, { preregistration: changedThresholds, authorityBinding, plan, materialization, resumeState, normalizedResults, rawScoreAuthorityResolver }), /preregistration|threshold|digest|identity/u);
+});
+
+function resealNormalizedResult(value) {
+  const base = structuredClone(value);
+  delete base.normalized_result_id;
+  delete base.normalized_result_digest;
+  const normalizedResultDigest = canonicalDigest(base);
+  return {
+    ...base,
+    normalized_result_id: `prompt-v2-normalized-${normalizedResultDigest.slice(-32)}`,
+    normalized_result_digest: normalizedResultDigest,
+  };
+}
+
+function resumeFor(results, resolver = rawScoreAuthorityResolver) {
+  let state = createPromptV2ResumeState({ plan, materialization, runInstanceId });
+  for (const result of results) state = applyPromptV2NormalizedResult({
+    state,
+    preregistration,
+    authorityBinding,
+    plan,
+    materialization,
+    result,
+    rawScoreAuthorityResolver: resolver,
+  });
+  return state;
+}
+
+check("frozen unavailable adapter cannot publish scoring-ready evidence or another reason", () => {
+  const claudeCase = plan.cases.find(({ adapter_track: adapterTrack }) => adapterTrack === "claude");
+  assert.throws(() => scoringReadyResult(claudeCase), /unavailable|runtime|frozen/u);
+  assert.throws(() => buildPromptV2NormalizedResult({
+    preregistration,
+    authorityBinding,
+    plan,
+    materialization,
+    runInstanceId,
+    caseId: claudeCase.case_id,
+    status: "unavailable",
+    unavailableReason: "adapter_runtime_unavailable",
+  }), /reason|cli_not_installed|frozen/u);
+
+  const unavailable = normalizedResults.find(({ lineage }) => lineage.case_id === claudeCase.case_id);
+  const resealed = resealNormalizedResult({
+    ...structuredClone(unavailable),
+    status: "not_scoring_ready",
+    unavailable_reason: null,
+  });
+  assert.throws(() => validatePromptV2NormalizedResult(resealed, {
+    preregistration,
+    authorityBinding,
+    plan,
+    materialization,
+    rawScoreAuthorityResolver,
+  }), /unavailable|runtime|frozen/u);
+});
+
+check("comparison rejects duplicate #197 engineering and evaluation authority across Prompt cases", () => {
+  const codexCurrent = plan.cases.find(({ adapter_track: adapterTrack, prompt_role: promptRole }) => adapterTrack === "codex" && promptRole === "current_prompt");
+  const codexPromptV2 = plan.cases.find(({ block_id: blockId, prompt_role: promptRole }) => blockId === codexCurrent.block_id && promptRole === "prompt_v2");
+  const duplicateAuthority = verifiedRawScoreAuthorityByCase.get(codexCurrent.case_id);
+  assert.ok(duplicateAuthority);
+  assert.throws(() => scoringReadyResult(codexPromptV2, { rawScoreRef: duplicateAuthority }), /transplant|Prompt case|authority/u);
+  const duplicate = scoringReadyResult(codexPromptV2, {
+    rawScoreRef: duplicateAuthority,
+    resolver: permissiveRawScoreAuthorityResolver,
+  });
+  const duplicateResults = normalizedResults.map((result) => result.lineage.case_id === codexPromptV2.case_id ? duplicate : result);
+  const duplicateState = resumeFor(duplicateResults, permissiveRawScoreAuthorityResolver);
+  assert.throws(() => buildPromptV2ComparisonReport({
+    preregistration,
+    authorityBinding,
+    plan,
+    materialization,
+    resumeState: duplicateState,
+    normalizedResults: duplicateResults,
+    rawScoreAuthorityResolver: permissiveRawScoreAuthorityResolver,
+  }), /duplicate.*(?:engineering|evaluation|raw)|raw.*duplicate/u);
+});
+
+check("#197 resolver rejects a raw-score reference whose metric provenance drifted", () => {
+  const caseRecord = plan.cases.find(({ adapter_track: adapterTrack }) => adapterTrack === "codex");
+  const authority = verifiedRawScoreAuthorityByCase.get(caseRecord.case_id);
+  assert.ok(authority);
+  assert.throws(() => scoringReadyResult(caseRecord, {
+    rawScoreRef: authority,
+    metricOverrides: { duration_ms: known(999) },
+  }), /metrics provenance|projection|authority/u);
+});
+
+check("resume refuses a self-consistent but semantically invalid normalized result", () => {
+  const scoringReady = normalizedResults.find(({ status }) => status === "scoring_ready");
+  const invalid = resealNormalizedResult({ ...structuredClone(scoringReady), raw_score_ref: null });
+  assert.throws(() => validatePromptV2NormalizedResult(invalid, { preregistration, authorityBinding, plan, materialization, rawScoreAuthorityResolver }), /raw-score|raw_score|scoring_ready/u);
+  assert.throws(() => applyPromptV2NormalizedResult({
+    state: createPromptV2ResumeState({ plan, materialization, runInstanceId }),
+    preregistration,
+    authorityBinding,
+    plan,
+    materialization,
+    result: invalid,
+    rawScoreAuthorityResolver,
+  }), /raw-score|raw_score|scoring_ready|semantic/u);
+});
+
+check("missing token or duration statistics take insufficient-evidence precedence", () => {
+  const incompleteResults = plan.cases.map((caseRecord) => caseRecord.adapter_track === "codex"
+    ? scoringReadyResult(caseRecord, {
+      metricOverrides: {
+        input_tokens: known(0),
+        output_tokens: known(0),
+        duration_ms: known(0),
+      },
+    })
+    : unavailableResult(caseRecord));
+  const incompleteState = resumeFor(incompleteResults);
+  const incompleteReport = buildPromptV2ComparisonReport({
+    preregistration,
+    authorityBinding,
+    plan,
+    materialization,
+    resumeState: incompleteState,
+    normalizedResults: incompleteResults,
+    rawScoreAuthorityResolver,
+  });
+  assert.equal(incompleteReport.adapter_reports.find(({ adapter_track: adapterTrack }) => adapterTrack === "codex").prompt_outcome, "insufficient_evidence");
 });
 
 process.stdout.write(`Prompt v2 preregistration tests passed (${checks} checks)\n`);

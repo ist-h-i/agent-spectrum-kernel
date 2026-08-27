@@ -43,7 +43,7 @@ import { verifyAssetRegistry } from "./asset-registry.mjs";
 const REPOSITORY_ID = "github.com/ist-h-i/agent-spectrum-kernel";
 const SCOPE_ID = "agent-spectrum-kernel";
 const PORTFOLIO_ID = "ask.portfolio.reference";
-const SOURCE_REVISION = "c24f459b0bf69a755dfde00719516e4a5844018d";
+const SOURCE_REVISION = "9586ea62888c896e6bda7e5647972218fe96ea0d";
 const repositoryRoot = resolve(import.meta.dirname, "..");
 const assetFixtureRoot = resolve(repositoryRoot, "docs/fixtures/asset-registry");
 const fixtureRoot = resolve(repositoryRoot, "docs/fixtures/portfolio-manager");

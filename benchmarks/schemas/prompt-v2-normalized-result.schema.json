@@ -41,12 +41,18 @@
         { "type": "null" },
         {
           "type": "object", "additionalProperties": false,
-          "required": ["engineering_result_id", "engineering_result_digest", "evaluation_id", "evaluation_digest", "result_set_id", "result_set_digest", "adapter_track", "condition"],
+          "required": ["engineering_result_id", "engineering_result_digest", "evaluation_id", "evaluation_digest", "result_set_id", "result_set_digest", "adapter_track", "condition", "source_run_instance_id", "source_plan_id", "source_plan_digest", "source_case_id", "source_fixture_id", "source_repetition", "prompt_case_id", "prompt_case_identity_digest", "prompt_role", "score_projection_digest", "case_binding_digest"],
           "properties": {
-            "engineering_result_id": { "type": "string", "minLength": 1 }, "engineering_result_digest": { "$ref": "#/$defs/digest" },
-            "evaluation_id": { "type": "string", "minLength": 1 }, "evaluation_digest": { "$ref": "#/$defs/digest" },
-            "result_set_id": { "type": "string", "minLength": 1 }, "result_set_digest": { "$ref": "#/$defs/digest" },
-            "adapter_track": { "enum": ["codex", "claude"] }, "condition": { "const": "full_ask" }
+            "engineering_result_id": { "type": "string", "pattern": "^engineering-result-[a-f0-9]{32}$" }, "engineering_result_digest": { "$ref": "#/$defs/digest" },
+            "evaluation_id": { "type": "string", "pattern": "^evaluation-[a-f0-9]{32}$" }, "evaluation_digest": { "$ref": "#/$defs/digest" },
+            "result_set_id": { "type": "string", "pattern": "^engineering-result-set-[a-f0-9]{32}$" }, "result_set_digest": { "$ref": "#/$defs/digest" },
+            "adapter_track": { "enum": ["codex", "claude"] }, "condition": { "const": "full_ask" },
+            "source_run_instance_id": { "type": "string", "format": "uuid" },
+            "source_plan_id": { "type": "string", "pattern": "^plan-[a-f0-9]{64}$" }, "source_plan_digest": { "$ref": "#/$defs/digest" },
+            "source_case_id": { "type": "string", "pattern": "^case-[a-f0-9]{16}-[a-f0-9]{16}$" },
+            "source_fixture_id": { "$ref": "#/$defs/token" }, "source_repetition": { "type": "integer", "minimum": 1, "maximum": 5 },
+            "prompt_case_id": { "type": "string", "pattern": "^prompt-v2-case-[a-f0-9]{32}$" }, "prompt_case_identity_digest": { "$ref": "#/$defs/digest" },
+            "prompt_role": { "enum": ["current_prompt", "prompt_v2"] }, "score_projection_digest": { "$ref": "#/$defs/digest" }, "case_binding_digest": { "$ref": "#/$defs/digest" }
           }
         }
       ]
@@ -90,6 +96,7 @@
   },
   "$defs": {
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "token": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
     "typedMetric": {
       "type": "object", "additionalProperties": false, "required": ["status", "value"],
       "properties": {

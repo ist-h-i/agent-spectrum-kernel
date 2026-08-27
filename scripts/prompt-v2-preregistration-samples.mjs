@@ -669,7 +669,7 @@ function portfolioManifestDraft({ sourceRoot, preregistration, registryReference
       ? { mode: "none", target: null, required_authority_kind: "external_portfolio_rollback_authority" }
       : { mode: "exact", target: rollbackTarget, required_authority_kind: "external_portfolio_rollback_authority" },
     benchmark_compatibility: [{
-      condition_id: "adaptive_ask",
+      condition_id: preregistration.raw_scoring.condition,
       config_path: PREREGISTRATION_PATH,
       config_digest: rawDigest(readFileSync(resolve(sourceRoot, PREREGISTRATION_PATH))),
       frozen_results_mutated: false,
@@ -1276,6 +1276,10 @@ export function verifyPromptV2PreregistrationFixture({ root }) {
     if (contexts.length !== 2 || contexts[0].context_digest === contexts[1].context_digest) throw new Error(`${adapter.adapter_track} baseline/challenger Portfolio authorities are not distinct`);
     verifyPortfolioLock({ storeRoot, lockDigest: adapter.baseline_portfolio.lock_digest, trustedPortfolioAuthorityContexts: contexts });
     const challengerLock = verifyPortfolioLock({ storeRoot, lockDigest: adapter.challenger_portfolio.lock_digest, trustedPortfolioAuthorityContexts: contexts });
+    for (const manifestDigest of [adapter.baseline_portfolio.manifest_digest, adapter.challenger_portfolio.manifest_digest]) {
+      const manifest = objectMap.get(manifestDigest);
+      if (!manifest || manifest.benchmark_compatibility?.length !== 1 || manifest.benchmark_compatibility[0].condition_id !== preregistration.raw_scoring.condition) throw new Error(`${adapter.adapter_track} Portfolio benchmark condition drifted from the frozen raw-scoring condition`);
+    }
     if (adapter.baseline_portfolio.portfolio_id !== adapter.challenger_portfolio.portfolio_id || challengerLock.lock.current_manifest_digest !== adapter.challenger_portfolio.manifest_digest) throw new Error(`${adapter.adapter_track} same-ID Portfolio transition drifted`);
     const rollbackEntry = challengerLock.lock.entries.find(({ manifest_digest }) => manifest_digest === adapter.baseline_portfolio.manifest_digest);
     if (!rollbackEntry || !["historical", "superseded"].includes(rollbackEntry.state)) throw new Error(`${adapter.adapter_track} exact Portfolio rollback anchor is missing`);

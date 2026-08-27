@@ -50,6 +50,30 @@ const ROUTE_GATE_FIELDS = Object.freeze([
   "evidence_correctness",
   "required_mechanism_observation",
 ]);
+const RAW_SCORE_AUTHORITY_KEYS = Object.freeze([
+  "engineering_result_id",
+  "engineering_result_digest",
+  "evaluation_id",
+  "evaluation_digest",
+  "result_set_id",
+  "result_set_digest",
+  "adapter_track",
+  "condition",
+  "source_run_instance_id",
+  "source_plan_id",
+  "source_plan_digest",
+  "source_case_id",
+  "source_fixture_id",
+  "source_repetition",
+]);
+const RAW_SCORE_BINDING_KEYS = Object.freeze([
+  ...RAW_SCORE_AUTHORITY_KEYS,
+  "prompt_case_id",
+  "prompt_case_identity_digest",
+  "prompt_role",
+  "score_projection_digest",
+  "case_binding_digest",
+]);
 const TERMINAL_STATUSES = new Set(["scoring_ready", "not_scoring_ready", "unavailable"]);
 const TYPED_STATUSES = new Set(["known", "unknown", "unavailable", "not_applicable"]);
 const GATE_STATUSES = new Set(["pass", "fail", "unknown", "unavailable", "not_applicable"]);
@@ -654,6 +678,86 @@ function assertNormalizedSelf(value, root = ROOT) {
   return value;
 }
 
+function runtimeContractFor(preregistration, adapterTrack) {
+  const contract = preregistration.runtime.adapters.find(({ adapter_track: adapter }) => adapter === adapterTrack);
+  if (!contract) fail(`${adapterTrack} runtime contract is missing from preregistration`);
+  return contract;
+}
+
+function assertFrozenRuntimeStatus({ preregistration, caseRecord, status, unavailableReason }) {
+  const runtime = runtimeContractFor(preregistration, caseRecord.adapter_track);
+  if (runtime.availability !== "unavailable") return runtime;
+  if (status !== "unavailable") fail(`${caseRecord.adapter_track} frozen unavailable runtime cannot publish ${status}`);
+  if (unavailableReason !== runtime.unavailable_reason) fail(`${caseRecord.adapter_track} unavailable reason must match the frozen ${runtime.unavailable_reason} contract`);
+  return runtime;
+}
+
+function rawScoreAuthorityFromBinding(rawScoreRef) {
+  return Object.fromEntries(RAW_SCORE_AUTHORITY_KEYS.map((key) => [key, rawScoreRef[key]]));
+}
+
+function assertRawScoreAuthority(authority, { preregistration, caseRecord }) {
+  assertExactKeys(authority, RAW_SCORE_AUTHORITY_KEYS, "#197 raw-score authority");
+  if (!/^engineering-result-[a-f0-9]{32}$/u.test(authority.engineering_result_id ?? "")) fail("#197 engineering result ID is invalid");
+  if (!/^evaluation-[a-f0-9]{32}$/u.test(authority.evaluation_id ?? "")) fail("#197 evaluation ID is invalid");
+  if (!/^engineering-result-set-[a-f0-9]{32}$/u.test(authority.result_set_id ?? "")) fail("#197 result-set ID is invalid");
+  for (const key of ["engineering_result_digest", "evaluation_digest", "result_set_digest", "source_plan_digest"]) assertDigest(authority[key], `#197 raw-score ${key}`);
+  if (!UUID_PATTERN.test(authority.source_run_instance_id ?? "")) fail("#197 source run identity is invalid");
+  if (!/^plan-[a-f0-9]{64}$/u.test(authority.source_plan_id ?? "")) fail("#197 source plan ID is invalid");
+  if (!/^case-[a-f0-9]{16}-[a-f0-9]{16}$/u.test(authority.source_case_id ?? "")) fail("#197 source case ID is invalid");
+  if (authority.adapter_track !== caseRecord.adapter_track || authority.condition !== preregistration.raw_scoring.condition) fail("#197 raw-score authority was transplanted across adapter/condition");
+  if (authority.source_fixture_id !== caseRecord.source_fixture_id || authority.source_repetition !== caseRecord.repetition) fail("#197 raw-score authority fixture/repetition lineage mismatch");
+  return authority;
+}
+
+function scoreProjection(metrics, guardrails, routeGates) {
+  return {
+    metrics: structuredClone(metrics),
+    guardrails: structuredClone(guardrails),
+    route_gates: structuredClone(routeGates),
+  };
+}
+
+function resolveRawScoreAuthority({ authority, preregistration, caseRecord, materialized, projection, rawScoreAuthorityResolver }) {
+  assertRawScoreAuthority(authority, { preregistration, caseRecord });
+  if (typeof rawScoreAuthorityResolver !== "function") fail("scoring_ready normalized result requires a verified #197 raw-score authority resolver");
+  const resolved = rawScoreAuthorityResolver(structuredClone(authority), {
+    case_id: caseRecord.case_id,
+    case_identity_digest: caseRecord.case_identity_digest,
+    prompt_role: caseRecord.prompt_role,
+    common_input_identity_digest: materialized.common_input_identity_digest,
+    raw_scorer_authority_digest: preregistration.raw_scoring.authority_digest,
+    score_projection: structuredClone(projection),
+  });
+  if (!resolved || typeof resolved !== "object" || Array.isArray(resolved)) fail("#197 raw-score resolver returned no verified authority record");
+  assertExactKeys(resolved, ["authority", "prompt_case_id", "score_projection"], "#197 raw-score resolver result");
+  assertRawScoreAuthority(resolved.authority, { preregistration, caseRecord });
+  exact(resolved.authority, authority, "#197 raw-score resolver returned another authority identity");
+  if (resolved.prompt_case_id !== caseRecord.case_id) fail("#197 raw-score authority was transplanted across Prompt cases");
+  exact(resolved.score_projection, projection, "#197 raw-score authority metrics provenance mismatch");
+  return authority;
+}
+
+function bindRawScoreAuthority({ authority, caseRecord, projection }) {
+  const promptBinding = {
+    prompt_case_id: caseRecord.case_id,
+    prompt_case_identity_digest: caseRecord.case_identity_digest,
+    prompt_role: caseRecord.prompt_role,
+    score_projection_digest: canonicalDigest(projection),
+  };
+  const case_binding_digest = canonicalDigest({ raw_score_authority: authority, ...promptBinding });
+  return { ...structuredClone(authority), ...promptBinding, case_binding_digest };
+}
+
+function validateBoundRawScoreReference({ rawScoreRef, preregistration, caseRecord, materialized, projection, rawScoreAuthorityResolver }) {
+  assertExactKeys(rawScoreRef, RAW_SCORE_BINDING_KEYS, "#197 raw-score reference");
+  const authority = rawScoreAuthorityFromBinding(rawScoreRef);
+  resolveRawScoreAuthority({ authority, preregistration, caseRecord, materialized, projection, rawScoreAuthorityResolver });
+  const expected = bindRawScoreAuthority({ authority, caseRecord, projection });
+  exact(rawScoreRef, expected, "#197 raw-score reference prompt-case binding mismatch");
+  return rawScoreRef;
+}
+
 export function buildPromptV2NormalizedResult({
   preregistration,
   authorityBinding,
@@ -667,6 +771,7 @@ export function buildPromptV2NormalizedResult({
   metrics = {},
   guardrails = {},
   route_gates = {},
+  rawScoreAuthorityResolver,
 }) {
   validatePromptV2ExecutionPlan(plan, { preregistration, authorityBinding });
   validatePromptV2MaterializationManifest(materialization, { preregistration, authorityBinding, plan });
@@ -677,18 +782,20 @@ export function buildPromptV2NormalizedResult({
   if (!caseRecord || !materialized) fail("normalized result case identity is not in the complete plan/materialization");
   const scoringReady = status === "scoring_ready";
   const unavailable = status === "unavailable";
+  assertFrozenRuntimeStatus({ preregistration, caseRecord, status, unavailableReason });
   if (scoringReady && !rawScoreRef) fail("scoring_ready normalized result requires an existing #197 raw-score reference");
   if (!scoringReady && rawScoreRef !== null) fail("non-scoring-ready normalized result must not claim a raw-score reference");
   if (unavailable && (typeof unavailableReason !== "string" || unavailableReason.length === 0)) fail("unavailable normalized result requires a typed reason");
   if (!unavailable && unavailableReason !== null) fail("available normalized result must not contain an unavailable reason");
-  if (rawScoreRef) {
-    assertExactKeys(rawScoreRef, ["engineering_result_id", "engineering_result_digest", "evaluation_id", "evaluation_digest", "result_set_id", "result_set_digest", "adapter_track", "condition"], "#197 raw-score reference");
-    for (const key of ["engineering_result_digest", "evaluation_digest", "result_set_digest"]) assertDigest(rawScoreRef[key], `#197 raw-score ${key}`);
-    if (rawScoreRef.adapter_track !== caseRecord.adapter_track || rawScoreRef.condition !== "full_ask") fail("#197 raw-score reference was transplanted across adapter/condition");
-  }
   const normalizedMetrics = Object.fromEntries(METRIC_FIELDS.map((field) => [field, typedMetric(metrics[field], field, { scoringReady, unavailable })]));
   const normalizedGuardrails = Object.fromEntries(GUARDRAIL_FIELDS.map((field) => [field, typedMetric(guardrails[field], field, { scoringReady, unavailable })]));
   const normalizedGates = Object.fromEntries(ROUTE_GATE_FIELDS.map((field) => [field, gateValue(route_gates[field], field, { scoringReady, unavailable })]));
+  const projection = scoreProjection(normalizedMetrics, normalizedGuardrails, normalizedGates);
+  let boundRawScoreRef = null;
+  if (rawScoreRef) {
+    resolveRawScoreAuthority({ authority: rawScoreRef, preregistration, caseRecord, materialized, projection, rawScoreAuthorityResolver });
+    boundRawScoreRef = bindRawScoreAuthority({ authority: rawScoreRef, caseRecord, projection });
+  }
   const authority = caseRecord.prompt_authority;
   const base = {
     schema_version: "1.0.0",
@@ -727,7 +834,7 @@ export function buildPromptV2NormalizedResult({
     },
     status,
     unavailable_reason: unavailableReason,
-    raw_score_ref: rawScoreRef ? structuredClone(rawScoreRef) : null,
+    raw_score_ref: boundRawScoreRef,
     metrics: normalizedMetrics,
     guardrails: normalizedGuardrails,
     route_gates: normalizedGates,
@@ -744,7 +851,7 @@ export function buildPromptV2NormalizedResult({
   return value;
 }
 
-export function validatePromptV2NormalizedResult(value, { preregistration, authorityBinding, plan, materialization, root = ROOT } = {}) {
+export function validatePromptV2NormalizedResult(value, { preregistration, authorityBinding, plan, materialization, rawScoreAuthorityResolver, root = ROOT } = {}) {
   assertNormalizedSelf(value, root);
   validatePromptV2ExecutionPlan(plan, { preregistration, authorityBinding, root });
   validatePromptV2MaterializationManifest(materialization, { preregistration, authorityBinding, plan, root });
@@ -786,20 +893,29 @@ export function validatePromptV2NormalizedResult(value, { preregistration, autho
   if (!UUID_PATTERN.test(value.lineage.run_instance_id)) fail("normalized result run identity is invalid");
   const scoringReady = value.status === "scoring_ready";
   const unavailable = value.status === "unavailable";
+  assertFrozenRuntimeStatus({ preregistration, caseRecord, status: value.status, unavailableReason: value.unavailable_reason });
   for (const field of METRIC_FIELDS) typedMetric(value.metrics[field], field, { scoringReady, unavailable });
   for (const field of GUARDRAIL_FIELDS) typedMetric(value.guardrails[field], field, { scoringReady, unavailable });
   for (const field of ROUTE_GATE_FIELDS) gateValue(value.route_gates[field], field, { scoringReady, unavailable });
   if (scoringReady) {
-    if (!value.raw_score_ref || value.raw_score_ref.adapter_track !== caseRecord.adapter_track || value.raw_score_ref.condition !== "full_ask") fail("normalized result lacks its exact existing #197 raw-score reference");
+    if (!value.raw_score_ref) fail("normalized result lacks its exact existing #197 raw-score reference");
+    validateBoundRawScoreReference({
+      rawScoreRef: value.raw_score_ref,
+      preregistration,
+      caseRecord,
+      materialized,
+      projection: scoreProjection(value.metrics, value.guardrails, value.route_gates),
+      rawScoreAuthorityResolver,
+    });
   } else if (value.raw_score_ref !== null) fail("non-scoring-ready normalized result must not serialize a raw-score payload/ref");
   if (unavailable && (typeof value.unavailable_reason !== "string" || value.unavailable_reason.length === 0)) fail("typed unavailable normalized result lacks a reason");
   if (!unavailable && value.unavailable_reason !== null) fail("normalized result availability reason drifted");
   return value;
 }
 
-export function applyPromptV2NormalizedResult({ state, plan, materialization, result }) {
+export function applyPromptV2NormalizedResult({ state, preregistration, authorityBinding, plan, materialization, result, rawScoreAuthorityResolver }) {
   validatePromptV2ResumeState(state, { plan, materialization });
-  assertNormalizedSelf(result);
+  validatePromptV2NormalizedResult(result, { preregistration, authorityBinding, plan, materialization, rawScoreAuthorityResolver });
   const index = state.cases.findIndex(({ case_id }) => case_id === result.lineage.case_id);
   if (index < 0) fail("normalized result case is outside the resume inventory");
   const current = state.cases[index];
@@ -1052,10 +1168,12 @@ function buildAdapterReport({ adapter, preregistration, plannedCases, results })
     pass: durationPass,
   };
   const stability_complete = [tokenMedian, currentTokenMad, candidateTokenMad, durationMedian, qualityGainMedian, currentQualityMad, candidateQualityMad].every((value) => value !== null && Number.isFinite(value)) && fixture_quality.every(({ median_delta, eligible_pairs, expected_pairs }) => median_delta.status === "known" && eligible_pairs === expected_pairs);
+  const statistics_complete = stability_complete && tokens.eligible_pairs === pairs.length && duration.eligible_pairs === pairs.length;
   const regression = quality_regression || guardrail_regression_fields.length > 0 || route_gate_regression_fields.length > 0;
   let prompt_outcome = "adopt_prompt_v2";
-  if (regression) prompt_outcome = "revise_and_repeat";
-  else if (!tokens.pass || !duration.pass || !stability_complete) prompt_outcome = "retain_current";
+  if (!statistics_complete) prompt_outcome = "insufficient_evidence";
+  else if (regression) prompt_outcome = "revise_and_repeat";
+  else if (!tokens.pass || !duration.pass) prompt_outcome = "retain_current";
   return {
     adapter_track: adapter,
     expected_cases,
@@ -1086,6 +1204,10 @@ function exactTerminalResultInventory({ resumeState, normalizedResults }) {
     byCase.set(result.lineage.case_id, result);
     byResult.add(result.normalized_result_id);
   }
+  for (const field of ["engineering_result_id", "engineering_result_digest", "evaluation_id", "evaluation_digest", "source_case_id"]) {
+    const identities = normalizedResults.filter(({ status }) => status === "scoring_ready").map(({ raw_score_ref: rawScoreRef }) => rawScoreRef[field]);
+    if (new Set(identities).size !== identities.length) fail(`comparison report contains duplicate #197 raw-score ${field}`);
+  }
   const terminalEntries = resumeState.cases.filter(({ status }) => TERMINAL_STATUSES.has(status));
   if (normalizedResults.length !== terminalEntries.length) fail("comparison report normalized-result inventory is missing or exceeds terminal resume refs");
   for (const entry of resumeState.cases) {
@@ -1100,7 +1222,7 @@ function exactTerminalResultInventory({ resumeState, normalizedResults }) {
   }
 }
 
-export function buildPromptV2ComparisonReport({ preregistration, authorityBinding, plan, materialization, resumeState, normalizedResults }) {
+export function buildPromptV2ComparisonReport({ preregistration, authorityBinding, plan, materialization, resumeState, normalizedResults, rawScoreAuthorityResolver }) {
   validatePromptV2Preregistration(preregistration, { verifyRepositoryBindings: false });
   validatePromptV2AuthorityBinding(authorityBinding, { preregistration });
   validatePromptV2ExecutionPlan(plan, { preregistration, authorityBinding });
@@ -1108,7 +1230,7 @@ export function buildPromptV2ComparisonReport({ preregistration, authorityBindin
   validatePromptV2ResumeState(resumeState, { plan, materialization });
   if (!Array.isArray(normalizedResults)) fail("comparison report normalizedResults must be an array");
   for (const result of normalizedResults) {
-    validatePromptV2NormalizedResult(result, { preregistration, authorityBinding, plan, materialization });
+    validatePromptV2NormalizedResult(result, { preregistration, authorityBinding, plan, materialization, rawScoreAuthorityResolver });
     if (result.lineage.run_instance_id !== resumeState.run_instance_id) fail("comparison report rejects cross-run normalized-result transplant");
   }
   exactTerminalResultInventory({ resumeState, normalizedResults });
@@ -1159,9 +1281,9 @@ export function buildPromptV2ComparisonReport({ preregistration, authorityBindin
   return report;
 }
 
-export function validatePromptV2ComparisonReport(value, { preregistration, authorityBinding, plan, materialization, resumeState, normalizedResults, root = ROOT } = {}) {
+export function validatePromptV2ComparisonReport(value, { preregistration, authorityBinding, plan, materialization, resumeState, normalizedResults, rawScoreAuthorityResolver, root = ROOT } = {}) {
   assertBenchmarkSchemaInstance(value, { schemaPath: schemaPath(root, PROMPT_V2_COMPARISON_REPORT_SCHEMA_PATH), label: "Prompt v2 comparison report" });
-  const expected = buildPromptV2ComparisonReport({ preregistration, authorityBinding, plan, materialization, resumeState, normalizedResults });
+  const expected = buildPromptV2ComparisonReport({ preregistration, authorityBinding, plan, materialization, resumeState, normalizedResults, rawScoreAuthorityResolver });
   exact(value, expected, "comparison report identity, threshold, adapter inventory, or derived outcome mismatch");
   if (value.report_digest !== computeReportDigest(value) || value.report_id !== `prompt-v2-report-${value.report_digest.slice(-32)}`) fail("comparison report digest/identity mismatch");
   assertNoForbiddenDurableFields(value, "comparison report");

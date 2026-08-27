@@ -25,13 +25,13 @@
           "portfolio": {
             "portfolio_id": "ask.portfolio.prompt-v2.codex",
             "revision": "prompt-v2-baseline-v1",
-            "manifest_digest": "sha256:89ff3b3db198064ec6ef225c5c9c3a94dfb8b734c8e8950ac9079fe9d2f2d773",
+            "manifest_digest": "sha256:6194e7a893316b18d9a0576ebf237f4ea15b24f1d19a716f5be88ad69f704e89",
             "asset_set_digest": "sha256:346873c682a7f2168407145e68f6cbfe36840adb1e656924c809e10fde03fdfa",
-            "lock_digest": "sha256:20ef152817c19bed997fdbfee1f0bf939df860c0f56fe1886c6347497a606fbd"
+            "lock_digest": "sha256:b2ae7e7ac41f9e2c3b76e57f41a2e424b6702a67a6148eec8c02a8c39b77a7d4"
           },
           "selection": {
-            "selection_object_digest": "sha256:70f4f01fc2786b346e82ab4816c0dccf1855b3ad10a627b5eb1bf37e5bfe13ce",
-            "selection_digest": "sha256:fb6285640883b058e09adff9d5a878a347af8753e9da2af3d602eb0dc04b5c01"
+            "selection_object_digest": "sha256:b6dada363a36bdb8597c6b2f7f72491be313616b9f744ad54748c959d54660e1",
+            "selection_digest": "sha256:0c7c17b140a774bf0222622f285379754bb5fecf9b382bb18ec48204fd47971f"
           },
           "projection": {
             "renderer_id": "install-codex-adapter",
@@ -53,13 +53,13 @@
           "portfolio": {
             "portfolio_id": "ask.portfolio.prompt-v2.codex",
             "revision": "prompt-v2-challenger-v1",
-            "manifest_digest": "sha256:597b7348300a16339baddd09233d611eb2cd63bb0ac50e6808f47422c42bbf54",
+            "manifest_digest": "sha256:d0ad457d0673caadce455e185795e71b25ba0aeb2e256e3ab0998e36db0b07bb",
             "asset_set_digest": "sha256:3e3c9e0b02c3d27d9d1ee14c13d97d509557ad750b57b3d77b05e171abc68906",
-            "lock_digest": "sha256:49b0edd6ac4140274adc96a626396c335866c55c2d1c38dcd09b10cf6a3c9999"
+            "lock_digest": "sha256:8beded452d55299ce90fd1b742611dd789b3d29c2f4f16443e27a54abece5510"
           },
           "selection": {
-            "selection_object_digest": "sha256:6d956a3b5e88d42fe82df7439d79fb35e0c2b6e2644bc769122092b03ce2ee8d",
-            "selection_digest": "sha256:c65a4bcd434e5868982a1a9ea24bcf4cd71d0475c9c5544752af9e184befa7d5"
+            "selection_object_digest": "sha256:6c226e331c688bf2d9c8ffee53fe4fc03c5eb93f39b02df18a914e1aa8756bac",
+            "selection_digest": "sha256:a86f3441b5ec699ba12b739ad44396117ddb9d215ef94bfa1792db17ad08c1f9"
           },
           "projection": {
             "renderer_id": "install-codex-adapter",
@@ -71,13 +71,13 @@
         }
       ],
       "evolution": {
-        "candidate_object_digest": "sha256:115a9c987c6a9a3127347a2116602103a4f7278a44872099479c2597825e1d12",
-        "candidate_digest": "sha256:bcc14a6650e90c1688b2eab2d102907fbb4295b339676318d585478fa8fbed1a",
-        "experiment_object_digest": "sha256:0ca6c6b45ab134eef65fbf408bcacbb1ada5a2a6ada4935397813336bdfed9fa",
-        "experiment_digest": "sha256:9514c272c2f0636d8152cf3f9be3aacca2c72ab2468b213d915744b22fb1dc91",
+        "candidate_object_digest": "sha256:0f91a69c151243a221793a5b1d48338973500a9b6231cde8020fe36064eabc9d",
+        "candidate_digest": "sha256:c1739a0faab33c3794efea70944807af8a0bf11b2b8a7cd5cb8ff16ccdf3052d",
+        "experiment_object_digest": "sha256:b407cd13c6540cd1e6b3395db517ff6f01f6e939892fff0cbc3e3ba310a87ec4",
+        "experiment_digest": "sha256:35dab9a6fe86b89092a6875b1c3453f06144107481632f4a861e24dad24e9127",
         "baseline_asset_record_digest": "sha256:81815fd22afae413217b241a65c9b8d7a7068bc703c33967c1a45c0824a4c80f",
         "candidate_asset_record_digest": "sha256:36f9b3b20a946aacb840e031c1b0d2cb87e0ab4f6e913aa877ea4bdca4cc52b2",
-        "rollback_target_manifest_digest": "sha256:89ff3b3db198064ec6ef225c5c9c3a94dfb8b734c8e8950ac9079fe9d2f2d773",
+        "rollback_target_manifest_digest": "sha256:6194e7a893316b18d9a0576ebf237f4ea15b24f1d19a716f5be88ad69f704e89",
         "phase": "pre_result",
         "results_accessed": false,
         "projection_mode": "prompt_v2_exact",
@@ -99,13 +99,13 @@
           "portfolio": {
             "portfolio_id": "ask.portfolio.prompt-v2.claude",
             "revision": "prompt-v2-baseline-v1",
-            "manifest_digest": "sha256:46e3541f78aae65223dad8779164ad227e2c388a906ba52ea72cf99b76e99641",
+            "manifest_digest": "sha256:56d938ec3d9e474c614670fd92cb4559eba7cd17f7f060a4a74cae892ee6ff8e",
             "asset_set_digest": "sha256:683f6c70f79d1fe4f63bb0480e1ab6e3c963323819e58b3ed9a85af8d4c9961c",
-            "lock_digest": "sha256:24cc391f26cb4e1d6ccb2ed995333b44bec57f251b1bcc71de1d0d90064eafc7"
+            "lock_digest": "sha256:eee4b853c63f8fd50602ceccaf684e0565f5b88e2fec58ed9ad98b9609a419b0"
           },
           "selection": {
-            "selection_object_digest": "sha256:f8743b7de742d68297e839e9fefb5cedd9abfc536d3ebe3700f5f5d9c4f5b6ac",
-            "selection_digest": "sha256:92a8565fe347835af936ae7ac085109cb6cbebee81cd9a962643281a30951d05"
+            "selection_object_digest": "sha256:6a8af21cd04f38b24c5012adba646112ee862f7a7078c66aedef9776f086df20",
+            "selection_digest": "sha256:9d5022b7c015d6d3baf05baf770dabd9957a95fac18234883d497ef795ffdd8d"
           },
           "projection": {
             "renderer_id": "install-claude-adapter",
@@ -127,13 +127,13 @@
           "portfolio": {
             "portfolio_id": "ask.portfolio.prompt-v2.claude",
             "revision": "prompt-v2-challenger-v1",
-            "manifest_digest": "sha256:98ff34cedf5c29a065c26ddc2ac5dac010b25efa4755433f5e4bd7335740a8c4",
+            "manifest_digest": "sha256:26e381a5556797020944346b7c92722c9991913febe189f182119fceb8d1ff07",
             "asset_set_digest": "sha256:f2ed4f5c784cd8778324b1eaab970fa2ea351785a89e9957cb3c318fed307adc",
-            "lock_digest": "sha256:1c70bc7146f6630c9c3734d1607f3b0c3c47edc834d5274b33e47efbccf21d0c"
+            "lock_digest": "sha256:140c1038e0db1a1ae65162f2e2f5c92549ede0f2c349bce2337380eea5ce85b8"
           },
           "selection": {
-            "selection_object_digest": "sha256:6c52dba00243e14db492d6f1f5eb9e16909ee1426c7327a3823c09234d6dbee0",
-            "selection_digest": "sha256:524a694b360def9e61f82776ad594a45d6269fe361fa75e3949ab72d6446f60d"
+            "selection_object_digest": "sha256:74e782adaaba7ad90096d11c1bce7da270fd12772f2f9e2373fe5f3185c0008f",
+            "selection_digest": "sha256:0820c32e0f813bcea4ed21cc5f9eb6be404b492208991036cabb77c7171014f6"
           },
           "projection": {
             "renderer_id": "install-claude-adapter",
@@ -145,13 +145,13 @@
         }
       ],
       "evolution": {
-        "candidate_object_digest": "sha256:33bcc3ca7a562fa9b084ddfd41696193512e8b871ffd8ad8e527d3760ebf24a1",
-        "candidate_digest": "sha256:c2f898284de497b2bde5fac0f44dc11b78ada15f735bd3150dfdf85b2e352cde",
-        "experiment_object_digest": "sha256:670b083134f098f98382dc06a356bd012e4205804c1ca9644df4750d9e70e225",
-        "experiment_digest": "sha256:26cee61977de4b5b43c1e4f3f2f35f6d26186c78783f754ec0f20751b9ba4efc",
+        "candidate_object_digest": "sha256:69d840502452956cae698020494d074e54a7f676c906d769815f4feb00c9c31a",
+        "candidate_digest": "sha256:4601430bc3e11ca1d94e08e4ad96c306cf7ad9101d77da22d338b25b93ba511b",
+        "experiment_object_digest": "sha256:96f015fd4397cf1f686de77758c6b7136dd5236b2eaeb70ab8a6658e15f11eba",
+        "experiment_digest": "sha256:e9f9a18c65cd4e7a643f50d4be629be77c39ebebc87d01b193abccbc5c59f746",
         "baseline_asset_record_digest": "sha256:0c23fd8c7aa03e146535e2ed5735a1ec2c0123784ac45a05a2d157733e081fc1",
         "candidate_asset_record_digest": "sha256:5ea73fbbe3ca75707c8328a5d2fe5723c94f681db67c528b35d33b501cd44e4a",
-        "rollback_target_manifest_digest": "sha256:46e3541f78aae65223dad8779164ad227e2c388a906ba52ea72cf99b76e99641",
+        "rollback_target_manifest_digest": "sha256:56d938ec3d9e474c614670fd92cb4559eba7cd17f7f060a4a74cae892ee6ff8e",
         "phase": "pre_result",
         "results_accessed": false,
         "projection_mode": "prompt_v2_exact",
@@ -166,5 +166,5 @@
     "recommendation_created": false,
     "lifecycle_mutation_authorized": false
   },
-  "binding_digest": "sha256:fab615bac51d18488c50c6674845db9be17ee2766272c6dbb9d82c334d93324a"
+  "binding_digest": "sha256:3e9208651cc2b486185680d68f2987a7d2d4f8d2b557999e0d3e68fb970427a1"
 }

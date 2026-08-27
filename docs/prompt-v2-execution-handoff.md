@@ -27,7 +27,7 @@ The generated binding and reference are the exact authority. A mutable branch na
 - Build the plan, materialization manifest, and initial resume state with the exports in `scripts/ask-benchmark-prompt-v2.mjs`.
 - Execute only pending Codex cases from the exact plan. Preserve task, workspace, and evaluator-visible input identity inside each pair while applying the exact role-specific Prompt Asset.
 - Record Claude cases through the typed unavailable path without process creation.
-- Use the existing #197 `full_ask` raw scoring/result/report authority. Preserve its exact raw result references; do not implement another scorer or add a fifth #197 condition.
+- Use the existing #197 `full_ask` raw scoring/result/report authority. Resolve every raw result reference through a verified #197 authority resolver that returns the exact source authority, Prompt case ID, and typed score projection; preserve those exact references and never synthesize, transplant, or recompute them. Do not implement another scorer or add a fifth #197 condition.
 - Append normalized case references through `applyPromptV2NormalizedResult`, then derive adapter-separated comparison reports with `buildPromptV2ComparisonReport`.
 - Keep raw prompts, full model outputs, stdout/stderr, private evaluator bytes, secrets, and absolute private paths outside durable public artifacts.
 - Report exact commands, terminal exits, case inventory, unavailable/unknown states, native-unit metrics, medians/MADs/sign counts, adapter outcomes, and the repository outcome.

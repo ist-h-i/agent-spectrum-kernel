@@ -403,7 +403,7 @@
       "additionalProperties": false,
       "required": ["condition_id", "config_path", "config_digest", "frozen_results_mutated"],
       "properties": {
-        "condition_id": { "type": "string", "enum": ["kernel_only", "adaptive_ask"] },
+        "condition_id": { "type": "string", "enum": ["kernel_only", "adaptive_ask", "full_ask"] },
         "config_path": { "$ref": "#/$defs/portablePath" },
         "config_digest": { "$ref": "#/$defs/digest" },
         "frozen_results_mutated": { "type": "boolean", "const": false }
