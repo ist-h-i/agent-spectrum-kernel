@@ -336,10 +336,16 @@ repository, consumed-input path/kind set, full command identity, runner and
 adapter IDs plus evidence level, toolchain-name set, and environment OS and
 architecture match the requirement. Revision, tree and input digests, runner,
 adapter and toolchain versions, and the bounded environment identity may then
-show that evidence from the same family is stale. Evidence outside that family,
-including an object from another repository or an unrelated input boundary,
-must remain irrelevant: adding it to a shared CAS cannot change the decision,
-reason set, selected or omitted Assets, or selection digest.
+show that evidence from the same family is stale, but only when the evidence
+producer kind/key identity pair and evidence level are accepted by that
+required gate. A valid signature proves record integrity; it does not grant
+producer authority for a gate. A non-exact record from an unaccepted producer
+or evidence level therefore cannot establish staleness and leaves a missing
+disposition unchanged. Evidence outside the family or authority boundary,
+including an object from another repository, an unrelated input boundary, or
+an unaccepted producer, must remain irrelevant: adding it to a shared CAS
+cannot change the decision, reason set, selected or omitted Assets, or
+selection digest.
 
 Freshness in this contract is exact material-identity freshness. It is not age,
 wall-clock TTL, file modification time, or a mutable "last checked" value. The

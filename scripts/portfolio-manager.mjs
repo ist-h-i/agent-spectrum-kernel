@@ -1269,21 +1269,39 @@ function evidenceMaterialFamilyIdentity(reuseIdentity) {
   };
 }
 
-function storedEvidenceMaterialFamilyDigests(storeRoot) {
-  const familyDigests = new Set();
+function storedVerificationEvidence(storeRoot) {
+  const evidenceRecords = [];
   for (const record of listContentAddressedJson({ storeRoot })) {
     if (record.value?.program !== "ask_verification_evidence") continue;
-    const evidence = sealVerificationEvidence(record.value);
-    familyDigests.add(canonicalDigest(evidenceMaterialFamilyIdentity(evidence)));
+    evidenceRecords.push(sealVerificationEvidence(record.value));
   }
-  return familyDigests;
+  return evidenceRecords;
+}
+
+function evidenceAuthorityAcceptedForGate(evidence, requiredGate) {
+  return requiredGate.authority.accepted_producers.some((producer) => (
+    producer.kind === evidence.producer.kind
+    && producer.identity_digest === evidence.producer.identity_digest
+  )) && requiredGate.authority.accepted_evidence_levels.includes(
+    evidence.execution.runner.evidence_level,
+  );
+}
+
+function hasAcceptedEvidenceInMaterialFamily(evidenceRecords, requiredGate) {
+  const requiredFamilyDigest = canonicalDigest(
+    evidenceMaterialFamilyIdentity(requiredGate.reuse_identity),
+  );
+  return evidenceRecords.some((evidence) => (
+    canonicalDigest(evidenceMaterialFamilyIdentity(evidence)) === requiredFamilyDigest
+    && evidenceAuthorityAcceptedForGate(evidence, requiredGate)
+  ));
 }
 
 function classifyEvidenceDisposition(
   disposition,
   requiredGate,
   allowedDispositions,
-  knownMaterialFamilyDigests,
+  evidenceRecords,
 ) {
   if (allowedDispositions.includes(disposition.disposition)) return null;
   if (disposition.reason_code === "conflicting_exact_evidence") return "evidence_conflict";
@@ -1291,10 +1309,7 @@ function classifyEvidenceDisposition(
     if (!requiredGate || requiredGate.gate_id !== disposition.gate_id) {
       throw new Error(`${disposition.gate_id} disposition has no matching material requirement`);
     }
-    const requiredFamilyDigest = canonicalDigest(
-      evidenceMaterialFamilyIdentity(requiredGate.reuse_identity),
-    );
-    return knownMaterialFamilyDigests.has(requiredFamilyDigest)
+    return hasAcceptedEvidenceInMaterialFamily(evidenceRecords, requiredGate)
       ? "evidence_stale"
       : "evidence_missing";
   }
@@ -1554,7 +1569,7 @@ export function resolvePortfolioSelection({
     }
   }
 
-  const knownMaterialFamilyDigests = storedEvidenceMaterialFamilyDigests(storeRoot);
+  const evidenceRecords = storedVerificationEvidence(storeRoot);
   for (const requirement of manifest.evidence_requirements) {
     const plan = planExactReuse({ storeRoot, requirements: requirement.requirements });
     validateVerificationReusePlan(plan, {
@@ -1590,7 +1605,7 @@ export function resolvePortfolioSelection({
         disposition,
         requiredGateById.get(disposition.gate_id),
         requirement.allowed_dispositions,
-        knownMaterialFamilyDigests,
+        evidenceRecords,
       ))
       .filter(Boolean);
     for (const code of sortedText([...new Set(failures)])) {

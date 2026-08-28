@@ -435,6 +435,7 @@ function verificationEvidenceDraft({
   consumedInputPath = "portfolio-selection-basis.json",
   consumedInputDigest = selectionBasisDigest,
   toolchainVersion = "24",
+  evidenceLevel = "behavior_verified",
   obligationRefs = [`${gateId}.obligation`],
   explicitNonCoverage = [],
 } = {}) {
@@ -471,7 +472,7 @@ function verificationEvidenceDraft({
         runner_version: "1.0.0",
         adapter_id: ADAPTER,
         adapter_version: adapterVersion,
-        evidence_level: "behavior_verified",
+        evidence_level: evidenceLevel,
       },
       toolchain: [{
         name: "node",
@@ -1329,6 +1330,80 @@ try {
     const afterRelatedStaleEvidence = select({ storeRoot, scenario: sharedCasIsolationScenario, assetTrust });
     assert.equal(afterRelatedStaleEvidence.selection.decision, "downgrade");
     assert.ok(hasReason(afterRelatedStaleEvidence.selection, "evidence_stale", "downgrade"));
+  });
+  const sharedCasAuthorityGateId = "issue-277-shared-cas-authority-gate";
+  const sharedCasAuthorityDraft = prepareEvidenceManifest({
+    storeRoot,
+    registry,
+    portfolioId: "ask.portfolio.issue277.shared-cas-authority",
+    revision: "v1",
+    entry: challengerTemplate(),
+    evidenceMode: "missing",
+    gateId: sharedCasAuthorityGateId,
+  });
+  const sharedCasAuthorityScenario = activateInitial({
+    storeRoot,
+    draft: sharedCasAuthorityDraft,
+    assetTrust,
+  });
+  regression("only authority-accepted evidence can establish stale material in a shared CAS", () => {
+    const before = select({ storeRoot, scenario: sharedCasAuthorityScenario, assetTrust });
+    assert.equal(before.selection.decision, "bypass");
+    assert.ok(hasReason(before.selection, "evidence_missing", "bypass"));
+
+    putVerificationEvidence({
+      storeRoot,
+      evidence: sealEvidence({
+        gateId: sharedCasAuthorityGateId,
+        selectionBasisDigest: digest("unaccepted-producer-selection-basis"),
+        targetRevision: "unaccepted-producer-revision",
+        targetTreeDigest: digest("unaccepted-producer-tree"),
+      }, alternateProducerKeys.privateKey),
+    });
+    const afterUnacceptedProducer = select({
+      storeRoot,
+      scenario: sharedCasAuthorityScenario,
+      assetTrust,
+    });
+    assert.deepEqual(afterUnacceptedProducer.selection, before.selection);
+
+    putVerificationEvidence({
+      storeRoot,
+      evidence: sealEvidence({
+        gateId: sharedCasAuthorityGateId,
+        selectionBasisDigest: digest("unaccepted-evidence-level-selection-basis"),
+        targetRevision: "unaccepted-evidence-level-revision",
+        targetTreeDigest: digest("unaccepted-evidence-level-tree"),
+        evidenceLevel: "runtime_detected",
+      }),
+    });
+    const afterUnacceptedEvidenceLevel = select({
+      storeRoot,
+      scenario: sharedCasAuthorityScenario,
+      assetTrust,
+    });
+    assert.deepEqual(afterUnacceptedEvidenceLevel.selection, before.selection);
+
+    putVerificationEvidence({
+      storeRoot,
+      evidence: sealEvidence({
+        gateId: sharedCasAuthorityGateId,
+        selectionBasisDigest: digest("accepted-stale-selection-basis"),
+        targetRevision: "accepted-stale-revision",
+        targetTreeDigest: digest("accepted-stale-tree"),
+      }),
+    });
+    const afterAcceptedStaleEvidence = select({
+      storeRoot,
+      scenario: sharedCasAuthorityScenario,
+      assetTrust,
+    });
+    assert.equal(afterAcceptedStaleEvidence.selection.decision, "downgrade");
+    assert.ok(hasReason(
+      afterAcceptedStaleEvidence.selection,
+      "evidence_stale",
+      "downgrade",
+    ));
   });
   check("stale adapter identity follows typed downgrade", () => {
     const resolved = select({ storeRoot, scenario: evidenceScenarios.stale, assetTrust });
