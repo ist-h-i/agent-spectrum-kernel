@@ -429,7 +429,10 @@ function verificationEvidenceDraft({
   selectionBasisDigest,
   terminalStatus = "succeeded",
   adapterVersion = "1.0.0",
+  repositoryId = REPOSITORY_ID,
+  targetRevision = SOURCE_REVISION,
   targetTreeDigest = TREE_DIGEST,
+  consumedInputPath = "portfolio-selection-basis.json",
   consumedInputDigest = selectionBasisDigest,
   toolchainVersion = "24",
   obligationRefs = [`${gateId}.obligation`],
@@ -445,13 +448,13 @@ function verificationEvidenceDraft({
       category: "test",
     },
     target: {
-      repository_id: REPOSITORY_ID,
-      target_revision: SOURCE_REVISION,
+      repository_id: repositoryId,
+      target_revision: targetRevision,
       tree_digest: targetTreeDigest,
     },
     consumed_inputs: [{
       kind: "manifest",
-      path: "portfolio-selection-basis.json",
+      path: consumedInputPath,
       digest: consumedInputDigest,
     }],
     execution: {
@@ -1269,6 +1272,63 @@ try {
     const resolved = select({ storeRoot, scenario: evidenceScenarios.missing, assetTrust });
     assert.equal(resolved.selection.decision, "bypass");
     assert.ok(hasReason(resolved.selection, "evidence_missing", "bypass"));
+  });
+  const sharedCasIsolationGateId = "issue-277-shared-cas-isolation-gate";
+  const sharedCasIsolationDraft = prepareEvidenceManifest({
+    storeRoot,
+    registry,
+    portfolioId: "ask.portfolio.issue277.shared-cas-isolation",
+    revision: "v1",
+    entry: challengerTemplate(),
+    evidenceMode: "missing",
+    gateId: sharedCasIsolationGateId,
+  });
+  const sharedCasIsolationScenario = activateInitial({
+    storeRoot,
+    draft: sharedCasIsolationDraft,
+    assetTrust,
+  });
+  regression("unrelated evidence with the same gate ID cannot change a shared-CAS selection", () => {
+    const before = select({ storeRoot, scenario: sharedCasIsolationScenario, assetTrust });
+    assert.equal(before.selection.decision, "bypass");
+    assert.ok(hasReason(before.selection, "evidence_missing", "bypass"));
+
+    putVerificationEvidence({
+      storeRoot,
+      evidence: sealEvidence({
+        gateId: sharedCasIsolationGateId,
+        selectionBasisDigest: digest("foreign-repository-selection-basis"),
+        repositoryId: "github.com/example/shared-cas-neighbor",
+        targetRevision: "neighbor-revision",
+        targetTreeDigest: digest("neighbor-tree"),
+      }),
+    });
+    const afterForeignRepository = select({ storeRoot, scenario: sharedCasIsolationScenario, assetTrust });
+    assert.deepEqual(afterForeignRepository.selection, before.selection);
+
+    putVerificationEvidence({
+      storeRoot,
+      evidence: sealEvidence({
+        gateId: sharedCasIsolationGateId,
+        selectionBasisDigest: digest("unrelated-input-selection-basis"),
+        consumedInputPath: "other/portfolio-selection-basis.json",
+      }),
+    });
+    const afterUnrelatedInput = select({ storeRoot, scenario: sharedCasIsolationScenario, assetTrust });
+    assert.deepEqual(afterUnrelatedInput.selection, before.selection);
+
+    putVerificationEvidence({
+      storeRoot,
+      evidence: sealEvidence({
+        gateId: sharedCasIsolationGateId,
+        selectionBasisDigest: digest("prior-selection-basis"),
+        targetRevision: "prior-revision",
+        targetTreeDigest: digest("prior-tree"),
+      }),
+    });
+    const afterRelatedStaleEvidence = select({ storeRoot, scenario: sharedCasIsolationScenario, assetTrust });
+    assert.equal(afterRelatedStaleEvidence.selection.decision, "downgrade");
+    assert.ok(hasReason(afterRelatedStaleEvidence.selection, "evidence_stale", "downgrade"));
   });
   check("stale adapter identity follows typed downgrade", () => {
     const resolved = select({ storeRoot, scenario: evidenceScenarios.stale, assetTrust });

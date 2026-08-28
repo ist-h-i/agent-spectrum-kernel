@@ -329,6 +329,18 @@ record, an exact PASS/FAIL conflict, an unknown dependency, or an invalidation
 digest change is not fresh evidence and must take the configured typed failure
 path.
 
+The distinction between `evidence_missing` and `evidence_stale` is scoped to a
+material family, never to the global presence of a `gate_id`. A stored evidence
+object belongs to the required family only when its full gate identity, target
+repository, consumed-input path/kind set, full command identity, runner and
+adapter IDs plus evidence level, toolchain-name set, and environment OS and
+architecture match the requirement. Revision, tree and input digests, runner,
+adapter and toolchain versions, and the bounded environment identity may then
+show that evidence from the same family is stale. Evidence outside that family,
+including an object from another repository or an unrelated input boundary,
+must remain irrelevant: adding it to a shared CAS cannot change the decision,
+reason set, selected or omitted Assets, or selection digest.
+
 Freshness in this contract is exact material-identity freshness. It is not age,
 wall-clock TTL, file modification time, or a mutable "last checked" value. The
 manager must not claim temporal freshness unless a later contract supplies an
