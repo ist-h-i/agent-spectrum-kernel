@@ -8,8 +8,8 @@ Execute and interpret the preregistered `current_prompt` versus `prompt_v2` cana
 
 ## Context
 
-- Preregistration source commit A: `1710b3007d60e249d553ca7a43b5a83937066b61`.
-- Source tree: `caff00c8f1d97386fe28d62d819028e644036a27`.
+- Preregistration source commit A: `c508a767f3386dac10180770edf37a67806fbb1b`.
+- Source tree: `d7d377c1265f0fb47119bfc80a2f3eb9535cf163`.
 - Frozen execution repository: `869d96b16543ef68b4c459064c8010e1cdb0b8de` / tree `1546f9cd522716f5d266018b7cc4901bed98c204`.
 - Preregistration digest: `sha256:5c7c9d0a8bce5171f5c9b6bbb4c737d509a8375bb8db1bdb89df80a684d49cce`.
 - Protocol raw-byte digest: `sha256:4ab18a466567e0a94df575bddb5aabc4ccf8fff496be11d3af74a32ef44aff3a`.

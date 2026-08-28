@@ -674,9 +674,9 @@
       },
       "preregistration": {
         "path": "benchmarks/prompt-v2-preregistration.json",
-        "file_sha256": "898d0f45e10c6e4951d04000a735b772d6d4c32482b15effc952226ff5e440c2",
-        "preregistration_id": "prompt-v2-prereg-09a8375bb8db1bdb89df80a684d49cce",
-        "preregistration_digest": "sha256:5c7c9d0a8bce5171f5c9b6bbb4c737d509a8375bb8db1bdb89df80a684d49cce",
+        "file_sha256": "4f47496ffa1d00f3336f816795db369e61f9d56ad9336d6e6ea2a99051674053",
+        "preregistration_id": "prompt-v2-prereg-ae74196b851d186ae1e0aa0a45939b3d",
+        "preregistration_digest": "sha256:f5cc838703008896e7864e17501c99c3ae74196b851d186ae1e0aa0a45939b3d",
         "expected_case_count": 56,
         "prompt_roles": [
           "current_prompt",
@@ -684,22 +684,22 @@
         ]
       },
       "source_archive": {
-        "revision": "1710b3007d60e249d553ca7a43b5a83937066b61",
-        "tree": "caff00c8f1d97386fe28d62d819028e644036a27",
+        "revision": "c508a767f3386dac10180770edf37a67806fbb1b",
+        "tree": "d7d377c1265f0fb47119bfc80a2f3eb9535cf163",
         "rendered_root": "docs/fixtures/prompt-v2-preregistration/rendered",
-        "rendered_inventory_digest": "sha256:479c63756fa0df8c71d3f1561b69c9fd8397acc63fae8289ee191dfaa2867778"
+        "rendered_inventory_digest": "sha256:a7db31d68baf31a99250af4f407815636d38cd13dd5cebddd78eba1eb660a67d"
       },
       "generated_authority": {
         "binding_path": "docs/fixtures/prompt-v2-preregistration/binding.json",
-        "binding_file_sha256": "efbbdb491f244723c530617f2b2ceb1de98f9cc0f43fb4bbf4069fd2adc810ec",
-        "binding_digest": "sha256:3e9208651cc2b486185680d68f2987a7d2d4f8d2b557999e0d3e68fb970427a1",
+        "binding_file_sha256": "496b8e592637cefbd0e2f60c118994aa066c18a60e42647bb148f78c06129bfc",
+        "binding_digest": "sha256:75aff7c8158b6b9da23c6a20d514bf156d2b9301d4cc82844eb05c69dc2d99f6",
         "reference_path": "docs/fixtures/prompt-v2-preregistration/reference.json",
-        "reference_file_sha256": "b4a174ad5fc76179fe5fa555cb83df0d3e6fd31956d41437aba6df874268c265",
-        "reference_digest": "sha256:a3e3aef6c9f50ddd021fd2b12f289ae8800069bd03e518f2f3fdd2207234298e",
-        "registry_snapshot_digest": "sha256:d4f1962245e57fdbadf098dc959f49130e7f97ecb888d13d306a82338df05bfa",
+        "reference_file_sha256": "b059809df015f9bd063c9ff4cf58a7f0a8dc1dda430ed7848856e0cb97dda752",
+        "reference_digest": "sha256:3e973ea52f6e4321379442928d86f39db16fb5c024ef4676254e24c07fd08548",
+        "registry_snapshot_digest": "sha256:fd6a82bb2685fbcb4a394613d8a2521ab91b1b7e9f75cfdb7621c712f52f8173",
         "store_root": "docs/fixtures/prompt-v2-preregistration/store",
         "object_count": 57,
-        "object_inventory_digest": "sha256:48f01a289f377dbb90784fdac290d832c71424e4f07eb0ad454427e9920fdfbe"
+        "object_inventory_digest": "sha256:7c267fbd91cc82c24916c1ad39ad559b1da11752c02fe35d21887aff6fd6c63a"
       },
       "schemas": [
         {
@@ -738,33 +738,33 @@
         },
         {
           "path": "scripts/prompt-v2-preregistration-samples.mjs",
-          "file_sha256": "663099af1ad2dc04b4365e1b2af73b698dc1d02a71b10a48c8a921716b6b88b6"
+          "file_sha256": "ddf77743676e8ade160d99162d4205433c2b4ce76b857ef90c9c9eb6f124aa41"
         },
         {
           "path": "scripts/test-prompt-v2-preregistration-samples.mjs",
-          "file_sha256": "ae7bc3fcfd0e94405ac4987ba4d9440e43e71a0174e9a776efb509cbbb0575f2"
+          "file_sha256": "48c85f1b8593bdfdf21914e944c2d4d9e65713583a61d8706d725668159d9ed2"
         }
       ],
       "adapter_tracks": [
         {
           "adapter_track": "codex",
           "selector_adapter": "codex",
-          "baseline_asset_record_digest": "sha256:81815fd22afae413217b241a65c9b8d7a7068bc703c33967c1a45c0824a4c80f",
-          "candidate_asset_record_digest": "sha256:36f9b3b20a946aacb840e031c1b0d2cb87e0ab4f6e913aa877ea4bdca4cc52b2",
-          "baseline_selection_digest": "sha256:0c7c17b140a774bf0222622f285379754bb5fecf9b382bb18ec48204fd47971f",
-          "challenger_selection_digest": "sha256:a86f3441b5ec699ba12b739ad44396117ddb9d215ef94bfa1792db17ad08c1f9",
-          "candidate_digest": "sha256:c1739a0faab33c3794efea70944807af8a0bf11b2b8a7cd5cb8ff16ccdf3052d",
-          "experiment_digest": "sha256:35dab9a6fe86b89092a6875b1c3453f06144107481632f4a861e24dad24e9127"
+          "baseline_asset_record_digest": "sha256:60dbe252776cd6f432232a821ed8d85de2d8366650b1695b0ca224954252b89b",
+          "candidate_asset_record_digest": "sha256:bd9c377da681705af17a658cc576d5fe6981ddf351e01d84198054d97d975e76",
+          "baseline_selection_digest": "sha256:fa4223ba5b44eec40a727c9f4df47d23c11e2e1bb05c6a36ea5cc06e7b411b26",
+          "challenger_selection_digest": "sha256:54a6b3598083b431cbd5f00f2329c803e2d59431194a632b39991c2b2e573507",
+          "candidate_digest": "sha256:c46e9d23fdb1db0d06fcb0b37292690985a013454ad16eafe726ecd48cbbc760",
+          "experiment_digest": "sha256:9544aa05b6dfc1e0b4ffc059feabe521b32d0b165fc90740421fc75bac76b4b7"
         },
         {
           "adapter_track": "claude",
           "selector_adapter": "claude_code",
-          "baseline_asset_record_digest": "sha256:0c23fd8c7aa03e146535e2ed5735a1ec2c0123784ac45a05a2d157733e081fc1",
-          "candidate_asset_record_digest": "sha256:5ea73fbbe3ca75707c8328a5d2fe5723c94f681db67c528b35d33b501cd44e4a",
-          "baseline_selection_digest": "sha256:9d5022b7c015d6d3baf05baf770dabd9957a95fac18234883d497ef795ffdd8d",
-          "challenger_selection_digest": "sha256:0820c32e0f813bcea4ed21cc5f9eb6be404b492208991036cabb77c7171014f6",
-          "candidate_digest": "sha256:4601430bc3e11ca1d94e08e4ad96c306cf7ad9101d77da22d338b25b93ba511b",
-          "experiment_digest": "sha256:e9f9a18c65cd4e7a643f50d4be629be77c39ebebc87d01b193abccbc5c59f746"
+          "baseline_asset_record_digest": "sha256:e4fb70aa92444a930e339dd5ca93d3b942eed3d5651ceededd6d268766035ab3",
+          "candidate_asset_record_digest": "sha256:061bc45dbab12ef756f3054352b599a00d4b789cefb4c1e71d3892d1bf5fc118",
+          "baseline_selection_digest": "sha256:c6ad33719e166a3c1e7ddc91ead8bdae915610fbd8d3245eb5e90347fcb161a7",
+          "challenger_selection_digest": "sha256:1e2161d6826dcf170a3494bca78190132f93d3080ba29f544c3e94f90d5cc715",
+          "candidate_digest": "sha256:dd731b505f95f8da50718919830b3c1b54b3fef5ca12e726f446a5db10165e8b",
+          "experiment_digest": "sha256:96509f953bbe328b3d7bdbfa9ca85546148d494bc1babec4c6bed04d8896a0a0"
         }
       ],
       "handoff_path": "docs/prompt-v2-execution-handoff.md",

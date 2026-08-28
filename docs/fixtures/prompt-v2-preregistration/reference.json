@@ -3,27 +3,27 @@
   "object_kind": "prompt_v2_preregistration_fixture_reference",
   "fixture_root": "docs/fixtures/prompt-v2-preregistration",
   "source": {
-    "repository_revision": "1710b3007d60e249d553ca7a43b5a83937066b61",
-    "repository_tree": "caff00c8f1d97386fe28d62d819028e644036a27",
-    "tree_digest": "sha256:8b7fadc5afd29fdb22520861dadbf948feee09feb90404bdba389e2957db1737"
+    "repository_revision": "c508a767f3386dac10180770edf37a67806fbb1b",
+    "repository_tree": "d7d377c1265f0fb47119bfc80a2f3eb9535cf163",
+    "tree_digest": "sha256:ebef1b35363d8097b303fb4d6937b573e2efccc342176adca3ce9c3ff3e95b35"
   },
   "preregistration": {
     "path": "benchmarks/prompt-v2-preregistration.json",
-    "raw_digest": "sha256:898d0f45e10c6e4951d04000a735b772d6d4c32482b15effc952226ff5e440c2",
-    "preregistration_id": "prompt-v2-prereg-09a8375bb8db1bdb89df80a684d49cce",
-    "preregistration_digest": "sha256:5c7c9d0a8bce5171f5c9b6bbb4c737d509a8375bb8db1bdb89df80a684d49cce"
+    "raw_digest": "sha256:4f47496ffa1d00f3336f816795db369e61f9d56ad9336d6e6ea2a99051674053",
+    "preregistration_id": "prompt-v2-prereg-ae74196b851d186ae1e0aa0a45939b3d",
+    "preregistration_digest": "sha256:f5cc838703008896e7864e17501c99c3ae74196b851d186ae1e0aa0a45939b3d"
   },
   "rendered_archive": {
     "root": "docs/fixtures/prompt-v2-preregistration/rendered",
     "reference_path": "docs/fixtures/prompt-v2-preregistration/rendered/reference.json",
-    "reference_raw_digest": "sha256:dde873121632ed20646bf374a2ef6c85fc010209f538ee33c889ea80041a01a1",
-    "archive_digest": "sha256:dab3f164502f18a37be4f9a35eed317360d226f92487fc19528eafb31d6032ea",
-    "inventory_digest": "sha256:479c63756fa0df8c71d3f1561b69c9fd8397acc63fae8289ee191dfaa2867778"
+    "reference_raw_digest": "sha256:7b6ea2a307454f3c20a43631fb63482e99e110fbc829f1de30fd8c5aec7d25f7",
+    "archive_digest": "sha256:518956f5683680e3517eb9f3916a01364dc1f79181f2eb34eecb395e77d0a28d",
+    "inventory_digest": "sha256:a7db31d68baf31a99250af4f407815636d38cd13dd5cebddd78eba1eb660a67d"
   },
   "binding": {
     "path": "docs/fixtures/prompt-v2-preregistration/binding.json",
-    "binding_digest": "sha256:3e9208651cc2b486185680d68f2987a7d2d4f8d2b557999e0d3e68fb970427a1",
-    "raw_digest": "sha256:efbbdb491f244723c530617f2b2ceb1de98f9cc0f43fb4bbf4069fd2adc810ec"
+    "binding_digest": "sha256:75aff7c8158b6b9da23c6a20d514bf156d2b9301d4cc82844eb05c69dc2d99f6",
+    "raw_digest": "sha256:496b8e592637cefbd0e2f60c118994aa066c18a60e42647bb148f78c06129bfc"
   },
   "foundation": {
     "fixture_root": "docs/fixtures/asset-registry",
@@ -54,14 +54,14 @@
     "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
     "scope_id": "agent-spectrum-kernel",
     "snapshot_revision": 11,
-    "snapshot_digest": "sha256:d4f1962245e57fdbadf098dc959f49130e7f97ecb888d13d306a82338df05bfa"
+    "snapshot_digest": "sha256:fd6a82bb2685fbcb4a394613d8a2521ab91b1b7e9f75cfdb7621c712f52f8173"
   },
   "evaluator_asset": {
     "asset_type": "evaluator_reference",
     "stable_id": "ask.evaluator-reference.prompt-v2-public-set",
-    "version": "git:1710b3007d60e249d553ca7a43b5a83937066b61",
-    "record_digest": "sha256:cdd719731e073447782f016284217e25b9eb7629ba0283af5fa7780f33fff251",
-    "content_digest": "sha256:381a48b508b4ea75ecc30c3794669696c2fe2c47943ed288708226f3273d67ba"
+    "version": "git:c508a767f3386dac10180770edf37a67806fbb1b",
+    "record_digest": "sha256:685407a5211074ed1747eb12b5b7b192f6dedff43d697ed6bcd57fa56e4b7fa8",
+    "content_digest": "sha256:f740e60aec69f5958317d3c82426dbdecc78ca9224340cb501cad96904d6ae96"
   },
   "adapters": [
     {
@@ -71,37 +71,37 @@
         "asset_type": "prompt",
         "stable_id": "ask.prompt-bundle.codex",
         "version": "234.0.0-current",
-        "record_digest": "sha256:81815fd22afae413217b241a65c9b8d7a7068bc703c33967c1a45c0824a4c80f",
-        "content_digest": "sha256:1fec5fb3550f17f7ef463d00eac53e34124c251f036a8808ea87e7d1347dc348"
+        "record_digest": "sha256:60dbe252776cd6f432232a821ed8d85de2d8366650b1695b0ca224954252b89b",
+        "content_digest": "sha256:241b8cba488511a47ed123fb1e31c5efcc1c999c581eabfaab4ceeae392a213c"
       },
       "candidate_asset": {
         "asset_type": "prompt",
         "stable_id": "ask.prompt-bundle.codex",
         "version": "234.0.0-prompt-v2",
-        "record_digest": "sha256:36f9b3b20a946aacb840e031c1b0d2cb87e0ab4f6e913aa877ea4bdca4cc52b2",
-        "content_digest": "sha256:93c421e03879eb4a4b9ee62e6e9fb596045f16638b983d1941b450e418509949"
+        "record_digest": "sha256:bd9c377da681705af17a658cc576d5fe6981ddf351e01d84198054d97d975e76",
+        "content_digest": "sha256:a3d4ae4ae50bab09f8ee6a6c3f415d501ed635d048ec86d04a154eea488ebcfb"
       },
       "baseline_portfolio": {
         "portfolio_id": "ask.portfolio.prompt-v2.codex",
         "revision": "prompt-v2-baseline-v1",
-        "manifest_digest": "sha256:6194e7a893316b18d9a0576ebf237f4ea15b24f1d19a716f5be88ad69f704e89",
-        "asset_set_digest": "sha256:346873c682a7f2168407145e68f6cbfe36840adb1e656924c809e10fde03fdfa",
-        "lock_digest": "sha256:b2ae7e7ac41f9e2c3b76e57f41a2e424b6702a67a6148eec8c02a8c39b77a7d4"
+        "manifest_digest": "sha256:d605f8927941f1c90a9bcf956874599843f8dad27e579e412a31f8c569ec2e0c",
+        "asset_set_digest": "sha256:246eb564400a1932acbbd4b84f53ca98c26c8e83d14b4782b6e4301fe97ad44b",
+        "lock_digest": "sha256:31e6094e927442aa7de883f7db797e27b19e35ac2acd8c74b127dee23dde5523"
       },
       "challenger_portfolio": {
         "portfolio_id": "ask.portfolio.prompt-v2.codex",
         "revision": "prompt-v2-challenger-v1",
-        "manifest_digest": "sha256:d0ad457d0673caadce455e185795e71b25ba0aeb2e256e3ab0998e36db0b07bb",
-        "asset_set_digest": "sha256:3e3c9e0b02c3d27d9d1ee14c13d97d509557ad750b57b3d77b05e171abc68906",
-        "lock_digest": "sha256:8beded452d55299ce90fd1b742611dd789b3d29c2f4f16443e27a54abece5510"
+        "manifest_digest": "sha256:a36dc32f64dc8f6e44c7df86609927674404f0b29dc967d7bd628811dc892cf4",
+        "asset_set_digest": "sha256:c5e7f806d0605db544a0dc948a1eb235cb264b70d7375121ac55993f5975ce46",
+        "lock_digest": "sha256:c1fb3d8f5b8872332fbc70ca82999dd94aff06a559ff5904d7fb246d65f90bb8"
       },
       "baseline_selection": {
-        "selection_object_digest": "sha256:b6dada363a36bdb8597c6b2f7f72491be313616b9f744ad54748c959d54660e1",
-        "selection_digest": "sha256:0c7c17b140a774bf0222622f285379754bb5fecf9b382bb18ec48204fd47971f"
+        "selection_object_digest": "sha256:8ccfffef593412265359bdd8c4918598f22441593f0190c2555845fb370b37a5",
+        "selection_digest": "sha256:fa4223ba5b44eec40a727c9f4df47d23c11e2e1bb05c6a36ea5cc06e7b411b26"
       },
       "challenger_selection": {
-        "selection_object_digest": "sha256:6c226e331c688bf2d9c8ffee53fe4fc03c5eb93f39b02df18a914e1aa8756bac",
-        "selection_digest": "sha256:a86f3441b5ec699ba12b739ad44396117ddb9d215ef94bfa1792db17ad08c1f9"
+        "selection_object_digest": "sha256:a863eaca7a4682c8cfd6f4ccfe4f5985fd2bd0fd3fb4d7f5e12fd5ea34cb4243",
+        "selection_digest": "sha256:54a6b3598083b431cbd5f00f2329c803e2d59431194a632b39991c2b2e573507"
       },
       "portfolio_authority_contexts": [
         {
@@ -116,24 +116,24 @@
               "manifest": {
                 "portfolio_id": "ask.portfolio.prompt-v2.codex",
                 "revision": "prompt-v2-baseline-v1",
-                "manifest_digest": "sha256:6194e7a893316b18d9a0576ebf237f4ea15b24f1d19a716f5be88ad69f704e89",
-                "asset_set_digest": "sha256:346873c682a7f2168407145e68f6cbfe36840adb1e656924c809e10fde03fdfa"
+                "manifest_digest": "sha256:d605f8927941f1c90a9bcf956874599843f8dad27e579e412a31f8c569ec2e0c",
+                "asset_set_digest": "sha256:246eb564400a1932acbbd4b84f53ca98c26c8e83d14b4782b6e4301fe97ad44b"
               },
               "from_state": null,
               "to_state": "current"
             }
           ],
-          "transition_basis_digest": "sha256:e3298d44e0291272ca1a6ed7707025e233e36418c71a23856a388a6a7fbe9b96",
+          "transition_basis_digest": "sha256:f2c2a7e068bae9c4583f4267343fd6fe1e7dec8db42800c8dde2f8d668a49bb1",
           "grants": [],
           "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
           "rollback_target": null,
           "authority": {
             "kind": "external_portfolio_activation_authority",
             "authority_id": "ask.prompt-v2.codex.baseline-portfolio-authority",
-            "authority_revision": "1710b3007d60e249d553ca7a43b5a83937066b61",
-            "authority_evidence_digest": "sha256:cfc3719f3aac7f6b0560af328e6f95ed40c86fbac9e31f910b692f2ff8257549"
+            "authority_revision": "c508a767f3386dac10180770edf37a67806fbb1b",
+            "authority_evidence_digest": "sha256:06736a300a15f95b511d6fb8248127100c681da5c1a324055c375da43a103e5f"
           },
-          "context_digest": "sha256:aa5d09a128c12e5d2fa5db4274e55d26c6d0b706e0c97c67a14160eadfbc4f42"
+          "context_digest": "sha256:082b48be3b910a340ee2401a08f153aad51f9676fb08b63de6a6aded81092778"
         },
         {
           "schema_version": "1.0.0",
@@ -141,14 +141,14 @@
           "portfolio_id": "ask.portfolio.prompt-v2.codex",
           "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
           "scope_id": "agent-spectrum-kernel",
-          "predecessor_lock_digest": "sha256:b2ae7e7ac41f9e2c3b76e57f41a2e424b6702a67a6148eec8c02a8c39b77a7d4",
+          "predecessor_lock_digest": "sha256:31e6094e927442aa7de883f7db797e27b19e35ac2acd8c74b127dee23dde5523",
           "transitions": [
             {
               "manifest": {
                 "portfolio_id": "ask.portfolio.prompt-v2.codex",
                 "revision": "prompt-v2-baseline-v1",
-                "manifest_digest": "sha256:6194e7a893316b18d9a0576ebf237f4ea15b24f1d19a716f5be88ad69f704e89",
-                "asset_set_digest": "sha256:346873c682a7f2168407145e68f6cbfe36840adb1e656924c809e10fde03fdfa"
+                "manifest_digest": "sha256:d605f8927941f1c90a9bcf956874599843f8dad27e579e412a31f8c569ec2e0c",
+                "asset_set_digest": "sha256:246eb564400a1932acbbd4b84f53ca98c26c8e83d14b4782b6e4301fe97ad44b"
               },
               "from_state": "current",
               "to_state": "historical"
@@ -157,36 +157,36 @@
               "manifest": {
                 "portfolio_id": "ask.portfolio.prompt-v2.codex",
                 "revision": "prompt-v2-challenger-v1",
-                "manifest_digest": "sha256:d0ad457d0673caadce455e185795e71b25ba0aeb2e256e3ab0998e36db0b07bb",
-                "asset_set_digest": "sha256:3e3c9e0b02c3d27d9d1ee14c13d97d509557ad750b57b3d77b05e171abc68906"
+                "manifest_digest": "sha256:a36dc32f64dc8f6e44c7df86609927674404f0b29dc967d7bd628811dc892cf4",
+                "asset_set_digest": "sha256:c5e7f806d0605db544a0dc948a1eb235cb264b70d7375121ac55993f5975ce46"
               },
               "from_state": null,
               "to_state": "current"
             }
           ],
-          "transition_basis_digest": "sha256:a8bd7397fc4e0d4b0f20c79326fe09c0409fb81b4017f318105fd6cc7c4d20bd",
+          "transition_basis_digest": "sha256:e76c0c2384f6fdb7a17982577d1933bed0aaf3995cbd66e62cec0333e6723b07",
           "grants": [],
           "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
           "rollback_target": null,
           "authority": {
             "kind": "external_portfolio_activation_authority",
             "authority_id": "ask.prompt-v2.codex.challenger-portfolio-authority",
-            "authority_revision": "1710b3007d60e249d553ca7a43b5a83937066b61",
-            "authority_evidence_digest": "sha256:41f5902f371fc837b5363f345d3cbb2b435ef2a347ebf0a03b0998dc2c2e15e7"
+            "authority_revision": "c508a767f3386dac10180770edf37a67806fbb1b",
+            "authority_evidence_digest": "sha256:d7c48b85f1946aa043e237ede9ccac1af8c9ee784ac95a147759a47fae714bad"
           },
-          "context_digest": "sha256:76437980cfb449672970c1276d3f807f27ea1561a808171a0da2dc555a7e19e4"
+          "context_digest": "sha256:0a0215ce59bc209ed1194a9e16e1f5fe83b81409df8f7dfbde3b7621b8cd6395"
         }
       ],
       "evolution": {
-        "candidate_object_digest": "sha256:0f91a69c151243a221793a5b1d48338973500a9b6231cde8020fe36064eabc9d",
-        "candidate_digest": "sha256:c1739a0faab33c3794efea70944807af8a0bf11b2b8a7cd5cb8ff16ccdf3052d",
-        "experiment_object_digest": "sha256:b407cd13c6540cd1e6b3395db517ff6f01f6e939892fff0cbc3e3ba310a87ec4",
-        "experiment_digest": "sha256:35dab9a6fe86b89092a6875b1c3453f06144107481632f4a861e24dad24e9127",
+        "candidate_object_digest": "sha256:e4b5bbaa32708319cd85b9fd75d41d8c87b19635457f0aefe634356bff6247e8",
+        "candidate_digest": "sha256:c46e9d23fdb1db0d06fcb0b37292690985a013454ad16eafe726ecd48cbbc760",
+        "experiment_object_digest": "sha256:4d9565dca2a8322dfcb125acb0ab3a50b1a858588f4ad70d83df6a502105d195",
+        "experiment_digest": "sha256:9544aa05b6dfc1e0b4ffc059feabe521b32d0b165fc90740421fc75bac76b4b7",
         "experiment_authority": {
           "kind": "external_evolution_experiment_authority",
           "authority_id": "ask.prompt-v2.codex.experiment-authority",
           "authority_revision": 1,
-          "authority_evidence_digest": "sha256:a6f2fcbf4f4626077402bfab0b48526d021e2e6c4df502fbd6bb6d1ea222b3c6"
+          "authority_evidence_digest": "sha256:f1257b109cb194f3b4fa2c1c1acf4b2be4f0d0e00c3ee979b56b5018dae2c52d"
         }
       }
     },
@@ -197,37 +197,37 @@
         "asset_type": "prompt",
         "stable_id": "ask.prompt-bundle.claude",
         "version": "234.0.0-current",
-        "record_digest": "sha256:0c23fd8c7aa03e146535e2ed5735a1ec2c0123784ac45a05a2d157733e081fc1",
+        "record_digest": "sha256:e4fb70aa92444a930e339dd5ca93d3b942eed3d5651ceededd6d268766035ab3",
         "content_digest": "sha256:7ace0455dcd2e36caa87eecd5ef6cff0bf3f9265c33b445c4bf2f37241a3619e"
       },
       "candidate_asset": {
         "asset_type": "prompt",
         "stable_id": "ask.prompt-bundle.claude",
         "version": "234.0.0-prompt-v2",
-        "record_digest": "sha256:5ea73fbbe3ca75707c8328a5d2fe5723c94f681db67c528b35d33b501cd44e4a",
-        "content_digest": "sha256:42f463a383ede4690b0ed9dc0925388a9cc2f6d7cec944932d07e25103423f59"
+        "record_digest": "sha256:061bc45dbab12ef756f3054352b599a00d4b789cefb4c1e71d3892d1bf5fc118",
+        "content_digest": "sha256:e9081721770a65e5626afc648dc76f06b4069be92f015a24da21347a6f43a465"
       },
       "baseline_portfolio": {
         "portfolio_id": "ask.portfolio.prompt-v2.claude",
         "revision": "prompt-v2-baseline-v1",
-        "manifest_digest": "sha256:56d938ec3d9e474c614670fd92cb4559eba7cd17f7f060a4a74cae892ee6ff8e",
-        "asset_set_digest": "sha256:683f6c70f79d1fe4f63bb0480e1ab6e3c963323819e58b3ed9a85af8d4c9961c",
-        "lock_digest": "sha256:eee4b853c63f8fd50602ceccaf684e0565f5b88e2fec58ed9ad98b9609a419b0"
+        "manifest_digest": "sha256:9c6c3c7992277baa653e58a316b9add80311f905001555a1d19a2e8b11b333da",
+        "asset_set_digest": "sha256:292855fbc1d7819a404e75b2a4584fbf9003179495a128df7707008a59025239",
+        "lock_digest": "sha256:95daef2bee6315f815c5fdd9137c72eb87666faa27659cd3dd069fb0f1bdd47c"
       },
       "challenger_portfolio": {
         "portfolio_id": "ask.portfolio.prompt-v2.claude",
         "revision": "prompt-v2-challenger-v1",
-        "manifest_digest": "sha256:26e381a5556797020944346b7c92722c9991913febe189f182119fceb8d1ff07",
-        "asset_set_digest": "sha256:f2ed4f5c784cd8778324b1eaab970fa2ea351785a89e9957cb3c318fed307adc",
-        "lock_digest": "sha256:140c1038e0db1a1ae65162f2e2f5c92549ede0f2c349bce2337380eea5ce85b8"
+        "manifest_digest": "sha256:44c1ab664588a862014aa18fb309f2dbcedb09ee1d8fbac7b87f026153e636d0",
+        "asset_set_digest": "sha256:dd2a7eb389722cbe7f880f198917b630839311e98c044e76ae69efcccb618de2",
+        "lock_digest": "sha256:a55df8da4f5dc8250c461f3872385580356ffbf0cd9ab8e51dad2ff95f7d95d8"
       },
       "baseline_selection": {
-        "selection_object_digest": "sha256:6a8af21cd04f38b24c5012adba646112ee862f7a7078c66aedef9776f086df20",
-        "selection_digest": "sha256:9d5022b7c015d6d3baf05baf770dabd9957a95fac18234883d497ef795ffdd8d"
+        "selection_object_digest": "sha256:33d48f415599642e3c7d3ed3277aa4f9e510c359d20f9abba5f347106370ac81",
+        "selection_digest": "sha256:c6ad33719e166a3c1e7ddc91ead8bdae915610fbd8d3245eb5e90347fcb161a7"
       },
       "challenger_selection": {
-        "selection_object_digest": "sha256:74e782adaaba7ad90096d11c1bce7da270fd12772f2f9e2373fe5f3185c0008f",
-        "selection_digest": "sha256:0820c32e0f813bcea4ed21cc5f9eb6be404b492208991036cabb77c7171014f6"
+        "selection_object_digest": "sha256:8509cc11abf1dba30d6fa5999b978f34c74c3bf12e8950fd29e746ec72cc666c",
+        "selection_digest": "sha256:1e2161d6826dcf170a3494bca78190132f93d3080ba29f544c3e94f90d5cc715"
       },
       "portfolio_authority_contexts": [
         {
@@ -242,24 +242,24 @@
               "manifest": {
                 "portfolio_id": "ask.portfolio.prompt-v2.claude",
                 "revision": "prompt-v2-baseline-v1",
-                "manifest_digest": "sha256:56d938ec3d9e474c614670fd92cb4559eba7cd17f7f060a4a74cae892ee6ff8e",
-                "asset_set_digest": "sha256:683f6c70f79d1fe4f63bb0480e1ab6e3c963323819e58b3ed9a85af8d4c9961c"
+                "manifest_digest": "sha256:9c6c3c7992277baa653e58a316b9add80311f905001555a1d19a2e8b11b333da",
+                "asset_set_digest": "sha256:292855fbc1d7819a404e75b2a4584fbf9003179495a128df7707008a59025239"
               },
               "from_state": null,
               "to_state": "current"
             }
           ],
-          "transition_basis_digest": "sha256:ac4725cc13bd613962f3f7f66a5bb1f07ed1d5092c8d1dcc7bc51421dcf91be4",
+          "transition_basis_digest": "sha256:91444422fd1e2f05ec046d270e503a94e19b58b46d9d3077e51d8c9c163e58b6",
           "grants": [],
           "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
           "rollback_target": null,
           "authority": {
             "kind": "external_portfolio_activation_authority",
             "authority_id": "ask.prompt-v2.claude.baseline-portfolio-authority",
-            "authority_revision": "1710b3007d60e249d553ca7a43b5a83937066b61",
-            "authority_evidence_digest": "sha256:f29c1ac927fb42c5fac80fdf6ba8ad37ea571e3da1090e742527ccad2e4ca1d7"
+            "authority_revision": "c508a767f3386dac10180770edf37a67806fbb1b",
+            "authority_evidence_digest": "sha256:e1af73ace1b0fbab655e0e1765d88f39141aed422fd20f3f211a818c4bffb244"
           },
-          "context_digest": "sha256:90804d288056dab91472fc5fdd53b50c67b16f4d694d17b5f67e0b9e6443e7eb"
+          "context_digest": "sha256:afcf8d8e4f26d2eeb71f3a5a1c3c40d14e48bb34b841fed887d989cd143e8fa4"
         },
         {
           "schema_version": "1.0.0",
@@ -267,14 +267,14 @@
           "portfolio_id": "ask.portfolio.prompt-v2.claude",
           "repository_id": "github.com/ist-h-i/agent-spectrum-kernel",
           "scope_id": "agent-spectrum-kernel",
-          "predecessor_lock_digest": "sha256:eee4b853c63f8fd50602ceccaf684e0565f5b88e2fec58ed9ad98b9609a419b0",
+          "predecessor_lock_digest": "sha256:95daef2bee6315f815c5fdd9137c72eb87666faa27659cd3dd069fb0f1bdd47c",
           "transitions": [
             {
               "manifest": {
                 "portfolio_id": "ask.portfolio.prompt-v2.claude",
                 "revision": "prompt-v2-baseline-v1",
-                "manifest_digest": "sha256:56d938ec3d9e474c614670fd92cb4559eba7cd17f7f060a4a74cae892ee6ff8e",
-                "asset_set_digest": "sha256:683f6c70f79d1fe4f63bb0480e1ab6e3c963323819e58b3ed9a85af8d4c9961c"
+                "manifest_digest": "sha256:9c6c3c7992277baa653e58a316b9add80311f905001555a1d19a2e8b11b333da",
+                "asset_set_digest": "sha256:292855fbc1d7819a404e75b2a4584fbf9003179495a128df7707008a59025239"
               },
               "from_state": "current",
               "to_state": "historical"
@@ -283,101 +283,101 @@
               "manifest": {
                 "portfolio_id": "ask.portfolio.prompt-v2.claude",
                 "revision": "prompt-v2-challenger-v1",
-                "manifest_digest": "sha256:26e381a5556797020944346b7c92722c9991913febe189f182119fceb8d1ff07",
-                "asset_set_digest": "sha256:f2ed4f5c784cd8778324b1eaab970fa2ea351785a89e9957cb3c318fed307adc"
+                "manifest_digest": "sha256:44c1ab664588a862014aa18fb309f2dbcedb09ee1d8fbac7b87f026153e636d0",
+                "asset_set_digest": "sha256:dd2a7eb389722cbe7f880f198917b630839311e98c044e76ae69efcccb618de2"
               },
               "from_state": null,
               "to_state": "current"
             }
           ],
-          "transition_basis_digest": "sha256:5840f249109671dac94ebb26a7cf70819863062c4dfde28922f254d324230349",
+          "transition_basis_digest": "sha256:155200ad2376fa937c6b836422f1841963c1331a3776d2f5e9c6978b644c362e",
           "grants": [],
           "grant_basis_digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
           "rollback_target": null,
           "authority": {
             "kind": "external_portfolio_activation_authority",
             "authority_id": "ask.prompt-v2.claude.challenger-portfolio-authority",
-            "authority_revision": "1710b3007d60e249d553ca7a43b5a83937066b61",
-            "authority_evidence_digest": "sha256:fadae36e949242eeacf9de300032340e89539595fa8d986dbb2388d8cac7e8b7"
+            "authority_revision": "c508a767f3386dac10180770edf37a67806fbb1b",
+            "authority_evidence_digest": "sha256:f78a6bc4df598b1b27012a60d11aef197ac9a9f5764705afbb65762359f7692c"
           },
-          "context_digest": "sha256:9608cb0fb3bbef566f5f4b5671fe53171a01e6e44a41b455af28a66bb5f412d7"
+          "context_digest": "sha256:00707e501bf423c383520b27ca1970ea04653710c70c89bd65b5e26e8136af60"
         }
       ],
       "evolution": {
-        "candidate_object_digest": "sha256:69d840502452956cae698020494d074e54a7f676c906d769815f4feb00c9c31a",
-        "candidate_digest": "sha256:4601430bc3e11ca1d94e08e4ad96c306cf7ad9101d77da22d338b25b93ba511b",
-        "experiment_object_digest": "sha256:96f015fd4397cf1f686de77758c6b7136dd5236b2eaeb70ab8a6658e15f11eba",
-        "experiment_digest": "sha256:e9f9a18c65cd4e7a643f50d4be629be77c39ebebc87d01b193abccbc5c59f746",
+        "candidate_object_digest": "sha256:20cbe9d9e9127d7aaae34bc1f875eab0088075b1d35872facf34403e1fdaba76",
+        "candidate_digest": "sha256:dd731b505f95f8da50718919830b3c1b54b3fef5ca12e726f446a5db10165e8b",
+        "experiment_object_digest": "sha256:155856428c69421815c15cba88c35dc4844d77120ea180194c9cddd5f7f60781",
+        "experiment_digest": "sha256:96509f953bbe328b3d7bdbfa9ca85546148d494bc1babec4c6bed04d8896a0a0",
         "experiment_authority": {
           "kind": "external_evolution_experiment_authority",
           "authority_id": "ask.prompt-v2.claude.experiment-authority",
           "authority_revision": 1,
-          "authority_evidence_digest": "sha256:1b3b4f66e17c85baa37100499d9b608e969e3a1a48a20f8302909ec59ad199d1"
+          "authority_evidence_digest": "sha256:01c041f0ce4b67a75975f20004db8807a6e3d8f542eb9ecb417f9cce0d307b20"
         }
       }
     }
   ],
   "store": {
     "object_count": 57,
-    "object_inventory_digest": "sha256:48f01a289f377dbb90784fdac290d832c71424e4f07eb0ad454427e9920fdfbe",
+    "object_inventory_digest": "sha256:7c267fbd91cc82c24916c1ad39ad559b1da11752c02fe35d21887aff6fd6c63a",
     "object_digests": [
-      "sha256:0252d18d53154b3e82d39235d1c327c94bfbc7e39bb87ba9b7ff9e9bfc6cda05",
+      "sha256:061bc45dbab12ef756f3054352b599a00d4b789cefb4c1e71d3892d1bf5fc118",
       "sha256:06cacaea5b7b84bb2a9f6a6e849f1e561967637cfc0c28bd60675b665f090a54",
       "sha256:0a1bf5ec027954e2def2bf6591655365258e4ed6c3e58a151ea242b961591dcc",
-      "sha256:0c23fd8c7aa03e146535e2ed5735a1ec2c0123784ac45a05a2d157733e081fc1",
-      "sha256:0f91a69c151243a221793a5b1d48338973500a9b6231cde8020fe36064eabc9d",
+      "sha256:0dcd4be73d6e1fc86e12d6493fa1f1a7a1ebd25ec16078f32bf0b8e6ef078619",
+      "sha256:11877f36b3de09ec1c52b059f7dc9e0cf4b0094a83368a786bdc8aa50e10f264",
       "sha256:124a398892b63295e43b894776bea049625e3847010acd2dce61880a207cf1da",
-      "sha256:140c1038e0db1a1ae65162f2e2f5c92549ede0f2c349bce2337380eea5ce85b8",
-      "sha256:1fec5fb3550f17f7ef463d00eac53e34124c251f036a8808ea87e7d1347dc348",
-      "sha256:22dd0c9cb0d224e773d642c2af9bed62bbe545ea8c61c4be0a38ab0917a49472",
-      "sha256:25de3a0e6d1d729733ad8703e6032344df2f0ee09b4c774ba08986d7cb5f1c76",
-      "sha256:26e381a5556797020944346b7c92722c9991913febe189f182119fceb8d1ff07",
+      "sha256:155856428c69421815c15cba88c35dc4844d77120ea180194c9cddd5f7f60781",
+      "sha256:20cbe9d9e9127d7aaae34bc1f875eab0088075b1d35872facf34403e1fdaba76",
+      "sha256:241b8cba488511a47ed123fb1e31c5efcc1c999c581eabfaab4ceeae392a213c",
+      "sha256:31e6094e927442aa7de883f7db797e27b19e35ac2acd8c74b127dee23dde5523",
       "sha256:33d26707d82e68099085b91f60b26b6bea6ea17af802a493dd70ee4629dfc72b",
+      "sha256:33d48f415599642e3c7d3ed3277aa4f9e510c359d20f9abba5f347106370ac81",
       "sha256:34a511af596bc1317941241135f053153d9862ff7552a243c0231fc079c4edba",
-      "sha256:36c7d798820dae3618f13fa823372d6ece26176ac6c426dd81cd9a987b11ebcc",
-      "sha256:36f9b3b20a946aacb840e031c1b0d2cb87e0ab4f6e913aa877ea4bdca4cc52b2",
-      "sha256:381a48b508b4ea75ecc30c3794669696c2fe2c47943ed288708226f3273d67ba",
       "sha256:39f30afcc78d50c1ff2cf85d4c18d546b47811c370146193535af08cc030cc65",
-      "sha256:3e939905a44265d7afce4e65cbc7f0dce568ff4f6a5eb8c2cf62351d2222eac0",
-      "sha256:42f463a383ede4690b0ed9dc0925388a9cc2f6d7cec944932d07e25103423f59",
+      "sha256:3b6344adc23c54fb92fc7c6e7a7d76783fe8d47e8b9207583cd372891cfe9724",
       "sha256:43e18c25bca6279ab7b333b5e4ce3bfdc8ada01023bfe47d0889d61e71872c56",
-      "sha256:4f2743382ba2c52adfa4570663d153fa3d1df33f4bc5f4f44d93702f3c65b697",
-      "sha256:56d938ec3d9e474c614670fd92cb4559eba7cd17f7f060a4a74cae892ee6ff8e",
+      "sha256:44c1ab664588a862014aa18fb309f2dbcedb09ee1d8fbac7b87f026153e636d0",
+      "sha256:47ecd439162d95542f0d21bcbbceb4ca218206b241bfc2c09d2af6cbf354ea4b",
+      "sha256:4d9565dca2a8322dfcb125acb0ab3a50b1a858588f4ad70d83df6a502105d195",
+      "sha256:54bbadc508363fb5a54dae7a086699e3b1a802decbb04404a1d5e16f2e13d2eb",
       "sha256:5b50712f43feecf82d532178310cf2e0fe2fe709e0d951eb797a3876ff0cf92d",
       "sha256:5cc2ab9ca47824d2d13438f7f4460b71db1a6f939cfce1b0f84291e3e5935be5",
-      "sha256:5ea73fbbe3ca75707c8328a5d2fe5723c94f681db67c528b35d33b501cd44e4a",
-      "sha256:6194e7a893316b18d9a0576ebf237f4ea15b24f1d19a716f5be88ad69f704e89",
+      "sha256:60dbe252776cd6f432232a821ed8d85de2d8366650b1695b0ca224954252b89b",
       "sha256:621237eed65b92d996a11b259d7ef8854357c9fd1e7170071d59c4f50f4e7b3e",
       "sha256:66690f1648966d64f80350ea710cf522c21b3aecc64f3bba5f27d1a78730779d",
-      "sha256:69d840502452956cae698020494d074e54a7f676c906d769815f4feb00c9c31a",
-      "sha256:6a8af21cd04f38b24c5012adba646112ee862f7a7078c66aedef9776f086df20",
-      "sha256:6c226e331c688bf2d9c8ffee53fe4fc03c5eb93f39b02df18a914e1aa8756bac",
-      "sha256:74e782adaaba7ad90096d11c1bce7da270fd12772f2f9e2373fe5f3185c0008f",
-      "sha256:759c9a5d97ddc05117469b1b59cdf7fbe567e4b7d4161ad5b392c1f8643d597b",
+      "sha256:685407a5211074ed1747eb12b5b7b192f6dedff43d697ed6bcd57fa56e4b7fa8",
       "sha256:7ace0455dcd2e36caa87eecd5ef6cff0bf3f9265c33b445c4bf2f37241a3619e",
       "sha256:7c9eb8e9f3441928c33ab41fe08351567d65bfb2bb1d2ae2852c93b3ac3464b7",
-      "sha256:7f457185c530c51c4633e4840cef258ffabda65acccc94a3c6af9977e0e0fd1b",
-      "sha256:81815fd22afae413217b241a65c9b8d7a7068bc703c33967c1a45c0824a4c80f",
-      "sha256:8beded452d55299ce90fd1b742611dd789b3d29c2f4f16443e27a54abece5510",
-      "sha256:91ad1357e351ede0ecea676f83d88ad830d79ed0133c03d1c5ef353d8ed42607",
-      "sha256:93c421e03879eb4a4b9ee62e6e9fb596045f16638b983d1941b450e418509949",
-      "sha256:96f015fd4397cf1f686de77758c6b7136dd5236b2eaeb70ab8a6658e15f11eba",
+      "sha256:8509cc11abf1dba30d6fa5999b978f34c74c3bf12e8950fd29e746ec72cc666c",
+      "sha256:8ccfffef593412265359bdd8c4918598f22441593f0190c2555845fb370b37a5",
+      "sha256:8d12527b530a07dcbda13a4a684c527547ed4e3f11461d398e8455fa2a7a52fd",
+      "sha256:95daef2bee6315f815c5fdd9137c72eb87666faa27659cd3dd069fb0f1bdd47c",
+      "sha256:98c40fe90c9b54fe5cc726e1c259ffadb61906d1dcd2c54f3ea79a44e5907cfa",
       "sha256:9bfd6af3c3768f8760fb1fe8b8ab98e6d4753d4802e38f7604b446dc7b14a95a",
-      "sha256:a3e7220c31d8ef0e1805092936f6983bab0bbf70847f8018cbcebb66fa40c518",
-      "sha256:b2ae7e7ac41f9e2c3b76e57f41a2e424b6702a67a6148eec8c02a8c39b77a7d4",
-      "sha256:b407cd13c6540cd1e6b3395db517ff6f01f6e939892fff0cbc3e3ba310a87ec4",
-      "sha256:b6dada363a36bdb8597c6b2f7f72491be313616b9f744ad54748c959d54660e1",
+      "sha256:9c6c3c7992277baa653e58a316b9add80311f905001555a1d19a2e8b11b333da",
+      "sha256:a0c81fc9f20d052f191d4a7972218896e0795bd2c0253bcda7fb2e8a39e26f52",
+      "sha256:a36dc32f64dc8f6e44c7df86609927674404f0b29dc967d7bd628811dc892cf4",
+      "sha256:a3d4ae4ae50bab09f8ee6a6c3f415d501ed635d048ec86d04a154eea488ebcfb",
+      "sha256:a55df8da4f5dc8250c461f3872385580356ffbf0cd9ab8e51dad2ff95f7d95d8",
+      "sha256:a863eaca7a4682c8cfd6f4ccfe4f5985fd2bd0fd3fb4d7f5e12fd5ea34cb4243",
+      "sha256:ae50d39b914d3fb74a994b0aa1e96ea4a5c3e4afc2b8112ba86fd4352c889845",
+      "sha256:bd9c377da681705af17a658cc576d5fe6981ddf351e01d84198054d97d975e76",
       "sha256:bec5d5f8f9ee2f8fdab1902f73888b251eb9e62e55bef3529542ab0deb8a48e2",
-      "sha256:bf064e5d7d1dcd4c12b28bf5778ec8abf06d1cc0f52ec895d8e4d3644cad5aa0",
+      "sha256:becc2d80b8a4c89ffcca2b75dc9ff6afb656eb3844669c288c741a8e56aae669",
+      "sha256:c1fb3d8f5b8872332fbc70ca82999dd94aff06a559ff5904d7fb246d65f90bb8",
       "sha256:c619c6c426da2f6fac9185c2426908ea83ff1598e5e9af7add61f509678a5853",
-      "sha256:cdd719731e073447782f016284217e25b9eb7629ba0283af5fa7780f33fff251",
-      "sha256:d0ad457d0673caadce455e185795e71b25ba0aeb2e256e3ab0998e36db0b07bb",
-      "sha256:d4f1962245e57fdbadf098dc959f49130e7f97ecb888d13d306a82338df05bfa",
+      "sha256:d605f8927941f1c90a9bcf956874599843f8dad27e579e412a31f8c569ec2e0c",
       "sha256:d6e6ac3acac3ee396987fd0333b6193c809156c88eb343b43c9e0b0c72fbe1c5",
       "sha256:d96f3131c5d6556d2fa74665befef66c0d279dd1177dc6d41f232f2844eafba6",
-      "sha256:e8f1e67bca2d3231d53ec4059e4e855fc1fb1882acef91894d64b04097cbc097",
-      "sha256:eee4b853c63f8fd50602ceccaf684e0565f5b88e2fec58ed9ad98b9609a419b0",
-      "sha256:f46abf273daaaf13cc96c10e54d2de72ba8cd269a58d1ea047331c38ba13dc18"
+      "sha256:da6fc5fdfad8ecd166102e7896800d5e66b17affcba191d96208dca09abdb2ab",
+      "sha256:e4b5bbaa32708319cd85b9fd75d41d8c87b19635457f0aefe634356bff6247e8",
+      "sha256:e4fb70aa92444a930e339dd5ca93d3b942eed3d5651ceededd6d268766035ab3",
+      "sha256:e9081721770a65e5626afc648dc76f06b4069be92f015a24da21347a6f43a465",
+      "sha256:f0a3616ec4fe350109cf511bc674807333fbbf02ace631c4f3ae0ae0cb888d18",
+      "sha256:f46abf273daaaf13cc96c10e54d2de72ba8cd269a58d1ea047331c38ba13dc18",
+      "sha256:f740e60aec69f5958317d3c82426dbdecc78ca9224340cb501cad96904d6ae96",
+      "sha256:fd6a82bb2685fbcb4a394613d8a2521ab91b1b7e9f75cfdb7621c712f52f8173"
     ]
   },
   "portable_paths_only": true,
@@ -393,5 +393,5 @@
     "lifecycle_mutation_authorized": false,
     "private_evaluator_content_included": false
   },
-  "reference_digest": "sha256:a3e3aef6c9f50ddd021fd2b12f289ae8800069bd03e518f2f3fdd2207234298e"
+  "reference_digest": "sha256:3e973ea52f6e4321379442928d86f39db16fb5c024ef4676254e24c07fd08548"
 }

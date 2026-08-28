@@ -181,8 +181,8 @@ function main() {
   }
 
   assert.equal(PROMPT_V2_PREREGISTRATION_RENDERED_ROOT, "docs/fixtures/prompt-v2-preregistration/rendered");
-  assert.equal(PROMPT_V2_SOURCE_REVISION, "1710b3007d60e249d553ca7a43b5a83937066b61");
-  assert.equal(PROMPT_V2_SOURCE_TREE, "caff00c8f1d97386fe28d62d819028e644036a27");
+  assert.equal(PROMPT_V2_SOURCE_REVISION, "c508a767f3386dac10180770edf37a67806fbb1b");
+  assert.equal(PROMPT_V2_SOURCE_TREE, "d7d377c1265f0fb47119bfc80a2f3eb9535cf163");
   const fixtureSummary = verifyPromptV2PreregistrationFixture({
     root: canonicalFixtureRoot,
   });

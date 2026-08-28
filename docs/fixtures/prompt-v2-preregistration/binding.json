@@ -1,13 +1,13 @@
 {
   "schema_version": "1.0.0",
   "binding_kind": "prompt_v2_preregistration_generated_authority",
-  "preregistration_id": "prompt-v2-prereg-09a8375bb8db1bdb89df80a684d49cce",
-  "preregistration_digest": "sha256:5c7c9d0a8bce5171f5c9b6bbb4c737d509a8375bb8db1bdb89df80a684d49cce",
+  "preregistration_id": "prompt-v2-prereg-ae74196b851d186ae1e0aa0a45939b3d",
+  "preregistration_digest": "sha256:f5cc838703008896e7864e17501c99c3ae74196b851d186ae1e0aa0a45939b3d",
   "source": {
-    "repository_revision": "1710b3007d60e249d553ca7a43b5a83937066b61",
-    "repository_tree": "caff00c8f1d97386fe28d62d819028e644036a27",
+    "repository_revision": "c508a767f3386dac10180770edf37a67806fbb1b",
+    "repository_tree": "d7d377c1265f0fb47119bfc80a2f3eb9535cf163",
     "rendered_source_root": "docs/fixtures/prompt-v2-preregistration/rendered",
-    "rendered_source_inventory_digest": "sha256:479c63756fa0df8c71d3f1561b69c9fd8397acc63fae8289ee191dfaa2867778"
+    "rendered_source_inventory_digest": "sha256:a7db31d68baf31a99250af4f407815636d38cd13dd5cebddd78eba1eb660a67d"
   },
   "adapter_bindings": [
     {
@@ -19,23 +19,23 @@
             "asset_type": "prompt",
             "stable_id": "ask.prompt-bundle.codex",
             "version": "234.0.0-current",
-            "record_digest": "sha256:81815fd22afae413217b241a65c9b8d7a7068bc703c33967c1a45c0824a4c80f",
-            "content_digest": "sha256:1fec5fb3550f17f7ef463d00eac53e34124c251f036a8808ea87e7d1347dc348"
+            "record_digest": "sha256:60dbe252776cd6f432232a821ed8d85de2d8366650b1695b0ca224954252b89b",
+            "content_digest": "sha256:241b8cba488511a47ed123fb1e31c5efcc1c999c581eabfaab4ceeae392a213c"
           },
           "portfolio": {
             "portfolio_id": "ask.portfolio.prompt-v2.codex",
             "revision": "prompt-v2-baseline-v1",
-            "manifest_digest": "sha256:6194e7a893316b18d9a0576ebf237f4ea15b24f1d19a716f5be88ad69f704e89",
-            "asset_set_digest": "sha256:346873c682a7f2168407145e68f6cbfe36840adb1e656924c809e10fde03fdfa",
-            "lock_digest": "sha256:b2ae7e7ac41f9e2c3b76e57f41a2e424b6702a67a6148eec8c02a8c39b77a7d4"
+            "manifest_digest": "sha256:d605f8927941f1c90a9bcf956874599843f8dad27e579e412a31f8c569ec2e0c",
+            "asset_set_digest": "sha256:246eb564400a1932acbbd4b84f53ca98c26c8e83d14b4782b6e4301fe97ad44b",
+            "lock_digest": "sha256:31e6094e927442aa7de883f7db797e27b19e35ac2acd8c74b127dee23dde5523"
           },
           "selection": {
-            "selection_object_digest": "sha256:b6dada363a36bdb8597c6b2f7f72491be313616b9f744ad54748c959d54660e1",
-            "selection_digest": "sha256:0c7c17b140a774bf0222622f285379754bb5fecf9b382bb18ec48204fd47971f"
+            "selection_object_digest": "sha256:8ccfffef593412265359bdd8c4918598f22441593f0190c2555845fb370b37a5",
+            "selection_digest": "sha256:fa4223ba5b44eec40a727c9f4df47d23c11e2e1bb05c6a36ea5cc06e7b411b26"
           },
           "projection": {
             "renderer_id": "install-codex-adapter",
-            "renderer_version": "7",
+            "renderer_version": "8",
             "renderer_input_digest": "sha256:fefb90d9d1e6b328629f2d4b53c31de05d4ae45bdfd581ebef0b3bde140a5366",
             "rendered_bundle_digest": "sha256:78cb85e6b8d8015c8bc2cf6c12ee02dae28bcb111dbf5c288e16336a205af8e6",
             "inventory_digest": "sha256:8b8856d682b04eafab5b5f384d255d6eb2840d21091dd001df7d07d72cfbacad"
@@ -47,37 +47,37 @@
             "asset_type": "prompt",
             "stable_id": "ask.prompt-bundle.codex",
             "version": "234.0.0-prompt-v2",
-            "record_digest": "sha256:36f9b3b20a946aacb840e031c1b0d2cb87e0ab4f6e913aa877ea4bdca4cc52b2",
-            "content_digest": "sha256:93c421e03879eb4a4b9ee62e6e9fb596045f16638b983d1941b450e418509949"
+            "record_digest": "sha256:bd9c377da681705af17a658cc576d5fe6981ddf351e01d84198054d97d975e76",
+            "content_digest": "sha256:a3d4ae4ae50bab09f8ee6a6c3f415d501ed635d048ec86d04a154eea488ebcfb"
           },
           "portfolio": {
             "portfolio_id": "ask.portfolio.prompt-v2.codex",
             "revision": "prompt-v2-challenger-v1",
-            "manifest_digest": "sha256:d0ad457d0673caadce455e185795e71b25ba0aeb2e256e3ab0998e36db0b07bb",
-            "asset_set_digest": "sha256:3e3c9e0b02c3d27d9d1ee14c13d97d509557ad750b57b3d77b05e171abc68906",
-            "lock_digest": "sha256:8beded452d55299ce90fd1b742611dd789b3d29c2f4f16443e27a54abece5510"
+            "manifest_digest": "sha256:a36dc32f64dc8f6e44c7df86609927674404f0b29dc967d7bd628811dc892cf4",
+            "asset_set_digest": "sha256:c5e7f806d0605db544a0dc948a1eb235cb264b70d7375121ac55993f5975ce46",
+            "lock_digest": "sha256:c1fb3d8f5b8872332fbc70ca82999dd94aff06a559ff5904d7fb246d65f90bb8"
           },
           "selection": {
-            "selection_object_digest": "sha256:6c226e331c688bf2d9c8ffee53fe4fc03c5eb93f39b02df18a914e1aa8756bac",
-            "selection_digest": "sha256:a86f3441b5ec699ba12b739ad44396117ddb9d215ef94bfa1792db17ad08c1f9"
+            "selection_object_digest": "sha256:a863eaca7a4682c8cfd6f4ccfe4f5985fd2bd0fd3fb4d7f5e12fd5ea34cb4243",
+            "selection_digest": "sha256:54a6b3598083b431cbd5f00f2329c803e2d59431194a632b39991c2b2e573507"
           },
           "projection": {
             "renderer_id": "install-codex-adapter",
-            "renderer_version": "7",
-            "renderer_input_digest": "sha256:ccef47755f95f5dd666a60a1d1f0d83612aeab4b9676819a2c068ebe7cfaa3a2",
-            "rendered_bundle_digest": "sha256:9fe6a01c98bb31c047793095d52db75e715b9e47d98c85124a5a1b2ba2e964d7",
-            "inventory_digest": "sha256:dc8eb71bbd4712a99dbce6507e3437a791feff1dcee36e5d5c09062a4360df9d"
+            "renderer_version": "8",
+            "renderer_input_digest": "sha256:bdb1816418af4bdfaf77a4ad947582309f8bf12fe291d05efd7e6069d8e10ea8",
+            "rendered_bundle_digest": "sha256:406e5648b3456b395f08fab17fa7cced14958b79460146880cd73819df72f400",
+            "inventory_digest": "sha256:8c481884e68910a8450d6201dc473471ff52f8e03ad107d92f78efea6b2ba9cf"
           }
         }
       ],
       "evolution": {
-        "candidate_object_digest": "sha256:0f91a69c151243a221793a5b1d48338973500a9b6231cde8020fe36064eabc9d",
-        "candidate_digest": "sha256:c1739a0faab33c3794efea70944807af8a0bf11b2b8a7cd5cb8ff16ccdf3052d",
-        "experiment_object_digest": "sha256:b407cd13c6540cd1e6b3395db517ff6f01f6e939892fff0cbc3e3ba310a87ec4",
-        "experiment_digest": "sha256:35dab9a6fe86b89092a6875b1c3453f06144107481632f4a861e24dad24e9127",
-        "baseline_asset_record_digest": "sha256:81815fd22afae413217b241a65c9b8d7a7068bc703c33967c1a45c0824a4c80f",
-        "candidate_asset_record_digest": "sha256:36f9b3b20a946aacb840e031c1b0d2cb87e0ab4f6e913aa877ea4bdca4cc52b2",
-        "rollback_target_manifest_digest": "sha256:6194e7a893316b18d9a0576ebf237f4ea15b24f1d19a716f5be88ad69f704e89",
+        "candidate_object_digest": "sha256:e4b5bbaa32708319cd85b9fd75d41d8c87b19635457f0aefe634356bff6247e8",
+        "candidate_digest": "sha256:c46e9d23fdb1db0d06fcb0b37292690985a013454ad16eafe726ecd48cbbc760",
+        "experiment_object_digest": "sha256:4d9565dca2a8322dfcb125acb0ab3a50b1a858588f4ad70d83df6a502105d195",
+        "experiment_digest": "sha256:9544aa05b6dfc1e0b4ffc059feabe521b32d0b165fc90740421fc75bac76b4b7",
+        "baseline_asset_record_digest": "sha256:60dbe252776cd6f432232a821ed8d85de2d8366650b1695b0ca224954252b89b",
+        "candidate_asset_record_digest": "sha256:bd9c377da681705af17a658cc576d5fe6981ddf351e01d84198054d97d975e76",
+        "rollback_target_manifest_digest": "sha256:d605f8927941f1c90a9bcf956874599843f8dad27e579e412a31f8c569ec2e0c",
         "phase": "pre_result",
         "results_accessed": false,
         "projection_mode": "prompt_v2_exact",
@@ -93,19 +93,19 @@
             "asset_type": "prompt",
             "stable_id": "ask.prompt-bundle.claude",
             "version": "234.0.0-current",
-            "record_digest": "sha256:0c23fd8c7aa03e146535e2ed5735a1ec2c0123784ac45a05a2d157733e081fc1",
+            "record_digest": "sha256:e4fb70aa92444a930e339dd5ca93d3b942eed3d5651ceededd6d268766035ab3",
             "content_digest": "sha256:7ace0455dcd2e36caa87eecd5ef6cff0bf3f9265c33b445c4bf2f37241a3619e"
           },
           "portfolio": {
             "portfolio_id": "ask.portfolio.prompt-v2.claude",
             "revision": "prompt-v2-baseline-v1",
-            "manifest_digest": "sha256:56d938ec3d9e474c614670fd92cb4559eba7cd17f7f060a4a74cae892ee6ff8e",
-            "asset_set_digest": "sha256:683f6c70f79d1fe4f63bb0480e1ab6e3c963323819e58b3ed9a85af8d4c9961c",
-            "lock_digest": "sha256:eee4b853c63f8fd50602ceccaf684e0565f5b88e2fec58ed9ad98b9609a419b0"
+            "manifest_digest": "sha256:9c6c3c7992277baa653e58a316b9add80311f905001555a1d19a2e8b11b333da",
+            "asset_set_digest": "sha256:292855fbc1d7819a404e75b2a4584fbf9003179495a128df7707008a59025239",
+            "lock_digest": "sha256:95daef2bee6315f815c5fdd9137c72eb87666faa27659cd3dd069fb0f1bdd47c"
           },
           "selection": {
-            "selection_object_digest": "sha256:6a8af21cd04f38b24c5012adba646112ee862f7a7078c66aedef9776f086df20",
-            "selection_digest": "sha256:9d5022b7c015d6d3baf05baf770dabd9957a95fac18234883d497ef795ffdd8d"
+            "selection_object_digest": "sha256:33d48f415599642e3c7d3ed3277aa4f9e510c359d20f9abba5f347106370ac81",
+            "selection_digest": "sha256:c6ad33719e166a3c1e7ddc91ead8bdae915610fbd8d3245eb5e90347fcb161a7"
           },
           "projection": {
             "renderer_id": "install-claude-adapter",
@@ -121,37 +121,37 @@
             "asset_type": "prompt",
             "stable_id": "ask.prompt-bundle.claude",
             "version": "234.0.0-prompt-v2",
-            "record_digest": "sha256:5ea73fbbe3ca75707c8328a5d2fe5723c94f681db67c528b35d33b501cd44e4a",
-            "content_digest": "sha256:42f463a383ede4690b0ed9dc0925388a9cc2f6d7cec944932d07e25103423f59"
+            "record_digest": "sha256:061bc45dbab12ef756f3054352b599a00d4b789cefb4c1e71d3892d1bf5fc118",
+            "content_digest": "sha256:e9081721770a65e5626afc648dc76f06b4069be92f015a24da21347a6f43a465"
           },
           "portfolio": {
             "portfolio_id": "ask.portfolio.prompt-v2.claude",
             "revision": "prompt-v2-challenger-v1",
-            "manifest_digest": "sha256:26e381a5556797020944346b7c92722c9991913febe189f182119fceb8d1ff07",
-            "asset_set_digest": "sha256:f2ed4f5c784cd8778324b1eaab970fa2ea351785a89e9957cb3c318fed307adc",
-            "lock_digest": "sha256:140c1038e0db1a1ae65162f2e2f5c92549ede0f2c349bce2337380eea5ce85b8"
+            "manifest_digest": "sha256:44c1ab664588a862014aa18fb309f2dbcedb09ee1d8fbac7b87f026153e636d0",
+            "asset_set_digest": "sha256:dd2a7eb389722cbe7f880f198917b630839311e98c044e76ae69efcccb618de2",
+            "lock_digest": "sha256:a55df8da4f5dc8250c461f3872385580356ffbf0cd9ab8e51dad2ff95f7d95d8"
           },
           "selection": {
-            "selection_object_digest": "sha256:74e782adaaba7ad90096d11c1bce7da270fd12772f2f9e2373fe5f3185c0008f",
-            "selection_digest": "sha256:0820c32e0f813bcea4ed21cc5f9eb6be404b492208991036cabb77c7171014f6"
+            "selection_object_digest": "sha256:8509cc11abf1dba30d6fa5999b978f34c74c3bf12e8950fd29e746ec72cc666c",
+            "selection_digest": "sha256:1e2161d6826dcf170a3494bca78190132f93d3080ba29f544c3e94f90d5cc715"
           },
           "projection": {
             "renderer_id": "install-claude-adapter",
             "renderer_version": "5",
-            "renderer_input_digest": "sha256:91f6ce42df80b7044b70e10b36ab0c531186c0c5602b77ecd64d23e1d1eaa374",
-            "rendered_bundle_digest": "sha256:714cd23ae501a1621994fab44f00917b0567d5a28634a5559cf4106b9933ae38",
-            "inventory_digest": "sha256:88986eb1bd18da377762b67b664e0cc73087c580407f3d9f610b5f09e56275fd"
+            "renderer_input_digest": "sha256:afdc237221058e1767f9d55ca037fd18c6d43393418b6e23c5b294db973145df",
+            "rendered_bundle_digest": "sha256:78b25debcebe5f4af4dc62f54e7430744d7b14a256da9d20b421c2b074145013",
+            "inventory_digest": "sha256:3516b490f87a14f84a9e04752a5ceca3ee7eb585ab5da3b7998e3c44fa9f9762"
           }
         }
       ],
       "evolution": {
-        "candidate_object_digest": "sha256:69d840502452956cae698020494d074e54a7f676c906d769815f4feb00c9c31a",
-        "candidate_digest": "sha256:4601430bc3e11ca1d94e08e4ad96c306cf7ad9101d77da22d338b25b93ba511b",
-        "experiment_object_digest": "sha256:96f015fd4397cf1f686de77758c6b7136dd5236b2eaeb70ab8a6658e15f11eba",
-        "experiment_digest": "sha256:e9f9a18c65cd4e7a643f50d4be629be77c39ebebc87d01b193abccbc5c59f746",
-        "baseline_asset_record_digest": "sha256:0c23fd8c7aa03e146535e2ed5735a1ec2c0123784ac45a05a2d157733e081fc1",
-        "candidate_asset_record_digest": "sha256:5ea73fbbe3ca75707c8328a5d2fe5723c94f681db67c528b35d33b501cd44e4a",
-        "rollback_target_manifest_digest": "sha256:56d938ec3d9e474c614670fd92cb4559eba7cd17f7f060a4a74cae892ee6ff8e",
+        "candidate_object_digest": "sha256:20cbe9d9e9127d7aaae34bc1f875eab0088075b1d35872facf34403e1fdaba76",
+        "candidate_digest": "sha256:dd731b505f95f8da50718919830b3c1b54b3fef5ca12e726f446a5db10165e8b",
+        "experiment_object_digest": "sha256:155856428c69421815c15cba88c35dc4844d77120ea180194c9cddd5f7f60781",
+        "experiment_digest": "sha256:96509f953bbe328b3d7bdbfa9ca85546148d494bc1babec4c6bed04d8896a0a0",
+        "baseline_asset_record_digest": "sha256:e4fb70aa92444a930e339dd5ca93d3b942eed3d5651ceededd6d268766035ab3",
+        "candidate_asset_record_digest": "sha256:061bc45dbab12ef756f3054352b599a00d4b789cefb4c1e71d3892d1bf5fc118",
+        "rollback_target_manifest_digest": "sha256:9c6c3c7992277baa653e58a316b9add80311f905001555a1d19a2e8b11b333da",
         "phase": "pre_result",
         "results_accessed": false,
         "projection_mode": "prompt_v2_exact",
@@ -166,5 +166,5 @@
     "recommendation_created": false,
     "lifecycle_mutation_authorized": false
   },
-  "binding_digest": "sha256:3e9208651cc2b486185680d68f2987a7d2d4f8d2b557999e0d3e68fb970427a1"
+  "binding_digest": "sha256:75aff7c8158b6b9da23c6a20d514bf156d2b9301d4cc82844eb05c69dc2d99f6"
 }
