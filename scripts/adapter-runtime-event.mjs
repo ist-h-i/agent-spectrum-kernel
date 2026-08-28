@@ -123,7 +123,12 @@ export function mapCodexRunnerResult(report, { eventId = null, taskId = null, oc
   const appliedLevel = evidenceLevel(report.execution_evidence?.workflow_contract_application?.evidence_level);
   const appliedContracts = appliedLevel === "none" ? [] : selectedContracts;
   const applicationEvidenceMissing = missingEvidence.some((item) => /(?:contract_load|contract_application)$/u.test(item));
-  const approvalRequired = requiredGates.includes("risk-gate") || envelope?.stop_reason?.status === "risk_gate";
+  const readOnlyReviewRiskEvaluation = report.mode === "review"
+    && report.sandbox === "read-only"
+    && requiredGates.includes("review-ai-quality")
+    && selectedContracts.includes("review-router");
+  const approvalRequired = (requiredGates.includes("risk-gate") && !readOnlyReviewRiskEvaluation)
+    || envelope?.stop_reason?.status === "risk_gate";
   const approvalMissing = approvalRequired && missingEvidence.includes("specific_action_approval");
   const envelopeStop = envelope?.stop_reason?.status === "human_decision" ? "blocked" : envelope?.stop_reason?.status;
   const stopStatus = approvalMissing
@@ -185,7 +190,11 @@ export function validateAdapterRuntimeEvent(event, { schemaPath = DEFAULT_SCHEMA
   const selectedContracts = new Set(event?.contracts?.selected ?? []);
   const appliedContracts = event?.contracts?.applied ?? [];
   const applicationEvidenceLevel = event?.contracts?.application_evidence_level;
-  if (requiredGates.has("risk-gate") && event?.approval?.required !== true) errors.push("$.approval.required: risk-gate requires approval.required");
+  const reviewRiskEvaluation = requiredGates.has("risk-gate")
+    && requiredGates.has("review-ai-quality")
+    && selectedContracts.has("review-router");
+  if (requiredGates.has("risk-gate") && !reviewRiskEvaluation && event?.approval?.required !== true) errors.push("$.approval.required: risk-gate requires approval.required");
+  if (reviewRiskEvaluation && event?.approval?.required === true) errors.push("$.approval.required: review risk-gate must not require action approval");
   if (event?.approval?.required === true && event?.approval?.status !== "approved" && (event?.stop?.status === "completed" || event?.outcome?.classification === "completed" || event?.outcome?.claim_effect === "support_within_scope")) errors.push("$.approval.status: incomplete approval cannot produce completed or support claim");
   if (event?.outcome?.claim_effect === "support_within_scope" && (event?.contracts?.applied?.length ?? 0) === 0) errors.push("$.outcome.claim_effect: support claim requires an applied contract");
   if (applicationEvidenceLevel === "none" && appliedContracts.length > 0) errors.push("$.contracts.applied: application evidence none cannot have applied contracts");

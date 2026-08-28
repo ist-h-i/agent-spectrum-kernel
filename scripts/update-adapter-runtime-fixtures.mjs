@@ -13,6 +13,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const profilePath = resolve(root, "docs/fixtures/adapter-runtime-profiles.json");
 const evidencePath = resolve(root, "docs/fixtures/adapter-runtime-evidence.json");
 const bundlePath = resolve(root, "docs/fixtures/adapter-runtime-bundle.json");
+const verificationProofPath = resolve(root, "docs/fixtures/verification-proof-policy-cases.json");
 const profileArtifact = JSON.parse(readFileSync(profilePath, "utf8"));
 const evidenceArtifact = JSON.parse(readFileSync(evidencePath, "utf8"));
 
@@ -65,6 +66,22 @@ for (const profile of profileArtifact.profiles) {
   }
 }
 writeFileSync(profilePath, `${JSON.stringify(profileArtifact, null, 2)}\n`);
+const verificationProofBytes = readFileSync(verificationProofPath, "utf8");
+const verificationProofArtifact = JSON.parse(verificationProofBytes);
+const verificationPromptProxy = verificationProofArtifact.size_proxy?.generated_localized_prompt;
+const codexImplementationPlan = buildCodexProjectionPlan({ profileName: "implementation" });
+const verificationPromptArtifact = codexImplementationPlan.compactProfileArtifacts.find(({ metadata }) => (
+  metadata.profile_id === verificationPromptProxy?.candidate_profile_id
+  && metadata.prompt_name === verificationPromptProxy?.candidate_prompt_name
+));
+if (!verificationPromptArtifact) throw new Error("Codex verification prompt proxy is missing from the implementation projection");
+const verificationPromptBytes = Buffer.from(verificationPromptArtifact.content, "utf8");
+const previousVerificationPromptFields = `"candidate_expected_bytes": ${verificationPromptProxy.candidate_expected_bytes},\n      "candidate_sha256": "${verificationPromptProxy.candidate_sha256}"`;
+verificationPromptProxy.candidate_expected_bytes = verificationPromptBytes.byteLength;
+verificationPromptProxy.candidate_sha256 = createHash("sha256").update(verificationPromptBytes).digest("hex");
+const nextVerificationPromptFields = `"candidate_expected_bytes": ${verificationPromptProxy.candidate_expected_bytes},\n      "candidate_sha256": "${verificationPromptProxy.candidate_sha256}"`;
+if (!verificationProofBytes.includes(previousVerificationPromptFields)) throw new Error("Codex verification prompt proxy fields are not in the canonical fixture form");
+writeFileSync(verificationProofPath, verificationProofBytes.replace(previousVerificationPromptFields, nextVerificationPromptFields));
 const currentBundle = JSON.parse(readFileSync(bundlePath, "utf8"));
 writeFileSync(bundlePath, `${JSON.stringify({ ...currentBundle, ...buildAdapterProjectionBundle() }, null, 2)}\n`);
 

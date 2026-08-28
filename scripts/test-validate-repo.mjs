@@ -3710,6 +3710,15 @@ function assertCodexInstallerScripts() {
       throw new Error(`source Codex command template must use the managed contract for ${prompt}: ${expectedInvocation}`);
     }
   }
+  const sourceReviewCommand = sourceCommand
+    .split("\n")
+    .find((line) => line.startsWith("node scripts/codex-exec-runner.mjs --prompt skill-review.md"));
+  if (!sourceReviewCommand?.match(/(?:^|\s)--gates-observed(?:\s|$)/u)) {
+    throw new Error("source Codex review command must record completed gate classification with --gates-observed by default");
+  }
+  if (!sourceCommand.includes("remove `--gates-observed` and replace it with repeated exact `--observed-signal <id>` arguments") || !sourceCommand.includes("Never combine those forms")) {
+    throw new Error("source Codex review guidance must explain default observation replacement and mutual exclusion");
+  }
 
   const freshTarget = resolve(fixtureRoot, "codex-install-fresh");
   assertRuntimePass("codex installer core setup", runRepoScript([coreInstaller, "--target", freshTarget]));
@@ -3892,6 +3901,17 @@ function assertCodexInstallerScripts() {
       const expectedInvocation = `--prompt ${prompt} --mode ${contract.mode} --sandbox ${contract.sandbox}`;
       if (!generatedCommand.includes(expectedInvocation)) {
         throw new Error(`codex command template must use the managed contract for ${prompt}: ${expectedInvocation}`);
+      }
+    }
+    if (profileState.selected_prompts.includes("skill-review.md")) {
+      const generatedReviewCommand = generatedCommand
+        .split("\n")
+        .find((line) => line.startsWith("node scripts/codex-exec-runner.mjs --prompt skill-review.md"));
+      if (!generatedReviewCommand?.match(/(?:^|\s)--gates-observed(?:\s|$)/u)) {
+        throw new Error(`codex ${profile} review command must include --gates-observed by default`);
+      }
+      if (!generatedCommand.includes("remove `--gates-observed` and replace it with repeated exact `--observed-signal <id>` arguments") || !generatedCommand.includes("Never combine `--gates-observed` with `--observed-signal`")) {
+        throw new Error(`codex ${profile} review guidance must preserve observation replacement and mutual exclusion`);
       }
     }
     assertCodexInstallClosed(`codex installer ${profile} profile`, profileTarget);

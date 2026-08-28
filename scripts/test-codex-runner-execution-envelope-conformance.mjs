@@ -21,6 +21,14 @@ function runNode(args, { cwd = repoRoot, env = {} } = {}) {
   });
 }
 
+function runGit(args, { cwd = target } = {}) {
+  return spawnSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024,
+  });
+}
+
 function assertPass(label, result) {
   assert.equal(result.status, 0, `${label} failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
 }
@@ -170,6 +178,7 @@ while [ "$#" -gt 0 ]; do
   if [ "$1" = "--output-last-message" ]; then output="$2"; shift 2; continue; fi
   shift
 done
+if [ -n "$ASK_FAKE_INVOCATION_PATH" ]; then printf '%s\n' "invoked" >> "$ASK_FAKE_INVOCATION_PATH"; fi
 if [ -z "$ASK_FAKE_RESULT_PATH" ]; then exit 3; fi
 cp "$ASK_FAKE_RESULT_PATH" "$output"
 `,
@@ -205,6 +214,166 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     assert.equal(existsSync(persistedRecordPath), true, `${fixture.mode} persisted record file`);
     assert.equal(JSON.parse(readFileSync(persistedRecordPath, "utf8")).record_id, report.execution_envelope_record.record_id, `${fixture.mode} persisted record identity`);
   }
+
+  const generatedCommands = readFileSync(resolve(target, ".agents/commands/codex-exec.md"), "utf8");
+  const generatedReviewCommand = generatedCommands
+    .split("\n")
+    .find((line) => line.startsWith("node scripts/codex-exec-runner.mjs --prompt skill-review.md"));
+  assert.ok(generatedReviewCommand, "generated Codex command template must include the review command");
+  assert.match(generatedReviewCommand, /(?:^|\s)--gates-observed(?:\s|$)/u, "generated review command must record completed gate classification by default");
+  assert.match(generatedCommands, /remove `--gates-observed` and replace it with repeated exact `--observed-signal <id>` arguments/u, "generated review guidance must explain how to replace the default observation form");
+  assert.match(generatedCommands, /Never combine `--gates-observed` with `--observed-signal`/u, "generated review guidance must preserve observation-form mutual exclusion");
+
+  const generatedReviewTokens = generatedReviewCommand.trim().split(/\s+/u);
+  assert.equal(generatedReviewTokens.filter((token) => token === "--gates-observed").length, 1, "generated review command must contain exactly one default observation form");
+  assert.equal(generatedReviewTokens.includes("--observed-signal"), false, "generated review command must not combine default and exact-signal observation forms");
+  assert.deepEqual(generatedReviewTokens.slice(0, 2), ["node", "scripts/codex-exec-runner.mjs"]);
+  assertPass("generated review fixture git init", runGit(["init", "-b", "main"]));
+  assertPass("generated review fixture git add", runGit(["add", "."]));
+  assertPass("generated review fixture git commit", runGit([
+    "-c", "user.name=ASK Fixture",
+    "-c", "user.email=ask-fixture@example.invalid",
+    "commit", "-m", "fixture baseline",
+  ]));
+  assertPass("generated review fixture origin main", runGit(["update-ref", "refs/remotes/origin/main", "HEAD"]));
+
+  const generatedReviewResponse = `Baseline review:
+- Gate: review-ai-quality
+- Status: pass
+- Evidence: generated command fixture
+
+Additional required gates:
+- none
+
+Missing evidence:
+- none
+
+Findings:
+- none
+`;
+  const generatedReviewResultPath = resolve(target, ".fixture-generated-review.json");
+  const fakeInvocationPath = resolve(target, ".fixture-codex-invocations");
+  writeFileSync(generatedReviewResultPath, `${JSON.stringify(structuredResult(generatedReviewResponse), null, 2)}\n`);
+  const generatedReviewResult = runNode([
+    generatedReviewTokens[1],
+    ...generatedReviewTokens.slice(2),
+    "--codex-bin", fakeCodex,
+    "--json",
+  ], {
+    cwd: target,
+    env: {
+      ASK_FAKE_RESULT_PATH: generatedReviewResultPath,
+      ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
+    },
+  });
+  assertPass("generated review command executes without missing gate observation", generatedReviewResult);
+  const generatedReviewReport = JSON.parse(generatedReviewResult.stdout);
+  assert.equal(generatedReviewReport.execution_evidence?.required_gates?.missing_evidence?.includes("required_gate_observation"), false);
+  assert.equal(readFileSync(fakeInvocationPath, "utf8").trim().split("\n").length, 1, "generated review command must invoke Codex once");
+
+  const infrastructureReviewResponse = `Baseline review:
+- Gate: review-ai-quality
+- Status: pass
+- Evidence: infrastructure review fixture
+
+Additional required gates:
+- review-architecture-impact: status=pass; evidence=read-only architecture review; signals=infrastructure_change
+- risk-gate: status=pass; evidence=read-only risk review; signals=infrastructure_change
+
+Missing evidence:
+- none
+
+Findings:
+- none
+`;
+  const infrastructureReviewResultPath = resolve(target, ".fixture-infrastructure-review.json");
+  writeFileSync(infrastructureReviewResultPath, `${JSON.stringify(structuredResult(infrastructureReviewResponse), null, 2)}\n`);
+  const infrastructureReviewTokens = generatedReviewTokens.filter((token) => token !== "--gates-observed");
+  const outputIndex = infrastructureReviewTokens.indexOf("--output");
+  infrastructureReviewTokens[outputIndex + 1] = ".agents/runs/conformance-infrastructure-review.md";
+  const infrastructureReviewResult = runNode([
+    infrastructureReviewTokens[1],
+    ...infrastructureReviewTokens.slice(2),
+    "--observed-signal", "infrastructure_change",
+    "--codex-bin", fakeCodex,
+    "--json",
+  ], {
+    cwd: target,
+    env: {
+      ASK_FAKE_RESULT_PATH: infrastructureReviewResultPath,
+      ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
+    },
+  });
+  assertPass("read-only infrastructure review executes risk-gate as an evaluation gate", infrastructureReviewResult);
+  const infrastructureReviewReport = JSON.parse(infrastructureReviewResult.stdout);
+  assert.equal(infrastructureReviewReport.mode, "review");
+  assert.equal(infrastructureReviewReport.sandbox, "read-only");
+  assert.deepEqual(infrastructureReviewReport.execution_evidence?.required_gates?.gates, [
+    "review-ai-quality",
+    "review-architecture-impact",
+    "risk-gate",
+  ]);
+  assert.equal(infrastructureReviewReport.execution_evidence?.required_gates?.missing_evidence?.includes("specific_action_approval"), false);
+  assert.equal(infrastructureReviewReport.normalized_adapter_event?.approval?.required, false);
+  assert.equal(readFileSync(fakeInvocationPath, "utf8").trim().split("\n").length, 2, "read-only risk review must invoke Codex once");
+
+  const conflictingObservationResult = runNode([
+    runner,
+    "--target", target,
+    "--prompt", "skill-review.md",
+    "--mode", "review",
+    "--gates-observed",
+    "--observed-signal", "infrastructure_change",
+    "--dry-run",
+  ], { cwd: target });
+  assert.notEqual(conflictingObservationResult.status, 0, "review observation forms must remain mutually exclusive");
+  assert.match(conflictingObservationResult.stderr, /do not combine it with --observed-signal/u);
+
+  const invocationsBeforeWriteReview = readFileSync(fakeInvocationPath, "utf8");
+  const writeReviewResult = runNode([
+    runner,
+    "--target", target,
+    "--prompt", "skill-review.md",
+    "--mode", "review",
+    "--sandbox", "workspace-write",
+    "--gates-observed",
+    "--codex-bin", fakeCodex,
+    "--output", ".agents/runs/conformance-write-review.md",
+    "--json",
+  ], {
+    cwd: target,
+    env: {
+      ASK_FAKE_RESULT_PATH: generatedReviewResultPath,
+      ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
+    },
+  });
+  assert.notEqual(writeReviewResult.status, 0, "managed review must reject workspace-write sandbox");
+  assert.match(writeReviewResult.stderr, /prompt\/sandbox mismatch/u);
+  assert.equal(readFileSync(fakeInvocationPath, "utf8"), invocationsBeforeWriteReview, "rejected workspace-write review must not invoke Codex");
+
+  const invocationsBeforeRiskAction = readFileSync(fakeInvocationPath, "utf8");
+  const riskActionResult = runNode([
+    runner,
+    "--target", target,
+    "--prompt", "skill-implement.md",
+    "--mode", "implementation",
+    "--required-gate", "risk-gate",
+    "--codex-bin", fakeCodex,
+    "--output", ".agents/runs/conformance-risk-action.md",
+    "--json",
+  ], {
+    cwd: target,
+    env: {
+      ASK_FAKE_RESULT_PATH: generatedReviewResultPath,
+      ASK_FAKE_INVOCATION_PATH: fakeInvocationPath,
+    },
+  });
+  assert.notEqual(riskActionResult.status, 0, "non-review risk-gated action must stop without approval");
+  const riskActionReport = JSON.parse(riskActionResult.stdout);
+  assert.equal(riskActionReport.normalized_adapter_event?.approval?.required, true);
+  assert.equal(riskActionReport.normalized_adapter_event?.approval?.status, "missing");
+  assert.equal(riskActionReport.normalized_adapter_event?.stop?.status, "risk_gate");
+  assert.equal(readFileSync(fakeInvocationPath, "utf8"), invocationsBeforeRiskAction, "non-review risk-gated action must not invoke Codex");
 
   const recordDirectory = resolve(target, ".agent-spectrum-kernel/runtime/execution-envelopes");
   const fencedExampleResultPath = resolve(target, ".fixture-fenced-example.json");

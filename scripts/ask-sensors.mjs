@@ -162,7 +162,9 @@ function runSensors({ target, mode, text, changedFiles, envelopeRecord, required
   if (mode === "review") {
     sensors.push(reviewLayerSummarySensor(text, contract, requiredGates, observedSignals, target, diagnostic));
   }
-  sensors.push(riskSurfaceSensor(text, changedFiles));
+  sensors.push(riskSurfaceSensor(text, changedFiles, {
+    evaluationOnly: mode === "review" && requiredGates.includes("risk-gate"),
+  }));
   sensors.push(unsupportedCapabilitySensor(target));
   sensors.push(evidencePhraseSensor(text));
 
@@ -415,10 +417,17 @@ function hasTopLevelSection(text, section) {
   return false;
 }
 
-function riskSurfaceSensor(text, changedFiles) {
+function riskSurfaceSensor(text, changedFiles, { evaluationOnly = false } = {}) {
   const surfaces = detectApprovalRequiredSurfaces({ text, paths: changedFiles });
   if (surfaces.length === 0) {
     return sensor("risk_surface", "pass", "No AGENTS approval-required risk surface detected.");
+  }
+  if (evaluationOnly) {
+    return sensor(
+      "risk_surface",
+      "pass",
+      `Approval-required risk surface evaluated by a managed read-only review: ${surfaces.map((surface) => surface.id).join(", ")}. No risky action was authorized or performed.`,
+    );
   }
   if (hasExplicitApprovalEvidence(text)) {
     return sensor(

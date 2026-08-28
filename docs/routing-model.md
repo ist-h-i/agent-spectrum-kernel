@@ -55,7 +55,7 @@ It is not for:
 - blocking read-only investigation or local verification,
 - turning route mismatch into an automatic work blocker.
 
-Route override remains allowed when the agent records the default route, selected route, and reason. The exception is a true required `risk-gate`; risky action approval cannot be bypassed by route override.
+Route override remains allowed when the agent records the default route, selected route, and reason. A `risk-gate` selected inside a managed read-only review is an evaluation gate and does not authorize or perform the risky action. A true risky action still requires specific-action approval and cannot bypass it by route override.
 
 ## User-Facing Work Modes
 

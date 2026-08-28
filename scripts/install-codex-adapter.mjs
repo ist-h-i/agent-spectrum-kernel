@@ -1061,10 +1061,10 @@ function commandSectionForPrompt(prompt) {
     return `## ${metadata.label}
 
 \`\`\`bash
-node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox} --diff-base origin/main...HEAD --output codex-review.md
+node scripts/codex-exec-runner.mjs --prompt ${prompt} --mode ${metadata.execution.mode} --sandbox ${metadata.execution.sandbox} --diff-base origin/main...HEAD --gates-observed --output codex-review.md
 \`\`\`
 
-Replace \`--gates-observed\` with repeated exact \`--observed-signal <id>\` arguments when the diff has a mapped signal; the runner derives additional gates from the canonical registry. Treat this as diff-only review unless the runner output also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.`;
+When the diff has a mapped signal, remove \`--gates-observed\` and replace it with repeated exact \`--observed-signal <id>\` arguments; the runner derives additional gates from the canonical registry. Never combine \`--gates-observed\` with \`--observed-signal\`. Treat this as diff-only review unless the runner output also provides the checked-out PR head, relevant docs, test results, and context required by the review gates.`;
   }
   if (prompt === "skill-implement.md") {
     return `## ${metadata.label}

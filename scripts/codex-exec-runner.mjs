@@ -626,7 +626,8 @@ try {
   let envelopeRecord = null;
   let publication = null;
   let structuredError = null;
-  const approvalBlocked = args.requiredGates.includes("risk-gate");
+  const readOnlyReviewRiskEvaluation = args.mode === "review" && args.sandbox === "read-only";
+  const approvalBlocked = args.requiredGates.includes("risk-gate") && !readOnlyReviewRiskEvaluation;
   const capabilityBlocked = preflightResult.capabilityMissing.length > 0;
   if (preflightResult.failures.length === 0) {
     const prompt = buildPrompt(args, preflightResult.state, preflightResult.promptPath, preflightResult.compactProfile);

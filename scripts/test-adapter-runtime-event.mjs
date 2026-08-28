@@ -75,6 +75,35 @@ const codexVerificationNormalized = mapCodexRunnerResult(codexVerificationResult
 });
 assert.deepEqual(codexVerificationNormalized.verification, { obligation_required: true, attempted: 0, passed: 0, failed: 0, unavailable: 1 }, "sensor pass must not become command or verification evidence");
 
+const codexReviewRiskResult = structuredClone(codexRunnerResult);
+codexReviewRiskResult.mode = "review";
+codexReviewRiskResult.sandbox = "read-only";
+codexReviewRiskResult.execution_evidence.requested_contracts.contracts = ["review-router", "risk-gate"];
+codexReviewRiskResult.execution_evidence.required_gates = {
+  evidence_level: "runtime_detected",
+  gates: ["review-ai-quality", "review-architecture-impact", "risk-gate"],
+  missing_evidence: [],
+};
+const codexReviewRiskNormalized = mapCodexRunnerResult(codexReviewRiskResult, {
+  eventId: "evt:codex-review-risk-fixture",
+  taskId: "task:codex-review-risk-fixture",
+  occurredAt: "2026-07-14T00:00:02Z",
+});
+assert.deepEqual(validateAdapterRuntimeEvent(codexReviewRiskNormalized), []);
+assert.equal(codexReviewRiskNormalized.approval.required, false, "read-only review risk-gate is an evaluation gate, not action approval");
+assert.equal(codexReviewRiskNormalized.approval.status, "not_required");
+
+const codexWriteRiskResult = structuredClone(codexReviewRiskResult);
+codexWriteRiskResult.mode = "implementation";
+codexWriteRiskResult.sandbox = "workspace-write";
+codexWriteRiskResult.execution_evidence.requested_contracts.contracts = ["controlled-implementation", "risk-gate"];
+const codexWriteRiskNormalized = mapCodexRunnerResult(codexWriteRiskResult, {
+  eventId: "evt:codex-write-risk-fixture",
+  taskId: "task:codex-write-risk-fixture",
+  occurredAt: "2026-07-14T00:00:03Z",
+});
+assert.equal(codexWriteRiskNormalized.approval.required, true, "non-review risk-gated action must still require approval");
+
 const missingStop = structuredClone(codexNormalized);
 delete missingStop.stop;
 assert.ok(validateAdapterRuntimeEvent(missingStop).some((error) => error.includes("$.stop: is required")));
@@ -106,6 +135,20 @@ const riskGateWithoutApproval = structuredClone(semanticBase);
 riskGateWithoutApproval.gates.required = ["risk-gate"];
 riskGateWithoutApproval.approval = { required: false, status: "not_required", action_categories: [] };
 assert.ok(validateAdapterRuntimeEvent(riskGateWithoutApproval).some((error) => error.includes("risk-gate requires approval.required")));
+
+const reviewRiskGateWithoutApproval = structuredClone(semanticBase);
+reviewRiskGateWithoutApproval.contracts.selected = ["review-router", "risk-gate"];
+reviewRiskGateWithoutApproval.gates.required = ["review-ai-quality", "review-architecture-impact", "risk-gate"];
+reviewRiskGateWithoutApproval.approval = { required: false, status: "not_required", action_categories: [] };
+assert.deepEqual(validateAdapterRuntimeEvent(reviewRiskGateWithoutApproval), [], "review risk-gate must not imply action approval");
+
+const reviewRiskGateWithApproval = structuredClone(reviewRiskGateWithoutApproval);
+reviewRiskGateWithApproval.approval = { required: true, status: "unknown", action_categories: ["risk_gated_action"] };
+assert.ok(validateAdapterRuntimeEvent(reviewRiskGateWithApproval).some((error) => error.includes("review risk-gate must not require action approval")));
+
+const nonReviewRiskGateWithReviewBaseline = structuredClone(reviewRiskGateWithoutApproval);
+nonReviewRiskGateWithReviewBaseline.contracts.selected = ["controlled-implementation", "risk-gate"];
+assert.ok(validateAdapterRuntimeEvent(nonReviewRiskGateWithReviewBaseline).some((error) => error.includes("risk-gate requires approval.required")), "a review gate id alone must not bypass non-review approval");
 
 const supportWithoutAppliedContract = structuredClone(semanticBase);
 supportWithoutAppliedContract.contracts.applied = [];
