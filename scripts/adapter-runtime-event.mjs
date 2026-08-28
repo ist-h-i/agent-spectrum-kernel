@@ -190,7 +190,8 @@ export function validateAdapterRuntimeEvent(event, { schemaPath = DEFAULT_SCHEMA
   const selectedContracts = new Set(event?.contracts?.selected ?? []);
   const appliedContracts = event?.contracts?.applied ?? [];
   const applicationEvidenceLevel = event?.contracts?.application_evidence_level;
-  const reviewRiskEvaluation = requiredGates.has("risk-gate")
+  const reviewRiskEvaluation = event?.adapter_id === "codex"
+    && requiredGates.has("risk-gate")
     && requiredGates.has("review-ai-quality")
     && selectedContracts.has("review-router");
   if (requiredGates.has("risk-gate") && !reviewRiskEvaluation && event?.approval?.required !== true) errors.push("$.approval.required: risk-gate requires approval.required");

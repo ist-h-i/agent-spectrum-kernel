@@ -36,6 +36,20 @@ const claudeExecutedGate = mapClaudeMetricsEvent(claudeExecutedGateEvent, { even
 assert.notEqual(claudeExecutedGate.approval.status, "approved", "gate execution is not explicit human approval evidence");
 assert.equal(claudeExecutedGate.stop.status, "risk_gate");
 
+const claudeReviewRiskEvent = structuredClone(claudeMetricsEvent);
+claudeReviewRiskEvent.skills_used = ["review-router", "review-ai-quality", "review-architecture-impact", "risk-gate"];
+claudeReviewRiskEvent.routing_result.required_gates = ["review-ai-quality", "review-architecture-impact", "risk-gate"];
+claudeReviewRiskEvent.gate_decisions = [
+  { gate: "review-ai-quality", status: "executed", missing_inputs: [] },
+  { gate: "review-architecture-impact", status: "executed", missing_inputs: [] },
+  { gate: "risk-gate", status: "required", missing_inputs: ["specific_action_approval"] },
+];
+const claudeReviewRiskNormalized = mapClaudeMetricsEvent(claudeReviewRiskEvent, { eventKind: "task_stop", hookEvent: "Stop" });
+assert.deepEqual(validateAdapterRuntimeEvent(claudeReviewRiskNormalized), []);
+assert.equal(claudeReviewRiskNormalized.approval.required, true, "Claude events do not carry Codex read-only sandbox evidence");
+assert.equal(claudeReviewRiskNormalized.approval.status, "missing");
+assert.equal(claudeReviewRiskNormalized.stop.status, "risk_gate");
+
 const codexRunnerResult = {
   status: "executed",
   evidence_level: "executed",
@@ -145,6 +159,10 @@ assert.deepEqual(validateAdapterRuntimeEvent(reviewRiskGateWithoutApproval), [],
 const reviewRiskGateWithApproval = structuredClone(reviewRiskGateWithoutApproval);
 reviewRiskGateWithApproval.approval = { required: true, status: "unknown", action_categories: ["risk_gated_action"] };
 assert.ok(validateAdapterRuntimeEvent(reviewRiskGateWithApproval).some((error) => error.includes("review risk-gate must not require action approval")));
+
+const claudeReviewRiskGateWithoutApproval = structuredClone(reviewRiskGateWithoutApproval);
+claudeReviewRiskGateWithoutApproval.adapter_id = "claude_code";
+assert.ok(validateAdapterRuntimeEvent(claudeReviewRiskGateWithoutApproval).some((error) => error.includes("risk-gate requires approval.required")), "Codex-only review evidence must not weaken Claude approval semantics");
 
 const nonReviewRiskGateWithReviewBaseline = structuredClone(reviewRiskGateWithoutApproval);
 nonReviewRiskGateWithReviewBaseline.contracts.selected = ["controlled-implementation", "risk-gate"];

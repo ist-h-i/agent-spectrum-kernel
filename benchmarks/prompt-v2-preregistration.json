@@ -162,9 +162,9 @@
       ],
       "renderer": {
         "renderer_id": "install-codex-adapter",
-        "renderer_version": "7",
+        "renderer_version": "8",
         "implementation_path": "scripts/install-codex-adapter.mjs",
-        "implementation_raw_byte_digest": "sha256:4784e1eebf76702db5b08e15208e9d31d12d3a056af4828e607e6e4551ccc851"
+        "implementation_raw_byte_digest": "sha256:202f2eec154a77d1f30444e657b5bfa7b8f38a1d840443a370ecdee5f904bc09"
       }
     },
     {
@@ -406,6 +406,6 @@
     "runtime_activation_implied": false,
     "lifecycle_mutation_authorized": false
   },
-  "preregistration_id": "prompt-v2-prereg-09a8375bb8db1bdb89df80a684d49cce",
-  "preregistration_digest": "sha256:5c7c9d0a8bce5171f5c9b6bbb4c737d509a8375bb8db1bdb89df80a684d49cce"
+  "preregistration_id": "prompt-v2-prereg-ae74196b851d186ae1e0aa0a45939b3d",
+  "preregistration_digest": "sha256:f5cc838703008896e7864e17501c99c3ae74196b851d186ae1e0aa0a45939b3d"
 }

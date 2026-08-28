@@ -108,7 +108,7 @@ try {
     assert.ok(projected.includes("formal_verification_contract"), `${path} omitted the formal verification path`);
   }
   assert.equal(claudeInitial.projection_plan?.renderer_version, "5", "Claude migration used an unexpected renderer revision");
-  assert.equal(codexInitial.projection_plan?.renderer_version, "7", "Codex migration used an unexpected renderer revision");
+  assert.equal(codexInitial.projection_plan?.renderer_version, "8", "Codex migration used an unexpected renderer revision");
 
   run(claudeInstaller, ["--profile", "implementation"]);
   run(codexInstaller, ["--profile", "implementation"]);

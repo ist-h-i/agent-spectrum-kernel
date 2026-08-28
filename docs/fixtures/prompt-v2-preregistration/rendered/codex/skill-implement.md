@@ -1,4 +1,4 @@
-<!-- ASK_CODEX_COMPACT_PROFILE {"v":"1.2.0","id":"codex-implementation-compact-v1","r":"ask-3.0.0","s":"4c8923aabce45dd227c4e79c8fb626ddd0c56dc670707438b05e89b01cad75ca","p":"248d835ef12a094c2193291177f75e566127d6560dc2182d939ae17123090fd9","rc":"controlled-implementation,test-first-verification,risk-gate","ci":"scope,verification,risk_approval,evidence,missing_evidence,output","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
+<!-- ASK_CODEX_COMPACT_PROFILE {"v":"1.2.0","id":"codex-implementation-compact-v1","r":"ask-3.0.0","s":"4a60c7ddd6b2fcbcc21db2798dd49a938d9e5e23759451012d96fc1a5fe98198","p":"91e6f3acd435e3cf2bc9a0f85f2f39c41d865859185fcc52b7175f96f0849a4e","rc":"controlled-implementation,test-first-verification,risk-gate","ci":"scope,verification,risk_approval,evidence,missing_evidence,output","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
 ---
 description: Implement a scoped change with the Codex compact ASK profile.
 ---

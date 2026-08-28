@@ -1,4 +1,4 @@
-<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"handoff","k":"c","r":"ask-3.0.0","p":"17633e22f76df8564dc056ad294a61bf577c6d2f8d29ee4373c7c23007c7312e","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
+<!-- ASK_CLAUDE_FIXED_ENTRY_PROFILE {"v":"1.2","m":"handoff","k":"c","r":"ask-3.0.0","p":"4409fed5473b1cfea4b8490bb35b129719fe66ceb68c5af837106eb44a050204","a":"834446dc55f4a4925ec80f948304e067cac1556b03a4bc38b096098569451932"} -->
 ---
 description: Fixed-entry Agent Spectrum Kernel handoff.
 ---
