@@ -3716,7 +3716,7 @@ function assertCodexInstallerScripts() {
   if (!sourceReviewCommand?.match(/(?:^|\s)--gates-observed(?:\s|$)/u)) {
     throw new Error("source Codex review command must record completed gate classification with --gates-observed by default");
   }
-  if (!sourceCommand.includes("remove `--gates-observed` and replace it with repeated exact `--observed-signal <id>` arguments") || !sourceCommand.includes("Never combine those forms")) {
+  if (!sourceCommand.includes("remove it and repeat `--observed-signal <id>` for each exact mapped signal") || !sourceCommand.includes("Never combine those forms")) {
     throw new Error("source Codex review guidance must explain default observation replacement and mutual exclusion");
   }
 
