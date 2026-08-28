@@ -546,6 +546,7 @@ function prepareEvidenceManifest({
   revision,
   entry,
   evidenceMode = "exact",
+  requiredEvidenceLevel = "behavior_verified",
   rollbackTarget = null,
   manifestOverrides = {},
   gateId = `${portfolioId}.gate`,
@@ -564,7 +565,11 @@ function prepareEvidenceManifest({
     ...structuredClone(manifestOverrides),
   });
   const selectionBasisDigest = computePortfolioSelectionBasisDigest(preliminary);
-  const passing = sealEvidence({ gateId, selectionBasisDigest });
+  const passing = sealEvidence({
+    gateId,
+    selectionBasisDigest,
+    evidenceLevel: requiredEvidenceLevel,
+  });
   if (evidenceMode === "exact" || evidenceMode === "conflict") {
     putVerificationEvidence({ storeRoot, evidence: passing });
   }
@@ -1371,23 +1376,6 @@ try {
       storeRoot,
       evidence: sealEvidence({
         gateId: sharedCasAuthorityGateId,
-        selectionBasisDigest: digest("unaccepted-evidence-level-selection-basis"),
-        targetRevision: "unaccepted-evidence-level-revision",
-        targetTreeDigest: digest("unaccepted-evidence-level-tree"),
-        evidenceLevel: "runtime_detected",
-      }),
-    });
-    const afterUnacceptedEvidenceLevel = select({
-      storeRoot,
-      scenario: sharedCasAuthorityScenario,
-      assetTrust,
-    });
-    assert.deepEqual(afterUnacceptedEvidenceLevel.selection, before.selection);
-
-    putVerificationEvidence({
-      storeRoot,
-      evidence: sealEvidence({
-        gateId: sharedCasAuthorityGateId,
         selectionBasisDigest: digest("accepted-stale-selection-basis"),
         targetRevision: "accepted-stale-revision",
         targetTreeDigest: digest("accepted-stale-tree"),
@@ -1404,6 +1392,48 @@ try {
       "evidence_stale",
       "downgrade",
     ));
+  });
+  const sharedCasEvidenceLevelGateId = "issue-277-shared-cas-evidence-level-gate";
+  const sharedCasEvidenceLevelDraft = prepareEvidenceManifest({
+    storeRoot,
+    registry,
+    portfolioId: "ask.portfolio.issue277.shared-cas-evidence-level",
+    revision: "v1",
+    entry: challengerTemplate(),
+    evidenceMode: "missing",
+    requiredEvidenceLevel: "runtime_detected",
+    gateId: sharedCasEvidenceLevelGateId,
+  });
+  const sharedCasEvidenceLevelScenario = activateInitial({
+    storeRoot,
+    draft: sharedCasEvidenceLevelDraft,
+    assetTrust,
+  });
+  regression("an unaccepted evidence level cannot establish stale material in a shared CAS", () => {
+    const before = select({
+      storeRoot,
+      scenario: sharedCasEvidenceLevelScenario,
+      assetTrust,
+    });
+    assert.equal(before.selection.decision, "bypass");
+    assert.ok(hasReason(before.selection, "evidence_missing", "bypass"));
+
+    putVerificationEvidence({
+      storeRoot,
+      evidence: sealEvidence({
+        gateId: sharedCasEvidenceLevelGateId,
+        selectionBasisDigest: digest("unaccepted-evidence-level-selection-basis"),
+        targetRevision: "unaccepted-evidence-level-revision",
+        targetTreeDigest: digest("unaccepted-evidence-level-tree"),
+        evidenceLevel: "runtime_detected",
+      }),
+    });
+    const afterUnacceptedEvidenceLevel = select({
+      storeRoot,
+      scenario: sharedCasEvidenceLevelScenario,
+      assetTrust,
+    });
+    assert.deepEqual(afterUnacceptedEvidenceLevel.selection, before.selection);
   });
   check("stale adapter identity follows typed downgrade", () => {
     const resolved = select({ storeRoot, scenario: evidenceScenarios.stale, assetTrust });
