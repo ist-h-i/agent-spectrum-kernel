@@ -139,6 +139,7 @@ function assetDescriptor({
   version = "1.0.0",
   highImpact = false,
   permissionsStatus = "supported",
+  requiredCapabilities = [CAPABILITY],
   sourceFile,
 }) {
   const evidenceRef = `issue-277:${name}`;
@@ -179,12 +180,12 @@ function assetDescriptor({
       task_classes: assetDimension([TASK_CLASS]),
       included_scopes: [OPERATION_SCOPE],
       excluded_scopes: [],
-      required_capabilities: [CAPABILITY],
+      required_capabilities: structuredClone(requiredCapabilities),
       notes: [],
     },
     permissions_and_effects: {
       status: permissionsStatus,
-      requested_permissions: [CAPABILITY],
+      requested_permissions: structuredClone(requiredCapabilities),
       possible_effects: ["read_repository"],
       permission_refs: [evidenceRef],
       effect_refs: [evidenceRef],
@@ -773,6 +774,7 @@ function createExploratoryScenario({
   portfolioId,
   entries,
   manifestSelectors = selectors(),
+  contextAllowlist = selectionContextAllowlist(),
   selectionPolicy = {},
   budgets = {},
   unresolvedConflicts = [],
@@ -783,6 +785,7 @@ function createExploratoryScenario({
     registry,
     entries,
     manifestSelectors,
+    contextAllowlist,
     selectionPolicy,
     budgets,
     unresolvedConflicts,
@@ -1156,6 +1159,103 @@ try {
     assert.equal(resolved.selection.decision, "downgrade");
     assert.ok(hasReason(resolved.selection, "capability_missing", "downgrade"));
     assert.deepEqual(resolved.selection.capability_downgrades[0].missing_capabilities, [CAPABILITY]);
+  });
+
+  const selectorCapabilities = ["selector-z", "formal-review", "shared-review"];
+  const assetCapabilities = ["private-evaluator-access", "asset-a", "shared-review"];
+  const capabilityRegistration = registerAsset({
+    storeRoot,
+    sourceRoot,
+    predecessorSnapshotDigest: registry.snapshot_digest,
+    trustedAuthorityContexts: assetTrust,
+    descriptor: assetDescriptor({
+      name: "layered-capabilities",
+      stableId: "ask.skill.issue277.layered-capabilities",
+      requiredCapabilities: assetCapabilities,
+      sourceFile: writeSyntheticAsset(sourceRoot, "layered-capabilities"),
+    }),
+  });
+  const capabilityRegistry = verifyAssetRegistry({
+    storeRoot,
+    snapshotDigest: capabilityRegistration.snapshot_digest,
+    trustedAuthorityContexts: assetTrust,
+  });
+  const capabilityAsset = resolveAsset({
+    storeRoot,
+    snapshotDigest: capabilityRegistry.snapshot_digest,
+    stableId: "ask.skill.issue277.layered-capabilities",
+    version: "1.0.0",
+    state: "candidate",
+    trustedAuthorityContexts: assetTrust,
+  });
+  const capabilityScenario = createExploratoryScenario({
+    storeRoot,
+    registry: capabilityRegistry,
+    assetTrust,
+    portfolioId: "ask.portfolio.issue277.layered-capabilities",
+    contextAllowlist: selectionContextAllowlist({
+      capabilities: [...new Set([CAPABILITY, ...selectorCapabilities, ...assetCapabilities])],
+    }),
+    entries: [portfolioEntry({
+      entryId: "layered-capability-entry",
+      asset: capabilityAsset,
+      entrySelectors: selectors({ capabilities: selectorDimension(selectorCapabilities) }),
+    })],
+  });
+  const capabilitySelection = (capabilities) => select({
+    storeRoot,
+    scenario: capabilityScenario,
+    assetTrust,
+    contextOverrides: { capabilities },
+  });
+
+  check("selector-only capability gaps remain complete", () => {
+    const resolved = capabilitySelection(assetCapabilities);
+    assert.deepEqual(resolved.selection.capability_downgrades, [{
+      entry_id: "layered-capability-entry",
+      missing_capabilities: ["formal-review", "selector-z"],
+      action: "downgrade",
+    }]);
+  });
+  check("Asset-only capability gaps remain complete", () => {
+    const resolved = capabilitySelection(selectorCapabilities);
+    assert.deepEqual(resolved.selection.capability_downgrades, [{
+      entry_id: "layered-capability-entry",
+      missing_capabilities: ["asset-a", "private-evaluator-access"],
+      action: "downgrade",
+    }]);
+  });
+  check("selector and Asset capability gaps are aggregated", () => {
+    const resolved = capabilitySelection(["shared-review"]);
+    assert.deepEqual(resolved.selection.capability_downgrades, [{
+      entry_id: "layered-capability-entry",
+      missing_capabilities: ["asset-a", "formal-review", "private-evaluator-access", "selector-z"],
+      action: "downgrade",
+    }]);
+  });
+  check("the same selector and Asset capability gap is deduplicated", () => {
+    const resolved = capabilitySelection([]);
+    const missing = resolved.selection.capability_downgrades[0].missing_capabilities;
+    assert.equal(missing.filter((capability) => capability === "shared-review").length, 1);
+  });
+  check("capability gap normalization and selection digests are stable", () => {
+    const first = capabilitySelection([]);
+    const second = capabilitySelection([]);
+    assert.deepEqual(first.selection.capability_downgrades[0].missing_capabilities, [
+      "asset-a",
+      "formal-review",
+      "private-evaluator-access",
+      "selector-z",
+      "shared-review",
+    ]);
+    assert.equal(first.selection.selection_digest, second.selection.selection_digest);
+    assert.equal(first.selection_object_digest, second.selection_object_digest);
+    assert.equal(stableCanonicalJson(first.selection), stableCanonicalJson(second.selection));
+  });
+  check("one entry exposes all capability gaps in one downgrade record", () => {
+    const resolved = capabilitySelection([]);
+    assert.equal(resolved.selection.capability_downgrades.length, 1);
+    assert.equal(resolved.selection.capability_downgrades[0].missing_capabilities.length, 5);
   });
 
   check("missing exact current-state reference makes evidence stale", () => {

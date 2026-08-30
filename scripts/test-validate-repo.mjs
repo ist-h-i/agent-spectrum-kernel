@@ -5646,6 +5646,116 @@ Layer summary:
     throw new Error(`review finding inventory and requested decision should pass sensors\n${separatedReviewResult.stdout}`);
   }
 
+  const decisionSemanticCases = [
+    {
+      label: "baseline fail plus approve",
+      output: reviewFixture({ baselineStatus: "fail", decision: "approve" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "baseline insufficient evidence plus approve",
+      output: reviewFixture({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: current target is unavailable; inspect the exact target", decision: "approve" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "additional gate fail plus approve",
+      output: reviewFixture({ additionalGates: "- review-output-quality: status=fail; evidence=output contract regression; signals=docs_output_change", decision: "approve" }),
+      args: ["--required-gate", "review-output-quality", "--observed-signal", "docs_output_change"],
+      expectedStatus: "fail",
+    },
+    {
+      label: "additional gate insufficient evidence plus approve",
+      output: reviewFixture({
+        additionalGates: "- review-output-quality: status=insufficient_evidence; evidence=rendered output unavailable; signals=docs_output_change",
+        missingEvidence: "- review-output-quality: rendered output unavailable; render the exact candidate",
+        decision: "approve",
+      }),
+      args: ["--required-gate", "review-output-quality", "--observed-signal", "docs_output_change"],
+      expectedStatus: "fail",
+    },
+    {
+      label: "missing evidence plus approve",
+      output: reviewFixture({ missingEvidence: "- current CI: final required job is unavailable; run the required job", decision: "approve" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "blocking finding plus approve",
+      output: reviewFixture({
+        findings: `- Finding ID: F-BLOCKING
+  Severity: blocker
+  Merge blocker: true
+  Practical impact: required output is unsafe to merge
+  Trigger or failure trace: final gate -> blocking finding
+  Evidence location: fixture/blocking
+  Required post-fix condition: resolve the finding`,
+        decision: "approve",
+      }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "all required gates pass plus approve",
+      output: reviewFixture({ additionalGates: "- review-output-quality: status=pass; evidence=exact rendered output; signals=docs_output_change", decision: "approve" }),
+      args: ["--required-gate", "review-output-quality", "--observed-signal", "docs_output_change"],
+      expectedStatus: "pass",
+    },
+    {
+      label: "approve with comments remains valid",
+      output: reviewFixture({ decision: "approve with comments" }),
+      expectedStatus: "pass",
+    },
+    {
+      label: "approve with comments rejects a failing baseline",
+      output: reviewFixture({ baselineStatus: "fail", decision: "approve with comments" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "request changes remains valid",
+      output: reviewFixture({ baselineStatus: "fail", decision: "request changes" }),
+      expectedStatus: "pass",
+    },
+    {
+      label: "block remains valid",
+      output: reviewFixture({ baselineStatus: "fail", decision: "block" }),
+      expectedStatus: "pass",
+    },
+    {
+      label: "insufficient evidence decision remains valid",
+      output: reviewFixture({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: current target is unavailable; inspect the exact target", decision: "insufficient evidence" }),
+      expectedStatus: "pass",
+    },
+    {
+      label: "unknown decision is rejected",
+      output: reviewFixture({ decision: "ship it" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "ambiguous missing evidence inventory cannot approve",
+      output: reviewFixture({ missingEvidence: "- none\n- current CI: unavailable; run CI", decision: "approve" }),
+      expectedStatus: "fail",
+    },
+    {
+      label: "uninterpretable finding inventory cannot approve",
+      output: reviewFixture({ findings: "- Finding ID: F-UNKNOWN\n  Merge blocker: unknown", decision: "approve" }),
+      expectedStatus: "fail",
+    },
+  ];
+  for (const [index, fixture] of decisionSemanticCases.entries()) {
+    const outputPath = resolve(target, `review-decision-semantic-${index}.txt`);
+    writeFileSync(outputPath, fixture.output);
+    const result = runRepoScript([
+      sensorsScript,
+      "--target", target,
+      "--mode", "review",
+      "--input", outputPath,
+      "--required-gate", "review-final-merge-gate",
+      ...(fixture.args ?? []),
+    ]);
+    assertRuntimePass(`review decision semantics: ${fixture.label}`, result);
+    if (!result.stdout.includes(`ASK sensors: ${fixture.expectedStatus}`)) {
+      throw new Error(`review decision semantic case '${fixture.label}' expected ${fixture.expectedStatus}\n${result.stdout}`);
+    }
+  }
+
   const legacyReviewOutput = resolve(target, "legacy-review-output.txt");
   writeFileSync(
     legacyReviewOutput,

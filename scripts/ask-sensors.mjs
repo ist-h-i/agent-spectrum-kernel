@@ -272,9 +272,9 @@ function reviewLayerSummarySensor(text, contract, requiredGates = [], observedSi
   if (finalGateRequired && decisionCount !== 1) {
     return sensor("review_layer_summary", "fail", `Review output must contain exactly one Decision for the requested final gate; received ${decisionCount}.`, "Emit one final decision after all required gate results.");
   }
-  const baselineFinding = inspectBaselineReview(sections.get("Baseline review:")?.[0] ?? []);
-  if (baselineFinding) {
-    return sensor("review_layer_summary", "fail", baselineFinding, "Emit exactly one review-ai-quality result with a normalized status and non-empty evidence.");
+  const baselineResult = inspectBaselineReview(sections.get("Baseline review:")?.[0] ?? []);
+  if (baselineResult.issue) {
+    return sensor("review_layer_summary", "fail", baselineResult.issue, "Emit exactly one review-ai-quality result with a normalized status and non-empty evidence.");
   }
   let route;
   try {
@@ -294,13 +294,31 @@ function reviewLayerSummarySensor(text, contract, requiredGates = [], observedSi
       "Derive additional gates only from exact observed signals in schemas/review-signal-gate-map.json.",
     );
   }
-  const additionalFinding = inspectAdditionalGateResults(
+  const additionalResult = inspectAdditionalGateResults(
     sections.get("Additional required gates:")?.[0] ?? [],
     route,
     sections.get("Missing evidence:")?.[0] ?? [],
   );
-  if (additionalFinding) {
-    return sensor("review_layer_summary", "fail", additionalFinding, "Emit one closed result record for every derived additional gate and no untriggered gate record.");
+  if (additionalResult.issue) {
+    return sensor("review_layer_summary", "fail", additionalResult.issue, "Emit one closed result record for every derived additional gate and no untriggered gate record.");
+  }
+  if (finalGateRequired) {
+    const decisionResult = inspectReviewDecision(sections.get("Decision:")?.[0] ?? []);
+    if (decisionResult.issue) {
+      return sensor("review_layer_summary", "fail", decisionResult.issue, "Emit exactly one normalized decision from the existing final-gate vocabulary.");
+    }
+    if (["approve", "approve_with_comments"].includes(decisionResult.decision)) {
+      const consistencyIssue = inspectApprovalConsistency({
+        decision: decisionResult.decision,
+        baselineStatus: baselineResult.status,
+        additionalStatuses: additionalResult.statuses,
+        missingEvidenceLines: sections.get("Missing evidence:")?.[0] ?? [],
+        findingLines: sections.get("Findings:")?.[0] ?? [],
+      });
+      if (consistencyIssue) {
+        return sensor("review_layer_summary", "fail", consistencyIssue, "Use request changes, block, or insufficient evidence until every approval precondition is satisfied.");
+      }
+    }
   }
   if (!diagnostic) {
     const forbidden = (contract.forbiddenOrdinarySections ?? []).filter((section) => hasTopLevelSection(text, section));
@@ -312,53 +330,106 @@ function reviewLayerSummarySensor(text, contract, requiredGates = [], observedSi
 }
 
 const REVIEW_GATE_STATUSES = new Set(["pass", "pass_with_comments", "fail", "insufficient_evidence"]);
+const REVIEW_DECISIONS = new Set(["approve", "approve_with_comments", "request_changes", "block", "insufficient_evidence"]);
 
 function inspectBaselineReview(lines) {
   const fields = new Map();
   for (const line of contentLines(lines)) {
     const match = line.match(/^\s*-\s+(Gate|Status|Evidence):\s*(.*?)\s*$/u);
-    if (!match) return `Baseline review contains an unsupported record line: ${line.trim()}.`;
+    if (!match) return { issue: `Baseline review contains an unsupported record line: ${line.trim()}.`, status: null };
     const [, field, value] = match;
-    if (fields.has(field)) return `Baseline review repeats ${field}.`;
+    if (fields.has(field)) return { issue: `Baseline review repeats ${field}.`, status: null };
     fields.set(field, value);
   }
-  if (fields.size !== 3 || fields.get("Gate") !== "review-ai-quality") return "Baseline review must contain exactly Gate, Status, and Evidence for review-ai-quality.";
-  if (!REVIEW_GATE_STATUSES.has(fields.get("Status"))) return `Baseline review has an invalid normalized status: ${fields.get("Status") || "missing"}.`;
-  if (!fields.get("Evidence")?.trim()) return "Baseline review evidence is empty.";
-  return null;
+  if (fields.size !== 3 || fields.get("Gate") !== "review-ai-quality") return { issue: "Baseline review must contain exactly Gate, Status, and Evidence for review-ai-quality.", status: null };
+  if (!REVIEW_GATE_STATUSES.has(fields.get("Status"))) return { issue: `Baseline review has an invalid normalized status: ${fields.get("Status") || "missing"}.`, status: null };
+  if (!fields.get("Evidence")?.trim()) return { issue: "Baseline review evidence is empty.", status: null };
+  return { issue: null, status: fields.get("Status") };
 }
 
 function inspectAdditionalGateResults(lines, route, missingEvidenceLines) {
   const records = contentLines(lines);
   if (route.additional_gates.length === 0) {
     return records.length === 1 && records[0].trim() === "- none"
-      ? null
-      : "Additional required gates must contain exactly '- none' when no observed signal derives a gate.";
+      ? { issue: null, statuses: [] }
+      : { issue: "Additional required gates must contain exactly '- none' when no observed signal derives a gate.", statuses: [] };
   }
-  if (records.some((line) => line.trim() === "- none")) return `Additional required gates reports none but ${route.additional_gates.join(", ")} is required.`;
-  if (records.length !== route.additional_gates.length) return `Additional required gate result cardinality is invalid: expected ${route.additional_gates.length}, received ${records.length}.`;
+  if (records.some((line) => line.trim() === "- none")) return { issue: `Additional required gates reports none but ${route.additional_gates.join(", ")} is required.`, statuses: [] };
+  if (records.length !== route.additional_gates.length) return { issue: `Additional required gate result cardinality is invalid: expected ${route.additional_gates.length}, received ${records.length}.`, statuses: [] };
   const seen = new Set();
+  const statuses = [];
   for (let index = 0; index < records.length; index += 1) {
     const line = records[index].trim();
     const match = line.match(/^-\s+([a-z0-9][a-z0-9-]*):\s+status=(pass|pass_with_comments|fail|insufficient_evidence);\s+evidence=([^;\r\n]+);\s+signals=([^;\r\n]+)$/u);
-    if (!match) return `Additional required gate result has an invalid closed record: ${line}.`;
+    if (!match) return { issue: `Additional required gate result has an invalid closed record: ${line}.`, statuses: [] };
     const [, gate, status, evidence, signalsText] = match;
-    if (seen.has(gate)) return `Additional required gate result is duplicated: ${gate}.`;
+    if (seen.has(gate)) return { issue: `Additional required gate result is duplicated: ${gate}.`, statuses: [] };
     seen.add(gate);
     const expectedGate = route.additional_gates[index];
-    if (gate !== expectedGate) return `Additional required gate result order or selection is invalid: expected ${expectedGate}, received ${gate}.`;
-    if (!REVIEW_GATE_STATUSES.has(status)) return `Additional required gate ${gate} has an invalid normalized status: ${status}.`;
-    if (!evidence.trim()) return `Additional required gate ${gate} has empty evidence.`;
+    if (gate !== expectedGate) return { issue: `Additional required gate result order or selection is invalid: expected ${expectedGate}, received ${gate}.`, statuses: [] };
+    if (!REVIEW_GATE_STATUSES.has(status)) return { issue: `Additional required gate ${gate} has an invalid normalized status: ${status}.`, statuses: [] };
+    if (!evidence.trim()) return { issue: `Additional required gate ${gate} has empty evidence.`, statuses: [] };
     const signals = signalsText.split(",").map((signal) => signal.trim()).filter(Boolean);
-    if (new Set(signals).size !== signals.length) return `Additional required gate ${gate} repeats a trigger signal.`;
+    if (new Set(signals).size !== signals.length) return { issue: `Additional required gate ${gate} repeats a trigger signal.`, statuses: [] };
     if (JSON.stringify([...signals].sort()) !== JSON.stringify(route.signals_by_gate[gate])) {
-      return `Additional required gate ${gate} has mismatched trigger signals: expected ${(route.signals_by_gate[gate] ?? []).join(",")}, received ${signals.join(",") || "none"}.`;
+      return { issue: `Additional required gate ${gate} has mismatched trigger signals: expected ${(route.signals_by_gate[gate] ?? []).join(",")}, received ${signals.join(",") || "none"}.`, statuses: [] };
     }
     if (status === "insufficient_evidence" && !contentLines(missingEvidenceLines).some((missingLine) => missingLine.includes(gate))) {
-      return `Additional required gate ${gate} is insufficient_evidence but Missing evidence does not name that gate.`;
+      return { issue: `Additional required gate ${gate} is insufficient_evidence but Missing evidence does not name that gate.`, statuses: [] };
     }
+    statuses.push({ gate, status });
   }
-  return null;
+  return { issue: null, statuses };
+}
+
+function inspectReviewDecision(lines) {
+  const records = contentLines(lines);
+  if (records.length !== 1) return { issue: `Decision must contain exactly one value; received ${records.length}.`, decision: null };
+  const match = records[0].match(/^\s*-\s+(.+?)\s*$/u);
+  if (!match) return { issue: `Decision contains an invalid record: ${records[0].trim()}.`, decision: null };
+  const decision = match[1].trim().toLowerCase().replace(/\s+/gu, "_");
+  if (!REVIEW_DECISIONS.has(decision)) return { issue: `Decision has an invalid normalized value: ${decision || "missing"}.`, decision: null };
+  return { issue: null, decision };
+}
+
+function inspectApprovalConsistency({ decision, baselineStatus, additionalStatuses, missingEvidenceLines, findingLines }) {
+  const issues = [];
+  if (baselineStatus !== "pass") issues.push(`baseline review status is ${baselineStatus ?? "missing"}`);
+  const nonPassingGates = additionalStatuses.filter(({ status }) => status !== "pass");
+  if (nonPassingGates.length > 0) issues.push(`additional required gates are not pass: ${nonPassingGates.map(({ gate, status }) => `${gate}=${status}`).join(", ")}`);
+
+  const missingEvidence = inspectEmptyInventory(missingEvidenceLines, "Missing evidence");
+  if (missingEvidence.issue) issues.push(missingEvidence.issue);
+  else if (!missingEvidence.empty) issues.push("Missing evidence is not empty");
+
+  const findings = inspectBlockingFindingInventory(findingLines);
+  if (findings.issue) issues.push(findings.issue);
+  else if (findings.blocking) issues.push("Findings contains an unresolved merge blocker");
+
+  return issues.length > 0 ? `Decision ${decision} is inconsistent with review authority: ${issues.join("; ")}.` : null;
+}
+
+function inspectEmptyInventory(lines, label) {
+  const records = contentLines(lines);
+  if (records.length === 0) return { issue: `${label} inventory is empty or uninterpretable`, empty: false };
+  const noneCount = records.filter((line) => line.trim() === "- none").length;
+  if (noneCount === 1 && records.length === 1) return { issue: null, empty: true };
+  if (noneCount > 0) return { issue: `${label} inventory mixes '- none' with evidence records`, empty: false };
+  return { issue: null, empty: false };
+}
+
+function inspectBlockingFindingInventory(lines) {
+  const empty = inspectEmptyInventory(lines, "Findings");
+  if (empty.empty) return { issue: null, blocking: false };
+  if (empty.issue) return { issue: empty.issue, blocking: false };
+  const records = contentLines(lines);
+  const findingCount = records.filter((line) => /^\s*-\s+Finding ID:\s*\S/u.test(line)).length;
+  const blockerFields = records.filter((line) => /^\s+Merge blocker:/u.test(line));
+  const normalizedBlockers = blockerFields.map((line) => line.match(/^\s+Merge blocker:\s*(true|false)\s*$/u)?.[1] ?? null);
+  if (findingCount === 0 || blockerFields.length !== findingCount || normalizedBlockers.some((value) => value === null)) {
+    return { issue: "Findings inventory has an uninterpretable merge-blocker state", blocking: false };
+  }
+  return { issue: null, blocking: normalizedBlockers.includes("true") };
 }
 
 function contentLines(lines) {

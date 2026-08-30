@@ -1459,7 +1459,7 @@ export function resolvePortfolioSelection({
   const assetsByEntry = new Map(closure.bound_assets.map((binding) => [binding.entry_id, binding.asset]));
   const reasons = [];
   const entryReasonMap = new Map(manifest.entries.map((entry) => [entry.entry_id, []]));
-  const capabilityDowngrades = [];
+  const capabilityDowngradesByEntry = new Map();
   const evidencePlans = [];
   const addReason = ({ action, code, entryId = null, subjectDigest = null }) => {
     const reason = { action, code, entry_id: entryId, subject_digest: subjectDigest };
@@ -1469,6 +1469,18 @@ export function resolvePortfolioSelection({
       const values = entryReasonMap.get(entryId);
       if (values && !values.some((entry) => stableCanonicalJson(entry) === key)) values.push(reason);
     }
+  };
+  const addCapabilityDowngrade = ({ entryId, missingCapabilities, action }) => {
+    if (missingCapabilities.length === 0) return;
+    const current = capabilityDowngradesByEntry.get(entryId);
+    capabilityDowngradesByEntry.set(entryId, {
+      entry_id: entryId,
+      missing_capabilities: sortedText([...new Set([
+        ...(current?.missing_capabilities ?? []),
+        ...missingCapabilities,
+      ])]),
+      action: severityAction(current?.action ?? null, action),
+    });
   };
 
   const portfolioSelector = selectorsMatch(manifest.selectors, context);
@@ -1514,13 +1526,7 @@ export function resolvePortfolioSelection({
       const code = capabilityOnly ? "capability_missing" : "asset_inapplicable";
       const action = capabilityOnly ? entry.failure_actions.capability_missing : entry.failure_actions.inapplicable;
       addReason({ action, code, entryId: entry.entry_id, subjectDigest: entry.asset.record_digest });
-      if (entrySelector.missingCapabilities.length > 0) {
-        capabilityDowngrades.push({
-          entry_id: entry.entry_id,
-          missing_capabilities: entrySelector.missingCapabilities,
-          action,
-        });
-      }
+      addCapabilityDowngrade({ entryId: entry.entry_id, missingCapabilities: entrySelector.missingCapabilities, action });
     }
     const asset = assetsByEntry.get(entry.entry_id);
     const applicability = assetApplicability(asset, context);
@@ -1529,14 +1535,7 @@ export function resolvePortfolioSelection({
       const code = capabilityOnly ? "capability_missing" : "asset_inapplicable";
       const action = capabilityOnly ? entry.failure_actions.capability_missing : entry.failure_actions.inapplicable;
       addReason({ action, code, entryId: entry.entry_id, subjectDigest: asset.record_digest });
-      if (applicability.missingCapabilities.length > 0
-        && !capabilityDowngrades.some((candidate) => candidate.entry_id === entry.entry_id)) {
-        capabilityDowngrades.push({
-          entry_id: entry.entry_id,
-          missing_capabilities: applicability.missingCapabilities,
-          action,
-        });
-      }
+      addCapabilityDowngrade({ entryId: entry.entry_id, missingCapabilities: applicability.missingCapabilities, action });
     }
     if (entry.prohibited_task_classes.includes(context.task_class)) {
       addReason({
@@ -1718,7 +1717,7 @@ export function resolvePortfolioSelection({
     omitted_assets: omittedAssets,
     reasons,
     evidence_plans: evidencePlans,
-    capability_downgrades: capabilityDowngrades,
+    capability_downgrades: [...capabilityDowngradesByEntry.values()],
     budget,
     rollback_target: cloneJson(manifest.rollback.target),
     selection_digest: "",

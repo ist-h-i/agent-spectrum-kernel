@@ -45,6 +45,32 @@ function structuredResult(responseMarkdown, control = {}) {
   };
 }
 
+function reviewResponse({
+  baselineStatus = "pass",
+  additionalGates = "- none",
+  missingEvidence = "- none",
+  findings = "- none",
+  decision,
+}) {
+  return `Baseline review:
+- Gate: review-ai-quality
+- Status: ${baselineStatus}
+- Evidence: isolated installed-runner fixture
+
+Additional required gates:
+${additionalGates}
+
+Missing evidence:
+${missingEvidence}
+
+Findings:
+${findings}
+
+Decision:
+- ${decision}
+`;
+}
+
 const modeCases = [
   {
     prompt: "skill-implement.md",
@@ -213,6 +239,86 @@ cp "$ASK_FAKE_RESULT_PATH" "$output"
     const persistedRecordPath = resolve(target, ".agent-spectrum-kernel/runtime/execution-envelopes", `${report.execution_envelope_record.record_id}.json`);
     assert.equal(existsSync(persistedRecordPath), true, `${fixture.mode} persisted record file`);
     assert.equal(JSON.parse(readFileSync(persistedRecordPath, "utf8")).record_id, report.execution_envelope_record.record_id, `${fixture.mode} persisted record identity`);
+  }
+
+  const installedDecisionCases = [
+    { label: "baseline fail plus approve", response: reviewResponse({ baselineStatus: "fail", decision: "approve" }), expectedPass: false },
+    { label: "baseline insufficient evidence plus approve", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", decision: "approve" }), expectedPass: false },
+    {
+      label: "additional gate fail plus approve",
+      response: reviewResponse({ additionalGates: "- review-output-quality: status=fail; evidence=output regression; signals=docs_output_change", decision: "approve" }),
+      observedSignal: "docs_output_change",
+      expectedPass: false,
+    },
+    {
+      label: "additional gate insufficient evidence plus approve",
+      response: reviewResponse({
+        additionalGates: "- review-output-quality: status=insufficient_evidence; evidence=render unavailable; signals=docs_output_change",
+        missingEvidence: "- review-output-quality: render unavailable; render exact candidate",
+        decision: "approve",
+      }),
+      observedSignal: "docs_output_change",
+      expectedPass: false,
+    },
+    { label: "missing evidence plus approve", response: reviewResponse({ missingEvidence: "- final CI: unavailable; run final CI", decision: "approve" }), expectedPass: false },
+    {
+      label: "blocking finding plus approve",
+      response: reviewResponse({
+        findings: `- Finding ID: F-BLOCKING
+  Severity: blocker
+  Merge blocker: true
+  Practical impact: required output is unsafe to merge
+  Trigger or failure trace: final gate -> blocking finding
+  Evidence location: fixture/blocking
+  Required post-fix condition: resolve the finding`,
+        decision: "approve",
+      }),
+      expectedPass: false,
+    },
+    {
+      label: "all required gates pass plus approve",
+      response: reviewResponse({ additionalGates: "- review-output-quality: status=pass; evidence=exact rendered output; signals=docs_output_change", decision: "approve" }),
+      observedSignal: "docs_output_change",
+      expectedPass: true,
+    },
+    { label: "approve with comments remains valid", response: reviewResponse({ decision: "approve with comments" }), expectedPass: true },
+    { label: "approve with comments rejects a failing baseline", response: reviewResponse({ baselineStatus: "fail", decision: "approve with comments" }), expectedPass: false },
+    { label: "request changes remains valid", response: reviewResponse({ baselineStatus: "fail", decision: "request changes" }), expectedPass: true },
+    { label: "block remains valid", response: reviewResponse({ baselineStatus: "fail", decision: "block" }), expectedPass: true },
+    { label: "insufficient evidence remains valid", response: reviewResponse({ baselineStatus: "insufficient_evidence", missingEvidence: "- review-ai-quality: exact target unavailable; inspect it", decision: "insufficient evidence" }), expectedPass: true },
+  ];
+  for (const [index, fixture] of installedDecisionCases.entries()) {
+    const resultPath = resolve(target, `.fixture-review-decision-${index}.json`);
+    const outputRelative = `.agents/runs/conformance-review-decision-${index}.md`;
+    writeFileSync(resultPath, `${JSON.stringify(structuredResult(fixture.response), null, 2)}\n`);
+    const runnerArgs = [
+      runner,
+      "--target", target,
+      "--prompt", "skill-review.md",
+      "--mode", "review",
+      "--final-decision",
+      "--codex-bin", fakeCodex,
+      "--output", outputRelative,
+      "--json",
+    ];
+    if (fixture.observedSignal) runnerArgs.push("--observed-signal", fixture.observedSignal);
+    else runnerArgs.push("--gates-observed");
+    const result = runNode(runnerArgs, { cwd: target, env: { ASK_FAKE_RESULT_PATH: resultPath } });
+    const report = JSON.parse(result.stdout);
+    if (fixture.expectedPass) {
+      assertPass(`installed review decision semantics: ${fixture.label}`, result);
+      assert.equal(report.status, "executed", `${fixture.label} runner status`);
+      assert.equal(report.sensor_status, "pass", `${fixture.label} sensor status`);
+      assert.equal(report.execution_envelope_record?.persisted, true, `${fixture.label} record persistence`);
+      assert.equal(existsSync(resolve(target, outputRelative)), true, `${fixture.label} output publication`);
+    } else {
+      assert.notEqual(result.status, 0, `${fixture.label} must fail closed`);
+      assert.equal(report.status, "insufficient_evidence", `${fixture.label} runner status`);
+      assert.equal(report.sensor_status, "fail", `${fixture.label} sensor status`);
+      assert.equal(report.execution_envelope_record?.persisted, false, `${fixture.label} record persistence`);
+      assert.equal(existsSync(resolve(target, outputRelative)), false, `${fixture.label} output publication`);
+      assert.match(report.failures.join("\n"), /ask-sensors rejected output/u, `${fixture.label} rejection reason`);
+    }
   }
 
   const generatedCommands = readFileSync(resolve(target, ".agents/commands/codex-exec.md"), "utf8");
